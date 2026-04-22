@@ -58,7 +58,7 @@
     "fast-xml-parser": "^5.7.1",
     "jquery": "^3.7.1",
     "jszip": "^3.10.1",
-    "marked": "^16.4.1",
+    "marked": "^18.0.2",
     "meteor-node-stubs": "^1.2.27",
     "sql.js": "^1.13.0",
     "svelte": "^5.55.0",
