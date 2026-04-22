@@ -1186,7 +1186,7 @@ export const cardMachine = createMachine(
       /**
        * TRANSITION STATE
        * Clean up current trial and prepare for next
-       * Substates: maybePrepareIncoming → fadingOut → logging → trackingPerformance → clearing/commit
+       * Substates: maybePrepareIncoming → logging → trackingPerformance → fadingOut → clearing/commit
        */
       [STATES.TRANSITION]: {
         initial: 'maybePrepareIncoming',
@@ -1195,7 +1195,7 @@ export const cardMachine = createMachine(
             always: [
               {
                 guard: ({ context }: MachineArgs) => context.incomingPreparationComplete === true,
-                target: 'fadingOut',
+                target: 'logging',
                 actions: ['logStateTransition'],
               },
               {
@@ -1209,7 +1209,7 @@ export const cardMachine = createMachine(
            * Invoke history logging service to persist trial data
            */
           logging: {
-            entry: ['markTrialEnd', 'logStateTransition'],
+            entry: ['markFeedbackEnd', 'markTrialEnd', 'logStateTransition'],
             invoke: {
               id: 'historyLoggingService',
               src: 'historyLoggingService',
@@ -1275,12 +1275,101 @@ export const cardMachine = createMachine(
                   // MEDIUM FIX #1: Check if unit finished after engine update
                   // If so, trigger unit completion instead of continuing to next card
                   guard: ({ event }: UpdateEngineDoneArgs) => event.output?.unitFinished === true,
-                  target: '#cardMachine.transition.clearing',
+                  target: '#cardMachine.transition.fadingOut',
                   actions: [
                     'logStateTransition',
-                    assign({ unitFinished: true }),
+                    assign({
+                      unitFinished: true,
+                      preparedTrial: () => null,
+                      incomingPreparationComplete: () => false,
+                      incomingReady: () => false,
+                    }),
                   ],
                 },
+                {
+                  guard: 'hasPreparedTrial',
+                  target: '#cardMachine.transition.fadingOut',
+                  actions: ['logStateTransition'],
+                },
+                {
+                  // Default: continue to next card
+                  target: 'fadingOut',
+                  actions: ['incrementQuestionIndex', 'logStateTransition'],
+                },
+              ],
+              onError: {
+                target: 'fadingOut',
+                actions: ['logError', 'incrementQuestionIndex'],
+              },
+            },
+          },
+          prepareIncoming: {
+            entry: ['logStateTransition'],
+            invoke: {
+              id: 'prepareIncomingTrialService',
+              src: 'prepareIncomingTrialService',
+              input: ({ context, event }: MachineArgs) => ({
+                context,
+                event,
+                engine: context.engine,
+              }),
+              onDone: [
+                {
+                  guard: ({ event }: PreparedAdvanceDoneArgs) => event.output?.unitFinished === true,
+                  target: 'logging',
+                  actions: [
+                    storePreparedIncomingTrial,
+                    'logStateTransition',
+                  ],
+                },
+                {
+                  guard: ({ event }: PreparedAdvanceDoneArgs) => event.output?.preparedAdvanceMode === 'fallback',
+                  target: 'fallbackAdvance',
+                  actions: [
+                    storePreparedIncomingTrial,
+                    'logStateTransition',
+                  ],
+                },
+                {
+                  target: 'seamlessAdvance',
+                  actions: [
+                    storePreparedIncomingTrial,
+                    'logStateTransition',
+                  ],
+                },
+              ],
+              onError: {
+                target: 'logging',
+                actions: [
+                  markIncomingPreparationFailed,
+                  'logError',
+                  'logStateTransition',
+                ],
+              },
+            },
+          },
+          seamlessAdvance: {
+            entry: ['logStateTransition'],
+            on: {
+              [EVENTS.INCOMING_READY]: {
+                target: 'logging',
+                actions: [markIncomingReady, 'logStateTransition'],
+              },
+            },
+          },
+          fallbackAdvance: {
+            entry: ['logStateTransition'],
+            on: {
+              [EVENTS.INCOMING_READY]: {
+                target: 'logging',
+                actions: [markIncomingReady, 'logStateTransition'],
+              },
+            },
+          },
+          fadingOut: {
+            entry: ['logStateTransition'],
+            on: {
+              [EVENTS.TRANSITION_COMPLETE]: [
                 {
                   guard: 'hasPreparedTrial',
                   target: `#cardMachine.${STATES.PRESENTING}.${STATES.DISPLAYING}`,
@@ -1342,87 +1431,10 @@ export const cardMachine = createMachine(
                   ],
                 },
                 {
-                  // Default: continue to next card
                   target: 'clearing',
-                  actions: ['incrementQuestionIndex', 'logStateTransition'],
+                  actions: ['logStateTransition'],
                 },
               ],
-              onError: {
-                target: 'clearing',
-                actions: ['logError', 'incrementQuestionIndex'],
-              },
-            },
-          },
-          prepareIncoming: {
-            entry: ['logStateTransition'],
-            invoke: {
-              id: 'prepareIncomingTrialService',
-              src: 'prepareIncomingTrialService',
-              input: ({ context, event }: MachineArgs) => ({
-                context,
-                event,
-                engine: context.engine,
-              }),
-              onDone: [
-                {
-                  guard: ({ event }: PreparedAdvanceDoneArgs) => event.output?.unitFinished === true,
-                  target: 'fadingOut',
-                  actions: [
-                    storePreparedIncomingTrial,
-                    'logStateTransition',
-                  ],
-                },
-                {
-                  guard: ({ event }: PreparedAdvanceDoneArgs) => event.output?.preparedAdvanceMode === 'fallback',
-                  target: 'fallbackAdvance',
-                  actions: [
-                    storePreparedIncomingTrial,
-                    'logStateTransition',
-                  ],
-                },
-                {
-                  target: 'seamlessAdvance',
-                  actions: [
-                    storePreparedIncomingTrial,
-                    'logStateTransition',
-                  ],
-                },
-              ],
-              onError: {
-                target: 'fadingOut',
-                actions: [
-                  markIncomingPreparationFailed,
-                  'logError',
-                  'logStateTransition',
-                ],
-              },
-            },
-          },
-          seamlessAdvance: {
-            entry: ['logStateTransition'],
-            on: {
-              [EVENTS.INCOMING_READY]: {
-                target: 'fadingOut',
-                actions: [markIncomingReady, 'logStateTransition'],
-              },
-            },
-          },
-          fallbackAdvance: {
-            entry: ['logStateTransition'],
-            on: {
-              [EVENTS.INCOMING_READY]: {
-                target: 'fadingOut',
-                actions: [markIncomingReady, 'logStateTransition'],
-              },
-            },
-          },
-          fadingOut: {
-            entry: ['logStateTransition'],
-            on: {
-              [EVENTS.TRANSITION_COMPLETE]: {
-                target: 'logging',
-                actions: ['markFeedbackEnd', 'logStateTransition'],
-              },
             },
             after: {
               FADE_OUT_STALL_TIMEOUT: {

@@ -581,9 +581,28 @@
       ? (!nextFeedbackBlockerSrc || preparedHandoffFeedbackReady)
       : (!nextFeedbackBlockerSrc || preserveFeedbackReady);
     if (preservePreparedHandoff) {
+      const preparedRevealKey = trialSubsetKey;
+      const preparedRevealSequence = revealSequence;
       preservePreparedHandoffOnNextReveal = false;
       preparedHandoffStimulusReady = false;
       preparedHandoffFeedbackReady = false;
+      void (async () => {
+        await tick();
+        await waitForBrowserPaint();
+        if (
+          testMode ||
+          preparedRevealSequence !== revealSequence ||
+          preparedRevealKey !== stagedTrialSubsetKey ||
+          isFadingOut
+        ) {
+          return;
+        }
+        send({
+          type: EVENTS.TRIAL_REVEAL_STARTED,
+          timestamp: Date.now(),
+          subsetKind: trialSubset.kind,
+        });
+      })();
     }
   }
 

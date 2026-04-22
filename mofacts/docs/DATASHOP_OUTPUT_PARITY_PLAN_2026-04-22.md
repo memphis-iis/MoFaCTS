@@ -78,26 +78,27 @@ The required direction is:
 - Consider exporting stored `responseDuration` as `CF (Response Duration)` because it is the duration from response start to submit/end.
 - Drop only `CF (Response Time)` because it is an absolute timestamp and is redundant after `Time`, `Problem Start Time`, and latency fields are correct.
 
-## Settled Decision 7: Feedback Duration Includes Presentation Transitions
+## Settled Decision 7: Feedback Timing Must Not Block The Visual Handoff
 
-MoFaCTS should count the whole feedback exposure interval, including visual fade time.
+MoFaCTS should keep feedback/study visible while current-trial finalization and incoming-card preparation complete. The export should not require a true fade-out-end feedback duration, because waiting for that value before writing history creates an unacceptable blank/flicker risk between trials.
 
 The required direction is:
 
 - Start feedback duration when feedback first begins to appear, meaning the start of feedback fade-in.
-- End feedback duration when feedback has fully faded out.
 - Include TTS/audio time that occurs during the feedback exposure interval.
 - If TTS/audio is longer than the configured feedback/study timeout, the actual feedback duration may exceed the configured timeout.
+- Compute `CF (Feedback Latency)` from the known pre-fade finalization cutoff, not from fade-out end.
+- Do not put history/model finalization after fade-out just to capture true visual exposure duration.
 
-This means current `CF (Feedback Latency)` behavior should be audited and likely adjusted. Current drill feedback starts near feedback fade-in, but currently ends before card fade-out. Current study behavior is a special case and is not guaranteed to match `feedbackEnd - feedbackStart`.
+This means `CF (Feedback Latency)` is a practical research timing field, not an exact visual exposure duration through fade-out.
 
 Implementation note after the handoff correction:
 
 - Incoming-card selection/preparation starts during feedback/study display, preserving the current-item exclusion invariant and hiding that cost inside the visible feedback/study interval when possible.
 - Fade-out starts only after both the planned fade-out-start time has arrived and incoming-card preparation is ready.
-- History insertion and engine update occur after fade-out end, when the final feedback/study duration is known.
-- Prepared-card commit occurs only after the final history write and engine update complete.
-- The feedback/study wait resolves at the planned fade-out start (`configured feedback/study duration - fade-out duration`), so fade-out is part of the configured duration when incoming-card preparation is ready in time.
+- History insertion and engine update occur before fade-out, while the completed card is still the live model/session card.
+- Prepared-card commit occurs immediately after fade-out end, with no async logging/model work in the visual handoff gap.
+- The feedback/study wait resolves before fade-out, then current-trial finalization runs while feedback/study remains visible.
 
 ## Settled Decision 7a: Semantic Exposure Anchors Must Be Explicit
 
@@ -109,14 +110,14 @@ The required direction is:
 - Do not track optional fade diagnostics such as fade-in end or fade-out start. Those timestamps do not define current export semantics and would create misleading cruft.
 - Define trial/problem exposure start as trial content fade-in start.
 - Define feedback/study exposure start as feedback/study content fade-in start.
-- Define feedback/study exposure end as feedback/study content fade-out end.
-- For durations that are meant to describe learner exposure, compute from these explicit semantic anchors, not from machine state entry or logging time.
-- Enforce this contract with tests: if a duration claims to include fade timing, the test should prove it starts at fade-in start and ends at the intended fade boundary.
-- Fail clearly if a required fade boundary timestamp is missing; do not silently fall back to `Date.now()` in export or history calculations.
+- Do not export a true fade-out-end feedback/study duration in the current handoff. That value would require post-fade finalization or deferred row mutation, which creates unacceptable transition risk.
+- `CF (Feedback Latency)` is a pre-fade finalization cutoff measure, not a true visual exposure duration.
+- Enforce this contract with tests: if a duration claims a particular visual boundary, the test should prove it starts and ends at that boundary.
+- Fail clearly if a required timestamp is missing; do not silently fall back to `Date.now()` in export or history calculations.
 
 Open precision item:
 
-- Confirm each exported duration's intended semantic anchors before implementation. Feedback/study exposure duration is already settled as feedback/study fade-in start through feedback/study fade-out end. Response-start `Time` is settled as response start, and its associated start latency should be measured from trial content fade-in start.
+- Confirm each exported duration's intended semantic anchors before implementation. Response-start `Time` is settled as response start, and its associated start latency should be measured from trial content fade-in start. `CF (Feedback Latency)` intentionally does not wait for fade-out end.
 
 ## Settled Decision 8: Video Rows Use Wall-Clock Action Time
 
@@ -213,7 +214,7 @@ The required direction is:
 - Treat trial/content fade-in start as the DataShop `Problem Start Time` for card rows.
 - Measure `CF (Start Latency)` and `CF (End Latency)` from trial/content fade-in start.
 - Treat feedback/study fade-in start as the start of `CF (Feedback Latency)`.
-- Treat feedback/study fade-out end as the end of `CF (Feedback Latency)`.
+- Treat the pre-fade finalization cutoff as the end of `CF (Feedback Latency)`; do not block the visual handoff to capture fade-out end.
 
 ## Remaining Open Questions
 

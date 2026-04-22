@@ -2,7 +2,7 @@
 
 Date: 2026-04-22
 
-This document records the intended timing and handoff semantics for MoFaCTS feedback and study phases. It supersedes any implementation idea that waits until after feedback fade-out to start next-card preparation.
+This document records the intended timing and handoff semantics for MoFaCTS feedback and study phases. It supersedes designs that place history/model finalization after feedback fade-out, because there is no acceptable visual gap between trials.
 
 ## Correct Sequence
 
@@ -26,55 +26,41 @@ This document records the intended timing and handoff semantics for MoFaCTS feed
 
 9. Feedback/study remains on screen while incoming-card preparation runs.
 
-10. The configured feedback/study duration is the target total interval from `feedbackStart` to feedback/study fully gone.
+10. When the feedback/study wait has completed and incoming-card preparation is ready, stamp the export feedback cutoff and finalize the current trial while the current feedback/study display is still fully visible.
 
-11. Fade-out should begin at:
+11. Current-trial finalization includes history insertion, experiment/session state update, and engine/performance update. It runs before the prepared next card is committed, so model updates still apply to the completed current card.
 
-```text
-feedbackStart + configuredFeedbackDuration - fadeOutDuration
-```
+12. After finalization completes, feedback/study fade-out begins.
 
-assuming the background work is ready by then.
+13. Feedback/study fade-out ends.
 
-12. If incoming-card preparation is not ready by the planned fade-out start, feedback/study remains visible longer.
+14. At fade-out end, the prepared next card is committed synchronously and the next trial begins its fade-in. No history/model/network work may be placed between fade-out end and the prepared-card commit.
 
-13. Once incoming-card preparation is ready and the planned fade-out start time has passed, feedback/study fade-out begins.
-
-14. Feedback/study is still active during fade-out.
-
-15. Feedback/study fade-out ends.
-
-16. `feedbackEnd` is stamped at fade-out end.
-
-17. `CF (Feedback Latency)` is computed as:
-
-```text
-feedbackEnd - feedbackStart
-```
-
-18. The final history row is written after fade-out end, because `CF (Feedback Latency)` depends on the fade-out-end timestamp. The write is blocking and must fail clearly if it cannot be persisted.
-
-19. Experiment/session state and engine/performance state are updated after the final history write.
-
-20. The prepared next card can be committed after final logging and state updates complete.
-
-21. Next trial/problem content begins fade-in.
-
-22. The next row's `Problem Start Time` is stamped at that new fade-in start.
+15. The next row's `Problem Start Time` is stamped at that new fade-in start.
 
 ## Key Semantics
 
-- Feedback/study completion means fade-out has ended.
-- Fade-out is part of the feedback/study duration.
-- The system should use feedback/study display time to hide the cost of selecting and preparing the incoming card.
-- If incoming-card preparation takes too long, the current feedback/study display should remain up longer rather than producing a blank screen or committing an unprepared next card.
-- History writing must wait until fade-out end because the final feedback/study duration is not known before then.
+- The visual transition has no permissible blank interval after fade-out.
+- The system should use feedback/study display time to hide incoming-card preparation and current-trial finalization.
+- If incoming-card preparation or current-trial finalization takes too long, the current feedback/study display should remain up longer rather than producing a blank screen or committing an unprepared next card.
 - The current in-progress item is excluded from incoming-card selection, so next-card preparation does not need the history row currently being completed.
-- `feedbackEnd` must not mean "the configured timer expired before fade-out." It means the feedback/study display is fully gone.
-- `CF (Feedback Latency)` should measure the actual elapsed interval from feedback/study fade-in start through feedback/study fade-out end.
+- `CF (Feedback Latency)` is no longer a true fade-out-end exposure measure. It is computed from known timing before fade-out so current-trial finalization can complete before the visual handoff.
+- A true fade-out-end latency would require post-fade finalization or deferred row mutation, and that tradeoff is not acceptable for the card transition.
 
 ## Implementation Implication
 
-The existing prepared-advance handoff is conceptually close because it already prepares the next card before committing it. The bugs are that incoming-card preparation must begin during feedback/study display, and feedback/study wait completion must be aligned so visual fade-out finishes at the configured duration when preparation is ready in time.
+The prepared-advance handoff must preserve two constraints at the same time:
 
-Implementation should preserve the prepared-card contract while moving the feedback/study completion boundary to fade-out end. Do not solve this by delaying card preparation until after fade-out. That loses the intended overlap and can cause blank-card behavior.
+- Finalization must happen before commit, while the completed trial is still the live model/session card.
+- Commit must happen immediately after fade-out, before any async service can create a blank interval.
+
+The machine sequence should therefore be:
+
+```text
+feedback/study visible
+-> incoming card ready
+-> history/state/model finalization
+-> fade out current feedback/study
+-> immediately commit prepared next card
+-> next trial fade-in
+```
