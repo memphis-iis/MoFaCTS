@@ -50,6 +50,8 @@ mofacts/.deploy/settingsproduction.json
 mofacts/.deploy/.env
 mofacts/.deploy/.env.production
 mofacts/.deploy/.env*.production
+mofacts/.deploy/.env.staging
+mofacts/.deploy/.env*.staging
 mofacts/.deploy/local-data/
 
 

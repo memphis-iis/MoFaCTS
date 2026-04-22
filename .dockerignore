@@ -33,6 +33,11 @@ docs_dev/
 mofacts/settings.json
 settings.json
 
+# Private deploy/runtime state
+mofacts/.deploy/.env*
+mofacts/.deploy/.gemini/
+mofacts/.deploy/local-data/
+
 # Build artifacts
 *.pyc
 __pycache__/

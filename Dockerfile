@@ -4,7 +4,8 @@ ENV METEOR_ALLOW_SUPERUSER=1
 
 # Use the repo-owned deploy scripts so .deploy is the only source of truth.
 COPY ./mofacts/.deploy/docker/ $SCRIPTS_FOLDER/
-RUN chmod +x $SCRIPTS_FOLDER/*.sh
+RUN sed -i 's/\r$//' $SCRIPTS_FOLDER/*.sh && \
+    chmod +x $SCRIPTS_FOLDER/*.sh
 
 # Function: copy application source into container build context.
 COPY ./mofacts/ $APP_SOURCE_FOLDER/
