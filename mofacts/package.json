@@ -76,7 +76,7 @@
     "@rspack/core": "^1.7.1",
     "@types/chai": "^5.2.3",
     "@types/jquery": "^3.5.13",
-    "@types/meteor": "^1.4.87",
+    "@types/meteor": "^2.9.11",
     "@types/mocha": "^10.0.10",
     "@types/node": "^22.19.11",
     "@types/sinon": "^21.0.0",
