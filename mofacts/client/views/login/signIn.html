@@ -1,0 +1,114 @@
+<template name="signIn">
+    <div class="auth-page page-loading" id="signInContainer">
+        <div class="auth-shell">
+            <div class="auth-card card">
+                <div class="card-body auth-card-body">
+                    <div class="auth-brand">
+                        <h2 class="auth-system-name mt-0">
+                            {{#if currentTheme.properties.logo_url}}
+                                <span class="navbar-brand-icon"
+                                      aria-hidden="true"
+                                      style="--navbar-brand-icon-image: url('{{currentTheme.properties.logo_url}}');"></span>
+                            {{/if}}
+                            <span>{{systemName}}</span>
+                        </h2>
+                        {{#if isExperiment}}
+                            <h1 class="auth-title">Continue experiment</h1>
+                        {{else}}
+                            <h1 class="auth-title sign-in-title">Sign in</h1>
+                        {{/if}}
+                        <p class="auth-description">{{signInDescription}}</p>
+                    </div>
+
+                    {{#if serverErrorMessage}}
+                    <p id="serverErrors" class="auth-message auth-message-error mb-0" role="alert" aria-live="polite">{{serverErrorMessage}}</p>
+                    {{#if showVerificationHelp}}
+                    <div class="auth-helper-text">
+                        <a href="/auth/verify-email" class="auth-link">Go to email verification</a>
+                    </div>
+                    {{/if}}
+                    {{/if}}
+
+                    {{#if isExperiment}}
+                    <form class="auth-form" novalidate>
+                        <div class="auth-field">
+                            <label class="form-label auth-label" for="signInUsername">{{experimentLoginLabel}}</label>
+                            <input type="text" id="signInUsername" value="" placeholder="{{experimentLoginText}}" maxlength="254" class="form-control sign-in-input accept-enter-key {{experimentUsernameInputStateClass}}" autocomplete="username" aria-invalid="{{experimentUsernameAriaInvalid}}" aria-describedby="{{experimentUsernameDescribedBy}}">
+                            {{#if experimentUsernameError}}
+                            <span id="experimentUsernameError" class="auth-field-message" role="alert">{{experimentUsernameError}}</span>
+                            {{/if}}
+                        </div>
+                        {{#if experimentPasswordRequired}}
+                        <div class="auth-field">
+                            <label class="form-label auth-label" for="password">Password</label>
+                            <input type="password" id="password" value="" placeholder="Password" maxlength="254" class="form-control sign-in-input accept-enter-key {{experimentPasswordInputStateClass}}" autocomplete="current-password" aria-invalid="{{experimentPasswordAriaInvalid}}" aria-describedby="{{experimentPasswordDescribedBy}}">
+                            {{#if experimentPasswordError}}
+                            <span id="experimentPasswordError" class="auth-field-message" role="alert">{{experimentPasswordError}}</span>
+                            {{/if}}
+                        </div>
+                        {{/if}}
+                        <button type="submit" id="experimentSignin" class="btn auth-primary-btn w-100">Continue</button>
+                    </form>
+                    {{else}}
+                    <form class="auth-form" novalidate>
+                        <div class="sign-in-form-grid">
+                            <div class="sign-in-form-row">
+                                <label class="form-label auth-label" for="signInUsername">Email</label>
+                                <input type="text" id="signInUsername" value="" placeholder="name@example.com" maxlength="254" class="form-control sign-in-input accept-enter-key {{normalEmailInputStateClass}}" autocomplete="username email" aria-invalid="{{normalEmailAriaInvalid}}" aria-describedby="{{normalEmailDescribedBy}}">
+                                {{#if normalEmailError}}
+                                <span id="normalEmailError" class="auth-field-message" role="alert">{{normalEmailError}}</span>
+                                {{/if}}
+                            </div>
+                            <div class="sign-in-form-row">
+                                <label class="form-label auth-label" for="password">Password</label>
+                                <div class="sign-in-form-input-cell">
+                                    <input type="password" id="password" value="" placeholder="Enter your password" maxlength="254" class="form-control sign-in-input accept-enter-key {{normalPasswordInputStateClass}}" autocomplete="current-password" aria-invalid="{{normalPasswordAriaInvalid}}" aria-describedby="{{normalPasswordDescribedBy}}">
+                                    <div class="auth-inline-actions">
+                                        <a href="/auth/forgot-password" class="auth-link small">Forgot password?</a>
+                                    </div>
+                                    {{#if normalPasswordError}}
+                                    <span id="normalPasswordError" class="auth-field-message" role="alert">{{normalPasswordError}}</span>
+                                    {{/if}}
+                                </div>
+                            </div>
+                        </div>
+                        <button type="submit" id="signInButton" class="btn auth-primary-btn w-100">Log In</button>
+                    </form>
+
+                    <div class="auth-divider" role="presentation">
+                        <span>Other ways to sign in</span>
+                    </div>
+
+                    <div class="auth-secondary-actions">
+                        <button type="button" id="signInButtonOAuth" class="btn btn-secondary auth-provider-btn w-100">
+                            <img width="20" height="20" class="me-2" alt="" aria-hidden="true" loading="eager" decoding="async" fetchpriority="low" src="/images/google-logo.svg" />
+                            <span>Sign in with Google</span>
+                        </button>
+                        <button type="button" id="signInWithMicrosoftSSO" class="btn btn-secondary auth-provider-btn w-100">
+                            <img width="20" height="20" class="me-2" alt="" aria-hidden="true" loading="eager" decoding="async" fetchpriority="low" src="/images/microsoft-logo.svg" />
+                            <span>Sign in with Microsoft</span>
+                        </button>
+                        {{#if canShowMemphisSaml}}
+                        <button type="button" id="signInWithMemphisSaml" class="btn btn-secondary auth-provider-btn w-100">
+                            <img width="20" height="20" class="me-2" alt="" aria-hidden="true" loading="eager" decoding="async" fetchpriority="low" src="/images/microsoft-logo.svg" />
+                            <span>{{memphisSamlButtonLabel}}</span>
+                        </button>
+                        {{/if}}
+                    </div>
+
+                    {{#if canShowSignUp}}
+                    <div class="auth-supporting-action">
+                        <span class="text-muted">Need an account?</span>
+                        <a href="/auth/signup" id="signUpButton" class="auth-link">Sign up</a>
+                    </div>
+                    {{/if}}
+                    {{/if}}
+                </div>
+            </div>
+        </div>
+
+        {{#unless isExperiment}}
+        {{> footer}}
+        {{/unless}}
+    </div>
+</template>

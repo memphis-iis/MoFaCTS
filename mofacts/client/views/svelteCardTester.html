@@ -1,0 +1,359 @@
+<template name="svelteCardTester">
+  <div class="svelte-card-tester">
+    <h2>Svelte Card Layout Tester</h2>
+    <p class="text-muted">Visual testing tool for Svelte card components. Test layouts, modes, and configurations without timers.</p>
+
+    <div class="tester-layout">
+      <!-- Left: Data Source -->
+      <div class="config-panel">
+        <h3>Data Source</h3>
+        {{#if loadError}}
+          <div class="alert alert-danger">{{loadError}}</div>
+        {{/if}}
+
+        <div class="form-group">
+          <label>TDF File (JSON)</label>
+          <input type="file" class="form-control tdf-file-input" accept=".json">
+        </div>
+
+        <div class="form-group">
+          <label>Stim File (JSON)</label>
+          <input type="file" class="form-control stim-file-input" accept=".json">
+        </div>
+
+        <div class="load-status">
+          <div><strong>TDF:</strong> {{tdfLabel}}</div>
+          <div><strong>Stim:</strong> {{stimLabel}}</div>
+        </div>
+
+        <hr>
+
+        <h4>Card Selection</h4>
+        <div class="form-group">
+          <label>Unit</label>
+          <select class="form-control unit-select">
+            <option value="">-- Load TDF --</option>
+            {{#each availableUnits}}
+              <option value="{{index}}" {{isUnitSelected index}}>{{label}}</option>
+            {{/each}}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Cluster</label>
+          <select class="form-control cluster-select">
+            <option value="">-- Load Stim --</option>
+            {{#each availableClusters}}
+              <option value="{{index}}" {{isClusterSelected index}}>{{label}}</option>
+            {{/each}}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Stim</label>
+          <select class="form-control stim-select">
+            <option value="">-- Select Cluster --</option>
+            {{#each availableStims}}
+              <option value="{{index}}" {{isStimSelected index}}>{{label}}</option>
+            {{/each}}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Test Type</label>
+          <select class="form-control testtype-select">
+            <option value="d" {{isTestTypeSelected 'd'}}>Drill (d)</option>
+            <option value="t" {{isTestTypeSelected 't'}}>Test (t)</option>
+            <option value="s" {{isTestTypeSelected 's'}}>Study (s)</option>
+            <option value="m" {{isTestTypeSelected 'm'}}>Force Correct (m)</option>
+            <option value="n" {{isTestTypeSelected 'n'}}>Timed Prompt (n)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>User Answer (feedback view)</label>
+          <input type="text" class="form-control user-answer-input" value="{{userAnswer}}">
+        </div>
+
+        <div class="form-group">
+          <label>Feedback Message</label>
+          <input type="text" class="form-control feedback-message-input" value="{{feedbackMessage}}">
+        </div>
+
+        <div class="form-check">
+          <input type="checkbox" class="form-check-input timeout-toggle" id="setting-timeout" {{timeoutChecked}}>
+          <label class="form-check-label" for="setting-timeout">Mark as Timeout</label>
+        </div>
+
+        <div class="config-actions">
+          <button class="btn btn-primary apply-selection-btn">Apply Selection</button>
+        </div>
+
+        {{#if selectionError}}
+          <div class="alert alert-danger mt-2">{{selectionError}}</div>
+        {{/if}}
+      </div>
+
+      <!-- Right: Card Preview -->
+      <div class="preview-panel">
+        <h3>Card Preview</h3>
+        <div id="svelte-card-mount"></div>
+      </div>
+    </div>
+
+    <!-- Control Panel -->
+    <div class="control-panel">
+      <div class="mode-controls">
+        <strong>Mode:</strong>
+        <button class="btn btn-sm mode-btn mode-btn-test {{#if isTestMode}}active{{/if}}">Test Mode</button>
+        <button class="btn btn-sm mode-btn mode-btn-study {{#if isStudyMode}}active{{/if}}">Study Mode</button>
+        <button class="btn btn-sm mode-btn mode-btn-correct {{#if isCorrectMode}}active{{/if}}">Feedback - Correct</button>
+        <button class="btn btn-sm mode-btn mode-btn-incorrect {{#if isIncorrectMode}}active{{/if}}">Feedback - Incorrect</button>
+      </div>
+
+      <div class="layout-controls">
+        <strong>Layout:</strong>
+        <button class="btn btn-sm layout-btn layout-btn-over-under">Over-Under</button>
+        <button class="btn btn-sm layout-btn layout-btn-split">Left-Right Split</button>
+      </div>
+    </div>
+
+    <!-- Settings Panel (Collapsible) -->
+    <div class="settings-panel">
+      <div class="settings-header">
+        <h4>
+          <i class="fa fa-cog"></i> UI Settings & Display Options
+          <button class="btn btn-sm btn-link toggle-settings">
+            <i class="fa {{#if settingsExpanded}}fa-chevron-up{{else}}fa-chevron-down{{/if}}"></i>
+          </button>
+        </h4>
+      </div>
+
+      <div class="settings-body" style="display: {{#if settingsExpanded}}block{{else}}none{{/if}};">
+        <div class="settings-grid">
+          <!-- Font & Display -->
+          <div class="settings-group">
+            <h5>Font & Display</h5>
+            <div class="form-group">
+              <label>Font Size</label>
+              <select class="form-control form-control-sm setting-fontsize">
+                <option value="12">12px</option>
+                <option value="16">16px</option>
+                <option value="20">20px</option>
+                <option value="24" selected>24px (Default)</option>
+                <option value="28">28px</option>
+                <option value="32">32px</option>
+                <option value="36">36px</option>
+                <option value="40">40px</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Stimuli Position</label>
+              <select class="form-control form-control-sm setting-stimuliPosition">
+                <option value="top">Top (Over-Under)</option>
+                <option value="left">Left (Split)</option>
+              </select>
+            </div>
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input setting-displayQuestionNumber" id="setting-displayQuestionNumber">
+              <label class="form-check-label" for="setting-displayQuestionNumber">Display Question Number</label>
+            </div>
+            <div class="form-group">
+              <label>Fade In Duration (ms)</label>
+              <input type="number" class="form-control form-control-sm setting-fadeInDuration" min="0" max="5000" step="50">
+            </div>
+            <div class="form-group">
+              <label>Fade Out Duration (ms)</label>
+              <input type="number" class="form-control form-control-sm setting-fadeOutDuration" min="0" max="5000" step="50">
+            </div>
+          </div>
+
+          <!-- Video Session -->
+          <div class="settings-group">
+            <h5>Video Session</h5>
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input setting-isVideoSession" id="setting-isVideoSession">
+              <label class="form-check-label" for="setting-isVideoSession">Enable Video Session</label>
+            </div>
+            <div class="form-group">
+              <label>Video URL</label>
+              <input type="text" class="form-control form-control-sm setting-videoUrl" placeholder="https://.../video.mp4">
+            </div>
+          </div>
+
+          <!-- Timeout -->
+          <div class="settings-group">
+            <h5>Timeout</h5>
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input setting-displayTimeoutBar" id="setting-displayTimeoutBar" checked>
+              <label class="form-check-label" for="setting-displayTimeoutBar">Display Timeout Bar</label>
+            </div>
+            <div class="form-group">
+              <label>Display Timeout As</label>
+              <select class="form-control form-control-sm setting-displayCardTimeoutAsBarOrText">
+                <option value="false">Hidden</option>
+                <option value="text">Text Only</option>
+                <option value="bar">Bar Only</option>
+                <option value="both">Both Bar & Text</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Timeout Threshold</label>
+              <input type="number" class="form-control form-control-sm setting-timeoutThreshold" min="1" max="100" step="1">
+            </div>
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input setting-displayTimeOutDuringStudy" id="setting-displayTimeOutDuringStudy">
+              <label class="form-check-label" for="setting-displayTimeOutDuringStudy">Display Timeout During Study</label>
+            </div>
+          </div>
+
+          <!-- Feedback Display -->
+          <div class="settings-group">
+            <h5>Feedback Display</h5>
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input setting-displayFeedback" id="setting-displayFeedback" checked>
+              <label class="form-check-label" for="setting-displayFeedback">Display Feedback</label>
+            </div>
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input setting-displayCorrectFeedback" id="setting-displayCorrectFeedback" checked>
+              <label class="form-check-label" for="setting-displayCorrectFeedback">Display Correct Feedback</label>
+            </div>
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input setting-displayIncorrectFeedback" id="setting-displayIncorrectFeedback" checked>
+              <label class="form-check-label" for="setting-displayIncorrectFeedback">Display Incorrect Feedback</label>
+            </div>
+            <div class="form-group">
+              <label>Only Show Simple Feedback</label>
+              <select class="form-control form-control-sm setting-onlyShowSimpleFeedback">
+                <option value="never">Never</option>
+                <option value="onCorrect">On Correct Only</option>
+                <option value="onIncorrect">On Incorrect Only</option>
+                <option value="always">Always</option>
+              </select>
+            </div>
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input setting-singleLineFeedback" id="setting-singleLineFeedback" checked>
+              <label class="form-check-label" for="setting-singleLineFeedback">Single Line Feedback</label>
+            </div>
+          </div>
+
+          <!-- Answer Display -->
+          <div class="settings-group">
+            <h5>Answer Display</h5>
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input setting-displayUserAnswerAtTop" id="setting-displayUserAnswerAtTop" checked>
+              <label class="form-check-label" for="setting-displayUserAnswerAtTop">Display User Answer At Top</label>
+            </div>
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input setting-displayCorrectAnswerInCenter" id="setting-displayCorrectAnswerInCenter" checked>
+              <label class="form-check-label" for="setting-displayCorrectAnswerInCenter">Display Correct Answer In Center</label>
+            </div>
+            <div class="form-group">
+              <label>Display User Answer In Feedback</label>
+              <select class="form-control form-control-sm setting-displayUserAnswerInFeedback">
+                <option value="never">Never</option>
+                <option value="onCorrect">On Correct Only</option>
+                <option value="onIncorrect" selected>On Incorrect Only</option>
+                <option value="always">Always</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Colors -->
+          <div class="settings-group">
+            <h5>Colors</h5>
+            <div class="form-group">
+              <label>Correct Color</label>
+              <input type="text" class="form-control form-control-sm setting-correctColor" value="green" placeholder="e.g., green, #00ff00">
+            </div>
+            <div class="form-group">
+              <label>Incorrect Color</label>
+              <input type="text" class="form-control form-control-sm setting-incorrectColor" value="darkorange" placeholder="e.g., red, #ff0000">
+            </div>
+          </div>
+
+          <!-- Messages -->
+          <div class="settings-group">
+            <h5>Messages</h5>
+            <div class="form-group">
+              <label>Correct Message</label>
+              <input type="text" class="form-control form-control-sm setting-correctMessage" value="Correct!" placeholder="Correct!">
+            </div>
+            <div class="form-group">
+              <label>Incorrect Message</label>
+              <input type="text" class="form-control form-control-sm setting-incorrectMessage" value="Incorrect" placeholder="Incorrect">
+            </div>
+          </div>
+
+          <!-- Text Input -->
+          <div class="settings-group">
+            <h5>Text Input</h5>
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input setting-displayTextInput" id="setting-displayTextInput" checked>
+              <label class="form-check-label" for="setting-displayTextInput">Display Text Input</label>
+            </div>
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input setting-displaySubmitButton" id="setting-displaySubmitButton" checked>
+              <label class="form-check-label" for="setting-displaySubmitButton">Display Submit Button</label>
+            </div>
+            <div class="form-group">
+              <label>Input Placeholder</label>
+              <input type="text" class="form-control form-control-sm setting-inputPlaceholderText" value="Your answer" placeholder="Your answer">
+            </div>
+          </div>
+
+          <!-- Multiple Choice -->
+          <div class="settings-group">
+            <h5>Multiple Choice</h5>
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input setting-displayMultipleChoiceButtons" id="setting-displayMultipleChoiceButtons" checked>
+              <label class="form-check-label" for="setting-displayMultipleChoiceButtons">Display Multiple Choice Buttons</label>
+            </div>
+            <div class="form-group">
+              <label>Choice Button Columns</label>
+              <select class="form-control form-control-sm setting-choiceButtonCols">
+                <option value="1">1 Column</option>
+                <option value="2" selected>2 Columns</option>
+                <option value="3">3 Columns</option>
+                <option value="4">4 Columns</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Audio & Speech -->
+          <div class="settings-group">
+            <h5>Audio & Speech</h5>
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input setting-enableAudio" id="setting-enableAudio" checked>
+              <label class="form-check-label" for="setting-enableAudio">Enable Audio</label>
+            </div>
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input setting-enableSpeechRecognition" id="setting-enableSpeechRecognition">
+              <label class="form-check-label" for="setting-enableSpeechRecognition">Enable Speech Recognition</label>
+            </div>
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input setting-forceSpeechRecognition" id="setting-forceSpeechRecognition">
+              <label class="form-check-label" for="setting-forceSpeechRecognition">Use SR Mode (Text Alternative)</label>
+            </div>
+            <div class="form-group">
+              <label>SR State</label>
+              <select class="form-control form-control-sm setting-srState">
+                <option value="listening">Listening</option>
+                <option value="processing">Processing</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Misc -->
+          <div class="settings-group">
+            <h5>Misc</h5>
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input setting-caseSensitive" id="setting-caseSensitive">
+              <label class="form-check-label" for="setting-caseSensitive">Case Sensitive Answers</label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>

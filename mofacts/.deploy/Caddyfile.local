@@ -1,0 +1,4 @@
+https://192.168.50.44:3000 {
+	tls internal
+	reverse_proxy 127.0.0.1:3100
+}

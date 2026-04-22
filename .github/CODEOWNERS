@@ -1,0 +1,13 @@
+# Default code owner (update as maintainers are added)
+* @ppavl
+
+# Core application
+/mofacts/server/ @ppavl
+/mofacts/client/ @ppavl
+
+# Documentation and governance
+/docs/ @ppavl
+/README.md @ppavl
+/SECURITY.md @ppavl
+/CONTRIBUTING.md @ppavl
+/GOVERNANCE.md @ppavl

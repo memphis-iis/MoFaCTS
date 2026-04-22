@@ -1,0 +1,42 @@
+{
+  "owner": "admin@localhost",
+  "ROOT_URL": "https://192.168.50.44:3000",
+  "encryptionKey": "ahNcV0wsycmPIlE+ttysfa+1Fg54sZeQctHeIn9ij368e+mzNskhVdFsNpjqfGdk",
+  "prod": false,
+  "enableEmail": false,
+  "mturkSandbox": true,
+  "initRoles": {
+    "admins": [
+      "admin@localhost"
+    ],
+    "teachers": []
+  },
+  "auth": {
+    "allowPublicSignup": true,
+    "requireEmailVerification": false,
+    "enableBreachedPasswordScreening": false,
+    "argon2Enabled": true
+  },
+  "public": {
+    "systemName": "MoFaCTS",
+    "forceSSL": false,
+    "admin": "admin@localhost",
+    "enableDeleteAllButton": false,
+    "testLogin": false
+  },
+  "saml": {
+    "memphis": {
+      "enabled": false,
+      "displayName": "University of Memphis",
+      "metadataUrl": "https://sso.memphis.edu/metadata/",
+      "idpIssuer": "https://sso.memphis.edu/idp/shibboleth",
+      "issuer": "https://YOUR_DOMAIN/auth/saml/memphis/metadata",
+      "callbackUrl": "https://YOUR_DOMAIN/auth/saml/memphis/acs",
+      "disableRequestedAuthnContext": true,
+      "signatureAlgorithm": "sha256",
+      "digestAlgorithm": "sha256",
+      "publicCertPath": "C:/path/to/memphis-saml-public-cert.pem",
+      "privateKeyPath": "C:/path/to/memphis-saml-private-key.pem"
+    }
+  }
+}

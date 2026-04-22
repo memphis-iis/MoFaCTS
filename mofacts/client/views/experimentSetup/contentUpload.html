@@ -1,0 +1,834 @@
+<!-- Content (TDF and Stim) File Uploading Template -->
+
+<template name="contentUpload">
+    <!-- Media Manager CSS Styles -->
+    <style>
+        /* Media Manager Panel */
+        .media-manager-panel {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 1rem;
+            margin-top: 0.75rem;
+        }
+
+        /* Drop Zone */
+        .media-drop-zone {
+            border: 2px dashed #dee2e6;
+            border-radius: 4px;
+            padding: 1rem;
+            text-align: center;
+            background: #fff;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-bottom: 1rem;
+        }
+
+        .media-drop-zone:hover,
+        .media-drop-zone.drag-over {
+            border-color: #0d6efd;
+            background: #e7f1ff;
+        }
+
+        .media-drop-zone.drag-over {
+            border-style: solid;
+        }
+
+        .media-drop-zone .drop-icon {
+            font-size: 1.5rem;
+            color: #6c757d;
+            margin-bottom: 0.5rem;
+        }
+
+        .media-drop-zone:hover .drop-icon,
+        .media-drop-zone.drag-over .drop-icon {
+            color: #0d6efd;
+        }
+
+        .media-drop-zone .drop-text {
+            color: #6c757d;
+            font-size: 0.875rem;
+        }
+
+        .media-drop-zone input[type="file"] {
+            display: none;
+        }
+
+        /* Upload Progress */
+        .media-upload-progress {
+            margin-bottom: 1rem;
+        }
+
+        .media-upload-progress .progress {
+            height: 8px;
+        }
+
+        .media-upload-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.25rem 0;
+            font-size: 0.875rem;
+        }
+
+        .media-upload-item .filename {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* Action Bar */
+        .media-action-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .media-action-bar .form-check {
+            margin-bottom: 0;
+        }
+
+        /* File List Table */
+        .media-file-table {
+            font-size: 0.875rem;
+            margin-bottom: 0;
+        }
+
+        .media-file-table th {
+            font-weight: 500;
+            background: #e9ecef;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        .media-file-table th,
+        .media-file-table td {
+            padding: 0.5rem;
+            vertical-align: middle;
+        }
+
+        .media-file-table .col-checkbox {
+            width: 40px;
+            text-align: center;
+        }
+
+        .media-file-table .col-type {
+            width: 60px;
+            text-align: center;
+        }
+
+        .media-file-table .col-size {
+            width: 80px;
+            text-align: right;
+        }
+
+        .media-file-table .col-actions {
+            width: 50px;
+            text-align: center;
+        }
+
+        .media-file-table .type-icon {
+            font-size: 1rem;
+        }
+
+        .media-file-table .type-icon.image { color: #198754; }
+        .media-file-table .type-icon.audio { color: #0d6efd; }
+        .media-file-table .type-icon.video { color: #6f42c1; }
+        .media-file-table .type-icon.unknown { color: #6c757d; }
+
+        .media-file-table .filename {
+            word-break: break-all;
+        }
+
+        .media-file-table .btn-delete-media {
+            padding: 0.15rem 0.35rem;
+            font-size: 0.75rem;
+        }
+
+        /* Empty State */
+        .media-empty-state {
+            text-align: center;
+            padding: 1.5rem;
+            color: #6c757d;
+        }
+
+        .media-empty-state .empty-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        /* Optimistic UI - Pending Upload Row Styles */
+        .pending-upload-row {
+            background-color: #f8f9fa;
+            opacity: 0.95;
+            border-left: 4px solid #0d6efd;
+        }
+
+        .pending-upload-row.pending-error {
+            border-left-color: #dc3545;
+            background-color: #fff5f5;
+        }
+
+        /* Pulse animation for processing state */
+        @keyframes pulse-subtle {
+            0%, 100% { opacity: 0.95; }
+            50% { opacity: 1; }
+        }
+
+        .pending-upload-row.pending-processing {
+            animation: pulse-subtle 2s ease-in-out infinite;
+        }
+
+        /* Badge styling improvements */
+        .badge {
+            font-size: 0.75rem;
+            font-weight: 500;
+            padding: 0.25rem 0.5rem;
+            vertical-align: middle;
+        }
+
+        .badge .fa {
+            margin-right: 0.25rem;
+        }
+
+        /* Progress bar enhancements */
+        .progress {
+            background-color: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-bar-animated {
+            animation: progress-bar-stripes 1s linear infinite;
+        }
+
+        @keyframes progress-bar-stripes {
+            0% { background-position: 1rem 0; }
+            100% { background-position: 0 0; }
+        }
+
+    </style>
+    <div class="container" style="margin-top: 1rem;">
+        <h3 style="margin-top: 0; text-align: center;">Content Manager</h3>
+
+        <!-- Upload Quota Status (for regular users) -->
+        {{#unless quotaStatus.unlimited}}
+        <div class="alert alert-info mb-4" role="alert">
+            <i class="fa fa-info-circle me-2"></i>
+            <strong>Upload Quota:</strong>
+            {{quotaStatus.remaining}} of {{quotaStatus.dailyLimit}} uploads remaining today
+            <span class="ms-2 text-muted">(Max file size: {{quotaStatus.maxFileSize}})</span>
+        </div>
+        {{/unless}}
+
+        <div class="admin-section">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <i class="fa fa-folder-open me-2" style="font-size: 1.25rem; color: var(--accent-color);"></i>
+                        <h5 class="m-0">Uploaded Content</h5>
+                    </div>
+
+            <div class="admin-table-wrapper">
+                <div class="table-responsive table-display-shell content-upload-table-wrapper {{#if initialPaintDone}}has-initial-paint has-painted{{else}}before-initial-paint is-before-paint{{/if}} {{#if listDisplayReady}}is-ready{{else}}is-not-ready is-loading{{/if}} {{#if overlayVisible}}show-overlay show-loading-overlay{{/if}}" aria-busy="{{#if listDisplayReady}}false{{else}}true{{/if}}">
+                    {{#unless initialPaintDone}}
+                    <div class="table-shell-placeholder content-upload-initial-placeholder" aria-hidden="true"></div>
+                    {{/unless}}
+                    {{#if overlayVisible}}
+                    <div class="table-shell-loading content-upload-loading" role="status" aria-live="polite">
+                        <i class="fa fa-circle-o-notch fa-spin me-2" aria-hidden="true"></i>
+                        Building table...
+                    </div>
+                    {{/if}}
+                    <table class="table table-striped table-bordered table-shell-content content-upload-table">
+                        <colgroup>
+                            <col class="content-upload-col-summary">
+                            <col class="content-upload-col-actions">
+                        </colgroup>
+                        <thead>
+                            <tr>
+                                <th class="table-col-summary">Summary</th>
+                                <th class="table-col-actions">Action</th>
+                            </tr>
+                        </thead>
+                    <tbody>
+                        {{#each assets}}
+                            <tr class="{{#if isPending}}pending-upload-row pending-{{pendingStatus}}{{/if}}">
+                                <td class="table-col-summary">
+                                    <div class="asset-cell-content">
+                                        <div class="asset-summary-primary">
+                                            <div class="asset-title-row">
+                                                <span class="asset-title">{{lessonName}}</span>
+                                                {{#unless isPending}}
+                                                    {{#if isOwnTdf}}
+                                                    <span class="asset-visibility-row">
+                                                        <span class="visibility-switch" title="Toggle visibility on Learning Dashboard">
+                                                            <span class="visibility-switch-label visibility-switch-label-left small">Private</span>
+                                                            <span class="form-switch visibility-switch-control">
+                                                                <input class="form-check-input visibility-toggle" type="checkbox" data-tdfid="{{_id}}" checked={{checkedIfPublic}} aria-label="Toggle lesson visibility">
+                                                            </span>
+                                                            <span class="visibility-switch-label visibility-switch-label-right small">Public</span>
+                                                        </span>
+                                                    </span>
+                                                    {{/if}}
+                                                {{/unless}}
+                                                {{#if isPending}}
+                                                    {{#if (equals pendingStatus 'uploading')}}
+                                                    <span class="badge bg-primary">
+                                                        <i class="fa fa-cloud-upload"></i> Uploading {{pendingProgress}}%
+                                                    </span>
+                                                    {{/if}}
+                                                    {{#if (equals pendingStatus 'processing')}}
+                                                    <span class="badge bg-info">
+                                                        <i class="fa fa-cog fa-spin"></i> Processing...
+                                                    </span>
+                                                    {{/if}}
+                                                    {{#if (equals pendingStatus 'completed')}}
+                                                    <span class="badge bg-success">
+                                                        <i class="fa fa-check"></i> Complete
+                                                    </span>
+                                                    {{/if}}
+                                                    {{#if (equals pendingStatus 'error')}}
+                                                    <span class="badge bg-danger">
+                                                        <i class="fa fa-exclamation-triangle"></i> Failed
+                                                    </span>
+                                                    {{/if}}
+                                                {{/if}}
+                                            </div>
+
+                                            {{#unless isPending}}
+                                                {{#if conditions}}
+                                                <div class="asset-conditions text-muted small">
+                                                    &bull; Conditions:
+                                                    {{#each conditions}}{{this.condition}} ({{this.count}}), {{/each}}
+                                                </div>
+                                                {{/if}}
+                                            {{/unless}}
+                                        </div>
+
+                                        <!-- Error message display -->
+                                        {{#if isPending}}
+                                            {{#if pendingError}}
+                                            <div class="asset-info-block asset-error">
+                                                <b>ERROR:</b> {{pendingError}}
+                                            </div>
+                                            {{/if}}
+                                        {{else}}
+                                            {{#if errors}}
+                                            <div class="asset-info-block asset-error">
+                                                <b>ERROR:</b>
+                                                {{#each errors}}
+                                                    {{{this}}}
+                                                {{/each}}
+                                            </div>
+                                            {{/if}}
+                                        {{/if}}
+
+                                        <!-- Progress bar for pending upload/processing state -->
+                                        {{#if isPending}}
+                                            {{#if (equals pendingStatus 'uploading')}}
+                                            <div class="asset-info-block">
+                                                <div class="progress" style="height: 8px; margin-top: 8px;">
+                                                    <div class="progress-bar progress-bar-striped progress-bar-animated"
+                                                         role="progressbar"
+                                                         style="width: {{pendingProgress}}%"
+                                                         aria-valuenow="{{pendingProgress}}"
+                                                         aria-valuemin="0"
+                                                         aria-valuemax="100">
+                                                    </div>
+                                                </div>
+                                                <!-- Minimal metadata for pending uploads -->
+                                                <div class="text-muted" style="margin-top: 4px;">
+                                                    <small>Upload started: {{fileName}}</small>
+                                                </div>
+                                            </div>
+                                            {{/if}}
+                                            {{#if (equals pendingStatus 'processing')}}
+                                            <div class="asset-info-block">
+                                                <div class="progress" style="height: 8px; margin-top: 8px;">
+                                                    <div class="progress-bar progress-bar-striped progress-bar-animated"
+                                                         role="progressbar"
+                                                         style="width: {{pendingProgress}}%"
+                                                         aria-valuenow="{{pendingProgress}}"
+                                                         aria-valuemin="0"
+                                                         aria-valuemax="100">
+                                                    </div>
+                                                </div>
+                                                <div class="text-muted" style="margin-top: 4px;">
+                                                    <small>Processing package and refreshing lesson list...</small>
+                                                </div>
+                                            </div>
+                                            {{/if}}
+                                        {{else}}
+                                        <!-- Regular TDF metadata -->
+                                        <div class="asset-info-block asset-meta-row">
+                                            <span class="asset-meta-item">
+                                                {{#if detailsReady}}
+                                                Stimuli: {{stimuliCount}}
+                                                {{else}}
+                                                <span class="text-muted">Stimuli: ...</span>
+                                                {{/if}}
+                                            </span>
+                                            <a id="show_stimuli" data-file="{{this._id}}" class="text-decoration-none asset-meta-item">
+                                                <i class="fa fa-file-o"></i> Files
+                                                {{#if detailsReady}}({{stimFilesCount}}){{else}}(...){{/if}}
+                                            </a>
+                                            <a class="manage-media-btn text-decoration-none asset-meta-item" data-tdfid="{{this._id}}" data-stimsetid="{{this.stimuliSetId}}">
+                                                <i class="fa fa-folder-open"></i> Manage Media
+                                                {{#if assetsReady}}({{assetsCount}}){{else}}(...){{/if}}
+                                            </a>
+                                        </div>
+                                        <div hidden id="stimuli-{{this._id}}" class="asset-toggle-content">
+                                            {{#if detailsReady}}
+                                                {{#if stimFileInfo.length}}
+                                                    {{#each this.stimFileInfo}}
+                                                        <button id="stim-download-btn" data-tdfid="{{../_id}}" class="btn-icon"><span class="fa fa-download" aria-hidden="true"></span> {{this.fileName}} </button>
+                                                    {{/each}}
+                                                {{else}}
+                                                    <span class="text-muted small">No stimulus files found.</span>
+                                                {{/if}}
+                                            {{else}}
+                                                <span class="text-muted small">Loading files...</span>
+                                            {{/if}}
+                                            </div>
+                                            <div hidden id="media-manager-{{this._id}}" class="media-manager-panel">
+                                                <!-- Drop Zone -->
+                                                <div class="media-drop-zone" data-tdfid="{{this._id}}" data-stimsetid="{{this.stimuliSetId}}">
+                                                    <div class="drop-icon"><i class="fa fa-cloud-upload"></i></div>
+                                                    <div class="drop-text">Drop files here or click to browse</div>
+                                                    <input type="file" class="media-file-input" data-tdfid="{{this._id}}" data-stimsetid="{{this.stimuliSetId}}" multiple accept="image/*,audio/*,video/*">
+                                                </div>
+
+                                                <!-- Upload Progress (shown during uploads) -->
+                                                <div class="media-upload-progress" id="upload-progress-{{this._id}}" style="display: none;">
+                                                    <div class="progress">
+                                                        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                                                    </div>
+                                                    <div class="upload-status small text-muted mt-1">Uploading...</div>
+                                                </div>
+
+                                                <!-- Action Bar -->
+                                                <div class="media-action-bar">
+                                                    <div class="form-check">
+                                                        <input class="form-check-input select-all-media" type="checkbox" id="select-all-{{this._id}}" data-tdfid="{{this._id}}">
+                                                        <label class="form-check-label small" for="select-all-{{this._id}}">Select All</label>
+                                                    </div>
+                                                    <button class="btn btn-outline-danger btn-sm delete-selected-media" data-tdfid="{{this._id}}" disabled>
+                                                        <i class="fa fa-trash"></i> Delete Selected (<span class="selected-count">0</span>)
+                                                    </button>
+                                                </div>
+
+                                                <!-- File List -->
+                                                {{#if assetsReady}}
+                                                {{#if this.assets.length}}
+                                                <div class="table-responsive">
+                                                    <table class="table table-striped table-bordered media-file-table">
+                                                        <thead>
+                                                            <tr>
+                                                                <th class="col-checkbox"></th>
+                                                                <th class="col-type">Type</th>
+                                                                <th>Filename</th>
+                                                                <th class="col-actions"></th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {{#each this.assets}}
+                                                            <tr>
+                                                                <td class="col-checkbox">
+                                                                    <input type="checkbox" class="form-check-input media-select-checkbox" data-assetid="{{this._id}}" data-filename="{{this.filename}}">
+                                                                </td>
+                                                                <td class="col-type">
+                                                                    {{#if (equals this.fileType 'image')}}
+                                                                        <i class="fa fa-picture-o type-icon image" title="Image"></i>
+                                                                    {{else}}
+                                                                    {{#if (equals this.fileType 'audio')}}
+                                                                        <i class="fa fa-music type-icon audio" title="Audio"></i>
+                                                                    {{else}}
+                                                                    {{#if (equals this.fileType 'video')}}
+                                                                        <i class="fa fa-film type-icon video" title="Video"></i>
+                                                                    {{else}}
+                                                                        <i class="fa fa-file-o type-icon unknown" title="File"></i>
+                                                                    {{/if}}
+                                                                    {{/if}}
+                                                                    {{/if}}
+                                                                </td>
+                                                                <td class="filename">
+                                                                    <a href="{{this.link}}" target="_blank" title="Open in new tab">{{this.filename}}</a>
+                                                                </td>
+                                                                <td class="col-actions">
+                                                                    <button class="btn btn-outline-danger btn-sm btn-delete-media" data-assetid="{{this._id}}" data-filename="{{this.filename}}" title="Delete this file">
+                                                                        <i class="fa fa-times"></i>
+                                                                    </button>
+                                                                </td>
+                                                            </tr>
+                                                            {{/each}}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                                {{else}}
+                                                <div class="media-empty-state">
+                                                    <div class="empty-icon"><i class="fa fa-folder-open-o"></i></div>
+                                                    <p class="mb-0">No media files attached to this lesson.<br>Drag and drop files above to add media.</p>
+                                                </div>
+                                                {{/if}}
+                                                {{else}}
+                                                <div class="media-empty-state">
+                                                    <div class="empty-icon"><i class="fa fa-folder-open-o"></i></div>
+                                                    <p class="mb-0">Loading media...</p>
+                                                </div>
+                                                {{/if}}
+                                            </div>
+                                        {{#if isOwnTdf}}
+                                        <div class="asset-info-block asset-secondary-row">
+                                            <a id="show_manage_access" data-file="{{this._id}}" class="text-decoration-none text-muted small">
+                                                <i class="fa fa-cog"></i> Manage Access & Ownership...
+                                            </a>
+                                            <div hidden id="manage-access-{{this._id}}" class="asset-toggle-content border-top pt-2 mt-2">
+                                                <div class="row g-2 mb-2">
+                                                    <div class="col-md-8">
+                                                        <label for="transfer-{{_id}}" class="form-label small mb-1">
+                                                            <i class="fa fa-exchange"></i> Transfer Ownership (not recoverable)
+                                                        </label>
+                                                        <div class="input-group input-group-sm">
+                                                            <input type="text" id="transfer-{{_id}}" class="form-control" placeholder="Enter new owner's email">
+                                                            <button id="transfer-btn" value="{{_id}}" class="btn btn-outline-secondary">
+                                                                <i class="fa fa-exchange"></i> Transfer
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="row g-2">
+                                                    <div class="col-md-8">
+                                                        <label for="add-access-{{_id}}" class="form-label small mb-1">
+                                                            <i class="fa fa-plus"></i> Share With Users
+                                                        </label>
+                                                        <div class="input-group input-group-sm">
+                                                            <input type="text" id="add-access-{{_id}}" data-id="{{_id}}" class="form-control js-accessor-input" placeholder="Enter user email(s), comma-separated">
+                                                            <button id="add-access-btn" value="{{_id}}" class="btn btn-outline-secondary">
+                                                                <i class="fa fa-plus"></i> Add
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="mt-2 pt-2 border-top">
+                                                    <div class="small text-muted mb-1">
+                                                        <i class="fa fa-users"></i> Shared Users
+                                                        {{#if detailsReady}}({{accessorsCount}}){{else}}(...){{/if}}
+                                                    </div>
+                                                    {{#if detailsReady}}
+                                                        {{#if accessors.length}}
+                                                        <ul class="asset-accessors-list">
+                                                        {{#each accessors}}
+                                                            <li>
+                                                            {{this.username}}
+                                                            <button id="remove-access-btn" value="{{../_id}}" data-user="{{this.userId}}" class="btn-icon"><span class="fa fa-minus" aria-hidden="true"></span></button>
+                                                            </li>
+                                                        {{/each}}
+                                                        </ul>
+                                                        {{else}}
+                                                        <span class="text-muted small">No shared users yet.</span>
+                                                        {{/if}}
+                                                    {{else}}
+                                                        <span class="text-muted small">Loading users...</span>
+                                                    {{/if}}
+                                                </div>
+                                                {{#if accessMessageText}}
+                                                <div class="alert {{accessMessageClass}} mt-2 mb-0 py-1 px-2 small" role="status" aria-live="polite">
+                                                    {{accessMessageText}}
+                                                </div>
+                                                {{/if}}
+                                            </div>
+                                        </div>
+                                        {{/if}}
+                                        <div class="asset-info-block asset-selector-row">
+                                            {{#if conditions}}
+                                            <div class="condition-selector-wrapper">
+                                                <label for="tdf-selector-{{_id}}" class="form-label small mb-1">
+                                                    Select condition to edit:
+                                                </label>
+                                                <select id="tdf-selector-{{_id}}"
+                                                        class="form-select form-select-sm condition-tdf-selector"
+                                                        data-root-tdfid="{{_id}}">
+                                                    <option value="{{_id}}">Root TDF ({{lessonName}})</option>
+                                                    {{#each conditions}}
+                                                        <option value="{{this.tdfId}}"
+                                                                {{disabledAttr this.tdfId}}>
+                                                            {{this.condition}}
+                                                            {{#unless this.tdfId}} (Not Found){{/unless}}
+                                                        </option>
+                                                    {{/each}}
+                                                </select>
+                                            </div>
+                                            {{/if}}
+
+                                            {{#if stimFiles}}
+                                            <div class="condition-selector-wrapper">
+                                                <label for="stim-selector-{{_id}}" class="form-label small mb-1">
+                                                    Select stim file to edit:
+                                                </label>
+                                                <select id="stim-selector-{{_id}}"
+                                                        class="form-select form-select-sm stim-file-selector"
+                                                        data-tdf-id="{{_id}}">
+                                                    {{#each stimFiles}}
+                                                        <option value="{{this.stimId}}"
+                                                                data-filename="{{this.filename}}"
+                                                                {{disabledAttr this.exists}}>
+                                                            {{this.filename}}
+                                                            {{#unless this.exists}} (Not Found){{/unless}}
+                                                        </option>
+                                                    {{/each}}
+                                                </select>
+                                            </div>
+                                            {{/if}}
+                                        </div>
+                                        {{/if}}
+                                    </div>
+                                </td>
+                                <td class="table-col-actions">
+                                    {{#unless isPending}}
+                                    <!-- Regular TDF action buttons -->
+                                    <div class="content-upload-actions">
+                                        <!-- Edit buttons - read from selectors if present -->
+                                        <div class="action-buttons-row">
+                                            <button id="content-edit-btn"
+                                                    value="{{_id}}"
+                                                    {{selectorDataAttr conditions}}
+                                                    class="btn-icon"
+                                                    title="Edit stimuli">
+                                                <span class="fa fa-pencil" aria-hidden="true"></span>
+                                            </button>
+                                            <button id="tdf-edit-btn"
+                                                    value="{{_id}}"
+                                                    {{selectorDataAttr conditions}}
+                                                    class="btn-icon"
+                                                    title="Edit TDF settings">
+                                                <span class="fa fa-cog" aria-hidden="true"></span>
+                                            </button>
+                                            <button id="copy-tdf-btn" value="{{_id}}" class="btn-icon" title="Make a private copy"><span class="fa fa-copy" aria-hidden="true"></span></button>
+                                            <button id="tdf-download-btn" data-tdfid="{{_id}}" class="btn-icon" title="Download current package"><span class="fa fa-download" aria-hidden="true"></span></button>
+                                            <button id="package-delete-btn" value="{{packageAssetId}}" data-package-file="{{packageFile}}" data-filename="{{fileName}}" class="btn-icon" title="Delete package"><span class="fa fa-trash" aria-hidden="true"></span></button>
+                                            {{#if conditions}}
+                                                <button id="reset-conditions-btn" value="{{_id}}" class="btn-icon" title="Reset conditions"><span class="fa fa-refresh" aria-hidden="true"></span></button>
+                                            {{/if}}
+                                        </div>
+                                    </div>
+                                    {{/unless}}
+                                </td>
+                            </tr>
+                        {{/each}}
+                        {{#if listDisplayReady}}
+                            {{#if showEmptyState}}
+                            <tr>
+                                <td colspan="2" class="text-center text-muted py-4">
+                                    No uploaded content found for this account.
+                                </td>
+                            </tr>
+                            {{/if}}
+                        {{/if}}
+                    </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="d-flex justify-content-center mt-3">
+                {{#if canLoadMore}}
+                <button class="btn btn-outline-secondary" id="load-more-tdfs">
+                    <i class="fa fa-plus"></i> Load More
+                </button>
+                {{/if}}
+            </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Create New Content Section -->
+        <div class="admin-section">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <i class="fa fa-plus-square-o me-2" style="font-size: 1.25rem; color: var(--accent-color);"></i>
+                        <h5 class="m-0">Create New Content</h5>
+                    </div>
+                    <div class="row g-3 align-items-center">
+                        <div class="col-lg-8 col-12">
+                            <div class="text-muted small">
+                                <div>Start from prompts.</div>
+                                <div>Build draft lesson.</div>
+                                <div>Edit. Validate. Finalize.</div>
+                            </div>
+                            <div class="text-muted small mt-2">
+                                Basics &rarr; Format &rarr; Content &rarr; Finalize
+                            </div>
+                        </div>
+                        <div class="col-lg-4 col-12 text-lg-end text-center">
+                            <div class="d-flex flex-column flex-sm-row justify-content-lg-end justify-content-center gap-2">
+                                <button type="button" class="btn btn-primary btn-lg" id="open-manual-content-creator">
+                                    <i class="fa fa-plus-square-o"></i> Start Content Creator
+                                </button>
+                                {{#if manualDraftsLoading}}
+                                <button type="button" class="btn btn-outline-secondary btn-lg" id="toggle-manual-drafts" disabled>
+                                    <i class="fa fa-refresh fa-spin"></i> Resume Draft
+                                </button>
+                                {{else}}
+                                <button type="button" class="btn btn-outline-secondary btn-lg" id="toggle-manual-drafts" {{manualDraftToggleAttrs}}>
+                                    <i class="fa fa-folder-open-o"></i> Resume Draft{{#if hasManualDrafts}} ({{manualDraftCount}}){{/if}}
+                                </button>
+                                {{/if}}
+                            </div>
+                        </div>
+                    </div>
+                    {{#if manualDraftsError}}
+                    <div class="alert alert-warning mt-3 mb-0">
+                        {{manualDraftsError}}
+                    </div>
+                    {{/if}}
+                    {{#if showManualDrafts}}
+                    <div class="mt-3 pt-3 border-top">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <div class="fw-semibold">Saved Drafts</div>
+                            {{#if manualDraftsLoading}}
+                            <div class="small text-muted"><i class="fa fa-refresh fa-spin"></i> Loading drafts...</div>
+                            {{/if}}
+                        </div>
+                        {{#if hasManualDrafts}}
+                        <div class="list-group">
+                            {{#each manualDrafts}}
+                            <div class="list-group-item">
+                                <div class="d-flex flex-column flex-md-row justify-content-between gap-3">
+                                    <div>
+                                        <div class="fw-semibold">{{lessonName}}</div>
+                                        <div class="small text-muted">{{stepLabel}} · {{status}}</div>
+                                        {{#if updatedAtLabel}}
+                                        <div class="small text-muted">Updated {{updatedAtLabel}}</div>
+                                        {{/if}}
+                                    </div>
+                                    <div class="d-flex flex-column flex-sm-row gap-2">
+                                        <button type="button" class="btn btn-primary open-saved-manual-draft" data-draft-id="{{_id}}">
+                                            Continue
+                                        </button>
+                                        <button type="button" class="btn btn-outline-danger delete-saved-manual-draft" data-draft-id="{{_id}}" data-lesson-name="{{lessonName}}">
+                                            Delete
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            {{/each}}
+                        </div>
+                        {{else}}
+                        <div class="small text-muted">No saved drafts yet.</div>
+                        {{/if}}
+                    </div>
+                    {{/if}}
+                </div>
+            </div>
+        </div>
+
+        <!-- Upload Package (ZIP) Section -->
+        <div class="admin-section">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <i class="fa fa-file-archive-o me-2" style="font-size: 1.25rem; color: var(--accent-color);"></i>
+                        <h5 class="m-0">Upload MoFaCTS Package (.zip)</h5>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="emailInsteadOfAlert">
+                                <label class="form-check-label" for="emailInsteadOfAlert">
+                                    Email a summary of the upload instead of an alert in the browser
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <input type="file" class="form-control" name="upload-file" id="upload-file" value="" accept=".zip">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Upload from Anki (.apkg) Section -->
+        <div class="admin-section">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <i class="fa fa-magic me-2" style="font-size: 1.25rem; color: var(--accent-color);"></i>
+                        <h5 class="m-0">Import from Anki (.apkg)</h5>
+                    </div>
+                    <p class="text-muted mb-3">
+                        Convert Anki flashcard decks into targeted MoFaCTS learning modules.
+                        Choose which fields to use and create one or more focused TDFs.
+                    </p>
+                    <div class="text-center">
+                        <button type="button" class="btn btn-primary btn-lg" id="open-apkg-wizard">
+                            <i class="fa fa-magic"></i> Configure Anki Import
+                        </button>
+                        <p class="text-muted small mt-2 mb-0">
+                            Interactive wizard for flexible .apkg conversion
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Anki Import Wizard (hidden by default) -->
+        <div id="apkg-wizard-modal" style="display: none;">
+            {{> apkgWizard}}
+        </div>
+
+        <!-- Upload from Canvas (.imscc) Section -->
+        <div class="admin-section">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <i class="fa fa-graduation-cap me-2" style="font-size: 1.25rem; color: var(--accent-color);"></i>
+                        <h5 class="m-0">Import from Canvas (.imscc)</h5>
+                    </div>
+                    <p class="text-muted mb-3">
+                        Extract quiz assignments from a local Canvas export package and generate a MoFaCTS package.
+                        The original IMSCC file stays local and is not uploaded.
+                    </p>
+                    <div class="text-center">
+                        <button type="button" class="btn btn-primary btn-lg" id="open-imscc-wizard">
+                            <i class="fa fa-graduation-cap"></i> Configure Canvas Import
+                        </button>
+                        <p class="text-muted small mt-2 mb-0">
+                            Interactive wizard for IMSCC conversion
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Canvas IMSCC Import Wizard (hidden by default) -->
+        <div id="imscc-wizard-modal" style="display: none;">
+            {{> imsccWizard}}
+        </div>
+
+        {{#if showDeleteAllButton}}
+        <div class="admin-section">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <i class="fa fa-exclamation-triangle me-2" style="font-size: 1.25rem; color: var(--alert-color);"></i>
+                        <h5 class="m-0">Admin Functions</h5>
+                    </div>
+                    <div class="alert alert-danger mb-3" role="alert">
+                        <strong>Warning:</strong> This will delete all files, remove all lessons, and remove all stimuli. This action is not recoverable.
+                    </div>
+                    <div class="text-center">
+                        <button class="btn btn-danger" id="deleteAllAssetsConfirm">
+                            <i class="fa fa-trash"></i> Delete All Uploaded Files
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {{/if}}
+    </div>
+</template>
+

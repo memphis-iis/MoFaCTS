@@ -1,0 +1,460 @@
+import type {
+  ComputePracticeTimeMs,
+  DashboardHistoryRecord,
+  DashboardStatsByTdf,
+  DashboardSummaryStats,
+  DashboardTdfStats
+} from './dashboardCacheMethods.contracts';
+
+type DashboardCacheDeps = {
+  Meteor: any;
+  Roles: any;
+  Histories: any;
+  Tdfs: any;
+  UserDashboardCache: any;
+  serverConsole: (...args: any[]) => void;
+  computePracticeTimeMs: ComputePracticeTimeMs;
+};
+
+export function computeCacheStats(
+  history: DashboardHistoryRecord[],
+  displayName: string | null | undefined,
+  computePracticeTimeMs: ComputePracticeTimeMs
+): DashboardTdfStats {
+  const stats: DashboardTdfStats = {
+    displayName: displayName || 'Unnamed',
+    totalTrials: history.length,
+    correctTrials: 0,
+    incorrectTrials: 0,
+    totalTimeMs: 0,
+    totalTimeMinutes: 0,
+    itemsPracticedCount: 0,
+    totalSessions: 0,
+    recentOutcomes: [],
+    overallAccuracy: 0,
+    last10Accuracy: 0,
+    firstPracticeDate: null,
+    lastPracticeDate: null,
+    lastProcessedHistoryId: null,
+    lastProcessedTimestamp: null
+  };
+
+  const uniqueItems = new Set<string>();
+  const sessions = new Set<string>();
+
+  for (const record of history) {
+    if (record.outcome === 'correct') stats.correctTrials++;
+    else if (record.outcome === 'incorrect') stats.incorrectTrials++;
+
+    stats.totalTimeMs += computePracticeTimeMs(record.CFEndLatency, record.CFFeedbackLatency);
+
+    const itemId = record.itemId || record.CFStimFileIndex || record.problemName;
+    if (itemId !== undefined && itemId !== null) {
+      uniqueItems.add(String(itemId));
+    }
+
+    if (record.recordedServerTime) {
+      const date = new Date(record.recordedServerTime);
+      sessions.add(date.toDateString());
+
+      if (!stats.firstPracticeDate || date < stats.firstPracticeDate) {
+        stats.firstPracticeDate = date;
+      }
+      if (!stats.lastPracticeDate || date > stats.lastPracticeDate) {
+        stats.lastPracticeDate = date;
+      }
+    }
+
+    stats.lastProcessedHistoryId = record._id ?? null;
+    stats.lastProcessedTimestamp = record.recordedServerTime ?? null;
+  }
+
+  const recentTrials = history.slice(-10);
+  stats.recentOutcomes = recentTrials.map((trial) => trial.outcome ?? '');
+
+  stats.itemsPracticedCount = uniqueItems.size;
+  stats.totalSessions = sessions.size;
+  stats.totalTimeMinutes = Number((stats.totalTimeMs / 60000).toFixed(1));
+
+  const totalAnswered = stats.correctTrials + stats.incorrectTrials;
+  stats.overallAccuracy = totalAnswered > 0
+    ? Number(((stats.correctTrials / totalAnswered) * 100).toFixed(1))
+    : 0;
+
+  const recentCorrect = stats.recentOutcomes.filter((outcome: string) => outcome === 'correct').length;
+  stats.last10Accuracy = stats.recentOutcomes.length > 0
+    ? Number(((recentCorrect / stats.recentOutcomes.length) * 100).toFixed(1))
+    : 0;
+
+  return stats;
+}
+
+export function computeSummaryStats(tdfStats: DashboardStatsByTdf | null | undefined): DashboardSummaryStats {
+  const safeStats: DashboardStatsByTdf = tdfStats || {};
+  let totalTrials = 0;
+  let totalCorrect = 0;
+  let totalIncorrect = 0;
+  let totalTime = 0;
+  let lastActivity: Date | null = null;
+
+  for (const statsAny of Object.values(safeStats) as DashboardTdfStats[]) {
+    totalTrials += statsAny.totalTrials;
+    totalCorrect += statsAny.correctTrials;
+    totalIncorrect += statsAny.incorrectTrials;
+    totalTime += statsAny.totalTimeMs;
+
+    if (statsAny.lastPracticeDate) {
+      const date = new Date(statsAny.lastPracticeDate);
+      if (!lastActivity || date > lastActivity) {
+        lastActivity = date;
+      }
+    }
+  }
+
+  const totalAnswered = totalCorrect + totalIncorrect;
+
+  return {
+    totalTdfsAttempted: Object.keys(safeStats).length,
+    totalTrialsAllTime: totalTrials,
+    totalTimeAllTime: totalTime,
+    overallAccuracyAllTime: totalAnswered > 0
+      ? Number(((totalCorrect / totalAnswered) * 100).toFixed(1))
+      : 0,
+    lastActivityDate: lastActivity
+  };
+}
+
+export function createDashboardCacheMethods({
+  Meteor,
+  Roles,
+  Histories,
+  Tdfs,
+  UserDashboardCache,
+  serverConsole,
+  computePracticeTimeMs
+}: DashboardCacheDeps) {
+  const methods = {
+    initializeDashboardCache: async function(this: any, userId: string | null = null) {
+      const targetUserId = userId || this.userId;
+      if (!targetUserId) {
+        throw new Meteor.Error('not-authorized', 'Must be logged in');
+      }
+
+      if (targetUserId !== this.userId) {
+        const isAdmin = await Roles.userIsInRoleAsync(this.userId, ['admin']);
+        if (!isAdmin) {
+          throw new Meteor.Error('not-authorized', 'Cannot initialize cache for other users');
+        }
+      }
+
+      serverConsole(`Initializing dashboard cache for user ${targetUserId}`);
+
+      const attemptedTdfIds = await Histories.rawCollection().distinct('TDFId', {
+        userId: targetUserId,
+        levelUnitType: 'model'
+      });
+
+      if (attemptedTdfIds.length === 0) {
+        await UserDashboardCache.upsertAsync(
+          { userId: targetUserId },
+          {
+            $set: {
+              userId: targetUserId,
+              tdfStats: {},
+              summary: {
+                totalTdfsAttempted: 0,
+                totalTrialsAllTime: 0,
+                totalTimeAllTime: 0,
+                overallAccuracyAllTime: 0,
+                lastActivityDate: null
+              },
+              lastUpdated: new Date(),
+              version: 1
+            },
+            $setOnInsert: {
+              createdAt: new Date()
+            }
+          }
+        );
+        return { success: true, tdfCount: 0 };
+      }
+
+      const attemptedTdfs = await Tdfs.find({
+        _id: { $in: attemptedTdfIds }
+      }, {
+        fields: {
+          _id: 1,
+          'content.fileName': 1,
+          'content.tdfs.tutor.setspec.lessonname': 1
+        }
+      }).fetchAsync();
+
+      const rootTdfs = await Tdfs.find({
+        'content.tdfs.tutor.setspec.condition': { $exists: true }
+      }, {
+        fields: {
+          _id: 1,
+          'content.tdfs.tutor.setspec.lessonname': 1,
+          'content.tdfs.tutor.setspec.condition': 1
+        }
+      }).fetchAsync();
+
+      const attemptedTdfIdsByFileName = new Map<string, string>();
+      for (const tdf of attemptedTdfs as any[]) {
+        const fileName = tdf.content?.fileName;
+        if (fileName) {
+          attemptedTdfIdsByFileName.set(fileName, tdf._id);
+        }
+      }
+
+      const childToRootMap = new Map<string, string>();
+      const rootTdfMap: Map<any, any> = new Map();
+      for (const rootTdf of rootTdfs as any[]) {
+        rootTdfMap.set(rootTdf._id, rootTdf);
+        const conditions: string[] = rootTdf.content?.tdfs?.tutor?.setspec?.condition || [];
+        for (const childRef of conditions) {
+          if (!childRef) {
+            continue;
+          }
+          childToRootMap.set(childRef, rootTdf._id);
+          const childTdfId = attemptedTdfIdsByFileName.get(childRef);
+          if (childTdfId) {
+            childToRootMap.set(childTdfId, rootTdf._id);
+          }
+        }
+      }
+
+      const allHistory: DashboardHistoryRecord[] = await Histories.find({
+        userId: targetUserId,
+        TDFId: { $in: attemptedTdfIds },
+        levelUnitType: 'model'
+      }, {
+        sort: { recordedServerTime: 1 }
+      }).fetchAsync();
+
+      const historyByTargetTdf: Map<string, DashboardHistoryRecord[]> = new Map();
+      const tdfMap: Map<any, any> = new Map((attemptedTdfs as any[]).map((t: any) => [t._id, t]));
+
+      for (const record of allHistory) {
+        const tdf = tdfMap.get(record.TDFId);
+        if (!tdf) continue;
+
+        const fileName = tdf.content?.fileName as string | undefined;
+        const rootTdfId =
+          (fileName ? childToRootMap.get(fileName) : undefined) ||
+          (record.TDFId ? childToRootMap.get(record.TDFId) : undefined);
+        const targetTdfId = rootTdfId || record.TDFId;
+        if (!targetTdfId) continue;
+
+        if (!historyByTargetTdf.has(targetTdfId)) {
+          historyByTargetTdf.set(targetTdfId, []);
+        }
+        const targetHistory = historyByTargetTdf.get(targetTdfId);
+        if (targetHistory) {
+          targetHistory.push(record);
+        }
+      }
+
+      const tdfStats: Record<string, any> = {};
+      for (const [targetTdfId, history] of historyByTargetTdf.entries()) {
+        const rootTdf = rootTdfMap.get(targetTdfId);
+        const displayName = rootTdf?.content?.tdfs?.tutor?.setspec?.lessonname ||
+          tdfMap.get(targetTdfId)?.content?.tdfs?.tutor?.setspec?.lessonname ||
+          'Unnamed';
+
+        tdfStats[targetTdfId] = computeCacheStats(history, displayName, computePracticeTimeMs);
+      }
+
+      const summary = computeSummaryStats(tdfStats);
+
+      await UserDashboardCache.upsertAsync(
+        { userId: targetUserId },
+        {
+          $set: {
+            userId: targetUserId,
+            tdfStats,
+            summary,
+            lastUpdated: new Date(),
+            version: 1
+          },
+          $setOnInsert: {
+            createdAt: new Date()
+          }
+        }
+      );
+
+      serverConsole(`Cache initialized for user ${targetUserId}: ${Object.keys(tdfStats).length} TDFs`);
+      return { success: true, tdfCount: Object.keys(tdfStats).length };
+    },
+
+    updateDashboardCacheForTdf: async function(this: any, TDFId: string) {
+      serverConsole(`[Cache] updateDashboardCacheForTdf called with TDFId: ${TDFId}`);
+
+      if (!this.userId) {
+        throw new Meteor.Error('not-authorized', 'Must be logged in');
+      }
+
+      const userId = this.userId;
+      serverConsole(`[Cache] User: ${userId}`);
+
+      const tdf = await Tdfs.findOneAsync(
+        { _id: TDFId },
+        { fields: {
+          'content.fileName': 1,
+          'content.tdfs.tutor.setspec.lessonname': 1
+        } }
+      );
+
+      if (!tdf) {
+        serverConsole(`[Cache] TDF ${TDFId} not found`);
+        return { success: false, error: 'TDF not found' };
+      }
+
+      const fileName = tdf.content?.fileName;
+      const childKeyCandidates = [fileName, TDFId].filter(Boolean);
+
+      const rootTdf = childKeyCandidates.length ? await Tdfs.findOneAsync({
+        'content.tdfs.tutor.setspec.condition': { $in: childKeyCandidates }
+      }, {
+        fields: {
+          _id: 1,
+          'content.tdfs.tutor.setspec.lessonname': 1,
+          'content.tdfs.tutor.setspec.condition': 1
+        }
+      }) : null;
+
+      let targetTdfId = TDFId;
+      let displayName = tdf.content?.tdfs?.tutor?.setspec?.lessonname || 'Unnamed';
+      let allHistory: any[] = [];
+
+      if (rootTdf) {
+        serverConsole(`[Cache] Child TDF detected, aggregating under root: ${rootTdf._id}`);
+        targetTdfId = rootTdf._id;
+        displayName = rootTdf.content?.tdfs?.tutor?.setspec?.lessonname || displayName;
+
+        const childRefs: string[] = rootTdf.content?.tdfs?.tutor?.setspec?.condition || [];
+        const normalizedChildRefs = [...new Set(childRefs.filter(Boolean))];
+
+        const childTdfs = normalizedChildRefs.length ? await Tdfs.find({
+          $or: [
+            { 'content.fileName': { $in: normalizedChildRefs } },
+            { _id: { $in: normalizedChildRefs } }
+          ]
+        }, {
+          fields: { _id: 1 }
+        }).fetchAsync() : [];
+
+        const childTdfIds = childTdfs.map((t: any) => t._id);
+        if (!childTdfIds.includes(TDFId)) {
+          childTdfIds.push(TDFId);
+        }
+
+        allHistory = await Histories.find({
+          userId,
+          TDFId: { $in: childTdfIds },
+          levelUnitType: 'model'
+        }, {
+          sort: { recordedServerTime: 1 }
+        }).fetchAsync();
+
+        serverConsole(`[Cache] Retrieved ${allHistory.length} history records from ${childTdfIds.length} child TDFs`);
+      } else {
+        allHistory = await Histories.find({
+          userId,
+          TDFId,
+          levelUnitType: 'model'
+        }, {
+          sort: { recordedServerTime: 1 }
+        }).fetchAsync();
+
+        serverConsole(`[Cache] Retrieved ${allHistory.length} history records for regular TDF`);
+      }
+
+      if (allHistory.length === 0) {
+        serverConsole('[Cache] No history records, skipping update');
+        return { success: true, action: 'no_history' };
+      }
+
+      const stats = computeCacheStats(allHistory, displayName, computePracticeTimeMs);
+
+      const cache = await UserDashboardCache.findOneAsync({ userId }) || {
+        userId,
+        tdfStats: {},
+        version: 1
+      };
+
+      const updatedTdfStats = {
+        ...(cache.tdfStats || {}),
+        [targetTdfId]: stats
+      };
+
+      const summary = computeSummaryStats(updatedTdfStats);
+
+      await UserDashboardCache.upsertAsync(
+        { userId },
+        {
+          $set: {
+            userId,
+            tdfStats: updatedTdfStats,
+            summary,
+            lastUpdated: new Date(),
+            version: cache.version || 1
+          },
+          $setOnInsert: {
+            createdAt: new Date()
+          }
+        }
+      );
+
+      serverConsole(`[Cache] Recomputed stats stored for ${rootTdf ? 'root' : 'regular'} TDF ${targetTdfId}`);
+      return { success: true, action: 'updated', newRecords: allHistory.length };
+    },
+
+    refreshDashboardCache: async function(this: any) {
+      if (!this.userId) {
+        throw new Meteor.Error('not-authorized');
+      }
+
+      await UserDashboardCache.removeAsync({ userId: this.userId });
+      return await methods.initializeDashboardCache.call(this);
+    },
+
+    removeTdfFromCache: async function(this: any, tdfId: string) {
+      if (!this.userId) {
+        throw new Meteor.Error('not-authorized');
+      }
+
+      const isAdmin = await Roles.userIsInRoleAsync(this.userId, ['admin']);
+      if (!isAdmin) {
+        throw new Meteor.Error('not-authorized', 'Admin only');
+      }
+
+      const caches = await UserDashboardCache.find(
+        { [`tdfStats.${tdfId}`]: { $exists: true } },
+        { fields: { tdfStats: 1 } }
+      ).fetchAsync();
+
+      let modified = 0;
+
+      for (const cache of caches) {
+        delete cache.tdfStats[tdfId];
+        const summary = computeSummaryStats(cache.tdfStats || {});
+        await UserDashboardCache.updateAsync(
+          { _id: cache._id },
+          {
+            $set: {
+              tdfStats: cache.tdfStats,
+              summary,
+              lastUpdated: new Date()
+            }
+          }
+        );
+        modified++;
+      }
+
+      return { success: true, modified };
+    }
+  };
+
+  return methods;
+}

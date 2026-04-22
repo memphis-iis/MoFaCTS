@@ -1,0 +1,541 @@
+<template name="tdfEdit">
+    <!-- Compact CSS for TDF Editor -->
+    <style>
+        /* Hide descriptions when mode is 'none' */
+        #tdf-editor-container.hide-descriptions .form-text,
+        #tdf-editor-container.hide-descriptions .je-desc,
+        #tdf-editor-container.hide-descriptions p.help-block,
+        #tdf-editor-container.hide-descriptions small.text-muted,
+        #tdf-editor-container.hide-descriptions [data-schemapath] > p,
+        #tdf-editor-container.hide-descriptions .je-object__container > p,
+        #tdf-editor-container.hide-descriptions .je-indented-panel > p {
+            display: none !important;
+        }
+
+        /* Style array field descriptions (<p> tags) consistently with string field descriptions (<small>) */
+        #tdf-editor-container [data-schemapath] > p {
+            font-size: 0.875em;
+            color: var(--bs-secondary-color, #6c757d);
+            margin-top: 0.25rem;
+            margin-bottom: 0.5rem;
+        }
+
+        /* TDF Editor - Reset Bootstrap spacing utilities, then apply minimal values */
+
+        /* Minimal margin on Bootstrap margin utility elements */
+        #tdf-editor-container [class*="my-"],
+        #tdf-editor-container [class*="mb-"],
+        #tdf-editor-container [class*="mt-"] {
+            margin: 0.25rem 0;
+        }
+
+        /* Minimal padding on Bootstrap padding utility elements */
+        #tdf-editor-container [class*="py-"],
+        #tdf-editor-container [class*="pb-"],
+        #tdf-editor-container [class*="pt-"] {
+            padding: 0.25rem 0;
+        }
+
+        /* Reset Bootstrap row gutters */
+        #tdf-editor-container .row {
+            --bs-gutter-x: 0.5rem;
+            --bs-gutter-y: 0.25rem;
+            margin-bottom: 0.15rem;
+        }
+
+        /* Minimal container padding (after reset, so these win) */
+        #tdf-editor-container .card-body {
+            padding: 0.5rem;
+        }
+        #tdf-editor-container .card-header {
+            padding: 0.35rem 0.5rem;
+        }
+
+        /* Remove margin from nested card.card-body elements (json-editor pattern) */
+        #tdf-editor-container .card.card-body {
+            margin: 0;
+            padding: 0.25rem;
+        }
+
+        /* Base font size */
+        #tdf-editor-container,
+        #tdf-editor-container * {
+            font-size: 0.875rem !important;
+        }
+
+        /* Headings - slightly larger but still compact */
+        #tdf-editor-container h1,
+        #tdf-editor-container h2,
+        #tdf-editor-container h3,
+        #tdf-editor-container h4,
+        #tdf-editor-container h5,
+        #tdf-editor-container h6,
+        #tdf-editor-container .card-header,
+        #tdf-editor-container .je-object__title,
+        #tdf-editor-container .h3.card-title {
+            font-size: 0.9rem !important;
+            font-weight: 600;
+            margin-bottom: 0;
+        }
+
+        /* Property labels in table layout */
+        #tdf-editor-container table th,
+        #tdf-editor-container table td {
+            font-size: 0.875rem !important;
+            padding: 0.25rem 0.5rem !important;
+        }
+
+        /* First column (property names) - slightly bold */
+        #tdf-editor-container table th:first-child,
+        #tdf-editor-container table td:first-child {
+            font-weight: 500;
+        }
+
+        /* Make labels and inputs side-by-side (2 columns) */
+        #tdf-editor-container .form-group {
+            margin-bottom: 0.25rem;
+            display: grid;
+            grid-template-columns: 200px 1fr;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        /* Textareas get full width with label on top (not side-by-side) */
+        #tdf-editor-container .form-group.has-textarea {
+            grid-template-columns: 1fr;
+            gap: 0.25rem;
+            align-items: start;
+        }
+
+        /* Make the column div take full width when it contains a textarea */
+        #tdf-editor-container .row > [class*="col-"]:has(.has-textarea),
+        #tdf-editor-container .row > div[class*="col-"].has-textarea-parent {
+            flex: 0 0 100%;
+            max-width: 100%;
+        }
+
+        #tdf-editor-container .form-group > label {
+            margin-bottom: 0 !important;
+            text-align: right;
+            padding-right: 0.5rem;
+        }
+
+        /* Labels for textareas should be left-aligned on top */
+        #tdf-editor-container .form-group.has-textarea > label {
+            text-align: left;
+            padding-right: 0;
+            font-weight: normal;
+        }
+
+        #tdf-editor-container .form-group > .form-control,
+        #tdf-editor-container .form-group > .form-select,
+        #tdf-editor-container .form-group > input,
+        #tdf-editor-container .form-group > select,
+        #tdf-editor-container .form-group > textarea {
+            margin-bottom: 0 !important;
+        }
+
+        #tdf-editor-container .card {
+            margin-bottom: 0.25rem;
+        }
+
+        #tdf-editor-container .form-control,
+        #tdf-editor-container .form-select {
+            padding: 0.2rem 0.4rem;
+        }
+
+        #tdf-editor-container .btn-group {
+            margin-bottom: 0;
+        }
+
+        #tdf-editor-container .je-object__controls,
+        #tdf-editor-container .je-array__controls {
+            margin-bottom: 0;
+        }
+
+        #tdf-editor-container label.form-label {
+            margin-bottom: 0.15rem;
+        }
+
+        /* Buttons */
+        #tdf-editor-container .btn,
+        #tdf-editor-container button {
+            font-size: 0.8rem !important;
+            padding: 0.2rem 0.4rem !important;
+        }
+
+        /* Style the Properties modal - distinguish in-use vs available */
+        /* Use flexbox to reorder: available at top, in-use at bottom */
+        #tdf-editor-container .je-modal > div {
+            display: flex;
+            flex-direction: column;
+        }
+
+        #tdf-editor-container .je-modal label {
+            display: block;
+            padding: 0.25rem 0.5rem;
+            margin: 0.1rem 0;
+            border-radius: 3px;
+        }
+
+        /* In-use properties (checked) - muted style, pushed to bottom */
+        #tdf-editor-container .je-modal label:has(input[type="checkbox"]:checked) {
+            background: #e9ecef;
+            color: #6c757d;
+            order: 1;
+        }
+
+        /* Available properties (unchecked) - highlighted, stay at top */
+        #tdf-editor-container .je-modal label:has(input[type="checkbox"]:not(:checked)) {
+            background: #d4edda;
+            order: 0;
+        }
+
+        /* Fallback classes for browsers without :has() */
+        #tdf-editor-container .je-modal label.property-in-use {
+            background: #e9ecef;
+            color: #6c757d;
+            order: 1;
+        }
+        #tdf-editor-container .je-modal label.property-available {
+            background: #d4edda;
+            order: 0;
+        }
+
+        /* Hide type switcher - properties should maintain their existing types */
+        #tdf-editor-container .je-switcher {
+            display: none !important;
+        }
+
+        /* Hide labels that are siblings of type switchers (duplicate labels) */
+        #tdf-editor-container label:has(+ .je-switcher),
+        #tdf-editor-container .je-switcher + label,
+        #tdf-editor-container b:has(+ .je-switcher) {
+            display: none !important;
+        }
+
+        /* Textareas for long content - ensure they work well in the grid layout */
+        #tdf-editor-container .form-group > textarea {
+            margin-bottom: 0 !important;
+            width: 100%;
+            min-height: 60px;
+        }
+
+        /* Select elements fill their grid cell (same pattern as textareas) */
+        #tdf-editor-container .form-group > select,
+        #tdf-editor-container .form-group > .form-select {
+            width: 100%;
+        }
+
+        /* =================================================================
+           VALIDATION UI STYLES
+           ================================================================= */
+
+        /* Validation Summary Panel */
+        .validation-summary {
+            margin-bottom: 1rem;
+        }
+
+        .validation-summary .alert {
+            padding: 0.75rem 1rem;
+        }
+
+        .validation-summary .validation-list {
+            list-style: none;
+            padding-left: 0;
+            margin-bottom: 0;
+            font-size: 0.875rem;
+        }
+
+        .validation-summary .validation-item {
+            padding: 0.25rem 0;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+
+        .validation-summary .validation-item:last-child {
+            border-bottom: none;
+        }
+
+        .validation-summary .jump-to-field {
+            font-weight: 500;
+        }
+
+        .validation-summary .jump-to-field:hover {
+            text-decoration: underline !important;
+        }
+
+        /* Field-Level Error Styling */
+        #tdf-editor-container .validation-error-field {
+            border-color: #dc3545 !important;
+            box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25) !important;
+        }
+
+        #tdf-editor-container .validation-warning-field {
+            border-color: #ffc107 !important;
+            box-shadow: 0 0 0 0.2rem rgba(255, 193, 7, 0.25) !important;
+        }
+
+        .field-validation-message {
+            font-size: 0.75rem !important;
+            line-height: 1.2;
+        }
+
+        .field-validation-message i {
+            font-size: 0.7rem;
+        }
+
+        /* Highlight Animation */
+        .validation-highlight {
+            animation: validation-pulse 0.5s ease-in-out 3;
+        }
+
+        @keyframes validation-pulse {
+            0%, 100% {
+                background-color: transparent;
+            }
+            50% {
+                background-color: rgba(255, 193, 7, 0.3);
+            }
+        }
+
+        /* Toggle Button Styling */
+        .toggle-validation-details {
+            color: inherit !important;
+            text-decoration: none !important;
+        }
+
+        .toggle-validation-details:hover {
+            opacity: 0.7;
+        }
+
+        /* MC Mode Toggle Button */
+        .mc-toggle-btn {
+            font-size: 0.75rem !important;
+            padding: 0.15rem 0.4rem !important;
+            vertical-align: middle;
+        }
+
+        .mc-toggle-btn.btn-success {
+            background-color: #198754;
+            border-color: #198754;
+        }
+
+        .mc-toggle-btn.btn-success:hover {
+            background-color: #157347;
+            border-color: #146c43;
+        }
+
+        .mc-toggle-btn.btn-outline-secondary:hover {
+            background-color: #6c757d;
+            color: white;
+        }
+
+        .editor-topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+        }
+
+        .editor-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .editor-verbosity {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .editor-verbosity .form-check {
+            margin-bottom: 0;
+        }
+
+        .save-feedback {
+            margin-right: auto;
+            min-height: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            color: #198754;
+            font-size: 0.875rem;
+            opacity: 0;
+            transition: opacity 0.15s ease;
+            pointer-events: none;
+        }
+
+        .save-feedback.is-visible {
+            opacity: 1;
+        }
+
+        /* Mobile layout adjustments */
+        @media (max-width: 768px) {
+            .editor-topbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .editor-status {
+                justify-content: flex-start;
+            }
+
+            .editor-verbosity {
+                justify-content: flex-start;
+            }
+
+            #tdf-editor-container .form-group {
+                grid-template-columns: 1fr;
+                gap: 0.25rem;
+                align-items: start;
+            }
+
+            #tdf-editor-container .form-group > label {
+                text-align: left;
+                padding-right: 0;
+                font-weight: 500;
+                margin-bottom: 0.25rem !important;
+            }
+
+            #tdf-editor-container .btn {
+                padding: 0.5rem 0.75rem !important;
+                min-height: 44px;
+                font-size: 0.875rem !important;
+            }
+
+            #tdf-editor-container .form-control,
+            #tdf-editor-container .form-select,
+            #tdf-editor-container input,
+            #tdf-editor-container textarea {
+                font-size: 16px !important;
+            }
+
+            #tdf-editor-container .media-field-wrapper {
+                flex-wrap: wrap;
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            #tdf-editor-container .media-field-wrapper > input[type="text"] {
+                min-width: 100%;
+                max-width: 100%;
+                order: 1;
+            }
+
+            #tdf-editor-container .media-preview {
+                order: 2;
+                width: 100%;
+                justify-content: center;
+            }
+
+            #tdf-editor-container .media-drop-zone {
+                order: 3;
+                width: 100%;
+                justify-content: center;
+                padding: 0.5rem;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .content-edit-actions {
+                flex-direction: column-reverse !important;
+            }
+
+            .content-edit-actions .save-feedback {
+                width: 100%;
+                justify-content: center;
+                margin-right: 0;
+            }
+
+            .content-edit-actions .btn {
+                width: 100%;
+                min-height: 48px;
+            }
+        }
+    </style>
+
+    <div class="container" style="margin-top: 1rem;">
+        <!-- Header -->
+        <div class="d-flex align-items-center mb-3">
+            <a href="/contentUpload" class="btn btn-outline-secondary me-3">
+                <i class="fa fa-arrow-left"></i> Back
+            </a>
+            <h3 class="m-0">
+                Edit TDF: {{lessonName}}
+                {{#if conditionInfo}}
+                    <small class="text-muted">
+                        (Editing: {{conditionInfo.fileName}} - Condition {{conditionInfo.index}} of {{conditionInfo.total}})
+                    </small>
+                {{/if}}
+            </h3>
+        </div>
+
+        {{#if loading}}
+        <div class="text-center py-5">
+            <i class="fa fa-spinner fa-spin fa-2x"></i>
+            <p class="mt-2">Loading TDF...</p>
+        </div>
+        {{else}}
+        {{#if noData}}
+        <div class="alert alert-warning">
+            <i class="fa fa-exclamation-triangle"></i>
+            TDF not found or you don't have permission to edit it.
+        </div>
+        {{else}}
+
+        <!-- Tooltip toggle + unsaved state (mobile-friendly) -->
+        <div class="editor-topbar mb-3">
+            <div class="editor-status">
+                {{#if hasChanges}}
+                <span class="badge bg-warning text-dark unsaved-badge">Unsaved changes</span>
+                {{/if}}
+            </div>
+            <div class="editor-verbosity">
+                <span class="text-muted small">Descriptions:</span>
+                <div class="form-check form-check-inline mb-0">
+                    <input class="form-check-input" type="radio" name="tooltipMode" id="tooltipNone" value="none" checked="{{noneChecked}}">
+                    <label class="form-check-label small" for="tooltipNone">None</label>
+                </div>
+                <div class="form-check form-check-inline mb-0">
+                    <input class="form-check-input" type="radio" name="tooltipMode" id="tooltipBrief" value="brief" checked="{{briefChecked}}">
+                    <label class="form-check-label small" for="tooltipBrief">Brief</label>
+                </div>
+                <div class="form-check form-check-inline mb-0">
+                    <input class="form-check-input" type="radio" name="tooltipMode" id="tooltipVerbose" value="verbose" checked="{{verboseChecked}}">
+                    <label class="form-check-label small" for="tooltipVerbose">Verbose</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Validation Summary Panel -->
+        <div id="tdf-validation-summary"></div>
+
+        <!-- JSON Editor container -->
+        <div class="card mb-4">
+            <div class="card-body p-2">
+                <div id="tdf-editor-container"></div>
+            </div>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="d-flex align-items-center justify-content-end gap-2 mt-4 mb-4 content-edit-actions">
+            <div class="save-feedback {{#if saveFeedbackText}}is-visible{{/if}}" role="status" aria-live="polite" aria-atomic="true">
+                {{#if saveFeedbackText}}
+                <i class="fa fa-check-circle" aria-hidden="true"></i>
+                <span>{{saveFeedbackText}}</span>
+                {{/if}}
+            </div>
+            <a href="/contentUpload" class="btn btn-secondary">
+                <i class="fa fa-times"></i> Cancel
+            </a>
+            <button class="btn btn-primary save-btn" disabled="{{saveDisabled}}">
+                <i class="fa fa-save"></i> Save Changes
+            </button>
+        </div>
+
+        {{/if}}
+        {{/if}}
+    </div>
+</template>

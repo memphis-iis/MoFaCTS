@@ -1,0 +1,516 @@
+<template name="apkgWizard">
+  <div class="apkg-wizard" id="apkg-wizard-container">
+    <!-- Wizard Header -->
+    <div class="wizard-header">
+      <h3>Import from Anki (.apkg)</h3>
+      <p class="text-muted">
+        Convert Anki flashcard decks into MoFaCTS learning modules.
+        Choose which fields to use and create one or more targeted TDFs.
+      </p>
+    </div>
+
+    <!-- Step Indicators -->
+    <div class="wizard-steps">
+      <div class="step {{#if isStep 1}}active{{/if}} {{#if stepCompleted 1}}completed{{/if}}">
+        <span class="step-number">1</span>
+        <span class="step-label">Upload</span>
+      </div>
+      <div class="step {{#if isStep 2}}active{{/if}} {{#if stepCompleted 2}}completed{{/if}}">
+        <span class="step-number">2</span>
+        <span class="step-label">Setup</span>
+      </div>
+      <div class="step {{#if isStep 3}}active{{/if}} {{#if stepCompleted 3}}completed{{/if}}">
+        <span class="step-number">3</span>
+        <span class="step-label">Edit Draft</span>
+      </div>
+      <div class="step {{#if isStep 4}}active{{/if}} {{#if stepCompleted 4}}completed{{/if}}">
+        <span class="step-number">4</span>
+        <span class="step-label">Package</span>
+      </div>
+    </div>
+
+    <!-- Wizard Content -->
+    <div class="wizard-content">
+
+      <!-- Step 1: Upload & Analyze -->
+      {{#if isStep 1}}
+      <div class="wizard-step step-upload">
+        <h4>Step 1: Select Anki Deck</h4>
+
+        <div class="form-group">
+          <label for="apkg-file-input">Choose .apkg file:</label>
+          <input type="file" class="form-control" id="apkg-file-input" accept=".apkg">
+          <small class="form-text text-muted">
+            Select an Anki deck file (.apkg) from your computer
+          </small>
+        </div>
+
+
+        {{#if analyzing}}
+        <div class="alert alert-info">
+          <i class="fa fa-spinner fa-spin"></i> Analyzing deck structure...
+          <div class="mt-2">
+            <small>• Parsing SQLite database</small><br>
+            <small>• Extracting fields and card templates</small><br>
+            <small>• Analyzing media files</small>
+          </div>
+        </div>
+        {{/if}}
+
+        {{#if analyzeError}}
+        <div class="alert alert-danger">
+          <strong>Error:</strong> {{analyzeError}}
+        </div>
+        {{/if}}
+
+        <div class="wizard-actions">
+          <button class="btn btn-secondary" id="cancel-wizard">Cancel</button>
+          {{#if analyzeDisabled}}
+          <button class="btn btn-primary" id="analyze-deck" disabled>
+            Analyze Deck →
+          </button>
+          {{else}}
+          <button class="btn btn-primary" id="analyze-deck">
+            Analyze Deck →
+          </button>
+          {{/if}}
+        </div>
+      </div>
+      {{/if}}
+
+      <!-- Step 2: Source Setup -->
+      {{#if isStep 2}}
+      <div class="wizard-step step-preview">
+        <h4>Step 2: Configure Lesson Sources</h4>
+
+        {{#if deckMetadata}}
+        <div class="deck-info card mb-3">
+          <div class="card-body">
+            <h5>{{deckMetadata.deckName}}</h5>
+            <div class="row">
+              <div class="col-md-3">
+                <strong>Notes:</strong> {{deckMetadata.noteCount}}
+              </div>
+              <div class="col-md-3">
+                <strong>Cards:</strong> {{deckMetadata.cardCount}}
+              </div>
+              <div class="col-md-3">
+                <strong>Media:</strong> {{deckMetadata.mediaCount}}
+              </div>
+              <div class="col-md-3">
+                <strong>Model:</strong> {{deckMetadata.modelName}}
+              </div>
+            </div>
+            {{#if (eq importableNoteCount deckMetadata.noteCount)}}
+            {{else}}
+            <div class="mt-2 small text-muted">
+              Importable notes from the primary model: {{importableNoteCount}}
+            </div>
+            {{/if}}
+          </div>
+        </div>
+
+        <h5>Available Fields:</h5>
+        <div class="fields-list">
+          {{#each deckMetadata.fields}}
+          <div class="field-card card mb-2">
+            <div class="card-body">
+              <div class="row align-items-center">
+                <div class="col-md-3">
+                  <strong>{{plusOne index}}. {{name}}</strong>
+                  <span class="badge badge-{{fieldTypeBadge type}}">{{type}}</span>
+                </div>
+                <div class="col-md-9">
+                  {{#if sampleImage}}
+                  <div class="field-preview mb-2">
+                    <img src="{{sampleImage}}" alt="Preview" class="img-thumbnail" style="max-height: 80px; max-width: 120px;">
+                  </div>
+                  {{/if}}
+                  <small class="text-muted">
+                    {{#if (eq type "image")}}
+                      <i class="fa fa-image"></i> Image field
+                    {{else if (eq type "mixed")}}
+                      <i class="fa fa-image"></i><i class="fa fa-font"></i> Image + Text
+                    {{else}}
+                      <i class="fa fa-font"></i> Text field
+                    {{/if}}
+                    {{#unless sampleImage}}
+                    <br>
+                    Samples: {{joinSamples samples}}
+                    {{/unless}}
+                  </small>
+                </div>
+              </div>
+            </div>
+          </div>
+          {{/each}}
+        </div>
+
+        <!-- TDF Configurations -->
+        <div class="tdf-configs">
+          {{#each tdfConfigs}}
+          <div class="tdf-config-card card mb-3">
+            <div class="card-header">
+              <strong>TDF {{plusOne @index}}: {{#if name}}{{name}}{{else}}(unnamed){{/if}}</strong>
+              {{#if isMultipleMode}}
+              <button class="btn btn-sm btn-danger float-right remove-config" data-index="{{@index}}">
+                <i class="fa fa-trash"></i> Remove
+              </button>
+              {{/if}}
+            </div>
+            <div class="card-body">
+
+              <!-- TDF Name -->
+              <div class="form-group">
+                <label>TDF Name:</label>
+                <input type="text" class="form-control tdf-name" data-index="{{@index}}"
+                       value="{{name}}" placeholder="e.g., Countries_Flags">
+              </div>
+
+              <!-- Prompt Field -->
+              <div class="form-group">
+                <label>Prompt (what students see):</label>
+                <select class="form-control prompt-field" data-index="{{@index}}" data-selected="{{prompt.field}}">
+                  <option value="">-- Select field --</option>
+                  {{#each deckFields}}
+                  <option value="{{index}}">
+                    {{plusOne index}}. {{name}} ({{type}})
+                  </option>
+                  {{/each}}
+                </select>
+              </div>
+
+              <!-- Response Field -->
+              <div class="form-group">
+                <label>Response (correct answer):</label>
+                <select class="form-control response-field" data-index="{{@index}}" data-selected="{{response.field}}">
+                  <option value="">-- Select field --</option>
+                  {{#each deckFields}}
+                  <option value="{{index}}">
+                    {{plusOne index}}. {{name}} ({{type}})
+                  </option>
+                  {{/each}}
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label>Note Range (optional):</label>
+                <input
+                  type="text"
+                  class="form-control source-range"
+                  data-index="{{@index}}"
+                  value="{{sourceRange}}"
+                  placeholder='e.g., 0-999 or 0-499 1000-1499'>
+                <small class="form-text text-muted">
+                  Leave blank to use all notes. Uses zero-based note ranges in deck order.
+                </small>
+              </div>
+
+              <div class="text-muted small mb-2">
+                Uses <strong>{{selectedNoteCount this}}</strong> of {{importableNoteCount}} importable notes{{#if usingSubset this}} for this TDF{{/if}}.
+              </div>
+
+              {{#if validationError}}
+              <div class="alert alert-warning">
+                <i class="fa fa-exclamation-triangle"></i> {{validationError}}
+              </div>
+              {{/if}}
+
+              {{#if isValid}}
+              <div class="alert alert-success">
+                <i class="fa fa-check"></i> Configuration looks good.
+              </div>
+              {{/if}}
+
+            </div>
+          </div>
+          {{/each}}
+        </div>
+
+        <!-- Add Another TDF Button -->
+        {{#unless hideAddButton}}
+        <div class="text-center mb-3">
+          <button class="btn btn-outline-primary" id="add-tdf-config">
+            <i class="fa fa-plus"></i> Add Another TDF Configuration
+          </button>
+          <p class="text-muted small mt-2">
+            Want to create multiple learning modules from this deck?
+          </p>
+        </div>
+        {{/unless}}
+
+        <!-- Summary -->
+        <div class="card bg-light">
+          <div class="card-body">
+            <h5>Summary:</h5>
+            <ul>
+              <li><strong>{{configCount}}</strong> TDF{{#if isMultipleMode}}s{{/if}} configured</li>
+              <li><strong>{{totalCards}}</strong> total cards will be generated</li>
+              {{#if totalMedia}}
+              <li><strong>{{totalMedia}}</strong> media files will be included</li>
+              {{/if}}
+            </ul>
+          </div>
+        </div>
+
+        <div class="wizard-actions mt-3">
+          <button class="btn btn-secondary" id="back-to-upload">← Back</button>
+          {{#if allConfigsValid}}
+          <button class="btn btn-primary" id="open-draft-editor">
+            Open Draft Editor →
+          </button>
+          {{else}}
+          <button class="btn btn-primary" id="open-draft-editor" disabled>
+            Open Draft Editor →
+          </button>
+          {{/if}}
+        </div>
+        {{/if}}
+      </div>
+      {{/if}}
+
+      <!-- Step 3: Draft Editor Workspace -->
+      {{#if isStep 3}}
+      <div class="wizard-step step-draft-editor">
+        {{#if generateError}}
+        <div class="alert alert-danger">
+          <strong>Packaging error:</strong> {{generateError}}
+        </div>
+        {{/if}}
+        {{> draftEditorWorkspace
+          lessons=draftLessons
+          onLessonsUpdate=updateDraftLessons
+          onBack=backToSourceConfig
+          onSaveContinue=saveDraftAndContinue
+        }}
+      </div>
+      {{/if}}
+
+      <!-- Step 4: Generate & Upload -->
+      {{#if isStep 4}}
+      <div class="wizard-step step-generate">
+        <h4>Step 4: {{#if generationComplete}}Package Ready{{else}}Generating...{{/if}}</h4>
+
+        {{#if generating}}
+        <div class="alert alert-info">
+          <i class="fa fa-spinner fa-spin"></i> Generating TDF{{#if isMultipleMode}}s{{/if}}...
+          <div class="progress mt-2">
+            <div class="progress-bar progress-bar-striped progress-bar-animated"
+                 style="width: {{generationProgress}}%">
+              {{generationProgress}}%
+            </div>
+          </div>
+          <div class="mt-2">
+            {{#if currentGenerationStep}}
+            <small>{{currentGenerationStep}}</small>
+            {{/if}}
+          </div>
+        </div>
+        {{/if}}
+
+        {{#if generateError}}
+        <div class="alert alert-danger">
+          <strong>Error:</strong> {{generateError}}
+          <button class="btn btn-sm btn-secondary mt-2" id="back-to-config-error">
+            ← Back to Configuration
+          </button>
+        </div>
+        {{/if}}
+
+        {{#if generationComplete}}
+        <div class="alert alert-success">
+          <i class="fa fa-check"></i> <strong>Generation Complete!</strong>
+        </div>
+
+        {{#if generationResult.totalSkipped}}
+        <div class="alert alert-warning">
+          <i class="fa fa-exclamation-triangle"></i>
+          Skipped {{generationResult.totalSkipped}} cards while preparing the imported lessons.
+        </div>
+        {{/if}}
+
+        <div class="card mb-3">
+          <div class="card-header">
+            <h5>Generated Files:</h5>
+          </div>
+          <div class="card-body">
+            <ul>
+              {{#each generationResult.manifest}}
+              <li>
+                <strong>{{tdfName}}</strong>: {{cardCount}} cards
+                {{#if mediaCount}}, {{mediaCount}} media files{{/if}}
+                {{#if skippedCount}}, {{skippedCount}} skipped{{/if}}
+              </li>
+              {{/each}}
+            </ul>
+            <div class="mt-2">
+              <strong>Total:</strong> {{generationResult.totalCards}} cards,
+              {{generationResult.totalMedia}} media files
+              {{#if generationResult.totalSkipped}}, {{generationResult.totalSkipped}} skipped{{/if}}
+            </div>
+          </div>
+        </div>
+
+        {{#if uploadStatus}}
+        <div class="alert alert-info mt-3">
+          <i class="fa fa-spinner fa-spin"></i> {{uploadStatus.message}}
+          <div class="progress mt-2">
+            <div class="progress-bar progress-bar-striped progress-bar-animated"
+                 style="width: {{uploadStatus.progress}}%">
+              {{uploadStatus.progress}}%
+            </div>
+          </div>
+          {{#if uploadStatus.hint}}
+          <small class="text-muted mt-2 d-block">
+            {{uploadStatus.hint}}
+          </small>
+          {{/if}}
+        </div>
+        {{/if}}
+
+        {{#if uploadError}}
+        <div class="alert alert-danger mt-3">
+          <i class="fa fa-exclamation-triangle"></i> {{uploadError}}
+        </div>
+        {{/if}}
+
+        <div class="wizard-actions">
+          {{#if uploadStatus}}
+          <button class="btn btn-outline-secondary" id="download-package" disabled>
+            <i class="fa fa-download"></i> Download Package
+          </button>
+          <button class="btn btn-primary" id="upload-to-mofacts" disabled>
+            <i class="fa fa-upload"></i> Upload to MoFaCTS
+          </button>
+          {{else}}
+          <button class="btn btn-outline-secondary" id="download-package">
+            <i class="fa fa-download"></i> Download Package
+          </button>
+          <button class="btn btn-primary" id="upload-to-mofacts">
+            <i class="fa fa-upload"></i> Upload to MoFaCTS
+          </button>
+          {{/if}}
+        </div>
+
+        {{#if uploadComplete}}
+        <div class="alert alert-success mt-3">
+          <i class="fa fa-check"></i> Successfully uploaded to MoFaCTS!
+          <button class="btn btn-sm btn-primary mt-2" id="close-wizard">
+            Close Wizard
+          </button>
+        </div>
+        {{/if}}
+
+        {{/if}}
+      </div>
+      {{/if}}
+
+    </div>
+  </div>
+
+  <style>
+  .apkg-wizard {
+    max-width: 900px;
+    margin: 20px auto;
+    padding: 20px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+
+  .wizard-header {
+    text-align: center;
+    margin-bottom: 30px;
+  }
+
+  .wizard-steps {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 30px;
+    position: relative;
+  }
+
+  .wizard-steps::before {
+    content: '';
+    position: absolute;
+    top: 20px;
+    left: 10%;
+    right: 10%;
+    height: 2px;
+    background: #ddd;
+    z-index: 0;
+  }
+
+  .wizard-steps .step {
+    flex: 1;
+    text-align: center;
+    position: relative;
+    z-index: 1;
+  }
+
+  .wizard-steps .step-number {
+    display: inline-block;
+    width: 40px;
+    height: 40px;
+    line-height: 40px;
+    border-radius: 50%;
+    background: #fff;
+    border: 2px solid #ddd;
+    color: #999;
+    font-weight: bold;
+    margin-bottom: 5px;
+  }
+
+  .wizard-steps .step.active .step-number {
+    border-color: #007bff;
+    background: #007bff;
+    color: #fff;
+  }
+
+  .wizard-steps .step.completed .step-number {
+    border-color: #28a745;
+    background: #28a745;
+    color: #fff;
+  }
+
+  .wizard-steps .step-label {
+    display: block;
+    font-size: 12px;
+    color: #666;
+  }
+
+  .wizard-content {
+    min-height: 400px;
+  }
+
+  .wizard-actions {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #ddd;
+  }
+
+  .field-card {
+    border-left: 3px solid #007bff;
+  }
+
+  .tdf-config-card {
+    border-left: 4px solid #007bff;
+  }
+
+  .tdf-config-card.editing {
+    border-left-color: #ffc107;
+  }
+
+  .badge-text { background: #6c757d; }
+  .badge-image { background: #17a2b8; }
+  .badge-mixed { background: #fd7e14; }
+  .badge-audio { background: #6f42c1; }
+
+  .fields-list {
+    max-height: 400px;
+    overflow-y: auto;
+  }
+  </style>
+</template>

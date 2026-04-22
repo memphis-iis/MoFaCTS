@@ -1,0 +1,43 @@
+services:
+  mofacts:
+    environment:
+      PORT: 3000
+      MONGO_URL: mongodb://mongodb:27017/MoFACT-meteor3
+      EXPECTED_MONGO_DB_NAME: MoFACT-meteor3
+      METEOR_SETTINGS_WORKAROUND: /run/local-settings/settings.local.json
+    volumes:
+      - type: bind
+        source: ./local-data/mofactsAssets_override
+        target: /mofactsAssets_override
+      - type: bind
+        source: ./local-data/dynamic-assets
+        target: /root/dynamic-assets
+      - type: bind
+        source: ./settings.local.json
+        target: /run/local-settings/settings.local.json
+        read_only: true
+    ports: !override
+      - "3100:3000"
+    build:
+      context: ../../
+      dockerfile: Dockerfile
+    networks:
+      - mofacts
+
+  mongodb:
+    image: mongo:8.0
+    restart: always
+    command:
+      - --storageEngine=wiredTiger
+    volumes:
+      - data:/data/db
+    networks:
+      - mofacts
+
+volumes:
+  data:
+    driver: local
+
+networks:
+  mofacts:
+    driver: bridge

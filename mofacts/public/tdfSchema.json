@@ -1,0 +1,3302 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MoFaCTS TDF Schema",
+  "description": "Registry-backed TDF schema.",
+  "type": "object",
+  "required": [
+    "tutor"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "tutor": {
+      "type": "object",
+      "title": "Tutor",
+      "required": [
+        "setspec",
+        "unit"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "setspec": {
+          "type": "object",
+          "title": "Setspec",
+          "properties": {
+            "lessonname": {
+              "type": "string",
+              "default": "",
+              "options": {
+                "grid_columns": 12
+              }
+            },
+            "stimulusfile": {
+              "type": "string",
+              "default": "",
+              "options": {
+                "grid_columns": 12
+              }
+            },
+            "name": {
+              "type": "string",
+              "default": "",
+              "options": {
+                "grid_columns": 6
+              }
+            },
+            "experimentTarget": {
+              "type": "string",
+              "default": "",
+              "options": {
+                "grid_columns": 6
+              }
+            },
+            "userselect": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                {
+                  "type": "boolean"
+                }
+              ],
+              "default": "false",
+              "options": {
+                "grid_columns": 4
+              }
+            },
+            "lfparameter": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "options": {
+                "grid_columns": 4
+              }
+            },
+            "hintsEnabled": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                {
+                  "type": "boolean"
+                }
+              ],
+              "default": false,
+              "options": {
+                "grid_columns": 4
+              }
+            },
+            "tags": {
+              "type": "array",
+              "title": "Tags",
+              "items": {
+                "type": "string",
+                "title": "Tag"
+              }
+            },
+            "shuffleclusters": {
+              "type": "string",
+              "default": "",
+              "options": {
+                "grid_columns": 12
+              }
+            },
+            "swapclusters": {
+              "type": "string",
+              "default": "",
+              "options": {
+                "grid_columns": 12
+              }
+            },
+            "enableAudioPromptAndFeedback": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                {
+                  "type": "boolean"
+                }
+              ],
+              "default": "false",
+              "options": {
+                "grid_columns": 4
+              }
+            },
+            "speechAPIKey": {
+              "type": "string",
+              "default": "",
+              "options": {
+                "grid_columns": 12
+              }
+            },
+            "textToSpeechAPIKey": {
+              "type": "string",
+              "default": "",
+              "options": {
+                "grid_columns": 12
+              }
+            },
+            "audioInputEnabled": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                {
+                  "type": "boolean"
+                }
+              ],
+              "default": "false",
+              "options": {
+                "grid_columns": 4
+              }
+            },
+            "speechRecognitionLanguage": {
+              "type": "string",
+              "enum": [
+                "af-ZA",
+                "am-ET",
+                "ar-AE",
+                "ar-BH",
+                "ar-DZ",
+                "ar-EG",
+                "ar-IL",
+                "ar-IQ",
+                "ar-JO",
+                "ar-KW",
+                "ar-LB",
+                "ar-MA",
+                "ar-MR",
+                "ar-OM",
+                "ar-PS",
+                "ar-QA",
+                "ar-SA",
+                "ar-SY",
+                "ar-TN",
+                "ar-YE",
+                "az-AZ",
+                "bg-BG",
+                "bn-BD",
+                "bn-IN",
+                "bs-BA",
+                "ca-ES",
+                "cs-CZ",
+                "da-DK",
+                "de-AT",
+                "de-CH",
+                "de-DE",
+                "el-GR",
+                "en-AU",
+                "en-CA",
+                "en-GB",
+                "en-GH",
+                "en-HK",
+                "en-IE",
+                "en-IN",
+                "en-KE",
+                "en-NG",
+                "en-NZ",
+                "en-PH",
+                "en-PK",
+                "en-SG",
+                "en-TZ",
+                "en-US",
+                "en-ZA",
+                "es-AR",
+                "es-BO",
+                "es-CL",
+                "es-CO",
+                "es-CR",
+                "es-DO",
+                "es-EC",
+                "es-ES",
+                "es-GT",
+                "es-HN",
+                "es-MX",
+                "es-NI",
+                "es-PA",
+                "es-PE",
+                "es-PR",
+                "es-PY",
+                "es-SV",
+                "es-US",
+                "es-UY",
+                "es-VE",
+                "et-EE",
+                "eu-ES",
+                "fa-IR",
+                "fi-FI",
+                "fil-PH",
+                "fr-BE",
+                "fr-CA",
+                "fr-CH",
+                "fr-FR",
+                "gl-ES",
+                "gu-IN",
+                "hi-IN",
+                "hr-HR",
+                "hu-HU",
+                "hy-AM",
+                "id-ID",
+                "is-IS",
+                "it-CH",
+                "it-IT",
+                "iw-IL",
+                "ja-JP",
+                "jv-ID",
+                "ka-GE",
+                "kk-KZ",
+                "km-KH",
+                "kn-IN",
+                "ko-KR",
+                "lo-LA",
+                "lt-LT",
+                "lv-LV",
+                "mk-MK",
+                "ml-IN",
+                "mn-MN",
+                "mr-IN",
+                "ms-MY",
+                "my-MM",
+                "ne-NP",
+                "nl-BE",
+                "nl-NL",
+                "no-NO",
+                "pl-PL",
+                "pt-BR",
+                "pt-PT",
+                "ro-RO",
+                "ru-RU",
+                "rw-RW",
+                "si-LK",
+                "sk-SK",
+                "sl-SI",
+                "sq-AL",
+                "sr-RS",
+                "st-ZA",
+                "su-ID",
+                "sv-SE",
+                "sw-KE",
+                "sw-TZ",
+                "ta-IN",
+                "ta-LK",
+                "ta-MY",
+                "ta-SG",
+                "te-IN",
+                "th-TH",
+                "tr-TR",
+                "ts-ZA",
+                "uk-UA",
+                "ur-IN",
+                "ur-PK",
+                "uz-UZ",
+                "ve-ZA",
+                "vi-VN",
+                "xh-ZA",
+                "zu-ZA"
+              ],
+              "default": "en-US",
+              "options": {
+                "grid_columns": 4
+              }
+            },
+            "audioInputSensitivity": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "options": {
+                "grid_columns": 4
+              }
+            },
+            "audioPromptMode": {
+              "type": "string",
+              "enum": [
+                "silent",
+                "question",
+                "feedback",
+                "all"
+              ],
+              "default": "silent",
+              "options": {
+                "grid_columns": 4
+              }
+            },
+            "textToSpeechLanguage": {
+              "type": "string",
+              "enum": [
+                "af-ZA",
+                "ar-XA",
+                "bg-BG",
+                "bn-IN",
+                "ca-ES",
+                "cmn-CN",
+                "cmn-TW",
+                "cs-CZ",
+                "da-DK",
+                "de-DE",
+                "el-GR",
+                "en-AU",
+                "en-GB",
+                "en-IN",
+                "en-US",
+                "es-ES",
+                "es-US",
+                "et-EE",
+                "eu-ES",
+                "fi-FI",
+                "fil-PH",
+                "fr-CA",
+                "fr-FR",
+                "gl-ES",
+                "gu-IN",
+                "he-IL",
+                "hi-IN",
+                "hr-HR",
+                "hu-HU",
+                "id-ID",
+                "is-IS",
+                "it-IT",
+                "ja-JP",
+                "kn-IN",
+                "ko-KR",
+                "lt-LT",
+                "lv-LV",
+                "ml-IN",
+                "mr-IN",
+                "ms-MY",
+                "nb-NO",
+                "nl-BE",
+                "nl-NL",
+                "pa-IN",
+                "pl-PL",
+                "pt-BR",
+                "pt-PT",
+                "ro-RO",
+                "ru-RU",
+                "sk-SK",
+                "sl-SI",
+                "sr-RS",
+                "sv-SE",
+                "ta-IN",
+                "te-IN",
+                "th-TH",
+                "tr-TR",
+                "uk-UA",
+                "ur-IN",
+                "vi-VN",
+                "yue-HK"
+              ],
+              "default": "en-US",
+              "options": {
+                "grid_columns": 4
+              }
+            },
+            "speechIgnoreOutOfGrammarResponses": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                {
+                  "type": "boolean"
+                }
+              ],
+              "default": "false",
+              "options": {
+                "grid_columns": 4
+              }
+            },
+            "speechOutOfGrammarFeedback": {
+              "type": "string",
+              "default": "",
+              "options": {
+                "grid_columns": 12
+              }
+            },
+            "audioPromptVoice": {
+              "type": "string",
+              "default": "",
+              "options": {
+                "grid_columns": 6
+              }
+            },
+            "audioPromptFeedbackVoice": {
+              "type": "string",
+              "default": "",
+              "options": {
+                "grid_columns": 6
+              }
+            },
+            "audioPromptQuestionSpeakingRate": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "options": {
+                "grid_columns": 4
+              }
+            },
+            "audioPromptFeedbackSpeakingRate": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "options": {
+                "grid_columns": 4
+              }
+            },
+            "audioPromptSpeakingRate": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "options": {
+                "grid_columns": 4
+              }
+            },
+            "loadbalancing": {
+              "type": "string",
+              "enum": [
+                "max",
+                "min"
+              ],
+              "options": {
+                "grid_columns": 4
+              }
+            },
+            "countcompletion": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "beginning",
+                    "end"
+                  ]
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "boolean"
+                }
+              ],
+              "options": {
+                "grid_columns": 4
+              }
+            },
+            "condition": {
+              "type": "array",
+              "title": "Conditions",
+              "items": {
+                "type": "string",
+                "title": "Condition"
+              }
+            },
+            "randomizedDelivery": {
+              "type": "array",
+              "title": "Randomized Delivery",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "title": "Condition Count"
+              }
+            },
+            "prestimulusDisplay": {
+              "type": "string",
+              "default": "",
+              "format": "textarea",
+              "options": {
+                "grid_columns": 12
+              }
+            },
+            "tips": {
+              "type": "array",
+              "title": "Tips",
+              "items": {
+                "type": "string",
+                "title": "Tip"
+              }
+            },
+            "progressReporterParams": {
+              "type": "array",
+              "title": "Progress Reporter Params",
+              "items": {
+                "type": "number",
+                "title": "Value"
+              }
+            },
+            "disableProgressReport": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                {
+                  "type": "boolean"
+                }
+              ],
+              "default": "false",
+              "options": {
+                "grid_columns": 4
+              }
+            },
+            "experimentPasswordRequired": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                {
+                  "type": "boolean"
+                }
+              ],
+              "default": "false",
+              "options": {
+                "grid_columns": 4
+              }
+            },
+            "simTimeout": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ],
+              "options": {
+                "grid_columns": 4
+              }
+            },
+            "simCorrectProb": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "options": {
+                "grid_columns": 4
+              }
+            },
+            "allowRevistUnit": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                {
+                  "type": "boolean"
+                }
+              ],
+              "default": "false",
+              "options": {
+                "grid_columns": 4
+              }
+            },
+            "uiSettings": {
+              "type": "object",
+              "title": "UI Settings",
+              "properties": {
+                "stimuliPosition": {
+                  "type": "string",
+                  "enum": [
+                    "top",
+                    "left"
+                  ],
+                  "default": "top",
+                  "options": {
+                    "grid_columns": 4
+                  }
+                },
+                "isVideoSession": {
+                  "type": "boolean",
+                  "default": false,
+                  "options": {
+                    "grid_columns": 4
+                  }
+                },
+                "videoUrl": {
+                  "type": "string",
+                  "default": "",
+                  "options": {
+                    "grid_columns": 12
+                  }
+                },
+                "displayCorrectFeedback": {
+                  "type": "boolean",
+                  "default": true,
+                  "options": {
+                    "grid_columns": 4
+                  }
+                },
+                "displayIncorrectFeedback": {
+                  "type": "boolean",
+                  "default": true,
+                  "options": {
+                    "grid_columns": 4
+                  }
+                },
+                "correctMessage": {
+                  "type": "string",
+                  "default": "Correct.",
+                  "options": {
+                    "grid_columns": 6
+                  }
+                },
+                "incorrectMessage": {
+                  "type": "string",
+                  "default": "Incorrect.",
+                  "options": {
+                    "grid_columns": 6
+                  }
+                },
+                "correctColor": {
+                  "type": "string",
+                  "default": "var(--success-color)",
+                  "options": {
+                    "grid_columns": 4
+                  }
+                },
+                "incorrectColor": {
+                  "type": "string",
+                  "default": "var(--alert-color)",
+                  "options": {
+                    "grid_columns": 4
+                  }
+                },
+                "displayUserAnswerInFeedback": {
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "enum": [
+                        "onCorrect",
+                        "onIncorrect"
+                      ]
+                    }
+                  ],
+                  "default": "onIncorrect",
+                  "options": {
+                    "grid_columns": 4
+                  }
+                },
+                "singleLineFeedback": {
+                  "type": "boolean",
+                  "default": false,
+                  "options": {
+                    "grid_columns": 4
+                  }
+                },
+                "onlyShowSimpleFeedback": {
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "enum": [
+                        "onCorrect",
+                        "onIncorrect"
+                      ]
+                    }
+                  ],
+                  "default": "onCorrect",
+                  "options": {
+                    "grid_columns": 4
+                  }
+                },
+                "displayUserAnswerInCorrectFeedback": {
+                  "type": "boolean",
+                  "default": false,
+                  "options": {
+                    "grid_columns": 4
+                  }
+                },
+                "displayUserAnswerInIncorrectFeedback": {
+                  "type": "boolean",
+                  "default": true,
+                  "options": {
+                    "grid_columns": 4
+                  }
+                },
+                "displayPerformance": {
+                  "type": "boolean",
+                  "default": false,
+                  "options": {
+                    "grid_columns": 4
+                  }
+                },
+                "displayTimeoutBar": {
+                  "type": "boolean",
+                  "default": false,
+                  "options": {
+                    "grid_columns": 4
+                  }
+                },
+                "choiceButtonCols": {
+                  "type": "integer",
+                  "default": 1,
+                  "options": {
+                    "grid_columns": 4
+                  }
+                },
+                "displaySubmitButton": {
+                  "type": "boolean",
+                  "default": false,
+                  "options": {
+                    "grid_columns": 4
+                  }
+                },
+                "inputPlaceholderText": {
+                  "type": "string",
+                  "default": "Type your answer here...",
+                  "options": {
+                    "grid_columns": 12
+                  }
+                },
+                "displayConfirmButton": {
+                  "type": "boolean",
+                  "default": false,
+                  "options": {
+                    "grid_columns": 4
+                  }
+                },
+                "continueButtonText": {
+                  "type": "string",
+                  "default": "Continue",
+                  "options": {
+                    "grid_columns": 6
+                  }
+                },
+                "skipStudyButtonText": {
+                  "type": "string",
+                  "default": "Skip",
+                  "options": {
+                    "grid_columns": 6
+                  }
+                },
+                "caseSensitive": {
+                  "type": "boolean",
+                  "default": false,
+                  "options": {
+                    "grid_columns": 4
+                  }
+                },
+                "displayQuestionNumber": {
+                  "type": "boolean",
+                  "default": false,
+                  "options": {
+                    "grid_columns": 4
+                  }
+                }
+              },
+              "additionalProperties": false
+            },
+            "unitTemplate": {
+              "type": "array",
+              "title": "Unit Templates",
+              "items": {
+                "type": "object",
+                "title": "Unit Template",
+                "properties": {
+                  "unitname": {
+                    "type": "string",
+                    "default": "",
+                    "options": {
+                      "grid_columns": 6
+                    }
+                  },
+                  "unitinstructions": {
+                    "type": "string",
+                    "default": "",
+                    "format": "textarea",
+                    "options": {
+                      "grid_columns": 12
+                    }
+                  },
+                  "unitinstructionsquestion": {
+                    "type": "string",
+                    "default": "",
+                    "format": "textarea",
+                    "options": {
+                      "grid_columns": 12
+                    }
+                  },
+                  "buttonorder": {
+                    "type": "string",
+                    "enum": [
+                      "fixed",
+                      "random"
+                    ],
+                    "default": "fixed",
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "buttontrial": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "true",
+                          "false"
+                        ]
+                      },
+                      {
+                        "type": "boolean"
+                      }
+                    ],
+                    "default": "false",
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "buttonOptions": {
+                    "type": "string",
+                    "default": "",
+                    "format": "textarea",
+                    "options": {
+                      "grid_columns": 12
+                    }
+                  },
+                  "instructionminseconds": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "integer"
+                      }
+                    ],
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "instructionmaxseconds": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "integer"
+                      }
+                    ],
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "picture": {
+                    "type": "string",
+                    "default": "",
+                    "options": {
+                      "grid_columns": 12
+                    }
+                  },
+                  "continueButtonText": {
+                    "type": "string",
+                    "default": "",
+                    "options": {
+                      "grid_columns": 6
+                    }
+                  },
+                  "countcompletion": {
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "integer"
+                      }
+                    ],
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "turkemailsubject": {
+                    "type": "string",
+                    "default": "",
+                    "options": {
+                      "grid_columns": 12
+                    }
+                  },
+                  "turkemail": {
+                    "type": "string",
+                    "default": "",
+                    "format": "textarea",
+                    "options": {
+                      "grid_columns": 12
+                    }
+                  },
+                  "turkbonus": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      }
+                    ],
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "adaptive": {
+                    "type": "array",
+                    "title": "Adaptive Targets",
+                    "items": {
+                      "type": "string",
+                      "title": "Adaptive Target"
+                    }
+                  },
+                  "adaptiveUnitTemplate": {
+                    "type": "array",
+                    "title": "Adaptive Unit Templates",
+                    "items": {
+                      "type": "integer",
+                      "title": "Unit Template Index"
+                    }
+                  },
+                  "adaptiveLogic": {
+                    "type": "object",
+                    "title": "Adaptive Logic",
+                    "propertyNames": {
+                      "pattern": "^[0-9]+$"
+                    },
+                    "patternProperties": {
+                      "^[0-9]+$": {
+                        "type": "array",
+                        "title": "Adaptive Rules",
+                        "items": {
+                          "type": "string",
+                          "title": "Adaptive Rule"
+                        }
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "deliveryparams": {
+                    "type": "object",
+                    "title": "Delivery Params",
+                    "properties": {
+                      "showhistory": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "string",
+                        "enum": [
+                          "true",
+                          "false"
+                        ],
+                        "default": "false"
+                      },
+                      "forceCorrection": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "string",
+                        "enum": [
+                          "true",
+                          "false"
+                        ],
+                        "default": "false"
+                      },
+                      "scoringEnabled": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "string",
+                        "enum": [
+                          "true",
+                          "false"
+                        ],
+                        "default": "true"
+                      },
+                      "purestudy": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "integer",
+                        "default": 0
+                      },
+                      "initialview": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "integer",
+                        "default": 0
+                      },
+                      "drill": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "integer",
+                        "default": 0
+                      },
+                      "reviewstudy": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "integer",
+                        "default": 0
+                      },
+                      "correctprompt": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "integer",
+                        "default": 0
+                      },
+                      "skipstudy": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "string",
+                        "enum": [
+                          "true",
+                          "false"
+                        ],
+                        "default": "false"
+                      },
+                      "lockoutminutes": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "integer",
+                        "default": 0
+                      },
+                      "fontsize": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "integer",
+                        "default": 24
+                      },
+                      "numButtonListImageColumns": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "integer",
+                        "default": 2
+                      },
+                      "correctscore": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "integer",
+                        "default": 1
+                      },
+                      "incorrectscore": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "integer",
+                        "default": 0
+                      },
+                      "practiceseconds": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "integer",
+                        "default": 0
+                      },
+                      "autostopTimeoutThreshold": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "integer",
+                        "default": 0
+                      },
+                      "autostopTranscriptionAttemptLimit": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "integer",
+                        "default": 3
+                      },
+                      "timeuntilaudio": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "integer",
+                        "default": 0
+                      },
+                      "timeuntilaudiofeedback": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "integer",
+                        "default": 0
+                      },
+                      "prestimulusdisplaytime": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "integer",
+                        "default": 0
+                      },
+                      "forcecorrectprompt": {
+                        "options": {
+                          "grid_columns": 12
+                        },
+                        "type": "string",
+                        "default": ""
+                      },
+                      "forcecorrecttimeout": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "integer",
+                        "default": 0
+                      },
+                      "studyFirst": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "number",
+                        "default": 0
+                      },
+                      "enhancedFeedback": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "string",
+                        "enum": [
+                          "true",
+                          "false"
+                        ],
+                        "default": "false"
+                      },
+                      "checkOtherAnswers": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "string",
+                        "enum": [
+                          "true",
+                          "false"
+                        ],
+                        "default": "false"
+                      },
+                      "feedbackType": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "string",
+                        "default": ""
+                      },
+                      "falseAnswerLimit": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "integer"
+                      },
+                      "allowstimulusdropping": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "string",
+                        "enum": [
+                          "true",
+                          "false"
+                        ],
+                        "default": "false"
+                      },
+                      "allowPhoneticMatching": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "string",
+                        "enum": [
+                          "true",
+                          "false"
+                        ],
+                        "default": "false"
+                      },
+                      "useSpellingCorrection": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "string",
+                        "enum": [
+                          "true",
+                          "false"
+                        ],
+                        "default": "false"
+                      },
+                      "branchingEnabled": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "string",
+                        "enum": [
+                          "true",
+                          "false"
+                        ],
+                        "default": "false"
+                      },
+                      "editDistance": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "integer",
+                        "default": 1
+                      },
+                      "optimalThreshold": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "number"
+                      },
+                      "resetStudentPerformance": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "string",
+                        "enum": [
+                          "true",
+                          "false"
+                        ],
+                        "default": "false"
+                      },
+                      "practicetimer": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "string",
+                        "enum": [
+                          "query-based",
+                          "clock-based"
+                        ],
+                        "default": "query-based"
+                      },
+                      "readyPromptString": {
+                        "options": {
+                          "grid_columns": 12
+                        },
+                        "type": "string",
+                        "default": ""
+                      },
+                      "readyPromptStringDisplayTime": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "integer",
+                        "default": 0
+                      },
+                      "forceSpacing": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "string",
+                        "enum": [
+                          "true",
+                          "false"
+                        ],
+                        "default": "true"
+                      },
+                      "allowRevistUnit": {
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "type": "string",
+                        "enum": [
+                          "true",
+                          "false"
+                        ],
+                        "default": "false"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "uiSettings": {
+                    "type": "object",
+                    "title": "UI Settings",
+                    "properties": {
+                      "stimuliPosition": {
+                        "type": "string",
+                        "enum": [
+                          "top",
+                          "left"
+                        ],
+                        "default": "top",
+                        "options": {
+                          "grid_columns": 4
+                        }
+                      },
+                      "isVideoSession": {
+                        "type": "boolean",
+                        "default": false,
+                        "options": {
+                          "grid_columns": 4
+                        }
+                      },
+                      "videoUrl": {
+                        "type": "string",
+                        "default": "",
+                        "options": {
+                          "grid_columns": 12
+                        }
+                      },
+                      "displayCorrectFeedback": {
+                        "type": "boolean",
+                        "default": true,
+                        "options": {
+                          "grid_columns": 4
+                        }
+                      },
+                      "displayIncorrectFeedback": {
+                        "type": "boolean",
+                        "default": true,
+                        "options": {
+                          "grid_columns": 4
+                        }
+                      },
+                      "correctMessage": {
+                        "type": "string",
+                        "default": "Correct.",
+                        "options": {
+                          "grid_columns": 6
+                        }
+                      },
+                      "incorrectMessage": {
+                        "type": "string",
+                        "default": "Incorrect.",
+                        "options": {
+                          "grid_columns": 6
+                        }
+                      },
+                      "correctColor": {
+                        "type": "string",
+                        "default": "var(--success-color)",
+                        "options": {
+                          "grid_columns": 4
+                        }
+                      },
+                      "incorrectColor": {
+                        "type": "string",
+                        "default": "var(--alert-color)",
+                        "options": {
+                          "grid_columns": 4
+                        }
+                      },
+                      "displayUserAnswerInFeedback": {
+                        "anyOf": [
+                          {
+                            "type": "boolean"
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "onCorrect",
+                              "onIncorrect"
+                            ]
+                          }
+                        ],
+                        "default": "onIncorrect",
+                        "options": {
+                          "grid_columns": 4
+                        }
+                      },
+                      "singleLineFeedback": {
+                        "type": "boolean",
+                        "default": false,
+                        "options": {
+                          "grid_columns": 4
+                        }
+                      },
+                      "onlyShowSimpleFeedback": {
+                        "anyOf": [
+                          {
+                            "type": "boolean"
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "onCorrect",
+                              "onIncorrect"
+                            ]
+                          }
+                        ],
+                        "default": "onCorrect",
+                        "options": {
+                          "grid_columns": 4
+                        }
+                      },
+                      "displayUserAnswerInCorrectFeedback": {
+                        "type": "boolean",
+                        "default": false,
+                        "options": {
+                          "grid_columns": 4
+                        }
+                      },
+                      "displayUserAnswerInIncorrectFeedback": {
+                        "type": "boolean",
+                        "default": true,
+                        "options": {
+                          "grid_columns": 4
+                        }
+                      },
+                      "displayPerformance": {
+                        "type": "boolean",
+                        "default": false,
+                        "options": {
+                          "grid_columns": 4
+                        }
+                      },
+                      "displayTimeoutBar": {
+                        "type": "boolean",
+                        "default": false,
+                        "options": {
+                          "grid_columns": 4
+                        }
+                      },
+                      "choiceButtonCols": {
+                        "type": "integer",
+                        "default": 1,
+                        "options": {
+                          "grid_columns": 4
+                        }
+                      },
+                      "displaySubmitButton": {
+                        "type": "boolean",
+                        "default": false,
+                        "options": {
+                          "grid_columns": 4
+                        }
+                      },
+                      "inputPlaceholderText": {
+                        "type": "string",
+                        "default": "Type your answer here...",
+                        "options": {
+                          "grid_columns": 12
+                        }
+                      },
+                      "displayConfirmButton": {
+                        "type": "boolean",
+                        "default": false,
+                        "options": {
+                          "grid_columns": 4
+                        }
+                      },
+                      "continueButtonText": {
+                        "type": "string",
+                        "default": "Continue",
+                        "options": {
+                          "grid_columns": 6
+                        }
+                      },
+                      "skipStudyButtonText": {
+                        "type": "string",
+                        "default": "Skip",
+                        "options": {
+                          "grid_columns": 6
+                        }
+                      },
+                      "caseSensitive": {
+                        "type": "boolean",
+                        "default": false,
+                        "options": {
+                          "grid_columns": 4
+                        }
+                      },
+                      "displayQuestionNumber": {
+                        "type": "boolean",
+                        "default": false,
+                        "options": {
+                          "grid_columns": 4
+                        }
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "learningsession": {
+                    "type": "object",
+                    "title": "Learning Session",
+                    "properties": {
+                      "clusterlist": {
+                        "type": "string",
+                        "default": "",
+                        "options": {
+                          "grid_columns": 12
+                        }
+                      },
+                      "unitMode": {
+                        "type": "string",
+                        "default": "",
+                        "options": {
+                          "grid_columns": 4
+                        }
+                      },
+                      "calculateProbability": {
+                        "type": "string",
+                        "default": "",
+                        "format": "textarea",
+                        "options": {
+                          "grid_columns": 12
+                        }
+                      },
+                      "displayminseconds": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "integer"
+                          }
+                        ],
+                        "options": {
+                          "grid_columns": 4
+                        }
+                      },
+                      "displaymaxseconds": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "integer"
+                          }
+                        ],
+                        "options": {
+                          "grid_columns": 4
+                        }
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "assessmentsession": {
+                    "type": "object",
+                    "title": "Assessment Session",
+                    "properties": {
+                      "clusterlist": {
+                        "type": "string",
+                        "default": "",
+                        "options": {
+                          "grid_columns": 12
+                        }
+                      },
+                      "randomizegroups": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "true",
+                              "false"
+                            ]
+                          },
+                          {
+                            "type": "boolean"
+                          }
+                        ],
+                        "default": "false",
+                        "options": {
+                          "grid_columns": 4
+                        }
+                      },
+                      "permutefinalresult": {
+                        "type": "string",
+                        "default": "",
+                        "options": {
+                          "grid_columns": 12
+                        }
+                      },
+                      "swapfinalresult": {
+                        "type": "string",
+                        "default": "",
+                        "options": {
+                          "grid_columns": 12
+                        }
+                      },
+                      "assignrandomclusters": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "true",
+                              "false"
+                            ]
+                          },
+                          {
+                            "type": "boolean"
+                          }
+                        ],
+                        "default": "false",
+                        "options": {
+                          "grid_columns": 4
+                        }
+                      },
+                      "initialpositions": {
+                        "type": "string",
+                        "default": "",
+                        "options": {
+                          "grid_columns": 12
+                        }
+                      },
+                      "randomchoices": {
+                        "type": "string",
+                        "default": "",
+                        "options": {
+                          "grid_columns": 6
+                        }
+                      },
+                      "conditiontemplatesbygroup": {
+                        "type": "object",
+                        "title": "Condition Templates By Group",
+                        "properties": {
+                          "groupnames": {
+                            "type": "string",
+                            "default": "",
+                            "options": {
+                              "grid_columns": 6
+                            }
+                          },
+                          "clustersrepeated": {
+                            "type": "string",
+                            "default": "",
+                            "options": {
+                              "grid_columns": 6
+                            }
+                          },
+                          "templatesrepeated": {
+                            "type": "string",
+                            "default": "",
+                            "options": {
+                              "grid_columns": 6
+                            }
+                          },
+                          "group": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "title": "Group Templates"
+                              },
+                              {
+                                "type": "array",
+                                "title": "Group Templates",
+                                "items": {
+                                  "type": "string",
+                                  "title": "Group Template"
+                                }
+                              }
+                            ]
+                          },
+                          "initialpositions": {
+                            "type": "string",
+                            "default": "",
+                            "options": {
+                              "grid_columns": 12
+                            }
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "videosession": {
+                    "type": "object",
+                    "title": "Video Session",
+                    "properties": {
+                      "videosource": {
+                        "type": "string",
+                        "default": "",
+                        "options": {
+                          "grid_columns": 12
+                        }
+                      },
+                      "questions": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "title": "Question Clusters"
+                          },
+                          {
+                            "type": "array",
+                            "title": "Question Clusters",
+                            "items": {
+                              "type": "integer",
+                              "title": "Cluster Index"
+                            }
+                          }
+                        ]
+                      },
+                      "questiontimes": {
+                        "type": "array",
+                        "title": "Question Times",
+                        "items": {
+                          "type": "integer",
+                          "title": "Question Time"
+                        }
+                      },
+                      "checkpointBehavior": {
+                        "type": "string",
+                        "enum": [
+                          "pause",
+                          "adaptive",
+                          "none"
+                        ],
+                        "options": {
+                          "grid_columns": 4
+                        }
+                      },
+                      "checkpoints": {
+                        "type": "array",
+                        "title": "Checkpoints",
+                        "items": {
+                          "type": "object",
+                          "title": "Checkpoint",
+                          "properties": {
+                            "time": {
+                              "type": "number",
+                              "title": "Time"
+                            }
+                          },
+                          "required": [
+                            "time"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "preventScrubbing": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "true",
+                              "false"
+                            ]
+                          },
+                          {
+                            "type": "boolean"
+                          }
+                        ],
+                        "default": "false",
+                        "options": {
+                          "grid_columns": 4
+                        }
+                      },
+                      "rewindOnIncorrect": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "true",
+                              "false"
+                            ]
+                          },
+                          {
+                            "type": "boolean"
+                          }
+                        ],
+                        "default": "false",
+                        "options": {
+                          "grid_columns": 4
+                        }
+                      },
+                      "repeatQuestionsSinceCheckpoint": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "true",
+                              "false"
+                            ]
+                          },
+                          {
+                            "type": "boolean"
+                          }
+                        ],
+                        "default": "false",
+                        "options": {
+                          "grid_columns": 4
+                        }
+                      },
+                      "unitMode": {
+                        "type": "string",
+                        "default": "",
+                        "options": {
+                          "grid_columns": 4
+                        }
+                      },
+                      "calculateProbability": {
+                        "type": "string",
+                        "default": "",
+                        "format": "textarea",
+                        "options": {
+                          "grid_columns": 12
+                        }
+                      },
+                      "displayText": {
+                        "type": "string",
+                        "default": "",
+                        "format": "textarea",
+                        "options": {
+                          "grid_columns": 12
+                        }
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "lessonname",
+            "stimulusfile"
+          ]
+        },
+        "unit": {
+          "type": "array",
+          "title": "Units",
+          "items": {
+            "type": "object",
+            "title": "Unit",
+            "properties": {
+              "unitname": {
+                "type": "string",
+                "default": "",
+                "options": {
+                  "grid_columns": 6
+                }
+              },
+              "unitinstructions": {
+                "type": "string",
+                "default": "",
+                "format": "textarea",
+                "options": {
+                  "grid_columns": 12
+                }
+              },
+              "unitinstructionsquestion": {
+                "type": "string",
+                "default": "",
+                "format": "textarea",
+                "options": {
+                  "grid_columns": 12
+                }
+              },
+              "buttonorder": {
+                "type": "string",
+                "enum": [
+                  "fixed",
+                  "random"
+                ],
+                "default": "fixed",
+                "options": {
+                  "grid_columns": 4
+                }
+              },
+              "buttontrial": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "true",
+                      "false"
+                    ]
+                  },
+                  {
+                    "type": "boolean"
+                  }
+                ],
+                "default": "false",
+                "options": {
+                  "grid_columns": 4
+                }
+              },
+              "buttonOptions": {
+                "type": "string",
+                "default": "",
+                "format": "textarea",
+                "options": {
+                  "grid_columns": 12
+                }
+              },
+              "instructionminseconds": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "options": {
+                  "grid_columns": 4
+                }
+              },
+              "instructionmaxseconds": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "options": {
+                  "grid_columns": 4
+                }
+              },
+              "picture": {
+                "type": "string",
+                "default": "",
+                "options": {
+                  "grid_columns": 12
+                }
+              },
+              "continueButtonText": {
+                "type": "string",
+                "default": "",
+                "options": {
+                  "grid_columns": 6
+                }
+              },
+              "countcompletion": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "options": {
+                  "grid_columns": 4
+                }
+              },
+              "turkemailsubject": {
+                "type": "string",
+                "default": "",
+                "options": {
+                  "grid_columns": 12
+                }
+              },
+              "turkemail": {
+                "type": "string",
+                "default": "",
+                "format": "textarea",
+                "options": {
+                  "grid_columns": 12
+                }
+              },
+              "turkbonus": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "options": {
+                  "grid_columns": 4
+                }
+              },
+              "adaptive": {
+                "type": "array",
+                "title": "Adaptive Targets",
+                "items": {
+                  "type": "string",
+                  "title": "Adaptive Target"
+                }
+              },
+              "adaptiveUnitTemplate": {
+                "type": "array",
+                "title": "Adaptive Unit Templates",
+                "items": {
+                  "type": "integer",
+                  "title": "Unit Template Index"
+                }
+              },
+              "adaptiveLogic": {
+                "type": "object",
+                "title": "Adaptive Logic",
+                "propertyNames": {
+                  "pattern": "^[0-9]+$"
+                },
+                "patternProperties": {
+                  "^[0-9]+$": {
+                    "type": "array",
+                    "title": "Adaptive Rules",
+                    "items": {
+                      "type": "string",
+                      "title": "Adaptive Rule"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
+              "deliveryparams": {
+                "type": "object",
+                "title": "Delivery Params",
+                "properties": {
+                  "showhistory": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "string",
+                    "enum": [
+                      "true",
+                      "false"
+                    ],
+                    "default": "false"
+                  },
+                  "forceCorrection": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "string",
+                    "enum": [
+                      "true",
+                      "false"
+                    ],
+                    "default": "false"
+                  },
+                  "scoringEnabled": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "string",
+                    "enum": [
+                      "true",
+                      "false"
+                    ],
+                    "default": "true"
+                  },
+                  "purestudy": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "integer",
+                    "default": 0
+                  },
+                  "initialview": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "integer",
+                    "default": 0
+                  },
+                  "drill": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "integer",
+                    "default": 0
+                  },
+                  "reviewstudy": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "integer",
+                    "default": 0
+                  },
+                  "correctprompt": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "integer",
+                    "default": 0
+                  },
+                  "skipstudy": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "string",
+                    "enum": [
+                      "true",
+                      "false"
+                    ],
+                    "default": "false"
+                  },
+                  "lockoutminutes": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "integer",
+                    "default": 0
+                  },
+                  "fontsize": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "integer",
+                    "default": 24
+                  },
+                  "numButtonListImageColumns": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "integer",
+                    "default": 2
+                  },
+                  "correctscore": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "integer",
+                    "default": 1
+                  },
+                  "incorrectscore": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "integer",
+                    "default": 0
+                  },
+                  "practiceseconds": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "integer",
+                    "default": 0
+                  },
+                  "autostopTimeoutThreshold": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "integer",
+                    "default": 0
+                  },
+                  "autostopTranscriptionAttemptLimit": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "integer",
+                    "default": 3
+                  },
+                  "timeuntilaudio": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "integer",
+                    "default": 0
+                  },
+                  "timeuntilaudiofeedback": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "integer",
+                    "default": 0
+                  },
+                  "prestimulusdisplaytime": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "integer",
+                    "default": 0
+                  },
+                  "forcecorrectprompt": {
+                    "options": {
+                      "grid_columns": 12
+                    },
+                    "type": "string",
+                    "default": ""
+                  },
+                  "forcecorrecttimeout": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "integer",
+                    "default": 0
+                  },
+                  "studyFirst": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "number",
+                    "default": 0
+                  },
+                  "enhancedFeedback": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "string",
+                    "enum": [
+                      "true",
+                      "false"
+                    ],
+                    "default": "false"
+                  },
+                  "checkOtherAnswers": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "string",
+                    "enum": [
+                      "true",
+                      "false"
+                    ],
+                    "default": "false"
+                  },
+                  "feedbackType": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "string",
+                    "default": ""
+                  },
+                  "falseAnswerLimit": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "integer"
+                  },
+                  "allowstimulusdropping": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "string",
+                    "enum": [
+                      "true",
+                      "false"
+                    ],
+                    "default": "false"
+                  },
+                  "allowPhoneticMatching": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "string",
+                    "enum": [
+                      "true",
+                      "false"
+                    ],
+                    "default": "false"
+                  },
+                  "useSpellingCorrection": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "string",
+                    "enum": [
+                      "true",
+                      "false"
+                    ],
+                    "default": "false"
+                  },
+                  "branchingEnabled": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "string",
+                    "enum": [
+                      "true",
+                      "false"
+                    ],
+                    "default": "false"
+                  },
+                  "editDistance": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "integer",
+                    "default": 1
+                  },
+                  "optimalThreshold": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "number"
+                  },
+                  "resetStudentPerformance": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "string",
+                    "enum": [
+                      "true",
+                      "false"
+                    ],
+                    "default": "false"
+                  },
+                  "practicetimer": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "string",
+                    "enum": [
+                      "query-based",
+                      "clock-based"
+                    ],
+                    "default": "query-based"
+                  },
+                  "readyPromptString": {
+                    "options": {
+                      "grid_columns": 12
+                    },
+                    "type": "string",
+                    "default": ""
+                  },
+                  "readyPromptStringDisplayTime": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "integer",
+                    "default": 0
+                  },
+                  "forceSpacing": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "string",
+                    "enum": [
+                      "true",
+                      "false"
+                    ],
+                    "default": "true"
+                  },
+                  "allowRevistUnit": {
+                    "options": {
+                      "grid_columns": 4
+                    },
+                    "type": "string",
+                    "enum": [
+                      "true",
+                      "false"
+                    ],
+                    "default": "false"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "uiSettings": {
+                "type": "object",
+                "title": "UI Settings",
+                "properties": {
+                  "stimuliPosition": {
+                    "type": "string",
+                    "enum": [
+                      "top",
+                      "left"
+                    ],
+                    "default": "top",
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "isVideoSession": {
+                    "type": "boolean",
+                    "default": false,
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "videoUrl": {
+                    "type": "string",
+                    "default": "",
+                    "options": {
+                      "grid_columns": 12
+                    }
+                  },
+                  "displayCorrectFeedback": {
+                    "type": "boolean",
+                    "default": true,
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "displayIncorrectFeedback": {
+                    "type": "boolean",
+                    "default": true,
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "correctMessage": {
+                    "type": "string",
+                    "default": "Correct.",
+                    "options": {
+                      "grid_columns": 6
+                    }
+                  },
+                  "incorrectMessage": {
+                    "type": "string",
+                    "default": "Incorrect.",
+                    "options": {
+                      "grid_columns": 6
+                    }
+                  },
+                  "correctColor": {
+                    "type": "string",
+                    "default": "var(--success-color)",
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "incorrectColor": {
+                    "type": "string",
+                    "default": "var(--alert-color)",
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "displayUserAnswerInFeedback": {
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "onCorrect",
+                          "onIncorrect"
+                        ]
+                      }
+                    ],
+                    "default": "onIncorrect",
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "singleLineFeedback": {
+                    "type": "boolean",
+                    "default": false,
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "onlyShowSimpleFeedback": {
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "onCorrect",
+                          "onIncorrect"
+                        ]
+                      }
+                    ],
+                    "default": "onCorrect",
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "displayUserAnswerInCorrectFeedback": {
+                    "type": "boolean",
+                    "default": false,
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "displayUserAnswerInIncorrectFeedback": {
+                    "type": "boolean",
+                    "default": true,
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "displayPerformance": {
+                    "type": "boolean",
+                    "default": false,
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "displayTimeoutBar": {
+                    "type": "boolean",
+                    "default": false,
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "choiceButtonCols": {
+                    "type": "integer",
+                    "default": 1,
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "displaySubmitButton": {
+                    "type": "boolean",
+                    "default": false,
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "inputPlaceholderText": {
+                    "type": "string",
+                    "default": "Type your answer here...",
+                    "options": {
+                      "grid_columns": 12
+                    }
+                  },
+                  "displayConfirmButton": {
+                    "type": "boolean",
+                    "default": false,
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "continueButtonText": {
+                    "type": "string",
+                    "default": "Continue",
+                    "options": {
+                      "grid_columns": 6
+                    }
+                  },
+                  "skipStudyButtonText": {
+                    "type": "string",
+                    "default": "Skip",
+                    "options": {
+                      "grid_columns": 6
+                    }
+                  },
+                  "caseSensitive": {
+                    "type": "boolean",
+                    "default": false,
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "displayQuestionNumber": {
+                    "type": "boolean",
+                    "default": false,
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
+              "learningsession": {
+                "type": "object",
+                "title": "Learning Session",
+                "properties": {
+                  "clusterlist": {
+                    "type": "string",
+                    "default": "",
+                    "options": {
+                      "grid_columns": 12
+                    }
+                  },
+                  "unitMode": {
+                    "type": "string",
+                    "default": "",
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "calculateProbability": {
+                    "type": "string",
+                    "default": "",
+                    "format": "textarea",
+                    "options": {
+                      "grid_columns": 12
+                    }
+                  },
+                  "displayminseconds": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "integer"
+                      }
+                    ],
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "displaymaxseconds": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "integer"
+                      }
+                    ],
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
+              "assessmentsession": {
+                "type": "object",
+                "title": "Assessment Session",
+                "properties": {
+                  "clusterlist": {
+                    "type": "string",
+                    "default": "",
+                    "options": {
+                      "grid_columns": 12
+                    }
+                  },
+                  "randomizegroups": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "true",
+                          "false"
+                        ]
+                      },
+                      {
+                        "type": "boolean"
+                      }
+                    ],
+                    "default": "false",
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "permutefinalresult": {
+                    "type": "string",
+                    "default": "",
+                    "options": {
+                      "grid_columns": 12
+                    }
+                  },
+                  "swapfinalresult": {
+                    "type": "string",
+                    "default": "",
+                    "options": {
+                      "grid_columns": 12
+                    }
+                  },
+                  "assignrandomclusters": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "true",
+                          "false"
+                        ]
+                      },
+                      {
+                        "type": "boolean"
+                      }
+                    ],
+                    "default": "false",
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "initialpositions": {
+                    "type": "string",
+                    "default": "",
+                    "options": {
+                      "grid_columns": 12
+                    }
+                  },
+                  "randomchoices": {
+                    "type": "string",
+                    "default": "",
+                    "options": {
+                      "grid_columns": 6
+                    }
+                  },
+                  "conditiontemplatesbygroup": {
+                    "type": "object",
+                    "title": "Condition Templates By Group",
+                    "properties": {
+                      "groupnames": {
+                        "type": "string",
+                        "default": "",
+                        "options": {
+                          "grid_columns": 6
+                        }
+                      },
+                      "clustersrepeated": {
+                        "type": "string",
+                        "default": "",
+                        "options": {
+                          "grid_columns": 6
+                        }
+                      },
+                      "templatesrepeated": {
+                        "type": "string",
+                        "default": "",
+                        "options": {
+                          "grid_columns": 6
+                        }
+                      },
+                      "group": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "title": "Group Templates"
+                          },
+                          {
+                            "type": "array",
+                            "title": "Group Templates",
+                            "items": {
+                              "type": "string",
+                              "title": "Group Template"
+                            }
+                          }
+                        ]
+                      },
+                      "initialpositions": {
+                        "type": "string",
+                        "default": "",
+                        "options": {
+                          "grid_columns": 12
+                        }
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              },
+              "videosession": {
+                "type": "object",
+                "title": "Video Session",
+                "properties": {
+                  "videosource": {
+                    "type": "string",
+                    "default": "",
+                    "options": {
+                      "grid_columns": 12
+                    }
+                  },
+                  "questions": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "title": "Question Clusters"
+                      },
+                      {
+                        "type": "array",
+                        "title": "Question Clusters",
+                        "items": {
+                          "type": "integer",
+                          "title": "Cluster Index"
+                        }
+                      }
+                    ]
+                  },
+                  "questiontimes": {
+                    "type": "array",
+                    "title": "Question Times",
+                    "items": {
+                      "type": "integer",
+                      "title": "Question Time"
+                    }
+                  },
+                  "checkpointBehavior": {
+                    "type": "string",
+                    "enum": [
+                      "pause",
+                      "adaptive",
+                      "none"
+                    ],
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "checkpoints": {
+                    "type": "array",
+                    "title": "Checkpoints",
+                    "items": {
+                      "type": "object",
+                      "title": "Checkpoint",
+                      "properties": {
+                        "time": {
+                          "type": "number",
+                          "title": "Time"
+                        }
+                      },
+                      "required": [
+                        "time"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "preventScrubbing": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "true",
+                          "false"
+                        ]
+                      },
+                      {
+                        "type": "boolean"
+                      }
+                    ],
+                    "default": "false",
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "rewindOnIncorrect": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "true",
+                          "false"
+                        ]
+                      },
+                      {
+                        "type": "boolean"
+                      }
+                    ],
+                    "default": "false",
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "repeatQuestionsSinceCheckpoint": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "true",
+                          "false"
+                        ]
+                      },
+                      {
+                        "type": "boolean"
+                      }
+                    ],
+                    "default": "false",
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "unitMode": {
+                    "type": "string",
+                    "default": "",
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "calculateProbability": {
+                    "type": "string",
+                    "default": "",
+                    "format": "textarea",
+                    "options": {
+                      "grid_columns": 12
+                    }
+                  },
+                  "displayText": {
+                    "type": "string",
+                    "default": "",
+                    "format": "textarea",
+                    "options": {
+                      "grid_columns": 12
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "deliveryparams": {
+          "type": "object",
+          "title": "Delivery Params",
+          "properties": {
+            "showhistory": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ],
+              "default": "false"
+            },
+            "forceCorrection": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ],
+              "default": "false"
+            },
+            "scoringEnabled": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ],
+              "default": "true"
+            },
+            "purestudy": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "integer",
+              "default": 0
+            },
+            "initialview": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "integer",
+              "default": 0
+            },
+            "drill": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "integer",
+              "default": 0
+            },
+            "reviewstudy": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "integer",
+              "default": 0
+            },
+            "correctprompt": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "integer",
+              "default": 0
+            },
+            "skipstudy": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ],
+              "default": "false"
+            },
+            "lockoutminutes": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "integer",
+              "default": 0
+            },
+            "fontsize": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "integer",
+              "default": 24
+            },
+            "numButtonListImageColumns": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "integer",
+              "default": 2
+            },
+            "correctscore": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "integer",
+              "default": 1
+            },
+            "incorrectscore": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "integer",
+              "default": 0
+            },
+            "practiceseconds": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "integer",
+              "default": 0
+            },
+            "autostopTimeoutThreshold": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "integer",
+              "default": 0
+            },
+            "autostopTranscriptionAttemptLimit": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "integer",
+              "default": 3
+            },
+            "timeuntilaudio": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "integer",
+              "default": 0
+            },
+            "timeuntilaudiofeedback": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "integer",
+              "default": 0
+            },
+            "prestimulusdisplaytime": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "integer",
+              "default": 0
+            },
+            "forcecorrectprompt": {
+              "options": {
+                "grid_columns": 12
+              },
+              "type": "string",
+              "default": ""
+            },
+            "forcecorrecttimeout": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "integer",
+              "default": 0
+            },
+            "studyFirst": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "number",
+              "default": 0
+            },
+            "enhancedFeedback": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ],
+              "default": "false"
+            },
+            "checkOtherAnswers": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ],
+              "default": "false"
+            },
+            "feedbackType": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "string",
+              "default": ""
+            },
+            "falseAnswerLimit": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "integer"
+            },
+            "allowstimulusdropping": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ],
+              "default": "false"
+            },
+            "allowPhoneticMatching": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ],
+              "default": "false"
+            },
+            "useSpellingCorrection": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ],
+              "default": "false"
+            },
+            "branchingEnabled": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ],
+              "default": "false"
+            },
+            "editDistance": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "integer",
+              "default": 1
+            },
+            "optimalThreshold": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "number"
+            },
+            "resetStudentPerformance": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ],
+              "default": "false"
+            },
+            "practicetimer": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "string",
+              "enum": [
+                "query-based",
+                "clock-based"
+              ],
+              "default": "query-based"
+            },
+            "readyPromptString": {
+              "options": {
+                "grid_columns": 12
+              },
+              "type": "string",
+              "default": ""
+            },
+            "readyPromptStringDisplayTime": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "integer",
+              "default": 0
+            },
+            "forceSpacing": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ],
+              "default": "true"
+            },
+            "allowRevistUnit": {
+              "options": {
+                "grid_columns": 4
+              },
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ],
+              "default": "false"
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    }
+  }
+}

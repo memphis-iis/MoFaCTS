@@ -1,0 +1,61 @@
+<template name="tdfAssignmentEdit">
+{{#if isInRole 'admin, teacher'}}
+  <div class="container" style="margin-top: 1rem;">
+    <h3 style="margin-top: 0; text-align: center;">Chapter Assignments</h3>
+
+    <!-- Add/Edit Assignments Section -->
+    <div class="admin-section">
+      <div class="card mb-4">
+        <div class="card-body">
+          <div class="d-flex align-items-center mb-3">
+            <i class="fa fa-book me-2" style="font-size: 1.25rem; color: var(--accent-color);"></i>
+            <h5 class="m-0">Add/Edit Assignments</h5>
+          </div>
+          <div class="row g-3">
+            <div class="col-12">
+              <label for="class-select" class="form-label">Select a class</label>
+              <select id="class-select" class="form-select">
+                <option selected="selected" value="invalid" disabled="true">Select a class</option>
+                {{#each courses}}
+                  <option value="{{this._id}}">{{this.courseName}}</option>
+                {{/each}}
+              </select>
+            </div>
+            <div class="col-lg-6 col-12">
+              <label class="form-label fw-bold">Available Chapters</label>
+              <select size="20" class="form-select" id="notSelectedTdfs" multiple>
+                {{#each tdfsNotSelected}}
+                  <option value="{{this.fileName}}">{{this.displayName}} ({{this.fileName}})</option>
+                {{/each}}
+              </select>
+              <div class="text-center mt-2">
+                <a id="selectTdf" class="btn btn-outline-primary btn-sm">
+                  <i class="fa fa-arrow-right"></i> Add Selected Chapters
+                </a>
+              </div>
+            </div>
+            <div class="col-lg-6 col-12">
+              <label class="form-label fw-bold">Selected Chapters</label>
+              <select size="20" class="form-select" id="selectedTdfs" multiple>
+                {{#each tdfsSelected}}
+                  <option value="{{this.fileName}}">{{this.displayName}} ({{this.fileName}})</option>
+                {{/each}}
+              </select>
+              <div class="text-center mt-2">
+                <a id="unselectTdf" class="btn btn-outline-danger btn-sm">
+                  <i class="fa fa-arrow-left"></i> Remove Selected Chapters
+                </a>
+              </div>
+            </div>
+            <div class="col-12 text-center mt-4">
+              <button id="saveAssignment" class="btn btn-primary">
+                <i class="fa fa-save"></i> Save Assignment
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{{/if}}
+</template>

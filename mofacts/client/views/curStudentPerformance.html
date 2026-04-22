@@ -1,0 +1,18 @@
+<template name="curStudentPerformance">
+    <section class="card-stats-bar" aria-label="Session stats">
+        <div class="card-stats-bar__item">
+            <span class="card-stats-bar__label" id="card-stat-time-label">Time</span>
+            <span class="card-stats-bar__value" aria-labelledby="card-stat-time-label">
+                {{curStudentPerformance.totalTimeDisplay}}
+                <span class="card-stats-bar__unit">min</span>
+            </span>
+        </div>
+        <span class="card-stats-bar__divider" aria-hidden="true"></span>
+        <div class="card-stats-bar__item">
+            <span class="card-stats-bar__label" id="card-stat-accuracy-label">Correct</span>
+            <span class="card-stats-bar__value" aria-labelledby="card-stat-accuracy-label">
+                {{curStudentPerformance.percentCorrect}}
+            </span>
+        </div>
+    </section>
+</template>

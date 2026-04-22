@@ -1,0 +1,44 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "**/*.test.{js,ts}",
+    "client/**/*.{js,ts,svelte}",
+    "server/**/*.{js,ts}",
+    "tests/**/*.{js,ts}",
+    "scripts/**/*.{js,cjs,mjs,ts}",
+    "packages/**/*.{js,ts}",
+    "lib/**/*.js"
+  ],
+  "project": [
+    "client/**/*.{js,ts}",
+    "server/**/*.{js,ts}",
+    "common/**/*.{js,ts,d.ts}",
+    "tests/**/*.{js,ts}",
+    "scripts/**/*.{js,cjs,mjs,ts}",
+    "packages/**/*.{js,ts}",
+    "lib/**/*.js",
+    "public/lib/**/*.js"
+  ],
+  "includeEntryExports": true,
+  "ignoreBinaries": [
+    "meteor"
+  ],
+  "ignoreDependencies": [
+    "@babel/runtime",
+    "husky",
+    "@rsdoctor/rspack-plugin",
+    "meteor-node-stubs",
+    "unzipper"
+  ],
+  "ignoreIssues": {
+    "client/lib/vendor/gauge.generated.js": [
+      "exports"
+    ],
+    "scripts/ts-loader-repro/rspack.repro.config.cjs": [
+      "exports"
+    ]
+  },
+  "ignoreFiles": [
+    "public/lib/**"
+  ]
+}

@@ -1,0 +1,58 @@
+/* Content Editor Styles */
+
+.content-edit-cluster {
+    border-left: 3px solid var(--accent-color, #007bff);
+}
+
+.content-edit-cluster .card-header {
+    background-color: #f8f9fa;
+}
+
+.content-edit-stim {
+    transition: background-color 0.2s;
+}
+
+.content-edit-stim:hover {
+    background-color: #f8f9fa;
+}
+
+.content-edit-stim:last-child {
+    border-bottom: none !important;
+}
+
+.content-edit-question {
+    font-size: 0.95rem;
+    line-height: 1.4;
+}
+
+.content-edit-question img {
+    max-width: 150px;
+    max-height: 150px;
+}
+
+.content-edit-answer {
+    font-size: 0.85rem;
+}
+
+.content-edit-image img {
+    object-fit: contain;
+    border-radius: 4px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 576px) {
+    .content-edit-stim {
+        flex-direction: column;
+    }
+
+    .content-edit-image {
+        margin-right: 0 !important;
+        margin-bottom: 0.5rem;
+    }
+
+    .content-edit-stim .remove-stim {
+        margin-left: 0 !important;
+        margin-top: 0.5rem;
+        align-self: flex-end;
+    }
+}

@@ -1,0 +1,21 @@
+.form-control{
+  width:unset;
+}
+
+.class-edit-heading {
+  margin-top: 0;
+  text-align: center;
+}
+
+@media (max-width: 576px) {
+  .class-edit-heading {
+    font-size: 1.5rem;
+  }
+}
+
+@media (max-width: 768px) {
+  #saveClass {
+    min-height: 44px;
+    padding: 0.75rem 1.5rem;
+  }
+}

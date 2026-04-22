@@ -1,0 +1,246 @@
+<template name="learningDashboard">
+  <div class="page-container page-container-wide" id="learningDashboardContainer">
+    <div class="card mb-4">
+      <div class="card-body">
+        <div class="d-flex align-items-center mb-3">
+          <i class="fa fa-book me-2" style="font-size: 1.25rem; color: var(--accent-color);"></i>
+          <h5 class="m-0">Learning Dashboard</h5>
+        </div>
+
+        <div class="row justify-content-center mb-3 learning-dashboard-search-shell">
+          <div class="col-12 col-md-6 col-lg-4">
+            <input id="learningDashboardSearch" type="text" placeholder="Search lessons..." class="form-control text-center" disabled="{{#if isLoading}}disabled{{/if}}" aria-disabled="{{#if isLoading}}true{{else}}false{{/if}}">
+          </div>
+        </div>
+
+        <div class="admin-table-wrapper">
+          <div class="table-responsive table-display-shell learning-dashboard-table-wrapper {{#if isLoading}}is-before-paint is-loading{{else}}has-painted is-ready{{/if}}" aria-busy="{{#if isLoading}}true{{else}}false{{/if}}">
+            {{#if isLoading}}
+              <div class="table-shell-placeholder learning-dashboard-table-placeholder" aria-hidden="true"></div>
+              <div class="sr-only" role="status" aria-live="polite">Loading lessons...</div>
+            {{else}}
+              {{#if hasTdfs}}
+                <table class="table table-striped table-hover table-shell-content learning-dashboard-table learning-dashboard-content-ready">
+                  <colgroup>
+                    <col class="learning-dashboard-col-lesson">
+                    <col class="learning-dashboard-col-features">
+                    <col class="learning-dashboard-col-stat">
+                    <col class="learning-dashboard-col-stat">
+                    <col class="learning-dashboard-col-stat">
+                    <col class="learning-dashboard-col-stat">
+                    <col class="learning-dashboard-col-stat">
+                    <col class="learning-dashboard-col-stat">
+                    <col class="learning-dashboard-col-last-practice">
+                    <col class="learning-dashboard-col-action">
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th scope="col">Lesson</th>
+                      <th scope="col" class="text-center">Features</th>
+                      <th scope="col" class="text-center">Total Trials</th>
+                      <th scope="col" class="text-center">Overall Accuracy</th>
+                      <th scope="col" class="text-center">Last 10 Accuracy</th>
+                      <th scope="col" class="text-center">Time (min)</th>
+                      <th scope="col" class="text-center">Items Practiced</th>
+                      <th scope="col" class="text-center">Days with Sessions</th>
+                      <th scope="col">Last Practice</th>
+                      <th scope="col" class="text-center">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {{#each allTdfsList}}
+                      <tr class="learning-dashboard-row {{#if this.isUsed}}learning-dashboard-row--used{{else}}learning-dashboard-row--unused{{/if}}">
+                        <th scope="row" class="learning-dashboard-cell learning-dashboard-cell--lesson" data-label="Lesson">
+                          <span class="responsive-table-label">Lesson</span>
+                          <div class="learning-dashboard-cell__value learning-dashboard-lesson">
+                            <strong class="learning-dashboard-lesson-title" title="{{displayLabel}}">{{displayLabel}}</strong>
+                            {{#if this.versionMetadataInvalid}}
+                              <div class="learning-dashboard-lesson-meta">
+                                <span class="badge bg-warning text-dark" title="{{this.versionMetadataDiagnostic}}">Metadata fix required</span>
+                              </div>
+                            {{/if}}
+                          </div>
+                        </th>
+                        <td class="learning-dashboard-cell learning-dashboard-cell--features text-center" data-label="Features">
+                          <span class="responsive-table-label">Features</span>
+                          <div class="learning-dashboard-cell__value learning-dashboard-feature-icons">
+                            {{#if this.enableAudioPromptAndFeedback}}
+                              <span class="fa fa-headphones {{ttsIconClass}}" title="Text-to-Speech {{#if this.hasTTSAPIKey}}(API key available){{else}}(needs API key in Audio Settings){{/if}}"></span>
+                            {{/if}}
+                            {{#if this.audioInputEnabled}}
+                              <span class="fa fa-microphone {{srIconClass}}" title="Speech Recognition {{#if this.hasSpeechAPIKey}}(API key available){{else}}(needs API key in Audio Settings){{/if}}"></span>
+                            {{/if}}
+                            {{#unless this.enableAudioPromptAndFeedback}}
+                              {{#unless this.audioInputEnabled}}
+                                <span class="learning-dashboard-empty-value">None</span>
+                              {{/unless}}
+                            {{/unless}}
+                          </div>
+                        </td>
+                        <td class="learning-dashboard-cell learning-dashboard-cell--stat text-center" data-label="Total Trials">
+                          <span class="responsive-table-label">Total Trials</span>
+                          <span class="learning-dashboard-cell__value">{{#if this.isUsed}}{{this.totalTrials}}{{else}}-{{/if}}</span>
+                        </td>
+                        <td class="learning-dashboard-cell learning-dashboard-cell--stat text-center" data-label="Overall Accuracy">
+                          <span class="responsive-table-label">Overall Accuracy</span>
+                          <span class="learning-dashboard-cell__value">{{#if this.isUsed}}{{this.overallAccuracy}}%{{else}}-{{/if}}</span>
+                        </td>
+                        <td class="learning-dashboard-cell learning-dashboard-cell--stat text-center" data-label="Last 10 Accuracy">
+                          <span class="responsive-table-label">Last 10 Accuracy</span>
+                          <span class="learning-dashboard-cell__value">{{#if this.isUsed}}{{this.last10Accuracy}}%{{else}}-{{/if}}</span>
+                        </td>
+                        <td class="learning-dashboard-cell learning-dashboard-cell--stat text-center" data-label="Time (min)">
+                          <span class="responsive-table-label">Time (min)</span>
+                          <span class="learning-dashboard-cell__value">{{#if this.isUsed}}{{this.totalTimeMinutes}}{{else}}-{{/if}}</span>
+                        </td>
+                        <td class="learning-dashboard-cell learning-dashboard-cell--stat text-center" data-label="Items Practiced">
+                          <span class="responsive-table-label">Items Practiced</span>
+                          <span class="learning-dashboard-cell__value">{{#if this.isUsed}}{{this.itemsPracticed}}{{else}}-{{/if}}</span>
+                        </td>
+                        <td class="learning-dashboard-cell learning-dashboard-cell--stat text-center" data-label="Days with Sessions">
+                          <span class="responsive-table-label">Days with Sessions</span>
+                          <span class="learning-dashboard-cell__value">{{#if this.isUsed}}{{this.totalSessions}}{{else}}-{{/if}}</span>
+                        </td>
+                        <td class="learning-dashboard-cell learning-dashboard-cell--last-practice" data-label="Last Practice">
+                          <span class="responsive-table-label">Last Practice</span>
+                          <span class="learning-dashboard-cell__value">{{#if this.isUsed}}{{this.lastPracticeDate}}{{else}}-{{/if}}</span>
+                        </td>
+                        <td class="learning-dashboard-cell learning-dashboard-cell--action text-center" data-label="Action">
+                          <span class="responsive-table-label">Action</span>
+                          <div class="learning-dashboard-cell__value learning-dashboard-action">
+                            {{#if this.isUsed}}
+                              <button class="btn btn-sm btn-primary learning-dashboard-action-button continue-lesson"
+                                data-tdfid="{{this.TDFId}}"
+                                data-lessonname="{{this.displayName}}"
+                                data-currentstimulisetid="{{this.currentStimuliSetId}}"
+                                data-ismultitdf="{{this.isMultiTdf}}">Continue</button>
+                            {{else}}
+                              <button class="btn btn-sm btn-success learning-dashboard-action-button start-lesson"
+                                data-tdfid="{{this.TDFId}}"
+                                data-lessonname="{{this.displayName}}"
+                                data-currentstimulisetid="{{this.currentStimuliSetId}}"
+                                data-ignoreoutofgrammarresponses="{{this.ignoreOutOfGrammarResponses}}"
+                                data-speechoutofgrammarfeedback="{{this.speechOutOfGrammarFeedback}}"
+                                data-ismultitdf="{{this.isMultiTdf}}">Start</button>
+                            {{/if}}
+                          </div>
+                        </td>
+                      </tr>
+                    {{/each}}
+                  </tbody>
+                </table>
+              {{else}}
+                <div class="alert alert-info text-center mb-0 learning-dashboard-empty-state">
+                  <p class="mb-0">No lessons found. Please contact your administrator.</p>
+                </div>
+              {{/if}}
+            {{/if}}
+          </div>
+        </div>
+
+        {{#unless isLoading}}
+          {{#if hasTdfs}}
+            <div class="learning-dashboard-cards learning-dashboard-content-ready">
+              {{#each allTdfsList}}
+                <div class="learning-dashboard-card border rounded p-3 mb-3 bg-white shadow-sm {{#unless this.isUsed}}lesson-card-unused{{/unless}}">
+                  <div class="fw-bold learning-dashboard-card-title">
+                    {{displayLabel}}
+                    {{#if this.versionMetadataInvalid}}
+                      <span class="badge bg-warning text-dark ms-1" title="{{this.versionMetadataDiagnostic}}">Metadata fix required</span>
+                    {{/if}}
+                  </div>
+
+                  <div class="d-flex justify-content-between align-items-center py-1 learning-dashboard-card-features-row">
+                    <div class="d-flex gap-1 align-items-center">
+                      {{#if this.enableAudioPromptAndFeedback}}
+                        <span class="fa fa-headphones {{ttsIconClass}}" title="Text-to-Speech {{#if this.hasTTSAPIKey}}(API key available){{else}}(needs API key in Audio Settings){{/if}}"></span>
+                      {{/if}}
+                      {{#if this.audioInputEnabled}}
+                        <span class="fa fa-microphone {{srIconClass}}" title="Speech Recognition {{#if this.hasSpeechAPIKey}}(API key available){{else}}(needs API key in Audio Settings){{/if}}"></span>
+                      {{/if}}
+                      {{#unless this.enableAudioPromptAndFeedback}}
+                        {{#unless this.audioInputEnabled}}
+                          <span class="learning-dashboard-empty-value">None</span>
+                        {{/unless}}
+                      {{/unless}}
+                    </div>
+
+                    <div>
+                      {{#if this.isUsed}}
+                        <span class="badge bg-success">{{this.overallAccuracy}}%</span>
+                      {{else}}
+                        <span class="badge bg-secondary">New</span>
+                      {{/if}}
+                    </div>
+                  </div>
+
+                  {{#if this.isUsed}}
+                    <div class="d-flex gap-1 mt-1 align-items-center">
+                      <button class="btn btn-sm btn-primary flex-grow-1 continue-lesson learning-dashboard-card-button"
+                        data-tdfid="{{this.TDFId}}"
+                        data-lessonname="{{this.displayName}}"
+                        data-currentstimulisetid="{{this.currentStimuliSetId}}"
+                        data-ismultitdf="{{this.isMultiTdf}}">
+                        Continue
+                      </button>
+                      <button class="btn btn-sm btn-primary flex-grow-1 learning-dashboard-card-button"
+                        type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#details-{{this.TDFId}}"
+                        aria-expanded="false"
+                        aria-controls="details-{{this.TDFId}}">
+                        Details
+                        <span class="fa fa-chevron-down card-expand-icon ms-1"></span>
+                      </button>
+                    </div>
+                  {{else}}
+                    <button class="btn btn-sm btn-success w-100 mt-1 start-lesson learning-dashboard-card-button"
+                      data-tdfid="{{this.TDFId}}"
+                      data-lessonname="{{this.displayName}}"
+                      data-currentstimulisetid="{{this.currentStimuliSetId}}"
+                      data-ignoreoutofgrammarresponses="{{this.ignoreOutOfGrammarResponses}}"
+                      data-speechoutofgrammarfeedback="{{this.speechOutOfGrammarFeedback}}"
+                      data-ismultitdf="{{this.isMultiTdf}}">
+                      Start
+                    </button>
+                  {{/if}}
+
+                  {{#if this.isUsed}}
+                    <div id="details-{{this.TDFId}}" class="collapse">
+                      <div class="border-top pt-1 mt-1">
+                        <div class="d-flex justify-content-between py-1 border-bottom">
+                          <span>Total Trials:</span>
+                          <span class="fw-bold">{{this.totalTrials}}</span>
+                        </div>
+                        <div class="d-flex justify-content-between py-1 border-bottom">
+                          <span>Last 10 Accuracy:</span>
+                          <span class="fw-bold">{{this.last10Accuracy}}%</span>
+                        </div>
+                        <div class="d-flex justify-content-between py-1 border-bottom">
+                          <span>Time Spent:</span>
+                          <span class="fw-bold">{{this.totalTimeMinutes}} min</span>
+                        </div>
+                        <div class="d-flex justify-content-between py-1 border-bottom">
+                          <span>Items Practiced:</span>
+                          <span class="fw-bold">{{this.itemsPracticed}}</span>
+                        </div>
+                        <div class="d-flex justify-content-between py-1 border-bottom">
+                          <span>Days with Sessions:</span>
+                          <span class="fw-bold">{{this.totalSessions}}</span>
+                        </div>
+                        <div class="d-flex justify-content-between py-1">
+                          <span>Last Practice:</span>
+                          <span class="fw-bold">{{this.lastPracticeDate}}</span>
+                        </div>
+                      </div>
+                    </div>
+                  {{/if}}
+                </div>
+              {{/each}}
+            </div>
+          {{/if}}
+        {{/unless}}
+      </div>
+    </div>
+  </div>
+</template>

@@ -1,0 +1,55 @@
+<template name="classSelection">
+  <div class="container" style="margin-top: 1rem; max-width: 900px;">
+    <h3 style="margin-top: 0; text-align: center;">Teacher / Class Selection</h3>
+
+    <div class="card mb-4">
+      <div class="card-body">
+        <div class="d-flex align-items-center mb-3">
+          <i class="fa fa-users me-2" style="font-size: 1.25rem; color: var(--accent-color);"></i>
+          <h5 class="m-0">Class Context</h5>
+        </div>
+
+        {{#if hasSelectedClassContext}}
+          <p class="mb-2">Current class: <strong>{{selectedClassDisplay}}</strong></p>
+        {{else}}
+          <p class="mb-2">No class selected. Choose your teacher and class to view assigned content.</p>
+        {{/if}}
+
+        {{#if classSelectionReady}}
+          <div class="row g-2 align-items-end">
+            <div class="col-md-5 col-12">
+              <label class="form-label" for="classSelectionTeacherSelect">Teacher</label>
+              <select id="classSelectionTeacherSelect" class="form-select">
+                <option value="">Select teacher</option>
+                {{#each classSelectionTeachers}}
+                  <option value="{{this._id}}">{{this.displayIdentifier}}</option>
+                {{/each}}
+              </select>
+            </div>
+
+            <div class="col-md-5 col-12">
+              <label class="form-label" for="classSelectionClassSelect">Class</label>
+              <select id="classSelectionClassSelect" class="form-select">
+                <option value="">Select class</option>
+                {{#each classSelectionClasses}}
+                  <option value="{{this.sectionId}}">
+                    {{this.courseName}}{{#if this.sectionName}} - {{this.sectionName}}{{/if}}
+                  </option>
+                {{/each}}
+              </select>
+            </div>
+
+            <div class="col-md-2 col-12 d-grid">
+              <button type="button" id="saveClassSelectionButton" class="btn btn-primary">Save</button>
+            </div>
+          </div>
+          <div class="mt-3 d-flex gap-2">
+            <button type="button" id="backToHomeButton" class="btn btn-outline-secondary">Back to Main Menu</button>
+          </div>
+        {{else}}
+          <p class="mb-0">Class options are loading...</p>
+        {{/if}}
+      </div>
+    </div>
+  </div>
+</template>

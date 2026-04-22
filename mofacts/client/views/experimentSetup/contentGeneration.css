@@ -1,0 +1,69 @@
+textarea {
+    resize: vertical;
+    min-width: 100%;
+}
+
+#parsed-sentences {
+    height: 600px;
+    overflow: auto;
+}
+
+#extracted-clozes {
+    height: 600px;
+    overflow: auto;
+}
+
+#cloze {
+  padding-bottom: 7px;
+}
+
+.cur-sentence {
+    color: #a834eb;
+}
+
+.sentence-no-cloze{
+    color: #666666;
+}
+
+.cloze-answers {
+  color: red;
+}
+
+.source-sentence {
+  font-style: italic;
+}
+
+.ul-no-bullets {
+  list-style: none;
+}
+
+#clozeTextEdit{
+  height:100%;
+  width:100%;
+}
+
+#select-delete {
+  float: left;
+  margin-top: 10px;
+  margin-right: 10px;
+}
+
+.btn-default {
+  width: 250px !important;
+}
+
+.flexContent{
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: -ms-flexbox;
+  display: flex;
+  flex-wrap: wrap;
+}
+
+#fileTemplateLabel{
+  margin-top: 0px;
+}
+
+#templateTDFSelect {
+  width: 50%;
+}

@@ -1,0 +1,38 @@
+# Dependency directories - will be installed fresh in Docker
+mofacts/node_modules/
+node_modules/
+
+# Meteor local build cache (NEVER include this!)
+mofacts/.meteor/local/
+.meteor/local/
+
+# Logs
+*.log
+npm-debug.log*
+
+# IDE
+.vscode/
+.idea/
+
+# Git
+.git/
+.gitignore
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+mofacts/tests/
+
+# Documentation (optional, can remove if needed in image)
+docs/
+docs_dev/
+
+# Local settings (will be copied separately via .deploy/assets/)
+mofacts/settings.json
+settings.json
+
+# Build artifacts
+*.pyc
+__pycache__/

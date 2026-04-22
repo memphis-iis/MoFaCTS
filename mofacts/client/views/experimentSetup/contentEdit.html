@@ -1,0 +1,791 @@
+<template name="contentEdit">
+    <!-- Compact CSS for Stim Editor - Same as TDF Editor -->
+    <style>
+        /* Hide descriptions when mode is 'none' */
+        #stim-editor-container.hide-descriptions .form-text,
+        #stim-editor-container.hide-descriptions .je-desc,
+        #stim-editor-container.hide-descriptions p.help-block,
+        #stim-editor-container.hide-descriptions small.text-muted,
+        #stim-editor-container.hide-descriptions [data-schemapath] > p,
+        #stim-editor-container.hide-descriptions .je-object__container > p,
+        #stim-editor-container.hide-descriptions .je-indented-panel > p {
+            display: none !important;
+        }
+
+        /* Style array field descriptions (<p> tags) consistently with string field descriptions (<small>) */
+        #stim-editor-container [data-schemapath] > p {
+            font-size: 0.875em;
+            color: var(--bs-secondary-color, #6c757d);
+            margin-top: 0.25rem;
+            margin-bottom: 0.5rem;
+        }
+
+        /* Stim Editor - Reset Bootstrap spacing utilities, then apply minimal values */
+
+        /* Minimal margin on Bootstrap margin utility elements */
+        #stim-editor-container [class*="my-"],
+        #stim-editor-container [class*="mb-"],
+        #stim-editor-container [class*="mt-"] {
+            margin: 0.25rem 0;
+        }
+
+        /* Minimal padding on Bootstrap padding utility elements */
+        #stim-editor-container [class*="py-"],
+        #stim-editor-container [class*="pb-"],
+        #stim-editor-container [class*="pt-"] {
+            padding: 0.25rem 0;
+        }
+
+        /* Reset Bootstrap row gutters */
+        #stim-editor-container .row {
+            --bs-gutter-x: 0.5rem;
+            --bs-gutter-y: 0.25rem;
+            margin-bottom: 0.15rem;
+        }
+
+        /* Minimal container padding (after reset, so these win) */
+        #stim-editor-container .card-body {
+            padding: 0.5rem;
+        }
+        #stim-editor-container .card-header {
+            padding: 0.35rem 0.5rem;
+        }
+
+        /* Remove margin from nested card.card-body elements (json-editor pattern) */
+        #stim-editor-container .card.card-body {
+            margin: 0;
+            padding: 0.25rem;
+        }
+
+        /* Root Clusters container - gray background instead of blue */
+        #stim-editor-container > [data-schemapath="root"] > .card {
+            background-color: #f8f9fa !important;
+            border-color: #dee2e6 !important;
+        }
+        #stim-editor-container > [data-schemapath="root"] > .card > .card-header {
+            background-color: #e9ecef !important;
+            border-color: #dee2e6 !important;
+        }
+
+        /* Base font size */
+        #stim-editor-container,
+        #stim-editor-container * {
+            font-size: 0.875rem !important;
+        }
+
+        /* Headings - slightly larger but still compact */
+        #stim-editor-container h1,
+        #stim-editor-container h2,
+        #stim-editor-container h3,
+        #stim-editor-container h4,
+        #stim-editor-container h5,
+        #stim-editor-container h6,
+        #stim-editor-container .card-header,
+        #stim-editor-container .je-object__title,
+        #stim-editor-container .h3.card-title {
+            font-size: 0.9rem !important;
+            font-weight: 600;
+            margin-bottom: 0;
+        }
+
+        /* Property labels in table layout */
+        #stim-editor-container table th,
+        #stim-editor-container table td {
+            font-size: 0.875rem !important;
+            padding: 0.25rem 0.5rem !important;
+        }
+
+        /* First column (property names) - slightly bold */
+        #stim-editor-container table th:first-child,
+        #stim-editor-container table td:first-child {
+            font-weight: 500;
+        }
+
+        /* Make labels and inputs side-by-side (2 columns) */
+        #stim-editor-container .form-group {
+            margin-bottom: 0.25rem;
+            display: grid;
+            grid-template-columns: 200px 1fr;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        /* Textareas get full width with label on top (not side-by-side) */
+        #stim-editor-container .form-group.has-textarea {
+            grid-template-columns: 1fr;
+            gap: 0.25rem;
+            align-items: start;
+        }
+
+        /* Make the column div take full width when it contains a textarea */
+        #stim-editor-container .row > [class*="col-"]:has(.has-textarea),
+        #stim-editor-container .row > div[class*="col-"].has-textarea-parent {
+            flex: 0 0 100%;
+            max-width: 100%;
+        }
+
+        #stim-editor-container .form-group > label {
+            margin-bottom: 0 !important;
+            text-align: right;
+            padding-right: 0.5rem;
+        }
+
+        /* Labels for textareas should be left-aligned on top */
+        #stim-editor-container .form-group.has-textarea > label {
+            text-align: left;
+            padding-right: 0;
+            font-weight: normal;
+        }
+
+        #stim-editor-container .form-group > .form-control,
+        #stim-editor-container .form-group > .form-select,
+        #stim-editor-container .form-group > input,
+        #stim-editor-container .form-group > select,
+        #stim-editor-container .form-group > textarea {
+            margin-bottom: 0 !important;
+        }
+
+        #stim-editor-container .card {
+            margin-bottom: 0.25rem;
+        }
+
+        #stim-editor-container .form-control,
+        #stim-editor-container .form-select {
+            padding: 0.2rem 0.4rem;
+        }
+
+        #stim-editor-container .btn-group {
+            margin-bottom: 0;
+        }
+
+        #stim-editor-container .je-object__controls,
+        #stim-editor-container .je-array__controls {
+            margin-bottom: 0;
+        }
+
+        #stim-editor-container label.form-label {
+            margin-bottom: 0.15rem;
+        }
+
+        /* Buttons */
+        #stim-editor-container .btn,
+        #stim-editor-container button {
+            font-size: 0.8rem !important;
+            padding: 0.2rem 0.4rem !important;
+        }
+
+        /* Style the Properties modal - distinguish in-use vs available */
+        /* Use flexbox to reorder: available at top, in-use at bottom */
+        #stim-editor-container .je-modal > div {
+            display: flex;
+            flex-direction: column;
+        }
+
+        #stim-editor-container .je-modal label {
+            display: block;
+            padding: 0.25rem 0.5rem;
+            margin: 0.1rem 0;
+            border-radius: 3px;
+        }
+
+        /* In-use properties (checked) - muted style, pushed to bottom */
+        #stim-editor-container .je-modal label:has(input[type="checkbox"]:checked) {
+            background: #e9ecef;
+            color: #6c757d;
+            order: 1;
+        }
+
+        /* Available properties (unchecked) - highlighted, stay at top */
+        #stim-editor-container .je-modal label:has(input[type="checkbox"]:not(:checked)) {
+            background: #d4edda;
+            order: 0;
+        }
+
+        /* Fallback classes for browsers without :has() */
+        #stim-editor-container .je-modal label.property-in-use {
+            background: #e9ecef;
+            color: #6c757d;
+            order: 1;
+        }
+        #stim-editor-container .je-modal label.property-available {
+            background: #d4edda;
+            order: 0;
+        }
+
+        /* Hide type switcher - properties should maintain their existing types */
+        #stim-editor-container .je-switcher {
+            display: none !important;
+        }
+
+        /* Hide labels that are siblings of type switchers (duplicate labels) */
+        #stim-editor-container label:has(+ .je-switcher),
+        #stim-editor-container .je-switcher + label,
+        #stim-editor-container b:has(+ .je-switcher) {
+            display: none !important;
+        }
+
+        /* Textareas for long content - ensure they work well in the grid layout */
+        #stim-editor-container .form-group > textarea {
+            margin-bottom: 0 !important;
+            width: 100%;
+            min-height: 60px;
+        }
+
+        /* Select elements fill their grid cell (same pattern as textareas) */
+        #stim-editor-container .form-group > select,
+        #stim-editor-container .form-group > .form-select {
+            width: 100%;
+        }
+
+        /* Media field enhancements - compact inline layout */
+        #stim-editor-container .media-field-wrapper {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 0.5rem;
+            width: 100%;
+            flex-wrap: nowrap;
+        }
+
+        #stim-editor-container .media-field-wrapper > input[type="text"] {
+            flex: 0 1 auto;
+            min-width: 150px;
+            max-width: 250px;
+        }
+
+        #stim-editor-container .media-preview {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.25rem;
+            background: #f8f9fa;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+        }
+
+        #stim-editor-container .media-preview:empty {
+            display: none;
+        }
+
+        #stim-editor-container .media-preview img {
+            max-width: 120px;
+            max-height: 80px;
+            object-fit: contain;
+            border-radius: 3px;
+        }
+
+        #stim-editor-container .media-preview audio {
+            height: 32px;
+            max-width: 200px;
+        }
+
+        #stim-editor-container .media-preview video {
+            max-height: 80px;
+            max-width: 120px;
+        }
+
+        #stim-editor-container .media-drop-zone {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            border: 1px dashed #dee2e6;
+            border-radius: 3px;
+            padding: 0.15rem 0.5rem;
+            color: #6c757d;
+            font-size: 0.75rem !important;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        #stim-editor-container .media-drop-zone:hover,
+        #stim-editor-container .media-drop-zone.drag-over {
+            border-color: #0d6efd;
+            background: #e7f1ff;
+            color: #0d6efd;
+        }
+
+        #stim-editor-container .media-drop-zone input[type="file"] {
+            display: none;
+        }
+
+        #stim-editor-container .media-drop-zone .drop-icon {
+            font-size: 0.85rem !important;
+        }
+
+        #stim-editor-container .media-drop-zone .drop-text {
+            display: none;
+        }
+
+        #stim-editor-container .media-preview .media-error {
+            color: #dc3545;
+            font-size: 0.7rem !important;
+            white-space: nowrap;
+        }
+
+        #stim-editor-container .media-upload-progress {
+            flex: 1;
+            min-width: 100px;
+        }
+
+        /* =================================================================
+           VALIDATION UI STYLES
+           ================================================================= */
+
+        /* Validation Summary Panel */
+        .validation-summary {
+            margin-bottom: 1rem;
+        }
+
+        .validation-summary .alert {
+            padding: 0.75rem 1rem;
+        }
+
+        .validation-summary .validation-list {
+            list-style: none;
+            padding-left: 0;
+            margin-bottom: 0;
+            font-size: 0.875rem;
+        }
+
+        .validation-summary .validation-item {
+            padding: 0.25rem 0;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+
+        .validation-summary .validation-item:last-child {
+            border-bottom: none;
+        }
+
+        .validation-summary .jump-to-field {
+            font-weight: 500;
+        }
+
+        .validation-summary .jump-to-field:hover {
+            text-decoration: underline !important;
+        }
+
+        /* Field-Level Error Styling */
+        #stim-editor-container .validation-error-field {
+            border-color: #dc3545 !important;
+            box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25) !important;
+        }
+
+        #stim-editor-container .validation-warning-field {
+            border-color: #ffc107 !important;
+            box-shadow: 0 0 0 0.2rem rgba(255, 193, 7, 0.25) !important;
+        }
+
+        .field-validation-message {
+            font-size: 0.75rem !important;
+            line-height: 1.2;
+        }
+
+        .field-validation-message i {
+            font-size: 0.7rem;
+        }
+
+        /* Highlight Animation */
+        .validation-highlight {
+            animation: validation-pulse 0.5s ease-in-out 3;
+        }
+
+        @keyframes validation-pulse {
+            0%, 100% {
+                background-color: transparent;
+            }
+            50% {
+                background-color: rgba(255, 193, 7, 0.3);
+            }
+        }
+
+        /* Toggle Button Styling */
+        .toggle-validation-details {
+            color: inherit !important;
+            text-decoration: none !important;
+        }
+
+        .toggle-validation-details:hover {
+            opacity: 0.7;
+        }
+
+        /* =================================================================
+           GENERATE INCORRECT RESPONSES MODAL - Ensure proper padding
+           (targeted by ID to avoid affecting other modals)
+           ================================================================= */
+        #generateIncorrectModal .modal-body {
+            padding: 1rem 1.5rem;
+        }
+        #generateIncorrectModal .modal-header {
+            padding: 1rem 1.5rem;
+        }
+        #generateIncorrectModal .modal-footer {
+            padding: 0.75rem 1.5rem;
+        }
+        #generateIncorrectModal .form-control {
+            padding: 0.375rem 0.75rem;
+        }
+        #generateIncorrectModal .btn {
+            padding: 0.375rem 0.75rem;
+            font-size: 1rem;
+        }
+
+        .editor-topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+        }
+
+        .editor-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .editor-verbosity {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .editor-verbosity .form-check {
+            margin-bottom: 0;
+        }
+
+        .save-feedback {
+            margin-right: auto;
+            min-height: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            color: #198754;
+            font-size: 0.875rem;
+            opacity: 0;
+            transition: opacity 0.15s ease;
+            pointer-events: none;
+        }
+
+        .save-feedback.is-visible {
+            opacity: 1;
+        }
+
+        /* Mobile layout adjustments */
+        @media (max-width: 768px) {
+            .editor-topbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .editor-status {
+                justify-content: flex-start;
+            }
+
+            .editor-verbosity {
+                justify-content: flex-start;
+            }
+
+            #stim-editor-container .form-group {
+                grid-template-columns: 1fr;
+                gap: 0.25rem;
+                align-items: start;
+            }
+
+            #stim-editor-container .form-group > label {
+                text-align: left;
+                padding-right: 0;
+                font-weight: 500;
+                margin-bottom: 0.25rem !important;
+            }
+
+            #stim-editor-container .btn {
+                padding: 0.5rem 0.75rem !important;
+                min-height: 44px;
+                font-size: 0.875rem !important;
+            }
+
+            #stim-editor-container .form-control,
+            #stim-editor-container .form-select,
+            #stim-editor-container input,
+            #stim-editor-container textarea {
+                font-size: 16px !important;
+            }
+
+            #stim-editor-container .media-field-wrapper {
+                flex-wrap: wrap;
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            #stim-editor-container .media-field-wrapper > input[type="text"] {
+                min-width: 100%;
+                max-width: 100%;
+                order: 1;
+            }
+
+            #stim-editor-container .media-preview {
+                order: 2;
+                width: 100%;
+                justify-content: center;
+            }
+
+            #stim-editor-container .media-drop-zone {
+                order: 3;
+                width: 100%;
+                justify-content: center;
+                padding: 0.5rem;
+            }
+        }
+
+        .mc-toolbar {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        @media (max-width: 576px) {
+            .mc-toolbar {
+                flex-direction: column;
+            }
+
+            .mc-toolbar .btn {
+                width: 100%;
+                min-height: 44px;
+            }
+
+            .content-edit-actions {
+                flex-direction: column-reverse !important;
+            }
+
+            .content-edit-actions .save-feedback {
+                width: 100%;
+                justify-content: center;
+                margin-right: 0;
+            }
+
+            .content-edit-actions .btn {
+                width: 100%;
+                min-height: 48px;
+            }
+        }
+
+        .cluster-navigation {
+            display: flex;
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .cluster-nav-controls,
+        .cluster-window-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        #cluster-window-size {
+            width: auto;
+        }
+
+        @media (max-width: 768px) {
+            .cluster-navigation {
+                flex-direction: column;
+            }
+
+            .cluster-nav-controls .btn {
+                min-height: 44px;
+                flex: 1 1 auto;
+            }
+
+            .cluster-counter {
+                width: 100%;
+                text-align: center;
+                order: -1;
+            }
+
+            .nav-label {
+                position: absolute;
+                width: 1px;
+                height: 1px;
+                padding: 0;
+                margin: -1px;
+                overflow: hidden;
+                clip: rect(0, 0, 0, 0);
+                white-space: nowrap;
+                border: 0;
+            }
+
+            .cluster-name {
+                text-align: center;
+            }
+
+            #cluster-window-size {
+                width: 80px !important;
+            }
+        }
+    </style>
+
+    <div class="container" style="margin-top: 1rem;">
+        <!-- Header -->
+        <div class="d-flex align-items-center mb-3">
+            <a href="/contentUpload" class="btn btn-outline-secondary me-3">
+                <i class="fa fa-arrow-left"></i> Back
+            </a>
+            <h3 class="m-0">
+                Edit Stimuli: {{lessonName}}
+                {{#if conditionInfo}}
+                    <small class="text-muted">
+                        (Editing: {{conditionInfo.fileName}} - Condition {{conditionInfo.index}} of {{conditionInfo.total}})
+                    </small>
+                {{/if}}
+                {{#if stimFileInfo}}
+                    <small class="text-muted">
+                        [Stim File: {{stimFileInfo.filename}}]
+                    </small>
+                {{/if}}
+            </h3>
+        </div>
+
+        {{#if loading}}
+        <div class="text-center py-5">
+            <i class="fa fa-spinner fa-spin fa-2x"></i>
+            <p class="mt-2">Loading content...</p>
+        </div>
+        {{else}}
+        {{#if noData}}
+        <div class="alert alert-warning">
+            <i class="fa fa-exclamation-triangle"></i>
+            No stimulus data found for this TDF, or you don't have permission to edit it.
+        </div>
+        {{else}}
+
+        {{#unless editorReady}}
+        <!-- Show initializing message while editor loads -->
+        <div class="text-center py-4">
+            <i class="fa fa-spinner fa-spin fa-2x text-primary"></i>
+            <p class="mt-2 text-muted">Initializing editor...</p>
+        </div>
+        {{/unless}}
+
+        {{#if editorReady}}
+        <!-- Tooltip toggle + unsaved state (mobile-friendly) -->
+        <div class="editor-topbar mb-3">
+            <div class="editor-status">
+                {{#if hasChanges}}
+                <span class="badge bg-warning text-dark unsaved-badge">Unsaved changes</span>
+                {{/if}}
+            </div>
+            <div class="editor-verbosity">
+                <span class="text-muted small">Descriptions:</span>
+                <div class="form-check form-check-inline mb-0">
+                    <input class="form-check-input" type="radio" name="tooltipMode" id="tooltipNone" value="none" checked="{{noneChecked}}">
+                    <label class="form-check-label small" for="tooltipNone">None</label>
+                </div>
+                <div class="form-check form-check-inline mb-0">
+                    <input class="form-check-input" type="radio" name="tooltipMode" id="tooltipBrief" value="brief" checked="{{briefChecked}}">
+                    <label class="form-check-label small" for="tooltipBrief">Brief</label>
+                </div>
+                <div class="form-check form-check-inline mb-0">
+                    <input class="form-check-input" type="radio" name="tooltipMode" id="tooltipVerbose" value="verbose" checked="{{verboseChecked}}">
+                    <label class="form-check-label small" for="tooltipVerbose">Verbose</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- MC Conversion Toolbar -->
+        <div class="mc-toolbar mb-3">
+            <button id="generateIncorrectBtn" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#generateIncorrectModal">
+                <i class="fa fa-random"></i> Generate Incorrect Responses
+            </button>
+            <button id="removeIncorrectBtn" class="btn btn-outline-danger btn-sm">
+                <i class="fa fa-trash"></i> Remove All Incorrect Responses
+            </button>
+        </div>
+        {{/if}}
+
+        <!-- Generate Incorrect Responses Modal -->
+        <div class="modal fade" id="generateIncorrectModal" tabindex="-1" aria-labelledby="generateIncorrectModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="generateIncorrectModalLabel">Generate Incorrect Responses</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="distractorCount" class="form-label">Number of distractors per question:</label>
+                            <input type="number" class="form-control" id="distractorCount" value="3" min="1" max="20">
+                        </div>
+                        <div class="alert alert-info small mb-0">
+                            <i class="fa fa-info-circle"></i>
+                            Distractors will be randomly selected from all other correct answers across all stims.
+                            Existing incorrect responses will be replaced.
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="confirmGenerateBtn">Generate</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="cluster-navigation mb-2">
+            <div class="cluster-nav-controls">
+                <button class="btn btn-outline-secondary btn-sm cluster-nav" data-dir="prev" aria-label="Previous cluster">
+                    <i class="fa fa-chevron-left"></i><span class="nav-label"> Prev</span>
+                </button>
+                <button class="btn btn-outline-secondary btn-sm cluster-nav" data-dir="next" aria-label="Next cluster">
+                    <span class="nav-label">Next </span><i class="fa fa-chevron-right"></i>
+                </button>
+                <span class="text-muted small cluster-counter">Cluster {{currentClusterNumber}} of {{clustersCount}}</span>
+            </div>
+            <div class="cluster-window-controls">
+                <label for="cluster-window-size" class="small text-muted mb-0">Show</label>
+                <select id="cluster-window-size" class="form-select form-select-sm">
+                    <option value="1" selected="{{windowSizeSelected 1}}">1</option>
+                    <option value="5" selected="{{windowSizeSelected 5}}">5</option>
+                    <option value="10" selected="{{windowSizeSelected 10}}">10</option>
+                    <option value="20" selected="{{windowSizeSelected 20}}">20</option>
+                    <option value="50" selected="{{windowSizeSelected 50}}">50</option>
+                </select>
+                <span class="small text-muted">clusters at a time</span>
+            </div>
+            <div class="small text-muted text-truncate cluster-name">{{currentClusterName}}</div>
+        </div>
+
+        <!-- Validation Summary Panel -->
+        <div id="stim-validation-summary"></div>
+
+        <!-- JSON Editor container -->
+        <div class="card mb-4">
+            <div class="card-body p-2">
+                <div id="stim-editor-container"></div>
+            </div>
+        </div>
+
+        {{#if editorReady}}
+        <!-- Action buttons -->
+        <div class="d-flex align-items-center justify-content-end gap-2 mt-3 mb-4 content-edit-actions">
+            <div class="save-feedback {{#if saveFeedbackText}}is-visible{{/if}}" role="status" aria-live="polite" aria-atomic="true">
+                {{#if saveFeedbackText}}
+                <i class="fa fa-check-circle" aria-hidden="true"></i>
+                <span>{{saveFeedbackText}}</span>
+                {{/if}}
+            </div>
+            <a href="/contentUpload" class="btn btn-secondary">
+                <i class="fa fa-times"></i> Cancel
+            </a>
+            <button class="btn btn-primary save-btn" disabled="{{saveDisabled}}">
+                <i class="fa fa-save"></i> Save All Clusters
+            </button>
+        </div>
+        {{/if}}
+
+        {{/if}}
+        {{/if}}
+    </div>
+</template>

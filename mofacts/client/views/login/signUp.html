@@ -1,0 +1,54 @@
+<template name="signUp">
+    <div class="auth-page">
+        <div class="auth-shell">
+            <div class="auth-card card">
+                <div class="card-body auth-card-body">
+                    <div class="auth-brand">
+                        <h2 class="auth-system-name mt-0">
+                            {{#if currentTheme.properties.logo_url}}
+                                <span class="navbar-brand-icon"
+                                      aria-hidden="true"
+                                      style="--navbar-brand-icon-image: url('{{currentTheme.properties.logo_url}}');"></span>
+                            {{/if}}
+                            <span>{{systemName}}</span>
+                        </h2>
+                        <h1 class="auth-title">Create account</h1>
+                        <p class="auth-description mb-2">Create your account to access your learning dashboard and saved progress.</p>
+                        <p class="auth-description auth-description-secondary mb-0">{{signUpInstructionCopy}}</p>
+                    </div>
+
+                    <p id="serverErrors" class="auth-message mb-0" role="alert" aria-live="polite" hidden></p>
+
+                    <form class="auth-form" novalidate>
+                        <div class="auth-field">
+                            <label class="form-label auth-label" for="signUpUsername">Email</label>
+                            <input type="text" id="signUpUsername" value="" placeholder="name@example.com" class="form-control" autocomplete="username email">
+                            <span id="usernameInvalid" class="auth-field-message" hidden>Enter a valid email address.</span>
+                        </div>
+
+                        <div class="auth-field">
+                            <label class="form-label auth-label" for="password1">Password</label>
+                            <input type="password" id="password1" value="" placeholder="Create a password" class="form-control" autocomplete="new-password">
+                            <div class="auth-helper-text">Use at least {{minPasswordLength}} characters.</div>
+                            <span id="passwordTooShort" class="auth-field-message" hidden>Password must be at least {{minPasswordLength}} characters long.</span>
+                        </div>
+
+                        <div class="auth-field">
+                            <label class="form-label auth-label" for="password2">Confirm password</label>
+                            <input type="password" id="password2" value="" placeholder="Re-enter your password" class="form-control" autocomplete="new-password">
+                            <span id="passwordMustMatch" class="auth-field-message" hidden>Passwords must match.</span>
+                        </div>
+
+                        <button type="button" id="signUpButton" class="btn auth-primary-btn w-100">Create Account</button>
+                    </form>
+
+                    <div class="auth-supporting-action">
+                        <span class="text-muted">Already have an account?</span>
+                        <a id="backkTosignInButton" href="/auth/login" class="auth-link">Sign in</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {{> footer}}
+    </div>
+</template>

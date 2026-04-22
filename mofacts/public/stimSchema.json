@@ -1,0 +1,220 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MoFaCTS Stimulus Schema",
+  "description": "Registry-backed stimulus schema.",
+  "type": "object",
+  "required": [
+    "setspec"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "setspec": {
+      "type": "object",
+      "title": "Setspec",
+      "required": [
+        "clusters"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "clusters": {
+          "type": "array",
+          "title": "Clusters",
+          "items": {
+            "type": "object",
+            "title": "Cluster",
+            "properties": {
+              "imageStimulus": {
+                "type": "string",
+                "default": "",
+                "options": {
+                  "grid_columns": 12
+                }
+              },
+              "audioStimulus": {
+                "type": "string",
+                "default": "",
+                "options": {
+                  "grid_columns": 12
+                }
+              },
+              "videoStimulus": {
+                "type": "string",
+                "default": "",
+                "options": {
+                  "grid_columns": 12
+                }
+              },
+              "stims": {
+                "type": "array",
+                "title": "Stims",
+                "items": {
+                  "type": "object",
+                  "title": "Stim",
+                  "properties": {
+                    "parameter": {
+                      "type": "string",
+                      "default": "",
+                      "options": {
+                        "grid_columns": 6
+                      }
+                    },
+                    "optimalProb": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "string"
+                        }
+                      ],
+                      "options": {
+                        "grid_columns": 4
+                      }
+                    },
+                    "speechHintExclusionList": {
+                      "type": "string",
+                      "default": "",
+                      "options": {
+                        "grid_columns": 12
+                      }
+                    },
+                    "alternateDisplays": {
+                      "type": "array",
+                      "title": "Alternate Displays",
+                      "items": {
+                        "type": "object",
+                        "title": "Alternate Display",
+                        "properties": {
+                          "text": {
+                            "type": "string",
+                            "default": "",
+                            "format": "textarea",
+                            "options": {
+                              "grid_columns": 12
+                            }
+                          },
+                          "clozeText": {
+                            "type": "string",
+                            "default": "",
+                            "format": "textarea",
+                            "options": {
+                              "grid_columns": 12
+                            }
+                          },
+                          "clozeStimulus": {
+                            "type": "string",
+                            "default": "",
+                            "options": {
+                              "grid_columns": 12
+                            }
+                          },
+                          "imgSrc": {
+                            "type": "string",
+                            "default": "",
+                            "options": {
+                              "grid_columns": 12
+                            }
+                          },
+                          "audioSrc": {
+                            "type": "string",
+                            "default": "",
+                            "options": {
+                              "grid_columns": 12
+                            }
+                          },
+                          "videoSrc": {
+                            "type": "string",
+                            "default": "",
+                            "options": {
+                              "grid_columns": 12
+                            }
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "display": {
+                      "type": "object",
+                      "title": "Display",
+                      "properties": {
+                        "text": {
+                          "type": "string",
+                          "default": "",
+                          "format": "textarea",
+                          "options": {
+                            "grid_columns": 12
+                          }
+                        },
+                        "clozeText": {
+                          "type": "string",
+                          "default": "",
+                          "format": "textarea",
+                          "options": {
+                            "grid_columns": 12
+                          }
+                        },
+                        "clozeStimulus": {
+                          "type": "string",
+                          "default": "",
+                          "options": {
+                            "grid_columns": 12
+                          }
+                        },
+                        "imgSrc": {
+                          "type": "string",
+                          "default": "",
+                          "options": {
+                            "grid_columns": 12
+                          }
+                        },
+                        "audioSrc": {
+                          "type": "string",
+                          "default": "",
+                          "options": {
+                            "grid_columns": 12
+                          }
+                        },
+                        "videoSrc": {
+                          "type": "string",
+                          "default": "",
+                          "options": {
+                            "grid_columns": 12
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "response": {
+                      "type": "object",
+                      "title": "Response",
+                      "properties": {
+                        "correctResponse": {
+                          "type": "string",
+                          "default": "",
+                          "options": {
+                            "grid_columns": 12
+                          }
+                        },
+                        "incorrectResponses": {
+                          "type": "array",
+                          "title": "Incorrect Responses",
+                          "items": {
+                            "type": "string",
+                            "title": "Incorrect Response"
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    }
+  }
+}

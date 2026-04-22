@@ -1,0 +1,94 @@
+<template name="draftEditorWorkspace">
+  <style>
+    #draft-tdf-editor-container .je-object__controls,
+    #draft-tdf-editor-container .je-array__controls,
+    #draft-content-editor-container .je-object__controls,
+    #draft-content-editor-container .je-array__controls {
+      display: inline-flex !important;
+      gap: 0.25rem;
+      margin-bottom: 0;
+      vertical-align: middle;
+    }
+
+    #draft-tdf-editor-container .json-editor-btntype-properties,
+    #draft-tdf-editor-container .json-editor-btntype-editjson,
+    #draft-content-editor-container .json-editor-btntype-properties,
+    #draft-content-editor-container .json-editor-btntype-editjson {
+      display: inline-flex !important;
+      align-items: center;
+    }
+
+    #draft-tdf-editor-container .form-label,
+    #draft-content-editor-container .form-label {
+      margin-bottom: 0.15rem;
+      font-weight: 500;
+    }
+
+    #draft-tdf-editor-container .je-switcher,
+    #draft-content-editor-container .je-switcher {
+      display: none !important;
+    }
+
+    #draft-tdf-editor-container label:has(+ .je-switcher),
+    #draft-tdf-editor-container .je-switcher + label,
+    #draft-tdf-editor-container b:has(+ .je-switcher),
+    #draft-content-editor-container label:has(+ .je-switcher),
+    #draft-content-editor-container .je-switcher + label,
+    #draft-content-editor-container b:has(+ .je-switcher) {
+      display: none !important;
+    }
+  </style>
+  <div class="draft-editor-workspace">
+    <div class="draft-workspace-header">
+      <div>
+        <h4 class="mb-1">{{workspaceHeading}}</h4>
+        {{#if currentLesson}}
+        <div class="text-muted small">
+          <strong>{{currentLesson.title}}</strong>
+          {{#if currentLesson.stats}}
+          · {{currentLesson.stats.totalItems}} items
+          {{#if currentLesson.stats.skippedItems}} · {{currentLesson.stats.skippedItems}} skipped{{/if}}
+          {{/if}}
+        </div>
+        {{/if}}
+      </div>
+      {{#if hasMultipleLessons}}
+      <div class="draft-lesson-select">
+        <label class="small mb-1">Lesson</label>
+        <select class="form-control form-control-sm" id="draft-lesson-select">
+          {{#each lessonOptions}}
+          <option value="{{index}}" selected={{isSelected}}>{{label}}</option>
+          {{/each}}
+        </select>
+      </div>
+      {{/if}}
+    </div>
+
+    {{#if workspaceError}}
+    <div class="alert alert-danger">
+      {{workspaceError}}
+    </div>
+    {{/if}}
+
+    <div class="draft-workspace-tabs btn-group mb-3" role="group">
+      <button class="btn btn-outline-primary draft-tab {{#if isActiveTab 'tdf'}}active{{/if}}" data-tab="tdf">TDF</button>
+      <button class="btn btn-outline-primary draft-tab {{#if isActiveTab 'content'}}active{{/if}}" data-tab="content">Content</button>
+    </div>
+
+    <div class="draft-editor-panel {{#unless isActiveTab 'tdf'}}d-none{{/unless}}">
+      <div id="draft-tdf-editor-container"></div>
+    </div>
+
+    <div class="draft-editor-panel {{#unless isActiveTab 'content'}}d-none{{/unless}}">
+      <div id="draft-content-editor-container"></div>
+    </div>
+
+    <div class="wizard-actions mt-3">
+      <button class="btn btn-secondary" id="draft-workspace-back">← Back</button>
+      <div class="draft-workspace-actions">
+        <button class="btn btn-outline-secondary" id="draft-reset-defaults">Reset to Generated Defaults</button>
+        <button class="btn btn-primary" id="draft-save-continue">{{saveContinueLabel}}</button>
+      </div>
+    </div>
+  </div>
+</template>

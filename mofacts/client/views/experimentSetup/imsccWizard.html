@@ -1,0 +1,527 @@
+<template name="imsccWizard">
+  <div class="imscc-wizard" id="imscc-wizard-container">
+    <div class="wizard-header">
+      <h3>Import from Canvas (.imscc)</h3>
+      <p class="text-muted">
+        Extract quiz content locally from a Canvas export package, review what will be converted,
+        and generate a MoFaCTS package without uploading the original IMSCC file.
+      </p>
+    </div>
+
+    <div class="wizard-steps">
+      <div class="step {{#if isStep 1}}active{{/if}} {{#if stepCompleted 1}}completed{{/if}}">
+        <span class="step-number">1</span>
+        <span class="step-label">Upload</span>
+      </div>
+      <div class="step {{#if isStep 2}}active{{/if}} {{#if stepCompleted 2}}completed{{/if}}">
+        <span class="step-number">2</span>
+        <span class="step-label">Setup</span>
+      </div>
+      <div class="step {{#if isStep 3}}active{{/if}} {{#if stepCompleted 3}}completed{{/if}}">
+        <span class="step-number">3</span>
+        <span class="step-label">Edit Draft</span>
+      </div>
+      <div class="step {{#if isStep 4}}active{{/if}}">
+        <span class="step-number">4</span>
+        <span class="step-label">Package</span>
+      </div>
+    </div>
+
+    <div class="wizard-content">
+      {{#if isStep 1}}
+      <div class="wizard-step">
+        <h4>Step 1: Select Canvas Export</h4>
+
+        <div class="form-group">
+          <label for="imscc-file-input">Choose .imscc file:</label>
+          <input type="file" class="form-control" id="imscc-file-input" accept=".imscc">
+          <small class="form-text text-muted">
+            The file is read locally in your browser. Only generated MoFaCTS files are uploaded.
+          </small>
+        </div>
+
+        {{#if selectedFileName}}
+        <div class="alert alert-secondary mt-3">
+          <strong>Selected:</strong> {{selectedFileName}}
+        </div>
+        {{/if}}
+
+        {{#if analyzing}}
+        <div class="alert alert-info">
+          <i class="fa fa-spinner fa-spin"></i> Analyzing IMSCC package...
+          <div class="progress mt-2">
+            <div class="progress-bar progress-bar-striped progress-bar-animated"
+                 style="width: {{analyzeProgress}}%">
+              {{analyzeProgress}}%
+            </div>
+          </div>
+        </div>
+        {{/if}}
+
+        {{#if analyzeError}}
+        <div class="alert alert-danger">
+          <strong>Error:</strong> {{analyzeError}}
+        </div>
+        {{/if}}
+
+        <div class="wizard-actions">
+          <button class="btn btn-secondary" id="cancel-imscc-wizard">Cancel</button>
+          <button class="btn btn-primary" id="analyze-imscc" {{analyzeDisabledAttr}}>
+            Analyze Package ->
+          </button>
+        </div>
+      </div>
+      {{/if}}
+
+      {{#if isStep 2}}
+      <div class="wizard-step">
+        <h4>Step 2: Select and Configure Quizzes</h4>
+
+        <div class="form-group mb-3 imscc-mode-setting">
+          <div class="imscc-mode-setting-top">
+            <strong>Output mode</strong>
+            <div class="imscc-mode-switch" title="Toggle between separate systems and a single joined system">
+              <span class="imscc-mode-switch-label imscc-mode-switch-label-left small">Separate</span>
+              <span class="form-switch imscc-mode-switch-control">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  id="imscc-join-mode-toggle"
+                  {{joinModeToggleAttrs}}
+                  aria-label="Toggle output mode between separate systems and one joined system">
+              </span>
+              <span class="imscc-mode-switch-label imscc-mode-switch-label-right small">Join</span>
+            </div>
+          </div>
+          <div class="imscc-mode-summary small text-muted">
+            <strong>Current:</strong> {{joinModeLabel}}.
+            {{#if joinMode}}
+            One combined MoFaCTS practice system for all selected quizzes.
+            {{else}}
+            One MoFaCTS practice system per selected quiz.
+            {{/if}}
+          </div>
+        </div>
+
+        {{#if metadata}}
+        <div class="card mb-3">
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-4"><strong>File:</strong> {{metadata.fileName}}</div>
+              <div class="col-md-4"><strong>Quizzes:</strong> {{metadata.quizCount}}</div>
+              <div class="col-md-4"><strong>Selected:</strong> {{selectedConfigCount}}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table table-striped table-bordered">
+            <thead>
+              <tr>
+                <th>Select</th>
+                <th>Quiz Title</th>
+                <th>Due Date</th>
+                <th>Questions</th>
+                <th>Supported</th>
+                <th>Unsupported</th>
+              </tr>
+            </thead>
+            <tbody>
+              {{#each configs}}
+              <tr>
+                <td>
+                  <input type="checkbox"
+                         class="imscc-quiz-select"
+                         data-ident="{{ident}}"
+                         {{selectedCheckedAttr}}>
+                </td>
+                <td>
+                  <strong>{{title}}</strong>
+                  {{#if unsupportedCount}}
+                  <div class="small text-muted">
+                    Unsupported types: {{unsupportedTypesLabel unsupportedTypes}}
+                  </div>
+                  {{/if}}
+                </td>
+                <td>{{formatDueDate dueAt}}</td>
+                <td>{{questionCount}}</td>
+                <td>{{supportedCount}}</td>
+                <td>{{unsupportedCount}}</td>
+              </tr>
+              {{/each}}
+            </tbody>
+          </table>
+        </div>
+        {{/if}}
+
+        <div class="card bg-light mb-3">
+          <div class="card-body">
+            <strong>Selected quizzes:</strong> {{selectedConfigCount}}<br>
+            <strong>Supported questions to convert:</strong> {{selectedSupportedCount}}
+          </div>
+        </div>
+
+        {{#if joinMode}}
+        <div class="card mb-3">
+          <div class="card-header">
+            <strong>Combined Practice System</strong>
+            <span class="badge badge-info ml-2">{{selectedConfigCount}} quizzes &bull; {{joinedTotalSupported}} supported questions</span>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-6">
+                <label>TDF Name</label>
+                <input type="text" class="form-control" id="imscc-joined-name" value="{{joinedConfig.name}}">
+              </div>
+              <div class="col-md-6">
+                <label>Included Quizzes</label>
+                <ul class="list-unstyled mb-0" style="max-height:150px;overflow-y:auto;border:1px solid #dee2e6;border-radius:.25rem;padding:8px;background:#f8f9fa">
+                  {{#each configs}}
+                    {{#if selected}}
+                    <li class="small">{{title}} <span class="text-muted">({{supportedCount}} supported)</span></li>
+                    {{/if}}
+                  {{/each}}
+                </ul>
+              </div>
+            </div>
+            <div class="mt-3">
+              <label>Instructions (optional)</label>
+              <textarea class="form-control" id="imscc-joined-instructions" rows="3">{{joinedConfig.instructions}}</textarea>
+            </div>
+            {{#if joinedConfig.validationError}}
+            <div class="alert alert-warning mt-3 mb-0">
+              {{joinedConfig.validationError}}
+            </div>
+            {{/if}}
+          </div>
+        </div>
+        {{else}}
+        {{#each configs}}
+          {{#if selected}}
+          <div class="card mb-3">
+            <div class="card-header">
+              <strong>{{title}}</strong>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-6">
+                  <label>TDF Name</label>
+                  <input type="text"
+                         class="form-control imscc-tdf-name"
+                         data-ident="{{ident}}"
+                         value="{{name}}">
+                </div>
+                <div class="col-md-6">
+                  <label>Conversion Summary</label>
+                  <div class="form-control bg-light">
+                    {{supportedCount}} supported, {{unsupportedCount}} unsupported
+                  </div>
+                </div>
+              </div>
+              <div class="mt-3">
+                <label>Instructions (optional)</label>
+                <textarea class="form-control imscc-instructions"
+                          rows="3"
+                          data-ident="{{ident}}">{{instructions}}</textarea>
+              </div>
+              {{#if validationError}}
+              <div class="alert alert-warning mt-3 mb-0">
+                {{validationError}}
+              </div>
+              {{/if}}
+            </div>
+          </div>
+          {{/if}}
+        {{/each}}
+
+        {{#if hasValidationError}}
+        <div class="alert alert-danger">
+          Fix validation errors before opening the draft editor.
+        </div>
+        {{/if}}
+        {{/if}}
+
+        {{#if generating}}
+        <div class="alert alert-info">
+          <i class="fa fa-spinner fa-spin"></i> Preparing editable draft...
+          <div class="progress mt-2">
+            <div class="progress-bar progress-bar-striped progress-bar-animated"
+                 style="width: {{generateProgress}}%">
+              {{generateProgress}}%
+            </div>
+          </div>
+        </div>
+        {{/if}}
+
+        {{#if generateError}}
+        <div class="alert alert-danger">
+          <strong>Error:</strong> {{generateError}}
+        </div>
+        {{/if}}
+
+        <div class="wizard-actions">
+          <button class="btn btn-secondary" id="imscc-back-to-upload">&lt;- Back</button>
+          <button class="btn btn-primary" id="open-imscc-draft-editor" {{generateDisabledAttr}}>
+            Open Draft Editor ->
+          </button>
+        </div>
+      </div>
+      {{/if}}
+
+      {{#if isStep 3}}
+      <div class="wizard-step">
+        {{#if generateError}}
+        <div class="alert alert-danger">
+          <strong>Packaging error:</strong> {{generateError}}
+        </div>
+        {{/if}}
+        {{> draftEditorWorkspace
+          lessons=draftLessons
+          onLessonsUpdate=updateDraftLessons
+          onBack=backToSourceConfig
+          onSaveContinue=saveDraftAndContinue}}
+      </div>
+      {{/if}}
+
+      {{#if isStep 4}}
+      <div class="wizard-step">
+        <h4>Step 4: Package Summary</h4>
+
+        {{#if generating}}
+        <div class="alert alert-info">
+          <i class="fa fa-spinner fa-spin"></i> Generating package...
+          <div class="progress mt-2">
+            <div class="progress-bar progress-bar-striped progress-bar-animated"
+                 style="width: {{generateProgress}}%">
+              {{generateProgress}}%
+            </div>
+          </div>
+        </div>
+        {{/if}}
+
+        {{#if generateError}}
+        <div class="alert alert-danger">
+          <strong>Error:</strong> {{generateError}}
+        </div>
+        {{/if}}
+
+        {{#if generationResult}}
+        <div class="alert alert-success">
+          Package generated successfully.
+        </div>
+
+        <div class="card mb-3">
+          <div class="card-header">
+            <h5 class="m-0">Generation Summary</h5>
+          </div>
+          <div class="card-body">
+            <div><strong>Total cards:</strong> {{generationResult.totalCards}}</div>
+            <div><strong>Total skipped:</strong> {{generationResult.totalSkipped}}</div>
+            <hr>
+            <ul class="mb-0">
+              {{#each generationResult.manifest}}
+              <li>
+                <strong>{{tdfName}}</strong> - {{cardCount}} cards
+                {{#if skippedCount}} ({{skippedCount}} skipped){{/if}}
+                {{#if mediaCount}}, {{mediaCount}} media files{{/if}}
+              </li>
+              {{/each}}
+            </ul>
+          </div>
+        </div>
+        {{/if}}
+
+        {{#if uploadStatus}}
+        <div class="alert alert-info">
+          <i class="fa fa-spinner fa-spin"></i> {{uploadStatus.message}}
+          <div class="progress mt-2">
+            <div class="progress-bar progress-bar-striped progress-bar-animated"
+                 style="width: {{uploadStatus.progress}}%">
+              {{uploadStatus.progress}}%
+            </div>
+          </div>
+        </div>
+        {{/if}}
+
+        {{#if uploadError}}
+        <div class="alert alert-danger">
+          {{uploadError}}
+        </div>
+        {{/if}}
+
+        {{#if uploadComplete}}
+        <div class="alert alert-success">
+          Upload complete. The lesson list has been refreshed.
+        </div>
+        {{/if}}
+
+        <div class="wizard-actions">
+          <button class="btn btn-secondary" id="imscc-back-to-config" {{backToConfigDisabledAttr}}>&lt;- Back</button>
+          <div>
+            <button class="btn btn-outline-secondary" id="imscc-download-package" {{downloadDisabledAttr}}>
+              <i class="fa fa-download"></i> Download Package
+            </button>
+            <button class="btn btn-primary" id="imscc-upload-to-mofacts" {{uploadDisabledAttr}}>
+              <i class="fa fa-upload"></i> Upload to MoFaCTS
+            </button>
+          </div>
+        </div>
+
+        <div class="wizard-actions">
+          <button class="btn btn-secondary" id="close-imscc-wizard">Close Wizard</button>
+        </div>
+      </div>
+      {{/if}}
+    </div>
+  </div>
+
+  <style>
+  .imscc-wizard {
+    max-width: 960px;
+    margin: 20px auto;
+    padding: 20px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  .imscc-wizard .wizard-header {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+
+  .imscc-wizard .wizard-steps {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    position: relative;
+  }
+
+  .imscc-wizard .wizard-steps::before {
+    content: '';
+    position: absolute;
+    top: 20px;
+    left: 10%;
+    right: 10%;
+    height: 2px;
+    background: #ddd;
+    z-index: 0;
+  }
+
+  .imscc-wizard .step {
+    flex: 1;
+    text-align: center;
+    position: relative;
+    z-index: 1;
+  }
+
+  .imscc-wizard .step-number {
+    display: inline-block;
+    width: 40px;
+    height: 40px;
+    line-height: 40px;
+    border-radius: 50%;
+    background: #fff;
+    border: 2px solid #ddd;
+    color: #999;
+    font-weight: bold;
+    margin-bottom: 5px;
+  }
+
+  .imscc-wizard .step.active .step-number {
+    border-color: #007bff;
+    background: #007bff;
+    color: #fff;
+  }
+
+  .imscc-wizard .step.completed .step-number {
+    border-color: #28a745;
+    background: #28a745;
+    color: #fff;
+  }
+
+  .imscc-wizard .step-label {
+    display: block;
+    font-size: 12px;
+    color: #666;
+  }
+
+  .imscc-wizard .wizard-actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #ddd;
+  }
+
+  .imscc-wizard .imscc-mode-setting {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .imscc-wizard .imscc-mode-setting-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .imscc-wizard .imscc-mode-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+  }
+
+  .imscc-wizard .imscc-mode-switch-control {
+    display: inline-flex;
+    align-items: center;
+    margin: 0;
+    padding: 0;
+    min-height: 0;
+    line-height: 1;
+  }
+
+  .imscc-wizard .imscc-mode-switch-control .form-check-input {
+    width: 2rem;
+    height: 1rem;
+    margin: 0 !important;
+    margin-left: 0 !important;
+    margin-top: 0 !important;
+    float: none !important;
+    vertical-align: middle;
+  }
+
+  .imscc-wizard .imscc-mode-switch-label {
+    min-width: 3.4rem;
+    color: #6c757d;
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  .imscc-wizard .imscc-mode-switch-label-left {
+    text-align: right;
+  }
+
+  .imscc-wizard .imscc-mode-switch-label-right {
+    text-align: left;
+  }
+
+  .imscc-wizard .imscc-mode-summary {
+    line-height: 1.35;
+    margin-left: 0;
+  }
+
+  @media (max-width: 640px) {
+    .imscc-wizard .imscc-mode-setting-top {
+      align-items: flex-start;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+  }
+  </style>
+</template>

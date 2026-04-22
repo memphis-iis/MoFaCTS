@@ -1,0 +1,460 @@
+<template name="manualContentCreator">
+    <div class="container" style="margin-top: 1rem;">
+        <style>
+            .manual-content-shell { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:1rem; align-items:start; }
+            .manual-stepper { display:flex; flex-wrap:wrap; gap:0.5rem; margin-bottom:1rem; }
+            .manual-step-chip { display:inline-flex; align-items:center; gap:0.45rem; padding:0.4rem 0.7rem; border-radius:999px; border:1px solid #d0d7de; background:#fff; color:#5b6470; font-size:0.875rem; }
+            .manual-step-chip.is-active { border-color:var(--accent-color); background:color-mix(in srgb, var(--accent-color) 12%, white 88%); color:#1f2328; }
+            .manual-step-chip.is-complete { border-color:#198754; color:#198754; }
+            .manual-step-chip .step-number { width:1.35rem; height:1.35rem; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; background:#eef1f4; font-size:0.75rem; font-weight:600; }
+            .manual-step-chip.is-active .step-number { background:var(--accent-color); color:#fff; }
+            .manual-step-chip.is-complete .step-number { background:#198754; color:#fff; }
+            .manual-field-label { font-size:0.8rem; font-weight:600; text-transform:uppercase; letter-spacing:0.03em; color:#59636e; margin-bottom:0.35rem; }
+            .manual-helper { font-size:0.8rem; color:#6c757d; margin-top:0.3rem; }
+            .manual-field-stack { display:grid; gap:1rem; }
+            .manual-inline-options { display:flex; flex-wrap:wrap; gap:0.75rem 1rem; }
+            .manual-summary-card { position:sticky; top:1rem; }
+            .manual-summary-grid, .manual-summary-item { display:grid; gap:0.2rem; }
+            .manual-summary-label { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.04em; color:#6c757d; }
+            .manual-summary-value { font-size:0.95rem; font-weight:600; color:#1f2328; word-break:break-word; }
+            .manual-actions { display:flex; justify-content:space-between; align-items:center; gap:0.75rem; margin-top:1rem; padding-top:1rem; border-top:1px solid #dee2e6; }
+            .manual-actions-right { display:flex; gap:0.5rem; flex-wrap:wrap; justify-content:flex-end; }
+            .manual-step-intro { margin-bottom:1rem; }
+            .manual-step-intro h4 { margin-bottom:0.25rem; }
+            .manual-table-actions { display:flex; justify-content:space-between; align-items:center; gap:0.75rem; margin-bottom:0.75rem; }
+            .manual-row-actions { display:inline-flex; gap:0.35rem; }
+            .manual-alert-list { margin:0; padding-left:1rem; }
+            @media (max-width: 991px) { .manual-content-shell { grid-template-columns:1fr; } .manual-summary-card { position:static; } }
+            @media (max-width: 768px) { .manual-actions { flex-direction:column-reverse; align-items:stretch; } .manual-actions-right { width:100%; } .manual-actions-right .btn, .manual-actions > .btn { width:100%; } .manual-inline-options { flex-direction:column; gap:0.5rem; } }
+        </style>
+
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+            <div class="d-flex align-items-center">
+                <a href="/contentUpload" class="btn btn-outline-secondary me-3">
+                    <i class="fa fa-arrow-left"></i> Back
+                </a>
+                <h3 class="m-0">Create New Content</h3>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+                <button type="button" class="btn btn-outline-primary" id="manual-save-draft" {{draftPersistenceAttrs}}>
+                    <i class="fa fa-floppy-o"></i> {{saveDraftLabel}}
+                </button>
+                {{#if hasSavedDraft}}
+                <button type="button" class="btn btn-outline-danger" id="manual-delete-draft" {{draftPersistenceAttrs}}>
+                    <i class="fa fa-trash"></i> Delete Draft
+                </button>
+                {{/if}}
+            </div>
+        </div>
+
+        {{#if draftPersistenceMessage}}
+        <div class="alert {{draftPersistenceMessageClass}} mb-3">
+            {{#if draftPersistenceBusy}}
+            <i class="fa fa-refresh fa-spin"></i>
+            {{/if}}
+            {{draftPersistenceMessage}}
+        </div>
+        {{/if}}
+
+        <div class="manual-stepper">
+            {{#each stepItems}}
+            <div class="manual-step-chip {{#if isActive}}is-active{{/if}} {{#if isComplete}}is-complete{{/if}}">
+                <span class="step-number">{{number}}</span>
+                <span>{{label}}</span>
+            </div>
+            {{/each}}
+        </div>
+
+        <div class="manual-content-shell">
+            <div>
+                <div class="card">
+                    <div class="card-body p-3">
+                        {{#if stepHasErrors}}
+                        <div class="alert alert-warning mb-3">
+                            <ul class="manual-alert-list">
+                                {{#each stepErrors}}
+                                <li>{{this}}</li>
+                                {{/each}}
+                            </ul>
+                        </div>
+                        {{/if}}
+
+                        {{#with state}}
+                        {{#if isStep 1}}
+                        <div class="manual-step-intro">
+                            <h4>Lesson Basics</h4>
+                            <div class="text-muted">Name. Structure. Visibility. Link.</div>
+                        </div>
+                        <div class="manual-field-stack">
+                            <div>
+                                <div class="manual-field-label">Lesson name</div>
+                                <input type="text" class="form-control" data-field="lessonName" value="{{lessonName}}" placeholder="My New Lesson">
+                            </div>
+                            <div>
+                                <div class="manual-field-label">Structure</div>
+                                <select class="form-select" data-field="structure">
+                                    <option value="learning-only" selected="{{selectedIf structure 'learning-only'}}">Learning only</option>
+                                    <option value="instructions-learning" selected="{{selectedIf structure 'instructions-learning'}}">Instructions + Learning</option>
+                                    <option value="assessment-only" selected="{{selectedIf structure 'assessment-only'}}">Assessment only</option>
+                                    <option value="instructions-assessment" selected="{{selectedIf structure 'instructions-assessment'}}">Instructions + Assessment</option>
+                                </select>
+                            </div>
+                            {{#if structureIncludesInstructions}}
+                            <div>
+                                <div class="manual-field-label">Instruction text</div>
+                                <textarea class="form-control" rows="4" data-field="instructionText" placeholder="Add the text learners should see before they begin.">{{instructionText}}</textarea>
+                                <div class="manual-helper">Shown before the practice or assessment unit begins.</div>
+                            </div>
+                            {{/if}}
+                            <div>
+                                <div class="manual-field-label">Visibility</div>
+                                <div class="manual-inline-options">
+                                    <label class="form-check mb-0">
+                                        <input class="form-check-input" type="radio" name="manual-visibility" data-field="visibility" value="private" checked="{{checkedIf visibility 'private'}}">
+                                        <span class="form-check-label">Private</span>
+                                    </label>
+                                    <label class="form-check mb-0">
+                                        <input class="form-check-input" type="radio" name="manual-visibility" data-field="visibility" value="public" checked="{{checkedIf visibility 'public'}}">
+                                        <span class="form-check-label">Public</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="form-check mb-0">
+                                    <input class="form-check-input" type="checkbox" data-field="experimentLinkEnabled" checked="{{boolChecked experimentLinkEnabled}}">
+                                    <span class="form-check-label">Experiment link</span>
+                                </label>
+                                {{#if experimentLinkEnabled}}
+                                <div class="mt-3">
+                                    <div class="manual-field-label">Link name</div>
+                                    <input type="text" class="form-control" data-field="experimentTarget" value="{{experimentTarget}}" placeholder="my-experiment">
+                                    <div class="manual-helper">Preview: {{experimentLinkPreview}}</div>
+                                </div>
+                                {{/if}}
+                            </div>
+                        </div>
+                        {{/if}}
+
+                        {{#if isStep 2}}
+                        <div class="manual-step-intro">
+                            <h4>Card Format</h4>
+                            <div class="text-muted">Prompt. Response. Cards. Shuffle.</div>
+                        </div>
+                        <div class="manual-field-stack">
+                            <div>
+                                <div class="manual-field-label">Prompt</div>
+                                <select class="form-select" data-field="promptType">
+                                    <option value="text" selected="{{selectedIf promptType 'text'}}">Text</option>
+                                    <option value="image" selected="{{selectedIf promptType 'image'}}">Image</option>
+                                    <option value="audio" selected="{{selectedIf promptType 'audio'}}">Audio</option>
+                                    <option value="video" selected="{{selectedIf promptType 'video'}}">Video</option>
+                                    <option value="text-image" selected="{{selectedIf promptType 'text-image'}}">Text + Image</option>
+                                </select>
+                            </div>
+                            <div>
+                                <div class="manual-field-label">Response</div>
+                                <select class="form-select" data-field="responseType">
+                                    <option value="typed" selected="{{selectedIf responseType 'typed'}}">Typed response</option>
+                                    <option value="multiple-choice" selected="{{selectedIf responseType 'multiple-choice'}}">Multiple choice</option>
+                                </select>
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="manual-field-label">Cards</div>
+                                    <input type="number" min="1" class="form-control" data-field="cardCount" value="{{cardCount}}">
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="manual-field-label">Shuffle</div>
+                                    <label class="form-check mt-2">
+                                        <input class="form-check-input" type="checkbox" data-field="shuffle" checked="{{boolChecked shuffle}}">
+                                        <span class="form-check-label">Shuffle before learners begin</span>
+                                    </label>
+                                </div>
+                            </div>
+                            {{#if isMultipleChoice}}
+                            <div>
+                                <div class="manual-field-label">Button order</div>
+                                <select class="form-select" data-field="buttonOrder">
+                                    <option value="random" selected="{{selectedIf buttonOrder 'random'}}">Random</option>
+                                    <option value="fixed" selected="{{selectedIf buttonOrder 'fixed'}}">Fixed</option>
+                                </select>
+                            </div>
+                            {{/if}}
+                        </div>
+                        {{/if}}
+
+                        {{#if isStep 3}}
+                        <div class="manual-step-intro">
+                            <h4>Audio And Display</h4>
+                            <div class="text-muted">Speech. Voice. Top bar. Timing. Tags.</div>
+                        </div>
+                        <div class="manual-field-stack">
+                            <div>
+                                <label class="form-check mb-0">
+                                    <input class="form-check-input" type="checkbox" data-field="speechRecognitionEnabled" checked="{{boolChecked speechRecognitionEnabled}}">
+                                    <span class="form-check-label">Speech recognition</span>
+                                </label>
+                                {{#if speechRecognitionEnabled}}
+                                <div class="row g-3 mt-1">
+                                    <div class="col-md-6">
+                                        <div class="manual-field-label">Speech language</div>
+                                        <input type="text" class="form-control" data-field="speechLanguage" value="{{speechLanguage}}" placeholder="en-US">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="manual-field-label">Out-of-grammar speech</div>
+                                        <label class="form-check mt-2">
+                                            <input class="form-check-input" type="checkbox" data-field="ignoreOutOfGrammar" checked="{{boolChecked ignoreOutOfGrammar}}">
+                                            <span class="form-check-label">Ignore responses outside answer set</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                {{/if}}
+                            </div>
+                            <div>
+                                <div class="manual-field-label">Text-to-speech</div>
+                                <select class="form-select" data-field="textToSpeechMode">
+                                    <option value="none" selected="{{selectedIf textToSpeechMode 'none'}}">Neither</option>
+                                    <option value="prompts" selected="{{selectedIf textToSpeechMode 'prompts'}}">Prompts</option>
+                                    <option value="feedback" selected="{{selectedIf textToSpeechMode 'feedback'}}">Feedback</option>
+                                    <option value="both" selected="{{selectedIf textToSpeechMode 'both'}}">Both</option>
+                                </select>
+                            </div>
+                            <div>
+                                <div class="manual-field-label">Top bar</div>
+                                <select class="form-select" data-field="topBarMode">
+                                    <option value="time-score" selected="{{selectedIf topBarMode 'time-score'}}">Time + Score</option>
+                                    <option value="time" selected="{{selectedIf topBarMode 'time'}}">Time</option>
+                                    <option value="score" selected="{{selectedIf topBarMode 'score'}}">Score</option>
+                                    <option value="none" selected="{{selectedIf topBarMode 'none'}}">Neither</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="form-check mb-0">
+                                    <input class="form-check-input" type="checkbox" data-field="practiceTimingEnabled" checked="{{boolChecked practiceTimingEnabled}}">
+                                    <span class="form-check-label">Practice timing limits</span>
+                                </label>
+                                <div class="manual-helper">Large max value = effectively unlimited.</div>
+                                {{#if practiceTimingEnabled}}
+                                <div class="row g-3 mt-1">
+                                    <div class="col-md-6">
+                                        <div class="manual-field-label">Min practice time</div>
+                                        <input type="text" class="form-control" data-field="minPracticeTime" value="{{minPracticeTime}}" placeholder="0">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="manual-field-label">Max practice time</div>
+                                        <input type="text" class="form-control" data-field="maxPracticeTime" value="{{maxPracticeTime}}" placeholder="1000000">
+                                    </div>
+                                </div>
+                                {{/if}}
+                            </div>
+                            <div>
+                                <div class="manual-field-label">Tags</div>
+                                <input type="text" class="form-control" data-field="tags" value="{{tags}}" placeholder="biology, unit-1">
+                                <div class="manual-helper">Optional labels for finding lessons later.</div>
+                            </div>
+                        </div>
+                        {{/if}}
+
+                        {{#if isStep 4}}
+                        <div class="manual-step-intro">
+                            <h4>Starter Content</h4>
+                            <div class="text-muted">Rows first. Full editor next.</div>
+                        </div>
+                        <div class="manual-field-stack">
+                            <div>
+                                <div class="manual-field-label">Starting mode</div>
+                                <select class="form-select" data-field="seedMode">
+                                    <option value="blank-rows" selected="{{selectedIf seedMode 'blank-rows'}}">Blank rows</option>
+                                    <option value="paste-table" selected="{{selectedIf seedMode 'paste-table'}}">Paste prompt / answer table</option>
+                                    <option value="example-duplicate" selected="{{selectedIf seedMode 'example-duplicate'}}">One example row + duplicate</option>
+                                </select>
+                            </div>
+                            {{#if isSeedMode 'blank-rows'}}
+                            <div class="manual-helper">Creates the requested number of empty rows so you can fill them in directly.</div>
+                            {{/if}}
+                            {{#if isSeedMode 'example-duplicate'}}
+                            <div class="manual-helper">Starts with one row so you can model the pattern, then duplicate it as needed.</div>
+                            {{/if}}
+                            {{#if isSeedMode 'paste-table'}}
+                            <div>
+                                <div class="manual-field-label">Paste table</div>
+                                <textarea id="manual-seed-table-text" class="form-control" rows="6" placeholder="Paste rows here using tabs, commas, or | separators.&#10;Columns: {{seedColumnHint}}">{{seedTableText}}</textarea>
+                                <div class="manual-helper">Expected columns: {{seedColumnHint}}</div>
+                            </div>
+                            {{/if}}
+                            <div class="manual-table-actions">
+                                <div class="small text-muted">Rows: {{rowsCount}} / Requested: {{cardCount}}</div>
+                                <button type="button" class="btn btn-outline-primary btn-sm" id="add-starter-row">
+                                    <i class="fa fa-plus"></i> Add row
+                                </button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            {{#if showPromptTextColumn}}<th>{{promptTextLabel}}</th>{{/if}}
+                                            {{#if showPromptMediaColumn}}<th>{{promptMediaLabel}}</th>{{/if}}
+                                            <th>Answer</th>
+                                            {{#if isMultipleChoice}}<th>Choice 2</th><th>Choice 3</th><th>Choice 4</th>{{/if}}
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {{#each rows}}
+                                        <tr>
+                                            <td>{{rowNumber}}</td>
+                                            {{#if showPromptTextColumn}}
+                                            <td><input type="text" class="form-control starter-row-input" data-row-id="{{id}}" data-field="promptText" value="{{promptText}}"></td>
+                                            {{/if}}
+                                            {{#if showPromptMediaColumn}}
+                                            <td><input type="text" class="form-control starter-row-input" data-row-id="{{id}}" data-field="mediaRef" value="{{mediaRef}}"></td>
+                                            {{/if}}
+                                            <td><input type="text" class="form-control starter-row-input" data-row-id="{{id}}" data-field="answer" value="{{answer}}"></td>
+                                            {{#if isMultipleChoice}}
+                                            <td><input type="text" class="form-control starter-row-input" data-row-id="{{id}}" data-field="choice2" value="{{choice2}}"></td>
+                                            <td><input type="text" class="form-control starter-row-input" data-row-id="{{id}}" data-field="choice3" value="{{choice3}}"></td>
+                                            <td><input type="text" class="form-control starter-row-input" data-row-id="{{id}}" data-field="choice4" value="{{choice4}}"></td>
+                                            {{/if}}
+                                            <td>
+                                                <div class="manual-row-actions">
+                                                    <button type="button" class="btn btn-outline-secondary btn-sm duplicate-starter-row" data-row-id="{{id}}"><i class="fa fa-copy"></i></button>
+                                                    <button type="button" class="btn btn-outline-danger btn-sm delete-starter-row" data-row-id="{{id}}"><i class="fa fa-trash"></i></button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {{/each}}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        {{/if}}
+
+                        {{#if isStep 5}}
+                            {{#if packageError}}
+                            <div class="alert alert-danger mb-3">
+                                <strong>Finalize error:</strong> {{packageError}}
+                            </div>
+                            {{/if}}
+
+                            {{#if packageReady}}
+                            <div class="manual-step-intro">
+                                <h4>Validate And Finalize</h4>
+                                <div class="text-muted">Package the edited draft, then upload it like any other lesson.</div>
+                            </div>
+
+                            <div class="card border-0 bg-light">
+                                <div class="card-body">
+                                    <div class="manual-field-stack">
+                                        <div>
+                                            <div class="manual-field-label">Package status</div>
+                                            <div>Draft packaged and ready for upload.</div>
+                                        </div>
+                                        <div>
+                                            <div class="manual-field-label">Included lessons</div>
+                                            <div>
+                                                {{#each generationResult.manifest}}
+                                                <div><strong>{{tdfName}}</strong>: {{cardCount}} cards{{#if mediaCount}}, {{mediaCount}} media{{/if}}{{#if skippedCount}}, {{skippedCount}} skipped{{/if}}</div>
+                                                {{/each}}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {{#if uploadStatus}}
+                            <div class="alert alert-info mt-3">
+                                <i class="fa fa-spinner fa-spin"></i> {{uploadStatus.message}}
+                                <div class="progress mt-2">
+                                    <div class="progress-bar progress-bar-striped progress-bar-animated"
+                                         style="width: {{uploadStatus.progress}}%">
+                                        {{uploadStatus.progress}}%
+                                    </div>
+                                </div>
+                            </div>
+                            {{/if}}
+
+                            {{#if uploadError}}
+                            <div class="alert alert-danger mt-3">
+                                <i class="fa fa-exclamation-triangle"></i> {{uploadError}}
+                            </div>
+                            {{/if}}
+
+                            {{#if uploadComplete}}
+                            <div class="alert alert-success mt-3">
+                                <i class="fa fa-check"></i> Lesson uploaded successfully.
+                            </div>
+                            {{/if}}
+
+                            <div class="manual-actions">
+                                <button type="button" class="btn btn-outline-secondary" id="manual-edit-draft">Back To Draft</button>
+                                <div class="manual-actions-right">
+                                    {{#if uploadStatus}}
+                                    <button type="button" class="btn btn-outline-secondary" id="manual-download-package" disabled>Download Package</button>
+                                    <button type="button" class="btn btn-primary" id="manual-upload-package" disabled>Upload To MoFaCTS</button>
+                                    {{else}}
+                                    <button type="button" class="btn btn-outline-secondary" id="manual-download-package">Download Package</button>
+                                    <button type="button" class="btn btn-primary" id="manual-upload-package">Upload To MoFaCTS</button>
+                                    {{/if}}
+                                    {{#if uploadComplete}}
+                                    <button type="button" class="btn btn-success" id="manual-return-to-content">Return To Content Manager</button>
+                                    {{/if}}
+                                </div>
+                            </div>
+                            {{else}}
+                            <div class="manual-step-intro">
+                                <h4>Edit Draft</h4>
+                                <div class="text-muted">Refine the generated lesson, then validate and finalize it.</div>
+                            </div>
+                            {{> draftEditorWorkspace
+                                lessons=draftLessons
+                                onLessonsUpdate=updateDraftLessons
+                                onBack=backToStarterContent
+                                onSaveContinue=saveDraftAndContinue
+                                heading='Step 5: Edit Draft And Finalize'
+                                saveContinueLabel='Validate and Finalize'
+                            }}
+                            {{/if}}
+                        {{/if}}
+                        {{/with}}
+
+                        {{#unless isStep 5}}
+                        <div class="manual-actions">
+                            <button type="button" class="btn btn-outline-secondary" id="manual-content-cancel">Cancel</button>
+                            <div class="manual-actions-right">
+                                {{#if canGoBack}}
+                                <button type="button" class="btn btn-secondary" id="manual-content-back">Back</button>
+                                {{/if}}
+                                {{#unless isStep 5}}
+                                <button type="button" class="btn btn-primary" id="manual-content-next">{{nextButtonLabel}}</button>
+                                {{/unless}}
+                            </div>
+                        </div>
+                        {{/unless}}
+                    </div>
+                </div>
+            </div>
+
+            <div class="manual-summary-card">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="manual-field-label mb-3">Summary</div>
+                        <div class="manual-summary-grid">
+                            {{#with state}}
+                            <div class="manual-summary-item"><div class="manual-summary-label">Name</div><div class="manual-summary-value">{{#if lessonName}}{{lessonName}}{{else}}Untitled{{/if}}</div></div>
+                            <div class="manual-summary-item"><div class="manual-summary-label">Structure</div><div class="manual-summary-value">{{structureSummary}}</div></div>
+                            <div class="manual-summary-item"><div class="manual-summary-label">Prompt</div><div class="manual-summary-value">{{promptSummary}}</div></div>
+                            <div class="manual-summary-item"><div class="manual-summary-label">Response</div><div class="manual-summary-value">{{responseSummary}}</div></div>
+                            <div class="manual-summary-item"><div class="manual-summary-label">Cards</div><div class="manual-summary-value">{{cardCount}}</div></div>
+                            <div class="manual-summary-item"><div class="manual-summary-label">Visibility</div><div class="manual-summary-value">{{visibility}}</div></div>
+                            <div class="manual-summary-item"><div class="manual-summary-label">Link</div><div class="manual-summary-value">{{#if experimentLinkEnabled}}{{#if experimentLinkPreview}}{{experimentLinkPreview}}{{else}}Pending name{{/if}}{{else}}Off{{/if}}</div></div>
+                            <div class="manual-summary-item"><div class="manual-summary-label">Top bar</div><div class="manual-summary-value">{{topBarSummary}}</div></div>
+                            <div class="manual-summary-item"><div class="manual-summary-label">Status</div><div class="manual-summary-value">{{statusSummary}}</div></div>
+                            {{/with}}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>

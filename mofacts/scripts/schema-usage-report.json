@@ -1,0 +1,1231 @@
+{
+  "generated": "2025-12-11T16:51:36.418Z",
+  "summary": {
+    "schemaFieldsTotal": 166,
+    "schemaFieldsUsed": 151,
+    "schemaFieldsUnused": 0,
+    "codeFieldsMissingFromSchema": 48,
+    "documentedFieldsMissingFromSchema": 0
+  },
+  "missingFromSchema": [
+    {
+      "field": "length",
+      "locations": [
+        "client\\index.js",
+        "client\\views\\experiment\\card.js",
+        "client\\views\\experiment\\instructions.js",
+        "client\\views\\experiment\\unitEngine.js"
+      ]
+    },
+    {
+      "field": "field",
+      "locations": [
+        "client\\lib\\apkgProcessor.js",
+        "client\\views\\experimentSetup\\apkgWizard.html",
+        "client\\views\\experimentSetup\\apkgWizard.js",
+        "server\\methods.js"
+      ]
+    },
+    {
+      "field": "admin",
+      "locations": [
+        "client\\lib\\router.js",
+        "client\\views\\home\\home.js",
+        "client\\views\\home\\learningDashboard.js",
+        "client\\views\\turkWorkflow.js",
+        "server\\methods.js"
+      ]
+    },
+    {
+      "field": "hasOwnProperty",
+      "locations": [
+        "client\\views\\experiment\\card.js",
+        "server\\methods.js"
+      ]
+    },
+    {
+      "field": "clusterIndex",
+      "locations": [
+        "client\\views\\experiment\\card.js",
+        "server\\methods.js"
+      ]
+    },
+    {
+      "field": "shufIndex",
+      "locations": [
+        "client\\views\\experiment\\card.js",
+        "client\\views\\experiment\\unitEngine.js"
+      ]
+    },
+    {
+      "field": "splice",
+      "locations": [
+        "client\\views\\experiment\\card.js"
+      ]
+    },
+    {
+      "field": "probFunctionParameters",
+      "locations": [
+        "client\\views\\experiment\\card.js",
+        "client\\views\\experiment\\unitEngine.js"
+      ]
+    },
+    {
+      "field": "error",
+      "locations": [
+        "client\\views\\experiment\\card.js"
+      ]
+    },
+    {
+      "field": "results",
+      "locations": [
+        "client\\views\\experiment\\card.js"
+      ]
+    },
+    {
+      "field": "alternatives",
+      "locations": [
+        "client\\views\\experiment\\card.js"
+      ]
+    },
+    {
+      "field": "transcript",
+      "locations": [
+        "client\\views\\experiment\\card.js"
+      ]
+    },
+    {
+      "field": "stimulusKC",
+      "locations": [
+        "client\\views\\experiment\\unitEngine.js",
+        "server\\methods.js"
+      ]
+    },
+    {
+      "field": "canUse",
+      "locations": [
+        "client\\views\\experiment\\unitEngine.js"
+      ]
+    },
+    {
+      "field": "probabilityEstimate",
+      "locations": [
+        "client\\views\\experiment\\unitEngine.js"
+      ]
+    },
+    {
+      "field": "lastSeen",
+      "locations": [
+        "client\\views\\experiment\\unitEngine.js"
+      ]
+    },
+    {
+      "field": "firstSeen",
+      "locations": [
+        "client\\views\\experiment\\unitEngine.js",
+        "server\\turk_methods.js"
+      ]
+    },
+    {
+      "field": "hasBeenIntroduced",
+      "locations": [
+        "client\\views\\experiment\\unitEngine.js"
+      ]
+    },
+    {
+      "field": "priorStudy",
+      "locations": [
+        "client\\views\\experiment\\unitEngine.js"
+      ]
+    },
+    {
+      "field": "available",
+      "locations": [
+        "client\\views\\experiment\\unitEngine.js"
+      ]
+    },
+    {
+      "field": "otherPracticeTime",
+      "locations": [
+        "client\\views\\experiment\\unitEngine.js"
+      ]
+    },
+    {
+      "field": "priorCorrect",
+      "locations": [
+        "client\\views\\experiment\\unitEngine.js"
+      ]
+    },
+    {
+      "field": "priorIncorrect",
+      "locations": [
+        "client\\views\\experiment\\unitEngine.js"
+      ]
+    },
+    {
+      "field": "previousCalculatedProbabilities",
+      "locations": [
+        "client\\views\\experiment\\unitEngine.js"
+      ]
+    },
+    {
+      "field": "outcomeStack",
+      "locations": [
+        "client\\views\\experiment\\unitEngine.js"
+      ]
+    },
+    {
+      "field": "allTimeCorrect",
+      "locations": [
+        "client\\views\\experiment\\unitEngine.js",
+        "server\\turk_methods.js"
+      ]
+    },
+    {
+      "field": "allTimeIncorrect",
+      "locations": [
+        "client\\views\\experiment\\unitEngine.js",
+        "server\\turk_methods.js"
+      ]
+    },
+    {
+      "field": "curSessionPriorCorrect",
+      "locations": [
+        "client\\views\\experiment\\unitEngine.js"
+      ]
+    },
+    {
+      "field": "curSessionPriorIncorrect",
+      "locations": [
+        "client\\views\\experiment\\unitEngine.js"
+      ]
+    },
+    {
+      "field": "totalPracticeDuration",
+      "locations": [
+        "client\\views\\experiment\\unitEngine.js"
+      ]
+    },
+    {
+      "field": "allTimeTotalPracticeDuration",
+      "locations": [
+        "client\\views\\experiment\\unitEngine.js"
+      ]
+    },
+    {
+      "field": "timesSeen",
+      "locations": [
+        "client\\views\\experiment\\unitEngine.js"
+      ]
+    },
+    {
+      "field": "_id",
+      "locations": [
+        "client\\views\\experiment\\unitEngine.js",
+        "client\\views\\home\\home.js",
+        "server\\methods.js"
+      ]
+    },
+    {
+      "field": "stimIndex",
+      "locations": [
+        "client\\views\\experiment\\unitEngine.js"
+      ]
+    },
+    {
+      "field": "stimuliSetId",
+      "locations": [
+        "client\\views\\experimentSetup\\contentUpload.js",
+        "server\\methods.js"
+      ]
+    },
+    {
+      "field": "responseKC",
+      "locations": [
+        "server\\methods.js"
+      ]
+    },
+    {
+      "field": "cardStates",
+      "locations": [
+        "server\\methods.js"
+      ]
+    },
+    {
+      "field": "stimStates",
+      "locations": [
+        "server\\methods.js"
+      ]
+    },
+    {
+      "field": "responseStates",
+      "locations": [
+        "server\\methods.js"
+      ]
+    },
+    {
+      "field": "contents",
+      "locations": [
+        "server\\methods.js"
+      ]
+    },
+    {
+      "field": "lessonName",
+      "locations": [
+        "server\\methods.js"
+      ]
+    },
+    {
+      "field": "audioContent",
+      "locations": [
+        "server\\methods.js"
+      ]
+    },
+    {
+      "field": "writeHead",
+      "locations": [
+        "server\\methods.js"
+      ]
+    },
+    {
+      "field": "end",
+      "locations": [
+        "server\\methods.js"
+      ]
+    },
+    {
+      "field": "writeHeader",
+      "locations": [
+        "server\\methods.js"
+      ]
+    },
+    {
+      "field": "write",
+      "locations": [
+        "server\\methods.js"
+      ]
+    },
+    {
+      "field": "username",
+      "locations": [
+        "server\\methods.js"
+      ]
+    },
+    {
+      "field": "prevStimExists",
+      "locations": [
+        "server\\methods.js"
+      ]
+    }
+  ],
+  "documentedNotInSchema": [],
+  "schemaUnused": [],
+  "schemaUsed": [
+    {
+      "label": "lessonname",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "stimulusfile",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "name",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "experimentTarget",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "userselect",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "lfparameter",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "hintsEnabled",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "tags",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "tips",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "speechAPIKey",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "textToSpeechAPIKey",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "audioInputEnabled",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "audioInputSensitivity",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "audioPromptMode",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "enableAudioPromptAndFeedback",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "speechIgnoreOutOfGrammarResponses",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "speechOutOfGrammarFeedback",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "audioPromptVoice",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "audioPromptFeedbackVoice",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "audioPromptSpeakingRate",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "audioPromptQuestionSpeakingRate",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "audioPromptFeedbackSpeakingRate",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "shuffleclusters",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "swapclusters",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "loadbalancing",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "countcompletion",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "condition",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "randomizedDelivery",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "prestimulusDisplay",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "progressReporterParams",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "disableProgressReport",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "simTimeout",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "simCorrectProb",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "allowRevistUnit",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "duedate",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "experimentPasswordRequired",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "recordInstructions",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "displayCardTimeoutAsBarOrText",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "displayTimeOutDuringStudy",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "displayPerformanceDuringStudy",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "displayPerformanceDuringTrial",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "stimuliPosition",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "choiceButtonCols",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "showStimuliBox",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "stimuliBoxColor",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "inputPlaceholderText",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "displayReadyPromptTimeoutAsBarOrText",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "displayConfirmButton",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "continueButtonText",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "skipStudyButtonText",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "instructionsTitleDisplay",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "lastVideoModalText",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "displayReviewTimeoutAsBarOrText",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "displayUserAnswerInFeedback",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "displayUserAnswerAtTop",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "displayUserAnswerInCorrectFeedback",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "displayUserAnswerInIncorrectFeedback",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "displayCorrectAnswerInCenter",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "singleLineFeedback",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "feedbackDisplayPosition",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "onlyShowSimpleFeedback",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "simplefeedbackOnCorrect",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "simplefeedbackOnIncorrect",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "suppressFeedbackDisplay",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "incorrectColor",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "correctColor",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "experimentLoginText",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "textInputDisplay",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "unitname",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "unitinstructions",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "buttonorder",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "videosource",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "questions",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "questiontimes",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "drill",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "correctprompt",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "reviewstudy",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "unitinstructionsquestion",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "buttontrial",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "buttonOptions",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "instructionminseconds",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "instructionmaxseconds",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "picture",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "turkemailsubject",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "turkemail",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "turkbonus",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "adaptive",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "adaptiveUnitTemplate",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "adaptiveLogic",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "2",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "3",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "clusterlist",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "unitMode",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "calculateProbability",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "displayminseconds",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "displaymaxseconds",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "randomizegroups",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "permutefinalresult",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "assignrandomclusters",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "initialpositions",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "randomchoices",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "groupnames",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "clustersrepeated",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "templatesrepeated",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "group",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "checkpointBehavior",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "checkpoints",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "time",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "displayText",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "purestudy",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "lockoutminutes",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "forceCorrection",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "skipstudy",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "showhistory",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "fontsize",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "initialview",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "readyPromptString",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "readyPromptStringDisplayTime",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "prestimulusdisplaytime",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "practiceseconds",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "correctscore",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "incorrectscore",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "feedbackType",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "allowFeedbackTypeSelect",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "falseAnswerLimit",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "useSpellingCorrection",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "allowPhoneticMatching",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "autostopTimeoutThreshold",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "optimalThreshold",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "forceSpacing",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "resetStudentPerformance",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "scoringEnabled",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "timeuntilaudio",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "timeuntilaudiofeedback",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "stackChoiceButtons",
+      "sources": [
+        "TDF"
+      ]
+    },
+    {
+      "label": "correctResponse",
+      "sources": [
+        "Stim"
+      ]
+    },
+    {
+      "label": "incorrectResponses",
+      "sources": [
+        "Stim"
+      ]
+    },
+    {
+      "label": "imgSrc",
+      "sources": [
+        "Stim"
+      ]
+    },
+    {
+      "label": "clozeText",
+      "sources": [
+        "Stim"
+      ]
+    },
+    {
+      "label": "text",
+      "sources": [
+        "Stim"
+      ]
+    },
+    {
+      "label": "clozeStimulus",
+      "sources": [
+        "Stim"
+      ]
+    },
+    {
+      "label": "audioSrc",
+      "sources": [
+        "Stim"
+      ]
+    },
+    {
+      "label": "videoSrc",
+      "sources": [
+        "Stim"
+      ]
+    },
+    {
+      "label": "parameter",
+      "sources": [
+        "Stim"
+      ]
+    },
+    {
+      "label": "speechHintExclusionList",
+      "sources": [
+        "Stim"
+      ]
+    },
+    {
+      "label": "responseType",
+      "sources": [
+        "Stim"
+      ]
+    },
+    {
+      "label": "imageStimulus",
+      "sources": [
+        "Stim"
+      ]
+    },
+    {
+      "label": "videoStimulus",
+      "sources": [
+        "Stim"
+      ]
+    },
+    {
+      "label": "audioStimulus",
+      "sources": [
+        "Stim"
+      ]
+    },
+    {
+      "label": "clusterKC",
+      "sources": [
+        "Stim"
+      ]
+    },
+    {
+      "label": "fileName",
+      "sources": [
+        "Stim"
+      ]
+    }
+  ]
+}

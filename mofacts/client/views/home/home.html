@@ -1,0 +1,77 @@
+<!-- MAIN home template - Unified home page for all users -->
+<template name="home">
+
+    <div class="container page-loading" id="homeContainer" style="margin-top: 1rem; max-width: 900px;">
+
+          <!-- MAIN MENU Section (Everyone) -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <i class="fa fa-home me-2" style="font-size: 1.25rem; color: var(--accent-color);"></i>
+                    <h5 class="m-0">Main Menu</h5>
+                </div>
+                <div class="button-menu">
+                    <button type="button" id="myLessonsButton" class="btn">Learning Dashboard</button>
+                    <button type="button" id="classSelectionButton" class="btn">Teacher / Class Select</button>
+                    <button type="button" id="contentUploadButton" class="btn">Content Manager</button>
+                    <button type="button" id="dataDownloadButton" class="btn">Download Data</button>
+                    <button type="button" id="audioSettingsButton" class="btn">Audio Settings</button>
+                    <button type="button" id="helpButton" class="btn">Help</button>
+                    <button type="button" id="logoutButton" class="btn">Logout</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- TEACHER FUNCTIONS Section (Teachers only) -->
+        {{#if isInRole 'teacher'}}
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <i class="fa fa-graduation-cap me-2" style="font-size: 1.25rem; color: var(--accent-color);"></i>
+                    <h5 class="m-0">Teacher Functions</h5>
+                </div>
+                <div class="button-menu">
+                    <button type="button" id="classEditButton" class="btn btn-role-teacher">Class Management</button>
+                    <button type="button" id="instructorReportingButton" class="btn btn-role-teacher">Instructor Reporting</button>
+                    <button type="button" id="tdfAssignmentEditButton" class="btn btn-role-teacher">Chapter Assignments</button>
+                </div>
+            </div>
+        </div>
+        {{/if}}
+
+        <!-- SHARED FUNCTIONS Section (Teachers and Admins) -->
+        {{#if isInRole 'teacher,admin'}}
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <i class="fa fa-users me-2" style="font-size: 1.25rem; color: var(--accent-color);"></i>
+                    <h5 class="m-0">Shared Functions</h5>
+                </div>
+                <div class="button-menu">
+                    <button type="button" id="wikiProfileButton" class="btn btn-role-shared">Wiki</button>
+                </div>
+            </div>
+        </div>
+        {{/if}}
+
+        <!-- ADMIN FUNCTIONS Section (Admins only) -->
+        {{#if isInRole 'admin'}}
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <i class="fa fa-cogs me-2" style="font-size: 1.25rem; color: var(--accent-color);"></i>
+                    <h5 class="m-0">Admin Functions</h5>
+                </div>
+                <div class="button-menu">
+                    <button type="button" id="adminControlsBtn" class="btn btn-role-admin">Admin Control Panel</button>
+                    <button type="button" id="userAdminButton" class="btn btn-role-admin">User Admin</button>
+                    <button type="button" id="mechTurkButton" class="btn btn-role-admin">Mechanical Turk</button>
+                    <button type="button" id="themeButton" class="btn btn-role-admin">Theme</button>
+                    <button type="button" id="adminTestsButton" class="btn btn-role-admin">Admin Tests</button>
+                </div>
+            </div>
+        </div>
+        {{/if}}
+
+    </div>
+</template>

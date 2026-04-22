@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noImplicitAny": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "allowJs": true,
+    "checkJs": false,
+    "skipLibCheck": true,
+    "allowUmdGlobalAccess": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "types": ["meteor", "node", "mocha", "chai"]
+  },
+  "include": [
+    "client/**/*.ts",
+    "server/**/*.ts",
+    "common/**/*.ts",
+    "common/**/*.d.ts",
+    "packages/**/*.ts"
+  ]
+}

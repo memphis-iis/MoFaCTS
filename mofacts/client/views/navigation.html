@@ -1,0 +1,34 @@
+<template name="nav">
+<nav class="navbar bg-light">
+  {{#if themeReady}}
+  <div class="container-fluid page-loading navbar-align-{{currentTheme.properties.navbar_alignment}}">
+    {{#unless isExperiment}}
+    <a class="navbar-brand home-link" href="#" style="cursor: pointer;">
+      {{#if currentTheme.properties.logo_url}}
+        <span
+          class="navbar-brand-icon"
+          aria-hidden="true"
+          style="--navbar-brand-icon-image: url('{{currentTheme.properties.logo_url}}');"></span>
+      {{/if}}
+      {{systemName}}
+    </a>
+    {{else}}
+    <span class="navbar-brand">
+      {{#if currentTheme.properties.logo_url}}
+        <span
+          class="navbar-brand-icon"
+          aria-hidden="true"
+          style="--navbar-brand-icon-image: url('{{currentTheme.properties.logo_url}}');"></span>
+      {{/if}}
+      {{systemName}}
+    </span>
+    {{/unless}}
+  </div>
+  {{else}}
+  <!-- Reserve space while loading to prevent layout shift -->
+  <div class="container-fluid navbar-loading-placeholder">
+    <span class="navbar-brand" style="visibility: hidden;">Loading</span>
+  </div>
+  {{/if}}
+</nav>
+</template>
