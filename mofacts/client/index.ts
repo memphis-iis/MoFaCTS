@@ -245,7 +245,6 @@ import { legacyDisplay } from '../common/underscoreCompat';
 
 export { meteorCallAsync };
 const MeteorAny = Meteor as any;
-const DEFAULT_ONLINE_HELP_URL = 'https://github.com/memphis-iis/mofacts/wiki/Student-Overview';
 const SessionAny = Session as any;
 const windowAny = window as any;
 
@@ -701,7 +700,7 @@ Template.DefaultLayout.events({
       }
     });
   },
-  'click #wikiButton': async function(event: JQuery.TriggeredEvent) {
+  'click #wikiButton': function(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     audioManager.pauseCurrentAudio();
     // Instantly hide offcanvas to prevent layout shift during page transition
@@ -709,12 +708,7 @@ Template.DefaultLayout.events({
     if (offcanvas) {
       offcanvas.hide();
     }
-    const helpStatus = await MeteorAny.callAsync('getCustomHelpPageStatus');
-    if (helpStatus?.enabled) {
-      FlowRouter.go('/help');
-      return;
-    }
-    window.open(DEFAULT_ONLINE_HELP_URL, '_blank', 'noopener');
+    FlowRouter.go('/help');
   },
   'click #mechTurkButton': function(event: JQuery.TriggeredEvent) {
     event.preventDefault();

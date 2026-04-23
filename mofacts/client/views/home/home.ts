@@ -31,8 +31,6 @@ declare const Meteor: any;
 declare const GlobalExperimentStates: any;
 declare const Tdfs: any;
 
-const DEFAULT_ONLINE_HELP_URL = 'https://github.com/memphis-iis/mofacts/wiki/Student-Overview';
-
 export {selectTdf};
 
 // //////////////////////////////////////////////////////////////////////////
@@ -66,14 +64,9 @@ Template.home.events({
     FlowRouter.go('/audioSettings');
   },
 
-  'click #helpButton': async function(event: any) {
+  'click #helpButton': function(event: any) {
     event.preventDefault();
-    const helpStatus = await Meteor.callAsync('getCustomHelpPageStatus');
-    if (helpStatus?.enabled) {
-      FlowRouter.go('/help');
-      return;
-    }
-    window.open(DEFAULT_ONLINE_HELP_URL, '_blank', 'noopener');
+    FlowRouter.go('/help');
   },
 
   'click #logoutButton': function(event: any) {

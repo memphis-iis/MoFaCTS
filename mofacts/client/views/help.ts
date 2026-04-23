@@ -16,6 +16,8 @@ type MeteorWithCallAsync = typeof Meteor & {
 };
 
 const DEFAULT_ONLINE_HELP_URL = 'https://github.com/memphis-iis/mofacts/wiki/Student-Overview';
+const DEFAULT_ONLINE_HELP_MARKDOWN_URL = 'https://raw.githubusercontent.com/wiki/memphis-iis/mofacts/Student-Overview.md';
+const DEFAULT_ONLINE_HELP_WIKI_BASE_URL = 'https://github.com/memphis-iis/MoFaCTS/wiki';
 
 // Configure marked for secure rendering
 marked.setOptions({
@@ -33,11 +35,64 @@ function convertMarkdownToHTML(markdown: string): string {
     ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'u', 'br', 'p', 'span', 'div',
                    'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
                    'table', 'tr', 'td', 'th', 'thead', 'tbody',
-                   'ul', 'ol', 'li', 'center', 'a', 'code', 'pre', 'blockquote', 'hr'],
-    ALLOWED_ATTR: ['style', 'class', 'id', 'href', 'target'],
+                   'ul', 'ol', 'li', 'center', 'a', 'code', 'pre', 'blockquote', 'hr',
+                   'img'],
+    ALLOWED_ATTR: ['style', 'class', 'id', 'href', 'target', 'src', 'alt', 'title'],
     ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i,
     FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'button'],
     FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur']
+  });
+}
+
+function normalizeWikiLink(href: string): string {
+  if (!href || href.startsWith('#')) {
+    return href;
+  }
+
+  if (/^(?:https?:|mailto:|tel:)/i.test(href)) {
+    return href;
+  }
+
+  const normalizedHref = href.replace(/^\.\//, '');
+  return `${DEFAULT_ONLINE_HELP_WIKI_BASE_URL}/${normalizedHref}`;
+}
+
+function normalizeWikiImage(src: string): string {
+  if (!src) {
+    return src;
+  }
+
+  if (/^(?:https?:|data:)/i.test(src)) {
+    return src;
+  }
+
+  const normalizedSrc = src.replace(/^\.\//, '');
+  return `${DEFAULT_ONLINE_HELP_WIKI_BASE_URL}/${normalizedSrc}`;
+}
+
+function normalizeRenderedHelpContent(helpContent: HTMLElement) {
+  helpContent.querySelectorAll<HTMLAnchorElement>('a[href]').forEach((anchor) => {
+    const href = (anchor.getAttribute('href') || '').trim();
+    if (!href) {
+      return;
+    }
+
+    const normalizedHref = normalizeWikiLink(href);
+    anchor.setAttribute('href', normalizedHref);
+
+    if (!normalizedHref.startsWith('#')) {
+      anchor.setAttribute('target', '_blank');
+      anchor.setAttribute('rel', 'noopener noreferrer');
+    }
+  });
+
+  helpContent.querySelectorAll<HTMLImageElement>('img[src]').forEach((image) => {
+    const src = (image.getAttribute('src') || '').trim();
+    if (!src) {
+      return;
+    }
+
+    image.setAttribute('src', normalizeWikiImage(src));
   });
 }
 
@@ -59,8 +114,12 @@ Template.help.rendered = async function() {
       // Use custom help markdown
       markdown = customHelp;
     } else {
-      window.location.assign(DEFAULT_ONLINE_HELP_URL);
-      return;
+      // Fall back to the live GitHub wiki markdown and render it in-app.
+      const response = await fetch(DEFAULT_ONLINE_HELP_MARKDOWN_URL);
+      if (!response.ok) {
+        throw new Error('Failed to load help content');
+      }
+      markdown = await response.text();
     }
 
     // Convert markdown to HTML
@@ -70,6 +129,7 @@ Template.help.rendered = async function() {
     const helpContent = document.getElementById('helpContent');
     if (helpContent) {
       helpContent.innerHTML = html;
+      normalizeRenderedHelpContent(helpContent);
     }
 
     // Ensure body styles from offcanvas are cleared before fade-in
