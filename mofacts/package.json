@@ -8,6 +8,7 @@
     "test": "tests"
   },
   "overrides": {
+    "@xmldom/xmldom": "^0.8.13",
     "brace-expansion": "^2.0.3",
     "follow-redirects": "^1.16.0",
     "node-forge": "^1.4.0",
