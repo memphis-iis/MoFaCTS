@@ -54,6 +54,15 @@ if (process.env.RUN_CONVERT_SCRIPT === '1') {
 
 const localResponseKCMap: Record<string, any> = {};
 let curResponseKCCtr = 1;
+
+function cloneDisplayObject(display: unknown) {
+  if (!display || typeof display !== 'object' || Array.isArray(display)) {
+    return undefined;
+  }
+
+  return JSON.parse(JSON.stringify(display));
+}
+
 function getNewItemFormat(stimFile: any, stimulusFileName: string, stimuliSetId: number, responseKCMap: Record<string, any>) {
   const items: any[] = [];
   const responseKCs = Object.values(responseKCMap);
@@ -126,6 +135,7 @@ function getNewItemFormat(stimFile: any, stimulusFileName: string, stimuliSetId:
         audioStimulus: stim.display?.audioSrc,
         imageStimulus: stim.display?.imgSrc,
         videoStimulus: stim.display?.videoSrc,
+        display: cloneDisplayObject(stim.display),
         alternateDisplays: stim.alternateDisplays,
       };
 

@@ -10,7 +10,7 @@
 
   const dispatch = createEventDispatcher();
 
-  /** @type {{ text?: string, clozeText?: string, imgSrc?: string, videoSrc?: string, audioSrc?: string }} */
+  /** @type {{ text?: string, clozeText?: string, imgSrc?: string, videoSrc?: string, audioSrc?: string, attribution?: { creatorName?: string, sourceName?: string, sourceUrl?: string, licenseName?: string, licenseUrl?: string } }} */
   export let display = {};
 
   /** @type {boolean} Whether to show the display */
@@ -36,6 +36,28 @@
 
   // Sanitize and render HTML content
   $: safeDisplay = display || {};
+  $: rawAttribution = safeDisplay?.attribution && typeof safeDisplay.attribution === 'object'
+    ? safeDisplay.attribution
+    : {};
+  $: imageAttribution = {
+    creatorName: String(rawAttribution.creatorName || '').trim(),
+    sourceName: String(rawAttribution.sourceName || '').trim(),
+    sourceUrl: String(rawAttribution.sourceUrl || '').trim(),
+    licenseName: String(rawAttribution.licenseName || '').trim(),
+    licenseUrl: String(rawAttribution.licenseUrl || '').trim(),
+  };
+  $: hasImageAttribution = Object.values(imageAttribution).some(Boolean);
+  $: attributionCaption = [
+    imageAttribution.creatorName,
+    imageAttribution.sourceName,
+    imageAttribution.licenseName,
+  ].filter(Boolean).join(' | ');
+  $: attributionHref = imageAttribution.sourceUrl || imageAttribution.licenseUrl || '';
+  $: attributionTitle = [
+    imageAttribution.creatorName ? `Creator: ${imageAttribution.creatorName}` : '',
+    imageAttribution.sourceName ? `Source: ${imageAttribution.sourceName}` : '',
+    imageAttribution.licenseName ? `License: ${imageAttribution.licenseName}` : '',
+  ].filter(Boolean).join(' | ');
 
   // Memoize sanitized content based on actual content changes, not object reference
   let lastTextContent = '';
@@ -174,10 +196,29 @@
         <div class="question-number">Question {questionNumber}</div>
       {/if}
 
-      {#key sanitizedText + sanitizedCloze + (safeDisplay.imgSrc || '') + (safeDisplay.videoSrc || '') + (safeDisplay.audioSrc || '')}
+      {#key sanitizedText + sanitizedCloze + (safeDisplay.imgSrc || '') + (safeDisplay.videoSrc || '') + (safeDisplay.audioSrc || '') + attributionCaption + attributionHref}
         {#if safeDisplay.imgSrc}
-          <div class="stimulus-image">
-            <img src={safeDisplay.imgSrc} alt="Stimulus" />
+          <div class="stimulus-image-block">
+            <div class="stimulus-image">
+              <img src={safeDisplay.imgSrc} alt="Stimulus" />
+            </div>
+            {#if hasImageAttribution && attributionCaption}
+              {#if attributionHref}
+                <a
+                  class="stimulus-attribution"
+                  href={attributionHref}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  title={attributionTitle || 'Open attribution source'}
+                >
+                  {attributionCaption}
+                </a>
+              {:else}
+                <div class="stimulus-attribution" title={attributionTitle}>
+                  {attributionCaption}
+                </div>
+              {/if}
+            {/if}
           </div>
         {/if}
 
@@ -361,14 +402,31 @@
     line-height: inherit;
   }
 
+  .stimulus-image-block {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    min-height: 0;
+    max-height: 100%;
+    gap: 0.35rem;
+  }
+
+  .stimulus-display.flow-row .stimulus-image-block {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
   .stimulus-image {
-    flex: 1; /* Fill available space in .stimulus-display */
+    flex: 1 1 0; /* Fill remaining space above the caption */
     display: flex;
     align-items: center;
     justify-content: center;
     min-height: 0; /* Allow flex shrinking */
+    min-width: 0;
     width: 100%;
-    height: 100%; /* Establish explicit height for % children */
+    max-height: 100%;
     overflow: hidden; /* Prevent image from exceeding bounds */
   }
 
@@ -385,6 +443,24 @@
     max-height: 100%; /* Fill parent .stimulus-image */
     object-fit: contain; /* Scale up or down while preserving aspect ratio */
     display: block;
+  }
+
+  .stimulus-attribution {
+    flex: 0 0 auto;
+    display: inline-block;
+    max-width: 100%;
+    color: var(--secondary-text-color);
+    font-size: 0.625rem;
+    line-height: 1.25;
+    text-align: center;
+    text-decoration: none;
+    word-break: break-word;
+  }
+
+  a.stimulus-attribution:hover,
+  a.stimulus-attribution:focus-visible {
+    color: var(--accent-color);
+    text-decoration: underline;
   }
 
   .stimulus-video {

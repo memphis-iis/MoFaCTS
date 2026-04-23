@@ -118,14 +118,37 @@
     return Boolean(value);
   }
 
+  function cloneAttribution(attribution) {
+    if (!attribution || typeof attribution !== 'object') {
+      return undefined;
+    }
+
+    const cloned = {
+      creatorName: attribution.creatorName || '',
+      sourceName: attribution.sourceName || '',
+      sourceUrl: attribution.sourceUrl || '',
+      licenseName: attribution.licenseName || '',
+      licenseUrl: attribution.licenseUrl || '',
+    };
+
+    return Object.values(cloned).some(Boolean) ? cloned : undefined;
+  }
+
   function cloneDisplay(display) {
-    return {
+    const cloned = {
       text: display?.text || '',
       clozeText: display?.clozeText || '',
       imgSrc: display?.imgSrc || '',
       videoSrc: display?.videoSrc || '',
       audioSrc: display?.audioSrc || '',
     };
+
+    const attribution = cloneAttribution(display?.attribution);
+    if (attribution) {
+      cloned.attribution = attribution;
+    }
+
+    return cloned;
   }
 
   function buildTrialSubset(args) {
@@ -473,6 +496,11 @@
         trialSubset.display?.imgSrc || '',
         trialSubset.display?.videoSrc || '',
         trialSubset.display?.audioSrc || '',
+        trialSubset.display?.attribution?.creatorName || '',
+        trialSubset.display?.attribution?.sourceName || '',
+        trialSubset.display?.attribution?.sourceUrl || '',
+        trialSubset.display?.attribution?.licenseName || '',
+        trialSubset.display?.attribution?.licenseUrl || '',
       ].join('::')
     : 'none';
   $: allBlockingAssetsReady = (!expectedStimulusBlockerSrc || stimulusBlockingAssetReady) &&

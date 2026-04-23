@@ -72,7 +72,9 @@ interface StimResponseLike {
 
 interface StimLike extends Record<string, unknown> {
   _id?: unknown;
-  display?: Record<string, unknown>;
+  display?: Record<string, unknown> & {
+    attribution?: unknown;
+  };
   text?: string;
   textStimulus?: string;
   clozeText?: string;
@@ -329,6 +331,31 @@ function resolveStimMediaSource(
     displayObj.videoSrc,
     stim.videoStimulus
   );
+}
+
+function normalizeDisplayAttribution(
+  ...sources: unknown[]
+): Record<string, string> | undefined {
+  const attributionSources = sources
+    .filter((value): value is Record<string, unknown> => typeof value === 'object' && value !== null);
+
+  const creatorName = firstNonEmptyString(...attributionSources.map((value) => value.creatorName));
+  const sourceName = firstNonEmptyString(...attributionSources.map((value) => value.sourceName));
+  const sourceUrl = firstNonEmptyString(...attributionSources.map((value) => value.sourceUrl));
+  const licenseName = firstNonEmptyString(...attributionSources.map((value) => value.licenseName));
+  const licenseUrl = firstNonEmptyString(...attributionSources.map((value) => value.licenseUrl));
+
+  if (!creatorName && !sourceName && !sourceUrl && !licenseName && !licenseUrl) {
+    return undefined;
+  }
+
+  return {
+    ...(creatorName ? { creatorName } : {}),
+    ...(sourceName ? { sourceName } : {}),
+    ...(sourceUrl ? { sourceUrl } : {}),
+    ...(licenseName ? { licenseName } : {}),
+    ...(licenseUrl ? { licenseUrl } : {}),
+  };
 }
 
 /**
@@ -634,6 +661,10 @@ function getPreparedCardDataFromSelection(
   const rawVideoSrc = resolveStimMediaSource(stim, 'video');
   const rawAudioSrc = resolveStimMediaSource(stim, 'audio');
   const preparedDisplay = (preparedState.currentDisplay || preparedState.currentDisplayEngine || {}) as Record<string, unknown>;
+  const displayAttribution = normalizeDisplayAttribution(
+    preparedDisplay.attribution,
+    stim.display?.attribution,
+  );
   const currentDisplay = {
     text: String(preparedDisplay.text ?? stim.display?.text ?? stim.text ?? stim.textStimulus ?? ''),
     clozeText: String(preparedDisplay.clozeText ?? stim.display?.clozeText ?? stim.clozeText ?? stim.clozeStimulus ?? ''),
@@ -646,6 +677,7 @@ function getPreparedCardDataFromSelection(
     audioSrc: typeof preparedDisplay.audioSrc === 'string' && preparedDisplay.audioSrc.trim().length > 0
       ? preparedDisplay.audioSrc
       : resolveImageUrl(rawAudioSrc, stimScopedSetId),
+    ...(displayAttribution ? { attribution: displayAttribution } : {}),
   };
   const fullAnswer = typeof preparedState.newExperimentState === 'object' &&
     typeof (preparedState.newExperimentState as Record<string, unknown>).originalAnswer === 'string'

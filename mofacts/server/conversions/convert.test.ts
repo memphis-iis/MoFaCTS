@@ -40,6 +40,47 @@ describe('stimuli response Unicode handling', function() {
     expect(formatted[0].incorrectResponses).to.deep.equal(['nina', 'sen\u0303ora', 'energ\u00eda']);
   });
 
+  it('preserves nested display metadata such as attribution when formatting stimuli', function() {
+    const formatted = getNewItemFormat({
+      stimuli: {
+        setspec: {
+          clusters: [
+            {
+              stims: [
+                {
+                  response: {
+                    correctResponse: 'India',
+                  },
+                  display: {
+                    imgSrc: 'https://upload.wikimedia.org/example.svg',
+                    attribution: {
+                      creatorName: 'TUBS',
+                      sourceName: 'Wikimedia Commons',
+                      sourceUrl: 'https://commons.wikimedia.org/wiki/File:Example.svg',
+                      licenseName: 'CC BY-SA 3.0',
+                    },
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      },
+    }, 'maps.json', 88, {});
+
+    expect(formatted).to.have.length(1);
+    expect(formatted[0].imageStimulus).to.equal('https://upload.wikimedia.org/example.svg');
+    expect(formatted[0].display).to.deep.equal({
+      imgSrc: 'https://upload.wikimedia.org/example.svg',
+      attribution: {
+        creatorName: 'TUBS',
+        sourceName: 'Wikimedia Commons',
+        sourceUrl: 'https://commons.wikimedia.org/wiki/File:Example.svg',
+        licenseName: 'CC BY-SA 3.0',
+      },
+    });
+  });
+
   it('repairs flattened stored stimuli from the raw stimuli file', function() {
     const repaired = repairFormattedStimuliResponsesFromRaw(
       [

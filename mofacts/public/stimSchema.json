@@ -128,6 +128,48 @@
                             "options": {
                               "grid_columns": 12
                             }
+                          },
+                          "attribution": {
+                            "type": "object",
+                            "title": "Attribution",
+                            "properties": {
+                              "creatorName": {
+                                "type": "string",
+                                "default": "",
+                                "options": {
+                                  "grid_columns": 12
+                                }
+                              },
+                              "sourceName": {
+                                "type": "string",
+                                "default": "Wikimedia Commons",
+                                "options": {
+                                  "grid_columns": 12
+                                }
+                              },
+                              "sourceUrl": {
+                                "type": "string",
+                                "default": "",
+                                "options": {
+                                  "grid_columns": 12
+                                }
+                              },
+                              "licenseName": {
+                                "type": "string",
+                                "default": "",
+                                "options": {
+                                  "grid_columns": 12
+                                }
+                              },
+                              "licenseUrl": {
+                                "type": "string",
+                                "default": "",
+                                "options": {
+                                  "grid_columns": 12
+                                }
+                              }
+                            },
+                            "additionalProperties": false
                           }
                         },
                         "additionalProperties": false
@@ -180,6 +222,48 @@
                           "options": {
                             "grid_columns": 12
                           }
+                        },
+                        "attribution": {
+                          "type": "object",
+                          "title": "Attribution",
+                          "properties": {
+                            "creatorName": {
+                              "type": "string",
+                              "default": "",
+                              "options": {
+                                "grid_columns": 12
+                              }
+                            },
+                            "sourceName": {
+                              "type": "string",
+                              "default": "Wikimedia Commons",
+                              "options": {
+                                "grid_columns": 12
+                              }
+                            },
+                            "sourceUrl": {
+                              "type": "string",
+                              "default": "",
+                              "options": {
+                                "grid_columns": 12
+                              }
+                            },
+                            "licenseName": {
+                              "type": "string",
+                              "default": "",
+                              "options": {
+                                "grid_columns": 12
+                              }
+                            },
+                            "licenseUrl": {
+                              "type": "string",
+                              "default": "",
+                              "options": {
+                                "grid_columns": 12
+                              }
+                            }
+                          },
+                          "additionalProperties": false
                         }
                       },
                       "additionalProperties": false

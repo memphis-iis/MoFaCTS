@@ -1577,6 +1577,41 @@ const STIM_DISPLAY_FIELD_REGISTRY: SectionFieldRegistry = {
       severity: 'warning',
     },
   }),
+  attribution: simpleField(createClosedObjectSchema('Attribution', {
+    creatorName: simpleField(stringField('', 12), {
+      brief: 'Attribution creator name.',
+      verbose: 'Visible creator/author name shown with licensed media.'
+    }),
+    sourceName: simpleField(stringField('Wikimedia Commons', 12), {
+      brief: 'Attribution source label.',
+      verbose: 'Visible source label shown in the attribution caption.'
+    }),
+    sourceUrl: simpleField(stringField('', 12), {
+      brief: 'Attribution source URL.',
+      verbose: 'Source page opened when the learner clicks the attribution caption.'
+    }, {
+      validation: {
+        validators: [{ type: 'url', message: 'Must be a valid URL' }],
+        severity: 'warning',
+      },
+    }),
+    licenseName: simpleField(stringField('', 12), {
+      brief: 'Attribution license name.',
+      verbose: 'Visible license label shown in the attribution caption.'
+    }),
+    licenseUrl: simpleField(stringField('', 12), {
+      brief: 'Attribution license URL.',
+      verbose: 'Optional license detail URL for the attributed media.'
+    }, {
+      validation: {
+        validators: [{ type: 'url', message: 'Must be a valid URL' }],
+        severity: 'warning',
+      },
+    }),
+  }), {
+    brief: 'Prompt media attribution.',
+    verbose: 'Creator, source, and license metadata rendered as a linked caption for the prompt media.'
+  }),
 };
 
 const STIM_RESPONSE_FIELD_REGISTRY: SectionFieldRegistry = {
@@ -1733,6 +1768,7 @@ const STIM_DIRECT_RUNTIME_KEYS = Object.freeze([
 
 const STIM_DISPLAY_DIRECT_RUNTIME_KEYS = Object.freeze([
   'audioSrc',
+  'attribution',
   'clozeStimulus',
   'clozeText',
   'imgSrc',

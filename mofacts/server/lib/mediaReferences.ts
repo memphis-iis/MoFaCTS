@@ -438,6 +438,9 @@ export function createMediaReferenceHelpers(deps: MediaReferenceDeps) {
           throw new Meteor.Error('invalid-media-schema', `Non-canonical flat stimulus media key is not allowed: ${disallowedField}`);
         }
       }
+      const displayObj = (stim.display && typeof stim.display === 'object' && !Array.isArray(stim.display))
+        ? stim.display as Record<string, unknown>
+        : null;
       for (const field of canonicalFields) {
         const value = stim[field];
         if (typeof value !== 'string' || !value.trim()) continue;
@@ -454,6 +457,15 @@ export function createMediaReferenceHelpers(deps: MediaReferenceDeps) {
         }
         if (resolved.resolved && resolved.resolved !== value) {
           stim[field] = resolved.resolved;
+        }
+        if (displayObj) {
+          const displayField = field === 'audioStimulus'
+            ? 'audioSrc'
+            : (field === 'imageStimulus' ? 'imgSrc' : 'videoSrc');
+          const canonicalValue = typeof stim[field] === 'string' ? stim[field] : value;
+          if (typeof canonicalValue === 'string' && canonicalValue.trim()) {
+            displayObj[displayField] = canonicalValue;
+          }
         }
       }
     }

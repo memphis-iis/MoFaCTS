@@ -41,6 +41,7 @@
  * @property {string} [imgSrc] - Image URL
  * @property {string} [videoSrc] - Video URL
  * @property {string} [audioSrc] - Audio URL
+ * @property {{ creatorName?: string, sourceName?: string, sourceUrl?: string, licenseName?: string, licenseUrl?: string }} [attribution] - Optional media attribution metadata
  */
 
 /**
