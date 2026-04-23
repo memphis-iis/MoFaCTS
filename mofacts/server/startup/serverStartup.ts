@@ -24,29 +24,6 @@ import { startConfiguredSyncedCronJobs } from './syncedCronRuntime';
 type UnknownRecord = Record<string, unknown>;
 type Logger = (...args: unknown[]) => void;
 
-type OAuthUser = {
-  _id: string;
-  username?: string | undefined;
-  emails?: Array<{ address: string; verified: boolean }> | undefined;
-  profile?: (Record<string, unknown> & { experiment?: unknown; username?: string | undefined }) | undefined;
-  services?: {
-    google?: { email?: string | undefined } | undefined;
-    microsoft?: {
-      mail?: string | undefined;
-      userPrincipalName?: string | undefined;
-      email?: string | undefined;
-    } | undefined;
-    memphisSaml?: {
-      email?: string | undefined;
-      mail?: string | undefined;
-      eduPersonPrincipalName?: string | undefined;
-      nameID?: string | undefined;
-      displayName?: string | undefined;
-    } | undefined;
-    password?: Record<string, unknown> | undefined;
-  } | undefined;
-};
-
 type RunServerStartupDeps = {
   serverConsole: Logger;
   DynamicSettings: {
@@ -545,11 +522,11 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     });
   }
 
-  Accounts.onCreateUser(function(options: { profile?: {} | undefined }, user: OAuthUser) {
+  Accounts.onCreateUser(function(options: { profile?: {} | undefined }, user: Meteor.User) {
     deps.serverConsole('[ACCOUNTS] onCreateUser called');
     deps.serverConsole('[ACCOUNTS] User services:', Object.keys(user.services || {}));
 
-    const dispUsr = (currentUser: OAuthUser) => _.pick(currentUser, '_id', 'username', 'emails', 'profile');
+    const dispUsr = (currentUser: Meteor.User) => _.pick(currentUser, '_id', 'username', 'emails', 'profile');
     if (options.profile) {
       user.profile = _.extend(user.profile || {}, options.profile as Record<string, unknown>);
     }
@@ -591,7 +568,8 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
         extractedEmail: email,
       });
     } else if (user.services?.password) {
-      const passwordEmailSource = user.emails?.[0]?.address || (user as UnknownRecord).email_canonical || (user as UnknownRecord).email_original || user.username || '';
+      const userRecord = user as unknown as UnknownRecord;
+      const passwordEmailSource = user.emails?.[0]?.address || userRecord.email_canonical || userRecord.email_original || user.username || '';
       email = String(passwordEmailSource).trim().toLowerCase();
     }
 
@@ -627,12 +605,13 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     }
 
     user.username = normalizedEmail.canonical;
-    (user as UnknownRecord).email_original = normalizedEmail.original;
-    (user as UnknownRecord).email_canonical = normalizedEmail.canonical;
+    const userRecord = user as unknown as UnknownRecord;
+    userRecord.email_original = normalizedEmail.original;
+    userRecord.email_canonical = normalizedEmail.canonical;
     user.emails = [{ address: normalizedEmail.canonical, verified: emailVerified }];
     user.profile = user.profile || {};
     user.profile.username = normalizedEmail.canonical;
-    (user as UnknownRecord).authState = deps.buildAccountAuthState(user, serviceName?.toLowerCase() || 'password');
+    userRecord.authState = deps.buildAccountAuthState(user, serviceName?.toLowerCase() || 'password');
     deps.serverConsole(`[ACCOUNTS] Creating new ${serviceName} user:`, dispUsr(user));
 
     const normalizedUsername = user.username || '';
