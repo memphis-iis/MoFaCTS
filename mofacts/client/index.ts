@@ -12,6 +12,7 @@ import { FlowRouter } from 'meteor/ostrio:flow-router-extra';
 import {
   getCurrentTheme
 } from './lib/currentTestingHelpers';
+import { resolveThemeBrandLabel } from '../common/themeBranding';
 import DOMPurify from 'dompurify';
 import {audioManager} from './lib/audioContextManager';
 import {
@@ -75,11 +76,7 @@ function sanitizeHTML(dirty: string | null | undefined) {
 export { clientConsole };
 
 function getSystemName() {
-  const configuredName = Meteor.settings.public?.systemName;
-  if (typeof configuredName === 'string' && configuredName.trim()) {
-    return configuredName.trim();
-  }
-  return 'MoFaCTS';
+  return resolveThemeBrandLabel(Session.get('curTheme'), Meteor.settings.public?.systemName);
 }
 
 // This redirects to the SSL version of the page if we're not on it
@@ -248,6 +245,7 @@ import { legacyDisplay } from '../common/underscoreCompat';
 
 export { meteorCallAsync };
 const MeteorAny = Meteor as any;
+const DEFAULT_ONLINE_HELP_URL = 'https://github.com/memphis-iis/mofacts/wiki/Student-Overview';
 const SessionAny = Session as any;
 const windowAny = window as any;
 
@@ -703,7 +701,7 @@ Template.DefaultLayout.events({
       }
     });
   },
-  'click #wikiButton': function(event: JQuery.TriggeredEvent) {
+  'click #wikiButton': async function(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     audioManager.pauseCurrentAudio();
     // Instantly hide offcanvas to prevent layout shift during page transition
@@ -711,7 +709,12 @@ Template.DefaultLayout.events({
     if (offcanvas) {
       offcanvas.hide();
     }
-    FlowRouter.go('/help');
+    const helpStatus = await MeteorAny.callAsync('getCustomHelpPageStatus');
+    if (helpStatus?.enabled) {
+      FlowRouter.go('/help');
+      return;
+    }
+    window.open(DEFAULT_ONLINE_HELP_URL, '_blank', 'noopener');
   },
   'click #mechTurkButton': function(event: JQuery.TriggeredEvent) {
     event.preventDefault();

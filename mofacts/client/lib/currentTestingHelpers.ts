@@ -9,6 +9,7 @@ import { DeliveryParamsStore } from './state/deliveryParamsStore';
 import { loadSessionMappingRecord, resolveOriginalClusterIndex } from '../views/experiment/svelte/services/mappingRecordService';
 import { createStimClusterMapping as createStimClusterMappingCore } from './clusterMappingUtils';
 import { normalizeThemePropertyValue } from '../../common/themePropertyNormalization';
+import { resolveThemeBrandLabel } from '../../common/themeBranding';
 import {
   DELIVERY_PARAM_DEFAULTS,
   normalizeDeliveryParamSource,
@@ -128,14 +129,6 @@ function updateThemeColorMeta(content: string) {
   meta.content = content;
 }
 
-function getSystemName() {
-  const configuredName = Meteor.settings.public?.systemName;
-  if (typeof configuredName === 'string' && configuredName.trim()) {
-    return configuredName.trim();
-  }
-  return 'MoFaCTS';
-}
-
 type StimCluster = {
   shufIndex: number;
   clusterIndex: number;
@@ -245,7 +238,7 @@ function applyThemeCSSProperties(themeData: ThemeData | null | undefined) {
     }
 
     // Set document title
-    const titleValue = getSystemName();
+    const titleValue = resolveThemeBrandLabel(themeData, Meteor.settings.public?.systemName);
     clientConsole(2, 'Setting document.title to:', titleValue);
     document.title = titleValue;
 

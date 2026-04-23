@@ -511,8 +511,17 @@
 
                 <!-- Branding -->
                 <div class="theme-section">
-                    <h5 class="theme-section-header">Branding Assets</h5>
+                    <h5 class="theme-section-header">Branding</h5>
                     <div class="row row-cols-2">
+                        <div class="col text-end">
+                            Brand Label:
+                        </div>
+                        <div class="col">
+                            <input type="text" class="form-control currentThemeProp" value="{{currentTheme.properties.brand_label}}" data-id="brand_label">
+                            <small class="form-text text-muted">
+                                Text shown next to the logo in the navbar and auth screens. Leave blank to use <code>public.systemName</code>.
+                            </small>
+                        </div>
                         <div class="col text-end">
                             Logo & Favicon:
                         </div>

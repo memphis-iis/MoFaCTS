@@ -15,6 +15,8 @@ type MeteorWithCallAsync = typeof Meteor & {
   callAsync<T = unknown>(name: string, ...args: unknown[]): Promise<T>;
 };
 
+const DEFAULT_ONLINE_HELP_URL = 'https://github.com/memphis-iis/mofacts/wiki/Student-Overview';
+
 // Configure marked for secure rendering
 marked.setOptions({
   breaks: true,        // Convert \n to <br>
@@ -57,12 +59,8 @@ Template.help.rendered = async function() {
       // Use custom help markdown
       markdown = customHelp;
     } else {
-      // Fall back to GitHub wiki
-      const response = await fetch('https://raw.githubusercontent.com/wiki/memphis-iis/mofacts/Student-Overview.md');
-      if (!response.ok) {
-        throw new Error('Failed to load help content');
-      }
-      markdown = await response.text();
+      window.location.assign(DEFAULT_ONLINE_HELP_URL);
+      return;
     }
 
     // Convert markdown to HTML
@@ -90,7 +88,7 @@ Template.help.rendered = async function() {
       helpContent.innerHTML = `
       <div class="alert alert-warning">
         <p>Unable to load help content. Please try again later or visit our
-        <a href="https://github.com/memphis-iis/mofacts/wiki/Student-Overview" target="_blank" class="content-link">online help guide</a>.</p>
+        <a href="${DEFAULT_ONLINE_HELP_URL}" target="_blank" class="content-link">online help guide</a>.</p>
       </div>
     `;
     }

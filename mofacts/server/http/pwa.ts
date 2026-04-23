@@ -4,6 +4,7 @@ import type { IncomingMessage, ServerResponse } from 'http';
 import fs from 'fs/promises';
 import path from 'path';
 import { createHash } from 'crypto';
+import { resolveThemeBrandLabel } from '../../common/themeBranding';
 import { themeRegistry } from '../lib/themeRegistry';
 
 type ThemeLike = {
@@ -28,14 +29,6 @@ function asNonEmptyString(value: unknown): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
-function getSystemName() {
-  const configuredName = Meteor.settings.public?.systemName;
-  if (typeof configuredName === 'string' && configuredName.trim()) {
-    return configuredName.trim();
-  }
-  return 'MoFaCTS';
-}
-
 function getThemeColors(theme: ThemeLike) {
   const properties = theme.properties || {};
   const backgroundColor =
@@ -57,6 +50,7 @@ function buildThemeVersion(theme: ThemeLike) {
       activeThemeId: theme.activeThemeId || null,
       themeName: theme.themeName || null,
       updatedAt: theme.metadata?.updatedAt || null,
+      brandLabel: properties.brand_label || null,
       logoUrl: properties.logo_url || null,
       favicon16Url: properties.favicon_16_url || null,
       favicon32Url: properties.favicon_32_url || null,
@@ -74,7 +68,7 @@ function buildThemeVersion(theme: ThemeLike) {
 
 function buildManifestPayload(theme: ThemeLike) {
   const properties = theme.properties || {};
-  const appName = getSystemName();
+  const appName = resolveThemeBrandLabel(theme, Meteor.settings.public?.systemName);
   const shortName = appName.length > 24 ? appName.slice(0, 24) : appName;
   const description =
     asNonEmptyString(properties.signInDescription) ||
