@@ -20,7 +20,8 @@ import {
   assertAssessmentScheduleArtifactForUnit,
   assertAssessmentScheduleBounds,
   deriveAssessmentScheduleCursor,
-} from './assessmentVideoResume';
+  hasAssessmentResumeProgress,
+} from './assessmentResume';
 import {
   applyMappingRecordToSession,
   createMappingRecord,
@@ -767,6 +768,9 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
     const isLearningUnit = !!curTdfUnit?.learningsession;
     const isAssessmentUnit = !!curTdfUnit?.assessmentsession;
 
+    let completedAssessmentTrials = 0;
+    let assessmentHasDurableResumeProgress = false;
+
     if (isLearningUnit) {
       clientConsole(2, '[Resume Service] Learning unit detected; reconstructing state from history');
       const historyRows = await meteorCallAsync<LearningHistoryRecord[]>(
@@ -791,20 +795,26 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
       });
     } else if (isAssessmentUnit) {
       clientConsole(2, '[Resume Service] Assessment unit detected; inferring position from history');
-      const completedTrialCount = await meteorCallAsync<number>(
+      completedAssessmentTrials = await meteorCallAsync<number>(
         'getAssessmentCompletedTrialCountFromHistory',
         Meteor.userId(),
         Session.get('currentTdfId'),
         currentUnitNumber
       );
+      assessmentHasDurableResumeProgress = hasAssessmentResumeProgress(
+        curExperimentState,
+        currentUnitNumber,
+        completedAssessmentTrials
+      );
       
       // Assessment units use questionIndex as the authoritative pointer.
       // We set it to the count of completed trials.
-      CardStore.setQuestionIndex(completedTrialCount);
+      CardStore.setQuestionIndex(completedAssessmentTrials);
       
       clientConsole(2, '[Resume Service] Assessment position inferred', {
-        completedTrialCount,
-        newIndex: completedTrialCount
+        completedTrialCount: completedAssessmentTrials,
+        newIndex: completedAssessmentTrials,
+        assessmentHasDurableResumeProgress,
       });
     } else {
       Session.set('overallOutcomeHistory', []);
@@ -1070,12 +1080,6 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
         ? engine.getSchedule()
         : Session.get('schedule');
       const scheduleLength = Array.isArray(scheduleArtifact?.q) ? scheduleArtifact.q.length : 0;
-      const completedAssessmentTrials = await meteorCallAsync<number>(
-        'getAssessmentCompletedTrialCountFromHistory',
-        userId,
-        currentTdfId,
-        currentUnitNumber
-      );
       assertAssessmentScheduleBounds(scheduleLength, completedAssessmentTrials);
       const derivedScheduleCursor = deriveAssessmentScheduleCursor(completedAssessmentTrials);
       if (typeof engine.setScheduleCursor !== 'function') {
@@ -1117,7 +1121,9 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
     }
 
     // Simplified: check curUnitInstructionsSeen directly - all units treated equally
-    const shouldShowInstructions = !Session.get('curUnitInstructionsSeen') && typeof curTdfUnit.unitinstructions !== 'undefined';
+    const shouldShowInstructions = !Session.get('curUnitInstructionsSeen')
+      && typeof curTdfUnit.unitinstructions !== 'undefined'
+      && !(isAssessmentUnit && assessmentHasDurableResumeProgress);
 
     if (shouldShowInstructions) {
       clientConsole(2, 'RESUME FINISHED: displaying unit instructions');
@@ -1129,6 +1135,13 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
         engine
       };
     } else {
+      if (isAssessmentUnit && assessmentHasDurableResumeProgress) {
+        Session.set('curUnitInstructionsSeen', true);
+        clientConsole(2, '[Resume Service] Skipping instruction redirect for in-progress assessment resume', {
+          currentUnitNumber,
+          completedAssessmentTrials,
+        });
+      }
       if (await engine.unitFinished()) {
         let lockoutMins = getResolvedLockoutMinutesForResume(curTdfUnit);
         if (lockoutMins > 0) {

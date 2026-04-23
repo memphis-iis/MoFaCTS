@@ -24,7 +24,7 @@ import {displayify} from '../../../common/globalHelpers';
 import {Answers} from './answerAssess';
 import { AdaptiveQuestionLogic } from './adaptiveQuestionLogic';
 import { reconstructLearningStateFromHistory } from './svelte/services/historyReconstruction';
-import { hasScheduleArtifactForUnit } from './svelte/services/assessmentVideoResume';
+import { hasScheduleArtifactForUnit } from './svelte/services/assessmentResume';
 
 const _ = (globalThis as any)._;
 const Tdfs = (globalThis as any).Tdfs;

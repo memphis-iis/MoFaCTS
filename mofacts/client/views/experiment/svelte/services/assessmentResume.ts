@@ -6,11 +6,6 @@ function toNonNegativeInteger(value: unknown): number {
   return Math.floor(parsed);
 }
 
-function toFiniteNumber(value: unknown): number | null {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
 export function hasScheduleArtifactForUnit(
   experimentState: Record<string, unknown> | null | undefined,
   unitNumber: number
@@ -27,6 +22,14 @@ export function assertAssessmentScheduleArtifactForUnit(
       `Assessment resume requires a persisted schedule artifact for unit ${toNonNegativeInteger(unitNumber)}`
     );
   }
+}
+
+export function hasAssessmentResumeProgress(
+  experimentState: Record<string, unknown> | null | undefined,
+  unitNumber: number,
+  completedTrialCount: unknown
+): boolean {
+  return hasScheduleArtifactForUnit(experimentState, unitNumber) || toNonNegativeInteger(completedTrialCount) > 0;
 }
 
 export function deriveAssessmentQuestionIndex(
@@ -59,40 +62,4 @@ export function assertAssessmentScheduleBounds(
       `Assessment resume next-card pointer is out of bounds (questionIndex=${questionIndex}, scheduleLength=${length})`
     );
   }
-}
-
-type VideoResumeAnchor = {
-  resumeStartTime: number;
-  resumeCheckpointIndex: number;
-};
-
-export function resolveVideoResumeAnchor(
-  checkpointTimes: unknown,
-  completedCheckpointQuestionCount: unknown
-): VideoResumeAnchor | null {
-  if (!Array.isArray(checkpointTimes) || checkpointTimes.length === 0) {
-    return null;
-  }
-
-  const completedCount = toNonNegativeInteger(completedCheckpointQuestionCount);
-  if (completedCount <= 0) {
-    return null;
-  }
-
-  if (completedCount > checkpointTimes.length) {
-    throw new Error(
-      `Video resume history exceeds checkpoint bounds (completed=${completedCount}, checkpoints=${checkpointTimes.length})`
-    );
-  }
-
-  const checkpointIndex = completedCount;
-  const checkpointTime = toFiniteNumber(checkpointTimes[completedCount - 1]);
-  if (checkpointTime === null) {
-    throw new Error(`Video checkpoint time is invalid at index ${completedCount - 1}`);
-  }
-
-  return {
-    resumeStartTime: checkpointTime,
-    resumeCheckpointIndex: checkpointIndex,
-  };
 }

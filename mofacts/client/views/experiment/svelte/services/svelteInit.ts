@@ -42,7 +42,7 @@ import { sanitizeUiSettings } from '../utils/uiSettingsValidator';
 import { initializeAudioRecorder } from './speechRecognitionService';
 import { leavePage } from './navigationCleanup';
 import { ensureCurrentStimuliSetId, resolveDynamicAssetPath } from './mediaResolver';
-import { resolveVideoResumeAnchor } from './assessmentVideoResume';
+import { resolveVideoResumeAnchor } from './videoResume';
 import { withStartupTimeout } from '../../../../lib/audioStartup';
 import { evaluateSrAvailability } from '../../../../lib/audioAvailability';
 import {

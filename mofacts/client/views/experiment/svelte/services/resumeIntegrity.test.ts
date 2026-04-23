@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { deriveAssessmentScheduleCursor } from './assessmentVideoResume';
+import { deriveAssessmentScheduleCursor } from './assessmentResume';
 
 type SimState = {
   schedule: string[];
