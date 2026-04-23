@@ -112,9 +112,7 @@ interface ResumeExperimentState extends ExperimentState {
   experimentXCond?: number;
   conditionNote?: string;
   currentTdfFile?: TdfFileLike;
-  // Deprecated progress fields below - to be removed from logic
   currentUnitNumber?: number;
-  lastAction?: unknown;
 }
 
 interface ResumeEngineLike extends UnitEngineLike {
@@ -1026,7 +1024,6 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
           currentUnitNumber,
           scheduleUnitNumber: curExperimentState?.scheduleUnitNumber ?? null,
           hasSchedule: !!curExperimentState?.schedule,
-          lastAction: curExperimentState?.lastAction ?? null,
           error,
         });
         return handleResumeFailure(

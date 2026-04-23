@@ -3,7 +3,6 @@ import {
   hasMeaningfulMappingProgress,
   isStrictMappingMismatchEnforcementEnabled,
 } from './mappingProgressPolicy';
-import { LAST_ACTION } from '../../../../../common/constants/resumeActions';
 
 type TestMeteorGlobal = typeof globalThis & {
   Meteor?: unknown;
@@ -30,7 +29,7 @@ describe('mappingProgressPolicy', function() {
   it('detects meaningful progress from action/history markers', function() {
     expect(hasMeaningfulMappingProgress({})).to.equal(false);
     expect(hasMeaningfulMappingProgress({ id: 'state-1' } as Record<string, unknown>)).to.equal(false);
-    expect(hasMeaningfulMappingProgress({ lastAction: LAST_ACTION.CARD_DISPLAYED })).to.equal(true);
+    expect(hasMeaningfulMappingProgress({ currentUnitNumber: 0 })).to.equal(true);
     expect(hasMeaningfulMappingProgress({ overallStudyHistory: [{ x: 1 }] })).to.equal(true);
   });
 

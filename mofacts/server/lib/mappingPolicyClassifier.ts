@@ -1,5 +1,4 @@
 import { createMappingSignature } from '../../client/lib/mappingSignature';
-import { hasMeaningfulProgressLastAction } from '../../common/constants/resumeActions';
 
 export function countStimClustersForPolicy(stimuli: unknown): number {
   if (!Array.isArray(stimuli)) {
@@ -68,10 +67,6 @@ export function hasMeaningfulProgressSignal(experimentState: any): boolean {
     return false;
   }
 
-  const action = typeof experimentState.lastAction === 'string' ? experimentState.lastAction : '';
-  if (hasMeaningfulProgressLastAction(action)) {
-    return true;
-  }
   if (Array.isArray(experimentState.overallOutcomeHistory) && experimentState.overallOutcomeHistory.length > 0) {
     return true;
   }

@@ -10,7 +10,6 @@ import { meteorCallAsync } from '../../index';
 import { getExperimentState, createExperimentState } from './svelte/services/experimentState';
 import { playerController, destroyPlyr } from '../../lib/plyrHelper';
 import '../../../common/Collections';
-import { LAST_ACTION } from '../../../common/constants/resumeActions';
 
 type RootTdfBoxed = {
   content: {
@@ -181,7 +180,6 @@ export async function unitIsFinished(reason: string, options: { engine?: unknown
     lastUnitStarted: newUnitNum,
     currentUnitNumber: newUnitNum,
     currentTdfUnit: curTdfUnit,
-    lastAction: LAST_ACTION.UNIT_ENDED,
     schedule: null,
     scheduleUnitNumber: null,
     videoCheckpointAnchorIndex: null,
@@ -247,7 +245,6 @@ export async function revisitUnit(unitNumber: string | number) {
     lastUnitStarted: oldExperimentState.lastUnitStarted,
     currentUnitNumber: newUnitNum,
     currentTdfUnit: curTdfUnit,
-    lastAction: LAST_ACTION.UNIT_ENDED,
     schedule: null,
     scheduleUnitNumber: null,
     videoCheckpointAnchorIndex: null,

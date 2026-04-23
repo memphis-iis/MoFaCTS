@@ -1,5 +1,4 @@
 import { Session } from 'meteor/session';
-import { LAST_ACTION, hasMeaningfulProgressLastAction } from '../../common/constants/resumeActions';
 
 // Entry intent is about how the learner reached /card, not about which trial appears next.
 // There are three product-level meanings we care about:
@@ -20,9 +19,8 @@ export const COMPLETED_LESSON_REDIRECT = '/learningDashboard' as const;
 
 export const CARD_REFRESH_REBUILD_REASON = {
   NO_EXPERIMENT_STATE: 'no_experiment_state',
-  MISSING_LAST_ACTION: 'missing_last_action',
-  MEANINGFUL_LAST_ACTION: 'meaningful_last_action',
-  INVALID_LAST_ACTION: 'invalid_last_action',
+  NO_PROGRESS_STATE: 'no_progress_state',
+  SAVED_PROGRESS_STATE: 'saved_progress_state',
 } as const;
 
 type CardRefreshRebuildReason =
@@ -48,7 +46,6 @@ type CardEntryContext = {
 type CardRefreshRebuildClassification = {
   intent: CardEntryIntent;
   reason: CardRefreshRebuildReason;
-  lastAction: unknown;
 };
 
 type CardLaunchProgressResolution = {
@@ -57,7 +54,6 @@ type CardLaunchProgressResolution = {
   moduleCompleted: boolean;
   persistedUnitNumber: number | null;
   lastUnitCompleted: number | null;
-  lastAction: unknown;
 };
 
 const CARD_ENTRY_INTENT_VALUES = new Set<CardEntryIntent>(Object.values(CARD_ENTRY_INTENT));
@@ -92,6 +88,26 @@ function normalizeTimestamp(value: unknown): number | null {
 
 function isCardEntryIntent(value: unknown): value is CardEntryIntent {
   return typeof value === 'string' && CARD_ENTRY_INTENT_VALUES.has(value as CardEntryIntent);
+}
+
+function hasPersistedProgressState(experimentState: Record<string, unknown> | null | undefined): boolean {
+  if (!experimentState || typeof experimentState !== 'object') {
+    return false;
+  }
+
+  if (normalizeUnitNumber(experimentState.currentUnitNumber) !== null) {
+    return true;
+  }
+
+  if (normalizeUnitNumber(experimentState.lastUnitCompleted) !== null) {
+    return true;
+  }
+
+  if (experimentState.schedule && normalizeUnitNumber(experimentState.scheduleUnitNumber) !== null) {
+    return true;
+  }
+
+  return false;
 }
 
 export function getCardEntryIntent(): CardEntryIntent | null {
@@ -151,31 +167,19 @@ export function classifyCardRefreshRebuild(
     return {
       intent: CARD_ENTRY_INTENT.INITIAL_TDF_ENTRY,
       reason: CARD_REFRESH_REBUILD_REASON.NO_EXPERIMENT_STATE,
-      lastAction: undefined,
     };
   }
 
-  const lastAction = experimentState.lastAction;
-  if (lastAction === undefined || lastAction === null || lastAction === '') {
-    return {
-      intent: CARD_ENTRY_INTENT.INITIAL_TDF_ENTRY,
-      reason: CARD_REFRESH_REBUILD_REASON.MISSING_LAST_ACTION,
-      lastAction: undefined,
-    };
-  }
-
-  if (hasMeaningfulProgressLastAction(lastAction)) {
+  if (hasPersistedProgressState(experimentState)) {
     return {
       intent: CARD_ENTRY_INTENT.PERSISTED_PROGRESS_RESUME,
-      reason: CARD_REFRESH_REBUILD_REASON.MEANINGFUL_LAST_ACTION,
-      lastAction,
+      reason: CARD_REFRESH_REBUILD_REASON.SAVED_PROGRESS_STATE,
     };
   }
 
   return {
-    intent: CARD_ENTRY_INTENT.PERSISTED_PROGRESS_RESUME,
-    reason: CARD_REFRESH_REBUILD_REASON.INVALID_LAST_ACTION,
-    lastAction,
+    intent: CARD_ENTRY_INTENT.INITIAL_TDF_ENTRY,
+    reason: CARD_REFRESH_REBUILD_REASON.NO_PROGRESS_STATE,
   };
 }
 
@@ -202,32 +206,22 @@ export function resolveCardLaunchProgress(
       moduleCompleted: false,
       persistedUnitNumber: null,
       lastUnitCompleted: null,
-      lastAction: undefined,
     };
   }
 
-  const lastAction = experimentState.lastAction;
   const persistedUnitNumber = normalizeUnitNumber(experimentState.currentUnitNumber);
   const lastUnitCompleted = normalizeUnitNumber(experimentState.lastUnitCompleted);
 
   const hasMeaningfulHistory =
-    hasMeaningfulProgressLastAction(lastAction) ||
     persistedUnitNumber !== null ||
-    lastUnitCompleted !== null;
+    lastUnitCompleted !== null ||
+    Boolean(experimentState.schedule && normalizeUnitNumber(experimentState.scheduleUnitNumber) !== null);
 
-  const finalUnitIndex = safeUnitCount > 0 ? safeUnitCount - 1 : null;
   const moduleCompleted = safeUnitCount > 0 && (
     (persistedUnitNumber !== null && persistedUnitNumber >= safeUnitCount) ||
     (
-      lastAction === LAST_ACTION.UNIT_ENDED &&
       lastUnitCompleted !== null &&
       lastUnitCompleted >= (safeUnitCount - 1)
-    ) ||
-    (
-      lastAction === LAST_ACTION.UNIT_ENDED &&
-      finalUnitIndex !== null &&
-      persistedUnitNumber !== null &&
-      persistedUnitNumber >= finalUnitIndex
     )
   );
 
@@ -239,6 +233,5 @@ export function resolveCardLaunchProgress(
     moduleCompleted,
     persistedUnitNumber,
     lastUnitCompleted,
-    lastAction,
   };
 }

@@ -305,7 +305,6 @@ async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId
       unitCount,
       persistedUnitNumber: launchProgress.persistedUnitNumber,
       lastUnitCompleted: launchProgress.lastUnitCompleted,
-      lastAction: launchProgress.lastAction,
     });
     Session.set('uiMessage', {
       text: 'This lesson has already been completed and cannot be reopened.',

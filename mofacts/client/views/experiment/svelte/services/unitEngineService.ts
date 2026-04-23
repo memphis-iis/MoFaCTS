@@ -21,7 +21,6 @@ import { getExperimentState } from './experimentState';
 import { sanitizeHTML, nextChar } from '../../../../lib/stringUtils';
 import { Answers } from '../../answerAssess';
 import { CardStore } from '../../modules/cardStore';
-import { LAST_ACTION } from '../../../../../common/constants/resumeActions';
 import { resolveDynamicAssetPath } from './mediaResolver';
 import { sanitizeUiSettings } from '../utils/uiSettingsValidator';
 import { assertIdInvariants, logIdInvariantBreachOnce } from '../../../../lib/idContext';
@@ -1097,47 +1096,8 @@ export async function selectCardService(
     // CRITICAL: Call engine.selectNextCard() first to prepare internal state
     // This must be called before getCardDataFromEngine() which calls findCurrentCardInfo()
     if (isResume) {
-      if (engine.unitType === 'model' || engine.unitType === 'schedule') {
-        await engine.selectNextCard(engineIndices, curExperimentState);
-        Session.set('resumeToQuestion', false);
-      } else {
-      const lastAction = curExperimentState?.lastAction;
-      const hasCompletedCurrentCardAction =
-        lastAction === LAST_ACTION.CARD_RESPONSE_RECORDED ||
-        lastAction === LAST_ACTION.CARD_TIMEOUT;
-
-      if (hasCompletedCurrentCardAction) {
-          await engine.selectNextCard(engineIndices, curExperimentState);
-        } else {
-          let resumedCurrentCard = false;
-          if (
-            typeof engine.findCurrentCardInfo === 'function' &&
-            typeof engine.setUpCardQuestionAndAnswerGlobals === 'function'
-          ) {
-            const curCardInfo = engine.findCurrentCardInfo();
-            const resumeClusterIndex = getFiniteNumber(curCardInfo?.clusterIndex);
-            const resumeStimIndex = getFiniteNumber(curCardInfo?.whichStim);
-            if (resumeClusterIndex !== undefined && resumeStimIndex !== undefined) {
-              const cluster = getStimCluster(resumeClusterIndex);
-              const stim = (cluster as StimClusterLike | null | undefined)?.stims?.[resumeStimIndex];
-              if (stim) {
-                const stateChanges = await engine.setUpCardQuestionAndAnswerGlobals(
-                  resumeClusterIndex,
-                  resumeStimIndex,
-                  stim.probFunctionParameters
-                );
-                Object.assign(curExperimentState || {}, stateChanges);
-              resumedCurrentCard = true;
-            }
-          }
-        }
-
-        if (!resumedCurrentCard) {
-          throw new Error('Resume failed: current card context missing; refusing to advance and risk data skip');
-        }
-      }
+      await engine.selectNextCard(engineIndices, curExperimentState);
       Session.set('resumeToQuestion', false);
-      }
     } else {
       if (typeof engine.clearPrefetchedNextCard === 'function') {
         engine.clearPrefetchedNextCard();

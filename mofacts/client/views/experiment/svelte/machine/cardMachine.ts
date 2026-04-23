@@ -18,7 +18,6 @@ import { EVENTS, STATES, DEFAULT_UI_SETTINGS, SR_CONFIG } from './constants';
 import * as guards from './guards';
 import * as actions from './actions';
 import { createServices } from './services';
-import { LAST_ACTION } from '../../../../../common/constants/resumeActions';
 import { CardStore } from '../../modules/cardStore';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Narrow exception: current XState v5 config/actor typings in this file are not modeled well enough yet, but we can still type the machine callback payloads locally.
@@ -559,7 +558,6 @@ export const cardMachine = createMachine(
                   originalDisplay: context.currentDisplay?.text || context.currentDisplay?.clozeText || '',
                   originalAnswer: context.originalAnswer,
                   currentAnswer: context.currentAnswer,
-                  lastAction: LAST_ACTION.CARD_DISPLAYED,
                 },
                 source: 'cardMachine.displaying',
               }),
@@ -1238,7 +1236,6 @@ export const cardMachine = createMachine(
                 context,
                 event,
                 stateUpdate: {
-                  lastAction: context.isTimeout ? LAST_ACTION.CARD_TIMEOUT : LAST_ACTION.CARD_RESPONSE_RECORDED,
                   overallOutcomeHistory: Session.get('overallOutcomeHistory'),
                 },
                 source: 'cardMachine.transition.logging',

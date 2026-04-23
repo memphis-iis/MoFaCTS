@@ -23,7 +23,6 @@ import {clientConsole} from '../../lib/userSessionHelpers';
 import {displayify} from '../../../common/globalHelpers';
 import {Answers} from './answerAssess';
 import { AdaptiveQuestionLogic } from './adaptiveQuestionLogic';
-import { LAST_ACTION } from '../../../common/constants/resumeActions';
 import { reconstructLearningStateFromHistory } from './svelte/services/historyReconstruction';
 import { hasScheduleArtifactForUnit } from './svelte/services/assessmentVideoResume';
 
@@ -1227,7 +1226,6 @@ async function modelUnitEngine(): Promise<any> {
       let newExperimentState: any = {
         clusterIndex: cardIndex,
         shufIndex: cardIndex,
-        lastAction: LAST_ACTION.CARD_DISPLAYED,
         lastTimeStamp: Date.now(),
         whichStim: whichStim,
       };

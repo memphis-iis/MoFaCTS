@@ -4,7 +4,6 @@ import {
   hasMeaningfulProgressSignal,
   isBreakingMappingChange,
 } from './mappingPolicyClassifier';
-import { LAST_ACTION } from '../../common/constants/resumeActions';
 
 describe('mappingPolicyClassifier', function() {
   it('counts unique clusters for policy signature input', function() {
@@ -159,7 +158,7 @@ describe('mappingPolicyClassifier', function() {
 
   it('detects meaningful progress signals from experiment state evidence', function() {
     expect(hasMeaningfulProgressSignal({})).to.equal(false);
-    expect(hasMeaningfulProgressSignal({ lastAction: LAST_ACTION.CARD_DISPLAYED })).to.equal(true);
+    expect(hasMeaningfulProgressSignal({ currentUnitNumber: 1 })).to.equal(true);
     expect(hasMeaningfulProgressSignal({ overallOutcomeHistory: [{ a: 1 }] })).to.equal(true);
   });
 });

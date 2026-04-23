@@ -1,10 +1,5 @@
 import { expect } from 'chai';
-import {
-  classifyResumeDecision,
-  LAST_ACTION,
-  RESUME_DECISION,
-  type LastAction,
-} from '../../../../../common/constants/resumeActions';
+import { deriveAssessmentScheduleCursor } from './assessmentVideoResume';
 
 type SimState = {
   schedule: string[];
@@ -23,10 +18,7 @@ function createState(schedule: string[]): SimState {
 }
 
 function displayCurrentCard(state: SimState): void {
-  if (state.currentIndex !== null) {
-    return;
-  }
-  if (state.nextIndex >= state.schedule.length) {
+  if (state.currentIndex !== null || state.nextIndex >= state.schedule.length) {
     return;
   }
   state.currentIndex = state.nextIndex;
@@ -45,36 +37,9 @@ function answerCurrentCard(state: SimState): void {
   state.currentIndex = null;
 }
 
-function timeoutCurrentCard(state: SimState): void {
-  answerCurrentCard(state);
-}
-
-function applyResumeDecision(state: SimState, lastAction: LastAction): void {
-  const moduleCompleted = state.nextIndex >= state.schedule.length && state.currentIndex === null;
-  const decision = classifyResumeDecision({
-    lastAction,
-    moduleCompleted,
-    showInstructions: false,
-  });
-
-  if (decision === RESUME_DECISION.HARD_STOP) {
-    throw new Error(`Unexpected hard stop for lastAction=${lastAction}`);
-  }
-  if (decision === RESUME_DECISION.UNIT_COMPLETE) {
-    return;
-  }
-  if (decision === RESUME_DECISION.RESUME_CURRENT_CARD) {
-    if (state.currentIndex === null) {
-      throw new Error('Expected a current card to resume');
-    }
-    return;
-  }
-  if (decision === RESUME_DECISION.ADVANCE_TO_NEXT_CARD) {
-    return;
-  }
-  if (decision === RESUME_DECISION.REDIRECT_INSTRUCTIONS) {
-    throw new Error('Unexpected redirect_instructions for schedule test scenario');
-  }
+function resumeFromCompletedHistory(state: SimState): void {
+  state.nextIndex = deriveAssessmentScheduleCursor(state.exported.length);
+  state.currentIndex = null;
 }
 
 function runToCompletion(state: SimState): void {
@@ -90,10 +55,6 @@ function assertNoSkipNoDuplicateAndOrder(state: SimState): void {
   expect(state.exported).to.deep.equal(state.schedule);
 }
 
-function cloneState(state: SimState): SimState {
-  return JSON.parse(JSON.stringify(state));
-}
-
 describe('resume integrity (schedule mode)', function() {
   const schedule = ['A_1', 'A_2', 'A_3', 'A_4', 'A_5', 'A_6', 'A_7', 'A_8', 'A_9', 'A_10'];
 
@@ -103,70 +64,38 @@ describe('resume integrity (schedule mode)', function() {
     assertNoSkipNoDuplicateAndOrder(state);
   });
 
-  it('resume after display-before-answer continues without skip/duplicate', function() {
+  it('history count resumes at the displayed-but-unanswered schedule item', function() {
     const state = createState(schedule);
 
-    displayCurrentCard(state);
-    answerCurrentCard(state); // A_1
-    displayCurrentCard(state);
-    answerCurrentCard(state); // A_2
-    displayCurrentCard(state); // A_3 shown, not answered yet
+    for (let i = 0; i < 5; i += 1) {
+      displayCurrentCard(state);
+      answerCurrentCard(state);
+    }
+    displayCurrentCard(state); // A_6 shown, not answered, so it is not in history/export.
 
-    applyResumeDecision(state, LAST_ACTION.CARD_DISPLAYED);
-    answerCurrentCard(state); // A_3
+    resumeFromCompletedHistory(state);
+
+    expect(state.nextIndex).to.equal(5);
+    expect(state.schedule[state.nextIndex]).to.equal('A_6');
+
     runToCompletion(state);
-
     assertNoSkipNoDuplicateAndOrder(state);
   });
 
-  it('resume after answer-before-transition advances without skip/duplicate', function() {
+  it('history count resumes after the last completed schedule item', function() {
     const state = createState(schedule);
 
     displayCurrentCard(state);
-    answerCurrentCard(state); // A_1
+    answerCurrentCard(state);
     displayCurrentCard(state);
-    answerCurrentCard(state); // A_2
-    displayCurrentCard(state);
-    answerCurrentCard(state); // A_3 answered before interruption
+    answerCurrentCard(state);
 
-    applyResumeDecision(state, LAST_ACTION.CARD_RESPONSE_RECORDED);
+    resumeFromCompletedHistory(state);
+
+    expect(state.nextIndex).to.equal(2);
+    expect(state.schedule[state.nextIndex]).to.equal('A_3');
+
     runToCompletion(state);
-
     assertNoSkipNoDuplicateAndOrder(state);
-  });
-
-  it('resume after timeout advances without skip/duplicate', function() {
-    const state = createState(schedule);
-
-    displayCurrentCard(state);
-    answerCurrentCard(state); // A_1
-    displayCurrentCard(state);
-    answerCurrentCard(state); // A_2
-    displayCurrentCard(state); // A_3 displayed
-    timeoutCurrentCard(state); // A_3 timed out and logged
-
-    applyResumeDecision(state, LAST_ACTION.CARD_TIMEOUT);
-    runToCompletion(state);
-
-    assertNoSkipNoDuplicateAndOrder(state);
-  });
-
-  it('reload + session restart preserve contiguous export order', function() {
-    const state = createState(schedule);
-
-    displayCurrentCard(state);
-    answerCurrentCard(state); // A_1
-    displayCurrentCard(state); // A_2 displayed
-    applyResumeDecision(state, LAST_ACTION.CARD_DISPLAYED);
-
-    const reloadedState = cloneState(state);
-    answerCurrentCard(reloadedState); // A_2
-    displayCurrentCard(reloadedState);
-    answerCurrentCard(reloadedState); // A_3
-    applyResumeDecision(reloadedState, LAST_ACTION.CARD_RESPONSE_RECORDED);
-
-    const restartedState = cloneState(reloadedState);
-    runToCompletion(restartedState);
-    assertNoSkipNoDuplicateAndOrder(restartedState);
   });
 });

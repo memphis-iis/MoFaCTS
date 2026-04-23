@@ -11,7 +11,6 @@ import {
   setCardEntryIntent,
   shouldUseProgressBootstrapForEntryIntent,
 } from './cardEntryIntent';
-import { LAST_ACTION } from '../../common/constants/resumeActions';
 
 describe('cardEntryIntent', function() {
   beforeEach(function() {
@@ -81,52 +80,46 @@ describe('cardEntryIntent', function() {
     expect(classifyCardRefreshRebuild(null)).to.deep.equal({
       intent: CARD_ENTRY_INTENT.INITIAL_TDF_ENTRY,
       reason: CARD_REFRESH_REBUILD_REASON.NO_EXPERIMENT_STATE,
-      lastAction: undefined,
     });
 
     expect(classifyCardRefreshRebuild({})).to.deep.equal({
       intent: CARD_ENTRY_INTENT.INITIAL_TDF_ENTRY,
       reason: CARD_REFRESH_REBUILD_REASON.NO_EXPERIMENT_STATE,
-      lastAction: undefined,
     });
   });
 
-  it('classifies refresh rebuild with missing lastAction as initial TDF entry', function() {
+  it('classifies refresh rebuild with unit progress as persisted-progress resume', function() {
     expect(classifyCardRefreshRebuild({
       currentUnitNumber: 0,
       currentTdfId: 'tdf-1',
     })).to.deep.equal({
+      intent: CARD_ENTRY_INTENT.PERSISTED_PROGRESS_RESUME,
+      reason: CARD_REFRESH_REBUILD_REASON.SAVED_PROGRESS_STATE,
+    });
+  });
+
+  it('classifies refresh rebuild with saved schedule progress as persisted-progress resume', function() {
+    expect(classifyCardRefreshRebuild({
+      schedule: { q: [{ clusterIndex: 0 }] },
+      scheduleUnitNumber: 0,
+    })).to.deep.equal({
+      intent: CARD_ENTRY_INTENT.PERSISTED_PROGRESS_RESUME,
+      reason: CARD_REFRESH_REBUILD_REASON.SAVED_PROGRESS_STATE,
+    });
+  });
+
+  it('classifies refresh rebuild without progress anchors as initial TDF entry', function() {
+    expect(classifyCardRefreshRebuild({
+      currentTdfId: 'tdf-1',
+      mappingSignature: 'sig',
+    })).to.deep.equal({
       intent: CARD_ENTRY_INTENT.INITIAL_TDF_ENTRY,
-      reason: CARD_REFRESH_REBUILD_REASON.MISSING_LAST_ACTION,
-      lastAction: undefined,
-    });
-  });
-
-  it('classifies refresh rebuild with canonical progress as persisted-progress resume', function() {
-    expect(classifyCardRefreshRebuild({
-      lastAction: LAST_ACTION.CARD_DISPLAYED,
-      currentUnitNumber: 2,
-    })).to.deep.equal({
-      intent: CARD_ENTRY_INTENT.PERSISTED_PROGRESS_RESUME,
-      reason: CARD_REFRESH_REBUILD_REASON.MEANINGFUL_LAST_ACTION,
-      lastAction: LAST_ACTION.CARD_DISPLAYED,
-    });
-  });
-
-  it('classifies refresh rebuild with invalid persisted action as persisted-progress fail-loud path', function() {
-    expect(classifyCardRefreshRebuild({
-      lastAction: 'QUESTION',
-      currentUnitNumber: 2,
-    })).to.deep.equal({
-      intent: CARD_ENTRY_INTENT.PERSISTED_PROGRESS_RESUME,
-      reason: CARD_REFRESH_REBUILD_REASON.INVALID_LAST_ACTION,
-      lastAction: 'QUESTION',
+      reason: CARD_REFRESH_REBUILD_REASON.NO_PROGRESS_STATE,
     });
   });
 
   it('resolves launch to persisted-progress resume when history exists', function() {
     expect(resolveCardLaunchProgress({
-      lastAction: LAST_ACTION.CARD_RESPONSE_RECORDED,
       currentUnitNumber: 1,
     }, 4)).to.deep.equal({
       intent: CARD_ENTRY_INTENT.PERSISTED_PROGRESS_RESUME,
@@ -134,13 +127,11 @@ describe('cardEntryIntent', function() {
       moduleCompleted: false,
       persistedUnitNumber: 1,
       lastUnitCompleted: null,
-      lastAction: LAST_ACTION.CARD_RESPONSE_RECORDED,
     });
   });
 
   it('treats out-of-bounds currentUnitNumber as completed launch sentinel', function() {
     expect(resolveCardLaunchProgress({
-      lastAction: LAST_ACTION.UNIT_ENDED,
       currentUnitNumber: 4,
       lastUnitCompleted: 3,
     }, 4)).to.deep.equal({
@@ -149,13 +140,11 @@ describe('cardEntryIntent', function() {
       moduleCompleted: true,
       persistedUnitNumber: 4,
       lastUnitCompleted: 3,
-      lastAction: LAST_ACTION.UNIT_ENDED,
     });
   });
 
-  it('treats final completed unit with UNIT_ENDED as completed even without out-of-bounds pointer', function() {
+  it('treats final completed unit as completed even without out-of-bounds pointer', function() {
     expect(resolveCardLaunchProgress({
-      lastAction: LAST_ACTION.UNIT_ENDED,
       currentUnitNumber: 3,
       lastUnitCompleted: 3,
     }, 4)).to.deep.equal({
@@ -164,21 +153,18 @@ describe('cardEntryIntent', function() {
       moduleCompleted: true,
       persistedUnitNumber: 3,
       lastUnitCompleted: 3,
-      lastAction: LAST_ACTION.UNIT_ENDED,
     });
   });
 
-  it('treats UNIT_ENDED on the final valid unit as completed even if lastUnitCompleted is missing', function() {
+  it('does not treat the final valid unit as completed without lastUnitCompleted', function() {
     expect(resolveCardLaunchProgress({
-      lastAction: LAST_ACTION.UNIT_ENDED,
       currentUnitNumber: 3,
     }, 4)).to.deep.equal({
       intent: CARD_ENTRY_INTENT.PERSISTED_PROGRESS_RESUME,
       hasMeaningfulHistory: true,
-      moduleCompleted: true,
+      moduleCompleted: false,
       persistedUnitNumber: 3,
       lastUnitCompleted: null,
-      lastAction: LAST_ACTION.UNIT_ENDED,
     });
   });
 });

@@ -41,6 +41,7 @@ function mergeExperimentState(
     'conditionTdfId',
     'experimentXCond',
     'schedule',
+    'scheduleUnitNumber',
     'currentRootTdfId',
     'currentTdfId',
     'currentUnitNumber',

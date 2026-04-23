@@ -1,9 +1,7 @@
 // Stage 2 mapping policy helper.
 // Conservative by design: if progress is ambiguous, treat as progressed.
-import { hasMeaningfulProgressLastAction } from '../../../../../common/constants/resumeActions';
 
 type MappingProgressState = {
-  lastAction?: unknown;
   currentUnitNumber?: unknown;
   questionIndex?: unknown;
   clusterIndex?: unknown;
@@ -32,11 +30,6 @@ function getMeteorPublicSettings(): MeteorSettingsPublicLike | undefined {
 export function hasMeaningfulMappingProgress(state: MappingProgressState | null | undefined): boolean {
   if (!state || typeof state !== 'object') {
     return false;
-  }
-
-  const action = typeof state.lastAction === 'string' ? state.lastAction : '';
-  if (hasMeaningfulProgressLastAction(action)) {
-    return true;
   }
 
   if (Object.prototype.hasOwnProperty.call(state, 'currentUnitNumber')) {

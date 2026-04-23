@@ -13,7 +13,6 @@ import {audioManager} from '../../lib/audioContextManager';
 import { DeliveryParamsStore } from '../../lib/state/deliveryParamsStore';
 import { UiSettingsStore } from '../../lib/state/uiSettingsStore';
 import { CardStore } from './modules/cardStore';
-import { LAST_ACTION } from '../../../common/constants/resumeActions';
 import { resolveDynamicAssetPath } from './svelte/services/mediaResolver';
 import { assertIdInvariants, logIdInvariantBreachOnce } from '../../lib/idContext';
 import { CARD_ENTRY_INTENT, setCardEntryIntent } from '../../lib/cardEntryIntent';
@@ -512,14 +511,12 @@ async function instructContinue() {
         currentTdfUnit: nextUnit,
         lastUnitCompleted: currentUnitNumber,
         lastUnitStarted: nextUnitNumber,
-        lastAction: LAST_ACTION.UNIT_ENDED,
       } as any);
     } else {
       await createExperimentState({
         currentUnitNumber: nextUnitNumber,
         lastUnitCompleted: currentUnitNumber,
         lastUnitStarted: currentUnitNumber,
-        lastAction: LAST_ACTION.UNIT_ENDED,
       } as any);
       navigationTarget = '/learningDashboard';
     }

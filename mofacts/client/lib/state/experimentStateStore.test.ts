@@ -25,15 +25,15 @@ describe('ExperimentStateStore', function() {
   });
 
   it('updates state via updater function', function() {
-    ExperimentStateStore.set({ currentTdfId: 'tdf-1', lastAction: 'start' });
+    ExperimentStateStore.set({ currentTdfId: 'tdf-1', currentUnitNumber: 0 });
 
     const next = ExperimentStateStore.update((current) => ({
       ...current,
-      lastAction: 'submit',
+      currentUnitNumber: 1,
     }));
 
-    expect(next.lastAction).to.equal('submit');
-    expect(ExperimentStateStore.get()!.lastAction).to.equal('submit');
+    expect(next.currentUnitNumber).to.equal(1);
+    expect(ExperimentStateStore.get()!.currentUnitNumber).to.equal(1);
   });
 
   it('clears state', function() {
