@@ -74,7 +74,6 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
-    "@jsonhero/schema-infer": "^0.1.5",
     "@meteorjs/rspack": "^1.0.1",
     "@rsdoctor/rspack-plugin": "^1.2.3",
     "@rspack/cli": "^1.7.1",
@@ -112,7 +111,7 @@
     ]
   },
   "engines": {
-    "node": "^22.22.0"
+    "node": ">=22.13.0 <23"
   },
   "scripts": {
     "test": "TEST_WATCH=1 meteor test --driver-package=meteortesting:mocha --port 3010 --settings settings.json",
@@ -126,7 +125,6 @@
     "prepare": "node scripts/prepare-husky.cjs",
     "precommit:lint-staged": "lint-staged",
     "secret:scan:staged": "node scripts/scan-staged-secrets.cjs",
-    "repro:ts-loader-parse-failure": "rspack build --config scripts/ts-loader-repro/rspack.repro.config.cjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "typecheck:vendor": "tsc --noEmit -p tsconfig.vendor-check.json",
     "knip": "knip"

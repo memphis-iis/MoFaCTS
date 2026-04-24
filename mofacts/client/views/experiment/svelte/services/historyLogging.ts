@@ -315,7 +315,7 @@ function checkAudioInputMode(): boolean {
   return userAudioToggled && tdfAudioEnabled;
 }
 
-export function recordSessionOutcomeHistories(testType: string, isCorrect: boolean): void {
+function recordSessionOutcomeHistories(testType: string, isCorrect: boolean): void {
   if (typeof testType !== 'string') {
     throw new Error('[History Logging] testType is missing or invalid');
   }

@@ -35,7 +35,6 @@ For institutional or course deployment, coordinate with the maintainers so confi
 - `mofacts/.deploy/`: canonical Docker Compose build and deployment workflow.
 - `docs/`: concise public repository documentation.
 - `.github/`: GitHub issue templates, pull request template, CI, and security workflow.
-- `scripts/`: maintenance and migration utilities.
 
 ## Running Locally
 

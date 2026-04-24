@@ -33,9 +33,6 @@
   "ignoreIssues": {
     "client/lib/vendor/gauge.generated.js": [
       "exports"
-    ],
-    "scripts/ts-loader-repro/rspack.repro.config.cjs": [
-      "exports"
     ]
   },
   "ignoreFiles": [
