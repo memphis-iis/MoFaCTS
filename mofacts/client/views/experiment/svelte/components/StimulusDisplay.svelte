@@ -5,7 +5,7 @@
    */
   import DOMPurify from 'dompurify';
   import { marked } from 'marked';
-  import { createEventDispatcher, tick } from 'svelte';
+  import { createEventDispatcher, onDestroy, tick } from 'svelte';
   import { waitForBrowserPaint } from '../utils/paintTiming';
 
   const dispatch = createEventDispatcher();
@@ -33,6 +33,16 @@
   let imageReady = true;
   let imageLoadToken = 0;
   let pendingImageSrc = '';
+  let imageBlockElement;
+  let imageElement;
+  let attributionElement;
+  let attributionLayoutReady = true;
+  let attributionLayoutSequence = 0;
+  let imageViewportWidthPx = null;
+  let imageViewportHeightPx = null;
+  let resizeHandlerAttached = false;
+  let imageResizeObserver;
+  const attributionGapPx = 6;
 
   // Sanitize and render HTML content
   $: safeDisplay = display || {};
@@ -58,6 +68,10 @@
     imageAttribution.sourceName ? `Source: ${imageAttribution.sourceName}` : '',
     imageAttribution.licenseName ? `License: ${imageAttribution.licenseName}` : '',
   ].filter(Boolean).join(' | ');
+  $: needsAttributedImageLayout = Boolean(safeDisplay.imgSrc) && hasImageAttribution && Boolean(attributionCaption);
+  $: imageViewportStyle = imageViewportWidthPx === null || imageViewportHeightPx === null
+    ? ''
+    : `width: ${imageViewportWidthPx}px; height: ${imageViewportHeightPx}px;`;
 
   // Memoize sanitized content based on actual content changes, not object reference
   let lastTextContent = '';
@@ -146,11 +160,166 @@
   $: waitingForImage = Boolean(safeDisplay.imgSrc) && !imageReady;
   let lastBlockingAssetState = '';
   let blockingAssetSequence = 0;
+  let lastAttributionLayoutSignature = '';
+
+  function updateAttributedImageLayout() {
+    if (!needsAttributedImageLayout) {
+      imageViewportWidthPx = null;
+      imageViewportHeightPx = null;
+      return true;
+    }
+
+    if (!imageBlockElement || !imageElement || !attributionElement) {
+      return false;
+    }
+
+    const blockRect = imageBlockElement.getBoundingClientRect();
+    const attributionRect = attributionElement.getBoundingClientRect();
+
+    if (!blockRect.height || !blockRect.width || !attributionRect.height) {
+      return false;
+    }
+
+    const naturalWidth = Number(imageElement.naturalWidth || 0);
+    const naturalHeight = Number(imageElement.naturalHeight || 0);
+
+    if (naturalWidth <= 0 || naturalHeight <= 0) {
+      return false;
+    }
+
+    const availableWidth = blockRect.width;
+    const availableHeight = blockRect.height - attributionRect.height - attributionGapPx;
+
+    if (availableWidth <= 0 || availableHeight <= 0) {
+      return false;
+    }
+
+    const imageAspect = naturalWidth / naturalHeight;
+    let nextWidth = availableWidth;
+    let nextHeight = nextWidth / imageAspect;
+
+    if (nextHeight > availableHeight) {
+      nextHeight = availableHeight;
+      nextWidth = nextHeight * imageAspect;
+    }
+
+    imageViewportWidthPx = Math.max(0, Math.floor(nextWidth));
+    imageViewportHeightPx = Math.max(0, Math.floor(nextHeight));
+    return true;
+  }
+
+  async function finalizeAttributionLayout(sequence, signature) {
+    await tick();
+    await waitForBrowserPaint();
+
+    if (sequence !== attributionLayoutSequence || signature !== lastAttributionLayoutSignature) {
+      return;
+    }
+
+    let laidOut = updateAttributedImageLayout();
+    if (!laidOut) {
+      await tick();
+      await waitForBrowserPaint();
+      if (sequence !== attributionLayoutSequence || signature !== lastAttributionLayoutSignature) {
+        return;
+      }
+      laidOut = updateAttributedImageLayout();
+    }
+
+    if (laidOut && sequence === attributionLayoutSequence && signature === lastAttributionLayoutSignature) {
+      attributionLayoutReady = true;
+    }
+  }
+
+  function handleViewportResize() {
+    if (!needsAttributedImageLayout) {
+      return;
+    }
+    void finalizeAttributionLayout(attributionLayoutSequence, lastAttributionLayoutSignature);
+  }
+
+  function syncResizeHandler() {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const shouldAttach = needsAttributedImageLayout;
+    if (shouldAttach && !resizeHandlerAttached) {
+      window.addEventListener('resize', handleViewportResize);
+      resizeHandlerAttached = true;
+    } else if (!shouldAttach && resizeHandlerAttached) {
+      window.removeEventListener('resize', handleViewportResize);
+      resizeHandlerAttached = false;
+    }
+  }
+
+  $: syncResizeHandler();
+
+  function syncResizeObserver() {
+    if (typeof ResizeObserver === 'undefined') {
+      return;
+    }
+
+    if (!needsAttributedImageLayout) {
+      if (imageResizeObserver) {
+        imageResizeObserver.disconnect();
+        imageResizeObserver = undefined;
+      }
+      return;
+    }
+
+    if (!imageBlockElement || !attributionElement) {
+      return;
+    }
+
+    if (!imageResizeObserver) {
+      imageResizeObserver = new ResizeObserver(() => {
+        void finalizeAttributionLayout(attributionLayoutSequence, lastAttributionLayoutSignature);
+      });
+    } else {
+      imageResizeObserver.disconnect();
+    }
+
+    imageResizeObserver.observe(imageBlockElement);
+    imageResizeObserver.observe(attributionElement);
+  }
+
+  $: syncResizeObserver();
+
+  $: {
+    const signature = [
+      safeDisplay?.imgSrc || '',
+      attributionCaption,
+      attributionHref,
+      imageReady ? 'ready' : 'loading',
+    ].join('::');
+
+    if (signature !== lastAttributionLayoutSignature) {
+      lastAttributionLayoutSignature = signature;
+      attributionLayoutSequence += 1;
+      const sequence = attributionLayoutSequence;
+
+      if (!needsAttributedImageLayout) {
+        imageViewportWidthPx = null;
+        imageViewportHeightPx = null;
+        attributionLayoutReady = true;
+      } else if (!imageReady) {
+        imageViewportWidthPx = null;
+        imageViewportHeightPx = null;
+        attributionLayoutReady = false;
+      } else {
+        imageViewportWidthPx = null;
+        imageViewportHeightPx = null;
+        attributionLayoutReady = false;
+        void finalizeAttributionLayout(sequence, signature);
+      }
+    }
+  }
 
   $: {
     const blocking = Boolean(safeDisplay?.imgSrc);
     const src = safeDisplay?.imgSrc || '';
-    const ready = !blocking || imageReady;
+    const ready = !blocking || (imageReady && attributionLayoutReady);
     const signature = `${blocking}:${ready}:${src}`;
 
     if (signature !== lastBlockingAssetState) {
@@ -182,6 +351,17 @@
 
     dispatch('blockingassetstate', detail);
   }
+
+  onDestroy(() => {
+    if (typeof window !== 'undefined' && resizeHandlerAttached) {
+      window.removeEventListener('resize', handleViewportResize);
+      resizeHandlerAttached = false;
+    }
+    if (imageResizeObserver) {
+      imageResizeObserver.disconnect();
+      imageResizeObserver = undefined;
+    }
+  });
 </script>
 
 {#if visible}
@@ -198,26 +378,39 @@
 
       {#key sanitizedText + sanitizedCloze + (safeDisplay.imgSrc || '') + (safeDisplay.videoSrc || '') + (safeDisplay.audioSrc || '') + attributionCaption + attributionHref}
         {#if safeDisplay.imgSrc}
-          <div class="stimulus-image-block">
-            <div class="stimulus-image">
-              <img src={safeDisplay.imgSrc} alt="Stimulus" />
-            </div>
+          <div class="stimulus-image-block" bind:this={imageBlockElement}>
             {#if hasImageAttribution && attributionCaption}
-              {#if attributionHref}
-                <a
-                  class="stimulus-attribution"
-                  href={attributionHref}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  title={attributionTitle || 'Open attribution source'}
-                >
-                  {attributionCaption}
-                </a>
-              {:else}
-                <div class="stimulus-attribution" title={attributionTitle}>
-                  {attributionCaption}
+              <div class="stimulus-image-figure">
+                <div class="stimulus-image stimulus-image-measured" style={imageViewportStyle}>
+                  <img bind:this={imageElement} src={safeDisplay.imgSrc} alt="Stimulus" />
                 </div>
-              {/if}
+                {#if attributionHref}
+                  <a
+                    bind:this={attributionElement}
+                    class="stimulus-attribution"
+                    class:stimulus-attribution-hidden={!attributionLayoutReady}
+                    href={attributionHref}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    title={attributionTitle || 'Open attribution source'}
+                  >
+                    {attributionCaption}
+                  </a>
+                {:else}
+                  <div
+                    bind:this={attributionElement}
+                    class="stimulus-attribution"
+                    class:stimulus-attribution-hidden={!attributionLayoutReady}
+                    title={attributionTitle}
+                  >
+                    {attributionCaption}
+                  </div>
+                {/if}
+              </div>
+            {:else}
+              <div class="stimulus-image stimulus-image-fill">
+                <img bind:this={imageElement} src={safeDisplay.imgSrc} alt="Stimulus" />
+              </div>
             {/if}
           </div>
         {/if}
@@ -405,12 +598,12 @@
   .stimulus-image-block {
     flex: 1 1 auto;
     display: flex;
-    flex-direction: column;
     align-items: center;
+    justify-content: center;
     width: 100%;
+    height: 100%;
     min-height: 0;
     max-height: 100%;
-    gap: 0.35rem;
   }
 
   .stimulus-display.flow-row .stimulus-image-block {
@@ -418,8 +611,19 @@
     min-width: 0;
   }
 
+  .stimulus-image-figure {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    min-width: 0;
+  }
+
   .stimulus-image {
-    flex: 1 1 0; /* Fill remaining space above the caption */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -430,10 +634,22 @@
     overflow: hidden; /* Prevent image from exceeding bounds */
   }
 
-  .stimulus-display.flow-row .stimulus-image {
+  .stimulus-image-fill {
+    flex: 1 1 auto;
+    height: 100%;
+  }
+
+  .stimulus-display.flow-row .stimulus-image-fill {
     flex: 1 1 0;
-    min-width: 0;
     height: auto;
+  }
+
+  .stimulus-image-measured {
+    flex: 0 1 auto;
+  }
+
+  .stimulus-display.flow-row .stimulus-image {
+    min-width: 0;
   }
 
   .stimulus-image img {
@@ -449,12 +665,17 @@
     flex: 0 0 auto;
     display: inline-block;
     max-width: 100%;
+    padding: 0 0.25rem;
     color: var(--secondary-text-color);
     font-size: 0.625rem;
     line-height: 1.25;
     text-align: center;
     text-decoration: none;
     word-break: break-word;
+  }
+
+  .stimulus-attribution-hidden {
+    visibility: hidden;
   }
 
   a.stimulus-attribution:hover,
