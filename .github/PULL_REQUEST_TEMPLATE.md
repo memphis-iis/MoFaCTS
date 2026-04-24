@@ -2,22 +2,27 @@
 
 Describe what changed and why.
 
-## Type of Change
+## Scope
 
-- [ ] Bug fix
-- [ ] New feature
-- [ ] Refactor
+- [ ] Application behavior
+- [ ] TDF/content authoring
 - [ ] Documentation
-- [ ] Build/CI
+- [ ] Build, CI, or deployment
+- [ ] Security or privacy
+- [ ] Other
 
-## Checklist
+## Verification
 
-- [ ] I ran `npm run lint`.
-- [ ] I ran `npm run test:ci` (or explained why not).
-- [ ] I updated docs where needed.
-- [ ] I linked related issues/discussions.
-- [ ] I verified no secrets were added.
+- [ ] `npm run lint`
+- [ ] `npm run typecheck`
+- [ ] Tests or validation are described below
+- [ ] Documentation was updated or not needed
+- [ ] No secrets, credentials, or private learner data were added
 
-## Related Issue(s)
+## Notes
+
+Describe test results, screenshots, release impact, or follow-up work.
+
+## Related Issues
 
 Closes #

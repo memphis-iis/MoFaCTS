@@ -1,27 +1,38 @@
 ---
 name: Feature request
 about: Suggest an improvement to MoFaCTS
-title: ''
+title: "[Feature]: "
 labels: enhancement
-assignees: ''
+assignees: ""
 ---
 
-## Problem Statement
+## Problem
 
-What problem are you trying to solve?
+What problem should MoFaCTS solve?
 
-## Proposed Solution
+## Proposed Change
 
-Describe your proposed change.
+Describe the change you want.
 
-## Alternatives Considered
+## Audience
 
-What alternatives did you evaluate?
+Who benefits?
 
-## Research/Teaching Impact
+- Researchers
+- Instructors
+- Learners
+- Content authors
+- Developers
+- Administrators
 
-Describe expected impact for students, instructors, researchers, or administrators.
+## Use Case
+
+Describe the course, study, authoring workflow, deployment, or development workflow this supports.
+
+## Alternatives
+
+What alternatives or workarounds have you considered?
 
 ## Additional Context
 
-Include links, screenshots, or references.
+Add links, examples, screenshots, or related issues.

@@ -1,8 +1,8 @@
 {
   "name": "mofacts",
-  "version": "1.0.0",
+  "version": "0.1.0-alpha.1",
   "type": "module",
-  "description": "",
+  "description": "Mobile Fact and Concept Training System, a web-based adaptive learning system.",
   "directories": {
     "lib": "lib",
     "test": "tests"

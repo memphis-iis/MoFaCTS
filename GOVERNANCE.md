@@ -1,37 +1,34 @@
 # Governance
 
-## Goals
+MoFaCTS is maintained to support research use, teaching use, content authoring, and sustainable software collaboration.
 
-MoFaCTS is governed to support:
+## Maintainers
 
-- research-quality reliability,
-- transparent decision-making, and
-- sustainable community contribution.
+Maintainers:
 
-## Roles
+- review and merge pull requests,
+- triage issues and security reports,
+- coordinate releases,
+- maintain project documentation and quality expectations.
 
-### Maintainers
+## Contributors
 
-- Review and merge pull requests.
-- Triage issues and coordinate releases.
-- Enforce project policies (`CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`).
+Contributors are welcome to:
 
-### Contributors
-
-- Propose changes via issues and pull requests.
-- Follow contribution and conduct guidelines.
+- report bugs,
+- propose features,
+- improve documentation,
+- submit focused pull requests,
+- discuss research, authoring, or deployment needs through issues or maintainer-approved channels.
 
 ## Decision Process
 
-- Day-to-day technical decisions are made by maintainers through PR review.
-- Substantial changes (architecture, deployment, governance) should start with a design issue or discussion.
-- In case of disagreement, maintainers seek consensus; unresolved decisions are made by maintainer majority.
+Day-to-day technical decisions are made through issue and pull request review. Substantial changes to architecture, data model, deployment, security, or public workflows should start with an issue or design discussion.
 
 ## Releases
 
-- The project uses semantic versioning.
-- Release notes are published in `CHANGELOG.md` and GitHub Releases.
+MoFaCTS uses semantic versioning for public release tags. Pre-1.0 releases are suitable for evaluation, research collaboration, and managed pilot deployments, while public compatibility commitments are still being formalized. Release notes are maintained in `CHANGELOG.md` and GitHub Releases.
 
-## Security and Responsible Disclosure
+## Conduct and Security
 
-Security reports follow `SECURITY.md`.
+Community behavior follows [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). Security reports follow [SECURITY.md](SECURITY.md).

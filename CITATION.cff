@@ -3,9 +3,10 @@ title: MoFaCTS
 message: "If you use MoFaCTS in research, please cite this software."
 type: software
 license: BUSL-1.1
-version: 1.0.0
+version: 0.1.0-alpha.1
 doi: 10.5281/zenodo.3533295
 repository-code: https://github.com/memphis-iis/mofacts
 url: https://github.com/memphis-iis/mofacts
+abstract: "MoFaCTS, the Mobile Fact and Concept Training System, is a web-based adaptive learning system for practice, assessment, and research."
 authors:
   - name: University of Memphis

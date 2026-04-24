@@ -1,31 +1,81 @@
-# MoFaCTS (svelte-app)
+# MoFaCTS
 
-MoFaCTS is a Meteor.js-driven, responsive implementation of the FaCT System designed for use by mobile participants.
+MoFaCTS, the Mobile Fact and Concept Training System, is a web-based adaptive learning system for practice, assessment, and research. It supports adaptive practice through cognitive memory models, Tutor Definition Files (TDFs), multiple stimulus types, and response modalities including multiple choice, fill-in-the-blank, and speech-recognition-based responses.
 
-## Canonical Documentation
+This repository is being prepared for a first public pre-1.0 release. The current target tag is `v0.1.0-alpha.1`.
 
-Most long-form documentation is maintained in the GitHub wiki. Keep repo docs minimal to reduce drift.
+## Who It Is For
 
-- Wiki: https://github.com/memphis-iis/mofacts/wiki
-- Developer doc routing: https://github.com/memphis-iis/mofacts/wiki/Developer-Documentation-Map
-- Local development setup: https://github.com/memphis-iis/mofacts/wiki/Local-Install
-- Production deployment runbook: https://github.com/memphis-iis/mofacts/wiki/Remote-Install
-- Runtime configuration schema: https://github.com/memphis-iis/mofacts/wiki/Settings-json-Reference
-- Troubleshooting: https://github.com/memphis-iis/mofacts/wiki/Troubleshooting
-- Learning algorithms reference: https://github.com/memphis-iis/mofacts/wiki/Learning-Algorithms-Reference
+- Researchers studying adaptive practice, learning, memory, and educational data.
+- Instructors and instructional designers preparing adaptive practice activities.
+- Content authors building lessons with Tutor Definition Files (TDFs).
+- Developers contributing to the MoFaCTS application and deployment workflow.
+- Institutional collaborators evaluating MoFaCTS for pilots or research partnerships.
 
-## Repo Layout
+## What MoFaCTS Can Do
 
-- `mofacts/` is the Meteor app root (`client`, `common`, `server`, `packages`, `public`).
-- `mofacts/.deploy/` holds deployment assets.
-- `docs/` and `mofacts/docs/` contain planning and implementation reference docs that are not canonical.
-- `scripts/` and `mofacts/scripts/` hold helper utilities.
+- Deliver flashcard-like adaptive practice using cognitive memory models.
+- Run lessons defined by Tutor Definition Files (TDFs).
+- Present text, image, audio, video, and cloze-style stimuli.
+- Collect multiple-choice, typed, and speech-recognition-based responses.
+- Support classroom, research, administrative, and deployment workflows.
+- Export and analyze learner interaction data for research and operations.
 
-## Version Requirements
+## Project Status
 
-See `SUPPORT.md` for supported runtime and tooling policy plus required CI checks.
-Use the wiki Local Install guide for setup workflow details.
+MoFaCTS is actively used and stable enough for evaluation, research collaboration, and managed pilot deployments. This is a pre-1.0 public alpha release because public packaging, documentation, APIs, deployment guidance, and compatibility commitments are still being formalized before a 1.0 release.
 
-## Notes
+For institutional or course deployment, coordinate with the maintainers so configuration, data handling, and support expectations are clear.
 
-- The active app lives at `C:\dev\mofacts\svelte-app\mofacts`.
+## Repository Layout
+
+- `mofacts/`: main Meteor/Svelte application source.
+- `mofacts/client/`, `mofacts/common/`, `mofacts/server/`: application code.
+- `mofacts/packages/`: local Meteor packages.
+- `mofacts/.deploy/`: canonical Docker Compose build and deployment workflow.
+- `docs/`: concise public repository documentation.
+- `.github/`: GitHub issue templates, pull request template, CI, and security workflow.
+- `scripts/`: maintenance and migration utilities.
+
+## Running Locally
+
+For contributor setup, see [docs/development.md](docs/development.md).
+
+Short version:
+
+```bash
+cd mofacts
+npm ci
+cp example.settings.json settings.json
+npm run typecheck
+```
+
+The supported local runtime baseline is Node.js `22.x`, npm `10.x`, and Meteor `3.4`. See [SUPPORT.md](SUPPORT.md) for the current support policy.
+
+## Documentation
+
+- [Architecture overview](docs/architecture.md)
+- [Development guide](docs/development.md)
+- [TDF authoring overview](docs/authoring.md)
+- [Release process](docs/release-process.md)
+- [Support policy](SUPPORT.md)
+- [Security policy](SECURITY.md)
+- [Contributing guide](CONTRIBUTING.md)
+
+The GitHub wiki remains the best home for long-form operational runbooks, detailed setup notes, and content authoring examples:
+
+- https://github.com/memphis-iis/mofacts/wiki
+
+## Citing MoFaCTS
+
+If you use MoFaCTS in research, cite the software using [CITATION.cff](CITATION.cff). GitHub will surface this metadata through the repository citation panel.
+
+## Contributing
+
+Contributions are welcome through issues and pull requests. Start with [CONTRIBUTING.md](CONTRIBUTING.md), open an issue for substantial changes, and keep pull requests focused.
+
+Security vulnerabilities should not be reported through public issues. Follow [SECURITY.md](SECURITY.md).
+
+## License
+
+MoFaCTS is released under the Business Source License 1.1. See [LICENSE](LICENSE).

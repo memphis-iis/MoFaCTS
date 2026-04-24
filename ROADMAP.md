@@ -1,23 +1,23 @@
 # Roadmap
 
-## Near Term (Q1-Q2 2026)
+This roadmap summarizes near-term public-release priorities. It is not a guarantee of delivery order.
 
-- Complete open-source readiness baseline:
-  - CI lint/test pipeline,
-  - contributor and governance docs,
-  - Mongo authentication defaults in deployment.
-- Publish architecture and data model docs extracted from internal notes.
-- Improve developer onboarding and deployment documentation.
+## Near Term
 
-## Mid Term (Q3-Q4 2026)
+- Publish `v0.1.0-alpha.1` as the first public pre-1.0 release.
+- Keep public documentation concise, current, and consistent with MoFaCTS as an adaptive learning system.
+- Improve contributor setup and release verification.
+- Continue hardening authentication, TDF upload, content authoring, and export workflows.
 
-- Expand automated test coverage and reporting.
-- Add API reference for Meteor methods and publications.
-- Formalize Blaze to Svelte migration milestones.
-- Add health endpoints and operational monitoring guidance.
+## Mid Term
+
+- Expand automated testing and release checks.
+- Document stable TDF authoring patterns and examples.
+- Improve architecture and data model documentation.
+- Reduce legacy Meteor method and client-runtime complexity.
 
 ## Longer Term
 
-- Modularize large server files (`methods.js`, `card.js`).
-- Evaluate gradual TypeScript adoption in high-change areas.
-- Strengthen community channels and consortium governance cadence.
+- Define compatibility commitments for a future 1.0 release.
+- Broaden institutional collaboration guidance.
+- Continue modularizing high-change application areas.

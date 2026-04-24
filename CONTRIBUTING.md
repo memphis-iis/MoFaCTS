@@ -1,90 +1,64 @@
 # Contributing to MoFaCTS
 
-Thanks for contributing to MoFaCTS.
+Thank you for helping improve MoFaCTS. This project is in a pre-1.0 alpha stage, so clear issues, focused pull requests, and careful documentation updates are especially valuable.
 
-## Documentation Routing (Important)
+## Before You Start
 
-- Start with [Developer Documentation Map](https://github.com/memphis-iis/mofacts/wiki/Developer-Documentation-Map).
-- The GitHub wiki is the canonical location for contributor onboarding, architecture, data model, and deployment guidance.
-- `svelte-app/docs` is reserved for current reference/planning docs that are not canonical guides.
+- Read the [README](README.md) for project scope and status.
+- Use [docs/development.md](docs/development.md) for local setup.
+- Check [SUPPORT.md](SUPPORT.md) for supported runtime versions and quality gates.
+- Open an issue first for substantial architecture, data model, deployment, security, or user-facing workflow changes.
 
 ## Development Setup
 
-New contributors should start with [Local Install](https://github.com/memphis-iis/mofacts/wiki/Local-Install) for guided local setup and first-change workflow.
+```bash
+git clone https://github.com/memphis-iis/mofacts.git
+cd mofacts/mofacts
+npm ci
+cp example.settings.json settings.json
+npm run typecheck
+```
 
-Supported runtime/tooling policy and required CI checks are documented in `SUPPORT.md`.
+Use Node.js `22.x`, npm `10.x`, and Meteor `3.4`.
 
-1. Clone the repository and enter the app directory:
-   ```bash
-   git clone https://github.com/memphis-iis/mofacts.git
-   cd mofacts/svelte-app/mofacts
-   ```
-2. Install dependencies:
-   ```bash
-   npm ci
-   ```
-3. Create local settings:
-   ```bash
-   cp example.settings.json settings.json
-   ```
-4. Run the app:
-   ```bash
-   meteor run --settings settings.json
-   ```
-
-## Branching and Pull Requests
+## Branches and Pull Requests
 
 - Branch from `main`.
-- Use focused feature branches (example: `feature/svelte-admin-panel`).
-- Open a pull request against `main`.
-- Keep PRs small and scoped when possible.
+- Use focused branch names such as `docs/release-readiness` or `fix/tdf-import-validation`.
+- Keep pull requests scoped to one logical change.
+- Include screenshots or short recordings for visible UI changes.
+- Update documentation when behavior, setup, configuration, or authoring expectations change.
 
 ## Quality Checks
 
-Required checks are defined in `SUPPORT.md`.
-Run these before opening a pull request:
+Run the relevant checks before opening a pull request:
 
 ```bash
+cd mofacts
 npm run lint
 npm run typecheck
-npm run test:ci
 ```
 
-Use auto-fix when appropriate:
+The repository also defines `npm run test:ci`, but release confidence for this repository should be recorded through the supported checks and the canonical Docker Compose workflow under `mofacts/.deploy/` when a release owner explicitly requests build or deploy validation.
 
-```bash
-npm run lint:fix
-```
+## Documentation Changes
 
-Optional diagnostics for external declaration packages:
+Keep root documentation concise and public-facing. Use:
 
-```bash
-npm run typecheck:vendor
-```
+- `README.md` for orientation.
+- `docs/` for stable public guides.
+- the GitHub wiki for longer operational runbooks and detailed examples.
+- the configuration/content repository for internal planning notes, historical audits, and content-specific work.
 
-## Dependency Updates and Pinning
+## Commit Style
 
-- Follow `docs/DEPENDENCY_POLICY.md` for dependency update cadence, lockfile usage, and override requirements.
-- Use `npm ci` for reproducible installs in local dev and CI.
-- Treat `package.json` `overrides` as a security/compatibility exception mechanism, not normal version management.
+Conventional Commits are recommended:
 
-## Pre-Commit Hooks
+- `docs: update release process`
+- `fix: validate tdf upload metadata`
+- `feat: add authoring preview control`
+- `chore: update alpha version metadata`
 
-- Husky-managed Git hooks are installed via `npm run prepare` (included in install workflows).
-- Pre-commit runs staged-file linting (`lint-staged`) and staged secret checks.
-- To bypass secret scanning for an intentional one-off case, use `SKIP_SECRET_SCAN=1` for that commit command.
+## Security
 
-## Commit Conventions
-
-We recommend Conventional Commits:
-
-- `feat: ...`
-- `fix: ...`
-- `docs: ...`
-- `refactor: ...`
-- `test: ...`
-- `chore: ...`
-
-## Reporting Security Issues
-
-Do not open public issues for security vulnerabilities. Follow `SECURITY.md`.
+Do not open public issues for vulnerabilities. Follow [SECURITY.md](SECURITY.md).

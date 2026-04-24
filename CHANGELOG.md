@@ -1,19 +1,31 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to MoFaCTS will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses semantic versioning for public release tags.
 
 ## [Unreleased]
 
 ### Added
-- Open-source readiness governance and contributor documentation.
-- GitHub CI workflow for linting and test execution.
-- CODEOWNERS, PR template, and feature request template.
-- Initial roadmap and citation metadata.
+
+- Public release-readiness documentation for the first pre-1.0 public release.
+- Concise public docs for architecture, development, authoring, and release process.
+- GitHub issue and pull request templates oriented toward public collaboration.
 
 ### Changed
-- Added npm scripts for linting and CI-safe testing.
-- Updated README runtime prerequisites to Node 22 and Meteor 3.4.
-- Enabled MongoDB authentication in Docker Compose.
+
+- Reframed public project language around MoFaCTS as a web-based adaptive learning system.
+- Moved historical planning notes and internal audit reports out of the public application repository.
+- Updated package and citation metadata toward `v0.1.0-alpha.1`.
+
+## [0.1.0-alpha.1] - Unreleased
+
+### Added
+
+- First planned public GitHub pre-1.0 release baseline.
+- Public-facing repository README, contribution guide, security policy, citation metadata, and release process.
+
+### Notes
+
+- This release should be marked as a GitHub pre-release because public packaging, documentation, APIs, deployment guidance, and compatibility commitments are still being formalized.
+- Do not tag or publish until maintainers approve the release checklist in `docs/release-process.md`.

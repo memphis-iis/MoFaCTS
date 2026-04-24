@@ -1,32 +1,37 @@
 # Support Policy
 
-This document defines supported runtime/tooling baselines for MoFaCTS contributors and consortium partners.
+MoFaCTS is actively used and stable enough for evaluation, research collaboration, and managed pilot deployments. Support is currently focused on the latest development line and the current pre-1.0 release train.
 
-## Supported Runtime
+## Runtime Baseline
 
 - Node.js: `22.x`
 - npm: `10.x`
 - Meteor: `3.4`
 
-These versions are the baseline used by CI and should be used for local development.
+These versions are the contributor and CI baseline.
 
-## TypeScript Policy
+## Quality Gates
 
-- Project TypeScript is enforced with strict settings.
-- `npm run typecheck` must pass for app-owned code.
-- External declaration-package conflicts are currently handled with `skipLibCheck: true`.
+For routine pull requests:
 
-## CI Quality Gates
+```bash
+cd mofacts
+npm run lint
+npm run typecheck
+```
 
-Required checks:
+For release preparation, record:
 
-1. `npm run lint`
-2. `npm run typecheck`
-3. `npm run test:ci`
+- lint result,
+- full TypeScript result,
+- relevant test result or explicit test limitation,
+- Docker Compose build/deploy validation result if maintainers request release-confidence validation.
 
-## Dependency Policy
+## Version Support
 
-- Use committed lockfiles.
-- Use `npm ci` in CI and recommended local workflows.
-- Update dependencies on a scheduled cadence.
-- Use `overrides` only for explicit security/compatibility reasons.
+| Version line | Status |
+| --- | --- |
+| `v0.1.0-alpha.x` | active pre-1.0 public release line |
+| older versions | unsupported |
+
+Pre-1.0 releases may include breaking changes. Stable compatibility commitments will be documented before a 1.0 release.

@@ -1,64 +1,43 @@
-# MoFaCTS Deploy Folder
+# MoFaCTS Deployment Workflow
 
-This folder is the single source of truth for the live MoFaCTS deploy configuration used by the `svelte-app` application.
+This folder contains the canonical Docker Compose deployment workflow for the MoFaCTS application.
 
-## What Is Live
+## Contents
 
-- `docker-compose.yml`: production-shaped runtime for the app and MongoDB
-- `docker-compose.local.yml`: local overrides for repo-local mounts and settings
-- `.env.production`, `.env.staging`, `.env.local`: environment values for each target
-- `settings.json`, `settings.local.json`: settings sources consumed by the Docker build or local override
-- `docker/`: repo-owned shell scripts copied into the app image at build time
-- `SERVER_IMAGE_DEPLOY_RUNBOOK.md`: production server setup and deploy runbook
-- `server-deploy-validate.sh`: remote image rollout helper
-- `start-lan-https.ps1`, `stop-lan-https.ps1`, `Caddyfile.local`: local LAN HTTPS workflow
-- `build-timed.ps1`: optional timing wrapper around `docker compose build`
+- `docker-compose.yml`: production-shaped app and MongoDB runtime.
+- `docker-compose.local.yml`: local override file for development or staging-style checks.
+- `.env.local`, `.env.staging`, `.env.production`: environment variable examples for supported targets.
+- `settings.json`, `settings.local.json`: application settings sources used by the container runtime.
+- `docker/`: scripts copied into the app image.
+- `SERVER_IMAGE_DEPLOY_RUNBOOK.md`: server deployment runbook.
+- `server-deploy-validate.sh`: remote rollout validation helper.
+- `start-lan-https.ps1`, `stop-lan-https.ps1`, `Caddyfile.local`: local LAN HTTPS helpers.
+- `build-timed.ps1`: optional timing wrapper around Docker Compose builds.
 
-## How The Build Resolves
+## Build Context
 
 Run Docker Compose from this folder.
 
-- `docker-compose.yml` sets `context: ../../`
-- from this directory that resolves to `svelte-app/`
-- `dockerfile: Dockerfile` therefore resolves to `svelte-app/Dockerfile`
+`docker-compose.yml` sets the build context to `../../`, which resolves to the repository root that contains the application Dockerfile.
 
-That Dockerfile builds the application image and copies the repo-owned scripts from `.deploy/docker/` into the container runtime.
+## Local Settings
 
-## Settings Paths
+Keep private settings and secrets out of commits. Use local environment files and local settings files for deployment-specific values.
 
-- The source production settings file in the repo is `.deploy/settings.json`
-- the Docker build copies it into the image at `/app/settings.json`
-- local development overrides that with `.deploy/settings.local.json` mounted to `/run/local-settings/settings.local.json`
+## Typical Local Validation
 
-The repo file stays in `.deploy`. The `/app/...` and `/run/...` paths are container-internal runtime paths.
+Only run Docker commands when you intend to validate the container workflow:
 
-## Memphis SAML Files
-
-Production Memphis SAML signing files are not baked into the image.
-
-- Keep the PEM files on the server host under `/mofactsAssets_override/`
-- the app reads them from:
-  - `/mofactsAssets_override/memphis-saml-public-cert.pem`
-  - `/mofactsAssets_override/memphis-saml-private-key.pem`
-- `.deploy/settings.json` already points to those runtime paths
-
-This keeps the private key out of the Docker image and out of the registry layers.
-
-## Production Deploy
-
-Typical deploy flow from this folder:
-
-```powershell
-docker compose --env-file .\.env.production build --no-cache
-docker compose --env-file .\.env.production push
-scp -i "C:\Users\ppavl\OneDrive\Desktop\prodkey.pem" .\docker-compose.yml ubuntu@52.89.109.53:/var/www/mofacts/docker-compose.yaml
-scp -i "C:\Users\ppavl\OneDrive\Desktop\prodkey.pem" .\.env.production ubuntu@52.89.109.53:/var/www/mofacts/.env
-scp -i "C:\Users\ppavl\OneDrive\Desktop\prodkey.pem" C:\Users\ppavl\OneDrive\Active projects\mofacts-saml\memphis-saml-public-cert.pem ubuntu@52.89.109.53:/tmp/memphis-saml-public-cert.pem
-scp -i "C:\Users\ppavl\OneDrive\Desktop\prodkey.pem" C:\Users\ppavl\OneDrive\Active projects\mofacts-saml\memphis-saml-private-key.pem ubuntu@52.89.109.53:/tmp/memphis-saml-private-key.pem
-ssh -i "C:\Users\ppavl\OneDrive\Desktop\prodkey.pem" ubuntu@52.89.109.53 "sudo mkdir -p /mofactsAssets_override && sudo mv /tmp/memphis-saml-public-cert.pem /mofactsAssets_override/memphis-saml-public-cert.pem && sudo mv /tmp/memphis-saml-private-key.pem /mofactsAssets_override/memphis-saml-private-key.pem && sudo chown root:root /mofactsAssets_override/memphis-saml-*.pem && sudo chmod 644 /mofactsAssets_override/memphis-saml-public-cert.pem && sudo chmod 600 /mofactsAssets_override/memphis-saml-private-key.pem"
-ssh -i "C:\Users\ppavl\OneDrive\Desktop\prodkey.pem" ubuntu@52.89.109.53 "cd /var/www/mofacts && sudo docker compose --env-file .env -f docker-compose.yaml pull && sudo docker compose --env-file .env -f docker-compose.yaml up -d"
+```bash
+cd mofacts/.deploy
+docker compose --env-file .env.local -f docker-compose.yml -f docker-compose.local.yml config
 ```
 
-Before running the deploy, set `"saml.memphis.enabled": true` in `.deploy/settings.json` once the PEM files are ready and you intend to expose the Memphis button in production.
+Build, push, and deploy commands should be run only by maintainers or release owners with the appropriate environment access.
 
-For full server bootstrap and rollback details, see `SERVER_IMAGE_DEPLOY_RUNBOOK.md`.
+## Security Notes
+
+- Do not commit private keys, SAML certificates, database credentials, or production settings.
+- Keep MongoDB private to the deployment network.
+- Use HTTPS for exposed deployments.
+- Review `SECURITY.md` before exposing a deployment to learners, instructors, or research participants.
