@@ -1,3 +1,8 @@
+/*
+ * Adapted from hark 1.2.3.
+ * Copyright (c) Philip Roberts.
+ * Licensed under the MIT License; see THIRD_PARTY_NOTICES.md.
+ */
 import WildEmitter from 'wildemitter';
 
 declare global {

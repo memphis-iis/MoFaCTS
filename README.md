@@ -77,4 +77,6 @@ Security vulnerabilities should not be reported through public issues. Follow [S
 
 ## License
 
-MoFaCTS is released under the Business Source License 1.1. See [LICENSE](LICENSE).
+MoFaCTS is licensed under the GNU Affero General Public License v3.0 only. See [LICENSE](LICENSE).
+
+Third-party code and dependencies keep their own licenses. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and [dependency-licenses.csv](dependency-licenses.csv).

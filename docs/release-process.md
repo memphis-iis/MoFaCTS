@@ -31,6 +31,7 @@ From `mofacts/`:
 ```bash
 npm run lint
 npm run typecheck
+npm run license:audit
 ```
 
 Record any test limitations explicitly. If maintainers want release-confidence build validation, use the Docker Compose workflow under `mofacts/.deploy/`.
@@ -42,10 +43,34 @@ Record any test limitations explicitly. If maintainers want release-confidence b
 - `CHANGELOG.md` includes the planned release entry.
 - `CITATION.cff` uses `0.1.0-alpha.1`.
 - `mofacts/package.json` and `mofacts/package-lock.json` use `0.1.0-alpha.1`.
+- Project code is documented as AGPL-3.0-only and third-party code keeps its own license.
+- `THIRD_PARTY_NOTICES.md` covers local third-party code and the npm dependency inventory policy.
+- `dependency-licenses.csv` is regenerated for runtime dependencies.
+- `dependency-licenses-all.csv` is regenerated if the release includes the optional dev/build audit report.
+- The deployed app exposes a visible "License / Source" link to the exact repository tag or source archive for the deployed version.
+- Docker images, source archives, and bundled JavaScript artifacts include AGPL text, third-party notices, build scripts, and lockfiles needed for Corresponding Source.
 - GitHub issue and PR templates are present.
 - Security reporting guidance is present.
 - Historical planning notes are not exposed as root public docs.
 - Maintainers have reviewed the release notes.
+
+## License Audit Commands
+
+From `mofacts/`:
+
+```bash
+npx license-checker --production --summary
+npx license-checker --production --csv --out ../dependency-licenses.csv
+npx license-checker --summary
+npx license-checker --csv --out ../dependency-licenses-all.csv
+```
+
+Final stale-license and provenance scans:
+
+```bash
+rg -n -i "BUSL|Business Source|Change Date|Change License|commercial license|not an Open Source license|source-available|source available" .
+rg -n -i "copyright|license|permission is hereby granted|mit license|apache license|bsd|gpl|lgpl|agpl|mozilla public license|mpl|isc license|unlicense|creative commons|cc-by|cc0" . --glob '!node_modules/**' --glob '!.meteor/**'
+```
 
 ## Tagging
 

@@ -121,6 +121,8 @@
     "generate:schemas": "node --experimental-strip-types scripts/generateSchemas.ts",
     "lint": "eslint . --ignore-pattern .meteor/**",
     "lint:fix": "eslint . --ignore-pattern .meteor/** --fix",
+    "license:audit": "npx license-checker --production --summary && npx license-checker --production --csv --out ../dependency-licenses.csv",
+    "license:audit:all": "npx license-checker --summary && npx license-checker --csv --out ../dependency-licenses-all.csv",
     "audit:fields": "node --experimental-strip-types scripts/auditFields.ts",
     "prepare": "node scripts/prepare-husky.cjs",
     "precommit:lint-staged": "lint-staged",
@@ -135,5 +137,5 @@
     ]
   },
   "author": "",
-  "license": "BUSL-1.1"
+  "license": "AGPL-3.0-only"
 }

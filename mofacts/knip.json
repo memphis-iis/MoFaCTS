@@ -30,11 +30,6 @@
     "meteor-node-stubs",
     "unzipper"
   ],
-  "ignoreIssues": {
-    "client/lib/vendor/gauge.generated.js": [
-      "exports"
-    ]
-  },
   "ignoreFiles": [
     "public/lib/**"
   ]
