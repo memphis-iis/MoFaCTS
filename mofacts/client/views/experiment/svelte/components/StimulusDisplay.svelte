@@ -49,26 +49,33 @@
   $: rawAttribution = safeDisplay?.attribution && typeof safeDisplay.attribution === 'object'
     ? safeDisplay.attribution
     : {};
-  $: imageAttribution = {
+  $: displayAttribution = {
     creatorName: String(rawAttribution.creatorName || '').trim(),
     sourceName: String(rawAttribution.sourceName || '').trim(),
     sourceUrl: String(rawAttribution.sourceUrl || '').trim(),
     licenseName: String(rawAttribution.licenseName || '').trim(),
     licenseUrl: String(rawAttribution.licenseUrl || '').trim(),
   };
-  $: hasImageAttribution = Object.values(imageAttribution).some(Boolean);
+  $: hasAttribution = Object.values(displayAttribution).some(Boolean);
   $: attributionCaption = [
-    imageAttribution.creatorName,
-    imageAttribution.sourceName,
-    imageAttribution.licenseName,
+    displayAttribution.creatorName,
+    displayAttribution.sourceName,
+    displayAttribution.licenseName,
   ].filter(Boolean).join(' | ');
-  $: attributionHref = imageAttribution.sourceUrl || imageAttribution.licenseUrl || '';
   $: attributionTitle = [
-    imageAttribution.creatorName ? `Creator: ${imageAttribution.creatorName}` : '',
-    imageAttribution.sourceName ? `Source: ${imageAttribution.sourceName}` : '',
-    imageAttribution.licenseName ? `License: ${imageAttribution.licenseName}` : '',
+    displayAttribution.creatorName ? `Creator: ${displayAttribution.creatorName}` : '',
+    displayAttribution.sourceName ? `Source: ${displayAttribution.sourceName}` : '',
+    displayAttribution.licenseName ? `License: ${displayAttribution.licenseName}` : '',
   ].filter(Boolean).join(' | ');
-  $: needsAttributedImageLayout = Boolean(safeDisplay.imgSrc) && hasImageAttribution && Boolean(attributionCaption);
+  $: hasCreatorAndAnotherAttributionPart = Boolean(
+    displayAttribution.creatorName && (displayAttribution.sourceName || displayAttribution.licenseName)
+  );
+  $: hasSourceAndLicenseAttribution = Boolean(displayAttribution.sourceName && displayAttribution.licenseName);
+  $: attributionLinkSignature = [
+    displayAttribution.sourceUrl,
+    displayAttribution.licenseUrl,
+  ].join('::');
+  $: needsAttributedImageLayout = Boolean(safeDisplay.imgSrc) && hasAttribution && Boolean(attributionCaption);
   $: imageViewportStyle = imageViewportWidthPx === null || imageViewportHeightPx === null
     ? ''
     : `width: ${imageViewportWidthPx}px; height: ${imageViewportHeightPx}px;`;
@@ -157,6 +164,7 @@
   $: hasTextContent = Boolean(safeDisplay.clozeText || safeDisplay.text);
   $: hasVisualContent = Boolean(safeDisplay.imgSrc || safeDisplay.videoSrc);
   $: isAudioOnly = Boolean(safeDisplay.audioSrc) && !hasTextContent && !hasVisualContent;
+  $: showTextAttribution = hasTextContent && !safeDisplay.imgSrc && hasAttribution && Boolean(attributionCaption);
   $: waitingForImage = Boolean(safeDisplay.imgSrc) && !imageReady;
   let lastBlockingAssetState = '';
   let blockingAssetSequence = 0;
@@ -290,7 +298,7 @@
     const signature = [
       safeDisplay?.imgSrc || '',
       attributionCaption,
-      attributionHref,
+      attributionLinkSignature,
       imageReady ? 'ready' : 'loading',
     ].join('::');
 
@@ -376,36 +384,58 @@
         <div class="question-number">Question {questionNumber}</div>
       {/if}
 
-      {#key sanitizedText + sanitizedCloze + (safeDisplay.imgSrc || '') + (safeDisplay.videoSrc || '') + (safeDisplay.audioSrc || '') + attributionCaption + attributionHref}
+      {#key sanitizedText + sanitizedCloze + (safeDisplay.imgSrc || '') + (safeDisplay.videoSrc || '') + (safeDisplay.audioSrc || '') + attributionCaption + attributionLinkSignature}
         {#if safeDisplay.imgSrc}
           <div class="stimulus-image-block" bind:this={imageBlockElement}>
-            {#if hasImageAttribution && attributionCaption}
+            {#if hasAttribution && attributionCaption}
               <div class="stimulus-image-figure">
                 <div class="stimulus-image stimulus-image-measured" style={imageViewportStyle}>
                   <img bind:this={imageElement} src={safeDisplay.imgSrc} alt="Stimulus" />
                 </div>
-                {#if attributionHref}
-                  <a
-                    bind:this={attributionElement}
-                    class="stimulus-attribution"
-                    class:stimulus-attribution-hidden={!attributionLayoutReady}
-                    href={attributionHref}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    title={attributionTitle || 'Open attribution source'}
-                  >
-                    {attributionCaption}
-                  </a>
-                {:else}
-                  <div
-                    bind:this={attributionElement}
-                    class="stimulus-attribution"
-                    class:stimulus-attribution-hidden={!attributionLayoutReady}
-                    title={attributionTitle}
-                  >
-                    {attributionCaption}
-                  </div>
-                {/if}
+                <span
+                  bind:this={attributionElement}
+                  class="stimulus-attribution"
+                  class:stimulus-attribution-hidden={!attributionLayoutReady}
+                  title={attributionTitle}
+                >
+                  {#if displayAttribution.creatorName}
+                    <span>{displayAttribution.creatorName}</span>
+                  {/if}
+                  {#if hasCreatorAndAnotherAttributionPart}
+                    <span aria-hidden="true"> | </span>
+                  {/if}
+                  {#if displayAttribution.sourceName}
+                    {#if displayAttribution.sourceUrl}
+                      <a
+                        href={displayAttribution.sourceUrl}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        title={`Source: ${displayAttribution.sourceName}`}
+                      >
+                        {displayAttribution.sourceName}
+                      </a>
+                    {:else}
+                      <span>{displayAttribution.sourceName}</span>
+                    {/if}
+                  {/if}
+                  {#if hasSourceAndLicenseAttribution}
+                    <span aria-hidden="true"> | </span>
+                  {/if}
+                  {#if displayAttribution.licenseName}
+                    {#if displayAttribution.licenseUrl}
+                      <a
+                        href={displayAttribution.licenseUrl}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        title={`License: ${displayAttribution.licenseName}`}
+                      >
+                        {displayAttribution.licenseName}
+                      </a>
+                    {:else}
+                      <span>{displayAttribution.licenseName}</span>
+                    {/if}
+                  {/if}
+                </span>
               </div>
             {:else}
               <div class="stimulus-image stimulus-image-fill">
@@ -428,15 +458,107 @@
 
         {#if safeDisplay.clozeText}
           <div class="stimulus-text-box">
-            <div class="stimulus-text cloze">
-              {@html sanitizedCloze}
+            <div class="stimulus-text-content">
+              <div class="stimulus-text cloze">
+                {@html sanitizedCloze}
+              </div>
             </div>
+            {#if showTextAttribution}
+              <span
+                class="stimulus-attribution stimulus-text-attribution"
+                title={attributionTitle}
+              >
+                {#if displayAttribution.creatorName}
+                  <span>{displayAttribution.creatorName}</span>
+                {/if}
+                {#if hasCreatorAndAnotherAttributionPart}
+                  <span aria-hidden="true"> | </span>
+                {/if}
+                {#if displayAttribution.sourceName}
+                  {#if displayAttribution.sourceUrl}
+                    <a
+                      href={displayAttribution.sourceUrl}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      title={`Source: ${displayAttribution.sourceName}`}
+                    >
+                      {displayAttribution.sourceName}
+                    </a>
+                  {:else}
+                    <span>{displayAttribution.sourceName}</span>
+                  {/if}
+                {/if}
+                {#if hasSourceAndLicenseAttribution}
+                  <span aria-hidden="true"> | </span>
+                {/if}
+                {#if displayAttribution.licenseName}
+                  {#if displayAttribution.licenseUrl}
+                    <a
+                      href={displayAttribution.licenseUrl}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      title={`License: ${displayAttribution.licenseName}`}
+                    >
+                      {displayAttribution.licenseName}
+                    </a>
+                  {:else}
+                    <span>{displayAttribution.licenseName}</span>
+                  {/if}
+                {/if}
+              </span>
+            {/if}
           </div>
         {:else if safeDisplay.text}
           <div class="stimulus-text-box">
-            <div class="stimulus-text">
-              {@html sanitizedText}
+            <div class="stimulus-text-content">
+              <div class="stimulus-text">
+                {@html sanitizedText}
+              </div>
             </div>
+            {#if showTextAttribution}
+              <span
+                class="stimulus-attribution stimulus-text-attribution"
+                title={attributionTitle}
+              >
+                {#if displayAttribution.creatorName}
+                  <span>{displayAttribution.creatorName}</span>
+                {/if}
+                {#if hasCreatorAndAnotherAttributionPart}
+                  <span aria-hidden="true"> | </span>
+                {/if}
+                {#if displayAttribution.sourceName}
+                  {#if displayAttribution.sourceUrl}
+                    <a
+                      href={displayAttribution.sourceUrl}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      title={`Source: ${displayAttribution.sourceName}`}
+                    >
+                      {displayAttribution.sourceName}
+                    </a>
+                  {:else}
+                    <span>{displayAttribution.sourceName}</span>
+                  {/if}
+                {/if}
+                {#if hasSourceAndLicenseAttribution}
+                  <span aria-hidden="true"> | </span>
+                {/if}
+                {#if displayAttribution.licenseName}
+                  {#if displayAttribution.licenseUrl}
+                    <a
+                      href={displayAttribution.licenseUrl}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      title={`License: ${displayAttribution.licenseName}`}
+                    >
+                      {displayAttribution.licenseName}
+                    </a>
+                  {:else}
+                    <span>{displayAttribution.licenseName}</span>
+                  {/if}
+                {/if}
+              </span>
+            {/if}
           </div>
         {/if}
 
@@ -499,6 +621,7 @@
     line-height: 1.5;
     word-wrap: break-word;
     color: var(--text-color);
+    width: 100%;
   }
 
   .stimulus-text.cloze {
@@ -571,10 +694,12 @@
     border-radius: var(--border-radius-lg);
     background: var(--stimuli-box-color);
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     text-align: center;
     box-sizing: border-box;
+    gap: 0.375rem;
   }
 
   .stimulus-display.flow-row .stimulus-text-box {
@@ -587,6 +712,15 @@
 
   .stimulus-text :global(p) {
     margin: 0.5rem 0;
+  }
+
+  .stimulus-text-content {
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   /* Keep imported/markdown inline styles from overriding delivery fontsize. */
@@ -674,12 +808,21 @@
     word-break: break-word;
   }
 
+  .stimulus-attribution a {
+    color: inherit;
+    text-decoration: none;
+  }
+
   .stimulus-attribution-hidden {
     visibility: hidden;
   }
 
-  a.stimulus-attribution:hover,
-  a.stimulus-attribution:focus-visible {
+  .stimulus-text-attribution {
+    margin-top: auto;
+  }
+
+  .stimulus-attribution a:hover,
+  .stimulus-attribution a:focus-visible {
     color: var(--accent-color);
     text-decoration: underline;
   }
