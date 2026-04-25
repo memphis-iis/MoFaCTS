@@ -1,6 +1,6 @@
 # Release Process
 
-This document defines the proposed release process for the first public pre-1.0 release.
+This document records the release process for the first public pre-1.0 release.
 
 ## Target Release
 
@@ -74,15 +74,13 @@ rg -n -i "copyright|license|permission is hereby granted|mit license|apache lice
 
 ## Tagging
 
-Do not tag until maintainers approve.
+The `v0.1.0-alpha.1` tag has been created and pushed after maintainer approval.
 
-After approval:
+For future releases, tag the approved release commit:
 
 ```bash
-git switch main
-git pull --ff-only
-git tag -a v0.1.0-alpha.1 -m "MoFaCTS v0.1.0-alpha.1"
-git push origin v0.1.0-alpha.1
+git tag -a <version> -m "MoFaCTS <version>"
+git push origin <version>
 ```
 
 ## Post-Release Verification

@@ -2,7 +2,7 @@
 
 MoFaCTS, the Mobile Fact and Concept Training System, is a web-based adaptive learning system for practice, assessment, and research. It supports adaptive practice through cognitive memory models, Tutor Definition Files (TDFs), multiple stimulus types, and response modalities including multiple choice, fill-in-the-blank, and speech-recognition-based responses.
 
-This repository is being prepared for a first public pre-1.0 release. The current target tag is `v0.1.0-alpha.1`.
+This repository is prepared for the first public pre-1.0 release. The current release tag is `v0.1.0-alpha.1`.
 
 ## Who It Is For
 
