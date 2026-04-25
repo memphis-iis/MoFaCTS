@@ -23,6 +23,17 @@ const { FlowRouter } = require('meteor/ostrio:flow-router-extra') as {
   FlowRouter: { go(path: string): void };
 };
 
+async function leavePracticeForHome(): Promise<boolean> {
+  const currentPath = document.location.pathname;
+  if (currentPath !== '/card' && currentPath !== '/instructions') {
+    return false;
+  }
+
+  const { leavePage } = await import('./experiment/svelte/services/navigationCleanup');
+  await leavePage('/home');
+  return true;
+}
+
 // Handle navbar rendering - show immediately once theme is ready
 // Logo loads naturally in background (no need to wait for small 30x30 image)
 Template.nav.onRendered(function(this: NavTemplateInstance) {
@@ -62,6 +73,10 @@ Template.nav.helpers({
 Template.nav.events({
   async 'click .home-link'(event: Event) {
     event.preventDefault();
+
+    if (await leavePracticeForHome()) {
+      return;
+    }
 
     // Update dashboard cache when leaving from card/practice page
     const currentPath = document.location.pathname;

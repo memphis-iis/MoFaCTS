@@ -75,6 +75,17 @@ function sanitizeHTML(dirty: string | null | undefined) {
 
 export { clientConsole };
 
+async function leavePracticeForHome(): Promise<boolean> {
+  const currentPath = document.location.pathname;
+  if (currentPath !== '/card' && currentPath !== '/instructions') {
+    return false;
+  }
+
+  const { leavePage } = await import('./views/experiment/svelte/services/navigationCleanup');
+  await leavePage('/home');
+  return true;
+}
+
 function getSystemName() {
   return resolveThemeBrandLabel(Session.get('curTheme'), Meteor.settings.public?.systemName);
 }
@@ -600,6 +611,11 @@ Template.DefaultLayout.events({
   },
   'click #homeButton': async function(event: JQuery.TriggeredEvent) {
     event.preventDefault();
+
+    if (await leavePracticeForHome()) {
+      return;
+    }
+
     audioManager.pauseCurrentAudio();
 
     // Update dashboard cache when leaving from card/practice page

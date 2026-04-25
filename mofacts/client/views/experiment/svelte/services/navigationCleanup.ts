@@ -22,6 +22,22 @@ const { FlowRouter } = require('meteor/ostrio:flow-router-extra') as {
 
 let isNavigatingAway = false;
 
+function stopCardAudioNow(): void {
+  try {
+    audioManager.pauseCurrentAudio();
+  } catch (err) {
+    clientConsole(1, '[Navigation] Error stopping active audio:', err);
+  }
+
+  if (window.speechSynthesis) {
+    try {
+      window.speechSynthesis.cancel();
+    } catch (err) {
+      clientConsole(1, '[Navigation] Error cancelling browser TTS:', err);
+    }
+  }
+}
+
 /**
  * Perform comprehensive cleanup and navigate to destination.
  */
@@ -32,6 +48,7 @@ export async function leavePage(dest: NavigationDestination): Promise<void> {
   }
   isNavigatingAway = true;
   stopStimDisplayTypeMapVersionSync('svelte leavePage');
+  stopCardAudioNow();
 
   try {
     cleanupAudioRecorder();
@@ -59,16 +76,7 @@ export async function leavePage(dest: NavigationDestination): Promise<void> {
     }
 
     // Universal cleanup (all destinations)
-
-    // Stop Google TTS audio
-    if (audioManager.getCurrentAudio()) {
-      audioManager.pauseCurrentAudio();
-    }
-
-    // Cancel browser TTS
-    if (window.speechSynthesis && window.speechSynthesis.speaking) {
-      window.speechSynthesis.cancel();
-    }
+    stopCardAudioNow();
 
     // Destroy Plyr video player
     try {
