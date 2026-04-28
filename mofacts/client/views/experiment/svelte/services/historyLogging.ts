@@ -17,7 +17,7 @@ import { CardStore } from '../../modules/cardStore';
 import { getStimCluster, getStimCount } from '../../../../lib/currentTestingHelpers';
 import { clientConsole } from '../../../../lib/clientLogger';
 import { parseSchedItemCondition } from '../../../../lib/tdfUtils';
-import { SCHEDULE_UNIT } from '../../../../../common/Definitions';
+import { SCHEDULE_UNIT, HISTORY_KEY_MAP } from '../../../../../common/Definitions';
 import { buildFeedbackText } from '../utils/feedbackTextBuilder';
 import { meteorCallAsync } from '../../../../lib/meteorAsync';
 import {
@@ -473,6 +473,9 @@ export function createHistoryRecord({
     return {} as HistoryRecord;
   }
   const filledInDisplay = JSON.parse(JSON.stringify(currentDisplay));
+  if (filledInDisplay.attribution) {
+    delete filledInDisplay.attribution;
+  }
 
   if (filledInDisplay.clozeText) {
     filledInDisplay.clozeText = filledInDisplay.clozeText.replace(/___+/g, correctAnswer);
@@ -591,13 +594,29 @@ export function createHistoryRecord({
    */
 async function insertHistoryRecord(answerLogRecord: HistoryRecord): Promise<void> {
   try {
-      await meteorCallAsync('insertHistory', answerLogRecord);
-      
-    } catch (e) {
-      clientConsole(1, '[History Logging] Error writing history record:', e);
-      throw new Error('Error inserting history: ' + e);
+    // Compress payload using numeric keys to reduce network traffic
+    const compressedRecord: Record<string, unknown> = {};
+    const reverseMap: Record<string, string> = {};
+    for (const [code, fieldName] of Object.entries(HISTORY_KEY_MAP)) {
+      reverseMap[fieldName] = code;
     }
+
+    for (const [key, value] of Object.entries(answerLogRecord)) {
+      const code = reverseMap[key];
+      if (code) {
+        compressedRecord[code] = value;
+      } else {
+        // Fallback for fields not in the map
+        compressedRecord[key] = value;
+      }
+    }
+
+    await meteorCallAsync('insertHistory', compressedRecord);
+  } catch (e) {
+    clientConsole(1, '[History Logging] Error writing history record:', e);
+    throw new Error('Error inserting history: ' + e);
   }
+}
 
 /**
  * XState service for logging trial completion.

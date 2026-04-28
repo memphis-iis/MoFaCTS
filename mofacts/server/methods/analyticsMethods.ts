@@ -67,6 +67,7 @@ type AnalyticsMethodsDeps = {
   ) => Promise<unknown>;
   getStimuliSetById: (stimuliSetId: string | number) => Promise<Array<{ clusterKC?: string | number; stimulusKC?: string | number }>>;
   hasMeaningfulProgressSignal: (experimentState: unknown) => boolean;
+  HISTORY_KEY_MAP: Record<string, string>;
 };
 
 function getExperimentStateTimestamp(stateDoc: { experimentState?: { lastActionTimeStamp?: unknown } } | null | undefined): number {
@@ -361,11 +362,23 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     if (!historyRecord || typeof historyRecord !== 'object' || Array.isArray(historyRecord)) {
       throw new Meteor.Error(400, 'Invalid history record');
     }
-    const requestedUserId = deps.normalizeCanonicalId(historyRecord.userId);
+
+    // Decompress payload from short keys to standard field names
+    const decompressedRecord: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(historyRecord)) {
+      const fieldName = deps.HISTORY_KEY_MAP[key];
+      if (fieldName) {
+        decompressedRecord[fieldName] = value;
+      } else {
+        decompressedRecord[key] = value;
+      }
+    }
+
+    const requestedUserId = deps.normalizeCanonicalId(decompressedRecord.userId);
     if (requestedUserId && requestedUserId !== actingUserId) {
       throw new Meteor.Error(403, 'Can only insert history for the current user');
     }
-    const tdfId = deps.normalizeCanonicalId(historyRecord.TDFId);
+    const tdfId = deps.normalizeCanonicalId(decompressedRecord.TDFId);
     if (!tdfId) {
       throw new Meteor.Error(400, 'History record requires a TDFId');
     }
@@ -375,19 +388,34 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       tdfId,
       {
         currentTdfId: tdfId,
-        conditionTdfId: deps.normalizeCanonicalId((historyRecord as any).conditionTdfId),
-        experimentTarget: deps.normalizeOptionalString((historyRecord as any).experimentTarget),
+        conditionTdfId: deps.normalizeCanonicalId((decompressedRecord as any).conditionTdfId),
+        experimentTarget: deps.normalizeOptionalString((decompressedRecord as any).experimentTarget),
       },
       'methods.insertHistory'
     );
 
-    const sanitizedHistoryRecord = Object.assign({}, historyRecord, {
+    const sanitizedHistoryRecord = Object.assign({}, decompressedRecord, {
       userId: actingUserId,
       TDFId: tdfId,
       eventId: deps.allocateNextEventId(),
       dynamicTagFields: [],
       recordedServerTime: (new Date()).getTime(),
     });
+    
+    // TEMPORARY DIAGNOSTIC LOGGING (REQUESTED BY USER)
+    const rawPayloadBytes = Buffer.byteLength(JSON.stringify(historyRecord), 'utf8');
+    const finalRecordBytes = Buffer.byteLength(JSON.stringify(sanitizedHistoryRecord), 'utf8');
+    
+    console.log('\n--- INSERT HISTORY PAYLOAD DIAGNOSTIC ---');
+    console.log(`[1] Raw received payload byte length: ${rawPayloadBytes} bytes`);
+    console.log(`[2] Final persisted record byte length: ${finalRecordBytes} bytes`);
+    console.log(`[3] Size Reduction: ${((1 - (rawPayloadBytes / finalRecordBytes)) * 100).toFixed(1)}% smaller on wire vs disk`);
+    console.log(`\n--- RAW PAYLOAD RECEIVED OVER DDP ---`);
+    console.log(JSON.stringify(historyRecord, null, 2));
+    console.log(`\n--- FINAL RECORD WRITTEN TO MONGO ---`);
+    console.log(JSON.stringify(sanitizedHistoryRecord, null, 2));
+    console.log('-----------------------------------------\n');
+
     await deps.Histories.insertAsync(sanitizedHistoryRecord);
   }
 
