@@ -1,6 +1,6 @@
 {
   "owner": "admin@localhost",
-  "ROOT_URL": "https://192.168.50.44:3000",
+  "ROOT_URL": "http://192.168.50.44:3100",
   "encryptionKey": "ahNcV0wsycmPIlE+ttysfa+1Fg54sZeQctHeIn9ij368e+mzNskhVdFsNpjqfGdk",
   "prod": false,
   "enableEmail": false,
