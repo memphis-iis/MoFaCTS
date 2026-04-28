@@ -10,6 +10,14 @@ export async function postProcessUploadedTdfs(args: {
 
   for (const tdfFile of unzippedFiles.filter((file) => file.type === 'tdf')) {
     const tdf = await deps.Tdfs.findOneAsync({ tdfFileName: tdfFile.name });
+    const setspec = tdf?.content?.tdfs?.tutor?.setspec;
+    if (setspec && Array.isArray(setspec.condition) && setspec.condition.length > 0) {
+      const conditionTdfIds = await deps.resolveConditionTdfIds(setspec);
+      if (conditionTdfIds.some((id) => !id)) {
+        throw new Error(`TDF "${tdfFile.name}" references condition TDFs that were not found after package upload.`);
+      }
+      setspec.conditionTdfIds = conditionTdfIds;
+    }
     if (tdf && tdf.content && tdf.content.tdfs && tdf.content.tdfs.tutor && tdf.content.tdfs.tutor.unit) {
       const responseKCMap = tdf._id ? await deps.getResponseKCMapForTdf(tdf._id) : {};
       const scopedStimuliSetId = tdf.stimuliSetId ?? state.stimSetId;
@@ -49,6 +57,8 @@ export async function postProcessUploadedTdfs(args: {
         });
         tdf.stimuli = canonicalStimuli;
       }
+    }
+    if (tdf) {
       await deps.Tdfs.upsertAsync({ _id: tdf._id }, tdf);
     }
   }

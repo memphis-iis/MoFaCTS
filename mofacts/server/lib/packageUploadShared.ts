@@ -76,6 +76,7 @@ export type ProcessPackageUploadDeps = {
     findOneAsync: (selector: Record<string, unknown>) => Promise<any>;
     upsertAsync: (selector: Record<string, unknown>, document: Record<string, unknown>) => Promise<unknown>;
   };
+  resolveConditionTdfIds: (setspec?: { condition?: string[] }) => Promise<Array<string | null>>;
   getResponseKCMapForTdf: (tdfId: string) => Promise<Record<string, unknown>>;
   processAudioFilesForTDF: (tdfDoc: any, stimuliSetId: any, options: any) => Promise<any>;
   canonicalizeStimDisplayMediaRefs: (stimuliDoc: any, stimuliSetId: any, options: any) => Promise<any>;

@@ -102,7 +102,7 @@ interface TdfDocumentLike extends Record<string, unknown> {
   content: TdfFileLike;
   stimuli?: StimLike[];
   stimuliSetId?: string;
-  conditionCounts?: Record<string, number>;
+  conditionCounts?: number[];
 }
 
 interface ResumeExperimentState extends ExperimentState {
@@ -267,6 +267,39 @@ function isValidConditionTdf(tdf: TdfDocumentLike | null | undefined): boolean {
          Array.isArray(tdf.content.tdfs.tutor.unit));
 }
 
+function validateConditionCounts(
+  conditionCounts: unknown,
+  conditionOptions: string[],
+  source: string
+): number[] {
+  if (!Array.isArray(conditionCounts)) {
+    throw new Error(`${source}: root TDF conditionCounts must be an array when loadbalancing is enabled.`);
+  }
+  if (conditionCounts.length !== conditionOptions.length) {
+    throw new Error(
+      `${source}: root TDF conditionCounts length ${conditionCounts.length} does not match condition length ${conditionOptions.length}.`
+    );
+  }
+  return conditionCounts.map((count, index) => {
+    if (!Number.isFinite(Number(count)) || Number(count) < 0) {
+      throw new Error(`${source}: invalid condition count at index ${index}.`);
+    }
+    return Number(count);
+  });
+}
+
+function getConditionIndexOrThrow(conditions: string[], conditionFileName: unknown, source: string) {
+  const normalizedConditionFileName = typeof conditionFileName === 'string' ? conditionFileName.trim() : '';
+  if (!normalizedConditionFileName) {
+    throw new Error(`${source}: current condition TDF fileName is missing.`);
+  }
+  const conditionIndex = conditions.indexOf(normalizedConditionFileName);
+  if (conditionIndex < 0) {
+    throw new Error(`${source}: condition "${normalizedConditionFileName}" is not listed in the root TDF condition array.`);
+  }
+  return conditionIndex;
+}
+
 /**
  * @returns {void}
  */
@@ -392,19 +425,23 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
           clientConsole(2, 'Exp Condition', conditionTdfId, newExperimentState.conditionNote);
         } else {
           // Load balancing
-          let conditionCounts = rootTDFBoxed.conditionCounts;
+          const conditionCounts = validateConditionCounts(
+            rootTDFBoxed.conditionCounts,
+            conditionOptions,
+            'resume.condition.loadbalancing'
+          );
           if(setspec.loadbalancing == "max"){
             // Select randomly from conditions with count less than max
             let max = 0;
             let maxConditions: string[] = [];
             for (const [index] of conditionOptions.entries()) {
-              const count = conditionCounts?.[String(index)] || 0;
+              const count = conditionCounts[index]!;
               if (count > max) {
                 max = count;
               }
             }
             for (const [index, conditionFileName] of conditionOptions.entries()) {
-              if ((conditionCounts?.[String(index)] || 0) < max) {
+              if (conditionCounts[index]! < max) {
                 maxConditions.push(conditionFileName);
               }
             }
@@ -430,13 +467,13 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
             let min = 1000000000;
             let minConditions: string[] = [];
             for (const [index] of conditionOptions.entries()) {
-              const count = conditionCounts?.[String(index)] || 0;
+              const count = conditionCounts[index]!;
               if (count < min) {
                 min = count;
               }
             }
             for (const [index, conditionFileName] of conditionOptions.entries()) {
-              if ((conditionCounts?.[String(index)] || 0) === min) {
+              if (conditionCounts[index]! === min) {
                 minConditions.push(conditionFileName);
               }
             }
@@ -470,23 +507,19 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
             rootTDFBoxed = await meteorCallAsync<TdfDocumentLike | null>('getTdfById', Session.get('currentRootTdfId'));
           }
           if (rootTDFBoxed && rootTDFBoxed.conditionCounts) {
-            const conditionCounts = rootTDFBoxed.conditionCounts;
             const conditions = rootTDF.tdfs.tutor.setspec.condition ?? [];
+            validateConditionCounts(
+              rootTDFBoxed.conditionCounts,
+              conditions,
+              'resume.condition.count-beginning'
+            );
             let conditionTdfForFileName = findTdf({ _id: conditionTdfId });
             if (!conditionTdfForFileName || !conditionTdfForFileName.content) {
               conditionTdfForFileName = await meteorCallAsync<TdfDocumentLike | null>('getTdfById', conditionTdfId);
             }
             const conditionFileName = conditionTdfForFileName?.content?.fileName;
-            if (conditionFileName) {
-              for (const [index, candidateFileName] of conditions.entries()) {
-                if (candidateFileName === conditionFileName) {
-                  const key = String(index);
-                  conditionCounts[key] = (conditionCounts[key] || 0) + 1;
-                  break;
-                }
-              }
-              await meteorCallAsync('updateTdfConditionCounts', Session.get('currentRootTdfId'), conditionCounts);
-            }
+            const conditionIndex = getConditionIndexOrThrow(conditions, conditionFileName, 'resume.condition.count-beginning');
+            await meteorCallAsync('incrementTdfConditionCount', Session.get('currentRootTdfId'), conditionIndex);
           }
         }
 

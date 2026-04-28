@@ -82,6 +82,39 @@ const Tdfs = (window as Window & {
   };
 }).Tdfs ?? null;
 
+function validateConditionCounts(
+  conditionCounts: unknown,
+  conditions: string[],
+  source: string
+): number[] {
+  if (!Array.isArray(conditionCounts)) {
+    throw new Error(`${source}: root TDF conditionCounts must be an array when loadbalancing is enabled.`);
+  }
+  if (conditionCounts.length !== conditions.length) {
+    throw new Error(
+      `${source}: root TDF conditionCounts length ${conditionCounts.length} does not match condition length ${conditions.length}.`
+    );
+  }
+  return conditionCounts.map((count, index) => {
+    if (!Number.isFinite(Number(count)) || Number(count) < 0) {
+      throw new Error(`${source}: invalid condition count at index ${index}.`);
+    }
+    return Number(count);
+  });
+}
+
+function getConditionIndexOrThrow(conditions: string[], conditionFileName: unknown, source: string) {
+  const normalizedConditionFileName = typeof conditionFileName === 'string' ? conditionFileName.trim() : '';
+  if (!normalizedConditionFileName) {
+    throw new Error(`${source}: current condition TDF fileName is missing.`);
+  }
+  const conditionIndex = conditions.indexOf(normalizedConditionFileName);
+  if (conditionIndex < 0) {
+    throw new Error(`${source}: condition "${normalizedConditionFileName}" is not listed in the root TDF condition array.`);
+  }
+  return conditionIndex;
+}
+
 export async function unitIsFinished(_reason: string): Promise<void> {
   assertIdInvariants('unitProgression.unitIsFinished.start', { requireCurrentTdfId: true, requireStimuliSetId: false });
   const curTdf = Session.get('currentTdfFile') as TdfFileState | null;
@@ -209,10 +242,13 @@ export async function unitIsFinished(_reason: string): Promise<void> {
       (setspec.loadbalancing && countCompletion && !setspec.countcompletion)
     ) {
       const curConditionFileName = currentTdfFileState?.fileName || '';
-      const curConditionNumber = setspec.condition.indexOf(curConditionFileName);
-      rootTDFBoxed.conditionCounts[curConditionNumber] = (rootTDFBoxed.conditionCounts[curConditionNumber] ?? 0) + 1;
-      const conditionCounts = rootTDFBoxed.conditionCounts;
-      await meteorCallAsync('updateTdfConditionCounts', rootTdfId, conditionCounts);
+      validateConditionCounts(
+        rootTDFBoxed.conditionCounts,
+        setspec.condition,
+        'unitProgression.count-midflow'
+      );
+      const curConditionNumber = getConditionIndexOrThrow(setspec.condition, curConditionFileName, 'unitProgression.count-midflow');
+      await meteorCallAsync('incrementTdfConditionCount', rootTdfId, curConditionNumber);
     }
 
     leaveTarget = '/instructions';
@@ -229,10 +265,13 @@ export async function unitIsFinished(_reason: string): Promise<void> {
         (setspec.loadbalancing && countCompletion && !setspec.countcompletion)
       ) {
         const curConditionFileName = currentTdfFileState?.fileName || '';
-        const curConditionNumber = setspec.condition.indexOf(curConditionFileName);
-        rootTDFBoxed.conditionCounts[curConditionNumber] = (rootTDFBoxed.conditionCounts[curConditionNumber] ?? 0) + 1;
-        const conditionCounts = rootTDFBoxed.conditionCounts;
-        await meteorCallAsync('updateTdfConditionCounts', rootTdfId, conditionCounts);
+        validateConditionCounts(
+          rootTDFBoxed.conditionCounts,
+          setspec.condition,
+          'unitProgression.count-end'
+        );
+        const curConditionNumber = getConditionIndexOrThrow(setspec.condition, curConditionFileName, 'unitProgression.count-end');
+        await meteorCallAsync('incrementTdfConditionCount', rootTdfId, curConditionNumber);
       }
     }
 

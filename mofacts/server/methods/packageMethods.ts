@@ -197,6 +197,7 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       UserUploadQuota: deps.UserUploadQuota,
       AuditLog: deps.AuditLog,
       Tdfs: deps.Tdfs,
+      resolveConditionTdfIds,
       getResponseKCMapForTdf,
       processAudioFilesForTDF: deps.processAudioFilesForTDF,
       canonicalizeStimDisplayMediaRefs: deps.canonicalizeStimDisplayMediaRefs,
@@ -741,7 +742,7 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       content: tdfJSONtoUpsert,
       ownerId: ownerId,
       visibility: 'profileOnly',
-      conditionCount: conditionCounts
+      conditionCounts: conditionCounts
       }});
 
     return {res: 'upserted', stimuliSetId};
