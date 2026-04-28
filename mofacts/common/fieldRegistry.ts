@@ -6,6 +6,7 @@ type DeliveryParamNormalizerKind =
   | 'integer'
   | 'lowercaseString'
   | 'number'
+  | 'string'
   | 'studyFirst';
 type DeliveryParamValidationKind = 'enum' | 'none' | 'nonNegativeInteger' | 'range';
 type ValidatorSeverity = 'error' | 'warning';
@@ -91,6 +92,10 @@ function normalizeLowercaseStringValue(value: unknown): string {
   return toTrimmedString(value).toLowerCase();
 }
 
+function normalizeStringValue(value: unknown): string {
+  return toTrimmedString(value);
+}
+
 function normalizeStudyFirstValue(value: unknown): number {
   const trimmed = toTrimmedString(value);
   if (!trimmed.length) {
@@ -126,6 +131,8 @@ function normalizeDeliveryParamValueByKind(
       return normalizeLowercaseStringValue(value);
     case 'number':
       return normalizeNumberValue(value);
+    case 'string':
+      return normalizeStringValue(value);
     case 'studyFirst':
       return normalizeStudyFirstValue(value);
     default:
@@ -571,6 +578,28 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     },
     validation: { kind: 'enum', severity: 'error', message: 'Must be "true" or "false"', values: ['true', 'false'] },
     aliases: ['allowRevisitUnit']
+  },
+  studyOnlyFields: {
+    section: 'deliveryparams',
+    authoring: { type: 'string', default: '', editor: { gridColumns: 6 } },
+    runtime: { default: '', normalize: 'string' },
+    lifecycle: { status: 'supported' },
+    tooltip: {
+      brief: 'Display fields for study-only trials.',
+      verbose: 'Comma-delimited stimulus display fields shown on study-only trials, such as "imgSrc,audioSrc". Leave blank to show the full display.'
+    },
+    validation: { kind: 'none' }
+  },
+  drillFields: {
+    section: 'deliveryparams',
+    authoring: { type: 'string', default: '', editor: { gridColumns: 6 } },
+    runtime: { default: '', normalize: 'string' },
+    lifecycle: { status: 'supported' },
+    tooltip: {
+      brief: 'Display fields for drill/test trials.',
+      verbose: 'Comma-delimited stimulus display fields shown on drill/test trials and their review feedback, such as "text,audioSrc". Leave blank to show the full display.'
+    },
+    validation: { kind: 'none' }
   }
 };
 
@@ -606,6 +635,7 @@ const DELIVERY_PARAM_DIRECT_RUNTIME_KEYS = Object.freeze([
   'branchingEnabled',
   'checkOtherAnswers',
   'correctprompt',
+  'drillFields',
   'drill',
   'forceCorrection',
   'forceSpacing',
@@ -620,6 +650,7 @@ const DELIVERY_PARAM_DIRECT_RUNTIME_KEYS = Object.freeze([
   'reviewstudy',
   'scoringEnabled',
   'showhistory',
+  'studyOnlyFields',
   'studyFirst',
   'timeuntilaudio',
   'timeuntilaudiofeedback'

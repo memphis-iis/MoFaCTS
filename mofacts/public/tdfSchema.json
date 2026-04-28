@@ -1366,6 +1366,20 @@
                           "false"
                         ],
                         "default": "false"
+                      },
+                      "studyOnlyFields": {
+                        "options": {
+                          "grid_columns": 6
+                        },
+                        "type": "string",
+                        "default": ""
+                      },
+                      "drillFields": {
+                        "options": {
+                          "grid_columns": 6
+                        },
+                        "type": "string",
+                        "default": ""
                       }
                     },
                     "additionalProperties": false
@@ -2425,6 +2439,20 @@
                       "false"
                     ],
                     "default": "false"
+                  },
+                  "studyOnlyFields": {
+                    "options": {
+                      "grid_columns": 6
+                    },
+                    "type": "string",
+                    "default": ""
+                  },
+                  "drillFields": {
+                    "options": {
+                      "grid_columns": 6
+                    },
+                    "type": "string",
+                    "default": ""
                   }
                 },
                 "additionalProperties": false
@@ -3292,6 +3320,20 @@
                 "false"
               ],
               "default": "false"
+            },
+            "studyOnlyFields": {
+              "options": {
+                "grid_columns": 6
+              },
+              "type": "string",
+              "default": ""
+            },
+            "drillFields": {
+              "options": {
+                "grid_columns": 6
+              },
+              "type": "string",
+              "default": ""
             }
           },
           "additionalProperties": false

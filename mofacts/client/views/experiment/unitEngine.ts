@@ -25,6 +25,7 @@ import {Answers} from './answerAssess';
 import { AdaptiveQuestionLogic } from './adaptiveQuestionLogic';
 import { reconstructLearningStateFromHistory } from './svelte/services/historyReconstruction';
 import { hasScheduleArtifactForUnit } from './svelte/services/assessmentResume';
+import { applyDisplayFieldSubset } from '../../../common/lib/displayFieldSubsets';
 
 const _ = (globalThis as any)._;
 const Tdfs = (globalThis as any).Tdfs;
@@ -203,7 +204,11 @@ async function defaultUnitEngine(curExperimentData: any) {
           }));
         }
       }
+      const testType = options?.testType || Session.get('testType') || 'd';
       const originalDisplay = JSON.parse(JSON.stringify(currentDisplay));
+      currentDisplay = JSON.parse(JSON.stringify(
+        applyDisplayFieldSubset(currentDisplay, DeliveryParamsStore.get(), testType)
+      ));
       newExperimentState.originalDisplay = originalDisplay;
 
       let currentQuestion = currentDisplay.clozeText || currentDisplay.text;
@@ -328,9 +333,8 @@ function videoUnitEngine(): any {
       Session.set('clusterIndex', cardIndex);
 
       // setUpCardQuestionAndAnswerGlobals is provided by the base defaultUnitEngine
-      await this.setUpCardQuestionAndAnswerGlobals(cardIndex, whichStim, undefined);
-
       Session.set('testType', 'd');
+      await this.setUpCardQuestionAndAnswerGlobals(cardIndex, whichStim, undefined, { testType: 'd' });
     },
 
     findCurrentCardInfo: function() {
@@ -1187,10 +1191,12 @@ async function modelUnitEngine(): Promise<any> {
 
        const card = cardProbabilities.cards[newClusterIndex];
        const stim = card.stims[newStimIndex];
+       const testType = this._resolveSelectionTestType(card, stim);
        const preparedState = await this.buildPreparedCardQuestionAndAnswerGlobals(
         newClusterIndex,
         newStimIndex,
         stim.probFunctionParameters,
+        { testType },
       );
 
       return {
@@ -1202,7 +1208,7 @@ async function modelUnitEngine(): Promise<any> {
           stimIndex: newStimIndex,
         },
         preparedState,
-        testType: this._resolveSelectionTestType(card, stim),
+        testType,
         ownerToken: options?.ownerToken || null,
         createdAt: Date.now(),
       };
@@ -1304,6 +1310,7 @@ async function modelUnitEngine(): Promise<any> {
         cardIndex,
         whichStim,
         stim.probFunctionParameters,
+        { testType: selection?.testType },
       );
       this._commitPreparedSelection({
         ...selection,
@@ -2074,7 +2081,12 @@ async function scheduleUnitEngine(): Promise<any> {
 
       const curClusterIndex = questInfo.clusterIndex;
       const curStimIndex = questInfo.whichStim;
-      const preparedState = await this.buildPreparedCardQuestionAndAnswerGlobals(curClusterIndex, curStimIndex, 0, undefined);
+      const preparedState = await this.buildPreparedCardQuestionAndAnswerGlobals(
+        curClusterIndex,
+        curStimIndex,
+        0,
+        { testType: questInfo.testType },
+      );
 
       return {
         scheduleIndex,

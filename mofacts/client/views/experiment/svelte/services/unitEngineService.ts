@@ -24,6 +24,7 @@ import { CardStore } from '../../modules/cardStore';
 import { resolveDynamicAssetPath } from './mediaResolver';
 import { sanitizeUiSettings } from '../utils/uiSettingsValidator';
 import { assertIdInvariants, logIdInvariantBreachOnce } from '../../../../lib/idContext';
+import { applyDisplayFieldSubset } from '../../../../../common/lib/displayFieldSubsets';
 import type {
   EngineServiceResult,
   ExperimentState,
@@ -665,7 +666,7 @@ function getPreparedCardDataFromSelection(
     preparedDisplay.attribution,
     stim.display?.attribution,
   );
-  const currentDisplay = {
+  const resolvedDisplay = {
     text: String(preparedDisplay.text ?? stim.display?.text ?? stim.text ?? stim.textStimulus ?? ''),
     clozeText: String(preparedDisplay.clozeText ?? stim.display?.clozeText ?? stim.clozeText ?? stim.clozeStimulus ?? ''),
     imgSrc: typeof preparedDisplay.imgSrc === 'string' && preparedDisplay.imgSrc.trim().length > 0
@@ -679,6 +680,15 @@ function getPreparedCardDataFromSelection(
       : resolveImageUrl(rawAudioSrc, stimScopedSetId),
     ...(displayAttribution ? { attribution: displayAttribution } : {}),
   };
+  const deliveryParams = getCurrentDeliveryParams();
+  const testType = typeof selection.testType === 'string'
+    ? selection.testType
+    : typeof stim.testType === 'string'
+      ? stim.testType
+      : typeof Session.get('testType') === 'string'
+        ? Session.get('testType')
+        : 'd';
+  const currentDisplay = applyDisplayFieldSubset(resolvedDisplay, deliveryParams, testType);
   const fullAnswer = typeof preparedState.newExperimentState === 'object' &&
     typeof (preparedState.newExperimentState as Record<string, unknown>).originalAnswer === 'string'
     ? String((preparedState.newExperimentState as Record<string, unknown>).originalAnswer)
@@ -696,9 +706,7 @@ function getPreparedCardDataFromSelection(
     currentDisplay,
     fullAnswer,
     correctAnswer,
-    ...(typeof selection.testType === 'string'
-      ? { testTypeOverride: selection.testType }
-      : {}),
+    testTypeOverride: testType,
   });
 }
 
