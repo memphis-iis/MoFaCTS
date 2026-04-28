@@ -8,10 +8,10 @@ import { meteorCallAsync } from '../../../../index';
 import { sessionCleanUp } from '../../../../lib/sessionUtils';
 import { ExperimentStateStore } from '../../../../lib/state/experimentStateStore';
 import { clientConsole } from '../../../../lib/clientLogger';
-import { audioManager } from '../../../../lib/audioContextManager';
 import { stopStimDisplayTypeMapVersionSync } from '../../../../lib/stimDisplayTypeMapSync';
 import { destroyPlyr } from '../../../../lib/plyrHelper';
 import { cleanupAudioRecorder } from './speechRecognitionService';
+import { stopTtsPlayback } from './ttsService';
 import { completeCleanup } from '../utils/lifecycleCleanup';
 import type { UpdateDashboardCacheResult } from '../../../../../server/methods/dashboardCacheMethods.contracts';
 import type { NavigationDestination } from '../../../../../common/types/svelteServices';
@@ -24,17 +24,9 @@ let isNavigatingAway = false;
 
 function stopCardAudioNow(): void {
   try {
-    audioManager.pauseCurrentAudio();
+    stopTtsPlayback('navigation');
   } catch (err) {
     clientConsole(1, '[Navigation] Error stopping active audio:', err);
-  }
-
-  if (window.speechSynthesis) {
-    try {
-      window.speechSynthesis.cancel();
-    } catch (err) {
-      clientConsole(1, '[Navigation] Error cancelling browser TTS:', err);
-    }
   }
 }
 

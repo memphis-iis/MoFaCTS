@@ -5,8 +5,8 @@
  * Ensures proper resource cleanup to prevent memory leaks and unexpected behavior.
  */
 import { clientConsole } from '../../../../lib/clientLogger';
-import { audioManager } from '../../../../lib/audioContextManager';
 import { cleanupAudioRecorder } from '../services/speechRecognitionService';
+import { stopTtsPlayback } from '../services/ttsService';
 
 /**
  * Stop all active timers
@@ -80,17 +80,9 @@ function cancelSpeechRecognition(): void {
  */
 function stopTTS(): void {
   try {
-    audioManager.pauseCurrentAudio();
+    stopTtsPlayback('cleanup');
   } catch (e) {
     clientConsole(1, '[Cleanup] Error stopping audio playback:', e);
-  }
-
-  if (window.speechSynthesis) {
-    try {
-      window.speechSynthesis.cancel();
-    } catch (e) {
-      clientConsole(1, '[Cleanup] Error stopping TTS:', e);
-    }
   }
 
   

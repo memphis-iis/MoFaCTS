@@ -44,6 +44,63 @@ type UserAudioProfile = {
 
 const MeteorCompat = Meteor as MeteorCallAsyncCompat;
 
+class TtsPlaybackCancelledError extends Error {
+  constructor(reason: string) {
+    super(reason);
+    this.name = 'TtsPlaybackCancelledError';
+  }
+}
+
+type ActiveTtsPlayback = {
+  id: number;
+  cancellation: TtsPlaybackCancelledError | null;
+  cancelHandlers: Set<(error: TtsPlaybackCancelledError) => void>;
+  cancel: (reason: string) => void;
+};
+
+let activeTtsPlayback: ActiveTtsPlayback | null = null;
+let ttsPlaybackSequence = 0;
+
+function isTtsPlaybackCancelled(error: unknown): error is TtsPlaybackCancelledError {
+  return error instanceof TtsPlaybackCancelledError;
+}
+
+function clearTtsPlaybackState(): void {
+  audioManager.pauseCurrentAudio();
+  if (window.speechSynthesis) {
+    window.speechSynthesis.cancel();
+  }
+  CardStore.setRecordingLocked(false);
+  CardStore.setTtsRequested(false);
+}
+
+export function stopTtsPlayback(reason = 'stopped'): void {
+  const playback = activeTtsPlayback;
+  clearTtsPlaybackState();
+  playback?.cancel(reason);
+  activeTtsPlayback = null;
+}
+
+function registerTtsCancellationHandler(
+  playbackId: number,
+  handler: (error: TtsPlaybackCancelledError) => void
+): (() => void) {
+  const playback = activeTtsPlayback;
+  if (!playback || playback.id !== playbackId) {
+    return () => {};
+  }
+
+  if (playback.cancellation) {
+    handler(playback.cancellation);
+    return () => {};
+  }
+
+  playback.cancelHandlers.add(handler);
+  return () => {
+    playback.cancelHandlers.delete(handler);
+  };
+}
+
 function isWebKitAudioEngine(): boolean {
   return typeof window !== 'undefined' && typeof (window as Window & { webkitAudioContext?: unknown }).webkitAudioContext !== 'undefined';
 }
@@ -272,7 +329,12 @@ function isTtsEnabledForFeedback() {
  * @param {TtsSpeakOptions} options - TTS options
  * @returns {Promise<void>}
  */
-async function speakText(text: string, options: TtsSpeakOptions = {}): Promise<void> {
+async function speakText(
+  text: string,
+  options: TtsSpeakOptions = {},
+  getCancellation: () => TtsPlaybackCancelledError | null = () => null,
+  playbackId = 0
+): Promise<void> {
   const isQuestion = options.isQuestion === true;
   const voice = options.voice || (isQuestion ? getAudioPromptVoice() : getAudioPromptFeedbackVoice());
   const rate = options.rate ?? (isQuestion ? getAudioPromptQuestionSpeakingRate() : getAudioPromptFeedbackSpeakingRate());
@@ -319,6 +381,7 @@ async function speakText(text: string, options: TtsSpeakOptions = {}): Promise<v
         let playbackObserved = false;
         let queueDrainIntervalId: ReturnType<typeof setInterval> | null = null;
         let hardTimeoutId: ReturnType<typeof setTimeout> | null = null;
+        let unregisterCancellation = () => {};
 
         const clearRecoveryTimers = () => {
           if (queueDrainIntervalId !== null) {
@@ -335,6 +398,11 @@ async function speakText(text: string, options: TtsSpeakOptions = {}): Promise<v
           if (settled) {
             return;
           }
+          const cancellation = getCancellation();
+          if (cancellation) {
+            rejectSpeech(cancellation);
+            return;
+          }
           settled = true;
           clearRecoveryTimers();
           if (requiresAppleMobileRecovery) {
@@ -349,8 +417,11 @@ async function speakText(text: string, options: TtsSpeakOptions = {}): Promise<v
           }
           settled = true;
           clearRecoveryTimers();
+          unregisterCancellation();
           speechReject(error);
         };
+
+        unregisterCancellation = registerTtsCancellationHandler(playbackId, rejectSpeech);
 
         utterance.addEventListener('end', () => {
           void resolveSpeech('utterance-end');
@@ -363,6 +434,12 @@ async function speakText(text: string, options: TtsSpeakOptions = {}): Promise<v
         }, { passive: true });
 
         const startSpeech = async () => {
+          const cancellation = getCancellation();
+          if (cancellation) {
+            rejectSpeech(cancellation);
+            return;
+          }
+
           if (requiresAppleMobileRecovery) {
             await prepareAppleMobileSpeechSynthesis();
           }
@@ -372,6 +449,12 @@ async function speakText(text: string, options: TtsSpeakOptions = {}): Promise<v
           if (browserVoice) {
             utterance.voice = browserVoice;
           }
+          const postVoiceCancellation = getCancellation();
+          if (postVoiceCancellation) {
+            rejectSpeech(postVoiceCancellation);
+            return;
+          }
+
           clientConsole(2, '[TTS] Browser speech synthesis start', {
             language: ttsLanguage,
             requestedVoice: voice,
@@ -420,16 +503,30 @@ async function speakText(text: string, options: TtsSpeakOptions = {}): Promise<v
 
       const playAudioObject = (audioObj: HTMLAudioElement) => new Promise<void>((audioResolve, audioReject) => {
         let settled = false;
+        let unregisterCancellation = () => {};
+        const removeListeners = () => {
+          audioObj.removeEventListener('ended', onEnded);
+          audioObj.removeEventListener('error', onError);
+          unregisterCancellation();
+        };
         const onEnded = () => {
           if (settled) return;
           settled = true;
+          removeListeners();
           audioResolve();
         };
         const onError = (event: unknown) => {
           if (settled) return;
           settled = true;
+          removeListeners();
           audioReject(event);
         };
+        const cancellation = getCancellation();
+        if (cancellation) {
+          audioReject(cancellation);
+          return;
+        }
+        unregisterCancellation = registerTtsCancellationHandler(playbackId, onError);
         audioObj.addEventListener('ended', onEnded, { passive: true });
         audioObj.addEventListener('error', onError, { passive: true });
 
@@ -479,6 +576,9 @@ async function speakText(text: string, options: TtsSpeakOptions = {}): Promise<v
         try {
           await playAudioObject(audioObj);
         } catch (error: unknown) {
+          if (isTtsPlaybackCancelled(error)) {
+            throw error;
+          }
           clientConsole(1, '[TTS] google playback rejected; falling back to browser TTS', {
             error: error instanceof Error ? error.message : String(error),
           });
@@ -516,7 +616,11 @@ async function speakText(text: string, options: TtsSpeakOptions = {}): Promise<v
  * @param {string} audioSrc - Audio file URL
  * @returns {Promise<void>}
  */
-async function playAudioFile(audioSrc: string): Promise<void> {
+async function playAudioFile(
+  audioSrc: string,
+  getCancellation: () => TtsPlaybackCancelledError | null = () => null,
+  playbackId = 0
+): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     try {
       
@@ -535,18 +639,37 @@ async function playAudioFile(audioSrc: string): Promise<void> {
       const audio = new Audio(currentAudioSrc);
       clientConsole(2, '[TTS] path selected', { path: 'pre-recorded-audio', src: currentAudioSrc });
       let settled = false;
+      let canPlayHandler: (() => void) | null = null;
+      let unregisterCancellation = () => {};
 
       const resolveOnce = () => {
         if (settled) return;
         settled = true;
+        unregisterCancellation();
+        if (canPlayHandler) {
+          audio.removeEventListener('canplay', canPlayHandler);
+          canPlayHandler = null;
+        }
         resolve();
       };
 
       const rejectOnce = (error: unknown) => {
         if (settled) return;
         settled = true;
+        unregisterCancellation();
+        if (canPlayHandler) {
+          audio.removeEventListener('canplay', canPlayHandler);
+          canPlayHandler = null;
+        }
         reject(error);
       };
+
+      const cancellation = getCancellation();
+      if (cancellation) {
+        rejectOnce(cancellation);
+        return;
+      }
+      unregisterCancellation = registerTtsCancellationHandler(playbackId, rejectOnce);
 
       audioManager.setCurrentAudio(audio);
 
@@ -563,6 +686,12 @@ async function playAudioFile(audioSrc: string): Promise<void> {
       };
 
       const playFromStart = () => {
+        const playCancellation = getCancellation();
+        if (playCancellation) {
+          rejectOnce(playCancellation);
+          return;
+        }
+
         try {
           audio.pause();
           audio.currentTime = 0;
@@ -590,11 +719,15 @@ async function playAudioFile(audioSrc: string): Promise<void> {
 
       // Wait until enough media is decoded to avoid clipping the first syllable.
       if ((audio.readyState || 0) < 3) {
-        const onCanPlay = () => {
-          audio.removeEventListener('canplay', onCanPlay);
+        canPlayHandler = () => {
+          if (!canPlayHandler) {
+            return;
+          }
+          audio.removeEventListener('canplay', canPlayHandler);
+          canPlayHandler = null;
           playFromStart();
         };
-        audio.addEventListener('canplay', onCanPlay, { once: true });
+        audio.addEventListener('canplay', canPlayHandler, { once: true });
         try {
           audio.load();
         } catch (_err: unknown) {
@@ -634,6 +767,26 @@ async function playAudioFile(audioSrc: string): Promise<void> {
  * @returns {Promise<TtsServiceResult>}
  */
 export async function ttsPlaybackService(_context: Record<string, unknown>, event: TtsPlaybackEvent): Promise<TtsServiceResult> {
+  stopTtsPlayback('superseded');
+  const playbackId = ++ttsPlaybackSequence;
+  let cancellation: TtsPlaybackCancelledError | null = null;
+  activeTtsPlayback = {
+    id: playbackId,
+    cancellation,
+    cancelHandlers: new Set(),
+    cancel: (reason: string) => {
+      if (!cancellation) {
+        cancellation = new TtsPlaybackCancelledError(reason);
+        activeTtsPlayback?.cancelHandlers.forEach((handler) => handler(cancellation as TtsPlaybackCancelledError));
+      }
+      if (activeTtsPlayback?.id === playbackId) {
+        activeTtsPlayback.cancellation = cancellation;
+      }
+    },
+  };
+
+  const getCancellation = () => cancellation;
+
   try {
     
 
@@ -652,8 +805,13 @@ export async function ttsPlaybackService(_context: Record<string, unknown>, even
     CardStore.setRecordingLocked(true);
     
     const playSegment = async (segmentText: string, segmentAudioSrc: string, segmentIsQuestion: boolean): Promise<boolean> => {
+      const segmentCancellation = getCancellation();
+      if (segmentCancellation) {
+        throw segmentCancellation;
+      }
+
       if (segmentAudioSrc) {
-        await playAudioFile(segmentAudioSrc);
+        await playAudioFile(segmentAudioSrc, getCancellation, playbackId);
         return true;
       }
 
@@ -665,7 +823,7 @@ export async function ttsPlaybackService(_context: Record<string, unknown>, even
         return false;
       }
 
-      await speakText(segmentText, { isQuestion: segmentIsQuestion });
+      await speakText(segmentText, { isQuestion: segmentIsQuestion }, getCancellation, playbackId);
       return true;
     };
 
@@ -676,17 +834,25 @@ export async function ttsPlaybackService(_context: Record<string, unknown>, even
 
       if (questionPlayed && hasAnswerSegment && delayAfterQuestionMs > 0) {
         await sleep(delayAfterQuestionMs);
+        const delayCancellation = getCancellation();
+        if (delayCancellation) {
+          throw delayCancellation;
+        }
       }
 
       await playSegment(text, audioSrc, false);
     } else if (audioSrc) {
-      await playAudioFile(audioSrc);
+      await playAudioFile(audioSrc, getCancellation, playbackId);
     } else if (text) {
-      await speakText(text, { isQuestion });
+      await speakText(text, { isQuestion }, getCancellation, playbackId);
     } else {
       // No TTS/audio payload for this transition.
     }
 
+
+    if (activeTtsPlayback?.id === playbackId) {
+      activeTtsPlayback = null;
+    }
 
     if (autoRestartSr) {
       try {
@@ -701,6 +867,16 @@ export async function ttsPlaybackService(_context: Record<string, unknown>, even
 
     return { status: 'completed' };
   } catch (error: unknown) {
+    if (isTtsPlaybackCancelled(error)) {
+      if (activeTtsPlayback?.id === playbackId) {
+        activeTtsPlayback = null;
+      }
+      CardStore.setRecordingLocked(false);
+      CardStore.setTtsRequested(false);
+      audioManager.clearCurrentAudio();
+      return { status: 'skipped' };
+    }
+
     clientConsole(1, '[TTS] Service error:', error);
 
     // Unlock recording even on error
@@ -717,6 +893,10 @@ export async function ttsPlaybackService(_context: Record<string, unknown>, even
 
     // Don't crash the trial - just log error and continue
     return { status: 'error', error: error instanceof Error ? error.message : String(error) };
+  } finally {
+    if (activeTtsPlayback?.id === playbackId && getCancellation()) {
+      activeTtsPlayback = null;
+    }
   }
 }
 

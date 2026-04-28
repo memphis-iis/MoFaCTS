@@ -7,7 +7,7 @@ import { assign as xAssign } from 'xstate';
 import { Session } from 'meteor/session';
 import { LOG_PREFIXES } from './constants';
 import { resetSrAttempts as resetSrAttemptsService } from '../services/speechRecognitionService';
-import { ttsPlaybackService, shouldPlayAudioPrompt } from '../services/ttsService';
+import { ttsPlaybackService, shouldPlayAudioPrompt, stopTtsPlayback } from '../services/ttsService';
 import { getFeedbackTimeoutMs } from '../utils/timeoutUtils';
 import { Answers } from '../../answerAssess';
 import { UiSettingsStore } from '../../../../lib/state/uiSettingsStore';
@@ -938,6 +938,8 @@ export function playTTS({ context, event: _event }: ActionArgs) {
  */
 export function stopTTS({ context: _context, event: _event }: ActionArgs) {
   
+
+  stopTtsPlayback('machine-stop');
 
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('cardMachine:stopTTS'));
