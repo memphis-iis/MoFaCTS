@@ -1,4 +1,5 @@
 <template name="instructions">
+    {{#unless isLeavingInstructions}}
     {{#if UISettings.displayInstructionsTitle}}
     <div class="header-box">
         {{curTdfName}}:
@@ -65,4 +66,5 @@
             </div>
         {{/if}}
     </div>
+    {{/unless}}
 </template>

@@ -58,6 +58,7 @@ let inlineAudioClickHandler: any = null;
 let instructionShortcutHandler: any = null;
 let lockoutDataWatcher: any = null;
 let lockoutScopeKey: string | null = null;
+const INSTRUCTIONS_LEAVING_KEY = 'instructionsLeaving';
 
 function checkAudioInputMode() {
   const userAudioToggled = (Meteor.user() as any)?.audioSettings?.audioInputMode || false;
@@ -477,6 +478,9 @@ function getUnitsRemaining() {
 // pains to not modify anything reactive until this function has returned
 async function instructContinue() {
   assertIdInvariants('instructions.instructContinue', { requireCurrentTdfId: true, requireStimuliSetId: false });
+  Session.set(INSTRUCTIONS_LEAVING_KEY, true);
+  $('#continueButton').prop('disabled', true);
+  $('#continueBar').hide();
   const currentUnitNumber = Session.get('currentUnitNumber') || 0;
   const tdfFile = Session.get('currentTdfFile');
   const unitList = tdfFile?.tdfs?.tutor?.unit;
@@ -594,6 +598,10 @@ Template.instructions.helpers({
     return UiSettingsStore.get() ;
   },
 
+  isLeavingInstructions: function() {
+    return !!Session.get(INSTRUCTIONS_LEAVING_KEY);
+  },
+
   allowcontinue: function() {
     // If we're in experiment mode, they can only continue if there are
     // units left.
@@ -632,8 +640,13 @@ Template.instructions.helpers({
   },
 });
 
+Template.instructions.created = function() {
+  Session.set(INSTRUCTIONS_LEAVING_KEY, false);
+};
+
 Template.instructions.rendered = function() {
   clientConsole(2, '[Instructions Rendered] Template rendered callback fired');
+  Session.set(INSTRUCTIONS_LEAVING_KEY, false);
 
   // Hide global loading spinner when instructions page is ready (handles startup units)
   if (Session.get('appLoading')) {
