@@ -70,7 +70,7 @@
     "underscore": "^1.13.8",
     "unzipper": "^0.12.3",
     "wildemitter": "^1.2.1",
-    "xstate": "^5.28.0"
+    "xstate": "^5.31.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
