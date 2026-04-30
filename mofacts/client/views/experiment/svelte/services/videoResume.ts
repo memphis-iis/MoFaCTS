@@ -16,6 +16,8 @@ type VideoResumeAnchor = {
   resumeCheckpointIndex: number;
 };
 
+const RESUME_AFTER_CHECKPOINT_OFFSET_SECONDS = 0.1;
+
 export function resolveVideoResumeAnchor(
   checkpointTimes: unknown,
   completedCheckpointQuestionCount: unknown
@@ -42,7 +44,7 @@ export function resolveVideoResumeAnchor(
   }
 
   return {
-    resumeStartTime: checkpointTime,
+    resumeStartTime: checkpointTime + RESUME_AFTER_CHECKPOINT_OFFSET_SECONDS,
     resumeCheckpointIndex: checkpointIndex,
   };
 }

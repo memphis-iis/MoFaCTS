@@ -212,6 +212,7 @@ async function defaultUnitEngine(curExperimentData: any) {
       newExperimentState.originalDisplay = originalDisplay;
 
       let currentQuestion = currentDisplay.clozeText || currentDisplay.text;
+      currentQuestion = typeof currentQuestion === 'string' ? currentQuestion : '';
       let currentQuestionPart2 = undefined;
       let currentStimAnswer = getStimAnswer(cardIndex, whichStim);
 
@@ -229,16 +230,18 @@ async function defaultUnitEngine(curExperimentData: any) {
 
       // Format cloze questions by replacing underscores with styled blanks
       const regex = /([_])+/g;
-      const formattedQuestion = currentQuestion.replaceAll(regex, `<u>${blank + blank}</u>`);
+      const formattedQuestion = currentQuestion
+        ? currentQuestion.replaceAll(regex, `<u>${blank + blank}</u>`)
+        : '';
 
       clientConsole(1, 'setUpCardQuestionAndAnswerGlobals2:', formattedQuestion, currentQuestionPart2);
 
       newExperimentState.currentAnswer = currentStimAnswer;
       newExperimentState.currentQuestionPart2 = currentQuestionPart2;
 
-      if (currentDisplay.clozeText) {
+      if (formattedQuestion && currentDisplay.clozeText) {
         currentDisplay.clozeText = formattedQuestion;
-      } else if (currentDisplay.text) {
+      } else if (formattedQuestion && currentDisplay.text) {
         currentDisplay.text = formattedQuestion;
       }
       newExperimentState.currentDisplayEngine = currentDisplay;

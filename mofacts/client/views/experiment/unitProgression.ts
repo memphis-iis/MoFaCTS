@@ -181,7 +181,7 @@ export async function unitIsFinished(reason: string, options: { engine?: unknown
       // Update the rootTDF
       await meteorCallAsync('incrementTdfConditionCount', Session.get('currentRootTdfId'), curConditionNumber);
     }
-    leaveTarget = '/instructions';
+    leaveTarget = curTdfUnit?.videosession ? '/card' : '/instructions';
   } else {
     // We have run out of units - return home for now
     clientConsole(2, 'UNIT FINISHED: No More Units');

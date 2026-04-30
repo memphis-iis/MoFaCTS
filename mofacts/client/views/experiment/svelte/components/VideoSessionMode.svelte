@@ -49,6 +49,12 @@
   /** @type {boolean} Whether to prevent seeking beyond the current checkpoint */
   export let preventScrubbing = false;
 
+  /** @type {boolean} Whether the parent state machine can accept a checkpoint now */
+  export let canAcceptCheckpoint = false;
+
+  /** @type {string} Diagnostic snapshot of the parent gate state */
+  export let checkpointGateState = '';
+
   let videoElement;
   let player;
   let containerElement;
@@ -68,12 +74,17 @@
   let isYouTube;
   let youtubeId = '';
   let appliedResumeAnchorKey = '';
+  let lastRejectedCheckpointKey = '';
+  let machineResumeInProgress = false;
 
   // Check if URL is YouTube
   $: isYouTube = videoUrl && (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be'));
   $: youtubeId = isYouTube ? extractYouTubeId(videoUrl) : '';
   $: resolvedOverlayMounted = overlayMounted || showOverlay;
   $: resolvedOverlayVisible = overlayVisible || showOverlay;
+  $: if (canAcceptCheckpoint) {
+    lastRejectedCheckpointKey = '';
+  }
 
   function destroyPlayer() {
     if (player && typeof player.destroy === 'function') {
@@ -185,7 +196,28 @@
 
     // Event listeners
     player.on('play', () => {
+      const activeCheckpointIndex = Math.max(0, nextCheckpointIndex - 1);
+      const activeCheckpointTime = Number(questionTimes?.[activeCheckpointIndex]);
+      const isAtTriggeredCheckpointTime = Number.isFinite(activeCheckpointTime) &&
+        player.currentTime >= activeCheckpointTime - 0.5;
+
+      if (atCheckpoint && !machineResumeInProgress && isAtTriggeredCheckpointTime) {
+        clientConsole(1, '[VideoSessionMode] Blocking manual playback while checkpoint question is active', {
+          currentTime: player.currentTime,
+          nextCheckpointIndex,
+          activeCheckpointTime,
+        });
+        player.pause();
+        return;
+      }
       isPlaying = true;
+      if (atCheckpoint) {
+        clientConsole(2, '[VideoSessionMode] Clearing checkpoint latch on playback resume', {
+          currentTime: player.currentTime,
+          nextCheckpointIndex,
+        });
+        atCheckpoint = false;
+      }
       logVideoAction('play');
       dispatch('play', { time: player.currentTime });
     });
@@ -321,6 +353,34 @@
 
       // Check if we've reached or passed the checkpoint time
       if (currentTime >= nextTime) {
+        const questionIndex = questionIndices[nextCheckpointIndex];
+        if (!Number.isFinite(questionIndex)) {
+          const message = '[VideoSessionMode] Missing question index for checkpoint';
+          clientConsole(1, message, questionIndices, nextCheckpointIndex);
+          throw new Error(message);
+        }
+
+        if (!canAcceptCheckpoint) {
+          const rejectionKey = `${nextCheckpointIndex}|${nextTime}|${questionIndex}|${checkpointGateState}`;
+          if (rejectionKey !== lastRejectedCheckpointKey) {
+            clientConsole(1, '[VideoSessionMode] Checkpoint detected while parent cannot accept it', {
+              checkpointIndex: nextCheckpointIndex,
+              checkpointTime: nextTime,
+              questionIndex,
+              currentTime,
+              checkpointGateState,
+            });
+            dispatch('checkpointrejected', {
+              index: nextCheckpointIndex,
+              time: nextTime,
+              questionIndex,
+              checkpointGateState,
+            });
+            lastRejectedCheckpointKey = rejectionKey;
+          }
+          return;
+        }
+
         clientConsole(
           2,
           `[VideoSessionMode] Reached checkpoint ${nextCheckpointIndex} at ${nextTime}s (current: ${currentTime}s)`
@@ -336,13 +396,6 @@
         if (player.fullscreen && player.fullscreen.active) {
           wasFullscreen = true;
           player.fullscreen.exit();
-        }
-
-        const questionIndex = questionIndices[nextCheckpointIndex];
-        if (!Number.isFinite(questionIndex)) {
-          const message = '[VideoSessionMode] Missing question index for checkpoint';
-          clientConsole(1, message, questionIndices, nextCheckpointIndex);
-          throw new Error(message);
         }
 
         // Dispatch checkpoint event with question details
@@ -425,10 +478,29 @@
       }
 
       // Resume playback
+      machineResumeInProgress = true;
+      const playPromise = player.play();
+      if (playPromise?.catch) {
+        playPromise
+          .catch((error) => {
+            clientConsole(1, '[VideoSessionMode] Resume playback failed:', error?.message || error);
+          })
+          .finally(() => {
+            machineResumeInProgress = false;
+          });
+      } else {
+        machineResumeInProgress = false;
+      }
+    }
+  }
+
+  export function recoverRejectedCheckpoint() {
+    atCheckpoint = false;
+    if (player && player.paused) {
       const playPromise = player.play();
       if (playPromise?.catch) {
         playPromise.catch((error) => {
-          clientConsole(1, '[VideoSessionMode] Resume playback failed:', error?.message || error);
+          clientConsole(1, '[VideoSessionMode] Failed to recover rejected checkpoint:', error?.message || error);
         });
       }
     }

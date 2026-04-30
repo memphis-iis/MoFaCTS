@@ -15,6 +15,7 @@
   import { Session } from 'meteor/session';
   import { Meteor } from 'meteor/meteor';
   import { FlowRouter } from 'meteor/ostrio:flow-router-extra';
+  import DOMPurify from 'dompurify';
   import { currentUserHasRole } from '../../../../lib/roleUtils';
   import { evaluateSrAvailability } from '../../../../lib/audioAvailability';
   import { stopStimDisplayTypeMapVersionSync } from '../../../../lib/stimDisplayTypeMapSync';
@@ -25,9 +26,11 @@
   import { cardMachine } from '../machine/cardMachine';
   import { DEFAULT_UI_SETTINGS, EVENTS } from '../machine/constants';
   import { initializeSvelteCard } from '../services/svelteInit';
+  import { createExperimentState } from '../services/experimentState';
   import { waitForBrowserPaint } from '../utils/paintTiming';
   import { deriveSrStatus } from '../utils/srStatus';
   import { getMainTimeoutMs, getFeedbackTimeoutMs } from '../utils/timeoutUtils';
+  import { recordCurrentInstructionContinue } from '../../instructions';
   import PerformanceArea from './PerformanceArea.svelte';
   import TrialContent from './TrialContent.svelte';
   import VideoSessionMode from './VideoSessionMode.svelte';
@@ -78,6 +81,21 @@
       clientConsole(1, '[CardScreen] Failed to read actor snapshot, using initial state', err);
     }
     return getInitialState();
+  }
+
+  function sanitizeInstructionHtml(dirty) {
+    if (!dirty) return '';
+    return DOMPurify.sanitize(String(dirty), {
+      ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'u', 'br', 'p', 'span', 'div',
+        'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'table', 'tr', 'td', 'th',
+        'thead', 'tbody', 'ul', 'ol', 'li', 'center', 'a', 'img', 'audio',
+        'source'],
+      ALLOWED_ATTR: ['style', 'class', 'id', 'border', 'href', 'src', 'alt',
+        'width', 'height', 'controls', 'preload', 'data-audio-id'],
+      ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|blob):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i,
+      FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'button'],
+      FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur'],
+    });
   }
 
   function subscribeToActor(actorInstance, handler) {
@@ -286,6 +304,10 @@
   // Initialize XState machine using a local actor to avoid version mismatches
   let actor = null;
   let state = getInitialState();
+  let videoInstructionDismissed = false;
+  let videoInstructionStartBlocked = false;
+  let videoInstructionsShownAt = 0;
+  let videoPlayerReady = false;
   const send = (event) => {
     if (testMode) {
       clientConsole(2, '[CardScreen] Ignoring event in test mode:', event?.type || event);
@@ -310,6 +332,19 @@
   $: isVideoSession = uiSettings.isVideoSession === true ||
     Session.get('isVideoSession') === true ||
     !!Session.get('currentTdfUnit')?.videosession;
+  $: currentTdfUnit = Session.get('currentTdfUnit') || {};
+  $: rawVideoInstructionText = typeof currentTdfUnit?.unitinstructions === 'string'
+    ? currentTdfUnit.unitinstructions.trim()
+    : '';
+  $: sanitizedVideoInstructionText = sanitizeInstructionHtml(rawVideoInstructionText);
+  $: videoInstructionsSeen = Session.get('curUnitInstructionsSeen') === true || videoInstructionDismissed;
+  $: showVideoInstructionOverlay = isVideoSession &&
+    !!rawVideoInstructionText &&
+    !videoInstructionsSeen;
+  $: if (showVideoInstructionOverlay && !videoInstructionsShownAt) {
+    videoInstructionsShownAt = Date.now();
+    Session.set('instructionClientStart', videoInstructionsShownAt);
+  }
   $: layoutMode = uiSettings.stimuliPosition;
   $: fontSizePx = parsePositiveNumber(deliveryParams?.fontsize) ?? 24;
   $: cardFontSizeStyle = `--card-font-size: ${fontSizePx}px;`;
@@ -491,6 +526,9 @@
   $: trialSubsetKey = trialSubset.showOverlay
     ? [
         context.timestamps?.trialStart || 0,
+        isVideoSession ? context.videoSession?.currentCheckpointIndex ?? '' : '',
+        isVideoSession ? context.engineIndices?.clusterIndex ?? '' : '',
+        isVideoSession ? context.questionIndex ?? '' : '',
         trialSubset.display?.text || '',
         trialSubset.display?.clozeText || '',
         trialSubset.display?.imgSrc || '',
@@ -1199,6 +1237,8 @@
   let videoAnswerHandler;
   let forceUnitAdvanceShortcutHandler;
   let completedVideoQuestions = new Set();
+  let pendingMachineVideoResume = false;
+  let flushingMachineVideoResume = false;
 
   function getCorrectAnswerImageSrc(buttonList, correctAnswer) {
     if (!Array.isArray(buttonList) || !correctAnswer) return '';
@@ -1350,9 +1390,172 @@
     };
   }
 
+  function isExperimentParticipantSession() {
+    return Meteor.user()?.loginParams?.loginMode === 'experiment' ||
+      Session.get('loginMode') === 'experiment';
+  }
+
+  function routeInitializationFailure() {
+    Session.set('appLoading', false);
+
+    if (isExperimentParticipantSession()) {
+      Session.set('uiMessage', null);
+      Session.set('experimentError', {
+        title: 'Experiment paused',
+        message: 'This practice activity did not start correctly.',
+        note: 'Please email the experiment coordinator or study contact with your participant ID.',
+      });
+      Session.set('suppressAuthenticatedChrome', true);
+      FlowRouter.go('/experimentError');
+      return;
+    }
+
+    Session.set('uiMessage', {
+      text: 'Lesson did not initialize correctly. Please restart from the Learning Dashboard.',
+      variant: 'danger'
+    });
+    FlowRouter.go('/learningDashboard');
+  }
+
+  async function flushPendingMachineVideoResume(reason) {
+    if (flushingMachineVideoResume || !pendingMachineVideoResume) {
+      return;
+    }
+
+    flushingMachineVideoResume = true;
+    await tick();
+    flushingMachineVideoResume = false;
+
+    if (!pendingMachineVideoResume) {
+      return;
+    }
+    if (!state.matches('videoWaiting')) {
+      clientConsole(1, '[CardScreen] Machine video resume command is pending outside videoWaiting', {
+        reason,
+        state: currentState,
+      });
+      setTimeout(() => {
+        void flushPendingMachineVideoResume('retry-state');
+      }, 50);
+      return;
+    }
+    if (!videoPlayer || typeof videoPlayer.resumeAfterQuestion !== 'function') {
+      clientConsole(1, '[CardScreen] Machine video resume command is pending before player is ready', {
+        reason,
+        hasVideoPlayer: !!videoPlayer,
+      });
+      setTimeout(() => {
+        void flushPendingMachineVideoResume('retry-player');
+      }, 50);
+      return;
+    }
+
+    pendingMachineVideoResume = false;
+    videoPlayer.resumeAfterQuestion();
+  }
+
+  function handleMachineVideoAnswer(event) {
+    const { isCorrect, checkpointIndex } = event.detail || {};
+    clientConsole(2, '[VIDEO-REWIND-DEBUG] videoAnswerHandler received:', {
+      isCorrect,
+      checkpointIndex,
+      rewindOnIncorrectEnabled,
+      hasVideoCheckpoints: !!videoCheckpoints,
+      hasVideoPlayer: !!videoPlayer,
+      videoCheckpointsTimes: videoCheckpoints?.times,
+      videoCheckpointsRewind: videoCheckpoints?.rewindCheckpoints,
+    });
+    const questionIndex = Number.isFinite(checkpointIndex)
+      ? videoCheckpoints?.questions?.[checkpointIndex]
+      : undefined;
+    if (isCorrect && Number.isFinite(questionIndex)) {
+      completedVideoQuestions.add(questionIndex);
+      clientConsole(2, '[VIDEO-REWIND-DEBUG] Correct answer, marking completed:', questionIndex);
+      return;
+    }
+    if (!rewindOnIncorrectEnabled) {
+      clientConsole(1, '[VIDEO-REWIND-DEBUG] rewindOnIncorrect disabled, skipping rewind');
+      return;
+    }
+    if (!Number.isFinite(checkpointIndex)) {
+      throw new Error('[CardScreen] Video answer missing checkpoint index');
+    }
+    if (!videoCheckpoints || !Array.isArray(videoCheckpoints.times)) {
+      throw new Error('[CardScreen] Video checkpoints not initialized');
+    }
+    if (!videoPlayer) {
+      throw new Error('[CardScreen] Video player missing for rewind');
+    }
+    const currentTime = videoPlayer.getCurrentTime?.() ?? 0;
+    const currentQuestionTime = Number(videoCheckpoints.times[checkpointIndex]);
+    if (!Number.isFinite(currentQuestionTime)) {
+      throw new Error('[CardScreen] Video checkpoint time is invalid for rewind');
+    }
+
+    const checkpointTimes = [0, ...getRewindCheckpointTimes(videoCheckpoints)]
+      .filter((time) => Number.isFinite(time))
+      .sort((a, b) => a - b);
+    let previousCheckpointTime = 0;
+    for (const time of checkpointTimes) {
+      if (time < (currentQuestionTime - 0.001)) {
+        previousCheckpointTime = time;
+      } else {
+        break;
+      }
+    }
+    const rewindTime = Math.max(0, previousCheckpointTime + 0.1);
+    const rewindIndex = getCheckpointResetIndex(videoCheckpoints.times, rewindTime);
+    clientConsole(2, '[VIDEO-REWIND-DEBUG] Rewind calculation:', {
+      currentTime,
+      currentQuestionTime,
+      previousCheckpointTime,
+      rewindTime,
+      rewindIndex,
+      checkpointTimes,
+    });
+    if (repeatQuestionsSinceCheckpointEnabled) {
+      markQuestionsForRepetition(rewindTime, currentTime);
+    }
+    if (typeof videoPlayer.resetCheckpointTo === 'function') {
+      clientConsole(2, '[VIDEO-REWIND-DEBUG] Calling resetCheckpointTo:', rewindIndex);
+      videoPlayer.resetCheckpointTo(rewindIndex);
+    } else {
+      clientConsole(1, '[VIDEO-REWIND-DEBUG] resetCheckpointTo is not a function');
+    }
+    if (typeof videoPlayer.rewindTo === 'function') {
+      clientConsole(2, '[VIDEO-REWIND-DEBUG] Calling rewindTo:', rewindTime);
+      videoPlayer.rewindTo(rewindTime);
+    } else {
+      clientConsole(1, '[VIDEO-REWIND-DEBUG] rewindTo is not a function');
+    }
+    if (typeof videoPlayer.logAction === 'function') {
+      videoPlayer.logAction('rewind_to_checkpoint');
+    }
+  }
+
+  function registerMachineWindowListeners() {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    if (!resumeVideoHandler) {
+      resumeVideoHandler = () => {
+        pendingMachineVideoResume = true;
+        void flushPendingMachineVideoResume('cardMachine:resumeVideo');
+      };
+      window.addEventListener('cardMachine:resumeVideo', resumeVideoHandler);
+    }
+
+    if (!videoAnswerHandler) {
+      videoAnswerHandler = handleMachineVideoAnswer;
+      window.addEventListener('cardMachine:videoAnswer', videoAnswerHandler);
+    }
+  }
+
   // Lifecycle: Start machine on mount
   let actorSubscription;
   let startDispatched = false;
+  let initializedForRender = false;
   const startPayload = {
     type: 'START',
     sessionId,
@@ -1378,12 +1581,7 @@
         initResult = await initializeSvelteCard();
       } catch (error) {
         clientConsole(1, '[CardScreen] initializeSvelteCard failed', error);
-        Session.set('appLoading', false);
-        Session.set('uiMessage', {
-          text: 'Lesson did not initialize correctly. Please restart from the Learning Dashboard.',
-          variant: 'danger'
-        });
-        FlowRouter.go('/learningDashboard');
+        routeInitializationFailure();
         return;
       }
       if (initResult?.redirected) {
@@ -1393,14 +1591,12 @@
       const ready = await waitForCardReadiness();
       if (!ready) {
         clientConsole(1, '[CardScreen] Readiness timeout before machine start', getCardReadinessState());
-        Session.set('appLoading', false);
-        Session.set('uiMessage', {
-          text: 'Lesson did not initialize correctly. Please restart from the Learning Dashboard.',
-          variant: 'danger'
-        });
-        FlowRouter.go('/learningDashboard');
+        routeInitializationFailure();
         return;
       }
+
+      initializedForRender = true;
+      await tick();
 
       // Clear the global launch spinner as soon as card bootstrap is complete.
       // Tying overlay dismissal to later visual machine states can leave the
@@ -1451,6 +1647,8 @@
         window.addEventListener('beforeunload', beforeUnloadHandler);
       }
 
+      registerMachineWindowListeners();
+
       if (!actor) {
         actor = createMachineActor(cardMachine);
       }
@@ -1480,93 +1678,6 @@
         videoCheckpoints = Session.get('videoCheckpoints');
         completedVideoQuestions = new Set();
       });
-
-      resumeVideoHandler = () => {
-        if (videoPlayer && typeof videoPlayer.resumeAfterQuestion === 'function') {
-          videoPlayer.resumeAfterQuestion();
-        }
-      };
-      window.addEventListener('cardMachine:resumeVideo', resumeVideoHandler);
-
-      videoAnswerHandler = (event) => {
-        const { isCorrect, checkpointIndex } = event.detail || {};
-        clientConsole(2, '[VIDEO-REWIND-DEBUG] videoAnswerHandler received:', {
-          isCorrect,
-          checkpointIndex,
-          rewindOnIncorrectEnabled,
-          hasVideoCheckpoints: !!videoCheckpoints,
-          hasVideoPlayer: !!videoPlayer,
-          videoCheckpointsTimes: videoCheckpoints?.times,
-          videoCheckpointsRewind: videoCheckpoints?.rewindCheckpoints,
-        });
-        const questionIndex = Number.isFinite(checkpointIndex)
-          ? videoCheckpoints?.questions?.[checkpointIndex]
-          : undefined;
-        if (isCorrect && Number.isFinite(questionIndex)) {
-          completedVideoQuestions.add(questionIndex);
-          clientConsole(2, '[VIDEO-REWIND-DEBUG] Correct answer, marking completed:', questionIndex);
-          return;
-        }
-        if (!rewindOnIncorrectEnabled) {
-          clientConsole(1, '[VIDEO-REWIND-DEBUG] rewindOnIncorrect disabled, skipping rewind');
-          return;
-        }
-        if (!Number.isFinite(checkpointIndex)) {
-          throw new Error('[CardScreen] Video answer missing checkpoint index');
-        }
-        if (!videoCheckpoints || !Array.isArray(videoCheckpoints.times)) {
-          throw new Error('[CardScreen] Video checkpoints not initialized');
-        }
-        if (!videoPlayer) {
-          throw new Error('[CardScreen] Video player missing for rewind');
-        }
-        const currentTime = videoPlayer.getCurrentTime?.() ?? 0;
-        const currentQuestionTime = Number(videoCheckpoints.times[checkpointIndex]);
-        if (!Number.isFinite(currentQuestionTime)) {
-          throw new Error('[CardScreen] Video checkpoint time is invalid for rewind');
-        }
-
-        const checkpointTimes = [0, ...getRewindCheckpointTimes(videoCheckpoints)]
-          .filter((time) => Number.isFinite(time))
-          .sort((a, b) => a - b);
-        let previousCheckpointTime = 0;
-        for (const time of checkpointTimes) {
-          if (time < (currentQuestionTime - 0.001)) {
-            previousCheckpointTime = time;
-          } else {
-            break;
-          }
-        }
-        const rewindTime = Math.max(0, previousCheckpointTime + 0.1);
-        const rewindIndex = getCheckpointResetIndex(videoCheckpoints.times, rewindTime);
-        clientConsole(2, '[VIDEO-REWIND-DEBUG] Rewind calculation:', {
-          currentTime,
-          currentQuestionTime,
-          previousCheckpointTime,
-          rewindTime,
-          rewindIndex,
-          checkpointTimes,
-        });
-        if (repeatQuestionsSinceCheckpointEnabled) {
-          markQuestionsForRepetition(rewindTime, currentTime);
-        }
-        if (typeof videoPlayer.resetCheckpointTo === 'function') {
-          clientConsole(2, '[VIDEO-REWIND-DEBUG] Calling resetCheckpointTo:', rewindIndex);
-          videoPlayer.resetCheckpointTo(rewindIndex);
-        } else {
-          clientConsole(1, '[VIDEO-REWIND-DEBUG] resetCheckpointTo is not a function');
-        }
-        if (typeof videoPlayer.rewindTo === 'function') {
-          clientConsole(2, '[VIDEO-REWIND-DEBUG] Calling rewindTo:', rewindTime);
-          videoPlayer.rewindTo(rewindTime);
-        } else {
-          clientConsole(1, '[VIDEO-REWIND-DEBUG] rewindTo is not a function');
-        }
-        if (typeof videoPlayer.logAction === 'function') {
-          videoPlayer.logAction('rewind_to_checkpoint');
-        }
-      };
-      window.addEventListener('cardMachine:videoAnswer', videoAnswerHandler);
 
       forceUnitAdvanceShortcutHandler = async (event) => {
         const saveShortcutPressed =
@@ -1669,6 +1780,9 @@
   $: preventScrubbingEnabled = normalizeVideoBoolean(videoSession?.preventScrubbing);
   $: rewindOnIncorrectEnabled = normalizeVideoBoolean(videoSession?.rewindOnIncorrect);
   $: repeatQuestionsSinceCheckpointEnabled = normalizeVideoBoolean(videoSession?.repeatQuestionsSinceCheckpoint);
+  $: if (pendingMachineVideoResume && videoPlayer && state.matches('videoWaiting')) {
+    void flushPendingMachineVideoResume('reactive-ready');
+  }
 
   // Meteor provides an environment flag we can safely use in Svelte
   const isDev = Meteor.isDevelopment;
@@ -1715,6 +1829,17 @@
 
   async function handleVideoCheckpoint(event) {
     const { index, questionIndex } = event.detail || {};
+    if (!state.matches('videoWaiting')) {
+      clientConsole(1, '[CardScreen] Rejected video checkpoint outside videoWaiting', {
+        state: currentState,
+        index,
+        questionIndex,
+      });
+      if (videoPlayer && typeof videoPlayer.recoverRejectedCheckpoint === 'function') {
+        videoPlayer.recoverRejectedCheckpoint();
+      }
+      return;
+    }
     if (!Number.isFinite(questionIndex)) {
       throw new Error('[CardScreen] Video checkpoint missing question index');
     }
@@ -1738,28 +1863,72 @@
   }
 
   function handleVideoReady() {
-    if (state.matches('videoWaiting') && videoPlayer && typeof videoPlayer.play === 'function') {
-      // Delay slightly to let YouTube iframe fully initialize before attempting autoplay.
-      // If autoplay is blocked by the browser (no user gesture), the play button overlay
-      // remains visible so the user can start manually.
-      setTimeout(() => {
-        if (!state.matches('videoWaiting') || !videoPlayer) return;
-        try {
-          const playResult = videoPlayer.play();
-          if (playResult?.catch) {
-            playResult.catch((error) => {
-              // AbortError is expected - browser blocks autoplay without user gesture.
-              // The Plyr play-large button overlay stays visible for the user to click.
-              if (error?.name !== 'AbortError') {
-                clientConsole(1, '[CardScreen] Video play on ready failed:', error?.message || error);
-              }
-            });
-          }
-        } catch (error) {
-          clientConsole(1, '[CardScreen] Video play on ready threw:', error?.message || error);
-        }
-      }, 300);
+    videoPlayerReady = true;
+    void flushPendingMachineVideoResume('video-ready');
+    if (!state.matches('videoWaiting') || !videoPlayer) return;
+    const player = typeof videoPlayer.getPlayer === 'function'
+      ? videoPlayer.getPlayer()
+      : null;
+    if (player) {
+      player.muted = false;
+      player.volume = Number.isFinite(player.volume) && player.volume > 0
+        ? player.volume
+        : 1;
     }
+  }
+
+  function markVideoInstructionsContinued() {
+    videoInstructionDismissed = true;
+    videoInstructionStartBlocked = false;
+    Session.set('curUnitInstructionsSeen', true);
+    Session.set('fromInstructions', true);
+
+    const currentUnitNumber = Session.get('currentUnitNumber') || 0;
+    const currentTdfUnit = Session.get('currentTdfUnit');
+    void recordCurrentInstructionContinue(videoInstructionsShownAt || Date.now()).catch((error) => {
+      clientConsole(1, '[CardScreen] Failed to record video instructions continue:', error);
+    });
+    void createExperimentState({
+      currentUnitNumber,
+      currentTdfUnit,
+      lastUnitStarted: currentUnitNumber,
+    }).catch((error) => {
+      clientConsole(1, '[CardScreen] Failed to persist video instructions state:', error);
+    });
+  }
+
+  function handleVideoInstructionContinue(event) {
+    event?.preventDefault?.();
+
+    if (!videoPlayer || typeof videoPlayer.play !== 'function') {
+      videoInstructionStartBlocked = true;
+      clientConsole(1, '[CardScreen] Video instructions continue clicked before player was ready');
+      return;
+    }
+
+    videoInstructionStartBlocked = false;
+    let playResult;
+    try {
+      playResult = videoPlayer.play();
+    } catch (error) {
+      videoInstructionStartBlocked = true;
+      clientConsole(1, '[CardScreen] Video start from instructions threw:', error?.message || error);
+      return;
+    }
+
+    if (playResult?.then) {
+      playResult
+        .then(() => {
+          markVideoInstructionsContinued();
+        })
+        .catch((error) => {
+          videoInstructionStartBlocked = true;
+          clientConsole(1, '[CardScreen] Video start from instructions was blocked:', error?.message || error);
+        });
+      return;
+    }
+
+    markVideoInstructionsContinued();
   }
 
   function handleVideoContinue() {
@@ -1816,6 +1985,7 @@
   }
 </script>
 
+{#if testMode || initializedForRender}
 <div class="card-screen" class:video-mode={isVideoSession} bind:this={cardScreenElement} style={cardFontSizeStyle}>
   {#if isVideoSession}
     <VideoSessionMode
@@ -1826,6 +1996,8 @@
       resumeStartTime={videoResumeAnchor?.resumeStartTime}
       resumeCheckpointIndex={videoResumeAnchor?.resumeCheckpointIndex}
       preventScrubbing={preventScrubbingEnabled}
+      canAcceptCheckpoint={state.matches('videoWaiting')}
+      checkpointGateState={JSON.stringify(currentState)}
       overlayMounted={trialContentMounted}
       overlayVisible={trialContentVisible}
       on:checkpoint={handleVideoCheckpoint}
@@ -1847,8 +2019,12 @@
 
       <div
         class="trial-content-fade"
+        bind:this={trialContentFadeElement}
         class:trial-content-visible={trialContentVisible}
         class:trial-content-fading-out={isFadingOut}
+        on:transitionrun={logTrialFadeEvent}
+        on:transitionstart={logTrialFadeEvent}
+        on:transitionend={logTrialFadeEvent}
       >
         <TrialContent
           {...trialContentProps}
@@ -1865,6 +2041,29 @@
       </div>
 
     </VideoSessionMode>
+
+    {#if showVideoInstructionOverlay}
+      <div class="video-instruction-overlay" role="dialog" aria-modal="true" aria-live="polite">
+        <div class="video-instruction-panel">
+          <div class="video-instruction-copy">
+            {@html sanitizedVideoInstructionText}
+          </div>
+          {#if videoInstructionStartBlocked}
+            <p class="video-instruction-warning">
+              The browser blocked automatic video start. Press Continue again to start the video.
+            </p>
+          {/if}
+          <button
+            type="button"
+            class="video-instruction-continue"
+            disabled={!videoPlayerReady}
+            on:click={handleVideoInstructionContinue}
+          >
+            {videoPlayerReady ? (uiSettings.continueButtonText || 'Continue') : 'Loading video...'}
+          </button>
+        </div>
+      </div>
+    {/if}
 
     {#if videoEndOverlayMounted}
       <div class="video-end-overlay" class:video-end-overlay-visible={videoEndOverlayVisible}>
@@ -1958,6 +2157,7 @@
     </div>
   {/if}
 </div>
+{/if}
 
 <style>
   .card-screen {
@@ -1980,6 +2180,57 @@
 
   .card-screen.video-mode {
     background-color: var(--text-color);
+  }
+
+  .video-instruction-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: clamp(16px, 4vw, 48px);
+    background: color-mix(in srgb, var(--background-color) 94%, transparent);
+  }
+
+  .video-instruction-panel {
+    width: min(760px, 100%);
+    max-height: min(78vh, 720px);
+    overflow: auto;
+    padding: clamp(18px, 3vw, 32px);
+    border: 1px solid var(--secondary-color);
+    background: var(--card-background-color);
+    color: var(--text-color);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
+  }
+
+  .video-instruction-copy {
+    font-size: clamp(1rem, 1.6vw, 1.2rem);
+    line-height: 1.5;
+  }
+
+  .video-instruction-warning {
+    margin: 16px 0 0;
+    color: var(--alert-color);
+    font-weight: 600;
+  }
+
+  .video-instruction-continue {
+    display: block;
+    width: min(420px, 100%);
+    min-height: 44px;
+    margin: 24px auto 0;
+    border: 1px solid var(--secondary-color);
+    border-radius: var(--border-radius-sm);
+    background: var(--main-button-color);
+    color: var(--main-button-text-color);
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .video-instruction-continue:disabled {
+    opacity: 0.65;
+    cursor: wait;
   }
 
   .trial-content-stack {

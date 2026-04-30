@@ -49,6 +49,8 @@ type CardMachineActorArgs = {
     output?: {
       isCorrect?: unknown;
     } | undefined;
+    checkpointIndex?: unknown;
+    questionIndex?: unknown;
   };
 };
 
@@ -497,6 +499,39 @@ export function isVideoSession({ context }: CardMachineActorArgs): boolean {
  */
 export function isNotVideoSession(args: CardMachineActorArgs): boolean {
   return !isVideoSession(args);
+}
+
+/**
+ * Check that a concrete configured video checkpoint can be accepted.
+ */
+export function canAcceptVideoCheckpoint(args: CardMachineActorArgs): boolean {
+  if (!isVideoSession(args)) {
+    return false;
+  }
+
+  const checkpointIndex = Number(args.event.checkpointIndex);
+  const questionIndex = Number(args.event.questionIndex);
+  if (!Number.isInteger(checkpointIndex) || checkpointIndex < 0 || !Number.isFinite(questionIndex)) {
+    return false;
+  }
+
+  const checkpoints = Session.get('videoCheckpoints') as {
+    times?: unknown[];
+    questions?: unknown[];
+  } | null | undefined;
+
+  if (!Array.isArray(checkpoints?.times) || !Array.isArray(checkpoints?.questions)) {
+    return false;
+  }
+  if (checkpointIndex >= checkpoints.times.length || checkpointIndex >= checkpoints.questions.length) {
+    return false;
+  }
+
+  const checkpointTime = Number(checkpoints.times[checkpointIndex]);
+  const configuredQuestionIndex = Number(checkpoints.questions[checkpointIndex]);
+  return Number.isFinite(checkpointTime) &&
+    Number.isFinite(configuredQuestionIndex) &&
+    configuredQuestionIndex === questionIndex;
 }
 
 // =============================================================================

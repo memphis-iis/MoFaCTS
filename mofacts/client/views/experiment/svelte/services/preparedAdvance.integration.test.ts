@@ -134,6 +134,27 @@ describe('prepared advance integration seams', function() {
     expect(result.preparedSelection).to.deep.equal(selection);
   });
 
+  it('prepareIncomingTrialService returns an explicit no-op for video units', async function() {
+    let selectNextCardCalls = 0;
+    const engine = {
+      unitType: 'video',
+      selectNextCard: async () => {
+        selectNextCardCalls += 1;
+      },
+    };
+
+    const result = await prepareIncomingTrialService(
+      { engine, questionIndex: 2 },
+      { engine }
+    ) as Record<string, unknown>;
+
+    expect(selectNextCardCalls).to.equal(0);
+    expect(result.preparedAdvanceMode).to.equal('none');
+    expect(result.unitFinished).to.equal(false);
+    expect(result.questionIndex).to.equal(3);
+    expect(result.engine).to.equal(engine);
+  });
+
   it('commitPreparedTrialRuntime applies schedule mirrors only at commit', function() {
     let commitPreparedScheduledCardCalls = 0;
     const selection = {

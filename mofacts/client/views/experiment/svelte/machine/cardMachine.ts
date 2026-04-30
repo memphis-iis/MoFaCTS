@@ -203,7 +203,11 @@ function isFeedbackAdvanceReady(context: CardMachineContext): boolean {
 }
 
 const storePreparedIncomingTrial = assign({
-  preparedTrial: ({ event }: PreparedAdvanceDoneArgs) => event.output?.unitFinished === true
+  preparedTrial: ({ event }: PreparedAdvanceDoneArgs) => (
+    event.output?.unitFinished === true ||
+    event.output?.preparedAdvanceMode === 'none' ||
+    !event.output?.currentDisplay
+  )
     ? null
     : event.output || null,
   engine: ({ context, event }: PreparedAdvanceDoneArgs) => event.output?.engine || context.engine,
@@ -385,7 +389,6 @@ export const cardMachine = createMachine(
                         ended: false,
                       }),
                     }),
-                    'resumeVideoPlayback',
                     'logStateTransition',
                   ],
                 },
@@ -1284,6 +1287,30 @@ export const cardMachine = createMachine(
                   ],
                 },
                 {
+                  guard: 'isVideoSession',
+                  target: '#cardMachine.videoWaiting',
+                  actions: [
+                    'incrementQuestionIndex',
+                    assign({
+                      preparedTrial: () => null,
+                      incomingPreparationComplete: () => false,
+                      incomingReady: () => false,
+                      preparedAdvanceMode: () => 'none',
+                      unitFinished: () => false,
+                      videoSession: ({ context }: MachineArgs) => ({
+                        ...context.videoSession,
+                        isActive: true,
+                        pendingQuestionIndex: null,
+                        ended: false,
+                      }),
+                    }),
+                    'clearFeedback',
+                    'resetTimers',
+                    'resumeVideoPlayback',
+                    'logStateTransition',
+                  ],
+                },
+                {
                   guard: 'hasPreparedTrial',
                   target: '#cardMachine.transition.fadingOut',
                   actions: ['logStateTransition'],
@@ -1313,6 +1340,14 @@ export const cardMachine = createMachine(
               onDone: [
                 {
                   guard: ({ event }: PreparedAdvanceDoneArgs) => event.output?.unitFinished === true,
+                  target: 'logging',
+                  actions: [
+                    storePreparedIncomingTrial,
+                    'logStateTransition',
+                  ],
+                },
+                {
+                  guard: ({ event }: PreparedAdvanceDoneArgs) => event.output?.preparedAdvanceMode === 'none',
                   target: 'logging',
                   actions: [
                     storePreparedIncomingTrial,
@@ -1497,25 +1532,35 @@ export const cardMachine = createMachine(
       videoWaiting: {
         entry: ['logStateTransition'],
         on: {
-          [EVENTS.VIDEO_CHECKPOINT]: {
-            target: `#cardMachine.${STATES.PRESENTING}`,
-              guard: 'isVideoSession',
+          [EVENTS.VIDEO_CHECKPOINT]: [
+            {
+              target: `#cardMachine.${STATES.PRESENTING}`,
+              guard: 'canAcceptVideoCheckpoint',
               actions: [
                 assign({
                   videoSession: ({ context, event }: MachineArgs) => ({
                     ...context.videoSession,
-                    currentCheckpointIndex: Number.isFinite(event.checkpointIndex)
-                      ? Number(event.checkpointIndex)
-                      : context.videoSession.currentCheckpointIndex,
-                    pendingQuestionIndex: Number.isFinite(event.questionIndex)
-                      ? Number(event.questionIndex)
-                      : context.videoSession.pendingQuestionIndex,
+                    currentCheckpointIndex: Number(event.checkpointIndex),
+                    pendingQuestionIndex: Number(event.questionIndex),
                     ended: false,
                   }),
               }),
               'logStateTransition',
             ],
-          },
+            },
+            {
+              target: `#cardMachine.${STATES.ERROR}`,
+              actions: [
+                assign({
+                  errorMessage: ({ event }: MachineArgs) => (
+                    `[CardMachine] Invalid video checkpoint event: checkpointIndex=${String(event.checkpointIndex)}, questionIndex=${String(event.questionIndex)}`
+                  ),
+                }),
+                'logError',
+                'logStateTransition',
+              ],
+            },
+          ],
           [EVENTS.VIDEO_ENDED]: {
             target: 'videoEnded',
               guard: 'isVideoSession',
@@ -1581,6 +1626,18 @@ export const cardMachine = createMachine(
           'logStateTransition',
         ],
       },
+      [EVENTS.VIDEO_CHECKPOINT]: {
+        target: `#cardMachine.${STATES.ERROR}`,
+        actions: [
+          assign({
+            errorMessage: ({ event }: MachineArgs) => (
+              `[CardMachine] VIDEO_CHECKPOINT received outside videoWaiting: checkpointIndex=${String(event.checkpointIndex)}, questionIndex=${String(event.questionIndex)}`
+            ),
+          }),
+          'logError',
+          'logStateTransition',
+        ],
+      },
     },
   },
   {
@@ -1643,6 +1700,7 @@ export const cardMachine = createMachine(
       // Video session guards
       isVideoSession: guards.isVideoSession,
       isNotVideoSession: guards.isNotVideoSession,
+      canAcceptVideoCheckpoint: guards.canAcceptVideoCheckpoint,
 
       hasUserAnswer: guards.hasUserAnswer,
       noUserAnswer: guards.noUserAnswer,
@@ -1681,7 +1739,9 @@ export const cardMachine = createMachine(
       syncDeliveryParams: actions.syncDeliveryParams,
       syncUiSettings: actions.syncUiSettings,
       syncCardStore: actions.syncCardStore,
+      syncSessionIndices: actions.syncSessionIndices,
       syncCurrentAnswer: actions.syncCurrentAnswer,
+      incrementQuestionIndex: actions.incrementQuestionIndex,
       setPrestimulusDisplay: actions.setPrestimulusDisplay,
       restoreQuestionDisplay: actions.restoreQuestionDisplay,
       forceSrFailureAnswer: actions.forceSrFailureAnswer,

@@ -200,6 +200,27 @@ export const syncCardStore = ({ context, event }: ActionArgs) => {
   CardStore.setButtonList(buttonList);
 };
 
+export function syncSessionIndices({ context }: ActionArgs) {
+  const indices = context.engineIndices || {};
+  if (Number.isFinite(indices.clusterIndex)) {
+    Session.set('clusterIndex', indices.clusterIndex);
+  }
+  if (Number.isFinite(indices.stimIndex) || Number.isFinite(indices.whichStim)) {
+    Session.set('engineIndices', {
+      ...indices,
+      stimIndex: Number.isFinite(indices.stimIndex) ? indices.stimIndex : indices.whichStim,
+    });
+  }
+  CardStore.setQuestionIndex(context.questionIndex || 1);
+}
+
+export const incrementQuestionIndex = assign({
+  questionIndex: ({ context }: ActionArgs) => {
+    const current = Number(context.questionIndex);
+    return Number.isFinite(current) ? current + 1 : 1;
+  },
+});
+
 /**
  * Keep live answer context in fast local runtime state.
  * This should not persist through ExperimentStateStore for learning-card checkpointing.
@@ -827,6 +848,9 @@ export function notifyVideoAnswer({ context }: ActionArgs) {
   if (!context.videoSession?.isActive) {
     clientConsole(1, '[VIDEO-REWIND-DEBUG] notifyVideoAnswer skipped because videoSession is not active');
     return;
+  }
+  if (!Number.isFinite(context.videoSession.currentCheckpointIndex)) {
+    throw new Error('[CardMachine] Video answer completion missing active checkpoint index');
   }
 
   if (typeof window !== 'undefined') {

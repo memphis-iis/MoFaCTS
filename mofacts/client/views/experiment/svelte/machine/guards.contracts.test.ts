@@ -1,10 +1,12 @@
 import { expect } from 'chai';
+import { Session } from 'meteor/session';
 import {
   isSupportedTrialType,
   isUnsupportedTrialType,
   isCorrectForceCorrection,
   unitFinished,
   canUsePreparedAdvance,
+  canAcceptVideoCheckpoint,
   isSoftError,
   isHardError,
   hasQuestionAudio,
@@ -29,6 +31,11 @@ function makeArgs(overrides: { context?: Record<string, unknown>; event?: Record
 }
 
 describe('machine guard contracts', function() {
+  afterEach(function() {
+    Session.set('isVideoSession', false);
+    Session.set('videoCheckpoints', null);
+  });
+
   it('accepts supported trial types and rejects unknown trial types', function() {
     expect(isSupportedTrialType(makeArgs({ context: { testType: 's' } }))).to.equal(true);
     expect(isSupportedTrialType(makeArgs({ context: { testType: 'd' } }))).to.equal(true);
@@ -83,6 +90,24 @@ describe('machine guard contracts', function() {
     expect(canUsePreparedAdvance(makeArgs({ context: { engine: { unitType: 'model' } } }))).to.equal(true);
     expect(canUsePreparedAdvance(makeArgs({ context: { engine: { unitType: 'schedule' } } }))).to.equal(true);
     expect(canUsePreparedAdvance(makeArgs({ context: { engine: { unitType: 'video' } } }))).to.equal(false);
+  });
+
+  it('accepts only configured video checkpoint mappings', function() {
+    Session.set('isVideoSession', true);
+    Session.set('videoCheckpoints', {
+      times: [69, 115],
+      questions: [3, 7],
+    });
+
+    expect(canAcceptVideoCheckpoint(makeArgs({
+      event: { type: 'VIDEO_CHECKPOINT', checkpointIndex: 0, questionIndex: 3 },
+    }))).to.equal(true);
+    expect(canAcceptVideoCheckpoint(makeArgs({
+      event: { type: 'VIDEO_CHECKPOINT', checkpointIndex: 0, questionIndex: 7 },
+    }))).to.equal(false);
+    expect(canAcceptVideoCheckpoint(makeArgs({
+      event: { type: 'VIDEO_CHECKPOINT', checkpointIndex: 2, questionIndex: 7 },
+    }))).to.equal(false);
   });
 });
 

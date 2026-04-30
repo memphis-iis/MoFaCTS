@@ -972,6 +972,15 @@ export async function prepareIncomingTrialService(
   }
 
   const nextQuestionIndex = Number.isFinite(context.questionIndex) ? Number(context.questionIndex) + 1 : 1;
+  if (engine.unitType === 'video') {
+    return {
+      unitFinished: false,
+      preparedAdvanceMode: 'none',
+      engine,
+      questionIndex: nextQuestionIndex,
+    };
+  }
+
   const curExperimentState = (ExperimentStateStore.get() || {}) as ExperimentState;
   if (engine.unitType === 'model') {
     const preparedTrial = await prepareLockedNextTrial(engine, context, curExperimentState, nextQuestionIndex);

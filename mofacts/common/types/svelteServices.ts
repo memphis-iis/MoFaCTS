@@ -3,7 +3,7 @@
 
 export type UnitType = 'schedule' | 'video' | 'model' | 'instruction-only';
 
-export type VideoCheckpointBehavior = 'none' | 'all' | 'some' | 'adaptive';
+export type VideoCheckpointBehavior = 'none' | 'pause' | 'all' | 'some' | 'adaptive';
 
 export interface RewindCheckpointData {
   checkpointBehavior: VideoCheckpointBehavior;

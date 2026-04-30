@@ -210,7 +210,7 @@ function deriveUnitType(unit: TdfUnitLike | null | undefined): UnitType | undefi
   return undefined;
 }
 
-const VIDEO_CHECKPOINT_BEHAVIORS = new Set(['none', 'all', 'some', 'adaptive']);
+const VIDEO_CHECKPOINT_BEHAVIORS = new Set(['none', 'pause', 'all', 'some', 'adaptive']);
 
 function normalizeVideoBoolean(value: unknown): boolean {
   return value === true || value === 'true' || value === 1 || value === '1';
@@ -337,7 +337,7 @@ function buildRewindCheckpointData(
     };
   }
 
-  if (checkpointBehavior === 'all') {
+  if (checkpointBehavior === 'pause' || checkpointBehavior === 'all') {
     return {
       checkpointBehavior,
       rewindCheckpoints: uniqueSortedNumeric(questionTimes),
@@ -859,10 +859,7 @@ async function initializeStandardCardEntry(
     }
 
     Session.set('currentTdfUnit', unit);
-    await initVideoSessionData(unit);
   }
-
-  await initVideoSessionData(Session.get('currentTdfUnit'));
 
   const existingEngine = getEngine() as RuntimeEngine | null;
   const currentUnitNumber = Session.get('currentUnitNumber') || 0;
@@ -958,11 +955,18 @@ async function initializeStandardCardEntry(
   const instructionsSeen = Session.get('curUnitInstructionsSeen');
   const shouldShowInstructions = ((!instructionsSeen) && (hasUnitText || hasUnitImage || hasUnitQuestion)) ||
     lockoutMinutes > 0;
+  const canInlineVideoInstructions = unitType === 'video' &&
+    lockoutMinutes <= 0 &&
+    hasUnitText &&
+    !hasUnitImage &&
+    !hasUnitQuestion;
 
-  if (shouldShowInstructions) {
+  if (shouldShowInstructions && !canInlineVideoInstructions) {
     FlowRouter.go('/instructions');
     return { redirected: true };
   }
+
+  await initVideoSessionData(Session.get('currentTdfUnit'));
 
   return { redirected: false };
 }
@@ -1006,6 +1010,9 @@ export async function initializeSvelteCard(): Promise<SvelteCardInitResult> {
   CardStore.setInputReady(false);
   Session.set('displayReady', false);
   Session.set('inputReady', false);
+  Session.set('isVideoSession', false);
+  Session.set('videoCheckpoints', null);
+  Session.set('videoResumeAnchor', null);
   if (!Array.isArray(Session.get('overallOutcomeHistory'))) {
     Session.set('overallOutcomeHistory', []);
   }

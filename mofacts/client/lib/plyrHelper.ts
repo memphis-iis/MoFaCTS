@@ -76,11 +76,6 @@ class PlayerController {
       this.checkpoints = videoSession.checkpoints.slice();
     }
     
-    // Always add time 0 as the first checkpoint (beginning of video)
-    if (this.checkpoints.length > 0 && this.checkpoints[0].time !== 0) {
-      this.checkpoints.unshift({ time: 0 });
-    }
-    
     const plyrConfig: any = {
       markers: { enabled: times.length > 0, points: points }
     };
@@ -638,7 +633,7 @@ class PlayerController {
 
     //Updatge checkpoints when markers change
     if(this.checkpointBehavior === "question"){
-      this.checkpoints = [{ time: 0 }, ...this.times.sort((a: any, b: any) => a - b).map((time: any) => ({ time }))];
+      this.checkpoints = this.times.sort((a: any, b: any) => a - b).map((time: any) => ({ time }));
     }
     for(let i = 0; i < newMarkers.length; i++){
       $(".plyr__progress").append(`<span class="plyr__progress__marker" style="left: ${newMarkers[i].time/this.player.duration*100}%;"></span>`)

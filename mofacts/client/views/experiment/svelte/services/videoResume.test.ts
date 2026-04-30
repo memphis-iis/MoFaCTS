@@ -7,11 +7,11 @@ describe('videoResume', function() {
 
   it('resumes from the last completed checkpoint time and next unanswered checkpoint index', function() {
     expect(resolveVideoResumeAnchor(checkpointTimes, 1)).to.deep.equal({
-      resumeStartTime: 10,
+      resumeStartTime: 10.1,
       resumeCheckpointIndex: 1,
     });
     expect(resolveVideoResumeAnchor(checkpointTimes, 2)).to.deep.equal({
-      resumeStartTime: 20,
+      resumeStartTime: 20.1,
       resumeCheckpointIndex: 2,
     });
   });
@@ -22,7 +22,7 @@ describe('videoResume', function() {
 
   it('resumes from the last checkpoint when all questions are already completed', function() {
     expect(resolveVideoResumeAnchor(checkpointTimes, 3)).to.deep.equal({
-      resumeStartTime: 30,
+      resumeStartTime: 30.1,
       resumeCheckpointIndex: 3,
     });
   });

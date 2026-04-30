@@ -75,7 +75,8 @@
     displayAttribution.sourceUrl,
     displayAttribution.licenseUrl,
   ].join('::');
-  $: needsAttributedImageLayout = Boolean(safeDisplay.imgSrc) && hasAttribution && Boolean(attributionCaption);
+  $: needsImageLayout = Boolean(safeDisplay.imgSrc);
+  $: needsAttributedImageLayout = needsImageLayout && hasAttribution && Boolean(attributionCaption);
   $: imageViewportStyle = imageViewportWidthPx === null || imageViewportHeightPx === null
     ? ''
     : `width: ${imageViewportWidthPx}px; height: ${imageViewportHeightPx}px;`;
@@ -171,20 +172,22 @@
   let lastAttributionLayoutSignature = '';
 
   function updateAttributedImageLayout() {
-    if (!needsAttributedImageLayout) {
+    if (!needsImageLayout) {
       imageViewportWidthPx = null;
       imageViewportHeightPx = null;
       return true;
     }
 
-    if (!imageBlockElement || !imageElement || !attributionElement) {
+    if (!imageBlockElement || !imageElement || (needsAttributedImageLayout && !attributionElement)) {
       return false;
     }
 
     const blockRect = imageBlockElement.getBoundingClientRect();
-    const attributionRect = attributionElement.getBoundingClientRect();
+    const attributionHeight = needsAttributedImageLayout
+      ? attributionElement.getBoundingClientRect().height
+      : 0;
 
-    if (!blockRect.height || !blockRect.width || !attributionRect.height) {
+    if (!blockRect.height || !blockRect.width || (needsAttributedImageLayout && !attributionHeight)) {
       return false;
     }
 
@@ -196,7 +199,7 @@
     }
 
     const availableWidth = blockRect.width;
-    const availableHeight = blockRect.height - attributionRect.height - attributionGapPx;
+    const availableHeight = blockRect.height - attributionHeight - (needsAttributedImageLayout ? attributionGapPx : 0);
 
     if (availableWidth <= 0 || availableHeight <= 0) {
       return false;
@@ -240,7 +243,7 @@
   }
 
   function handleViewportResize() {
-    if (!needsAttributedImageLayout) {
+    if (!needsImageLayout) {
       return;
     }
     void finalizeAttributionLayout(attributionLayoutSequence, lastAttributionLayoutSignature);
@@ -251,7 +254,7 @@
       return;
     }
 
-    const shouldAttach = needsAttributedImageLayout;
+    const shouldAttach = needsImageLayout;
     if (shouldAttach && !resizeHandlerAttached) {
       window.addEventListener('resize', handleViewportResize);
       resizeHandlerAttached = true;
@@ -268,7 +271,7 @@
       return;
     }
 
-    if (!needsAttributedImageLayout) {
+    if (!needsImageLayout) {
       if (imageResizeObserver) {
         imageResizeObserver.disconnect();
         imageResizeObserver = undefined;
@@ -276,7 +279,7 @@
       return;
     }
 
-    if (!imageBlockElement || !attributionElement) {
+    if (!imageBlockElement || (needsAttributedImageLayout && !attributionElement)) {
       return;
     }
 
@@ -289,7 +292,9 @@
     }
 
     imageResizeObserver.observe(imageBlockElement);
-    imageResizeObserver.observe(attributionElement);
+    if (needsAttributedImageLayout) {
+      imageResizeObserver.observe(attributionElement);
+    }
   }
 
   $: syncResizeObserver();
@@ -307,7 +312,7 @@
       attributionLayoutSequence += 1;
       const sequence = attributionLayoutSequence;
 
-      if (!needsAttributedImageLayout) {
+      if (!needsImageLayout) {
         imageViewportWidthPx = null;
         imageViewportHeightPx = null;
         attributionLayoutReady = true;
@@ -438,7 +443,7 @@
                 </span>
               </div>
             {:else}
-              <div class="stimulus-image stimulus-image-fill">
+              <div class="stimulus-image stimulus-image-measured" style={imageViewportStyle}>
                 <img bind:this={imageElement} src={safeDisplay.imgSrc} alt="Stimulus" />
               </div>
             {/if}
@@ -766,16 +771,6 @@
     width: 100%;
     max-height: 100%;
     overflow: hidden; /* Prevent image from exceeding bounds */
-  }
-
-  .stimulus-image-fill {
-    flex: 1 1 auto;
-    height: 100%;
-  }
-
-  .stimulus-display.flow-row .stimulus-image-fill {
-    flex: 1 1 0;
-    height: auto;
   }
 
   .stimulus-image-measured {

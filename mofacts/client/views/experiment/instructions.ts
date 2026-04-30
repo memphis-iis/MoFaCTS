@@ -42,7 +42,7 @@ function sanitizeHTML(dirty: any) {
   });
 }
 
-export { instructContinue, unitHasLockout, checkForFileImage };
+export { instructContinue, unitHasLockout, checkForFileImage, recordCurrentInstructionContinue };
 // //////////////////////////////////////////////////////////////////////////
 // Instruction timer and leaving this page - we don't want to leave a
 // timer running!
@@ -867,34 +867,7 @@ function gatherInstructionLogRecord(trialEndTimeStamp: any, trialStartTimeStamp:
   return instructionLog;
 }
 
-async function handleInstructionContinueAction(forceBypassLockout = false) {
-  if (forceBypassLockout) {
-    // Prevent stale lockout config from bleeding into the next unit after manual bypass.
-    Session.set('currentDeliveryParams', null);
-    DeliveryParamsStore.set({});
-  }
-  if (!forceBypassLockout) {
-    const lockoutRemainingMs = currLockOut();
-    if (lockoutRemainingMs > 0) {
-      clientConsole(2, '[Instructions] Continue blocked due to active lockout', lockoutRemainingMs);
-      return;
-    }
-    const configuredLockout = getConfiguredLockoutMinutes();
-    if (configuredLockout === null) {
-      clientConsole(2, '[Instructions] Continue blocked while lockout config is unresolved');
-      return;
-    }
-    // If lockout is configured but already expired, never re-block on
-    // initialization race/missing persisted record.
-    if (configuredLockout > 0 && lockoutRemainingMs <= 0) {
-      clientConsole(2, '[Instructions] Continue allowed: lockout already expired');
-    } else if (configuredLockout > 0 && !checkForExistingLockout()) {
-      await lockoutKick();
-      clientConsole(2, '[Instructions] Continue blocked while lockout initializes');
-      return;
-    }
-  }
-
+async function recordCurrentInstructionContinue(trialStartTimeStamp: any = timeRendered) {
   //record the unit instructions if the unit setspec has the recordInstructions tag set to true
   // OR if the tdf setspec has the recordInstructions tag set to true
   // OR if the tdf setspec has the recordInstructions has an array of unit numbers that includes the current unit number
@@ -923,10 +896,41 @@ async function handleInstructionContinueAction(forceBypassLockout = false) {
   const recordInstructions = curUnit?.recordInstructions || recordInstructionsIncludesUnit ||
     setSpec?.recordInstructions === true || setSpec?.recordInstructions === "true";
   if(recordInstructions){
-    const instructionLog = gatherInstructionLogRecord(Date.now(), timeRendered);
+    const instructionLog = gatherInstructionLogRecord(Date.now(), trialStartTimeStamp);
     clientConsole(2, 'instructionLog', instructionLog);
-    (Meteor as any).callAsync('insertHistory', instructionLog)
+    await (Meteor as any).callAsync('insertHistory', instructionLog)
   }
+}
+
+async function handleInstructionContinueAction(forceBypassLockout = false) {
+  if (forceBypassLockout) {
+    // Prevent stale lockout config from bleeding into the next unit after manual bypass.
+    Session.set('currentDeliveryParams', null);
+    DeliveryParamsStore.set({});
+  }
+  if (!forceBypassLockout) {
+    const lockoutRemainingMs = currLockOut();
+    if (lockoutRemainingMs > 0) {
+      clientConsole(2, '[Instructions] Continue blocked due to active lockout', lockoutRemainingMs);
+      return;
+    }
+    const configuredLockout = getConfiguredLockoutMinutes();
+    if (configuredLockout === null) {
+      clientConsole(2, '[Instructions] Continue blocked while lockout config is unresolved');
+      return;
+    }
+    // If lockout is configured but already expired, never re-block on
+    // initialization race/missing persisted record.
+    if (configuredLockout > 0 && lockoutRemainingMs <= 0) {
+      clientConsole(2, '[Instructions] Continue allowed: lockout already expired');
+    } else if (configuredLockout > 0 && !checkForExistingLockout()) {
+      await lockoutKick();
+      clientConsole(2, '[Instructions] Continue blocked while lockout initializes');
+      return;
+    }
+  }
+
+  await recordCurrentInstructionContinue(timeRendered);
   await instructContinue();
 }
 

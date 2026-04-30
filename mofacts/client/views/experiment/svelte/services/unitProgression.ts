@@ -251,7 +251,7 @@ export async function unitIsFinished(_reason: string): Promise<void> {
       await meteorCallAsync('incrementTdfConditionCount', rootTdfId, curConditionNumber);
     }
 
-    leaveTarget = '/instructions';
+    leaveTarget = curTdfUnit?.videosession ? '/card' : '/instructions';
   } else {
     clientConsole(2, 'UNIT FINISHED: No More Units');
 
