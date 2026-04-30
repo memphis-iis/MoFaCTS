@@ -80,7 +80,6 @@ export function registerDdpRateLimits(deps: DdpRateLimitDeps) {
         'transferDataOwnership',
         'assignAccessors',
         'resolveUsersForTdf',
-        'toggleTdfPresence',
         'adminCreateOrUpdateUser',
         'insertNewUsers'
       ].includes(name);

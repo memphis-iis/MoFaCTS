@@ -154,7 +154,6 @@ function getNewTdfFormat(oldTdf: any, stimuliSetId: number, tdfId?: string | num
     content: {
       tdfs: oldTdf.tdfs,
     },
-    visibility: oldTdf.visibility || 'profileOnly',
   };
   if (tdfId) tdfObj._id = tdfId;
 

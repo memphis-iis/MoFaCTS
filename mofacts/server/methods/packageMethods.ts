@@ -741,7 +741,6 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       path: packagePath,
       content: tdfJSONtoUpsert,
       ownerId: ownerId,
-      visibility: 'profileOnly',
       conditionCounts: conditionCounts
       }});
 
@@ -832,8 +831,7 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
         packageAssetId: packageAssetId,
         rawStimuliFile: stimJSON,
         stimuli: formattedStims,
-        stimuliSetId: stimuliSetId,
-        visibility: 'profileOnly'
+        stimuliSetId: stimuliSetId
       };
       if(ret.res != 'awaitClientTDF'){
         ret.res = 'awaitClientTDF';
@@ -875,7 +873,6 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       rawStimuliFile: stimJSON,
       stimuli: formattedStims,
       stimuliSetId: stimuliSetId,
-      visibility: 'profileOnly',
       conditionCounts: conditionCounts
     }});
 
@@ -1149,7 +1146,6 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     const newTdf = JSON.parse(JSON.stringify(sourceTdf));
     delete newTdf._id;
     newTdf.ownerId = userId;
-    newTdf.visibility = 'profileOnly';
     newTdf.accessors = [];
 
     const originalFileName = newTdf.content?.fileName || 'unknown.xml';

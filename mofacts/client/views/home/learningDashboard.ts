@@ -263,7 +263,6 @@ Template.learningDashboard.rendered = async function(this: any) {
   const tdfFields = {
     _id: 1,
     stimuliSetId: 1,
-    visibility: 1,
     ownerId: 1,
     accessors: 1,
     'content.fileName': 1,
@@ -464,7 +463,7 @@ Template.learningDashboard.rendered = async function(this: any) {
     // Check if this TDF has been attempted
     const hasBeenAttempted = attemptedTdfIds.has(TDFId);
 
-    // Server publication is the source of truth for dashboard visibility.
+    // Server publication is the source of truth for dashboard access.
     // Client-side checks should only enforce local view-policy (version gating, assignment context).
     const shouldShow = true;
 

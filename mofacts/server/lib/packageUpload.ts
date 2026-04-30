@@ -95,6 +95,14 @@ export async function processPackageUploadWorkflow(
     return { results, stimSetId: state.stimSetId };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
+    if (!state.stimSetId && fileObj?._id && typeof deps.DynamicAssets.removeAsync === 'function') {
+      try {
+        await deps.DynamicAssets.removeAsync({ _id: fileObj._id });
+        deps.serverConsole('Removed package asset after failed initialization:', fileObj._id);
+      } catch (cleanupError: unknown) {
+        deps.serverConsole('Could not remove package asset after failed initialization:', fileObj._id, cleanupError);
+      }
+    }
     await failPackageUpload(emailToggle, deps, {
       zipPath,
       filePath: state.filePath,

@@ -33,6 +33,37 @@ export async function processParsedPackageTdfs(args: {
   const stimFileName = firstStim?.name;
   const touchedStimuliSetIds = new Set<string | number>();
   const results: SaveContentResult[] = [];
+  const childUserSelectByFileName = new Map<string, string>();
+
+  for (const rootCandidate of unzippedFiles.filter((file) => file.type === 'tdf')) {
+    const rootContents = rootCandidate.contents as {
+      tutor?: {
+        setspec?: {
+          condition?: unknown;
+          userselect?: unknown;
+        };
+      };
+    };
+    const rootSetspec = rootContents?.tutor?.setspec;
+    const rootConditions = Array.isArray(rootSetspec?.condition) ? rootSetspec.condition : [];
+    if (rootConditions.length === 0) {
+      continue;
+    }
+    const rootUserSelect = String(rootSetspec?.userselect || 'false').trim().toLowerCase() === 'true'
+      ? 'true'
+      : 'false';
+    for (const condition of rootConditions) {
+      if (typeof condition !== 'string' || !condition.trim()) {
+        throw new Error(`Root TDF "${rootCandidate.name}" has an invalid condition reference.`);
+      }
+      const conditionFileName = condition.trim();
+      const previous = childUserSelectByFileName.get(conditionFileName);
+      if (previous && previous !== rootUserSelect) {
+        throw new Error(`Condition TDF "${conditionFileName}" is referenced by roots with conflicting public/private settings.`);
+      }
+      childUserSelectByFileName.set(conditionFileName, rootUserSelect);
+    }
+  }
 
   try {
     for (const tdf of unzippedFiles.filter((file) => file.type === 'tdf')) {
@@ -68,6 +99,10 @@ export async function processParsedPackageTdfs(args: {
       }
       if (!isTeacherOrAdmin) {
         tdfContents.tutor.setspec.userselect = 'false';
+      }
+      const inheritedUserSelect = childUserSelectByFileName.get(tdf.name);
+      if (inheritedUserSelect) {
+        tdfContents.tutor.setspec.userselect = inheritedUserSelect;
       }
 
       const packageResult: SaveContentResult = { result: null, errmsg: 'No action taken?', action: 'None' };

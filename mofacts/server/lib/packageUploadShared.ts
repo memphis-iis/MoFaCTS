@@ -47,6 +47,7 @@ export type ProcessPackageUploadDeps = {
     collection: {
       findOneAsync: (selector: Record<string, unknown>) => Promise<DynamicAssetLike | null>;
     };
+    removeAsync?: (selector: Record<string, unknown>) => Promise<unknown>;
   };
   userIsInRoleAsync: (userId: string, roles: string[]) => Promise<boolean>;
   normalizeCanonicalId: (value: unknown) => string | null;

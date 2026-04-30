@@ -575,7 +575,6 @@ Meteor.publish('tdfForEditMetadata', async function(tdfId: any) {
 const TDF_LISTING_FIELDS = {
     _id: 1,
     stimuliSetId: 1,
-    visibility: 1,
     ownerId: 1,
     accessors: 1,
     'content.fileName': 1,
@@ -593,7 +592,6 @@ const TDF_CONTENT_UPLOAD_DETAIL_FIELDS = {
     packageAssetId: 1,
     ownerId: 1,
     accessors: 1,
-    visibility: 1,
     rawStimuliFile: 1,
     'content.fileName': 1,
     'content.tdfs.tutor.setspec': 1
@@ -695,7 +693,6 @@ Meteor.publish('dashboardTdfsListing', async function() {
                     _id: 1,
                     ownerId: 1,
                     accessors: 1,
-                    visibility: 1,
                     'content.tdfs.tutor.setspec.userselect': 1
                 }
             }

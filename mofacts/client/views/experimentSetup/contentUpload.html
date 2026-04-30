@@ -264,13 +264,13 @@
                                                 <span class="asset-title">{{lessonName}}</span>
                                                 {{#unless isPending}}
                                                     {{#if isOwnTdf}}
-                                                    <span class="asset-visibility-row">
-                                                        <span class="visibility-switch" title="Toggle visibility on Learning Dashboard">
-                                                            <span class="visibility-switch-label visibility-switch-label-left small">Private</span>
-                                                            <span class="form-switch visibility-switch-control">
-                                                                <input class="form-check-input visibility-toggle" type="checkbox" data-tdfid="{{_id}}" checked={{checkedIfPublic}} aria-label="Toggle lesson visibility">
+                                                    <span class="asset-public-private-row">
+                                                        <span class="public-private-switch" title="Toggle public/private status on Learning Dashboard">
+                                                            <span class="public-private-switch-label public-private-switch-label-left small">Private</span>
+                                                            <span class="form-switch public-private-switch-control">
+                                                                <input class="form-check-input public-private-toggle" type="checkbox" data-tdfid="{{_id}}" checked={{checkedIfPublic}} aria-label="Toggle lesson public/private status">
                                                             </span>
-                                                            <span class="visibility-switch-label visibility-switch-label-right small">Public</span>
+                                                            <span class="public-private-switch-label public-private-switch-label-right small">Public</span>
                                                         </span>
                                                     </span>
                                                     {{/if}}

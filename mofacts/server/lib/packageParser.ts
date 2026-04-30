@@ -81,7 +81,8 @@ export async function parsePackageZip(
     let type: UploadedPackageFile['type'];
     if (extension === 'json') {
       serverConsole(fileName);
-      fileContents = JSON.parse(fileContents.toString());
+      const jsonText = fileContents.toString('utf8').replace(/^\uFEFF/, '');
+      fileContents = JSON.parse(jsonText);
       type = fileContents.setspec ? 'stim' : 'tdf';
     } else {
       type = 'media';

@@ -924,8 +924,8 @@ Template.contentUpload.events({
     }
   },
 
-  // Toggle TDF visibility (public/private)
-  'change .visibility-toggle': async function(event: any, _template: any) {
+  // Toggle TDF public/private setting
+  'change .public-private-toggle': async function(event: any, _template: any) {
     const tdfId = event.currentTarget.getAttribute('data-tdfid');
     const isPublic = event.currentTarget.checked;
 
@@ -936,8 +936,8 @@ Template.contentUpload.events({
       assetsHelperCachedResult = [];
       assetsRefreshTrigger.set(assetsRefreshTrigger.get() + 1);
     } catch (err: any) {
-      clientConsole(1, '[VISIBILITY] Error toggling visibility:', err);
-      alert('Error changing visibility: ' + err.message);
+      clientConsole(1, '[PUBLIC/PRIVATE] Error toggling public/private setting:', err);
+      alert('Error changing public/private setting: ' + err.message);
       // Revert the checkbox state
       event.currentTarget.checked = !isPublic;
     }

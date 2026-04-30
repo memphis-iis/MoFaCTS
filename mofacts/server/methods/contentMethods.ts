@@ -33,7 +33,6 @@ type TdfLike = {
   packageFile?: string | null;
   packageAssetId?: unknown;
   stimuliSetId?: unknown;
-  visibility?: unknown;
   conditionCounts?: unknown[];
   rawStimuliFile?: unknown;
   stimuli?: Array<Record<string, unknown>>;
@@ -197,7 +196,6 @@ async function getContentUploadSummariesForIds(
         packageFile: 1,
         packageAssetId: 1,
         stimuliSetId: 1,
-        visibility: 1,
         conditionCounts: 1,
         'content.fileName': 1,
         'content.tdfs.tutor.setspec.lessonname': 1,
@@ -564,7 +562,6 @@ export function createContentMethods(deps: ContentMethodsDeps) {
           fields: {
             ownerId: 1,
             accessors: 1,
-            visibility: 1,
             'content.fileName': 1,
             'content.tdfs.tutor.setspec.lessonname': 1,
             'content.tdfs.tutor.setspec.userselect': 1,
@@ -623,7 +620,6 @@ export function createContentMethods(deps: ContentMethodsDeps) {
             rawStimuliFile: 1,
             ownerId: 1,
             accessors: 1,
-            visibility: 1,
             'content.tdfs.tutor.setspec.stimulusfile': 1,
             'content.tdfs.tutor.setspec.userselect': 1,
             'content.tdfs.tutor.setspec.experimentTarget': 1,
@@ -701,8 +697,22 @@ export function createContentMethods(deps: ContentMethodsDeps) {
         }
 
         const isAdmin = await hasUserRole(deps.getMethodAuthorizationDeps(), userId, ['admin']);
+        const packageAsset = await deps.DynamicAssets.findOneAsync({ _id: packageAssetId });
+        const packageFileCandidates = new Set<string>();
+        const packageExt = typeof packageAsset?.ext === 'string' && packageAsset.ext.trim()
+          ? packageAsset.ext.trim()
+          : 'zip';
+        packageFileCandidates.add(`${packageAssetId}.${packageExt}`);
+        packageFileCandidates.add(`${packageAssetId}.${packageExt.toLowerCase()}`);
+
+        const matchingTdfQuery: Record<string, unknown> = {
+          $or: [
+            { packageAssetId },
+            { packageFile: { $in: Array.from(packageFileCandidates) } },
+          ],
+        };
         const matchingTdfs = await deps.Tdfs.find(
-          { packageAssetId },
+          matchingTdfQuery,
           { fields: { _id: 1, ownerId: 1, stimuliSetId: 1, stimuli: 1 } }
         ).fetchAsync();
 
@@ -782,7 +792,6 @@ export function createContentMethods(deps: ContentMethodsDeps) {
         }
 
         deps.serverConsole('Removing package asset with ID:', packageAssetId);
-        const packageAsset = await deps.DynamicAssets.findOneAsync({ _id: packageAssetId });
         if (packageAsset) {
           if (!isAdmin && packageAsset.userId !== userId) {
             throw new Meteor.Error(403, 'Can only delete your own packages');
@@ -1004,21 +1013,6 @@ export function createContentMethods(deps: ContentMethodsDeps) {
       };
     },
 
-    toggleTdfPresence: async function(this: MethodContext, tdfIds: string[], mode: boolean | string) {
-      await requireUserWithRoles(deps.getMethodAuthorizationDeps(), {
-        userId: this.userId,
-        roles: ['admin'],
-        notLoggedInMessage: 'Must be logged in',
-        notLoggedInCode: 401,
-        forbiddenMessage: 'Admin access required to toggle TDF visibility',
-        forbiddenCode: 403,
-      });
-
-      for (const tdfid of tdfIds) {
-        await deps.Tdfs.updateAsync({ _id: tdfid }, { $set: { visibility: mode } });
-      }
-    },
-
     getTdfOwnersMap: async function(this: MethodContext, ownerIds: string[]) {
       const actingUserId = requireAuthenticatedUser(this.userId, 'Must be logged in', 401);
       if (!Array.isArray(ownerIds)) {
@@ -1042,7 +1036,7 @@ export function createContentMethods(deps: ContentMethodsDeps) {
       } else {
         const tdfs = await deps.Tdfs.find(
           { ownerId: { $in: uniqueOwnerIds } },
-          { fields: { _id: 1, ownerId: 1, accessors: 1, visibility: 1, 'content.tdfs.tutor.setspec.userselect': 1 } }
+          { fields: { _id: 1, ownerId: 1, accessors: 1, 'content.tdfs.tutor.setspec.userselect': 1 } }
         ).fetchAsync();
         for (const tdf of tdfs) {
           if (tdf?.ownerId && await deps.canAccessContentUploadTdf(actingUserId, tdf)) {
@@ -1077,7 +1071,6 @@ export function createContentMethods(deps: ContentMethodsDeps) {
             _id: 1,
             ownerId: 1,
             accessors: 1,
-            visibility: 1,
             stimuliSetId: 1,
             conditionCounts: 1,
             'content.fileName': 1,
@@ -1130,7 +1123,7 @@ export function createContentMethods(deps: ContentMethodsDeps) {
         subjectUserId: tdf.ownerId,
         notLoggedInMessage: 'Must be logged in',
         notLoggedInCode: 'not-authorized',
-        forbiddenMessage: 'Only owner can change visibility',
+        forbiddenMessage: 'Only owner can change public/private setting',
         forbiddenCode: 'not-authorized',
       });
 
@@ -1154,7 +1147,7 @@ export function createContentMethods(deps: ContentMethodsDeps) {
       }
 
       await deps.AuditLog.insertAsync({
-        action: 'tdf_visibility_change',
+        action: 'tdf_userselect_change',
         userId: this.userId,
         tdfId,
         newValue: newUserSelect,
