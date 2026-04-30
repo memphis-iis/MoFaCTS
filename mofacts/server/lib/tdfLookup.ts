@@ -12,6 +12,9 @@ type TdfLookupDeps = {
     find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]> };
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
   };
+  usersCollection: {
+    findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
+  };
   GlobalExperimentStates: {
     find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]> };
   };
@@ -28,6 +31,11 @@ function normalizeTdfKeys(keys: unknown[]) {
     return [];
   }
   return [...new Set(keys.map((key) => (typeof key === 'string' ? key.trim() : '')).filter(Boolean))];
+}
+
+function getTdfExperimentTarget(tdf: any) {
+  const target = tdf?.content?.tdfs?.tutor?.setspec?.experimentTarget;
+  return typeof target === 'string' ? target.trim().toLowerCase() : '';
 }
 
 export function createTdfLookupHelpers(deps: TdfLookupDeps) {
@@ -67,6 +75,24 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
       assignedRootIds.has(String(tdf._id || ''))
     ) {
       return tdf;
+    }
+
+    const tdfExperimentTarget = getTdfExperimentTarget(tdf);
+    if (tdfExperimentTarget) {
+      const user = await deps.usersCollection.findOneAsync(
+        { _id: this.userId },
+        { fields: { profile: 1, accessedTDFs: 1 } }
+      );
+      const userExperimentTarget = typeof user?.profile?.experimentTarget === 'string'
+        ? user.profile.experimentTarget.trim().toLowerCase()
+        : '';
+      const accessedTdfIds = Array.isArray(user?.accessedTDFs)
+        ? user.accessedTDFs.map((id: unknown) => String(id || '').trim()).filter(Boolean)
+        : [];
+
+      if (userExperimentTarget === tdfExperimentTarget || accessedTdfIds.includes(String(tdf._id || ''))) {
+        return tdf;
+      }
     }
 
     const experimentStates = await deps.GlobalExperimentStates.find(

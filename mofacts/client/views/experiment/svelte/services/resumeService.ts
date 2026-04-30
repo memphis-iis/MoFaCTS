@@ -526,6 +526,8 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
         newExperimentState.conditionTdfId = conditionTdfId;
         setConditionResolutionContext({ conditionTdfId }, 'resume.condition.resolve');
         await createExperimentState({
+          currentRootTdfId: Session.get('currentRootTdfId'),
+          currentTdfId: conditionTdfId,
           conditionTdfId,
         });
       }

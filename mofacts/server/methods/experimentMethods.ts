@@ -41,6 +41,23 @@ type ExperimentMethodsDeps = {
 };
 
 export function createExperimentMethods(deps: ExperimentMethodsDeps) {
+  async function issueLoginToken(userId: string) {
+    const accountsAny = Accounts as any;
+    if (
+      typeof accountsAny._generateStampedLoginToken !== 'function' ||
+      typeof accountsAny._insertLoginToken !== 'function'
+    ) {
+      throw new Meteor.Error('experiment-login-token-unavailable', 'Experiment login token support is unavailable');
+    }
+
+    const stampedToken = accountsAny._generateStampedLoginToken();
+    if (!stampedToken?.token) {
+      throw new Meteor.Error('experiment-login-token-missing', 'Experiment login token could not be created');
+    }
+    await accountsAny._insertLoginToken(userId, stampedToken);
+    return stampedToken.token;
+  }
+
   async function getTdfByExperimentTarget(experimentTarget: string) {
     experimentTarget = experimentTarget.toLowerCase();
     try {
@@ -104,7 +121,6 @@ export function createExperimentMethods(deps: ExperimentMethodsDeps) {
       }
 
       return await deps.withSignUpLock(normalizedUserName, async () => {
-        const issuedPassword = randomBytes(24).toString('hex');
         const usernameExactCI = new RegExp(`^${deps.escapeRegexLiteral(normalizedUserName)}$`, 'i');
         const existingUser = await deps.usersCollection.findOneAsync({ username: usernameExactCI });
 
@@ -176,7 +192,6 @@ export function createExperimentMethods(deps: ExperimentMethodsDeps) {
             return { userExists: true, userId: existingUser._id, status: 'already_complete' };
           }
 
-          Accounts.setPassword(existingUser._id, issuedPassword);
           const profileSetPayload: Record<string, unknown> = {
             'profile.lastExperimentProvisionedAt': new Date()
           };
@@ -196,14 +211,16 @@ export function createExperimentMethods(deps: ExperimentMethodsDeps) {
             userExists: true
           });
 
-          return { userExists: true, userId: existingUser._id, issuedPassword, status: 'resumed' };
+          const loginToken = await issueLoginToken(existingUser._id);
+          return { userExists: true, userId: existingUser._id, loginToken, status: 'resumed' };
         }
 
         let createdId: string;
         try {
+          const internalAccountPassword = randomBytes(24).toString('hex');
           createdId = await deps.createUserWithRetry(
             normalizedUserName,
-            issuedPassword,
+            internalAccountPassword,
             {
               experiment: true,
               experimentTarget: normalizedTarget,
@@ -225,7 +242,8 @@ export function createExperimentMethods(deps: ExperimentMethodsDeps) {
           userExists: false
         });
 
-        return { userExists: false, userId: createdId, issuedPassword, status: 'created' };
+        const loginToken = await issueLoginToken(createdId);
+        return { userExists: false, userId: createdId, loginToken, status: 'created' };
       });
     } catch (error: unknown) {
       const meteorErr = error as { error?: unknown; reason?: unknown; message?: unknown };

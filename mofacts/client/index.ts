@@ -324,6 +324,10 @@ Accounts.onLogin(function() {
     if (user && user.profile) {
       computation.stop(); // Only run once
 
+      if (user.profile.experiment === true || user.profile.createdBy === 'provisionExperimentUser') {
+        return;
+      }
+
       // Check if the user has a profile with an email, first name, and last name
       if (!user.profile.username) {
         (async () => {
@@ -785,6 +789,18 @@ Template.registerHelper('modalTemplate', function() {
 });
 Template.registerHelper('isLoggedIn', function() {
   return Meteor.userId() !== null;
+});
+Template.registerHelper('showAuthenticatedChrome', function() {
+  if (Meteor.userId() === null) {
+    return false;
+  }
+
+  if (Session.get('suppressAuthenticatedChrome') === true) {
+    return false;
+  }
+
+  const currentTemplate = Session.get('currentTemplate');
+  return !['signIn', 'signUp', 'resetPassword', 'verifyEmail', 'experimentError'].includes(currentTemplate);
 });
 Template.registerHelper('showPageNumbers', function() {
   return Session.get('showPageNumbers');

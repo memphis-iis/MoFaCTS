@@ -300,6 +300,7 @@ const getTdfNamesByOwnerId = getTdfNamesByOwnerIdMethod as (ownerId: string) => 
 const tdfLookupHelpers = createTdfLookupHelpers({
   serverConsole,
   Tdfs,
+  usersCollection: MeteorAny.users,
   GlobalExperimentStates,
   normalizeCanonicalId,
   resolveAssignedRootTdfIdsForUser,

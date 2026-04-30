@@ -70,6 +70,13 @@ type AnalyticsMethodsDeps = {
   HISTORY_KEY_MAP: Record<string, string>;
 };
 
+const INSERT_HISTORY_TIMING_ENABLED = process.env.MOFACTS_INSERT_HISTORY_TIMING === '1';
+const INSERT_HISTORY_PAYLOAD_DEBUG_ENABLED = process.env.MOFACTS_INSERT_HISTORY_PAYLOAD_DEBUG === '1';
+
+function elapsedMsSince(startTime: number): number {
+  return Date.now() - startTime;
+}
+
 function getExperimentStateTimestamp(stateDoc: { experimentState?: { lastActionTimeStamp?: unknown } } | null | undefined): number {
   const candidate = Number((stateDoc as any)?.experimentState?.lastActionTimeStamp);
   return Number.isFinite(candidate) ? candidate : 0;
@@ -99,10 +106,15 @@ function sanitizeFileNameSegment(value: unknown, fallback: string) {
 
 export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
   const validatedExperimentAccessCache = new Map<string, number>();
+  const assignedConditionAccessCache = new Map<string, { cachedAt: number; rootTdfId: string; experimentState: UnknownRecord }>();
   const EXPERIMENT_ACCESS_CACHE_TTL = 5 * 60 * 1000;
 
   function experimentAccessCacheKey(userId: string, rootTdfId: string) {
     return `${userId}:${rootTdfId}`;
+  }
+
+  function conditionAssignmentCacheKey(userId: string, conditionTdfId: string) {
+    return `${userId}:${conditionTdfId}`;
   }
 
   async function validateExperimentStateMutation(
@@ -358,11 +370,13 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
   }
 
   async function insertHistory(this: MethodContext, historyRecord: UnknownRecord) {
+    const methodStartTime = Date.now();
     const actingUserId = requireAuthenticatedUser(this.userId, 'Must be logged in', 401);
     if (!historyRecord || typeof historyRecord !== 'object' || Array.isArray(historyRecord)) {
       throw new Meteor.Error(400, 'Invalid history record');
     }
 
+    const decompressStartTime = Date.now();
     // Decompress payload from short keys to standard field names
     const decompressedRecord: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(historyRecord)) {
@@ -373,7 +387,9 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
         decompressedRecord[key] = value;
       }
     }
+    const decompressMs = elapsedMsSince(decompressStartTime);
 
+    const sanitizeStartTime = Date.now();
     const requestedUserId = deps.normalizeCanonicalId(decompressedRecord.userId);
     if (requestedUserId && requestedUserId !== actingUserId) {
       throw new Meteor.Error(403, 'Can only insert history for the current user');
@@ -382,18 +398,13 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     if (!tdfId) {
       throw new Meteor.Error(400, 'History record requires a TDFId');
     }
+    const sanitizeMs = elapsedMsSince(sanitizeStartTime);
 
-    await validateExperimentStateMutation(
-      actingUserId,
-      tdfId,
-      {
-        currentTdfId: tdfId,
-        conditionTdfId: deps.normalizeCanonicalId((decompressedRecord as any).conditionTdfId),
-        experimentTarget: deps.normalizeOptionalString((decompressedRecord as any).experimentTarget),
-      },
-      'methods.insertHistory'
-    );
+    const authorizationStartTime = Date.now();
+    await validateHistoryWriteAccess(actingUserId, tdfId, decompressedRecord);
+    const authorizationMs = elapsedMsSince(authorizationStartTime);
 
+    const recordBuildStartTime = Date.now();
     const sanitizedHistoryRecord = Object.assign({}, decompressedRecord, {
       userId: actingUserId,
       TDFId: tdfId,
@@ -401,22 +412,42 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       dynamicTagFields: [],
       recordedServerTime: (new Date()).getTime(),
     });
-    
-    // TEMPORARY DIAGNOSTIC LOGGING (REQUESTED BY USER)
-    const rawPayloadBytes = Buffer.byteLength(JSON.stringify(historyRecord), 'utf8');
-    const finalRecordBytes = Buffer.byteLength(JSON.stringify(sanitizedHistoryRecord), 'utf8');
-    
-    console.log('\n--- INSERT HISTORY PAYLOAD DIAGNOSTIC ---');
-    console.log(`[1] Raw received payload byte length: ${rawPayloadBytes} bytes`);
-    console.log(`[2] Final persisted record byte length: ${finalRecordBytes} bytes`);
-    console.log(`[3] Size Reduction: ${((1 - (rawPayloadBytes / finalRecordBytes)) * 100).toFixed(1)}% smaller on wire vs disk`);
-    console.log(`\n--- RAW PAYLOAD RECEIVED OVER DDP ---`);
-    console.log(JSON.stringify(historyRecord, null, 2));
-    console.log(`\n--- FINAL RECORD WRITTEN TO MONGO ---`);
-    console.log(JSON.stringify(sanitizedHistoryRecord, null, 2));
-    console.log('-----------------------------------------\n');
+    const recordBuildMs = elapsedMsSince(recordBuildStartTime);
 
+    let rawPayloadBytes: number | undefined;
+    let finalRecordBytes: number | undefined;
+    if (INSERT_HISTORY_TIMING_ENABLED || INSERT_HISTORY_PAYLOAD_DEBUG_ENABLED) {
+      rawPayloadBytes = Buffer.byteLength(JSON.stringify(historyRecord), 'utf8');
+      finalRecordBytes = Buffer.byteLength(JSON.stringify(sanitizedHistoryRecord), 'utf8');
+    }
+
+    if (INSERT_HISTORY_PAYLOAD_DEBUG_ENABLED) {
+      deps.serverConsole('[insertHistory payload]', {
+        rawPayloadBytes,
+        finalRecordBytes,
+        rawPayload: historyRecord,
+        persistedRecord: sanitizedHistoryRecord,
+      });
+    }
+
+    const insertStartTime = Date.now();
     await deps.Histories.insertAsync(sanitizedHistoryRecord);
+    const insertMs = elapsedMsSince(insertStartTime);
+
+    if (INSERT_HISTORY_TIMING_ENABLED) {
+      deps.serverConsole('[insertHistory timing]', {
+        userId: actingUserId,
+        TDFId: tdfId,
+        rawPayloadBytes,
+        finalRecordBytes,
+        decompressMs,
+        sanitizeMs,
+        authorizationMs,
+        recordBuildMs,
+        insertMs,
+        totalMs: elapsedMsSince(methodStartTime),
+      });
+    }
   }
 
   async function getLastTDFAccessed(userId: string) {
@@ -432,6 +463,76 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
 
   async function getHistoryByTDFID(TDFId: string) {
     return await deps.Histories.find({ TDFId }).fetchAsync();
+  }
+
+  async function validateHistoryWriteAccess(
+    actingUserId: string,
+    tdfId: string,
+    decompressedRecord: UnknownRecord
+  ) {
+    const cacheKey = conditionAssignmentCacheKey(actingUserId, tdfId);
+    const cachedAssignment = assignedConditionAccessCache.get(cacheKey);
+    let assignedRootTdfId =
+      cachedAssignment && (Date.now() - cachedAssignment.cachedAt) <= EXPERIMENT_ACCESS_CACHE_TTL
+        ? cachedAssignment.rootTdfId
+        : null;
+    let assignedState = cachedAssignment?.experimentState || {};
+
+    if (!assignedRootTdfId) {
+      const assignmentDoc = await deps.GlobalExperimentStates.findOneAsync(
+        {
+          userId: actingUserId,
+          'experimentState.conditionTdfId': tdfId,
+        },
+        {
+          fields: {
+            TDFId: 1,
+            experimentState: 1,
+          },
+          sort: {
+            'experimentState.lastActionTimeStamp': -1,
+          },
+        }
+      );
+      assignedRootTdfId = deps.normalizeCanonicalId(assignmentDoc?.TDFId);
+      assignedState = (assignmentDoc?.experimentState || {}) as UnknownRecord;
+      if (assignedRootTdfId) {
+        assignedConditionAccessCache.set(cacheKey, {
+          cachedAt: Date.now(),
+          rootTdfId: assignedRootTdfId,
+          experimentState: assignedState,
+        });
+      }
+    }
+
+    if (assignedRootTdfId) {
+      await validateExperimentStateMutation(
+        actingUserId,
+        assignedRootTdfId,
+        {
+          ...assignedState,
+          currentRootTdfId: assignedRootTdfId,
+          currentTdfId: tdfId,
+          conditionTdfId: tdfId,
+          experimentTarget:
+            deps.normalizeOptionalString((decompressedRecord as any).experimentTarget)
+            || deps.normalizeOptionalString((assignedState as any).experimentTarget),
+        },
+        'methods.insertHistory.assignedCondition'
+      );
+      return;
+    }
+
+    await validateExperimentStateMutation(
+      actingUserId,
+      tdfId,
+      {
+        currentTdfId: tdfId,
+        conditionTdfId: deps.normalizeCanonicalId((decompressedRecord as any).conditionTdfId),
+        experimentTarget: deps.normalizeOptionalString((decompressedRecord as any).experimentTarget),
+      },
+      'methods.insertHistory'
+    );
   }
 
   async function getUserRecentTDFs(userId: string) {
@@ -688,7 +789,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       levelUnitType: 'video',
       levelUnit: Number(levelUnit),
       studentResponseType: 'ATTEMPT',
-      outcome: { $in: ['correct', 'incorrect'] },
+      outcome: 'correct',
     }).countAsync();
   }
 

@@ -168,6 +168,7 @@ const lazyTemplateLoaders: Record<string, any> = {
   audioSettings: () => import('../views/audioSettings'),
   help: () => import('../views/help'),
   accessDenied: () => import('../views/accessDenied'),
+  experimentError: () => import('../views/experimentError'),
   testRunner: () => import('../views/testRunner'),
   theme: () => import('../views/theme'),
   setTheme: () => import('../views/theme'),
@@ -429,6 +430,8 @@ FlowRouter.route('/experiment/:target?/:xcond?', {
       clientConsole(2, 'EXPERIMENT target:', target, 'xcond', xcond);
 
       clearMappingRecordFromSession();
+      Session.set('suppressAuthenticatedChrome', false);
+      Session.set('appLoading', false);
 
       // Log out first, then render sign-in to avoid transient route/auth race states.
       await logoutCurrentUserForExperimentRoute();
@@ -728,10 +731,29 @@ FlowRouter.route('/accessDenied', {
   }
 })
 
+FlowRouter.route('/experimentError', {
+  name: 'client.experimentError',
+  action: async function(this: any) {
+    Session.set('curModule', 'experimentError');
+    Session.set('suppressAuthenticatedChrome', true);
+    Session.set('appLoading', false);
+    await renderRouteTemplate(this, 'experimentError');
+  }
+})
+
 FlowRouter.route('/learningDashboard', {
   name: 'client.learningDashboard',
   action: function() {
-    waitForAuthenticatedRoute(this, 'client.learningDashboard', async () => {
+    waitForAuthenticatedRoute(this, 'client.learningDashboard', async (user: any) => {
+      if (getUserLoginMode(user) === 'experiment') {
+        Session.set('experimentError', {
+          title: 'Experiment paused',
+          message: 'This experiment link does not provide access to the general learning dashboard.',
+          note: 'Please email the experiment coordinator or study contact with your participant ID.',
+        });
+        FlowRouter.go('/experimentError');
+        return;
+      }
       Session.set('curModule', 'learningDashboard');
       renderLayout(this, 'learningDashboard');
     });
@@ -972,6 +994,8 @@ FlowRouter.route('/card', {
     }
     assertIdInvariants('router.card.entry', { requireCurrentTdfId: false, requireStimuliSetId: false });
     ensureStimuliSetIdSessionInvariant();
+    Session.set('suppressAuthenticatedChrome', false);
+    Session.set('appLoading', false);
     const refreshCardRequested = Boolean(FlowRouter.current()?.queryParams?.refreshCard);
     if(!Session.get('currentTdfId')){
       const userId = Meteor.userId();
@@ -1094,6 +1118,8 @@ FlowRouter.route('/instructions', {
     Session.set('instructionClientStart', Date.now());
     Session.set('curModule', 'instructions');
     Session.set('fromInstructions', true);
+    Session.set('suppressAuthenticatedChrome', false);
+    Session.set('appLoading', false);
     renderLayout(this, 'instructions');
   },
   triggersEnter: [function(context: any, redirect: any, stop: any) {

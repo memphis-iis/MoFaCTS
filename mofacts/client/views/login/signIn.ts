@@ -107,6 +107,17 @@ function getMeteorErrorCode(error: unknown): string {
   return typeof err?.error === 'string' ? err.error : '';
 }
 
+function getMeteorErrorReason(error: unknown): string {
+  const err = error as { reason?: unknown; message?: unknown };
+  if (typeof err?.reason === 'string' && err.reason.trim()) {
+    return err.reason.trim();
+  }
+  if (typeof err?.message === 'string' && err.message.trim()) {
+    return err.message.trim();
+  }
+  return toErrorMessage(error);
+}
+
 function normalizeLoginIdentifier(rawValue: unknown): string {
   const trimmedValue = legacyTrim(String(rawValue || ''));
   if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedValue)) {
@@ -122,6 +133,8 @@ function clearInlineSignInError() {
 function restoreVisibleSignInScreen(template?: any) {
   const signInTemplate = template || Template.instance();
   signInTemplate?.isLoggingIn?.set?.(false);
+  Session.set('suppressAuthenticatedChrome', false);
+  Session.set('appLoading', false);
   const container = document.getElementById('signInContainer') as HTMLElement | null;
   if (!container) {
     return;
@@ -132,6 +145,23 @@ function restoreVisibleSignInScreen(template?: any) {
   container.style.pointerEvents = '';
   container.classList.remove('page-loading');
   container.classList.add('page-loaded');
+}
+
+function beginExperimentLaunchTransition(template?: any) {
+  const signInTemplate = template || Template.instance();
+  signInTemplate?.isLoggingIn?.set?.(true);
+  Session.set('suppressAuthenticatedChrome', true);
+  Session.set('appLoading', true);
+  Session.set('appLoadingMessage', 'Starting experiment...');
+
+  const container = document.getElementById('signInContainer') as HTMLElement | null;
+  if (!container) {
+    return;
+  }
+
+  container.classList.remove('page-loaded');
+  container.classList.add('page-loading');
+  container.style.pointerEvents = 'none';
 }
 
 function showInlineSignInError(message: string, options: Partial<SignInState> = {}, template?: any) {
@@ -759,8 +789,12 @@ async function signInNotify(landingPage: string | false = '/profile') {
     MeteorAny.callAsync('debugLog', 'Sign in was successful');
     MeteorAny.callAsync('logUserAgentAndLoginTime', Meteor.userId(), navigator.userAgent);
   }
-  Meteor.logoutOtherClients();
-  void meteorCallAsync('recordSessionRevocation', 'logout-other-clients-password');
+  try {
+    await Promise.resolve(Meteor.logoutOtherClients());
+    void meteorCallAsync('recordSessionRevocation', 'logout-other-clients-password');
+  } catch (error) {
+    clientConsole(1, '[AUTH] logoutOtherClients failed after sign-in:', error);
+  }
   if(landingPage)
     FlowRouter.go(landingPage);
 }
@@ -790,32 +824,39 @@ async function resolveExperimentTargetForLogin() {
   };
 }
 
-async function completeExperimentSignIn() {
-  const {
-    experimentTarget,
-    foundExpTarget,
-    setspec,
-    ignoreOutOfGrammarResponses,
-    speechOutOfGrammarFeedback
-  } = await resolveExperimentTargetForLogin();
+async function completeExperimentSignIn(template?: any) {
+  beginExperimentLaunchTransition(template);
 
-  // Persist experiment login context before first state mutation in selectTdf().
-  // This prevents auth race conditions where updateExperimentState runs with stale loginMode.
-  await persistLoginDataAfterLogin('direct', Session.get('loginMode'));
+  try {
+    const {
+      experimentTarget,
+      foundExpTarget,
+      setspec,
+      ignoreOutOfGrammarResponses,
+      speechOutOfGrammarFeedback
+    } = await resolveExperimentTargetForLogin();
 
-  await selectTdf(
-    foundExpTarget._id,
-    setspec.lessonname,
-    foundExpTarget.stimuliSetId,
-    ignoreOutOfGrammarResponses,
-    speechOutOfGrammarFeedback,
-    'Auto-selected by experiment target ' + experimentTarget,
-    foundExpTarget.content.isMultiTdf,
-    setspec,
-    true
-  );
+    // Persist experiment login context before first state mutation in selectTdf().
+    // This prevents auth race conditions where updateExperimentState runs with stale loginMode.
+    await persistLoginDataAfterLogin('direct', Session.get('loginMode'));
 
-  signInNotify(false);
+    await selectTdf(
+      foundExpTarget._id,
+      setspec.lessonname,
+      foundExpTarget.stimuliSetId,
+      ignoreOutOfGrammarResponses,
+      speechOutOfGrammarFeedback,
+      'Auto-selected by experiment target ' + experimentTarget,
+      foundExpTarget.content.isMultiTdf,
+      setspec,
+      true
+    );
+
+    signInNotify(false);
+  } catch (error) {
+    restoreVisibleSignInScreen(template);
+    throw error;
+  }
 }
 
 function getExperimentLoginErrorMessage(error: unknown): string {
@@ -950,10 +991,11 @@ async function userPasswordCheck(template?: any) {
 
       try {
         await loginWithPasswordAsync(newUsername, newPassword);
-        await completeExperimentSignIn();
+        await completeExperimentSignIn(template);
         clientConsole(2, '[EXPERIMENT-LOGIN] Complete');
       } catch (error) {
         clientConsole(1, 'ERROR: The user was not logged in on experiment sign in?', newUsername, 'Error:', error);
+        restoreVisibleSignInScreen(template);
         showInlineSignInError('It appears that you could not be logged in as ' + newUsername + '.', {}, template);
         $('#experimentSignin').prop('disabled', false);
         focusFirstSignInError(template);
@@ -967,7 +1009,7 @@ async function userPasswordCheck(template?: any) {
       if (experimentTarget) experimentTarget = experimentTarget.toLowerCase();
       setExperimentParticipantContext({ experimentTarget, userId: Meteor.userId() }, 'signIn.userPasswordCheck.experimentProvision');
 
-      // Experiment mode - provision credentials via dedicated server method.
+      // Experiment mode - provision an account and resume token from the participant ID.
       try {
         const provisionResult = (await meteorCallAsync('provisionExperimentUser', experimentTarget, newUsername)) as any;
 
@@ -978,28 +1020,55 @@ async function userPasswordCheck(template?: any) {
           return;
         }
 
-        if (!provisionResult?.issuedPassword) {
-          throw new Error('Provisioning did not return credentials');
+        if (!provisionResult?.loginToken) {
+          throw new Error('Provisioning did not return a login token');
         }
 
-        newPassword = provisionResult.issuedPassword;
-
         // Everything was OK if we make it here - now we init the session,
-        // login, and proceed to the profile screen
+        // login, and proceed to the profile screen.
         sessionCleanUp();
 
-        // METEOR 3 FIX: Use promisified version instead of callback
-        const loginWithPasswordAsync = MeteorAny.promisify(Meteor.loginWithPassword);
+        const loginWithTokenAsync = MeteorAny.promisify(Meteor.loginWithToken);
 
         try {
-          await loginWithPasswordAsync(newUsername, newPassword);
-          await completeExperimentSignIn();
-          clientConsole(2, '[EXPERIMENT-LOGIN-2] Complete');
+          await loginWithTokenAsync(provisionResult.loginToken);
         } catch (error) {
-          clientConsole(1, 'ERROR: The user was not logged in on experiment sign in?', newUsername, 'Error:', error);
-          showInlineSignInError('It appears that you could not be logged in as ' + newUsername + '.', {}, template);
+          clientConsole(1, '[EXPERIMENT-LOGIN] Token login failed', {
+            username: newUsername,
+            errorCode: getMeteorErrorCode(error),
+            reason: getMeteorErrorReason(error),
+            error
+          });
+          showInlineSignInError(
+            'It appears that you could not be logged in as ' + newUsername + ': ' + getMeteorErrorReason(error),
+            {},
+            template
+          );
           $('#experimentSignin').prop('disabled', false);
           focusFirstSignInError(template);
+          return;
+        }
+
+        try {
+          await completeExperimentSignIn(template);
+          clientConsole(2, '[EXPERIMENT-LOGIN-2] Complete');
+        } catch (error) {
+          clientConsole(1, '[EXPERIMENT-LOGIN] Post-login experiment setup failed', {
+            username: newUsername,
+            userId: Meteor.userId(),
+            errorCode: getMeteorErrorCode(error),
+            reason: getMeteorErrorReason(error),
+            error
+          });
+          restoreVisibleSignInScreen(template);
+          showInlineSignInError(
+            'You were logged in as ' + newUsername + ', but the experiment could not be started: ' + getMeteorErrorReason(error),
+            {},
+            template
+          );
+          $('#experimentSignin').prop('disabled', false);
+          focusFirstSignInError(template);
+          return;
         }
       } catch (error) {
         const participantMessage = getExperimentLoginErrorMessage(error);

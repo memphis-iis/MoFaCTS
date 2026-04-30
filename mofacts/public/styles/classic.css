@@ -366,6 +366,10 @@ input[type="file"]::file-selector-button:hover {
     font-size: clamp(1.45rem, 3vw, 1.95rem);
 }
 
+.experiment-portal-title {
+    font-size: clamp(1.35rem, 2.6vw, 1.75rem);
+}
+
 #signInContainer.auth-page {
     min-height: 100svh;
     display: flex;

@@ -94,6 +94,34 @@ function getTrialOutcome(testType: string, isCorrect: boolean): string {
   }
   return isCorrect ? 'correct' : 'incorrect';
 }
+
+function truncateToFiveDecimals(value: number): number {
+  return Math.trunc(value * 100000) / 100000;
+}
+
+function normalizeHistoryValueForWire(value: unknown): unknown {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value === 0 ? undefined : value;
+  }
+  if (value === '' || value === null || value === false) {
+    return undefined;
+  }
+  if (Array.isArray(value)) {
+    return value;
+  }
+  if (value && typeof value === 'object') {
+    const compacted: Record<string, unknown> = {};
+    for (const [nestedKey, nestedValue] of Object.entries(value as Record<string, unknown>)) {
+      const normalizedNestedValue = normalizeHistoryValueForWire(nestedValue);
+      if (normalizedNestedValue !== undefined) {
+        compacted[nestedKey] = normalizedNestedValue;
+      }
+    }
+    return Object.keys(compacted).length > 0 ? compacted : undefined;
+  }
+  return value;
+}
+
 type HistoryClusterLike = {
   stims: HistoryStimLike[];
   clusterIndex?: number;
@@ -422,7 +450,9 @@ export function createHistoryRecord({
   const clusterIndex = Session.get('clusterIndex');
   const cardInfo = engine.findCurrentCardInfo();
   const whichStim = typeof cardInfo.whichStim === 'number' ? cardInfo.whichStim : 0;
-  const probabilityEstimate = cardInfo.probabilityEstimate;
+  const probabilityEstimate = typeof cardInfo.probabilityEstimate === 'number'
+    ? truncateToFiveDecimals(cardInfo.probabilityEstimate)
+    : cardInfo.probabilityEstimate;
   const cluster = getStimCluster(clusterIndex) as HistoryClusterLike;
   const { _id, clusterKC, stimulusKC } = cluster.stims[whichStim] || {};
 
@@ -603,11 +633,15 @@ async function insertHistoryRecord(answerLogRecord: HistoryRecord): Promise<void
 
     for (const [key, value] of Object.entries(answerLogRecord)) {
       const code = reverseMap[key];
+      const normalizedValue = normalizeHistoryValueForWire(value);
+      if (normalizedValue === undefined) {
+        continue;
+      }
       if (code) {
-        compressedRecord[code] = value;
+        compressedRecord[code] = normalizedValue;
       } else {
         // Fallback for fields not in the map
-        compressedRecord[key] = value;
+        compressedRecord[key] = normalizedValue;
       }
     }
 

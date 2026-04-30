@@ -660,6 +660,70 @@ describe('condition count method authorization', function() {
     }
   });
 
+  it('allows history insertion for a condition assigned in root experiment state', async function() {
+    await TdfsAny.insertAsync({
+      _id: 'history-root',
+      ownerId: 'owner-user',
+      content: {
+        fileName: 'AllConditionsRoot.json',
+        tdfs: {
+          tutor: {
+            setspec: {
+              lessonname: 'History Root',
+              experimentTarget: 'flashcardtest',
+              userselect: 'false',
+              condition: ['Generalflashcard1.json'],
+              conditionTdfIds: ['history-condition'],
+            },
+          },
+        },
+      },
+    });
+    await TdfsAny.insertAsync({
+      _id: 'history-condition',
+      ownerId: 'owner-user',
+      content: {
+        fileName: 'Generalflashcard1.json',
+        tdfs: {
+          tutor: {
+            setspec: {
+              lessonname: 'General Flashcard 1',
+              experimentTarget: 'GF1',
+              userselect: 'false',
+            },
+          },
+        },
+      },
+    });
+    await MeteorUsersAny.insertAsync({
+      _id: 'current-user',
+      profile: { experimentTarget: 'flashcardtest' },
+      loginParams: { loginMode: 'experiment' },
+    });
+    await GlobalExperimentStatesAny.insertAsync({
+      userId: 'current-user',
+      TDFId: 'history-root',
+      experimentState: {
+        currentRootTdfId: 'history-root',
+        currentTdfId: 'history-condition',
+        conditionTdfId: 'history-condition',
+        experimentTarget: 'flashcardtest',
+        lastActionTimeStamp: Date.now(),
+      },
+    });
+
+    await (asyncMethods.insertHistory as any).call({ userId: 'current-user' }, {
+      userId: 'current-user',
+      TDFId: 'history-condition',
+    });
+
+    const insertedHistory = await HistoriesAny.findOneAsync({
+      userId: 'current-user',
+      TDFId: 'history-condition',
+    }) as any;
+    expect(insertedHistory).to.exist;
+  });
+
   it('does not expose raw all-history TDF reads as a public method', function() {
     expect(asyncMethods.getHistoryByTDFID).to.equal(undefined);
   });
