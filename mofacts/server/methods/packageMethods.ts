@@ -497,6 +497,16 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     return normalizedConditions.map((entry) => (entry ? (conditionIdByKey.get(entry) || null) : null));
   }
 
+  async function enforceConditionChildUserSelect(conditionTdfIds: Array<string | null>) {
+    const validIds = conditionTdfIds.filter((id): id is string => typeof id === 'string' && id.length > 0);
+    for (const id of validIds) {
+      await deps.Tdfs.updateAsync(
+        { _id: id },
+        { $set: { 'content.tdfs.tutor.setspec.userselect': 'false' } }
+      );
+    }
+  }
+
   async function lookupStimuliByFilename(stimulusFileName: unknown): Promise<unknown[] | null> {
     if (typeof stimulusFileName !== 'string' || !stimulusFileName.trim()) {
       return null;
@@ -743,6 +753,7 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       ownerId: ownerId,
       conditionCounts: conditionCounts
       }});
+    await enforceConditionChildUserSelect(Tdf.tutor.setspec.conditionTdfIds ?? []);
 
     return {res: 'upserted', stimuliSetId};
   }
@@ -875,6 +886,7 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       stimuliSetId: stimuliSetId,
       conditionCounts: conditionCounts
     }});
+    await enforceConditionChildUserSelect(Tdf.tutor.setspec.conditionTdfIds ?? []);
 
     return {stimuliSetId: stimuliSetId}
   }
@@ -921,6 +933,10 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       );
     }
     await deps.Tdfs.upsertAsync({_id: updateObj._id},{$set:updateObj});
+    const confirmedConditionTdfIds = (updateObj as any)?.content?.tdfs?.tutor?.setspec?.conditionTdfIds;
+    if (Array.isArray(confirmedConditionTdfIds)) {
+      await enforceConditionChildUserSelect(confirmedConditionTdfIds);
+    }
     if (updateObj?.stimuliSetId !== undefined && updateObj?.stimuliSetId !== null) {
       await deps.updateStimDisplayTypeMap([updateObj.stimuliSetId]);
     } else {
