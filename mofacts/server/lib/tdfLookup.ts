@@ -39,6 +39,18 @@ function getTdfExperimentTarget(tdf: any) {
 }
 
 export function createTdfLookupHelpers(deps: TdfLookupDeps) {
+  function getUserExperimentTarget(user: any) {
+    return typeof user?.profile?.experimentTarget === 'string'
+      ? user.profile.experimentTarget.trim().toLowerCase()
+      : '';
+  }
+
+  function getUserAccessedTdfIds(user: any) {
+    return Array.isArray(user?.accessedTDFs)
+      ? user.accessedTDFs.map((id: unknown) => String(id || '').trim()).filter(Boolean)
+      : [];
+  }
+
   async function getTdfsByFileNameOrId(keys: unknown[]) {
     const normalizedKeys = normalizeTdfKeys(keys);
     if (normalizedKeys.length === 0) {
@@ -78,17 +90,16 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
     }
 
     const tdfExperimentTarget = getTdfExperimentTarget(tdf);
+    let user: any = null;
+    let userExperimentTarget = '';
+    let accessedTdfIds: string[] = [];
     if (tdfExperimentTarget) {
-      const user = await deps.usersCollection.findOneAsync(
+      user = await deps.usersCollection.findOneAsync(
         { _id: this.userId },
         { fields: { profile: 1, accessedTDFs: 1 } }
       );
-      const userExperimentTarget = typeof user?.profile?.experimentTarget === 'string'
-        ? user.profile.experimentTarget.trim().toLowerCase()
-        : '';
-      const accessedTdfIds = Array.isArray(user?.accessedTDFs)
-        ? user.accessedTDFs.map((id: unknown) => String(id || '').trim()).filter(Boolean)
-        : [];
+      userExperimentTarget = getUserExperimentTarget(user);
+      accessedTdfIds = getUserAccessedTdfIds(user);
 
       if (userExperimentTarget === tdfExperimentTarget || accessedTdfIds.includes(String(tdf._id || ''))) {
         return tdf;
@@ -118,7 +129,22 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
     for (const rootTdf of rootTdfDocs) {
       const rootId = String(rootTdf?._id || '');
       const canViewRoot = await deps.canViewDashboardTdf(this.userId, rootTdf);
-      if (!canViewRoot && !assignedRootIds.has(rootId)) {
+      const rootExperimentTarget = getTdfExperimentTarget(rootTdf);
+      if (!user) {
+        user = await deps.usersCollection.findOneAsync(
+          { _id: this.userId },
+          { fields: { profile: 1, accessedTDFs: 1 } }
+        );
+        userExperimentTarget = getUserExperimentTarget(user);
+        accessedTdfIds = getUserAccessedTdfIds(user);
+      }
+      const canAccessExperimentRoot =
+        !!rootExperimentTarget &&
+        (
+          userExperimentTarget === rootExperimentTarget ||
+          accessedTdfIds.includes(rootId)
+        );
+      if (!canViewRoot && !assignedRootIds.has(rootId) && !canAccessExperimentRoot) {
         continue;
       }
       if (rootId === TDFId) {

@@ -482,7 +482,10 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       const assignmentDoc = await deps.GlobalExperimentStates.findOneAsync(
         {
           userId: actingUserId,
-          'experimentState.conditionTdfId': tdfId,
+          $or: [
+            { 'experimentState.conditionTdfId': tdfId },
+            { 'experimentState.currentTdfId': tdfId },
+          ],
         },
         {
           fields: {

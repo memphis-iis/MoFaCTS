@@ -346,6 +346,72 @@ describe('public TDF and stimulus method authorization', function() {
     expect(stimuli[0].stimulusKC).to.equal(3);
   });
 
+  it('allows experiment participants to access stimuli for their assigned condition TDF', async function() {
+    await TdfsAny.insertAsync({
+      _id: 'condition-root-tdf',
+      ownerId: 'owner-user',
+      stimuliSetId: 106,
+      content: {
+        fileName: 'AllConditionsRoot.json',
+        tdfs: {
+          tutor: {
+            setspec: {
+              lessonname: 'Condition Root',
+              experimentTarget: 'flashcardtest-fast',
+              userselect: 'false',
+              condition: ['Keywordflashcard2.json'],
+              conditionTdfIds: ['condition-child-tdf'],
+            },
+          },
+        },
+      },
+    });
+    await TdfsAny.insertAsync({
+      _id: 'condition-child-tdf',
+      ownerId: 'owner-user',
+      stimuliSetId: 107,
+      rawStimuliFile: {
+        setspec: { clusters: [] },
+      },
+      stimuli: [
+        { stimulusKC: 4, clusterKC: 1, correctResponse: 'answer' },
+      ],
+      content: {
+        fileName: 'Keywordflashcard2.json',
+        tdfs: {
+          tutor: {
+            setspec: {
+              lessonname: 'Keyword Flashcard 2',
+              experimentTarget: 'kf2',
+              userselect: 'false',
+            },
+          },
+        },
+      },
+    });
+    await MeteorUsersAny.insertAsync({
+      _id: 'current-user',
+      profile: { experimentTarget: 'flashcardtest-fast' },
+      loginParams: { loginMode: 'experiment' },
+    });
+    await GlobalExperimentStatesAny.insertAsync({
+      userId: 'current-user',
+      TDFId: 'condition-root-tdf',
+      experimentState: {
+        currentRootTdfId: 'condition-root-tdf',
+        currentTdfId: 'condition-child-tdf',
+        conditionTdfId: 'condition-child-tdf',
+        experimentTarget: 'flashcardtest-fast',
+        lastActionTimeStamp: Date.now(),
+      },
+    });
+
+    const stimuli = await (asyncMethods.getStimuliSetById as any).call({ userId: 'current-user' }, 107);
+
+    expect(stimuli).to.have.length(1);
+    expect(stimuli[0].stimulusKC).to.equal(4);
+  });
+
   it('keeps stimulus display map reads callable for the client sync path', async function() {
     expect(asyncMethods.getStimDisplayTypeMap).to.be.a('function');
     expect(asyncMethods.getStimDisplayTypeMapVersion).to.be.a('function');
@@ -707,6 +773,69 @@ describe('condition count method authorization', function() {
         currentRootTdfId: 'history-root',
         currentTdfId: 'history-condition',
         conditionTdfId: 'history-condition',
+        experimentTarget: 'flashcardtest',
+        lastActionTimeStamp: Date.now(),
+      },
+    });
+
+    await (asyncMethods.insertHistory as any).call({ userId: 'current-user' }, {
+      userId: 'current-user',
+      TDFId: 'history-condition',
+    });
+
+    const insertedHistory = await HistoriesAny.findOneAsync({
+      userId: 'current-user',
+      TDFId: 'history-condition',
+    }) as any;
+    expect(insertedHistory).to.exist;
+  });
+
+  it('allows condition history insertion when assignment state only has currentTdfId', async function() {
+    await TdfsAny.insertAsync({
+      _id: 'history-root',
+      ownerId: 'owner-user',
+      content: {
+        fileName: 'AllConditionsRoot.json',
+        tdfs: {
+          tutor: {
+            setspec: {
+              lessonname: 'History Root',
+              experimentTarget: 'flashcardtest',
+              userselect: 'false',
+              condition: ['Generalflashcard1.json'],
+              conditionTdfIds: ['history-condition'],
+            },
+          },
+        },
+      },
+    });
+    await TdfsAny.insertAsync({
+      _id: 'history-condition',
+      ownerId: 'owner-user',
+      content: {
+        fileName: 'Generalflashcard1.json',
+        tdfs: {
+          tutor: {
+            setspec: {
+              lessonname: 'General Flashcard 1',
+              experimentTarget: 'GF1',
+              userselect: 'false',
+            },
+          },
+        },
+      },
+    });
+    await MeteorUsersAny.insertAsync({
+      _id: 'current-user',
+      profile: { experimentTarget: 'flashcardtest' },
+      loginParams: { loginMode: 'experiment' },
+    });
+    await GlobalExperimentStatesAny.insertAsync({
+      userId: 'current-user',
+      TDFId: 'history-root',
+      experimentState: {
+        currentRootTdfId: 'history-root',
+        currentTdfId: 'history-condition',
         experimentTarget: 'flashcardtest',
         lastActionTimeStamp: Date.now(),
       },
