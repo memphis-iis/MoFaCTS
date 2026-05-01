@@ -267,6 +267,7 @@ function sessionCleanUp() {
   }
   Session.set('currentRootTdfId', undefined);
   Session.set('conditionTdfId', undefined);
+  Session.set('ownerDashboardLaunch', false);
 }
 
 

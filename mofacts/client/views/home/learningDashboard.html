@@ -53,7 +53,18 @@
                         <th scope="row" class="learning-dashboard-cell learning-dashboard-cell--lesson" data-label="Lesson">
                           <span class="responsive-table-label">Lesson</span>
                           <div class="learning-dashboard-cell__value learning-dashboard-lesson">
-                            <strong class="learning-dashboard-lesson-title" title="{{displayLabel}}">{{displayLabel}}</strong>
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                              <strong class="learning-dashboard-lesson-title" title="{{displayLabel}}">{{displayLabel}}</strong>
+                              {{#if this.conditions}}
+                                <select class="form-select form-select-sm condition-tdf-selector" style="width:auto;min-width:14rem;"
+                                  data-roottdfid="{{this.TDFId}}">
+                                  <option value="{{this.TDFId}}">{{this.displayName}} (auto-assign)</option>
+                                  {{#each this.conditions}}
+                                    <option value="{{this.tdfId}}">{{this.fileName}} ({{this.count}})</option>
+                                  {{/each}}
+                                </select>
+                              {{/if}}
+                            </div>
                             {{#if this.versionMetadataInvalid}}
                               <div class="learning-dashboard-lesson-meta">
                                 <span class="badge bg-warning text-dark" title="{{this.versionMetadataDiagnostic}}">Metadata fix required</span>
@@ -108,7 +119,10 @@
                         <td class="learning-dashboard-cell learning-dashboard-cell--action text-center" data-label="Action">
                           <span class="responsive-table-label">Action</span>
                           <div class="learning-dashboard-cell__value learning-dashboard-action">
-                            {{#if this.isUsed}}
+                            {{#if this.conditions}}
+                              {{!-- Owner of a condition-pool root TDF: selector is in the lesson cell; just show Start --}}
+                              <button class="btn btn-sm btn-success learning-dashboard-action-button start-condition-root">Start</button>
+                            {{else if this.isUsed}}
                               <button class="btn btn-sm btn-primary learning-dashboard-action-button continue-lesson"
                                 data-tdfid="{{this.TDFId}}"
                                 data-lessonname="{{this.displayName}}"
@@ -145,6 +159,15 @@
                 <div class="learning-dashboard-card border rounded p-3 mb-3 bg-white shadow-sm {{#unless this.isUsed}}lesson-card-unused{{/unless}}">
                   <div class="fw-bold learning-dashboard-card-title">
                     {{displayLabel}}
+                    {{#if this.conditions}}
+                      <select class="form-select form-select-sm mt-1 condition-tdf-selector"
+                        data-roottdfid="{{this.TDFId}}">
+                        <option value="{{this.TDFId}}">{{this.displayName}} (auto-assign)</option>
+                        {{#each this.conditions}}
+                          <option value="{{this.tdfId}}">{{this.fileName}} ({{this.count}})</option>
+                        {{/each}}
+                      </select>
+                    {{/if}}
                     {{#if this.versionMetadataInvalid}}
                       <span class="badge bg-warning text-dark ms-1" title="{{this.versionMetadataDiagnostic}}">Metadata fix required</span>
                     {{/if}}
@@ -174,7 +197,10 @@
                     </div>
                   </div>
 
-                  {{#if this.isUsed}}
+                  {{#if this.conditions}}
+                    {{!-- Owner of a condition-pool root TDF: selector is in the card title; just show Start --}}
+                    <button class="btn btn-sm btn-success w-100 mt-1 start-condition-root learning-dashboard-card-button">Start</button>
+                  {{else if this.isUsed}}
                     <div class="d-flex gap-1 mt-1 align-items-center">
                       <button class="btn btn-sm btn-primary flex-grow-1 continue-lesson learning-dashboard-card-button"
                         data-tdfid="{{this.TDFId}}"

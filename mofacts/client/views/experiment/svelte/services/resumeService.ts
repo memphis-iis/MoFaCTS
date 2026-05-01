@@ -519,7 +519,9 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
             }
             const conditionFileName = conditionTdfForFileName?.content?.fileName;
             const conditionIndex = getConditionIndexOrThrow(conditions, conditionFileName, 'resume.condition.count-beginning');
-            await meteorCallAsync('incrementTdfConditionCount', Session.get('currentRootTdfId'), conditionIndex);
+            if (!Session.get('ownerDashboardLaunch')) {
+              await meteorCallAsync('incrementTdfConditionCount', Session.get('currentRootTdfId'), conditionIndex);
+            }
           }
         }
 

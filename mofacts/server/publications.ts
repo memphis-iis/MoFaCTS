@@ -577,6 +577,7 @@ const TDF_LISTING_FIELDS = {
     stimuliSetId: 1,
     ownerId: 1,
     accessors: 1,
+    conditionCounts: 1,
     'content.fileName': 1,
     'content.isMultiTdf': 1,
     'content.tdfs.tutor.setspec': 1

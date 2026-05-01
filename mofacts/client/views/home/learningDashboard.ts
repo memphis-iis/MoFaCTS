@@ -222,6 +222,37 @@ Template.learningDashboard.events({
       null,
     );
   },
+
+  'click .start-condition-root': async function(event: any) {
+    event.preventDefault();
+    const row = $(event.currentTarget).closest('tr, .learning-dashboard-card');
+    const selector = row.find('.condition-tdf-selector');
+    const selectedId = selector.val() as string;
+    const rootId = selector.data('roottdfid') as string;
+    if (!selectedId) return;
+
+    const tdfDoc = Tdfs.findOne({ _id: selectedId });
+    if (!tdfDoc) return;
+    const setspec = tdfDoc.content?.tdfs?.tutor?.setspec || {};
+
+    // isOwnerLaunch = true: owner's session does not increment conditionCounts
+    await selectTdf(
+      selectedId,
+      setspec.lessonname || tdfDoc.content?.fileName || selectedId,
+      tdfDoc.stimuliSetId,
+      setspec.speechIgnoreOutOfGrammarResponses === 'true',
+      setspec.speechOutOfGrammarFeedback || 'Response not in answer set',
+      'Owner condition launch from Learning Dashboard',
+      tdfDoc.content?.isMultiTdf,
+      setspec,
+      false,
+      true, // isOwnerLaunch
+    );
+    // For the root option, also store the root TDF id so resumeService can resolve conditions
+    if (selectedId === rootId) {
+      Session.set('tdfFamilyRootTdfId', rootId);
+    }
+  },
 });
 
 Template.learningDashboard.rendered = async function(this: any) {
@@ -265,6 +296,7 @@ Template.learningDashboard.rendered = async function(this: any) {
     stimuliSetId: 1,
     ownerId: 1,
     accessors: 1,
+    conditionCounts: 1,
     'content.fileName': 1,
     'content.isMultiTdf': 1,
     'content.tdfs.tutor.setspec': 1
@@ -420,6 +452,22 @@ Template.learningDashboard.rendered = async function(this: any) {
 
   const allTdfObjects = [];
 
+  // Build sets of condition-child filenames and IDs so they can be suppressed
+  // as standalone rows (they are only accessible via their owner's condition selector).
+  const conditionChildFileNames = new Set<string>();
+  const conditionChildIds = new Set<string>();
+  for (const tdf of allTdfs) {
+    const sp = tdf?.content?.tdfs?.tutor?.setspec;
+    const conditionFileNames: unknown[] = Array.isArray(sp?.condition) ? sp.condition : [];
+    const conditionTdfIds: unknown[] = Array.isArray(sp?.conditionTdfIds) ? sp.conditionTdfIds : [];
+    for (const fn of conditionFileNames) {
+      if (typeof fn === 'string' && fn.trim()) conditionChildFileNames.add(fn.trim());
+    }
+    for (const id of conditionTdfIds) {
+      if (typeof id === 'string' && id.trim()) conditionChildIds.add(id.trim());
+    }
+  }
+
   // SINGLE PASS: Process TDFs and add stats in one iteration
   // Optimized from 2-pass algorithm - O(n) instead of O(2n)
   for (const tdf of allTdfs) {
@@ -431,6 +479,11 @@ Template.learningDashboard.rendered = async function(this: any) {
     // Make sure we have a valid TDF (with a setspec)
     const setspec = tdfObject.tdfs?.tutor?.setspec;
     if (!setspec) {
+      continue;
+    }
+
+    // Skip condition children — they are accessible only via their parent root's selector
+    if (conditionChildIds.has(String(TDFId)) || conditionChildFileNames.has(String(tdfObject.fileName))) {
       continue;
     }
 
@@ -452,6 +505,19 @@ Template.learningDashboard.rendered = async function(this: any) {
     const tdfHasTTSAPIKey = !!(setspec.textToSpeechAPIKey && setspec.textToSpeechAPIKey.trim());
     const hasSpeechAPIKey = tdfHasSpeechAPIKey || userHasSpeechAPIKey;
     const hasTTSAPIKey = tdfHasTTSAPIKey || userHasTTSAPIKey;
+
+    // Determine ownership and build condition selector data for owner rows
+    const isOwner = tdf.ownerId === Meteor.userId();
+    let conditions: { fileName: string; tdfId: string | null; count: number }[] | null = null;
+    if (isOwner && Array.isArray(setspec.condition) && setspec.condition.length > 0) {
+      const condTdfIds: unknown[] = Array.isArray(setspec.conditionTdfIds) ? setspec.conditionTdfIds : [];
+      const condCounts: unknown[] = Array.isArray((tdf as any).conditionCounts) ? (tdf as any).conditionCounts : [];
+      conditions = (setspec.condition as string[]).map((fn: string, i: number) => ({
+        fileName: fn,
+        tdfId: typeof condTdfIds[i] === 'string' ? condTdfIds[i] as string : null,
+        count: typeof condCounts[i] === 'number' ? condCounts[i] as number : 0,
+      }));
+    }
 
     // Check if this TDF is assigned to the user
     const isAssigned = courseTdfs.length > 0
@@ -499,6 +565,8 @@ Template.learningDashboard.rendered = async function(this: any) {
         hasTTSAPIKey: hasTTSAPIKey,
         isMultiTdf: isMultiTdf,
         tags: setspec.tags || [],
+        isOwner: isOwner,
+        conditions: conditions,
         isUsed: isUsed,
         hasBeenAttempted: hasBeenAttempted,
         versionMetadataInvalid: versionDecision.metadataInvalid,
@@ -618,12 +686,13 @@ async function checkAndWarmupAudioIfNeeded() {
 
 // Actual logic for selecting and starting a TDF
 async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId: any, ignoreOutOfGrammarResponses: any,
-  speechOutOfGrammarFeedback: any, how: any, isMultiTdf: any, setspec: any, isExperiment = false) {
+  speechOutOfGrammarFeedback: any, how: any, isMultiTdf: any, setspec: any, isExperiment = false, isOwnerLaunch = false) {
 
   const audioPromptFeedbackView = getAudioPromptFeedbackView();
 
   // make sure session variables are cleared from previous tests
   sessionCleanUp();
+  if (isOwnerLaunch) Session.set('ownerDashboardLaunch', true);
   Session.set('uiMessage', null);
 
   // Set the session variables we know

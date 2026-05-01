@@ -179,7 +179,9 @@ export async function unitIsFinished(reason: string, options: { engine?: unknown
       const curConditionNumber = getConditionIndexOrThrow(setspec.condition, curConditionFileName, 'legacyUnitProgression.count-midflow');
       // Increment the completion count for the current condition
       // Update the rootTDF
-      await meteorCallAsync('incrementTdfConditionCount', Session.get('currentRootTdfId'), curConditionNumber);
+      if (!Session.get('ownerDashboardLaunch')) {
+        await meteorCallAsync('incrementTdfConditionCount', Session.get('currentRootTdfId'), curConditionNumber);
+      }
     }
     leaveTarget = curTdfUnit?.videosession ? '/card' : '/instructions';
   } else {
@@ -203,7 +205,9 @@ export async function unitIsFinished(reason: string, options: { engine?: unknown
       );
       const curConditionNumber = getConditionIndexOrThrow(setspec.condition, curConditionFileName, 'legacyUnitProgression.count-end');
       // Update the rootTDF
-      await meteorCallAsync('incrementTdfConditionCount', Session.get('currentRootTdfId'), curConditionNumber);
+      if (!Session.get('ownerDashboardLaunch')) {
+        await meteorCallAsync('incrementTdfConditionCount', Session.get('currentRootTdfId'), curConditionNumber);
+      }
     }
 
     leaveTarget = '/profile';
