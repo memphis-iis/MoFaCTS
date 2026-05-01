@@ -13,7 +13,7 @@ declare global {
 }
 
 export function loadClientSettings() {
-  const handle = Meteor.subscribe('settings');
+  const handle = Meteor.subscribe('clientRuntimeSettings');
   Tracker.autorun(function () {
     if (handle.ready()) {
       const setting = DynamicSettings.findOne({ key: 'clientVerbosityLevel' });

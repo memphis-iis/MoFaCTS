@@ -963,6 +963,17 @@ Meteor.publish('settings', async function() {
     return DynamicSettings.find();
 });
 
+Meteor.publish('clientRuntimeSettings', function() {
+    if (!this.userId) {
+        return this.ready();
+    }
+
+    return DynamicSettings.find(
+        { key: 'clientVerbosityLevel' },
+        { fields: { key: 1, value: 1 } }
+    );
+});
+
 // Publish user's audio settings
 Meteor.publish('userAudioSettings', async function() {
     if (!this.userId) {
