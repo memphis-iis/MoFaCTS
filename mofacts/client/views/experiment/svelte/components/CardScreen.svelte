@@ -661,8 +661,21 @@
           preparedRevealKey !== stagedTrialSubsetKey ||
           isFadingOut
         ) {
+          clientConsole(2, '[CardScreen][Reveal] prepared handoff reveal skipped', {
+            testMode,
+            preparedRevealSequence,
+            revealSequence,
+            preparedRevealKey,
+            stagedTrialSubsetKey,
+            isFadingOut,
+            subsetKind: trialSubset.kind,
+          });
           return;
         }
+        clientConsole(2, '[CardScreen][Reveal] prepared handoff reveal started', {
+          preparedRevealKey,
+          subsetKind: trialSubset.kind,
+        });
         send({
           type: EVENTS.TRIAL_REVEAL_STARTED,
           timestamp: Date.now(),
@@ -1017,18 +1030,36 @@
       return;
     }
 
+    const subsetKind = event.detail?.subsetKind || trialSubset.kind;
+    const timestamp = event.detail?.timestamp || Date.now();
+    const transitionDurationMs = event.detail?.transitionDurationMs ?? null;
+
+    if (state.matches('study.preparing')) {
+      clientConsole(2, '[CardScreen][StudyReveal] started', {
+        subsetKind,
+        transitionDurationMs,
+      });
+
+      send({
+        type: EVENTS.TRIAL_REVEAL_STARTED,
+        timestamp,
+        subsetKind,
+      });
+      return;
+    }
+
     if (!state.matches('feedback.preparing')) {
       return;
     }
 
     clientConsole(2, '[CardScreen][ReviewReveal] started', {
-      subsetKind: event.detail?.subsetKind || trialSubset.kind,
-      transitionDurationMs: event.detail?.transitionDurationMs ?? null,
+      subsetKind,
+      transitionDurationMs,
     });
 
     send({
       type: 'REVIEW_REVEAL_STARTED',
-      timestamp: event.detail?.timestamp || Date.now(),
+      timestamp,
     });
   }
 
@@ -1048,6 +1079,15 @@
       await waitForBrowserPaint();
 
       if (sequence !== revealSequence || key !== stagedTrialSubsetKey || isFadingOut || !allBlockingAssetsReady) {
+        clientConsole(2, '[CardScreen][Reveal] queued reveal skipped', {
+          key,
+          stagedTrialSubsetKey,
+          sequence,
+          revealSequence,
+          isFadingOut,
+          allBlockingAssetsReady,
+          subsetKind: trialSubset.kind,
+        });
         return;
       }
 
@@ -1580,7 +1620,30 @@
       try {
         initResult = await initializeSvelteCard();
       } catch (error) {
-        clientConsole(1, '[CardScreen] initializeSvelteCard failed', error);
+        const diagnostic = {
+          error,
+          currentTdfName: Session.get('currentTdfFile')?.name || Session.get('currentTdfFile')?.fileName || null,
+          currentTdfId: Session.get('currentTdfId') || null,
+          currentRootTdfId: Session.get('currentRootTdfId') || null,
+          currentStimuliSetId: Session.get('currentStimuliSetId') || null,
+          currentUnitNumber: Session.get('currentUnitNumber') ?? null,
+          currentUnitName: Session.get('currentTdfUnit')?.unitname || null,
+          clusterlist: Session.get('currentTdfUnit')?.learningsession?.clusterlist ||
+            Session.get('currentTdfUnit')?.videosession?.questions ||
+            Session.get('currentTdfUnit')?.assessmentsession?.clusterlist ||
+            null,
+          stimuliCount: Array.isArray(Session.get('currentStimuliSet'))
+            ? Session.get('currentStimuliSet').length
+            : null,
+        };
+        Session.set('cardInitFailureDiagnostic', {
+          stage: 'initializeSvelteCard',
+          capturedAt: Date.now(),
+          ...diagnostic,
+          errorMessage: error?.message || String(error),
+          errorStack: error?.stack || null,
+        });
+        clientConsole(1, '[CardScreen] initializeSvelteCard failed', diagnostic);
         routeInitializationFailure();
         return;
       }
@@ -1590,7 +1653,21 @@
 
       const ready = await waitForCardReadiness();
       if (!ready) {
-        clientConsole(1, '[CardScreen] Readiness timeout before machine start', getCardReadinessState());
+        const diagnostic = {
+          ...getCardReadinessState(),
+          currentTdfId: Session.get('currentTdfId') || null,
+          currentRootTdfId: Session.get('currentRootTdfId') || null,
+          currentStimuliSetId: Session.get('currentStimuliSetId') || null,
+          currentUnitNumber: Session.get('currentUnitNumber') ?? null,
+          currentUnitName: Session.get('currentTdfUnit')?.unitname || null,
+          deliveryParamKeys: Object.keys(DeliveryParamsStore.get() || {}),
+        };
+        Session.set('cardInitFailureDiagnostic', {
+          stage: 'cardReadinessTimeout',
+          capturedAt: Date.now(),
+          ...diagnostic,
+        });
+        clientConsole(1, '[CardScreen] Readiness timeout before machine start', diagnostic);
         routeInitializationFailure();
         return;
       }

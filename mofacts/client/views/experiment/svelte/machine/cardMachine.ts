@@ -19,6 +19,7 @@ import * as guards from './guards';
 import * as actions from './actions';
 import { createServices } from './services';
 import { CardStore } from '../../modules/cardStore';
+import { clientConsole } from '../../../../lib/clientLogger';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Narrow exception: current XState v5 config/actor typings in this file are not modeled well enough yet, but we can still type the machine callback payloads locally.
 const createMachine: any = xCreateMachine;
@@ -193,6 +194,15 @@ function getPreparedTrial(context: CardMachineContext): PreparedAdvanceResult | 
 }
 
 function isFeedbackAdvanceReady(context: CardMachineContext): boolean {
+  clientConsole(2, '[CardMachine][FeedbackAdvanceReady]', {
+    incomingPreparationComplete: context.incomingPreparationComplete,
+    unitFinished: context.unitFinished,
+    hasPreparedTrial: !!context.preparedTrial,
+    incomingReady: context.incomingReady,
+    preparedAdvanceMode: context.preparedAdvanceMode,
+    testType: context.testType,
+  });
+
   if (!context.incomingPreparationComplete) {
     return false;
   }

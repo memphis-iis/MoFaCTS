@@ -1195,12 +1195,87 @@ async function modelUnitEngine(): Promise<any> {
        const card = cardProbabilities.cards[newClusterIndex];
        const stim = card.stims[newStimIndex];
        const testType = this._resolveSelectionTestType(card, stim);
-       const preparedState = await this.buildPreparedCardQuestionAndAnswerGlobals(
-        newClusterIndex,
-        newStimIndex,
-        stim.probFunctionParameters,
-        { testType },
-      );
+       const currentDeliveryParams = DeliveryParamsStore.get() as Record<string, unknown>;
+       const preparationDiagnostic = {
+        currentTdfName: Session.get('currentTdfName') || null,
+        currentTdfId: Session.get('currentTdfId') || null,
+        currentRootTdfId: Session.get('currentRootTdfId') || null,
+        currentStimuliSetId: Session.get('currentStimuliSetId') || null,
+        currentUnitNumber: Session.get('currentUnitNumber') ?? null,
+        currentUnitName: Session.get('currentTdfUnit')?.unitname || null,
+        clusterIndex: newClusterIndex,
+        stimIndex: newStimIndex,
+        studyFirst: currentDeliveryParams.studyFirst,
+        studyOnlyFields: currentDeliveryParams.studyOnlyFields || null,
+        drillFields: currentDeliveryParams.drillFields || null,
+        cardHasBeenIntroduced: card.hasBeenIntroduced,
+        stimHasBeenIntroduced: stim.hasBeenIntroduced,
+        stimAvailable: stim.available || null,
+        resolvedTestType: testType,
+      };
+       Session.set('firstCardPreparationDiagnostic', {
+        stage: 'beforeBuildPreparedCard',
+        capturedAt: Date.now(),
+        ...preparationDiagnostic,
+      });
+       clientConsole(1, '[Unit Engine] First-card preparation diagnostic', preparationDiagnostic);
+       let preparedState;
+       try {
+        preparedState = await this.buildPreparedCardQuestionAndAnswerGlobals(
+          newClusterIndex,
+          newStimIndex,
+          stim.probFunctionParameters,
+          { testType },
+        );
+       } catch (error) {
+        const errorRecord = error instanceof Error ? error : null;
+        const failureDiagnostic = {
+          error,
+          currentTdfName: Session.get('currentTdfName') || null,
+          currentTdfId: Session.get('currentTdfId') || null,
+          currentRootTdfId: Session.get('currentRootTdfId') || null,
+          currentStimuliSetId: Session.get('currentStimuliSetId') || null,
+          currentUnitNumber: Session.get('currentUnitNumber') ?? null,
+          currentUnitName: Session.get('currentTdfUnit')?.unitname || null,
+          clusterIndex: newClusterIndex,
+          stimIndex: newStimIndex,
+          studyFirst: currentDeliveryParams.studyFirst,
+          studyOnlyFields: currentDeliveryParams.studyOnlyFields || null,
+          drillFields: currentDeliveryParams.drillFields || null,
+          resolvedTestType: testType,
+        };
+        Session.set('firstCardPreparationDiagnostic', {
+          stage: 'buildPreparedCardFailed',
+          capturedAt: Date.now(),
+          ...failureDiagnostic,
+          errorMessage: errorRecord?.message || String(error),
+          errorStack: errorRecord?.stack || null,
+        });
+        clientConsole(1, '[Unit Engine] First-card preparation failed', failureDiagnostic);
+        throw error;
+       }
+       const completedDiagnostic = {
+        currentTdfName: Session.get('currentTdfName') || null,
+        currentTdfId: Session.get('currentTdfId') || null,
+        currentStimuliSetId: Session.get('currentStimuliSetId') || null,
+        currentUnitNumber: Session.get('currentUnitNumber') ?? null,
+        currentUnitName: Session.get('currentTdfUnit')?.unitname || null,
+        clusterIndex: newClusterIndex,
+        stimIndex: newStimIndex,
+        resolvedTestType: testType,
+        currentDisplayKeys: Object.keys(preparedState?.currentDisplay || {}),
+        hasDisplayText: Boolean(preparedState?.currentDisplay?.text),
+        hasDisplayClozeText: Boolean(preparedState?.currentDisplay?.clozeText),
+        hasDisplayAudio: Boolean(preparedState?.currentDisplay?.audioSrc),
+        hasDisplayImage: Boolean(preparedState?.currentDisplay?.imgSrc),
+        hasCurrentAnswer: Boolean(preparedState?.currentAnswer),
+      };
+       Session.set('firstCardPreparationDiagnostic', {
+        stage: 'buildPreparedCardCompleted',
+        capturedAt: Date.now(),
+        ...completedDiagnostic,
+      });
+       clientConsole(1, '[Unit Engine] First-card preparation completed', completedDiagnostic);
 
       return {
         indices,
