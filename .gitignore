@@ -26,6 +26,7 @@ ubuntu-bionic-18.04-cloudimg-console.log
 profileTmp
 certs
 node_modules/
+backups/
 !mofacts/private/tdf/*
 mofacts/_build/
 mofacts/public/build-assets/
@@ -47,6 +48,7 @@ db/mongodump.tar.gz
 # Private deploy config
 mofacts/.deploy/settings.json
 mofacts/.deploy/settingsproduction.json
+mofacts/.deploy/settingsstaging.json
 mofacts/.deploy/.env
 mofacts/.deploy/.env.production
 mofacts/.deploy/.env*.production
