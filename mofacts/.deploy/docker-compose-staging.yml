@@ -24,14 +24,14 @@ services:
     depends_on:
       - mongodb
     environment:
-      ROOT_URL: ${ROOT_URL:-https://mofacts.optimallearning.org}
+      ROOT_URL: ${ROOT_URL:-https://staging.optimallearning.org}
       MONGO_URL: ${MONGO_URL:-mongodb://mongodb:27017/MoFACT-meteor3}
       EXPECTED_MONGO_DB_NAME: ${EXPECTED_MONGO_DB_NAME:-MoFACT-meteor3}
       PORT: ${PORT:-3000}
       WAIT_HOSTS: mongodb:27017
       # Settings are baked into the image at /app/settings.json (outside the
       # /mofactsAssets bind mount so deploys are self-contained).
-      METEOR_SETTINGS_WORKAROUND: '${METEOR_SETTINGS_PATH:-/app/settings.json}'
+      METEOR_SETTINGS_WORKAROUND: '${METEOR_SETTINGS_PATH:-/app/settingsstaging.json}'
     networks:
       - mofacts
 
