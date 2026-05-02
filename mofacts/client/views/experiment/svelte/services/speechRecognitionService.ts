@@ -209,6 +209,31 @@ function estimateLinear16DurationMs(byteLength: number, sampleRate: number): num
   return Math.round((byteLength / 2 / sampleRate) * 1000);
 }
 
+export function shouldRetryShortTargetWithCommandModel(
+  response: GoogleSpeechApiResponse | null | undefined,
+  currentAnswer: string | null,
+  language: string
+): boolean {
+  const normalizedCurrentAnswer = normalizeSpeechToken(currentAnswer || '');
+  const resultCount = Array.isArray(response?.results) ? response.results.length : 0;
+
+  return resultCount === 0 &&
+    /^es(?:-|$)/i.test(language.trim()) &&
+    normalizedCurrentAnswer.length > 0 &&
+    normalizedCurrentAnswer.length <= 3;
+}
+
+function buildCommandAndSearchRetryRequest(request: SpeechApiRequest): SpeechApiRequest {
+  return {
+    ...request,
+    config: {
+      ...request.config,
+      model: 'command_and_search',
+      useEnhanced: false,
+    },
+  };
+}
+
 function buildSpeechAdaptation(
   phraseHints: string[],
   currentAnswer: string | null
@@ -286,8 +311,12 @@ function summarizeSpeechAdaptation(
   };
 }
 
-function normalizeSpeechToken(value: unknown): string {
-  return String(value || '').trim().toLowerCase();
+export function normalizeSpeechToken(value: unknown): string {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
 }
 
 export function buildSpeechRecognitionPhraseHints(targets: string[]): string[] {
@@ -959,12 +988,27 @@ async function processAudioData(audioData: ArrayBuffer | string): Promise<Speech
   try {
     const tdfId = Session.get('currentTdfId');
     const speechAPIKey = Session.get('speechAPIKey') || '';
-    const apiResult = await MeteorCompat.callAsync('makeGoogleSpeechAPICall', tdfId, speechAPIKey, request, answerGrammar);
-    const apiElapsedMs = Math.round(performance.now() - apiCallStartedAt);
+    let apiResult = await MeteorCompat.callAsync('makeGoogleSpeechAPICall', tdfId, speechAPIKey, request, answerGrammar);
+    let apiElapsedMs = Math.round(performance.now() - apiCallStartedAt);
     
     // API returns [answerGrammar, response] array - extract the response object
-    const [, response] = Array.isArray(apiResult) ? apiResult : [answerGrammar, apiResult];
-    const typedResponse = response as GoogleSpeechApiResponse | null | undefined;
+    let [, response] = Array.isArray(apiResult) ? apiResult : [answerGrammar, apiResult];
+    let typedResponse = response as GoogleSpeechApiResponse | null | undefined;
+    if (shouldRetryShortTargetWithCommandModel(typedResponse, requestCorrectAnswer, speechRecognitionLanguage)) {
+      const retryStartedAt = performance.now();
+      const retryRequest = buildCommandAndSearchRetryRequest(request);
+      clientConsole(1, '[SR DEBUG] Retrying short Spanish target with command_and_search model', {
+        attempt: speechTranscriptionAttempts,
+        correctAnswer: requestCorrectAnswer,
+        originalModel: request.config.model,
+        retryModel: retryRequest.config.model,
+        originalApiElapsedMs: apiElapsedMs,
+      });
+      apiResult = await MeteorCompat.callAsync('makeGoogleSpeechAPICall', tdfId, speechAPIKey, retryRequest, answerGrammar);
+      apiElapsedMs += Math.round(performance.now() - retryStartedAt);
+      [, response] = Array.isArray(apiResult) ? apiResult : [answerGrammar, apiResult];
+      typedResponse = response as GoogleSpeechApiResponse | null | undefined;
+    }
     const resultCount = Array.isArray(typedResponse?.results) ? typedResponse.results.length : 0;
     const adaptationTimeout = Boolean(typedResponse?.speechAdaptationInfo?.adaptationTimeout);
     const adaptationTimeoutMessage = typedResponse?.speechAdaptationInfo?.timeoutMessage || '';

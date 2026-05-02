@@ -182,9 +182,11 @@ export function findSpanishPhoneticConflictsWithCorrectAnswer(
 ): string[] {
   const conflicts: string[] = [];
   const correctCodes = getAllSpanishPhoneticCodes(correctAnswer);
+  const normalizedCorrectAnswer = normalizeSpanishForPhonetics(correctAnswer);
 
   for (const word of grammarList) {
     if (word === correctAnswer) continue;
+    if (normalizeSpanishForPhonetics(word) === normalizedCorrectAnswer) continue;
 
     const wordCodes = getAllSpanishPhoneticCodes(word);
     const bestComparison = getBestSpanishPhoneticCodeComparison(

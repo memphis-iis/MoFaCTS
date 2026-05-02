@@ -90,7 +90,9 @@ function answerIsBranched(answer: string): boolean {
 }
 
 function normalizeAnswerValue(value: string, caseSensitive = false): string {
-  const trimmed = legacyTrim(value || '');
+  const trimmed = legacyTrim(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
   return caseSensitive ? trimmed : trimmed.toLowerCase();
 }
 

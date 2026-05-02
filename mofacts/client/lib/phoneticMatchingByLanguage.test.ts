@@ -121,4 +121,21 @@ describe('phoneticMatchingByLanguage', function() {
     expect(conflicts).to.include('baca');
     expect(conflicts).to.not.include('casa');
   });
+
+  it('does not treat accented Spanish answer aliases as phonetic conflicts', function() {
+    const grammar = ['que', 'de', 'se', 'qué', 'e'];
+    const phoneticIndex = buildPhoneticIndexForLanguage(grammar, 'es-MX');
+
+    const conflicts = findPhoneticConflictsWithCorrectAnswerForLanguage(
+      'que',
+      grammar,
+      phoneticIndex,
+      'es-MX'
+    );
+
+    expect(conflicts).to.include('de');
+    expect(conflicts).to.include('se');
+    expect(conflicts).to.include('e');
+    expect(conflicts).to.not.include('qué');
+  });
 });
