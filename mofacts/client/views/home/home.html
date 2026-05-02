@@ -1,23 +1,66 @@
 <!-- MAIN home template - Unified home page for all users -->
 <template name="home">
 
-    <div class="container page-loading" id="homeContainer" style="margin-top: 1rem; max-width: 900px;">
+    <div class="container page-loading" id="homeContainer" style="margin-top: 1rem; max-width: 1350px;">
 
-          <!-- MAIN MENU Section (Everyone) -->
+        <!-- HERO BANNER (only shown when a hero image URL is configured in the theme) -->
+        {{#if homeHeroStyle}}
+        <div class="card mb-4 home-hero" style="{{homeHeroStyle}}">
+            <div class="card-body">
+                <p class="mb-0" style="color: var(--text-color);">Access your teaching tools, resources, and system functions.</p>
+            </div>
+        </div>
+        {{/if}}
+
+        <!-- MAIN MENU Section (Everyone) -->
         <div class="card mb-4">
             <div class="card-body">
-                <div class="d-flex align-items-center mb-3">
+                <div class="d-flex align-items-center mb-1">
                     <i class="fa fa-home me-2" style="font-size: 1.25rem; color: var(--accent-color);"></i>
                     <h5 class="m-0">Main Menu</h5>
                 </div>
+                <p class="text-muted small mb-3">Access core system features</p>
                 <div class="button-menu">
-                    <button type="button" id="myLessonsButton" class="btn">Learning Dashboard</button>
-                    <button type="button" id="classSelectionButton" class="btn">Teacher / Class Select</button>
-                    <button type="button" id="contentUploadButton" class="btn">Content Manager</button>
-                    <button type="button" id="dataDownloadButton" class="btn">Download Data</button>
-                    <button type="button" id="audioSettingsButton" class="btn">Audio Settings</button>
-                    <button type="button" id="helpButton" class="btn">Help</button>
-                    <button type="button" id="logoutButton" class="btn">Logout</button>
+                    <button type="button" id="myLessonsButton" class="btn btn-menu-item">
+                        <i class="fa fa-bar-chart btn-menu-icon"></i>
+                        <span class="btn-menu-title">Learning Dashboard</span>
+                        <span class="btn-menu-desc">View progress and learning insights</span>
+                    </button>
+                    <button type="button" id="classSelectionButton" class="btn btn-menu-item">
+                        <i class="fa fa-users btn-menu-icon"></i>
+                        <span class="btn-menu-title">Teacher Select</span>
+                        <span class="btn-menu-desc">Join your class</span>
+                    </button>
+                    <button type="button" id="contentUploadButton" class="btn btn-menu-item">
+                        <i class="fa fa-folder-open btn-menu-icon"></i>
+                        <span class="btn-menu-title">Content Manager</span>
+                        <span class="btn-menu-desc">Create, edit, and manage learning content</span>
+                    </button>
+                    <button type="button" id="dataDownloadButton" class="btn btn-menu-item">
+                        <i class="fa fa-download btn-menu-icon"></i>
+                        <span class="btn-menu-title">Download Data</span>
+                        <span class="btn-menu-desc">Practice data reports for owned content</span>
+                    </button>
+                    <button type="button" id="audioSettingsButton" class="btn btn-menu-item">
+                        <i class="fa fa-volume-up btn-menu-icon"></i>
+                        <span class="btn-menu-title">Audio Settings</span>
+                        <span class="btn-menu-desc">Configure audio preferences</span>
+                    </button>
+                    <button type="button" id="helpButton" class="btn btn-menu-item">
+                        <i class="fa fa-question-circle btn-menu-icon"></i>
+                        <span class="btn-menu-title">Help</span>
+                        <span class="btn-menu-desc">Student startup guide</span>
+                    </button>
+                    <button type="button" id="wikiProfileButton" class="btn btn-menu-item">
+                        <i class="fa fa-book btn-menu-icon"></i>
+                        <span class="btn-menu-title">Documentation</span>
+                        <span class="btn-menu-desc">Complete wiki docs</span>
+                    </button>
+                    <button type="button" id="logoutButton" class="btn btn-menu-item">
+                        <i class="fa fa-sign-out btn-menu-icon"></i>
+                        <span class="btn-menu-title">Logout</span>
+                        <span class="btn-menu-desc">Sign out of the system</span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -26,48 +69,82 @@
         {{#if isInRole 'teacher'}}
         <div class="card mb-4">
             <div class="card-body">
-                <div class="d-flex align-items-center mb-3">
-                    <i class="fa fa-graduation-cap me-2" style="font-size: 1.25rem; color: var(--accent-color);"></i>
+                <div class="d-flex align-items-center mb-1">
+                    <i class="fa fa-graduation-cap me-2" style="font-size: 1.25rem; color: var(--teacher-button-color);"></i>
                     <h5 class="m-0">Teacher Functions</h5>
                 </div>
+                <p class="text-muted small mb-3">Tools to manage classes and instruction</p>
                 <div class="button-menu">
-                    <button type="button" id="classEditButton" class="btn btn-role-teacher">Class Management</button>
-                    <button type="button" id="instructorReportingButton" class="btn btn-role-teacher">Instructor Reporting</button>
-                    <button type="button" id="tdfAssignmentEditButton" class="btn btn-role-teacher">Chapter Assignments</button>
+                    <button type="button" id="classEditButton" class="btn btn-menu-item btn-role-teacher">
+                        <i class="fa fa-users btn-menu-icon"></i>
+                        <span class="btn-menu-title">Class Management</span>
+                        <span class="btn-menu-desc">Create and edit classes</span>
+                    </button>
+                    <button type="button" id="instructorReportingButton" class="btn btn-menu-item btn-role-teacher">
+                        <i class="fa fa-bar-chart btn-menu-icon"></i>
+                        <span class="btn-menu-title">Instructor Reporting</span>
+                        <span class="btn-menu-desc">View and export instructional reports</span>
+                    </button>
+                    <button type="button" id="tdfAssignmentEditButton" class="btn btn-menu-item btn-role-teacher">
+                        <i class="fa fa-tasks btn-menu-icon"></i>
+                        <span class="btn-menu-title">Chapter Assignments</span>
+                        <span class="btn-menu-desc">Assign and manage chapter work</span>
+                    </button>
                 </div>
             </div>
         </div>
         {{/if}}
 
-        <!-- SHARED FUNCTIONS Section (Teachers and Admins) -->
+        {{!-- SHARED FUNCTIONS Section (Teachers and Admins) - currently unused; preserved for future use
         {{#if isInRole 'teacher,admin'}}
         <div class="card mb-4">
             <div class="card-body">
-                <div class="d-flex align-items-center mb-3">
+                <div class="d-flex align-items-center mb-1">
                     <i class="fa fa-users me-2" style="font-size: 1.25rem; color: var(--accent-color);"></i>
                     <h5 class="m-0">Shared Functions</h5>
                 </div>
                 <div class="button-menu">
-                    <button type="button" id="wikiProfileButton" class="btn btn-role-shared">Documentation</button>
                 </div>
             </div>
         </div>
         {{/if}}
+        --}}
 
         <!-- ADMIN FUNCTIONS Section (Admins only) -->
         {{#if isInRole 'admin'}}
         <div class="card mb-4">
             <div class="card-body">
-                <div class="d-flex align-items-center mb-3">
-                    <i class="fa fa-cogs me-2" style="font-size: 1.25rem; color: var(--accent-color);"></i>
+                <div class="d-flex align-items-center mb-1">
+                    <i class="fa fa-cogs me-2" style="font-size: 1.25rem; color: var(--admin-button-color);"></i>
                     <h5 class="m-0">Admin Functions</h5>
                 </div>
+                <p class="text-muted small mb-3">Administrative tools and system management</p>
                 <div class="button-menu">
-                    <button type="button" id="adminControlsBtn" class="btn btn-role-admin">Admin Control Panel</button>
-                    <button type="button" id="userAdminButton" class="btn btn-role-admin">User Admin</button>
-                    <button type="button" id="mechTurkButton" class="btn btn-role-admin">Mechanical Turk</button>
-                    <button type="button" id="themeButton" class="btn btn-role-admin">Theme</button>
-                    <button type="button" id="adminTestsButton" class="btn btn-role-admin">Admin Tests</button>
+                    <button type="button" id="adminControlsBtn" class="btn btn-menu-item btn-role-admin">
+                        <i class="fa fa-cogs btn-menu-icon"></i>
+                        <span class="btn-menu-title">Admin Control Panel</span>
+                        <span class="btn-menu-desc">System settings and configuration</span>
+                    </button>
+                    <button type="button" id="userAdminButton" class="btn btn-menu-item btn-role-admin">
+                        <i class="fa fa-user btn-menu-icon"></i>
+                        <span class="btn-menu-title">User Admin</span>
+                        <span class="btn-menu-desc">Manage users and permissions</span>
+                    </button>
+                    <button type="button" id="mechTurkButton" class="btn btn-menu-item btn-role-admin">
+                        <i class="fa fa-wrench btn-menu-icon"></i>
+                        <span class="btn-menu-title">Mechanical Turk</span>
+                        <span class="btn-menu-desc">Manage MTurk integrations</span>
+                    </button>
+                    <button type="button" id="themeButton" class="btn btn-menu-item btn-role-admin">
+                        <i class="fa fa-paint-brush btn-menu-icon"></i>
+                        <span class="btn-menu-title">Theme</span>
+                        <span class="btn-menu-desc">Customize system appearance</span>
+                    </button>
+                    <button type="button" id="adminTestsButton" class="btn btn-menu-item btn-role-admin">
+                        <i class="fa fa-flask btn-menu-icon"></i>
+                        <span class="btn-menu-title">Admin Tests</span>
+                        <span class="btn-menu-desc">Run system tests and diagnostics</span>
+                    </button>
                 </div>
             </div>
         </div>

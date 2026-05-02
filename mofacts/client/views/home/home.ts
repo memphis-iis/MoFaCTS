@@ -8,6 +8,7 @@ const { FlowRouter } = require('meteor/ostrio:flow-router-extra');
 import {Cookie} from '../../lib/cookies';
 import { Tracker } from 'meteor/tracker';
 import './home.html';
+import './home.css';
 import { isConditionRootWithoutUnitArray, normalizeTutorUnits } from '../../lib/tdfUtils';
 import { ensureCurrentStimuliSetId } from '../experiment/svelte/services/mediaResolver';
 import { clearConditionResolutionContext, setActiveTdfContext } from '../../lib/idContext';
@@ -37,7 +38,14 @@ export {selectTdf};
 // Template storage and helpers
 
 Template.home.helpers({
-  // placeholder for future home-only helpers
+  homeHeroStyle(): string {
+    const theme = Session.get('curTheme');
+    const url = (theme?.properties?.home_hero_image_url as string | undefined);
+    if (typeof url === 'string' && url.trim().length > 0) {
+      return `background-image: url('${url.trim()}');`;
+    }
+    return '';
+  }
 });
 
 // //////////////////////////////////////////////////////////////////////////

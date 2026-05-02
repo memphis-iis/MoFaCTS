@@ -49,6 +49,7 @@ const FALLBACK_THEME = {
     shared_button_text_color: '#000000',
     admin_button_color: '#F5B57C',
     admin_button_text_color: '#000000',
+    home_hero_image_url: '',
     brand_label: '',
     logo_url: '/images/themes/brain-logo.png',
     favicon_16_url: '/images/themes/brain-16.png',

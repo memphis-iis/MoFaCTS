@@ -733,12 +733,24 @@ input[type="range"]::-moz-range-progress,
     max-width: 300px;
 }
 
-/* Responsive button grid - uses CSS Grid with auto-fit for fluid reflow */
+/* Responsive button grid - 2 cols mobile, 3 cols tablet, 4 cols desktop */
 .button-menu {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    grid-template-columns: repeat(2, 1fr);
     gap: clamp(0.5rem, 1.5vw, 1rem);
     width: 100%;
+}
+
+@media (min-width: 576px) {
+    .button-menu {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (min-width: 768px) {
+    .button-menu {
+        grid-template-columns: repeat(4, 1fr);
+    }
 }
 
 .button-menu .btn {

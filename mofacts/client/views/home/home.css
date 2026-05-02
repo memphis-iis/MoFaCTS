@@ -1,0 +1,51 @@
+/* Button grid gap override for home page */
+.button-menu {
+    gap: 0.5rem;
+}
+
+/* Icon card button variant - icon left, title/desc stacked on the right */
+.button-menu .btn-menu-item {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto auto;
+    align-items: center;
+    text-align: left;
+    padding: 0.625rem 0.875rem;
+    gap: 0 0.75rem;
+}
+
+.button-menu .btn-menu-item .btn-menu-icon {
+    grid-column: 1;
+    grid-row: 1 / 3;
+    align-self: center;
+    font-size: 1.25rem;
+}
+
+.button-menu .btn-menu-item .btn-menu-title {
+    grid-column: 2;
+    grid-row: 1;
+    font-weight: 600;
+    font-size: 0.875rem;
+    line-height: 1.2;
+    align-self: end;
+}
+
+.button-menu .btn-menu-item .btn-menu-desc {
+    grid-column: 2;
+    grid-row: 2;
+    font-size: 0.75rem;
+    opacity: 0.75;
+    line-height: 1.3;
+    font-weight: 400;
+    white-space: normal;
+    align-self: start;
+}
+
+/* Hero banner with optional background image */
+.home-hero {
+    background-size: auto;
+    background-position: center center;
+    background-repeat: no-repeat;
+    min-height: 130px;
+    overflow: hidden;
+}
