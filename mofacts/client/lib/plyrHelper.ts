@@ -4,6 +4,7 @@ import { extractDelimFields, rangeVal } from './currentTestingHelpers';
 import { ExperimentStateStore } from './state/experimentStateStore';
 import { clientConsole } from './clientLogger';
 import { UiSettingsStore } from './state/uiSettingsStore';
+import { parseYouTubeVideoUrl } from './youtubeUrl';
 
 import { legacyTrim } from '../../common/underscoreCompat';
 
@@ -762,19 +763,21 @@ export async function initializePlyr() {
   let source = Session.get('currentTdfUnit').videosession.videosource;
 
   // Handle YouTube vs HTML5 video sources differently
-  if(source.includes('youtu')){
-    // Extract video ID from YouTube URL
-    if(source.includes('youtu.be')){
-      source = source.split('youtu.be/')[1];
-    } else {
-      source = source.split('v=')[1];
-      source = source.split('&')[0];
-    }
+  const youtubeInfo = parseYouTubeVideoUrl(source);
+  if(youtubeInfo){
+    clientConsole(1, '[PlyrHelper] Initializing YouTube player', {
+      videoId: youtubeInfo.id,
+      sourceHost: youtubeInfo.sourceHost,
+      watchUrl: youtubeInfo.watchUrl,
+      loginMode: Session.get('loginMode') || null,
+      isExperiment: Session.get('loginMode') === 'experiment',
+      documentReferrerPresent: Boolean(document.referrer),
+    });
     playerController.player.source = {
       type: 'video',
       sources: [
         {
-          src: 'https://www.youtube.com/watch?v=' + source,
+          src: youtubeInfo.watchUrl,
           provider: 'youtube',
         },
       ],

@@ -10,6 +10,7 @@
   import { ExperimentStateStore } from '../../../../lib/state/experimentStateStore';
   import { clientConsole } from '../../../../lib/userSessionHelpers';
   import { legacyTrim } from '../../../../../common/underscoreCompat';
+  import { parseYouTubeVideoUrl } from '../../../../lib/youtubeUrl';
 
   const dispatch = createEventDispatcher();
 
@@ -72,14 +73,16 @@
   let lastVolume;
   let lastSpeed;
   let isYouTube;
+  let youtubeInfo = null;
   let youtubeId = '';
   let appliedResumeAnchorKey = '';
   let lastRejectedCheckpointKey = '';
   let machineResumeInProgress = false;
 
   // Check if URL is YouTube
-  $: isYouTube = videoUrl && (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be'));
-  $: youtubeId = isYouTube ? extractYouTubeId(videoUrl) : '';
+  $: youtubeInfo = parseYouTubeVideoUrl(videoUrl);
+  $: isYouTube = youtubeInfo !== null;
+  $: youtubeId = youtubeInfo?.id || '';
   $: resolvedOverlayMounted = overlayMounted || showOverlay;
   $: resolvedOverlayVisible = overlayVisible || showOverlay;
   $: if (canAcceptCheckpoint) {
@@ -116,7 +119,7 @@
 
     if (isYouTube && !youtubeId) {
       const message = '[VideoSessionMode] Invalid YouTube URL - missing video ID';
-      clientConsole(1, message, normalizedVideoUrl);
+      clientConsole(1, message, buildVideoDiagnostic(normalizedVideoUrl, null));
       return;
     }
 
@@ -153,15 +156,13 @@
     if (isYouTube) {
       // YouTube video - use Plyr's YouTube provider
       // Note: videoElement will be replaced with YouTube embed
-      clientConsole(2, '[VideoSessionMode] Initializing YouTube player:', videoUrl);
+      clientConsole(1, '[VideoSessionMode] Initializing YouTube player', buildVideoDiagnostic(normalizedVideoUrl, null));
       player = new Plyr(videoElement, {
         ...plyrConfig,
         youtube: {
           noCookie: true,
           rel: 0,
-          showinfo: 0,
           iv_load_policy: 3,
-          modestbranding: 1,
         },
       });
     } else if (videoElement && videoUrl) {
@@ -239,6 +240,7 @@
       clientConsole(1, '[VideoSessionMode] Player ready', {
         mode: isYouTube ? 'youtube' : 'html5',
         src: initializedVideoUrl || normalizedVideoUrl,
+        ...(isYouTube ? buildVideoDiagnostic(normalizedVideoUrl, getRenderedYouTubeIframeSrc()) : {}),
       });
       lastVolume = player.volume;
       lastSpeed = player.speed;
@@ -294,6 +296,7 @@
         error: error?.message || error || null,
         src: initializedVideoUrl || normalizedVideoUrl,
         mediaErrorCode,
+        ...(isYouTube ? buildVideoDiagnostic(normalizedVideoUrl, getRenderedYouTubeIframeSrc()) : {}),
       });
     });
 
@@ -669,18 +672,52 @@
     if (progressBar) progressBar.style.pointerEvents = 'none';
   }
 
-  function extractYouTubeId(url) {
-    if (!url) return '';
-    if (url.includes('youtu.be/')) {
-      return url.split('youtu.be/')[1].split(/[?&#]/)[0];
+  function getRenderedYouTubeIframeSrc() {
+    return containerElement?.querySelector('iframe[src*="youtube"]')?.getAttribute('src') || null;
+  }
+
+  function getReferrerPolicyValue() {
+    const metaPolicy = document.querySelector('meta[name="referrer"]')?.getAttribute('content');
+    return metaPolicy || 'strict-origin-when-cross-origin';
+  }
+
+  function getBrowserFamily() {
+    const userAgentData = navigator.userAgentData;
+    if (userAgentData?.brands?.length) {
+      return userAgentData.brands.map((brand) => `${brand.brand}/${brand.version}`).join(', ');
     }
-    if (url.includes('youtube.com')) {
-      const match = url.match(/[?&#]v=([^&#]+)/);
-      if (match?.[1]) return match[1];
-      const embedMatch = url.match(/\/embed\/([^?&#]+)/);
-      if (embedMatch?.[1]) return embedMatch[1];
-    }
-    return '';
+    const userAgent = navigator.userAgent || '';
+    if (userAgent.includes('Edg/')) return 'Edge';
+    if (userAgent.includes('Chrome/')) return 'Chrome';
+    if (userAgent.includes('Firefox/')) return 'Firefox';
+    if (userAgent.includes('Safari/')) return 'Safari';
+    return 'Unknown';
+  }
+
+  function buildVideoDiagnostic(rawUrl, iframeSrc) {
+    return {
+      loginMode: Session.get('loginMode') || null,
+      isExperiment: Session.get('loginMode') === 'experiment',
+      routePath: window.location?.pathname || '',
+      videoId: youtubeInfo?.id || null,
+      sourceHost: youtubeInfo?.sourceHost || null,
+      watchUrl: youtubeInfo?.watchUrl || null,
+      embedHost: 'youtube-nocookie.com',
+      iframeSrc,
+      originalUrlHost: (() => {
+        try {
+          return new URL(rawUrl).hostname;
+        } catch (_error) {
+          return null;
+        }
+      })(),
+      documentReferrerPresent: Boolean(document.referrer),
+      referrerPolicy: getReferrerPolicyValue(),
+      browserFamily: getBrowserFamily(),
+      standaloneDisplayMode: Boolean(window.matchMedia?.('(display-mode: standalone)')?.matches),
+      touchCapable: navigator.maxTouchPoints > 0,
+      thirdPartyCookieProbeAvailable: typeof document.hasStorageAccess === 'function',
+    };
   }
 
   function inferVideoMimeType(url) {
@@ -731,6 +768,7 @@
   }
 
   .video-container {
+    position: relative;
     width: 100%;
     height: 100%;
   }
