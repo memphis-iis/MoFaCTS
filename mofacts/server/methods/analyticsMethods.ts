@@ -508,7 +508,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       }
     }
 
-    if (assignedRootTdfId) {
+    if (assignedRootTdfId && assignedRootTdfId !== tdfId) {
       await validateExperimentStateMutation(
         actingUserId,
         assignedRootTdfId,

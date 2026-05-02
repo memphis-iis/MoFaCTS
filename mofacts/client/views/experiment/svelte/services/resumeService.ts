@@ -564,17 +564,22 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
       ensureCurrentStimuliSetId(curTdf.stimuliSetId);
       clientConsole(2, 'condition stimuliSetId', curTdf);
     } else {
+      newExperimentState.conditionTdfId = null;
+      curExperimentState = {
+        ...curExperimentState,
+        conditionTdfId: null,
+      };
       if(!Session.get('currentTdfFile')){
         Session.set('currentTdfFile', rootTDF);
         Session.set('currentTdfName', rootTDF.fileName);
-        setActiveTdfContext({
-          currentRootTdfId: Session.get('currentRootTdfId'),
-          currentTdfId: Session.get('currentRootTdfId'),
-          currentStimuliSetId: rootTDFBoxed.stimuliSetId,
-        }, 'resume.no-condition.revert-root');
-        clearConditionResolutionContext('resume.no-condition.revert-root');
-        ensureCurrentStimuliSetId(rootTDFBoxed.stimuliSetId);
       }
+      setActiveTdfContext({
+        currentRootTdfId: Session.get('currentRootTdfId'),
+        currentTdfId: Session.get('currentRootTdfId'),
+        currentStimuliSetId: rootTDFBoxed.stimuliSetId,
+      }, 'resume.no-condition.revert-root');
+      clearConditionResolutionContext('resume.no-condition.revert-root');
+      ensureCurrentStimuliSetId(rootTDFBoxed.stimuliSetId);
       clientConsole(2, 'No Experimental condition is required: continuing', rootTDFBoxed);
     }
 

@@ -68,6 +68,17 @@ function mergeExperimentState(
     || Session.get('currentTdfId')
     || Session.get('currentRootTdfId');
 
+  const hasExplicitConditionTdfId = Object.prototype.hasOwnProperty.call(partialState, 'conditionTdfId');
+  if (hasExplicitConditionTdfId) {
+    filteredState.conditionTdfId = partialState.conditionTdfId ?? null;
+  } else if (
+    filteredState.currentRootTdfId
+    && filteredState.currentTdfId
+    && String(filteredState.currentRootTdfId) === String(filteredState.currentTdfId)
+  ) {
+    filteredState.conditionTdfId = null;
+  }
+
   if (!filteredState.experimentTarget) {
     const targetFromSession = Session.get('experimentTarget');
     const targetFromProfile = (Meteor.user() as MeteorUserProfileLike | null | undefined)?.profile?.experimentTarget;

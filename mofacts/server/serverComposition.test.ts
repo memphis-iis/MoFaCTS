@@ -726,6 +726,42 @@ describe('condition count method authorization', function() {
     }
   });
 
+  it('allows regular TDF history insertion when experiment state currentTdfId is the root', async function() {
+    await TdfsAny.insertAsync({
+      _id: 'history-regular',
+      ownerId: 'owner-user',
+      content: {
+        fileName: 'history-regular.json',
+        tdfs: { tutor: { setspec: { lessonname: 'History Regular', userselect: 'true' } } },
+      },
+    });
+    await MeteorUsersAny.insertAsync({
+      _id: 'current-user',
+      profile: {},
+      loginParams: {},
+    });
+    await GlobalExperimentStatesAny.insertAsync({
+      userId: 'current-user',
+      TDFId: 'history-regular',
+      experimentState: {
+        currentRootTdfId: 'history-regular',
+        currentTdfId: 'history-regular',
+        lastActionTimeStamp: Date.now(),
+      },
+    });
+
+    await (asyncMethods.insertHistory as any).call({ userId: 'current-user' }, {
+      userId: 'current-user',
+      TDFId: 'history-regular',
+    });
+
+    const insertedHistory = await HistoriesAny.findOneAsync({
+      userId: 'current-user',
+      TDFId: 'history-regular',
+    }) as any;
+    expect(insertedHistory).to.exist;
+  });
+
   it('allows history insertion for a condition assigned in root experiment state', async function() {
     await TdfsAny.insertAsync({
       _id: 'history-root',
