@@ -1942,7 +1942,7 @@
   function handleVideoReady() {
     videoPlayerReady = true;
     void flushPendingMachineVideoResume('video-ready');
-    if (!state.matches('videoWaiting') || !videoPlayer) return;
+    if (!state.matches('videoWaiting') || !videoPlayer || showVideoInstructionOverlay) return;
     const player = typeof videoPlayer.getPlayer === 'function'
       ? videoPlayer.getPlayer()
       : null;
@@ -2075,6 +2075,7 @@
       preventScrubbing={preventScrubbingEnabled}
       canAcceptCheckpoint={state.matches('videoWaiting')}
       checkpointGateState={JSON.stringify(currentState)}
+      startBlocked={showVideoInstructionOverlay}
       overlayMounted={trialContentMounted}
       overlayVisible={trialContentVisible}
       on:checkpoint={handleVideoCheckpoint}

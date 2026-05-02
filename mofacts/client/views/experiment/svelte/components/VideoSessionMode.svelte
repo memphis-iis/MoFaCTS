@@ -53,6 +53,9 @@
   /** @type {boolean} Whether the parent state machine can accept a checkpoint now */
   export let canAcceptCheckpoint = false;
 
+  /** @type {boolean} Whether startup is blocked by an instruction overlay */
+  export let startBlocked = false;
+
   /** @type {string} Diagnostic snapshot of the parent gate state */
   export let checkpointGateState = '';
 
@@ -87,6 +90,12 @@
   $: resolvedOverlayVisible = overlayVisible || showOverlay;
   $: if (canAcceptCheckpoint) {
     lastRejectedCheckpointKey = '';
+  }
+  $: if (player && startBlocked) {
+    player.muted = true;
+    if (!player.paused) {
+      player.pause();
+    }
   }
 
   function destroyPlayer() {
@@ -418,6 +427,7 @@
   // Expose player control methods
   export function play() {
     if (!player) return undefined;
+    player.muted = false;
     const playPromise = player.play();
     if (playPromise?.catch) {
       playPromise.catch((error) => {
