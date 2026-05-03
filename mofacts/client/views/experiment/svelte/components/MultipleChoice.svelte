@@ -128,6 +128,10 @@
       return;
     }
 
+    // Clear any scale set by a previous trial so baseFontSize reflects --card-font-size,
+    // not the stale --choice-font-size left over from a shrunk layout.
+    gridElement.style.removeProperty('--choice-font-size');
+
     const firstButton = gridElement.querySelector('button.choice-button');
     const fallbackFontSize = parseFloat(
       window.getComputedStyle(document.documentElement).getPropertyValue('--card-font-size')
