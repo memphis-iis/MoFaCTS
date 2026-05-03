@@ -30,6 +30,12 @@ import { applyFallbackProgressSignals, shouldUseProgressSignalFallback } from '.
 import { ensureCurrentStimuliSetId } from '../experiment/svelte/services/mediaResolver';
 import { clearConditionResolutionContext, setActiveTdfContext } from '../../lib/idContext';
 import { passesDashboardEntitlement } from './dashboardEntitlement';
+import {
+  finishLaunchLoading,
+  markLaunchLoadingTiming,
+  setLaunchLoadingMessage,
+  startLaunchLoading,
+} from '../../lib/launchLoading';
 
 declare const Template: any;
 declare const Meteor: any;
@@ -195,7 +201,7 @@ Template.learningDashboard.events({
     const tdf = Tdfs.findOne({_id: tdfId});
     if (tdf) {
       const setspec = tdf.content.tdfs.tutor.setspec;
-      await selectTdf(
+      await safeSelectTdf(
         tdfId,
         lessonName,
         tdf.stimuliSetId,
@@ -211,7 +217,7 @@ Template.learningDashboard.events({
   'click .start-lesson': async function(event: any) {
     event.preventDefault();
     const target = $(event.currentTarget);
-    await selectTdf(
+    await safeSelectTdf(
       target.data('tdfid'),
       target.data('lessonname'),
       target.data('currentstimulisetid'),
@@ -236,7 +242,7 @@ Template.learningDashboard.events({
     const setspec = tdfDoc.content?.tdfs?.tutor?.setspec || {};
 
     // isOwnerLaunch = true: owner's session does not increment conditionCounts
-    await selectTdf(
+    await safeSelectTdf(
       selectedId,
       setspec.lessonname || tdfDoc.content?.fileName || selectedId,
       tdfDoc.stimuliSetId,
@@ -640,7 +646,7 @@ function diagnoseAudioStartupFailure(error: unknown): string {
 function handleLaunchAudioStartupFailure(error: unknown) {
   const userMessage = diagnoseAudioStartupFailure(error);
   clientConsole(1, '[LearningDashboard] Audio startup failed before lesson launch:', error);
-  Session.set('appLoading', false);
+  finishLaunchLoading('audio-startup-failed');
   Session.set('uiMessage', {
     text: userMessage,
     variant: 'danger',
@@ -663,7 +669,9 @@ async function checkAndWarmupAudioIfNeeded() {
 
   let userPersonalKeys = { hasSR: false, hasTTS: false };
   try {
+    markLaunchLoadingTiming('hasUserPersonalKeys:start');
     userPersonalKeys = await (Meteor as any).callAsync('hasUserPersonalKeys');
+    markLaunchLoadingTiming('hasUserPersonalKeys:complete', userPersonalKeys);
   } catch (error) {
     clientConsole(1, '[LearningDashboard] Could not determine personal audio key availability during launch prep:', error);
   }
@@ -679,15 +687,31 @@ async function checkAndWarmupAudioIfNeeded() {
     return;
   }
 
-  Session.set('appLoading', true);
-  Session.set('appLoadingMessage', 'Preparing audio features...');
+  setLaunchLoadingMessage('Preparing audio features...');
+  markLaunchLoadingTiming('audioWarmup:start', audioPreparationPlan);
   await prepareAudioForLaunchIfNeeded(currentTdfFile, audioStartupUser);
+  markLaunchLoadingTiming('audioWarmup:complete');
 }
 
 // Actual logic for selecting and starting a TDF
+async function safeSelectTdf(...args: Parameters<typeof selectTdf>) {
+  try {
+    await selectTdf(...args);
+  } catch (error) {
+    finishLaunchLoading('dashboard-launch-failed');
+    clientConsole(1, '[LearningDashboard] Lesson launch failed:', error);
+    Session.set('uiMessage', {
+      text: 'Lesson did not start correctly. Please try again from the Learning Dashboard.',
+      variant: 'danger',
+    });
+  }
+}
+
 async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId: any, ignoreOutOfGrammarResponses: any,
   speechOutOfGrammarFeedback: any, how: any, isMultiTdf: any, setspec: any, isExperiment = false, isOwnerLaunch = false) {
 
+  startLaunchLoading('Preparing lesson...', 'learningDashboard');
+  markLaunchLoadingTiming('dashboardClick', { currentTdfId, lessonName, how, isMultiTdf });
   const audioPromptFeedbackView = getAudioPromptFeedbackView();
 
   // make sure session variables are cleared from previous tests
@@ -707,11 +731,14 @@ async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId
   clearConditionResolutionContext('learningDashboard.selectTdf.start');
 
   // Subscribe to full TDF data for the active session
+  setLaunchLoadingMessage('Loading lesson...');
+  markLaunchLoadingTiming('currentTdfSubscription:start', { currentTdfId });
   const tdfSub = Meteor.subscribe('currentTdf', currentTdfId);
   await new Promise<void>((resolve) => {
     const handle = Tracker.autorun(() => {
       if (tdfSub.ready()) {
         handle.stop();
+        markLaunchLoadingTiming('currentTdfSubscription:ready', { currentTdfId });
         resolve();
       }
     });
@@ -720,6 +747,7 @@ async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId
   const tdfDoc = Tdfs.findOne({_id: currentTdfId});
   if (!tdfDoc || !tdfDoc.content) {
     clientConsole(1, 'Failed to load current TDF from subscription:', currentTdfId);
+    finishLaunchLoading('tdf-subscription-missing-content');
     alert('Unable to load the selected lesson. Please try again or contact support.');
     return;
   }
@@ -727,13 +755,16 @@ async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId
   normalizeTutorUnits(curTdfContent);
   if (!Array.isArray(curTdfContent?.tdfs?.tutor?.unit)) {
     clientConsole(1, '[LearningDashboard] Selected TDF content missing tutor.unit; fetching full TDF by id:', currentTdfId);
+    markLaunchLoadingTiming('getTdfById:start', { currentTdfId });
     const fullTdfDoc: any = await meteorCallAsync('getTdfById', currentTdfId);
+    markLaunchLoadingTiming('getTdfById:complete', { currentTdfId });
     curTdfContent = fullTdfDoc?.content;
     normalizeTutorUnits(curTdfContent);
     const isConditionRoot = isConditionRootWithoutUnitArray(curTdfContent);
     if (!Array.isArray(curTdfContent?.tdfs?.tutor?.unit) && !isConditionRoot) {
       const errorMsg = `[LearningDashboard] Selected TDF ${currentTdfId} is missing required content.tdfs.tutor.unit`;
       clientConsole(1, errorMsg);
+      finishLaunchLoading('tdf-missing-unit-list');
       alert('Unable to start this lesson because the TDF unit list is missing.');
       return;
     }
@@ -759,7 +790,10 @@ async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId
   Session.set('speechOutOfGrammarFeedback', speechOutOfGrammarFeedback);
   Session.set('curTdfTips', curTdfTips);
   const unitCount = Array.isArray(curTdfContent?.tdfs?.tutor?.unit) ? curTdfContent.tdfs.tutor.unit.length : 0;
+  setLaunchLoadingMessage('Restoring progress...');
+  markLaunchLoadingTiming('getExperimentState:start', { source: 'selectTdf' });
   const persistedExperimentState = await getExperimentState();
+  markLaunchLoadingTiming('getExperimentState:complete', { source: 'selectTdf' });
   const launchProgress = resolveCardLaunchProgress(persistedExperimentState, unitCount);
 
   if (launchProgress.moduleCompleted) {
@@ -773,6 +807,7 @@ async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId
       text: 'This lesson has already been completed and cannot be reopened.',
       variant: 'warning',
     });
+    finishLaunchLoading('module-completed');
     return;
   }
 
@@ -879,6 +914,7 @@ async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId
     if (isMultiTdf) {
       await navigateForMultiTdf(launchProgress.intent);
     } else {
+      setLaunchLoadingMessage('Preparing first trial...');
       setCardEntryIntent(launchProgress.intent, {
         source: 'learningDashboard.selectTdf',
       });
@@ -900,7 +936,10 @@ async function navigateForMultiTdf(entryIntent: CardEntryIntent = CARD_ENTRY_INT
     return unitType;
   }
 
+  setLaunchLoadingMessage('Restoring progress...');
+  markLaunchLoadingTiming('getExperimentState:start', { source: 'navigateForMultiTdf' });
   const experimentState: any = await getExperimentState();
+  markLaunchLoadingTiming('getExperimentState:complete', { source: 'navigateForMultiTdf' });
   const lastUnitCompleted = experimentState.lastUnitCompleted || -1;
   const lastUnitStarted = experimentState.lastUnitStarted || -1;
   let unitLocked = false;
@@ -919,21 +958,15 @@ async function navigateForMultiTdf(entryIntent: CardEntryIntent = CARD_ENTRY_INT
       }
     }
   }
-  // Scenario 2: Warmup audio if TDF has embedded keys (before navigating)
-  try {
-    await checkAndWarmupAudioIfNeeded();
-  } catch (error) {
-    handleLaunchAudioStartupFailure(error);
-    return;
-  }
-
   // Only show selection if we're in a unit where it doesn't matter (infinite learning sessions)
   if (unitLocked) {
+    setLaunchLoadingMessage('Preparing first trial...');
     setCardEntryIntent(entryIntent, {
       source: 'learningDashboard.navigateForMultiTdf',
     });
     FlowRouter.go('/card');
   } else {
+    finishLaunchLoading('multi-tdf-select');
     FlowRouter.go('/multiTdfSelect');
   }
 }

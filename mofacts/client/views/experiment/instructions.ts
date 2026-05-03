@@ -16,6 +16,12 @@ import { CardStore } from './modules/cardStore';
 import { resolveDynamicAssetPath } from './svelte/services/mediaResolver';
 import { assertIdInvariants, logIdInvariantBreachOnce } from '../../lib/idContext';
 import { CARD_ENTRY_INTENT, setCardEntryIntent } from '../../lib/cardEntryIntent';
+import {
+  finishLaunchLoading,
+  isLaunchLoadingActive,
+  markLaunchLoadingTiming,
+  startLaunchLoading,
+} from '../../lib/launchLoading';
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra');
 
 declare const Meteor: any;
@@ -477,68 +483,82 @@ function getUnitsRemaining() {
 // must only reference visible from anywhere on the client AND we take great
 // pains to not modify anything reactive until this function has returned
 async function instructContinue() {
+  if (!isLaunchLoadingActive()) {
+    startLaunchLoading('Preparing first trial...', 'instructions');
+  }
+  markLaunchLoadingTiming('instructionContinue:instructContinue:start');
   assertIdInvariants('instructions.instructContinue', { requireCurrentTdfId: true, requireStimuliSetId: false });
-  Session.set(INSTRUCTIONS_LEAVING_KEY, true);
-  $('#continueButton').prop('disabled', true);
-  $('#continueBar').hide();
-  const currentUnitNumber = Session.get('currentUnitNumber') || 0;
-  const tdfFile = Session.get('currentTdfFile');
-  const unitList = tdfFile?.tdfs?.tutor?.unit;
-  let curUnit = Session.get('currentTdfUnit');
-  if(!curUnit){
-    let experimentState: any = await getExperimentState();
-    const stateUnitList = experimentState?.currentTdfFile?.tdfs?.tutor?.unit;
-    if (!Array.isArray(stateUnitList)) {
-      throw new Error(`[Instructions] Missing experimentState.currentTdfFile.tdfs.tutor.unit while resolving current unit (currentTdfId=${Session.get('currentTdfId')})`);
+  try {
+    Session.set(INSTRUCTIONS_LEAVING_KEY, true);
+    $('#continueButton').prop('disabled', true);
+    $('#continueBar').hide();
+    const currentUnitNumber = Session.get('currentUnitNumber') || 0;
+    const tdfFile = Session.get('currentTdfFile');
+    const unitList = tdfFile?.tdfs?.tutor?.unit;
+    let curUnit = Session.get('currentTdfUnit');
+    if(!curUnit){
+      markLaunchLoadingTiming('instructionContinue:getExperimentState:start');
+      let experimentState: any = await getExperimentState();
+      markLaunchLoadingTiming('instructionContinue:getExperimentState:complete');
+      const stateUnitList = experimentState?.currentTdfFile?.tdfs?.tutor?.unit;
+      if (!Array.isArray(stateUnitList)) {
+        throw new Error(`[Instructions] Missing experimentState.currentTdfFile.tdfs.tutor.unit while resolving current unit (currentTdfId=${Session.get('currentTdfId')})`);
+      }
+      curUnit = stateUnitList[currentUnitNumber];
+      if (!curUnit) {
+        throw new Error(`[Instructions] Current unit ${currentUnitNumber} not found in experimentState unit list (currentTdfId=${Session.get('currentTdfId')}, unitCount=${stateUnitList.length})`);
+      }
     }
-    curUnit = stateUnitList[currentUnitNumber];
-    if (!curUnit) {
-      throw new Error(`[Instructions] Current unit ${currentUnitNumber} not found in experimentState unit list (currentTdfId=${Session.get('currentTdfId')}, unitCount=${stateUnitList.length})`);
-    }
-  }
 
-  // Check if this is an instruction-only unit (has instructions but no session)
-  const isInstructionOnly = !curUnit.assessmentsession && !curUnit.learningsession && !curUnit.videosession;
-  const nextUnitNumber = currentUnitNumber + 1;
-  Session.set('instructionClientStart', 0);
+    // Check if this is an instruction-only unit (has instructions but no session)
+    const isInstructionOnly = !curUnit.assessmentsession && !curUnit.learningsession && !curUnit.videosession;
+    const nextUnitNumber = currentUnitNumber + 1;
+    Session.set('instructionClientStart', 0);
 
-  let navigationTarget = '/card';
+    let navigationTarget = '/card';
 
-  if (isInstructionOnly) {
-    if (nextUnitNumber < unitList.length) {
-      const nextUnit = unitList[nextUnitNumber];
-      Session.set('currentUnitNumber', nextUnitNumber);
-      Session.set('currentTdfUnit', nextUnit);
-      Session.set('curUnitInstructionsSeen', false);
-      await createExperimentState({
-        currentUnitNumber: nextUnitNumber,
-        currentTdfUnit: nextUnit,
-        lastUnitCompleted: currentUnitNumber,
-        lastUnitStarted: nextUnitNumber,
-      } as any);
+    if (isInstructionOnly) {
+      if (nextUnitNumber < unitList.length) {
+        const nextUnit = unitList[nextUnitNumber];
+        Session.set('currentUnitNumber', nextUnitNumber);
+        Session.set('currentTdfUnit', nextUnit);
+        Session.set('curUnitInstructionsSeen', false);
+        await createExperimentState({
+          currentUnitNumber: nextUnitNumber,
+          currentTdfUnit: nextUnit,
+          lastUnitCompleted: currentUnitNumber,
+          lastUnitStarted: nextUnitNumber,
+        } as any);
+      } else {
+        await createExperimentState({
+          currentUnitNumber: nextUnitNumber,
+          lastUnitCompleted: currentUnitNumber,
+          lastUnitStarted: currentUnitNumber,
+        } as any);
+        navigationTarget = '/learningDashboard';
+      }
     } else {
-      await createExperimentState({
-        currentUnitNumber: nextUnitNumber,
-        lastUnitCompleted: currentUnitNumber,
-        lastUnitStarted: currentUnitNumber,
-      } as any);
-      navigationTarget = '/learningDashboard';
+      Session.set('currentUnitNumber', currentUnitNumber);
+      Session.set('currentTdfUnit', curUnit);
+      Session.set('curUnitInstructionsSeen', true);
     }
-  } else {
-    Session.set('currentUnitNumber', currentUnitNumber);
-    Session.set('currentTdfUnit', curUnit);
-    Session.set('curUnitInstructionsSeen', true);
-  }
 
-  if (navigationTarget === '/card') {
-    setCardEntryIntent(CARD_ENTRY_INTENT.INSTRUCTION_CONTINUE, {
-      source: 'instructions.instructContinue',
-    });
+    if (navigationTarget === '/card') {
+      setCardEntryIntent(CARD_ENTRY_INTENT.INSTRUCTION_CONTINUE, {
+        source: 'instructions.instructContinue',
+      });
+    } else {
+      finishLaunchLoading('instructions-complete-dashboard');
+    }
+    Session.set('fromInstructions', true);
+    CardStore.setEnterKeyLock(false);
+    clientConsole(2, 'releasing enterKeyLock in instructContinue');
+    markLaunchLoadingTiming('instructionContinue:route', { navigationTarget });
+    leavePage(navigationTarget);
+  } catch (error) {
+    finishLaunchLoading('instruction-continue-failed');
+    throw error;
   }
-  Session.set('fromInstructions', true);
-  CardStore.setEnterKeyLock(false);
-  clientConsole(2, 'releasing enterKeyLock in instructContinue');
-  leavePage(navigationTarget);
 }
 
 
@@ -648,11 +668,8 @@ Template.instructions.rendered = function() {
   clientConsole(2, '[Instructions Rendered] Template rendered callback fired');
   Session.set(INSTRUCTIONS_LEAVING_KEY, false);
 
-  // Hide global loading spinner when instructions page is ready (handles startup units)
-  if (Session.get('appLoading')) {
-
-    Session.set('appLoading', false);
-  }
+  // Hide global loading spinner when instructions page is ready (handles startup units).
+  finishLaunchLoading('instructions-rendered');
 
   // Make sure lockout interval timer is running
   lockoutKick();
@@ -898,7 +915,9 @@ async function recordCurrentInstructionContinue(trialStartTimeStamp: any = timeR
   if(recordInstructions){
     const instructionLog = gatherInstructionLogRecord(Date.now(), trialStartTimeStamp);
     clientConsole(2, 'instructionLog', instructionLog);
+    markLaunchLoadingTiming('instructionContinue:historyRecord:start');
     await (Meteor as any).callAsync('insertHistory', instructionLog)
+    markLaunchLoadingTiming('instructionContinue:historyRecord:complete');
   }
 }
 
@@ -930,6 +949,8 @@ async function handleInstructionContinueAction(forceBypassLockout = false) {
     }
   }
 
+  startLaunchLoading('Preparing first trial...', 'instructions');
+  markLaunchLoadingTiming('instructionContinue:pressed', { forceBypassLockout });
   await recordCurrentInstructionContinue(timeRendered);
   await instructContinue();
 }

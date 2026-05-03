@@ -45,6 +45,7 @@ import { ensureCurrentStimuliSetId, resolveDynamicAssetPath } from './mediaResol
 import { resolveVideoResumeAnchor } from './videoResume';
 import { withStartupTimeout } from '../../../../lib/audioStartup';
 import { evaluateSrAvailability } from '../../../../lib/audioAvailability';
+import { finishLaunchLoading, markLaunchLoadingTiming, setLaunchLoadingMessage } from '../../../../lib/launchLoading';
 import {
   CARD_ENTRY_INTENT,
   classifyCardRefreshRebuild,
@@ -163,12 +164,16 @@ async function restoreHiddenItemsFromHistory(): Promise<void> {
   }
 
   try {
+    markLaunchLoadingTiming('restoreHiddenItemsFromHistory:start');
     const hiddenItems = await meteorCallAsync<Array<string | number>>(
       'getHiddenStimulusKCsFromHistory',
       userId,
       currentTdfId
     );
     CardStore.setHiddenItems(Array.isArray(hiddenItems) ? hiddenItems : []);
+    markLaunchLoadingTiming('restoreHiddenItemsFromHistory:complete', {
+      count: Array.isArray(hiddenItems) ? hiddenItems.length : 0,
+    });
   } catch (error) {
     clientConsole(1, '[Svelte Init] Failed to restore hidden items from history:', error);
     CardStore.resetHiddenItems();
@@ -663,7 +668,13 @@ async function initializeStandardCardEntry(
 
   Session.set('resumeToQuestion', false);
 
+  if (!prefetchedExperimentState) {
+    markLaunchLoadingTiming('getExperimentState:start', { source: 'initializeStandardCardEntry' });
+  }
   const experimentState: ExperimentState = prefetchedExperimentState || await getExperimentState();
+  if (!prefetchedExperimentState) {
+    markLaunchLoadingTiming('getExperimentState:complete', { source: 'initializeStandardCardEntry' });
+  }
   restoreCurrentUnitNumberForRefreshRebuild(dispatchContext, experimentState);
   const { tdfFile, tutor } = restoreCanonicalTdfFileForStandardInit(initialTdfFile, experimentState);
 
@@ -902,7 +913,9 @@ async function initializeStandardCardEntry(
     });
     Session.set('currentUnitNumber', currentUnitNumber);
 
+    markLaunchLoadingTiming('engineInitialization:start', { currentUnitNumber, unitType });
     const engine = await initializeEngine(tdfFile, currentUnitNumber, unitType);
+    markLaunchLoadingTiming('engineInitialization:complete', { currentUnitNumber, unitType });
     engine.__unitNumber = currentUnitNumber;
     engine.__tdfId = currentTdfId;
     engine.__unitName = unit?.unitname || null;
@@ -912,7 +925,9 @@ async function initializeStandardCardEntry(
 
   const engine = getEngine() as RuntimeEngine | null;
   if (engine?.loadResumeState) {
+    markLaunchLoadingTiming('engineLoadResumeState:start');
     await engine.loadResumeState();
+    markLaunchLoadingTiming('engineLoadResumeState:complete');
   }
 
   DeliveryParamsStore.set(getCurrentDeliveryParams());
@@ -922,21 +937,29 @@ async function initializeStandardCardEntry(
 
   if (currentUser?._id && userDisplayIdentifier && currentTdfId) {
     clientConsole(2, '[Svelte Init] Subscribing to dashboardCache for performance totals');
+    markLaunchLoadingTiming('dashboardCacheSubscription:start', { currentTdfId });
     await new Promise<void>((resolve) => {
       Meteor.subscribe('dashboardCache', {
         onReady: () => {
           clientConsole(2, '[Svelte Init] dashboardCache subscription ready');
+          markLaunchLoadingTiming('dashboardCacheSubscription:ready', { currentTdfId });
           resolve();
         },
         onStop: (error: unknown) => {
           if (error) {
             clientConsole(1, '[Svelte Init] dashboardCache subscription error:', error);
           }
+          markLaunchLoadingTiming('dashboardCacheSubscription:stopped', {
+            currentTdfId,
+            hasError: !!error,
+          });
           resolve();
         }
       });
     });
+    markLaunchLoadingTiming('setStudentPerformance:start', { currentTdfId });
     await setStudentPerformance(currentUser._id, userDisplayIdentifier, currentTdfId);
+    markLaunchLoadingTiming('setStudentPerformance:complete', { currentTdfId });
   } else {
     clientConsole(1, '[Svelte Init] Missing user or tdfId - cannot set student performance', {
       hasUserId: !!currentUser?._id,
@@ -962,6 +985,7 @@ async function initializeStandardCardEntry(
     !hasUnitQuestion;
 
   if (shouldShowInstructions && !canInlineVideoInstructions) {
+    finishLaunchLoading('redirect-to-instructions');
     FlowRouter.go('/instructions');
     return { redirected: true };
   }
@@ -1026,7 +1050,9 @@ export async function initializeSvelteCard(): Promise<SvelteCardInitResult> {
   let prefetchedExperimentState: ExperimentState | null = null;
   let refreshRebuildClassification: ReturnType<typeof classifyCardRefreshRebuild> | null = null;
   if (requestedCardEntryIntent === CARD_ENTRY_INTENT.CARD_REFRESH_REBUILD) {
+    markLaunchLoadingTiming('getExperimentState:start', { source: 'cardRefreshRebuild' });
     prefetchedExperimentState = await getExperimentState();
+    markLaunchLoadingTiming('getExperimentState:complete', { source: 'cardRefreshRebuild' });
     refreshRebuildClassification = classifyCardRefreshRebuild(prefetchedExperimentState);
     effectiveCardEntryIntent = refreshRebuildClassification.intent;
   }
@@ -1058,6 +1084,7 @@ export async function initializeSvelteCard(): Promise<SvelteCardInitResult> {
   }
   tdfFile = tdfFile as TdfFileLike;
   let tutor = tdfFile.tdfs!.tutor!;
+  setLaunchLoadingMessage('Preparing first trial...');
   await restoreHiddenItemsFromHistory();
   assertIdInvariants('svelteInit.before-media-resolution', {
     requireCurrentTdfId: true,

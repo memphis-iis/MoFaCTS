@@ -3,6 +3,7 @@ import { Meteor } from 'meteor/meteor';
 import { Session } from 'meteor/session';
 import { Tracker } from 'meteor/tracker';
 import { clientConsole } from '../../lib/userSessionHelpers';
+import { finishLaunchLoading, markLaunchLoadingTiming, setLaunchLoadingMessage } from '../../lib/launchLoading';
 import { createBlazeMount } from './svelte/meteorIntegration';
 import { restartMainCardTimeoutIfNecessary } from './modules/cardTimeouts';
 import { CardStore } from './modules/cardStore';
@@ -34,6 +35,8 @@ type CardTemplateInstance = {
 
 Template.card.onRendered(function (this: CardTemplateInstance) {
   const template = this;
+  setLaunchLoadingMessage('Preparing first trial...');
+  markLaunchLoadingTiming('cardRoute:entered');
 
   Tracker.afterFlush(() => {
     if (template.svelteMount) {
@@ -57,14 +60,20 @@ Template.card.onRendered(function (this: CardTemplateInstance) {
       };
     };
 
+    markLaunchLoadingTiming('cardRoute:loadCardScreen:start');
     loadCardScreen().then((CardScreen) => {
+      markLaunchLoadingTiming('cardRoute:loadCardScreen:complete');
       if (template.isDestroyed || template.svelteMount) return;
       try {
         template.svelteMount = createBlazeMount(target, CardScreen, {}, getReactiveProps);
       } catch (error) {
+        markLaunchLoadingTiming('cardRoute:mount:failed');
+        finishLaunchLoading('card-mount-failed');
         clientConsole(1, '[Card Router] Error mounting Svelte component:', error);
       }
     }).catch((error) => {
+      markLaunchLoadingTiming('cardRoute:loadCardScreen:failed');
+      finishLaunchLoading('card-chunk-load-failed');
       clientConsole(1, '[Card Router] Error loading CardScreen chunk:', error);
     });
   });

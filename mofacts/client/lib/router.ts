@@ -18,6 +18,7 @@ import {
 import { legacyInt, legacyTrim } from '../../common/underscoreCompat';
 import { getErrorMessage } from './errorUtils';
 import { CARD_ENTRY_INTENT, setCardEntryIntent } from './cardEntryIntent';
+import { isLaunchLoadingActive } from './launchLoading';
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra');
 const BlazeLayout: any = (globalThis as any).BlazeLayout;
 const Tdfs: any = (globalThis as any).Tdfs;
@@ -80,6 +81,12 @@ a cookie scheme to insure experimental participants stay in experiment mode:
     * If a user visits the root ("/") route, we reset all cookies back in order
       to allow "normal" login again.
 */
+
+function clearAppLoadingUnlessLaunch(): void {
+  if (!isLaunchLoadingActive()) {
+    Session.set('appLoading', false);
+  }
+}
 
 // Note that these three session variables aren't touched by the helpers in
 // lib/sessionUtils.js. They are only set here in our client-side routing
@@ -431,7 +438,7 @@ FlowRouter.route('/experiment/:target?/:xcond?', {
 
       clearMappingRecordFromSession();
       Session.set('suppressAuthenticatedChrome', false);
-      Session.set('appLoading', false);
+      clearAppLoadingUnlessLaunch();
 
       // Log out first, then render sign-in to avoid transient route/auth race states.
       await logoutCurrentUserForExperimentRoute();
@@ -736,7 +743,7 @@ FlowRouter.route('/experimentError', {
   action: async function(this: any) {
     Session.set('curModule', 'experimentError');
     Session.set('suppressAuthenticatedChrome', true);
-    Session.set('appLoading', false);
+    clearAppLoadingUnlessLaunch();
     await renderRouteTemplate(this, 'experimentError');
   }
 })
@@ -995,7 +1002,7 @@ FlowRouter.route('/card', {
     assertIdInvariants('router.card.entry', { requireCurrentTdfId: false, requireStimuliSetId: false });
     ensureStimuliSetIdSessionInvariant();
     Session.set('suppressAuthenticatedChrome', false);
-    Session.set('appLoading', false);
+    clearAppLoadingUnlessLaunch();
     const refreshCardRequested = Boolean(FlowRouter.current()?.queryParams?.refreshCard);
     if(!Session.get('currentTdfId')){
       const userId = Meteor.userId();
@@ -1119,7 +1126,7 @@ FlowRouter.route('/instructions', {
     Session.set('curModule', 'instructions');
     Session.set('fromInstructions', true);
     Session.set('suppressAuthenticatedChrome', false);
-    Session.set('appLoading', false);
+    clearAppLoadingUnlessLaunch();
     renderLayout(this, 'instructions');
   },
   triggersEnter: [function(context: any, redirect: any, stop: any) {

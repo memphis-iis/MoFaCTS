@@ -22,6 +22,12 @@
   import { DeliveryParamsStore } from '../../../../lib/state/deliveryParamsStore';
   import { UiSettingsStore } from '../../../../lib/state/uiSettingsStore';
   import { clientConsole } from '../../../../lib/clientLogger';
+  import {
+    finishLaunchLoading,
+    isLaunchLoadingActive,
+    markLaunchLoadingTiming,
+    setLaunchLoadingMessage
+  } from '../../../../lib/launchLoading';
   import { Answers } from '../../answerAssess';
   import { cardMachine } from '../machine/cardMachine';
   import { DEFAULT_UI_SETTINGS, EVENTS } from '../machine/constants';
@@ -423,6 +429,8 @@
     visibleSetAt: 0,
     configuredDurationMs: 0,
   };
+  let pendingLaunchRevealKey = '';
+  let launchRevealFinishScheduled = false;
   let stimulusBlockingAssetReady = true;
   let feedbackBlockingAssetReady = true;
   let incomingStimulusBlockingAssetReady = true;
@@ -770,11 +778,6 @@
     send({ type: 'INCOMING_READY' });
   }
 
-  // Keep the global loading overlay in place until the card has visible content.
-  $: if (Session.get('appLoading') && cardVisualReady) {
-    Session.set('appLoading', false);
-  }
-
   $: displayMinSeconds = getDisplayTimeoutValue(
     deliveryParams.displayMinSeconds ??
       deliveryParams.displayminseconds ??
@@ -1113,6 +1116,15 @@
       trialSubsetVisible = true;
       activeSlotMounted = true;
       activeSlotVisible = true;
+      if (isLaunchLoadingActive()) {
+        pendingLaunchRevealKey = key;
+        launchRevealFinishScheduled = false;
+        markLaunchLoadingTiming('firstReveal:classSet', {
+          key,
+          subsetKind: trialSubset.kind,
+        });
+        scheduleLaunchRevealPaintFallback(key, trialSubset.kind);
+      }
       if (!testMode) {
         send({
           type: EVENTS.TRIAL_REVEAL_STARTED,
@@ -1174,6 +1186,15 @@
       opacity: computedOpacity,
       pseudoElement: event.pseudoElement || '',
     });
+
+    if (
+      isLaunchLoadingActive() &&
+      pendingLaunchRevealKey &&
+      pendingLaunchRevealKey === lastFadeLogContext.key &&
+      (event.type === 'transitionrun' || event.type === 'transitionstart')
+    ) {
+      finishFirstLaunchRevealLoading(`first-trial-${event.type}`);
+    }
 
     if (!testMode && event.type === 'transitionend' && isFadingOut && !transitionCompleteSent) {
       if (isPreparedFadingOut) {
@@ -1436,6 +1457,7 @@
   }
 
   function routeInitializationFailure() {
+    finishLaunchLoading('card-initialization-failed');
     Session.set('appLoading', false);
 
     if (isExperimentParticipantSession()) {
@@ -1573,6 +1595,52 @@
     }
   }
 
+  function finishFirstLaunchRevealLoading(reason) {
+    if (!isLaunchLoadingActive()) {
+      pendingLaunchRevealKey = '';
+      return;
+    }
+    markLaunchLoadingTiming('firstReveal:fadeStarted', {
+      reason,
+      key: lastFadeLogContext.key,
+      subsetKind: lastFadeLogContext.subsetKind,
+      elapsedSinceRevealTriggerMs: lastFadeLogContext.visibleSetAt
+        ? Math.round(performance.now() - lastFadeLogContext.visibleSetAt)
+        : null,
+    });
+    pendingLaunchRevealKey = '';
+    finishLaunchLoading(reason);
+  }
+
+  function scheduleLaunchRevealPaintFallback(key, subsetKind) {
+    if (launchRevealFinishScheduled) {
+      return;
+    }
+    launchRevealFinishScheduled = true;
+    void (async () => {
+      await tick();
+      await waitForBrowserPaint();
+      if (!isLaunchLoadingActive() || pendingLaunchRevealKey !== key) {
+        return;
+      }
+      if (lastFadeLogContext.configuredDurationMs > 0) {
+        window.setTimeout(() => {
+          if (isLaunchLoadingActive() && pendingLaunchRevealKey === key) {
+            markLaunchLoadingTiming('firstReveal:transitionEventFallback', {
+              key,
+              subsetKind,
+              configuredDurationMs: lastFadeLogContext.configuredDurationMs,
+            });
+            finishFirstLaunchRevealLoading('first-trial-paint-fallback');
+          }
+        }, 80);
+        return;
+      }
+      markLaunchLoadingTiming('firstReveal:noTransitionFallback', { key, subsetKind });
+      finishFirstLaunchRevealLoading('first-trial-no-transition');
+    })();
+  }
+
   function registerMachineWindowListeners() {
     if (typeof window === 'undefined') {
       return;
@@ -1618,7 +1686,12 @@
     (async () => {
       let initResult;
       try {
+        setLaunchLoadingMessage('Preparing first trial...');
+        markLaunchLoadingTiming('initializeSvelteCard:start');
         initResult = await initializeSvelteCard();
+        markLaunchLoadingTiming('initializeSvelteCard:complete', {
+          redirected: !!initResult?.redirected,
+        });
       } catch (error) {
         const diagnostic = {
           error,
@@ -1648,10 +1721,13 @@
         return;
       }
       if (initResult?.redirected) {
+        finishLaunchLoading('card-init-redirected');
         return;
       }
 
+      markLaunchLoadingTiming('cardReadinessWait:start');
       const ready = await waitForCardReadiness();
+      markLaunchLoadingTiming('cardReadinessWait:complete', { ready });
       if (!ready) {
         const diagnostic = {
           ...getCardReadinessState(),
@@ -1674,12 +1750,13 @@
 
       initializedForRender = true;
       await tick();
-
-      // Clear the global launch spinner as soon as card bootstrap is complete.
-      // Tying overlay dismissal to later visual machine states can leave the
-      // spinner covering the screen if SR/audio startup perturbs sequencing.
-      if (Session.get('appLoading')) {
-        Session.set('appLoading', false);
+      if (Session.get('currentTdfUnit')?.videosession && isLaunchLoadingActive()) {
+        await waitForBrowserPaint();
+        markLaunchLoadingTiming('videoUnit:rendered', {
+          showVideoInstructionOverlay,
+          videoPlayerReady,
+        });
+        finishLaunchLoading('video-unit-rendered');
       }
 
       if (typeof window !== 'undefined') {
@@ -1860,7 +1937,6 @@
   $: if (pendingMachineVideoResume && videoPlayer && state.matches('videoWaiting')) {
     void flushPendingMachineVideoResume('reactive-ready');
   }
-
   // Meteor provides an environment flag we can safely use in Svelte
   const isDev = Meteor.isDevelopment;
 
