@@ -107,8 +107,26 @@ async function makeDataDownloadMethodCall(methodName: string, ...args: any[]): P
   }
 }
 
+function encodeUtf16Le(str: string): ArrayBuffer {
+  // UTF-16LE BOM (FF FE) + content. Excel opens this natively as tab-delimited Unicode.
+  const buf = new ArrayBuffer(2 + str.length * 2);
+  const view = new DataView(buf);
+  view.setUint8(0, 0xFF);
+  view.setUint8(1, 0xFE);
+  for (let i = 0; i < str.length; i++) {
+    view.setUint16(2 + i * 2, str.charCodeAt(i), true /* little-endian */);
+  }
+  return buf;
+}
+
 function createData(result: any): void {
-  const blob = new Blob([result.content], {type : result.contentType});
+  let blobData: ArrayBuffer | string = result.content;
+  let mimeType: string = result.contentType;
+  if (result.contentType === 'text/tab-separated-values') {
+    blobData = encodeUtf16Le(result.content);
+    mimeType = 'text/tab-separated-values; charset=utf-16le';
+  }
+  const blob = new Blob([blobData], {type: mimeType});
   let  a = document.createElement("a");
   document.body.appendChild(a);
   a.style = "display: none";
