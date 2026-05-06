@@ -35,7 +35,7 @@ type CardTemplateInstance = {
 
 Template.card.onRendered(function (this: CardTemplateInstance) {
   const template = this;
-  setLaunchLoadingMessage('Preparing first trial...');
+  setLaunchLoadingMessage('Loading content...');
   markLaunchLoadingTiming('cardRoute:entered');
 
   Tracker.afterFlush(() => {

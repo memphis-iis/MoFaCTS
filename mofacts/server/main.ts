@@ -5,3 +5,4 @@ import "./serverComposition";
 import "./publications";
 import "./http/health";
 import "./http/pwa";
+import "./http/socialPreview";

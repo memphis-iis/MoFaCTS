@@ -985,7 +985,7 @@ async function initializeStandardCardEntry(
     !hasUnitQuestion;
 
   if (shouldShowInstructions && !canInlineVideoInstructions) {
-    finishLaunchLoading('redirect-to-instructions');
+    setLaunchLoadingMessage('Loading instructions...');
     FlowRouter.go('/instructions');
     return { redirected: true };
   }
@@ -1084,7 +1084,7 @@ export async function initializeSvelteCard(): Promise<SvelteCardInitResult> {
   }
   tdfFile = tdfFile as TdfFileLike;
   let tutor = tdfFile.tdfs!.tutor!;
-  setLaunchLoadingMessage('Preparing first trial...');
+  setLaunchLoadingMessage('Loading content...');
   await restoreHiddenItemsFromHistory();
   assertIdInvariants('svelteInit.before-media-resolution', {
     requireCurrentTdfId: true,

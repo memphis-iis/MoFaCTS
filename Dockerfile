@@ -114,7 +114,7 @@ RUN set -eux; \
       printf '%s\n' \
         "${mirror}/${ALPINE_BRANCH}/main" \
         "${mirror}/${ALPINE_BRANCH}/community" > /etc/apk/repositories; \
-      apk update && apk add --no-cache bash ca-certificates imagemagick; \
+      apk update && apk add --no-cache bash ca-certificates font-dejavu imagemagick; \
     }; \
     install_with_mirror "$ALPINE_PRIMARY_MIRROR" || install_with_mirror "$ALPINE_FALLBACK_MIRROR"
 
@@ -129,6 +129,7 @@ COPY --from=bundle_deps_builder $APP_BUNDLE_FOLDER/bundle $APP_BUNDLE_FOLDER/bun
 # (which holds SSL certs, feedback data, and dictionaries).
 RUN mkdir -p /app
 COPY ./mofacts/.deploy/settings.json /app/settings.json
+COPY ./mofacts/.deploy/settingsstaging.json /app/settingsstaging.json
 
 # Function: remove platform-specific binaries not needed in linux container runtime.
 RUN rm -rf $APP_BUNDLE_FOLDER/bundle/programs/server/npm/node_modules/@swc/core-darwin* \

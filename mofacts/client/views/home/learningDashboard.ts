@@ -914,7 +914,7 @@ async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId
     if (isMultiTdf) {
       await navigateForMultiTdf(launchProgress.intent);
     } else {
-      setLaunchLoadingMessage('Preparing first trial...');
+      setLaunchLoadingMessage('Loading content...');
       setCardEntryIntent(launchProgress.intent, {
         source: 'learningDashboard.selectTdf',
       });
@@ -960,7 +960,7 @@ async function navigateForMultiTdf(entryIntent: CardEntryIntent = CARD_ENTRY_INT
   }
   // Only show selection if we're in a unit where it doesn't matter (infinite learning sessions)
   if (unitLocked) {
-    setLaunchLoadingMessage('Preparing first trial...');
+    setLaunchLoadingMessage('Loading content...');
     setCardEntryIntent(entryIntent, {
       source: 'learningDashboard.navigateForMultiTdf',
     });

@@ -1686,7 +1686,7 @@
     (async () => {
       let initResult;
       try {
-        setLaunchLoadingMessage('Preparing first trial...');
+        setLaunchLoadingMessage('Loading content...');
         markLaunchLoadingTiming('initializeSvelteCard:start');
         initResult = await initializeSvelteCard();
         markLaunchLoadingTiming('initializeSvelteCard:complete', {
@@ -1721,7 +1721,7 @@
         return;
       }
       if (initResult?.redirected) {
-        finishLaunchLoading('card-init-redirected');
+        // Overlay stays active; Template.instructions.rendered calls finishLaunchLoading.
         return;
       }
 

@@ -484,7 +484,7 @@ function getUnitsRemaining() {
 // pains to not modify anything reactive until this function has returned
 async function instructContinue() {
   if (!isLaunchLoadingActive()) {
-    startLaunchLoading('Preparing first trial...', 'instructions');
+    startLaunchLoading('Loading content...', 'instructions');
   }
   markLaunchLoadingTiming('instructionContinue:instructContinue:start');
   assertIdInvariants('instructions.instructContinue', { requireCurrentTdfId: true, requireStimuliSetId: false });
@@ -949,7 +949,7 @@ async function handleInstructionContinueAction(forceBypassLockout = false) {
     }
   }
 
-  startLaunchLoading('Preparing first trial...', 'instructions');
+  startLaunchLoading('Loading content...', 'instructions');
   markLaunchLoadingTiming('instructionContinue:pressed', { forceBypassLockout });
   await recordCurrentInstructionContinue(timeRendered);
   await instructContinue();
