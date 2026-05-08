@@ -705,10 +705,14 @@ input[type="range"]::-moz-range-progress,
 
 /* ===== BUTTONS ===== */
 .btn, .btn-icon{
+    --bs-btn-font-size: 14px;
+    --bs-btn-line-height: 22px;
+    --bs-btn-padding-y: 0;
     background-color: var(--button-color);
     border-color: var(--btn-border-color);
     color: var(--primary-button-text-color);
     border-radius: var(--border-radius-sm);
+    min-height: 24px;
 }
 
 .btn-selected{
@@ -1345,6 +1349,48 @@ tfoot th {
 /* Action column utility - prevents button wrapping */
 .table-col-actions {
     white-space: nowrap;
+    vertical-align: middle;
+}
+
+/* User Admin has many compact usage columns. Keep row data on one line,
+   while allowing multi-line headers so labels do not set huge minimums. */
+.user-admin-table {
+    width: max-content;
+    min-width: 100%;
+    table-layout: auto;
+}
+
+.user-admin-table .table-col-medium {
+    width: auto;
+    min-width: 80px;
+}
+
+.user-admin-table .table-col-large {
+    width: auto;
+    min-width: 120px;
+}
+
+.user-admin-table thead th {
+    white-space: normal;
+    overflow-wrap: normal;
+    word-break: normal;
+    line-height: 1.12;
+    padding: 8px 8px;
+    vertical-align: middle;
+}
+
+.user-admin-header-label {
+    display: inline-block;
+    max-width: 80px;
+    white-space: normal;
+}
+
+.user-admin-table tbody td,
+.user-admin-table tbody th {
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-break: normal;
+    padding: 8px 8px;
     vertical-align: middle;
 }
 
@@ -2219,9 +2265,10 @@ tfoot th {
 
     /* Larger touch targets for mobile - iOS recommends 44x44px minimum */
     .btn, button, input[type="text"], input[type="password"], input[type="file"] {
-        min-height: 44px;
-        font-size: 1.125rem; /* 18px - slightly larger for readability */
-        padding: 0.75rem 1rem;
+        min-height: 32px;
+        font-size: 16px;
+        line-height: 24px;
+        padding: 3px 0.75rem;
     }
 
 
@@ -2298,8 +2345,8 @@ tfoot th {
     .btn,
     button,
     a.content-link {
-        min-height: 44px;
-        padding: 0.75rem 1rem;
+        min-height: 32px;
+        padding: 3px 0.75rem;
     }
 
     /* Multiple choice buttons */

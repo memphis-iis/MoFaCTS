@@ -472,7 +472,7 @@ const restrictedRoutes = [
 
 const routeAccessPolicies: Record<string, RouteAccessPolicy> = {
   'client.turkWorkflow': { requiresAuth: true, allowedRoles: 'admin' },
-  'client.userAdmin': { requiresAuth: true, allowedRoles: 'admin,teacher' },
+  'client.userAdmin': { requiresAuth: true, allowedRoles: 'admin' },
   'client.tdfAssignmentEdit': { requiresAuth: true, allowedRoles: 'admin,teacher' },
   'client.instructorReporting': { requiresAuth: true, allowedRoles: 'admin,teacher' },
   'client.classEdit': { requiresAuth: true, allowedRoles: 'admin,teacher' },

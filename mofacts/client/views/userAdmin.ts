@@ -14,13 +14,156 @@ import { legacyTrim } from '../../common/underscoreCompat';
 const UserCounts = new Mongo.Collection('user_counts');
 const FilteredUserPageIds = new Mongo.Collection('filtered_user_page_ids');
 const MeteorCompat = Meteor as typeof Meteor & { callAsync: (name: string, ...args: any[]) => Promise<any> };
+declare const UserDashboardCache: Mongo.Collection<any>;
 
 const USERS_PER_PAGE = 50;
+
+type SortDirection = 'asc' | 'desc';
+
+function getPagedUserIds(): string[] {
+  return FilteredUserPageIds.find({}, { sort: { userId: 1 } })
+    .fetch()
+    .map((doc: any) => doc.userId)
+    .filter((id: unknown): id is string => typeof id === 'string' && id.trim().length > 0);
+}
+
+function getDisplayIdentifier(user: any): { displayIdentifier: string; hasIdentifierInvariantViolation: boolean } {
+  const identifierRaw = String(user?.email_canonical || user?.emails?.[0]?.address || user?.username || '').trim();
+  const hasIdentifierInvariantViolation = identifierRaw.length === 0;
+  return {
+    displayIdentifier: hasIdentifierInvariantViolation
+      ? `[MISSING USER IDENTIFIER] userId=${String(user?._id || 'unknown')}`
+      : identifierRaw,
+    hasIdentifierInvariantViolation
+  };
+}
+
+function formatOneDecimal(value: unknown): string {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric.toFixed(1) : '0.0';
+}
+
+function formatWholeNumber(value: unknown): string {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? String(Math.round(numeric)) : '0';
+}
+
+function formatMinutes(value: unknown): string {
+  const minutes = Number(value);
+  if (!Number.isFinite(minutes) || minutes <= 0) {
+    return '0m';
+  }
+  const roundedMinutes = Math.round(minutes);
+  const hours = Math.floor(roundedMinutes / 60);
+  const remainingMinutes = roundedMinutes % 60;
+  if (hours > 0 && remainingMinutes > 0) {
+    return `${hours}h ${remainingMinutes}m`;
+  }
+  if (hours > 0) {
+    return `${hours}h`;
+  }
+  return `${remainingMinutes}m`;
+}
+
+function formatDate(value: unknown): string {
+  if (!value) {
+    return 'None';
+  }
+  const date = new Date(value as any);
+  if (Number.isNaN(date.getTime())) {
+    return 'Invalid date';
+  }
+  return date.toLocaleDateString();
+}
+
+function getTimeValue(value: unknown): number {
+  if (!value) {
+    return 0;
+  }
+  const date = new Date(value as any);
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+}
+
+function buildUsageDisplay(user: any) {
+  const cache = UserDashboardCache.findOne({ userId: user._id }) as any;
+  if (!cache) {
+    return {
+      usageStatus: 'missing-cache',
+      usageCellClass: 'text-muted',
+      totalTrialsDisplay: 'No cache',
+      accuracyDisplay: 'No cache',
+      totalTimeDisplay: 'No cache',
+      averageSessionDaysDisplay: 'No cache',
+      averageItemsPracticedDisplay: 'No cache',
+      lastActivityDisplay: 'No cache',
+      cacheUpdatedDisplay: 'No cache',
+      usageSort: {
+        totalTrials: Number.NEGATIVE_INFINITY,
+        weightedAccuracy: Number.NEGATIVE_INFINITY,
+        totalTimeMinutes: Number.NEGATIVE_INFINITY,
+        averageSessionDays: Number.NEGATIVE_INFINITY,
+        averageItemsPracticed: Number.NEGATIVE_INFINITY,
+        lastActivityDate: Number.NEGATIVE_INFINITY,
+        cacheUpdated: Number.NEGATIVE_INFINITY
+      }
+    };
+  }
+
+  const usageSummary = cache.usageSummary;
+  if (!usageSummary) {
+    return {
+      usageStatus: 'needs-refresh',
+      usageCellClass: 'text-warning',
+      totalTrialsDisplay: 'Refresh needed',
+      accuracyDisplay: 'Refresh needed',
+      totalTimeDisplay: 'Refresh needed',
+      averageSessionDaysDisplay: 'Refresh needed',
+      averageItemsPracticedDisplay: 'Refresh needed',
+      lastActivityDisplay: 'Refresh needed',
+      cacheUpdatedDisplay: formatDate(cache.lastUpdated),
+      usageSort: {
+        totalTrials: Number.NEGATIVE_INFINITY,
+        weightedAccuracy: Number.NEGATIVE_INFINITY,
+        totalTimeMinutes: Number.NEGATIVE_INFINITY,
+        averageSessionDays: Number.NEGATIVE_INFINITY,
+        averageItemsPracticed: Number.NEGATIVE_INFINITY,
+        lastActivityDate: Number.NEGATIVE_INFINITY,
+        cacheUpdated: getTimeValue(cache.lastUpdated)
+      }
+    };
+  }
+
+  return {
+    usageStatus: 'ready',
+    usageCellClass: '',
+    totalTrialsDisplay: formatWholeNumber(usageSummary.totalTrials),
+    accuracyDisplay: `${formatOneDecimal(usageSummary.weightedAccuracy)}%`,
+    totalTimeDisplay: formatMinutes(usageSummary.totalTimeMinutes),
+    averageSessionDaysDisplay: formatOneDecimal(usageSummary.averageSessionDays),
+    averageItemsPracticedDisplay: formatOneDecimal(usageSummary.averageItemsPracticed),
+    lastActivityDisplay: formatDate(usageSummary.lastActivityDate),
+    cacheUpdatedDisplay: formatDate(cache.lastUpdated),
+    usageSort: {
+      totalTrials: Number(usageSummary.totalTrials || 0),
+      weightedAccuracy: Number(usageSummary.weightedAccuracy || 0),
+      totalTimeMinutes: Number(usageSummary.totalTimeMinutes || 0),
+      averageSessionDays: Number(usageSummary.averageSessionDays || 0),
+      averageItemsPracticed: Number(usageSummary.averageItemsPracticed || 0),
+      lastActivityDate: getTimeValue(usageSummary.lastActivityDate),
+      cacheUpdated: getTimeValue(cache.lastUpdated)
+    }
+  };
+}
 
 Template.userAdmin.onCreated(function(this: any) {
   this.filter = new ReactiveVar('');
   this.currentPage = new ReactiveVar(0);
   this.isLoading = new ReactiveVar(true);
+  this.isRefreshingUsage = new ReactiveVar(false);
+  this.usageRefreshMessage = new ReactiveVar('');
+  this.usageRefreshMessageType = new ReactiveVar('info');
+  this.sortField = new ReactiveVar('identifier');
+  this.sortDirection = new ReactiveVar('asc' as SortDirection);
   this.autoruns = [];
 
   // Debounce timer for filter changes
@@ -39,7 +182,11 @@ Template.userAdmin.onRendered(function(this: any) {
     // This avoids stale onReady callbacks from a prior stopped subscription.
     const usersSub = instance.subscribe('filteredUsers', filter, page, USERS_PER_PAGE);
     const countSub = instance.subscribe('filteredUsersCount', filter);
-    instance.isLoading.set(!(usersSub.ready() && countSub.ready()));
+    const usageUserIds = getPagedUserIds();
+    const usageSub = usageUserIds.length > 0
+      ? instance.subscribe('userAdminDashboardUsage', usageUserIds)
+      : { ready: () => true };
+    instance.isLoading.set(!(usersSub.ready() && countSub.ready() && usageSub.ready()));
   });
   instance.autoruns.push(autorun);
 });
@@ -65,10 +212,10 @@ Template.userAdmin.helpers({
     // reruns on both add AND remove (not just remove).
     (Meteor as any).roleAssignment?.find({}).fetch();
     const canManageUsers = userHasRole(Meteor.user(), 'admin');
-    const pagedUserIds = FilteredUserPageIds.find({}, { sort: { userId: 1 } })
-      .fetch()
-      .map((doc: any) => doc.userId)
-      .filter((id: unknown): id is string => typeof id === 'string' && id.trim().length > 0);
+    const instance = Template.instance() as any;
+    const sortField = String(instance.sortField.get() || 'identifier');
+    const sortDirection = instance.sortDirection.get() as SortDirection;
+    const pagedUserIds = getPagedUserIds();
 
     if (pagedUserIds.length === 0) {
       return [];
@@ -79,16 +226,14 @@ Template.userAdmin.helpers({
 
     // Process roles for display (O(n) single pass)
     return users.map((user: any) => {
-      const identifierRaw = String(user?.email_canonical || user?.emails?.[0]?.address || user?.username || '').trim();
-      const hasIdentifierInvariantViolation = identifierRaw.length === 0;
-      const displayIdentifier = hasIdentifierInvariantViolation
-        ? `[MISSING USER IDENTIFIER] userId=${String(user?._id || 'unknown')}`
-        : identifierRaw;
+      const { displayIdentifier, hasIdentifierInvariantViolation } = getDisplayIdentifier(user);
+      const usageDisplay = buildUsageDisplay(user);
       user.teacher = false;
       user.admin = false;
       user.canManageUsers = canManageUsers;
       user.displayIdentifier = displayIdentifier;
       user.hasIdentifierInvariantViolation = hasIdentifierInvariantViolation;
+      Object.assign(user, usageDisplay);
 
       user.teacher = userHasRole(user, 'teacher');
       user.admin = userHasRole(user, 'admin');
@@ -99,22 +244,88 @@ Template.userAdmin.helpers({
       if (aViolation !== bViolation) {
         return aViolation ? 1 : -1;
       }
-      return String(a.displayIdentifier || '').localeCompare(String(b.displayIdentifier || ''));
+      let compareValue = 0;
+      if (sortField === 'identifier') {
+        compareValue = String(a.displayIdentifier || '').localeCompare(String(b.displayIdentifier || ''));
+      } else {
+        compareValue = Number(a.usageSort?.[sortField] ?? Number.NEGATIVE_INFINITY) -
+          Number(b.usageSort?.[sortField] ?? Number.NEGATIVE_INFINITY);
+      }
+      return sortDirection === 'asc' ? compareValue : -compareValue;
     });
   },
 
   hasIdentifierInvariantViolations: function() {
-    const pagedUserIds = FilteredUserPageIds.find({})
-      .fetch()
-      .map((doc: any) => doc.userId)
-      .filter((id: unknown): id is string => typeof id === 'string' && id.trim().length > 0);
+    const pagedUserIds = getPagedUserIds();
     const users = pagedUserIds.length > 0
       ? Meteor.users.find({ _id: { $in: pagedUserIds } }).fetch()
       : [];
     return users.some((user: any) => {
-      const identifierRaw = String(user?.email_canonical || user?.emails?.[0]?.address || user?.username || '').trim();
-      return identifierRaw.length === 0;
+      return getDisplayIdentifier(user).hasIdentifierInvariantViolation;
     });
+  },
+
+  usageAggregateSummary: function() {
+    const pagedUserIds = getPagedUserIds();
+    const users = pagedUserIds.length > 0
+      ? Meteor.users.find({ _id: { $in: pagedUserIds } }).fetch()
+      : [];
+    let usersWithIdentifiers = 0;
+    let usersWithUsageCache = 0;
+    let usersNeedingRefresh = 0;
+    let totalTrials = 0;
+    let activeUsers = 0;
+
+    for (const user of users) {
+      if (getDisplayIdentifier(user).hasIdentifierInvariantViolation) {
+        continue;
+      }
+      usersWithIdentifiers++;
+      const cache = UserDashboardCache.findOne({ userId: user._id }) as any;
+      if (!cache) {
+        continue;
+      }
+      if (!cache.usageSummary) {
+        usersNeedingRefresh++;
+        continue;
+      }
+      usersWithUsageCache++;
+      totalTrials += Number(cache.usageSummary.totalTrials || 0);
+      if (cache.usageSummary.lastActivityDate) {
+        activeUsers++;
+      }
+    }
+
+    return `${usersWithUsageCache}/${usersWithIdentifiers} users have cached usage summaries; ${totalTrials} cached trials; ${activeUsers} active users${usersNeedingRefresh > 0 ? `; ${usersNeedingRefresh} need refresh` : ''}.`;
+  },
+
+  isRefreshingUsage: function() {
+    return (Template.instance() as any).isRefreshingUsage.get();
+  },
+
+  usageRefreshMessage: function() {
+    return (Template.instance() as any).usageRefreshMessage.get();
+  },
+
+  usageRefreshAlertClass: function() {
+    const messageType = (Template.instance() as any).usageRefreshMessageType.get();
+    if (messageType === 'success') return 'alert-success';
+    if (messageType === 'warning') return 'alert-warning';
+    if (messageType === 'danger') return 'alert-danger';
+    return 'alert-info';
+  },
+
+  refreshUsageAttrs: function() {
+    const isRefreshing = (Template.instance() as any).isRefreshingUsage.get();
+    return isRefreshing ? { disabled: true } : {};
+  },
+
+  sortIndicator: function(field: string) {
+    const instance = Template.instance() as any;
+    if (instance.sortField.get() !== field) {
+      return '';
+    }
+    return instance.sortDirection.get() === 'asc' ? '^' : 'v';
   },
 
   isLoading: function() {
@@ -191,7 +402,22 @@ Template.userAdmin.events({
     instance.filterDebounceTimer = setTimeout(() => {
       instance.filter.set(value);
       instance.currentPage.set(0); // Reset to first page on filter change
+      instance.usageRefreshMessage.set('');
     }, 300);
+  },
+
+  'click .sortable-useradmin': function(event: any, instance: any) {
+    event.preventDefault();
+    const sortField = legacyTrim($(event.currentTarget).data('sortfield'));
+    if (!sortField) {
+      return;
+    }
+    if (instance.sortField.get() === sortField) {
+      instance.sortDirection.set(instance.sortDirection.get() === 'asc' ? 'desc' : 'asc');
+    } else {
+      instance.sortField.set(sortField);
+      instance.sortDirection.set(sortField === 'identifier' ? 'asc' : 'desc');
+    }
   },
 
   'click #prevPage': function(event: any, instance: any) {
@@ -199,6 +425,7 @@ Template.userAdmin.events({
     const current = instance.currentPage.get();
     if (current > 0) {
       instance.currentPage.set(current - 1);
+      instance.usageRefreshMessage.set('');
     }
   },
 
@@ -212,6 +439,39 @@ Template.userAdmin.events({
 
     if (current < totalPages - 1) {
       instance.currentPage.set(current + 1);
+      instance.usageRefreshMessage.set('');
+    }
+  },
+
+  'click #refreshUsageCaches': async function(event: any, instance: any) {
+    event.preventDefault();
+    const userIds = getPagedUserIds();
+    if (userIds.length === 0) {
+      instance.usageRefreshMessageType.set('warning');
+      instance.usageRefreshMessage.set('No users are available on this page to refresh.');
+      return;
+    }
+
+    instance.isRefreshingUsage.set(true);
+    instance.usageRefreshMessageType.set('info');
+    instance.usageRefreshMessage.set(`Refreshing usage caches for ${userIds.length} users...`);
+
+    try {
+      const result = await MeteorCompat.callAsync('refreshUserAdminUsageCaches', userIds);
+      const refreshedCount = Array.isArray(result?.refreshed) ? result.refreshed.length : 0;
+      const failedCount = Array.isArray(result?.failed) ? result.failed.length : 0;
+      if (failedCount > 0) {
+        instance.usageRefreshMessageType.set('warning');
+        instance.usageRefreshMessage.set(`Refreshed ${refreshedCount} users; ${failedCount} failed. First failure: ${result.failed[0].userId}: ${result.failed[0].error}`);
+      } else {
+        instance.usageRefreshMessageType.set('success');
+        instance.usageRefreshMessage.set(`Refreshed usage caches for ${refreshedCount} users.`);
+      }
+    } catch (error: unknown) {
+      instance.usageRefreshMessageType.set('danger');
+      instance.usageRefreshMessage.set('Failed to refresh usage caches: ' + getErrorMessage(error));
+    } finally {
+      instance.isRefreshingUsage.set(false);
     }
   },
 
