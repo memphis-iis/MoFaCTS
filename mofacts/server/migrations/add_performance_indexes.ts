@@ -135,11 +135,35 @@ export async function createPerformanceIndexes() {
     );
     serverConsole('  Created: UserDashboardCache.lastUpdated');
 
+    await UserDashboardCache.rawCollection().createIndex(
+      { 'usageSummary.totalTrials': -1 },
+      { name: 'perf_usageSummary_totalTrials', background: true }
+    );
+    serverConsole('  Created: UserDashboardCache.usageSummary.totalTrials');
+
+    await UserDashboardCache.rawCollection().createIndex(
+      { 'usageSummary.weightedAccuracy': -1 },
+      { name: 'perf_usageSummary_weightedAccuracy', background: true }
+    );
+    serverConsole('  Created: UserDashboardCache.usageSummary.weightedAccuracy');
+
+    await UserDashboardCache.rawCollection().createIndex(
+      { 'usageSummary.totalTimeMinutes': -1 },
+      { name: 'perf_usageSummary_totalTimeMinutes', background: true }
+    );
+    serverConsole('  Created: UserDashboardCache.usageSummary.totalTimeMinutes');
+
+    await UserDashboardCache.rawCollection().createIndex(
+      { 'usageSummary.lastActivityDate': -1 },
+      { name: 'perf_usageSummary_lastActivityDate', background: true }
+    );
+    serverConsole('  Created: UserDashboardCache.usageSummary.lastActivityDate');
+
     serverConsole('========================================');
-    serverConsole('All 15 performance indexes created successfully');
+    serverConsole('All 19 performance indexes created successfully');
     serverConsole('========================================');
 
-    return { success: true, indexesCreated: 15 };
+    return { success: true, indexesCreated: 19 };
   } catch (error) {
     serverConsole('========================================');
     serverConsole('Error creating performance indexes:', error);

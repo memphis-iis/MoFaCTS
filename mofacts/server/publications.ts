@@ -41,18 +41,17 @@ function normalizeIdList(ids: any) {
 }
 
 // ===== PHASE 3: Paginated Users Publication =====
-// Server-side filtering and pagination for userAdmin page
+// Server-side filtering and pagination for admin-only User Admin page
 // Eliminates O(n²) client-side iteration
 Meteor.publish('filteredUsers', async function(filter = '', page = 0, limit = 50) {
-    // Security check - must be admin or teacher
+    // Security check - must be admin
     if (!this.userId) {
         return this.ready();
     }
 
     const isAdmin = await Roles.userIsInRoleAsync(this.userId, ['admin']);
-    const isTeacher = await Roles.userIsInRoleAsync(this.userId, ['teacher']);
 
-    if (!isAdmin && !isTeacher) {
+    if (!isAdmin) {
         return this.ready();
     }
 
@@ -102,15 +101,14 @@ Meteor.publish('filteredUsers', async function(filter = '', page = 0, limit = 50
 
 // Publish total count for pagination UI
 Meteor.publish('filteredUsersCount', async function(filter = '') {
-    // Security check - must be admin or teacher
+    // Security check - must be admin
     if (!this.userId) {
         return this.ready();
     }
 
     const isAdmin = await Roles.userIsInRoleAsync(this.userId, ['admin']);
-    const isTeacher = await Roles.userIsInRoleAsync(this.userId, ['teacher']);
 
-    if (!isAdmin && !isTeacher) {
+    if (!isAdmin) {
         return this.ready();
     }
 
@@ -133,6 +131,34 @@ Meteor.publish('filteredUsersCount', async function(filter = '') {
     self.ready();
 
     // No reactivity needed - count updates on re-subscribe
+});
+
+Meteor.publish('userAdminDashboardUsage', async function(userIds: any[] = []) {
+    if (!this.userId) {
+        return this.ready();
+    }
+
+    const isAdmin = await Roles.userIsInRoleAsync(this.userId, ['admin']);
+    if (!isAdmin) {
+        return this.ready();
+    }
+
+    const normalizedUserIds = normalizeIdList(userIds).slice(0, 100);
+    if (normalizedUserIds.length === 0) {
+        return this.ready();
+    }
+
+    return UserDashboardCache.find(
+        { userId: { $in: normalizedUserIds } },
+        {
+            fields: {
+                userId: 1,
+                usageSummary: 1,
+                lastUpdated: 1,
+                version: 1
+            }
+        }
+    );
 });
 
 // ===== PHASE 1.5 OPTIMIZATION: Theme Publication =====
@@ -204,6 +230,7 @@ Meteor.publish('dashboardCache', function() {
                 userId: 1,
                 tdfStats: 1,
                 summary: 1,
+                usageSummary: 1,
                 lastUpdated: 1,
                 version: 1
             }

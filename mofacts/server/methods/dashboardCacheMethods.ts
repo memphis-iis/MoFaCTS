@@ -3,7 +3,8 @@ import type {
   DashboardHistoryRecord,
   DashboardStatsByTdf,
   DashboardSummaryStats,
-  DashboardTdfStats
+  DashboardTdfStats,
+  DashboardUsageSummary
 } from './dashboardCacheMethods.contracts';
 
 type DashboardCacheDeps = {
@@ -12,9 +13,14 @@ type DashboardCacheDeps = {
   Histories: any;
   Tdfs: any;
   UserDashboardCache: any;
+  usersCollection: any;
   serverConsole: (...args: any[]) => void;
   computePracticeTimeMs: ComputePracticeTimeMs;
 };
+
+function roundOneDecimal(value: number): number {
+  return Number(value.toFixed(1));
+}
 
 export function computeCacheStats(
   history: DashboardHistoryRecord[],
@@ -124,12 +130,62 @@ export function computeSummaryStats(tdfStats: DashboardStatsByTdf | null | undef
   };
 }
 
+export function computeUsageSummary(tdfStats: DashboardStatsByTdf | null | undefined): DashboardUsageSummary {
+  const safeStats: DashboardStatsByTdf = tdfStats || {};
+  const practicedStats = (Object.values(safeStats) as DashboardTdfStats[])
+    .filter((statsAny) => Number(statsAny?.totalTrials || 0) > 0);
+
+  let totalTrials = 0;
+  let totalCorrect = 0;
+  let totalIncorrect = 0;
+  let totalTimeMs = 0;
+  let totalSessionDays = 0;
+  let totalItemsPracticed = 0;
+  let lastActivityDate: Date | null = null;
+
+  for (const statsAny of practicedStats) {
+    totalTrials += Number(statsAny.totalTrials || 0);
+    totalCorrect += Number(statsAny.correctTrials || 0);
+    totalIncorrect += Number(statsAny.incorrectTrials || 0);
+    totalTimeMs += Number(statsAny.totalTimeMs || 0);
+    totalSessionDays += Number(statsAny.totalSessions || 0);
+    totalItemsPracticed += Number(statsAny.itemsPracticedCount || 0);
+
+    if (statsAny.lastPracticeDate) {
+      const date = new Date(statsAny.lastPracticeDate);
+      if (!Number.isNaN(date.getTime()) && (!lastActivityDate || date > lastActivityDate)) {
+        lastActivityDate = date;
+      }
+    }
+  }
+
+  const practicedSystemCount = practicedStats.length;
+  const totalAnswered = totalCorrect + totalIncorrect;
+
+  return {
+    totalTrials,
+    weightedAccuracy: totalAnswered > 0
+      ? roundOneDecimal((totalCorrect / totalAnswered) * 100)
+      : 0,
+    totalTimeMinutes: roundOneDecimal(totalTimeMs / 60000),
+    averageSessionDays: practicedSystemCount > 0
+      ? roundOneDecimal(totalSessionDays / practicedSystemCount)
+      : 0,
+    averageItemsPracticed: practicedSystemCount > 0
+      ? roundOneDecimal(totalItemsPracticed / practicedSystemCount)
+      : 0,
+    lastActivityDate,
+    practicedSystemCount
+  };
+}
+
 export function createDashboardCacheMethods({
   Meteor,
   Roles,
   Histories,
   Tdfs,
   UserDashboardCache,
+  usersCollection,
   serverConsole,
   computePracticeTimeMs
 }: DashboardCacheDeps) {
@@ -148,6 +204,14 @@ export function createDashboardCacheMethods({
       }
 
       serverConsole(`Initializing dashboard cache for user ${targetUserId}`);
+
+      const targetUser = await usersCollection.findOneAsync(
+        { _id: targetUserId },
+        { fields: { _id: 1 } }
+      );
+      if (!targetUser) {
+        throw new Meteor.Error('not-found', 'Cannot initialize cache for missing user');
+      }
 
       const attemptedTdfIds = await Histories.rawCollection().distinct('TDFId', {
         userId: targetUserId,
@@ -168,6 +232,7 @@ export function createDashboardCacheMethods({
                 overallAccuracyAllTime: 0,
                 lastActivityDate: null
               },
+              usageSummary: computeUsageSummary({}),
               lastUpdated: new Date(),
               version: 1
             },
@@ -266,6 +331,7 @@ export function createDashboardCacheMethods({
       }
 
       const summary = computeSummaryStats(tdfStats);
+      const usageSummary = computeUsageSummary(tdfStats);
 
       await UserDashboardCache.upsertAsync(
         { userId: targetUserId },
@@ -274,6 +340,7 @@ export function createDashboardCacheMethods({
             userId: targetUserId,
             tdfStats,
             summary,
+            usageSummary,
             lastUpdated: new Date(),
             version: 1
           },
@@ -389,6 +456,7 @@ export function createDashboardCacheMethods({
       };
 
       const summary = computeSummaryStats(updatedTdfStats);
+      const usageSummary = computeUsageSummary(updatedTdfStats);
 
       await UserDashboardCache.upsertAsync(
         { userId },
@@ -397,6 +465,7 @@ export function createDashboardCacheMethods({
             userId,
             tdfStats: updatedTdfStats,
             summary,
+            usageSummary,
             lastUpdated: new Date(),
             version: cache.version || 1
           },
@@ -419,6 +488,52 @@ export function createDashboardCacheMethods({
       return await methods.initializeDashboardCache.call(this);
     },
 
+    refreshUserAdminUsageCaches: async function(this: any, userIds: unknown) {
+      if (!this.userId) {
+        throw new Meteor.Error('not-authorized', 'Must be logged in');
+      }
+
+      const isAdmin = await Roles.userIsInRoleAsync(this.userId, ['admin']);
+      if (!isAdmin) {
+        throw new Meteor.Error('not-authorized', 'Admin only');
+      }
+
+      if (!Array.isArray(userIds)) {
+        throw new Meteor.Error('invalid-args', 'Expected an array of user IDs');
+      }
+
+      const normalizedUserIds = [...new Set(userIds
+        .map((userId) => typeof userId === 'string' ? userId.trim() : '')
+        .filter((userId) => userId.length > 0))];
+
+      if (normalizedUserIds.length === 0) {
+        throw new Meteor.Error('invalid-args', 'No valid user IDs were provided');
+      }
+
+      if (normalizedUserIds.length > 100) {
+        throw new Meteor.Error('invalid-args', 'Refresh is limited to 100 users at a time');
+      }
+
+      const refreshed: Array<{ userId: string; tdfCount: number }> = [];
+      const failed: Array<{ userId: string; error: string }> = [];
+
+      for (const targetUserId of normalizedUserIds) {
+        try {
+          const result = await methods.initializeDashboardCache.call(this, targetUserId);
+          refreshed.push({ userId: targetUserId, tdfCount: result.tdfCount });
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : String(error);
+          failed.push({ userId: targetUserId, error: message });
+        }
+      }
+
+      return {
+        success: failed.length === 0,
+        refreshed,
+        failed
+      };
+    },
+
     removeTdfFromCache: async function(this: any, tdfId: string) {
       if (!this.userId) {
         throw new Meteor.Error('not-authorized');
@@ -439,12 +554,14 @@ export function createDashboardCacheMethods({
       for (const cache of caches) {
         delete cache.tdfStats[tdfId];
         const summary = computeSummaryStats(cache.tdfStats || {});
+        const usageSummary = computeUsageSummary(cache.tdfStats || {});
         await UserDashboardCache.updateAsync(
           { _id: cache._id },
           {
             $set: {
               tdfStats: cache.tdfStats,
               summary,
+              usageSummary,
               lastUpdated: new Date()
             }
           }

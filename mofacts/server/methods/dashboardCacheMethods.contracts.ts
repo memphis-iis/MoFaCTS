@@ -45,6 +45,16 @@ export interface DashboardSummaryStats {
   lastActivityDate: Date | null;
 }
 
+export interface DashboardUsageSummary {
+  totalTrials: number;
+  weightedAccuracy: number;
+  totalTimeMinutes: number;
+  averageSessionDays: number;
+  averageItemsPracticed: number;
+  lastActivityDate: Date | null;
+  practicedSystemCount: number;
+}
+
 export type ComputePracticeTimeMs = (
   endLatency: number | null | undefined,
   feedbackLatency: number | null | undefined

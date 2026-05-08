@@ -849,6 +849,7 @@ export const asyncMethods: Record<string, unknown> = {
     Histories,
     Tdfs,
     UserDashboardCache,
+    usersCollection: MeteorAny.users,
     serverConsole,
     computePracticeTimeMs
   }),
