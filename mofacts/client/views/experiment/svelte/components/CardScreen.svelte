@@ -645,9 +645,9 @@
     revealSequence += 1;
     queuedRevealKey = '';
     queuedRevealSequence = 0;
-    trialSubsetVisible = preservePreparedHandoff;
+    trialSubsetVisible = false;
     activeSlotMounted = trialSubset.showOverlay || preservePreparedHandoff;
-    activeSlotVisible = preservePreparedHandoff;
+    activeSlotVisible = false;
     stimulusBlockingAssetReady = preservePreparedHandoff
       ? (!nextStimulusBlockerSrc || preparedHandoffStimulusReady)
       : (!nextStimulusBlockerSrc || preserveStimulusReady);
@@ -662,7 +662,7 @@
       preparedHandoffFeedbackReady = false;
       void (async () => {
         await tick();
-        await waitForBrowserPaint();
+        primeTrialContentFadeStart();
         if (
           testMode ||
           preparedRevealSequence !== revealSequence ||
@@ -684,6 +684,15 @@
           preparedRevealKey,
           subsetKind: trialSubset.kind,
         });
+        lastFadeLogContext = {
+          key: preparedRevealKey,
+          subsetKind: trialSubset.kind,
+          visibleSetAt: performance.now(),
+          configuredDurationMs: getElementTransitionDurationMs(trialContentFadeElement),
+        };
+        trialSubsetVisible = true;
+        activeSlotMounted = true;
+        activeSlotVisible = true;
         send({
           type: EVENTS.TRIAL_REVEAL_STARTED,
           timestamp: Date.now(),
@@ -1133,6 +1142,17 @@
         });
       }
     })();
+  }
+
+  function primeTrialContentFadeStart() {
+    if (!trialContentFadeElement || typeof window === 'undefined') {
+      return;
+    }
+
+    // Mobile Safari can briefly composite swapped trial content at the prior
+    // opacity unless it observes the hidden start state before fade-in begins.
+    void trialContentFadeElement.offsetWidth;
+    void getComputedStyle(trialContentFadeElement).opacity;
   }
 
   function getElementTransitionDurationMs(element) {
