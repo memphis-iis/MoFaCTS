@@ -12,7 +12,10 @@
 import { Meteor } from 'meteor/meteor';
 import { Session } from 'meteor/session';
 import { audioManager } from '../../../../lib/audioContextManager';
-import { warnIfAppleMobileAudioMayBeLocked } from '../../../../lib/audioUnlock';
+import {
+  getUnlockedAppleMobileAudioElement,
+  warnIfAppleMobileAudioMayBeLocked,
+} from '../../../../lib/audioUnlock';
 import { CardStore } from '../../modules/cardStore';
 import { startRecording as startSrRecording } from './speechRecognitionService';
 import { clientConsole } from '../../../../lib/userSessionHelpers';
@@ -571,10 +574,17 @@ async function speakText(
           return;
         }
 
-        const audioObj = new Audio(`data:audio/mp3;base64,${res}`);
+        const unlockedAudioObj = getUnlockedAppleMobileAudioElement();
+        const audioObj = unlockedAudioObj || new Audio();
+        audioObj.src = `data:audio/mp3;base64,${res}`;
+        audioObj.muted = false;
+        audioObj.volume = 1;
         audioManager.pauseCurrentAudio();
         audioManager.setCurrentAudio(audioObj);
-        clientConsole(2, '[TTS] path selected', { path: 'google-tts-playback' });
+        clientConsole(2, '[TTS] path selected', {
+          path: 'google-tts-playback',
+          reusedUnlockedAudioElement: !!unlockedAudioObj,
+        });
         warnIfAppleMobileAudioMayBeLocked('google-tts-playback');
         try {
           await playAudioObject(audioObj);

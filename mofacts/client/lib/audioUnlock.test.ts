@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import {
+  getUnlockedAppleMobileAudioElement,
   hasAppleMobileAudioUnlock,
   isAppleMobileAudioUnlockEnvironment,
   resetAppleMobileAudioUnlockForTests,
@@ -129,5 +130,57 @@ describe('audioUnlock', function() {
 
     expect(speakCount).to.equal(1);
     expect(hasAppleMobileAudioUnlock()).to.equal(true);
+  });
+
+  it('keeps the unlocked HTML audio element available for later Google TTS playback', async function() {
+    setNavigatorForTest(
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
+      5
+    );
+    Object.defineProperty(window, 'SpeechSynthesisUtterance', {
+      configurable: true,
+      value: class MockSpeechSynthesisUtterance {
+        text: string;
+        volume = 1;
+        rate = 1;
+        lang = '';
+
+        constructor(text: string) {
+          this.text = text;
+        }
+      },
+    });
+    Object.defineProperty(window, 'speechSynthesis', {
+      configurable: true,
+      value: { speak: () => {} },
+    });
+
+    let createdAudio: HTMLAudioElement | null = null;
+    Object.defineProperty(globalThis, 'Audio', {
+      configurable: true,
+      value: class MockAudio {
+        muted = false;
+        volume = 1;
+        src = '';
+
+        constructor() {
+          createdAudio = this as unknown as HTMLAudioElement;
+        }
+
+        play() { return Promise.resolve(); }
+        pause() {}
+        removeAttribute(_name: string) {}
+        load() {}
+      },
+    });
+
+    unlockAppleMobileAudioForUserGesture();
+    await Promise.resolve();
+
+    expect(getUnlockedAppleMobileAudioElement()).to.equal(createdAudio);
+    const audio = createdAudio as HTMLAudioElement | null;
+    expect(audio).to.not.equal(null);
+    expect(audio?.muted).to.equal(false);
+    expect(audio?.volume).to.equal(1);
   });
 });

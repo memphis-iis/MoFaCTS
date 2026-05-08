@@ -10,6 +10,7 @@ type NavigatorWithUserActivation = Navigator & {
 let speechSynthesisUnlocked = false;
 let htmlAudioUnlocked = false;
 let unlockAttempted = false;
+let unlockedHtmlAudioElement: HTMLAudioElement | null = null;
 
 export function isAppleMobileAudioUnlockEnvironment(
   userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : '',
@@ -27,10 +28,19 @@ export function hasAppleMobileAudioUnlock(): boolean {
   return speechSynthesisUnlocked || htmlAudioUnlocked;
 }
 
+export function getUnlockedAppleMobileAudioElement(): HTMLAudioElement | null {
+  if (!isAppleMobileAudioUnlockEnvironment() || !htmlAudioUnlocked) {
+    return null;
+  }
+
+  return unlockedHtmlAudioElement;
+}
+
 export function resetAppleMobileAudioUnlockForTests(): void {
   speechSynthesisUnlocked = false;
   htmlAudioUnlocked = false;
   unlockAttempted = false;
+  unlockedHtmlAudioElement = null;
 }
 
 function unlockSpeechSynthesis(): void {
@@ -52,6 +62,7 @@ function unlockHtmlAudio(): void {
   }
 
   const audio = new Audio();
+  unlockedHtmlAudioElement = audio;
   audio.muted = false;
   audio.volume = 1;
   audio.src = 'data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YSADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==';
@@ -63,6 +74,9 @@ function unlockHtmlAudio(): void {
         audio.pause();
       })
       .catch((error: unknown) => {
+        if (unlockedHtmlAudioElement === audio) {
+          unlockedHtmlAudioElement = null;
+        }
         clientConsole(1, '[Audio Unlock] HTML audio unlock failed', {
           error: error instanceof Error ? error.message : String(error),
         });
