@@ -15,6 +15,7 @@ import { Tracker } from 'meteor/tracker';
 import { clientConsole } from '../..';
 import { getErrorMessage } from '../../lib/errorUtils';
 import { getImportIndexSelectionCount, parseImportIndexSpec } from '../../lib/importRangeUtils';
+import { getUploadIntegrity } from '../../lib/uploadIntegrity';
 import './draftEditorWorkspace';
 import { buildImportPackageFromDraftLessons } from '../../lib/importPackageBuilder';
 
@@ -622,7 +623,8 @@ Template.apkgWizard.events({
                 hint: 'This may take a moment for packages with many media files...'
               });
 
-              const processResult = await (Meteor as any).callAsync('processPackageUpload', fileObj._id, Meteor.userId(), link, emailToggle);
+              const uploadIntegrity = await getUploadIntegrity(file);
+              const processResult = await (Meteor as any).callAsync('processPackageUpload', fileObj._id, Meteor.userId(), link, emailToggle, uploadIntegrity);
 
               
 

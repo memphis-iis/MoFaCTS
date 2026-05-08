@@ -9,6 +9,7 @@ import { ReactiveDict } from 'meteor/reactive-dict';
 import { currentUserHasRole } from '../../lib/roleUtils';
 import { buildStimuliFromNormalizedItems, buildTutorFromNormalizedItems, getImportFileNames } from '../../lib/importCompositionBuilder';
 import type { NormalizedImportItem } from '../../lib/normalizedImportTypes';
+import { getUploadIntegrity } from '../../lib/uploadIntegrity';
 import './apkgWizard';
 import './imsccWizard';
 export {doFileUpload};
@@ -1908,9 +1909,25 @@ async function doPackageUpload(file: any, template: any){
   assetsHelperLastRun = 0;
   assetsHelperCachedResult = [];
 
+  let uploadIntegrity: { expectedSize: number; sha256?: string } = { expectedSize: Number(file?.size) || 0 };
+  try {
+    template.pendingUploads.set(tempId, {
+      ...template.pendingUploads.get(tempId),
+      status: "checking",
+      progress: 0
+    });
+    uploadIntegrity = await getUploadIntegrity(file);
+  } catch (error) {
+    clientConsole(1, '[UPLOAD] Could not compute package checksum; continuing with size check only:', error);
+  }
+
   const upload = DynamicAssetsCollection.insert({
     file: file,
-    chunkSize: 'dynamic'
+    chunkSize: 'dynamic',
+    meta: {
+      expectedSize: uploadIntegrity.expectedSize,
+      sha256: uploadIntegrity.sha256
+    }
   }, false);
 
   upload.on('start', function (this: any) {
@@ -1998,7 +2015,7 @@ async function doPackageUpload(file: any, template: any){
 
         (async () => {
           try {
-            const result = await MeteorAny.callAsync('processPackageUpload', fileObj._id, Meteor.userId(), link, emailToggle);
+            const result = await MeteorAny.callAsync('processPackageUpload', fileObj._id, Meteor.userId(), link, emailToggle, uploadIntegrity);
             
             for (const res of (result.results || [])) {
               if (res.data && res.data.res == 'awaitClientTDF') {

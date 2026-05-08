@@ -17,6 +17,12 @@ export type DynamicAssetLike = {
   fileName?: string;
   type?: string;
   size?: number;
+  meta?: Record<string, unknown>;
+};
+
+export type PackageUploadIntegrity = {
+  expectedSize?: number;
+  sha256?: string;
 };
 
 export type SaveContentResult = {

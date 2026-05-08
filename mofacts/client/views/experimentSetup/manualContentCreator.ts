@@ -6,6 +6,7 @@ import { Random } from 'meteor/random';
 import './manualContentCreator.html';
 import './draftEditorWorkspace';
 import { buildImportPackageFromDraftLessons } from '../../lib/importPackageBuilder';
+import { getUploadIntegrity } from '../../lib/uploadIntegrity';
 import {
   buildManualDraftLesson,
   createDefaultManualCreatorState,
@@ -867,12 +868,14 @@ Template.manualContentCreator.events({
             });
 
             const link = DynamicAssets.link({ ...fileObj });
+            const uploadIntegrity = await getUploadIntegrity(file);
             const processResult = await (Meteor as any).callAsync(
               'processPackageUpload',
               fileObj._id,
               Meteor.userId(),
               link,
-              false
+              false,
+              uploadIntegrity
             );
 
             for (const res of processResult.results || []) {

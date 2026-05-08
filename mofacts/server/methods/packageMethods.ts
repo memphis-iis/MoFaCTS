@@ -3,6 +3,7 @@ import { check, Match } from 'meteor/check';
 import { randomBytes } from 'crypto';
 import type { UploadedPackageFile } from '../lib/packageParser';
 import { processPackageUploadWorkflow } from '../lib/packageUpload';
+import type { PackageUploadIntegrity } from '../lib/packageUploadShared';
 
 type UnknownRecord = Record<string, unknown>;
 type MethodContext = {
@@ -176,7 +177,7 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     return responseKC[0].maxResponseKC;
   }
 
-  async function processPackageUpload(this: MethodContext, fileObjOrId: string | DynamicAssetLike, owner: string, _zipLink: string, emailToggle: boolean){
+  async function processPackageUpload(this: MethodContext, fileObjOrId: string | DynamicAssetLike, owner: string, _zipLink: string, emailToggle: boolean, integrity?: PackageUploadIntegrity){
     return processPackageUploadWorkflow(this, fileObjOrId, owner, emailToggle, {
       DynamicAssets: deps.DynamicAssets,
       userIsInRoleAsync: deps.userIsInRoleAsync,
@@ -203,7 +204,7 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       canonicalizeStimDisplayMediaRefs: deps.canonicalizeStimDisplayMediaRefs,
       getNewItemFormat: deps.getNewItemFormat,
       canonicalizeFlatStimuliMediaRefs: deps.canonicalizeFlatStimuliMediaRefs
-    });
+    }, integrity);
   }
 
   async function saveMediaFile(media: UploadedPackageFile, owner: string, stimSetId: string | number | null | undefined){
