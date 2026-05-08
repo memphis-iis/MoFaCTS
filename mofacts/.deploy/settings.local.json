@@ -1,5 +1,5 @@
 {
-  "owner": "admin@localhost",
+  "owner": "admin@local.test",
   "ROOT_URL": "http://192.168.50.44:3100",
   "encryptionKey": "ahNcV0wsycmPIlE+ttysfa+1Fg54sZeQctHeIn9ij368e+mzNskhVdFsNpjqfGdk",
   "prod": false,
@@ -7,7 +7,7 @@
   "mturkSandbox": true,
   "initRoles": {
     "admins": [
-      "admin@localhost"
+      "admin@localhost.test"
     ],
     "teachers": []
   },
@@ -20,7 +20,7 @@
   "public": {
     "systemName": "MoFaCTS",
     "forceSSL": false,
-    "admin": "admin@localhost",
+    "admin": "admin@localhost.test",
     "enableDeleteAllButton": false,
     "testLogin": false
   },
