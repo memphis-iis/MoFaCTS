@@ -23,6 +23,7 @@ import {
   setAudioPromptQuestionVolume, setAudioPromptFeedbackVolume
 } from '../../lib/state/audioState';
 import { getAudioLaunchPreparationPlan, prepareAudioForLaunchIfNeeded } from '../../lib/audioStartup';
+import { unlockAppleMobileAudioForUserGesture } from '../../lib/audioUnlock';
 import { CARD_ENTRY_INTENT, resolveCardLaunchProgress, setCardEntryIntent, type CardEntryIntent } from '../../lib/cardEntryIntent';
 import { isConditionRootWithoutUnitArray, normalizeTutorUnits } from '../../lib/tdfUtils';
 import { evaluateDashboardVersionPolicy, type VersionMeta } from './versionPolicy';
@@ -193,6 +194,7 @@ Template.learningDashboard.events({
 
   'click .continue-lesson': async function(event: any) {
     event.preventDefault();
+    unlockAppleMobileAudioForUserGesture();
     const target = $(event.currentTarget);
     const tdfId = target.data('tdfid');
     const lessonName = target.data('lessonname');
@@ -216,6 +218,7 @@ Template.learningDashboard.events({
 
   'click .start-lesson': async function(event: any) {
     event.preventDefault();
+    unlockAppleMobileAudioForUserGesture();
     const target = $(event.currentTarget);
     await safeSelectTdf(
       target.data('tdfid'),
@@ -231,6 +234,7 @@ Template.learningDashboard.events({
 
   'click .start-condition-root': async function(event: any) {
     event.preventDefault();
+    unlockAppleMobileAudioForUserGesture();
     const row = $(event.currentTarget).closest('tr, .learning-dashboard-card');
     const selector = row.find('.condition-tdf-selector');
     const selectedId = selector.val() as string;

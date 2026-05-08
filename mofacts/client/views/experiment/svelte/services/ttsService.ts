@@ -12,6 +12,7 @@
 import { Meteor } from 'meteor/meteor';
 import { Session } from 'meteor/session';
 import { audioManager } from '../../../../lib/audioContextManager';
+import { warnIfAppleMobileAudioMayBeLocked } from '../../../../lib/audioUnlock';
 import { CardStore } from '../../modules/cardStore';
 import { startRecording as startSrRecording } from './speechRecognitionService';
 import { clientConsole } from '../../../../lib/userSessionHelpers';
@@ -463,6 +464,7 @@ async function speakText(
             volume: utterance.volume,
             requiresAppleMobileRecovery,
           });
+          warnIfAppleMobileAudioMayBeLocked('browser-speech-synthesis');
           window.speechSynthesis.speak(utterance);
 
           if (!requiresAppleMobileRecovery) {
@@ -573,6 +575,7 @@ async function speakText(
         audioManager.pauseCurrentAudio();
         audioManager.setCurrentAudio(audioObj);
         clientConsole(2, '[TTS] path selected', { path: 'google-tts-playback' });
+        warnIfAppleMobileAudioMayBeLocked('google-tts-playback');
         try {
           await playAudioObject(audioObj);
         } catch (error: unknown) {
