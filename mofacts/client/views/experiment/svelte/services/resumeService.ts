@@ -47,6 +47,10 @@ import type {
   UnitEngineLike,
 } from '../../../../../common/types';
 import { repairFormattedStimuliResponsesFromRaw } from '../../../../../common/lib/stimuliResponseRepair';
+import {
+  applyLearnerTdfConfig,
+  type LearnerTdfConfig,
+} from '../../../../../common/lib/learnerTdfConfig';
 import { ensureCurrentStimuliSetId, resolveDynamicAssetPath } from './mediaResolver';
 import {
   assertIdInvariants,
@@ -60,6 +64,10 @@ import {
 type DeliveryParamsLike = Record<string, unknown>;
 type StimLike = Record<string, unknown>;
 type UiSettingsMap = Record<string, unknown>;
+
+declare const UserDashboardCache: {
+  findOne(selector: Record<string, unknown>): { learnerTdfConfigs?: Record<string, LearnerTdfConfig> } | undefined;
+};
 
 interface TdfUnitLike extends Record<string, unknown> {
   deliveryparams?: DeliveryParamsLike | DeliveryParamsLike[];
@@ -103,6 +111,42 @@ interface TdfDocumentLike extends Record<string, unknown> {
   stimuli?: StimLike[];
   stimuliSetId?: string;
   conditionCounts?: number[];
+}
+
+async function ensureDashboardCacheForLearnerConfig(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    const handle = Meteor.subscribe('dashboardCache', {
+      onReady: () => resolve(),
+      onStop: () => resolve(),
+    });
+    if (handle.ready()) {
+      resolve();
+    }
+  });
+}
+
+async function applyResumeLearnerTdfConfig(tdfFile: TdfFileLike, tdfId: unknown): Promise<TdfFileLike> {
+  const normalizedTdfId = typeof tdfId === 'string' ? tdfId.trim() : '';
+  const userId = Meteor.userId();
+  if (!normalizedTdfId || !userId) {
+    return tdfFile;
+  }
+
+  await ensureDashboardCacheForLearnerConfig();
+  const learnerConfig = UserDashboardCache.findOne({ userId })?.learnerTdfConfigs?.[normalizedTdfId];
+  if (!learnerConfig) {
+    return tdfFile;
+  }
+
+  const result = applyLearnerTdfConfig(tdfFile, learnerConfig);
+  if (result.warnings.length) {
+    clientConsole(1, '[Resume Service] Learner TDF config warning:', result.warnings.join('; '));
+    Session.set('uiMessage', {
+      text: result.warnings.join(' '),
+      variant: 'warning',
+    });
+  }
+  return result.tdf as TdfFileLike;
 }
 
 interface ResumeExperimentState extends ExperimentState {
@@ -742,6 +786,16 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
     clientConsole(2, '[Resume Service] Restored currentUnitNumber:', Session.get('currentUnitNumber'));
 
     resolvedTdfFile = curTdf?.content ?? null;
+    if (resolvedTdfFile) {
+      resolvedTdfFile = await applyResumeLearnerTdfConfig(
+        resolvedTdfFile,
+        curTdf?._id || Session.get('currentTdfId') || Session.get('currentRootTdfId')
+      );
+      if (curTdf) {
+        curTdf.content = resolvedTdfFile;
+      }
+      rootTDF = resolvedTdfFile;
+    }
     resolvedUnitList = getUnitListFromTdf(resolvedTdfFile);
     if (!resolvedUnitList) {
       const tdfIdToFetch = curTdf?._id || Session.get('currentTdfId') || Session.get('currentRootTdfId');
@@ -754,8 +808,10 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
         const fetchedTdf = await meteorCallAsync<TdfDocumentLike | null>('getTdfById', tdfIdToFetch);
         if (fetchedTdf?.content?.tdfs?.tutor?.unit?.length) {
           curTdf = fetchedTdf;
-          resolvedTdfFile = fetchedTdf.content;
-          resolvedUnitList = getUnitListFromTdf(fetchedTdf.content);
+          resolvedTdfFile = await applyResumeLearnerTdfConfig(fetchedTdf.content, fetchedTdf._id || tdfIdToFetch);
+          curTdf.content = resolvedTdfFile;
+          rootTDF = resolvedTdfFile;
+          resolvedUnitList = getUnitListFromTdf(resolvedTdfFile);
         }
       }
     }

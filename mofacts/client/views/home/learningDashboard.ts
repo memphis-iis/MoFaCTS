@@ -32,6 +32,11 @@ import { ensureCurrentStimuliSetId } from '../experiment/svelte/services/mediaRe
 import { clearConditionResolutionContext, setActiveTdfContext } from '../../lib/idContext';
 import { passesDashboardEntitlement } from './dashboardEntitlement';
 import {
+  LEARNER_TDF_FIELD_DEFINITIONS,
+  applyLearnerTdfConfig,
+  type LearnerTdfConfig
+} from '../../../common/lib/learnerTdfConfig';
+import {
   finishLaunchLoading,
   markLaunchLoadingTiming,
   setLaunchLoadingMessage,
@@ -45,6 +50,209 @@ declare const $: any;
 declare const Tdfs: any;
 declare const Assignments: any;
 declare const UserDashboardCache: any;
+
+type LearnerConfigState = {
+  tdfId: string | null;
+  loading: boolean;
+  error: string | null;
+  step: 'scope' | 'family' | 'settings';
+  content: any | null;
+  scope: 'setspec' | 'unit' | null;
+  unitIndex: number | null;
+  family: 'ui' | 'delivery' | null;
+  saving: boolean;
+};
+
+const EMPTY_CONFIG_STATE: LearnerConfigState = {
+  tdfId: null,
+  loading: false,
+  error: null,
+  step: 'scope',
+  content: null,
+  scope: null,
+  unitIndex: null,
+  family: null,
+  saving: false,
+};
+
+function getDashboardCache() {
+  const studentID = Session.get('curStudentID') || Meteor.userId();
+  return UserDashboardCache.findOne({ userId: studentID });
+}
+
+function getLearnerTdfConfig(tdfId: string): LearnerTdfConfig | undefined {
+  return getDashboardCache()?.learnerTdfConfigs?.[tdfId];
+}
+
+function applyDashboardLearnerConfig(content: any, tdfId: string) {
+  const learnerConfig = getLearnerTdfConfig(tdfId);
+  if (!learnerConfig) {
+    return content;
+  }
+  const result = applyLearnerTdfConfig(content, learnerConfig);
+  if (result.warnings.length) {
+    clientConsole(1, '[Dashboard Config] Learner TDF config warning:', result.warnings.join('; '));
+    Session.set('uiMessage', {
+      text: result.warnings.join(' '),
+      variant: 'warning',
+    });
+  }
+  return result.tdf;
+}
+
+function learnerConfigHasSetSpecAudioOverride(tdfId: string, key: 'audioPromptMode' | 'audioInputSensitivity') {
+  return getLearnerTdfConfig(tdfId)?.overrides?.setspec?.[key] !== undefined;
+}
+
+function getConfigurableContent(state: LearnerConfigState) {
+  if (!state.content) {
+    return null;
+  }
+  try {
+    return applyLearnerTdfConfig(state.content, getLearnerTdfConfig(String(state.tdfId))).tdf;
+  } catch (error) {
+    clientConsole(1, '[Dashboard Config] Failed to apply learner config for editing:', error);
+    return state.content;
+  }
+}
+
+function getTutorUnits(content: any) {
+  const units = content?.tdfs?.tutor?.unit;
+  return Array.isArray(units) ? units : [];
+}
+
+function getLearnerConfigurableFieldsForState(state: LearnerConfigState) {
+  return LEARNER_TDF_FIELD_DEFINITIONS.filter((field) => {
+    if (field.scope !== state.scope || field.family !== state.family) {
+      return false;
+    }
+    if (state.scope !== 'unit') {
+      return true;
+    }
+
+    const unit = state.unitIndex === null ? null : getTutorUnits(state.content)[state.unitIndex];
+    if (field.family === 'ui') {
+      return Boolean(unit?.learningsession || unit?.assessmentsession || unit?.videosession);
+    }
+    if (field.family === 'delivery') {
+      if (unit?.learningsession || unit?.assessmentsession) {
+        return true;
+      }
+      return Boolean(unit?.videosession);
+    }
+    return false;
+  });
+}
+
+function unitSupportsLearnerFamily(unit: any, family: 'ui' | 'delivery') {
+  if (family === 'ui') {
+    return Boolean(unit?.learningsession || unit?.assessmentsession || unit?.videosession);
+  }
+  if (unit?.learningsession || unit?.assessmentsession) {
+    return true;
+  }
+  return Boolean(unit?.videosession);
+}
+
+function getPathValue(source: any, path: string, unitIndex: number | null = null) {
+  if (path.startsWith('setspec.')) {
+    return path.split('.').slice(1).reduce((acc, part) => acc?.[part], source?.tdfs?.tutor?.setspec);
+  }
+  if (path.startsWith('deliveryparams.')) {
+    return path.split('.').slice(1).reduce((acc, part) => acc?.[part], source?.tdfs?.tutor?.deliveryparams);
+  }
+  if (path.startsWith('unit[].') && unitIndex !== null) {
+    return path.split('.').slice(1).reduce((acc, part) => acc?.[part], source?.tdfs?.tutor?.unit?.[unitIndex]);
+  }
+  return undefined;
+}
+
+function getDefaultForField(field: any, state: LearnerConfigState) {
+  return getPathValue(state.content, field.tdfPath, state.unitIndex) ?? field.defaultValue;
+}
+
+function getEffectiveForField(field: any, state: LearnerConfigState) {
+  return getPathValue(getConfigurableContent(state), field.tdfPath, state.unitIndex) ?? field.defaultValue;
+}
+
+function isFieldCustomized(field: any, state: LearnerConfigState) {
+  return getEffectiveForField(field, state) !== getDefaultForField(field, state);
+}
+
+function buildConfigPatchFromForm(container: JQuery<HTMLElement>, state: LearnerConfigState) {
+  const patch: any = state.scope === 'setspec'
+    ? { setspec: {}, deliveryparams: {} }
+    : { unit: { [String(state.unitIndex)]: { deliveryparams: {}, uiSettings: {} } } };
+  const fields = getSettingFields(state);
+
+  for (const field of fields) {
+    const input = container.find(`[data-config-field="${field.id}"]`);
+    if (!input.length) continue;
+
+    let value: string | number | boolean;
+    if (field.control === 'toggle') {
+      value = Boolean((input.get(0) as HTMLInputElement).checked);
+    } else if (field.control === 'number' || field.control === 'slider' || field.id === 'setspec.audioInputSensitivity') {
+      value = Number(input.val());
+    } else {
+      value = String(input.val());
+    }
+
+    if (field.id === 'setspec.audioPromptMode') {
+      patch.setspec.audioPromptMode = value;
+    } else if (field.id === 'setspec.audioInputSensitivity') {
+      patch.setspec.audioInputSensitivity = value;
+    } else if (field.tdfPath.startsWith('setspec.uiSettings.')) {
+      const key = field.tdfPath.split('.').pop();
+      if (key) {
+        patch.setspec.uiSettings = {
+          ...(patch.setspec.uiSettings || {}),
+          [key]: value
+        };
+      }
+    } else if (field.tdfPath.startsWith('deliveryparams.')) {
+      const key = field.tdfPath.split('.').pop();
+      if (key) {
+        patch.deliveryparams[key] = value;
+      }
+    } else if (field.tdfPath.startsWith('unit[].uiSettings.') && state.unitIndex !== null) {
+      const key = field.id.split('.').pop();
+      if (key && state.unitIndex !== null) {
+        patch.unit[String(state.unitIndex)].uiSettings[key] = value;
+      }
+    } else if (field.tdfPath.startsWith('unit[].deliveryparams.') && state.unitIndex !== null) {
+      const key = field.tdfPath.split('.').pop();
+      if (key) {
+        patch.unit[String(state.unitIndex)].deliveryparams[key] = value;
+      }
+    }
+  }
+
+  return patch;
+}
+
+function getSettingFields(state: LearnerConfigState) {
+  if (state.scope === 'unit') {
+    const unit = state.unitIndex === null ? null : getTutorUnits(state.content)[state.unitIndex];
+    if (!state.family || !unitSupportsLearnerFamily(unit, state.family)) {
+      return [];
+    }
+  }
+
+  return getLearnerConfigurableFieldsForState(state);
+}
+
+function getFamilyChoicesForState(state: LearnerConfigState) {
+  const families = new Set(
+    LEARNER_TDF_FIELD_DEFINITIONS
+      .filter((field) => getLearnerConfigurableFieldsForState({ ...state, family: field.family }).includes(field))
+      .map((field) => field.family)
+  );
+  return [
+    ...(families.has('delivery') ? [{ label: 'Delivery parameters', family: 'delivery' }] : []),
+    ...(families.has('ui') ? [{ label: 'UI parameters', family: 'ui' }] : [])
+  ];
+}
 
 
 function parseVersionMajor(raw: unknown): number | null {
@@ -113,6 +321,7 @@ Template.learningDashboard.onCreated(function(this: any) {
   this.subscriptions = [];
   this.autoruns = [];
   this.searchDebounceTimer = null;
+  this.learnerConfigState = new ReactiveVar(EMPTY_CONFIG_STATE);
 });
 
 Template.learningDashboard.helpers({
@@ -151,6 +360,87 @@ Template.learningDashboard.helpers({
       return `${this.displayName} (${fileName} - ${this.TDFId})`;
     }
     return this.displayName;
+  },
+
+  configForRow() {
+    const state = (Template.instance() as any).learnerConfigState.get() as LearnerConfigState;
+    return state.tdfId === this.TDFId ? state : null;
+  },
+
+});
+
+Template.learnerTdfConfigPanel.helpers({
+  isConfigStep(step: string) {
+    return this.step === step;
+  },
+
+  scopeChoices() {
+    const units = getTutorUnits(this.content);
+    return [
+      { label: 'Lesson settings', scope: 'setspec', unitIndex: '' },
+      ...units.map((unit: any, index: number) => ({
+        label: unit?.unitname || unit?.name || `Unit ${index + 1}`,
+        scope: 'unit',
+        unitIndex: String(index)
+      }))
+    ];
+  },
+
+  familyChoices() {
+    return getFamilyChoicesForState(this as LearnerConfigState);
+  },
+
+  hasFamilyChoices() {
+    return getFamilyChoicesForState(this as LearnerConfigState).length > 0;
+  },
+
+  noConfigurableUnitSettingsMessage() {
+    const state = this as LearnerConfigState;
+    if (state.scope !== 'unit') return '';
+    const unit = state.unitIndex === null ? null : getTutorUnits(state.content)[state.unitIndex];
+    if (unitSupportsLearnerFamily(unit, 'ui') || unitSupportsLearnerFamily(unit, 'delivery')) return '';
+    return 'This instructions unit has no practice trials, so these learner settings would not change the unit.';
+  },
+
+  selectedScopeLabel() {
+    if (this.scope === 'setspec') return 'Lesson settings';
+    if (this.scope === 'unit' && this.unitIndex !== null) {
+      const unit = getTutorUnits(this.content)[this.unitIndex];
+      return unit?.unitname || unit?.name || `Unit ${this.unitIndex + 1}`;
+    }
+    return '';
+  },
+
+  settingFields() {
+    return getSettingFields(this as LearnerConfigState).map((field) => {
+      const effectiveValue = getEffectiveForField(field, this as LearnerConfigState);
+      const defaultValue = getDefaultForField(field, this as LearnerConfigState);
+      const value = effectiveValue;
+      const defaultInputValue = defaultValue;
+      const displayValue = field.unit ? `${value} ${field.unit}` : String(value);
+      const displaySuffix = field.unit;
+      return {
+        ...field,
+        value,
+        defaultInputValue,
+        displayValue,
+        displaySuffix,
+        checked: Boolean(value),
+        options: field.options?.map((option) => ({
+          ...option,
+          selected: option.value === value
+        })),
+        customized: isFieldCustomized(field, this as LearnerConfigState),
+        inputMin: field.min,
+        inputMax: field.max,
+        inputStep: field.step,
+        isToggle: field.control === 'toggle',
+        isSelect: field.control === 'select',
+        isSlider: field.control === 'slider',
+        isNumber: field.control === 'number',
+        isText: field.control === 'text'
+      };
+    });
   },
 });
 
@@ -261,6 +551,135 @@ Template.learningDashboard.events({
     // For the root option, also store the root TDF id so resumeService can resolve conditions
     if (selectedId === rootId) {
       Session.set('tdfFamilyRootTdfId', rootId);
+    }
+  },
+
+  'click .configure-lesson': async function(event: any, instance: any) {
+    event.preventDefault();
+    const target = $(event.currentTarget);
+    const tdfId = String(target.data('tdfid') || '');
+    const existingState = instance.learnerConfigState.get() as LearnerConfigState;
+    if (existingState.tdfId === tdfId) {
+      instance.learnerConfigState.set(EMPTY_CONFIG_STATE);
+      return;
+    }
+
+    instance.learnerConfigState.set({
+      ...EMPTY_CONFIG_STATE,
+      tdfId,
+      loading: true
+    });
+
+    try {
+      let tdfDoc = Tdfs.findOne({ _id: tdfId });
+      if (!Array.isArray(tdfDoc?.content?.tdfs?.tutor?.unit)) {
+        tdfDoc = await meteorCallAsync('getTdfById', tdfId);
+      }
+      const content = tdfDoc?.content;
+      normalizeTutorUnits(content);
+      if (!Array.isArray(content?.tdfs?.tutor?.unit)) {
+        instance.learnerConfigState.set({
+          ...EMPTY_CONFIG_STATE,
+          tdfId,
+          error: 'Configuration is available after choosing a concrete lesson condition.'
+        });
+        return;
+      }
+      instance.learnerConfigState.set({
+        ...EMPTY_CONFIG_STATE,
+        tdfId,
+        content,
+        step: 'scope'
+      });
+    } catch (error) {
+      clientConsole(1, '[Dashboard Config] Failed to load full TDF:', error);
+      instance.learnerConfigState.set({
+        ...EMPTY_CONFIG_STATE,
+        tdfId,
+        error: 'Unable to load lesson settings. Please try again.'
+      });
+    }
+  },
+
+  'click .learner-config-close': function(_event: any, instance: any) {
+    instance.learnerConfigState.set(EMPTY_CONFIG_STATE);
+  },
+
+  'click .learner-config-scope': function(event: any, instance: any) {
+    const current = instance.learnerConfigState.get() as LearnerConfigState;
+    const target = $(event.currentTarget);
+    instance.learnerConfigState.set({
+      ...current,
+      step: 'family',
+      scope: target.data('scope'),
+      unitIndex: target.data('unitindex') === '' ? null : Number(target.data('unitindex')),
+      family: null,
+      error: null
+    });
+  },
+
+  'click .learner-config-family': function(event: any, instance: any) {
+    const current = instance.learnerConfigState.get() as LearnerConfigState;
+    instance.learnerConfigState.set({
+      ...current,
+      step: 'settings',
+      family: $(event.currentTarget).data('family'),
+      error: null
+    });
+  },
+
+  'click .learner-config-back': function(_event: any, instance: any) {
+    const current = instance.learnerConfigState.get() as LearnerConfigState;
+    instance.learnerConfigState.set({
+      ...current,
+      step: current.step === 'settings' ? 'family' : 'scope',
+      family: current.step === 'settings' ? null : current.family,
+      error: null
+    });
+  },
+
+  'click .learner-config-reset-field': function(event: any) {
+    const button = $(event.currentTarget);
+    const fieldId = button.data('fieldid');
+    const container = button.closest('.learner-config-panel');
+    const input = container.find(`[data-config-field="${fieldId}"]`);
+    if (!input.length) return;
+    const defaultValue = button.data('defaultvalue');
+    if ((input.get(0) as HTMLInputElement).type === 'checkbox') {
+      (input.get(0) as HTMLInputElement).checked = defaultValue === true || defaultValue === 'true';
+    } else {
+      input.val(defaultValue);
+    }
+    const valueTarget = container.find(`[data-config-value-for="${fieldId}"]`);
+    if (valueTarget.length) {
+      const suffix = input.data('value-suffix') || '';
+      valueTarget.text(`${input.val()}${suffix ? ` ${suffix}` : ''}`);
+    }
+  },
+
+  'input .learner-config-slider': function(event: any) {
+    const input = $(event.currentTarget);
+    const fieldId = input.data('config-field');
+    const suffix = input.data('value-suffix') || '';
+    input.closest('.learner-config-field').find(`[data-config-value-for="${fieldId}"]`).text(`${input.val()}${suffix ? ` ${suffix}` : ''}`);
+  },
+
+  'submit .learner-config-form': async function(event: any, instance: any) {
+    event.preventDefault();
+    const current = instance.learnerConfigState.get() as LearnerConfigState;
+    if (!current.tdfId) return;
+    instance.learnerConfigState.set({ ...current, saving: true, error: null });
+    try {
+      const patch = buildConfigPatchFromForm($(event.currentTarget), current);
+      await meteorCallAsync('saveLearnerTdfConfig', current.tdfId, patch);
+      instance.learnerConfigState.set(EMPTY_CONFIG_STATE);
+    } catch (error: any) {
+      clientConsole(1, '[Dashboard Config] Failed to save learner TDF config:', error);
+      instance.learnerConfigState.set({
+        ...current,
+        saving: false,
+        error: error?.reason || error?.message || 'Unable to save settings.'
+      });
     }
   },
 });
@@ -776,6 +1195,7 @@ async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId
       clientConsole(2, '[LearningDashboard] Selected root condition TDF without unit array; continuing via condition-resolve flow:', currentTdfId);
     }
   }
+  curTdfContent = applyDashboardLearnerConfig(curTdfContent, String(currentTdfId));
   const curTdfTips = curTdfContent.tdfs.tutor.setspec.tips;
   const hasConditionPool = Array.isArray(curTdfContent?.tdfs?.tutor?.setspec?.condition)
     && curTdfContent.tdfs.tutor.setspec.condition.length > 0;
@@ -840,13 +1260,17 @@ async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId
     audioPromptFeedbackVoice = setspec.audioPromptFeedbackVoice || 'en-US-Standard-A';
   } else {
     // Load from user's audioSettings if available, otherwise use defaults
-    audioPromptMode = audioSettings.audioPromptMode || 'silent';
+    audioPromptMode = learnerConfigHasSetSpecAudioOverride(String(currentTdfId), 'audioPromptMode')
+      ? curTdfContent.tdfs.tutor.setspec.audioPromptMode || 'silent'
+      : audioSettings.audioPromptMode || 'silent';
     audioInputEnabled = audioSettings.audioInputMode || false;
     
     audioPromptFeedbackSpeakingRate = audioSettings.audioPromptFeedbackSpeakingRate || 1;
     audioPromptQuestionSpeakingRate = audioSettings.audioPromptQuestionSpeakingRate || 1;
     audioPromptVoice = audioSettings.audioPromptVoice || 'en-US-Standard-A';
-    audioInputSensitivity = audioSettings.audioInputSensitivity;
+    audioInputSensitivity = learnerConfigHasSetSpecAudioOverride(String(currentTdfId), 'audioInputSensitivity')
+      ? curTdfContent.tdfs.tutor.setspec.audioInputSensitivity
+      : audioSettings.audioInputSensitivity;
     audioPromptQuestionVolume = audioSettings.audioPromptQuestionVolume || 0;
     audioPromptFeedbackVolume = audioSettings.audioPromptFeedbackVolume || 0;
     audioPromptFeedbackVoice = audioSettings.audioPromptFeedbackVoice || 'en-US-Standard-A';

@@ -163,6 +163,55 @@ button[aria-expanded="true"] .card-expand-icon {
     opacity: 0.75;
 }
 
+.learner-config-row td {
+    background: color-mix(in srgb, var(--card-background-color) 96%, var(--accent-color) 4%);
+}
+
+.learner-config-panel {
+    border-top: 1px solid color-mix(in srgb, var(--text-color) 14%, transparent);
+    padding: 0.85rem 0;
+}
+
+.learner-config-choice-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    gap: 0.5rem;
+}
+
+.learner-config-fields-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.learner-config-field {
+    min-width: 0;
+    padding: 0.75rem;
+    border: 1px solid color-mix(in srgb, var(--text-color) 10%, transparent);
+    border-radius: var(--border-radius-sm);
+}
+
+.learner-config-field-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    font-weight: 600;
+    margin-bottom: 0.35rem;
+}
+
+.learner-config-current-value {
+    flex: 0 0 auto;
+    font-variant-numeric: tabular-nums;
+    color: var(--secondary-text-color);
+}
+
+@media (max-width: 767px) {
+    .learner-config-fields-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 @media (max-width: 1199px) {
     .learning-dashboard-table-wrapper.has-painted {
         display: none;
