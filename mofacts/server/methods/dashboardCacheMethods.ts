@@ -6,6 +6,13 @@ import type {
   DashboardTdfStats,
   DashboardUsageSummary
 } from './dashboardCacheMethods.contracts';
+import {
+  buildLearnerTdfConfig,
+  buildLearnerTdfSourceMetadata,
+  normalizeLearnerTdfOverrides,
+  type LearnerTdfConfig,
+  type LearnerTdfOverrides
+} from '../../common/lib/learnerTdfConfig';
 
 type DashboardCacheDeps = {
   Meteor: any;
@@ -16,6 +23,7 @@ type DashboardCacheDeps = {
   usersCollection: any;
   serverConsole: (...args: any[]) => void;
   computePracticeTimeMs: ComputePracticeTimeMs;
+  canViewDashboardTdf: (userId: unknown, tdf: any) => boolean;
 };
 
 function roundOneDecimal(value: number): number {
@@ -187,9 +195,156 @@ export function createDashboardCacheMethods({
   UserDashboardCache,
   usersCollection,
   serverConsole,
-  computePracticeTimeMs
+  computePracticeTimeMs,
+  canViewDashboardTdf
 }: DashboardCacheDeps) {
+  async function getConfigurableTdfForUser(userId: string, tdfId: string) {
+    const normalizedTdfId = typeof tdfId === 'string' ? tdfId.trim() : '';
+    if (!normalizedTdfId) {
+      throw new Meteor.Error('invalid-args', 'TDF ID is required');
+    }
+
+    const tdf = await Tdfs.findOneAsync(
+      { _id: normalizedTdfId },
+      {
+        fields: {
+          _id: 1,
+          ownerId: 1,
+          accessors: 1,
+          updatedAt: 1,
+          lastUpdated: 1,
+          content: 1
+        }
+      }
+    );
+
+    if (!tdf) {
+      throw new Meteor.Error('not-found', 'TDF not found');
+    }
+    if (!canViewDashboardTdf(userId, tdf)) {
+      throw new Meteor.Error('not-authorized', 'Not authorized to configure this TDF');
+    }
+
+    return tdf;
+  }
+
+  function hasConfigurablePatchValue(value: unknown): boolean {
+    if (value === null || value === undefined) {
+      return false;
+    }
+    if (Array.isArray(value)) {
+      return value.some(hasConfigurablePatchValue);
+    }
+    if (typeof value === 'object') {
+      return Object.values(value as Record<string, unknown>).some(hasConfigurablePatchValue);
+    }
+    return true;
+  }
+
+  function getTdfConfigSource(tdf: any) {
+    return {
+      ...(tdf?.content || {}),
+      updatedAt: tdf?.updatedAt,
+      lastUpdated: tdf?.lastUpdated
+    };
+  }
+
+  async function writeLearnerTdfConfig(userId: string, tdfId: string, config: LearnerTdfConfig | null) {
+    const cache = await UserDashboardCache.findOneAsync({ userId });
+    const learnerTdfConfigs = {
+      ...(cache?.learnerTdfConfigs || {})
+    };
+
+    if (config && config.overrides && Object.keys(config.overrides).length > 0) {
+      learnerTdfConfigs[tdfId] = config;
+    } else {
+      delete learnerTdfConfigs[tdfId];
+    }
+
+    await UserDashboardCache.upsertAsync(
+      { userId },
+      {
+        $set: {
+          userId,
+          learnerTdfConfigs,
+          lastUpdated: new Date(),
+          version: cache?.version || 1
+        },
+        $setOnInsert: {
+          createdAt: new Date(),
+          tdfStats: {},
+          summary: computeSummaryStats({}),
+          usageSummary: computeUsageSummary({})
+        }
+      }
+    );
+  }
+
   const methods = {
+    saveLearnerTdfConfig: async function(this: any, tdfId: string, configPatch: LearnerTdfOverrides) {
+      if (!this.userId) {
+        throw new Meteor.Error('not-authorized', 'Must be logged in');
+      }
+      if (!hasConfigurablePatchValue(configPatch)) {
+        throw new Meteor.Error('invalid-args', 'Select at least one setting to save');
+      }
+
+      const tdf = await getConfigurableTdfForUser(this.userId, tdfId);
+      const tdfSource = getTdfConfigSource(tdf);
+      const config = buildLearnerTdfConfig(tdfSource, tdf._id, configPatch);
+
+      await writeLearnerTdfConfig(this.userId, tdf._id, config);
+
+      return {
+        success: true,
+        config
+      };
+    },
+
+    resetLearnerTdfConfig: async function(this: any, tdfId: string, scope: string | null = null) {
+      if (!this.userId) {
+        throw new Meteor.Error('not-authorized', 'Must be logged in');
+      }
+
+      const tdf = await getConfigurableTdfForUser(this.userId, tdfId);
+      const cache = await UserDashboardCache.findOneAsync({ userId: this.userId });
+      const existingConfig = cache?.learnerTdfConfigs?.[tdf._id] as LearnerTdfConfig | undefined;
+      if (!existingConfig?.overrides) {
+        return { success: true, config: null };
+      }
+
+      if (scope !== null && scope !== 'setspec' && scope !== 'unit') {
+        throw new Meteor.Error('invalid-args', 'Scope must be setspec or unit');
+      }
+
+      const nextOverrides: LearnerTdfOverrides = {
+        ...(existingConfig.overrides || {})
+      };
+      if (scope === 'setspec') {
+        delete nextOverrides.setspec;
+      } else if (scope === 'unit') {
+        delete nextOverrides.unit;
+      } else {
+        delete nextOverrides.setspec;
+        delete nextOverrides.unit;
+      }
+
+      const normalizedOverrides = normalizeLearnerTdfOverrides(getTdfConfigSource(tdf), nextOverrides);
+      const nextConfig: LearnerTdfConfig | null = Object.keys(normalizedOverrides).length > 0
+        ? {
+            source: buildLearnerTdfSourceMetadata(getTdfConfigSource(tdf), tdf._id),
+            overrides: normalizedOverrides
+          }
+        : null;
+
+      await writeLearnerTdfConfig(this.userId, tdf._id, nextConfig);
+
+      return {
+        success: true,
+        config: nextConfig
+      };
+    },
+
     initializeDashboardCache: async function(this: any, userId: string | null = null) {
       const targetUserId = userId || this.userId;
       if (!targetUserId) {

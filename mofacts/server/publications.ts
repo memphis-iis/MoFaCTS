@@ -229,6 +229,7 @@ Meteor.publish('dashboardCache', function() {
             fields: {
                 userId: 1,
                 tdfStats: 1,
+                learnerTdfConfigs: 1,
                 summary: 1,
                 usageSummary: 1,
                 lastUpdated: 1,

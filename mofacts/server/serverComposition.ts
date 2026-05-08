@@ -851,7 +851,8 @@ export const asyncMethods: Record<string, unknown> = {
     UserDashboardCache,
     usersCollection: MeteorAny.users,
     serverConsole,
-    computePracticeTimeMs
+    computePracticeTimeMs,
+    canViewDashboardTdf
   }),
 }
 
