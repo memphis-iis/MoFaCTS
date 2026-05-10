@@ -890,6 +890,10 @@ input[type="range"]::-moz-range-progress,
 }
 
 /* Unit instructions */
+.instructions-container {
+    margin-top: 1rem;
+}
+
 .instructions-card {
     color: var(--text-color);
 }
