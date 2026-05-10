@@ -28,6 +28,9 @@ The application source tree lives under `mofacts/`.
 ## Operational Rules
 
 - Silent fallbacks are not allowed; fail clearly when invariants break.
+- Stay on the current branch for local commits and pushes unless the user explicitly asks to create or switch branches.
+- Do not create `codex/*` or other work branches automatically.
+- This repository normally expects agent commits to be made on `main` when the checkout is on `main`.
 - Do not add compatibility fallback paths unless explicitly requested.
 - Do not generate, edit, or keep side-by-side emitted `.js` files next to `.ts` source files in `mofacts/client/`, `mofacts/server/`, or `mofacts/common/`.
 - Treat untracked `.js` twins beside `.ts` files in `mofacts/` as build spill unless proven otherwise.
