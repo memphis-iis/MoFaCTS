@@ -30,7 +30,7 @@ jobs:
         run: npm ci
 
       - name: Prepare test settings
-        run: cp example.settings.json settings.json
+        run: cp settings.ci.json settings.json
 
       - name: Lint
         run: npm run lint

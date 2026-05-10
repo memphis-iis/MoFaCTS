@@ -1,0 +1,40 @@
+{
+  "owner": "admin@localhost.test",
+  "ROOT_URL": "http://localhost:3000",
+  "encryptionKey": "ci-development-encryption-key-do-not-use",
+  "prod": false,
+  "enableEmail": false,
+  "mturkSandbox": true,
+  "initRoles": {
+    "admins": [
+      "admin@localhost.test"
+    ],
+    "teachers": []
+  },
+  "auth": {
+    "allowPublicSignup": true,
+    "requireEmailVerification": false,
+    "enableBreachedPasswordScreening": false,
+    "argon2Enabled": true
+  },
+  "public": {
+    "systemName": "MoFaCTS",
+    "forceSSL": false,
+    "admin": "admin@localhost.test",
+    "enableDeleteAllButton": false,
+    "testLogin": false,
+    "socialPreview": {
+      "title": "MoFaCTS | Mobile Fact and Concept Training System",
+      "type": "website",
+      "url": "http://localhost:3000/",
+      "description": "MoFaCTS is an open-source learning system for practice, assessment, instruction, and research.",
+      "twitterDescription": "MoFaCTS is an open-source learning system for practice, assessment, instruction, and research.",
+      "image": "theme",
+      "imageType": "image/png",
+      "imageWidth": "1200",
+      "imageHeight": "630",
+      "imageAlt": "MoFaCTS adaptive practice learning system preview image",
+      "noindex": true
+    }
+  }
+}

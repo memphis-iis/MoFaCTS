@@ -1,7 +1,7 @@
 {
   "owner": "admin@local.test",
   "ROOT_URL": "http://192.168.50.44:3100",
-  "encryptionKey": "ahNcV0wsycmPIlE+ttysfa+1Fg54sZeQctHeIn9ij368e+mzNskhVdFsNpjqfGdk",
+  "encryptionKey": "local-development-encryption-key-do-not-use",
   "prod": false,
   "enableEmail": false,
   "mturkSandbox": true,
