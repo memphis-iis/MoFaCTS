@@ -5,7 +5,6 @@ import { Tracker } from 'meteor/tracker';
 import { clientConsole } from '../../lib/userSessionHelpers';
 import { finishLaunchLoading, markLaunchLoadingTiming, setLaunchLoadingMessage } from '../../lib/launchLoading';
 import { createBlazeMount } from './svelte/meteorIntegration';
-import { restartMainCardTimeoutIfNecessary } from './modules/cardTimeouts';
 import { CardStore } from './modules/cardStore';
 import './card.html';
 
@@ -88,7 +87,6 @@ Template.card.onDestroyed(function (this: CardTemplateInstance) {
 });
 
 export {
-  restartMainCardTimeoutIfNecessary,
   getCardState,
   setCardState,
 };

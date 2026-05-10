@@ -158,14 +158,6 @@
               <input type="checkbox" class="form-check-input setting-displayQuestionNumber" id="setting-displayQuestionNumber">
               <label class="form-check-label" for="setting-displayQuestionNumber">Display Question Number</label>
             </div>
-            <div class="form-group">
-              <label>Fade In Duration (ms)</label>
-              <input type="number" class="form-control form-control-sm setting-fadeInDuration" min="0" max="5000" step="50">
-            </div>
-            <div class="form-group">
-              <label>Fade Out Duration (ms)</label>
-              <input type="number" class="form-control form-control-sm setting-fadeOutDuration" min="0" max="5000" step="50">
-            </div>
           </div>
 
           <!-- Video Session -->
@@ -188,32 +180,11 @@
               <input type="checkbox" class="form-check-input setting-displayTimeoutBar" id="setting-displayTimeoutBar" checked>
               <label class="form-check-label" for="setting-displayTimeoutBar">Display Timeout Bar</label>
             </div>
-            <div class="form-group">
-              <label>Display Timeout As</label>
-              <select class="form-control form-control-sm setting-displayCardTimeoutAsBarOrText">
-                <option value="false">Hidden</option>
-                <option value="text">Text Only</option>
-                <option value="bar">Bar Only</option>
-                <option value="both">Both Bar & Text</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Timeout Threshold</label>
-              <input type="number" class="form-control form-control-sm setting-timeoutThreshold" min="1" max="100" step="1">
-            </div>
-            <div class="form-check">
-              <input type="checkbox" class="form-check-input setting-displayTimeOutDuringStudy" id="setting-displayTimeOutDuringStudy">
-              <label class="form-check-label" for="setting-displayTimeOutDuringStudy">Display Timeout During Study</label>
-            </div>
           </div>
 
           <!-- Feedback Display -->
           <div class="settings-group">
             <h5>Feedback Display</h5>
-            <div class="form-check">
-              <input type="checkbox" class="form-check-input setting-displayFeedback" id="setting-displayFeedback" checked>
-              <label class="form-check-label" for="setting-displayFeedback">Display Feedback</label>
-            </div>
             <div class="form-check">
               <input type="checkbox" class="form-check-input setting-displayCorrectFeedback" id="setting-displayCorrectFeedback" checked>
               <label class="form-check-label" for="setting-displayCorrectFeedback">Display Correct Feedback</label>
@@ -241,12 +212,8 @@
           <div class="settings-group">
             <h5>Answer Display</h5>
             <div class="form-check">
-              <input type="checkbox" class="form-check-input setting-displayUserAnswerAtTop" id="setting-displayUserAnswerAtTop" checked>
-              <label class="form-check-label" for="setting-displayUserAnswerAtTop">Display User Answer At Top</label>
-            </div>
-            <div class="form-check">
-              <input type="checkbox" class="form-check-input setting-displayCorrectAnswerInCenter" id="setting-displayCorrectAnswerInCenter" checked>
-              <label class="form-check-label" for="setting-displayCorrectAnswerInCenter">Display Correct Answer In Center</label>
+              <input type="checkbox" class="form-check-input setting-displayCorrectAnswerInIncorrectFeedback" id="setting-displayCorrectAnswerInIncorrectFeedback" checked>
+              <label class="form-check-label" for="setting-displayCorrectAnswerInIncorrectFeedback">Display Correct Answer In Incorrect Feedback</label>
             </div>
             <div class="form-group">
               <label>Display User Answer In Feedback</label>
@@ -289,10 +256,6 @@
           <div class="settings-group">
             <h5>Text Input</h5>
             <div class="form-check">
-              <input type="checkbox" class="form-check-input setting-displayTextInput" id="setting-displayTextInput" checked>
-              <label class="form-check-label" for="setting-displayTextInput">Display Text Input</label>
-            </div>
-            <div class="form-check">
               <input type="checkbox" class="form-check-input setting-displaySubmitButton" id="setting-displaySubmitButton" checked>
               <label class="form-check-label" for="setting-displaySubmitButton">Display Submit Button</label>
             </div>
@@ -305,10 +268,6 @@
           <!-- Multiple Choice -->
           <div class="settings-group">
             <h5>Multiple Choice</h5>
-            <div class="form-check">
-              <input type="checkbox" class="form-check-input setting-displayMultipleChoiceButtons" id="setting-displayMultipleChoiceButtons" checked>
-              <label class="form-check-label" for="setting-displayMultipleChoiceButtons">Display Multiple Choice Buttons</label>
-            </div>
             <div class="form-group">
               <label>Choice Button Columns</label>
               <select class="form-control form-control-sm setting-choiceButtonCols">
@@ -316,30 +275,6 @@
                 <option value="2" selected>2 Columns</option>
                 <option value="3">3 Columns</option>
                 <option value="4">4 Columns</option>
-              </select>
-            </div>
-          </div>
-
-          <!-- Audio & Speech -->
-          <div class="settings-group">
-            <h5>Audio & Speech</h5>
-            <div class="form-check">
-              <input type="checkbox" class="form-check-input setting-enableAudio" id="setting-enableAudio" checked>
-              <label class="form-check-label" for="setting-enableAudio">Enable Audio</label>
-            </div>
-            <div class="form-check">
-              <input type="checkbox" class="form-check-input setting-enableSpeechRecognition" id="setting-enableSpeechRecognition">
-              <label class="form-check-label" for="setting-enableSpeechRecognition">Enable Speech Recognition</label>
-            </div>
-            <div class="form-check">
-              <input type="checkbox" class="form-check-input setting-forceSpeechRecognition" id="setting-forceSpeechRecognition">
-              <label class="form-check-label" for="setting-forceSpeechRecognition">Use SR Mode (Text Alternative)</label>
-            </div>
-            <div class="form-group">
-              <label>SR State</label>
-              <select class="form-control form-control-sm setting-srState">
-                <option value="listening">Listening</option>
-                <option value="processing">Processing</option>
               </select>
             </div>
           </div>

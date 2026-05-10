@@ -3,7 +3,6 @@ import '../common/Collections';
 import '../common/globalHelpers';
 import {sessionCleanUp} from './lib/sessionUtils';
 import './lib/authStorage';
-import { restartMainCardTimeoutIfNecessary } from './views/experiment/modules/cardTimeouts';
 import { CardStore } from './views/experiment/modules/cardStore';
 import { ExperimentStateStore } from './lib/state/experimentStateStore';
 import {instructContinue} from './views/experiment/instructions';
@@ -50,7 +49,6 @@ import './views/navigation';
 
 // -- Experiment --
 import './views/experiment/multiTdfSelect';
-import './views/experiment/inputF';
 // Lazily loaded route modules are loaded from client/lib/router.js:
 // - admin/help/theme/turk/user/test pages
 // - experiment setup editor/upload pages
@@ -572,7 +570,6 @@ Template.DefaultLayout.onRendered(function() {
   loadClientSettings();
   $('#errorReportingModal').on('hidden.bs.modal', function() {
     clientConsole(2, 'error reporting modal hidden');
-    restartMainCardTimeoutIfNecessary();
   });
   //load css into head based on user's preferences
   $('#helpModal').on('hidden.bs.modal', function() {
@@ -580,7 +577,6 @@ Template.DefaultLayout.onRendered(function() {
     if (currentAudio) {
       currentAudio.play();
     }
-    restartMainCardTimeoutIfNecessary();
   });
 
   // Global handler for continue buttons

@@ -49,9 +49,4 @@ function parseYouTubeVideoUrl(rawUrl: unknown): YouTubeVideoInfo | null {
   }
 }
 
-function isYouTubeVideoUrl(rawUrl: unknown): boolean {
-  return parseYouTubeVideoUrl(rawUrl) !== null;
-}
-
-export type { YouTubeVideoInfo };
-export { parseYouTubeVideoUrl, isYouTubeVideoUrl };
+export { parseYouTubeVideoUrl };
