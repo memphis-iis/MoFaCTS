@@ -1,3 +1,7 @@
+.learning-dashboard-container {
+    margin-top: 1rem;
+}
+
 .learning-dashboard-search-shell {
     margin-bottom: 0.75rem;
 }
@@ -119,6 +123,8 @@
 
 .learning-dashboard-action-button {
     min-width: 6.5rem;
+    max-width: 9rem;
+    flex: 0 1 9rem;
 }
 
 .learning-dashboard-empty-state {
@@ -143,10 +149,12 @@
 }
 
 .learning-dashboard-card-button {
-    min-height: 44px;
+    min-height: var(--button-height);
     display: flex;
     align-items: center;
     justify-content: center;
+    max-width: 9.5rem;
+    flex: 0 1 9.5rem !important;
 }
 
 .card-expand-icon {
@@ -168,25 +176,55 @@ button[aria-expanded="true"] .card-expand-icon {
 }
 
 .learner-config-panel {
-    border-top: 1px solid color-mix(in srgb, var(--text-color) 14%, transparent);
-    padding: 0.85rem 0;
+    display: grid;
+    grid-template-rows: 1fr;
+    padding: 0;
+    background: transparent;
+    animation: learner-config-panel-open var(--transition-smooth) ease-out both;
+}
+
+.learner-config-panel.is-closing {
+    pointer-events: none;
+    animation: learner-config-panel-close var(--transition-smooth) ease-in both;
+}
+
+.learner-config-panel-clip {
+    min-height: 0;
+    overflow: hidden;
+}
+
+.learner-config-panel-card {
+    width: 90%;
+    max-width: 90%;
+    margin: 0.85rem auto 1rem;
+    padding: 0.7rem;
+    border-radius: var(--border-radius-sm);
+    background: var(--card-background-color);
+    box-shadow: 0 0.25rem 0.9rem rgba(0, 0, 0, 0.1);
 }
 
 .learner-config-choice-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 14rem));
+    justify-content: center;
     gap: 0.5rem;
+}
+
+.learner-config-choice-grid .btn {
+    width: min(100%, 14rem);
+    min-height: var(--button-height);
+    white-space: normal;
 }
 
 .learner-config-fields-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.75rem;
+    gap: 0.5rem;
 }
 
 .learner-config-field {
     min-width: 0;
-    padding: 0.75rem;
+    padding: 0.48rem 0.58rem;
     border: 1px solid color-mix(in srgb, var(--text-color) 10%, transparent);
     border-radius: var(--border-radius-sm);
 }
@@ -195,9 +233,11 @@ button[aria-expanded="true"] .card-expand-icon {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.75rem;
-    font-weight: 600;
-    margin-bottom: 0.35rem;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 400;
+    line-height: 1.25;
+    margin-bottom: 0.25rem;
 }
 
 .learner-config-current-value {
@@ -206,7 +246,72 @@ button[aria-expanded="true"] .card-expand-icon {
     color: var(--secondary-text-color);
 }
 
+.learner-config-reset-field.btn {
+    min-height: 0;
+    height: auto;
+    padding: 0;
+    border: 0;
+    font-size: 0.75rem;
+    line-height: 1.15;
+    text-decoration: none;
+    background: transparent;
+}
+
+.learner-config-reset-field.btn:hover,
+.learner-config-reset-field.btn:focus {
+    text-decoration: none;
+    background: transparent;
+}
+
+.learner-config-field .form-check {
+    min-height: calc(var(--button-height) * 0.66);
+    margin-bottom: 0;
+    padding-left: 0;
+}
+
+.learner-config-field .form-switch .form-check-input {
+    width: 2.55em;
+    height: 1.25em;
+    margin-left: 0;
+}
+
+.learner-config-field .form-select-sm,
+.learner-config-field .form-control-sm {
+    min-height: calc(var(--button-height) * 0.66);
+    padding-top: 0.16rem;
+    padding-bottom: 0.16rem;
+    font-size: 0.875rem;
+    line-height: 1.2;
+}
+
+.learner-config-field .form-range {
+    margin: 0.25rem 0 0;
+}
+
+@keyframes learner-config-panel-open {
+    from {
+        grid-template-rows: 0fr;
+    }
+    to {
+        grid-template-rows: 1fr;
+    }
+}
+
+@keyframes learner-config-panel-close {
+    from {
+        grid-template-rows: 1fr;
+    }
+    to {
+        grid-template-rows: 0fr;
+    }
+}
+
 @media (max-width: 767px) {
+    .learner-config-panel-card {
+        width: 100%;
+        max-width: 100%;
+    }
+
     .learner-config-fields-grid {
         grid-template-columns: 1fr;
     }
@@ -234,7 +339,8 @@ button[aria-expanded="true"] .card-expand-icon {
 
 @media (prefers-reduced-motion: reduce) {
     .learning-dashboard-content-ready,
-    .learning-dashboard-table-placeholder {
+    .learning-dashboard-table-placeholder,
+    .learner-config-panel {
         transition: none;
         animation: none;
     }

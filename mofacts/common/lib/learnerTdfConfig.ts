@@ -1,14 +1,21 @@
 import {
   DELIVERY_PARAM_DEFAULTS,
+  DELIVERY_PARAM_APPLICABILITY,
   DELIVERY_PARAM_FIELD_REGISTRY,
-  DELIVERY_PARAM_SUPPORTED_KEYS,
+  DELIVERY_PARAM_LEARNER_CONFIGURABLE_KEYS,
+  UI_SETTINGS_APPLICABILITY,
   UI_SETTINGS_RUNTIME_DEFAULTS,
-  UI_SETTINGS_SUPPORTED_KEYS,
+  UI_SETTINGS_LEARNER_CONFIGURABLE_KEYS,
   coerceAndValidateUiSetting,
   createTdfSchemaFromRegistry,
   createTdfValidatorMap,
   normalizeDeliveryParamValue
 } from '../fieldRegistry';
+import {
+  detectTdfUnitType,
+  unitTypeApplies,
+  type TdfUnitType,
+} from '../fieldApplicability';
 
 type LearnerTdfScope = 'setspec' | 'unit';
 type LearnerTdfFamily = 'ui' | 'delivery';
@@ -40,7 +47,7 @@ export type LearnerTdfConfig = {
   overrides?: LearnerTdfOverrides;
 };
 
-export type LearnerTdfFieldDefinition = {
+type LearnerTdfFieldDefinition = {
   id: LearnerTdfFieldId;
   scope: LearnerTdfScope;
   family: LearnerTdfFamily;
@@ -53,17 +60,18 @@ export type LearnerTdfFieldDefinition = {
   max?: number;
   step?: number;
   unit?: string;
+  appliesToUnitTypes?: readonly TdfUnitType[];
 };
 
-export type LearnerTdfFieldId = string;
+type LearnerTdfFieldId = string;
 
-export type LearnerTdfValidationResult = {
+type LearnerTdfValidationResult = {
   valid: boolean;
   errors: string[];
   staleUnitOverrides: boolean;
 };
 
-export type LearnerTdfApplyResult<T> = {
+type LearnerTdfApplyResult<T> = {
   tdf: T;
   applied: boolean;
   warnings: string[];
@@ -142,25 +150,36 @@ function fieldDefinitionFromSchema(args: {
       : isNumber
         ? 0
         : '';
+  const label = args.label || (typeof args.schema.title === 'string' ? args.schema.title.trim() : '');
+  if (!label) {
+    throw new Error(`Missing learner-config schema title for ${args.tdfPath}`);
+  }
 
   return {
     id: args.id,
     scope: args.scope,
     family: args.family,
-    label: args.label || String(args.schema.title || humanizeKey(args.key)),
+    label,
     tdfPath: args.tdfPath,
     control: isBoolean ? 'toggle' : enumValues.length ? 'select' : isNumber ? 'number' : 'text',
     defaultValue,
     ...(enumValues.length ? { options: enumValues.map((value) => ({ value, label: humanizeKey(value) })) } : {}),
     ...(isNumber && typeof numericValidator?.min === 'number' ? { min: numericValidator.min } : {}),
     ...(isNumber && typeof numericValidator?.max === 'number' ? { max: numericValidator.max } : {}),
-    ...(isNumber ? { step: schemaHasType(args.schema, 'integer') ? 1 : 0.1 } : {})
+    ...(isNumber ? { step: schemaHasType(args.schema, 'integer') ? 1 : 0.1 } : {}),
+    ...(Array.isArray(args.schema['x-appliesToUnitTypes'])
+      ? { appliesToUnitTypes: args.schema['x-appliesToUnitTypes'] as readonly TdfUnitType[] }
+      : {})
   };
 }
 
 function deliveryFieldDefinition(scope: LearnerTdfScope, key: string): LearnerTdfFieldDefinition | null {
   const registry = DELIVERY_PARAM_FIELD_REGISTRY[key];
   if (!registry) return null;
+  const label = registry.tooltip.brief.trim();
+  if (!label) {
+    throw new Error(`Missing delivery-param learner-config label for ${key}`);
+  }
   const tdfPath = scope === 'unit' ? `unit[].deliveryparams.${key}` : `deliveryparams.${key}`;
   const enumValues = registry.authoring.enum || [];
   const isBoolean = registry.authoring.type === 'booleanString';
@@ -179,20 +198,21 @@ function deliveryFieldDefinition(scope: LearnerTdfScope, key: string): LearnerTd
     id: tdfPath,
     scope,
     family: 'delivery',
-    label: registry.tooltip.brief || humanizeKey(key),
+    label,
     tdfPath,
     control: isBoolean ? 'toggle' : enumValues.length ? 'select' : isNumber ? 'number' : 'text',
     defaultValue: safeDefault,
     ...(enumValues.length ? { options: enumValues.map((value) => ({ value, label: humanizeKey(value) })) } : {}),
     ...(isNumber && typeof validator?.min === 'number' ? { min: validator.min } : {}),
     ...(isNumber && typeof validator?.max === 'number' ? { max: validator.max } : {}),
-    ...(isNumber ? { step: registry.authoring.type === 'integer' ? 1 : 0.1 } : {})
+    ...(isNumber ? { step: registry.authoring.type === 'integer' ? 1 : 0.1 } : {}),
+    ...(DELIVERY_PARAM_APPLICABILITY[key] ? { appliesToUnitTypes: DELIVERY_PARAM_APPLICABILITY[key] } : {})
   };
 }
 
 function uiFieldDefinition(scope: LearnerTdfScope, key: string): LearnerTdfFieldDefinition {
   const schema = getUiSettingsSchemaProperty(key);
-  return fieldDefinitionFromSchema({
+  const definition = fieldDefinitionFromSchema({
     id: `${scope === 'unit' ? 'unit[]' : 'setspec'}.uiSettings.${key}`,
     scope,
     family: 'ui',
@@ -201,6 +221,10 @@ function uiFieldDefinition(scope: LearnerTdfScope, key: string): LearnerTdfField
     schema,
     defaultValue: UI_SETTINGS_RUNTIME_DEFAULTS[key]
   });
+  return {
+    ...definition,
+    ...(UI_SETTINGS_APPLICABILITY[key] ? { appliesToUnitTypes: UI_SETTINGS_APPLICABILITY[key] } : {}),
+  };
 }
 
 function getAudioPromptOptions() {
@@ -241,12 +265,12 @@ export const LEARNER_TDF_FIELD_DEFINITIONS: readonly LearnerTdfFieldDefinition[]
     step: 1,
     unit: 'dB'
   },
-  ...UI_SETTINGS_SUPPORTED_KEYS.map((key) => uiFieldDefinition('setspec', key)),
-  ...UI_SETTINGS_SUPPORTED_KEYS.map((key) => uiFieldDefinition('unit', key)),
-  ...DELIVERY_PARAM_SUPPORTED_KEYS
+  ...UI_SETTINGS_LEARNER_CONFIGURABLE_KEYS.map((key) => uiFieldDefinition('setspec', key)),
+  ...UI_SETTINGS_LEARNER_CONFIGURABLE_KEYS.map((key) => uiFieldDefinition('unit', key)),
+  ...DELIVERY_PARAM_LEARNER_CONFIGURABLE_KEYS
     .map((key) => deliveryFieldDefinition('setspec', key))
     .filter((field): field is LearnerTdfFieldDefinition => Boolean(field)),
-  ...DELIVERY_PARAM_SUPPORTED_KEYS
+  ...DELIVERY_PARAM_LEARNER_CONFIGURABLE_KEYS
     .map((key) => deliveryFieldDefinition('unit', key))
     .filter((field): field is LearnerTdfFieldDefinition => Boolean(field))
 ];
@@ -273,6 +297,25 @@ function getTutorRoot(tdf: unknown): JsonRecord {
 function getUnitArray(tdf: unknown): JsonRecord[] {
   const units = getTutorRoot(tdf).unit;
   return Array.isArray(units) ? units.filter(isRecord) : [];
+}
+
+export function learnerTdfFieldAppliesToUnit(
+  field: Pick<LearnerTdfFieldDefinition, 'appliesToUnitTypes'>,
+  unit: unknown
+): boolean {
+  return unitTypeApplies(field.appliesToUnitTypes, detectTdfUnitType(unit));
+}
+
+function learnerConfigurableKeyAppliesToUnit(
+  family: LearnerTdfFamily,
+  key: string,
+  unit: unknown
+): boolean {
+  const unitType = detectTdfUnitType(unit);
+  const applicability = family === 'delivery'
+    ? DELIVERY_PARAM_APPLICABILITY[key]
+    : UI_SETTINGS_APPLICABILITY[key];
+  return unitTypeApplies(applicability, unitType);
 }
 
 function getTdfUpdatedAt(tdf: unknown): string | undefined {
@@ -310,7 +353,7 @@ function stableStringify(value: unknown): string {
 function unitSignatureEntry(unit: JsonRecord): string {
   const deliveryparams = asRecord(unit.deliveryparams);
   const allowedDeliveryparams: Record<string, unknown> = {};
-  for (const key of DELIVERY_PARAM_SUPPORTED_KEYS) {
+  for (const key of DELIVERY_PARAM_LEARNER_CONFIGURABLE_KEYS) {
     if (deliveryparams[key] !== undefined) {
       allowedDeliveryparams[key] = deliveryparams[key];
     }
@@ -577,7 +620,7 @@ function normalizeLearnerTdfOverridesWithErrors(tdf: unknown, overrides: unknown
       const uiSettings = asRecord(setspec.uiSettings);
       const normalizedUiSettings: Record<string, unknown> = {};
       for (const key of Object.keys(uiSettings)) {
-        if (!UI_SETTINGS_SUPPORTED_KEYS.includes(key)) {
+        if (!UI_SETTINGS_LEARNER_CONFIGURABLE_KEYS.includes(key)) {
           errors.push(`setspec.uiSettings.${key} is not learner configurable`);
           continue;
         }
@@ -601,7 +644,7 @@ function normalizeLearnerTdfOverridesWithErrors(tdf: unknown, overrides: unknown
     const deliveryparams = asRecord(input.deliveryparams);
     const normalizedDeliveryparams: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(deliveryparams)) {
-      if (!DELIVERY_PARAM_SUPPORTED_KEYS.includes(key)) {
+      if (!DELIVERY_PARAM_LEARNER_CONFIGURABLE_KEYS.includes(key)) {
         errors.push(`deliveryparams.${key} is not learner configurable`);
         continue;
       }
@@ -625,6 +668,7 @@ function normalizeLearnerTdfOverridesWithErrors(tdf: unknown, overrides: unknown
       }
 
       const unitConfig = asRecord(unitConfigValue);
+      const sourceUnit = units[index];
       for (const key of Object.keys(unitConfig)) {
         if (key !== 'deliveryparams' && key !== 'uiSettings') {
           errors.push(`unit.${unitIndex}.${key} is not learner configurable`);
@@ -634,8 +678,12 @@ function normalizeLearnerTdfOverridesWithErrors(tdf: unknown, overrides: unknown
       const deliveryparams = asRecord(unitConfig.deliveryparams);
       const normalizedDeliveryparams: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(deliveryparams)) {
-        if (!DELIVERY_PARAM_SUPPORTED_KEYS.includes(key)) {
+        if (!DELIVERY_PARAM_LEARNER_CONFIGURABLE_KEYS.includes(key)) {
           errors.push(`unit.${unitIndex}.deliveryparams.${key} is not learner configurable`);
+          continue;
+        }
+        if (!learnerConfigurableKeyAppliesToUnit('delivery', key, sourceUnit)) {
+          errors.push(`unit.${unitIndex}.deliveryparams.${key} does not apply to this unit type`);
           continue;
         }
         normalizedDeliveryparams[key] = normalizeDeliveryParamValue(key, value);
@@ -649,8 +697,12 @@ function normalizeLearnerTdfOverridesWithErrors(tdf: unknown, overrides: unknown
         const uiSettings = asRecord(unitConfig.uiSettings);
         const normalizedUiSettings: Record<string, unknown> = {};
         for (const key of Object.keys(uiSettings)) {
-          if (!UI_SETTINGS_SUPPORTED_KEYS.includes(key)) {
+          if (!UI_SETTINGS_LEARNER_CONFIGURABLE_KEYS.includes(key)) {
             errors.push(`unit.${unitIndex}.uiSettings.${key} is not learner configurable`);
+            continue;
+          }
+          if (!learnerConfigurableKeyAppliesToUnit('ui', key, sourceUnit)) {
+            errors.push(`unit.${unitIndex}.uiSettings.${key} does not apply to this unit type`);
             continue;
           }
           const value = normalizeUiSettingValue(`unit.${unitIndex}.uiSettings.${key}`, uiSettings[key], errors);

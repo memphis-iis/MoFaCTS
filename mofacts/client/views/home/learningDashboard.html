@@ -1,5 +1,5 @@
 <template name="learningDashboard">
-  <div class="page-container page-container-wide" id="learningDashboardContainer">
+  <div class="container learning-dashboard-container" id="learningDashboardContainer">
     <div class="card mb-4">
       <div class="card-body">
         <div class="d-flex align-items-center mb-3">
@@ -149,7 +149,7 @@
                           </div>
                         </td>
                       </tr>
-                      {{#with configForRow}}
+                      {{#with configForTableRow}}
                         <tr class="learner-config-row">
                           <td colspan="10">
                             {{> learnerTdfConfigPanel}}
@@ -215,12 +215,12 @@
 
                   {{#if this.conditions}}
                     {{!-- Owner of a condition-pool root TDF: selector is in the card title; just show Start --}}
-                    <div class="d-flex gap-1 mt-1">
+                    <div class="d-flex gap-1 mt-1 justify-content-center flex-wrap">
                       <button class="btn btn-sm btn-success flex-grow-1 start-condition-root learning-dashboard-card-button">Start</button>
                       <button class="btn btn-sm btn-outline-secondary flex-grow-1 configure-lesson learning-dashboard-card-button" data-tdfid="{{this.TDFId}}">Configure</button>
                     </div>
                   {{else if this.isUsed}}
-                    <div class="d-flex gap-1 mt-1 align-items-center">
+                    <div class="d-flex gap-1 mt-1 align-items-center justify-content-center flex-wrap">
                       <button class="btn btn-sm btn-primary flex-grow-1 continue-lesson learning-dashboard-card-button"
                         data-tdfid="{{this.TDFId}}"
                         data-lessonname="{{this.displayName}}"
@@ -242,7 +242,7 @@
                       </button>
                     </div>
                   {{else}}
-                    <div class="d-flex gap-1 mt-1">
+                    <div class="d-flex gap-1 mt-1 justify-content-center flex-wrap">
                       <button class="btn btn-sm btn-success flex-grow-1 start-lesson learning-dashboard-card-button"
                         data-tdfid="{{this.TDFId}}"
                         data-lessonname="{{this.displayName}}"
@@ -258,7 +258,7 @@
                     </div>
                   {{/if}}
 
-                  {{#with configForRow}}
+                  {{#with configForCardRow}}
                     {{> learnerTdfConfigPanel}}
                   {{/with}}
 
@@ -303,99 +303,81 @@
 </template>
 
 <template name="learnerTdfConfigPanel">
-  <div class="learner-config-panel">
-    <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
-      <strong>Configure practice</strong>
-      <button type="button" class="btn btn-sm btn-link learner-config-close">Close</button>
-    </div>
-
-    {{#if this.loading}}
-      <div class="text-muted">Loading settings...</div>
-    {{else}}
-      {{#if this.error}}
-        <div class="alert alert-warning py-2 mb-2">{{this.error}}</div>
-      {{/if}}
-
-      {{#if isConfigStep "scope"}}
-        <div class="learner-config-choice-grid">
-          {{#each scopeChoices}}
-            <button type="button" class="btn btn-outline-primary learner-config-scope" data-scope="{{this.scope}}" data-unitindex="{{this.unitIndex}}">
-              {{this.label}}
-            </button>
-          {{/each}}
-        </div>
-      {{/if}}
-
-      {{#if isConfigStep "family"}}
-        <div class="small text-muted mb-2">{{selectedScopeLabel}}</div>
-        {{#if hasFamilyChoices}}
-          <div class="learner-config-choice-grid">
-            {{#each familyChoices}}
-              <button type="button" class="btn btn-outline-primary learner-config-family" data-family="{{this.family}}">
-                {{this.label}}
-              </button>
-            {{/each}}
-          </div>
+  <div class="{{learnerConfigPanelClass}}">
+    <div class="learner-config-panel-clip">
+      <div class="learner-config-panel-card">
+        {{#if this.loading}}
+          <div class="text-muted">Loading settings...</div>
         {{else}}
-          <div class="alert alert-info py-2 mb-2">{{noConfigurableUnitSettingsMessage}}</div>
-        {{/if}}
-        <button type="button" class="btn btn-sm btn-link px-0 mt-2 learner-config-back">Back</button>
-      {{/if}}
+          {{#if this.error}}
+            <div class="alert alert-warning py-2 mb-2">{{this.error}}</div>
+          {{/if}}
 
-      {{#if isConfigStep "settings"}}
-        <form class="learner-config-form">
-          <div class="small text-muted mb-2">{{selectedScopeLabel}}</div>
-          <div class="learner-config-fields-grid">
-          {{#each settingFields}}
-            <div class="learner-config-field">
-              <div class="learner-config-field-label">
-                <span>{{this.label}}</span>
-                {{#if this.isSlider}}
-                  <span class="learner-config-current-value" data-config-value-for="{{this.id}}">{{this.displayValue}}</span>
-                {{/if}}
-                {{#if this.customized}}
-                  <button type="button" class="btn btn-sm btn-link learner-config-reset-field"
-                    data-fieldid="{{this.id}}"
-                    data-defaultvalue="{{this.defaultInputValue}}">
-                    Reset
-                  </button>
-                {{/if}}
-              </div>
-
-              {{#if this.isToggle}}
-                <div class="form-check form-switch">
-                  <input class="form-check-input" type="checkbox" data-config-field="{{this.id}}" checked="{{#if this.checked}}checked{{/if}}">
-                </div>
-              {{/if}}
-
-              {{#if this.isSelect}}
-                <select class="form-select form-select-sm" data-config-field="{{this.id}}">
-                  {{#each this.options}}
-                    <option value="{{this.value}}" selected="{{#if this.selected}}selected{{/if}}">{{this.label}}</option>
-                  {{/each}}
-                </select>
-              {{/if}}
-
-              {{#if this.isSlider}}
-                <input class="form-range learner-config-slider" type="range" min="{{this.inputMin}}" max="{{this.inputMax}}" step="{{this.inputStep}}" value="{{this.value}}" data-config-field="{{this.id}}" data-value-suffix="{{this.displaySuffix}}">
-              {{/if}}
-
-              {{#if this.isNumber}}
-                <input class="form-control form-control-sm" type="number" min="{{this.inputMin}}" max="{{this.inputMax}}" step="{{this.inputStep}}" value="{{this.value}}" data-config-field="{{this.id}}">
-              {{/if}}
-
-              {{#if this.isText}}
-                <input class="form-control form-control-sm" type="text" value="{{this.value}}" data-config-field="{{this.id}}">
-              {{/if}}
+          {{#if isConfigStep "scope"}}
+            <div class="learner-config-choice-grid">
+              {{#each scopeChoices}}
+                <button type="button" class="btn btn-outline-primary learner-config-scope" data-scope="{{this.scope}}" data-unitindex="{{this.unitIndex}}" data-family="{{this.family}}">
+                  {{this.label}}
+                </button>
+              {{/each}}
             </div>
-          {{/each}}
-          </div>
-          <div class="d-flex gap-2 justify-content-end">
-            <button type="button" class="btn btn-sm btn-link learner-config-back">Back</button>
-            <button type="submit" class="btn btn-sm btn-primary" disabled="{{#if this.saving}}disabled{{/if}}">Save</button>
-          </div>
-        </form>
-      {{/if}}
-    {{/if}}
+          {{/if}}
+
+          {{#if isConfigStep "settings"}}
+            <form class="learner-config-form">
+              <div class="small text-muted mb-2">{{selectedConfigLabel}}</div>
+              <div class="learner-config-fields-grid">
+              {{#each settingFields}}
+                <div class="learner-config-field">
+                  <div class="learner-config-field-label">
+                    <span>{{this.label}}</span>
+                    {{#if this.isSlider}}
+                      <span class="learner-config-current-value" data-config-value-for="{{this.id}}">{{this.displayValue}}</span>
+                    {{/if}}
+                    {{#if this.customized}}
+                      <button type="button" class="btn btn-sm btn-link learner-config-reset-field"
+                        data-fieldid="{{this.id}}"
+                        data-defaultvalue="{{this.defaultInputValue}}">
+                        Reset
+                      </button>
+                    {{/if}}
+                  </div>
+
+                  {{#if this.isToggle}}
+                    <div class="form-check form-switch">
+                      <input class="form-check-input" type="checkbox" data-config-field="{{this.id}}" checked="{{#if this.checked}}checked{{/if}}">
+                    </div>
+                  {{/if}}
+
+                  {{#if this.isSelect}}
+                    <select class="form-select form-select-sm" data-config-field="{{this.id}}">
+                      {{#each this.options}}
+                        <option value="{{this.value}}" selected="{{#if this.selected}}selected{{/if}}">{{this.label}}</option>
+                      {{/each}}
+                    </select>
+                  {{/if}}
+
+                  {{#if this.isSlider}}
+                    <input class="form-range learner-config-slider" type="range" min="{{this.inputMin}}" max="{{this.inputMax}}" step="{{this.inputStep}}" value="{{this.value}}" data-config-field="{{this.id}}" data-value-suffix="{{this.displaySuffix}}">
+                  {{/if}}
+
+                  {{#if this.isNumber}}
+                    <input class="form-control form-control-sm" type="number" min="{{this.inputMin}}" max="{{this.inputMax}}" step="{{this.inputStep}}" value="{{this.value}}" data-config-field="{{this.id}}">
+                  {{/if}}
+
+                  {{#if this.isText}}
+                    <input class="form-control form-control-sm" type="text" value="{{this.value}}" data-config-field="{{this.id}}">
+                  {{/if}}
+                </div>
+              {{/each}}
+              </div>
+              <div class="d-flex gap-2 justify-content-end align-items-center learner-config-footer">
+                <span class="small text-muted">{{learnerConfigSaveStatus}}</span>
+              </div>
+            </form>
+          {{/if}}
+        {{/if}}
+      </div>
+    </div>
   </div>
 </template>

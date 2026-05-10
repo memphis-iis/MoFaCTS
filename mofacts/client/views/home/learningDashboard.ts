@@ -34,6 +34,7 @@ import { passesDashboardEntitlement } from './dashboardEntitlement';
 import {
   LEARNER_TDF_FIELD_DEFINITIONS,
   applyLearnerTdfConfig,
+  learnerTdfFieldAppliesToUnit,
   type LearnerTdfConfig
 } from '../../../common/lib/learnerTdfConfig';
 import {
@@ -55,12 +56,14 @@ type LearnerConfigState = {
   tdfId: string | null;
   loading: boolean;
   error: string | null;
-  step: 'scope' | 'family' | 'settings';
+  step: 'scope' | 'settings';
   content: any | null;
   scope: 'setspec' | 'unit' | null;
   unitIndex: number | null;
   family: 'ui' | 'delivery' | null;
   saving: boolean;
+  closing: boolean;
+  dirty: boolean;
 };
 
 const EMPTY_CONFIG_STATE: LearnerConfigState = {
@@ -73,7 +76,118 @@ const EMPTY_CONFIG_STATE: LearnerConfigState = {
   unitIndex: null,
   family: null,
   saving: false,
+  closing: false,
+  dirty: false,
 };
+
+const LEARNER_CONFIG_CLOSE_FALLBACK_MS = 200;
+const LEARNER_CONFIG_AUTOSAVE_DELAY_MS = 500;
+
+function parseCssDurationMs(rawValue: string | null | undefined) {
+  const value = String(rawValue || '').trim();
+  if (!value) {
+    return LEARNER_CONFIG_CLOSE_FALLBACK_MS;
+  }
+  if (value.endsWith('ms')) {
+    const ms = Number(value.slice(0, -2));
+    return Number.isFinite(ms) ? ms : LEARNER_CONFIG_CLOSE_FALLBACK_MS;
+  }
+  if (value.endsWith('s')) {
+    const seconds = Number(value.slice(0, -1));
+    return Number.isFinite(seconds) ? seconds * 1000 : LEARNER_CONFIG_CLOSE_FALLBACK_MS;
+  }
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : LEARNER_CONFIG_CLOSE_FALLBACK_MS;
+}
+
+function getLearnerConfigCloseDurationMs() {
+  if (typeof window === 'undefined') {
+    return LEARNER_CONFIG_CLOSE_FALLBACK_MS;
+  }
+  const transition = window.getComputedStyle(document.documentElement).getPropertyValue('--transition-smooth');
+  return parseCssDurationMs(transition) + 20;
+}
+
+function clearLearnerConfigCloseTimer(instance: any) {
+  if (instance.learnerConfigCloseTimer) {
+    clearTimeout(instance.learnerConfigCloseTimer);
+    instance.learnerConfigCloseTimer = null;
+  }
+}
+
+function clearLearnerConfigAutosaveTimer(instance: any) {
+  if (instance.learnerConfigAutosaveTimer) {
+    clearTimeout(instance.learnerConfigAutosaveTimer);
+    instance.learnerConfigAutosaveTimer = null;
+  }
+}
+
+function closeLearnerConfigPanel(instance: any) {
+  const current = instance.learnerConfigState.get() as LearnerConfigState;
+  if (!current.tdfId) {
+    instance.learnerConfigState.set(EMPTY_CONFIG_STATE);
+    return;
+  }
+  if (current.closing) {
+    return;
+  }
+
+  clearLearnerConfigCloseTimer(instance);
+  instance.learnerConfigState.set({ ...current, closing: true });
+  instance.learnerConfigCloseTimer = setTimeout(() => {
+    instance.learnerConfigState.set(EMPTY_CONFIG_STATE);
+    instance.learnerConfigCloseTimer = null;
+  }, getLearnerConfigCloseDurationMs());
+}
+
+function markLearnerConfigDirty(instance: any) {
+  const current = instance.learnerConfigState.get() as LearnerConfigState;
+  if (!current.tdfId || current.closing) {
+    return;
+  }
+  if (!current.dirty) {
+    instance.learnerConfigState.set({ ...current, dirty: true });
+  }
+}
+
+function scheduleLearnerConfigAutosave(instance: any, form: JQuery<HTMLElement>) {
+  const current = instance.learnerConfigState.get() as LearnerConfigState;
+  if (!current.tdfId || current.closing || current.step !== 'settings') {
+    return;
+  }
+
+  const patch = buildConfigPatchFromForm(form, current);
+  const saveRevision = (instance.learnerConfigSaveRevision || 0) + 1;
+  instance.learnerConfigSaveRevision = saveRevision;
+  markLearnerConfigDirty(instance);
+  clearLearnerConfigAutosaveTimer(instance);
+
+  instance.learnerConfigAutosaveTimer = setTimeout(async () => {
+    instance.learnerConfigAutosaveTimer = null;
+    const saveState = instance.learnerConfigState.get() as LearnerConfigState;
+    if (saveState.tdfId === current.tdfId) {
+      instance.learnerConfigState.set({ ...saveState, saving: true, error: null });
+    }
+    try {
+      await meteorCallAsync('saveLearnerTdfConfig', current.tdfId, patch);
+      const latest = instance.learnerConfigState.get() as LearnerConfigState;
+      if (latest.tdfId === current.tdfId && instance.learnerConfigSaveRevision === saveRevision) {
+        instance.learnerConfigState.set({ ...latest, saving: false, dirty: false, error: null });
+      }
+    } catch (error: any) {
+      clientConsole(1, '[Dashboard Config] Failed to autosave learner TDF config:', error);
+      const latest = instance.learnerConfigState.get() as LearnerConfigState;
+      if (latest.tdfId === current.tdfId) {
+        instance.learnerConfigState.set({
+          ...latest,
+          saving: false,
+          dirty: true,
+          error: error?.reason || error?.message || 'Unable to save settings.'
+        });
+      }
+    }
+  }, LEARNER_CONFIG_AUTOSAVE_DELAY_MS);
+}
 
 function getDashboardCache() {
   const studentID = Session.get('curStudentID') || Meteor.userId();
@@ -131,27 +245,16 @@ function getLearnerConfigurableFieldsForState(state: LearnerConfigState) {
     }
 
     const unit = state.unitIndex === null ? null : getTutorUnits(state.content)[state.unitIndex];
-    if (field.family === 'ui') {
-      return Boolean(unit?.learningsession || unit?.assessmentsession || unit?.videosession);
-    }
-    if (field.family === 'delivery') {
-      if (unit?.learningsession || unit?.assessmentsession) {
-        return true;
-      }
-      return Boolean(unit?.videosession);
-    }
-    return false;
+    return learnerTdfFieldAppliesToUnit(field, unit);
   });
 }
 
 function unitSupportsLearnerFamily(unit: any, family: 'ui' | 'delivery') {
-  if (family === 'ui') {
-    return Boolean(unit?.learningsession || unit?.assessmentsession || unit?.videosession);
-  }
-  if (unit?.learningsession || unit?.assessmentsession) {
-    return true;
-  }
-  return Boolean(unit?.videosession);
+  return LEARNER_TDF_FIELD_DEFINITIONS.some(
+    (field) => field.scope === 'unit' &&
+      field.family === family &&
+      learnerTdfFieldAppliesToUnit(field, unit)
+  );
 }
 
 function getPathValue(source: any, path: string, unitIndex: number | null = null) {
@@ -254,6 +357,34 @@ function getFamilyChoicesForState(state: LearnerConfigState) {
   ];
 }
 
+function getScopeChoicesForState(state: LearnerConfigState) {
+  const units = getTutorUnits(state.content);
+  return [
+    { label: 'Lesson settings', scope: 'setspec', unitIndex: null },
+    ...units.map((unit: any, index: number) => ({
+      label: unit?.unitname || unit?.name || `Unit ${index + 1}`,
+      scope: 'unit',
+      unitIndex: index
+    }))
+  ];
+}
+
+function getConfigChoicesForState(state: LearnerConfigState) {
+  return getScopeChoicesForState(state).flatMap((scopeChoice) => {
+    const scopedState = {
+      ...state,
+      scope: scopeChoice.scope as 'setspec' | 'unit',
+      unitIndex: scopeChoice.unitIndex
+    };
+    return getFamilyChoicesForState(scopedState).map((familyChoice) => ({
+      ...scopeChoice,
+      ...familyChoice,
+      unitIndex: scopeChoice.unitIndex === null ? '' : String(scopeChoice.unitIndex),
+      label: `${scopeChoice.label}: ${familyChoice.label}`
+    }));
+  });
+}
+
 
 function parseVersionMajor(raw: unknown): number | null {
   if (typeof raw === 'number' && Number.isInteger(raw) && raw >= 1) {
@@ -321,6 +452,9 @@ Template.learningDashboard.onCreated(function(this: any) {
   this.subscriptions = [];
   this.autoruns = [];
   this.searchDebounceTimer = null;
+  this.learnerConfigCloseTimer = null;
+  this.learnerConfigAutosaveTimer = null;
+  this.learnerConfigSaveRevision = 0;
   this.learnerConfigState = new ReactiveVar(EMPTY_CONFIG_STATE);
 });
 
@@ -362,53 +496,48 @@ Template.learningDashboard.helpers({
     return this.displayName;
   },
 
-  configForRow() {
+  configForTableRow() {
     const state = (Template.instance() as any).learnerConfigState.get() as LearnerConfigState;
-    return state.tdfId === this.TDFId ? state : null;
+    return state.tdfId === this.TDFId ? { ...state, location: 'table' } : null;
+  },
+
+  configForCardRow() {
+    const state = (Template.instance() as any).learnerConfigState.get() as LearnerConfigState;
+    return state.tdfId === this.TDFId ? { ...state, location: 'card' } : null;
   },
 
 });
 
 Template.learnerTdfConfigPanel.helpers({
+  learnerConfigPanelClass() {
+    return this.closing ? 'learner-config-panel is-closing' : 'learner-config-panel';
+  },
+
+  learnerConfigSaveStatus() {
+    if (this.saving) return 'Saving...';
+    if (this.dirty) return 'Waiting to save...';
+    return 'Changes save automatically';
+  },
+
   isConfigStep(step: string) {
     return this.step === step;
   },
 
   scopeChoices() {
-    const units = getTutorUnits(this.content);
-    return [
-      { label: 'Lesson settings', scope: 'setspec', unitIndex: '' },
-      ...units.map((unit: any, index: number) => ({
-        label: unit?.unitname || unit?.name || `Unit ${index + 1}`,
-        scope: 'unit',
-        unitIndex: String(index)
-      }))
-    ];
+    return getConfigChoicesForState(this as LearnerConfigState);
   },
 
-  familyChoices() {
-    return getFamilyChoicesForState(this as LearnerConfigState);
-  },
-
-  hasFamilyChoices() {
-    return getFamilyChoicesForState(this as LearnerConfigState).length > 0;
-  },
-
-  noConfigurableUnitSettingsMessage() {
+  selectedConfigLabel() {
     const state = this as LearnerConfigState;
-    if (state.scope !== 'unit') return '';
-    const unit = state.unitIndex === null ? null : getTutorUnits(state.content)[state.unitIndex];
-    if (unitSupportsLearnerFamily(unit, 'ui') || unitSupportsLearnerFamily(unit, 'delivery')) return '';
-    return 'This instructions unit has no practice trials, so these learner settings would not change the unit.';
-  },
-
-  selectedScopeLabel() {
-    if (this.scope === 'setspec') return 'Lesson settings';
-    if (this.scope === 'unit' && this.unitIndex !== null) {
-      const unit = getTutorUnits(this.content)[this.unitIndex];
-      return unit?.unitname || unit?.name || `Unit ${this.unitIndex + 1}`;
+    let scopeLabel = '';
+    if (state.scope === 'setspec') {
+      scopeLabel = 'Lesson settings';
+    } else if (state.scope === 'unit' && state.unitIndex !== null) {
+      const unit = getTutorUnits(state.content)[state.unitIndex];
+      scopeLabel = unit?.unitname || unit?.name || `Unit ${state.unitIndex + 1}`;
     }
-    return '';
+    const familyLabel = state.family === 'delivery' ? 'Delivery parameters' : 'UI parameters';
+    return scopeLabel ? `${scopeLabel}: ${familyLabel}` : familyLabel;
   },
 
   settingFields() {
@@ -560,10 +689,11 @@ Template.learningDashboard.events({
     const tdfId = String(target.data('tdfid') || '');
     const existingState = instance.learnerConfigState.get() as LearnerConfigState;
     if (existingState.tdfId === tdfId) {
-      instance.learnerConfigState.set(EMPTY_CONFIG_STATE);
+      closeLearnerConfigPanel(instance);
       return;
     }
 
+    clearLearnerConfigCloseTimer(instance);
     instance.learnerConfigState.set({
       ...EMPTY_CONFIG_STATE,
       tdfId,
@@ -601,44 +731,21 @@ Template.learningDashboard.events({
     }
   },
 
-  'click .learner-config-close': function(_event: any, instance: any) {
-    instance.learnerConfigState.set(EMPTY_CONFIG_STATE);
-  },
-
   'click .learner-config-scope': function(event: any, instance: any) {
     const current = instance.learnerConfigState.get() as LearnerConfigState;
     const target = $(event.currentTarget);
     instance.learnerConfigState.set({
       ...current,
-      step: 'family',
+      step: 'settings',
       scope: target.data('scope'),
       unitIndex: target.data('unitindex') === '' ? null : Number(target.data('unitindex')),
-      family: null,
+      family: target.data('family'),
+      dirty: false,
       error: null
     });
   },
 
-  'click .learner-config-family': function(event: any, instance: any) {
-    const current = instance.learnerConfigState.get() as LearnerConfigState;
-    instance.learnerConfigState.set({
-      ...current,
-      step: 'settings',
-      family: $(event.currentTarget).data('family'),
-      error: null
-    });
-  },
-
-  'click .learner-config-back': function(_event: any, instance: any) {
-    const current = instance.learnerConfigState.get() as LearnerConfigState;
-    instance.learnerConfigState.set({
-      ...current,
-      step: current.step === 'settings' ? 'family' : 'scope',
-      family: current.step === 'settings' ? null : current.family,
-      error: null
-    });
-  },
-
-  'click .learner-config-reset-field': function(event: any) {
+  'click .learner-config-reset-field': function(event: any, instance: any) {
     const button = $(event.currentTarget);
     const fieldId = button.data('fieldid');
     const container = button.closest('.learner-config-panel');
@@ -655,32 +762,27 @@ Template.learningDashboard.events({
       const suffix = input.data('value-suffix') || '';
       valueTarget.text(`${input.val()}${suffix ? ` ${suffix}` : ''}`);
     }
+    scheduleLearnerConfigAutosave(instance, button.closest('.learner-config-form'));
   },
 
-  'input .learner-config-slider': function(event: any) {
+  'change [data-config-field]': function(_event: any, instance: any) {
+    scheduleLearnerConfigAutosave(instance, $(_event.currentTarget).closest('.learner-config-form'));
+  },
+
+  'input [data-config-field]': function(_event: any, instance: any) {
+    scheduleLearnerConfigAutosave(instance, $(_event.currentTarget).closest('.learner-config-form'));
+  },
+
+  'input .learner-config-slider': function(event: any, instance: any) {
     const input = $(event.currentTarget);
     const fieldId = input.data('config-field');
     const suffix = input.data('value-suffix') || '';
     input.closest('.learner-config-field').find(`[data-config-value-for="${fieldId}"]`).text(`${input.val()}${suffix ? ` ${suffix}` : ''}`);
+    scheduleLearnerConfigAutosave(instance, input.closest('.learner-config-form'));
   },
 
-  'submit .learner-config-form': async function(event: any, instance: any) {
+  'submit .learner-config-form': function(event: any) {
     event.preventDefault();
-    const current = instance.learnerConfigState.get() as LearnerConfigState;
-    if (!current.tdfId) return;
-    instance.learnerConfigState.set({ ...current, saving: true, error: null });
-    try {
-      const patch = buildConfigPatchFromForm($(event.currentTarget), current);
-      await meteorCallAsync('saveLearnerTdfConfig', current.tdfId, patch);
-      instance.learnerConfigState.set(EMPTY_CONFIG_STATE);
-    } catch (error: any) {
-      clientConsole(1, '[Dashboard Config] Failed to save learner TDF config:', error);
-      instance.learnerConfigState.set({
-        ...current,
-        saving: false,
-        error: error?.reason || error?.message || 'Unable to save settings.'
-      });
-    }
   },
 });
 
@@ -1050,6 +1152,9 @@ Template.learningDashboard.onDestroyed(function(this: any) {
   if (this.searchDebounceTimer) {
     clearTimeout(this.searchDebounceTimer);
   }
+
+  clearLearnerConfigCloseTimer(this);
+  clearLearnerConfigAutosaveTimer(this);
 });
 
 function diagnoseAudioStartupFailure(error: unknown): string {
