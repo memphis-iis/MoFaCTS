@@ -75,7 +75,7 @@
 
 <style>
   .performance-area {
-    background-color: var(--card-background-color);
+    background-color: var(--stimuli-box-color);
     border-bottom: 1px solid var(--secondary-color);
     padding: 0.375rem 0.5rem;
     margin-bottom: 0.5rem;
