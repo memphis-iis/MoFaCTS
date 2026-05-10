@@ -283,11 +283,14 @@ select {
 }
 
 /* File input styling - consistent with buttons */
-input[type="file"] {
+input[type="file"],
+.form-control[type="file"] {
     font-family: inherit;
     font-size: 1rem;
     height: var(--button-height);
     min-height: var(--button-height);
+    padding: 0;
+    line-height: calc(var(--button-height) - 2px);
     border: 1px solid var(--btn-secondary-border);
     border-radius: var(--border-radius-sm);
     background-color: var(--secondary-color);
@@ -295,14 +298,16 @@ input[type="file"] {
     cursor: pointer;
 }
 
-input[type="file"]::file-selector-button {
+input[type="file"]::file-selector-button,
+.form-control[type="file"]::file-selector-button {
     font-family: inherit;
     font-size: 1rem;
-    height: 100%;
-    padding: 0.375rem 0.75rem;
+    height: calc(var(--button-height) - 2px);
+    min-height: calc(var(--button-height) - 2px);
+    padding: 0 0.75rem;
     margin-right: 0.75rem;
     border: none;
-    border-radius: var(--border-radius-sm);
+    border-radius: calc(var(--border-radius-sm) - 1px);
     background-color: var(--button-color);
     color: var(--primary-button-text-color);
     cursor: pointer;
