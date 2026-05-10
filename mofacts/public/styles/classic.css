@@ -3,6 +3,7 @@
     /* Color Palette */
     --background-color: #F2F2F2;
     --text-color: #000000;
+    --page-header-text-color: var(--text-color);
     --accent-color: #7ed957;
     --focus-ring-color: var(--accent-color);
     --surface-emphasis-color: var(--accent-color);
@@ -196,6 +197,16 @@ h3{
     font-size: clamp(1.25rem, 2.5vw, 1.5rem);    font-weight: 800;
     margin-top: 1.5rem;
     margin-bottom: 1rem;
+}
+
+.page-header-text,
+.page-header-title {
+    color: var(--page-header-text-color, var(--text-color));
+}
+
+.page-header-title {
+    margin-top: 0;
+    text-align: center;
 }
 
 h4{

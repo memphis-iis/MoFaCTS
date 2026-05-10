@@ -22,6 +22,7 @@ const FALLBACK_THEME = {
     themeName: 'MoFaCTS',
     background_color: '#F2F2F2',
     text_color: '#000000',
+    page_header_text_color: '#000000',
     button_color: '#7ed957',
     primary_button_text_color: '#000000',
     accent_color: '#7ed957',
@@ -291,6 +292,7 @@ function mergeWithFallbackProps(properties: any, derivedName: string) {
   const merged = {
     ...FALLBACK_PROPERTIES,
     ...normalized,
+    page_header_text_color: normalized.page_header_text_color || normalized.text_color || FALLBACK_PROPERTIES.page_header_text_color,
     themeName: normalized.themeName || derivedName
   };
   return normalizeThemeIconProperties(merged, normalized);
