@@ -3,7 +3,6 @@ import { Session } from 'meteor/session';
 import { getEngine } from '../../lib/engineManager';
 import { DeliveryParamsStore } from '../../lib/state/deliveryParamsStore';
 import { CardStore } from './modules/cardStore';
-import { clearCardTimeout } from './modules/cardTimeouts';
 import { getCurrentDeliveryParams, setStudentPerformance } from '../../lib/currentTestingHelpers';
 import { clientConsole } from '../../lib/userSessionHelpers';
 import { meteorCallAsync } from '../../index';
@@ -29,8 +28,8 @@ type RootTdfBoxed = {
 type AdaptiveLogicEngine = {
   adaptiveQuestionLogic?: {
     curUnit?: { adaptiveLogic?: unknown };
-    evaluate: (rule: unknown) => Promise<{ conditionResult?: boolean; when?: unknown; questions?: unknown[] } | undefined>;
-    unitBuilder: (template: unknown, adaptiveQuestionTimes: unknown[], adaptiveQuestions: unknown[]) => unknown;
+    evaluate: (rule: unknown) => Promise<{ conditionResult?: boolean; when?: unknown; questions?: unknown[]; checkpoints?: unknown[] } | undefined>;
+    unitBuilder: (template: unknown, adaptiveQuestionTimes: unknown[], adaptiveQuestions: unknown[], adaptiveCheckpoints?: unknown[]) => unknown;
     modifyUnit: (logic: unknown, unit: unknown) => Promise<unknown>;
     when?: unknown;
   };
@@ -104,26 +103,37 @@ export async function unitIsFinished(reason: string, options: { engine?: unknown
       clientConsole(2, 'adaptive schedule');
       for (let adaptiveUnitIndex in adaptive) {
         let newUnitIndex = adaptive[adaptiveUnitIndex].split(',')[0];
+        const targetUnitIndex = Number(newUnitIndex) - 1;
         let isTemplate = adaptive[adaptiveUnitIndex].split(',')[1] == 't';
         let adaptiveQuestionTimes = [];
         let adaptiveQuestions = [];
+        let adaptiveCheckpoints = [];
         for (let rule of adaptiveLogic[newUnitIndex]) {
           let logicOutput = await engine.adaptiveQuestionLogic.evaluate(rule);
           if (logicOutput?.conditionResult) {
-            adaptiveQuestionTimes.push(logicOutput.when);
             if (logicOutput.questions) {
-              adaptiveQuestions.push(...logicOutput.questions);
+              for (const adaptiveQuestion of logicOutput.questions) {
+                adaptiveQuestions.push(adaptiveQuestion);
+                adaptiveQuestionTimes.push(logicOutput.when);
+              }
+            }
+            if (logicOutput.checkpoints) {
+              adaptiveCheckpoints.push(...logicOutput.checkpoints);
             }
           }
         }
         if (isTemplate) {
-          adaptiveTemplate = curTdf.tdfs.tutor.setspec.unitTemplate[adaptiveUnitIndex];
-          unit = engine.adaptiveQuestionLogic.unitBuilder(adaptiveTemplate, adaptiveQuestionTimes, adaptiveQuestions);
+          const templateIndex = prevUnit?.adaptiveUnitTemplate?.[Number(adaptiveUnitIndex)] ?? Number(adaptiveUnitIndex);
+          adaptiveTemplate = curTdf.tdfs.tutor.setspec.unitTemplate?.[templateIndex];
+          if (!adaptiveTemplate) {
+            throw new Error(`Adaptive template index ${templateIndex} not found for adaptive target ${adaptive[adaptiveUnitIndex]}.`);
+          }
+          unit = engine.adaptiveQuestionLogic.unitBuilder(adaptiveTemplate, adaptiveQuestionTimes, adaptiveQuestions, adaptiveCheckpoints);
           countCompletion = prevUnit?.countcompletion;
           curTdf.tdfs.tutor.unit.splice(newUnitIndex - 1, 0, unit);
         } else {
-          unit = await engine.adaptiveQuestionLogic.modifyUnit(adaptiveLogic[adaptiveUnitIndex], unit);
-          curTdf.tdfs.tutor.unit[newUnitIndex] = unit;
+          unit = await engine.adaptiveQuestionLogic.modifyUnit(adaptiveLogic[newUnitIndex], curTdf.tdfs.tutor.unit[targetUnitIndex]);
+          curTdf.tdfs.tutor.unit[targetUnitIndex] = unit;
         }
       }
     }
@@ -246,7 +256,6 @@ export async function unitIsFinished(reason: string, options: { engine?: unknown
 
 export async function revisitUnit(unitNumber: string | number) {
   clientConsole(2, 'REVIST UNIT:', unitNumber);
-  clearCardTimeout();
   await destroyPlyr();
 
   const curTdf = Session.get('currentTdfFile');
