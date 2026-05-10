@@ -23,6 +23,8 @@
   /** @type {number} Remaining time in seconds */
   export let remainingTime = 0;
 
+  $: hasVisibleTimeout = showTimeoutBar && timeoutMode !== 'none';
+
 </script>
 
 <div class="performance-area">
@@ -44,13 +46,19 @@
     </div>
   </div>
 
-  {#if showTimeoutBar && timeoutMode !== 'none'}
-    <div class="timeout-bar-container">
+  {#if showTimeoutBar}
+    <div
+      class="timeout-bar-container"
+      class:timeout-bar-container-placeholder={!hasVisibleTimeout}
+      aria-hidden={!hasVisibleTimeout}
+    >
       <div class="timeout-label">
         {#if timeoutMode === 'question'}
           Time remaining: {remainingTime}s
         {:else if timeoutMode === 'feedback'}
           Continuing in: {remainingTime}s
+        {:else}
+          Time remaining: 0s
         {/if}
       </div>
       <div class="timeout-bar-wrapper">
@@ -126,6 +134,10 @@
 
   .timeout-bar-container {
     margin-top: 0.375rem;
+  }
+
+  .timeout-bar-container-placeholder {
+    visibility: hidden;
   }
 
   .timeout-label {
