@@ -1,4 +1,4 @@
-export type UploadIntegrity = {
+type UploadIntegrity = {
   expectedSize: number;
   sha256?: string;
 };

@@ -12,6 +12,7 @@ import { clientConsole } from '../../lib/clientLogger';
 import { TDF_TOOLTIPS, getTooltipMode, setTooltipMode, injectDescriptions, updateDescriptionsInPlace, buildDescriptionCache } from '../../lib/tooltipContent';
 import { ValidatorEngine, ValidationContext } from '../../lib/validatorCore';
 import { createValidationSummary, applyFieldErrors, initValidationUI } from '../../lib/validatorUI';
+import { installSchemaApplicabilityControls } from '../../lib/schemaApplicabilityEditor';
 
 /**
  * TDF Editor - Schema-driven editor using json-editor library
@@ -132,6 +133,10 @@ Template.tdfEdit.onDestroyed(function(this: any) {
     if (this.fieldObserver) {
         this.fieldObserver.disconnect();
         this.fieldObserver = null;
+    }
+    if (this.applicabilityController) {
+        this.applicabilityController.destroy();
+        this.applicabilityController = null;
     }
     if (this._inputHandler) {
         const container = document.getElementById('tdf-editor-container');
@@ -636,9 +641,11 @@ function injectLabelsForInputs(container: any, editor: any, rootArg?: any) {
         const editorInstance = editor.getEditor(schemaPath);
         if (!editorInstance || !editorInstance.schema) return;
 
-        // Get the title from the schema
-        const title = editorInstance.schema.title || editorInstance.key;
-        if (!title) return;
+        // Labels are registry-owned schema metadata. Missing titles indicate a schema generation bug.
+        const title = editorInstance.schema.title;
+        if (!title) {
+            throw new Error(`[TDF Edit] Missing schema title for ${schemaPath}`);
+        }
 
         // Create and inject the label
         const label = document.createElement('label');
@@ -692,34 +699,6 @@ function initEditor(instance: any, tdf: any) {
     // Extract the tutor schema (the main part we want to edit)
     const tutorSchema = cachedSchema.properties?.tutor || cachedSchema;
 
-    // Add human-readable titles to all properties so labels show
-    // Converts camelCase to Title Case (e.g., "lessonname" -> "Lessonname", "audioInputEnabled" -> "Audio Input Enabled")
-    function addTitlesToSchema(schema: any): any {
-        if (schema.type === 'object' && schema.properties) {
-            for (const key in schema.properties) {
-                const prop = schema.properties[key];
-
-                // Add title if not present - convert camelCase to readable
-                if (!prop.title) {
-                    // Insert space before capital letters, capitalize first letter
-                    prop.title = key
-                        .replace(/([A-Z])/g, ' $1')
-                        .replace(/^./, (str: any) => str.toUpperCase())
-                        .trim();
-                }
-
-                // Recursively process nested structures
-                if (prop.type === 'object') {
-                    addTitlesToSchema(prop);
-                } else if (prop.type === 'array' && prop.items && prop.items.type === 'object') {
-                    addTitlesToSchema(prop.items);
-                }
-            }
-        }
-        return schema;
-    }
-    addTitlesToSchema(tutorSchema);
-
     // Inject tooltip descriptions based on current mode (brief or verbose)
     const schemaWithDescriptions = injectDescriptions(tutorSchema, TDF_TOOLTIPS, tooltipMode);
 
@@ -758,6 +737,7 @@ function initEditor(instance: any, tdf: any) {
     }
 
     instance.editor = new JSONEditorAny(container, options);
+    instance.applicabilityController = installSchemaApplicabilityControls(container, instance.editor);
 
     // Flag to skip change detection during initialization
     let isInitializing = true;
@@ -926,6 +906,7 @@ function initEditor(instance: any, tdf: any) {
                 (node.querySelectorAll ? Array.from(node.querySelectorAll('.je-modal')) : []);
 
             for (const modal of modals) {
+                instance.applicabilityController?.sync(modal);
                 // Skip if already processed
                 if (modal.dataset.labelsProcessed) continue;
                 modal.dataset.labelsProcessed = 'true';

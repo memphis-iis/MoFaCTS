@@ -15,7 +15,7 @@
 
 @media (max-width: 768px) {
   #saveClass {
-    min-height: 44px;
+    min-height: var(--button-height);
     padding: 0.75rem 1.5rem;
   }
 }

@@ -1,4 +1,5 @@
 import { clientConsole } from '../../lib/clientLogger';
+import { installSchemaApplicabilityControls } from '../../lib/schemaApplicabilityEditor';
 
 const JSONEditorAny = (globalThis as any).JSONEditor;
 
@@ -162,6 +163,7 @@ export async function createTdfDraftEditor(
 
   let isApplyingValue = false;
   let chromeObserver: MutationObserver | null = null;
+  let applicabilityController: ReturnType<typeof installSchemaApplicabilityControls> | null = null;
   const editor = new JSONEditorAny(container, {
     schema: wrappedSchema,
     startval: { tutor: editorValue },
@@ -200,11 +202,13 @@ export async function createTdfDraftEditor(
 
   editor.on('ready', () => {
     syncDraftEditorChrome(container, editor);
+    applicabilityController = installSchemaApplicabilityControls(container, editor);
     chromeObserver = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
         for (const node of mutation.addedNodes) {
           if (node.nodeType !== 1) continue;
           syncDraftEditorChrome(container, editor, node as HTMLElement);
+          applicabilityController?.sync(node as HTMLElement);
         }
       }
     });
@@ -213,6 +217,7 @@ export async function createTdfDraftEditor(
 
   return {
     destroy() {
+      applicabilityController?.destroy();
       chromeObserver?.disconnect();
       editor.destroy();
     },
