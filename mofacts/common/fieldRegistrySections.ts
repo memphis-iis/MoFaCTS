@@ -1,4 +1,8 @@
 import { createDeliveryParamSchema } from './fieldRegistry.ts';
+import {
+  INTERACTIVE_TDF_UNIT_TYPES,
+  type TdfUnitType,
+} from './fieldApplicability.ts';
 
 type FieldLifecycleStatus = 'supported' | 'deprecated' | 'ignored';
 type ValidatorSeverity = 'error' | 'warning';
@@ -35,6 +39,13 @@ type UiRuntimeValidationDefinition = {
 
 type SectionFieldDefinition = {
   authoringSchema: Record<string, unknown>;
+  surfaces?: {
+    schema?: boolean;
+    editor?: boolean;
+    learnerConfig?: boolean;
+    runtime?: boolean;
+  };
+  appliesToUnitTypes?: readonly TdfUnitType[];
   lifecycle: {
     status: FieldLifecycleStatus;
   };
@@ -405,12 +416,29 @@ function simpleField(
 function createClosedObjectSchema(
   title: string,
   registry: SectionFieldRegistry,
-  required: string[] = []
+  required: string[] = [],
+  defaultApplicableUnitTypes?: readonly TdfUnitType[]
 ): Record<string, unknown> {
   const properties = Object.fromEntries(
     Object.entries(registry)
-      .filter(([, definition]) => definition.lifecycle.status === 'supported')
-      .map(([key, definition]) => [key, deepClone(definition.authoringSchema)])
+      .filter(([, definition]) =>
+        definition.lifecycle.status === 'supported' &&
+        definition.surfaces?.schema !== false
+      )
+      .map(([key, definition]) => {
+        const schema: Record<string, unknown> = {
+          title: definition.tooltip.brief,
+          ...deepClone(definition.authoringSchema),
+        };
+        const applicableUnitTypes = definition.appliesToUnitTypes || defaultApplicableUnitTypes;
+        if (applicableUnitTypes?.length) {
+          schema['x-appliesToUnitTypes'] = [...applicableUnitTypes];
+        }
+        if (definition.surfaces?.editor === false) {
+          schema['x-editor'] = false;
+        }
+        return [key, schema];
+      })
   );
 
   const schema: Record<string, unknown> = {
@@ -486,7 +514,11 @@ function createDeprecatedGuidance(registry: SectionFieldRegistry): Record<string
 function createRuntimeDefaults(registry: SectionFieldRegistry): Record<string, unknown> {
   return Object.fromEntries(
     Object.entries(registry)
-      .filter(([, definition]) => definition.lifecycle.status === 'supported')
+      .filter(([, definition]) =>
+        definition.lifecycle.status === 'supported' &&
+        definition.surfaces?.runtime !== false &&
+        definition.runtime
+      )
       .map(([key, definition]) => [key, definition.runtime?.default])
   );
 }
@@ -594,6 +626,12 @@ const SETSPEC_FIELD_REGISTRY: SectionFieldRegistry = {
   userselect: simpleField(legacyBooleanField('false'), {
     brief: 'Show lesson on the learner dashboard.',
     verbose: 'When enabled, learners can pick this lesson directly from their dashboard.'
+  }),
+  allowRevistUnit: simpleField(legacyBooleanField('false'), {
+    brief: 'Allow revisiting the current unit from instructions.',
+    verbose: 'When enabled at the lesson level, instruction screens expose the current-unit revisit path so a learner can return to the unit instead of only continuing forward.'
+  }, {
+    aliases: ['allowRevisitUnit'],
   }),
   lfparameter: simpleField(withGrid({ anyOf: [{ type: 'string' }, { type: 'number' }] }, 4), {
     brief: 'Fuzzy matching threshold.',
@@ -713,6 +751,24 @@ const SETSPEC_FIELD_REGISTRY: SectionFieldRegistry = {
       severity: 'warning',
     },
   }),
+  audioPromptQuestionVolume: simpleField(withGrid({ anyOf: [{ type: 'string' }, { type: 'number' }] }, 4), {
+    brief: 'Question TTS volume.',
+    verbose: 'Volume adjustment in decibels for spoken question prompts.'
+  }, {
+    validation: {
+      validators: [{ type: 'range', min: -6, max: 6, message: 'Must be between -6 and 6 dB' }],
+      severity: 'warning',
+    },
+  }),
+  audioPromptFeedbackVolume: simpleField(withGrid({ anyOf: [{ type: 'string' }, { type: 'number' }] }, 4), {
+    brief: 'Feedback TTS volume.',
+    verbose: 'Volume adjustment in decibels for spoken feedback prompts.'
+  }, {
+    validation: {
+      validators: [{ type: 'range', min: -6, max: 6, message: 'Must be between -6 and 6 dB' }],
+      severity: 'warning',
+    },
+  }),
   audioPromptSpeakingRate: simpleField(withGrid({ anyOf: [{ type: 'string' }, { type: 'number' }] }, 4), {
     brief: 'Legacy overall speaking rate.',
     verbose: 'Legacy lesson-wide speech speed multiplier.'
@@ -745,6 +801,51 @@ const SETSPEC_FIELD_REGISTRY: SectionFieldRegistry = {
   condition: simpleField(stringArrayField('Conditions', 'Condition'), {
     brief: 'Experiment condition file names.',
     verbose: 'Condition TDF filenames used by root experiments.'
+  }),
+  conditionTdfIds: simpleField({
+    type: 'array',
+    title: 'Condition TDF IDs',
+    items: {
+      anyOf: [{ type: 'string' }, { type: 'null' }],
+      title: 'Condition TDF ID',
+    },
+  }, {
+    brief: 'Resolved condition TDF IDs.',
+    verbose: 'Server-resolved TDF IDs corresponding to condition filenames. Used by experiment dashboards and package workflows.'
+  }, {
+    surfaces: { learnerConfig: false },
+  }),
+  duedate: simpleField(stringField('', 4), {
+    brief: 'Class practice due date.',
+    verbose: 'Due date used by instructor reporting/class practice deadline UI.'
+  }, {
+    surfaces: { learnerConfig: false },
+  }),
+  showPageNumbers: simpleField(legacyBooleanField('false'), {
+    brief: 'Show page numbers.',
+    verbose: 'Controls whether page numbers are shown in the legacy lesson chrome.'
+  }, {
+    surfaces: { learnerConfig: false },
+  }),
+  recordInstructions: simpleField({
+    anyOf: [
+      { type: 'boolean' },
+      { type: 'string', enum: ['true', 'false'] },
+      {
+        type: 'array',
+        title: 'Instruction Unit Numbers',
+        items: {
+          anyOf: [{ type: 'integer' }, { type: 'string' }],
+          title: 'Unit Number',
+        },
+      },
+    ],
+    options: { grid_columns: 4 },
+  }, {
+    brief: 'Record instruction viewing time.',
+    verbose: 'Controls instruction-view logging. Supports true/false or an array of unit numbers whose instruction screens should be recorded.'
+  }, {
+    surfaces: { learnerConfig: false },
   }),
   randomizedDelivery: simpleField({
     type: 'array',
@@ -785,18 +886,12 @@ const SETSPEC_FIELD_REGISTRY: SectionFieldRegistry = {
     brief: 'Simulation accuracy probability.',
     verbose: 'Probability of a correct response during simulated runs.'
   }),
-  allowRevistUnit: simpleField(legacyBooleanField('false'), {
-    brief: 'Allow revisiting previous units.',
-    verbose: 'Misspelled compatibility flag that allows going back to a previous unit.'
-  }, {
-    aliases: ['allowRevisitUnit'],
-  }),
 };
 
 const UI_SETTINGS_FIELD_REGISTRY: SectionFieldRegistry = {
   stimuliPosition: simpleField(enumStringField(['top', 'left'], 'top', 4), {
     brief: 'Prompt placement.',
-    verbose: 'Position the stimulus above or to the left of the response area.'
+    verbose: 'Position of the prompt relative to the response area. Options are "top" or "left"; default is "top".'
   }, {
     runtime: {
       default: 'top',
@@ -808,6 +903,12 @@ const UI_SETTINGS_FIELD_REGISTRY: SectionFieldRegistry = {
     brief: 'Flag the unit as a video session.',
     verbose: 'Runtime marker for video-session rendering and controls.'
   }, {
+    appliesToUnitTypes: ['video'],
+    surfaces: {
+      schema: false,
+      learnerConfig: false,
+      editor: false,
+    },
     runtime: {
       default: false,
       coerce: 'boolean',
@@ -818,6 +919,12 @@ const UI_SETTINGS_FIELD_REGISTRY: SectionFieldRegistry = {
     brief: 'Resolved video URL.',
     verbose: 'Runtime-resolved video URL passed into the Svelte video session UI.'
   }, {
+    appliesToUnitTypes: ['video'],
+    surfaces: {
+      schema: false,
+      learnerConfig: false,
+      editor: false,
+    },
     runtime: {
       default: '',
       coerce: 'none',
@@ -895,7 +1002,7 @@ const UI_SETTINGS_FIELD_REGISTRY: SectionFieldRegistry = {
     },
     {
       brief: 'Show the learner answer in feedback.',
-      verbose: 'Show submitted learner text on correct answers, incorrect answers, both, or neither.'
+      verbose: 'Controls when the learner’s submitted answer is shown in feedback. Options are "onCorrect", "onIncorrect", true for always, or false for never.'
     },
     {
       runtime: {
@@ -907,7 +1014,7 @@ const UI_SETTINGS_FIELD_REGISTRY: SectionFieldRegistry = {
   ),
   singleLineFeedback: simpleField(booleanField(false, 4), {
     brief: 'Force feedback onto one line.',
-    verbose: 'Strip line breaks from feedback text for a compact single-line layout.'
+    verbose: 'When true, keeps feedback on one line by stripping line breaks. When false, answer text can drop beneath the Correct/Incorrect label.'
   }, {
     runtime: {
       default: false,
@@ -921,37 +1028,27 @@ const UI_SETTINGS_FIELD_REGISTRY: SectionFieldRegistry = {
         { type: 'boolean' },
         { type: 'string', enum: ['onCorrect', 'onIncorrect'] },
       ],
-      default: 'onCorrect',
+      default: false,
       options: { grid_columns: 4 },
     },
     {
       brief: 'Use simplified feedback.',
-      verbose: 'Show only the simple correct/incorrect label for some or all feedback cases.'
+      verbose: 'Replaces full feedback with just the simple Correct/Incorrect label. Options are "onCorrect", "onIncorrect", true for both, or false for full feedback. Default is false.'
     },
     {
       runtime: {
-        default: 'onCorrect',
+        default: false,
         coerce: 'boolean',
         validation: { kind: 'booleanOrEnum', values: ['onCorrect', 'onIncorrect'] },
       },
     }
   ),
-  displayUserAnswerInCorrectFeedback: simpleField(booleanField(false, 4), {
-    brief: 'Show learner answer on correct feedback.',
-    verbose: 'Compatibility split flag for correct-answer feedback.'
+  displayCorrectAnswerInIncorrectFeedback: simpleField(booleanField(false, 4), {
+    brief: 'Show the correct answer after incorrect feedback.',
+    verbose: 'When true, includes the actual correct answer in incorrect feedback after the Incorrect label. Default is false.'
   }, {
     runtime: {
       default: false,
-      coerce: 'boolean',
-      validation: { kind: 'boolean' },
-    },
-  }),
-  displayUserAnswerInIncorrectFeedback: simpleField(booleanField(true, 4), {
-    brief: 'Show learner answer on incorrect feedback.',
-    verbose: 'Compatibility split flag for incorrect-answer feedback.'
-  }, {
-    runtime: {
-      default: true,
       coerce: 'boolean',
       validation: { kind: 'boolean' },
     },
@@ -978,7 +1075,7 @@ const UI_SETTINGS_FIELD_REGISTRY: SectionFieldRegistry = {
   }),
   choiceButtonCols: simpleField(integerField(1, 4), {
     brief: 'Number of button columns.',
-    verbose: 'Preferred column count for multiple-choice button layouts.'
+    verbose: 'Number of columns for multiple-choice button layout. Default is 1.'
   }, {
     runtime: {
       default: 1,
@@ -998,7 +1095,7 @@ const UI_SETTINGS_FIELD_REGISTRY: SectionFieldRegistry = {
   }),
   inputPlaceholderText: simpleField(stringField('Type your answer here...', 12), {
     brief: 'Input placeholder text.',
-    verbose: 'Placeholder text shown in the learner response box.'
+    verbose: 'Placeholder text shown in the learner answer input. Default is "Type your answer here...".'
   }, {
     runtime: {
       default: 'Type your answer here...',
@@ -1008,7 +1105,7 @@ const UI_SETTINGS_FIELD_REGISTRY: SectionFieldRegistry = {
   }),
   displayConfirmButton: simpleField(booleanField(false, 4), {
     brief: 'Show confirm button.',
-    verbose: 'Show a confirmation button before continuing past a state.'
+    verbose: 'When true, adds a confirm button that must be clicked before proceeding. Default is false.'
   }, {
     runtime: {
       default: false,
@@ -1018,8 +1115,9 @@ const UI_SETTINGS_FIELD_REGISTRY: SectionFieldRegistry = {
   }),
   continueButtonText: simpleField(stringField('Continue', 6), {
     brief: 'Continue button text.',
-    verbose: 'Label shown on continue/confirm buttons.'
+    verbose: 'Text shown on Continue or Confirm buttons. Default is "Continue".'
   }, {
+    appliesToUnitTypes: ['learning', 'assessment', 'video', 'instructions'],
     runtime: {
       default: 'Continue',
       coerce: 'none',
@@ -1028,8 +1126,9 @@ const UI_SETTINGS_FIELD_REGISTRY: SectionFieldRegistry = {
   }),
   skipStudyButtonText: simpleField(stringField('Skip', 6), {
     brief: 'Skip study button text.',
-    verbose: 'Label shown on the study-skip button when skip-study is enabled.'
+    verbose: 'Label shown on the Skip Study button when study skipping is enabled. Default is "Skip".'
   }, {
+    appliesToUnitTypes: ['learning', 'assessment'],
     runtime: {
       default: 'Skip',
       coerce: 'none',
@@ -1056,174 +1155,16 @@ const UI_SETTINGS_FIELD_REGISTRY: SectionFieldRegistry = {
       validation: { kind: 'boolean' },
     },
   }),
-  showStimuliBox: {
-    authoringSchema: booleanField(true, 4),
-    lifecycle: { status: 'deprecated' },
-    tooltip: { brief: 'Deprecated.', verbose: 'Deprecated layout flag.' },
-    migration: { note: 'Layout is auto-computed; no replacement needed' },
-  },
-  stimuliBoxColor: {
-    authoringSchema: stringField('', 4),
-    lifecycle: { status: 'deprecated' },
-    tooltip: { brief: 'Deprecated.', verbose: 'Deprecated layout color override.' },
-    migration: { note: 'Use theme colors instead' },
-  },
-  instructionsTitleDisplay: {
-    authoringSchema: stringField('', 4),
-    lifecycle: { status: 'deprecated' },
-    tooltip: { brief: 'Deprecated.', verbose: 'Deprecated instructions header option.' },
-    migration: { note: 'Not used in deployments; instructions simplified' },
-  },
-  feedbackDisplayPosition: {
-    authoringSchema: stringField('', 4),
-    lifecycle: { status: 'deprecated' },
-    tooltip: { brief: 'Deprecated.', verbose: 'Deprecated feedback placement override.' },
-    migration: { note: 'Auto-computed based on layout' },
-  },
-  displayPerformanceDuringStudy: {
-    authoringSchema: booleanField(false, 4),
-    lifecycle: { status: 'deprecated' },
-    tooltip: { brief: 'Deprecated.', verbose: 'Deprecated split performance toggle.' },
-    migration: { note: 'Use displayPerformance instead' },
-  },
-  displayPerformanceDuringTrial: {
-    authoringSchema: booleanField(true, 4),
-    lifecycle: { status: 'deprecated' },
-    tooltip: { brief: 'Deprecated.', verbose: 'Deprecated split performance toggle.' },
-    migration: { note: 'Use displayPerformance instead' },
-  },
-  displayProgressBar: {
-    authoringSchema: booleanField(false, 4),
-    lifecycle: { status: 'deprecated' },
-    tooltip: { brief: 'Deprecated.', verbose: 'Deprecated progress bar flag.' },
-    migration: { note: 'Performance stats are shown when displayPerformance is true' },
-  },
-  fadeInDuration: {
-    authoringSchema: integerField(300, 4),
-    lifecycle: { status: 'deprecated' },
-    tooltip: { brief: 'Deprecated.', verbose: 'Deprecated transition duration.' },
-    migration: { note: 'Transitions handled by CSS; no replacement needed' },
-  },
-  fadeOutDuration: {
-    authoringSchema: integerField(200, 4),
-    lifecycle: { status: 'deprecated' },
-    tooltip: { brief: 'Deprecated.', verbose: 'Deprecated transition duration.' },
-    migration: { note: 'Transitions handled by CSS; no replacement needed' },
-  },
-  displayFeedback: {
-    authoringSchema: booleanField(true, 4),
-    lifecycle: { status: 'deprecated' },
-    tooltip: { brief: 'Deprecated.', verbose: 'Deprecated master feedback flag.' },
-    migration: { note: 'Control feedback display via deliveryParams feedback timeout (0ms = no feedback)' },
-  },
-  simplefeedbackOnCorrect: {
-    authoringSchema: booleanField(false, 4),
-    lifecycle: { status: 'deprecated' },
-    tooltip: { brief: 'Deprecated.', verbose: 'Deprecated split simple-feedback flag.' },
-    migration: { note: 'Use onlyShowSimpleFeedback instead' },
-  },
-  simplefeedbackOnIncorrect: {
-    authoringSchema: booleanField(false, 4),
-    lifecycle: { status: 'deprecated' },
-    tooltip: { brief: 'Deprecated.', verbose: 'Deprecated split simple-feedback flag.' },
-    migration: { note: 'Use onlyShowSimpleFeedback instead' },
-  },
-  displayCorrectAnswerInCenter: {
-    authoringSchema: booleanField(false, 4),
-    lifecycle: { status: 'deprecated' },
-    tooltip: { brief: 'Deprecated.', verbose: 'Deprecated centered-answer feedback flag.' },
-    migration: { note: 'Not implemented in Svelte; feedback handles answer display' },
-  },
-  suppressFeedbackDisplay: {
-    authoringSchema: booleanField(false, 4),
-    lifecycle: { status: 'deprecated' },
-    tooltip: { brief: 'Deprecated.', verbose: 'Deprecated suppress-feedback flag.' },
-    migration: { note: 'Set deliveryParams feedback timeout to 0ms instead' },
-  },
-  timeoutThreshold: {
-    authoringSchema: integerField(undefined, 4),
-    lifecycle: { status: 'deprecated' },
-    tooltip: { brief: 'Deprecated.', verbose: 'Deprecated timeout threshold.' },
-    migration: { note: 'Not used; no replacement needed' },
-  },
-  displayCardTimeoutAsBarOrText: {
-    authoringSchema: stringField('', 4),
-    lifecycle: { status: 'deprecated' },
-    tooltip: { brief: 'Deprecated.', verbose: 'Deprecated timeout display mode.' },
-    migration: { note: 'Use displayTimeoutBar boolean instead' },
-  },
-  displayReviewTimeoutAsBarOrText: {
-    authoringSchema: stringField('', 4),
-    lifecycle: { status: 'deprecated' },
-    tooltip: { brief: 'Deprecated.', verbose: 'Deprecated timeout display mode.' },
-    migration: { note: 'Use displayTimeoutBar boolean instead' },
-  },
-  displayReadyPromptTimeoutAsBarOrText: {
-    authoringSchema: stringField('', 4),
-    lifecycle: { status: 'deprecated' },
-    tooltip: { brief: 'Deprecated.', verbose: 'Deprecated timeout display mode.' },
-    migration: { note: 'Use displayTimeoutBar boolean instead' },
-  },
-  displayTimeOutDuringStudy: {
-    authoringSchema: booleanField(true, 4),
-    lifecycle: { status: 'deprecated' },
-    tooltip: { brief: 'Deprecated.', verbose: 'Deprecated study-timeout display flag.' },
-    migration: { note: 'Timeout behavior controlled by deliveryParams' },
-  },
-  displayMultipleChoiceButtons: {
-    authoringSchema: booleanField(true, 4),
-    lifecycle: { status: 'deprecated' },
-    tooltip: { brief: 'Deprecated.', verbose: 'Deprecated explicit MC flag.' },
-    migration: { note: 'Multiple choice is auto-detected from stimulus distractors' },
-  },
-  displayTextInput: {
-    authoringSchema: booleanField(true, 4),
-    lifecycle: { status: 'deprecated' },
-    tooltip: { brief: 'Deprecated.', verbose: 'Deprecated explicit text-input flag.' },
-    migration: { note: 'Text input is auto-detected from trial type' },
-  },
-  enableAudio: {
-    authoringSchema: booleanField(false, 4),
-    lifecycle: { status: 'deprecated' },
-    tooltip: { brief: 'Deprecated.', verbose: 'Deprecated audio toggle.' },
-    migration: { note: 'Configure learner audio behavior via setspec audio prompt settings instead' },
-  },
-  enableSpeechRecognition: {
-    authoringSchema: booleanField(false, 4),
-    lifecycle: { status: 'deprecated' },
-    tooltip: { brief: 'Deprecated.', verbose: 'Deprecated SR toggle.' },
-    migration: { note: 'Use setspec audioInputEnabled and related audio settings instead' },
-  },
-  lastVideoModalText: {
-    authoringSchema: stringField('', 12),
-    lifecycle: { status: 'deprecated' },
-    tooltip: { brief: 'Deprecated.', verbose: 'Deprecated final-video modal override.' },
-    migration: { note: 'Video session uses default modal text' },
-  },
-  textInputDisplay: {
-    authoringSchema: stringField('', 6),
-    lifecycle: { status: 'deprecated' },
-    tooltip: { brief: 'Deprecated.', verbose: 'Deprecated CSS/input customization hook.' },
-    migration: { note: 'CSS class customization removed' },
-  },
-  experimentLoginText: {
-    authoringSchema: stringField('', 12),
-    lifecycle: { status: 'deprecated' },
-    tooltip: { brief: 'Deprecated.', verbose: 'Deprecated login prompt override.' },
-    migration: { note: 'Handled at login screen level' },
-  },
-  displayUserAnswerAtTop: {
-    authoringSchema: booleanField(false, 4),
-    lifecycle: { status: 'deprecated' },
-    tooltip: { brief: 'Deprecated.', verbose: 'Deprecated feedback layout flag.' },
-    migration: { note: 'Feedback layout no longer supports this split mode' },
-  },
-  stackChoiceButtons: {
-    authoringSchema: booleanField(false, 4),
-    lifecycle: { status: 'deprecated' },
-    tooltip: { brief: 'Deprecated.', verbose: 'Deprecated button layout flag.' },
-    migration: { note: 'Use choiceButtonCols instead' },
-  },
+  experimentLoginText: simpleField(stringField('', 12), {
+    brief: 'Experiment login prompt.',
+    verbose: 'Prompt text shown in the experiment login username field. This is read from setspec.uiSettings during experiment launch.'
+  }, {
+    surfaces: {
+      learnerConfig: false,
+      runtime: false,
+    },
+    appliesToUnitTypes: ['instructions'],
+  }),
 };
 
 const UNIT_FIELD_REGISTRY: SectionFieldRegistry = {
@@ -1284,6 +1225,12 @@ const UNIT_FIELD_REGISTRY: SectionFieldRegistry = {
       verbose: 'Unit-level completion-counting hook for experiments.'
     }
   ),
+  recordInstructions: simpleField(legacyBooleanField('true'), {
+    brief: 'Record this instruction screen.',
+    verbose: 'Controls whether instruction viewing time is logged for this unit.'
+  }, {
+    surfaces: { learnerConfig: false },
+  }),
   turkemailsubject: simpleField(stringField('', 12), {
     brief: 'MTurk reminder email subject.',
     verbose: 'Subject line used for Turk reminder messages.'
@@ -1350,13 +1297,11 @@ const LEARNING_SESSION_FIELD_REGISTRY: SectionFieldRegistry = {
     brief: 'Custom probability function.',
     verbose: 'JavaScript function body used to customize item probability calculations.'
   }),
-  displayminseconds: simpleField(withGrid({ anyOf: [{ type: 'string' }, { type: 'integer' }] }, 4), {
-    brief: 'Minimum practice time.',
-    verbose: 'Minimum allowed practice duration before advancing.'
-  }),
-  displaymaxseconds: simpleField(withGrid({ anyOf: [{ type: 'string' }, { type: 'integer' }] }, 4), {
-    brief: 'Maximum practice time.',
-    verbose: 'Maximum allowed practice duration before forcing advancement.'
+  stimulusfile: simpleField(stringField('', 12), {
+    brief: 'Learning-session stimulus file.',
+    verbose: 'Optional learning-session-level stimulus filename used by content lookup workflows.'
+  }, {
+    surfaces: { learnerConfig: false },
   }),
 };
 
@@ -1501,6 +1446,28 @@ const VIDEO_SESSION_FIELD_REGISTRY: SectionFieldRegistry = {
     brief: 'Custom probability function.',
     verbose: 'Probability function used by adaptive video question selection.'
   }),
+  adaptiveLogic: simpleField({
+    anyOf: [
+      {
+        type: 'array',
+        title: 'Adaptive Logic Rules',
+        items: {
+          type: 'string',
+          title: 'Adaptive Logic Rule',
+        },
+      },
+      {
+        type: 'object',
+        title: 'Adaptive Logic',
+        additionalProperties: true,
+      },
+    ],
+  }, {
+    brief: 'Adaptive video question logic.',
+    verbose: 'Adaptive logic rules used by video sessions to select or insert questions/checkpoints.'
+  }, {
+    surfaces: { learnerConfig: false },
+  }),
   displayText: simpleField(textareaField(''), {
     brief: 'Supplemental video text.',
     verbose: 'Display text associated with the video session.'
@@ -1540,19 +1507,19 @@ const STIM_CLUSTER_FIELD_REGISTRY: SectionFieldRegistry = {
 const STIM_DISPLAY_FIELD_REGISTRY: SectionFieldRegistry = {
   text: simpleField(textareaField(''), {
     brief: 'Question/stimulus text.',
-    verbose: 'Main text prompt shown to the learner.'
+    verbose: 'Main question or stimulus text displayed to the learner. HTML is supported for formatting.'
   }),
   clozeText: simpleField(textareaField(''), {
     brief: 'Cloze sentence text.',
-    verbose: 'Fill-in-the-blank sentence or phrase.'
+    verbose: 'Question text with a blank for fill-in. Use with clozeStimulus for the answer word.'
   }),
   clozeStimulus: simpleField(stringField('', 12), {
     brief: 'Cloze answer token.',
-    verbose: 'Answer token paired with the cloze prompt.'
+    verbose: 'The answer word to insert in the clozeText blank. Paired with clozeText for fill-in-the-blank questions.'
   }),
   imgSrc: simpleField(stringField('', 12), {
     brief: 'Stim image filename.',
-    verbose: 'Image asset displayed for this stimulus.'
+    verbose: 'Filename of the image to display as the stimulus. Accepted formats include JPEG, PNG, GIF, WebP, and SVG; the file must be uploaded in the same package.'
   }, {
     validation: {
       validators: [{ type: 'mediaExists', mediaType: 'image', message: 'Image file not found' }],
@@ -1561,7 +1528,7 @@ const STIM_DISPLAY_FIELD_REGISTRY: SectionFieldRegistry = {
   }),
   audioSrc: simpleField(stringField('', 12), {
     brief: 'Stim audio filename.',
-    verbose: 'Audio asset played for this stimulus.'
+    verbose: 'Filename of the audio to play as the stimulus. Accepted formats include MP3, WAV, OGG, and M4A; the file must be uploaded in the same package.'
   }, {
     validation: {
       validators: [{ type: 'mediaExists', mediaType: 'audio', message: 'Audio file not found' }],
@@ -1570,7 +1537,7 @@ const STIM_DISPLAY_FIELD_REGISTRY: SectionFieldRegistry = {
   }),
   videoSrc: simpleField(stringField('', 12), {
     brief: 'Stim video URL or filename.',
-    verbose: 'Video asset or URL shown for this stimulus.'
+    verbose: 'URL or filename of the video to display. Accepted formats include MP4, WebM, and OGG; values can be external URLs or uploaded local files.'
   }, {
     validation: {
       validators: [{ type: 'urlOrMediaExists', mediaType: 'video', message: 'Video file not found and not a valid URL' }],
@@ -1617,7 +1584,7 @@ const STIM_DISPLAY_FIELD_REGISTRY: SectionFieldRegistry = {
 const STIM_RESPONSE_FIELD_REGISTRY: SectionFieldRegistry = {
   correctResponse: simpleField(stringField('', 12), {
     brief: 'Expected correct response.',
-    verbose: 'Primary answer used for evaluation and feedback.'
+    verbose: 'The exact answer the learner should provide. Used for answer evaluation and feedback.'
   }, {
     validation: {
       validators: [
@@ -1629,7 +1596,7 @@ const STIM_RESPONSE_FIELD_REGISTRY: SectionFieldRegistry = {
   }),
   incorrectResponses: simpleField(stringArrayField('Incorrect Responses', 'Incorrect Response'), {
     brief: 'Common incorrect responses.',
-    verbose: 'Distractor or grammar-support responses for button/SR flows.'
+    verbose: 'Array of common incorrect answers. Optional, but useful for multiple-choice distractors and speech-recognition grammar support.'
   }, {
     validation: {
       validators: [
@@ -1644,7 +1611,7 @@ const STIM_RESPONSE_FIELD_REGISTRY: SectionFieldRegistry = {
 const STIM_FIELD_REGISTRY: SectionFieldRegistry = {
   parameter: simpleField(stringField('', 6), {
     brief: 'Stimulus parameter metadata.',
-    verbose: 'Comma-delimited advanced metadata, often including optimal probability.'
+    verbose: 'Comma-separated optional parameters for advanced scoring algorithms. The second value is reserved for the item-specific optimal difficulty threshold.'
   }, {
     validation: {
       validators: [{ type: 'parameterFormat', message: 'Parameter should be "number,number" format (e.g., "0,.7")' }],
@@ -1662,7 +1629,7 @@ const STIM_FIELD_REGISTRY: SectionFieldRegistry = {
   }),
   speechHintExclusionList: simpleField(stringField('', 12), {
     brief: 'Speech-hint exclusion list.',
-    verbose: 'Comma-delimited words excluded from SR grammar support.'
+    verbose: 'Comma-delimited words to exclude from speech-recognition matching, helping prevent false positives for common words.'
   }),
   alternateDisplays: simpleField({
     type: 'array',
@@ -1670,7 +1637,7 @@ const STIM_FIELD_REGISTRY: SectionFieldRegistry = {
     items: createClosedObjectSchema('Alternate Display', STIM_DISPLAY_FIELD_REGISTRY),
   }, {
     brief: 'Alternate display variants.',
-    verbose: 'Additional display objects that can be used as alternate prompt presentations.'
+    verbose: 'Array of alternate display objects, such as clozeText/clozeStimulus pairs, that provide additional question variations for the same item.'
   }),
 };
 
@@ -1678,20 +1645,26 @@ const SETSPEC_DIRECT_RUNTIME_KEYS = Object.freeze([
   'allowRevistUnit',
   'audioInputEnabled',
   'audioInputSensitivity',
+  'audioPromptFeedbackVolume',
   'audioPromptFeedbackVoice',
   'audioPromptMode',
   'audioPromptQuestionSpeakingRate',
+  'audioPromptQuestionVolume',
   'audioPromptSpeakingRate',
   'audioPromptVoice',
   'condition',
+  'conditionTdfIds',
   'countcompletion',
   'disableProgressReport',
+  'duedate',
   'enableAudioPromptAndFeedback',
   'experimentPasswordRequired',
   'loadbalancing',
   'prestimulusDisplay',
   'progressReporterParams',
   'randomizedDelivery',
+  'recordInstructions',
+  'showPageNumbers',
   'speechRecognitionLanguage',
   'speechIgnoreOutOfGrammarResponses',
   'speechOutOfGrammarFeedback',
@@ -1712,6 +1685,7 @@ const UNIT_DIRECT_RUNTIME_KEYS = Object.freeze([
   'instructionmaxseconds',
   'instructionminseconds',
   'picture',
+  'recordInstructions',
   'turkbonus',
   'turkemail',
   'turkemailsubject',
@@ -1723,8 +1697,7 @@ const UNIT_DIRECT_RUNTIME_KEYS = Object.freeze([
 const LEARNING_SESSION_DIRECT_RUNTIME_KEYS = Object.freeze([
   'calculateProbability',
   'clusterlist',
-  'displaymaxseconds',
-  'displayminseconds',
+  'stimulusfile',
   'unitMode',
 ]);
 
@@ -1740,6 +1713,7 @@ const ASSESSMENT_SESSION_DIRECT_RUNTIME_KEYS = Object.freeze([
 ]);
 
 const VIDEO_SESSION_DIRECT_RUNTIME_KEYS = Object.freeze([
+  'adaptiveLogic',
   'calculateProbability',
   'checkpointBehavior',
   'checkpoints',
@@ -1781,10 +1755,33 @@ const STIM_RESPONSE_DIRECT_RUNTIME_KEYS = Object.freeze([
   'incorrectResponses',
 ]);
 
-export const UI_SETTINGS_SUPPORTED_KEYS = Object.freeze(
+const UI_SETTINGS_SUPPORTED_KEYS = Object.freeze(
   Object.keys(UI_SETTINGS_FIELD_REGISTRY).filter(
     (key) => UI_SETTINGS_FIELD_REGISTRY[key]?.lifecycle.status === 'supported'
   )
+);
+
+export const UI_SETTINGS_LEARNER_CONFIGURABLE_KEYS = Object.freeze(
+  UI_SETTINGS_SUPPORTED_KEYS.filter(
+    (key) => UI_SETTINGS_FIELD_REGISTRY[key]?.surfaces?.learnerConfig !== false
+  )
+);
+
+export const UI_SETTINGS_RUNTIME_KEYS = Object.freeze(
+  UI_SETTINGS_SUPPORTED_KEYS.filter(
+    (key) =>
+      UI_SETTINGS_FIELD_REGISTRY[key]?.surfaces?.runtime !== false &&
+      Boolean(UI_SETTINGS_FIELD_REGISTRY[key]?.runtime)
+  )
+);
+
+export const UI_SETTINGS_APPLICABILITY = Object.freeze(
+  Object.fromEntries(
+    UI_SETTINGS_SUPPORTED_KEYS.map((key) => [
+      key,
+      [...(UI_SETTINGS_FIELD_REGISTRY[key]?.appliesToUnitTypes || INTERACTIVE_TDF_UNIT_TYPES)],
+    ])
+  ) as Record<string, readonly TdfUnitType[]>
 );
 
 export const UI_SETTINGS_RUNTIME_DEFAULTS = Object.freeze(
@@ -1797,6 +1794,9 @@ export const UI_SETTINGS_DEPRECATED_GUIDANCE = Object.freeze(
 
 export const UI_SETTINGS_RUNTIME_INVENTORY = Object.freeze({
   supportedKeys: UI_SETTINGS_SUPPORTED_KEYS,
+  runtimeKeys: UI_SETTINGS_RUNTIME_KEYS,
+  learnerConfigurableKeys: UI_SETTINGS_LEARNER_CONFIGURABLE_KEYS,
+  applicability: UI_SETTINGS_APPLICABILITY,
   deprecatedKeys: Object.keys(UI_SETTINGS_DEPRECATED_GUIDANCE),
 });
 
@@ -1819,7 +1819,7 @@ export function coerceAndValidateUiSetting(fieldName: string, rawValue: unknown)
 }
 
 function createUiSettingsSchema(): Record<string, unknown> {
-  return createClosedObjectSchema('UI Settings', UI_SETTINGS_FIELD_REGISTRY);
+  return createClosedObjectSchema('UI Settings', UI_SETTINGS_FIELD_REGISTRY, [], INTERACTIVE_TDF_UNIT_TYPES);
 }
 
 function createConditionTemplateSchema(): Record<string, unknown> {
@@ -2036,7 +2036,7 @@ export const TDF_REGISTRY_SECTIONS: RegistrySectionDescriptor[] = [
     schemaPath: ['tutor', 'setspec', 'uiSettings'],
     tooltipPrefixes: ['setspec.uiSettings', 'unit[].uiSettings', 'setspec.unitTemplate[].uiSettings'],
     registry: UI_SETTINGS_FIELD_REGISTRY,
-    directRuntimeKeys: UI_SETTINGS_SUPPORTED_KEYS,
+    directRuntimeKeys: UI_SETTINGS_LEARNER_CONFIGURABLE_KEYS,
   },
   {
     schemaLabel: 'tutor.unit[]',

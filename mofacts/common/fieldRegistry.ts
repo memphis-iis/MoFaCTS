@@ -1,3 +1,8 @@
+import {
+  INTERACTIVE_TDF_UNIT_TYPES,
+  type TdfUnitType,
+} from './fieldApplicability.ts';
+
 type FieldLifecycleStatus = 'supported' | 'deprecated' | 'ignored';
 type DeliveryParamValue = string | number | boolean | undefined;
 type DeliveryParamAuthoringType = 'booleanString' | 'integer' | 'number' | 'string';
@@ -6,8 +11,8 @@ type DeliveryParamNormalizerKind =
   | 'integer'
   | 'lowercaseString'
   | 'number'
-  | 'string'
-  | 'studyFirst';
+  | 'studyFirst'
+  | 'string';
 type DeliveryParamValidationKind = 'enum' | 'none' | 'nonNegativeInteger' | 'range';
 type ValidatorSeverity = 'error' | 'warning';
 
@@ -22,6 +27,13 @@ type DeliveryParamValidationDefinition = {
 
 type DeliveryParamFieldDefinition = {
   section: 'deliveryparams';
+  surfaces?: {
+    schema?: boolean;
+    editor?: boolean;
+    learnerConfig?: boolean;
+    runtime?: boolean;
+  };
+  appliesToUnitTypes?: readonly TdfUnitType[];
   authoring: {
     type: DeliveryParamAuthoringType;
     default?: string | number;
@@ -97,25 +109,18 @@ function normalizeStringValue(value: unknown): string {
 }
 
 function normalizeStudyFirstValue(value: unknown): number {
-  const trimmed = toTrimmedString(value);
-  if (!trimmed.length) {
+  const trimmed = toTrimmedString(value).toLowerCase();
+  if (!trimmed || trimmed === 'false') {
     return 0;
   }
-
-  const lowered = trimmed.toLowerCase();
-  if (lowered === 'true') {
+  if (trimmed === 'true') {
     return 1;
   }
-  if (lowered === 'false') {
-    return 0;
-  }
-
-  const parsed = Number(trimmed);
+  const parsed = Number.parseFloat(trimmed);
   if (!Number.isFinite(parsed)) {
     return 0;
   }
-
-  return Math.min(1, Math.max(0, parsed));
+  return Math.max(0, Math.min(1, parsed));
 }
 
 function normalizeDeliveryParamValueByKind(
@@ -131,27 +136,16 @@ function normalizeDeliveryParamValueByKind(
       return normalizeLowercaseStringValue(value);
     case 'number':
       return normalizeNumberValue(value);
-    case 'string':
-      return normalizeStringValue(value);
     case 'studyFirst':
       return normalizeStudyFirstValue(value);
+    case 'string':
+      return normalizeStringValue(value);
     default:
       return value as DeliveryParamValue;
   }
 }
 
 export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
-  showhistory: {
-    section: 'deliveryparams',
-    authoring: { type: 'booleanString', default: 'false', editor: { gridColumns: 4 } },
-    runtime: { default: false, normalize: 'boolean' },
-    lifecycle: { status: 'supported' },
-    tooltip: {
-      brief: 'Show scrolling response history.',
-      verbose: 'When "true", enables the scrolling history display during practice so prior responses remain visible.'
-    },
-    validation: { kind: 'enum', severity: 'error', message: 'Must be "true" or "false"', values: ['true', 'false'] }
-  },
   forceCorrection: {
     section: 'deliveryparams',
     authoring: { type: 'booleanString', default: 'false', editor: { gridColumns: 4 } },
@@ -159,12 +153,13 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     lifecycle: { status: 'supported' },
     tooltip: {
       brief: 'Require correct answer entry before advancing.',
-      verbose: 'When "true", the learner must type the correct answer after feedback before the card can advance.'
+      verbose: 'When "true", forces the learner to type the correct response after feedback before proceeding.'
     },
     validation: { kind: 'enum', severity: 'error', message: 'Must be "true" or "false"', values: ['true', 'false'] }
   },
   scoringEnabled: {
     section: 'deliveryparams',
+    appliesToUnitTypes: ['learning'],
     authoring: { type: 'booleanString', default: 'true', editor: { gridColumns: 4 } },
     runtime: { default: true, normalize: 'boolean' },
     lifecycle: { status: 'supported' },
@@ -174,25 +169,51 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     },
     validation: { kind: 'enum', severity: 'error', message: 'Must be "true" or "false"', values: ['true', 'false'] }
   },
+  forceSpacing: {
+    section: 'deliveryparams',
+    appliesToUnitTypes: ['learning'],
+    authoring: { type: 'booleanString', default: 'false', editor: { gridColumns: 4 } },
+    runtime: { default: false, normalize: 'boolean' },
+    lifecycle: { status: 'supported' },
+    tooltip: {
+      brief: 'Prevent immediate repeats in adaptive scheduling.',
+      verbose: 'When "true", the adaptive scheduler requires at least one intervening trial before the same item can be selected again.'
+    },
+    validation: { kind: 'enum', severity: 'error', message: 'Must be "true" or "false"', values: ['true', 'false'] }
+  },
+  optimalThreshold: {
+    section: 'deliveryparams',
+    appliesToUnitTypes: ['learning'],
+    authoring: { type: 'number', default: 0.9, editor: { gridColumns: 4 } },
+    runtime: { default: 0.9, normalize: 'number' },
+    lifecycle: { status: 'supported' },
+    tooltip: {
+      brief: 'Target recall probability for adaptive scheduling.',
+      verbose: 'Probability threshold used by the adaptive scheduler when selecting the next item; values should be between 0 and 1.'
+    },
+    validation: { kind: 'range', severity: 'error', min: 0, max: 1, message: 'Must be between 0 and 1' }
+  },
+  studyFirst: {
+    section: 'deliveryparams',
+    appliesToUnitTypes: ['learning'],
+    authoring: { type: 'number', default: 0, editor: { gridColumns: 4 } },
+    runtime: { default: 0, normalize: 'studyFirst' },
+    lifecycle: { status: 'supported' },
+    tooltip: {
+      brief: 'Probability of showing study before first drill.',
+      verbose: 'Controls whether an item is first presented as study before drill/test; 0 disables it, 1 always shows study first, and values between 0 and 1 apply probabilistically.'
+    },
+    validation: { kind: 'range', severity: 'error', min: 0, max: 1, message: 'Must be between 0 and 1' }
+  },
   purestudy: {
     section: 'deliveryparams',
+    appliesToUnitTypes: ['learning', 'assessment'],
     authoring: { type: 'integer', default: 0, editor: { gridColumns: 4 } },
     runtime: { default: 0, normalize: 'integer' },
     lifecycle: { status: 'supported' },
     tooltip: {
       brief: 'Study-trial duration in milliseconds.',
-      verbose: 'How long study-only cards remain visible before advancing. A value of 0 means there is no configured study timeout.'
-    },
-    validation: { kind: 'nonNegativeInteger', severity: 'error', message: 'Must be a non-negative integer' }
-  },
-  initialview: {
-    section: 'deliveryparams',
-    authoring: { type: 'integer', default: 0, editor: { gridColumns: 4 } },
-    runtime: { default: 0, normalize: 'integer' },
-    lifecycle: { status: 'supported' },
-    tooltip: {
-      brief: 'Initial first-part display duration in milliseconds.',
-      verbose: 'Milliseconds to show the first part of a two-part stimulus before the second part is revealed.'
+      verbose: 'Milliseconds to display an item during study-only trials. Example: 16000 = 16 seconds. A value of 0 means no study timeout.'
     },
     validation: { kind: 'nonNegativeInteger', severity: 'error', message: 'Must be a non-negative integer' }
   },
@@ -203,7 +224,60 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     lifecycle: { status: 'supported' },
     tooltip: {
       brief: 'Answer timeout in milliseconds.',
-      verbose: 'Milliseconds before a drill/test response times out. The timer resets on keypress activity where applicable.'
+      verbose: 'Milliseconds before a drill/test response times out. The timer resets on each keypress where applicable. Example: 30000 = 30 seconds; 0 = no timeout.'
+    },
+    validation: { kind: 'nonNegativeInteger', severity: 'error', message: 'Must be a non-negative integer' }
+  },
+  practicetimer: {
+    section: 'deliveryparams',
+    appliesToUnitTypes: ['learning'],
+    authoring: { type: 'string', default: '', enum: ['', 'clock-based'], editor: { gridColumns: 4 } },
+    runtime: { default: '', normalize: 'string' },
+    lifecycle: { status: 'supported' },
+    tooltip: {
+      brief: 'Practice timer mode.',
+      verbose: 'Selects the practice timing mode; "clock-based" uses elapsed seconds from practiceseconds to end practice.'
+    },
+    validation: {
+      kind: 'enum',
+      severity: 'error',
+      message: 'Must be blank or "clock-based"',
+      values: ['', 'clock-based']
+    }
+  },
+  practiceseconds: {
+    section: 'deliveryparams',
+    appliesToUnitTypes: ['learning'],
+    authoring: { type: 'integer', default: 0, editor: { gridColumns: 4 } },
+    runtime: { default: 0, normalize: 'integer' },
+    lifecycle: { status: 'supported' },
+    tooltip: {
+      brief: 'Practice duration in seconds.',
+      verbose: 'Number of elapsed seconds used by clock-based practice timing before the unit advances.'
+    },
+    validation: { kind: 'nonNegativeInteger', severity: 'error', message: 'Must be a non-negative integer' }
+  },
+  displayMinSeconds: {
+    section: 'deliveryparams',
+    appliesToUnitTypes: ['learning', 'video'],
+    authoring: { type: 'integer', default: 0, editor: { gridColumns: 4 } },
+    runtime: { default: 0, normalize: 'integer' },
+    lifecycle: { status: 'supported' },
+    tooltip: {
+      brief: 'Minimum display time in seconds.',
+      verbose: 'Minimum elapsed seconds before the learner can continue from a variable-length display unit.'
+    },
+    validation: { kind: 'nonNegativeInteger', severity: 'error', message: 'Must be a non-negative integer' }
+  },
+  displayMaxSeconds: {
+    section: 'deliveryparams',
+    appliesToUnitTypes: ['learning', 'video'],
+    authoring: { type: 'integer', default: 0, editor: { gridColumns: 4 } },
+    runtime: { default: 0, normalize: 'integer' },
+    lifecycle: { status: 'supported' },
+    tooltip: {
+      brief: 'Maximum display time in seconds.',
+      verbose: 'Maximum elapsed seconds before a variable-length display unit can advance automatically.'
     },
     validation: { kind: 'nonNegativeInteger', severity: 'error', message: 'Must be a non-negative integer' }
   },
@@ -214,7 +288,7 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     lifecycle: { status: 'supported' },
     tooltip: {
       brief: 'Incorrect-review duration in milliseconds.',
-      verbose: 'How long incorrect-answer review feedback remains visible before the unit advances.'
+      verbose: 'Milliseconds to display the item after an incorrect response for review. Example: 6000 = 6 seconds.'
     },
     validation: { kind: 'nonNegativeInteger', severity: 'error', message: 'Must be a non-negative integer' }
   },
@@ -225,29 +299,31 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     lifecycle: { status: 'supported' },
     tooltip: {
       brief: 'Correct-feedback duration in milliseconds.',
-      verbose: 'Milliseconds to show correct-answer feedback before the next card is selected.'
+      verbose: 'Milliseconds to display correct-answer feedback before advancing. Example: 750 = 0.75 seconds.'
     },
     validation: { kind: 'nonNegativeInteger', severity: 'error', message: 'Must be a non-negative integer' }
   },
   skipstudy: {
     section: 'deliveryparams',
+    appliesToUnitTypes: ['learning', 'assessment'],
     authoring: { type: 'booleanString', default: 'false', editor: { gridColumns: 4 } },
     runtime: { default: false, normalize: 'boolean' },
     lifecycle: { status: 'supported' },
     tooltip: {
       brief: 'Allow study trials to be skipped.',
-      verbose: 'When "true", study cards can be skipped from the learner interface instead of waiting for the study duration to finish.'
+      verbose: 'When "true", study trials can be skipped from the learner interface instead of waiting for the study duration to finish.'
     },
     validation: { kind: 'enum', severity: 'error', message: 'Must be "true" or "false"', values: ['true', 'false'] }
   },
   lockoutminutes: {
     section: 'deliveryparams',
+    appliesToUnitTypes: ['learning', 'assessment', 'video', 'instructions'],
     authoring: { type: 'integer', default: 0, editor: { gridColumns: 4 } },
     runtime: { default: 0, normalize: 'integer' },
     lifecycle: { status: 'supported' },
     tooltip: {
       brief: 'Lockout length in minutes before the next unit.',
-      verbose: 'Minutes a learner must wait before the next unit becomes available. Used for retention-interval scheduling.'
+      verbose: 'Minutes a learner must wait before proceeding to the next unit. Used for spaced retention intervals.'
     },
     validation: { kind: 'nonNegativeInteger', severity: 'error', message: 'Must be a non-negative integer' }
   },
@@ -258,62 +334,7 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     lifecycle: { status: 'supported' },
     tooltip: {
       brief: 'Stimulus font size.',
-      verbose: 'Font size used for card content. The current Svelte card interprets this as a numeric size for the rendered card text.'
-    },
-    validation: { kind: 'nonNegativeInteger', severity: 'error', message: 'Must be a non-negative integer' }
-  },
-  numButtonListImageColumns: {
-    section: 'deliveryparams',
-    authoring: { type: 'integer', default: 2, editor: { gridColumns: 4 } },
-    runtime: { default: 2, normalize: 'integer' },
-    lifecycle: { status: 'supported' },
-    tooltip: {
-      brief: 'Preferred column count for image-button layouts.',
-      verbose: 'Controls the desired number of columns when button responses are displayed with images.'
-    },
-    validation: { kind: 'nonNegativeInteger', severity: 'error', message: 'Must be a non-negative integer' }
-  },
-  correctscore: {
-    section: 'deliveryparams',
-    authoring: { type: 'integer', default: 1, editor: { gridColumns: 4 } },
-    runtime: { default: 1, normalize: 'integer' },
-    lifecycle: { status: 'supported' },
-    tooltip: {
-      brief: 'Points awarded for a correct response.',
-      verbose: 'Score added when a learner answers correctly.'
-    },
-    validation: { kind: 'nonNegativeInteger', severity: 'error', message: 'Must be a non-negative integer' }
-  },
-  incorrectscore: {
-    section: 'deliveryparams',
-    authoring: { type: 'integer', default: 0, editor: { gridColumns: 4 } },
-    runtime: { default: 0, normalize: 'integer' },
-    lifecycle: { status: 'supported' },
-    tooltip: {
-      brief: 'Points applied for an incorrect response.',
-      verbose: 'Score adjustment applied when the learner answers incorrectly.'
-    },
-    validation: { kind: 'nonNegativeInteger', severity: 'error', message: 'Must be a non-negative integer' }
-  },
-  practiceseconds: {
-    section: 'deliveryparams',
-    authoring: { type: 'integer', default: 0, editor: { gridColumns: 4 } },
-    runtime: { default: 0, normalize: 'integer' },
-    lifecycle: { status: 'supported' },
-    tooltip: {
-      brief: 'Practice duration limit in seconds.',
-      verbose: 'Total number of seconds allowed for the learning session. A value of 0 means no configured duration limit.'
-    },
-    validation: { kind: 'nonNegativeInteger', severity: 'error', message: 'Must be a non-negative integer' }
-  },
-  autostopTimeoutThreshold: {
-    section: 'deliveryparams',
-    authoring: { type: 'integer', default: 0, editor: { gridColumns: 4 } },
-    runtime: { default: 0, normalize: 'integer' },
-    lifecycle: { status: 'supported' },
-    tooltip: {
-      brief: 'Auto-stop after this many consecutive timeouts.',
-      verbose: 'Number of consecutive timeouts that triggers automatic unit termination. A value of 0 disables the threshold.'
+      verbose: 'CSS font size used for stimulus display. The current Svelte card interprets this as a numeric pixel size; default is 24.'
     },
     validation: { kind: 'nonNegativeInteger', severity: 'error', message: 'Must be a non-negative integer' }
   },
@@ -335,18 +356,7 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     lifecycle: { status: 'supported' },
     tooltip: {
       brief: 'Delay before question audio in milliseconds.',
-      verbose: 'Milliseconds to wait before playing question audio or prompt TTS.'
-    },
-    validation: { kind: 'nonNegativeInteger', severity: 'error', message: 'Must be a non-negative integer' }
-  },
-  timeuntilaudiofeedback: {
-    section: 'deliveryparams',
-    authoring: { type: 'integer', default: 0, editor: { gridColumns: 4 } },
-    runtime: { default: 0, normalize: 'integer' },
-    lifecycle: { status: 'supported' },
-    tooltip: {
-      brief: 'Delay before feedback audio in milliseconds.',
-      verbose: 'Milliseconds to wait before playing feedback audio after an answer is evaluated.'
+      verbose: 'Milliseconds to wait before playing question audio or prompt text-to-speech. Default: 0.'
     },
     validation: { kind: 'nonNegativeInteger', severity: 'error', message: 'Must be a non-negative integer' }
   },
@@ -368,7 +378,7 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     lifecycle: { status: 'supported' },
     tooltip: {
       brief: 'Prompt shown during force-correction.',
-      verbose: 'Custom message shown when the learner must type the correct answer before continuing.'
+      verbose: 'Custom message shown when the learner must type the correct answer before continuing after feedback.'
     },
     validation: { kind: 'none' }
   },
@@ -383,28 +393,6 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     },
     validation: { kind: 'nonNegativeInteger', severity: 'error', message: 'Must be a non-negative integer' }
   },
-  studyFirst: {
-    section: 'deliveryparams',
-    authoring: { type: 'number', default: 0, editor: { gridColumns: 4 } },
-    runtime: { default: 0, normalize: 'studyFirst' },
-    lifecycle: { status: 'supported' },
-    tooltip: {
-      brief: 'Probability of showing study first for a new card.',
-      verbose: 'Values between 0 and 1 control the probability that a new card begins with a study trial before the first drill/test attempt.'
-    },
-    validation: { kind: 'range', severity: 'error', message: 'Must be between 0 and 1', min: 0, max: 1 }
-  },
-  enhancedFeedback: {
-    section: 'deliveryparams',
-    authoring: { type: 'booleanString', default: 'false', editor: { gridColumns: 4 } },
-    runtime: { default: false, normalize: 'boolean' },
-    lifecycle: { status: 'supported' },
-    tooltip: {
-      brief: 'Legacy enhanced-feedback compatibility flag.',
-      verbose: 'Compatibility flag preserved in delivery params for lessons that still author this setting.'
-    },
-    validation: { kind: 'enum', severity: 'error', message: 'Must be "true" or "false"', values: ['true', 'false'] }
-  },
   checkOtherAnswers: {
     section: 'deliveryparams',
     authoring: { type: 'booleanString', default: 'false', editor: { gridColumns: 4 } },
@@ -412,20 +400,9 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     lifecycle: { status: 'supported' },
     tooltip: {
       brief: 'Reject near-matches that equal another item’s answer.',
-      verbose: 'When enabled, edit-distance matching will not accept an answer that exactly matches a different current stimulus answer.'
+      verbose: 'When enabled, edit-distance matching will not accept a near-match that exactly matches another current stimulus answer.'
     },
     validation: { kind: 'enum', severity: 'error', message: 'Must be "true" or "false"', values: ['true', 'false'] }
-  },
-  feedbackType: {
-    section: 'deliveryparams',
-    authoring: { type: 'string', default: '', editor: { gridColumns: 4 } },
-    runtime: { default: '', normalize: 'lowercaseString' },
-    lifecycle: { status: 'supported' },
-    tooltip: {
-      brief: 'Feedback mode label.',
-      verbose: 'Legacy feedback mode string preserved for compatibility and logging. The current Svelte runtime does not branch authoring behavior from this field.'
-    },
-    validation: { kind: 'none' }
   },
   falseAnswerLimit: {
     section: 'deliveryparams',
@@ -434,20 +411,9 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     lifecycle: { status: 'supported' },
     tooltip: {
       brief: 'Maximum incorrect attempts allowed for a button trial.',
-      verbose: 'Caps the number of incorrect responses allowed during button-based trials before the item advances.'
+      verbose: 'Maximum incorrect responses allowed for each button trial before moving on. Leave blank for no configured limit.'
     },
     validation: { kind: 'nonNegativeInteger', severity: 'error', message: 'Must be a non-negative integer' }
-  },
-  allowstimulusdropping: {
-    section: 'deliveryparams',
-    authoring: { type: 'booleanString', default: 'false', editor: { gridColumns: 4 } },
-    runtime: { default: false, normalize: 'boolean' },
-    lifecycle: { status: 'supported' },
-    tooltip: {
-      brief: 'Legacy stimulus-dropping compatibility flag.',
-      verbose: 'Compatibility flag preserved in delivery params for lesson files that still author this setting.'
-    },
-    validation: { kind: 'enum', severity: 'error', message: 'Must be "true" or "false"', values: ['true', 'false'] }
   },
   allowPhoneticMatching: {
     section: 'deliveryparams',
@@ -456,23 +422,9 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     lifecycle: { status: 'supported' },
     tooltip: {
       brief: 'Enable phonetic answer matching.',
-      verbose: 'When "true", phonetic matching is used as a fallback during answer evaluation after exact/edit-distance checks fail.'
+      verbose: 'When "true", enables Double Metaphone phonetic matching as a fallback during answer evaluation after exact and edit-distance checks fail.'
     },
     validation: { kind: 'enum', severity: 'error', message: 'Must be "true" or "false"', values: ['true', 'false'] }
-  },
-  useSpellingCorrection: {
-    section: 'deliveryparams',
-    authoring: { type: 'booleanString', default: 'false', editor: { gridColumns: 4 } },
-    runtime: { default: false, normalize: 'boolean' },
-    lifecycle: { status: 'supported' },
-    tooltip: {
-      brief: 'Deprecated spelling-correction toggle.',
-      verbose: 'Historical compatibility flag retained for legacy authored content. Prefer lfparameter or allowPhoneticMatching in new content.'
-    },
-    validation: { kind: 'enum', severity: 'warning', message: 'Must be "true" or "false"', values: ['true', 'false'] },
-    migration: {
-      note: 'Prefer lfparameter or allowPhoneticMatching in new content.'
-    }
   },
   branchingEnabled: {
     section: 'deliveryparams',
@@ -485,28 +437,6 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     },
     validation: { kind: 'enum', severity: 'error', message: 'Must be "true" or "false"', values: ['true', 'false'] }
   },
-  editDistance: {
-    section: 'deliveryparams',
-    authoring: { type: 'integer', default: 1, editor: { gridColumns: 4 } },
-    runtime: { default: 1, normalize: 'integer' },
-    lifecycle: { status: 'supported' },
-    tooltip: {
-      brief: 'Legacy edit-distance parameter.',
-      verbose: 'Compatibility field preserved for lesson metadata. Current answer evaluation uses lfparameter rather than this direct threshold.'
-    },
-    validation: { kind: 'nonNegativeInteger', severity: 'error', message: 'Must be a non-negative integer' }
-  },
-  optimalThreshold: {
-    section: 'deliveryparams',
-    authoring: { type: 'number', editor: { gridColumns: 4 } },
-    runtime: { default: false, normalize: 'number' },
-    lifecycle: { status: 'supported' },
-    tooltip: {
-      brief: 'Override the learning model’s optimal probability.',
-      verbose: 'Overrides item-level optimum values with a lesson-wide threshold between 0 and 1 for model-based selection.'
-    },
-    validation: { kind: 'range', severity: 'error', message: 'Must be between 0 and 1', min: 0, max: 1 }
-  },
   resetStudentPerformance: {
     section: 'deliveryparams',
     authoring: { type: 'booleanString', default: 'false', editor: { gridColumns: 4 } },
@@ -514,34 +444,43 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     lifecycle: { status: 'supported' },
     tooltip: {
       brief: 'Reset displayed progress for the unit.',
-      verbose: 'When enabled, the learner’s displayed progress for the unit is reset without deleting the underlying history records.'
+      verbose: 'When "true", resets the learner’s displayed progress for the unit. Historical data is preserved; only the displayed progress is reset.'
     },
     validation: { kind: 'enum', severity: 'error', message: 'Must be "true" or "false"', values: ['true', 'false'] }
   },
-  practicetimer: {
+  allowRevistUnit: {
     section: 'deliveryparams',
-    authoring: {
-      type: 'string',
-      default: 'query-based',
-      enum: ['query-based', 'clock-based'],
-      editor: { gridColumns: 4 }
-    },
-    runtime: { default: 'query-based', normalize: 'lowercaseString' },
+    appliesToUnitTypes: ['learning', 'assessment', 'video', 'instructions'],
+    aliases: ['allowRevisitUnit'],
+    authoring: { type: 'booleanString', default: 'false', editor: { gridColumns: 4 } },
+    runtime: { default: false, normalize: 'boolean' },
     lifecycle: { status: 'supported' },
     tooltip: {
-      brief: 'How practice duration is measured.',
-      verbose: 'Controls whether practice duration is measured from question count/query timing or from the running clock-based student performance total.'
+      brief: 'Allow revisiting the current unit from instructions.',
+      verbose: 'When "true", instruction screens expose the current-unit revisit path so a learner can return to the unit instead of only continuing forward.'
     },
-    validation: { kind: 'enum', severity: 'error', message: 'Must be one of the supported timer modes', values: ['query-based', 'clock-based'] }
+    validation: { kind: 'enum', severity: 'error', message: 'Must be "true" or "false"', values: ['true', 'false'] }
   },
-  readyPromptString: {
+  allowFeedbackTypeSelect: {
     section: 'deliveryparams',
-    authoring: { type: 'string', default: '', editor: { gridColumns: 12 } },
-    runtime: { default: '', normalize: 'lowercaseString' },
+    authoring: { type: 'booleanString', default: 'false', editor: { gridColumns: 4 } },
+    runtime: { default: false, normalize: 'boolean' },
     lifecycle: { status: 'supported' },
     tooltip: {
-      brief: 'Prompt text shown between trials.',
-      verbose: 'Text displayed during the ready-prompt phase before the next trial begins.'
+      brief: 'Enable selectable feedback display mode.',
+      verbose: 'When "true", the resume flow initializes the card state to display feedback when the feedback state has not already been set.'
+    },
+    validation: { kind: 'enum', severity: 'error', message: 'Must be "true" or "false"', values: ['true', 'false'] }
+  },
+  feedbackType: {
+    section: 'deliveryparams',
+    surfaces: { learnerConfig: false },
+    authoring: { type: 'string', default: '', editor: { gridColumns: 4 } },
+    runtime: { default: '', normalize: 'string' },
+    lifecycle: { status: 'supported' },
+    tooltip: {
+      brief: 'Feedback type metadata.',
+      verbose: 'Legacy feedback classification copied to history records for reporting and exports. It does not control feedback display behavior.'
     },
     validation: { kind: 'none' }
   },
@@ -552,35 +491,13 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     lifecycle: { status: 'supported' },
     tooltip: {
       brief: 'Ready-prompt duration in milliseconds.',
-      verbose: 'Milliseconds to display the ready-prompt text between trials.'
+      verbose: 'Milliseconds to wait during the ready-prompt phase between trials before the next display/input phase begins.'
     },
     validation: { kind: 'nonNegativeInteger', severity: 'error', message: 'Must be a non-negative integer' }
   },
-  forceSpacing: {
-    section: 'deliveryparams',
-    authoring: { type: 'booleanString', default: 'true', editor: { gridColumns: 4 } },
-    runtime: { default: true, normalize: 'boolean' },
-    lifecycle: { status: 'supported' },
-    tooltip: {
-      brief: 'Enforce minimum spacing between repeated stimuli.',
-      verbose: 'When "true", the learning model enforces minimum spacing constraints even when the item pool is tight.'
-    },
-    validation: { kind: 'enum', severity: 'error', message: 'Must be "true" or "false"', values: ['true', 'false'] }
-  },
-  allowRevistUnit: {
-    section: 'deliveryparams',
-    authoring: { type: 'booleanString', default: 'false', editor: { gridColumns: 4 } },
-    runtime: { default: false, normalize: 'boolean' },
-    lifecycle: { status: 'supported' },
-    tooltip: {
-      brief: 'Allow revisiting the previous unit/instructions flow.',
-      verbose: 'Misspelled historical field that allows the learner to return to the previous unit or instructions flow when supported by the lesson.'
-    },
-    validation: { kind: 'enum', severity: 'error', message: 'Must be "true" or "false"', values: ['true', 'false'] },
-    aliases: ['allowRevisitUnit']
-  },
   studyOnlyFields: {
     section: 'deliveryparams',
+    appliesToUnitTypes: ['learning', 'assessment'],
     authoring: { type: 'string', default: '', editor: { gridColumns: 6 } },
     runtime: { default: '', normalize: 'string' },
     lifecycle: { status: 'supported' },
@@ -611,6 +528,21 @@ export const DELIVERY_PARAM_SUPPORTED_KEYS = Object.freeze(
   )
 );
 
+export const DELIVERY_PARAM_LEARNER_CONFIGURABLE_KEYS = Object.freeze(
+  DELIVERY_PARAM_SUPPORTED_KEYS.filter(
+    (key) => DELIVERY_PARAM_FIELD_REGISTRY[key]?.surfaces?.learnerConfig !== false
+  )
+);
+
+export const DELIVERY_PARAM_APPLICABILITY = Object.freeze(
+  Object.fromEntries(
+    DELIVERY_PARAM_SUPPORTED_KEYS.map((key) => [
+      key,
+      [...(DELIVERY_PARAM_FIELD_REGISTRY[key]?.appliesToUnitTypes || INTERACTIVE_TDF_UNIT_TYPES)],
+    ])
+  ) as Record<string, readonly TdfUnitType[]>
+);
+
 export const DELIVERY_PARAM_ALIAS_TO_CANONICAL = Object.freeze(
   Object.fromEntries(
     DELIVERY_PARAM_CANONICAL_KEYS.flatMap((canonicalKey) =>
@@ -629,37 +561,45 @@ export const DELIVERY_PARAM_DEFAULTS = Object.freeze(
 );
 
 const DELIVERY_PARAM_DIRECT_RUNTIME_KEYS = Object.freeze([
+  'allowFeedbackTypeSelect',
   'allowPhoneticMatching',
   'allowRevistUnit',
   'autostopTranscriptionAttemptLimit',
   'branchingEnabled',
   'checkOtherAnswers',
   'correctprompt',
+  'displayMaxSeconds',
+  'displayMinSeconds',
   'drillFields',
   'drill',
-  'forceCorrection',
+  'falseAnswerLimit',
   'forceSpacing',
+  'forceCorrection',
   'forcecorrectprompt',
   'forcecorrecttimeout',
+  'fontsize',
+  'lockoutminutes',
   'optimalThreshold',
-  'practicetimer',
   'prestimulusdisplaytime',
+  'practiceseconds',
+  'practicetimer',
   'purestudy',
   'readyPromptStringDisplayTime',
   'resetStudentPerformance',
   'reviewstudy',
   'scoringEnabled',
-  'showhistory',
-  'studyOnlyFields',
+  'skipstudy',
   'studyFirst',
-  'timeuntilaudio',
-  'timeuntilaudiofeedback'
+  'studyOnlyFields',
+  'timeuntilaudio'
 ]);
 
 export const DELIVERY_PARAM_RUNTIME_INVENTORY = Object.freeze({
   canonicalKeys: DELIVERY_PARAM_CANONICAL_KEYS,
   supportedKeys: DELIVERY_PARAM_SUPPORTED_KEYS,
+  learnerConfigurableKeys: DELIVERY_PARAM_LEARNER_CONFIGURABLE_KEYS,
   aliasToCanonical: DELIVERY_PARAM_ALIAS_TO_CANONICAL,
+  applicability: DELIVERY_PARAM_APPLICABILITY,
   directRuntimeKeys: DELIVERY_PARAM_DIRECT_RUNTIME_KEYS
 });
 
@@ -694,7 +634,9 @@ export function normalizeDeliveryParamSource(
 }
 
 function schemaForAuthoringType(field: DeliveryParamFieldDefinition): Record<string, unknown> {
-  const schema: Record<string, unknown> = {};
+  const schema: Record<string, unknown> = {
+    title: field.tooltip.brief,
+  };
   const gridColumns = field.authoring.editor?.gridColumns;
   if (gridColumns) {
     schema.options = { grid_columns: gridColumns };
@@ -724,15 +666,22 @@ function schemaForAuthoringType(field: DeliveryParamFieldDefinition): Record<str
     schema.default = field.authoring.default;
   }
 
+  schema['x-appliesToUnitTypes'] = [...(field.appliesToUnitTypes || INTERACTIVE_TDF_UNIT_TYPES)];
+  if (field.surfaces?.editor === false) {
+    schema['x-editor'] = false;
+  }
+
   return schema;
 }
 
 export function createDeliveryParamSchema(): Record<string, unknown> {
   const properties = Object.fromEntries(
-    DELIVERY_PARAM_SUPPORTED_KEYS.map((key) => {
-      const field = DELIVERY_PARAM_FIELD_REGISTRY[key];
-      return [key, field ? schemaForAuthoringType(field) : {}];
-    })
+    DELIVERY_PARAM_SUPPORTED_KEYS
+      .filter((key) => DELIVERY_PARAM_FIELD_REGISTRY[key]?.surfaces?.schema !== false)
+      .map((key) => {
+        const field = DELIVERY_PARAM_FIELD_REGISTRY[key];
+        return [key, field ? schemaForAuthoringType(field) : {}];
+      })
   );
 
   return {

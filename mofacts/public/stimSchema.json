@@ -24,6 +24,7 @@
             "title": "Cluster",
             "properties": {
               "imageStimulus": {
+                "title": "Cluster image stimulus.",
                 "type": "string",
                 "default": "",
                 "options": {
@@ -31,6 +32,7 @@
                 }
               },
               "audioStimulus": {
+                "title": "Cluster audio stimulus.",
                 "type": "string",
                 "default": "",
                 "options": {
@@ -38,6 +40,7 @@
                 }
               },
               "videoStimulus": {
+                "title": "Cluster video stimulus.",
                 "type": "string",
                 "default": "",
                 "options": {
@@ -52,6 +55,7 @@
                   "title": "Stim",
                   "properties": {
                     "parameter": {
+                      "title": "Stimulus parameter metadata.",
                       "type": "string",
                       "default": "",
                       "options": {
@@ -59,6 +63,7 @@
                       }
                     },
                     "optimalProb": {
+                      "title": "Stimulus optimum probability override.",
                       "anyOf": [
                         {
                           "type": "number"
@@ -72,6 +77,7 @@
                       }
                     },
                     "speechHintExclusionList": {
+                      "title": "Speech-hint exclusion list.",
                       "type": "string",
                       "default": "",
                       "options": {
@@ -79,13 +85,14 @@
                       }
                     },
                     "alternateDisplays": {
-                      "type": "array",
                       "title": "Alternate Displays",
+                      "type": "array",
                       "items": {
                         "type": "object",
                         "title": "Alternate Display",
                         "properties": {
                           "text": {
+                            "title": "Question/stimulus text.",
                             "type": "string",
                             "default": "",
                             "format": "textarea",
@@ -94,6 +101,7 @@
                             }
                           },
                           "clozeText": {
+                            "title": "Cloze sentence text.",
                             "type": "string",
                             "default": "",
                             "format": "textarea",
@@ -102,6 +110,7 @@
                             }
                           },
                           "clozeStimulus": {
+                            "title": "Cloze answer token.",
                             "type": "string",
                             "default": "",
                             "options": {
@@ -109,6 +118,7 @@
                             }
                           },
                           "imgSrc": {
+                            "title": "Stim image filename.",
                             "type": "string",
                             "default": "",
                             "options": {
@@ -116,6 +126,7 @@
                             }
                           },
                           "audioSrc": {
+                            "title": "Stim audio filename.",
                             "type": "string",
                             "default": "",
                             "options": {
@@ -123,6 +134,7 @@
                             }
                           },
                           "videoSrc": {
+                            "title": "Stim video URL or filename.",
                             "type": "string",
                             "default": "",
                             "options": {
@@ -130,10 +142,11 @@
                             }
                           },
                           "attribution": {
-                            "type": "object",
                             "title": "Attribution",
+                            "type": "object",
                             "properties": {
                               "creatorName": {
+                                "title": "Attribution creator name.",
                                 "type": "string",
                                 "default": "",
                                 "options": {
@@ -141,6 +154,7 @@
                                 }
                               },
                               "sourceName": {
+                                "title": "Attribution source label.",
                                 "type": "string",
                                 "default": "Wikimedia Commons",
                                 "options": {
@@ -148,6 +162,7 @@
                                 }
                               },
                               "sourceUrl": {
+                                "title": "Attribution source URL.",
                                 "type": "string",
                                 "default": "",
                                 "options": {
@@ -155,6 +170,7 @@
                                 }
                               },
                               "licenseName": {
+                                "title": "Attribution license name.",
                                 "type": "string",
                                 "default": "",
                                 "options": {
@@ -162,6 +178,7 @@
                                 }
                               },
                               "licenseUrl": {
+                                "title": "Attribution license URL.",
                                 "type": "string",
                                 "default": "",
                                 "options": {
@@ -180,6 +197,7 @@
                       "title": "Display",
                       "properties": {
                         "text": {
+                          "title": "Question/stimulus text.",
                           "type": "string",
                           "default": "",
                           "format": "textarea",
@@ -188,6 +206,7 @@
                           }
                         },
                         "clozeText": {
+                          "title": "Cloze sentence text.",
                           "type": "string",
                           "default": "",
                           "format": "textarea",
@@ -196,6 +215,7 @@
                           }
                         },
                         "clozeStimulus": {
+                          "title": "Cloze answer token.",
                           "type": "string",
                           "default": "",
                           "options": {
@@ -203,6 +223,7 @@
                           }
                         },
                         "imgSrc": {
+                          "title": "Stim image filename.",
                           "type": "string",
                           "default": "",
                           "options": {
@@ -210,6 +231,7 @@
                           }
                         },
                         "audioSrc": {
+                          "title": "Stim audio filename.",
                           "type": "string",
                           "default": "",
                           "options": {
@@ -217,6 +239,7 @@
                           }
                         },
                         "videoSrc": {
+                          "title": "Stim video URL or filename.",
                           "type": "string",
                           "default": "",
                           "options": {
@@ -224,10 +247,11 @@
                           }
                         },
                         "attribution": {
-                          "type": "object",
                           "title": "Attribution",
+                          "type": "object",
                           "properties": {
                             "creatorName": {
+                              "title": "Attribution creator name.",
                               "type": "string",
                               "default": "",
                               "options": {
@@ -235,6 +259,7 @@
                               }
                             },
                             "sourceName": {
+                              "title": "Attribution source label.",
                               "type": "string",
                               "default": "Wikimedia Commons",
                               "options": {
@@ -242,6 +267,7 @@
                               }
                             },
                             "sourceUrl": {
+                              "title": "Attribution source URL.",
                               "type": "string",
                               "default": "",
                               "options": {
@@ -249,6 +275,7 @@
                               }
                             },
                             "licenseName": {
+                              "title": "Attribution license name.",
                               "type": "string",
                               "default": "",
                               "options": {
@@ -256,6 +283,7 @@
                               }
                             },
                             "licenseUrl": {
+                              "title": "Attribution license URL.",
                               "type": "string",
                               "default": "",
                               "options": {
@@ -273,6 +301,7 @@
                       "title": "Response",
                       "properties": {
                         "correctResponse": {
+                          "title": "Expected correct response.",
                           "type": "string",
                           "default": "",
                           "options": {
@@ -280,8 +309,8 @@
                           }
                         },
                         "incorrectResponses": {
-                          "type": "array",
                           "title": "Incorrect Responses",
+                          "type": "array",
                           "items": {
                             "type": "string",
                             "title": "Incorrect Response"

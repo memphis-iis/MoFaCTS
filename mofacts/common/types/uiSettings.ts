@@ -1,33 +1,31 @@
 // Owner: Learning Runtime Team
 // Shared contracts for setspec/unit UI setting overlays.
 
-export type TimeoutDisplayMode = 'both' | 'bar' | 'text' | 'false';
-export type StimuliPosition = 'overunder' | 'split';
+export type FeedbackDisplayMode = boolean | 'onCorrect' | 'onIncorrect';
+export type StimuliPosition = 'top' | 'left';
 
 export interface UiSettings {
-  displayCardTimeoutAsBarOrText?: TimeoutDisplayMode;
-  displayReadyPromptTimeoutAsBarOrText?: TimeoutDisplayMode;
-  displayReviewTimeoutAsBarOrText?: TimeoutDisplayMode;
-  displayTimeOutDuringStudy?: boolean;
-  displayPerformanceDuringStudy?: boolean;
-  displayPerformanceDuringTrial?: boolean;
   stimuliPosition?: StimuliPosition;
+  isVideoSession?: boolean;
+  videoUrl?: string;
+  displayCorrectFeedback?: boolean;
+  displayIncorrectFeedback?: boolean;
+  correctMessage?: string;
+  incorrectMessage?: string;
+  correctColor?: string;
+  incorrectColor?: string;
+  displayUserAnswerInFeedback?: FeedbackDisplayMode;
+  singleLineFeedback?: boolean;
+  onlyShowSimpleFeedback?: FeedbackDisplayMode;
+  displayCorrectAnswerInIncorrectFeedback?: boolean;
+  displayPerformance?: boolean;
+  displayTimeoutBar?: boolean;
   choiceButtonCols?: number;
-  showStimuliBox?: boolean;
-  stimuliBoxColor?: string;
+  displaySubmitButton?: boolean;
   inputPlaceholderText?: string;
   displayConfirmButton?: boolean;
   continueButtonText?: string;
   skipStudyButtonText?: string;
-  instructionsTitleDisplay?: string;
-  lastVideoModalText?: string;
-  displayUserAnswerInFeedback?: boolean;
-  displayCorrectAnswerInCenter?: boolean;
-  singleLineFeedback?: boolean;
-  feedbackDisplayPosition?: string;
-  onlyShowSimpleFeedback?: boolean;
-  suppressFeedbackDisplay?: boolean;
-  incorrectColor?: string;
-  correctColor?: string;
-  experimentLoginText?: string;
+  caseSensitive?: boolean;
+  displayQuestionNumber?: boolean;
 }

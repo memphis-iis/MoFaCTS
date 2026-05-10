@@ -6,6 +6,7 @@ const TRANSITION_PROPERTIES = new Set([
 
 const LENGTH_PROPERTIES = new Set([
   'font_size_base',
+  'button_height',
   'border_radius_sm',
   'border_radius_lg',
 ]);

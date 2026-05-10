@@ -129,7 +129,8 @@
     "secret:scan:staged": "node scripts/scan-staged-secrets.cjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "typecheck:vendor": "tsc --noEmit -p tsconfig.vendor-check.json",
-    "knip": "knip"
+    "knip": "knip",
+    "audit:runtime-fields": "python scripts/audit_runtime_field_refs.py"
   },
   "lint-staged": {
     "*.{js,mjs,cjs,ts,svelte}": [

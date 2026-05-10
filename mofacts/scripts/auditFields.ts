@@ -1,4 +1,6 @@
 import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   DEFAULT_UI_SETTINGS,
 } from '../client/views/experiment/svelte/machine/constants.ts';
@@ -29,6 +31,13 @@ import {
   stimSchemaPath,
 } from './schemaGeneration.ts';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const importParameterDefaultsPath = path.resolve(
+  __dirname,
+  '../lib/importParameterDefaultsShared.json'
+);
+
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));
 }
@@ -52,12 +61,17 @@ function supportedKeys(registry) {
   return Object.keys(registry).filter((key) => registry[key]?.lifecycle.status === 'supported');
 }
 
+function supportedSchemaKeys(registry) {
+  return supportedKeys(registry).filter((key) => registry[key]?.surfaces?.schema !== false);
+}
+
 function collectFailures() {
   const failures = [];
   const generatedTdfSchema = buildTdfSchema();
   const generatedStimSchema = buildStimSchema();
   const committedTdfSchema = readJson(tdfSchemaPath);
   const committedStimSchema = readJson(stimSchemaPath);
+  const importParameterDefaults = readJson(importParameterDefaultsPath).IMPORT_PARAMETER_DEFAULTS || {};
 
   if (stableJson(generatedTdfSchema) !== stableJson(committedTdfSchema)) {
     failures.push({
@@ -94,10 +108,11 @@ function collectFailures() {
   for (const section of TDF_REGISTRY_SECTIONS) {
     const schemaNode = getSchemaAtPath(generatedTdfSchema, section.schemaPath);
     const expectedKeys = supportedKeys(section.registry);
+    const expectedSchemaKeys = supportedSchemaKeys(section.registry);
     const extraKeys = nestedSchemaKeys[section.schemaLabel] || [];
     const propertyKeys = Object.keys(schemaNode?.properties || {});
-    const unsupportedKeys = propertyKeys.filter((key) => !expectedKeys.includes(key) && !extraKeys.includes(key));
-    const missingKeys = expectedKeys.filter((key) => !propertyKeys.includes(key));
+    const unsupportedKeys = propertyKeys.filter((key) => !expectedSchemaKeys.includes(key) && !extraKeys.includes(key));
+    const missingKeys = expectedSchemaKeys.filter((key) => !propertyKeys.includes(key));
 
     if (schemaNode?.additionalProperties !== false) {
       failures.push({
@@ -167,10 +182,11 @@ function collectFailures() {
   for (const section of STIM_REGISTRY_SECTIONS) {
     const schemaNode = getSchemaAtPath(generatedStimSchema, section.schemaPath);
     const expectedKeys = supportedKeys(section.registry);
+    const expectedSchemaKeys = supportedSchemaKeys(section.registry);
     const extraKeys = nestedSchemaKeys[section.schemaLabel] || [];
     const propertyKeys = Object.keys(schemaNode?.properties || {});
-    const unsupportedKeys = propertyKeys.filter((key) => !expectedKeys.includes(key) && !extraKeys.includes(key));
-    const missingKeys = expectedKeys.filter((key) => !propertyKeys.includes(key));
+    const unsupportedKeys = propertyKeys.filter((key) => !expectedSchemaKeys.includes(key) && !extraKeys.includes(key));
+    const missingKeys = expectedSchemaKeys.filter((key) => !propertyKeys.includes(key));
 
     if (schemaNode?.additionalProperties !== false) {
       failures.push({
@@ -264,11 +280,14 @@ function collectFailures() {
     }
   }
 
-  if (DELIVERY_PARAM_ALIAS_TO_CANONICAL.allowRevisitUnit !== 'allowRevistUnit') {
-    failures.push({
-      category: 'Alias and migration coverage',
-      message: 'Legacy alias allowRevisitUnit -> allowRevistUnit is missing',
-    });
+  const allowedImportOnlyKeys = new Set(['lfparameter']);
+  for (const key of Object.keys(importParameterDefaults)) {
+    if (!DELIVERY_PARAM_SUPPORTED_KEYS.includes(key) && !allowedImportOnlyKeys.has(key)) {
+      failures.push({
+        category: 'Import defaults against registry',
+        message: `Import parameter default "${key}" is not a supported delivery param or approved import-only key`,
+      });
+    }
   }
 
   for (const [key, field] of Object.entries(DELIVERY_PARAM_FIELD_REGISTRY)) {
@@ -289,11 +308,11 @@ function collectFailures() {
     });
   }
 
-  for (const supportedKey of UI_SETTINGS_RUNTIME_INVENTORY.supportedKeys) {
-    if (!Object.prototype.hasOwnProperty.call(UI_SETTINGS_RUNTIME_DEFAULTS, supportedKey)) {
+  for (const runtimeKey of UI_SETTINGS_RUNTIME_INVENTORY.runtimeKeys) {
+    if (!Object.prototype.hasOwnProperty.call(UI_SETTINGS_RUNTIME_DEFAULTS, runtimeKey)) {
       failures.push({
         category: 'Registry completeness against runtime inventories',
-        message: `UI settings supported key "${supportedKey}" is missing a runtime default`,
+        message: `UI settings runtime key "${runtimeKey}" is missing a runtime default`,
       });
     }
   }
@@ -315,7 +334,9 @@ function printReport(failures) {
   console.log(`TDF registry sections: ${TDF_REGISTRY_SECTIONS.length}`);
   console.log(`Stim registry sections: ${STIM_REGISTRY_SECTIONS.length}`);
   console.log(`Delivery params supported: ${DELIVERY_PARAM_SUPPORTED_KEYS.length}`);
+  console.log(`Delivery params learner-configurable: ${DELIVERY_PARAM_RUNTIME_INVENTORY.learnerConfigurableKeys.length}`);
   console.log(`UI settings supported: ${UI_SETTINGS_RUNTIME_INVENTORY.supportedKeys.length}`);
+  console.log(`UI settings learner-configurable: ${UI_SETTINGS_RUNTIME_INVENTORY.learnerConfigurableKeys.length}`);
   console.log(`UI settings deprecated: ${UI_SETTINGS_RUNTIME_INVENTORY.deprecatedKeys.length}`);
 
   if (failures.length === 0) {
