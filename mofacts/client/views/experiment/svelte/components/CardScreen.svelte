@@ -414,6 +414,7 @@
   let frozenIsForceCorrecting = false;
   let frozenResponseVisible = false;
   let frozenTrialSubsetKind = 'none';
+  let frozenPerformanceSlotProps = null;
   let trialSubsetVisible = false;
   let stagedTrialSubsetKey = 'none';
   let revealSequence = 0;
@@ -833,6 +834,26 @@
   $: confirmEnabled = uiSettings.displayConfirmButton === true &&
     (context.buttonTrial ? !!selectedChoice : textAnswer.trim().length > 0);
   let timeoutModeState = 'none';
+
+  $: livePerformanceSlotProps = {
+    showTimeoutBar,
+    totalTimeDisplay: performanceData.totalTimeDisplay,
+    percentCorrect: performanceData.percentCorrect,
+    cardsSeen: performanceData.cardsSeen,
+    totalCards: performanceData.totalCards,
+    currentTrial: performanceData.currentTrial,
+    timeoutMode,
+    timeoutProgress,
+    remainingTime,
+  };
+
+  $: if (!isOutgoingFreezeState) {
+    frozenPerformanceSlotProps = { ...livePerformanceSlotProps };
+  }
+
+  $: performanceSlotProps = isOutgoingFreezeState && frozenPerformanceSlotProps
+    ? frozenPerformanceSlotProps
+    : livePerformanceSlotProps;
 
   function getTimeoutMode(currentState) {
     if (currentState.matches('presenting.awaiting')) return 'question';
@@ -2165,16 +2186,6 @@
       on:timeupdate
       on:ended={handleVideoEnded}
     >
-      {#if uiSettings.displayPerformance}
-      <PerformanceArea
-        {showTimeoutBar}
-        {...performanceData}
-        {timeoutMode}
-        {timeoutProgress}
-        {remainingTime}
-      />
-      {/if}
-
       <div
         class="trial-content-fade"
         bind:this={trialContentFadeElement}
@@ -2184,6 +2195,10 @@
         on:transitionstart={logTrialFadeEvent}
         on:transitionend={logTrialFadeEvent}
       >
+        {#if uiSettings.displayPerformance}
+        <PerformanceArea {...performanceSlotProps} />
+        {/if}
+
         <TrialContent
           {...trialContentProps}
           parentVisible={trialContentVisible}
@@ -2231,16 +2246,6 @@
       </div>
     {/if}
   {:else}
-    {#if uiSettings.displayPerformance}
-    <PerformanceArea
-      {showTimeoutBar}
-      {...performanceData}
-      {timeoutMode}
-      {timeoutProgress}
-      {remainingTime}
-    />
-    {/if}
-
     <div class="trial-content-stack">
       <div
         class="trial-content-fade trial-content-slot"
@@ -2251,6 +2256,10 @@
         on:transitionstart={logTrialFadeEvent}
         on:transitionend={logTrialFadeEvent}
       >
+        {#if uiSettings.displayPerformance}
+        <PerformanceArea {...performanceSlotProps} />
+        {/if}
+
         <TrialContent
           {...trialContentProps}
           parentVisible={trialContentVisible}

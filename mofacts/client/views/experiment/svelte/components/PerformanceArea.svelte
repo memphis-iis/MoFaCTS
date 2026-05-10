@@ -108,7 +108,7 @@
   .stat-value {
     font-size: 0.82rem;
     font-weight: 700;
-    color: var(--text-color);
+    color: var(--primary-button-text-color);
   }
 
   .stat-unit {
