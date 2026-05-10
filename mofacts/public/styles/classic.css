@@ -889,6 +889,20 @@ input[type="range"]::-moz-range-progress,
     display: none;
 }
 
+/* Unit instructions */
+.instructions-card {
+    color: var(--text-color);
+}
+
+.instructions-card img {
+    max-width: 100%;
+    height: auto;
+}
+
+.instructions-card #continueBar {
+    margin-bottom: 0;
+}
+
 /* ===== CARD MULTIPLE-CHOICE PANEL ===== */
 .c-card-choices {
     --choice-gap: clamp(0.75rem, 1.5vw, 1.25rem);
