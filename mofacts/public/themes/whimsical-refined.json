@@ -51,6 +51,7 @@
     "transition_smooth": "220ms",
     "font_family": "\"Avenir Next\", \"Segoe UI\", Candara, \"Trebuchet MS\", sans-serif",
     "font_size_base": "16px",
+    "button_height": "44px",
     "button_border_darkness": 18,
     "button_hover_darkness": 12
   },

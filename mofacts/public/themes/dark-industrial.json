@@ -51,6 +51,7 @@
     "transition_smooth": "180ms",
     "font_family": "Bahnschrift, \"Segoe UI\", \"Arial Narrow\", sans-serif",
     "font_size_base": "16px",
+    "button_height": "44px",
     "button_border_darkness": 28,
     "button_hover_darkness": 10
   },

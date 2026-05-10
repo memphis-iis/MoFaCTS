@@ -51,6 +51,7 @@
     "transition_smooth": "200ms",
     "font_family": "system-ui, -apple-system, \"Segoe UI\", sans-serif",
     "font_size_base": "16px",
+    "button_height": "44px",
     "button_border_darkness": 20,
     "button_hover_darkness": 15
   },
