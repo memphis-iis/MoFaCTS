@@ -75,17 +75,14 @@
 
 /**
  * @typedef {Object} UiSettings
- * UI configuration from TDF setspec (25 essential settings - Phase 4)
+ * UI configuration from the canonical field registry.
  *
  * Layout & Display (5)
  * @property {StimulusPosition} stimuliPosition - Layout: 'top' or 'left'
  * @property {boolean} isVideoSession - Video overlay mode
  * @property {string} [videoUrl] - Video URL for video session
- * @property {number} [fadeInDuration] - Fade-in animation time (ms)
- * @property {number} [fadeOutDuration] - Fade-out animation time (ms)
  *
- * Feedback Settings (10)
- * @property {boolean} displayFeedback - Show feedback after drill trials
+ * Feedback Settings
  * @property {boolean} displayCorrectFeedback - Show "Correct!" message
  * @property {boolean} displayIncorrectFeedback - Show "Incorrect" message
  * @property {string} correctMessage - Custom correct feedback text
@@ -95,42 +92,25 @@
  * @property {'onCorrect' | 'onIncorrect' | boolean} displayUserAnswerInFeedback - Show user answer rules
  * @property {boolean} singleLineFeedback - Render feedback in a single line
  * @property {'onCorrect' | 'onIncorrect' | boolean} onlyShowSimpleFeedback - Show only "Correct."/"Incorrect."
- * @property {boolean} [displayUserAnswerInCorrectFeedback] - Legacy per-correct flag
- * @property {boolean} [displayUserAnswerInIncorrectFeedback] - Legacy per-incorrect flag
- * @property {boolean} [simplefeedbackOnCorrect] - Legacy simple feedback on correct
- * @property {boolean} [simplefeedbackOnIncorrect] - Legacy simple feedback on incorrect
- * @property {boolean} [displayCorrectAnswerInCenter] - Legacy centered feedback flag
- * @property {boolean|string} [suppressFeedbackDisplay] - Legacy feedback suppression
+ * @property {boolean} [displayCorrectAnswerInIncorrectFeedback] - Show the correct answer after incorrect feedback
  *
  * Performance & Timeouts
  * @property {boolean} displayPerformance - Show performance area
  * @property {boolean} displayTimeoutBar - Show timeout countdown
- * @property {number} timeoutThreshold - Consecutive timeouts before warning
- * @property {boolean|string} [displayCardTimeoutAsBarOrText] - Legacy timeout display mode
- * @property {boolean|string} [displayReviewTimeoutAsBarOrText] - Legacy review timeout display mode
- * @property {boolean|string} [displayReadyPromptTimeoutAsBarOrText] - Legacy ready prompt display mode
- * @property {boolean} [displayTimeOutDuringStudy] - Legacy study timeout toggle
  *
- * Multiple Choice Settings (2)
- * @property {boolean} displayMultipleChoiceButtons - MC enabled
+ * Multiple Choice Settings
  * @property {number} choiceButtonCols - Number of columns for MC buttons (1-4)
  *
- * Text Input Settings (3)
- * @property {boolean} displayTextInput - Text input enabled
+ * Text Input Settings
  * @property {boolean} displaySubmitButton - Show submit button
  * @property {string} inputPlaceholderText - Placeholder text for input field
- * @property {boolean} [displayConfirmButton] - Legacy confirm button toggle
- * @property {string} [continueButtonText] - Legacy continue button text
- * @property {string} [skipStudyButtonText] - Legacy skip study button text
- * @property {boolean} [showStimuliBox] - Legacy stimuli box toggle
- * @property {string} [stimuliBoxColor] - Legacy stimuli box color
+ * @property {boolean} [displayConfirmButton] - Require a confirm action before submission
+ * @property {string} [continueButtonText] - Continue or confirm button text
+ * @property {string} [skipStudyButtonText] - Skip-study button text
  *
- * Audio & SR Settings (2)
- * @property {boolean} enableAudio - Enable TTS/audio playback
- * @property {boolean} enableSpeechRecognition - Enable SR feature
- *
- * Miscellaneous (1)
+ * Miscellaneous
  * @property {boolean} caseSensitive - Case-sensitive answer checking
+ * @property {boolean} displayQuestionNumber - Show the current question number
  */
 
 // =============================================================================

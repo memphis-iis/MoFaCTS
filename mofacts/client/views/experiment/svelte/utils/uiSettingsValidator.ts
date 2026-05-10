@@ -6,14 +6,14 @@
 import {
   UI_SETTINGS_DEPRECATED_GUIDANCE,
   UI_SETTINGS_RUNTIME_DEFAULTS,
-  UI_SETTINGS_SUPPORTED_KEYS,
+  UI_SETTINGS_RUNTIME_KEYS,
   coerceAndValidateUiSetting,
 } from '../../../../../common/fieldRegistry.ts';
 import { clientConsole } from '../../../../lib/clientLogger';
 
 type UiSettings = Record<string, unknown>;
 
-const KEPT_FIELDS = new Set(UI_SETTINGS_SUPPORTED_KEYS);
+const KEPT_FIELDS = new Set(UI_SETTINGS_RUNTIME_KEYS);
 const DEPRECATED_FIELDS = UI_SETTINGS_DEPRECATED_GUIDANCE;
 
 let hasWarnedThisSession = false;
@@ -65,66 +65,7 @@ export function sanitizeUiSettings(
     hasWarnedThisSession = true;
   }
 
-  if (safeRawSettings.displayUserAnswerInFeedback !== undefined) {
-    if (cleanSettings.displayUserAnswerInFeedback === 'onCorrect') {
-      cleanSettings.displayUserAnswerInCorrectFeedback = true;
-      cleanSettings.displayUserAnswerInIncorrectFeedback = false;
-    } else if (cleanSettings.displayUserAnswerInFeedback === 'onIncorrect') {
-      cleanSettings.displayUserAnswerInCorrectFeedback = false;
-      cleanSettings.displayUserAnswerInIncorrectFeedback = true;
-    } else if (cleanSettings.displayUserAnswerInFeedback === true) {
-      cleanSettings.displayUserAnswerInCorrectFeedback = true;
-      cleanSettings.displayUserAnswerInIncorrectFeedback = true;
-    } else if (cleanSettings.displayUserAnswerInFeedback === false) {
-      cleanSettings.displayUserAnswerInCorrectFeedback = false;
-      cleanSettings.displayUserAnswerInIncorrectFeedback = false;
-    }
-  } else if (
-    safeRawSettings.displayUserAnswerInCorrectFeedback !== undefined ||
-    safeRawSettings.displayUserAnswerInIncorrectFeedback !== undefined
-  ) {
-    const correct = !!cleanSettings.displayUserAnswerInCorrectFeedback;
-    const incorrect = !!cleanSettings.displayUserAnswerInIncorrectFeedback;
-    if (correct && incorrect) {
-      cleanSettings.displayUserAnswerInFeedback = true;
-    } else if (correct) {
-      cleanSettings.displayUserAnswerInFeedback = 'onCorrect';
-    } else if (incorrect) {
-      cleanSettings.displayUserAnswerInFeedback = 'onIncorrect';
-    } else {
-      cleanSettings.displayUserAnswerInFeedback = false;
-    }
-  }
-
-  if (
-    safeRawSettings.onlyShowSimpleFeedback === undefined &&
-    (safeRawSettings.simplefeedbackOnCorrect !== undefined ||
-      safeRawSettings.simplefeedbackOnIncorrect !== undefined)
-  ) {
-    const correct = coerceLegacyBoolean(safeRawSettings.simplefeedbackOnCorrect) === true;
-    const incorrect = coerceLegacyBoolean(safeRawSettings.simplefeedbackOnIncorrect) === true;
-    if (correct && incorrect) {
-      cleanSettings.onlyShowSimpleFeedback = true;
-    } else if (correct) {
-      cleanSettings.onlyShowSimpleFeedback = 'onCorrect';
-    } else if (incorrect) {
-      cleanSettings.onlyShowSimpleFeedback = 'onIncorrect';
-    } else {
-      cleanSettings.onlyShowSimpleFeedback = false;
-    }
-  }
-
   return cleanSettings;
-}
-
-function coerceLegacyBoolean(value: unknown): unknown {
-  if (value === 'true') {
-    return true;
-  }
-  if (value === 'false') {
-    return false;
-  }
-  return value;
 }
 
 function logWarnings(

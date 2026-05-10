@@ -56,10 +56,9 @@
   export let displayCorrectFeedback = true;
   export let displayIncorrectFeedback = true;
   export let displayUserAnswerInFeedback = 'onIncorrect';
-  export let displayUserAnswerInCorrectFeedback = false;
-  export let displayUserAnswerInIncorrectFeedback = false;
   export let singleLineFeedback = false;
   export let onlyShowSimpleFeedback = false;
+  export let displayCorrectAnswerInIncorrectFeedback = false;
   export let isVideoSession = false;
   export let videoUrl = '';
   export let cardFontSizeStyle = '';
@@ -121,10 +120,9 @@
         {displayCorrectFeedback}
         {displayIncorrectFeedback}
         {displayUserAnswerInFeedback}
-        {displayUserAnswerInCorrectFeedback}
-        {displayUserAnswerInIncorrectFeedback}
         {singleLineFeedback}
         {onlyShowSimpleFeedback}
+        {displayCorrectAnswerInIncorrectFeedback}
       />
     </VideoSessionMode>
   {:else}
@@ -178,10 +176,9 @@
       {displayCorrectFeedback}
       {displayIncorrectFeedback}
       {displayUserAnswerInFeedback}
-      {displayUserAnswerInCorrectFeedback}
-      {displayUserAnswerInIncorrectFeedback}
       {singleLineFeedback}
       {onlyShowSimpleFeedback}
+      {displayCorrectAnswerInIncorrectFeedback}
     />
   {/if}
 </div>

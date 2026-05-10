@@ -39,6 +39,7 @@ type TdfFileState = Record<string, unknown> & {
 type TdfUnitState = Record<string, unknown> & {
   adaptive?: Record<string, string>;
   adaptiveLogic?: Record<string, unknown[]>;
+  adaptiveUnitTemplate?: unknown[];
   countcompletion?: unknown;
   learningsession?: unknown;
 };
@@ -47,12 +48,13 @@ type AdaptiveLogicOutput = {
   conditionResult?: boolean;
   when?: unknown;
   questions?: unknown[];
+  checkpoints?: unknown[];
 };
 
 type AdaptiveQuestionLogic = {
   curUnit?: { adaptiveLogic?: unknown };
   evaluate: (rule: unknown) => Promise<AdaptiveLogicOutput | undefined>;
-  unitBuilder: (template: unknown, adaptiveQuestionTimes: unknown[], adaptiveQuestions: unknown[]) => unknown;
+  unitBuilder: (template: unknown, adaptiveQuestionTimes: unknown[], adaptiveQuestions: unknown[], adaptiveCheckpoints?: unknown[]) => unknown;
   modifyUnit: (logic: unknown, unit: unknown) => Promise<unknown>;
   when?: unknown;
 };
@@ -141,36 +143,48 @@ export async function unitIsFinished(_reason: string): Promise<void> {
         for (const adaptiveUnitIndex in adaptive) {
           const adaptiveEntry = String(adaptive[adaptiveUnitIndex]);
           const newUnitIndex = Number(adaptiveEntry.split(',')[0]);
+          const targetUnitIndex = newUnitIndex - 1;
           const isTemplate = adaptiveEntry.split(',')[1] === 't';
           const adaptiveQuestionTimes: unknown[] = [];
           const adaptiveQuestions: unknown[] = [];
+          const adaptiveCheckpoints: unknown[] = [];
 
           for (const logicRule of (adaptiveLogic?.[newUnitIndex] || [])) {
             const logicOutput = await engine.adaptiveQuestionLogic.evaluate(logicRule);
             if (logicOutput?.conditionResult) {
-              adaptiveQuestionTimes.push(logicOutput.when);
               if (logicOutput.questions) {
-                adaptiveQuestions.push(...logicOutput.questions);
+                for (const adaptiveQuestion of logicOutput.questions) {
+                  adaptiveQuestions.push(adaptiveQuestion);
+                  adaptiveQuestionTimes.push(logicOutput.when);
+                }
+              }
+              if (logicOutput.checkpoints) {
+                adaptiveCheckpoints.push(...logicOutput.checkpoints);
               }
             }
           }
 
           if (isTemplate) {
             const adaptiveTemplates = curTdf.tdfs.tutor.setspec.unitTemplate || [];
-            const adaptiveTemplate = adaptiveTemplates[Number(adaptiveUnitIndex)];
+            const templateIndex = Number(prevUnit.adaptiveUnitTemplate?.[Number(adaptiveUnitIndex)] ?? adaptiveUnitIndex);
+            const adaptiveTemplate = adaptiveTemplates[templateIndex];
+            if (!adaptiveTemplate) {
+              throw new Error(`Adaptive template index ${templateIndex} not found for adaptive target ${adaptiveEntry}.`);
+            }
             const unit = engine.adaptiveQuestionLogic.unitBuilder(
               adaptiveTemplate,
               adaptiveQuestionTimes,
-              adaptiveQuestions
+              adaptiveQuestions,
+              adaptiveCheckpoints
             );
             countCompletion = prevUnit.countcompletion;
             curTdf.tdfs.tutor.unit.splice(newUnitIndex - 1, 0, unit as TdfUnitState);
           } else {
             const unit = await engine.adaptiveQuestionLogic.modifyUnit(
-              adaptiveLogic?.[adaptiveUnitIndex],
-              curTdf.tdfs.tutor.unit[newUnitIndex]
+              adaptiveLogic?.[newUnitIndex],
+              curTdf.tdfs.tutor.unit[targetUnitIndex]
             );
-            curTdf.tdfs.tutor.unit[newUnitIndex] = unit as TdfUnitState;
+            curTdf.tdfs.tutor.unit[targetUnitIndex] = unit as TdfUnitState;
           }
         }
       }

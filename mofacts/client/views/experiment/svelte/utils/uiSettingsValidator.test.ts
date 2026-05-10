@@ -42,27 +42,25 @@ describe('UISettings Validator (Phase 4)', function() {
       expect(result3).to.deep.equal(DEFAULTS);
     });
 
-    it('should preserve valid kept fields', function() {
+    it('should preserve valid registry fields', function() {
       const input = {
         stimuliPosition: 'left',
-        displayFeedback: false,
         correctMessage: 'Great!',
-        timeoutThreshold: 5,
+        choiceButtonCols: 3,
       };
 
       const result = sanitizeUiSettingsAny(input);
 
       expect(result.stimuliPosition).to.equal('left');
-      expect(result.displayFeedback).to.equal(false);
       expect(result.correctMessage).to.equal('Great!');
-      expect(result.timeoutThreshold).to.equal(5);
+      expect(result.choiceButtonCols).to.equal(3);
     });
 
-    it('should ignore deprecated fields', function() {
+    it('should ignore fields that were removed from the registry', function() {
       const input = {
         stimuliPosition: 'left',
-        showStimuliBox: true, // deprecated
-        displayPerformanceDuringTrial: true, // deprecated
+        showStimuliBox: true,
+        displayPerformanceDuringTrial: true,
         correctMessage: 'Great!',
       };
 
@@ -91,46 +89,40 @@ describe('UISettings Validator (Phase 4)', function() {
     it('should use defaults for invalid values', function() {
       const input = {
         stimuliPosition: 'invalid', // Invalid enum
-        timeoutThreshold: -5, // Invalid number (< 0)
         choiceButtonCols: 10, // Invalid number (> 4)
-        fadeInDuration: 10000, // Invalid number (> 5000)
+        correctMessage: '', // Invalid string (empty)
       };
 
       const result = sanitizeUiSettingsAny(input, { silent: true });
 
       expect(result.stimuliPosition).to.equal(DEFAULTS.stimuliPosition);
-      expect(result.timeoutThreshold).to.equal(DEFAULTS.timeoutThreshold);
       expect(result.choiceButtonCols).to.equal(DEFAULTS.choiceButtonCols);
-      expect(result.fadeInDuration).to.equal(DEFAULTS.fadeInDuration);
+      expect(result.correctMessage).to.equal(DEFAULTS.correctMessage);
     });
 
     it('should coerce string booleans to actual booleans', function() {
       const input = {
-        displayFeedback: 'true',
+        displayCorrectFeedback: 'true',
         displayTimeoutBar: 'false',
       };
 
       const result = sanitizeUiSettingsAny(input, { silent: true });
 
-      expect(result.displayFeedback).to.equal(true);
+      expect(result.displayCorrectFeedback).to.equal(true);
       expect(result.displayTimeoutBar).to.equal(false);
-      expect(typeof result.displayFeedback).to.equal('boolean');
+      expect(typeof result.displayCorrectFeedback).to.equal('boolean');
       expect(typeof result.displayTimeoutBar).to.equal('boolean');
     });
 
     it('should coerce string numbers to actual numbers', function() {
       const input = {
-        timeoutThreshold: '5',
         choiceButtonCols: '3',
-        fadeInDuration: '500',
       };
 
       const result = sanitizeUiSettingsAny(input, { silent: true });
 
-      expect(result.timeoutThreshold).to.equal(5);
       expect(result.choiceButtonCols).to.equal(3);
-      expect(result.fadeInDuration).to.equal(500);
-      expect(typeof result.timeoutThreshold).to.equal('number');
+      expect(typeof result.choiceButtonCols).to.equal('number');
     });
 
     it('should validate color hex codes', function() {
@@ -145,7 +137,7 @@ describe('UISettings Validator (Phase 4)', function() {
 
       const input2 = {
         correctColor: '#0f0', // Valid 3-char hex
-        incorrectColor: 'red', // Invalid (not hex)
+        incorrectColor: 'not a color',
       };
 
       const result2 = sanitizeUiSettingsAny(input2, { silent: true });
@@ -153,17 +145,11 @@ describe('UISettings Validator (Phase 4)', function() {
       expect(result2.incorrectColor).to.equal(DEFAULTS.incorrectColor);
     });
 
-    it('should handle all 25 kept fields', function() {
+    it('should handle the current registry-backed UI settings', function() {
       const input = {
-        // Layout & Display (5)
         stimuliPosition: 'left',
         isVideoSession: true,
         videoUrl: 'https://example.com/video.mp4',
-        fadeInDuration: 500,
-        fadeOutDuration: 300,
-
-        // Feedback Settings (10)
-        displayFeedback: false,
         displayCorrectFeedback: true,
         displayIncorrectFeedback: true,
         correctMessage: 'Excellent!',
@@ -173,26 +159,17 @@ describe('UISettings Validator (Phase 4)', function() {
         displayUserAnswerInFeedback: 'onCorrect',
         singleLineFeedback: true,
         onlyShowSimpleFeedback: 'onIncorrect',
-
-        // Performance & Timeouts
+        displayCorrectAnswerInIncorrectFeedback: true,
+        displayPerformance: true,
         displayTimeoutBar: true,
-        timeoutThreshold: 5,
-
-        // Multiple Choice Settings (2)
-        displayMultipleChoiceButtons: true,
         choiceButtonCols: 3,
-
-        // Text Input Settings (3)
-        displayTextInput: true,
         displaySubmitButton: false,
         inputPlaceholderText: 'Enter answer',
-
-        // Audio & SR Settings (2)
-        enableAudio: false,
-        enableSpeechRecognition: true,
-
-        // Miscellaneous (1)
+        displayConfirmButton: true,
+        continueButtonText: 'Next',
+        skipStudyButtonText: 'Skip it',
         caseSensitive: true,
+        displayQuestionNumber: true,
       };
 
       const result = sanitizeUiSettingsAny(input, { silent: true });
@@ -200,10 +177,6 @@ describe('UISettings Validator (Phase 4)', function() {
       expect(result.stimuliPosition).to.equal('left');
       expect(result.isVideoSession).to.equal(true);
       expect(result.videoUrl).to.equal('https://example.com/video.mp4');
-      expect(result.fadeInDuration).to.equal(500);
-      expect(result.fadeOutDuration).to.equal(300);
-
-      expect(result.displayFeedback).to.equal(false);
       expect(result.displayCorrectFeedback).to.equal(true);
       expect(result.displayIncorrectFeedback).to.equal(true);
       expect(result.correctMessage).to.equal('Excellent!');
@@ -213,21 +186,17 @@ describe('UISettings Validator (Phase 4)', function() {
       expect(result.displayUserAnswerInFeedback).to.equal('onCorrect');
       expect(result.singleLineFeedback).to.equal(true);
       expect(result.onlyShowSimpleFeedback).to.equal('onIncorrect');
-
+      expect(result.displayCorrectAnswerInIncorrectFeedback).to.equal(true);
+      expect(result.displayPerformance).to.equal(true);
       expect(result.displayTimeoutBar).to.equal(true);
-      expect(result.timeoutThreshold).to.equal(5);
-
-      expect(result.displayMultipleChoiceButtons).to.equal(true);
       expect(result.choiceButtonCols).to.equal(3);
-
-      expect(result.displayTextInput).to.equal(true);
       expect(result.displaySubmitButton).to.equal(false);
       expect(result.inputPlaceholderText).to.equal('Enter answer');
-
-      expect(result.enableAudio).to.equal(false);
-      expect(result.enableSpeechRecognition).to.equal(true);
-
+      expect(result.displayConfirmButton).to.equal(true);
+      expect(result.continueButtonText).to.equal('Next');
+      expect(result.skipStudyButtonText).to.equal('Skip it');
       expect(result.caseSensitive).to.equal(true);
+      expect(result.displayQuestionNumber).to.equal(true);
     });
   });
 
@@ -235,26 +204,23 @@ describe('UISettings Validator (Phase 4)', function() {
     it('should return empty array for clean settings', function() {
       const input = {
         stimuliPosition: 'left',
-        displayFeedback: true,
+        displayCorrectFeedback: true,
       };
 
       const result = getDeprecatedFields(input);
       expect(result).to.be.an('array').that.is.empty;
     });
 
-    it('should detect deprecated fields', function() {
+    it('should not classify removed fields as deprecated when no guidance is registered', function() {
       const input = {
         stimuliPosition: 'left',
-        showStimuliBox: true, // deprecated
-        displayPerformanceDuringTrial: true, // deprecated
-        suppressFeedbackDisplay: false, // deprecated
+        showStimuliBox: true,
+        displayPerformanceDuringTrial: true,
+        suppressFeedbackDisplay: false,
       };
 
       const result = getDeprecatedFields(input);
-      expect(result).to.have.lengthOf(3);
-      expect(result).to.include('showStimuliBox');
-      expect(result).to.include('displayPerformanceDuringTrial');
-      expect(result).to.include('suppressFeedbackDisplay');
+      expect(result).to.be.empty;
     });
 
     it('should handle empty/null input', function() {
@@ -268,7 +234,7 @@ describe('UISettings Validator (Phase 4)', function() {
     it('should return empty array for clean settings', function() {
       const input = {
         stimuliPosition: 'left',
-        displayFeedback: true,
+        displayCorrectFeedback: true,
       };
 
       const result = getUnknownFields(input);
@@ -288,16 +254,16 @@ describe('UISettings Validator (Phase 4)', function() {
       expect(result).to.include('anotherUnknown');
     });
 
-    it('should not include deprecated fields as unknown', function() {
+    it('should include removed fields as unknown when no deprecation guidance is registered', function() {
       const input = {
-        showStimuliBox: true, // deprecated, not unknown
-        unknownField: 'value', // unknown
+        showStimuliBox: true,
+        unknownField: 'value',
       };
 
       const result = getUnknownFields(input);
-      expect(result).to.have.lengthOf(1);
+      expect(result).to.have.lengthOf(2);
       expect(result).to.include('unknownField');
-      expect(result).to.not.include('showStimuliBox');
+      expect(result).to.include('showStimuliBox');
     });
 
     it('should handle empty/null input', function() {
@@ -311,9 +277,9 @@ describe('UISettings Validator (Phase 4)', function() {
     it('should generate complete report', function() {
       const input = {
         stimuliPosition: 'left',
-        showStimuliBox: true, // deprecated
-        displayPerformanceDuringTrial: true, // deprecated
-        unknownField: 'value', // unknown
+        showStimuliBox: true,
+        displayPerformanceDuringTrial: true,
+        unknownField: 'value',
       };
 
       const report = getDeprecationReport(input, 'tdf123', 'My TDF');
@@ -323,15 +289,15 @@ describe('UISettings Validator (Phase 4)', function() {
       expect(report).to.have.property('timestamp');
       expect(report).to.have.property('deprecatedFields').that.is.an('array');
       expect(report).to.have.property('unknownFields').that.is.an('array');
-      expect(report).to.have.property('deprecatedCount', 2);
-      expect(report).to.have.property('unknownCount', 1);
+      expect(report).to.have.property('deprecatedCount', 0);
+      expect(report).to.have.property('unknownCount', 3);
       expect(report).to.have.property('needsMigration', true);
     });
 
     it('should indicate no migration needed for clean settings', function() {
       const input = {
         stimuliPosition: 'left',
-        displayFeedback: true,
+        displayCorrectFeedback: true,
       };
 
       const report = getDeprecationReport(input, 'tdf456', 'Clean TDF');
@@ -345,13 +311,21 @@ describe('UISettings Validator (Phase 4)', function() {
   describe('Edge Cases', function() {
     it('should handle string "0" and "1" as numbers', function() {
       const input = {
-        timeoutThreshold: '0', // Invalid (must be > 0)
+        choiceButtonCols: '0',
+      };
+
+      const result = sanitizeUiSettingsAny(input, { silent: true });
+
+      expect(result.choiceButtonCols).to.equal(DEFAULTS.choiceButtonCols);
+    });
+
+    it('should handle valid string number boundaries', function() {
+      const input = {
         choiceButtonCols: '1', // Valid (1-4)
       };
 
       const result = sanitizeUiSettingsAny(input, { silent: true });
 
-      expect(result.timeoutThreshold).to.equal(DEFAULTS.timeoutThreshold); // Invalid, use default
       expect(result.choiceButtonCols).to.equal(1); // Valid
     });
 

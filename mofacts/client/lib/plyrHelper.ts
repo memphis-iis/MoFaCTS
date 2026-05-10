@@ -3,7 +3,6 @@ import { Session } from 'meteor/session';
 import { extractDelimFields, rangeVal } from './currentTestingHelpers';
 import { ExperimentStateStore } from './state/experimentStateStore';
 import { clientConsole } from './clientLogger';
-import { UiSettingsStore } from './state/uiSettingsStore';
 import { parseYouTubeVideoUrl } from './youtubeUrl';
 
 import { legacyTrim } from '../../common/underscoreCompat';
@@ -415,23 +414,11 @@ class PlayerController {
     //add class
     $('#progressbar').addClass('progress-bar');
     //set the width of the progress bar
-    if(this.times.length != 0 || (UiSettingsStore.get() as any).displayReviewTimeoutAsBarOrText == "bar" || (UiSettingsStore.get() as any).displayEndOfVideoCountdown){
-      if(UiSettingsStore.get().displayReviewTimeoutAsBarOrText == "text" || UiSettingsStore.get().displayReviewTimeoutAsBarOrText == "both"){                
-        (document.getElementById("CountdownTimerText") as any).innerHTML = 'Continuing in: ' + Math.floor(timeDiff) + ' seconds';
-      } else {
-        (document.getElementById("CountdownTimerText") as any).innerHTML = '';
-      }
-      if(UiSettingsStore.get().displayReviewTimeoutAsBarOrText == "bar" || UiSettingsStore.get().displayCardTimeoutAsBarOrText == "both"){
-        //add the progress bar class
-        $('#progressbar').addClass('progress-bar');
-        (document.getElementById("progressbar") as any).style.width = percentage + "%";
-      } else {
-        //set width to 0% 
-        (document.getElementById("progressbar") as any).style.width = 0 + "%";
-        //remove progress bar class
-        $('#progressbar').removeClass('progress-bar');
-      }
-   }
+    if(this.times.length != 0){
+      (document.getElementById("CountdownTimerText") as any).innerHTML = '';
+      (document.getElementById("progressbar") as any).style.width = 0 + "%";
+      $('#progressbar').removeClass('progress-bar');
+    }
     if(timeDiff < 0 && !this.questioningComplete){
       this.showQuestion();
     }

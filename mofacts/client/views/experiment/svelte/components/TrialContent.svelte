@@ -133,17 +133,14 @@
   /** @type {'onCorrect' | 'onIncorrect' | boolean} Display user answer rules */
   export let displayUserAnswerInFeedback = 'onIncorrect';
 
-  /** @type {boolean} Legacy flag: show user answer on correct */
-  export let displayUserAnswerInCorrectFeedback = false;
-
-  /** @type {boolean} Legacy flag: show user answer on incorrect */
-  export let displayUserAnswerInIncorrectFeedback = false;
-
   /** @type {boolean} Render feedback in a single line */
   export let singleLineFeedback = false;
 
   /** @type {'onCorrect' | 'onIncorrect' | boolean} Show only "Correct." / "Incorrect." */
   export let onlyShowSimpleFeedback = false;
+
+  /** @type {boolean} Show the correct answer on incorrect feedback */
+  export let displayCorrectAnswerInIncorrectFeedback = false;
 
   /** @type {boolean} Whether audio replay is enabled */
   export let replayEnabled = true;
@@ -345,10 +342,9 @@
           {displayCorrectFeedback}
           {displayIncorrectFeedback}
           {displayUserAnswerInFeedback}
-          {displayUserAnswerInCorrectFeedback}
-          {displayUserAnswerInIncorrectFeedback}
           {singleLineFeedback}
           {onlyShowSimpleFeedback}
+          {displayCorrectAnswerInIncorrectFeedback}
           on:blockingassetstate
         />
       {:else if mountedResponseVisible}

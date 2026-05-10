@@ -7,6 +7,8 @@ type FeedbackHtmlContext = {
   showUserAnswer?: boolean;
   showSimpleFeedback?: boolean;
   userAnswerText?: string;
+  correctAnswerText?: string;
+  displayCorrectAnswer?: boolean;
   correctAnswerImage?: string;
   singleLine?: boolean;
 };
@@ -52,6 +54,8 @@ function buildFeedbackHtml({
   showUserAnswer,
   showSimpleFeedback,
   userAnswerText,
+  correctAnswerText,
+  displayCorrectAnswer,
   correctAnswerImage,
   singleLine,
 }: FeedbackHtmlContext): string {
@@ -98,6 +102,16 @@ function buildFeedbackHtml({
     segments.push(formatted);
   }
 
+  if (
+    !isCorrectAnswer &&
+    displayCorrectAnswer &&
+    !displaySimpleFeedback &&
+    !hasCorrectImage &&
+    correctAnswerText
+  ) {
+    segments.push(`Correct answer: ${correctAnswerText}.`);
+  }
+
   let html = segments.join(separator);
 
   if (hasCorrectImage) {
@@ -134,9 +148,10 @@ function buildFeedbackText(context: FeedbackBuildContext = {}): string {
     text = 'Incorrect. The correct response is displayed below.';
   }
 
-  const showUserAnswer = shouldShow((uiSettings as Record<string, unknown>).displayUserAnswerInFeedback as FeedbackSetting, context.isCorrect) ||
-    (!!context.isCorrect && Boolean((uiSettings as Record<string, unknown>).displayUserAnswerInCorrectFeedback)) ||
-    (!context.isCorrect && Boolean((uiSettings as Record<string, unknown>).displayUserAnswerInIncorrectFeedback));
+  const showUserAnswer = shouldShow(
+    (uiSettings as Record<string, unknown>).displayUserAnswerInFeedback as FeedbackSetting,
+    context.isCorrect
+  );
   const showSimpleFeedback = shouldShow((uiSettings as Record<string, unknown>).onlyShowSimpleFeedback as FeedbackSetting, context.isCorrect);
 
   const htmlContext: FeedbackHtmlContext = {
@@ -144,6 +159,8 @@ function buildFeedbackText(context: FeedbackBuildContext = {}): string {
     showUserAnswer,
     showSimpleFeedback,
     userAnswerText: context.userAnswer || '',
+    correctAnswerText: context.currentAnswer || context.originalAnswer || '',
+    displayCorrectAnswer: Boolean((uiSettings as Record<string, unknown>).displayCorrectAnswerInIncorrectFeedback),
     correctAnswerImage: hasCorrectImage ? 'image' : '',
     singleLine: Boolean((uiSettings as Record<string, unknown>).singleLineFeedback),
   };

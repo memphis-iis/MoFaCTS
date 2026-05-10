@@ -209,7 +209,7 @@ function estimateLinear16DurationMs(byteLength: number, sampleRate: number): num
   return Math.round((byteLength / 2 / sampleRate) * 1000);
 }
 
-export function shouldRetryShortTargetWithCommandModel(
+function shouldRetryShortTargetWithCommandModel(
   response: GoogleSpeechApiResponse | null | undefined,
   currentAnswer: string | null,
   language: string

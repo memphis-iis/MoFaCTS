@@ -561,7 +561,6 @@ export const applyValidationResult = assign({
       correctprompt: timeoutContext.deliveryParams?.correctprompt,
       reviewstudy: timeoutContext.deliveryParams?.reviewstudy,
       purestudy: timeoutContext.deliveryParams?.purestudy,
-      feedbackTimeout: timeoutContext.deliveryParams?.feedbackTimeout,
     });
 
     return timeoutMs;

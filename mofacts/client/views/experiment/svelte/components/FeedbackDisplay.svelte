@@ -54,17 +54,14 @@
   /** @type {'onCorrect' | 'onIncorrect' | boolean} Display user answer rules */
   export let displayUserAnswerInFeedback = 'onIncorrect';
 
-  /** @type {boolean} Legacy flag: show user answer on correct */
-  export let displayUserAnswerInCorrectFeedback = false;
-
-  /** @type {boolean} Legacy flag: show user answer on incorrect */
-  export let displayUserAnswerInIncorrectFeedback = false;
-
   /** @type {boolean} Render feedback in a single line */
   export let singleLineFeedback = false;
 
   /** @type {'onCorrect' | 'onIncorrect' | boolean} Show only "Correct." / "Incorrect." */
   export let onlyShowSimpleFeedback = false;
+
+  /** @type {boolean} Show the correct answer on incorrect feedback */
+  export let displayCorrectAnswerInIncorrectFeedback = false;
 
   $: shouldDisplay = visible && (
     (isCorrect && displayCorrectFeedback) ||
@@ -88,13 +85,11 @@
   let lastBlockingAssetState = '';
   let blockingAssetSequence = 0;
 
-  $: showUserAnswer = shouldShow(displayUserAnswerInFeedback, isCorrect) ||
-    (isCorrect && displayUserAnswerInCorrectFeedback) ||
-    (!isCorrect && displayUserAnswerInIncorrectFeedback);
+  $: showUserAnswer = shouldShow(displayUserAnswerInFeedback, isCorrect);
   $: showSimpleFeedback = shouldShow(onlyShowSimpleFeedback, isCorrect);
 
   $: {
-    clientConsole(2, '[FeedbackDisplay] userAnswer:', userAnswer, 'showUserAnswer:', showUserAnswer, 'displayUserAnswerInFeedback:', displayUserAnswerInFeedback, 'displayUserAnswerInIncorrectFeedback:', displayUserAnswerInIncorrectFeedback, 'isCorrect:', isCorrect);
+    clientConsole(2, '[FeedbackDisplay] userAnswer:', userAnswer, 'showUserAnswer:', showUserAnswer, 'displayUserAnswerInFeedback:', displayUserAnswerInFeedback, 'isCorrect:', isCorrect);
   }
 
   $: sanitizedUserAnswer = DOMPurify.sanitize(userAnswer, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
@@ -109,6 +104,7 @@
     showSimpleFeedback,
     userAnswerText: sanitizedUserAnswer,
     correctAnswerText: sanitizedCorrectAnswer,
+    displayCorrectAnswer: displayCorrectAnswerInIncorrectFeedback,
     correctAnswerImage: sanitizedCorrectAnswerImage,
     singleLine: singleLineFeedback,
   });

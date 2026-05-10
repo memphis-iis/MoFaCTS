@@ -22,9 +22,6 @@ import { clientConsole } from '../lib/clientLogger';
 
 const DEFAULT_UI_SETTINGS: any = {
   ...BASE_UI_SETTINGS,
-  forceSpeechRecognition: false,
-  srState: 'listening',
-  displayUserAnswerAtTop: false,
   displayQuestionNumber: false
 };
 
@@ -346,8 +343,7 @@ function buildMatches(activeStates: any) {
 }
 
 function shouldShowTimeoutBar(uiSettings: any) {
-  return ['bar', 'both'].includes(uiSettings.displayCardTimeoutAsBarOrText) ||
-    ['bar', 'both'].includes(uiSettings.displayReviewTimeoutAsBarOrText);
+  return uiSettings.displayTimeoutBar === true;
 }
 
 function buildTimeoutConfig(mode: any, uiSettings: any) {
@@ -413,14 +409,7 @@ function normalizeUiSettings(rawSettings: any = {}) {
     }
   });
 
-  const booleanStringFields = [
-    'displayUserAnswerInFeedback',
-    'onlyShowSimpleFeedback',
-    'suppressFeedbackDisplay',
-    'displayCardTimeoutAsBarOrText',
-    'displayReviewTimeoutAsBarOrText',
-    'displayReadyPromptTimeoutAsBarOrText'
-  ];
+  const booleanStringFields = ['displayUserAnswerInFeedback', 'onlyShowSimpleFeedback'];
 
   booleanStringFields.forEach((field: any) => {
     if (mergedSettings[field] === 'true') {
@@ -429,72 +418,6 @@ function normalizeUiSettings(rawSettings: any = {}) {
       mergedSettings[field] = false;
     }
   });
-
-  if (rawSettings.displayUserAnswerInFeedback !== undefined) {
-    if (mergedSettings.displayUserAnswerInFeedback === 'onCorrect') {
-      mergedSettings.displayUserAnswerInCorrectFeedback = true;
-      mergedSettings.displayUserAnswerInIncorrectFeedback = false;
-    } else if (mergedSettings.displayUserAnswerInFeedback === 'onIncorrect') {
-      mergedSettings.displayUserAnswerInCorrectFeedback = false;
-      mergedSettings.displayUserAnswerInIncorrectFeedback = true;
-    } else if (mergedSettings.displayUserAnswerInFeedback === true) {
-      mergedSettings.displayUserAnswerInCorrectFeedback = true;
-      mergedSettings.displayUserAnswerInIncorrectFeedback = true;
-    } else if (mergedSettings.displayUserAnswerInFeedback === false) {
-      mergedSettings.displayUserAnswerInCorrectFeedback = false;
-      mergedSettings.displayUserAnswerInIncorrectFeedback = false;
-    }
-  } else if (
-    rawSettings.displayUserAnswerInCorrectFeedback !== undefined ||
-    rawSettings.displayUserAnswerInIncorrectFeedback !== undefined
-  ) {
-    const correct = !!mergedSettings.displayUserAnswerInCorrectFeedback;
-    const incorrect = !!mergedSettings.displayUserAnswerInIncorrectFeedback;
-    if (correct && incorrect) {
-      mergedSettings.displayUserAnswerInFeedback = true;
-    } else if (correct) {
-      mergedSettings.displayUserAnswerInFeedback = 'onCorrect';
-    } else if (incorrect) {
-      mergedSettings.displayUserAnswerInFeedback = 'onIncorrect';
-    } else {
-      mergedSettings.displayUserAnswerInFeedback = false;
-    }
-  }
-
-  if (rawSettings.onlyShowSimpleFeedback !== undefined) {
-    if (mergedSettings.onlyShowSimpleFeedback === 'onCorrect') {
-      mergedSettings.simplefeedbackOnCorrect = true;
-      mergedSettings.simplefeedbackOnIncorrect = false;
-    } else if (mergedSettings.onlyShowSimpleFeedback === 'onIncorrect') {
-      mergedSettings.simplefeedbackOnCorrect = false;
-      mergedSettings.simplefeedbackOnIncorrect = true;
-    } else if (mergedSettings.onlyShowSimpleFeedback === true) {
-      mergedSettings.simplefeedbackOnCorrect = true;
-      mergedSettings.simplefeedbackOnIncorrect = true;
-    } else if (mergedSettings.onlyShowSimpleFeedback === false) {
-      mergedSettings.simplefeedbackOnCorrect = false;
-      mergedSettings.simplefeedbackOnIncorrect = false;
-    }
-  } else if (
-    rawSettings.simplefeedbackOnCorrect !== undefined ||
-    rawSettings.simplefeedbackOnIncorrect !== undefined
-  ) {
-    const correct = !!mergedSettings.simplefeedbackOnCorrect;
-    const incorrect = !!mergedSettings.simplefeedbackOnIncorrect;
-    if (correct && incorrect) {
-      mergedSettings.onlyShowSimpleFeedback = true;
-    } else if (correct) {
-      mergedSettings.onlyShowSimpleFeedback = 'onCorrect';
-    } else if (incorrect) {
-      mergedSettings.onlyShowSimpleFeedback = 'onIncorrect';
-    } else {
-      mergedSettings.onlyShowSimpleFeedback = false;
-    }
-  }
-
-  if (mergedSettings.suppressFeedbackDisplay === true || mergedSettings.suppressFeedbackDisplay === 'true') {
-    mergedSettings.displayFeedback = false;
-  }
 
   return mergedSettings;
 }
@@ -509,46 +432,29 @@ function syncSettingsFromConfig(instance: any) {
   $('.setting-fontsize').val(deliveryparams.fontsize || '24');
   $('.setting-stimuliPosition').val(uiSettings.stimuliPosition || 'top');
   $('.setting-displayQuestionNumber').prop('checked', uiSettings.displayQuestionNumber === true);
-  $('.setting-fadeInDuration').val(uiSettings.fadeInDuration);
-  $('.setting-fadeOutDuration').val(uiSettings.fadeOutDuration);
   $('.setting-isVideoSession').prop('checked', uiSettings.isVideoSession === true);
   $('.setting-videoUrl').val(uiSettings.videoUrl || '');
 
-  const showTimeoutBarSetting = ['bar', 'both'].includes(uiSettings.displayCardTimeoutAsBarOrText) ||
-    ['bar', 'both'].includes(uiSettings.displayReviewTimeoutAsBarOrText);
-  $('.setting-displayTimeoutBar').prop('checked', showTimeoutBarSetting);
-  $('.setting-timeoutThreshold').val(uiSettings.timeoutThreshold);
-  const timeoutValue = uiSettings.displayCardTimeoutAsBarOrText === false ? 'false' : uiSettings.displayCardTimeoutAsBarOrText || 'false';
-  $('.setting-displayCardTimeoutAsBarOrText').val(timeoutValue);
-  $('.setting-displayTimeOutDuringStudy').prop('checked', uiSettings.displayTimeOutDuringStudy === true);
+  $('.setting-displayTimeoutBar').prop('checked', uiSettings.displayTimeoutBar === true);
 
-  $('.setting-displayFeedback').prop('checked', uiSettings.displayFeedback === true);
   $('.setting-displayCorrectFeedback').prop('checked', uiSettings.displayCorrectFeedback === true);
   $('.setting-displayIncorrectFeedback').prop('checked', uiSettings.displayIncorrectFeedback === true);
   $('.setting-onlyShowSimpleFeedback').val(toTriStateSelectValue(uiSettings.onlyShowSimpleFeedback));
   $('.setting-singleLineFeedback').prop('checked', uiSettings.singleLineFeedback === true);
 
-  $('.setting-displayUserAnswerAtTop').prop('checked', uiSettings.displayUserAnswerAtTop === true);
-  $('.setting-displayCorrectAnswerInCenter').prop('checked', uiSettings.displayCorrectAnswerInCenter === true);
+  $('.setting-displayCorrectAnswerInIncorrectFeedback').prop('checked', uiSettings.displayCorrectAnswerInIncorrectFeedback === true);
   $('.setting-displayUserAnswerInFeedback').val(toTriStateSelectValue(uiSettings.displayUserAnswerInFeedback));
 
   $('.setting-correctColor').val(uiSettings.correctColor || 'green');
   $('.setting-incorrectColor').val(uiSettings.incorrectColor || 'darkorange');
 
-  $('.setting-displayTextInput').prop('checked', uiSettings.displayTextInput === true);
   $('.setting-displaySubmitButton').prop('checked', uiSettings.displaySubmitButton === true);
 
   $('.setting-correctMessage').val(uiSettings.correctMessage || 'Correct!');
   $('.setting-incorrectMessage').val(uiSettings.incorrectMessage || 'Incorrect');
   $('.setting-inputPlaceholderText').val(uiSettings.inputPlaceholderText || 'Your answer');
 
-  $('.setting-displayMultipleChoiceButtons').prop('checked', uiSettings.displayMultipleChoiceButtons === true);
   $('.setting-choiceButtonCols').val(uiSettings.choiceButtonCols || 2);
-
-  $('.setting-enableAudio').prop('checked', uiSettings.enableAudio === true);
-  $('.setting-enableSpeechRecognition').prop('checked', uiSettings.enableSpeechRecognition === true);
-  $('.setting-forceSpeechRecognition').prop('checked', uiSettings.forceSpeechRecognition === true);
-  $('.setting-srState').val(uiSettings.srState || 'listening');
 
   $('.setting-caseSensitive').prop('checked', uiSettings.caseSensitive === true);
 }
@@ -563,11 +469,6 @@ function toTriStateSelectValue(value: any) {
   if (value === true) return 'always';
   if (value === false || value == null) return 'never';
   return value;
-}
-
-function parseNumberOrDefault(value: any, fallback: any) {
-  const num = parseFloat(value);
-  return Number.isNaN(num) ? fallback : num;
 }
 
 function updateConfigSetting(instance: any, section: any, key: any, value: any) {
@@ -1002,21 +903,6 @@ Template.svelteCardTester.events({
     updateConfigSetting(instance, 'uiSettings', 'stimuliPosition', event.target.value);
   },
 
-  'change .setting-displayCardTimeoutAsBarOrText'(event: any, instance: any) {
-    const value = event.target.value;
-    updateConfigSetting(instance, 'uiSettings', 'displayCardTimeoutAsBarOrText',
-      value === 'false' ? false : value);
-    Meteor.defer(() => syncSettingsFromConfig(instance));
-  },
-
-  'change .setting-displayTimeOutDuringStudy'(event: any, instance: any) {
-    updateConfigSetting(instance, 'uiSettings', 'displayTimeOutDuringStudy', event.target.checked);
-  },
-
-  'change .setting-displayFeedback'(event: any, instance: any) {
-    updateConfigSetting(instance, 'uiSettings', 'displayFeedback', event.target.checked);
-  },
-
   'change .setting-displayCorrectFeedback'(event: any, instance: any) {
     updateConfigSetting(instance, 'uiSettings', 'displayCorrectFeedback', event.target.checked);
   },
@@ -1033,12 +919,8 @@ Template.svelteCardTester.events({
     updateConfigSetting(instance, 'uiSettings', 'singleLineFeedback', event.target.checked);
   },
 
-  'change .setting-displayUserAnswerAtTop'(event: any, instance: any) {
-    updateConfigSetting(instance, 'uiSettings', 'displayUserAnswerAtTop', event.target.checked);
-  },
-
-  'change .setting-displayCorrectAnswerInCenter'(event: any, instance: any) {
-    updateConfigSetting(instance, 'uiSettings', 'displayCorrectAnswerInCenter', event.target.checked);
+  'change .setting-displayCorrectAnswerInIncorrectFeedback'(event: any, instance: any) {
+    updateConfigSetting(instance, 'uiSettings', 'displayCorrectAnswerInIncorrectFeedback', event.target.checked);
   },
 
   'change .setting-displayUserAnswerInFeedback'(event: any, instance: any) {
@@ -1061,10 +943,6 @@ Template.svelteCardTester.events({
     updateConfigSetting(instance, 'uiSettings', 'incorrectMessage', event.target.value);
   },
 
-  'change .setting-displayTextInput'(event: any, instance: any) {
-    updateConfigSetting(instance, 'uiSettings', 'displayTextInput', event.target.checked);
-  },
-
   'change .setting-displaySubmitButton'(event: any, instance: any) {
     updateConfigSetting(instance, 'uiSettings', 'displaySubmitButton', event.target.checked);
   },
@@ -1085,47 +963,12 @@ Template.svelteCardTester.events({
     updateConfigSetting(instance, 'uiSettings', 'displayQuestionNumber', event.target.checked);
   },
 
-  'change .setting-fadeInDuration'(event: any, instance: any) {
-    updateConfigSetting(instance, 'uiSettings', 'fadeInDuration', parseNumberOrDefault(event.target.value, DEFAULT_UI_SETTINGS.fadeInDuration));
-  },
-
-  'change .setting-fadeOutDuration'(event: any, instance: any) {
-    updateConfigSetting(instance, 'uiSettings', 'fadeOutDuration', parseNumberOrDefault(event.target.value, DEFAULT_UI_SETTINGS.fadeOutDuration));
-  },
-
   'change .setting-displayTimeoutBar'(event: any, instance: any) {
-    const isChecked = event.target.checked;
-    updateConfigSetting(instance, 'uiSettings', 'displayTimeoutBar', isChecked);
-    updateConfigSetting(instance, 'uiSettings', 'displayCardTimeoutAsBarOrText', isChecked ? 'bar' : false);
-    Meteor.defer(() => syncSettingsFromConfig(instance));
-  },
-
-  'change .setting-timeoutThreshold'(event: any, instance: any) {
-    updateConfigSetting(instance, 'uiSettings', 'timeoutThreshold', parseNumberOrDefault(event.target.value, DEFAULT_UI_SETTINGS.timeoutThreshold));
-  },
-
-  'change .setting-displayMultipleChoiceButtons'(event: any, instance: any) {
-    updateConfigSetting(instance, 'uiSettings', 'displayMultipleChoiceButtons', event.target.checked);
+    updateConfigSetting(instance, 'uiSettings', 'displayTimeoutBar', event.target.checked);
   },
 
   'change .setting-choiceButtonCols'(event: any, instance: any) {
     updateConfigSetting(instance, 'uiSettings', 'choiceButtonCols', parseInt(event.target.value, 10));
-  },
-
-  'change .setting-enableAudio'(event: any, instance: any) {
-    updateConfigSetting(instance, 'uiSettings', 'enableAudio', event.target.checked);
-  },
-
-  'change .setting-enableSpeechRecognition'(event: any, instance: any) {
-    updateConfigSetting(instance, 'uiSettings', 'enableSpeechRecognition', event.target.checked);
-  },
-
-  'change .setting-forceSpeechRecognition'(event: any, instance: any) {
-    updateConfigSetting(instance, 'uiSettings', 'forceSpeechRecognition', event.target.checked);
-  },
-
-  'change .setting-srState'(event: any, instance: any) {
-    updateConfigSetting(instance, 'uiSettings', 'srState', event.target.value);
   },
 
   'change .setting-caseSensitive'(event: any, instance: any) {

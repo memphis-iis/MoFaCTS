@@ -536,16 +536,6 @@ export const cardMachine = createMachine(
            */
           [STATES.FADING_IN]: {
             entry: ['logStateTransition'],
-            // TODO: Add video player service invocation for video sessions
-            // invoke: {
-            //   id: 'videoPlayerService',
-            //   src: 'videoPlayerService',
-            //   data: (context) => ({
-            //     videoSrc: context.currentDisplay.videoSrc,
-            //     checkpoints: context.deliveryParams.videoCheckpoints,
-            //   }),
-            //   cond: 'isVideoSession',
-            // },
             after: {
               FADE_IN_DURATION: {
                 target: STATES.DISPLAYING,

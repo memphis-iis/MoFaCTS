@@ -256,10 +256,9 @@
         displayCorrectFeedback: Boolean(slotState.displayCorrectFeedback),
         displayIncorrectFeedback: Boolean(slotState.displayIncorrectFeedback),
         displayUserAnswerInFeedback: uiSettings.displayUserAnswerInFeedback,
-        displayUserAnswerInCorrectFeedback: uiSettings.displayUserAnswerInCorrectFeedback,
-        displayUserAnswerInIncorrectFeedback: uiSettings.displayUserAnswerInIncorrectFeedback,
         singleLineFeedback: uiSettings.singleLineFeedback,
-        onlyShowSimpleFeedback: Boolean(slotState.onlyShowSimpleFeedback),
+        onlyShowSimpleFeedback: slotState.onlyShowSimpleFeedback,
+        displayCorrectAnswerInIncorrectFeedback: uiSettings.displayCorrectAnswerInIncorrectFeedback,
         replayEnabled: subset.replayEnabled,
       },
     };
@@ -602,10 +601,9 @@
     displayCorrectFeedback,
     displayIncorrectFeedback,
     displayUserAnswerInFeedback: uiSettings.displayUserAnswerInFeedback,
-    displayUserAnswerInCorrectFeedback: uiSettings.displayUserAnswerInCorrectFeedback,
-    displayUserAnswerInIncorrectFeedback: uiSettings.displayUserAnswerInIncorrectFeedback,
     singleLineFeedback: uiSettings.singleLineFeedback,
     onlyShowSimpleFeedback,
+    displayCorrectAnswerInIncorrectFeedback: uiSettings.displayCorrectAnswerInIncorrectFeedback,
     replayEnabled: trialSubset.replayEnabled,
   };
   $: videoEnded = state.matches('videoEnded');
@@ -787,22 +785,8 @@
     send({ type: 'INCOMING_READY' });
   }
 
-  $: displayMinSeconds = getDisplayTimeoutValue(
-    deliveryParams.displayMinSeconds ??
-      deliveryParams.displayminseconds ??
-      deliveryParams.displayMinSecs ??
-      deliveryParams.displayminsecs ??
-      deliveryParams.minSecs ??
-      0
-  );
-  $: displayMaxSeconds = getDisplayTimeoutValue(
-    deliveryParams.displayMaxSeconds ??
-      deliveryParams.displaymaxseconds ??
-      deliveryParams.displayMaxSecs ??
-      deliveryParams.displaymaxsecs ??
-      deliveryParams.maxSecs ??
-      0
-  );
+  $: displayMinSeconds = getDisplayTimeoutValue(deliveryParams.displayMinSeconds ?? 0);
+  $: displayMaxSeconds = getDisplayTimeoutValue(deliveryParams.displayMaxSeconds ?? 0);
   $: hasDisplayTimeout = displayMinSeconds > 0 || displayMaxSeconds > 0;
   $: footerMessage = buildDisplayTimeoutMessage(displayMinSeconds, displayMaxSeconds);
 
@@ -2392,7 +2376,7 @@
   .video-instruction-continue {
     display: block;
     width: min(420px, 100%);
-    min-height: 44px;
+    min-height: var(--button-height);
     margin: 24px auto 0;
     border: 1px solid var(--secondary-color);
     border-radius: var(--border-radius-sm);
