@@ -315,24 +315,21 @@ input[type="file"]::file-selector-button,
 .form-control[type="file"]::file-selector-button {
     appearance: none;
     box-sizing: border-box;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
     font-family: inherit;
     font-size: 1rem;
     font-weight: 400;
-    height: var(--button-height);
-    min-height: var(--button-height);
+    height: calc(var(--button-height) - 2px);
+    min-height: calc(var(--button-height) - 2px);
     padding: 0 1rem;
-    margin: -1px 0.75rem -1px -1px;
+    margin: 0 0.75rem 0 0;
     border: none;
     border-radius: var(--border-radius-sm) 0 0 var(--border-radius-sm);
     background-color: var(--button-color);
     color: var(--primary-button-text-color);
     cursor: pointer;
-    line-height: 1;
+    line-height: calc(var(--button-height) - 2px);
     transition: background-color var(--transition-fast) ease;
-    vertical-align: middle;
+    vertical-align: top;
 }
 
 input[type="file"]::file-selector-button:hover,
