@@ -7,11 +7,11 @@ type ImportParameterDefaults = {
   skipstudy: string;
   reviewstudy: string;
   correctprompt: string;
-  fontsize: string;
-  correctscore: string;
-  incorrectscore: string;
   optimalThreshold: string;
   practiceseconds: string;
+  fontsize: string;
+  displayMinSeconds?: string;
+  displayMaxSeconds?: string;
 };
 
 const IMPORT_PARAMETER_DEFAULTS: ImportParameterDefaults = sharedDefaults.IMPORT_PARAMETER_DEFAULTS;

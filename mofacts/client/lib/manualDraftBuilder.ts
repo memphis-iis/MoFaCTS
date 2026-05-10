@@ -144,8 +144,7 @@ function buildUiSettings(state: ManualCreatorState) {
   const showScore = state.topBarMode === 'score' || state.topBarMode === 'time-score';
 
   return {
-    displayTimeOutDuringStudy: showTime,
-    displayPerformanceDuringStudy: showScore,
+    displayPerformance: showTime || showScore,
     choiceButtonCols: state.responseType === 'multiple-choice' ? 2 : 1
   };
 }
@@ -193,19 +192,17 @@ function buildItems(state: ManualCreatorState): NormalizedImportItem[] {
 function buildLearningUnit(state: ManualCreatorState, clusterRange: string) {
   const parameters = cloneImportParameterDefaults();
   const { lfparameter: _lfparameter, ...deliveryparams } = parameters;
+  if (state.practiceTimingEnabled) {
+    deliveryparams.displayMinSeconds = String(state.minPracticeTime || '').trim() || '0';
+    deliveryparams.displayMaxSeconds = String(state.maxPracticeTime || '').trim() || '0';
+  }
 
   return {
     unitname: 'Practice',
     learningsession: {
       clusterlist: clusterRange,
       unitMode: 'distance',
-      calculateProbability: CALCULATE_PROBABILITY_FORMULA,
-      ...(state.practiceTimingEnabled
-        ? {
-            displayminseconds: String(state.minPracticeTime || '').trim() || '0',
-            displaymaxseconds: String(state.maxPracticeTime || '').trim() || '0'
-          }
-        : {})
+      calculateProbability: CALCULATE_PROBABILITY_FORMULA
     },
     deliveryparams,
     ...(state.responseType === 'multiple-choice'

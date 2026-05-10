@@ -1681,11 +1681,12 @@ async function modelUnitEngine(): Promise<any> {
 
     unitFinished: async function() {
       const session = this.curUnit.learningsession || this.curUnit.videosession;
-      const minSecs = session.displayminseconds || 0;
-      const maxSecs = session.displaymaxseconds || 0;
+      const deliveryParams = DeliveryParamsStore.get() as Record<string, unknown>;
+      const minSecs = Number(deliveryParams.displayMinSeconds || 0);
+      const maxSecs = Number(deliveryParams.displayMaxSeconds || 0);
       const maxTrials = parseInt(session.maxTrials || 0);
       const numTrialsSoFar = cardProbabilities.numQuestionsAnsweredCurrentSession || 0;
-      const practicetimer = DeliveryParamsStore.get().practicetimer;
+      const practicetimer = deliveryParams.practicetimer;
 
       if (maxTrials > 0 && numTrialsSoFar >= maxTrials) {
         return true;
@@ -1700,7 +1701,7 @@ async function modelUnitEngine(): Promise<any> {
         return false;
       }
 
-      // TODO: we should probably remove this as it's been superceded by displayminseconds/displaymaxseconds
+      // If we're still here, check practice seconds.
       // If we're still here, check practice seconds
       const practiceSeconds = Number((DeliveryParamsStore.get() as any).practiceseconds || 0);
       if (practiceSeconds < 1.0) {
