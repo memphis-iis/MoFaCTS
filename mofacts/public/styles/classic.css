@@ -300,10 +300,12 @@ input[type="file"],
 
 input[type="file"]::file-selector-button,
 .form-control[type="file"]::file-selector-button {
+    box-sizing: border-box;
     font-family: inherit;
     font-size: 1rem;
     height: calc(var(--button-height) - 2px);
     min-height: calc(var(--button-height) - 2px);
+    line-height: calc(var(--button-height) - 2px);
     padding: 0 0.75rem;
     margin-right: 0.75rem;
     border: none;
@@ -311,10 +313,13 @@ input[type="file"]::file-selector-button,
     background-color: var(--button-color);
     color: var(--primary-button-text-color);
     cursor: pointer;
+    text-align: center;
     transition: background-color var(--transition-fast) ease;
+    vertical-align: top;
 }
 
-input[type="file"]::file-selector-button:hover {
+input[type="file"]::file-selector-button:hover,
+.form-control[type="file"]::file-selector-button:hover {
     background-color: var(--btn-hover-bg);
 }
 
