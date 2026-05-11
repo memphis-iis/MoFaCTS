@@ -18,7 +18,6 @@ import { getStimCluster, getStimCount } from '../../../../lib/currentTestingHelp
 import { clientConsole } from '../../../../lib/clientLogger';
 import { parseSchedItemCondition } from '../../../../lib/tdfUtils';
 import { SCHEDULE_UNIT, HISTORY_KEY_MAP } from '../../../../../common/Definitions';
-import { buildFeedbackText } from '../utils/feedbackTextBuilder';
 import { meteorCallAsync } from '../../../../lib/meteorAsync';
 import {
   applyMappingRecordToSession,
@@ -93,6 +92,19 @@ function getTrialOutcome(testType: string, isCorrect: boolean): string {
     return 'study';
   }
   return isCorrect ? 'correct' : 'incorrect';
+}
+
+function getDisplayedFeedbackText(testType: string): string {
+  if (testType === 't' || testType === 's') {
+    return '';
+  }
+
+  const feedbackText = CardStore.getCardValue('feedbackTtsText');
+  if (typeof feedbackText !== 'string' || legacyTrim(feedbackText) === '') {
+    throw new Error('[History Logging] feedbackTtsText missing before history write');
+  }
+
+  return feedbackText;
 }
 
 function truncateToFiveDecimals(value: number): number {
@@ -694,12 +706,7 @@ export async function historyLoggingService(
       ? context.timestamps.trialStart
       : context.timestamps.firstKeypress ?? context.timestamps.trialEnd;
 
-    const feedbackText = buildFeedbackText({
-      ...context,
-      userAnswer: context.userAnswer || '',
-      originalAnswer: typeof context.originalAnswer === 'string' ? context.originalAnswer : '',
-      currentAnswer: typeof context.currentAnswer === 'string' ? context.currentAnswer : '',
-    });
+    const feedbackText = getDisplayedFeedbackText(context.testType);
 
     // Create record
     const engine = (event.engine || context.engine) as HistoryEngineLike;

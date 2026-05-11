@@ -287,4 +287,34 @@ describe('resume runtime integration seams', function() {
 
     expect(rejectionMessage).to.contain('overallOutcomeHistory');
   });
+
+  it('historyLoggingService rejects when canonical feedback text is missing', async function() {
+    Session.set('overallOutcomeHistory', []);
+    Session.set('overallStudyHistory', []);
+    CardStore.setCardValue('feedbackTtsText', '');
+
+    const context: HistoryLoggingContext = {
+      testType: 'd',
+      isCorrect: false,
+      timestamps: {
+        trialStart: 1000,
+        trialEnd: 1500,
+        firstKeypress: 1100,
+        feedbackStart: 1200,
+        feedbackEnd: 1400,
+      },
+      source: 'keyboard',
+      userAnswer: 'wrong',
+      deliveryParams: {},
+    };
+
+    let rejectionMessage = '';
+    try {
+      await historyLoggingService(context, { skipOutcomeHistoryUpdate: true });
+    } catch (error) {
+      rejectionMessage = error instanceof Error ? error.message : String(error);
+    }
+
+    expect(rejectionMessage).to.contain('feedbackTtsText missing');
+  });
 });

@@ -235,6 +235,7 @@ export interface HistoryLoggingContext {
 
 export interface HistoryLoggingEvent {
   engine?: UnitEngineLike | null;
+  skipOutcomeHistoryUpdate?: boolean;
 }
 
 export type HistoryLoggingStatus = 'logged';
