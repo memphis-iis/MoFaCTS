@@ -23,8 +23,11 @@ jobs:
           cache: npm
           cache-dependency-path: mofacts/package-lock.json
 
-      - name: Install Meteor 3.4
-        run: curl https://install.meteor.com/?release=3.4 | sh
+      - name: Install Meteor 3.4.1
+        run: curl https://install.meteor.com/?release=3.4.1 | sh
+
+      - name: Sync Meteor npm dependencies
+        run: meteor update --npm 2>/dev/null || true
 
       - name: Install dependencies
         run: npm ci
