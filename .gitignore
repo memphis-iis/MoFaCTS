@@ -42,10 +42,10 @@ db/mongodump.tar.gz
 
 # Shareable local Docker/dev config
 !mofacts/.deploy/.env.local
-!mofacts/.deploy/settings.local.json
 !mofacts/.deploy/docker-compose.local.yml
 
 # Private deploy config
+mofacts/.deploy/settings.local.json
 mofacts/.deploy/settings.json
 mofacts/.deploy/settingsproduction.json
 mofacts/.deploy/settingsstaging.json

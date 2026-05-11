@@ -45,7 +45,7 @@ import { ensureCurrentStimuliSetId, resolveDynamicAssetPath } from './mediaResol
 import { resolveVideoResumeAnchor } from './videoResume';
 import { withStartupTimeout } from '../../../../lib/audioStartup';
 import { evaluateSrAvailability } from '../../../../lib/audioAvailability';
-import { finishLaunchLoading, markLaunchLoadingTiming, setLaunchLoadingMessage } from '../../../../lib/launchLoading';
+import { markLaunchLoadingTiming, setLaunchLoadingMessage } from '../../../../lib/launchLoading';
 import {
   CARD_ENTRY_INTENT,
   classifyCardRefreshRebuild,

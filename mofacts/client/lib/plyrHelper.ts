@@ -406,11 +406,6 @@ class PlayerController {
       this.times.push(this.player.duration);
       this.nextTime = this.player.duration;
     }
-    //get the difference between the next time and the previous time
-    const lastTime = this.nextTimeIndex == 0 ? 0: this.times[this.lastTimeIndex];
-    const totalTimeDiff =  this.nextTime - lastTime;
-    //get the percentage of the progress bar that should be filled
-    const percentage = (timeDiff / totalTimeDiff) * 100;
     //add class
     $('#progressbar').addClass('progress-bar');
     //set the width of the progress bar

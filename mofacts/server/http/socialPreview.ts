@@ -28,15 +28,6 @@ type ThemeLike = {
   properties?: Record<string, unknown>;
 };
 
-type SvgTextLine = {
-  text: string;
-  x: number;
-  y: number;
-  size: number;
-  weight?: number;
-  opacity?: number;
-};
-
 const SOCIAL_CRAWLER_PATTERN = /\b(facebookexternalhit|facebot|linkedinbot|twitterbot|slackbot|discordbot|whatsapp|telegrambot|pinterest|skypeuripreview|microsoftpreview)\b/i;
 const SOCIAL_PREVIEW_IMAGE_VERSION = '2026-05-05-3';
 const execFileAsync = promisify(execFile);
@@ -286,42 +277,8 @@ function wrapText(value: string, maxCharsPerLine: number, maxLines: number) {
   return lines;
 }
 
-function svgTextLine(line: SvgTextLine, fontFamily: string, fill: string) {
-  const opacity = typeof line.opacity === 'number' ? ` opacity="${line.opacity}"` : '';
-  const weight = line.weight ? ` font-weight="${line.weight}"` : '';
-  return `<text x="${line.x}" y="${line.y}" font-family="${escapeHtml(fontFamily)}" font-size="${line.size}"${weight} fill="${escapeHtml(fill)}"${opacity}>${escapeHtml(line.text)}</text>`;
-}
-
 function previewImageTitle(preview: Awaited<ReturnType<typeof getSocialPreviewSettings>>) {
   return firstNonEmptyString(preview.theme.brandLabel, preview.title.split('|')[0]) || 'MoFaCTS';
-}
-
-function buildPreviewSvg(preview: Awaited<ReturnType<typeof getSocialPreviewSettings>>) {
-  const titleFontSize = preview.title.length > 28 ? 64 : 78;
-  const titleLines = wrapText(preview.title, preview.title.length > 28 ? 28 : 18, 1);
-  const subtitleLines = wrapText(preview.description, 55, 2);
-  const titleSvg = titleLines
-    .map((line, index) => svgTextLine({ text: line, x: 92, y: 334 + (index * 76), size: titleFontSize, weight: 700 }, preview.theme.fontFamily, preview.theme.textColor))
-    .join('');
-  const subtitleSvg = subtitleLines
-    .map((line, index) => svgTextLine({ text: line, x: 96, y: 410 + (index * 46), size: 34, opacity: 0.76 }, preview.theme.fontFamily, preview.theme.textColor))
-    .join('');
-  const logoImage = preview.theme.logoHref
-    ? `<image href="${escapeHtml(preview.theme.logoHref)}" x="118" y="116" width="92" height="92" preserveAspectRatio="xMidYMid meet"/>`
-    : `<text x="164" y="174" font-family="${escapeHtml(preview.theme.fontFamily)}" font-size="74" font-weight="700" text-anchor="middle" fill="${escapeHtml(preview.theme.textColor)}">M</text>`;
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
-  <rect width="1200" height="630" fill="${escapeHtml(preview.theme.backgroundColor)}"/>
-  <rect width="1200" height="20" fill="${escapeHtml(preview.theme.accentColor)}"/>
-  <rect y="610" width="1200" height="20" fill="${escapeHtml(preview.theme.secondaryColor)}"/>
-  <rect x="64" y="58" width="1072" height="514" rx="24" fill="${escapeHtml(preview.theme.cardColor)}"/>
-  <circle cx="164" cy="162" r="76" fill="${escapeHtml(preview.theme.backgroundColor)}"/>
-  ${logoImage}
-  ${svgTextLine({ text: preview.theme.brandLabel, x: 260, y: 134, size: 26, weight: 700 }, preview.theme.fontFamily, preview.theme.accentColor)}
-  ${titleSvg}
-  ${subtitleSvg}
-  ${svgTextLine({ text: preview.rootUrl.replace(/^https?:\/\//, ''), x: 96, y: 546, size: 28, opacity: 0.72 }, preview.theme.fontFamily, preview.theme.textColor)}
-</svg>`;
 }
 
 function imageMagickCommand() {
