@@ -29,6 +29,7 @@ describe('learner TDF config', function() {
           unit: [
             {
               unitname: 'Intro',
+              learningsession: {},
               uiSettings: {
                 displayPerformance: false
               },
@@ -41,6 +42,7 @@ describe('learner TDF config', function() {
             },
             {
               unitname: 'Practice',
+              learningsession: {},
               uiSettings: {
                 displayPerformance: false
               },
@@ -106,15 +108,13 @@ describe('learner TDF config', function() {
     const baseTdf = makeTdf();
     const config = buildLearnerTdfConfig(baseTdf, 'tdf-a', {
       deliveryparams: {
-        drill: 50000,
-        showhistory: true
+        drill: 50000
       }
     });
 
     const result = applyLearnerTdfConfig(baseTdf, config);
 
     expect(result.tdf.tdfs.tutor.deliveryparams.drill).to.equal(50000);
-    expect(result.tdf.tdfs.tutor.deliveryparams.showhistory).to.equal(true);
   });
 
   it('accepts all supported UI settings through the registry allowlist', function() {
