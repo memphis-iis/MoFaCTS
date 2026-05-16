@@ -2,9 +2,17 @@
 
 ## Goal
 
-Make feedback generation, rendering, speech, and history logging flow through one canonical route.
+This is a staged feedback-pipeline refactor with some follow-on removals, not a cosmetic cleanup.
+
+The goal is to make feedback generation, rendering, speech, and history logging flow through one canonical route.
 
 The system should decide feedback content once, display that exact result, speak that exact result, and persist that exact result. It should not reconstruct a second version for logging, and it should not preserve TDF fields that current runtime code does not execute.
+
+The work splits into three linked parts:
+
+1. Canonicalize the feedback text that reaches TTS and history.
+2. Separate semantic evaluation from display composition.
+3. Remove runtime and schema settings that no longer affect current behavior.
 
 This plan is intentionally incomplete. Its purpose is to make the current branching network explicit, identify low-risk simplifications, and define the rules for follow-up removals.
 
@@ -16,21 +24,23 @@ This plan is intentionally incomplete. Its purpose is to make the current branch
 - Do not keep schema-visible feedback settings that no longer affect current runtime behavior.
 - Do not preserve parallel legacy and Svelte feedback routes unless there is an explicit current product need.
 
-## Current Canonical Route
+## Completed Core Route
 
-For live learner-visible feedback, the current canonical route is:
+For live learner-visible feedback, the implemented canonical route is:
 
 ```text
 answer evaluation
   -> Answers.answerIsCorrect(...)
   -> { isCorrect, matchText }
   -> card machine context.feedbackMessage
-  -> FeedbackDisplay.buildFeedbackHtml(...)
-  -> displayed feedback html
-  -> stripped displayed feedback text stored as CardStore.feedbackTtsText
+  -> FeedbackDisplay.buildFeedbackContent(...)
+  -> { feedbackText, feedbackHtml }
+  -> feedbackcontent event
+  -> card machine context.feedbackText
+  -> TTS + history logging
 ```
 
-This means the current canonical semantic source is `feedbackMessage`, and the current canonical displayed text is `feedbackTtsText` after the renderer has applied its final display policy.
+This means the current canonical semantic source is `feedbackMessage`, and the current canonical saved text is `feedbackText` produced directly by the composer and carried through the machine context.
 
 ## Current Branching Network
 
@@ -54,11 +64,8 @@ else:
   else if phonetic match:
     matchText = "That sounds like the answer but you're writing it the wrong way, the correct answer is 'X'."
     isCorrect = true
-  else if no response:
-    matchText = "The correct answer is X."
-    isCorrect = false
   else:
-    matchText = "Incorrect. The correct answer is X."
+    matchText = "Incorrect."
     isCorrect = false
 ```
 
@@ -73,29 +80,25 @@ if correct-answer image case:
   message = "Incorrect. The correct response is displayed below."
 
 showUserAnswer = displayUserAnswerInFeedback matches outcome
-showSimpleFeedback = onlyShowSimpleFeedback matches outcome
+style any Correct./Incorrect. labels already present in message
 
-if showSimpleFeedback:
-  message = "Correct." or "Incorrect."
-else:
-  style any Correct./Incorrect. labels already present in message
-  if timeout and message lacks Incorrect. label:
-    prepend Incorrect.
+if timeout and message lacks Incorrect. label:
+  prepend Incorrect.
 
 segments = []
 
 if showUserAnswer and user answer text exists and not image case:
-  segments.push("Your answer: ...")
+  segments.push("Your answer was ...")
 
 if message exists:
   segments.push(message)
 
-if incorrect and displayCorrectAnswerInIncorrectFeedback and correct answer text exists and not simple feedback and not image case:
-  segments.push("Correct answer: ...")
+if incorrect and displayCorrectAnswerInIncorrectFeedback and correct answer text exists and not image case:
+  segments.push("The correct answer is ...")
 
 join segments with:
-  " " if singleLineFeedback = true
-  "<br>" if singleLineFeedback = false
+  " " if feedbackLayout = "inline"
+  "<br>" if feedbackLayout = "stacked"
 
 if correct-answer image case:
   append image on a new line
@@ -103,15 +106,15 @@ if correct-answer image case:
 
 ### Secondary history path
 
-Historically, history logging rebuilt feedback text through a second helper. That path should be removed in favor of the canonical displayed feedback text route.
-
-Target direction:
+The secondary history path is now aligned with the canonical route.
 
 ```text
-displayed feedback text
-  -> CardStore.feedbackTtsText
+explicit feedback content
+  -> machine context.feedbackText
   -> history logging
 ```
+
+There is no remaining `CardStore.feedbackTtsText` bridge in the runtime path.
 
 ## Current Sources Of Branching
 
@@ -132,9 +135,9 @@ These are not all equally important. The first four decide content. The remainin
 
 The current renderer already behaves like a partial segment composer:
 
-- `Your answer: ...`
+- `Your answer was ...`
 - main feedback message
-- `Correct answer: ...`
+- `The correct answer is ...`
 - optional correct-answer image
 
 The problem is that the middle segment is usually still a precomposed sentence from the evaluator, so we cannot reason cleanly about which subparts are present. A segment-based design should make each displayable unit explicit and let layout settings operate on those units rather than on opaque prose.
@@ -232,7 +235,7 @@ These should remain separate from all explanation segments.
 #### User-response segments
 
 - `userAnswerText`
-  - Text form: `Your answer: {value}.`
+  - Text form: `Your answer was {value}.`
   - Used when the runtime wants the learner's entered answer echoed back.
 - `userAnswerBlank`
   - Text form: `Your answer was blank.`
@@ -243,7 +246,7 @@ The blank-answer segment should not be encoded indirectly by omitting `userAnswe
 #### Correct-answer segments
 
 - `correctAnswerText`
-  - Text form: `Correct answer: {value}.`
+  - Text form: `The correct answer is {value}.`
 - `correctAnswerImageIntro`
   - Text form: `The correct response is displayed below.`
 - `correctAnswerImage`
@@ -322,9 +325,13 @@ answer evaluation
   -> FeedbackDisplayPolicy
   -> segment composer applies configuration
   -> ordered FeedbackSegment[]
-  -> html/plain-text projections
+  -> separate plain-text and HTML outputs
   -> ui + speech + history
 ```
+
+The composer should return both outputs separately, with plain text as the canonical saved value and HTML as the display projection.
+The display layer should not derive or write the canonical saved text.
+The feedback display component should emit the explicit feedback content object upward, and the container should own any transport or handoff write.
 
 Then runtime settings become inclusion rules over segments:
 
@@ -369,19 +376,18 @@ selected segments
 
 The segment model should define one default output order. Without this, each callsite will reintroduce local ordering decisions and the design will drift.
 
-Recommended order:
+Recommended current order:
 
 | Order | Segment family | Notes |
 | --- | --- | --- |
-| 1 | outcome label | `correctLabel` or `incorrectLabel` |
-| 2 | user-response fact | `userAnswerText` or `userAnswerBlank` |
-| 3 | explanation | `closeEnoughExplanation`, `phoneticMatchExplanation`, `timeoutExplanation`, `branchMatchMessage` |
+| 1 | user-response fact | `userAnswerText` or `userAnswerBlank`, when enabled |
+| 2 | outcome label and explanation | `correctLabel`, `incorrectLabel`, `closeEnoughExplanation`, `phoneticMatchExplanation`, `timeoutExplanation`, `branchMatchMessage` |
 | 4 | correct-answer fact | `correctAnswerText` |
 | 5 | media intro | `correctAnswerImageIntro` |
 | 6 | media payload | `correctAnswerImage` |
 | 7 | trailing custom/authored text | `customBranchMessage` |
 
-Exceptions should be rare and explicit. If a new requirement needs a different order, that should become a deliberate policy decision, not an inline array-push change in one component.
+This intentionally preserves the current learner-facing shape where an echoed learner response can precede the outcome message, for example `Your answer was Lyon. Incorrect.` Exceptions should be rare and explicit. If a new requirement needs a different order, that should become a deliberate policy decision, not an inline array-push change in one component.
 
 ## Additional Maintainability Opportunities
 
@@ -397,7 +403,8 @@ That removes a fragile class of bugs where authored text accidentally contains w
 
 If `FeedbackSegment[]` is canonical, then:
 
-- UI can render html
+- the composer can emit plain text and HTML separately from the same segments
+- UI can render HTML
 - speech can render plain text
 - history can store the canonical plain-text projection
 
@@ -438,7 +445,7 @@ That would help later auditing, analytics, or replay features without reparsing 
 Plain text feedback is only the final rendered sentence sequence, for example:
 
 ```text
-Incorrect. Your answer was blank. Correct answer: mitochondria.
+Incorrect. Your answer was blank. The correct answer is mitochondria.
 ```
 
 Structured feedback keeps the parts and their meaning, for example:
@@ -460,9 +467,9 @@ Structured feedback keeps the parts and their meaning, for example:
   segments: [
     { key: 'incorrectLabel', text: 'Incorrect.' },
     { key: 'userAnswerBlank', text: 'Your answer was blank.' },
-    { key: 'correctAnswerText', text: 'Correct answer: mitochondria.' },
+    { key: 'correctAnswerText', text: 'The correct answer is mitochondria.' },
   ],
-  text: 'Incorrect. Your answer was blank. Correct answer: mitochondria.'
+  text: 'Incorrect. Your answer was blank. The correct answer is mitochondria.'
 }
 ```
 
@@ -472,7 +479,7 @@ The important differences are:
 
 - plain text is only the final projection for humans
 - structured feedback preserves semantic meaning and segment boundaries
-- structured feedback can be re-rendered for UI, speech, history, analytics, or replay without reparsing prose
+- structured feedback can be projected to UI HTML and plain text without reparsing prose
 - plain text cannot reliably tell us which parts were intentionally present versus coincidentally phrased into one sentence
 
 For the immediate cleanup, history should remain plain text. The structured form matters only as an internal runtime representation for evaluation and segment selection. It is not a requirement to persist structured feedback now.
@@ -484,6 +491,7 @@ For this cleanup, persist plain-text feedback only.
 That means:
 
 - the runtime may use semantic state and segments internally
+- the composer should produce the canonical plain-text feedback directly
 - the final history value should remain the canonical plain-text projection
 - this plan does not require storing segment arrays or semantic-state objects in history
 - any future structured persistence should be treated as a separate follow-up decision, not part of the current cleanup
@@ -529,18 +537,76 @@ For implementation tracking, this plan should serve as the working design doc, b
 
 ## Feedback Field Change Inventory
 
-Before or during implementation, keep a small field-by-field inventory in this plan or the implementation PR notes.
+The full field-by-field policy is now maintained in the next section. It covers the original four feedback UI fields plus related display, timing, evaluation, speech, and history metadata settings that affect feedback behavior.
 
-Recommended columns:
+During implementation, keep that policy table current rather than handling fields ad hoc in PR notes.
 
-| Field | Current role | Future role | Action | Doc update needed |
+## Full-Stack Feedback Settings Policy
+
+This cleanup should treat feedback-related settings as one product surface, even though they currently live in multiple places:
+
+- `setspec.uiSettings`: feedback display composition and visual presentation.
+- `deliveryparams`: feedback timing, force-correct flow, evaluation modes that affect feedback semantics, and legacy history metadata.
+- `setspec`: speech/audio settings that determine whether the canonical feedback text is spoken and how speech-related feedback behaves.
+
+The policy below is the working decision table for Phase 3. "Remove" means remove runtime references, field registry/schema entries, tests, and docs in the same change.
+
+### UI Settings Policy
+
+| Field | Current role | Policy decision | Implementation action |
+| --- | --- | --- | --- |
+| `displayCorrectFeedback` | Suppresses rendering for correct feedback. | Keep and fix semantics under canonical content. | Keep the existing name for now. If false, correct feedback means no learner-visible feedback output: no rendered feedback, no feedback TTS, and no required canonical feedback-content handoff for that feedback display. Correctness evaluation and history outcome still happen. |
+| `displayIncorrectFeedback` | Suppresses rendering for incorrect feedback. | Keep and fix semantics under canonical content. | Keep the existing name for now. If false, incorrect feedback means no learner-visible feedback output: no rendered feedback, no feedback TTS, and no required canonical feedback-content handoff for that feedback display. Preserve force-correct behavior separately from visual feedback suppression. |
+| `correctMessage` | Legacy custom correct text. Currently mostly bypassed because evaluator `matchText` is canonical. | Remove and replace with the fixed concept. | Remove from runtime, types, registry, schema, tester UI, and tests. Use `correctLabelText` for the correct outcome-label segment. Do not alias `correctMessage` at runtime. |
+| `incorrectMessage` | Legacy custom incorrect text/timeouts. Currently mostly bypassed by evaluator-generated incorrect text. | Remove and replace with the fixed concept. | Remove from runtime, types, registry, schema, tester UI, and tests. Use `incorrectLabelText` for the incorrect outcome-label segment. Do not alias `incorrectMessage` at runtime. |
+| `correctColor` | Visual styling for correct feedback. | Keep as-is. | Keep in runtime/schema. It is presentation-only and does not affect canonical text. |
+| `incorrectColor` | Visual styling for incorrect/timeout feedback. | Keep as-is. | Keep in runtime/schema. It is presentation-only and does not affect canonical text. |
+| `displayUserAnswerInFeedback` | Controls whether the learner answer segment is included. | Keep but fix/normalize. | Keep the public field name for compatibility. Normalize internally to `FeedbackDisplayPolicy.showUserAnswerOn: 'never' | 'correct' | 'incorrect' | 'always'` instead of passing booleans around. Update docs to describe segment inclusion. |
+| `displayCorrectAnswerInIncorrectFeedback` | Adds a separate correct-answer segment after incorrect feedback. | Keep as the single correct-answer-output control. | Keep the public field name for compatibility. Normalize internally to `showCorrectAnswerOnIncorrect`. There should be one policy decision for whether the correct-answer output is included; the composer should own how that output is represented so the answer is not emitted redundantly. |
+| `singleLineFeedback` | Chooses inline versus stacked segment layout. | Remove and replace with `feedbackLayout`. | Remove from runtime, types, registry, schema, tester UI, and tests. Use `feedbackLayout: 'inline' | 'stacked'`. Do not alias `singleLineFeedback` at runtime. Layout must not alter canonical plain text. |
+| `onlyShowSimpleFeedback` | Replaces full feedback with only `Correct.`/`Incorrect.`. | Remove. | Replace behavior by segment policy: optional explanatory/display segments can be disabled without a separate replacement mode. Remove from runtime, `UiSettings`, field registry, generated schema, tester UI, and tests. Add migration note: use the remaining display controls to suppress user/correct-answer segments; authored evaluator explanations remain canonical unless a future segment policy explicitly disables them. |
+
+### Delivery Parameter Policy
+
+| Field | Current role | Policy decision | Implementation action |
+| --- | --- | --- | --- |
+| `correctprompt` | Correct-feedback display duration in milliseconds. | Keep as-is. | Keep as feedback timing. Name is legacy but broadly wired; do not rename during this cleanup. |
+| `reviewstudy` | Incorrect-review/feedback display duration in milliseconds. | Keep as-is. | Keep as feedback timing. Name is legacy but broadly wired; do not rename during this cleanup. |
+| `forceCorrection` | Requires force-correct entry after incorrect feedback. | Keep as-is. | Keep as flow control, not feedback composition. Ensure it remains independent of `displayIncorrectFeedback`. |
+| `forcecorrectprompt` | Prompt displayed in force-correct state. | Remove and replace with correctly cased `forceCorrectPrompt`. | Remove the lowercase field name from registry/schema/runtime. Use `forceCorrectPrompt` as the only authored delivery parameter, and preserve authored string casing when displaying it. |
+| `forcecorrecttimeout` | Timeout for force-correct state. | Keep as-is. | Keep as flow timing. |
+| `branchingEnabled` | Enables branched answer parsing and authored branch messages. | Keep as-is. | Keep as evaluation/semantic-feedback control. Under structured feedback, branch message becomes an additive `branchMatchMessage` segment. |
+| `allowPhoneticMatching` | Enables phonetic match, which changes correctness and feedback explanation. | Keep as-is. | Keep as evaluation control. Structured semantic state should represent `reason: 'phonetic'`. |
+| `checkOtherAnswers` | Prevents accepting near-matches that equal another item's answer. | Keep as-is. | Keep as evaluation control. It affects correctness and therefore feedback semantics, but is not a display setting. |
+| `feedbackType` | Legacy feedback classification copied to history. | Keep as the single future feedback-type field, deprecated for current rendering behavior. | Keep temporarily as deprecated metadata. It must not control rendering in the current cleanup. Future feedback types should be modeled here, with `none`, `basic`, `full`, or custom modes as values of this one policy field. |
+| `allowFeedbackTypeSelect` | Legacy resume/display-feedback mode hook. | Remove. | Remove from delivery registry/schema/runtime. It is redundant with the future `feedbackType` model and should not remain as a second feedback-type switch. |
+| `drill` | Main answer timeout, can lead to timeout feedback. | Keep as-is. | Not a feedback setting. Keep out of feedback composition removals. |
+| `purestudy` | Study-trial duration and study feedback-like display timing. | Keep as-is. | Not part of drill feedback composition. Keep out of this cleanup. |
+
+### Speech And Feedback Audio Policy
+
+These settings are adjacent to feedback, but they do not compose feedback text. They decide whether feedback can be spoken, how speech sounds, or what speech-status message is shown.
+
+| Field | Authored/accessed as | Current role | Policy decision | Implementation action |
 | --- | --- | --- | --- | --- |
-| `displayUserAnswerInFeedback` | segment eligibility control | likely retained | keep or normalize | yes |
-| `displayCorrectAnswerInIncorrectFeedback` | segment eligibility control | likely retained | keep or normalize | yes |
-| `onlyShowSimpleFeedback` | suppresses non-label content | may collapse into `mode: 'labelOnly'` | review/remove | yes |
-| `singleLineFeedback` | join mode over visible parts | pure layout join mode | keep or remove | yes |
+| `enableAudioPromptAndFeedback` | Authored in `setspec`; copied into `Session` as the lesson TTS capability gate. | Lesson-level TTS capability gate. | Keep for now. | Keep because TTS currently requires both learner/user mode and lesson support. Document as capability gating, not feedback content or display behavior. |
+| `audioPromptMode` | Authored in `setspec`, can be overridden by learner config, and also exists in user audio settings/profile. Runtime computes an effective prompt mode from those sources. | Learner TTS mode: `silent`, `question`, `feedback`, or `all`. | Keep as-is. | Keep. It determines whether canonical feedback text is spoken when lesson support allows it; it does not alter the feedback text. |
+| `audioPromptFeedbackVoice` | Authored in `setspec` and also stored in user audio settings/profile. Runtime generally uses the effective user/audio setting, with TDF values as lesson defaults or overrides. | Feedback TTS voice. | Keep as-is. | Keep as feedback speech presentation. Not part of feedback composition. |
+| `audioPromptFeedbackSpeakingRate` | Authored in `setspec` and also stored in user audio settings/profile. Runtime generally uses the effective user/audio setting, with TDF values as lesson defaults or overrides. | Feedback TTS rate. | Keep as-is. | Keep as feedback speech presentation. Not part of feedback composition. |
+| `audioPromptFeedbackVolume` | Authored in `setspec` and also stored in user audio settings/profile. Runtime generally uses the effective user/audio setting, with TDF values as lesson defaults or overrides. | Feedback TTS volume. | Keep as-is. | Keep as feedback speech presentation. Not part of feedback composition. |
+| `audioPromptVoice` | Authored in `setspec` and also stored in user audio settings/profile. Runtime uses it for question/default TTS and may use it as a fallback. | Question/default TTS voice. | Keep as-is. | Not feedback-specific except as fallback. Keep out of feedback composition cleanup. |
+| `audioPromptSpeakingRate` | Authored in `setspec` and present in audio state as a legacy/shared speech rate. | Legacy overall speaking rate. | Audit/fix. | If feedback-specific and question-specific rates supersede it, mark deprecated or remove in a separate audio-settings cleanup. Do not remove as part of feedback display cleanup without checking fallback behavior. |
+| `speechIgnoreOutOfGrammarResponses` | Authored in `setspec`; copied into `Session` for speech-recognition handling. | Controls ignored speech transcripts. | Keep as speech-input behavior. | Not part of feedback composition. Keep. |
+| `speechOutOfGrammarFeedback` | Authored in `setspec`; copied into `Session` for speech-recognition handling. | Message shown when ignored speech input is discarded. | Keep but classify as speech-status feedback, not answer feedback composition. | Audit whether this bypasses the canonical feedback composer. If it displays learner-visible feedback, route it as a speech-status message or document it as separate from answer feedback. |
 
-If more feedback-related fields turn up during implementation, add them to the same inventory rather than handling them ad hoc.
+### Immediate Phase 3 Action Order
+
+1. Remove `onlyShowSimpleFeedback` from runtime, types, schema, tester UI, and tests.
+2. Normalize `displayUserAnswerInFeedback`, `displayCorrectAnswerInIncorrectFeedback`, and `feedbackLayout` into `FeedbackDisplayPolicy` at the component boundary, with `singleLineFeedback` removed rather than aliased.
+3. Replace `correctMessage` and `incorrectMessage` with `correctLabelText` and `incorrectLabelText`, with the old field names removed rather than aliased.
+4. Fix `displayCorrectFeedback` and `displayIncorrectFeedback` so hidden feedback means no learner-visible feedback output and no missing-content handoff error.
+5. Keep `feedbackType` as deprecated metadata/future policy field, remove `allowFeedbackTypeSelect`, and document the future one-setting feedback-type model.
+6. Replace `forcecorrectprompt` with `forceCorrectPrompt` and preserve authored prompt-text casing.
 
 ## Mapping Current Behavior To Segments
 
@@ -562,7 +628,7 @@ correctAnswerText
 
 Open question:
 
-- Whether `correctAnswerText` should be mandatory here or whether the explanation segment should carry the answer value itself.
+- Resolved: preserve the current elegant phrasing by letting the explanation carry the answer value in a logical sentence, rather than always appending a separate correct-answer segment.
 
 ### Phonetic-match correct answer
 
@@ -584,11 +650,12 @@ optional correctAnswerText
 
 ```text
 incorrectLabel
-userAnswerBlank
-correctAnswerText
+optional correctAnswerText
 ```
 
-This is more explicit than the current sentence `The correct answer is X.` and preserves the fact that the learner gave no response.
+Decision:
+
+- Keep the incorrect outcome and correct-answer output as separate composed parts. Blank incorrect responses should not automatically say the correct answer. The correct answer is shown only when `displayCorrectAnswerInIncorrectFeedback` enables the `correctAnswerText` segment.
 
 ### Incorrect with correct-answer image
 
@@ -608,7 +675,7 @@ optional correctAnswerText
 
 Open question:
 
-- Whether authored branch messages should be treated as one opaque custom segment or gradually decomposed into standard segment types.
+- Resolved: keep the current behavior. Start with the ordinary composed feedback pieces and append the authored branching message at the end. Branching feedback is an additive authored message, not an alternative replacement pipeline.
 
 ## Likely Setting Simplification Under A Segment Model
 
@@ -625,8 +692,12 @@ Possible future interpretation:
 
 - `displayUserAnswerInFeedback` controls whether `userAnswerText` is eligible.
 - `displayCorrectAnswerInIncorrectFeedback` controls whether `correctAnswerText` is eligible on incorrect outcomes.
-- `onlyShowSimpleFeedback` may become unnecessary if it just means `outcome-label-only`.
+- `onlyShowSimpleFeedback` is likely unnecessary after the policy model exists; simple feedback can be represented by turning off optional explanatory/display segments instead of keeping a separate replacement mode.
 - `singleLineFeedback` becomes a pure layout join mode over selected segments.
+
+Incorrect evaluator output should not embed the correct answer by default. The correct answer belongs to the optional `correctAnswerText` segment so the setting has one clear responsibility and cannot duplicate content.
+
+Image-answer behavior is not part of the immediate next implementation slice. Preserve the current image-answer behavior while refactoring non-image text feedback.
 
 ## Immediate Design Recommendation
 
@@ -664,11 +735,12 @@ Target:
 Problem:
 
 - Some settings are still wired through the runtime but have little meaningful effect in the current flow.
-- `singleLineFeedback` is the clearest example.
+- `onlyShowSimpleFeedback` is the clearest example because it duplicates behavior that should be represented by segment policy.
 
 Target:
 
 - Remove settings whose current runtime behavior is negligible or misleading.
+- Replace unclear legacy names with explicit policy fields where behavior remains useful.
 
 ### 3. Schema/runtime drift
 
@@ -693,7 +765,7 @@ There should not be a period where a field remains authorable in the TDF schema 
 
 ## Candidate Simplifications
 
-These are ordered from lowest product risk to higher product risk.
+These are roughly ordered from lowest product risk to higher product risk. They are not the implementation sequence; the phased plan below is the dependency order.
 
 ### Candidate A: Remove history-time feedback reconstruction
 
@@ -702,26 +774,31 @@ Change:
 - Delete the secondary feedback-text builder path used for history reconstruction.
 - Use canonical displayed feedback text for history records.
 
+Status:
+
+- Completed.
+
 Expected effect:
 
 - No intended learner-visible change.
 - History becomes aligned with the displayed result.
 - Missing canonical feedback becomes an explicit error instead of a silent fallback.
 
-### Candidate B: Remove `singleLineFeedback`
+### Candidate B: Replace `singleLineFeedback`
 
 Change:
 
-- Remove the field from runtime code, field registry, and generated schema.
+- Replace `singleLineFeedback` with `feedbackLayout: 'inline' | 'stacked'`.
+- Remove `singleLineFeedback` from runtime and generated schema; use `feedbackLayout` as the only layout setting.
 
 Expected effect:
 
-- Only rare multi-segment feedback layouts change.
-- Most current lessons should show no visible difference.
+- No intended visible change for authored content that used the old boolean.
+- The policy name now describes layout rather than implying text mutation.
 
-Open question:
+Status:
 
-- Is there any authored content that intentionally depends on inline versus stacked user-answer/correct-answer packaging?
+- Completed.
 
 ### Candidate C: Collapse duplicate correct-answer display decisions
 
@@ -746,6 +823,10 @@ Expected effect:
 
 - Real learner-visible behavior change where that option is currently used.
 
+Status:
+
+- Completed. The field is deprecated/removed from schema-visible UI settings and no longer participates in runtime feedback composition.
+
 ## Proposed Phased Plan
 
 ### Phase 1: Canonicalize persistence
@@ -754,30 +835,113 @@ Expected effect:
 2. Remove reconstruction fallbacks from the logging path.
 3. Add invariant checks for missing canonical feedback text before history write.
 
-### Phase 2: Audit weak feedback settings
+Status: completed.
+
+### Phase 2: Refactor feedback message creation
+
+1. Make the evaluator-to-display boundary explicit.
+2. Compose feedback from semantic state plus segment selection instead of opaque sentence surgery.
+3. Keep display policy as a separate layer that only decides inclusion and layout.
+
+Status: completed for the current non-image text-feedback slice.
+
+Completed so far:
+
+1. Feedback content is composed once into explicit plain-text and HTML outputs.
+2. The canonical plain-text output is produced by the composer and excludes HTML tags.
+3. `FeedbackDisplay` emits explicit feedback content upward instead of writing canonical text itself.
+4. `CardScreen` forwards that content to the machine as `FEEDBACK_CONTENT`.
+5. The machine stores canonical `feedbackText` in context and uses it for TTS.
+6. History logging reads the same canonical `feedbackText` from the machine flow.
+7. The old `CardStore.feedbackTtsText` transport bridge was removed.
+8. The composer now has explicit `FeedbackDisplayPolicy`, `FeedbackSemanticState`, ordered segment composition, and separate text/HTML projections.
+9. The feedback state waits for both feedback reveal and canonical feedback content before entering TTS or feedback waiting.
+
+Remaining follow-up after this slice:
+
+1. Move semantic-state creation upstream into the evaluator so it no longer has to be inferred from today's `matchText` strings.
+2. Represent authored branching feedback explicitly as an additive branch-message segment.
+3. Extend the same typed path to image-answer behavior after the non-image path is stable.
+4. Expand tests around evaluator output and branch-message ordering once the evaluator returns structured semantic data.
+
+### Phase 3: Audit weak feedback settings
 
 1. Inventory all runtime references for:
    - `singleLineFeedback`
    - `displayUserAnswerInFeedback`
    - `displayCorrectAnswerInIncorrectFeedback`
    - `onlyShowSimpleFeedback`
-2. For each field, decide whether it still has meaningful product behavior.
+2. Use the explicit message-composition boundary to decide whether each field still has meaningful product behavior.
 3. Remove fields that do not.
 4. Remove registry and schema entries in the same change.
 
-### Phase 3: Collapse duplicate content assembly
+Status: in progress.
 
-1. Decide whether the evaluator or renderer owns correct-answer wording.
-2. Reduce the renderer to packaging-only logic when possible.
-3. Keep one canonical incorrect-feedback structure.
+The non-image text-feedback path is now explicit enough to start this audit. If a field is removed, remove its runtime references, `mofacts/common/fieldRegistrySections.ts` entry, generated `mofacts/public/tdfSchema.json` entry, tests, and docs in the same change.
+
+Completed in this phase:
+
+1. Removed `onlyShowSimpleFeedback` from runtime composition and generated schema.
+2. Added `feedbackLayout: 'inline' | 'stacked'` and removed `singleLineFeedback` from runtime/types/registry/schema/tester UI.
+3. Added `correctLabelText` and `incorrectLabelText` and removed `correctMessage` / `incorrectMessage` from runtime/types/registry/schema/tester UI.
+4. Changed hidden feedback handoff so suppressed feedback does not require non-empty canonical feedback content.
+5. Kept `feedbackType` as an inert deprecated placeholder/future policy field and removed `allowFeedbackTypeSelect`.
+6. Replaced `forcecorrectprompt` with `forceCorrectPrompt` and preserved authored prompt-text casing.
+
+Remaining in this phase:
+
+1. Decide whether the inert `feedbackType` placeholder should continue to be emitted to history/export records or be left empty until a real product meaning exists.
+
+## Practical Completion Status
+
+The core feedback-text transport cleanup is implemented for ordinary drill feedback:
+
+- feedback content is composed once into explicit text and HTML
+- the machine stores the canonical plain-text feedback
+- TTS and history read that same machine-context text
+- removed feedback settings are out of the runtime/schema path
+- `feedbackLayout`, `correctLabelText`, `incorrectLabelText`, and `forceCorrectPrompt` are the current supported names
+- force-correct now waits until ordinary feedback has been revealed, canonical feedback content has reached the machine, and feedback display/TTS handling has completed before showing the correction prompt
+
+Known loose ends before calling the broader cleanup fully complete:
+
+1. Semantic state is still inferred from evaluator `matchText` in the composer. This is acceptable for the current slice, but the next cleanup should move structured semantic-state creation into answer evaluation.
+2. Branching feedback is still an opaque evaluator message rather than an explicit additive `branchMatchMessage` segment.
+3. Image-answer feedback works through the composer, but it has not received the same semantic-state/test coverage as the non-image text path.
+4. The broader `deliverySettings` consolidation is a separate compatibility track. Keep it coordinated with this plan, but do not treat it as part of the feedback pipeline itself.
+
+### Phase 4: Collapse duplicate content assembly
+
+1. Move the remaining semantic-state construction upstream into the evaluator.
+2. Represent close-enough, phonetic, timeout, generic incorrect, branching, and image-answer cases as structured semantic states instead of inferring them from `matchText`.
+3. Keep correct-answer output owned by the composer for generic incorrect text feedback, while preserving current close-enough/phonetic wording that already embeds the answer in the explanation.
+4. Keep one canonical incorrect-feedback structure.
+
+Status: follow-up, only if phase 3 leaves meaningful duplication to remove.
+
+This order matters: the settings audit should happen after message creation is explicit, because that is when the remaining TDF fields become transparent rather than inferred.
 
 ## Evaluation Questions For Follow-Up
 
 - Should incorrect feedback remain evaluator-owned text, or should it be decomposed into structured parts before rendering?
 - Is `displayCorrectAnswerInIncorrectFeedback` still a product requirement, given that incorrect evaluator messages already often include the correct answer?
-- Is `onlyShowSimpleFeedback` actively used in supported authored content?
-- Is there any real content that depends on `singleLineFeedback` today?
-- Do history consumers need plain text specifically, or can they store canonical displayed html plus a derived plain-text projection?
+- Which optional segment controls should replace `onlyShowSimpleFeedback` when that setting is removed?
+- Do any remaining supported lessons still depend on `singleLineFeedback` or `onlyShowSimpleFeedback`?
+
+## Completed Work
+
+The following pieces are done in code and should stay documented as completed:
+
+1. Feedback content is composed once into explicit plain-text and HTML outputs.
+2. Canonical feedback text strips HTML tags before it can reach TTS or history.
+3. `FeedbackDisplay` emits explicit feedback content upward instead of writing canonical text itself.
+4. `CardScreen` forwards that content to the machine as `FEEDBACK_CONTENT`.
+5. The machine stores canonical `feedbackText` in context and uses it for TTS.
+6. History logging reads the same canonical `feedbackText` from the machine flow.
+7. The old `CardStore.feedbackTtsText` transport bridge was removed.
+8. History display-order and alternate-display-index sourcing remain on their existing CardStore-backed path; this cleanup only changes feedback-text transport.
+9. Non-image feedback composition now flows through display policy, semantic state, ordered segments, and separate plain-text/HTML projections.
+10. Feedback TTS/waiting transitions are gated on canonical feedback content arrival.
 
 ## Expected End State
 
