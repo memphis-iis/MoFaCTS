@@ -135,6 +135,7 @@
  * @property {number} trialStart - Trial start timestamp (ms)
  * @property {number} [trialEnd] - Trial end timestamp (ms)
  * @property {number} [firstKeypress] - First keypress timestamp (ms)
+ * @property {number} [timeoutStart] - Current response timeout start/reset timestamp (ms)
  * @property {number} [inputEnabled] - Input enabled timestamp (ms)
  * @property {number} [feedbackStart] - Feedback display start (ms)
  * @property {number} [feedbackEnd] - Feedback display end (ms)

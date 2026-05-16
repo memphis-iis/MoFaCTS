@@ -50,6 +50,7 @@ type ActionContext = {
     trialStart: number;
     trialEnd: number | undefined;
     firstKeypress: number | undefined;
+    timeoutStart: number | undefined;
     inputEnabled: number | undefined;
     feedbackStart: number | undefined;
     feedbackEnd: number | undefined;
@@ -147,6 +148,7 @@ export const loadCardData = assign({
     trialStart: 0,
     trialEnd: undefined,
     firstKeypress: undefined,
+    timeoutStart: undefined,
     inputEnabled: undefined,
     feedbackStart: undefined,
     feedbackEnd: undefined,
@@ -312,6 +314,10 @@ export const markTimeoutReset = assign({
     const current = Number.isFinite(context.timeoutResetCounter) ? context.timeoutResetCounter : 0;
     return current + 1;
   },
+  timestamps: ({ context, event }: ActionArgs) => ({
+    ...context.timestamps,
+    timeoutStart: event?.timestamp || Date.now(),
+  }),
 });
 
 /**
@@ -405,6 +411,7 @@ export const markTrialRevealStart = assign({
     return {
       ...context.timestamps,
       trialStart,
+      timeoutStart: context.timestamps.timeoutStart || trialStart,
       feedbackStart: context.testType === 's'
         ? context.timestamps.feedbackStart || trialStart
         : context.timestamps.feedbackStart,

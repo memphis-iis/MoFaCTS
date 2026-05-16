@@ -69,6 +69,7 @@ interface TrialTimestamps {
   trialStart: number;
   trialEnd: number | undefined;
   firstKeypress: number | undefined;
+  timeoutStart: number | undefined;
   inputEnabled: number | undefined;
   feedbackStart: number | undefined;
   feedbackEnd: number | undefined;
@@ -355,6 +356,7 @@ const initialContext = {
     trialStart: 0,
     trialEnd: undefined,
     firstKeypress: undefined,
+    timeoutStart: undefined,
     inputEnabled: undefined,
     feedbackStart: undefined,
     feedbackEnd: undefined,
@@ -486,6 +488,7 @@ export const cardMachine = createMachine(
                         trialStart: 0,
                         trialEnd: undefined,
                         firstKeypress: undefined,
+                        timeoutStart: undefined,
                         inputEnabled: undefined,
                         feedbackStart: undefined,
                         feedbackEnd: undefined,
@@ -1453,6 +1456,7 @@ export const cardMachine = createMachine(
                         trialStart: 0,
                         trialEnd: undefined,
                         firstKeypress: undefined,
+                        timeoutStart: undefined,
                         inputEnabled: undefined,
                         feedbackStart: undefined,
                         feedbackEnd: undefined,

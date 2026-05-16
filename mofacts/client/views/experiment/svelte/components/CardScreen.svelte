@@ -418,7 +418,6 @@
   let frozenFeedbackCorrectAnswer = '';
   let frozenDisplayCorrectFeedback = true;
   let frozenDisplayIncorrectFeedback = true;
-  let frozenPerformanceSlotProps = null;
   let trialSubsetVisible = false;
   let stagedTrialSubsetKey = 'none';
   let revealSequence = 0;
@@ -891,15 +890,10 @@
     remainingTime,
   };
 
-  $: if (!isOutgoingFreezeState) {
-    frozenPerformanceSlotProps = { ...livePerformanceSlotProps };
-  }
-
-  $: performanceSlotProps = isOutgoingFreezeState && frozenPerformanceSlotProps
-    ? frozenPerformanceSlotProps
-    : livePerformanceSlotProps;
+  $: performanceSlotProps = livePerformanceSlotProps;
 
   function getTimeoutMode(currentState) {
+    if (isOutgoingFreezeState && timeoutModeState !== 'none') return timeoutModeState;
     if (currentState.matches('presenting.awaiting')) return 'question';
     if (currentState.matches('presenting.readyPrompt')) return 'feedback';
     if (currentState.matches('feedback.waiting') || currentState.matches('study.waiting')) return 'feedback';
@@ -928,6 +922,24 @@
       return 'You can continue whenever you want';
     }
     return '';
+  }
+
+  function getQuestionTimeoutStartMs() {
+    const timeoutStart = Number(context.timestamps?.timeoutStart);
+    if (Number.isFinite(timeoutStart) && timeoutStart > 0) {
+      return timeoutStart;
+    }
+    const trialStart = Number(context.timestamps?.trialStart);
+    return Number.isFinite(trialStart) && trialStart > 0 ? trialStart : Date.now();
+  }
+
+  function getFeedbackTimeoutStartMs() {
+    const feedbackStart = Number(context.timestamps?.feedbackStart);
+    if (Number.isFinite(feedbackStart) && feedbackStart > 0) {
+      return feedbackStart;
+    }
+    const trialStart = Number(context.timestamps?.trialStart);
+    return Number.isFinite(trialStart) && trialStart > 0 ? trialStart : Date.now();
   }
 
   function clearTimeoutInterval() {
@@ -961,7 +973,7 @@
     }
   }
 
-  function startTimeoutCountdown(duration, mode) {
+  function startTimeoutCountdown(duration, mode, startTimestamp = Date.now()) {
     if (!duration || duration <= 0) {
       timeoutProgress = 0;
       remainingTime = 0;
@@ -970,7 +982,9 @@
       return;
     }
 
-    timeoutStart = Date.now();
+    timeoutStart = Number.isFinite(Number(startTimestamp)) && Number(startTimestamp) > 0
+      ? Number(startTimestamp)
+      : Date.now();
     timeoutDuration = duration;
     timeoutModeState = mode;
     updateTimeoutCountdown();
@@ -2010,19 +2024,30 @@
       if (mode === 'question') {
         const duration = getMainTimeoutMs({ ...context, deliverySettings });
         const resetCounter = Number.isFinite(context.timeoutResetCounter) ? context.timeoutResetCounter : 0;
-        if (timeoutModeState !== mode || timeoutDuration !== duration || resetCounter !== lastTimeoutResetCounter) {
+        const startTimestamp = getQuestionTimeoutStartMs();
+        if (
+          timeoutModeState !== mode ||
+          timeoutDuration !== duration ||
+          resetCounter !== lastTimeoutResetCounter ||
+          timeoutStart !== startTimestamp
+        ) {
           lastTimeoutResetCounter = resetCounter;
-          startTimeoutCountdown(duration, mode);
+          startTimeoutCountdown(duration, mode, startTimestamp);
         }
       } else if (mode === 'feedback') {
         let duration;
+        let startTimestamp;
         if (state.matches('presenting.readyPrompt')) {
           duration = parseInt(deliverySettings.readyPromptStringDisplayTime, 10) || 0;
+          startTimestamp = timeoutModeState === mode && timeoutDuration === duration && timeoutStart
+            ? timeoutStart
+            : Date.now();
         } else {
           duration = getFeedbackTimeoutMs({ ...context, deliverySettings });
+          startTimestamp = getFeedbackTimeoutStartMs();
         }
-        if (timeoutModeState !== mode || timeoutDuration !== duration) {
-          startTimeoutCountdown(duration, mode);
+        if (timeoutModeState !== mode || timeoutDuration !== duration || timeoutStart !== startTimestamp) {
+          startTimeoutCountdown(duration, mode, startTimestamp);
         }
       } else if (timeoutModeState !== 'none') {
         timeoutModeState = 'none';

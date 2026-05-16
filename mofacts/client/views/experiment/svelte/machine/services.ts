@@ -16,11 +16,14 @@ import { selectCardService, updateEngineService, prepareIncomingTrialService } f
 import { ttsPlaybackService } from '../services/ttsService';
 import { speechRecognitionService as srService } from '../services/speechRecognitionService';
 import { videoPlayerService as videoService } from '../services/videoPlayerService';
+import { CardStore } from '../../modules/cardStore';
 import { fromCallback, fromPromise, type AnyEventObject } from 'xstate';
 
 type TimeoutContextLike = Parameters<typeof getMainTimeoutMs>[0] & {
   feedbackTimeoutMs?: number;
   timestamps?: {
+    trialStart?: number;
+    timeoutStart?: number;
     feedbackStart?: number;
   };
 };
@@ -157,19 +160,40 @@ async function prefetchImage(context: { currentDisplay?: { imgSrc?: string } }, 
  * @returns {Promise<void>}
  */
 function mainCardTimeout(context: TimeoutContextLike, _event: unknown) {
-  const timeout = getMainTimeoutMs(context);
-
-  
+  const remaining = getMainTimeoutRemainingMs(context);
 
   return new Promise<void>((resolve) => {
+    let ttsWaitIntervalId: ReturnType<typeof setInterval> | null = null;
+    const resolveAfterTtsCompletes = () => {
+      if (!CardStore.isTtsRequested()) {
+        resolve();
+        return;
+      }
+
+      ttsWaitIntervalId = setInterval(() => {
+        if (CardStore.isTtsRequested()) {
+          return;
+        }
+        if (ttsWaitIntervalId) {
+          clearInterval(ttsWaitIntervalId);
+          ttsWaitIntervalId = null;
+        }
+        resolve();
+      }, 50);
+    };
+
     const timeoutId = setTimeout(() => {
-      
-      resolve();
-    }, timeout);
+      resolveAfterTtsCompletes();
+    }, remaining);
 
     // Store timeout ID for potential cancellation
     // (XState will auto-cancel when service exits)
-    return () => clearTimeout(timeoutId);
+    return () => {
+      clearTimeout(timeoutId);
+      if (ttsWaitIntervalId) {
+        clearInterval(ttsWaitIntervalId);
+      }
+    };
   });
 }
 
@@ -181,15 +205,13 @@ function mainCardTimeout(context: TimeoutContextLike, _event: unknown) {
  * @returns {Promise<void>}
  */
 function feedbackTimeout(context: TimeoutContextLike, _event: unknown) {
-  const timeout = Number.isFinite(context.feedbackTimeoutMs)
-    ? Math.max(0, Number(context.feedbackTimeoutMs))
-    : getFeedbackTimeoutMs(context);
   const feedbackStart = Number(context.timestamps?.feedbackStart);
   const elapsed = Number.isFinite(feedbackStart) && feedbackStart > 0
     ? Math.max(0, Date.now() - feedbackStart)
     : 0;
   const fadeOutDurationMs = getFeedbackFadeOutDurationMs();
-  const remaining = Math.max(0, timeout - elapsed - fadeOutDurationMs);
+  const remaining = getFeedbackTimeoutRemainingMs(context, elapsed, fadeOutDurationMs);
+  const timeout = getFeedbackTimeoutDurationMs(context);
 
   clientConsole(2, '[CardMachine][FeedbackTiming] feedbackTimeout:start', {
     testType: context.testType,
@@ -217,6 +239,39 @@ function feedbackTimeout(context: TimeoutContextLike, _event: unknown) {
 
     return () => clearTimeout(timeoutId);
   });
+}
+
+function getFeedbackTimeoutDurationMs(context: TimeoutContextLike): number {
+  return Number.isFinite(context.feedbackTimeoutMs)
+    ? Math.max(0, Number(context.feedbackTimeoutMs))
+    : getFeedbackTimeoutMs(context);
+}
+
+function getMainTimeoutStartMs(context: TimeoutContextLike): number {
+  const timeoutStart = Number(context.timestamps?.timeoutStart);
+  if (Number.isFinite(timeoutStart) && timeoutStart > 0) {
+    return timeoutStart;
+  }
+  const trialStart = Number(context.timestamps?.trialStart);
+  return Number.isFinite(trialStart) && trialStart > 0 ? trialStart : 0;
+}
+
+export function getMainTimeoutRemainingMs(context: TimeoutContextLike, nowMs = Date.now()): number {
+  const timeout = getMainTimeoutMs(context);
+  const timeoutStart = getMainTimeoutStartMs(context);
+  const elapsed = timeoutStart > 0 ? Math.max(0, nowMs - timeoutStart) : 0;
+  return Math.max(0, timeout - elapsed);
+}
+
+export function getFeedbackTimeoutRemainingMs(
+  context: TimeoutContextLike,
+  elapsedMs: number,
+  fadeOutDurationMs: number
+): number {
+  const timeout = getFeedbackTimeoutDurationMs(context);
+  const elapsed = Number.isFinite(elapsedMs) ? Math.max(0, elapsedMs) : 0;
+  const fadeOutLeadMs = Number.isFinite(fadeOutDurationMs) ? Math.max(0, fadeOutDurationMs) : 0;
+  return Math.max(0, timeout - elapsed - fadeOutLeadMs);
 }
 
 // =============================================================================
