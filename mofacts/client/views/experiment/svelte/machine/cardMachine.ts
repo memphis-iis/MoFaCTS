@@ -1265,12 +1265,8 @@ export const cardMachine = createMachine(
               },
             },
           },
-          /**
-           * TRACKING_PERFORMANCE SUBSTATE
-           * Track performance metrics (optional analytics)
-           */
           trackingPerformance: {
-            entry: ['trackPerformance', 'logStateTransition'],
+            entry: ['logStateTransition'],
             invoke: {
               id: 'updateEngineService',
               src: 'updateEngineService',
@@ -1768,14 +1764,11 @@ export const cardMachine = createMachine(
       // Side effect actions
       logStateTransition: actions.logStateTransition,
       logError: actions.logError,
-      logHistory: actions.logHistory,
       focusInput: actions.focusInput,
       disableInput: actions.disableInput,
       enableInput: actions.enableInput,
       clearFeedback: actions.clearFeedback,
       announceToScreenReader: actions.announceToScreenReader,
-      trackPerformance: actions.trackPerformance,
-      updateScrollHistory: actions.updateScrollHistory,
       handleUnitCompletion: actions.handleUnitCompletion,
       displayAnswer: actions.displayAnswer,
       displayFeedback: actions.displayFeedback,

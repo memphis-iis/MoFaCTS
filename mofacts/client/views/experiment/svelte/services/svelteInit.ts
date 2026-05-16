@@ -712,8 +712,8 @@ async function initializeInstructionContinueCard(
 }
 
 async function initializeCardRefreshRebuild(
-  tdfFile: TdfFileLike,
-  dispatchContext: CardEntryDispatchContext
+  _tdfFile: TdfFileLike,
+  _dispatchContext: CardEntryDispatchContext
 ): Promise<SvelteCardInitResult> {
   throw new Error(`[Svelte Init] ${CARD_ENTRY_INTENT.CARD_REFRESH_REBUILD} must be resolved before card initialization dispatch`);
 }

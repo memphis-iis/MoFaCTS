@@ -641,28 +641,6 @@ export function logError({ context, event }: ActionArgs) {
 }
 
 /**
- * Log trial history to database
- * @param {CardMachineActorArgs} args
- */
-export function logHistory({ context: _context }: ActionArgs) {
-  
-
-  // TODO: Call Meteor method to save to Histories collection
-  // Meteor.callAsync('logTrialHistory', {
-  //   sessionId: context.sessionId,
-  //   tdfId: context.tdfId,
-  //   unitId: context.unitId,
-  //   testType: context.testType,
-  //   userAnswer: context.userAnswer,
-  //   correctAnswer: context.currentAnswer,
-  //   isCorrect: context.isCorrect,
-  //   isTimeout: context.isTimeout,
-  //   timestamps: context.timestamps,
-  //   engineIndices: context.engineIndices,
-  // });
-}
-
-/**
  * Focus on input element
  * @param {CardMachineActorArgs} args
  */
@@ -738,39 +716,6 @@ export function announceToScreenReader({ context }: ActionArgs) {
       detail: { message },
     }));
   }
-}
-
-/**
- * Track performance metrics
- * @param {CardMachineActorArgs} args
- */
-export function trackPerformance({ context, event: _event }: ActionArgs) {
-  const trialEnd = context.timestamps.trialEnd ?? context.timestamps.trialStart;
-  const inputEnabled = context.timestamps.inputEnabled ?? context.timestamps.trialStart;
-  const _trialDuration = trialEnd - context.timestamps.trialStart;
-  const _responseTime = context.timestamps.firstKeypress
-    ? context.timestamps.firstKeypress - inputEnabled
-    : null;
-
-  
-
-  // TODO: Send to UserMetrics collection
-  // Meteor.callAsync('updateUserMetrics', {
-  //   userId: Meteor.userId(),
-  //   tdfId: context.tdfId,
-  //   trialDuration,
-  //   responseTime,
-  //   isCorrect: context.isCorrect,
-  // });
-}
-
-/**
- * Update scroll history (if feature is kept)
- * @param {CardMachineActorArgs} args
- */
-export function updateScrollHistory({ context: _context }: ActionArgs) {
-  // TODO: Determine if scroll history feature should be kept
-  
 }
 
 /**

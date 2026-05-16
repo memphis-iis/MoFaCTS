@@ -39,7 +39,7 @@ function hasInstructionContent(unit: EngineUnitLike): boolean {
   return Boolean(unit.unitinstructions || unit.picture || unit.unitinstructionsquestion);
 }
 
-export function deriveEngineUnitType(unit: EngineUnitLike | null | undefined, source: string): UnitType {
+function deriveEngineUnitType(unit: EngineUnitLike | null | undefined, source: string): UnitType {
   if (!unit) {
     throw new Error(`${source}: Cannot create unit engine without currentTdfUnit`);
   }

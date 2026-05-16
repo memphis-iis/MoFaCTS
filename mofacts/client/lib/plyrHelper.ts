@@ -4,6 +4,7 @@ import { extractDelimFields, rangeVal } from './currentTestingHelpers';
 import { ExperimentStateStore } from './state/experimentStateStore';
 import { clientConsole } from './clientLogger';
 import { parseYouTubeVideoUrl } from './youtubeUrl';
+import { insertCompressedHistory } from './historyWire';
 
 import { legacyTrim } from '../../common/underscoreCompat';
 
@@ -522,7 +523,9 @@ class PlayerController {
       'instructionQuestionResult': Session.get('instructionQuestionResult') || false,
       'entryPoint': MeteorAny.user()?.loginParams?.entryPoint
     };
-    MeteorAny.callAsync('insertHistory', answerLogRecord);
+    insertCompressedHistory(answerLogRecord).catch((error: unknown) => {
+      clientConsole(1, '[Plyr] Error writing video history:', error);
+    });
   }
 
   async playVideo() {

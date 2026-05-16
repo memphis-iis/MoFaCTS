@@ -289,7 +289,7 @@ export function ttsDisabled(args: CardMachineActorArgs): boolean {
   return !ttsEnabled(args);
 }
 
-export function feedbackContentReady({ context }: CardMachineActorArgs): boolean {
+function feedbackContentReady({ context }: CardMachineActorArgs): boolean {
   if (context.feedbackSuppressed === true) {
     return true;
   }

@@ -11,6 +11,7 @@
   import { clientConsole } from '../../../../lib/userSessionHelpers';
   import { legacyTrim } from '../../../../../common/underscoreCompat';
   import { parseYouTubeVideoUrl } from '../../../../lib/youtubeUrl';
+  import { insertCompressedHistory } from '../../../../lib/historyWire';
 
   const dispatch = createEventDispatcher();
 
@@ -669,7 +670,7 @@
     lastSpeed = player.speed;
     seekStart = player.currentTime;
 
-    Meteor.callAsync('insertHistory', answerLogRecord).catch((error) => {
+    insertCompressedHistory(answerLogRecord).catch((error) => {
       clientConsole(1, '[VideoSessionMode] Error writing video history:', error?.message || error);
     });
   }

@@ -17,8 +17,9 @@ import { CardStore } from '../../modules/cardStore';
 import { getStimCluster, getStimCount } from '../../../../lib/currentTestingHelpers';
 import { clientConsole } from '../../../../lib/clientLogger';
 import { parseSchedItemCondition } from '../../../../lib/tdfUtils';
-import { SCHEDULE_UNIT, HISTORY_KEY_MAP } from '../../../../../common/Definitions';
+import { SCHEDULE_UNIT } from '../../../../../common/Definitions';
 import { meteorCallAsync } from '../../../../lib/meteorAsync';
+import { insertCompressedHistory } from '../../../../lib/historyWire';
 import {
   applyMappingRecordToSession,
   loadMappingRecord,
@@ -121,29 +122,6 @@ function getLoggedFeedbackType(testType: string, isCorrect: boolean, feedbackSup
 
 function truncateToFiveDecimals(value: number): number {
   return Math.trunc(value * 100000) / 100000;
-}
-
-function normalizeHistoryValueForWire(value: unknown): unknown {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return value === 0 ? undefined : value;
-  }
-  if (value === '' || value === null || value === false) {
-    return undefined;
-  }
-  if (Array.isArray(value)) {
-    return value;
-  }
-  if (value && typeof value === 'object') {
-    const compacted: Record<string, unknown> = {};
-    for (const [nestedKey, nestedValue] of Object.entries(value as Record<string, unknown>)) {
-      const normalizedNestedValue = normalizeHistoryValueForWire(nestedValue);
-      if (normalizedNestedValue !== undefined) {
-        compacted[nestedKey] = normalizedNestedValue;
-      }
-    }
-    return Object.keys(compacted).length > 0 ? compacted : undefined;
-  }
-  return value;
 }
 
 type HistoryClusterLike = {
@@ -430,7 +408,7 @@ export function createHistoryRecord({
   userAnswer,
   isCorrect,
   testType,
-  deliverySettings,
+  deliverySettings: _deliverySettings,
   wasReportedForRemoval = false,
   engine,
   currentDisplay,
@@ -650,28 +628,7 @@ export function createHistoryRecord({
    */
 async function insertHistoryRecord(answerLogRecord: HistoryRecord): Promise<void> {
   try {
-    // Compress payload using numeric keys to reduce network traffic
-    const compressedRecord: Record<string, unknown> = {};
-    const reverseMap: Record<string, string> = {};
-    for (const [code, fieldName] of Object.entries(HISTORY_KEY_MAP)) {
-      reverseMap[fieldName] = code;
-    }
-
-    for (const [key, value] of Object.entries(answerLogRecord)) {
-      const code = reverseMap[key];
-      const normalizedValue = normalizeHistoryValueForWire(value);
-      if (normalizedValue === undefined) {
-        continue;
-      }
-      if (code) {
-        compressedRecord[code] = normalizedValue;
-      } else {
-        // Fallback for fields not in the map
-        compressedRecord[key] = normalizedValue;
-      }
-    }
-
-    await meteorCallAsync('insertHistory', compressedRecord);
+    await insertCompressedHistory(answerLogRecord as Record<string, unknown>);
   } catch (e) {
     clientConsole(1, '[History Logging] Error writing history record:', e);
     throw new Error('Error inserting history: ' + e);

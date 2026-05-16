@@ -317,13 +317,7 @@ function buildFeedbackContent({
   };
 }
 
-function buildFeedbackHtml(context: FeedbackHtmlContext): string {
-  return buildFeedbackContent(context).feedbackHtml;
-}
-
 export {
   buildFeedbackContent,
-  buildFeedbackHtml,
   shouldShow,
-  stripTags,
 };
