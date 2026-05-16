@@ -14,19 +14,19 @@ export type DeliverySettingsMigrationWarning = {
   message: string;
 };
 
-export type DeliverySettingsMigrationResult<T = unknown> = {
+type DeliverySettingsMigrationResult<T = unknown> = {
   tdf: T;
   changed: boolean;
   warnings: DeliverySettingsMigrationWarning[];
 };
 
-export type LearnerConfigDeliverySettingsMigrationResult<T = unknown> = {
+type LearnerConfigDeliverySettingsMigrationResult<T = unknown> = {
   config: T;
   changed: boolean;
   warnings: DeliverySettingsMigrationWarning[];
 };
 
-export type DeliverySettingsMigrationOptions = {
+type DeliverySettingsMigrationOptions = {
   removeLegacy?: boolean;
 };
 

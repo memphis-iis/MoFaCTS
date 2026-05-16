@@ -9,10 +9,12 @@ import { expect } from 'chai';
 
 const MeteorAny = Meteor as any;
 const MeteorUsersAny = Meteor.users as any;
+const AssignmentsAny = (globalThis as any).Assignments as any;
 const CoursesAny = (globalThis as any).Courses as any;
 const DynamicSettingsAny = (globalThis as any).DynamicSettings as any;
 const GlobalExperimentStatesAny = (globalThis as any).GlobalExperimentStates as any;
 const HistoriesAny = (globalThis as any).Histories as any;
+const SectionsAny = (globalThis as any).Sections as any;
 const SectionUserMapAny = (globalThis as any).SectionUserMap as any;
 const TdfsAny = (globalThis as any).Tdfs as any;
 const UserDashboardCacheAny = (globalThis as any).UserDashboardCache as any;
@@ -26,12 +28,14 @@ const PasswordResetTokensAny = (globalThis as any).PasswordResetTokens as any;
 (Meteor.settings as any).auth.requireEmailVerification = false;
 
 StubCollections.stub(AuditLogAny);
+StubCollections.stub(AssignmentsAny);
 StubCollections.stub(AuthThrottleStateAny);
 StubCollections.stub(CoursesAny);
 StubCollections.stub(DynamicSettingsAny);
 StubCollections.stub(GlobalExperimentStatesAny);
 StubCollections.stub(HistoriesAny);
 StubCollections.stub(PasswordResetTokensAny);
+StubCollections.stub(SectionsAny);
 StubCollections.stub(SectionUserMapAny);
 StubCollections.stub(TdfsAny);
 StubCollections.stub(UserDashboardCacheAny);
@@ -42,6 +46,7 @@ StubCollections.stub(UserUploadQuotaAny);
 describe('server auth and session methods', function() {
   beforeEach(function() {
     AuditLogAny.remove({});
+    AssignmentsAny.remove({});
     AuthThrottleStateAny.remove({});
     CoursesAny.remove({});
     DynamicSettingsAny.remove({});
@@ -49,6 +54,7 @@ describe('server auth and session methods', function() {
     HistoriesAny.remove({});
     MeteorUsersAny.remove({});
     PasswordResetTokensAny.remove({});
+    SectionsAny.remove({});
     SectionUserMapAny.remove({});
     TdfsAny.remove({});
     UserDashboardCacheAny.remove({});
@@ -296,6 +302,68 @@ describe('public TDF and stimulus method authorization', function() {
     } catch (error: any) {
       expect(error.error).to.equal(403);
     }
+  });
+
+  it('allows an enrolled student to load condition children of an assigned root before experiment state exists', async function() {
+    await CoursesAny.insertAsync({
+      _id: 'assigned-course',
+      teacherUserId: 'teacher-user',
+      semester: 'SU_2022',
+    });
+    await SectionsAny.insertAsync({
+      _id: 'assigned-section',
+      courseId: 'assigned-course',
+    });
+    await SectionUserMapAny.insertAsync({
+      _id: 'assigned-enrollment',
+      userId: 'assigned-student',
+      sectionId: 'assigned-section',
+    });
+    await AssignmentsAny.insertAsync({
+      _id: 'assigned-row',
+      courseId: 'assigned-course',
+      TDFId: 'assigned-root',
+    });
+    await TdfsAny.insertAsync({
+      _id: 'assigned-root',
+      ownerId: 'teacher-user',
+      stimuliSetId: 106,
+      content: {
+        fileName: 'AssignedRoot.json',
+        tdfs: {
+          tutor: {
+            setspec: {
+              lessonname: 'Assigned Root',
+              userselect: 'false',
+              condition: ['AssignedCondition.json'],
+              conditionTdfIds: ['assigned-condition'],
+            },
+          },
+        },
+      },
+    });
+    await TdfsAny.insertAsync({
+      _id: 'assigned-condition',
+      ownerId: 'teacher-user',
+      stimuliSetId: 107,
+      content: {
+        fileName: 'AssignedCondition.json',
+        tdfs: {
+          tutor: {
+            setspec: {
+              lessonname: 'Assigned Condition',
+              userselect: 'false',
+            },
+          },
+        },
+      },
+    });
+
+    const byId = await (asyncMethods.getTdfById as any).call({ userId: 'assigned-student' }, 'assigned-condition');
+    const byFileName = await (asyncMethods.getTdfByFileName as any).call({ userId: 'assigned-student' }, 'AssignedCondition.json');
+
+    expect(byId._id).to.equal('assigned-condition');
+    expect(byFileName._id).to.equal('assigned-condition');
   });
 
   it('denies unrelated user public stimulus lookup by stimuliSetId', async function() {

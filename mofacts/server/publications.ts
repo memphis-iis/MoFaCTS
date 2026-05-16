@@ -294,12 +294,7 @@ Meteor.publish('files.assets.all', async function () {
             { _id: this.userId },
             { fields: { accessedTDFs: 1, profile: 1, loginParams: 1 } }
         );
-        const accessedTdfIds = Array.isArray(user?.accessedTDFs) ? user.accessedTDFs : [];
-        const historicalTdfIds = (await Histories.find(
-            { userId: this.userId },
-            { fields: { TDFId: 1 } }
-        ).fetchAsync()).map((h: any) => h.TDFId);
-        const uniqueHistoricalTdfIds = [...new Set(historicalTdfIds)];
+        const accessedTdfIds = normalizeIdList(user?.accessedTDFs || []);
         const experimentTarget =
             typeof user?.profile?.experimentTarget === 'string'
                 ? user.profile.experimentTarget.trim().toLowerCase()
@@ -310,7 +305,6 @@ Meteor.publish('files.assets.all', async function () {
                 { ownerId: this.userId },
                 { 'accessors.userId': this.userId },
                 { _id: { $in: accessedTdfIds } },
-                { _id: { $in: uniqueHistoricalTdfIds } },
                 { 'content.tdfs.tutor.setspec.userselect': 'true' }
             ]
         };
@@ -608,7 +602,26 @@ const TDF_LISTING_FIELDS = {
     conditionCounts: 1,
     'content.fileName': 1,
     'content.isMultiTdf': 1,
-    'content.tdfs.tutor.setspec': 1,
+    'content.tdfs.tutor.setspec.lessonname': 1,
+    'content.tdfs.tutor.setspec.duedate': 1,
+    'content.tdfs.tutor.setspec.tags': 1,
+    'content.tdfs.tutor.setspec.condition': 1,
+    'content.tdfs.tutor.setspec.conditionTdfIds': 1,
+    'content.tdfs.tutor.setspec.userselect': 1,
+    'content.tdfs.tutor.setspec.experimentTarget': 1,
+    'content.tdfs.tutor.setspec.showPageNumbers': 1,
+    'content.tdfs.tutor.setspec.speechIgnoreOutOfGrammarResponses': 1,
+    'content.tdfs.tutor.setspec.speechOutOfGrammarFeedback': 1,
+    'content.tdfs.tutor.setspec.audioPromptMode': 1,
+    'content.tdfs.tutor.setspec.audioInputEnabled': 1,
+    'content.tdfs.tutor.setspec.audioInputSensitivity': 1,
+    'content.tdfs.tutor.setspec.enableAudioPromptAndFeedback': 1,
+    'content.tdfs.tutor.setspec.audioPromptFeedbackSpeakingRate': 1,
+    'content.tdfs.tutor.setspec.audioPromptQuestionSpeakingRate': 1,
+    'content.tdfs.tutor.setspec.audioPromptVoice': 1,
+    'content.tdfs.tutor.setspec.audioPromptQuestionVolume': 1,
+    'content.tdfs.tutor.setspec.audioPromptFeedbackVolume': 1,
+    'content.tdfs.tutor.setspec.audioPromptFeedbackVoice': 1,
     'content.tdfs.tutor.unit.learningsession': 1
     // Includes only the learning-session marker from units; still excludes full unit content.
 };
@@ -682,15 +695,7 @@ Meteor.publish('allTdfsListing', async function() {
         }, { fields: TDF_LISTING_FIELDS });
     }
 
-    // Students can see:
-    // 1. TDFs with userselect='true' (self-selectable)
-    // 2. TDFs they have practiced (have history for) - for progress reporting
-    const historicalTdfIds = (await Histories.find(
-        { userId: this.userId },
-        { fields: { TDFId: 1 } }
-    ).fetchAsync()).map((h: any) => h.TDFId);
-
-    const uniqueHistoricalTdfIds = [...new Set(historicalTdfIds)];
+    // Students can see available TDFs only; cached stats for unavailable TDFs should not make rows visible.
     const user = await (Meteor.users as any).findOneAsync(
         { _id: this.userId },
         { fields: { accessedTDFs: 1 } }
@@ -702,7 +707,6 @@ Meteor.publish('allTdfsListing', async function() {
             { ownerId: this.userId },
             { 'accessors.userId': this.userId },
             { 'content.tdfs.tutor.setspec.userselect': 'true' },
-            { _id: { $in: uniqueHistoricalTdfIds } },
             { _id: { $in: accessedTdfIds } }
         ]
     }, { fields: TDF_LISTING_FIELDS });
@@ -715,32 +719,30 @@ Meteor.publish('dashboardTdfsListing', async function() {
         return this.ready();
     }
 
-    const [allDocs, assignedRootIds] = await Promise.all([
-        Tdfs.find(
-            {},
-            {
-                fields: {
-                    _id: 1,
-                    ownerId: 1,
-                    accessors: 1,
-                    'content.tdfs.tutor.setspec.userselect': 1
-                }
-            }
-        ).fetchAsync(),
-        resolveAssignedRootTdfIdsForUser(this.userId)
+    const [assignedRootIds, user] = await Promise.all([
+        resolveAssignedRootTdfIdsForUser(this.userId),
+        (Meteor.users as any).findOneAsync(
+            { _id: this.userId },
+            { fields: { accessedTDFs: 1 } }
+        )
     ]);
 
-    const assignedRootIdSet = new Set(assignedRootIds);
-    const visibleIds = allDocs
-        .filter((tdf: any) =>
-        canViewDashboardTdf(this.userId, tdf) || assignedRootIdSet.has(String(tdf?._id || ''))
-    )
-        .map((tdf: any) => String(tdf?._id || ''))
-        .filter((id: string) => id.length > 0);
-    if (visibleIds.length === 0) {
-        return this.ready();
+    const explicitDashboardIds = [
+        ...new Set([
+            ...normalizeIdList(assignedRootIds),
+            ...normalizeIdList(user?.accessedTDFs || [])
+        ])
+    ];
+    const visibilityTerms: any[] = [
+        { ownerId: this.userId },
+        { 'accessors.userId': this.userId },
+        { 'content.tdfs.tutor.setspec.userselect': 'true' },
+    ];
+    if (explicitDashboardIds.length > 0) {
+        visibilityTerms.push({ _id: { $in: explicitDashboardIds } });
     }
-    return Tdfs.find({ _id: { $in: visibleIds } }, { fields: TDF_LISTING_FIELDS });
+
+    return Tdfs.find({ $or: visibilityTerms }, { fields: TDF_LISTING_FIELDS });
 });
 
 Meteor.publish('tdfForContentUploadDetails', async function(tdfId: any) {
@@ -812,25 +814,18 @@ Meteor.publish('allTdfs', async function() {
         });
     }
 
-    // Students can see:
-    // 1. TDFs with userselect='true' (self-selectable)
-    // 2. TDFs they have practiced (have history for) - for progress reporting
-
-    // Get TDF IDs the student has history for
-    const historicalTdfIds = (await Histories.find(
-        { userId: this.userId },
-        { fields: { TDFId: 1 } }
-    ).fetchAsync()).map((h: any) => h.TDFId);
-
-    // Get unique TDF IDs
-    const uniqueHistoricalTdfIds = [...new Set(historicalTdfIds)];
+    const user = await (Meteor.users as any).findOneAsync(
+        { _id: this.userId },
+        { fields: { accessedTDFs: 1 } }
+    );
+    const accessedTdfIds = normalizeIdList(user?.accessedTDFs || []);
 
     return Tdfs.find({
         $or: [
             { ownerId: this.userId },
             { 'accessors.userId': this.userId },
             { 'content.tdfs.tutor.setspec.userselect': 'true' },
-            { _id: { $in: uniqueHistoricalTdfIds } }
+            { _id: { $in: accessedTdfIds } }
         ]
     });
 });

@@ -18,7 +18,7 @@ type UserDashboardCacheDocument = {
   learnerTdfConfigs?: Record<string, unknown>;
 };
 
-export type ConvertDeliverySettingsOptions = {
+type ConvertDeliverySettingsOptions = {
   dryRun?: boolean;
   confirmWrite?: 'convert-delivery-settings';
   tdfIds?: string[];
@@ -26,7 +26,7 @@ export type ConvertDeliverySettingsOptions = {
   removeLegacy?: boolean;
 };
 
-export type ConvertDeliverySettingsDocReport = {
+type ConvertDeliverySettingsDocReport = {
   _id: string;
   fileName?: string;
   packageAssetId?: string;
@@ -34,7 +34,7 @@ export type ConvertDeliverySettingsDocReport = {
   warnings: DeliverySettingsMigrationWarning[];
 };
 
-export type ConvertDeliverySettingsReport = {
+type ConvertDeliverySettingsReport = {
   dryRun: boolean;
   removeLegacy: boolean;
   scanned: number;
@@ -67,12 +67,12 @@ type UserDashboardCacheMigrationCollection = {
   updateAsync(selector: Record<string, unknown>, modifier: Record<string, unknown>): Promise<unknown>;
 };
 
-export type ConvertDeliverySettingsCollections = {
+type ConvertDeliverySettingsCollections = {
   Tdfs: TdfMigrationCollection;
   UserDashboardCache: UserDashboardCacheMigrationCollection;
 };
 
-export type ConvertDeliverySettingsCacheDocReport = {
+type ConvertDeliverySettingsCacheDocReport = {
   _id: string;
   userId?: string;
   changed: boolean;
@@ -108,7 +108,7 @@ function shouldMigrateConfig(tdfId: string, options: ConvertDeliverySettingsOpti
   return !options.tdfIds?.length || options.tdfIds.includes(tdfId);
 }
 
-export async function convertDeliverySettingsInDatabase(
+async function convertDeliverySettingsInDatabase(
   options: ConvertDeliverySettingsOptions = {}
 ): Promise<ConvertDeliverySettingsReport> {
   return convertDeliverySettingsInCollections(

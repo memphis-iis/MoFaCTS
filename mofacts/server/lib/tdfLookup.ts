@@ -4,7 +4,19 @@ type UnknownRecord = Record<string, unknown>;
 type MethodContext = {
   userId?: string | null;
 };
-type TdfAccessDoc = { ownerId?: string; accessors?: Array<{ userId?: string }>; content?: { fileName?: string } };
+type TdfAccessDoc = {
+  _id?: string;
+  ownerId?: string;
+  accessors?: Array<{ userId?: string }>;
+  content?: {
+    fileName?: string;
+    tdfs?: {
+      tutor?: {
+        setspec?: Record<string, unknown>;
+      };
+    };
+  };
+};
 
 type TdfLookupDeps = {
   serverConsole: (...args: unknown[]) => void;
@@ -37,6 +49,15 @@ function getTdfExperimentTarget(tdf: any) {
   const target = tdf?.content?.tdfs?.tutor?.setspec?.experimentTarget;
   return typeof target === 'string' ? target.trim().toLowerCase() : '';
 }
+
+const TDF_ACCESS_FIELDS = {
+  _id: 1,
+  ownerId: 1,
+  accessors: 1,
+  'content.fileName': 1,
+  'content.tdfs.tutor.setspec.userselect': 1,
+  'content.tdfs.tutor.setspec.experimentTarget': 1,
+};
 
 export function createTdfLookupHelpers(deps: TdfLookupDeps) {
   function getUserExperimentTarget(user: any) {
@@ -75,21 +96,78 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
     ).fetchAsync();
   }
 
+  async function requestedTdfIsConditionOfRoots(requestedTdfId: string, rootTdfIds: string[]) {
+    const normalizedRootIds = normalizeTdfKeys(rootTdfIds);
+    if (!requestedTdfId || normalizedRootIds.length === 0) {
+      return false;
+    }
+
+    const rootTdfDocs = await deps.Tdfs.find(
+      { _id: { $in: normalizedRootIds } },
+      { fields: { _id: 1, 'content.tdfs.tutor.setspec': 1 } }
+    ).fetchAsync();
+
+    const conditionFileNames: string[] = [];
+    for (const rootTdf of rootTdfDocs) {
+      const rootSetspec = rootTdf?.content?.tdfs?.tutor?.setspec;
+      if (Array.isArray(rootSetspec?.conditionTdfIds)) {
+        const conditionIds = rootSetspec.conditionTdfIds
+          .map((id: unknown) => deps.normalizeCanonicalId(id))
+          .filter((id: string | null): id is string => typeof id === 'string');
+        if (conditionIds.includes(requestedTdfId)) {
+          return true;
+        }
+      }
+
+      const conditions = Array.isArray(rootSetspec?.condition) ? rootSetspec.condition : [];
+      for (const condition of conditions) {
+        if (typeof condition === 'string' && condition.trim()) {
+          conditionFileNames.push(condition.trim());
+        }
+      }
+    }
+
+    if (conditionFileNames.length === 0) {
+      return false;
+    }
+
+    const conditionDocs = await getTdfsByFileNameOrId(conditionFileNames);
+    return conditionDocs.some((conditionDoc) =>
+      deps.normalizeCanonicalId(conditionDoc?._id) === requestedTdfId
+    );
+  }
+
   async function getTdfById(this: MethodContext | void, TDFId: string) {
-    const tdf = await deps.Tdfs.findOneAsync({ _id: TDFId });
-    if (!this?.userId || !tdf) {
-      return tdf;
+    if (!this?.userId) {
+      return await deps.Tdfs.findOneAsync({ _id: TDFId });
     }
 
+    const tdfAccess = await deps.Tdfs.findOneAsync(
+      { _id: TDFId },
+      { fields: TDF_ACCESS_FIELDS }
+    );
+    if (!tdfAccess) {
+      return null;
+    }
+
+    const loadFullTdf = async () => await deps.Tdfs.findOneAsync({ _id: TDFId });
     const assignedRootIds = new Set(await deps.resolveAssignedRootTdfIdsForUser(this.userId));
+    const normalizedRequestedTdfId = deps.normalizeCanonicalId(TDFId);
     if (
-      await deps.canViewDashboardTdf(this.userId, tdf) ||
-      assignedRootIds.has(String(tdf._id || ''))
+      await deps.canViewDashboardTdf(this.userId, tdfAccess) ||
+      assignedRootIds.has(String(tdfAccess._id || ''))
     ) {
-      return tdf;
+      return await loadFullTdf();
     }
 
-    const tdfExperimentTarget = getTdfExperimentTarget(tdf);
+    if (
+      normalizedRequestedTdfId &&
+      await requestedTdfIsConditionOfRoots(normalizedRequestedTdfId, [...assignedRootIds])
+    ) {
+      return await loadFullTdf();
+    }
+
+    const tdfExperimentTarget = getTdfExperimentTarget(tdfAccess);
     let user: any = null;
     let userExperimentTarget = '';
     let accessedTdfIds: string[] = [];
@@ -101,8 +179,8 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
       userExperimentTarget = getUserExperimentTarget(user);
       accessedTdfIds = getUserAccessedTdfIds(user);
 
-      if (userExperimentTarget === tdfExperimentTarget || accessedTdfIds.includes(String(tdf._id || ''))) {
-        return tdf;
+      if (userExperimentTarget === tdfExperimentTarget || accessedTdfIds.includes(String(tdfAccess._id || ''))) {
+        return await loadFullTdf();
       }
     }
 
@@ -148,7 +226,7 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
         continue;
       }
       if (rootId === TDFId) {
-        return tdf;
+        return await loadFullTdf();
       }
       const rootSetspec = rootTdf?.content?.tdfs?.tutor?.setspec;
       if (Array.isArray(rootSetspec?.conditionTdfIds)) {
@@ -156,7 +234,7 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
           .map((id: unknown) => deps.normalizeCanonicalId(id))
           .filter((id: string | null): id is string => typeof id === 'string');
         if (resolvedIds.includes(TDFId)) {
-          return tdf;
+          return await loadFullTdf();
         }
       } else {
         const conditions = Array.isArray(rootSetspec?.condition) ? rootSetspec.condition : [];
@@ -176,7 +254,7 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
         if (id) resolvedConditionIds.add(id);
       }
       if (resolvedConditionIds.has(TDFId)) {
-        return tdf;
+        return await loadFullTdf();
       }
     }
 
@@ -194,6 +272,13 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
       deps.serverConsole('getTdfByFileName ERROR,', filename, ',', e);
       return null;
     }
+  }
+
+  async function getTdfAccessByFileName(filename: string) {
+    return await deps.Tdfs.findOneAsync(
+      { 'content.fileName': filename },
+      { fields: TDF_ACCESS_FIELDS }
+    );
   }
 
   async function userCanAccessContentUploadTdf(userId: string, tdf: TdfAccessDoc | null | undefined) {
@@ -243,6 +328,7 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
   return {
     getTdfById,
     getTdfByFileName,
+    getTdfAccessByFileName,
     getTdfsByFileNameOrId,
     userCanAccessContentUploadTdf,
     userCanManageTdf,

@@ -311,6 +311,7 @@ const tdfLookupHelpers = createTdfLookupHelpers({
 const {
   getTdfById,
   getTdfByFileName,
+  getTdfAccessByFileName,
   getTdfsByFileNameOrId,
   userCanManageTdf,
   assertUserOwnsTdfs,
@@ -669,7 +670,7 @@ async function getTdfByIdPublic(this: MethodContext, TDFId: string) {
 
 async function getTdfByFileNamePublic(this: MethodContext, filename: string) {
   const userId = requireAuthenticatedUser(this.userId, 'Must be logged in to access TDF content', 401);
-  const tdf = await getTdfByFileName(filename);
+  const tdf = await getTdfAccessByFileName(filename);
   if (!tdf) {
     return null;
   }

@@ -46,7 +46,6 @@ declare const Meteor: any;
 declare const Session: any;
 declare const $: any;
 declare const Tdfs: any;
-declare const Assignments: any;
 declare const UserDashboardCache: any;
 
 type LearnerConfigState = {
@@ -743,15 +742,10 @@ Template.learningDashboard.rendered = async function(this: any) {
   Session.set('showSpeechAPISetup', true);
 
   const studentID = Session.get('curStudentID') || Meteor.userId();
-  const curClassContext = Meteor.user()?.loginParams?.curClass || Session.get('curClass') || null;
-  const courseId = curClassContext?.courseId || null;
-  // Subscribe to lightweight TDF listing and assignments before reading collections
+  // Subscribe to lightweight TDF listing before reading collections
   const subs = [
     Meteor.subscribe('dashboardTdfsListing'),
   ];
-  if (courseId) {
-    subs.push(Meteor.subscribe('Assignments', courseId));
-  }
   instance.subscriptions.push(...subs);
 
   await new Promise<void>((resolve) => {
@@ -774,7 +768,14 @@ Template.learningDashboard.rendered = async function(this: any) {
     conditionCounts: 1,
     'content.fileName': 1,
     'content.isMultiTdf': 1,
-    'content.tdfs.tutor.setspec': 1,
+    'content.tdfs.tutor.setspec.lessonname': 1,
+    'content.tdfs.tutor.setspec.tags': 1,
+    'content.tdfs.tutor.setspec.condition': 1,
+    'content.tdfs.tutor.setspec.conditionTdfIds': 1,
+    'content.tdfs.tutor.setspec.speechIgnoreOutOfGrammarResponses': 1,
+    'content.tdfs.tutor.setspec.speechOutOfGrammarFeedback': 1,
+    'content.tdfs.tutor.setspec.audioInputEnabled': 1,
+    'content.tdfs.tutor.setspec.enableAudioPromptAndFeedback': 1,
     'content.tdfs.tutor.unit.learningsession': 1
     // Include only the learning-session marker from units so Configure can stay hidden for non-practice lessons.
   };
@@ -863,31 +864,6 @@ Template.learningDashboard.rendered = async function(this: any) {
     }
   }
 
-  // Process all TDFs to build used/unused lists
-  const courseTdfs = Assignments.find({courseId: courseId}).fetch();
-  const assignedRootIds = new Set(
-    courseTdfs
-      .map((assignment: any) => String(assignment?.TDFId || '').trim())
-      .filter((id: string) => id.length > 0)
-  );
-  const assignedConditionRefs = new Set<string>();
-  for (const tdf of allTdfs) {
-    const tdfId = String(tdf?._id || '').trim();
-    if (!assignedRootIds.has(tdfId)) {
-      continue;
-    }
-    const refs = tdf?.content?.tdfs?.tutor?.setspec?.condition;
-    if (!Array.isArray(refs)) {
-      continue;
-    }
-    for (const ref of refs) {
-      const normalized = String(ref || '').trim();
-      if (normalized.length > 0) {
-        assignedConditionRefs.add(normalized);
-      }
-    }
-  }
-
   // Check if user has personal API keys configured
   const user = Meteor.user();
   const userHasSpeechAPIKey = !!(user?.speechAPIKey && user.speechAPIKey.trim());
@@ -943,12 +919,9 @@ Template.learningDashboard.rendered = async function(this: any) {
     const enableAudioPromptAndFeedback = setspec.enableAudioPromptAndFeedback ?
       setspec.enableAudioPromptAndFeedback == 'true' : false;
 
-    // Check if TDF has embedded API keys OR if user has personal API keys
-    // Icon should be green if EITHER source has a key (TDF or user personal key)
-    const tdfHasSpeechAPIKey = !!(setspec.speechAPIKey && setspec.speechAPIKey.trim());
-    const tdfHasTTSAPIKey = !!(setspec.textToSpeechAPIKey && setspec.textToSpeechAPIKey.trim());
-    const hasSpeechAPIKey = tdfHasSpeechAPIKey || userHasSpeechAPIKey;
-    const hasTTSAPIKey = tdfHasTTSAPIKey || userHasTTSAPIKey;
+    // Embedded TDF API key values are intentionally not published in dashboard listing rows.
+    const hasSpeechAPIKey = userHasSpeechAPIKey;
+    const hasTTSAPIKey = userHasTTSAPIKey;
 
     // Determine ownership and build condition selector data for owner rows
     const isOwner = tdf.ownerId === Meteor.userId();
@@ -962,13 +935,6 @@ Template.learningDashboard.rendered = async function(this: any) {
         count: typeof condCounts[i] === 'number' ? condCounts[i] as number : 0,
       }));
     }
-
-    // Check if this TDF is assigned to the user
-    const isAssigned = courseTdfs.length > 0
-      ? assignedRootIds.has(String(TDFId))
-        || assignedConditionRefs.has(String(TDFId))
-        || assignedConditionRefs.has(String(fileName))
-      : false;
 
     // Check if this TDF has been attempted
     const hasBeenAttempted = attemptedTdfIds.has(TDFId);
