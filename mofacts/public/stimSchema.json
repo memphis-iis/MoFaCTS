@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "MoFaCTS Stimulus Schema",
-  "description": "Registry-backed stimulus schema.",
+  "description": "Schema for MoFaCTS stimulus files, including clusters, learner-facing display content, expected responses, media references, and alternate displays.",
   "type": "object",
   "required": [
     "setspec"
@@ -25,6 +25,7 @@
             "properties": {
               "imageStimulus": {
                 "title": "Cluster image stimulus.",
+                "description": "Cluster-level image asset used when stims inherit the shared image.",
                 "type": "string",
                 "default": "",
                 "options": {
@@ -33,6 +34,7 @@
               },
               "audioStimulus": {
                 "title": "Cluster audio stimulus.",
+                "description": "Cluster-level audio asset used when stims inherit the shared audio.",
                 "type": "string",
                 "default": "",
                 "options": {
@@ -41,6 +43,7 @@
               },
               "videoStimulus": {
                 "title": "Cluster video stimulus.",
+                "description": "Cluster-level video asset used when stims inherit the shared video.",
                 "type": "string",
                 "default": "",
                 "options": {
@@ -56,6 +59,7 @@
                   "properties": {
                     "parameter": {
                       "title": "Stimulus parameter metadata.",
+                      "description": "Comma-separated optional parameters for advanced scoring algorithms. The second value is reserved for the item-specific optimal difficulty threshold.",
                       "type": "string",
                       "default": "",
                       "options": {
@@ -64,6 +68,7 @@
                     },
                     "optimalProb": {
                       "title": "Stimulus optimum probability override.",
+                      "description": "Item-specific optimum probability used by the learning model.",
                       "anyOf": [
                         {
                           "type": "number"
@@ -78,6 +83,7 @@
                     },
                     "speechHintExclusionList": {
                       "title": "Speech-hint exclusion list.",
+                      "description": "Comma-delimited words to exclude from speech-recognition matching, helping prevent false positives for common words.",
                       "type": "string",
                       "default": "",
                       "options": {
@@ -86,6 +92,7 @@
                     },
                     "alternateDisplays": {
                       "title": "Alternate Displays",
+                      "description": "Array of alternate display objects, such as clozeText/clozeStimulus pairs, that provide additional question variations for the same item.",
                       "type": "array",
                       "items": {
                         "type": "object",
@@ -93,6 +100,7 @@
                         "properties": {
                           "text": {
                             "title": "Question/stimulus text.",
+                            "description": "Main question or stimulus text displayed to the learner. HTML is supported for formatting.",
                             "type": "string",
                             "default": "",
                             "format": "textarea",
@@ -102,6 +110,7 @@
                           },
                           "clozeText": {
                             "title": "Cloze sentence text.",
+                            "description": "Question text with a blank for fill-in. Use with clozeStimulus for the answer word.",
                             "type": "string",
                             "default": "",
                             "format": "textarea",
@@ -111,6 +120,7 @@
                           },
                           "clozeStimulus": {
                             "title": "Cloze answer token.",
+                            "description": "The answer word to insert in the clozeText blank. Paired with clozeText for fill-in-the-blank questions.",
                             "type": "string",
                             "default": "",
                             "options": {
@@ -119,6 +129,7 @@
                           },
                           "imgSrc": {
                             "title": "Stim image filename.",
+                            "description": "Filename of the image to display as the stimulus. Accepted formats include JPEG, PNG, GIF, WebP, and SVG; the file must be uploaded in the same package.",
                             "type": "string",
                             "default": "",
                             "options": {
@@ -127,6 +138,7 @@
                           },
                           "audioSrc": {
                             "title": "Stim audio filename.",
+                            "description": "Filename of the audio to play as the stimulus. Accepted formats include MP3, WAV, OGG, and M4A; the file must be uploaded in the same package.",
                             "type": "string",
                             "default": "",
                             "options": {
@@ -135,6 +147,7 @@
                           },
                           "videoSrc": {
                             "title": "Stim video URL or filename.",
+                            "description": "URL or filename of the video to display. Accepted formats include MP4, WebM, and OGG; values can be external URLs or uploaded local files.",
                             "type": "string",
                             "default": "",
                             "options": {
@@ -143,10 +156,12 @@
                           },
                           "attribution": {
                             "title": "Attribution",
+                            "description": "Creator, source, and license metadata rendered as a linked caption for the prompt media.",
                             "type": "object",
                             "properties": {
                               "creatorName": {
                                 "title": "Attribution creator name.",
+                                "description": "Visible creator/author name shown with licensed media.",
                                 "type": "string",
                                 "default": "",
                                 "options": {
@@ -155,6 +170,7 @@
                               },
                               "sourceName": {
                                 "title": "Attribution source label.",
+                                "description": "Visible source label shown in the attribution caption.",
                                 "type": "string",
                                 "default": "Wikimedia Commons",
                                 "options": {
@@ -163,6 +179,7 @@
                               },
                               "sourceUrl": {
                                 "title": "Attribution source URL.",
+                                "description": "Source page opened when the learner clicks the attribution caption.",
                                 "type": "string",
                                 "default": "",
                                 "options": {
@@ -171,6 +188,7 @@
                               },
                               "licenseName": {
                                 "title": "Attribution license name.",
+                                "description": "Visible license label shown in the attribution caption.",
                                 "type": "string",
                                 "default": "",
                                 "options": {
@@ -179,6 +197,7 @@
                               },
                               "licenseUrl": {
                                 "title": "Attribution license URL.",
+                                "description": "Optional license detail URL for the attributed media.",
                                 "type": "string",
                                 "default": "",
                                 "options": {
@@ -198,6 +217,7 @@
                       "properties": {
                         "text": {
                           "title": "Question/stimulus text.",
+                          "description": "Main question or stimulus text displayed to the learner. HTML is supported for formatting.",
                           "type": "string",
                           "default": "",
                           "format": "textarea",
@@ -207,6 +227,7 @@
                         },
                         "clozeText": {
                           "title": "Cloze sentence text.",
+                          "description": "Question text with a blank for fill-in. Use with clozeStimulus for the answer word.",
                           "type": "string",
                           "default": "",
                           "format": "textarea",
@@ -216,6 +237,7 @@
                         },
                         "clozeStimulus": {
                           "title": "Cloze answer token.",
+                          "description": "The answer word to insert in the clozeText blank. Paired with clozeText for fill-in-the-blank questions.",
                           "type": "string",
                           "default": "",
                           "options": {
@@ -224,6 +246,7 @@
                         },
                         "imgSrc": {
                           "title": "Stim image filename.",
+                          "description": "Filename of the image to display as the stimulus. Accepted formats include JPEG, PNG, GIF, WebP, and SVG; the file must be uploaded in the same package.",
                           "type": "string",
                           "default": "",
                           "options": {
@@ -232,6 +255,7 @@
                         },
                         "audioSrc": {
                           "title": "Stim audio filename.",
+                          "description": "Filename of the audio to play as the stimulus. Accepted formats include MP3, WAV, OGG, and M4A; the file must be uploaded in the same package.",
                           "type": "string",
                           "default": "",
                           "options": {
@@ -240,6 +264,7 @@
                         },
                         "videoSrc": {
                           "title": "Stim video URL or filename.",
+                          "description": "URL or filename of the video to display. Accepted formats include MP4, WebM, and OGG; values can be external URLs or uploaded local files.",
                           "type": "string",
                           "default": "",
                           "options": {
@@ -248,10 +273,12 @@
                         },
                         "attribution": {
                           "title": "Attribution",
+                          "description": "Creator, source, and license metadata rendered as a linked caption for the prompt media.",
                           "type": "object",
                           "properties": {
                             "creatorName": {
                               "title": "Attribution creator name.",
+                              "description": "Visible creator/author name shown with licensed media.",
                               "type": "string",
                               "default": "",
                               "options": {
@@ -260,6 +287,7 @@
                             },
                             "sourceName": {
                               "title": "Attribution source label.",
+                              "description": "Visible source label shown in the attribution caption.",
                               "type": "string",
                               "default": "Wikimedia Commons",
                               "options": {
@@ -268,6 +296,7 @@
                             },
                             "sourceUrl": {
                               "title": "Attribution source URL.",
+                              "description": "Source page opened when the learner clicks the attribution caption.",
                               "type": "string",
                               "default": "",
                               "options": {
@@ -276,6 +305,7 @@
                             },
                             "licenseName": {
                               "title": "Attribution license name.",
+                              "description": "Visible license label shown in the attribution caption.",
                               "type": "string",
                               "default": "",
                               "options": {
@@ -284,6 +314,7 @@
                             },
                             "licenseUrl": {
                               "title": "Attribution license URL.",
+                              "description": "Optional license detail URL for the attributed media.",
                               "type": "string",
                               "default": "",
                               "options": {
@@ -302,6 +333,7 @@
                       "properties": {
                         "correctResponse": {
                           "title": "Expected correct response.",
+                          "description": "The exact answer the learner should provide. Used for answer evaluation and feedback.",
                           "type": "string",
                           "default": "",
                           "options": {
@@ -310,6 +342,7 @@
                         },
                         "incorrectResponses": {
                           "title": "Incorrect Responses",
+                          "description": "Array of common incorrect answers. Optional, but useful for multiple-choice distractors and speech-recognition grammar support.",
                           "type": "array",
                           "items": {
                             "type": "string",

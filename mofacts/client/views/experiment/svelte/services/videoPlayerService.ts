@@ -8,7 +8,7 @@
  * - client/lib/plyrHelper.js (initializePlyr, playerController, destroyPlyr)
  */
 
-import { initializePlyr, destroyPlyr } from '../../../../lib/plyrHelper';
+import { initializePlyr, destroyPlyr, playerController } from '../../../../lib/plyrHelper';
 import { clientConsole } from '../../../../lib/clientLogger';
 import type {
   VideoCheckpoint,
@@ -29,9 +29,8 @@ const CheckpointType = {
 } as const;
 
 const initializePlyrCompat = initializePlyr as unknown as (
-  videoSrc: string,
-  options?: Record<string, unknown>
-) => VideoPlayerLike;
+  engine: unknown
+) => Promise<void>;
 
 const destroyPlyrCompat = destroyPlyr as unknown as () => void;
 
@@ -43,20 +42,24 @@ const destroyPlyrCompat = destroyPlyr as unknown as () => void;
  * @param {(checkpoint: VideoCheckpoint, player: VideoPlayerLike) => void | null} onCheckpoint - Callback when checkpoint reached
  * @returns {VideoPlayerLike} Plyr player instance
  */
-function initializeVideoPlayer(
+async function initializeVideoPlayer(
   videoSrc: string,
   checkpoints: VideoCheckpoint[] = [],
-  onCheckpoint: ((checkpoint: VideoCheckpoint, player: VideoPlayerLike) => void) | null = null
-): VideoPlayerLike {
+  onCheckpoint: ((checkpoint: VideoCheckpoint, player: VideoPlayerLike) => void) | null = null,
+  engine?: unknown,
+): Promise<VideoPlayerLike> {
   
   
 
-  // Initialize Plyr
-  const player = initializePlyrCompat(videoSrc, {
-    controls: ['play', 'progress', 'current-time', 'mute', 'volume', 'fullscreen'],
-    autoplay: false,
-    resetOnEnd: false
-  });
+  if (!engine) {
+    throw new Error('Video player initialization requires an explicit current unit engine');
+  }
+
+  await initializePlyrCompat(engine);
+  const player = playerController?.player as VideoPlayerLike | null | undefined;
+  if (!player) {
+    throw new Error('Video player initialization did not create a Plyr player');
+  }
 
   // Sort checkpoints by time
   const sortedCheckpoints = [...checkpoints].sort((a, b) => a.time - b.time);
@@ -181,7 +184,7 @@ function destroyVideoPlayer(player: VideoPlayerLike | null | undefined): void {
 }
 
 /**
- * Parse video checkpoints from TDF or delivery params.
+ * Parse video checkpoints from the TDF delivery configuration.
  * Converts checkpoint strings to checkpoint objects.
  *
  * Format: "time:type:data" or "time:question:index"
@@ -247,48 +250,49 @@ export function videoPlayerService(
   return (send: VideoPlayerServiceSend, receive: VideoPlayerServiceReceive): (() => void) => {
     let player: VideoPlayerLike | null = null;
 
-    try {
-      
-
-      const videoSrc = event.videoSrc || context.currentDisplay?.videoSrc;
-      const checkpointStrings = event.checkpoints || context.videoCheckpoints || [];
-
-      if (!videoSrc) {
-        throw new Error('No video source provided');
-      }
-
-      // Parse checkpoints
-      const checkpoints = parseCheckpoints(checkpointStrings);
-
-      // Initialize player with checkpoint handler
-      player = initializeVideoPlayer(videoSrc, checkpoints, (checkpoint: VideoCheckpoint) => {
+    void (async () => {
+      try {
         
 
-        if (checkpoint.type === CheckpointType.QUESTION) {
-          // Send event to show question
-          send({
-            type: 'QUESTION_CHECKPOINT',
-            checkpoint,
-            questionIndex: checkpoint.data ? parseInt(checkpoint.data) : 0,
-            time: checkpoint.time
-          });
-        } else if (checkpoint.type === CheckpointType.END) {
-          // Video ended
-          send({ type: 'VIDEO_ENDED' });
-        } else {
-          // Generic checkpoint
-          send({ type: 'CHECKPOINT_REACHED', checkpoint });
+        const videoSrc = event.videoSrc || context.currentDisplay?.videoSrc;
+        const checkpointStrings = event.checkpoints || context.videoCheckpoints || [];
+
+        if (!videoSrc) {
+          throw new Error('No video source provided');
         }
-      });
 
-      // Store player reference in context
-      send({ type: 'PLAYER_INITIALIZED', player });
+        // Parse checkpoints
+        const checkpoints = parseCheckpoints(checkpointStrings);
 
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      clientConsole(1, '[Video] Service error:', error);
-      send({ type: 'ERROR', source: 'videoPlayer', error: message });
-    }
+        // Initialize player with checkpoint handler
+        player = await initializeVideoPlayer(videoSrc, checkpoints, (checkpoint: VideoCheckpoint) => {
+
+          if (checkpoint.type === CheckpointType.QUESTION) {
+            // Send event to show question
+            send({
+              type: 'QUESTION_CHECKPOINT',
+              checkpoint,
+              questionIndex: checkpoint.data ? parseInt(checkpoint.data) : 0,
+              time: checkpoint.time
+            });
+          } else if (checkpoint.type === CheckpointType.END) {
+            // Video ended
+            send({ type: 'VIDEO_ENDED' });
+          } else {
+            // Generic checkpoint
+            send({ type: 'CHECKPOINT_REACHED', checkpoint });
+          }
+        }, context.engine);
+
+        // Store player reference in context
+        send({ type: 'PLAYER_INITIALIZED', player });
+
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        clientConsole(1, '[Video] Service error:', error);
+        send({ type: 'ERROR', source: 'videoPlayer', error: message });
+      }
+    })();
 
     // Handle incoming events
     receive((serviceEvent: VideoPlayerServiceEvent) => {

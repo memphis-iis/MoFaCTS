@@ -14,11 +14,10 @@
 
 import { createMachine as xCreateMachine, assign as xAssign } from 'xstate';
 import { Session } from 'meteor/session';
-import { EVENTS, STATES, DEFAULT_UI_SETTINGS, SR_CONFIG } from './constants';
+import { EVENTS, STATES, DEFAULT_DELIVERY_SETTINGS, SR_CONFIG } from './constants';
 import * as guards from './guards';
 import * as actions from './actions';
 import { createServices } from './services';
-import { CardStore } from '../../modules/cardStore';
 import { clientConsole } from '../../../../lib/clientLogger';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Narrow exception: current XState v5 config/actor typings in this file are not modeled well enough yet, but we can still type the machine callback payloads locally.
@@ -26,8 +25,7 @@ const createMachine: any = xCreateMachine;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Same narrow exception as above for `assign`; this keeps runtime semantics unchanged while we remove the many broader `any` callback usages in the machine body.
 const assign: any = xAssign;
 
-type DeliveryParams = Record<string, unknown>;
-type UiSettings = typeof DEFAULT_UI_SETTINGS & Record<string, unknown>;
+type DeliverySettings = typeof DEFAULT_DELIVERY_SETTINGS & Record<string, unknown>;
 
 interface CurrentDisplay extends Record<string, unknown> {
   text?: string;
@@ -83,6 +81,9 @@ interface CardMachineContext {
   originalAnswer: string;
   userAnswer: string;
   feedbackMessage: string;
+  feedbackText: string;
+  feedbackRevealStarted: boolean;
+  feedbackSuppressed: boolean;
   isCorrect: boolean;
   isTimeout: boolean;
   feedbackTimeoutMs: number | undefined;
@@ -90,8 +91,7 @@ interface CardMachineContext {
   buttonTrial: boolean;
   buttonList: ButtonChoice[];
   testType: string;
-  deliveryParams: DeliveryParams;
-  uiSettings: UiSettings;
+  deliverySettings: DeliverySettings;
   setspec: Record<string, unknown> | undefined;
   audio: AudioState;
   srGrammarMatch: boolean | null;
@@ -128,6 +128,9 @@ interface CardMachineEvent extends Record<string, unknown> {
   checkpointIndex?: number;
   questionIndex?: number;
   unitFinished?: boolean;
+  feedbackText?: string;
+  feedbackHtml?: string;
+  feedbackSuppressed?: boolean;
 }
 
 interface CardSelectionResult extends Record<string, unknown> {
@@ -137,8 +140,7 @@ interface CardSelectionResult extends Record<string, unknown> {
   buttonTrial?: boolean;
   buttonList?: ButtonChoice[];
   testType?: string;
-  deliveryParams?: Partial<DeliveryParams>;
-  uiSettings?: Partial<UiSettings>;
+  deliverySettings?: Partial<DeliverySettings>;
   setspec?: Record<string, unknown>;
   engineIndices?: EngineIndices | null;
   engine?: unknown;
@@ -289,6 +291,9 @@ const initialContext = {
   originalAnswer: '',
   userAnswer: '',
   feedbackMessage: '',
+  feedbackText: '',
+  feedbackRevealStarted: false,
+  feedbackSuppressed: false,
   isCorrect: false,
   isTimeout: false,
   feedbackTimeoutMs: undefined,
@@ -300,8 +305,7 @@ const initialContext = {
   testType: 'd', // Default to drill
 
   // Settings & params (defaults)
-  deliveryParams: {},
-  uiSettings: DEFAULT_UI_SETTINGS,
+  deliverySettings: DEFAULT_DELIVERY_SETTINGS,
   setspec: {},
 
   // Audio & SR state
@@ -452,14 +456,10 @@ export const cardMachine = createMachine(
                       buttonTrial: ({ context, event }: CardSelectionDoneArgs) => event.output?.buttonTrial ?? context.buttonTrial,
                       buttonList: ({ context, event }: CardSelectionDoneArgs) => event.output?.buttonList || context.buttonList || [],
                       testType: ({ context, event }: CardSelectionDoneArgs) => event.output?.testType || context.testType,
-                      deliveryParams: ({ context, event }: CardSelectionDoneArgs) => ({
-                        ...(context.deliveryParams || {}),
-                        ...(event.output?.deliveryParams || {}),
-                      }),
-                      uiSettings: ({ context, event }: CardSelectionDoneArgs) => ({
-                        ...DEFAULT_UI_SETTINGS,
-                        ...(context.uiSettings || {}),
-                        ...(event.output?.uiSettings || {}),
+                      deliverySettings: ({ context, event }: CardSelectionDoneArgs) => ({
+                        ...DEFAULT_DELIVERY_SETTINGS,
+                        ...(context.deliverySettings || {}),
+                        ...(event.output?.deliverySettings || {}),
                       }),
                       setspec: ({ context, event }: CardSelectionDoneArgs) => event.output?.setspec || context.setspec,
                       engineIndices: ({ context, event }: CardSelectionDoneArgs) => event.output?.engineIndices || context.engineIndices,
@@ -473,6 +473,9 @@ export const cardMachine = createMachine(
                       // Reset trial state
                       userAnswer: () => '',
                       feedbackMessage: () => '',
+                      feedbackText: () => '',
+                      feedbackRevealStarted: () => false,
+                      feedbackSuppressed: () => false,
                       isCorrect: () => false,
                       isTimeout: () => false,
                       feedbackTimeoutMs: () => undefined,
@@ -488,9 +491,8 @@ export const cardMachine = createMachine(
                         feedbackEnd: undefined,
                       }),
                     }),
-                    'syncUiSettings',
+                    'syncDeliverySettings',
                     'syncCardStore',
-                    'syncDeliveryParams',
                     'syncSessionIndices',
                     'syncCurrentAnswer',
                     'resetSrState',
@@ -744,7 +746,7 @@ export const cardMachine = createMachine(
                         event,
                         // Pass answer and context for phonetic matching
                         correctAnswer: context.currentAnswer,
-                        deliveryParams: context.deliveryParams,
+                        deliverySettings: context.deliverySettings,
                         speechHintExclusionList: context.speechHintExclusionList,
                       }),
                     },
@@ -1004,7 +1006,7 @@ export const cardMachine = createMachine(
                 delayAfterQuestionMs: 1000,
                 display: context.currentDisplay,
                 isQuestion: false, // This is the answer (study mode)
-                deliveryParams: context.deliveryParams,
+                deliverySettings: context.deliverySettings,
               }),
               onDone: {
                 target: 'waiting',
@@ -1077,27 +1079,27 @@ export const cardMachine = createMachine(
            * Display feedback and start review timing with presentation start.
            */
           preparing: {
-            entry: ['displayFeedback', 'announceToScreenReader', 'logStateTransition'],
+            entry: [assign({ feedbackText: () => '', feedbackRevealStarted: () => false, feedbackSuppressed: () => false }), 'displayFeedback', 'announceToScreenReader', 'logStateTransition'],
             always: [
               {
-                target: 'forceCorrecting',
-                guard: 'isForceCorrectTrialAndIncorrect',
-                actions: ['markFeedbackStart', 'logStateTransition'],
+                target: 'speaking',
+                guard: 'feedbackReadyForTts',
+                actions: ['logStateTransition'],
+              },
+              {
+                target: 'waiting',
+                guard: 'feedbackReadyWithoutTts',
+                actions: ['logStateTransition'],
               },
             ],
             on: {
-              [EVENTS.REVIEW_REVEAL_STARTED]: [
-                {
-                  target: 'speaking',
-                  guard: 'ttsEnabled',
-                  actions: ['markFeedbackStart', 'logStateTransition'],
-                },
-                {
-                  target: 'waiting',
-                  guard: 'ttsDisabled',
-                  actions: ['markFeedbackStart', 'logStateTransition'],
-                },
-              ],
+              [EVENTS.REVIEW_REVEAL_STARTED]: {
+                actions: [
+                  assign({ feedbackRevealStarted: () => true }),
+                  'markFeedbackStart',
+                  'logStateTransition',
+                ],
+              },
             },
           },
           /**
@@ -1131,9 +1133,12 @@ export const cardMachine = createMachine(
               id: 'ttsService',
               src: 'ttsService',
               input: ({ context, event }: MachineArgs) => {
-                const feedbackText = CardStore.getCardValue('feedbackTtsText');
+                const feedbackText = context.feedbackText;
+                if (context.feedbackSuppressed === true) {
+                  throw new Error('[cardMachine] suppressed feedback should not enter feedback.speaking');
+                }
                 if (typeof feedbackText !== 'string' || feedbackText.trim() === '') {
-                  throw new Error('[cardMachine] feedbackTtsText missing at feedback.speaking handoff');
+                  throw new Error('[cardMachine] feedbackText missing at feedback.speaking handoff');
                 }
 
                 return {
@@ -1142,7 +1147,7 @@ export const cardMachine = createMachine(
                   text: feedbackText,
                   isQuestion: false, // This is feedback
                   display: context.currentDisplay,
-                  deliveryParams: context.deliveryParams,
+                  deliverySettings: context.deliverySettings,
                   feedbackType: context.isCorrect ? 'correct' : 'incorrect',
                 };
               },
@@ -1167,10 +1172,17 @@ export const cardMachine = createMachine(
               id: 'feedbackTimeout',
               src: 'feedbackTimeout',
               input: toServiceInput,
-              onDone: {
-                target: 'readyToFade',
-                actions: ['logStateTransition'],
-              },
+              onDone: [
+                {
+                  target: 'forceCorrecting',
+                  guard: 'needsForceCorrectPrompt',
+                  actions: ['logStateTransition'],
+                },
+                {
+                  target: 'readyToFade',
+                  actions: ['logStateTransition'],
+                },
+              ],
             },
           },
           readyToFade: {
@@ -1415,14 +1427,10 @@ export const cardMachine = createMachine(
                       buttonTrial: ({ context }: MachineArgs) => getPreparedTrial(context)?.buttonTrial ?? context.buttonTrial,
                       buttonList: ({ context }: MachineArgs) => getPreparedTrial(context)?.buttonList || context.buttonList || [],
                       testType: ({ context }: MachineArgs) => String(getPreparedTrial(context)?.testType || context.testType || 'd'),
-                      deliveryParams: ({ context }: MachineArgs) => ({
-                        ...(context.deliveryParams || {}),
-                        ...(getPreparedTrial(context)?.deliveryParams || {}),
-                      }),
-                      uiSettings: ({ context }: MachineArgs) => ({
-                        ...DEFAULT_UI_SETTINGS,
-                        ...(context.uiSettings || {}),
-                        ...(getPreparedTrial(context)?.uiSettings || {}),
+                      deliverySettings: ({ context }: MachineArgs) => ({
+                        ...DEFAULT_DELIVERY_SETTINGS,
+                        ...(context.deliverySettings || {}),
+                        ...(getPreparedTrial(context)?.deliverySettings || {}),
                       }),
                       setspec: ({ context }: MachineArgs) => getPreparedTrial(context)?.setspec || context.setspec,
                       engineIndices: ({ context }: MachineArgs) => getPreparedTrial(context)?.engineIndices || context.engineIndices,
@@ -1436,6 +1444,9 @@ export const cardMachine = createMachine(
                       speechHintExclusionList: ({ context }: MachineArgs) => String(getPreparedTrial(context)?.speechHintExclusionList || context.speechHintExclusionList || ''),
                       userAnswer: () => '',
                       feedbackMessage: () => '',
+                      feedbackText: () => '',
+                      feedbackRevealStarted: () => false,
+                      feedbackSuppressed: () => false,
                       isCorrect: () => false,
                       isTimeout: () => false,
                       feedbackTimeoutMs: () => undefined,
@@ -1454,7 +1465,7 @@ export const cardMachine = createMachine(
                     'resetSrState',
                     'resetSrAttempts',
                     'clearErrorMessage',
-                    'syncUiSettings',
+                    'syncDeliverySettings',
                     'setDisplayReady',
                     'setInputNotReady',
                     'clearFeedback',
@@ -1602,6 +1613,12 @@ export const cardMachine = createMachine(
 
     // Global error handler
     on: {
+      FEEDBACK_CONTENT: {
+        actions: assign({
+          feedbackText: ({ event }: MachineArgs) => String(event.feedbackText || '').trim(),
+          feedbackSuppressed: ({ event }: MachineArgs) => event.feedbackSuppressed === true,
+        }),
+      },
       [EVENTS.TRIAL_REVEAL_STARTED]: {
         actions: ['markTrialRevealStart', 'logStateTransition'],
       },
@@ -1651,6 +1668,7 @@ export const cardMachine = createMachine(
       isDrillTrial: guards.isDrillTrial,
       isTestTrial: guards.isTestTrial,
       isForceCorrectTrialAndIncorrect: guards.isForceCorrectTrialAndIncorrect,
+      needsForceCorrectPrompt: guards.needsForceCorrectPrompt,
       isCorrectForceCorrection: guards.isCorrectForceCorrection,
       isTimedPromptTrial: guards.isTimedPromptTrial,
       isSupportedTrialType: guards.isSupportedTrialType,
@@ -1671,6 +1689,8 @@ export const cardMachine = createMachine(
       // TTS guards
       ttsEnabled: guards.ttsEnabled,
       ttsDisabled: guards.ttsDisabled,
+      feedbackReadyForTts: guards.feedbackReadyForTts,
+      feedbackReadyWithoutTts: guards.feedbackReadyWithoutTts,
 
       // Feedback guards
       needsFeedback: guards.needsFeedback,
@@ -1736,8 +1756,7 @@ export const cardMachine = createMachine(
       validateAnswer: actions.validateAnswer,
       applyValidationResult: actions.applyValidationResult,
       clearUserAnswer: actions.clearUserAnswer,
-      syncDeliveryParams: actions.syncDeliveryParams,
-      syncUiSettings: actions.syncUiSettings,
+      syncDeliverySettings: actions.syncDeliverySettings,
       syncCardStore: actions.syncCardStore,
       syncSessionIndices: actions.syncSessionIndices,
       syncCurrentAnswer: actions.syncCurrentAnswer,
@@ -1785,7 +1804,7 @@ export const cardMachine = createMachine(
       FADE_OUT_DURATION: () => getCssDuration('--transition-smooth'),
       FADE_OUT_STALL_TIMEOUT: () => getCssDuration('--transition-smooth') + 1000,
       FORCE_CORRECT_TIMEOUT: ({ context }: MachineArgs) => {
-        const timeout = parseInt(String(context.deliveryParams?.forcecorrecttimeout ?? ''), 10);
+        const timeout = parseInt(String(context.deliverySettings?.forcecorrecttimeout ?? ''), 10);
         return Number.isFinite(timeout) ? timeout : 2000; // Default to 2s
       },
     },

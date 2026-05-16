@@ -54,11 +54,11 @@
  */
 
 // =============================================================================
-// DELIVERY PARAMS & UI SETTINGS
+// DELIVERY PARAMS & delivery settings
 // =============================================================================
 
 /**
- * @typedef {Object} DeliveryParams
+ * @typedef {Object} DeliverySettings
  * Per-trial delivery parameters from TDF
  * @property {string|number} [readyPromptStringDisplayTime] - Ready prompt delay
  * @property {string|number} [prestimulusdisplaytime] - Prestimulus delay
@@ -74,8 +74,8 @@
  */
 
 /**
- * @typedef {Object} UiSettings
- * UI configuration from the canonical field registry.
+ * @typedef {Object} DeliverySettings
+ * Runtime delivery configuration from the canonical field registry.
  *
  * Layout & Display (5)
  * @property {StimulusPosition} stimuliPosition - Layout: 'top' or 'left'
@@ -85,27 +85,25 @@
  * Feedback Settings
  * @property {boolean} displayCorrectFeedback - Show "Correct!" message
  * @property {boolean} displayIncorrectFeedback - Show "Incorrect" message
- * @property {string} correctMessage - Custom correct feedback text
- * @property {string} incorrectMessage - Custom incorrect feedback text
+ * @property {string} correctLabelText - Custom correct feedback label text
+ * @property {string} incorrectLabelText - Custom incorrect feedback label text
  * @property {string} correctColor - Correct feedback color (CSS hex)
  * @property {string} incorrectColor - Incorrect feedback color (CSS hex)
  * @property {'onCorrect' | 'onIncorrect' | boolean} displayUserAnswerInFeedback - Show user answer rules
- * @property {boolean} singleLineFeedback - Render feedback in a single line
- * @property {'onCorrect' | 'onIncorrect' | boolean} onlyShowSimpleFeedback - Show only "Correct."/"Incorrect."
+ * @property {'inline' | 'stacked'} feedbackLayout - Feedback segment layout
  * @property {boolean} [displayCorrectAnswerInIncorrectFeedback] - Show the correct answer after incorrect feedback
  *
  * Performance & Timeouts
  * @property {boolean} displayPerformance - Show performance area
- * @property {boolean} displayTimeoutBar - Show timeout countdown
+ * @property {boolean} displayTimeoutBar - Show timeout progress bar
+ * @property {boolean} displayTimeoutCountdown - Show numeric timeout countdown
  *
  * Multiple Choice Settings
  * @property {number} choiceButtonCols - Number of columns for MC buttons (1-4)
  *
  * Text Input Settings
- * @property {boolean} displaySubmitButton - Show submit button
  * @property {string} inputPlaceholderText - Placeholder text for input field
- * @property {boolean} [displayConfirmButton] - Require a confirm action before submission
- * @property {string} [continueButtonText] - Continue or confirm button text
+ * @property {string} [continueButtonText] - Continue button text
  * @property {string} [skipStudyButtonText] - Skip-study button text
  *
  * Miscellaneous
@@ -179,8 +177,7 @@
  * @property {boolean} buttonTrial - Multiple choice trial
  * @property {ButtonChoice[]} buttonList - MC button options
  * @property {TestType} testType - Trial type code
- * @property {DeliveryParams} deliveryParams - Delivery parameters
- * @property {UiSettings} uiSettings - UI configuration
+ * @property {DeliverySettings} deliverySettings - Runtime delivery configuration
  * @property {SetSpec} [setspec] - Active setspec configuration
  * @property {AudioState} audio - Audio/SR state
  * @property {EngineIndices | null} engineIndices - Unit engine indices
@@ -220,8 +217,7 @@
  * @property {TestType} testType - Trial type
  * @property {boolean} buttonTrial - Is multiple choice
  * @property {ButtonChoice[]} buttonList - MC options
- * @property {DeliveryParams} deliveryParams - Delivery params
- * @property {UiSettings} uiSettings - UI settings
+ * @property {DeliverySettings} deliverySettings - Runtime delivery configuration
  * @property {SetSpec} [setspec] - Active setspec configuration
  * @property {EngineIndices} engineIndices - Engine indices
  * @property {boolean} [unitFinished] - Unit completion flag
@@ -402,8 +398,8 @@
  * @property {TestType} testType
  * @property {boolean} buttonTrial
  * @property {ButtonChoice[]} buttonList
- * @property {DeliveryParams} deliveryParams
- * @property {UiSettings} uiSettings
+ * @property {DeliverySettings} DeliverySettings
+ * @property {DeliverySettings} DeliverySettings
  * @property {SetSpec} [setspec]
  * @property {EngineIndices} engineIndices
  * @property {boolean} [unitFinished] - If unit is complete

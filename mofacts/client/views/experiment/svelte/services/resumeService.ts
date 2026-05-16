@@ -14,8 +14,8 @@ import type { LearningHistoryRecord } from './historyReconstruction';
 import { meteorCallAsync } from '../../../../lib/meteorAsync';
 import { clientConsole } from '../../../../lib/userSessionHelpers';
 import { createMappingSignature } from '../../../../lib/mappingSignature';
+import { loadLaunchReadyTdf } from '../../../../lib/launchReadyTdf';
 import { hasMeaningfulMappingProgress, isStrictMappingMismatchEnforcementEnabled } from './mappingProgressPolicy';
-import { sanitizeUiSettings } from '../utils/uiSettingsValidator';
 import {
   assertAssessmentScheduleArtifactForUnit,
   assertAssessmentScheduleBounds,
@@ -29,12 +29,11 @@ import {
   validateMappingRecord,
 } from './mappingRecordService';
 import { CardStore } from '../../modules/cardStore';
-import { UiSettingsStore } from '../../../../lib/state/uiSettingsStore';
-import { DeliveryParamsStore } from '../../../../lib/state/deliveryParamsStore';
+import { deliverySettingsStore } from '../../../../lib/state/deliverySettingsStore';
 import { ExperimentStateStore } from '../../../../lib/state/experimentStateStore';
-import { createScheduleUnit, createModelUnit, createEmptyUnit, createVideoUnit } from '../../../experiment/unitEngine';
+import { createUnitEngineForUnit } from '../../engineConstructors';
 import {
-  getCurrentDeliveryParams,
+  refreshCurrentDeliverySettingsStore,
   getStimCount,
   getUserDisplayIdentifier,
   setStudentPerformance
@@ -61,22 +60,20 @@ import {
 } from '../../../../lib/idContext';
 
 
-type DeliveryParamsLike = Record<string, unknown>;
+type DeliverySettingsLike = Record<string, unknown>;
 type StimLike = Record<string, unknown>;
-type UiSettingsMap = Record<string, unknown>;
 
 declare const UserDashboardCache: {
   findOne(selector: Record<string, unknown>): { learnerTdfConfigs?: Record<string, LearnerTdfConfig> } | undefined;
 };
 
 interface TdfUnitLike extends Record<string, unknown> {
-  deliveryparams?: DeliveryParamsLike | DeliveryParamsLike[];
+  deliverySettings?: DeliverySettingsLike | DeliverySettingsLike[];
   videosession?: {
     videosource?: string;
   } & Record<string, unknown>;
   assessmentsession?: unknown;
   learningsession?: unknown;
-  uiSettings?: UiSettingsMap;
   unitinstructions?: unknown;
 }
 
@@ -87,7 +84,6 @@ interface TdfSetSpecLike extends Record<string, unknown> {
   randomizedDelivery?: unknown[];
   shuffleclusters?: string;
   swapclusters?: string;
-  uiSettings?: UiSettingsMap;
   audioInputEnabled?: string;
   speechAPIKey?: string;
   unitTemplate?: unknown;
@@ -99,6 +95,7 @@ interface TdfFileLike extends Record<string, unknown> {
   tdfs: {
     tutor: {
       setspec: TdfSetSpecLike;
+      deliverySettings?: unknown;
       unit?: TdfUnitLike[];
       title?: string;
     };
@@ -155,13 +152,51 @@ interface ResumeExperimentState extends ExperimentState {
   mappingSignature?: string | null;
   schedule?: unknown;
   experimentXCond?: number;
+  subTdfIndex?: number;
   conditionNote?: string;
-  currentTdfFile?: TdfFileLike;
   currentUnitNumber?: number;
 }
 
+const RESUME_STATE_PERSIST_FIELDS = [
+  'conditionTdfId',
+  'experimentXCond',
+  'clusterMapping',
+  'mappingSignature',
+  'currentUnitNumber',
+  'subTdfIndex',
+] as const satisfies readonly (keyof ResumeExperimentState)[];
+
+function isSameResumeStateValue(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function buildResumeStatePatch(
+  currentState: ResumeExperimentState,
+  stagedState: ResumeExperimentState
+): Partial<ResumeExperimentState> {
+  const patch: Partial<ResumeExperimentState> = {};
+  for (const field of RESUME_STATE_PERSIST_FIELDS) {
+    if (!Object.prototype.hasOwnProperty.call(stagedState, field)) {
+      continue;
+    }
+    if (!isSameResumeStateValue(currentState[field], stagedState[field])) {
+      (patch as Record<keyof ResumeExperimentState, unknown>)[field] = stagedState[field];
+    }
+  }
+  return patch;
+}
+
+function getResolvedConditionTdfId(
+  currentState: ResumeExperimentState,
+  stagedState: ResumeExperimentState
+): string | null {
+  if (Object.prototype.hasOwnProperty.call(stagedState, 'conditionTdfId')) {
+    return stagedState.conditionTdfId ?? null;
+  }
+  return currentState.conditionTdfId ?? null;
+}
+
 interface ResumeEngineLike extends UnitEngineLike {
-  unitType?: string;
   unitFinished: () => Promise<boolean>;
   loadResumeState: () => Promise<void>;
   getSchedule?: () => { q?: unknown[] } | null;
@@ -208,8 +243,8 @@ function getResolvedLockoutMinutesForResume(curTdfUnit: TdfUnitLike | null | und
     return 0;
   }
 
-  const unitDelParams = curTdfUnit?.deliveryparams;
-  let resolvedParams: DeliveryParamsLike | null = null;
+  const unitDelParams = curTdfUnit?.deliverySettings;
+  let resolvedSettings: DeliverySettingsLike | null = null;
   if (Array.isArray(unitDelParams)) {
     if (unitDelParams.length < 1) {
       return 0;
@@ -218,18 +253,18 @@ function getResolvedLockoutMinutesForResume(curTdfUnit: TdfUnitLike | null | und
     if (!Number.isFinite(xcondIndex) || xcondIndex < 0 || xcondIndex >= unitDelParams.length) {
       xcondIndex = 0;
     }
-    resolvedParams = unitDelParams[xcondIndex] ?? unitDelParams[0] ?? null;
+    resolvedSettings = unitDelParams[xcondIndex] ?? unitDelParams[0] ?? null;
   } else if (unitDelParams && typeof unitDelParams === 'object') {
-    resolvedParams = unitDelParams;
+    resolvedSettings = unitDelParams;
   } else {
     return 0;
   }
 
-  if (!resolvedParams) {
+  if (!resolvedSettings) {
     return 0;
   }
 
-  return getLockoutMinutesFromParams(resolvedParams);
+  return getLockoutMinutesFromParams(resolvedSettings);
 }
 
 function findTdf(query: Record<string, unknown>): TdfDocumentLike | null {
@@ -411,14 +446,21 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
     // EXPERIMENTAL CONDITIONS
     // ====================
 
-    let rootTDFBoxed = findTdf({ _id: Session.get('currentRootTdfId') });
+    const rootTdfId = Session.get('currentRootTdfId') || Session.get('currentTdfId');
+    let rootTDFBoxed: TdfDocumentLike | null = null;
+    try {
+      const launchReadyRoot = await loadLaunchReadyTdf(rootTdfId, {
+        allowConditionRoot: true,
+        source: 'resume.root',
+      });
+      rootTDFBoxed = launchReadyRoot.tdfDoc as TdfDocumentLike;
+    } catch (error) {
+      clientConsole(1, 'PANIC: Unable to load the launch-ready root TDF for learning', rootTdfId, error);
+      return handleResumeFailure('Unfortunately, the root TDF could not be loaded. Please contact your administrator.');
+    }
     if (!rootTDFBoxed || !isValidRootTdf(rootTDFBoxed)) {
-      clientConsole(1, 'Root TDF not found or incomplete in client collection, fetching from server:', Session.get('currentRootTdfId'));
-      rootTDFBoxed = await meteorCallAsync<TdfDocumentLike | null>('getTdfById', Session.get('currentRootTdfId'));
-      if (!rootTDFBoxed || !isValidRootTdf(rootTDFBoxed)) {
-        clientConsole(1, 'PANIC: Unable to load the root TDF for learning', Session.get('currentRootTdfId'));
-        return handleResumeFailure('Unfortunately, the root TDF could not be loaded. Please contact your administrator.');
-      }
+      clientConsole(1, 'PANIC: Root TDF failed root invariant after launch-ready load', rootTdfId);
+      return handleResumeFailure('Unfortunately, the root TDF could not be loaded. Please contact your administrator.');
     }
 
     let curTdf: TdfDocumentLike | null = rootTDFBoxed;
@@ -589,14 +631,19 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
       }, 'resume.condition.activate');
       setConditionResolutionContext({ conditionTdfId }, 'resume.condition.activate');
 
-      curTdf = findTdf({ _id: conditionTdfId });
+      try {
+        const launchReadyCondition = await loadLaunchReadyTdf(conditionTdfId, {
+          allowConditionRoot: false,
+          source: 'resume.condition.activate',
+        });
+        curTdf = launchReadyCondition.tdfDoc as TdfDocumentLike;
+      } catch (error) {
+        clientConsole(1, 'Could not load launch-ready condition TDF by ID:', conditionTdfId, error);
+        return handleResumeFailure('Unfortunately, the experiment condition TDF could not be loaded. Please contact your administrator.');
+      }
       if (!curTdf || !isValidConditionTdf(curTdf)) {
-        clientConsole(1, 'Condition TDF not found or incomplete in client collection, fetching from server:', conditionTdfId);
-        curTdf = await meteorCallAsync<TdfDocumentLike | null>('getTdfById', conditionTdfId);
-        if (!curTdf || !isValidConditionTdf(curTdf)) {
-          clientConsole(1, 'Could not find condition TDF by ID:', conditionTdfId);
-          return handleResumeFailure('Unfortunately, the experiment condition TDF could not be loaded. Please contact your administrator.');
-        }
+        clientConsole(1, 'Condition TDF failed invariant after launch-ready load:', conditionTdfId);
+        return handleResumeFailure('Unfortunately, the experiment condition TDF could not be loaded. Please contact your administrator.');
       }
       Session.set('currentTdfFile', curTdf.content);
       Session.set('currentTdfName', curTdf.content.fileName);
@@ -609,14 +656,8 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
       clientConsole(2, 'condition stimuliSetId', curTdf);
     } else {
       newExperimentState.conditionTdfId = null;
-      curExperimentState = {
-        ...curExperimentState,
-        conditionTdfId: null,
-      };
-      if(!Session.get('currentTdfFile')){
-        Session.set('currentTdfFile', rootTDF);
-        Session.set('currentTdfName', rootTDF.fileName);
-      }
+      Session.set('currentTdfFile', rootTDF);
+      Session.set('currentTdfName', rootTDF.fileName);
       setActiveTdfContext({
         currentRootTdfId: Session.get('currentRootTdfId'),
         currentTdfId: Session.get('currentRootTdfId'),
@@ -642,7 +683,7 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
     Session.set('fromInstructions', false);
 
     if (setspec.randomizedDelivery && setspec.randomizedDelivery.length) {
-      clientConsole(2, 'xcond for delivery params is sys assigned: searching');
+      clientConsole(2, 'xcond for delivery settings is sys assigned: searching');
       const prevExperimentXCond = curExperimentState.experimentXCond;
 
       let experimentXCond;
@@ -682,7 +723,7 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
 
     if (mappingNeedsIntervention) {
       if (hasMeaningfulMappingProgress(curExperimentState)) {
-        clientConsole(1, '[Resume Service] Cluster mapping missing/incompatible with current setSpec; blocking resume (Stage 2 policy)', {
+        clientConsole(1, '[Resume Service] Cluster mapping missing/incompatible with current setSpec; blocking resume (resume compatibility policy)', {
           eventType: 'mapping-hard-stop',
           reason: mappingMissing ? 'missing-mapping-with-progress' : 'invalid-mapping-with-progress',
           hardStop: true,
@@ -694,12 +735,12 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
           currentTdfId: Session.get('currentTdfId'),
         });
         return handleResumeFailure(
-          'This lesson version changed and your saved mapping is no longer valid. Please reset progress for this version or continue in the correct published version.',
+          'Saved progress cannot be resumed because this lesson content changed. Restart the lesson to continue.',
           { redirectTo: '/home', variant: 'warning' }
         );
       }
 
-      clientConsole(1, '[Resume Service] No meaningful progress detected; creating initial cluster mapping (Stage 2 create path)');
+      clientConsole(1, '[Resume Service] No meaningful progress detected; creating initial cluster mapping');
       clientConsole(2, 'shuffles.length', shuffles.length);
       clientConsole(2, 'swaps.length', swaps.length);
       mappingRecord = createMappingRecord({
@@ -720,9 +761,9 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
     }
 
     const { signature: currentMappingSignature } = createMappingSignature({
-      tdfFile: Session.get('currentTdfFile'),
+      tdfFile: curTdf.content,
       rootTdfId: Session.get('currentRootTdfId'),
-      conditionTdfId: newExperimentState.conditionTdfId || curExperimentState.conditionTdfId || null,
+      conditionTdfId: getResolvedConditionTdfId(curExperimentState, newExperimentState),
       stimuliSetId: Session.get('currentStimuliSetId'),
       stimuliSet: Session.get('currentStimuliSet'),
       stimCount,
@@ -731,13 +772,12 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
       ? curExperimentState.mappingSignature
       : null;
     const signatureMismatch = !!persistedMappingSignature && persistedMappingSignature !== currentMappingSignature;
-    const formatMigrationMismatch = !!persistedMappingSignature
-      && persistedMappingSignature.startsWith('msig_v1_')
-      && currentMappingSignature.startsWith('msig_v2_');
-    const enforceableSignatureMismatch = signatureMismatch && !formatMigrationMismatch;
+    const enforceableSignatureMismatch = signatureMismatch;
     const strictMismatchEnforcement = isStrictMappingMismatchEnforcementEnabled();
+    let signatureMismatchHasMeaningfulProgress = false;
     if (enforceableSignatureMismatch) {
       const progressed = hasMeaningfulMappingProgress(curExperimentState);
+      signatureMismatchHasMeaningfulProgress = progressed;
       const hardStop = strictMismatchEnforcement && progressed;
       const mismatchPayload = {
         eventType: 'mapping-hard-stop',
@@ -745,12 +785,12 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
         hardStop,
         strictMismatchEnforcement,
         progressed,
-        userMessage: 'This lesson version changed and saved progress cannot continue without reset/version routing.',
+        userMessage: 'Saved progress cannot be resumed because this lesson content changed. Restart the lesson to continue.',
         persistedMappingSignature,
         currentMappingSignature,
         rootTdfId: Session.get('currentRootTdfId'),
         currentTdfId: Session.get('currentTdfId'),
-        conditionTdfId: newExperimentState.conditionTdfId || curExperimentState.conditionTdfId || null,
+        conditionTdfId: getResolvedConditionTdfId(curExperimentState, newExperimentState),
         stimuliSetId: Session.get('currentStimuliSetId'),
       };
       clientConsole(1, '[Resume Service] Mapping signature mismatch detected', mismatchPayload);
@@ -762,7 +802,11 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
       }
     }
 
-    if (!persistedMappingSignature || formatMigrationMismatch || persistedMappingSignature === currentMappingSignature) {
+    if (
+      !persistedMappingSignature ||
+      persistedMappingSignature === currentMappingSignature ||
+      (enforceableSignatureMismatch && !signatureMismatchHasMeaningfulProgress)
+    ) {
       newExperimentState.mappingSignature = currentMappingSignature;
     }
 
@@ -770,7 +814,9 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
       ...(mappingRecord || { mappingTable: clusterMapping, createdAt: Date.now(), mappingSignature: null }),
       mappingTable: clusterMapping,
       mappingSignature:
-        !persistedMappingSignature || formatMigrationMismatch || persistedMappingSignature === currentMappingSignature
+        !persistedMappingSignature ||
+        persistedMappingSignature === currentMappingSignature ||
+        (enforceableSignatureMismatch && !signatureMismatchHasMeaningfulProgress)
           ? currentMappingSignature
           : persistedMappingSignature,
     };
@@ -781,7 +827,6 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
     } else {
       Session.set('currentUnitNumber', 0);
       newExperimentState.currentUnitNumber = 0;
-      newExperimentState.lastUnitStarted = 0;
     }
     clientConsole(2, '[Resume Service] Restored currentUnitNumber:', Session.get('currentUnitNumber'));
 
@@ -798,22 +843,10 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
     }
     resolvedUnitList = getUnitListFromTdf(resolvedTdfFile);
     if (!resolvedUnitList) {
-      const tdfIdToFetch = curTdf?._id || Session.get('currentTdfId') || Session.get('currentRootTdfId');
-      if (tdfIdToFetch) {
-        clientConsole(1, '[Resume Service] Units missing - fetching full TDF from server', {
-          tdfId: tdfIdToFetch,
-          currentRootTdfId: Session.get('currentRootTdfId'),
-          currentTdfId: Session.get('currentTdfId'),
-        });
-        const fetchedTdf = await meteorCallAsync<TdfDocumentLike | null>('getTdfById', tdfIdToFetch);
-        if (fetchedTdf?.content?.tdfs?.tutor?.unit?.length) {
-          curTdf = fetchedTdf;
-          resolvedTdfFile = await applyResumeLearnerTdfConfig(fetchedTdf.content, fetchedTdf._id || tdfIdToFetch);
-          curTdf.content = resolvedTdfFile;
-          rootTDF = resolvedTdfFile;
-          resolvedUnitList = getUnitListFromTdf(resolvedTdfFile);
-        }
-      }
+      clientConsole(1, '[Resume Service] Launch-ready TDF did not contain a runnable unit list', {
+        currentRootTdfId: Session.get('currentRootTdfId'),
+        currentTdfId: Session.get('currentTdfId'),
+      });
     }
     if (!resolvedTdfFile || !resolvedUnitList) {
       logIdInvariantBreachOnce('resume:missing-unit-list', {
@@ -859,6 +892,18 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
     }
     Session.set('currentTdfUnit', curTdfUnit);
     clientConsole(2, 'resume, currentTdfUnit:', curTdfUnit);
+
+    const resumeStatePatch = buildResumeStatePatch(curExperimentState, newExperimentState);
+    if (Object.keys(resumeStatePatch).length > 0) {
+      clientConsole(2, '[Resume Service] Persisting resolved resume state:', Object.keys(resumeStatePatch));
+      await createExperimentState(resumeStatePatch);
+      const persistedState = ExperimentStateStore.get() as ResumeExperimentState | undefined;
+      curExperimentState = {
+        ...curExperimentState,
+        ...resumeStatePatch,
+        ...(persistedState || {}),
+      };
+    }
 
     // =========================================================================
     // HISTORY RECONSTRUCTION (CORE RESUME LOGIC)
@@ -924,31 +969,7 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
     // ====================
     // ====================
 
-    const curTdfUISettings: UiSettingsMap | false = rootTDF.tdfs.tutor.setspec.uiSettings || false;
-    const curUnitUISettions: UiSettingsMap | false = curTdfUnit.uiSettings || false;
-
-    if(curTdfUISettings){
-      clientConsole(2, 'using tdf ui settings')
-    } else if(curUnitUISettions){
-      clientConsole(2, 'using unit ui settings')
-    } else {
-      clientConsole(2, 'using default ui settings')
-    }
-
-    // Mirror normal init behavior: merge setspec + unit UI settings
-    // (unit overrides setspec) instead of choosing only one source.
-    const mergedUiSettings = {
-      ...(curTdfUISettings || {}),
-      ...(curUnitUISettions || {}),
-    };
-    const tdfName = rootTDF?.tdfs?.tutor?.title || Session.get('currentTdfName') || '';
-    UiSettingsStore.set(sanitizeUiSettings(mergedUiSettings, { tdfName }));
-
     if (CardStore.isFeedbackUnset()){
-      // getFeedbackParameters() - simplified
-      if(DeliveryParamsStore.get().allowFeedbackTypeSelect){
-        CardStore.setDisplayFeedback(true);
-      }
       CardStore.setFeedbackUnset(false);
     }
 
@@ -965,31 +986,28 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
     CardStore.setOriginalQuestion(undefined);
     CardStore.setCurrentAnswer(undefined);
     CardStore.setAlternateDisplayIndex(undefined);
-    Session.set('subTdfIndex', undefined);
+    if (typeof curExperimentState.subTdfIndex === 'number' && Number.isInteger(curExperimentState.subTdfIndex)) {
+      Session.set('subTdfIndex', curExperimentState.subTdfIndex);
+    } else {
+      Session.set('subTdfIndex', undefined);
+    }
     CardStore.setCurrentDisplay(undefined);
 
     let moduleCompleted = false;
 
     async function resetEngine(curUnitNum: number): Promise<ResumeEngineLike> {
       const curExperimentData = { curExperimentState };
-      let engine;
       const unitListForEngine = resolvedUnitList || tdfFile?.tdfs?.tutor?.unit;
       const unit = unitListForEngine?.[curUnitNum];
       if (!unit) {
         throw new Error('Resume failed to resolve a valid unit for engine reset.');
       }
 
-      if (unit.assessmentsession) {
-        engine = await createScheduleUnit(curExperimentData);
-      } else if (unit.videosession) {
-        engine = await createVideoUnit(curExperimentData);
-      } else if (unit.learningsession) {
-        engine = await createModelUnit(curExperimentData);
-      } else {
-        engine = await createEmptyUnit(curExperimentData);
-      }
-
-      return engine as ResumeEngineLike;
+      return await createUnitEngineForUnit(unit, curExperimentData, {
+        source: 'resumeService.resetEngine',
+        unit,
+        unitNumber: curUnitNum,
+      }) as ResumeEngineLike;
     }
 
     const unitCount = resolvedUnitList ? resolvedUnitList.length : 0;
@@ -1026,16 +1044,13 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
     ExperimentStateStore.set(curExperimentState);
     const engine = await resetEngine(Session.get('currentUnitNumber'));
     clearPreparedNextRuntimeState(engine, 'resume-entry');
-    const newExpState: ResumeExperimentState = {};
-    newExpState.unitType = engine.unitType;
-    newExpState.TDFId = Session.get('currentTdfId');
 
     if (!Session.get('currentTdfUnit') && curTdfUnit) {
       clientConsole(1, '[Resume Service] currentTdfUnit missing before delivery param load; restoring from resolved unit');
       Session.set('currentTdfUnit', curTdfUnit);
     }
-    DeliveryParamsStore.set(getCurrentDeliveryParams());
-    CardStore.setScoringEnabled(DeliveryParamsStore.get().scoringEnabled);
+    refreshCurrentDeliverySettingsStore();
+    CardStore.setScoringEnabled(Boolean((deliverySettingsStore.get() as Record<string, unknown>).scoringEnabled));
 
     await engine.loadResumeState();
 

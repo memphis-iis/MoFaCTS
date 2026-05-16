@@ -1,41 +1,42 @@
 
 /**
- * @fileoverview Unit tests for UISettings validator (Phase 4)
+ * @fileoverview Unit tests for DeliverySettings validator (Phase 4)
  * Tests sanitization, validation, deprecation warnings, and telemetry
  */
 
 import { expect } from 'chai';
 import {
-  sanitizeUiSettings,
+  sanitizeDeliverySettings,
   getDeprecatedFields,
   getUnknownFields,
   getDeprecationReport,
   resetWarningState,
-} from './uiSettingsValidator';
-import { DEFAULT_UI_SETTINGS } from '../machine/constants';
-const sanitizeUiSettingsAny = (
+} from './deliverySettingsValidator';
+import { DEFAULT_DELIVERY_SETTINGS } from '../views/experiment/svelte/machine/constants';
+const sanitizeDeliverySettingsAny = (
   input?: unknown,
   options?: { silent?: boolean }
-): Record<string, unknown> => sanitizeUiSettings(input as Record<string, unknown>, options);
-const DEFAULTS: Record<string, unknown> = DEFAULT_UI_SETTINGS as Record<string, unknown>;
+): Record<string, unknown> => sanitizeDeliverySettings(input as Record<string, unknown>, options);
+const DEFAULTS: Record<string, unknown> = DEFAULT_DELIVERY_SETTINGS as Record<string, unknown>;
 
 
-describe('UISettings Validator (Phase 4)', function() {
+describe('DeliverySettings Validator (Phase 4)', function() {
   beforeEach(function() {
     // Reset warning state before each test
     resetWarningState();
   });
 
-  describe('sanitizeUiSettingsAny()', function() {
+  describe('sanitizeDeliverySettingsAny()', function() {
     it('should return defaults when given empty object', function() {
-      const result = sanitizeUiSettingsAny({});
+      const result = sanitizeDeliverySettingsAny({});
       expect(result).to.deep.equal(DEFAULTS);
+      expect(result.displayCorrectAnswerInIncorrectFeedback).to.equal(true);
     });
 
     it('should return defaults when given null/undefined', function() {
-      const result1 = sanitizeUiSettingsAny(null);
-      const result2 = sanitizeUiSettingsAny(undefined);
-      const result3 = sanitizeUiSettingsAny();
+      const result1 = sanitizeDeliverySettingsAny(null);
+      const result2 = sanitizeDeliverySettingsAny(undefined);
+      const result3 = sanitizeDeliverySettingsAny();
 
       expect(result1).to.deep.equal(DEFAULTS);
       expect(result2).to.deep.equal(DEFAULTS);
@@ -45,29 +46,38 @@ describe('UISettings Validator (Phase 4)', function() {
     it('should preserve valid registry fields', function() {
       const input = {
         stimuliPosition: 'left',
-        correctMessage: 'Great!',
+        correctLabelText: 'Great!',
         choiceButtonCols: 3,
       };
 
-      const result = sanitizeUiSettingsAny(input);
+      const result = sanitizeDeliverySettingsAny(input);
 
       expect(result.stimuliPosition).to.equal('left');
-      expect(result.correctMessage).to.equal('Great!');
+      expect(result.correctLabelText).to.equal('Great!');
       expect(result.choiceButtonCols).to.equal(3);
     });
 
-    it('should ignore fields that were removed from the registry', function() {
+    it('should ignore removed feedback fields instead of aliasing them', function() {
       const input = {
         stimuliPosition: 'left',
         showStimuliBox: true,
         displayPerformanceDuringTrial: true,
         correctMessage: 'Great!',
+        incorrectMessage: 'Try again',
+        singleLineFeedback: true,
+        onlyShowSimpleFeedback: true,
       };
 
-      const result = sanitizeUiSettingsAny(input, { silent: true });
+      const result = sanitizeDeliverySettingsAny(input, { silent: true });
 
       expect(result.stimuliPosition).to.equal('left');
-      expect(result.correctMessage).to.equal('Great!');
+      expect(result.correctMessage).to.be.undefined;
+      expect(result.incorrectMessage).to.be.undefined;
+      expect(result.singleLineFeedback).to.be.undefined;
+      expect(result.onlyShowSimpleFeedback).to.be.undefined;
+      expect(result.correctLabelText).to.equal(DEFAULTS.correctLabelText);
+      expect(result.incorrectLabelText).to.equal(DEFAULTS.incorrectLabelText);
+      expect(result.feedbackLayout).to.equal(DEFAULTS.feedbackLayout);
       expect(result.showStimuliBox).to.be.undefined;
       expect(result.displayPerformanceDuringTrial).to.be.undefined;
     });
@@ -79,7 +89,7 @@ describe('UISettings Validator (Phase 4)', function() {
         anotherUnknown: 42,
       };
 
-      const result = sanitizeUiSettingsAny(input, { silent: true });
+      const result = sanitizeDeliverySettingsAny(input, { silent: true });
 
       expect(result.stimuliPosition).to.equal('left');
       expect(result.unknownField123).to.be.undefined;
@@ -90,14 +100,14 @@ describe('UISettings Validator (Phase 4)', function() {
       const input = {
         stimuliPosition: 'invalid', // Invalid enum
         choiceButtonCols: 10, // Invalid number (> 4)
-        correctMessage: '', // Invalid string (empty)
+        correctLabelText: '', // Invalid string (empty)
       };
 
-      const result = sanitizeUiSettingsAny(input, { silent: true });
+      const result = sanitizeDeliverySettingsAny(input, { silent: true });
 
       expect(result.stimuliPosition).to.equal(DEFAULTS.stimuliPosition);
       expect(result.choiceButtonCols).to.equal(DEFAULTS.choiceButtonCols);
-      expect(result.correctMessage).to.equal(DEFAULTS.correctMessage);
+      expect(result.correctLabelText).to.equal(DEFAULTS.correctLabelText);
     });
 
     it('should coerce string booleans to actual booleans', function() {
@@ -106,7 +116,7 @@ describe('UISettings Validator (Phase 4)', function() {
         displayTimeoutBar: 'false',
       };
 
-      const result = sanitizeUiSettingsAny(input, { silent: true });
+      const result = sanitizeDeliverySettingsAny(input, { silent: true });
 
       expect(result.displayCorrectFeedback).to.equal(true);
       expect(result.displayTimeoutBar).to.equal(false);
@@ -119,7 +129,7 @@ describe('UISettings Validator (Phase 4)', function() {
         choiceButtonCols: '3',
       };
 
-      const result = sanitizeUiSettingsAny(input, { silent: true });
+      const result = sanitizeDeliverySettingsAny(input, { silent: true });
 
       expect(result.choiceButtonCols).to.equal(3);
       expect(typeof result.choiceButtonCols).to.equal('number');
@@ -131,7 +141,7 @@ describe('UISettings Validator (Phase 4)', function() {
         incorrectColor: '#dc3545', // Valid 6-char hex
       };
 
-      const result1 = sanitizeUiSettingsAny(input1, { silent: true });
+      const result1 = sanitizeDeliverySettingsAny(input1, { silent: true });
       expect(result1.correctColor).to.equal('#28a745');
       expect(result1.incorrectColor).to.equal('#dc3545');
 
@@ -140,59 +150,55 @@ describe('UISettings Validator (Phase 4)', function() {
         incorrectColor: 'not a color',
       };
 
-      const result2 = sanitizeUiSettingsAny(input2, { silent: true });
+      const result2 = sanitizeDeliverySettingsAny(input2, { silent: true });
       expect(result2.correctColor).to.equal('#0f0');
       expect(result2.incorrectColor).to.equal(DEFAULTS.incorrectColor);
     });
 
-    it('should handle the current registry-backed UI settings', function() {
+    it('should handle the current registry-backed delivery settings', function() {
       const input = {
         stimuliPosition: 'left',
         isVideoSession: true,
         videoUrl: 'https://example.com/video.mp4',
         displayCorrectFeedback: true,
         displayIncorrectFeedback: true,
-        correctMessage: 'Excellent!',
-        incorrectMessage: 'Try again',
+        correctLabelText: 'Excellent!',
+        incorrectLabelText: 'Try again',
         correctColor: '#00ff00',
         incorrectColor: '#ff0000',
         displayUserAnswerInFeedback: 'onCorrect',
-        singleLineFeedback: true,
-        onlyShowSimpleFeedback: 'onIncorrect',
+        feedbackLayout: 'inline',
         displayCorrectAnswerInIncorrectFeedback: true,
         displayPerformance: true,
         displayTimeoutBar: true,
+        displayTimeoutCountdown: true,
         choiceButtonCols: 3,
-        displaySubmitButton: false,
         inputPlaceholderText: 'Enter answer',
-        displayConfirmButton: true,
         continueButtonText: 'Next',
         skipStudyButtonText: 'Skip it',
         caseSensitive: true,
         displayQuestionNumber: true,
       };
 
-      const result = sanitizeUiSettingsAny(input, { silent: true });
+      const result = sanitizeDeliverySettingsAny(input, { silent: true });
 
       expect(result.stimuliPosition).to.equal('left');
       expect(result.isVideoSession).to.equal(true);
       expect(result.videoUrl).to.equal('https://example.com/video.mp4');
       expect(result.displayCorrectFeedback).to.equal(true);
       expect(result.displayIncorrectFeedback).to.equal(true);
-      expect(result.correctMessage).to.equal('Excellent!');
-      expect(result.incorrectMessage).to.equal('Try again');
+      expect(result.correctLabelText).to.equal('Excellent!');
+      expect(result.incorrectLabelText).to.equal('Try again');
       expect(result.correctColor).to.equal('#00ff00');
       expect(result.incorrectColor).to.equal('#ff0000');
       expect(result.displayUserAnswerInFeedback).to.equal('onCorrect');
-      expect(result.singleLineFeedback).to.equal(true);
-      expect(result.onlyShowSimpleFeedback).to.equal('onIncorrect');
+      expect(result.feedbackLayout).to.equal('inline');
       expect(result.displayCorrectAnswerInIncorrectFeedback).to.equal(true);
       expect(result.displayPerformance).to.equal(true);
       expect(result.displayTimeoutBar).to.equal(true);
+      expect(result.displayTimeoutCountdown).to.equal(true);
       expect(result.choiceButtonCols).to.equal(3);
-      expect(result.displaySubmitButton).to.equal(false);
       expect(result.inputPlaceholderText).to.equal('Enter answer');
-      expect(result.displayConfirmButton).to.equal(true);
       expect(result.continueButtonText).to.equal('Next');
       expect(result.skipStudyButtonText).to.equal('Skip it');
       expect(result.caseSensitive).to.equal(true);
@@ -214,6 +220,8 @@ describe('UISettings Validator (Phase 4)', function() {
     it('should not classify removed fields as deprecated when no guidance is registered', function() {
       const input = {
         stimuliPosition: 'left',
+        displaySubmitButton: true,
+        displayConfirmButton: true,
         showStimuliBox: true,
         displayPerformanceDuringTrial: true,
         suppressFeedbackDisplay: false,
@@ -314,7 +322,7 @@ describe('UISettings Validator (Phase 4)', function() {
         choiceButtonCols: '0',
       };
 
-      const result = sanitizeUiSettingsAny(input, { silent: true });
+      const result = sanitizeDeliverySettingsAny(input, { silent: true });
 
       expect(result.choiceButtonCols).to.equal(DEFAULTS.choiceButtonCols);
     });
@@ -324,7 +332,7 @@ describe('UISettings Validator (Phase 4)', function() {
         choiceButtonCols: '1', // Valid (1-4)
       };
 
-      const result = sanitizeUiSettingsAny(input, { silent: true });
+      const result = sanitizeDeliverySettingsAny(input, { silent: true });
 
       expect(result.choiceButtonCols).to.equal(1); // Valid
     });
@@ -335,7 +343,7 @@ describe('UISettings Validator (Phase 4)', function() {
         stimuliPosition: 'left', // Correct case
       };
 
-      const result = sanitizeUiSettingsAny(input, { silent: true });
+      const result = sanitizeDeliverySettingsAny(input, { silent: true });
 
       expect(result.stimuliPosition).to.equal('left');
       expect(result.StimuliPosition).to.be.undefined;
@@ -343,25 +351,25 @@ describe('UISettings Validator (Phase 4)', function() {
 
     it('should handle very long string values', function() {
       const input = {
-        correctMessage: 'A'.repeat(200), // > 100 chars (invalid)
-        incorrectMessage: 'B'.repeat(50), // Valid
+        correctLabelText: 'A'.repeat(200), // > 100 chars (invalid)
+        incorrectLabelText: 'B'.repeat(50), // Valid
       };
 
-      const result = sanitizeUiSettingsAny(input, { silent: true });
+      const result = sanitizeDeliverySettingsAny(input, { silent: true });
 
-      expect(result.correctMessage).to.equal(DEFAULTS.correctMessage); // Invalid, use default
-      expect(result.incorrectMessage).to.equal('B'.repeat(50)); // Valid
+      expect(result.correctLabelText).to.equal(DEFAULTS.correctLabelText); // Invalid, use default
+      expect(result.incorrectLabelText).to.equal('B'.repeat(50)); // Valid
     });
 
     it('should handle empty string values', function() {
       const input = {
-        correctMessage: '', // Invalid (must be > 0 length)
+        correctLabelText: '', // Invalid (must be > 0 length)
         videoUrl: '', // Valid (optional)
       };
 
-      const result = sanitizeUiSettingsAny(input, { silent: true });
+      const result = sanitizeDeliverySettingsAny(input, { silent: true });
 
-      expect(result.correctMessage).to.equal(DEFAULTS.correctMessage); // Invalid, use default
+      expect(result.correctLabelText).to.equal(DEFAULTS.correctLabelText); // Invalid, use default
       expect(result.videoUrl).to.equal(''); // Valid
     });
   });

@@ -1,9 +1,9 @@
 import { Meteor } from 'meteor/meteor';
 import { Session } from 'meteor/session';
 import { getEngine } from '../../lib/engineManager';
-import { DeliveryParamsStore } from '../../lib/state/deliveryParamsStore';
+import { deliverySettingsStore } from '../../lib/state/deliverySettingsStore';
 import { CardStore } from './modules/cardStore';
-import { getCurrentDeliveryParams, setStudentPerformance } from '../../lib/currentTestingHelpers';
+import { refreshCurrentDeliverySettingsStore, setStudentPerformance } from '../../lib/currentTestingHelpers';
 import { clientConsole } from '../../lib/userSessionHelpers';
 import { meteorCallAsync } from '../../index';
 import { getExperimentState, createExperimentState } from './svelte/services/experimentState';
@@ -142,8 +142,6 @@ export async function unitIsFinished(reason: string, options: { engine?: unknown
       playerController.addStimToSchedule(curUnitForAdaptive);
     }
     Session.set('currentTdfFile', curTdf);
-    curExperimentState.currentTdfFile = curTdf;
-    await createExperimentState(curExperimentState);
   }
 
   let curTdfUnit = curTdf.tdfs.tutor.unit[newUnitNum];
@@ -153,13 +151,13 @@ export async function unitIsFinished(reason: string, options: { engine?: unknown
   Session.set('currentUnitNumber', newUnitNum);
   Session.set('currentTdfUnit', curTdfUnit);
   Session.set('resetSchedule', true);
-  DeliveryParamsStore.set(getCurrentDeliveryParams());
+  refreshCurrentDeliverySettingsStore();
   Session.set('currentUnitStartTime', Date.now());
   CardStore.setFeedbackUnset(true);
   CardStore.setFeedbackTypeFromHistory(undefined);
   Session.set('curUnitInstructionsSeen', false);
 
-  const resetStudentPerformance = DeliveryParamsStore.get().resetStudentPerformance;
+  const resetStudentPerformance = deliverySettingsStore.get().resetStudentPerformance;
   let leaveTarget;
   if (newUnitNum < curTdf.tdfs.tutor.unit.length) {
     // Just hit a new unit - we need to restart with instructions
@@ -230,9 +228,7 @@ export async function unitIsFinished(reason: string, options: { engine?: unknown
     shufIndex: 0,
     whichStim: 0,
     lastUnitCompleted: curUnitNum,
-    lastUnitStarted: newUnitNum,
     currentUnitNumber: newUnitNum,
-    currentTdfUnit: curTdfUnit,
     schedule: null,
     scheduleUnitNumber: null,
     videoCheckpointAnchorIndex: null,
@@ -281,7 +277,7 @@ export async function revisitUnit(unitNumber: string | number) {
   Session.set('currentUnitNumber', newUnitNum);
   Session.set('currentTdfUnit', curTdfUnit);
   Session.set('resetSchedule', true);
-  DeliveryParamsStore.set(getCurrentDeliveryParams());
+  refreshCurrentDeliverySettingsStore();
   Session.set('currentUnitStartTime', Date.now());
   CardStore.setFeedbackUnset(true);
   CardStore.setFeedbackTypeFromHistory(undefined);
@@ -294,9 +290,7 @@ export async function revisitUnit(unitNumber: string | number) {
     shufIndex: 0,
     whichStim: 0,
     lastUnitCompleted: oldExperimentState.lastUnitCompleted,
-    lastUnitStarted: oldExperimentState.lastUnitStarted,
     currentUnitNumber: newUnitNum,
-    currentTdfUnit: curTdfUnit,
     schedule: null,
     scheduleUnitNumber: null,
     videoCheckpointAnchorIndex: null,

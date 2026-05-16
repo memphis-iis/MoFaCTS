@@ -4,20 +4,20 @@ import {
 } from './fieldApplicability.ts';
 
 type FieldLifecycleStatus = 'supported' | 'deprecated' | 'ignored';
-type DeliveryParamValue = string | number | boolean | undefined;
-type DeliveryParamAuthoringType = 'booleanString' | 'integer' | 'number' | 'string';
-type DeliveryParamNormalizerKind =
+type DeliverySettingValue = string | number | boolean | undefined;
+type DeliverySettingAuthoringType = 'booleanString' | 'integer' | 'number' | 'string';
+type DeliverySettingNormalizerKind =
   | 'boolean'
   | 'integer'
   | 'lowercaseString'
   | 'number'
   | 'studyFirst'
   | 'string';
-type DeliveryParamValidationKind = 'enum' | 'none' | 'nonNegativeInteger' | 'range';
+type DeliverySettingValidationKind = 'enum' | 'none' | 'nonNegativeInteger' | 'range';
 type ValidatorSeverity = 'error' | 'warning';
 
-type DeliveryParamValidationDefinition = {
-  kind: DeliveryParamValidationKind;
+type DeliverySettingValidationDefinition = {
+  kind: DeliverySettingValidationKind;
   severity?: ValidatorSeverity;
   message?: string;
   min?: number;
@@ -25,8 +25,7 @@ type DeliveryParamValidationDefinition = {
   values?: readonly string[];
 };
 
-type DeliveryParamFieldDefinition = {
-  section: 'deliveryparams';
+type DeliverySettingFieldDefinition = {
   surfaces?: {
     schema?: boolean;
     editor?: boolean;
@@ -35,7 +34,7 @@ type DeliveryParamFieldDefinition = {
   };
   appliesToUnitTypes?: readonly TdfUnitType[];
   authoring: {
-    type: DeliveryParamAuthoringType;
+    type: DeliverySettingAuthoringType;
     default?: string | number;
     enum?: readonly string[];
     editor?: {
@@ -43,8 +42,8 @@ type DeliveryParamFieldDefinition = {
     };
   };
   runtime: {
-    default: DeliveryParamValue;
-    normalize: DeliveryParamNormalizerKind;
+    default: DeliverySettingValue;
+    normalize: DeliverySettingNormalizerKind;
   };
   lifecycle: {
     status: FieldLifecycleStatus;
@@ -53,7 +52,7 @@ type DeliveryParamFieldDefinition = {
     brief: string;
     verbose: string;
   };
-  validation: DeliveryParamValidationDefinition;
+  validation: DeliverySettingValidationDefinition;
   aliases?: readonly string[];
   migration?: {
     replacement?: string;
@@ -61,13 +60,13 @@ type DeliveryParamFieldDefinition = {
   };
 };
 
-type DeliveryParamValidatorConfig = {
+type DeliverySettingValidatorConfig = {
   validators: Array<Record<string, unknown>>;
   severity: ValidatorSeverity;
   breaking?: boolean;
 };
 
-type DeliveryParamRegistry = Record<string, DeliveryParamFieldDefinition>;
+type DeliverySettingRegistry = Record<string, DeliverySettingFieldDefinition>;
 
 function toTrimmedString(value: unknown): string {
   if (value === null || value === undefined) {
@@ -123,10 +122,10 @@ function normalizeStudyFirstValue(value: unknown): number {
   return Math.max(0, Math.min(1, parsed));
 }
 
-function normalizeDeliveryParamValueByKind(
-  kind: DeliveryParamNormalizerKind,
+function normalizeDeliverySettingValueByKind(
+  kind: DeliverySettingNormalizerKind,
   value: unknown
-): DeliveryParamValue {
+): DeliverySettingValue {
   switch (kind) {
     case 'boolean':
       return normalizeBooleanValue(value);
@@ -141,13 +140,12 @@ function normalizeDeliveryParamValueByKind(
     case 'string':
       return normalizeStringValue(value);
     default:
-      return value as DeliveryParamValue;
+      return value as DeliverySettingValue;
   }
 }
 
-export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
+export const DELIVERY_SETTINGS_FIELD_REGISTRY: DeliverySettingRegistry = {
   forceCorrection: {
-    section: 'deliveryparams',
     authoring: { type: 'booleanString', default: 'false', editor: { gridColumns: 4 } },
     runtime: { default: false, normalize: 'boolean' },
     lifecycle: { status: 'supported' },
@@ -157,20 +155,7 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     },
     validation: { kind: 'enum', severity: 'error', message: 'Must be "true" or "false"', values: ['true', 'false'] }
   },
-  scoringEnabled: {
-    section: 'deliveryparams',
-    appliesToUnitTypes: ['learning'],
-    authoring: { type: 'booleanString', default: 'true', editor: { gridColumns: 4 } },
-    runtime: { default: true, normalize: 'boolean' },
-    lifecycle: { status: 'supported' },
-    tooltip: {
-      brief: 'Enable score tracking during the unit.',
-      verbose: 'Turns scoring on or off for the current unit. Learning sessions default to scoring unless this is explicitly disabled.'
-    },
-    validation: { kind: 'enum', severity: 'error', message: 'Must be "true" or "false"', values: ['true', 'false'] }
-  },
   forceSpacing: {
-    section: 'deliveryparams',
     appliesToUnitTypes: ['learning'],
     authoring: { type: 'booleanString', default: 'false', editor: { gridColumns: 4 } },
     runtime: { default: false, normalize: 'boolean' },
@@ -182,7 +167,6 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     validation: { kind: 'enum', severity: 'error', message: 'Must be "true" or "false"', values: ['true', 'false'] }
   },
   optimalThreshold: {
-    section: 'deliveryparams',
     appliesToUnitTypes: ['learning'],
     authoring: { type: 'number', default: 0.9, editor: { gridColumns: 4 } },
     runtime: { default: 0.9, normalize: 'number' },
@@ -194,7 +178,6 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     validation: { kind: 'range', severity: 'error', min: 0, max: 1, message: 'Must be between 0 and 1' }
   },
   studyFirst: {
-    section: 'deliveryparams',
     appliesToUnitTypes: ['learning'],
     authoring: { type: 'number', default: 0, editor: { gridColumns: 4 } },
     runtime: { default: 0, normalize: 'studyFirst' },
@@ -206,7 +189,6 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     validation: { kind: 'range', severity: 'error', min: 0, max: 1, message: 'Must be between 0 and 1' }
   },
   purestudy: {
-    section: 'deliveryparams',
     appliesToUnitTypes: ['learning', 'assessment'],
     authoring: { type: 'integer', default: 0, editor: { gridColumns: 4 } },
     runtime: { default: 0, normalize: 'integer' },
@@ -218,7 +200,6 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     validation: { kind: 'nonNegativeInteger', severity: 'error', message: 'Must be a non-negative integer' }
   },
   drill: {
-    section: 'deliveryparams',
     authoring: { type: 'integer', default: 0, editor: { gridColumns: 4 } },
     runtime: { default: 0, normalize: 'integer' },
     lifecycle: { status: 'supported' },
@@ -229,7 +210,6 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     validation: { kind: 'nonNegativeInteger', severity: 'error', message: 'Must be a non-negative integer' }
   },
   practicetimer: {
-    section: 'deliveryparams',
     appliesToUnitTypes: ['learning'],
     authoring: { type: 'string', default: '', enum: ['', 'clock-based'], editor: { gridColumns: 4 } },
     runtime: { default: '', normalize: 'string' },
@@ -246,7 +226,6 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     }
   },
   practiceseconds: {
-    section: 'deliveryparams',
     appliesToUnitTypes: ['learning'],
     authoring: { type: 'integer', default: 0, editor: { gridColumns: 4 } },
     runtime: { default: 0, normalize: 'integer' },
@@ -258,31 +237,28 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     validation: { kind: 'nonNegativeInteger', severity: 'error', message: 'Must be a non-negative integer' }
   },
   displayMinSeconds: {
-    section: 'deliveryparams',
     appliesToUnitTypes: ['learning', 'video'],
     authoring: { type: 'integer', default: 0, editor: { gridColumns: 4 } },
     runtime: { default: 0, normalize: 'integer' },
     lifecycle: { status: 'supported' },
     tooltip: {
       brief: 'Minimum display time in seconds.',
-      verbose: 'Minimum elapsed seconds before the learner can continue from a variable-length display unit.'
+      verbose: 'Minimum elapsed seconds before the learner can continue from a timed learning or video unit. A value of 0 allows immediate continue.'
     },
     validation: { kind: 'nonNegativeInteger', severity: 'error', message: 'Must be a non-negative integer' }
   },
   displayMaxSeconds: {
-    section: 'deliveryparams',
     appliesToUnitTypes: ['learning', 'video'],
     authoring: { type: 'integer', default: 0, editor: { gridColumns: 4 } },
     runtime: { default: 0, normalize: 'integer' },
     lifecycle: { status: 'supported' },
     tooltip: {
       brief: 'Maximum display time in seconds.',
-      verbose: 'Maximum elapsed seconds before a variable-length display unit can advance automatically.'
+      verbose: 'Maximum elapsed seconds before a timed learning or video unit advances automatically. A value of 0 disables automatic advance.'
     },
     validation: { kind: 'nonNegativeInteger', severity: 'error', message: 'Must be a non-negative integer' }
   },
   reviewstudy: {
-    section: 'deliveryparams',
     authoring: { type: 'integer', default: 0, editor: { gridColumns: 4 } },
     runtime: { default: 0.001, normalize: 'integer' },
     lifecycle: { status: 'supported' },
@@ -293,7 +269,6 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     validation: { kind: 'nonNegativeInteger', severity: 'error', message: 'Must be a non-negative integer' }
   },
   correctprompt: {
-    section: 'deliveryparams',
     authoring: { type: 'integer', default: 0, editor: { gridColumns: 4 } },
     runtime: { default: 0, normalize: 'integer' },
     lifecycle: { status: 'supported' },
@@ -304,7 +279,6 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     validation: { kind: 'nonNegativeInteger', severity: 'error', message: 'Must be a non-negative integer' }
   },
   skipstudy: {
-    section: 'deliveryparams',
     appliesToUnitTypes: ['learning', 'assessment'],
     authoring: { type: 'booleanString', default: 'false', editor: { gridColumns: 4 } },
     runtime: { default: false, normalize: 'boolean' },
@@ -316,7 +290,6 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     validation: { kind: 'enum', severity: 'error', message: 'Must be "true" or "false"', values: ['true', 'false'] }
   },
   lockoutminutes: {
-    section: 'deliveryparams',
     appliesToUnitTypes: ['learning', 'assessment', 'video', 'instructions'],
     authoring: { type: 'integer', default: 0, editor: { gridColumns: 4 } },
     runtime: { default: 0, normalize: 'integer' },
@@ -328,7 +301,6 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     validation: { kind: 'nonNegativeInteger', severity: 'error', message: 'Must be a non-negative integer' }
   },
   fontsize: {
-    section: 'deliveryparams',
     authoring: { type: 'integer', default: 24, editor: { gridColumns: 4 } },
     runtime: { default: 24, normalize: 'integer' },
     lifecycle: { status: 'supported' },
@@ -339,7 +311,6 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     validation: { kind: 'nonNegativeInteger', severity: 'error', message: 'Must be a non-negative integer' }
   },
   autostopTranscriptionAttemptLimit: {
-    section: 'deliveryparams',
     authoring: { type: 'integer', default: 3, editor: { gridColumns: 4 } },
     runtime: { default: 3, normalize: 'integer' },
     lifecycle: { status: 'supported' },
@@ -350,7 +321,6 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     validation: { kind: 'nonNegativeInteger', severity: 'error', message: 'Must be a non-negative integer' }
   },
   timeuntilaudio: {
-    section: 'deliveryparams',
     authoring: { type: 'integer', default: 0, editor: { gridColumns: 4 } },
     runtime: { default: 0, normalize: 'integer' },
     lifecycle: { status: 'supported' },
@@ -361,7 +331,6 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     validation: { kind: 'nonNegativeInteger', severity: 'error', message: 'Must be a non-negative integer' }
   },
   prestimulusdisplaytime: {
-    section: 'deliveryparams',
     authoring: { type: 'integer', default: 0, editor: { gridColumns: 4 } },
     runtime: { default: 0, normalize: 'integer' },
     lifecycle: { status: 'supported' },
@@ -371,19 +340,17 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     },
     validation: { kind: 'nonNegativeInteger', severity: 'error', message: 'Must be a non-negative integer' }
   },
-  forcecorrectprompt: {
-    section: 'deliveryparams',
+  forceCorrectPrompt: {
     authoring: { type: 'string', default: '', editor: { gridColumns: 12 } },
-    runtime: { default: '', normalize: 'lowercaseString' },
+    runtime: { default: '', normalize: 'string' },
     lifecycle: { status: 'supported' },
     tooltip: {
-      brief: 'Prompt shown during force-correction.',
-      verbose: 'Custom message shown when the learner must type the correct answer before continuing after feedback.'
+      brief: 'Force-correction prompt',
+      verbose: 'Message shown when a learner must type the correct answer before continuing after incorrect-answer feedback. Authored capitalization is preserved.'
     },
     validation: { kind: 'none' }
   },
   forcecorrecttimeout: {
-    section: 'deliveryparams',
     authoring: { type: 'integer', default: 0, editor: { gridColumns: 4 } },
     runtime: { default: 0, normalize: 'integer' },
     lifecycle: { status: 'supported' },
@@ -394,7 +361,6 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     validation: { kind: 'nonNegativeInteger', severity: 'error', message: 'Must be a non-negative integer' }
   },
   checkOtherAnswers: {
-    section: 'deliveryparams',
     authoring: { type: 'booleanString', default: 'false', editor: { gridColumns: 4 } },
     runtime: { default: false, normalize: 'boolean' },
     lifecycle: { status: 'supported' },
@@ -405,7 +371,6 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     validation: { kind: 'enum', severity: 'error', message: 'Must be "true" or "false"', values: ['true', 'false'] }
   },
   falseAnswerLimit: {
-    section: 'deliveryparams',
     authoring: { type: 'integer', editor: { gridColumns: 4 } },
     runtime: { default: undefined, normalize: 'integer' },
     lifecycle: { status: 'supported' },
@@ -416,7 +381,6 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     validation: { kind: 'nonNegativeInteger', severity: 'error', message: 'Must be a non-negative integer' }
   },
   allowPhoneticMatching: {
-    section: 'deliveryparams',
     authoring: { type: 'booleanString', default: 'false', editor: { gridColumns: 4 } },
     runtime: { default: false, normalize: 'boolean' },
     lifecycle: { status: 'supported' },
@@ -427,7 +391,6 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     validation: { kind: 'enum', severity: 'error', message: 'Must be "true" or "false"', values: ['true', 'false'] }
   },
   branchingEnabled: {
-    section: 'deliveryparams',
     authoring: { type: 'booleanString', default: 'false', editor: { gridColumns: 4 } },
     runtime: { default: false, normalize: 'boolean' },
     lifecycle: { status: 'supported' },
@@ -438,7 +401,6 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     validation: { kind: 'enum', severity: 'error', message: 'Must be "true" or "false"', values: ['true', 'false'] }
   },
   resetStudentPerformance: {
-    section: 'deliveryparams',
     authoring: { type: 'booleanString', default: 'false', editor: { gridColumns: 4 } },
     runtime: { default: false, normalize: 'boolean' },
     lifecycle: { status: 'supported' },
@@ -448,10 +410,9 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     },
     validation: { kind: 'enum', severity: 'error', message: 'Must be "true" or "false"', values: ['true', 'false'] }
   },
-  allowRevistUnit: {
-    section: 'deliveryparams',
+  allowRevisitUnit: {
     appliesToUnitTypes: ['learning', 'assessment', 'video', 'instructions'],
-    aliases: ['allowRevisitUnit'],
+    aliases: ['allowRevistUnit'],
     authoring: { type: 'booleanString', default: 'false', editor: { gridColumns: 4 } },
     runtime: { default: false, normalize: 'boolean' },
     lifecycle: { status: 'supported' },
@@ -461,31 +422,18 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     },
     validation: { kind: 'enum', severity: 'error', message: 'Must be "true" or "false"', values: ['true', 'false'] }
   },
-  allowFeedbackTypeSelect: {
-    section: 'deliveryparams',
-    authoring: { type: 'booleanString', default: 'false', editor: { gridColumns: 4 } },
-    runtime: { default: false, normalize: 'boolean' },
-    lifecycle: { status: 'supported' },
-    tooltip: {
-      brief: 'Enable selectable feedback display mode.',
-      verbose: 'When "true", the resume flow initializes the card state to display feedback when the feedback state has not already been set.'
-    },
-    validation: { kind: 'enum', severity: 'error', message: 'Must be "true" or "false"', values: ['true', 'false'] }
-  },
   feedbackType: {
-    section: 'deliveryparams',
     surfaces: { learnerConfig: false },
     authoring: { type: 'string', default: '', editor: { gridColumns: 4 } },
     runtime: { default: '', normalize: 'string' },
-    lifecycle: { status: 'supported' },
+    lifecycle: { status: 'deprecated' },
     tooltip: {
-      brief: 'Feedback type metadata.',
-      verbose: 'Legacy feedback classification copied to history records for reporting and exports. It does not control feedback display behavior.'
+      brief: 'Feedback type metadata',
+      verbose: 'Deprecated metadata field for feedback classification in history records and exports. It does not control current feedback display, speech, timing, or answer evaluation behavior.'
     },
     validation: { kind: 'none' }
   },
   readyPromptStringDisplayTime: {
-    section: 'deliveryparams',
     authoring: { type: 'integer', default: 0, editor: { gridColumns: 4 } },
     runtime: { default: 0, normalize: 'integer' },
     lifecycle: { status: 'supported' },
@@ -496,7 +444,6 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     validation: { kind: 'nonNegativeInteger', severity: 'error', message: 'Must be a non-negative integer' }
   },
   studyOnlyFields: {
-    section: 'deliveryparams',
     appliesToUnitTypes: ['learning', 'assessment'],
     authoring: { type: 'string', default: '', editor: { gridColumns: 6 } },
     runtime: { default: '', normalize: 'string' },
@@ -508,7 +455,6 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
     validation: { kind: 'none' }
   },
   drillFields: {
-    section: 'deliveryparams',
     authoring: { type: 'string', default: '', editor: { gridColumns: 6 } },
     runtime: { default: '', normalize: 'string' },
     lifecycle: { status: 'supported' },
@@ -520,50 +466,49 @@ export const DELIVERY_PARAM_FIELD_REGISTRY: DeliveryParamRegistry = {
   }
 };
 
-const DELIVERY_PARAM_CANONICAL_KEYS = Object.freeze(Object.keys(DELIVERY_PARAM_FIELD_REGISTRY));
+const DELIVERY_SETTINGS_CANONICAL_KEYS = Object.freeze(Object.keys(DELIVERY_SETTINGS_FIELD_REGISTRY));
 
-export const DELIVERY_PARAM_SUPPORTED_KEYS = Object.freeze(
-  DELIVERY_PARAM_CANONICAL_KEYS.filter(
-    (key) => DELIVERY_PARAM_FIELD_REGISTRY[key]?.lifecycle.status === 'supported'
+export const DELIVERY_SETTINGS_SUPPORTED_KEYS = Object.freeze(
+  DELIVERY_SETTINGS_CANONICAL_KEYS.filter(
+    (key) => DELIVERY_SETTINGS_FIELD_REGISTRY[key]?.lifecycle.status === 'supported'
   )
 );
 
-export const DELIVERY_PARAM_LEARNER_CONFIGURABLE_KEYS = Object.freeze(
-  DELIVERY_PARAM_SUPPORTED_KEYS.filter(
-    (key) => DELIVERY_PARAM_FIELD_REGISTRY[key]?.surfaces?.learnerConfig !== false
+export const DELIVERY_SETTINGS_LEARNER_CONFIGURABLE_KEYS = Object.freeze(
+  DELIVERY_SETTINGS_SUPPORTED_KEYS.filter(
+    (key) => DELIVERY_SETTINGS_FIELD_REGISTRY[key]?.surfaces?.learnerConfig !== false
   )
 );
 
-export const DELIVERY_PARAM_APPLICABILITY = Object.freeze(
+export const DELIVERY_SETTINGS_APPLICABILITY = Object.freeze(
   Object.fromEntries(
-    DELIVERY_PARAM_SUPPORTED_KEYS.map((key) => [
+    DELIVERY_SETTINGS_SUPPORTED_KEYS.map((key) => [
       key,
-      [...(DELIVERY_PARAM_FIELD_REGISTRY[key]?.appliesToUnitTypes || INTERACTIVE_TDF_UNIT_TYPES)],
+      [...(DELIVERY_SETTINGS_FIELD_REGISTRY[key]?.appliesToUnitTypes || INTERACTIVE_TDF_UNIT_TYPES)],
     ])
   ) as Record<string, readonly TdfUnitType[]>
 );
 
-export const DELIVERY_PARAM_ALIAS_TO_CANONICAL = Object.freeze(
+export const DELIVERY_SETTINGS_ALIAS_TO_CANONICAL = Object.freeze(
   Object.fromEntries(
-    DELIVERY_PARAM_CANONICAL_KEYS.flatMap((canonicalKey) =>
-      (DELIVERY_PARAM_FIELD_REGISTRY[canonicalKey]?.aliases || []).map((alias) => [alias, canonicalKey])
+    DELIVERY_SETTINGS_CANONICAL_KEYS.flatMap((canonicalKey) =>
+      (DELIVERY_SETTINGS_FIELD_REGISTRY[canonicalKey]?.aliases || []).map((alias) => [alias, canonicalKey])
     )
   ) as Record<string, string>
 );
 
-export const DELIVERY_PARAM_DEFAULTS = Object.freeze(
+export const DELIVERY_SETTINGS_DEFAULTS = Object.freeze(
   Object.fromEntries(
-    DELIVERY_PARAM_CANONICAL_KEYS.map((key) => {
-      const field = DELIVERY_PARAM_FIELD_REGISTRY[key];
+    DELIVERY_SETTINGS_CANONICAL_KEYS.map((key) => {
+      const field = DELIVERY_SETTINGS_FIELD_REGISTRY[key];
       return [key, field ? field.runtime.default : undefined];
     })
-  ) as Record<string, DeliveryParamValue>
+  ) as Record<string, DeliverySettingValue>
 );
 
-const DELIVERY_PARAM_DIRECT_RUNTIME_KEYS = Object.freeze([
-  'allowFeedbackTypeSelect',
+const DELIVERY_SETTINGS_DIRECT_RUNTIME_KEYS = Object.freeze([
   'allowPhoneticMatching',
-  'allowRevistUnit',
+  'allowRevisitUnit',
   'autostopTranscriptionAttemptLimit',
   'branchingEnabled',
   'checkOtherAnswers',
@@ -575,7 +520,7 @@ const DELIVERY_PARAM_DIRECT_RUNTIME_KEYS = Object.freeze([
   'falseAnswerLimit',
   'forceSpacing',
   'forceCorrection',
-  'forcecorrectprompt',
+  'forceCorrectPrompt',
   'forcecorrecttimeout',
   'fontsize',
   'lockoutminutes',
@@ -587,34 +532,33 @@ const DELIVERY_PARAM_DIRECT_RUNTIME_KEYS = Object.freeze([
   'readyPromptStringDisplayTime',
   'resetStudentPerformance',
   'reviewstudy',
-  'scoringEnabled',
   'skipstudy',
   'studyFirst',
   'studyOnlyFields',
   'timeuntilaudio'
 ]);
 
-export const DELIVERY_PARAM_RUNTIME_INVENTORY = Object.freeze({
-  canonicalKeys: DELIVERY_PARAM_CANONICAL_KEYS,
-  supportedKeys: DELIVERY_PARAM_SUPPORTED_KEYS,
-  learnerConfigurableKeys: DELIVERY_PARAM_LEARNER_CONFIGURABLE_KEYS,
-  aliasToCanonical: DELIVERY_PARAM_ALIAS_TO_CANONICAL,
-  applicability: DELIVERY_PARAM_APPLICABILITY,
-  directRuntimeKeys: DELIVERY_PARAM_DIRECT_RUNTIME_KEYS
+export const DELIVERY_SETTINGS_RUNTIME_INVENTORY = Object.freeze({
+  canonicalKeys: DELIVERY_SETTINGS_CANONICAL_KEYS,
+  supportedKeys: DELIVERY_SETTINGS_SUPPORTED_KEYS,
+  learnerConfigurableKeys: DELIVERY_SETTINGS_LEARNER_CONFIGURABLE_KEYS,
+  aliasToCanonical: DELIVERY_SETTINGS_ALIAS_TO_CANONICAL,
+  applicability: DELIVERY_SETTINGS_APPLICABILITY,
+  directRuntimeKeys: DELIVERY_SETTINGS_DIRECT_RUNTIME_KEYS
 });
 
-export function normalizeDeliveryParamValue(
+export function normalizeDeliverySettingValue(
   key: string,
   value: unknown
-): DeliveryParamValue {
-  const field = DELIVERY_PARAM_FIELD_REGISTRY[key];
+): DeliverySettingValue {
+  const field = DELIVERY_SETTINGS_FIELD_REGISTRY[key];
   if (!field) {
-    return value as DeliveryParamValue;
+    return value as DeliverySettingValue;
   }
-  return normalizeDeliveryParamValueByKind(field.runtime.normalize, value);
+  return normalizeDeliverySettingValueByKind(field.runtime.normalize, value);
 }
 
-export function normalizeDeliveryParamSource(
+export function normalizeDeliverySettingsSource(
   source: Record<string, unknown> | null | undefined
 ): Record<string, unknown> {
   if (!source || typeof source !== 'object') {
@@ -622,7 +566,7 @@ export function normalizeDeliveryParamSource(
   }
 
   const normalizedSource: Record<string, unknown> = { ...source };
-  for (const [alias, canonicalKey] of Object.entries(DELIVERY_PARAM_ALIAS_TO_CANONICAL)) {
+  for (const [alias, canonicalKey] of Object.entries(DELIVERY_SETTINGS_ALIAS_TO_CANONICAL)) {
     if (
       Object.prototype.hasOwnProperty.call(normalizedSource, alias) &&
       !Object.prototype.hasOwnProperty.call(normalizedSource, canonicalKey)
@@ -633,9 +577,10 @@ export function normalizeDeliveryParamSource(
   return normalizedSource;
 }
 
-function schemaForAuthoringType(field: DeliveryParamFieldDefinition): Record<string, unknown> {
+function schemaForAuthoringType(field: DeliverySettingFieldDefinition): Record<string, unknown> {
   const schema: Record<string, unknown> = {
     title: field.tooltip.brief,
+    description: field.tooltip.verbose,
   };
   const gridColumns = field.authoring.editor?.gridColumns;
   if (gridColumns) {
@@ -674,44 +619,44 @@ function schemaForAuthoringType(field: DeliveryParamFieldDefinition): Record<str
   return schema;
 }
 
-export function createDeliveryParamSchema(): Record<string, unknown> {
+export function createDeliverySettingSchema(): Record<string, unknown> {
   const properties = Object.fromEntries(
-    DELIVERY_PARAM_SUPPORTED_KEYS
-      .filter((key) => DELIVERY_PARAM_FIELD_REGISTRY[key]?.surfaces?.schema !== false)
+    DELIVERY_SETTINGS_SUPPORTED_KEYS
+      .filter((key) => DELIVERY_SETTINGS_FIELD_REGISTRY[key]?.surfaces?.schema !== false)
       .map((key) => {
-        const field = DELIVERY_PARAM_FIELD_REGISTRY[key];
+        const field = DELIVERY_SETTINGS_FIELD_REGISTRY[key];
         return [key, field ? schemaForAuthoringType(field) : {}];
       })
   );
 
   return {
     type: 'object',
-    title: 'Delivery Params',
+    title: 'Delivery Settings',
     properties,
     additionalProperties: false
   };
 }
 
-export function createDeliveryParamTooltipMap(): Record<string, { brief: string; verbose: string }> {
+export function createDeliverySettingTooltipMap(): Record<string, { brief: string; verbose: string }> {
   const tooltips: Record<string, { brief: string; verbose: string }> = {};
 
-  for (const key of DELIVERY_PARAM_SUPPORTED_KEYS) {
-    const field = DELIVERY_PARAM_FIELD_REGISTRY[key];
+  for (const key of DELIVERY_SETTINGS_SUPPORTED_KEYS) {
+    const field = DELIVERY_SETTINGS_FIELD_REGISTRY[key];
     if (!field) {
       continue;
     }
     const tooltip = field.tooltip;
-    tooltips[`deliveryparams.${key}`] = tooltip;
-    tooltips[`unit[].deliveryparams.${key}`] = tooltip;
-    tooltips[`setspec.unitTemplate[].deliveryparams.${key}`] = tooltip;
+    tooltips[`deliverySettings.${key}`] = tooltip;
+    tooltips[`unit[].deliverySettings.${key}`] = tooltip;
+    tooltips[`setspec.unitTemplate[].deliverySettings.${key}`] = tooltip;
   }
 
   return tooltips;
 }
 
 function validatorConfigForField(
-  field: DeliveryParamFieldDefinition
-): DeliveryParamValidatorConfig | null {
+  field: DeliverySettingFieldDefinition
+): DeliverySettingValidatorConfig | null {
   const { validation } = field;
   switch (validation.kind) {
     case 'nonNegativeInteger':
@@ -750,11 +695,11 @@ function validatorConfigForField(
   }
 }
 
-export function createDeliveryParamValidatorMap(): Record<string, DeliveryParamValidatorConfig> {
-  const validators: Record<string, DeliveryParamValidatorConfig> = {};
+export function createDeliverySettingValidatorMap(): Record<string, DeliverySettingValidatorConfig> {
+  const validators: Record<string, DeliverySettingValidatorConfig> = {};
 
-  for (const key of DELIVERY_PARAM_SUPPORTED_KEYS) {
-    const field = DELIVERY_PARAM_FIELD_REGISTRY[key];
+  for (const key of DELIVERY_SETTINGS_SUPPORTED_KEYS) {
+    const field = DELIVERY_SETTINGS_FIELD_REGISTRY[key];
     if (!field) {
       continue;
     }
@@ -762,18 +707,18 @@ export function createDeliveryParamValidatorMap(): Record<string, DeliveryParamV
     if (!config) {
       continue;
     }
-    validators[`deliveryparams.${key}`] = config;
-    validators[`unit[].deliveryparams.${key}`] = config;
-    validators[`setspec.unitTemplate[].deliveryparams.${key}`] = config;
+    validators[`deliverySettings.${key}`] = config;
+    validators[`unit[].deliverySettings.${key}`] = config;
+    validators[`setspec.unitTemplate[].deliverySettings.${key}`] = config;
   }
 
   return validators;
 }
 
-export function createDeliveryParamValidationCoverage(): Record<string, DeliveryParamValidationKind> {
+export function createDeliverySettingValidationCoverage(): Record<string, DeliverySettingValidationKind> {
   return Object.fromEntries(
-    DELIVERY_PARAM_SUPPORTED_KEYS.map((key) => {
-      const field = DELIVERY_PARAM_FIELD_REGISTRY[key];
+    DELIVERY_SETTINGS_SUPPORTED_KEYS.map((key) => {
+      const field = DELIVERY_SETTINGS_FIELD_REGISTRY[key];
       return [key, field ? field.validation.kind : 'none'];
     })
   );

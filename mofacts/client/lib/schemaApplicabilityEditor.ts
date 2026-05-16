@@ -94,8 +94,38 @@ function checkboxPropertyKey(editor: JsonEditorLike, objectPath: string, group: 
   return null;
 }
 
+function getPropertyGroupLabel(group: Element): string {
+  const label = group.querySelector('label')?.textContent?.trim();
+  if (label) {
+    return label;
+  }
+  const input = group.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+  return input?.value || input?.getAttribute('name') || group.textContent?.trim() || '';
+}
+
+export function sortPropertiesModal(modal: Element): void {
+  const formGroups = Array.from(modal.querySelectorAll(':scope > .form-group'));
+  if (formGroups.length < 2) {
+    return;
+  }
+
+  formGroups.sort((left, right) => {
+    const leftChecked = (left.querySelector('input[type="checkbox"]') as HTMLInputElement | null)?.checked ? 1 : 0;
+    const rightChecked = (right.querySelector('input[type="checkbox"]') as HTMLInputElement | null)?.checked ? 1 : 0;
+    if (leftChecked !== rightChecked) {
+      return leftChecked - rightChecked;
+    }
+    return getPropertyGroupLabel(left).localeCompare(getPropertyGroupLabel(right), undefined, {
+      numeric: true,
+      sensitivity: 'base',
+    });
+  });
+
+  formGroups.forEach((group) => modal.appendChild(group));
+}
+
 function filterPropertiesModal(editor: JsonEditorLike, modal: Element, objectPath: string | null): void {
-  if (!objectPath || !/\.((uiSettings)|(deliveryparams))$/.test(objectPath)) {
+  if (!objectPath || !/\.deliverySettings$/.test(objectPath)) {
     return;
   }
   const unitPath = getUnitPathFromConfigPath(objectPath);
@@ -137,6 +167,7 @@ export function installSchemaApplicabilityControls(
       : Array.from(root.querySelectorAll?.('.je-modal') || []);
     for (const modal of modals) {
       filterPropertiesModal(editor, modal, activePropertiesObjectPath);
+      sortPropertiesModal(modal);
     }
   };
 

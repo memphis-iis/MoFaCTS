@@ -13,6 +13,10 @@
 
   const dispatch = createEventDispatcher();
 
+  function handleFeedbackContent(event) {
+    dispatch('feedbackcontent', event.detail);
+  }
+
   /** @type {'top' | 'left'} Layout mode (top = over-under, left = split) */
   export let layoutMode = 'top';
 
@@ -49,9 +53,6 @@
   /** @type {string} User answer for feedback display */
   export let feedbackUserAnswer = '';
 
-  /** @type {boolean} Show submit button */
-  export let showSubmitButton = true;
-
   /** @type {string} Input placeholder */
   export let inputPlaceholder = 'Type your answer...';
 
@@ -63,15 +64,6 @@
 
   /** @type {number} Button columns */
   export let buttonColumns = 2;
-
-  /** @type {boolean} Whether confirm button mode is enabled */
-  export let displayConfirmButton = false;
-
-  /** @type {boolean} Whether confirm button should be enabled */
-  export let confirmEnabled = false;
-
-  /** @type {number|null} Selected choice index */
-  export let selectedChoiceIndex = null;
 
   /** @type {'idle' | 'ready' | 'recording' | 'processing' | 'error'} SR status */
   export let srStatus = 'idle';
@@ -106,11 +98,11 @@
   /** @type {string} Correct answer image URL */
   export let correctAnswerImageSrc = '';
 
-  /** @type {string} Correct message */
-  export let correctMessage = 'Correct!';
+  /** @type {string} Correct outcome label */
+  export let correctLabelText = 'Correct.';
 
-  /** @type {string} Incorrect message */
-  export let incorrectMessage = 'Incorrect';
+  /** @type {string} Incorrect outcome label */
+  export let incorrectLabelText = 'Incorrect.';
 
   /** @type {string} Feedback message from answer evaluation */
   export let feedbackMessage = '';
@@ -133,14 +125,11 @@
   /** @type {'onCorrect' | 'onIncorrect' | boolean} Display user answer rules */
   export let displayUserAnswerInFeedback = 'onIncorrect';
 
-  /** @type {boolean} Render feedback in a single line */
-  export let singleLineFeedback = false;
-
-  /** @type {'onCorrect' | 'onIncorrect' | boolean} Show only "Correct." / "Incorrect." */
-  export let onlyShowSimpleFeedback = false;
+  /** @type {'inline' | 'stacked'} Feedback segment layout */
+  export let feedbackLayout = 'stacked';
 
   /** @type {boolean} Show the correct answer on incorrect feedback */
-  export let displayCorrectAnswerInIncorrectFeedback = false;
+  export let displayCorrectAnswerInIncorrectFeedback = true;
 
   /** @type {boolean} Whether audio replay is enabled */
   export let replayEnabled = true;
@@ -334,17 +323,17 @@
           userAnswer={feedbackUserAnswer}
           {correctAnswer}
           {correctAnswerImageSrc}
-          {correctMessage}
-          {incorrectMessage}
+          {correctLabelText}
+          {incorrectLabelText}
           {feedbackMessage}
           {correctColor}
           {incorrectColor}
           {displayCorrectFeedback}
           {displayIncorrectFeedback}
           {displayUserAnswerInFeedback}
-          {singleLineFeedback}
-          {onlyShowSimpleFeedback}
+          {feedbackLayout}
           {displayCorrectAnswerInIncorrectFeedback}
+          on:feedbackcontent={handleFeedbackContent}
           on:blockingassetstate
         />
       {:else if mountedResponseVisible}
@@ -354,14 +343,10 @@
           {isForceCorrecting}
           {forceCorrectPrompt}
           {userAnswer}
-          {showSubmitButton}
           {inputPlaceholder}
           {showButtons}
           {buttonList}
           {buttonColumns}
-          {displayConfirmButton}
-          {confirmEnabled}
-          {selectedChoiceIndex}
           {srStatus}
           {srAttempt}
           {srMaxAttempts}
@@ -372,7 +357,6 @@
           on:activity
           on:firstKeypress
           on:choice
-          on:confirm
         />
       {/if}
       </div>

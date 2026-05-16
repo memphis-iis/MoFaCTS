@@ -8,7 +8,7 @@ import { FlowRouter } from 'meteor/ostrio:flow-router-extra';
 import { meteorCallAsync, clientConsole } from '../..';
 import { sessionCleanUp } from '../../lib/sessionUtils';
 import { displayify } from '../../../common/globalHelpers';
-import { selectTdf } from '../home/home';
+import { selectTdf } from '../../lib/lessonLaunchRunner';
 import './signIn.html';
 import '../footer.html';
 import { setExperimentParticipantContext } from '../../lib/idContext';

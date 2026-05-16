@@ -19,8 +19,7 @@
   import { currentUserHasRole } from '../../../../lib/roleUtils';
   import { evaluateSrAvailability } from '../../../../lib/audioAvailability';
   import { stopStimDisplayTypeMapVersionSync } from '../../../../lib/stimDisplayTypeMapSync';
-  import { DeliveryParamsStore } from '../../../../lib/state/deliveryParamsStore';
-  import { UiSettingsStore } from '../../../../lib/state/uiSettingsStore';
+  import { deliverySettingsStore } from '../../../../lib/state/deliverySettingsStore';
   import { clientConsole } from '../../../../lib/clientLogger';
   import {
     finishLaunchLoading,
@@ -30,7 +29,7 @@
   } from '../../../../lib/launchLoading';
   import { Answers } from '../../answerAssess';
   import { cardMachine } from '../machine/cardMachine';
-  import { DEFAULT_UI_SETTINGS, EVENTS } from '../machine/constants';
+  import { DEFAULT_DELIVERY_SETTINGS, EVENTS } from '../machine/constants';
   import { initializeSvelteCard } from '../services/svelteInit';
   import { createExperimentState } from '../services/experimentState';
   import { waitForBrowserPaint } from '../utils/paintTiming';
@@ -207,7 +206,8 @@
       showSkipStudyButton: slotState.showSkipStudyButton,
     });
     const buttonList = Array.isArray(trial.buttonList) ? trial.buttonList : [];
-    const correctAnswer = String(trial.currentAnswer || '');
+    const correctAnswer = Answers.getDisplayAnswerText(String(trial.originalAnswer || trial.currentAnswer || '')) ||
+      String(trial.currentAnswer || '');
     const feedbackIsCorrect = Boolean(slotState.isCorrect);
     const correctAnswerImageSrc = getCorrectAnswerImageSrc(buttonList, correctAnswer);
 
@@ -229,14 +229,10 @@
         responseVisible: subset.responseVisible,
         userAnswer: slotState.userAnswer || '',
         feedbackUserAnswer: slotState.feedbackUserAnswer || '',
-        showSubmitButton: uiSettings.displaySubmitButton,
-        inputPlaceholder: uiSettings.inputPlaceholderText,
+        inputPlaceholder: deliverySettings.inputPlaceholderText,
         showButtons: true,
         buttonList,
-        buttonColumns: uiSettings.choiceButtonCols,
-        displayConfirmButton: uiSettings.displayConfirmButton,
-        confirmEnabled: Boolean(slotState.confirmEnabled),
-        selectedChoiceIndex: slotState.selectedChoiceIndex ?? null,
+        buttonColumns: deliverySettings.choiceButtonCols,
         srStatus: slotState.srStatus || 'idle',
         srAttempt: Number.isFinite(slotState.srAttempt) ? slotState.srAttempt : 0,
         srMaxAttempts: Number.isFinite(slotState.srMaxAttempts) ? slotState.srMaxAttempts : 0,
@@ -247,18 +243,17 @@
         isTimeout: Boolean(slotState.isTimeout),
         correctAnswer,
         correctAnswerImageSrc,
-        correctMessage: uiSettings.correctMessage,
-        incorrectMessage: uiSettings.incorrectMessage,
+        correctLabelText: deliverySettings.correctLabelText,
+        incorrectLabelText: deliverySettings.incorrectLabelText,
         feedbackMessage: slotState.feedbackMessage || '',
-        forceCorrectPrompt: deliveryParams.forcecorrectprompt || 'Please type the correct answer to continue',
-        correctColor: slotState.correctColor || uiSettings.correctColor,
-        incorrectColor: uiSettings.incorrectColor,
+        forceCorrectPrompt: deliverySettings.forceCorrectPrompt || 'Please type the correct answer to continue',
+        correctColor: slotState.correctColor || deliverySettings.correctColor,
+        incorrectColor: deliverySettings.incorrectColor,
         displayCorrectFeedback: Boolean(slotState.displayCorrectFeedback),
         displayIncorrectFeedback: Boolean(slotState.displayIncorrectFeedback),
-        displayUserAnswerInFeedback: uiSettings.displayUserAnswerInFeedback,
-        singleLineFeedback: uiSettings.singleLineFeedback,
-        onlyShowSimpleFeedback: slotState.onlyShowSimpleFeedback,
-        displayCorrectAnswerInIncorrectFeedback: uiSettings.displayCorrectAnswerInIncorrectFeedback,
+        displayUserAnswerInFeedback: deliverySettings.displayUserAnswerInFeedback,
+        feedbackLayout: deliverySettings.feedbackLayout,
+        displayCorrectAnswerInIncorrectFeedback: deliverySettings.displayCorrectAnswerInIncorrectFeedback,
         replayEnabled: subset.replayEnabled,
       },
     };
@@ -331,10 +326,9 @@
   $: context = state.context;
   $: currentState = state.value;
   $: preparedTrial = context.preparedTrial || null;
-  $: uiSettings = { ...DEFAULT_UI_SETTINGS, ...(context.uiSettings || {}) };
-  $: deliveryParams = context.deliveryParams || {};
+  $: deliverySettings = { ...DEFAULT_DELIVERY_SETTINGS, ...(context.deliverySettings || {}) };
   $: audioState = context.audio || { waitingForTranscription: false, srAttempts: 0, maxSrAttempts: 0 };
-  $: isVideoSession = uiSettings.isVideoSession === true ||
+  $: isVideoSession = deliverySettings.isVideoSession === true ||
     Session.get('isVideoSession') === true ||
     !!Session.get('currentTdfUnit')?.videosession;
   $: currentTdfUnit = Session.get('currentTdfUnit') || {};
@@ -350,12 +344,15 @@
     videoInstructionsShownAt = Date.now();
     Session.set('instructionClientStart', videoInstructionsShownAt);
   }
-  $: layoutMode = uiSettings.stimuliPosition;
-  $: fontSizePx = parsePositiveNumber(deliveryParams?.fontsize) ?? 24;
+  $: layoutMode = deliverySettings.stimuliPosition;
+  $: fontSizePx = parsePositiveNumber(deliverySettings?.fontsize) ?? 24;
   $: cardFontSizeStyle = `--card-font-size: ${fontSizePx}px;`;
 
   // Timeout bar visibility - controlled by displayTimeoutBar boolean
-  $: showTimeoutBar = uiSettings.displayTimeoutBar;
+  $: showTimeoutBar = deliverySettings.displayTimeoutBar;
+  $: showTimeoutCountdown = deliverySettings.displayTimeoutCountdown;
+  $: showPerformanceStats = deliverySettings.displayPerformance;
+  $: showPerformanceArea = showPerformanceStats || showTimeoutBar || showTimeoutCountdown;
 
   // Audio & SR settings
   let user = null;
@@ -414,6 +411,13 @@
   let frozenIsForceCorrecting = false;
   let frozenResponseVisible = false;
   let frozenTrialSubsetKind = 'none';
+  let frozenShowSkipStudyButton = false;
+  let frozenFeedbackIsCorrect = false;
+  let frozenFeedbackCorrectColor = 'var(--success-color)';
+  let frozenFeedbackText = '';
+  let frozenFeedbackCorrectAnswer = '';
+  let frozenDisplayCorrectFeedback = true;
+  let frozenDisplayIncorrectFeedback = true;
   let frozenPerformanceSlotProps = null;
   let trialSubsetVisible = false;
   let stagedTrialSubsetKey = 'none';
@@ -473,19 +477,20 @@
   $: baseFeedbackVisible = baseTrialSubsetKind === 'feedback' || baseTrialSubsetKind === 'study';
   $: baseResponseVisible = baseTrialSubsetKind === 'question' || baseTrialSubsetKind === 'forceCorrect';
   let studyInteractionText = '';
-  $: showSkipStudyButton = isStudyState && toBoolean(deliveryParams.skipstudy);
-  $: feedbackIsCorrect = isStudyState ? true : context.isCorrect;
-  $: feedbackCorrectColor = isStudyState ? 'var(--text-color)' : uiSettings.correctColor;
+  $: baseShowSkipStudyButton = isStudyState && toBoolean(deliverySettings.skipstudy);
+  $: baseFeedbackIsCorrect = isStudyState ? true : context.isCorrect;
+  $: baseFeedbackCorrectColor = isStudyState ? 'var(--text-color)' : deliverySettings.correctColor;
   $: studyAnswerText = isStudyState
     ? Answers.getDisplayAnswerText(String(context.originalAnswer || context.currentAnswer || '')) || String(context.currentAnswer || '')
     : '';
-  $: feedbackText = isStudyState ? (studyInteractionText || studyAnswerText) : context.feedbackMessage;
+  $: baseFeedbackText = isStudyState ? (studyInteractionText || studyAnswerText) : context.feedbackMessage;
+  $: baseFeedbackCorrectAnswer = Answers.getDisplayAnswerText(String(context.originalAnswer || context.currentAnswer || '')) ||
+    String(context.currentAnswer || '');
   $: if (!isStudyState && studyInteractionText) {
     studyInteractionText = '';
   }
-  $: onlyShowSimpleFeedback = isStudyState ? false : uiSettings.onlyShowSimpleFeedback;
-  $: displayCorrectFeedback = isStudyState ? true : uiSettings.displayCorrectFeedback;
-  $: displayIncorrectFeedback = isStudyState ? false : uiSettings.displayIncorrectFeedback;
+  $: baseDisplayCorrectFeedback = isStudyState ? true : deliverySettings.displayCorrectFeedback;
+  $: baseDisplayIncorrectFeedback = isStudyState ? false : deliverySettings.displayIncorrectFeedback;
   $: inputEnabled = state.matches('presenting.awaiting') || state.matches('feedback.forceCorrecting');
   $: isOutgoingFreezeState = state.matches('transition.logging') ||
     state.matches('transition.updatingState') ||
@@ -510,6 +515,13 @@
     frozenIsForceCorrecting = baseIsForceCorrecting;
     frozenResponseVisible = baseResponseVisible;
     frozenDisplay = cloneDisplay(context.currentDisplay);
+    frozenShowSkipStudyButton = baseShowSkipStudyButton;
+    frozenFeedbackIsCorrect = baseFeedbackIsCorrect;
+    frozenFeedbackCorrectColor = baseFeedbackCorrectColor;
+    frozenFeedbackText = baseFeedbackText;
+    frozenFeedbackCorrectAnswer = baseFeedbackCorrectAnswer;
+    frozenDisplayCorrectFeedback = baseDisplayCorrectFeedback;
+    frozenDisplayIncorrectFeedback = baseDisplayIncorrectFeedback;
   }
 
   $: trialSubsetKind = isOutgoingFreezeState ? frozenTrialSubsetKind : baseTrialSubsetKind;
@@ -517,6 +529,13 @@
   $: feedbackVisible = isOutgoingFreezeState ? frozenFeedbackVisible : baseFeedbackVisible;
   $: isForceCorrecting = isOutgoingFreezeState ? frozenIsForceCorrecting : baseIsForceCorrecting;
   $: responseVisible = isOutgoingFreezeState ? frozenResponseVisible : baseResponseVisible;
+  $: showSkipStudyButton = isOutgoingFreezeState ? frozenShowSkipStudyButton : baseShowSkipStudyButton;
+  $: feedbackIsCorrect = isOutgoingFreezeState ? frozenFeedbackIsCorrect : baseFeedbackIsCorrect;
+  $: feedbackCorrectColor = isOutgoingFreezeState ? frozenFeedbackCorrectColor : baseFeedbackCorrectColor;
+  $: feedbackText = isOutgoingFreezeState ? frozenFeedbackText : baseFeedbackText;
+  $: feedbackCorrectAnswer = isOutgoingFreezeState ? frozenFeedbackCorrectAnswer : baseFeedbackCorrectAnswer;
+  $: displayCorrectFeedback = isOutgoingFreezeState ? frozenDisplayCorrectFeedback : baseDisplayCorrectFeedback;
+  $: displayIncorrectFeedback = isOutgoingFreezeState ? frozenDisplayIncorrectFeedback : baseDisplayIncorrectFeedback;
   $: trialSubset = buildTrialSubset({
     kind: trialSubsetKind,
     display: isOutgoingFreezeState ? frozenDisplay : context.currentDisplay,
@@ -524,7 +543,7 @@
     feedbackVisible,
     responseVisible,
     isForceCorrecting,
-    showQuestionNumber: uiSettings.displayQuestionNumber,
+    showQuestionNumber: deliverySettings.displayQuestionNumber,
     questionNumber: performanceData?.currentTrial || 0,
     replayEnabled: !feedbackVisible,
     showSkipStudyButton,
@@ -575,14 +594,10 @@
     responseVisible: trialSubset.responseVisible,
     userAnswer: textAnswer,
     feedbackUserAnswer: context.userAnswer,
-    showSubmitButton: uiSettings.displaySubmitButton,
-    inputPlaceholder: uiSettings.inputPlaceholderText,
+    inputPlaceholder: deliverySettings.inputPlaceholderText,
     showButtons: true,
     buttonList: context.buttonList,
-    buttonColumns: uiSettings.choiceButtonCols,
-    displayConfirmButton: uiSettings.displayConfirmButton,
-    confirmEnabled,
-    selectedChoiceIndex,
+    buttonColumns: deliverySettings.choiceButtonCols,
     srStatus,
     srAttempt: audioState.srAttempts,
     srMaxAttempts: audioState.maxSrAttempts,
@@ -591,20 +606,19 @@
     feedbackVisible: trialSubset.feedbackVisible,
     isCorrect: feedbackIsCorrect,
     isTimeout: context.isTimeout,
-    correctAnswer: context.currentAnswer,
+    correctAnswer: feedbackCorrectAnswer,
     correctAnswerImageSrc,
-    correctMessage: uiSettings.correctMessage,
-    incorrectMessage: uiSettings.incorrectMessage,
+    correctLabelText: deliverySettings.correctLabelText,
+    incorrectLabelText: deliverySettings.incorrectLabelText,
     feedbackMessage: feedbackText,
-    forceCorrectPrompt: deliveryParams.forcecorrectprompt || 'Please type the correct answer to continue',
+    forceCorrectPrompt: deliverySettings.forceCorrectPrompt || 'Please type the correct answer to continue',
     correctColor: feedbackCorrectColor,
-    incorrectColor: uiSettings.incorrectColor,
+    incorrectColor: deliverySettings.incorrectColor,
     displayCorrectFeedback,
     displayIncorrectFeedback,
-    displayUserAnswerInFeedback: uiSettings.displayUserAnswerInFeedback,
-    singleLineFeedback: uiSettings.singleLineFeedback,
-    onlyShowSimpleFeedback,
-    displayCorrectAnswerInIncorrectFeedback: uiSettings.displayCorrectAnswerInIncorrectFeedback,
+    displayUserAnswerInFeedback: deliverySettings.displayUserAnswerInFeedback,
+    feedbackLayout: deliverySettings.feedbackLayout,
+    displayCorrectAnswerInIncorrectFeedback: deliverySettings.displayCorrectAnswerInIncorrectFeedback,
     replayEnabled: trialSubset.replayEnabled,
   };
   $: videoEnded = state.matches('videoEnded');
@@ -715,10 +729,10 @@
         feedbackVisible: incomingPreparedSubsetKind === 'study',
         responseVisible: incomingPreparedSubsetKind === 'question',
         isForceCorrecting: false,
-        showQuestionNumber: uiSettings.displayQuestionNumber,
+        showQuestionNumber: deliverySettings.displayQuestionNumber,
         questionNumber: (performanceData?.currentTrial || 0) + 1,
         replayEnabled: incomingPreparedSubsetKind === 'question',
-        showSkipStudyButton: incomingPreparedSubsetKind === 'study' && toBoolean(deliveryParams.skipstudy),
+        showSkipStudyButton: incomingPreparedSubsetKind === 'study' && toBoolean(deliverySettings.skipstudy),
         inputEnabled: false,
         userAnswer: '',
         feedbackUserAnswer: '',
@@ -728,10 +742,9 @@
         isCorrect: incomingPreparedSubsetKind === 'study',
         isTimeout: false,
         feedbackMessage: '',
-        correctColor: incomingPreparedSubsetKind === 'study' ? 'var(--text-color)' : uiSettings.correctColor,
-        displayCorrectFeedback: incomingPreparedSubsetKind === 'study' ? true : uiSettings.displayCorrectFeedback,
-        displayIncorrectFeedback: incomingPreparedSubsetKind === 'study' ? false : uiSettings.displayIncorrectFeedback,
-        onlyShowSimpleFeedback: incomingPreparedSubsetKind === 'study' ? false : uiSettings.onlyShowSimpleFeedback,
+        correctColor: incomingPreparedSubsetKind === 'study' ? 'var(--text-color)' : deliverySettings.correctColor,
+        displayCorrectFeedback: incomingPreparedSubsetKind === 'study' ? true : deliverySettings.displayCorrectFeedback,
+        displayIncorrectFeedback: incomingPreparedSubsetKind === 'study' ? false : deliverySettings.displayIncorrectFeedback,
       })
     : null;
   $: incomingExpectedStimulusBlockerSrc = incomingSlot?.expectedStimulusBlockerSrc || '';
@@ -786,10 +799,42 @@
     send({ type: 'INCOMING_READY' });
   }
 
-  $: displayMinSeconds = getDisplayTimeoutValue(deliveryParams.displayMinSeconds ?? 0);
-  $: displayMaxSeconds = getDisplayTimeoutValue(deliveryParams.displayMaxSeconds ?? 0);
+  $: displayMinSeconds = getDisplayTimeoutValue(deliverySettings.displayMinSeconds ?? 0);
+  $: displayMaxSeconds = getDisplayTimeoutValue(deliverySettings.displayMaxSeconds ?? 0);
   $: hasDisplayTimeout = displayMinSeconds > 0 || displayMaxSeconds > 0;
-  $: footerMessage = buildDisplayTimeoutMessage(displayMinSeconds, displayMaxSeconds);
+  $: displayTimeoutStartMs = getDisplayTimeoutStartMs();
+  $: displayTimeoutElapsedSeconds = hasDisplayTimeout
+    ? Math.max(0, Math.floor((displayTimeoutNow - displayTimeoutStartMs) / 1000))
+    : 0;
+  $: displayTimeoutCanContinue =
+    !hasDisplayTimeout ||
+    displayMinSeconds <= 0 ||
+    displayTimeoutElapsedSeconds >= displayMinSeconds;
+  $: footerMessage = buildDisplayTimeoutMessage(
+    displayMinSeconds,
+    displayMaxSeconds,
+    displayTimeoutElapsedSeconds
+  );
+  $: displayTimeoutScopeKey = [
+    Session.get('currentTdfId') || '',
+    Session.get('currentUnitNumber') ?? '',
+    displayTimeoutStartMs,
+  ].join(':');
+  $: if (displayTimeoutScopeKey !== lastDisplayTimeoutScopeKey) {
+    lastDisplayTimeoutScopeKey = displayTimeoutScopeKey;
+    displayTimeoutAutoAdvanced = false;
+  }
+  $: if (
+    !testMode &&
+    hasDisplayTimeout &&
+    displayMaxSeconds > 0 &&
+    displayTimeoutElapsedSeconds >= displayMaxSeconds &&
+    !displayTimeoutAutoAdvanced &&
+    !continuingToNextUnit
+  ) {
+    displayTimeoutAutoAdvanced = true;
+    void forceAdvanceToNextUnit('Display Max Seconds Reached');
+  }
 
   $: correctAnswerImageSrc = getCorrectAnswerImageSrc(context.buttonList, context.currentAnswer);
 
@@ -800,23 +845,24 @@
   let timeoutProgress = 0;
   let remainingTime = 0;
   let timeoutInterval;
+  let displayTimeoutInterval;
+  let displayTimeoutNow = Date.now();
+  let displayTimeoutMountMs = Date.now();
+  let displayTimeoutStartMs = displayTimeoutMountMs;
+  let displayTimeoutElapsedSeconds = 0;
+  let displayTimeoutAutoAdvanced = false;
+  let displayTimeoutScopeKey = '';
+  let lastDisplayTimeoutScopeKey = '';
+  let continuingToNextUnit = false;
   let timeoutStart = null;
   let timeoutDuration = 0;
   let lastTimeoutResetCounter = 0;
-  let selectedChoice = null;
-  let selectedChoiceIndex = null;
   let textAnswer = '';
   let lastInputTrialStart = null;
 
   $: {
     if (state.matches('presenting.loading') || state.matches('transition.clearing')) {
-      selectedChoice = null;
-      selectedChoiceIndex = null;
       textAnswer = '';
-    }
-    if (!context.buttonTrial) {
-      selectedChoice = null;
-      selectedChoiceIndex = null;
     }
   }
 
@@ -824,19 +870,17 @@
     const currentTrialStart = context.timestamps?.trialStart ?? null;
     if (currentTrialStart !== lastInputTrialStart) {
       lastInputTrialStart = currentTrialStart;
-      selectedChoice = null;
-      selectedChoiceIndex = null;
       textAnswer = '';
       context.userAnswer = '';
     }
   }
 
-  $: confirmEnabled = uiSettings.displayConfirmButton === true &&
-    (context.buttonTrial ? !!selectedChoice : textAnswer.trim().length > 0);
   let timeoutModeState = 'none';
 
   $: livePerformanceSlotProps = {
+    showPerformanceStats,
     showTimeoutBar,
+    showTimeoutCountdown,
     totalTimeDisplay: performanceData.totalTimeDisplay,
     percentCorrect: performanceData.percentCorrect,
     cardsSeen: performanceData.cardsSeen,
@@ -867,15 +911,21 @@
     return Number.isFinite(parsed) ? parsed : 0;
   }
 
-  function buildDisplayTimeoutMessage(minSecs, maxSecs) {
-    if (minSecs > 0 && maxSecs > 0) {
-      return `You can continue in ${minSecs}s or wait up to ${maxSecs}s`;
-    }
-    if (minSecs > 0) {
-      return `You can continue in ${minSecs}s`;
+  function getDisplayTimeoutStartMs() {
+    const unitStart = Number(Session.get('currentUnitStartTime'));
+    return Number.isFinite(unitStart) && unitStart > 0 ? unitStart : displayTimeoutMountMs;
+  }
+
+  function buildDisplayTimeoutMessage(minSecs, maxSecs, elapsedSecs) {
+    if (minSecs > 0 && elapsedSecs < minSecs) {
+      return `You can continue in ${Math.max(0, minSecs - elapsedSecs)}s`;
     }
     if (maxSecs > 0) {
-      return `Time remaining: ${maxSecs}s`;
+      const remaining = Math.max(0, maxSecs - elapsedSecs);
+      return remaining > 0 ? `Time remaining: ${remaining}s` : 'Continuing...';
+    }
+    if (minSecs > 0) {
+      return 'You can continue whenever you want';
     }
     return '';
   }
@@ -884,6 +934,13 @@
     if (timeoutInterval) {
       clearInterval(timeoutInterval);
       timeoutInterval = null;
+    }
+  }
+
+  function clearDisplayTimeoutInterval() {
+    if (displayTimeoutInterval) {
+      clearInterval(displayTimeoutInterval);
+      displayTimeoutInterval = null;
     }
   }
 
@@ -932,21 +989,12 @@
   }
 
   function handleChoice(event) {
-    const isConfirmMode = uiSettings.displayConfirmButton === true;
-    if (isConfirmMode) {
-      selectedChoice = event.detail;
-      selectedChoiceIndex = event.detail?.index ?? null;
-      return;
-    }
-
-    if (!event.detail?.selectionOnly) {
-      send({
-        type: 'SUBMIT',
-        userAnswer: event.detail.answer,
-        timestamp: event.detail.timestamp,
-        source: 'buttonClick'
-      });
-    }
+    send({
+      type: 'SUBMIT',
+      userAnswer: event.detail.answer,
+      timestamp: event.detail.timestamp,
+      source: 'buttonClick'
+    });
   }
 
   function handleInput(event) {
@@ -962,40 +1010,6 @@
     send({
       type: 'INPUT_ACTIVITY',
       timestamp: event.detail?.timestamp || Date.now()
-    });
-  }
-
-  function handleConfirm(event) {
-    const isConfirmMode = uiSettings.displayConfirmButton === true;
-    if (!isConfirmMode) {
-      clientConsole(1, '[CardScreen] Confirm requested but displayConfirmButton is false');
-      return;
-    }
-
-    if (context.buttonTrial) {
-      if (!selectedChoice) {
-        clientConsole(1, '[CardScreen] Confirm requested without a selected choice');
-        return;
-      }
-      send({
-        type: 'SUBMIT',
-        userAnswer: selectedChoice.answer,
-        timestamp: event.detail?.timestamp || Date.now(),
-        source: 'confirmButton'
-      });
-      return;
-    }
-
-    const answer = textAnswer.trim();
-    if (!answer) {
-      clientConsole(1, '[CardScreen] Confirm requested without text input');
-      return;
-    }
-    send({
-      type: 'SUBMIT',
-      userAnswer: answer,
-      timestamp: event.detail?.timestamp || Date.now(),
-      source: 'confirmButton'
     });
   }
 
@@ -1040,6 +1054,18 @@
         feedbackBlockingAssetReady = ready;
       }
     }
+  }
+
+  function handleFeedbackContent(event) {
+    const detail = event.detail || {};
+    const feedbackText = String(detail.feedbackText || '').trim();
+
+    send({
+      type: 'FEEDBACK_CONTENT',
+      feedbackText,
+      feedbackHtml: String(detail.feedbackHtml || ''),
+      feedbackSuppressed: detail.suppressed === true,
+    });
   }
 
   function handleReviewRevealStarted(event) {
@@ -1423,11 +1449,11 @@
     await releaseScreenWakeLock(reason);
   }
 
-  function hasDeliveryParamsReady() {
-    const deliveryParamsState = DeliveryParamsStore.get();
-    return !!deliveryParamsState &&
-      typeof deliveryParamsState === 'object' &&
-      Object.keys(deliveryParamsState).length > 0;
+  function hasDeliverySettingsReady() {
+    const deliverySettingsState = deliverySettingsStore.get();
+    return !!deliverySettingsState &&
+      typeof deliverySettingsState === 'object' &&
+      Object.keys(deliverySettingsState).length > 0;
   }
 
   function hasVideoSessionReadiness() {
@@ -1439,9 +1465,9 @@
     const checkpoints = Session.get('videoCheckpoints');
     const times = checkpoints?.times;
     const questions = checkpoints?.questions;
-    const uiSettingsState = UiSettingsStore.get() || {};
-    const hasVideoUrl = typeof uiSettingsState.videoUrl === 'string' &&
-      uiSettingsState.videoUrl.trim().length > 0;
+    const deliverySettingsState = deliverySettingsStore.get() || {};
+    const hasVideoUrl = typeof deliverySettingsState.videoUrl === 'string' &&
+      deliverySettingsState.videoUrl.trim().length > 0;
 
     return Array.isArray(times) &&
       times.length > 0 &&
@@ -1452,7 +1478,7 @@
 
   function hasCardReadiness() {
     return !!Session.get('currentTdfUnit') &&
-      hasDeliveryParamsReady() &&
+      hasDeliverySettingsReady() &&
       hasVideoSessionReadiness();
   }
 
@@ -1470,7 +1496,7 @@
   function getCardReadinessState() {
     return {
       hasCurrentTdfUnit: !!Session.get('currentTdfUnit'),
-      hasDeliveryParams: hasDeliveryParamsReady(),
+      hasDeliverySettings: hasDeliverySettingsReady(),
       hasVideoReadiness: hasVideoSessionReadiness(),
       isVideoUnit: !!Session.get('currentTdfUnit')?.videosession
     };
@@ -1700,6 +1726,13 @@
   let cardScreenElement;
 
   onMount(() => {
+    displayTimeoutMountMs = Date.now();
+    displayTimeoutNow = displayTimeoutMountMs;
+    clearDisplayTimeoutInterval();
+    displayTimeoutInterval = setInterval(() => {
+      displayTimeoutNow = Date.now();
+    }, 250);
+
     if (testMode) {
       state = normalizeTestSnapshot(testSnapshot);
       if (testPerformance) {
@@ -1761,7 +1794,7 @@
           currentStimuliSetId: Session.get('currentStimuliSetId') || null,
           currentUnitNumber: Session.get('currentUnitNumber') ?? null,
           currentUnitName: Session.get('currentTdfUnit')?.unitname || null,
-          deliveryParamKeys: Object.keys(DeliveryParamsStore.get() || {}),
+          deliveryParamKeys: Object.keys(deliverySettingsStore.get() || {}),
         };
         Session.set('cardInitFailureDiagnostic', {
           stage: 'cardReadinessTimeout',
@@ -1918,6 +1951,7 @@
       actor = null;
     }
     clearTimeoutInterval();
+    clearDisplayTimeoutInterval();
     if (performanceTracker) {
       performanceTracker.stop();
       performanceTracker = null;
@@ -1974,7 +2008,7 @@
     } else {
       const mode = getTimeoutMode(state);
       if (mode === 'question') {
-        const duration = getMainTimeoutMs({ ...context, deliveryParams });
+        const duration = getMainTimeoutMs({ ...context, deliverySettings });
         const resetCounter = Number.isFinite(context.timeoutResetCounter) ? context.timeoutResetCounter : 0;
         if (timeoutModeState !== mode || timeoutDuration !== duration || resetCounter !== lastTimeoutResetCounter) {
           lastTimeoutResetCounter = resetCounter;
@@ -1983,9 +2017,9 @@
       } else if (mode === 'feedback') {
         let duration;
         if (state.matches('presenting.readyPrompt')) {
-          duration = parseInt(deliveryParams.readyPromptStringDisplayTime, 10) || 0;
+          duration = parseInt(deliverySettings.readyPromptStringDisplayTime, 10) || 0;
         } else {
-          duration = getFeedbackTimeoutMs({ ...context, deliveryParams });
+          duration = getFeedbackTimeoutMs({ ...context, deliverySettings });
         }
         if (timeoutModeState !== mode || timeoutDuration !== duration) {
           startTimeoutCountdown(duration, mode);
@@ -2062,14 +2096,11 @@
     Session.set('fromInstructions', true);
 
     const currentUnitNumber = Session.get('currentUnitNumber') || 0;
-    const currentTdfUnit = Session.get('currentTdfUnit');
     void recordCurrentInstructionContinue(videoInstructionsShownAt || Date.now()).catch((error) => {
       clientConsole(1, '[CardScreen] Failed to record video instructions continue:', error);
     });
     void createExperimentState({
       currentUnitNumber,
-      currentTdfUnit,
-      lastUnitStarted: currentUnitNumber,
     }).catch((error) => {
       clientConsole(1, '[CardScreen] Failed to persist video instructions state:', error);
     });
@@ -2112,8 +2143,6 @@
   function handleVideoContinue() {
     send({ type: 'VIDEO_CONTINUE' });
   }
-
-  let continuingToNextUnit = false;
 
   async function forceAdvanceToNextUnit(reason) {
     if (testMode || continuingToNextUnit) {
@@ -2168,7 +2197,7 @@
   {#if isVideoSession}
     <VideoSessionMode
       bind:this={videoPlayer}
-      videoUrl={uiSettings.videoUrl}
+      videoUrl={deliverySettings.videoUrl}
       questionTimes={videoCheckpoints?.times || []}
       questionIndices={videoCheckpoints?.questions || []}
       resumeStartTime={videoResumeAnchor?.resumeStartTime}
@@ -2195,7 +2224,7 @@
         on:transitionstart={logTrialFadeEvent}
         on:transitionend={logTrialFadeEvent}
       >
-        {#if uiSettings.displayPerformance}
+        {#if showPerformanceArea}
         <PerformanceArea {...performanceSlotProps} />
         {/if}
 
@@ -2204,10 +2233,10 @@
           parentVisible={trialContentVisible}
           on:submit={handleSubmit}
           on:choice={handleChoice}
-          on:confirm={handleConfirm}
           on:input={handleInput}
           on:activity={handleInputActivity}
           on:firstKeypress={handleFirstKeypress}
+          on:feedbackcontent={handleFeedbackContent}
           on:blockingassetstate={handleBlockingAssetState}
           on:reviewrevealstarted={handleReviewRevealStarted}
         />
@@ -2232,7 +2261,7 @@
             disabled={!videoPlayerReady}
             on:click={handleVideoInstructionContinue}
           >
-            {videoPlayerReady ? (uiSettings.continueButtonText || 'Continue') : 'Loading video...'}
+            {videoPlayerReady ? (deliverySettings.continueButtonText || 'Continue') : 'Loading video...'}
           </button>
         </div>
       </div>
@@ -2241,7 +2270,7 @@
     {#if videoEndOverlayMounted}
       <div class="video-end-overlay" class:video-end-overlay-visible={videoEndOverlayVisible}>
         <button type="button" class="video-continue-button" on:click={handleVideoContinue}>
-          {uiSettings.continueButtonText || 'Continue'}
+          {deliverySettings.continueButtonText || 'Continue'}
         </button>
       </div>
     {/if}
@@ -2256,7 +2285,7 @@
         on:transitionstart={logTrialFadeEvent}
         on:transitionend={logTrialFadeEvent}
       >
-        {#if uiSettings.displayPerformance}
+        {#if showPerformanceArea}
         <PerformanceArea {...performanceSlotProps} />
         {/if}
 
@@ -2265,10 +2294,10 @@
           parentVisible={trialContentVisible}
           on:submit={handleSubmit}
           on:choice={handleChoice}
-          on:confirm={handleConfirm}
           on:input={handleInput}
           on:activity={handleInputActivity}
           on:firstKeypress={handleFirstKeypress}
+          on:feedbackcontent={handleFeedbackContent}
           on:replay={handleReplay}
           on:blockingassetstate={handleBlockingAssetState}
           on:reviewrevealstarted={handleReviewRevealStarted}
@@ -2276,7 +2305,7 @@
         {#if trialSubset.showSkipStudyButton}
           <div class="skip-study-container">
             <button type="button" class="skip-study-button" on:click={handleSkipStudy}>
-              {uiSettings.skipStudyButtonText || 'Skip'}
+              {deliverySettings.skipStudyButtonText || 'Skip'}
             </button>
           </div>
         {/if}
@@ -2290,6 +2319,7 @@
           <TrialContent
             {...incomingSlot.props}
             parentVisible={false}
+            on:feedbackcontent={handleFeedbackContent}
             on:blockingassetstate={(event) => handleBlockingAssetState(event, 'incoming')}
           />
         </div>
@@ -2305,10 +2335,10 @@
           type="button"
           class="fixed-footer__button"
           on:click={handleFooterContinue}
-          disabled={continuingToNextUnit}
+          disabled={continuingToNextUnit || !displayTimeoutCanContinue}
           aria-busy={continuingToNextUnit}
         >
-          {uiSettings.continueButtonText || 'Continue'}
+          {deliverySettings.continueButtonText || 'Continue'}
         </button>
       </div>
     </div>

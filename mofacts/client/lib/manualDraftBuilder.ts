@@ -139,7 +139,7 @@ function mapAudioPromptMode(mode: TtsMode) {
   return 'silent';
 }
 
-function buildUiSettings(state: ManualCreatorState) {
+function buildDeliverySettings(state: ManualCreatorState) {
   const showTime = state.topBarMode === 'time' || state.topBarMode === 'time-score';
   const showScore = state.topBarMode === 'score' || state.topBarMode === 'time-score';
 
@@ -191,10 +191,10 @@ function buildItems(state: ManualCreatorState): NormalizedImportItem[] {
 
 function buildLearningUnit(state: ManualCreatorState, clusterRange: string) {
   const parameters = cloneImportParameterDefaults();
-  const { lfparameter: _lfparameter, ...deliveryparams } = parameters;
+  const { lfparameter: _lfparameter, ...deliverySettings } = parameters;
   if (state.practiceTimingEnabled) {
-    deliveryparams.displayMinSeconds = String(state.minPracticeTime || '').trim() || '0';
-    deliveryparams.displayMaxSeconds = String(state.maxPracticeTime || '').trim() || '0';
+    deliverySettings.displayMinSeconds = String(state.minPracticeTime || '').trim() || '0';
+    deliverySettings.displayMaxSeconds = String(state.maxPracticeTime || '').trim() || '0';
   }
 
   return {
@@ -204,7 +204,7 @@ function buildLearningUnit(state: ManualCreatorState, clusterRange: string) {
       unitMode: 'distance',
       calculateProbability: CALCULATE_PROBABILITY_FORMULA
     },
-    deliveryparams,
+    deliverySettings,
     ...(state.responseType === 'multiple-choice'
       ? {
           buttontrial: 'true',
@@ -216,7 +216,7 @@ function buildLearningUnit(state: ManualCreatorState, clusterRange: string) {
 
 function buildAssessmentUnit(state: ManualCreatorState, clusterRange: string) {
   const parameters = cloneImportParameterDefaults();
-  const { lfparameter: _lfparameter, ...deliveryparams } = parameters;
+  const { lfparameter: _lfparameter, ...deliverySettings } = parameters;
 
   return {
     unitname: 'Assessment',
@@ -225,7 +225,7 @@ function buildAssessmentUnit(state: ManualCreatorState, clusterRange: string) {
       randomizegroups: 'false',
       assignrandomclusters: 'false'
     },
-    deliveryparams,
+    deliverySettings,
     ...(state.responseType === 'multiple-choice'
       ? {
           buttonorder: state.buttonOrder
@@ -293,6 +293,7 @@ export function buildManualDraftLesson(state: ManualCreatorState): ImportDraftLe
 
   const tutor = clone(draft.generatedBaseline.tutor) as {
     setspec?: Record<string, unknown>;
+    deliverySettings?: Record<string, unknown>;
     unit?: Array<Record<string, unknown>>;
   };
   tutor.setspec = tutor.setspec || {};
@@ -306,7 +307,7 @@ export function buildManualDraftLesson(state: ManualCreatorState): ImportDraftLe
   tutor.setspec.audioInputEnabled = state.speechRecognitionEnabled ? 'true' : 'false';
   tutor.setspec.speechRecognitionLanguage = String(state.speechLanguage || '').trim() || 'en-US';
   tutor.setspec.speechIgnoreOutOfGrammarResponses = state.speechRecognitionEnabled && state.ignoreOutOfGrammar ? 'true' : 'false';
-  tutor.setspec.uiSettings = buildUiSettings(state);
+  tutor.deliverySettings = buildDeliverySettings(state);
   tutor.unit = buildUnits(state, clusterRange, instructionsHtml);
 
   draft.generatedBaseline.tutor = tutor as Record<string, unknown>;

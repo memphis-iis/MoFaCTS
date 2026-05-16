@@ -8,7 +8,6 @@ import {meteorCallAsync, clientConsole} from '../..';
 /** @typedef {import('../../../server/methods/dashboardCacheMethods.contracts').InitializeDashboardCacheResult} InitializeDashboardCacheResult */
 import {sessionCleanUp} from '../../lib/sessionUtils';
 import {checkUserSession} from '../../lib/userSessionHelpers';
-import { CardStore } from '../experiment/modules/cardStore';
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra');
 import {currentUserHasRole} from '../../lib/roleUtils';
 import {
@@ -24,12 +23,10 @@ import {
 } from '../../lib/state/audioState';
 import { getAudioLaunchPreparationPlan, prepareAudioForLaunchIfNeeded } from '../../lib/audioStartup';
 import { unlockAppleMobileAudioForUserGesture } from '../../lib/audioUnlock';
-import { CARD_ENTRY_INTENT, resolveCardLaunchProgress, setCardEntryIntent, type CardEntryIntent } from '../../lib/cardEntryIntent';
-import { isConditionRootWithoutUnitArray, normalizeTutorUnits } from '../../lib/tdfUtils';
-import { evaluateDashboardVersionPolicy, type VersionMeta } from './versionPolicy';
+import { CARD_ENTRY_INTENT, setCardEntryIntent, type CardEntryIntent } from '../../lib/cardEntryIntent';
+import { normalizeTutorUnits } from '../../lib/tdfUtils';
+import { prepareLessonLaunchContext } from '../../lib/lessonLaunchInitializer';
 import { applyFallbackProgressSignals, shouldUseProgressSignalFallback } from './progressSignals';
-import { ensureCurrentStimuliSetId } from '../experiment/svelte/services/mediaResolver';
-import { clearConditionResolutionContext, setActiveTdfContext } from '../../lib/idContext';
 import { passesDashboardEntitlement } from './dashboardEntitlement';
 import {
   LEARNER_TDF_FIELD_DEFINITIONS,
@@ -60,7 +57,7 @@ type LearnerConfigState = {
   content: any | null;
   scope: 'setspec' | 'unit' | null;
   unitIndex: number | null;
-  family: 'ui' | 'delivery' | null;
+  family: 'deliverySettings' | null;
   saving: boolean;
   closing: boolean;
   dirty: boolean;
@@ -122,6 +119,60 @@ function clearLearnerConfigAutosaveTimer(instance: any) {
   }
 }
 
+function getLocalLearnerTdfConfigs(): Record<string, LearnerTdfConfig | undefined> {
+  const configs = Session.get('learnerTdfConfigOverrides');
+  return configs && typeof configs === 'object' ? configs : {};
+}
+
+function setLocalLearnerTdfConfig(tdfId: string, config: LearnerTdfConfig | null | undefined) {
+  const configs = {
+    ...getLocalLearnerTdfConfigs(),
+  };
+  if (config) {
+    configs[tdfId] = config;
+  } else {
+    delete configs[tdfId];
+  }
+  Session.set('learnerTdfConfigOverrides', configs);
+}
+
+async function saveLearnerConfigPatch(
+  instance: any,
+  tdfId: string,
+  patch: any,
+  saveRevision: number
+) {
+  const current = instance.learnerConfigState.get() as LearnerConfigState;
+  if (current.tdfId === tdfId) {
+    instance.learnerConfigState.set({ ...current, saving: true, error: null });
+  }
+
+  try {
+    const result = await meteorCallAsync('saveLearnerTdfConfig', tdfId, patch) as { config?: LearnerTdfConfig | null };
+    setLocalLearnerTdfConfig(tdfId, result?.config || null);
+    const latest = instance.learnerConfigState.get() as LearnerConfigState;
+    if (latest.tdfId === tdfId && instance.learnerConfigSaveRevision === saveRevision) {
+      instance.learnerConfigState.set({ ...latest, saving: false, dirty: false, error: null });
+    }
+  } catch (error: any) {
+    clientConsole(1, '[Dashboard Config] Failed to autosave learner TDF config:', error);
+    const latest = instance.learnerConfigState.get() as LearnerConfigState;
+    if (latest.tdfId === tdfId) {
+      instance.learnerConfigState.set({
+        ...latest,
+        saving: false,
+        dirty: true,
+        error: error?.reason || error?.message || 'Unable to save settings.'
+      });
+    }
+    throw error;
+  } finally {
+    if (instance.learnerConfigPendingSave?.saveRevision === saveRevision) {
+      instance.learnerConfigPendingSave = null;
+    }
+  }
+}
+
 function closeLearnerConfigPanel(instance: any) {
   const current = instance.learnerConfigState.get() as LearnerConfigState;
   if (!current.tdfId) {
@@ -156,35 +207,32 @@ function scheduleLearnerConfigAutosave(instance: any, form: JQuery<HTMLElement>)
     return;
   }
 
+  const tdfId = current.tdfId;
   const patch = buildConfigPatchFromForm(form, current);
   const saveRevision = (instance.learnerConfigSaveRevision || 0) + 1;
   instance.learnerConfigSaveRevision = saveRevision;
+  instance.learnerConfigPendingSave = {
+    tdfId,
+    patch,
+    saveRevision,
+  };
   markLearnerConfigDirty(instance);
   clearLearnerConfigAutosaveTimer(instance);
 
   instance.learnerConfigAutosaveTimer = setTimeout(async () => {
     instance.learnerConfigAutosaveTimer = null;
-    const saveState = instance.learnerConfigState.get() as LearnerConfigState;
-    if (saveState.tdfId === current.tdfId) {
-      instance.learnerConfigState.set({ ...saveState, saving: true, error: null });
-    }
     try {
-      await meteorCallAsync('saveLearnerTdfConfig', current.tdfId, patch);
-      const latest = instance.learnerConfigState.get() as LearnerConfigState;
-      if (latest.tdfId === current.tdfId && instance.learnerConfigSaveRevision === saveRevision) {
-        instance.learnerConfigState.set({ ...latest, saving: false, dirty: false, error: null });
-      }
-    } catch (error: any) {
-      clientConsole(1, '[Dashboard Config] Failed to autosave learner TDF config:', error);
-      const latest = instance.learnerConfigState.get() as LearnerConfigState;
-      if (latest.tdfId === current.tdfId) {
-        instance.learnerConfigState.set({
-          ...latest,
-          saving: false,
-          dirty: true,
-          error: error?.reason || error?.message || 'Unable to save settings.'
-        });
-      }
+      instance.learnerConfigSavePromise = saveLearnerConfigPatch(
+        instance,
+        tdfId,
+        patch,
+        saveRevision
+      ).finally(() => {
+        instance.learnerConfigSavePromise = null;
+      });
+      await instance.learnerConfigSavePromise;
+    } catch {
+      // Error state is set by saveLearnerConfigPatch.
     }
   }, LEARNER_CONFIG_AUTOSAVE_DELAY_MS);
 }
@@ -195,7 +243,7 @@ function getDashboardCache() {
 }
 
 function getLearnerTdfConfig(tdfId: string): LearnerTdfConfig | undefined {
-  return getDashboardCache()?.learnerTdfConfigs?.[tdfId];
+  return getLocalLearnerTdfConfigs()[tdfId] || getDashboardCache()?.learnerTdfConfigs?.[tdfId];
 }
 
 function applyDashboardLearnerConfig(content: any, tdfId: string) {
@@ -214,7 +262,7 @@ function applyDashboardLearnerConfig(content: any, tdfId: string) {
   return result.tdf;
 }
 
-function learnerConfigHasSetSpecAudioOverride(tdfId: string, key: 'audioPromptMode' | 'audioInputSensitivity') {
+function learnerConfigHasSetSpecAudioOverride(tdfId: string, key: 'audioPromptMode' | 'audioInputEnabled' | 'audioInputSensitivity') {
   return getLearnerTdfConfig(tdfId)?.overrides?.setspec?.[key] !== undefined;
 }
 
@@ -235,47 +283,65 @@ function getTutorUnits(content: any) {
   return Array.isArray(units) ? units : [];
 }
 
+function unitHasLearningSession(unit: any) {
+  return Boolean(unit?.learningsession && typeof unit.learningsession === 'object');
+}
+
+function getLearningUnitIndexes(content: any) {
+  return getTutorUnits(content)
+    .map((unit: any, index: number) => unitHasLearningSession(unit) ? index : -1)
+    .filter((index: number) => index >= 0);
+}
+
+function tdfHasLearningSession(content: any) {
+  return getLearningUnitIndexes(content).length > 0;
+}
+
+function getPrimaryLearningUnitIndex(state: LearnerConfigState) {
+  return getLearningUnitIndexes(state.content)[0] ?? null;
+}
+
 function getLearnerConfigurableFieldsForState(state: LearnerConfigState) {
+  const primaryLearningUnitIndex = getPrimaryLearningUnitIndex(state);
+  const primaryLearningUnit = primaryLearningUnitIndex === null
+    ? null
+    : getTutorUnits(state.content)[primaryLearningUnitIndex];
+
   return LEARNER_TDF_FIELD_DEFINITIONS.filter((field) => {
-    if (field.scope !== state.scope || field.family !== state.family) {
-      return false;
-    }
-    if (state.scope !== 'unit') {
+    if (field.scope === 'setspec') {
       return true;
     }
-
-    const unit = state.unitIndex === null ? null : getTutorUnits(state.content)[state.unitIndex];
-    return learnerTdfFieldAppliesToUnit(field, unit);
+    return Boolean(primaryLearningUnit) && learnerTdfFieldAppliesToUnit(field, primaryLearningUnit);
   });
 }
 
-function unitSupportsLearnerFamily(unit: any, family: 'ui' | 'delivery') {
-  return LEARNER_TDF_FIELD_DEFINITIONS.some(
-    (field) => field.scope === 'unit' &&
-      field.family === family &&
-      learnerTdfFieldAppliesToUnit(field, unit)
-  );
-}
-
 function getPathValue(source: any, path: string, unitIndex: number | null = null) {
+  const tutor = source?.tdfs?.tutor;
   if (path.startsWith('setspec.')) {
-    return path.split('.').slice(1).reduce((acc, part) => acc?.[part], source?.tdfs?.tutor?.setspec);
+    return path.split('.').slice(1).reduce((acc, part) => acc?.[part], tutor?.setspec);
   }
-  if (path.startsWith('deliveryparams.')) {
-    return path.split('.').slice(1).reduce((acc, part) => acc?.[part], source?.tdfs?.tutor?.deliveryparams);
+  if (path.startsWith('deliverySettings.')) {
+    return path.split('.').slice(1).reduce((acc, part) => acc?.[part], tutor?.deliverySettings);
   }
   if (path.startsWith('unit[].') && unitIndex !== null) {
-    return path.split('.').slice(1).reduce((acc, part) => acc?.[part], source?.tdfs?.tutor?.unit?.[unitIndex]);
+    const key = path.startsWith('unit[].deliverySettings.') ? path.split('.').pop() : null;
+    const unitValue = path.split('.').slice(1).reduce((acc, part) => acc?.[part], tutor?.unit?.[unitIndex]);
+    if (unitValue !== undefined || !key) {
+      return unitValue;
+    }
+    return tutor?.deliverySettings?.[key];
   }
   return undefined;
 }
 
 function getDefaultForField(field: any, state: LearnerConfigState) {
-  return getPathValue(state.content, field.tdfPath, state.unitIndex) ?? field.defaultValue;
+  const unitIndex = field.scope === 'unit' ? getPrimaryLearningUnitIndex(state) : null;
+  return getPathValue(state.content, field.tdfPath, unitIndex) ?? field.defaultValue;
 }
 
 function getEffectiveForField(field: any, state: LearnerConfigState) {
-  return getPathValue(getConfigurableContent(state), field.tdfPath, state.unitIndex) ?? field.defaultValue;
+  const unitIndex = field.scope === 'unit' ? getPrimaryLearningUnitIndex(state) : null;
+  return getPathValue(getConfigurableContent(state), field.tdfPath, unitIndex) ?? field.defaultValue;
 }
 
 function isFieldCustomized(field: any, state: LearnerConfigState) {
@@ -283,9 +349,8 @@ function isFieldCustomized(field: any, state: LearnerConfigState) {
 }
 
 function buildConfigPatchFromForm(container: JQuery<HTMLElement>, state: LearnerConfigState) {
-  const patch: any = state.scope === 'setspec'
-    ? { setspec: {}, deliveryparams: {} }
-    : { unit: { [String(state.unitIndex)]: { deliveryparams: {}, uiSettings: {} } } };
+  const patch: any = { setspec: {}, unit: {} };
+  const learningUnitIndexes = getLearningUnitIndexes(state.content);
   const fields = getSettingFields(state);
 
   for (const field of fields) {
@@ -303,30 +368,27 @@ function buildConfigPatchFromForm(container: JQuery<HTMLElement>, state: Learner
 
     if (field.id === 'setspec.audioPromptMode') {
       patch.setspec.audioPromptMode = value;
+    } else if (field.id === 'setspec.audioInputEnabled') {
+      patch.setspec.audioInputEnabled = value;
     } else if (field.id === 'setspec.audioInputSensitivity') {
       patch.setspec.audioInputSensitivity = value;
-    } else if (field.tdfPath.startsWith('setspec.uiSettings.')) {
+    } else if (field.tdfPath.startsWith('deliverySettings.')) {
       const key = field.tdfPath.split('.').pop();
       if (key) {
-        patch.setspec.uiSettings = {
-          ...(patch.setspec.uiSettings || {}),
-          [key]: value
-        };
+        for (const index of learningUnitIndexes) {
+          const unitIndex = String(index);
+          patch.unit[unitIndex] ||= { deliverySettings: {} };
+          patch.unit[unitIndex].deliverySettings[key] = value;
+        }
       }
-    } else if (field.tdfPath.startsWith('deliveryparams.')) {
+    } else if (field.tdfPath.startsWith('unit[].deliverySettings.')) {
       const key = field.tdfPath.split('.').pop();
       if (key) {
-        patch.deliveryparams[key] = value;
-      }
-    } else if (field.tdfPath.startsWith('unit[].uiSettings.') && state.unitIndex !== null) {
-      const key = field.id.split('.').pop();
-      if (key && state.unitIndex !== null) {
-        patch.unit[String(state.unitIndex)].uiSettings[key] = value;
-      }
-    } else if (field.tdfPath.startsWith('unit[].deliveryparams.') && state.unitIndex !== null) {
-      const key = field.tdfPath.split('.').pop();
-      if (key) {
-        patch.unit[String(state.unitIndex)].deliveryparams[key] = value;
+        for (const index of learningUnitIndexes) {
+          const unitIndex = String(index);
+          patch.unit[unitIndex] ||= { deliverySettings: {} };
+          patch.unit[unitIndex].deliverySettings[key] = value;
+        }
       }
     }
   }
@@ -335,113 +397,10 @@ function buildConfigPatchFromForm(container: JQuery<HTMLElement>, state: Learner
 }
 
 function getSettingFields(state: LearnerConfigState) {
-  if (state.scope === 'unit') {
-    const unit = state.unitIndex === null ? null : getTutorUnits(state.content)[state.unitIndex];
-    if (!state.family || !unitSupportsLearnerFamily(unit, state.family)) {
-      return [];
-    }
+  if (!tdfHasLearningSession(state.content)) {
+    return [];
   }
-
   return getLearnerConfigurableFieldsForState(state);
-}
-
-function getFamilyChoicesForState(state: LearnerConfigState) {
-  const families = new Set(
-    LEARNER_TDF_FIELD_DEFINITIONS
-      .filter((field) => getLearnerConfigurableFieldsForState({ ...state, family: field.family }).includes(field))
-      .map((field) => field.family)
-  );
-  return [
-    ...(families.has('delivery') ? [{ label: 'Delivery parameters', family: 'delivery' }] : []),
-    ...(families.has('ui') ? [{ label: 'UI parameters', family: 'ui' }] : [])
-  ];
-}
-
-function getScopeChoicesForState(state: LearnerConfigState) {
-  const units = getTutorUnits(state.content);
-  return [
-    { label: 'Lesson settings', scope: 'setspec', unitIndex: null },
-    ...units.map((unit: any, index: number) => ({
-      label: unit?.unitname || unit?.name || `Unit ${index + 1}`,
-      scope: 'unit',
-      unitIndex: index
-    }))
-  ];
-}
-
-function getConfigChoicesForState(state: LearnerConfigState) {
-  return getScopeChoicesForState(state).flatMap((scopeChoice) => {
-    const scopedState = {
-      ...state,
-      scope: scopeChoice.scope as 'setspec' | 'unit',
-      unitIndex: scopeChoice.unitIndex
-    };
-    return getFamilyChoicesForState(scopedState).map((familyChoice) => ({
-      ...scopeChoice,
-      ...familyChoice,
-      unitIndex: scopeChoice.unitIndex === null ? '' : String(scopeChoice.unitIndex),
-      label: `${scopeChoice.label}: ${familyChoice.label}`
-    }));
-  });
-}
-
-
-function parseVersionMajor(raw: unknown): number | null {
-  if (typeof raw === 'number' && Number.isInteger(raw) && raw >= 1) {
-    return raw;
-  }
-  if (typeof raw === 'string') {
-    const trimmed = raw.trim();
-    if (!trimmed) return null;
-    const direct = Number(trimmed);
-    if (Number.isInteger(direct) && direct >= 1) {
-      return direct;
-    }
-    const m = trimmed.match(/^v(\d+)$/i);
-    if (m) {
-      const parsed = Number(m[1]);
-      return Number.isInteger(parsed) && parsed >= 1 ? parsed : null;
-    }
-  }
-  return null;
-}
-
-function parsePublishedAt(raw: unknown): number | null {
-  if (!raw) return null;
-  const asDate = new Date(raw as any);
-  const ms = asDate.getTime();
-  return Number.isFinite(ms) ? ms : null;
-}
-
-function normalizeNullableString(raw: unknown): string | null {
-  if (raw === null || raw === undefined) return null;
-  const value = String(raw).trim();
-  return value.length ? value : null;
-}
-
-function extractVersionMeta(tdf: any): VersionMeta {
-  const setspec = tdf?.content?.tdfs?.tutor?.setspec || {};
-  const lineageId = normalizeNullableString(
-    setspec.lessonLineageId ?? setspec.lessonlineageid ?? setspec.lineageId ?? setspec.lineageid
-  );
-  const versionMajor = parseVersionMajor(
-    setspec.versionMajor ?? setspec.versionmajor ?? setspec.version ?? setspec.versionLabel ?? setspec.versionlabel
-  );
-  const publishedAtMs = parsePublishedAt(
-    setspec.publishedAt ?? setspec.publishedat ?? tdf?.updatedAt ?? tdf?.createdAt
-  );
-  const rawPublished = setspec.isPublished ?? setspec.ispublished;
-  const isPublished = typeof rawPublished === 'boolean'
-    ? rawPublished
-    : (typeof rawPublished === 'string' ? rawPublished.toLowerCase() === 'true' : null);
-
-  return {
-    tdfId: String(tdf?._id || ''),
-    lineageId,
-    versionMajor,
-    publishedAtMs,
-    isPublished,
-  };
 }
 
 Template.learningDashboard.onCreated(function(this: any) {
@@ -498,12 +457,12 @@ Template.learningDashboard.helpers({
 
   configForTableRow() {
     const state = (Template.instance() as any).learnerConfigState.get() as LearnerConfigState;
-    return state.tdfId === this.TDFId ? { ...state, location: 'table' } : null;
+    return this.hasLearningSession && state.tdfId === this.TDFId ? { ...state, location: 'table' } : null;
   },
 
   configForCardRow() {
     const state = (Template.instance() as any).learnerConfigState.get() as LearnerConfigState;
-    return state.tdfId === this.TDFId ? { ...state, location: 'card' } : null;
+    return this.hasLearningSession && state.tdfId === this.TDFId ? { ...state, location: 'card' } : null;
   },
 
 });
@@ -523,29 +482,21 @@ Template.learnerTdfConfigPanel.helpers({
     return this.step === step;
   },
 
-  scopeChoices() {
-    return getConfigChoicesForState(this as LearnerConfigState);
-  },
-
   selectedConfigLabel() {
-    const state = this as LearnerConfigState;
-    let scopeLabel = '';
-    if (state.scope === 'setspec') {
-      scopeLabel = 'Lesson settings';
-    } else if (state.scope === 'unit' && state.unitIndex !== null) {
-      const unit = getTutorUnits(state.content)[state.unitIndex];
-      scopeLabel = unit?.unitname || unit?.name || `Unit ${state.unitIndex + 1}`;
-    }
-    const familyLabel = state.family === 'delivery' ? 'Delivery parameters' : 'UI parameters';
-    return scopeLabel ? `${scopeLabel}: ${familyLabel}` : familyLabel;
+    return 'Lesson settings';
   },
 
   settingFields() {
-    return getSettingFields(this as LearnerConfigState).map((field) => {
+    return getSettingFields(this as LearnerConfigState).slice().sort((left, right) =>
+      left.label.localeCompare(right.label, undefined, {
+        numeric: true,
+        sensitivity: 'base',
+      })
+    ).map((field) => {
       const effectiveValue = getEffectiveForField(field, this as LearnerConfigState);
       const defaultValue = getDefaultForField(field, this as LearnerConfigState);
-      const value = effectiveValue;
-      const defaultInputValue = defaultValue;
+      const value = field.control === 'select' ? String(effectiveValue) : effectiveValue;
+      const defaultInputValue = field.control === 'select' ? String(defaultValue) : defaultValue;
       const displayValue = field.unit ? `${value} ${field.unit}` : String(value);
       const displaySuffix = field.unit;
       return {
@@ -557,7 +508,7 @@ Template.learnerTdfConfigPanel.helpers({
         checked: Boolean(value),
         options: field.options?.map((option) => ({
           ...option,
-          selected: option.value === value
+          selected: option.value === String(value)
         })),
         customized: isFieldCustomized(field, this as LearnerConfigState),
         inputMin: field.min,
@@ -701,10 +652,7 @@ Template.learningDashboard.events({
     });
 
     try {
-      let tdfDoc = Tdfs.findOne({ _id: tdfId });
-      if (!Array.isArray(tdfDoc?.content?.tdfs?.tutor?.unit)) {
-        tdfDoc = await meteorCallAsync('getTdfById', tdfId);
-      }
+      const tdfDoc = await meteorCallAsync('getTdfById', tdfId) as any;
       const content = tdfDoc?.content;
       normalizeTutorUnits(content);
       if (!Array.isArray(content?.tdfs?.tutor?.unit)) {
@@ -715,11 +663,21 @@ Template.learningDashboard.events({
         });
         return;
       }
+      if (!tdfHasLearningSession(content)) {
+        instance.learnerConfigState.set({
+          ...EMPTY_CONFIG_STATE,
+          tdfId,
+          error: 'Settings are available for lessons with practice units.'
+        });
+        return;
+      }
       instance.learnerConfigState.set({
         ...EMPTY_CONFIG_STATE,
         tdfId,
         content,
-        step: 'scope'
+        step: 'settings',
+        scope: 'setspec',
+        family: 'deliverySettings'
       });
     } catch (error) {
       clientConsole(1, '[Dashboard Config] Failed to load full TDF:', error);
@@ -729,20 +687,6 @@ Template.learningDashboard.events({
         error: 'Unable to load lesson settings. Please try again.'
       });
     }
-  },
-
-  'click .learner-config-scope': function(event: any, instance: any) {
-    const current = instance.learnerConfigState.get() as LearnerConfigState;
-    const target = $(event.currentTarget);
-    instance.learnerConfigState.set({
-      ...current,
-      step: 'settings',
-      scope: target.data('scope'),
-      unitIndex: target.data('unitindex') === '' ? null : Number(target.data('unitindex')),
-      family: target.data('family'),
-      dirty: false,
-      error: null
-    });
   },
 
   'click .learner-config-reset-field': function(event: any, instance: any) {
@@ -830,8 +774,9 @@ Template.learningDashboard.rendered = async function(this: any) {
     conditionCounts: 1,
     'content.fileName': 1,
     'content.isMultiTdf': 1,
-    'content.tdfs.tutor.setspec': 1
-    // Explicitly EXCLUDE content.tdfs.tutor.unit (large array)
+    'content.tdfs.tutor.setspec': 1,
+    'content.tdfs.tutor.unit.learningsession': 1
+    // Include only the learning-session marker from units so Configure can stay hidden for non-practice lessons.
   };
   let allTdfs = Tdfs.find({}, { fields: tdfFields }).fetch();
   Session.set('allTdfs', allTdfs);
@@ -948,39 +893,6 @@ Template.learningDashboard.rendered = async function(this: any) {
   const userHasSpeechAPIKey = !!(user?.speechAPIKey && user.speechAPIKey.trim());
   const userHasTTSAPIKey = !!(user?.textToSpeechAPIKey && user.textToSpeechAPIKey.trim());
 
-  // Stage 4 version gating:
-  // - current version = highest versionMajor (tie: latest publishedAt)
-  // - if user has progress in older version, still allow current version
-  const versionMetaByTdfId = new Map<string, VersionMeta>();
-  const versionsByLineage = new Map<string, VersionMeta[]>();
-  const currentVersionByLineage = new Map<string, string>();
-
-  for (const tdf of allTdfs) {
-    const meta = extractVersionMeta(tdf);
-    versionMetaByTdfId.set(meta.tdfId, meta);
-    if (!meta.lineageId || meta.versionMajor === null) {
-      continue;
-    }
-    if (!versionsByLineage.has(meta.lineageId)) {
-      versionsByLineage.set(meta.lineageId, []);
-    }
-    versionsByLineage.get(meta.lineageId)!.push(meta);
-  }
-
-  for (const [lineageId, versions] of versionsByLineage.entries()) {
-    const publishedOnly = versions.filter((v) => v.isPublished !== false);
-    const pool = publishedOnly.length ? publishedOnly : versions;
-    const sorted = pool.slice().sort((a, b) => {
-      const versionDiff = (b.versionMajor || 0) - (a.versionMajor || 0);
-      if (versionDiff !== 0) return versionDiff;
-      return (b.publishedAtMs || 0) - (a.publishedAtMs || 0);
-    });
-    const current = sorted[0];
-    if (current?.tdfId) {
-      currentVersionByLineage.set(lineageId, current.tdfId);
-    }
-  }
-
   const allTdfObjects = [];
 
   // Build sets of condition-child filenames and IDs so they can be suppressed
@@ -1020,6 +932,7 @@ Template.learningDashboard.rendered = async function(this: any) {
 
     const name = setspec.lessonname;
     const fileName = tdfObject.fileName;
+    const hasLearningSession = tdfHasLearningSession(tdfObject);
     const ignoreOutOfGrammarResponses = setspec.speechIgnoreOutOfGrammarResponses ?
       setspec.speechIgnoreOutOfGrammarResponses.toLowerCase() == 'true' : false;
     const speechOutOfGrammarFeedback = setspec.speechOutOfGrammarFeedback ?
@@ -1061,17 +974,7 @@ Template.learningDashboard.rendered = async function(this: any) {
     const hasBeenAttempted = attemptedTdfIds.has(TDFId);
 
     // Server publication is the source of truth for dashboard access.
-    // Client-side checks should only enforce local view-policy (version gating, assignment context).
     const shouldShow = true;
-
-    const versionMeta = versionMetaByTdfId.get(TDFId);
-    const versionDecision = evaluateDashboardVersionPolicy({
-      tdfId: TDFId,
-      isAssigned,
-      hasMeaningfulProgress: tdfsWithMeaningfulProgress.has(TDFId),
-      versionMeta,
-      currentVersionByLineage,
-    });
 
     const passesEntitlement = passesDashboardEntitlement({
       isPublishedByServer: true,
@@ -1094,14 +997,13 @@ Template.learningDashboard.rendered = async function(this: any) {
         enableAudioPromptAndFeedback: enableAudioPromptAndFeedback,
         hasSpeechAPIKey: hasSpeechAPIKey,
         hasTTSAPIKey: hasTTSAPIKey,
+        hasLearningSession: hasLearningSession,
         isMultiTdf: isMultiTdf,
         tags: setspec.tags || [],
         isOwner: isOwner,
         conditions: conditions,
         isUsed: isUsed,
         hasBeenAttempted: hasBeenAttempted,
-        versionMetadataInvalid: versionDecision.metadataInvalid,
-        versionMetadataDiagnostic: versionDecision.reason,
         // Add stats if available (inline instead of second pass)
         totalTrials: stats?.totalTrials,
         overallAccuracy: stats?.overallAccuracy,
@@ -1247,83 +1149,29 @@ async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId
   if (isOwnerLaunch) Session.set('ownerDashboardLaunch', true);
   Session.set('uiMessage', null);
 
-  // Set the session variables we know
-  // Note that we assume the root and current TDF ids start the same.
-  // The canonical entry resolver / card bootstrap may later redirect to a
-  // condition-specific TDF when the selected root participates in condition resolution.
-  setActiveTdfContext({
-    currentRootTdfId: currentTdfId,
-    currentTdfId: currentTdfId,
-    currentStimuliSetId: currentStimuliSetId,
-  }, 'learningDashboard.selectTdf.start');
-  clearConditionResolutionContext('learningDashboard.selectTdf.start');
-
-  // Subscribe to full TDF data for the active session
-  setLaunchLoadingMessage('Loading lesson...');
-  markLaunchLoadingTiming('currentTdfSubscription:start', { currentTdfId });
-  const tdfSub = Meteor.subscribe('currentTdf', currentTdfId);
-  await new Promise<void>((resolve) => {
-    const handle = Tracker.autorun(() => {
-      if (tdfSub.ready()) {
-        handle.stop();
-        markLaunchLoadingTiming('currentTdfSubscription:ready', { currentTdfId });
-        resolve();
-      }
+  let preparedLaunch;
+  try {
+    preparedLaunch = await prepareLessonLaunchContext({
+      currentTdfId,
+      currentStimuliSetId,
+      ignoreOutOfGrammarResponses,
+      speechOutOfGrammarFeedback,
+      source: 'learningDashboard.selectTdf',
+      applyContent: (content) => applyDashboardLearnerConfig(content, String(currentTdfId)),
+      setLaunchLoadingMessage,
+      markLaunchLoadingTiming,
     });
-  });
-
-  const tdfDoc = Tdfs.findOne({_id: currentTdfId});
-  if (!tdfDoc || !tdfDoc.content) {
-    clientConsole(1, 'Failed to load current TDF from subscription:', currentTdfId);
+  } catch (error) {
+    clientConsole(1, '[LearningDashboard] Failed to load launch-ready TDF:', currentTdfId, error);
     finishLaunchLoading('tdf-subscription-missing-content');
     alert('Unable to load the selected lesson. Please try again or contact support.');
     return;
   }
-  let curTdfContent = tdfDoc.content;
-  normalizeTutorUnits(curTdfContent);
-  if (!Array.isArray(curTdfContent?.tdfs?.tutor?.unit)) {
-    clientConsole(1, '[LearningDashboard] Selected TDF content missing tutor.unit; fetching full TDF by id:', currentTdfId);
-    markLaunchLoadingTiming('getTdfById:start', { currentTdfId });
-    const fullTdfDoc: any = await meteorCallAsync('getTdfById', currentTdfId);
-    markLaunchLoadingTiming('getTdfById:complete', { currentTdfId });
-    curTdfContent = fullTdfDoc?.content;
-    normalizeTutorUnits(curTdfContent);
-    const isConditionRoot = isConditionRootWithoutUnitArray(curTdfContent);
-    if (!Array.isArray(curTdfContent?.tdfs?.tutor?.unit) && !isConditionRoot) {
-      const errorMsg = `[LearningDashboard] Selected TDF ${currentTdfId} is missing required content.tdfs.tutor.unit`;
-      clientConsole(1, errorMsg);
-      finishLaunchLoading('tdf-missing-unit-list');
-      alert('Unable to start this lesson because the TDF unit list is missing.');
-      return;
-    }
-    if (!Array.isArray(curTdfContent?.tdfs?.tutor?.unit) && isConditionRoot) {
-      clientConsole(2, '[LearningDashboard] Selected root condition TDF without unit array; continuing via condition-resolve flow:', currentTdfId);
-    }
-  }
-  curTdfContent = applyDashboardLearnerConfig(curTdfContent, String(currentTdfId));
+
+  const curTdfContent = preparedLaunch.content;
   const curTdfTips = curTdfContent.tdfs.tutor.setspec.tips;
-  const hasConditionPool = Array.isArray(curTdfContent?.tdfs?.tutor?.setspec?.condition)
-    && curTdfContent.tdfs.tutor.setspec.condition.length > 0;
-  const launchMode = hasConditionPool ? 'root-random' : 'condition-fixed';
-  Session.set('tdfLaunchMode', launchMode);
-  Session.set('tdfFamilyRootTdfId', hasConditionPool ? currentTdfId : null);
-  Session.set('currentTdfFile', curTdfContent);
-  Session.set('currentTdfName', curTdfContent.fileName);
-  setActiveTdfContext({
-    currentRootTdfId: currentTdfId,
-    currentTdfId: currentTdfId,
-    currentStimuliSetId: currentStimuliSetId,
-  }, 'learningDashboard.selectTdf.loaded');
-  ensureCurrentStimuliSetId(currentStimuliSetId || tdfDoc.stimuliSetId);
-  CardStore.setIgnoreOutOfGrammarResponses(ignoreOutOfGrammarResponses);
-  Session.set('speechOutOfGrammarFeedback', speechOutOfGrammarFeedback);
   Session.set('curTdfTips', curTdfTips);
-  const unitCount = Array.isArray(curTdfContent?.tdfs?.tutor?.unit) ? curTdfContent.tdfs.tutor.unit.length : 0;
-  setLaunchLoadingMessage('Restoring progress...');
-  markLaunchLoadingTiming('getExperimentState:start', { source: 'selectTdf' });
-  const persistedExperimentState = await getExperimentState();
-  markLaunchLoadingTiming('getExperimentState:complete', { source: 'selectTdf' });
-  const launchProgress = resolveCardLaunchProgress(persistedExperimentState, unitCount);
+  const { launchProgress, unitCount } = preparedLaunch;
 
   if (launchProgress.moduleCompleted) {
     clientConsole(2, '[LearningDashboard] Blocking lesson relaunch because persisted state is completed', {
@@ -1474,19 +1322,28 @@ async function navigateForMultiTdf(entryIntent: CardEntryIntent = CARD_ENTRY_INT
   const experimentState: any = await getExperimentState();
   markLaunchLoadingTiming('getExperimentState:complete', { source: 'navigateForMultiTdf' });
   const lastUnitCompleted = experimentState.lastUnitCompleted || -1;
-  const lastUnitStarted = experimentState.lastUnitStarted || -1;
+  const currentUnitNumber = typeof experimentState.currentUnitNumber === 'number'
+    ? experimentState.currentUnitNumber
+    : -1;
   let unitLocked = false;
 
   // If we haven't finished the unit yet, we may want to lock into the current unit
   // so the user can't mess up the data
-  if (lastUnitStarted > lastUnitCompleted) {
-    const curUnit = experimentState.currentTdfUnit;
+  if (currentUnitNumber > lastUnitCompleted) {
+    const unitList = Session.get('currentTdfFile')?.tdfs?.tutor?.unit;
+    const curUnit = Array.isArray(unitList) ? unitList[currentUnitNumber] : null;
     const curUnitType = getUnitType(curUnit);
     // We always want to lock users in to an assessment session
     if (curUnitType === SCHEDULE_UNIT) {
       unitLocked = true;
     } else if (curUnitType === MODEL_UNIT || curUnitType === VIDEO_UNIT) {
-      if (!!curUnit.displayMinSeconds || !!curUnit.displayMaxSeconds) {
+      const deliverySettings = curUnit?.deliverySettings || {};
+      if (
+        !!deliverySettings.displayMinSeconds ||
+        !!deliverySettings.displayMaxSeconds ||
+        !!curUnit.displayMinSeconds ||
+        !!curUnit.displayMaxSeconds
+      ) {
         unitLocked = true;
       }
     }

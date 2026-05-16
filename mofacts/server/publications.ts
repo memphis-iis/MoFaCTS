@@ -608,8 +608,9 @@ const TDF_LISTING_FIELDS = {
     conditionCounts: 1,
     'content.fileName': 1,
     'content.isMultiTdf': 1,
-    'content.tdfs.tutor.setspec': 1
-    // Explicitly EXCLUDES: content.tdfs.tutor.unit (large array)
+    'content.tdfs.tutor.setspec': 1,
+    'content.tdfs.tutor.unit.learningsession': 1
+    // Includes only the learning-session marker from units; still excludes full unit content.
 };
 
 const TDF_CONTENT_UPLOAD_DETAIL_FIELDS = {

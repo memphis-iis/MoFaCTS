@@ -3,6 +3,7 @@ import { Session } from 'meteor/session';
 import {
   isSupportedTrialType,
   isUnsupportedTrialType,
+  needsForceCorrectPrompt,
   isCorrectForceCorrection,
   unitFinished,
   canUsePreparedAdvance,
@@ -20,7 +21,7 @@ function makeArgs(overrides: { context?: Record<string, unknown>; event?: Record
       isCorrect: false,
       unitFinished: false,
       currentDisplay: {},
-      deliveryParams: {},
+      deliverySettings: {},
       ...overrides.context,
     },
     event: {
@@ -59,6 +60,28 @@ describe('machine guard contracts', function() {
 
     expect(isCorrectForceCorrection(matching)).to.equal(true);
     expect(isCorrectForceCorrection(nonMatching)).to.equal(false);
+  });
+
+  it('requires force-correct prompt only until a review entry is captured', function() {
+    const pending = makeArgs({
+      context: {
+        testType: 'd',
+        isCorrect: false,
+        deliverySettings: { forceCorrection: true },
+        reviewEntry: '',
+      },
+    });
+    const completed = makeArgs({
+      context: {
+        testType: 'd',
+        isCorrect: false,
+        deliverySettings: { forceCorrection: true },
+        reviewEntry: 'answer',
+      },
+    });
+
+    expect(needsForceCorrectPrompt(pending)).to.equal(true);
+    expect(needsForceCorrectPrompt(completed)).to.equal(false);
   });
 
   it('treats CARD_SELECTED unitFinished payload as authoritative', function() {

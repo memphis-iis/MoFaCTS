@@ -46,9 +46,12 @@ type CardEntryContext = {
 type CardRefreshRebuildClassification = {
   intent: CardEntryIntent;
   reason: CardRefreshRebuildReason;
+  moduleCompleted: boolean;
+  persistedUnitNumber: number | null;
+  lastUnitCompleted: number | null;
 };
 
-type CardLaunchProgressResolution = {
+export type CardLaunchProgress = {
   intent: CardEntryIntent;
   hasMeaningfulHistory: boolean;
   moduleCompleted: boolean;
@@ -161,32 +164,42 @@ export function clearCardEntryContext(): void {
 }
 
 export function classifyCardRefreshRebuild(
-  experimentState: Record<string, unknown> | null | undefined
+  experimentState: Record<string, unknown> | null | undefined,
+  unitCount = 0
 ): CardRefreshRebuildClassification {
   if (!experimentState || typeof experimentState !== 'object' || Object.keys(experimentState).length === 0) {
     return {
       intent: CARD_ENTRY_INTENT.INITIAL_TDF_ENTRY,
       reason: CARD_REFRESH_REBUILD_REASON.NO_EXPERIMENT_STATE,
+      moduleCompleted: false,
+      persistedUnitNumber: null,
+      lastUnitCompleted: null,
     };
   }
 
-  if (hasPersistedProgressState(experimentState)) {
+  const launchProgress = resolveCardLaunchProgress(experimentState, unitCount);
+  if (launchProgress.hasMeaningfulHistory || hasPersistedProgressState(experimentState)) {
     return {
       intent: CARD_ENTRY_INTENT.PERSISTED_PROGRESS_RESUME,
       reason: CARD_REFRESH_REBUILD_REASON.SAVED_PROGRESS_STATE,
+      moduleCompleted: launchProgress.moduleCompleted,
+      persistedUnitNumber: launchProgress.persistedUnitNumber,
+      lastUnitCompleted: launchProgress.lastUnitCompleted,
     };
   }
 
   return {
     intent: CARD_ENTRY_INTENT.INITIAL_TDF_ENTRY,
     reason: CARD_REFRESH_REBUILD_REASON.NO_PROGRESS_STATE,
+    moduleCompleted: false,
+    persistedUnitNumber: launchProgress.persistedUnitNumber,
+    lastUnitCompleted: launchProgress.lastUnitCompleted,
   };
 }
 
 export function shouldUseProgressBootstrapForEntryIntent(intent: CardEntryIntent | null): boolean {
   switch (intent) {
   case CARD_ENTRY_INTENT.PERSISTED_PROGRESS_RESUME:
-  case CARD_ENTRY_INTENT.CARD_REFRESH_REBUILD:
     return true;
   default:
     return false;
@@ -196,7 +209,7 @@ export function shouldUseProgressBootstrapForEntryIntent(intent: CardEntryIntent
 export function resolveCardLaunchProgress(
   experimentState: Record<string, unknown> | null | undefined,
   unitCount: number
-): CardLaunchProgressResolution {
+): CardLaunchProgress {
   const safeUnitCount = Number.isFinite(unitCount) && unitCount > 0 ? unitCount : 0;
 
   if (!experimentState || typeof experimentState !== 'object' || Object.keys(experimentState).length === 0) {

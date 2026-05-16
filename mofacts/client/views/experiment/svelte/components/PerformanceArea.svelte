@@ -5,8 +5,14 @@
    * Switches between question timeout and feedback countdown
    */
 
-  /** @type {boolean} Whether to show timeout bar */
+  /** @type {boolean} Whether to show time/correct performance stats */
+  export let showPerformanceStats = true;
+
+  /** @type {boolean} Whether to show timeout progress bar */
   export let showTimeoutBar = true;
+
+  /** @type {boolean} Whether to show numeric timeout countdown text */
+  export let showTimeoutCountdown = true;
 
   /** @type {string} Total time display in minutes (string from legacy format) */
   export let totalTimeDisplay = '0.0';
@@ -23,52 +29,58 @@
   /** @type {number} Remaining time in seconds */
   export let remainingTime = 0;
 
-  $: hasVisibleTimeout = showTimeoutBar && timeoutMode !== 'none';
+  $: hasVisibleTimeout = (showTimeoutBar || showTimeoutCountdown) && timeoutMode !== 'none';
 
 </script>
 
 <div class="performance-area">
-  <div class="performance-stats">
-    <div class="stat-item">
-      <span class="stat-label" id="card-stat-time-label">Time</span>
-      <span class="stat-value" aria-labelledby="card-stat-time-label">
-        {totalTimeDisplay}<span class="stat-unit">min</span>
-      </span>
+  {#if showPerformanceStats}
+    <div class="performance-stats">
+      <div class="stat-item">
+        <span class="stat-label" id="card-stat-time-label">Time</span>
+        <span class="stat-value" aria-labelledby="card-stat-time-label">
+          {totalTimeDisplay}<span class="stat-unit">min</span>
+        </span>
+      </div>
+
+      <span class="stat-divider" aria-hidden="true"></span>
+
+      <div class="stat-item">
+        <span class="stat-label" id="card-stat-accuracy-label">Correct</span>
+        <span class="stat-value" aria-labelledby="card-stat-accuracy-label">
+          {percentCorrect}
+        </span>
+      </div>
     </div>
+  {/if}
 
-    <span class="stat-divider" aria-hidden="true"></span>
-
-    <div class="stat-item">
-      <span class="stat-label" id="card-stat-accuracy-label">Correct</span>
-      <span class="stat-value" aria-labelledby="card-stat-accuracy-label">
-        {percentCorrect}
-      </span>
-    </div>
-  </div>
-
-  {#if showTimeoutBar}
+  {#if showTimeoutBar || showTimeoutCountdown}
     <div
       class="timeout-bar-container"
       class:timeout-bar-container-placeholder={!hasVisibleTimeout}
       aria-hidden={!hasVisibleTimeout}
     >
-      <div class="timeout-label">
-        {#if timeoutMode === 'question'}
-          Time remaining: {remainingTime}s
-        {:else if timeoutMode === 'feedback'}
-          Continuing in: {remainingTime}s
-        {:else}
-          Time remaining: 0s
-        {/if}
-      </div>
-      <div class="timeout-bar-wrapper">
-        <div
-          class="timeout-bar"
-          class:warning={timeoutProgress > 50}
-          class:critical={timeoutProgress > 80}
-          style="--timeout-progress: {timeoutProgress}%"
-        ></div>
-      </div>
+      {#if showTimeoutCountdown}
+        <div class="timeout-label">
+          {#if timeoutMode === 'question'}
+            Time remaining: {remainingTime}s
+          {:else if timeoutMode === 'feedback'}
+            Continuing in: {remainingTime}s
+          {:else}
+            Time remaining: 0s
+          {/if}
+        </div>
+      {/if}
+      {#if showTimeoutBar}
+        <div class="timeout-bar-wrapper">
+          <div
+            class="timeout-bar"
+            class:warning={timeoutProgress > 50}
+            class:critical={timeoutProgress > 80}
+            style="--timeout-progress: {timeoutProgress}%"
+          ></div>
+        </div>
+      {/if}
     </div>
   {/if}
 </div>

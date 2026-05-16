@@ -1,18 +1,15 @@
 /**
  * Unit Engine Service
  *
- * Wraps existing unitEngine.js functionality for XState machine.
+ * Wraps current unit-engine construction for XState machine.
  * Handles card selection, scheduling, and adaptive learning algorithms.
- *
- * Reference:
- * - unitEngine.js (createScheduleUnit, createModelUnit, createEmptyUnit)
  */
 
 import { Session } from 'meteor/session';
-import { createScheduleUnit, createModelUnit, createEmptyUnit, createVideoUnit } from '../../unitEngine';
-import { getStimCluster, getCurrentDeliveryParams } from '../../../../lib/currentTestingHelpers';
+import { createUnitEngine } from '../../engineConstructors';
+import { getStimCluster, getCurrentDeliverySettings } from '../../../../lib/currentTestingHelpers';
 import { clientConsole } from '../../../../lib/clientLogger';
-import { UiSettingsStore } from '../../../../lib/state/uiSettingsStore';
+import { deliverySettingsStore } from '../../../../lib/state/deliverySettingsStore';
 import { getEngine } from '../../../../lib/engineManager';
 import { ExperimentStateStore } from '../../../../lib/state/experimentStateStore';
 import { computePracticeTimeMs } from '../../../../../lib/practiceTime';
@@ -22,7 +19,6 @@ import { sanitizeHTML, nextChar } from '../../../../lib/stringUtils';
 import { Answers } from '../../answerAssess';
 import { CardStore } from '../../modules/cardStore';
 import { resolveDynamicAssetPath } from './mediaResolver';
-import { sanitizeUiSettings } from '../utils/uiSettingsValidator';
 import { assertIdInvariants, logIdInvariantBreachOnce } from '../../../../lib/idContext';
 import { applyDisplayFieldSubset } from '../../../../../common/lib/displayFieldSubsets';
 import type {
@@ -110,7 +106,7 @@ interface TdfUnitLike extends Record<string, unknown> {
   isButtonTrial?: unknown;
   buttonTrial?: unknown;
   buttontrial?: unknown;
-  uiSettings?: Record<string, unknown>;
+  deliverySettings?: Record<string, unknown>;
 }
 
 interface TdfFileLike extends Record<string, unknown> {
@@ -118,15 +114,14 @@ interface TdfFileLike extends Record<string, unknown> {
     tutor?: {
       unit?: TdfUnitLike[];
       title?: string;
-      setspec?: {
-        uiSettings?: Record<string, unknown>;
-      };
+      deliverySettings?: Record<string, unknown>;
+      setspec?: Record<string, unknown>;
     };
   };
   name?: string;
 }
 
-type RuntimeUiSettings = ReturnType<typeof sanitizeUiSettings> & {
+type RuntimeDeliverySettings = Record<string, unknown> & {
   isVideoSession?: boolean;
   videoUrl?: string;
 };
@@ -145,8 +140,7 @@ interface PreparedTrialContent extends Record<string, unknown> {
   buttonTrial?: boolean;
   buttonList?: unknown[];
   testType?: string;
-  deliveryParams?: Record<string, unknown>;
-  uiSettings?: Record<string, unknown>;
+  deliverySettings?: Record<string, unknown>;
   setspec?: Record<string, unknown>;
   engineIndices?: Record<string, unknown> | null;
   engine?: UnitEngineLike | null;
@@ -252,36 +246,11 @@ export async function initializeEngine(tdf: TdfFileLike, unitNumber: number, uni
 
   
 
-  let engine = null;
-
-  if (unitType === 'schedule') {
-    engine = await createScheduleUnit(curExperimentData);  // FIXED: 1 param with wrapper
-    
-  } else if (unitType === 'model') {
-    engine = await createModelUnit(curExperimentData);     // FIXED: 1 param with wrapper
-    
-  } else if (unitType === 'video') {
-    engine = await createVideoUnit(curExperimentData);
-    
-  } else if (unitType === 'instruction-only') {
-    // ONLY create empty unit if explicitly marked as instruction-only
-    
-    engine = await createEmptyUnit(curExperimentData);     // FIXED: 1 param with wrapper
-  } else {
-    // NO SILENT FALLBACK - throw error for unknown types
-    const availableTypes = [];
-    if (unit.assessmentsession) availableTypes.push('assessmentsession');
-    if (unit.learningsession) availableTypes.push('learningsession');
-    if (unit.videosession) availableTypes.push('videosession');
-    throw new Error(
-      `initializeEngine: Unknown or undefined unit type "${unitType}" for unit "${unit.unitname}" at index ${unitNumber}. ` +
-      `Expected 'schedule', 'model', or 'instruction-only'. ` +
-      `Unit has: ${availableTypes.length ? availableTypes.join(', ') : 'no session types'}`
-    );
-  }
-
-  
-  return engine;
+  return await createUnitEngine(unitType, curExperimentData, {
+    source: 'initializeEngine',
+    unit,
+    unitNumber,
+  });
 }
 
 /**
@@ -425,7 +394,7 @@ function shuffleArray<T>(values: T[]): T[] {
  *   stim: Record<string, unknown>;
  *   originalAnswer: string;
  *   correctAnswer: string;
- *   deliveryParams: Record<string, unknown> | null | undefined;
+ *   deliverySettings: Record<string, unknown> | null | undefined;
  * }} params
  * @returns {Array<{
  *   verbalChoice: string;
@@ -439,13 +408,13 @@ function buildButtonList({
   stim,
   originalAnswer,
   correctAnswer,
-  deliveryParams,
+  deliverySettings,
 }: {
   curUnit: TdfUnitLike | null | undefined;
   stim: StimLike;
   originalAnswer: string;
   correctAnswer: string;
-  deliveryParams: Record<string, unknown> | null | undefined;
+  deliverySettings: Record<string, unknown> | null | undefined;
 }) {
   const buttonOrder = curUnit?.buttonorder ? curUnit.buttonorder.trim().toLowerCase() : '';
   const unitButtonOptions = normalizeButtonOptions(curUnit?.buttonOptions);
@@ -465,7 +434,7 @@ function buildButtonList({
   }
 
   const displayCorrectAnswer = Answers.getDisplayAnswerText(originalAnswer || correctAnswer || '');
-  const wrongButtonLimitValue = deliveryParams?.falseAnswerLimit;
+  const wrongButtonLimitValue = deliverySettings?.falseAnswerLimit;
   const wrongButtonLimit = typeof wrongButtonLimitValue === 'number'
     ? wrongButtonLimitValue
     : Number(wrongButtonLimitValue);
@@ -582,27 +551,22 @@ function buildCardDataFromResolvedTrial(params: {
     }
   }
 
-  const deliveryParams = getCurrentDeliveryParams();
-  const currentTdfFile = Session.get('currentTdfFile') as TdfFileLike | null | undefined;
-  const currentTdfUnit = (Session.get('currentTdfUnit') as TdfUnitLike | null | undefined) || {};
-  const existingUiSettings = (UiSettingsStore.get() || {}) as RuntimeUiSettings;
-  const mergedUiSettings = {
-    ...existingUiSettings,
-    ...(currentTdfFile?.tdfs?.tutor?.setspec?.uiSettings || {}),
-    ...(currentTdfUnit?.uiSettings || {}),
-  };
-  const tdfName = currentTdfFile?.tdfs?.tutor?.title || currentTdfFile?.name || '';
-  const uiSettings = sanitizeUiSettings(mergedUiSettings, { tdfName, silent: true }) as RuntimeUiSettings;
+  const baseDeliverySettings = getCurrentDeliverySettings();
+  const existingDeliverySettings = (deliverySettingsStore.get() || {}) as RuntimeDeliverySettings;
+  const deliverySettings = {
+    ...baseDeliverySettings,
+  } as RuntimeDeliverySettings;
   if (Session.get('isVideoSession') === true) {
-    uiSettings.isVideoSession = true;
+    deliverySettings.isVideoSession = true;
     if (
-      (typeof uiSettings.videoUrl !== 'string' || uiSettings.videoUrl.trim().length === 0) &&
-      typeof existingUiSettings.videoUrl === 'string' &&
-      existingUiSettings.videoUrl.trim().length > 0
+      (typeof deliverySettings.videoUrl !== 'string' || deliverySettings.videoUrl.trim().length === 0) &&
+      typeof existingDeliverySettings.videoUrl === 'string' &&
+      existingDeliverySettings.videoUrl.trim().length > 0
     ) {
-      uiSettings.videoUrl = existingUiSettings.videoUrl;
+      deliverySettings.videoUrl = existingDeliverySettings.videoUrl;
     }
   }
+  const currentTdfFile = Session.get('currentTdfFile') as TdfFileLike | null | undefined;
   const setspec = currentTdfFile?.tdfs?.tutor?.setspec || {};
 
   const sessionTestType = typeof Session.get('testType') === 'string'
@@ -619,7 +583,7 @@ function buildCardDataFromResolvedTrial(params: {
         stim,
         originalAnswer: fullAnswer,
         correctAnswer,
-        deliveryParams,
+        deliverySettings,
       })
     : [];
 
@@ -631,8 +595,7 @@ function buildCardDataFromResolvedTrial(params: {
     testType,
     buttonTrial,
     buttonList,
-    deliveryParams,
-    uiSettings,
+    deliverySettings,
     setspec,
     engineIndices: {
       clusterIndex: resolvedClusterIndex,
@@ -680,7 +643,7 @@ function getPreparedCardDataFromSelection(
       : resolveImageUrl(rawAudioSrc, stimScopedSetId),
     ...(displayAttribution ? { attribution: displayAttribution } : {}),
   };
-  const deliveryParams = getCurrentDeliveryParams();
+  const deliverySettings = getCurrentDeliverySettings();
   const testType = typeof selection.testType === 'string'
     ? selection.testType
     : typeof stim.testType === 'string'
@@ -688,7 +651,7 @@ function getPreparedCardDataFromSelection(
       : typeof Session.get('testType') === 'string'
         ? Session.get('testType')
         : 'd';
-  const currentDisplay = applyDisplayFieldSubset(resolvedDisplay, deliveryParams, testType);
+  const currentDisplay = applyDisplayFieldSubset(resolvedDisplay, deliverySettings, testType);
   const fullAnswer = typeof preparedState.newExperimentState === 'object' &&
     typeof (preparedState.newExperimentState as Record<string, unknown>).originalAnswer === 'string'
     ? String((preparedState.newExperimentState as Record<string, unknown>).originalAnswer)
@@ -1029,8 +992,8 @@ export function commitPreparedTrialRuntime(
 
   CardStore.setButtonTrial(Boolean(preparedTrial.buttonTrial));
   CardStore.setButtonList(Array.isArray(preparedTrial.buttonList) ? preparedTrial.buttonList : []);
-  if (preparedTrial.deliveryParams) {
-    Session.set('currentDeliveryParams', preparedTrial.deliveryParams);
+  if (preparedTrial.deliverySettings) {
+    Session.set('currentDeliverySettings', preparedTrial.deliverySettings);
   }
   if (preparedTrial.engineIndices) {
     const { clusterIndex, whichStim, stimIndex } = preparedTrial.engineIndices;
@@ -1134,8 +1097,10 @@ export async function selectCardService(
         testType: 'd',
         buttonTrial: false,
         buttonList: [],
-        deliveryParams: getCurrentDeliveryParams(),
-        uiSettings: UiSettingsStore.get() || {},
+        deliverySettings: {
+          ...getCurrentDeliverySettings(),
+          ...(deliverySettingsStore.get() || {}),
+        },
         engineIndices: { clusterIndex },
         questionIndex,
         engine

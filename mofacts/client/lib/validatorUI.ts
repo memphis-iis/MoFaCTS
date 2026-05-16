@@ -103,8 +103,8 @@ function createValidationItem(error: ValidationResult): string {
 
 /**
  * Format a schema path for human-readable display
- * @param {string} path - Schema path like 'root.unit[0].deliveryparams.drill'
- * @returns {string} Formatted path like 'Unit 1 > Delivery Params > Drill'
+ * @param {string} path - Schema path like 'root.unit[0].deliverySettings.drill'
+ * @returns {string} Formatted path like 'Unit 1 > Delivery Settings > Drill'
  */
 function formatPathForDisplay(path: string): string {
   return path
@@ -182,8 +182,8 @@ export function applyFieldErrors(container: HTMLElement, results: ValidationResu
 
 /**
  * Convert our path format to json-editor's data-schemapath format
- * Our format: 'root.unit[0].deliveryparams.drill'
- * json-editor format: 'root.unit.0.deliveryparams.drill'
+ * Our format: 'root.unit[0].deliverySettings.drill'
+ * json-editor format: 'root.unit.0.deliverySettings.drill'
  *
  * @param {string} path - Our path format
  * @returns {string} json-editor schemapath format

@@ -5,14 +5,14 @@ import './svelteCardTester.html';
 import { Session } from 'meteor/session';
 import { Template } from 'meteor/templating';
 import { ReactiveVar } from 'meteor/reactive-var';
-import { UiSettingsStore } from '../lib/state/uiSettingsStore';
-import { sanitizeUiSettings } from './experiment/svelte/utils/uiSettingsValidator';
+import { deliverySettingsStore } from '../lib/state/deliverySettingsStore';
+import { resolveCurrentDeliverySettings } from '../lib/deliverySettingsResolver';
 import {
   createStimClusterMapping,
   getStimCluster,
-  getCurrentDeliveryParams
+  getCurrentDeliverySettings
 } from '../lib/currentTestingHelpers';
-import { DEFAULT_UI_SETTINGS as BASE_UI_SETTINGS } from './experiment/svelte/machine/constants';
+import { DEFAULT_DELIVERY_SETTINGS as BASE_DELIVERY_SETTINGS } from './experiment/svelte/machine/constants';
 import { getCardDataFromEngine } from './experiment/svelte/services/unitEngineService';
 import { applyMappingRecordToSession } from './experiment/svelte/services/mappingRecordService';
 import { Answers } from './experiment/answerAssess';
@@ -20,8 +20,8 @@ import { KC_MULTIPLE, MODEL_UNIT, SCHEDULE_UNIT, VIDEO_UNIT, STIM_PARAMETER } fr
 import { getErrorMessage, getErrorStack } from '../lib/errorUtils';
 import { clientConsole } from '../lib/clientLogger';
 
-const DEFAULT_UI_SETTINGS: any = {
-  ...BASE_UI_SETTINGS,
+const DEFAULT_DELIVERY_SETTINGS: any = {
+  ...BASE_DELIVERY_SETTINGS,
   displayQuestionNumber: false
 };
 
@@ -58,7 +58,7 @@ function captureSessionState() {
   SESSION_KEYS.forEach((key) => {
     snapshot[key] = Session.get(key);
   });
-  snapshot.uiSettings = UiSettingsStore.get();
+  snapshot.deliverySettings = deliverySettingsStore.get();
   return snapshot;
 }
 
@@ -67,7 +67,7 @@ function restoreSessionState(snapshot: any) {
   SESSION_KEYS.forEach((key) => {
     Session.set(key, snapshot[key]);
   });
-  UiSettingsStore.set(snapshot.uiSettings || {});
+  deliverySettingsStore.set(snapshot.deliverySettings || {});
 }
 
 function readJsonFile(file: any) {
@@ -316,10 +316,14 @@ function configureTesterSession({ tdf, stimuli, unitIndex, testType, clusterCoun
     createdAt: Date.now(),
   });
 
-  const tdfSettings = setspec.uiSettings || {};
-  const unitSettings = unit.uiSettings || {};
-  const tdfName = tdf.tdfs?.tutor?.title || tdf.fileName || '';
-  UiSettingsStore.set(sanitizeUiSettings({ ...tdfSettings, ...unitSettings }, { tdfName }));
+  const { settings: deliverySettings } = resolveCurrentDeliverySettings({
+    tdfFile: tdf,
+    tutor: tdf.tdfs?.tutor,
+    unit,
+    unitIndex,
+    unitType,
+  });
+  deliverySettingsStore.set(deliverySettings);
 }
 
 function getActiveStatesForMode(mode: any) {
@@ -342,12 +346,13 @@ function buildMatches(activeStates: any) {
   };
 }
 
-function shouldShowTimeoutBar(uiSettings: any) {
-  return uiSettings.displayTimeoutBar === true;
+function shouldShowTimeoutDisplay(deliverySettings: any) {
+  return deliverySettings.displayTimeoutBar === true ||
+    deliverySettings.displayTimeoutCountdown === true;
 }
 
-function buildTimeoutConfig(mode: any, uiSettings: any) {
-  if (!shouldShowTimeoutBar(uiSettings)) {
+function buildTimeoutConfig(mode: any, deliverySettings: any) {
+  if (!shouldShowTimeoutDisplay(deliverySettings)) {
     return { ...DEFAULT_TIMEOUTS.none };
   }
   if (mode === 'test') {
@@ -360,10 +365,10 @@ function buildTimeoutConfig(mode: any, uiSettings: any) {
 }
 
 function buildTestSnapshot({ config, cardData, mode, userAnswer, feedbackMessage, isTimeout, performanceData }: any) {
-  const mergedUiSettings = normalizeUiSettings(config.uiSettings || {});
-  const mergedDeliveryParams = {
-    ...getCurrentDeliveryParams(),
-    ...(config.deliveryparams || {})
+  const mergedDeliverySettings = normalizeDeliverySettings(config.deliverySettings || {});
+  const mergedRuntimeDeliverySettings = {
+    ...getCurrentDeliverySettings(),
+    ...(config.deliverySettings || {})
   };
 
   const activeStates = getActiveStatesForMode(mode);
@@ -376,8 +381,10 @@ function buildTestSnapshot({ config, cardData, mode, userAnswer, feedbackMessage
     buttonList: cardData.buttonList,
     buttonTrial: cardData.buttonTrial,
     testType: cardData.testType,
-    deliveryParams: mergedDeliveryParams,
-    uiSettings: mergedUiSettings,
+    deliverySettings: {
+      ...mergedRuntimeDeliverySettings,
+      ...mergedDeliverySettings,
+    },
     feedbackMessage: feedbackMessage || '',
     isCorrect,
     isTimeout: !!isTimeout,
@@ -393,15 +400,15 @@ function buildTestSnapshot({ config, cardData, mode, userAnswer, feedbackMessage
       matches
     },
     performance: performanceData || { ...DEFAULT_PERFORMANCE },
-    timeout: buildTimeoutConfig(mode, mergedUiSettings)
+    timeout: buildTimeoutConfig(mode, mergedDeliverySettings)
   };
 }
 
-function normalizeUiSettings(rawSettings: any = {}) {
-  const mergedSettings = { ...DEFAULT_UI_SETTINGS, ...(rawSettings || {}) };
+function normalizeDeliverySettings(rawSettings: any = {}) {
+  const mergedSettings = { ...DEFAULT_DELIVERY_SETTINGS, ...(rawSettings || {}) };
 
-  Object.keys(DEFAULT_UI_SETTINGS).forEach((field: any) => {
-    if (typeof DEFAULT_UI_SETTINGS[field] !== 'boolean') return;
+  Object.keys(DEFAULT_DELIVERY_SETTINGS).forEach((field: any) => {
+    if (typeof DEFAULT_DELIVERY_SETTINGS[field] !== 'boolean') return;
     if (mergedSettings[field] === 'true') {
       mergedSettings[field] = true;
     } else if (mergedSettings[field] === 'false') {
@@ -409,7 +416,7 @@ function normalizeUiSettings(rawSettings: any = {}) {
     }
   });
 
-  const booleanStringFields = ['displayUserAnswerInFeedback', 'onlyShowSimpleFeedback'];
+  const booleanStringFields = ['displayUserAnswerInFeedback'];
 
   booleanStringFields.forEach((field: any) => {
     if (mergedSettings[field] === 'true') {
@@ -426,37 +433,37 @@ function syncSettingsFromConfig(instance: any) {
   const config = instance.currentConfig.get();
   if (!config) return;
 
-  const deliveryparams = config.deliveryparams || config.deliveryParams || {};
-  const uiSettings = normalizeUiSettings(config.uiSettings || {});
+  const deliverySettings = {
+    ...(config.deliverySettings || {}),
+    ...normalizeDeliverySettings(config.deliverySettings || {}),
+  };
 
-  $('.setting-fontsize').val(deliveryparams.fontsize || '24');
-  $('.setting-stimuliPosition').val(uiSettings.stimuliPosition || 'top');
-  $('.setting-displayQuestionNumber').prop('checked', uiSettings.displayQuestionNumber === true);
-  $('.setting-isVideoSession').prop('checked', uiSettings.isVideoSession === true);
-  $('.setting-videoUrl').val(uiSettings.videoUrl || '');
+  $('.setting-fontsize').val(deliverySettings.fontsize || '24');
+  $('.setting-stimuliPosition').val(deliverySettings.stimuliPosition || 'top');
+  $('.setting-displayQuestionNumber').prop('checked', deliverySettings.displayQuestionNumber === true);
+  $('.setting-isVideoSession').prop('checked', deliverySettings.isVideoSession === true);
+  $('.setting-videoUrl').val(deliverySettings.videoUrl || '');
 
-  $('.setting-displayTimeoutBar').prop('checked', uiSettings.displayTimeoutBar === true);
+  $('.setting-displayTimeoutBar').prop('checked', deliverySettings.displayTimeoutBar === true);
+  $('.setting-displayTimeoutCountdown').prop('checked', deliverySettings.displayTimeoutCountdown === true);
 
-  $('.setting-displayCorrectFeedback').prop('checked', uiSettings.displayCorrectFeedback === true);
-  $('.setting-displayIncorrectFeedback').prop('checked', uiSettings.displayIncorrectFeedback === true);
-  $('.setting-onlyShowSimpleFeedback').val(toTriStateSelectValue(uiSettings.onlyShowSimpleFeedback));
-  $('.setting-singleLineFeedback').prop('checked', uiSettings.singleLineFeedback === true);
+  $('.setting-displayCorrectFeedback').prop('checked', deliverySettings.displayCorrectFeedback === true);
+  $('.setting-displayIncorrectFeedback').prop('checked', deliverySettings.displayIncorrectFeedback === true);
+  $('.setting-feedbackLayout').val(deliverySettings.feedbackLayout || 'stacked');
 
-  $('.setting-displayCorrectAnswerInIncorrectFeedback').prop('checked', uiSettings.displayCorrectAnswerInIncorrectFeedback === true);
-  $('.setting-displayUserAnswerInFeedback').val(toTriStateSelectValue(uiSettings.displayUserAnswerInFeedback));
+  $('.setting-displayCorrectAnswerInIncorrectFeedback').prop('checked', deliverySettings.displayCorrectAnswerInIncorrectFeedback === true);
+  $('.setting-displayUserAnswerInFeedback').val(toTriStateSelectValue(deliverySettings.displayUserAnswerInFeedback));
 
-  $('.setting-correctColor').val(uiSettings.correctColor || 'green');
-  $('.setting-incorrectColor').val(uiSettings.incorrectColor || 'darkorange');
+  $('.setting-correctColor').val(deliverySettings.correctColor || 'var(--success-color)');
+  $('.setting-incorrectColor').val(deliverySettings.incorrectColor || 'var(--alert-color)');
 
-  $('.setting-displaySubmitButton').prop('checked', uiSettings.displaySubmitButton === true);
+  $('.setting-correctLabelText').val(deliverySettings.correctLabelText || 'Correct.');
+  $('.setting-incorrectLabelText').val(deliverySettings.incorrectLabelText || 'Incorrect.');
+  $('.setting-inputPlaceholderText').val(deliverySettings.inputPlaceholderText || 'Your answer');
 
-  $('.setting-correctMessage').val(uiSettings.correctMessage || 'Correct!');
-  $('.setting-incorrectMessage').val(uiSettings.incorrectMessage || 'Incorrect');
-  $('.setting-inputPlaceholderText').val(uiSettings.inputPlaceholderText || 'Your answer');
+  $('.setting-choiceButtonCols').val(deliverySettings.choiceButtonCols || 2);
 
-  $('.setting-choiceButtonCols').val(uiSettings.choiceButtonCols || 2);
-
-  $('.setting-caseSensitive').prop('checked', uiSettings.caseSensitive === true);
+  $('.setting-caseSensitive').prop('checked', deliverySettings.caseSensitive === true);
 }
 
 function parseTriStateSelectValue(value: any) {
@@ -486,12 +493,9 @@ function updateConfigSetting(instance: any, section: any, key: any, value: any) 
   const cardData = instance.currentCardData.get();
   if (cardData) {
     const nextCardData = { ...cardData };
-    if (section === 'uiSettings') {
-      nextCardData.uiSettings = { ...(nextCardData.uiSettings || {}), ...nextConfig[section] };
-      UiSettingsStore.set(normalizeUiSettings(nextCardData.uiSettings || {}));
-    }
-    if (section === 'deliveryparams' || section === 'deliveryParams') {
-      nextCardData.deliveryParams = { ...(nextCardData.deliveryParams || {}), ...nextConfig[section] };
+    if (section === 'deliverySettings') {
+      nextCardData.deliverySettings = { ...(nextCardData.deliverySettings || {}), ...nextConfig[section] };
+      deliverySettingsStore.set(normalizeDeliverySettings(nextCardData.deliverySettings || {}));
     }
     instance.currentCardData.set(nextCardData);
   }
@@ -556,8 +560,7 @@ function buildConfigFromSelection(instance: any) {
     answer: cardData.currentAnswer,
     buttonList: cardData.buttonList,
     testType: cardData.testType,
-    deliveryparams: cardData.deliveryParams || {},
-    uiSettings: cardData.uiSettings || {}
+    deliverySettings: cardData.deliverySettings || {}
   };
 
   return { config, cardData };
@@ -883,11 +886,11 @@ Template.svelteCardTester.events({
   },
 
   'click .layout-btn-over-under'(event: any, instance: any) {
-    updateConfigSetting(instance, 'uiSettings', 'stimuliPosition', 'top');
+    updateConfigSetting(instance, 'deliverySettings', 'stimuliPosition', 'top');
   },
 
   'click .layout-btn-split'(event: any, instance: any) {
-    updateConfigSetting(instance, 'uiSettings', 'stimuliPosition', 'left');
+    updateConfigSetting(instance, 'deliverySettings', 'stimuliPosition', 'left');
   },
 
   'click .toggle-settings, click .settings-header'(event: any, instance: any) {
@@ -896,83 +899,79 @@ Template.svelteCardTester.events({
   },
 
   'change .setting-fontsize'(event: any, instance: any) {
-    updateConfigSetting(instance, 'deliveryparams', 'fontsize', event.target.value);
+    updateConfigSetting(instance, 'deliverySettings', 'fontsize', event.target.value);
   },
 
   'change .setting-stimuliPosition'(event: any, instance: any) {
-    updateConfigSetting(instance, 'uiSettings', 'stimuliPosition', event.target.value);
+    updateConfigSetting(instance, 'deliverySettings', 'stimuliPosition', event.target.value);
   },
 
   'change .setting-displayCorrectFeedback'(event: any, instance: any) {
-    updateConfigSetting(instance, 'uiSettings', 'displayCorrectFeedback', event.target.checked);
+    updateConfigSetting(instance, 'deliverySettings', 'displayCorrectFeedback', event.target.checked);
   },
 
   'change .setting-displayIncorrectFeedback'(event: any, instance: any) {
-    updateConfigSetting(instance, 'uiSettings', 'displayIncorrectFeedback', event.target.checked);
+    updateConfigSetting(instance, 'deliverySettings', 'displayIncorrectFeedback', event.target.checked);
   },
 
-  'change .setting-onlyShowSimpleFeedback'(event: any, instance: any) {
-    updateConfigSetting(instance, 'uiSettings', 'onlyShowSimpleFeedback', parseTriStateSelectValue(event.target.value));
-  },
-
-  'change .setting-singleLineFeedback'(event: any, instance: any) {
-    updateConfigSetting(instance, 'uiSettings', 'singleLineFeedback', event.target.checked);
+  'change .setting-feedbackLayout'(event: any, instance: any) {
+    updateConfigSetting(instance, 'deliverySettings', 'feedbackLayout', event.target.value);
   },
 
   'change .setting-displayCorrectAnswerInIncorrectFeedback'(event: any, instance: any) {
-    updateConfigSetting(instance, 'uiSettings', 'displayCorrectAnswerInIncorrectFeedback', event.target.checked);
+    updateConfigSetting(instance, 'deliverySettings', 'displayCorrectAnswerInIncorrectFeedback', event.target.checked);
   },
 
   'change .setting-displayUserAnswerInFeedback'(event: any, instance: any) {
-    updateConfigSetting(instance, 'uiSettings', 'displayUserAnswerInFeedback', parseTriStateSelectValue(event.target.value));
+    updateConfigSetting(instance, 'deliverySettings', 'displayUserAnswerInFeedback', parseTriStateSelectValue(event.target.value));
   },
 
   'change .setting-correctColor'(event: any, instance: any) {
-    updateConfigSetting(instance, 'uiSettings', 'correctColor', event.target.value);
+    updateConfigSetting(instance, 'deliverySettings', 'correctColor', event.target.value);
   },
 
   'change .setting-incorrectColor'(event: any, instance: any) {
-    updateConfigSetting(instance, 'uiSettings', 'incorrectColor', event.target.value);
+    updateConfigSetting(instance, 'deliverySettings', 'incorrectColor', event.target.value);
   },
 
-  'change .setting-correctMessage'(event: any, instance: any) {
-    updateConfigSetting(instance, 'uiSettings', 'correctMessage', event.target.value);
+  'change .setting-correctLabelText'(event: any, instance: any) {
+    updateConfigSetting(instance, 'deliverySettings', 'correctLabelText', event.target.value);
   },
 
-  'change .setting-incorrectMessage'(event: any, instance: any) {
-    updateConfigSetting(instance, 'uiSettings', 'incorrectMessage', event.target.value);
-  },
-
-  'change .setting-displaySubmitButton'(event: any, instance: any) {
-    updateConfigSetting(instance, 'uiSettings', 'displaySubmitButton', event.target.checked);
+  'change .setting-incorrectLabelText'(event: any, instance: any) {
+    updateConfigSetting(instance, 'deliverySettings', 'incorrectLabelText', event.target.value);
   },
 
   'change .setting-inputPlaceholderText'(event: any, instance: any) {
-    updateConfigSetting(instance, 'uiSettings', 'inputPlaceholderText', event.target.value);
+    updateConfigSetting(instance, 'deliverySettings', 'inputPlaceholderText', event.target.value);
   },
 
   'change .setting-isVideoSession'(event: any, instance: any) {
-    updateConfigSetting(instance, 'uiSettings', 'isVideoSession', event.target.checked);
+    updateConfigSetting(instance, 'deliverySettings', 'isVideoSession', event.target.checked);
   },
 
   'change .setting-videoUrl'(event: any, instance: any) {
-    updateConfigSetting(instance, 'uiSettings', 'videoUrl', event.target.value);
+    updateConfigSetting(instance, 'deliverySettings', 'videoUrl', event.target.value);
   },
 
   'change .setting-displayQuestionNumber'(event: any, instance: any) {
-    updateConfigSetting(instance, 'uiSettings', 'displayQuestionNumber', event.target.checked);
+    updateConfigSetting(instance, 'deliverySettings', 'displayQuestionNumber', event.target.checked);
   },
 
   'change .setting-displayTimeoutBar'(event: any, instance: any) {
-    updateConfigSetting(instance, 'uiSettings', 'displayTimeoutBar', event.target.checked);
+    updateConfigSetting(instance, 'deliverySettings', 'displayTimeoutBar', event.target.checked);
+  },
+
+  'change .setting-displayTimeoutCountdown'(event: any, instance: any) {
+    updateConfigSetting(instance, 'deliverySettings', 'displayTimeoutCountdown', event.target.checked);
   },
 
   'change .setting-choiceButtonCols'(event: any, instance: any) {
-    updateConfigSetting(instance, 'uiSettings', 'choiceButtonCols', parseInt(event.target.value, 10));
+    updateConfigSetting(instance, 'deliverySettings', 'choiceButtonCols', parseInt(event.target.value, 10));
   },
 
   'change .setting-caseSensitive'(event: any, instance: any) {
-    updateConfigSetting(instance, 'uiSettings', 'caseSensitive', event.target.checked);
+    updateConfigSetting(instance, 'deliverySettings', 'caseSensitive', event.target.checked);
   }
 });
 

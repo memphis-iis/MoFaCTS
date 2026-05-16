@@ -8,7 +8,9 @@
   import VideoSessionMode from './VideoSessionMode.svelte';
 
   // Performance props
+  export let showPerformanceStats = true;
   export let showTimeoutBar = true;
+  export let showTimeoutCountdown = true;
   export let totalTimeDisplay = '0.0';
   export let percentCorrect = 'N/A';
   export let cardsSeen = 0;
@@ -29,14 +31,10 @@
   export let inputEnabled = true;
   export let userAnswer = '';
   export let feedbackUserAnswer = '';
-  export let showSubmitButton = true;
   export let inputPlaceholder = 'Type your answer...';
   export let showButtons = true;
   export let buttonList = [];
   export let buttonColumns = 2;
-  export let displayConfirmButton = false;
-  export let confirmEnabled = false;
-  export let selectedChoiceIndex = null;
   export let srStatus = 'idle';
   export let srAttempt = 0;
   export let srMaxAttempts = 3;
@@ -47,8 +45,8 @@
   export let isTimeout = false;
   export let correctAnswer = '';
   export let correctAnswerImageSrc = '';
-  export let correctMessage = 'Correct!';
-  export let incorrectMessage = 'Incorrect';
+  export let correctLabelText = 'Correct.';
+  export let incorrectLabelText = 'Incorrect.';
   export let feedbackMessage = '';
   export let forceCorrectPrompt = 'Please type the correct answer to continue';
   export let correctColor = 'var(--success-color)';
@@ -56,9 +54,8 @@
   export let displayCorrectFeedback = true;
   export let displayIncorrectFeedback = true;
   export let displayUserAnswerInFeedback = 'onIncorrect';
-  export let singleLineFeedback = false;
-  export let onlyShowSimpleFeedback = false;
-  export let displayCorrectAnswerInIncorrectFeedback = false;
+  export let feedbackLayout = 'stacked';
+  export let displayCorrectAnswerInIncorrectFeedback = true;
   export let isVideoSession = false;
   export let videoUrl = '';
   export let cardFontSizeStyle = '';
@@ -71,7 +68,9 @@
       showOverlay={displayVisible || feedbackVisible}
     >
       <PerformanceArea
+        {showPerformanceStats}
         {showTimeoutBar}
+        {showTimeoutCountdown}
         {totalTimeDisplay}
         {percentCorrect}
         {cardsSeen}
@@ -93,14 +92,10 @@
         {inputEnabled}
         {userAnswer}
         {feedbackUserAnswer}
-        {showSubmitButton}
         {inputPlaceholder}
         {showButtons}
         {buttonList}
         {buttonColumns}
-        {displayConfirmButton}
-        {confirmEnabled}
-        {selectedChoiceIndex}
         {srStatus}
         {srAttempt}
         {srMaxAttempts}
@@ -111,8 +106,8 @@
         {isTimeout}
         {correctAnswer}
         {correctAnswerImageSrc}
-        {correctMessage}
-        {incorrectMessage}
+        {correctLabelText}
+        {incorrectLabelText}
         {feedbackMessage}
         {forceCorrectPrompt}
         {correctColor}
@@ -120,14 +115,15 @@
         {displayCorrectFeedback}
         {displayIncorrectFeedback}
         {displayUserAnswerInFeedback}
-        {singleLineFeedback}
-        {onlyShowSimpleFeedback}
+        {feedbackLayout}
         {displayCorrectAnswerInIncorrectFeedback}
       />
     </VideoSessionMode>
   {:else}
     <PerformanceArea
+      {showPerformanceStats}
       {showTimeoutBar}
+      {showTimeoutCountdown}
       {totalTimeDisplay}
       {percentCorrect}
       {cardsSeen}
@@ -149,14 +145,10 @@
       {inputEnabled}
       {userAnswer}
       {feedbackUserAnswer}
-      {showSubmitButton}
       {inputPlaceholder}
       {showButtons}
       {buttonList}
       {buttonColumns}
-      {displayConfirmButton}
-      {confirmEnabled}
-      {selectedChoiceIndex}
       {srStatus}
       {srAttempt}
       {srMaxAttempts}
@@ -167,8 +159,8 @@
       {isTimeout}
       {correctAnswer}
       {correctAnswerImageSrc}
-      {correctMessage}
-      {incorrectMessage}
+      {correctLabelText}
+      {incorrectLabelText}
       {feedbackMessage}
       {forceCorrectPrompt}
       {correctColor}
@@ -176,8 +168,7 @@
       {displayCorrectFeedback}
       {displayIncorrectFeedback}
       {displayUserAnswerInFeedback}
-      {singleLineFeedback}
-      {onlyShowSimpleFeedback}
+      {feedbackLayout}
       {displayCorrectAnswerInIncorrectFeedback}
     />
   {/if}

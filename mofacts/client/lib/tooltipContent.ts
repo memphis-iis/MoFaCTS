@@ -6,14 +6,14 @@
  */
 
 import {
-  createDeliveryParamTooltipMap,
+  createDeliverySettingTooltipMap,
   createStimTooltipMap,
   createTdfTooltipMap,
 } from '../../common/fieldRegistry';
 
 export const TDF_TOOLTIPS = {
   ...createTdfTooltipMap(),
-  ...createDeliveryParamTooltipMap(),
+  ...createDeliverySettingTooltipMap(),
 };
 
 export const STIM_TOOLTIPS = {

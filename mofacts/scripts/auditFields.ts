@@ -2,16 +2,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  DEFAULT_UI_SETTINGS,
+  DEFAULT_DELIVERY_SETTINGS,
 } from '../client/views/experiment/svelte/machine/constants.ts';
 import {
-  DELIVERY_PARAM_ALIAS_TO_CANONICAL,
-  DELIVERY_PARAM_FIELD_REGISTRY,
-  DELIVERY_PARAM_RUNTIME_INVENTORY,
-  DELIVERY_PARAM_SUPPORTED_KEYS,
-  createDeliveryParamTooltipMap,
-  createDeliveryParamValidationCoverage,
-  createDeliveryParamValidatorMap,
+  DELIVERY_SETTINGS_ALIAS_TO_CANONICAL,
+  DELIVERY_SETTINGS_FIELD_REGISTRY,
+  DELIVERY_SETTINGS_RUNTIME_INVENTORY,
+  DELIVERY_SETTINGS_SUPPORTED_KEYS,
+  createDeliverySettingTooltipMap,
+  createDeliverySettingValidationCoverage,
+  createDeliverySettingValidatorMap,
   createStimTooltipMap,
   createStimValidatorMap,
   createTdfTooltipMap,
@@ -20,9 +20,9 @@ import {
   STIM_VALIDATION_COVERAGE,
   TDF_REGISTRY_SECTIONS,
   TDF_VALIDATION_COVERAGE,
-  UI_SETTINGS_DEPRECATED_GUIDANCE,
-  UI_SETTINGS_RUNTIME_DEFAULTS,
-  UI_SETTINGS_RUNTIME_INVENTORY,
+  DELIVERY_DISPLAY_SETTINGS_DEPRECATED_GUIDANCE,
+  DELIVERY_DISPLAY_SETTINGS_RUNTIME_DEFAULTS,
+  DELIVERY_DISPLAY_SETTINGS_RUNTIME_INVENTORY,
 } from '../common/fieldRegistry.ts';
 import {
   buildTdfSchema,
@@ -89,17 +89,17 @@ function collectFailures() {
 
   const tdfTooltipMap = {
     ...createTdfTooltipMap(),
-    ...createDeliveryParamTooltipMap(),
+    ...createDeliverySettingTooltipMap(),
   };
   const stimTooltipMap = createStimTooltipMap();
   const tdfValidatorMap = {
     ...createTdfValidatorMap(),
-    ...createDeliveryParamValidatorMap(),
+    ...createDeliverySettingValidatorMap(),
   };
   const stimValidatorMap = createStimValidatorMap();
   const nestedSchemaKeys = {
-    'tutor.setspec': ['uiSettings', 'unitTemplate'],
-    'tutor.unit[]': ['deliveryparams', 'uiSettings', 'learningsession', 'assessmentsession', 'videosession'],
+    'tutor.setspec': ['unitTemplate'],
+    'tutor.unit[]': ['deliverySettings', 'learningsession', 'assessmentsession', 'videosession'],
     'tutor.unit[].assessmentsession': ['conditiontemplatesbygroup'],
     'setspec.clusters[]': ['stims'],
     'setspec.clusters[].stims[]': ['display', 'response'],
@@ -143,9 +143,7 @@ function collectFailures() {
           });
         }
 
-        const coverageKey = section.schemaLabel.includes('uiSettings')
-          ? 'uiSettings'
-          : section.schemaLabel.includes('learningsession')
+        const coverageKey = section.schemaLabel.includes('learningsession')
             ? 'learningsession'
             : section.schemaLabel.includes('conditiontemplatesbygroup')
               ? 'conditiontemplatesbygroup'
@@ -245,11 +243,11 @@ function collectFailures() {
   }
 
   const deliveryParamPaths = [
-    'deliveryparams',
-    'unit[].deliveryparams',
-    'setspec.unitTemplate[].deliveryparams',
+    'deliverySettings',
+    'unit[].deliverySettings',
+    'setspec.unitTemplate[].deliverySettings',
   ];
-  for (const key of DELIVERY_PARAM_SUPPORTED_KEYS) {
+  for (const key of DELIVERY_SETTINGS_SUPPORTED_KEYS) {
     for (const prefix of deliveryParamPaths) {
       const fieldPath = `${prefix}.${key}`;
       if (!tdfTooltipMap[fieldPath]) {
@@ -259,7 +257,7 @@ function collectFailures() {
         });
       }
 
-      if (createDeliveryParamValidationCoverage()[key] !== 'none' && !tdfValidatorMap[fieldPath]) {
+      if (createDeliverySettingValidationCoverage()[key] !== 'none' && !tdfValidatorMap[fieldPath]) {
         failures.push({
           category: 'Validator projection completeness',
           message: `Missing validator metadata for ${fieldPath}`,
@@ -268,10 +266,10 @@ function collectFailures() {
     }
   }
 
-  for (const key of DELIVERY_PARAM_RUNTIME_INVENTORY.directRuntimeKeys || []) {
+  for (const key of DELIVERY_SETTINGS_RUNTIME_INVENTORY.directRuntimeKeys || []) {
     if (
-      !DELIVERY_PARAM_RUNTIME_INVENTORY.canonicalKeys.includes(key) &&
-      !Object.prototype.hasOwnProperty.call(DELIVERY_PARAM_RUNTIME_INVENTORY.aliasToCanonical, key)
+      !DELIVERY_SETTINGS_RUNTIME_INVENTORY.canonicalKeys.includes(key) &&
+      !Object.prototype.hasOwnProperty.call(DELIVERY_SETTINGS_RUNTIME_INVENTORY.aliasToCanonical, key)
     ) {
       failures.push({
         category: 'Registry completeness against runtime inventories',
@@ -282,17 +280,17 @@ function collectFailures() {
 
   const allowedImportOnlyKeys = new Set(['lfparameter']);
   for (const key of Object.keys(importParameterDefaults)) {
-    if (!DELIVERY_PARAM_SUPPORTED_KEYS.includes(key) && !allowedImportOnlyKeys.has(key)) {
+    if (!DELIVERY_SETTINGS_SUPPORTED_KEYS.includes(key) && !allowedImportOnlyKeys.has(key)) {
       failures.push({
         category: 'Import defaults against registry',
-        message: `Import parameter default "${key}" is not a supported delivery param or approved import-only key`,
+        message: `Import parameter default "${key}" is not a supported delivery setting or approved import-only key`,
       });
     }
   }
 
-  for (const [key, field] of Object.entries(DELIVERY_PARAM_FIELD_REGISTRY)) {
+  for (const [key, field] of Object.entries(DELIVERY_SETTINGS_FIELD_REGISTRY)) {
     for (const alias of field.aliases || []) {
-      if (DELIVERY_PARAM_ALIAS_TO_CANONICAL[alias] !== key) {
+      if (DELIVERY_SETTINGS_ALIAS_TO_CANONICAL[alias] !== key) {
         failures.push({
           category: 'Alias and migration coverage',
           message: `Alias ${alias} does not resolve to canonical key ${key}`,
@@ -301,27 +299,27 @@ function collectFailures() {
     }
   }
 
-  if (stableJson(DEFAULT_UI_SETTINGS) !== stableJson(UI_SETTINGS_RUNTIME_DEFAULTS)) {
+  if (stableJson(DEFAULT_DELIVERY_SETTINGS) !== stableJson(DELIVERY_DISPLAY_SETTINGS_RUNTIME_DEFAULTS)) {
     failures.push({
       category: 'Registry completeness against runtime inventories',
-      message: 'DEFAULT_UI_SETTINGS does not match the registry-derived UI settings defaults',
+      message: 'DEFAULT_DELIVERY_SETTINGS does not match the registry-derived delivery settings defaults',
     });
   }
 
-  for (const runtimeKey of UI_SETTINGS_RUNTIME_INVENTORY.runtimeKeys) {
-    if (!Object.prototype.hasOwnProperty.call(UI_SETTINGS_RUNTIME_DEFAULTS, runtimeKey)) {
+  for (const runtimeKey of DELIVERY_DISPLAY_SETTINGS_RUNTIME_INVENTORY.runtimeKeys) {
+    if (!Object.prototype.hasOwnProperty.call(DELIVERY_DISPLAY_SETTINGS_RUNTIME_DEFAULTS, runtimeKey)) {
       failures.push({
         category: 'Registry completeness against runtime inventories',
-        message: `UI settings runtime key "${runtimeKey}" is missing a runtime default`,
+        message: `Delivery display setting runtime key "${runtimeKey}" is missing a runtime default`,
       });
     }
   }
 
-  for (const deprecatedKey of UI_SETTINGS_RUNTIME_INVENTORY.deprecatedKeys) {
-    if (!UI_SETTINGS_DEPRECATED_GUIDANCE[deprecatedKey]) {
+  for (const deprecatedKey of DELIVERY_DISPLAY_SETTINGS_RUNTIME_INVENTORY.deprecatedKeys) {
+    if (!DELIVERY_DISPLAY_SETTINGS_DEPRECATED_GUIDANCE[deprecatedKey]) {
       failures.push({
         category: 'Alias and migration coverage',
-        message: `Deprecated UI setting "${deprecatedKey}" is missing migration guidance`,
+        message: `Deprecated delivery display setting "${deprecatedKey}" is missing migration guidance`,
       });
     }
   }
@@ -333,11 +331,11 @@ function printReport(failures) {
   console.log('Field Registry Audit');
   console.log(`TDF registry sections: ${TDF_REGISTRY_SECTIONS.length}`);
   console.log(`Stim registry sections: ${STIM_REGISTRY_SECTIONS.length}`);
-  console.log(`Delivery params supported: ${DELIVERY_PARAM_SUPPORTED_KEYS.length}`);
-  console.log(`Delivery params learner-configurable: ${DELIVERY_PARAM_RUNTIME_INVENTORY.learnerConfigurableKeys.length}`);
-  console.log(`UI settings supported: ${UI_SETTINGS_RUNTIME_INVENTORY.supportedKeys.length}`);
-  console.log(`UI settings learner-configurable: ${UI_SETTINGS_RUNTIME_INVENTORY.learnerConfigurableKeys.length}`);
-  console.log(`UI settings deprecated: ${UI_SETTINGS_RUNTIME_INVENTORY.deprecatedKeys.length}`);
+  console.log(`Delivery timing/control settings supported: ${DELIVERY_SETTINGS_SUPPORTED_KEYS.length}`);
+  console.log(`Delivery timing/control settings learner-configurable: ${DELIVERY_SETTINGS_RUNTIME_INVENTORY.learnerConfigurableKeys.length}`);
+  console.log(`Delivery display settings supported: ${DELIVERY_DISPLAY_SETTINGS_RUNTIME_INVENTORY.supportedKeys.length}`);
+  console.log(`Delivery display settings learner-configurable: ${DELIVERY_DISPLAY_SETTINGS_RUNTIME_INVENTORY.learnerConfigurableKeys.length}`);
+  console.log(`Delivery display settings deprecated: ${DELIVERY_DISPLAY_SETTINGS_RUNTIME_INVENTORY.deprecatedKeys.length}`);
 
   if (failures.length === 0) {
     console.log('Audit passed.');

@@ -26,7 +26,7 @@ describe('machine services contracts', function() {
 
   it('readyPromptDelayService returns delay contract payload', async function() {
     const result = await readyPromptDelayService({
-      deliveryParams: { readyPromptStringDisplayTime: '0' },
+      deliverySettings: { readyPromptStringDisplayTime: '0' },
     });
 
     expect(result).to.deep.equal({ delayMs: 0 });
@@ -34,7 +34,7 @@ describe('machine services contracts', function() {
 
   it('prestimulusDelayService returns delay contract payload', async function() {
     const result = await prestimulusDelayService({
-      deliveryParams: { prestimulusdisplaytime: '0' },
+      deliverySettings: { prestimulusdisplaytime: '0' },
     });
 
     expect(result).to.deep.equal({ delayMs: 0 });
@@ -43,7 +43,7 @@ describe('machine services contracts', function() {
   it('questionAudioGateService skips when no audio payload exists', async function() {
     const result = await questionAudioGateService({
       currentDisplay: { text: 'no audio' },
-      deliveryParams: {},
+      deliverySettings: {},
     });
 
     expect(result).to.deep.equal({ skipped: true });

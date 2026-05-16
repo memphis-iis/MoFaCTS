@@ -3,7 +3,7 @@ import {haveMeteorUser} from '../lib/currentTestingHelpers';
 import {instructContinue, unitHasLockout} from '../views/experiment/instructions';
 import {Cookie} from './cookies';
 import {displayify} from '../../common/globalHelpers';
-import {selectTdf} from '../views/home/home';
+import {selectTdf} from './lessonLaunchRunner';
 import {clientConsole} from '../index';
 import {CardStore} from '../views/experiment/modules/cardStore';
 import { Tracker } from 'meteor/tracker';
@@ -431,7 +431,7 @@ FlowRouter.route('/experiment/:target?/:xcond?', {
         tdf.content.tdfs.tutor.setspec.experimentPasswordRequired === 'true' ||
         tdf.content.tdfs.tutor.setspec.experimentPasswordRequired === true;
       Session.set('experimentPasswordRequired', experimentPasswordRequired);
-      Session.set('loginPrompt',tdf.content.tdfs.tutor.setspec.uiSettings?.experimentLoginText || "Amazon Turk ID");
+      Session.set('loginPrompt',tdf.content.tdfs.tutor.deliverySettings?.experimentLoginText || "Amazon Turk ID");
       clientConsole(2, 'experimentPasswordRequired:', experimentPasswordRequired);
 
       clientConsole(2, 'EXPERIMENT target:', target, 'xcond', xcond);

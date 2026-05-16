@@ -1,4 +1,4 @@
-import { createDeliveryParamSchema } from './fieldRegistry.ts';
+import { createDeliverySettingSchema } from './fieldRegistry.ts';
 import {
   INTERACTIVE_TDF_UNIT_TYPES,
   type TdfUnitType,
@@ -6,8 +6,8 @@ import {
 
 type FieldLifecycleStatus = 'supported' | 'deprecated' | 'ignored';
 type ValidatorSeverity = 'error' | 'warning';
-type UiRuntimeCoercionKind = 'none' | 'boolean' | 'number';
-type UiRuntimeValidationKind =
+type DeliveryDisplayRuntimeCoercionKind = 'none' | 'boolean' | 'number';
+type DeliveryDisplayRuntimeValidationKind =
   | 'any'
   | 'boolean'
   | 'booleanOrEnum'
@@ -30,8 +30,8 @@ type ValidatorConfig = {
   breaking?: boolean;
 };
 
-type UiRuntimeValidationDefinition = {
-  kind: UiRuntimeValidationKind;
+type DeliveryDisplayRuntimeValidationDefinition = {
+  kind: DeliveryDisplayRuntimeValidationKind;
   min?: number;
   max?: number;
   values?: readonly string[];
@@ -53,8 +53,8 @@ type SectionFieldDefinition = {
   validation?: ValidatorConfig | null;
   runtime?: {
     default?: unknown;
-    coerce?: UiRuntimeCoercionKind;
-    validation?: UiRuntimeValidationDefinition;
+    coerce?: DeliveryDisplayRuntimeCoercionKind;
+    validation?: DeliveryDisplayRuntimeValidationDefinition;
   };
   migration?: {
     replacement?: string;
@@ -428,6 +428,7 @@ function createClosedObjectSchema(
       .map(([key, definition]) => {
         const schema: Record<string, unknown> = {
           title: definition.tooltip.brief,
+          description: definition.tooltip.verbose,
           ...deepClone(definition.authoringSchema),
         };
         const applicableUnitTypes = definition.appliesToUnitTypes || defaultApplicableUnitTypes;
@@ -523,7 +524,7 @@ function createRuntimeDefaults(registry: SectionFieldRegistry): Record<string, u
   );
 }
 
-function coerceUiRuntimeValue(definition: SectionFieldDefinition, value: unknown): unknown {
+function coerceDeliveryDisplayRuntimeValue(definition: SectionFieldDefinition, value: unknown): unknown {
   switch (definition.runtime?.coerce) {
     case 'boolean':
       if (value === 'true') {
@@ -545,7 +546,7 @@ function coerceUiRuntimeValue(definition: SectionFieldDefinition, value: unknown
   }
 }
 
-function isUiRuntimeValueValid(definition: SectionFieldDefinition, value: unknown): boolean {
+function isDeliveryDisplayRuntimeValueValid(definition: SectionFieldDefinition, value: unknown): boolean {
   const rule = definition.runtime?.validation;
   if (!rule) {
     return true;
@@ -627,11 +628,11 @@ const SETSPEC_FIELD_REGISTRY: SectionFieldRegistry = {
     brief: 'Show lesson on the learner dashboard.',
     verbose: 'When enabled, learners can pick this lesson directly from their dashboard.'
   }),
-  allowRevistUnit: simpleField(legacyBooleanField('false'), {
+  allowRevisitUnit: simpleField(legacyBooleanField('false'), {
     brief: 'Allow revisiting the current unit from instructions.',
     verbose: 'When enabled at the lesson level, instruction screens expose the current-unit revisit path so a learner can return to the unit instead of only continuing forward.'
   }, {
-    aliases: ['allowRevisitUnit'],
+    aliases: ['allowRevistUnit'],
   }),
   lfparameter: simpleField(withGrid({ anyOf: [{ type: 'string' }, { type: 'number' }] }, 4), {
     brief: 'Fuzzy matching threshold.',
@@ -888,7 +889,7 @@ const SETSPEC_FIELD_REGISTRY: SectionFieldRegistry = {
   }),
 };
 
-const UI_SETTINGS_FIELD_REGISTRY: SectionFieldRegistry = {
+const DELIVERY_DISPLAY_SETTINGS_FIELD_REGISTRY: SectionFieldRegistry = {
   stimuliPosition: simpleField(enumStringField(['top', 'left'], 'top', 4), {
     brief: 'Prompt placement.',
     verbose: 'Position of the prompt relative to the response area. Options are "top" or "left"; default is "top".'
@@ -932,8 +933,8 @@ const UI_SETTINGS_FIELD_REGISTRY: SectionFieldRegistry = {
     },
   }),
   displayCorrectFeedback: simpleField(booleanField(true, 4), {
-    brief: 'Show correct feedback.',
-    verbose: 'Controls whether positive feedback is rendered after correct answers.'
+    brief: 'Show correct feedback',
+    verbose: 'When enabled, learners see feedback after correct answers. When disabled, correct answers still count as correct, but no correct-answer feedback is displayed or spoken.'
   }, {
     runtime: {
       default: true,
@@ -942,8 +943,8 @@ const UI_SETTINGS_FIELD_REGISTRY: SectionFieldRegistry = {
     },
   }),
   displayIncorrectFeedback: simpleField(booleanField(true, 4), {
-    brief: 'Show incorrect feedback.',
-    verbose: 'Controls whether negative feedback is rendered after incorrect answers.'
+    brief: 'Show incorrect feedback',
+    verbose: 'When enabled, learners see feedback after incorrect answers and timeouts. When disabled, incorrect outcomes still count as incorrect, but no incorrect-answer feedback is displayed or spoken.'
   }, {
     runtime: {
       default: true,
@@ -951,9 +952,9 @@ const UI_SETTINGS_FIELD_REGISTRY: SectionFieldRegistry = {
       validation: { kind: 'boolean' },
     },
   }),
-  correctMessage: simpleField(stringField('Correct.', 6), {
-    brief: 'Correct-answer feedback text.',
-    verbose: 'Primary feedback string shown after correct answers.'
+  correctLabelText: simpleField(stringField('Correct.', 6), {
+    brief: 'Correct feedback label',
+    verbose: 'Text used for the leading outcome label on correct-answer feedback. This label does not replace evaluator explanations such as close-enough or phonetic-match messages.'
   }, {
     runtime: {
       default: 'Correct.',
@@ -961,9 +962,9 @@ const UI_SETTINGS_FIELD_REGISTRY: SectionFieldRegistry = {
       validation: { kind: 'stringMaxLengthNonEmpty', max: 100 },
     },
   }),
-  incorrectMessage: simpleField(stringField('Incorrect.', 6), {
-    brief: 'Incorrect-answer feedback text.',
-    verbose: 'Primary feedback string shown after incorrect answers or timeouts.'
+  incorrectLabelText: simpleField(stringField('Incorrect.', 6), {
+    brief: 'Incorrect feedback label',
+    verbose: 'Text used for the leading outcome label on incorrect-answer and timeout feedback. This label does not replace evaluator explanations or correct-answer wording.'
   }, {
     runtime: {
       default: 'Incorrect.',
@@ -972,8 +973,8 @@ const UI_SETTINGS_FIELD_REGISTRY: SectionFieldRegistry = {
     },
   }),
   correctColor: simpleField(stringField('var(--success-color)', 4), {
-    brief: 'Correct feedback color.',
-    verbose: 'CSS color token or variable used for correct feedback.'
+    brief: 'Correct feedback color',
+    verbose: 'CSS color value used for correct-answer feedback text. Supported values are hex colors such as "#00ff00" or CSS custom properties such as "var(--success-color)".'
   }, {
     runtime: {
       default: 'var(--success-color)',
@@ -982,8 +983,8 @@ const UI_SETTINGS_FIELD_REGISTRY: SectionFieldRegistry = {
     },
   }),
   incorrectColor: simpleField(stringField('var(--alert-color)', 4), {
-    brief: 'Incorrect feedback color.',
-    verbose: 'CSS color token or variable used for incorrect feedback.'
+    brief: 'Incorrect feedback color',
+    verbose: 'CSS color value used for incorrect-answer and timeout feedback text. Supported values are hex colors such as "#ff0000" or CSS custom properties such as "var(--alert-color)".'
   }, {
     runtime: {
       default: 'var(--alert-color)',
@@ -1001,8 +1002,8 @@ const UI_SETTINGS_FIELD_REGISTRY: SectionFieldRegistry = {
       options: { grid_columns: 4 },
     },
     {
-      brief: 'Show the learner answer in feedback.',
-      verbose: 'Controls when the learner’s submitted answer is shown in feedback. Options are "onCorrect", "onIncorrect", true for always, or false for never.'
+      brief: 'Show learner answer in feedback',
+      verbose: 'Controls when the learner’s submitted answer is included in feedback. Use "onIncorrect" to show it only after incorrect answers, "onCorrect" only after correct answers, true to show it for both, or false to never show it.'
     },
     {
       runtime: {
@@ -1012,43 +1013,22 @@ const UI_SETTINGS_FIELD_REGISTRY: SectionFieldRegistry = {
       },
     }
   ),
-  singleLineFeedback: simpleField(booleanField(false, 4), {
-    brief: 'Force feedback onto one line.',
-    verbose: 'When true, keeps feedback on one line by stripping line breaks. When false, answer text can drop beneath the Correct/Incorrect label.'
+  feedbackLayout: simpleField(enumStringField(['stacked', 'inline'], 'stacked', 4), {
+    brief: 'Feedback layout',
+    verbose: 'Controls how selected feedback pieces are arranged visually. Use "stacked" to place pieces on separate lines, or "inline" to keep them in one line when space allows. This setting does not change spoken or logged feedback text.'
   }, {
     runtime: {
-      default: false,
-      coerce: 'boolean',
-      validation: { kind: 'boolean' },
+      default: 'stacked',
+      coerce: 'none',
+      validation: { kind: 'enum', values: ['stacked', 'inline'] },
     },
   }),
-  onlyShowSimpleFeedback: simpleField(
-    {
-      anyOf: [
-        { type: 'boolean' },
-        { type: 'string', enum: ['onCorrect', 'onIncorrect'] },
-      ],
-      default: false,
-      options: { grid_columns: 4 },
-    },
-    {
-      brief: 'Use simplified feedback.',
-      verbose: 'Replaces full feedback with just the simple Correct/Incorrect label. Options are "onCorrect", "onIncorrect", true for both, or false for full feedback. Default is false.'
-    },
-    {
-      runtime: {
-        default: false,
-        coerce: 'boolean',
-        validation: { kind: 'booleanOrEnum', values: ['onCorrect', 'onIncorrect'] },
-      },
-    }
-  ),
-  displayCorrectAnswerInIncorrectFeedback: simpleField(booleanField(false, 4), {
-    brief: 'Show the correct answer after incorrect feedback.',
-    verbose: 'When true, includes the actual correct answer in incorrect feedback after the Incorrect label. Default is false.'
+  displayCorrectAnswerInIncorrectFeedback: simpleField(booleanField(true, 4), {
+    brief: 'Show correct answer after incorrect feedback',
+    verbose: 'When enabled, incorrect-answer feedback includes the expected correct answer after the outcome label and evaluator explanation, when a text answer is available.'
   }, {
     runtime: {
-      default: false,
+      default: true,
       coerce: 'boolean',
       validation: { kind: 'boolean' },
     },
@@ -1065,7 +1045,17 @@ const UI_SETTINGS_FIELD_REGISTRY: SectionFieldRegistry = {
   }),
   displayTimeoutBar: simpleField(booleanField(false, 4), {
     brief: 'Show timeout bar.',
-    verbose: 'Render timeout countdown as a progress bar.'
+    verbose: 'Render timeout progress as a visual bar. The numeric countdown is controlled separately by displayTimeoutCountdown.'
+  }, {
+    runtime: {
+      default: false,
+      coerce: 'boolean',
+      validation: { kind: 'boolean' },
+    },
+  }),
+  displayTimeoutCountdown: simpleField(booleanField(false, 4), {
+    brief: 'Show numeric timeout countdown.',
+    verbose: 'Render timeout text such as time remaining or continuing countdown. The visual progress bar is controlled separately by displayTimeoutBar.'
   }, {
     runtime: {
       default: false,
@@ -1083,19 +1073,9 @@ const UI_SETTINGS_FIELD_REGISTRY: SectionFieldRegistry = {
       validation: { kind: 'integerRange', min: 1, max: 4 },
     },
   }),
-  displaySubmitButton: simpleField(booleanField(false, 4), {
-    brief: 'Show explicit submit button.',
-    verbose: 'Require clicking a submit button instead of auto-submitting on Enter.'
-  }, {
-    runtime: {
-      default: false,
-      coerce: 'boolean',
-      validation: { kind: 'boolean' },
-    },
-  }),
   inputPlaceholderText: simpleField(stringField('Type your answer here...', 12), {
-    brief: 'Input placeholder text.',
-    verbose: 'Placeholder text shown in the learner answer input. Default is "Type your answer here...".'
+    brief: 'Answer input hint text',
+    verbose: 'Faint helper text shown inside the learner answer field before the learner starts typing. Default is "Type your answer here...".'
   }, {
     runtime: {
       default: 'Type your answer here...',
@@ -1103,19 +1083,9 @@ const UI_SETTINGS_FIELD_REGISTRY: SectionFieldRegistry = {
       validation: { kind: 'stringMaxLength', max: 100 },
     },
   }),
-  displayConfirmButton: simpleField(booleanField(false, 4), {
-    brief: 'Show confirm button.',
-    verbose: 'When true, adds a confirm button that must be clicked before proceeding. Default is false.'
-  }, {
-    runtime: {
-      default: false,
-      coerce: 'boolean',
-      validation: { kind: 'boolean' },
-    },
-  }),
   continueButtonText: simpleField(stringField('Continue', 6), {
     brief: 'Continue button text.',
-    verbose: 'Text shown on Continue or Confirm buttons. Default is "Continue".'
+    verbose: 'Text shown on Continue controls used by video and timed-display lesson navigation. Default is "Continue".'
   }, {
     appliesToUnitTypes: ['learning', 'assessment', 'video', 'instructions'],
     runtime: {
@@ -1157,7 +1127,7 @@ const UI_SETTINGS_FIELD_REGISTRY: SectionFieldRegistry = {
   }),
   experimentLoginText: simpleField(stringField('', 12), {
     brief: 'Experiment login prompt.',
-    verbose: 'Prompt text shown in the experiment login username field. This is read from setspec.uiSettings during experiment launch.'
+    verbose: 'Prompt text shown in the experiment login username field. This is read from tutor.deliverySettings during experiment launch.'
   }, {
     surfaces: {
       learnerConfig: false,
@@ -1416,7 +1386,8 @@ const VIDEO_SESSION_FIELD_REGISTRY: SectionFieldRegistry = {
       properties: {
         time: {
           type: 'number',
-          title: 'Time',
+          title: 'Checkpoint time',
+          description: 'Video timestamp, in seconds, when this checkpoint question should appear.',
         },
       },
       required: ['time'],
@@ -1642,7 +1613,7 @@ const STIM_FIELD_REGISTRY: SectionFieldRegistry = {
 };
 
 const SETSPEC_DIRECT_RUNTIME_KEYS = Object.freeze([
-  'allowRevistUnit',
+  'allowRevisitUnit',
   'audioInputEnabled',
   'audioInputSensitivity',
   'audioPromptFeedbackVolume',
@@ -1755,71 +1726,101 @@ const STIM_RESPONSE_DIRECT_RUNTIME_KEYS = Object.freeze([
   'incorrectResponses',
 ]);
 
-const UI_SETTINGS_SUPPORTED_KEYS = Object.freeze(
-  Object.keys(UI_SETTINGS_FIELD_REGISTRY).filter(
-    (key) => UI_SETTINGS_FIELD_REGISTRY[key]?.lifecycle.status === 'supported'
+const DELIVERY_DISPLAY_SETTINGS_SUPPORTED_KEYS = Object.freeze(
+  Object.keys(DELIVERY_DISPLAY_SETTINGS_FIELD_REGISTRY).filter(
+    (key) => DELIVERY_DISPLAY_SETTINGS_FIELD_REGISTRY[key]?.lifecycle.status === 'supported'
   )
 );
 
-export const UI_SETTINGS_LEARNER_CONFIGURABLE_KEYS = Object.freeze(
-  UI_SETTINGS_SUPPORTED_KEYS.filter(
-    (key) => UI_SETTINGS_FIELD_REGISTRY[key]?.surfaces?.learnerConfig !== false
+export const DELIVERY_DISPLAY_SETTINGS_LEARNER_CONFIGURABLE_KEYS = Object.freeze(
+  DELIVERY_DISPLAY_SETTINGS_SUPPORTED_KEYS.filter(
+    (key) => DELIVERY_DISPLAY_SETTINGS_FIELD_REGISTRY[key]?.surfaces?.learnerConfig !== false
   )
 );
 
-export const UI_SETTINGS_RUNTIME_KEYS = Object.freeze(
-  UI_SETTINGS_SUPPORTED_KEYS.filter(
+export const DELIVERY_DISPLAY_SETTINGS_RUNTIME_KEYS = Object.freeze(
+  DELIVERY_DISPLAY_SETTINGS_SUPPORTED_KEYS.filter(
     (key) =>
-      UI_SETTINGS_FIELD_REGISTRY[key]?.surfaces?.runtime !== false &&
-      Boolean(UI_SETTINGS_FIELD_REGISTRY[key]?.runtime)
+      DELIVERY_DISPLAY_SETTINGS_FIELD_REGISTRY[key]?.surfaces?.runtime !== false &&
+      Boolean(DELIVERY_DISPLAY_SETTINGS_FIELD_REGISTRY[key]?.runtime)
   )
 );
 
-export const UI_SETTINGS_APPLICABILITY = Object.freeze(
+export const DELIVERY_DISPLAY_SETTINGS_APPLICABILITY = Object.freeze(
   Object.fromEntries(
-    UI_SETTINGS_SUPPORTED_KEYS.map((key) => [
+    DELIVERY_DISPLAY_SETTINGS_SUPPORTED_KEYS.map((key) => [
       key,
-      [...(UI_SETTINGS_FIELD_REGISTRY[key]?.appliesToUnitTypes || INTERACTIVE_TDF_UNIT_TYPES)],
+      [...(DELIVERY_DISPLAY_SETTINGS_FIELD_REGISTRY[key]?.appliesToUnitTypes || INTERACTIVE_TDF_UNIT_TYPES)],
     ])
   ) as Record<string, readonly TdfUnitType[]>
 );
 
-export const UI_SETTINGS_RUNTIME_DEFAULTS = Object.freeze(
-  createRuntimeDefaults(UI_SETTINGS_FIELD_REGISTRY)
+export const DELIVERY_DISPLAY_SETTINGS_RUNTIME_DEFAULTS = Object.freeze(
+  createRuntimeDefaults(DELIVERY_DISPLAY_SETTINGS_FIELD_REGISTRY)
 );
 
-export const UI_SETTINGS_DEPRECATED_GUIDANCE = Object.freeze(
-  createDeprecatedGuidance(UI_SETTINGS_FIELD_REGISTRY)
+export const DELIVERY_DISPLAY_SETTINGS_DEPRECATED_GUIDANCE = Object.freeze(
+  createDeprecatedGuidance(DELIVERY_DISPLAY_SETTINGS_FIELD_REGISTRY)
 );
 
-export const UI_SETTINGS_RUNTIME_INVENTORY = Object.freeze({
-  supportedKeys: UI_SETTINGS_SUPPORTED_KEYS,
-  runtimeKeys: UI_SETTINGS_RUNTIME_KEYS,
-  learnerConfigurableKeys: UI_SETTINGS_LEARNER_CONFIGURABLE_KEYS,
-  applicability: UI_SETTINGS_APPLICABILITY,
-  deprecatedKeys: Object.keys(UI_SETTINGS_DEPRECATED_GUIDANCE),
+export const DELIVERY_DISPLAY_SETTINGS_RUNTIME_INVENTORY = Object.freeze({
+  supportedKeys: DELIVERY_DISPLAY_SETTINGS_SUPPORTED_KEYS,
+  runtimeKeys: DELIVERY_DISPLAY_SETTINGS_RUNTIME_KEYS,
+  learnerConfigurableKeys: DELIVERY_DISPLAY_SETTINGS_LEARNER_CONFIGURABLE_KEYS,
+  applicability: DELIVERY_DISPLAY_SETTINGS_APPLICABILITY,
+  deprecatedKeys: Object.keys(DELIVERY_DISPLAY_SETTINGS_DEPRECATED_GUIDANCE),
 });
 
-export function coerceAndValidateUiSetting(fieldName: string, rawValue: unknown): {
+export function coerceAndValidateDeliveryDisplaySetting(fieldName: string, rawValue: unknown): {
   valid: boolean;
   value: unknown;
   defaultValue: unknown;
 } {
-  const definition = UI_SETTINGS_FIELD_REGISTRY[fieldName];
+  const definition = DELIVERY_DISPLAY_SETTINGS_FIELD_REGISTRY[fieldName];
   if (!definition || definition.lifecycle.status !== 'supported') {
     return { valid: false, value: rawValue, defaultValue: undefined };
   }
 
-  const coercedValue = coerceUiRuntimeValue(definition, rawValue);
+  const coercedValue = coerceDeliveryDisplayRuntimeValue(definition, rawValue);
   return {
-    valid: isUiRuntimeValueValid(definition, coercedValue),
+    valid: isDeliveryDisplayRuntimeValueValid(definition, coercedValue),
     value: coercedValue,
     defaultValue: definition.runtime?.default,
   };
 }
 
-function createUiSettingsSchema(): Record<string, unknown> {
-  return createClosedObjectSchema('UI Settings', UI_SETTINGS_FIELD_REGISTRY, [], INTERACTIVE_TDF_UNIT_TYPES);
+function createDeliveryDisplaySettingsSchema(): Record<string, unknown> {
+  return createClosedObjectSchema('delivery settings', DELIVERY_DISPLAY_SETTINGS_FIELD_REGISTRY, [], INTERACTIVE_TDF_UNIT_TYPES);
+}
+
+function createDeliverySettingsSchema(): Record<string, unknown> {
+  const timingSettingsSchema = createDeliverySettingSchema();
+  const displaySettingsSchema = createDeliveryDisplaySettingsSchema();
+  return {
+    type: 'object',
+    title: 'Delivery Settings',
+    description: 'Canonical learner-runtime delivery settings for timing, feedback, answer controls, prompt presentation, and related lesson behavior.',
+    properties: {
+      ...((timingSettingsSchema.properties as Record<string, unknown>) || {}),
+      ...((displaySettingsSchema.properties as Record<string, unknown>) || {}),
+    },
+    additionalProperties: false,
+  };
+}
+
+function createUnitDeliverySettingsSchema(): Record<string, unknown> {
+  const deliverySettingsSchema = createDeliverySettingsSchema();
+  return {
+    oneOf: [
+      deliverySettingsSchema,
+      {
+        type: 'array',
+        title: 'Condition Delivery Settings',
+        description: 'Per-condition delivery settings. The runtime selects the entry matching the active experiment condition.',
+        items: deliverySettingsSchema,
+      },
+    ],
+  };
 }
 
 function createConditionTemplateSchema(): Record<string, unknown> {
@@ -1845,8 +1846,7 @@ function createVideoSessionSchema(): Record<string, unknown> {
 
 function createUnitSchema(title = 'Unit'): Record<string, unknown> {
   const schema = createClosedObjectSchema(title, UNIT_FIELD_REGISTRY);
-  (schema.properties as Record<string, unknown>).deliveryparams = createDeliveryParamSchema();
-  (schema.properties as Record<string, unknown>).uiSettings = createUiSettingsSchema();
+  (schema.properties as Record<string, unknown>).deliverySettings = createUnitDeliverySettingsSchema();
   (schema.properties as Record<string, unknown>).learningsession = createLearningSessionSchema();
   (schema.properties as Record<string, unknown>).assessmentsession = createAssessmentSessionSchema();
   (schema.properties as Record<string, unknown>).videosession = createVideoSessionSchema();
@@ -1855,7 +1855,6 @@ function createUnitSchema(title = 'Unit'): Record<string, unknown> {
 
 function createSetspecSchema(): Record<string, unknown> {
   const schema = createClosedObjectSchema('Setspec', SETSPEC_FIELD_REGISTRY, ['lessonname', 'stimulusfile']);
-  (schema.properties as Record<string, unknown>).uiSettings = createUiSettingsSchema();
   (schema.properties as Record<string, unknown>).unitTemplate = {
     type: 'array',
     title: 'Unit Templates',
@@ -1865,10 +1864,11 @@ function createSetspecSchema(): Record<string, unknown> {
 }
 
 export function createTdfSchemaFromRegistry(): Record<string, unknown> {
+  const tutorDeliverySettingsSchema = createDeliverySettingsSchema();
   return {
     $schema: 'http://json-schema.org/draft-07/schema#',
     title: 'MoFaCTS TDF Schema',
-    description: 'Registry-backed TDF schema.',
+    description: 'Schema for MoFaCTS tutor definition files, including lesson metadata, delivery settings, unit configuration, and adaptive session definitions.',
     type: 'object',
     required: ['tutor'],
     additionalProperties: false,
@@ -1885,7 +1885,7 @@ export function createTdfSchemaFromRegistry(): Record<string, unknown> {
             title: 'Units',
             items: createUnitSchema(),
           },
-          deliveryparams: createDeliveryParamSchema(),
+          deliverySettings: tutorDeliverySettingsSchema,
         },
       },
     },
@@ -1921,7 +1921,7 @@ export function createStimSchemaFromRegistry(): Record<string, unknown> {
   return {
     $schema: 'http://json-schema.org/draft-07/schema#',
     title: 'MoFaCTS Stimulus Schema',
-    description: 'Registry-backed stimulus schema.',
+    description: 'Schema for MoFaCTS stimulus files, including clusters, learner-facing display content, expected responses, media references, and alternate displays.',
     type: 'object',
     required: ['setspec'],
     additionalProperties: false,
@@ -1946,10 +1946,10 @@ export function createStimSchemaFromRegistry(): Record<string, unknown> {
 export function createTdfTooltipMap(): Record<string, TooltipContent> {
   return {
     ...createTooltipMapForRegistry(SETSPEC_FIELD_REGISTRY, ['setspec']),
-    ...createTooltipMapForRegistry(UI_SETTINGS_FIELD_REGISTRY, [
-      'setspec.uiSettings',
-      'unit[].uiSettings',
-      'setspec.unitTemplate[].uiSettings',
+    ...createTooltipMapForRegistry(DELIVERY_DISPLAY_SETTINGS_FIELD_REGISTRY, [
+      'deliverySettings',
+      'unit[].deliverySettings',
+      'setspec.unitTemplate[].deliverySettings',
     ]),
     ...createTooltipMapForRegistry(UNIT_FIELD_REGISTRY, ['unit[]', 'setspec.unitTemplate[]']),
     ...createTooltipMapForRegistry(LEARNING_SESSION_FIELD_REGISTRY, [
@@ -1986,10 +1986,10 @@ export function createStimTooltipMap(): Record<string, TooltipContent> {
 export function createTdfValidatorMap(): Record<string, ValidatorConfig> {
   return {
     ...createValidatorMapForRegistry(SETSPEC_FIELD_REGISTRY, ['setspec']),
-    ...createValidatorMapForRegistry(UI_SETTINGS_FIELD_REGISTRY, [
-      'setspec.uiSettings',
-      'unit[].uiSettings',
-      'setspec.unitTemplate[].uiSettings',
+    ...createValidatorMapForRegistry(DELIVERY_DISPLAY_SETTINGS_FIELD_REGISTRY, [
+      'deliverySettings',
+      'unit[].deliverySettings',
+      'setspec.unitTemplate[].deliverySettings',
     ]),
     ...createValidatorMapForRegistry(UNIT_FIELD_REGISTRY, ['unit[]', 'setspec.unitTemplate[]']),
     ...createValidatorMapForRegistry(LEARNING_SESSION_FIELD_REGISTRY, [
@@ -2030,13 +2030,6 @@ export const TDF_REGISTRY_SECTIONS: RegistrySectionDescriptor[] = [
     tooltipPrefixes: ['setspec'],
     registry: SETSPEC_FIELD_REGISTRY,
     directRuntimeKeys: SETSPEC_DIRECT_RUNTIME_KEYS,
-  },
-  {
-    schemaLabel: 'tutor.setspec.uiSettings',
-    schemaPath: ['tutor', 'setspec', 'uiSettings'],
-    tooltipPrefixes: ['setspec.uiSettings', 'unit[].uiSettings', 'setspec.unitTemplate[].uiSettings'],
-    registry: UI_SETTINGS_FIELD_REGISTRY,
-    directRuntimeKeys: UI_SETTINGS_LEARNER_CONFIGURABLE_KEYS,
   },
   {
     schemaLabel: 'tutor.unit[]',
@@ -2110,7 +2103,7 @@ export const STIM_REGISTRY_SECTIONS: RegistrySectionDescriptor[] = [
 
 export const TDF_VALIDATION_COVERAGE = Object.freeze({
   setspec: createValidationCoverageForRegistry(SETSPEC_FIELD_REGISTRY),
-  uiSettings: createValidationCoverageForRegistry(UI_SETTINGS_FIELD_REGISTRY),
+  deliverySettings: createValidationCoverageForRegistry(DELIVERY_DISPLAY_SETTINGS_FIELD_REGISTRY),
   unit: createValidationCoverageForRegistry(UNIT_FIELD_REGISTRY),
   learningsession: createValidationCoverageForRegistry(LEARNING_SESSION_FIELD_REGISTRY),
   assessmentsession: createValidationCoverageForRegistry(ASSESSMENT_SESSION_FIELD_REGISTRY),

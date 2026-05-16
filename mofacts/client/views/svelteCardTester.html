@@ -122,7 +122,7 @@
     <div class="settings-panel">
       <div class="settings-header">
         <h4>
-          <i class="fa fa-cog"></i> UI Settings & Display Options
+          <i class="fa fa-cog"></i> Delivery Settings & Display Options
           <button class="btn btn-sm btn-link toggle-settings">
             <i class="fa {{#if settingsExpanded}}fa-chevron-up{{else}}fa-chevron-down{{/if}}"></i>
           </button>
@@ -180,6 +180,10 @@
               <input type="checkbox" class="form-check-input setting-displayTimeoutBar" id="setting-displayTimeoutBar" checked>
               <label class="form-check-label" for="setting-displayTimeoutBar">Display Timeout Bar</label>
             </div>
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input setting-displayTimeoutCountdown" id="setting-displayTimeoutCountdown" checked>
+              <label class="form-check-label" for="setting-displayTimeoutCountdown">Display Numeric Countdown</label>
+            </div>
           </div>
 
           <!-- Feedback Display -->
@@ -194,17 +198,11 @@
               <label class="form-check-label" for="setting-displayIncorrectFeedback">Display Incorrect Feedback</label>
             </div>
             <div class="form-group">
-              <label>Only Show Simple Feedback</label>
-              <select class="form-control form-control-sm setting-onlyShowSimpleFeedback">
-                <option value="never">Never</option>
-                <option value="onCorrect">On Correct Only</option>
-                <option value="onIncorrect">On Incorrect Only</option>
-                <option value="always">Always</option>
+              <label>Feedback Layout</label>
+              <select class="form-control form-control-sm setting-feedbackLayout">
+                <option value="stacked" selected>Stacked</option>
+                <option value="inline">Inline</option>
               </select>
-            </div>
-            <div class="form-check">
-              <input type="checkbox" class="form-check-input setting-singleLineFeedback" id="setting-singleLineFeedback" checked>
-              <label class="form-check-label" for="setting-singleLineFeedback">Single Line Feedback</label>
             </div>
           </div>
 
@@ -231,11 +229,11 @@
             <h5>Colors</h5>
             <div class="form-group">
               <label>Correct Color</label>
-              <input type="text" class="form-control form-control-sm setting-correctColor" value="green" placeholder="e.g., green, #00ff00">
+              <input type="text" class="form-control form-control-sm setting-correctColor" value="var(--success-color)" placeholder="e.g., #00ff00 or var(--success-color)">
             </div>
             <div class="form-group">
               <label>Incorrect Color</label>
-              <input type="text" class="form-control form-control-sm setting-incorrectColor" value="darkorange" placeholder="e.g., red, #ff0000">
+              <input type="text" class="form-control form-control-sm setting-incorrectColor" value="var(--alert-color)" placeholder="e.g., #ff0000 or var(--alert-color)">
             </div>
           </div>
 
@@ -243,22 +241,18 @@
           <div class="settings-group">
             <h5>Messages</h5>
             <div class="form-group">
-              <label>Correct Message</label>
-              <input type="text" class="form-control form-control-sm setting-correctMessage" value="Correct!" placeholder="Correct!">
+              <label>Correct Label</label>
+              <input type="text" class="form-control form-control-sm setting-correctLabelText" value="Correct." placeholder="Correct.">
             </div>
             <div class="form-group">
-              <label>Incorrect Message</label>
-              <input type="text" class="form-control form-control-sm setting-incorrectMessage" value="Incorrect" placeholder="Incorrect">
+              <label>Incorrect Label</label>
+              <input type="text" class="form-control form-control-sm setting-incorrectLabelText" value="Incorrect." placeholder="Incorrect.">
             </div>
           </div>
 
           <!-- Text Input -->
           <div class="settings-group">
             <h5>Text Input</h5>
-            <div class="form-check">
-              <input type="checkbox" class="form-check-input setting-displaySubmitButton" id="setting-displaySubmitButton" checked>
-              <label class="form-check-label" for="setting-displaySubmitButton">Display Submit Button</label>
-            </div>
             <div class="form-group">
               <label>Input Placeholder</label>
               <input type="text" class="form-control form-control-sm setting-inputPlaceholderText" value="Your answer" placeholder="Your answer">

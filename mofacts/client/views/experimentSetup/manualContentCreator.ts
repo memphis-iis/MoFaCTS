@@ -881,14 +881,6 @@ Template.manualContentCreator.events({
             for (const res of processResult.results || []) {
               if (res?.data?.res === 'awaitClientTDF') {
                 const reasons = Array.isArray(res.data.reason) ? res.data.reason : [];
-                if (reasons.includes('breakingVersionRequired')) {
-                  instance.uploadStatus.set(null);
-                  instance.uploadError.set(
-                    `Breaking change detected for ${res.data.TDF.content.fileName}. Publish a new version (vN+1) instead of overwrite.`
-                  );
-                  return;
-                }
-
                 const prompts = [];
                 if (reasons.includes('prevTDFExists')) {
                   prompts.push(`Previous ${res.data.TDF.content.fileName} already exists and will be overwritten. Continue?`);

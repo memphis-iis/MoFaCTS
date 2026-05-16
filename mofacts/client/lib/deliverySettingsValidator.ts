@@ -1,30 +1,30 @@
 /**
- * @fileoverview UISettings Validator
- * Sanitizes UI settings from TDFs using the canonical field registry.
+ * @fileoverview DeliverySettings Validator
+ * Sanitizes delivery settings from TDFs using the canonical field registry.
  */
 
 import {
-  UI_SETTINGS_DEPRECATED_GUIDANCE,
-  UI_SETTINGS_RUNTIME_DEFAULTS,
-  UI_SETTINGS_RUNTIME_KEYS,
-  coerceAndValidateUiSetting,
-} from '../../../../../common/fieldRegistry.ts';
-import { clientConsole } from '../../../../lib/clientLogger';
+  DELIVERY_DISPLAY_SETTINGS_DEPRECATED_GUIDANCE,
+  DELIVERY_DISPLAY_SETTINGS_RUNTIME_DEFAULTS,
+  DELIVERY_DISPLAY_SETTINGS_RUNTIME_KEYS,
+  coerceAndValidateDeliveryDisplaySetting,
+} from '../../common/fieldRegistry.ts';
+import { clientConsole } from './clientLogger';
 
-type UiSettings = Record<string, unknown>;
+type DeliverySettings = Record<string, unknown>;
 
-const KEPT_FIELDS = new Set(UI_SETTINGS_RUNTIME_KEYS);
-const DEPRECATED_FIELDS = UI_SETTINGS_DEPRECATED_GUIDANCE;
+const KEPT_FIELDS = new Set(DELIVERY_DISPLAY_SETTINGS_RUNTIME_KEYS);
+const DEPRECATED_FIELDS = DELIVERY_DISPLAY_SETTINGS_DEPRECATED_GUIDANCE;
 
 let hasWarnedThisSession = false;
 
-export function sanitizeUiSettings(
+export function sanitizeDeliverySettings(
   rawSettings: Record<string, unknown> = {},
   options: { silent?: boolean; tdfName?: string } = {}
-): UiSettings {
+): DeliverySettings {
   const { silent = false, tdfName = '' } = options;
   const safeRawSettings = rawSettings && typeof rawSettings === 'object' ? rawSettings : {};
-  const cleanSettings = { ...(UI_SETTINGS_RUNTIME_DEFAULTS as UiSettings) };
+  const cleanSettings = { ...(DELIVERY_DISPLAY_SETTINGS_RUNTIME_DEFAULTS as DeliverySettings) };
 
   const deprecatedFields: Array<{ name: string; guidance: string }> = [];
   const unknownFields: string[] = [];
@@ -32,7 +32,7 @@ export function sanitizeUiSettings(
 
   for (const [fieldName, rawValue] of Object.entries(safeRawSettings)) {
     if (KEPT_FIELDS.has(fieldName)) {
-      const result = coerceAndValidateUiSetting(fieldName, rawValue);
+      const result = coerceAndValidateDeliveryDisplaySetting(fieldName, rawValue);
       if (result.valid) {
         cleanSettings[fieldName] = result.value;
       } else {
@@ -77,27 +77,27 @@ function logWarnings(
   const tdfLabel = tdfName ? ` in TDF "${tdfName}"` : '';
 
   if (deprecatedFields.length > 0) {
-    clientConsole(1, `[UISettings] Deprecated fields detected${tdfLabel}:`);
+    clientConsole(1, `[DeliverySettings] Deprecated fields detected${tdfLabel}:`);
     deprecatedFields.forEach(({ name, guidance }) => {
-      clientConsole(1, `[UISettings] Deprecated field ${name}: ${guidance}`);
+      clientConsole(1, `[DeliverySettings] Deprecated field ${name}: ${guidance}`);
     });
-    clientConsole(1, `[UISettings] ${deprecatedFields.length} deprecated field(s) ignored. Update TDF to remove warnings.`);
+    clientConsole(1, `[DeliverySettings] ${deprecatedFields.length} deprecated field(s) ignored. Update TDF to remove warnings.`);
   }
 
   if (unknownFields.length > 0) {
-    clientConsole(1, `[UISettings] Unknown fields detected${tdfLabel}:`, unknownFields);
-    clientConsole(1, `[UISettings] ${unknownFields.length} unknown field(s) ignored.`);
+    clientConsole(1, `[DeliverySettings] Unknown fields detected${tdfLabel}:`, unknownFields);
+    clientConsole(1, `[DeliverySettings] ${unknownFields.length} unknown field(s) ignored.`);
   }
 
   if (invalidFields.length > 0) {
-    clientConsole(1, `[UISettings] Invalid values detected${tdfLabel}:`);
+    clientConsole(1, `[DeliverySettings] Invalid values detected${tdfLabel}:`);
     invalidFields.forEach(({ name, value, default: def }) => {
       clientConsole(
         1,
-        `[UISettings] Invalid value for ${name}: ${JSON.stringify(value)} (using default: ${JSON.stringify(def)})`
+        `[DeliverySettings] Invalid value for ${name}: ${JSON.stringify(value)} (using default: ${JSON.stringify(def)})`
       );
     });
-    clientConsole(1, `[UISettings] ${invalidFields.length} invalid value(s) replaced with defaults.`);
+    clientConsole(1, `[DeliverySettings] ${invalidFields.length} invalid value(s) replaced with defaults.`);
   }
 }
 

@@ -19,7 +19,7 @@ import { Meteor } from 'meteor/meteor';
 import { Session } from 'meteor/session';
 import { _ } from 'meteor/underscore';
 import { CardStore } from '../../modules/cardStore';
-import { DeliveryParamsStore } from '../../../../lib/state/deliveryParamsStore';
+import { deliverySettingsStore } from '../../../../lib/state/deliverySettingsStore';
 import { ExperimentStateStore } from '../../../../lib/state/experimentStateStore';
 import { getAudioInputSensitivity, setAudioRecorderInitialized } from '../../../../lib/state/audioState';
 import { audioManager } from '../../../../lib/audioContextManager';
@@ -168,7 +168,7 @@ type RuntimeWindow = Window & {
   firefox_audio_hack?: MediaStreamAudioSourceNode | null;
 };
 
-type DeliveryParamsLike = {
+type DeliverySettingsLike = {
   autostopTranscriptionAttemptLimit?: unknown;
 };
 
@@ -828,7 +828,7 @@ async function processAudioData(audioData: ArrayBuffer | string): Promise<Speech
 
   // Increment attempt counter
   speechTranscriptionAttempts += 1;
-  const maxAttempts = Number((DeliveryParamsStore.get() as DeliveryParamsLike).autostopTranscriptionAttemptLimit || 3);
+  const maxAttempts = Number((deliverySettingsStore.get() as DeliverySettingsLike).autostopTranscriptionAttemptLimit || 3);
   
 
   // Check if exceeded max attempts

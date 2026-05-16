@@ -40,6 +40,7 @@ function mergeExperimentState(
     'mappingSignature',
     'conditionTdfId',
     'experimentXCond',
+    'subTdfIndex',
     'schedule',
     'scheduleUnitNumber',
     'currentRootTdfId',

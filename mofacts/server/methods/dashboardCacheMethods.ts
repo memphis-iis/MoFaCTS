@@ -322,10 +322,12 @@ export function createDashboardCacheMethods({
       };
       if (scope === 'setspec') {
         delete nextOverrides.setspec;
+        delete nextOverrides.deliverySettings;
       } else if (scope === 'unit') {
         delete nextOverrides.unit;
       } else {
         delete nextOverrides.setspec;
+        delete nextOverrides.deliverySettings;
         delete nextOverrides.unit;
       }
 

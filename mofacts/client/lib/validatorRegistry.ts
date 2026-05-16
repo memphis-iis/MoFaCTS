@@ -12,7 +12,7 @@
  */
 
 import {
-  createDeliveryParamValidatorMap,
+  createDeliverySettingValidatorMap,
   createStimValidatorMap,
   createTdfValidatorMap,
 } from '../../common/fieldRegistry';
@@ -23,7 +23,7 @@ import {
 
 export const TDF_VALIDATORS = {
   ...createTdfValidatorMap(),
-  ...createDeliveryParamValidatorMap()
+  ...createDeliverySettingValidatorMap()
 };
 
 // =============================================================================

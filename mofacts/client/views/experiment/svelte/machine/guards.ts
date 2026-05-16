@@ -15,8 +15,9 @@ type CardMachineActorArgs = {
   context: {
     testType?: string;
     feedbackTimeoutMs?: number | undefined;
-    deliveryParams?: {
+    deliverySettings?: {
       forceCorrection?: boolean | string | undefined;
+      isVideoSession?: boolean | undefined;
     };
     isCorrect?: boolean | undefined;
     buttonTrial?: boolean | undefined;
@@ -29,17 +30,18 @@ type CardMachineActorArgs = {
     unitFinished?: boolean | undefined;
     preparedAdvanceMode?: string | undefined;
     preparedTrial?: Record<string, unknown> | null | undefined;
-    uiSettings?: {
-      isVideoSession?: boolean | undefined;
-    };
     engine?: unknown;
     userAnswer?: string | undefined;
     currentAnswer?: string | undefined;
+    reviewEntry?: string | undefined;
     currentDisplay?: Record<string, unknown> & {
       audioSrc?: string | undefined;
     };
     consecutiveTimeouts?: number | undefined;
     isTimeout?: boolean | undefined;
+    feedbackText?: string | undefined;
+    feedbackRevealStarted?: boolean | undefined;
+    feedbackSuppressed?: boolean | undefined;
   };
   event: {
     type?: string | undefined;
@@ -62,7 +64,7 @@ function resolveFeedbackTimeoutMs({ context, event }: CardMachineActorArgs): num
       : context.isCorrect;
 
   return getFeedbackTimeoutMs({
-    deliveryParams: context.deliveryParams,
+    deliverySettings: context.deliverySettings,
     testType: context.testType,
     isCorrect: validationIsCorrect,
   } as FeedbackTimeoutContext);
@@ -141,9 +143,13 @@ export function isUnsupportedTrialType(args: CardMachineActorArgs): boolean {
 export function isForceCorrectTrialAndIncorrect({ context }: CardMachineActorArgs): boolean {
   const isForceCorrect = context.testType === TRIAL_TYPES.FORCE_CORRECT || 
                          context.testType === TRIAL_TYPES.TIMED_PROMPT ||
-                         context.deliveryParams?.forceCorrection === true ||
-                         context.deliveryParams?.forceCorrection === 'true';
+                         context.deliverySettings?.forceCorrection === true ||
+                         context.deliverySettings?.forceCorrection === 'true';
   return isForceCorrect && !context.isCorrect;
+}
+
+export function needsForceCorrectPrompt(args: CardMachineActorArgs): boolean {
+  return isForceCorrectTrialAndIncorrect(args) && String(args.context.reviewEntry || '').trim() === '';
 }
 
 /**
@@ -281,6 +287,26 @@ export function ttsEnabled(_args: CardMachineActorArgs): boolean {
  */
 export function ttsDisabled(args: CardMachineActorArgs): boolean {
   return !ttsEnabled(args);
+}
+
+export function feedbackContentReady({ context }: CardMachineActorArgs): boolean {
+  if (context.feedbackSuppressed === true) {
+    return true;
+  }
+  return typeof context.feedbackText === 'string' && context.feedbackText.trim() !== '';
+}
+
+export function feedbackReadyForTts(args: CardMachineActorArgs): boolean {
+  return args.context.feedbackRevealStarted === true &&
+    args.context.feedbackSuppressed !== true &&
+    feedbackContentReady(args) &&
+    ttsEnabled(args);
+}
+
+export function feedbackReadyWithoutTts(args: CardMachineActorArgs): boolean {
+  return args.context.feedbackRevealStarted === true &&
+    feedbackContentReady(args) &&
+    (args.context.feedbackSuppressed === true || ttsDisabled(args));
 }
 
 // =============================================================================
@@ -489,7 +515,7 @@ export function isSoftError({ event }: CardMachineActorArgs): boolean {
  * @returns {boolean}
  */
 export function isVideoSession({ context }: CardMachineActorArgs): boolean {
-  return context.uiSettings?.isVideoSession === true || Session.get('isVideoSession') === true;
+  return context.deliverySettings?.isVideoSession === true || Session.get('isVideoSession') === true;
 }
 
 /**

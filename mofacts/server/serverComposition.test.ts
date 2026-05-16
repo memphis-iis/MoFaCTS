@@ -445,11 +445,11 @@ describe('public TDF and stimulus method authorization', function() {
               experimentPasswordRequired: false,
               speechAPIKey: 'encrypted-speech-key',
               textToSpeechAPIKey: 'encrypted-tts-key',
-              uiSettings: {
-                experimentLoginText: 'Participant ID',
-                privateAdminNote: 'do not expose',
-              },
               condition: ['condition-a.json'],
+            },
+            deliverySettings: {
+              experimentLoginText: 'Participant ID',
+              privateAdminNote: 'do not expose',
             },
             unit: [{ unitname: 'private unit' }],
           },
@@ -466,7 +466,7 @@ describe('public TDF and stimulus method authorization', function() {
     expect(entry.content.tdfs.tutor.unit).to.equal(undefined);
     expect(entry.content.tdfs.tutor.setspec.speechAPIKey).to.equal(undefined);
     expect(entry.content.tdfs.tutor.setspec.textToSpeechAPIKey).to.equal(undefined);
-    expect(entry.content.tdfs.tutor.setspec.uiSettings).to.deep.equal({
+    expect(entry.content.tdfs.tutor.deliverySettings).to.deep.equal({
       experimentLoginText: 'Participant ID',
     });
   });

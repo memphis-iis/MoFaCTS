@@ -1172,7 +1172,7 @@ Template.contentUpload.events({
         '<p>This lesson was imported from an Anki deck.</p><p>Study each card and type your answer when prompted.</p>',
         normalizedItems,
         {
-          uiSettings: {
+          deliverySettings: {
             displayPerformance: true,
             displayTimeoutBar: false
           }
@@ -1825,10 +1825,6 @@ async function doFileUpload(fileArray: any) {
           if (!result.result) {
             if(result.data && result.data.res == 'awaitClientTDF'){
               const reasons = Array.isArray(result.data.reason) ? result.data.reason : [];
-              if (reasons.includes('breakingVersionRequired')) {
-                alert(`This upload changes mapping semantics and cannot overwrite the existing lesson version.\n\nCreate/publish a new version (vN+1).\nFile Name: ${result.data.TDF.content.fileName}`);
-                return;
-              }
               if(confirm(`A previous file exists and will be overwritten. Continue?\nFile Name: ${result.data.TDF.content.fileName}`)){
                 try {
                   await MeteorAny.callAsync('tdfUpdateConfirmed', result.data.TDF, false, reasons);
@@ -2021,20 +2017,6 @@ async function doPackageUpload(file: any, template: any){
               if (res.data && res.data.res == 'awaitClientTDF') {
                 let reason = []
                 const reasons = Array.isArray(res.data.reason) ? res.data.reason : [];
-                if (reasons.includes('breakingVersionRequired')) {
-                  const uploadData = template.pendingUploads.get(pendingUploadId);
-                  if (uploadData) {
-                    template.pendingUploads.set(pendingUploadId, {
-                      ...uploadData,
-                      status: "error",
-                      packageAssetId: packageAssetId,
-                      error: `Breaking change detected for ${res.data.TDF.content.fileName}. Publish a new version (vN+1) instead of overwrite.`
-                    });
-                    assetsHelperLastRun = 0;
-                    assetsHelperCachedResult = [];
-                  }
-                  return;
-                }
                 if(res.data.reason.includes('prevTDFExists'))
                   reason.push(`Previous ${res.data.TDF.content.fileName} already exists, continuing the upload will overwrite the old file. Continue?`)
                 if(res.data.reason.includes(`prevStimExists`))

@@ -37,22 +37,22 @@ function parseDisplayFields(value: unknown, paramName: string): string[] | null 
 }
 
 function getSubsetFieldsForTrial(
-  deliveryParams: DisplaySubsetParams,
+  deliverySettings: DisplaySubsetParams,
   testType: unknown
 ): string[] | null {
   const normalizedTestType = String(testType || '').trim().toLowerCase();
   if (normalizedTestType === 's') {
-    return parseDisplayFields(deliveryParams?.studyOnlyFields, 'studyOnlyFields');
+    return parseDisplayFields(deliverySettings?.studyOnlyFields, 'studyOnlyFields');
   }
-  return parseDisplayFields(deliveryParams?.drillFields, 'drillFields');
+  return parseDisplayFields(deliverySettings?.drillFields, 'drillFields');
 }
 
 export function applyDisplayFieldSubset<T extends Record<string, unknown>>(
   display: T,
-  deliveryParams: DisplaySubsetParams,
+  deliverySettings: DisplaySubsetParams,
   testType: unknown
 ): Partial<T> {
-  const fields = getSubsetFieldsForTrial(deliveryParams, testType);
+  const fields = getSubsetFieldsForTrial(deliverySettings, testType);
   if (!fields) {
     return { ...display };
   }

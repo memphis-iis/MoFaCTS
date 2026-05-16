@@ -5,34 +5,62 @@ type FeedbackHtmlContext = {
   isCorrectAnswer?: boolean;
   isTimeoutAnswer?: boolean;
   showUserAnswer?: boolean;
-  showSimpleFeedback?: boolean;
   userAnswerText?: string;
   correctAnswerText?: string;
   displayCorrectAnswer?: boolean;
   correctAnswerImage?: string;
-  singleLine?: boolean;
+  feedbackLayout?: 'inline' | 'stacked';
+  correctLabelText?: string;
+  incorrectLabelText?: string;
 };
 
-type FeedbackBuildContext = {
-  uiSettings?: Record<string, unknown>;
-  testType?: string;
-  feedbackMessage?: string;
-  isCorrect?: boolean;
-  isTimeout?: boolean;
-  buttonTrial?: boolean;
-  originalAnswer?: string;
-  userAnswer?: string;
-  currentAnswer?: string;
+type FeedbackDisplayPolicy = {
+  showUserAnswer: boolean;
+  showCorrectAnswerOnIncorrect: boolean;
+  mode: 'full' | 'labelOnly';
+  layout: 'inline' | 'stacked';
+  correctLabelText: string;
+  incorrectLabelText: string;
+};
+
+type FeedbackSemanticState =
+  | {
+      outcome: 'correct' | 'incorrect';
+      reason: 'labelOnly';
+      mainText: string;
+    }
+  | {
+      outcome: 'correct' | 'incorrect';
+      reason: 'evaluatedMessage' | 'timeout';
+      mainText: string;
+    }
+  | {
+      outcome: 'incorrect';
+      reason: 'correctAnswerImage';
+      mainText: string;
+      imageSrc: string;
+    };
+
+type FeedbackSegmentKey =
+  | 'userAnswerText'
+  | 'mainFeedbackMessage'
+  | 'correctAnswerText'
+  | 'correctAnswerImage';
+
+type FeedbackSegment = {
+  key: FeedbackSegmentKey;
+  kind: 'text' | 'image';
+  text: string;
+  html: string;
+};
+
+type FeedbackContent = {
+  feedbackText: string;
+  feedbackHtml: string;
 };
 
 function stripTags(value: unknown): string {
   return String(value || '').replace(/<[^>]*>/g, '');
-}
-
-function isImagePath(value: unknown): boolean {
-  if (!value || typeof value !== 'string') return false;
-  const imageExtensions = /\.(png|jpe?g|gif|svg|webp|bmp|ico|tiff?)$/i;
-  return imageExtensions.test(value.trim());
 }
 
 function formatLabel(text: string): string {
@@ -47,139 +75,255 @@ function shouldShow(setting: FeedbackSetting, isCorrectAnswer: boolean | undefin
   return false;
 }
 
-function buildFeedbackHtml({
+function normalizeDisplayPolicy({
+  showUserAnswer,
+  displayCorrectAnswer,
+  feedbackLayout,
+  correctLabelText,
+  incorrectLabelText,
+}: {
+  showUserAnswer: boolean | undefined;
+  displayCorrectAnswer: boolean | undefined;
+  feedbackLayout: 'inline' | 'stacked' | undefined;
+  correctLabelText: string | undefined;
+  incorrectLabelText: string | undefined;
+}): FeedbackDisplayPolicy {
+  return {
+    showUserAnswer: showUserAnswer === true,
+    showCorrectAnswerOnIncorrect: displayCorrectAnswer === true,
+    mode: 'full',
+    layout: feedbackLayout === 'inline' ? 'inline' : 'stacked',
+    correctLabelText: normalizeOutcomeLabelText(correctLabelText, 'Correct.'),
+    incorrectLabelText: normalizeOutcomeLabelText(incorrectLabelText, 'Incorrect.'),
+  };
+}
+
+function normalizeOutcomeLabelText(value: unknown, fallback: string): string {
+  const label = stripTags(value || '').trim() || fallback;
+  return /[.!?]$/.test(label) ? label : `${label}.`;
+}
+
+function normalizeEvaluatorMessage(message: unknown): string {
+  const value = String(message || '');
+  const trimmed = stripTags(value).trim();
+
+  if (trimmed === 'Correct') {
+    return 'Correct.';
+  }
+
+  if (trimmed === 'Incorrect') {
+    return 'Incorrect.';
+  }
+
+  return value;
+}
+
+function determineSemanticState({
+  message,
+  isCorrectAnswer,
+  isTimeoutAnswer,
+  correctAnswerImage,
+  policy,
+}: {
+  message: string | undefined;
+  isCorrectAnswer: boolean | undefined;
+  isTimeoutAnswer: boolean | undefined;
+  correctAnswerImage: string | undefined;
+  policy: FeedbackDisplayPolicy;
+}): FeedbackSemanticState {
+  const outcome = isCorrectAnswer ? 'correct' : 'incorrect';
+  const hasCorrectImage = outcome === 'incorrect' && !!correctAnswerImage;
+
+  if (hasCorrectImage) {
+    return {
+      outcome: 'incorrect',
+      reason: 'correctAnswerImage',
+      mainText: 'Incorrect. The correct response is displayed below.',
+      imageSrc: String(correctAnswerImage),
+    };
+  }
+
+  if (policy.mode === 'labelOnly') {
+    return {
+      outcome,
+      reason: 'labelOnly',
+      mainText: outcome === 'correct' ? policy.correctLabelText : policy.incorrectLabelText,
+    };
+  }
+
+  let mainText = normalizeEvaluatorMessage(message);
+
+  if (isTimeoutAnswer && !stripTags(mainText).includes('Incorrect.')) {
+    mainText = mainText ? `Incorrect. ${mainText}` : 'Incorrect.';
+  }
+
+  return {
+    outcome,
+    reason: isTimeoutAnswer ? 'timeout' : 'evaluatedMessage',
+    mainText,
+  };
+}
+
+function applyOutcomeLabelText(text: string, policy: FeedbackDisplayPolicy): string {
+  const trimmed = stripTags(text).trim();
+
+  if (trimmed === 'Correct' || trimmed === 'Correct.') {
+    return policy.correctLabelText;
+  }
+
+  if (trimmed === 'Incorrect' || trimmed === 'Incorrect.') {
+    return policy.incorrectLabelText;
+  }
+
+  if (text.startsWith('Correct.')) {
+    return `${policy.correctLabelText}${text.slice('Correct.'.length)}`;
+  }
+
+  if (text.startsWith('Incorrect.')) {
+    return `${policy.incorrectLabelText}${text.slice('Incorrect.'.length)}`;
+  }
+
+  return text;
+}
+
+function projectTextSegment(
+  key: FeedbackSegmentKey,
+  text: string,
+  options: { outcomeLabelText?: string } = {}
+): FeedbackSegment {
+  const plainText = stripTags(text);
+  const outcomeLabelText = options.outcomeLabelText;
+  const html = outcomeLabelText && text.startsWith(outcomeLabelText)
+    ? `${formatLabel(outcomeLabelText)}${text.slice(outcomeLabelText.length)}`
+    : text;
+
+  return {
+    key,
+    kind: 'text',
+    text: plainText,
+    html,
+  };
+}
+
+function composeFeedbackSegments({
+  semanticState,
+  policy,
+  userAnswerText,
+  correctAnswerText,
+}: {
+  semanticState: FeedbackSemanticState;
+  policy: FeedbackDisplayPolicy;
+  userAnswerText: string | undefined;
+  correctAnswerText: string | undefined;
+}): FeedbackSegment[] {
+  const segments: FeedbackSegment[] = [];
+  const hasCorrectImage = semanticState.reason === 'correctAnswerImage';
+  const displayUserAnswer = policy.showUserAnswer && !hasCorrectImage;
+  const displayCorrectAnswer =
+    semanticState.outcome === 'incorrect' &&
+    policy.showCorrectAnswerOnIncorrect &&
+    policy.mode !== 'labelOnly' &&
+    !hasCorrectImage &&
+    !!correctAnswerText;
+
+  if (displayUserAnswer && userAnswerText) {
+    segments.push(projectTextSegment('userAnswerText', `Your answer was ${userAnswerText}.`));
+  }
+
+  if (semanticState.mainText) {
+    const mainText = applyOutcomeLabelText(semanticState.mainText, policy);
+    const outcomeLabelText = mainText.startsWith(policy.correctLabelText)
+      ? policy.correctLabelText
+      : (mainText.startsWith(policy.incorrectLabelText) ? policy.incorrectLabelText : undefined);
+    segments.push(projectTextSegment(
+      'mainFeedbackMessage',
+      mainText,
+      outcomeLabelText ? { outcomeLabelText } : {}
+    ));
+  }
+
+  if (displayCorrectAnswer) {
+    segments.push(projectTextSegment('correctAnswerText', `The correct answer is ${correctAnswerText}.`));
+  }
+
+  if (hasCorrectImage) {
+    segments.push({
+      key: 'correctAnswerImage',
+      kind: 'image',
+      text: '',
+      html: `<img src="${semanticState.imageSrc}" alt="Correct answer image" class="feedback-image">`,
+    });
+  }
+
+  return segments;
+}
+
+function renderFeedbackText(segments: FeedbackSegment[]): string {
+  const textSegments = segments.filter((segment) => segment.kind === 'text');
+  return textSegments.map((segment) => segment.text).join(' ');
+}
+
+function renderFeedbackHtml(segments: FeedbackSegment[], policy: FeedbackDisplayPolicy): string {
+  const separator = policy.layout === 'inline' ? ' ' : '<br>';
+  const imageSegments = segments.filter((segment) => segment.kind === 'image');
+  const textSegments = segments.filter((segment) => segment.kind === 'text');
+  const html = textSegments.map((segment) => segment.html).join(separator);
+
+  if (imageSegments.length === 0) {
+    return html;
+  }
+
+  const imageHtml = imageSegments.map((segment) => segment.html).join('<br>');
+  return html ? `${html}<br>${imageHtml}` : imageHtml;
+}
+
+function buildFeedbackContent({
   message,
   isCorrectAnswer,
   isTimeoutAnswer,
   showUserAnswer,
-  showSimpleFeedback,
   userAnswerText,
   correctAnswerText,
   displayCorrectAnswer,
   correctAnswerImage,
-  singleLine,
-}: FeedbackHtmlContext): string {
-  const separator = singleLine ? ' ' : '<br>';
-  const imageSeparator = '<br>';
-  const correctLabel = formatLabel('Correct.');
-  const incorrectLabel = formatLabel('Incorrect.');
-  const hasCorrectImage = !isCorrectAnswer && !!correctAnswerImage;
-  const allowLabelStyling = !hasCorrectImage;
-  const displayUserAnswer = showUserAnswer && !hasCorrectImage;
-  const displaySimpleFeedback = showSimpleFeedback && !hasCorrectImage;
+  feedbackLayout,
+  correctLabelText,
+  incorrectLabelText,
+}: FeedbackHtmlContext): FeedbackContent {
+  const policy = normalizeDisplayPolicy({
+    showUserAnswer,
+    displayCorrectAnswer,
+    feedbackLayout,
+    correctLabelText,
+    incorrectLabelText,
+  });
+  const semanticState = determineSemanticState({
+    message,
+    isCorrectAnswer,
+    isTimeoutAnswer,
+    correctAnswerImage,
+    policy,
+  });
+  const segments = composeFeedbackSegments({
+    semanticState,
+    policy,
+    userAnswerText,
+    correctAnswerText,
+  });
 
-  let formatted = message || '';
-
-  if (hasCorrectImage) {
-    formatted = 'Incorrect. The correct response is displayed below.';
-  }
-
-  if (displaySimpleFeedback) {
-    formatted = isCorrectAnswer ? correctLabel : incorrectLabel;
-  } else if (allowLabelStyling) {
-    formatted = formatted.replace(/Correct\./g, correctLabel);
-    formatted = formatted.replace(/Incorrect\./g, incorrectLabel);
-    const trimmed = stripTags(formatted).trim();
-    if (trimmed === 'Correct') {
-      formatted = correctLabel;
-    } else if (trimmed === 'Incorrect') {
-      formatted = incorrectLabel;
-    }
-
-    if (isTimeoutAnswer && !stripTags(formatted).includes('Incorrect.')) {
-      formatted = formatted
-        ? `${incorrectLabel}${separator}${formatted}`
-        : incorrectLabel;
-    }
-  }
-
-  const segments = [];
-  if (displayUserAnswer && userAnswerText) {
-    segments.push(`Your answer: ${userAnswerText}.`);
-  }
-
-  if (formatted) {
-    segments.push(formatted);
-  }
-
-  if (
-    !isCorrectAnswer &&
-    displayCorrectAnswer &&
-    !displaySimpleFeedback &&
-    !hasCorrectImage &&
-    correctAnswerText
-  ) {
-    segments.push(`Correct answer: ${correctAnswerText}.`);
-  }
-
-  let html = segments.join(separator);
-
-  if (hasCorrectImage) {
-    const imageTag = `<img src="${correctAnswerImage}" alt="Correct answer image" class="feedback-image">`;
-    html = html ? `${html}${imageSeparator}${imageTag}` : imageTag;
-  }
-
-  return html;
+  return {
+    feedbackText: renderFeedbackText(segments),
+    feedbackHtml: renderFeedbackHtml(segments, policy),
+  };
 }
 
-function buildFeedbackText(context: FeedbackBuildContext = {}): string {
-  const uiSettings = context.uiSettings || {};
-
-  if (context.testType === 't' || context.testType === 's') {
-    return '';
-  }
-
-  let baseMessage = context.feedbackMessage;
-  if (!baseMessage) {
-    baseMessage = context.isCorrect
-      ? String((uiSettings as Record<string, unknown>).correctMessage || 'Correct.')
-      : String((uiSettings as Record<string, unknown>).incorrectMessage || 'Incorrect.');
-  }
-
-  if (context.isTimeout && (uiSettings as Record<string, unknown>).incorrectMessage) {
-    baseMessage = String((uiSettings as Record<string, unknown>).incorrectMessage);
-  }
-
-  let text = baseMessage || '';
-
-  const hasCorrectImage = !context.isCorrect && context.buttonTrial &&
-    isImagePath(context.originalAnswer || '');
-  if (hasCorrectImage) {
-    text = 'Incorrect. The correct response is displayed below.';
-  }
-
-  const showUserAnswer = shouldShow(
-    (uiSettings as Record<string, unknown>).displayUserAnswerInFeedback as FeedbackSetting,
-    context.isCorrect
-  );
-  const showSimpleFeedback = shouldShow((uiSettings as Record<string, unknown>).onlyShowSimpleFeedback as FeedbackSetting, context.isCorrect);
-
-  const htmlContext: FeedbackHtmlContext = {
-    message: text,
-    showUserAnswer,
-    showSimpleFeedback,
-    userAnswerText: context.userAnswer || '',
-    correctAnswerText: context.currentAnswer || context.originalAnswer || '',
-    displayCorrectAnswer: Boolean((uiSettings as Record<string, unknown>).displayCorrectAnswerInIncorrectFeedback),
-    correctAnswerImage: hasCorrectImage ? 'image' : '',
-    singleLine: Boolean((uiSettings as Record<string, unknown>).singleLineFeedback),
-  };
-  if (context.isCorrect !== undefined) {
-    htmlContext.isCorrectAnswer = context.isCorrect;
-  }
-  if (context.isTimeout !== undefined) {
-    htmlContext.isTimeoutAnswer = context.isTimeout;
-  }
-
-  const html = buildFeedbackHtml(htmlContext);
-
-  return stripTags(html);
+function buildFeedbackHtml(context: FeedbackHtmlContext): string {
+  return buildFeedbackContent(context).feedbackHtml;
 }
 
 export {
+  buildFeedbackContent,
   buildFeedbackHtml,
-  buildFeedbackText,
   shouldShow,
   stripTags,
 };
-

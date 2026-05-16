@@ -46,7 +46,7 @@ type HistoryLoggingServiceContext = {
   };
   source?: string;
   userAnswer?: string;
-  deliveryParams: Record<string, unknown>;
+  deliverySettings: Record<string, unknown>;
   wasReportedForRemoval?: boolean;
   engine?: UnitEngineLike | null;
   currentDisplay?: Record<string, unknown> & {
@@ -60,6 +60,8 @@ type HistoryLoggingServiceContext = {
   reviewEntry?: string;
   originalAnswer?: unknown;
   currentAnswer?: unknown;
+  feedbackText?: string;
+  feedbackSuppressed?: boolean;
 };
 type HistoryAnswerContext = {
   originalDisplay?: unknown;
@@ -94,17 +96,27 @@ function getTrialOutcome(testType: string, isCorrect: boolean): string {
   return isCorrect ? 'correct' : 'incorrect';
 }
 
-function getDisplayedFeedbackText(testType: string): string {
+function getDisplayedFeedbackText(testType: string, feedbackText?: string, feedbackSuppressed = false): string {
   if (testType === 't' || testType === 's') {
     return '';
   }
 
-  const feedbackText = CardStore.getCardValue('feedbackTtsText');
+  if (feedbackSuppressed) {
+    return '';
+  }
+
   if (typeof feedbackText !== 'string' || legacyTrim(feedbackText) === '') {
-    throw new Error('[History Logging] feedbackTtsText missing before history write');
+    throw new Error('[History Logging] feedbackText missing before history write');
   }
 
   return feedbackText;
+}
+
+function getLoggedFeedbackType(testType: string, isCorrect: boolean, feedbackSuppressed = false): string {
+  if (testType === 't' || testType === 's' || feedbackSuppressed) {
+    return '';
+  }
+  return isCorrect ? 'correct' : 'incorrect';
 }
 
 function truncateToFiveDecimals(value: number): number {
@@ -400,7 +412,7 @@ function recordSessionOutcomeHistories(testType: string, isCorrect: boolean): vo
  * @param {string} params.userAnswer - User's answer (trimmed)
  * @param {boolean} params.isCorrect - Was answer correct
  * @param {string} params.testType - 's', 'd', or 't'
- * @param {Record<string, unknown>} params.deliveryParams - Delivery parameters object
+ * @param {Record<string, unknown>} params.deliverySettings - Delivery parameters object
  * @param {boolean} params.wasReportedForRemoval - Was item flagged for removal
  * @param {UnitEngineLike} params.engine - Unit engine instance
  * @param {Record<string, unknown>} params.currentDisplay - Display object
@@ -418,7 +430,7 @@ export function createHistoryRecord({
   userAnswer,
   isCorrect,
   testType,
-  deliveryParams,
+  deliverySettings,
   wasReportedForRemoval = false,
   engine,
   currentDisplay,
@@ -427,6 +439,7 @@ export function createHistoryRecord({
   questionIndex = 1,
   alternateDisplayIndex = null,
   feedbackText = '',
+  feedbackSuppressed = false,
   reviewEntry = '',
   answerContext = {}
 }: {
@@ -437,7 +450,7 @@ export function createHistoryRecord({
   userAnswer: string;
   isCorrect: boolean;
   testType: string;
-  deliveryParams: Record<string, unknown>;
+  deliverySettings: Record<string, unknown>;
   wasReportedForRemoval?: boolean;
   engine: HistoryEngineLike;
   currentDisplay: Record<string, unknown> | null | undefined;
@@ -446,6 +459,7 @@ export function createHistoryRecord({
   questionIndex?: number;
   alternateDisplayIndex?: number | null;
   feedbackText?: string;
+  feedbackSuppressed?: boolean;
   reviewEntry?: string;
   answerContext?: HistoryAnswerContext;
 }): HistoryRecord {
@@ -616,7 +630,7 @@ export function createHistoryRecord({
 
     // Feedback
     'feedbackText': legacyTrim(feedbackText || ''),
-    'feedbackType': deliveryParams.feedbackType,
+    'feedbackType': getLoggedFeedbackType(testType, isCorrect, feedbackSuppressed),
 
     'instructionQuestionResult': Session.get('instructionQuestionResult') || false,
 
@@ -706,7 +720,7 @@ export async function historyLoggingService(
       ? context.timestamps.trialStart
       : context.timestamps.firstKeypress ?? context.timestamps.trialEnd;
 
-    const feedbackText = getDisplayedFeedbackText(context.testType);
+    const feedbackText = getDisplayedFeedbackText(context.testType, context.feedbackText, context.feedbackSuppressed === true);
 
     // Create record
     const engine = (event.engine || context.engine) as HistoryEngineLike;
@@ -719,7 +733,7 @@ export async function historyLoggingService(
       userAnswer: context.userAnswer || '',
       isCorrect: context.isCorrect,
       testType: context.testType,
-      deliveryParams: context.deliveryParams,
+      deliverySettings: context.deliverySettings,
       wasReportedForRemoval: context.wasReportedForRemoval || false,
       engine,
       currentDisplay: context.currentDisplay,
@@ -728,6 +742,7 @@ export async function historyLoggingService(
       questionIndex: context.questionIndex ?? 1,
       alternateDisplayIndex: context.alternateDisplayIndex ?? null,
       feedbackText,
+      feedbackSuppressed: context.feedbackSuppressed === true,
       reviewEntry: context.reviewEntry || '',
       answerContext: {
         originalDisplay: context.currentDisplay?.text || context.currentDisplay?.clozeText || '',

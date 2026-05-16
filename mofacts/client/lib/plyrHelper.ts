@@ -16,12 +16,33 @@ async function newQuestionHandler() {
   return;
 }
 
-function getUnitEngine() {
-  return Session.get('unitEngine');
+type PlyrUnitEngine = {
+  adaptiveQuestionLogic: {
+    schedule: any[];
+    setSchedule: (schedule: any[]) => void;
+    evaluate?: (logic: string) => Promise<void> | void;
+    when?: unknown;
+  };
+  selectNextCard: (indices: Record<string, unknown>, experimentState: unknown) => Promise<unknown>;
+};
+
+function requirePlyrUnitEngine(engine: unknown, source: string): PlyrUnitEngine {
+  const candidate = engine as Partial<PlyrUnitEngine> | null | undefined;
+  if (
+    !candidate ||
+    typeof candidate.selectNextCard !== 'function' ||
+    !candidate.adaptiveQuestionLogic ||
+    !Array.isArray(candidate.adaptiveQuestionLogic.schedule) ||
+    typeof candidate.adaptiveQuestionLogic.setSchedule !== 'function'
+  ) {
+    throw new Error(`${source} requires an explicit current unit engine with video scheduling support`);
+  }
+  return candidate as PlyrUnitEngine;
 }
 
 class PlayerController {
   [key: string]: any;
+  unitEngine: PlyrUnitEngine;
   player: any;
   currentCheckpointIndex = 0;  
   maxAllowedTime = 0;         
@@ -50,7 +71,8 @@ class PlayerController {
   times: any[] = [];
   questions: any[] = [];
 
-  constructor(playerElement: any, times: any[], questions: any[], points: any[]) {
+  constructor(playerElement: any, times: any[], questions: any[], points: any[], unitEngine: PlyrUnitEngine) {
+    this.unitEngine = unitEngine;
     const videoSession = (Session.get('currentTdfUnit') as any).videosession;
     this.preventScrubbing = videoSession.preventScrubbing || false;
     this.rewindOnIncorrect = videoSession.rewindOnIncorrect || false;
@@ -317,13 +339,12 @@ class PlayerController {
     return new Promise<void>((resolve, reject) => {
       this.player.on('ready', async (_event: any) => {
         try {
-          const engine = getUnitEngine();
           this.times.sort((a, b) => a - b);
           if(this.nextTimeIndex < this.times.length){
             this.nextTime = this.times[this.nextTimeIndex];
             let nextQuestion = this.questions[this.nextTimeIndex];
             let indices = {stimIndex: 0, clusterIndex: nextQuestion}
-            await engine.selectNextCard(indices, ExperimentStateStore.get());
+            await this.unitEngine.selectNextCard(indices, ExperimentStateStore.get());
             await newQuestionHandler();
           }
 
@@ -367,12 +388,11 @@ class PlayerController {
   }
 
   async setNextTime(time: any, index: any){
-    const engine = getUnitEngine();
     this.nextTime = time;
     this.nextTimeIndex = index;
     const nextQuestion = this.questions[index];
     Session.set('engineIndices', {stimIndex: 0, clusterIndex: nextQuestion});
-    await engine.selectNextCard(Session.get('engineIndices'), ExperimentStateStore.get());
+    await this.unitEngine.selectNextCard(Session.get('engineIndices'), ExperimentStateStore.get());
     await newQuestionHandler();
   }
 
@@ -533,26 +553,25 @@ class PlayerController {
   }
 
   async playNextCard() {
-    const engine = getUnitEngine();
     let curTdfUnit = Session.get('currentTdfUnit');
     let logic = '';
     if( curTdfUnit.videosession.adaptiveLogic && curTdfUnit.videosession.adaptiveLogic[this.lastlogicIndex])
       logic = curTdfUnit.videosession.adaptiveLogic[this.lastlogicIndex];
     this.lastlogicIndex++;
-    if(engine.adaptiveQuestionLogic){
+    if(this.unitEngine.adaptiveQuestionLogic){
       if(logic != '' && logic != undefined){
            
-        await engine.adaptiveQuestionLogic.evaluate(logic);
+        await this.unitEngine.adaptiveQuestionLogic.evaluate?.(logic);
       }
       //add new question to current unit
-      if(engine.adaptiveQuestionLogic.when == Session.get("currentUnitNumber")){
+      if(this.unitEngine.adaptiveQuestionLogic.when == Session.get("currentUnitNumber")){
         this.addStimToSchedule(curTdfUnit);
       }
     }
     if(this.nextTimeIndex < this.questions.length){
       const nextQuestion = this.questions[this.nextTimeIndex];
       Session.set('engineIndices', {stimIndex: 0, clusterIndex: nextQuestion});
-      await engine.selectNextCard(Session.get('engineIndices'), ExperimentStateStore.get());
+      await this.unitEngine.selectNextCard(Session.get('engineIndices'), ExperimentStateStore.get());
       await newQuestionHandler();
     }
     waitForElmRemoved("[id*='displayContainer']").then(() => {
@@ -561,9 +580,8 @@ class PlayerController {
   }
 
   addStimToSchedule(curTdfUnit: any){
-    const engine = getUnitEngine();
     let markers: any[] = [];
-    const newschedule = engine.adaptiveQuestionLogic.schedule;
+    const newschedule = this.unitEngine.adaptiveQuestionLogic.schedule;
     this.questions = [];
     this.times = [];
     //assume time is correct and sort questions based on times
@@ -666,8 +684,8 @@ function getIndex(arr: any[], num: any) {
   }).indexOf(num);
 }
 
-export async function initializePlyr() {
-  const engine = getUnitEngine();
+export async function initializePlyr(engineHandle: unknown) {
+  const engine = requirePlyrUnitEngine(engineHandle, 'initializePlyr');
   Session.set('trialStartTimestamp', Date.now());
   const currentVideoSession = Session.get('currentTdfUnit').videosession || {};
   let questions = Session.get('currentTdfUnit').videosession.questions;
@@ -739,7 +757,7 @@ export async function initializePlyr() {
   }
   await waitForElm('#videoUnitPlayer');
 
-  playerController = new PlayerController('#videoUnitPlayer', times, questions, points);
+  playerController = new PlayerController('#videoUnitPlayer', times, questions, points, engine);
 
   //set the source of the video to the new video
   let source = Session.get('currentTdfUnit').videosession.videosource;

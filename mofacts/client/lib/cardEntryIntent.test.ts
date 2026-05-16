@@ -70,7 +70,7 @@ describe('cardEntryIntent', function() {
 
   it('routes only persisted-progress intents through canonical progress bootstrap', function() {
     expect(shouldUseProgressBootstrapForEntryIntent(CARD_ENTRY_INTENT.PERSISTED_PROGRESS_RESUME)).to.equal(true);
-    expect(shouldUseProgressBootstrapForEntryIntent(CARD_ENTRY_INTENT.CARD_REFRESH_REBUILD)).to.equal(true);
+    expect(shouldUseProgressBootstrapForEntryIntent(CARD_ENTRY_INTENT.CARD_REFRESH_REBUILD)).to.equal(false);
     expect(shouldUseProgressBootstrapForEntryIntent(CARD_ENTRY_INTENT.INITIAL_TDF_ENTRY)).to.equal(false);
     expect(shouldUseProgressBootstrapForEntryIntent(CARD_ENTRY_INTENT.INSTRUCTION_CONTINUE)).to.equal(false);
     expect(shouldUseProgressBootstrapForEntryIntent(null)).to.equal(false);
@@ -80,11 +80,17 @@ describe('cardEntryIntent', function() {
     expect(classifyCardRefreshRebuild(null)).to.deep.equal({
       intent: CARD_ENTRY_INTENT.INITIAL_TDF_ENTRY,
       reason: CARD_REFRESH_REBUILD_REASON.NO_EXPERIMENT_STATE,
+      moduleCompleted: false,
+      persistedUnitNumber: null,
+      lastUnitCompleted: null,
     });
 
     expect(classifyCardRefreshRebuild({})).to.deep.equal({
       intent: CARD_ENTRY_INTENT.INITIAL_TDF_ENTRY,
       reason: CARD_REFRESH_REBUILD_REASON.NO_EXPERIMENT_STATE,
+      moduleCompleted: false,
+      persistedUnitNumber: null,
+      lastUnitCompleted: null,
     });
   });
 
@@ -95,6 +101,9 @@ describe('cardEntryIntent', function() {
     })).to.deep.equal({
       intent: CARD_ENTRY_INTENT.PERSISTED_PROGRESS_RESUME,
       reason: CARD_REFRESH_REBUILD_REASON.SAVED_PROGRESS_STATE,
+      moduleCompleted: false,
+      persistedUnitNumber: 0,
+      lastUnitCompleted: null,
     });
   });
 
@@ -105,6 +114,31 @@ describe('cardEntryIntent', function() {
     })).to.deep.equal({
       intent: CARD_ENTRY_INTENT.PERSISTED_PROGRESS_RESUME,
       reason: CARD_REFRESH_REBUILD_REASON.SAVED_PROGRESS_STATE,
+      moduleCompleted: false,
+      persistedUnitNumber: null,
+      lastUnitCompleted: null,
+    });
+  });
+
+  it('classifies refresh rebuild with either completion sentinel as completed', function() {
+    expect(classifyCardRefreshRebuild({
+      currentUnitNumber: 4,
+    }, 4)).to.deep.equal({
+      intent: CARD_ENTRY_INTENT.PERSISTED_PROGRESS_RESUME,
+      reason: CARD_REFRESH_REBUILD_REASON.SAVED_PROGRESS_STATE,
+      moduleCompleted: true,
+      persistedUnitNumber: 4,
+      lastUnitCompleted: null,
+    });
+
+    expect(classifyCardRefreshRebuild({
+      lastUnitCompleted: 3,
+    }, 4)).to.deep.equal({
+      intent: CARD_ENTRY_INTENT.PERSISTED_PROGRESS_RESUME,
+      reason: CARD_REFRESH_REBUILD_REASON.SAVED_PROGRESS_STATE,
+      moduleCompleted: true,
+      persistedUnitNumber: null,
+      lastUnitCompleted: 3,
     });
   });
 
@@ -115,6 +149,9 @@ describe('cardEntryIntent', function() {
     })).to.deep.equal({
       intent: CARD_ENTRY_INTENT.INITIAL_TDF_ENTRY,
       reason: CARD_REFRESH_REBUILD_REASON.NO_PROGRESS_STATE,
+      moduleCompleted: false,
+      persistedUnitNumber: null,
+      lastUnitCompleted: null,
     });
   });
 

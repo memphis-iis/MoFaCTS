@@ -1,8 +1,11 @@
-// Stage 2 mapping policy helper.
-// Conservative by design: if progress is ambiguous, treat as progressed.
+// Resume-compatibility policy helper.
+// Conservative by design: ambiguous progress is treated as meaningful progress.
 
 type MappingProgressState = {
   currentUnitNumber?: unknown;
+  lastUnitCompleted?: unknown;
+  schedule?: unknown;
+  scheduleUnitNumber?: unknown;
   questionIndex?: unknown;
   clusterIndex?: unknown;
   shufIndex?: unknown;
@@ -32,10 +35,6 @@ export function hasMeaningfulMappingProgress(state: MappingProgressState | null 
     return false;
   }
 
-  if (Object.prototype.hasOwnProperty.call(state, 'currentUnitNumber')) {
-    return true;
-  }
-
   if (Object.prototype.hasOwnProperty.call(state, 'questionIndex')) {
     return true;
   }
@@ -53,6 +52,14 @@ export function hasMeaningfulMappingProgress(state: MappingProgressState | null 
   }
 
   if (Array.isArray(state.overallStudyHistory) && state.overallStudyHistory.length > 0) {
+    return true;
+  }
+
+  if (state.schedule && typeof state.schedule === 'object') {
+    return true;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(state, 'scheduleUnitNumber')) {
     return true;
   }
 

@@ -92,25 +92,8 @@ function normalizeOptionalString(value: unknown): string | null {
   return normalized.length > 0 ? normalized : null;
 }
 
-function getExperimentVersionTag(setspec: any): string | null {
-  const versionLabel = normalizeOptionalString(setspec?.versionLabel ?? setspec?.versionlabel);
-  if (versionLabel) {
-    return versionLabel.toLowerCase().startsWith('v') ? versionLabel : `v${versionLabel}`;
-  }
-
-  const versionMajor = normalizeOptionalString(setspec?.versionMajor ?? setspec?.versionmajor ?? setspec?.version);
-  if (versionMajor) {
-    return versionMajor.toLowerCase().startsWith('v') ? versionMajor : `v${versionMajor}`;
-  }
-
-  return null;
-}
-
-function formatExperimentLabel(fileName: string, versionTag: string | null, tdfId: string): string {
+function formatExperimentLabel(fileName: string, tdfId: string): string {
   const shortId = tdfId.slice(0, 8);
-  if (versionTag) {
-    return `${fileName} (${versionTag}, ${shortId})`;
-  }
   return `${fileName} (${shortId})`;
 }
 
@@ -301,7 +284,6 @@ Template.turkWorkflow.rendered = async function(this: any) {
     selectorKey: string;
     fileName: string;
     lessonName: string;
-    versionTag: string | null;
     displayLabel: string;
   }[] = [];
 
@@ -330,7 +312,6 @@ Template.turkWorkflow.rendered = async function(this: any) {
 
     const expTarget = setspec.experimentTarget ? setspec.experimentTarget.trim() : '';
     const selectorKey = normalizeOptionalString(tdf._id) || fileName;
-    const versionTag = getExperimentVersionTag(setspec);
 
     if (expTarget.length > 0) {
       logExperiments.push({
@@ -338,8 +319,7 @@ Template.turkWorkflow.rendered = async function(this: any) {
         selectorKey,
         fileName,
         lessonName: name,
-        versionTag,
-        displayLabel: formatExperimentLabel(fileName, versionTag, String(tdf._id || 'unknown')),
+        displayLabel: formatExperimentLabel(fileName, String(tdf._id || 'unknown')),
       });
     }
   });

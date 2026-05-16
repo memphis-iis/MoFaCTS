@@ -17,12 +17,6 @@
   /** @type {number} Number of columns (1-4) */
   export let columns = 2;
 
-  /** @type {boolean} Whether confirm button mode is enabled */
-  export let confirmMode = false;
-
-  /** @type {number|null} Selected choice index */
-  export let selectedIndex = null;
-
   /** @type {boolean} Whether to show buttons */
   export let showButtons = true;
 
@@ -38,7 +32,6 @@
       answer: button.buttonName,
       buttonName: button.buttonName,
       index,
-      selectionOnly: confirmMode,
       timestamp: Date.now()
     });
   }
@@ -98,14 +91,7 @@
       return gridElement.clientHeight;
     }
 
-    const confirmButton = responseArea.querySelector('.confirm-button');
     let reservedHeight = 0;
-    if (confirmButton) {
-      const confirmStyles = window.getComputedStyle(confirmButton);
-      reservedHeight = confirmButton.getBoundingClientRect().height;
-      reservedHeight += (parseFloat(confirmStyles.marginTop || '0') || 0);
-      reservedHeight += (parseFloat(confirmStyles.marginBottom || '0') || 0);
-    }
 
     return Math.max(0, responseArea.clientHeight - reservedHeight - 8);
   }
@@ -148,17 +134,11 @@
 
     const columnCount = resolveColumnCount();
     const rowCount = Math.max(1, Math.ceil(buttonList.length / columnCount));
-    const responseArea = gridElement.closest('.response-area');
-    const hasConfirmButton = Boolean(responseArea?.querySelector('.confirm-button'));
-
     let minScale = 0.55;
     if (rowCount >= 4) {
       minScale = 0.42;
     } else if (rowCount === 3) {
       minScale = 0.5;
-    }
-    if (hasConfirmButton) {
-      minScale -= 0.04;
     }
     minScale = Math.max(0.36, minScale);
 
@@ -265,12 +245,6 @@
 
     if (targetIndex !== index) {
       buttons[targetIndex].focus();
-      if (confirmMode) {
-        const nextButton = buttonList[targetIndex];
-        if (nextButton) {
-          handleChoice(nextButton, targetIndex);
-        }
-      }
     }
   }
 </script>
@@ -283,9 +257,7 @@
           class="choice-button"
           class:disabled={!enabled}
           class:is-image={button.isImage}
-          class:selected={index === selectedIndex}
           disabled={!enabled}
-          aria-pressed={index === selectedIndex}
           on:click={() => handleChoice(button, index)}
           on:keydown={(event) => handleKeydown(event, index, button)}
           data-button-value={button.buttonValue}
@@ -371,16 +343,6 @@
     object-fit: contain;
   }
 
-  .choice-button.selected {
-    background-color: var(--main-button-color);
-    color: var(--main-button-text-color);
-    opacity: 1;
-    border-color: color-mix(
-      in srgb,
-      var(--main-button-color) calc(100% - (var(--button-border-darkness) * 1%)),
-      black calc(var(--button-border-darkness) * 1%)
-    );
-  }
   /* Mobile responsiveness */
   @media (max-width: 768px) {
     .button-grid {

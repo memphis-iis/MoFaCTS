@@ -231,7 +231,7 @@ describe('resume runtime integration seams', function() {
       userAnswer: 'alpha',
       isCorrect: true,
       testType: 'd',
-      deliveryParams: { feedbackType: 'full' },
+      deliverySettings: { feedbackType: 'full' },
       engine: {
         unitType: 'schedule',
         findCurrentCardInfo: () => ({
@@ -275,7 +275,7 @@ describe('resume runtime integration seams', function() {
         },
         source: 'keyboard',
         userAnswer: 'alpha',
-        deliveryParams: {},
+        deliverySettings: {},
       };
 
     let rejectionMessage = '';
@@ -291,7 +291,6 @@ describe('resume runtime integration seams', function() {
   it('historyLoggingService rejects when canonical feedback text is missing', async function() {
     Session.set('overallOutcomeHistory', []);
     Session.set('overallStudyHistory', []);
-    CardStore.setCardValue('feedbackTtsText', '');
 
     const context: HistoryLoggingContext = {
       testType: 'd',
@@ -305,7 +304,7 @@ describe('resume runtime integration seams', function() {
       },
       source: 'keyboard',
       userAnswer: 'wrong',
-      deliveryParams: {},
+      deliverySettings: {},
     };
 
     let rejectionMessage = '';
@@ -315,6 +314,6 @@ describe('resume runtime integration seams', function() {
       rejectionMessage = error instanceof Error ? error.message : String(error);
     }
 
-    expect(rejectionMessage).to.contain('feedbackTtsText missing');
+    expect(rejectionMessage).to.contain('feedbackText missing');
   });
 });

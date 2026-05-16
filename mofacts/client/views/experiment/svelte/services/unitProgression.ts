@@ -9,12 +9,10 @@ import { Session } from 'meteor/session';
 import { getEngine } from '../../../../lib/engineManager';
 import { meteorCallAsync } from '../../../../index';
 import { clientConsole } from '../../../../lib/userSessionHelpers';
-import { getCurrentDeliveryParams, setStudentPerformance } from '../../../../lib/currentTestingHelpers';
-import { DeliveryParamsStore } from '../../../../lib/state/deliveryParamsStore';
-import { UiSettingsStore } from '../../../../lib/state/uiSettingsStore';
+import { refreshCurrentDeliverySettingsStore, setStudentPerformance } from '../../../../lib/currentTestingHelpers';
+import { deliverySettingsStore } from '../../../../lib/state/deliverySettingsStore';
 import { CardStore } from '../../modules/cardStore';
 import { getExperimentState, createExperimentState } from './experimentState';
-import { sanitizeUiSettings } from '../utils/uiSettingsValidator';
 import '../../../../../common/Collections';
 import type { ExperimentState } from '../../../../../common/types/experiment';
 import type { UnitCompletionEngine } from '../../../../../common/types/svelteServices';
@@ -29,6 +27,7 @@ type TdfFileState = Record<string, unknown> & {
   tdfs: {
     tutor: {
       title?: string;
+      deliverySettings?: Record<string, unknown>;
       unit: TdfUnitState[];
       setspec: Record<string, unknown> & { unitTemplate?: unknown[] };
     };
@@ -42,6 +41,7 @@ type TdfUnitState = Record<string, unknown> & {
   adaptiveUnitTemplate?: unknown[];
   countcompletion?: unknown;
   learningsession?: unknown;
+  deliverySettings?: Record<string, unknown>;
 };
 
 type AdaptiveLogicOutput = {
@@ -195,8 +195,6 @@ export async function unitIsFinished(_reason: string): Promise<void> {
     }
 
     Session.set('currentTdfFile', curTdf);
-    curExperimentState.currentTdfFile = curTdf;
-    await createExperimentState(curExperimentState);
   }
 
   const currentTdfFileState = Session.get('currentTdfFile') as TdfFileState | null | undefined;
@@ -208,24 +206,14 @@ export async function unitIsFinished(_reason: string): Promise<void> {
   Session.set('currentUnitNumber', newUnitNum);
   Session.set('currentTdfUnit', curTdfUnit);
   Session.set('resetSchedule', true);
-  DeliveryParamsStore.set(getCurrentDeliveryParams());
-  const tdfSettings = (curTdf.tdfs?.tutor?.setspec?.uiSettings || {}) as Record<string, unknown>;
-  const unitSettings = (curTdfUnit?.uiSettings || {}) as Record<string, unknown>;
-  const lessonName = curTdf.tdfs?.tutor?.setspec?.lessonname;
-  const tdfName = (
-    (typeof lessonName === 'string' && lessonName) ||
-    curTdf.tdfs?.tutor?.title ||
-    curTdf.fileName ||
-    ''
-  ) as string;
-  UiSettingsStore.set(sanitizeUiSettings({ ...tdfSettings, ...unitSettings }, { tdfName }));
+  refreshCurrentDeliverySettingsStore();
   Session.set('currentUnitStartTime', Date.now());
   CardStore.setFeedbackUnset(true);
   CardStore.setFeedbackTypeFromHistory(undefined);
   Session.set('curUnitInstructionsSeen', false);
 
   const resetStudentPerformance = Boolean(
-    (DeliveryParamsStore.get() as Record<string, unknown>).resetStudentPerformance
+    (deliverySettingsStore.get() as Record<string, unknown>).resetStudentPerformance
   );
   let leaveTarget: string;
 

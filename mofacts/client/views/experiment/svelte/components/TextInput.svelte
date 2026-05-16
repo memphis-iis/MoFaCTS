@@ -1,7 +1,7 @@
 <script>
   /**
    * TextInput Component
-   * Text entry field with submit button
+   * Text entry field that submits on Enter.
    */
   import { onMount, createEventDispatcher } from 'svelte';
 
@@ -12,9 +12,6 @@
 
   /** @type {boolean} Whether input is enabled */
   export let enabled = true;
-
-  /** @type {boolean} Whether to show submit button */
-  export let showSubmitButton = true;
 
   /** @type {string} Placeholder text */
   export let placeholder = 'Type your answer...';
@@ -80,17 +77,6 @@
     autocomplete="off"
     spellcheck="false"
   />
-
-  {#if showSubmitButton}
-    <button
-      class="submit-button"
-      class:disabled={!enabled}
-      disabled={!enabled}
-      on:click={handleSubmit}
-    >
-      Submit
-    </button>
-  {/if}
 </div>
 
 <style>
@@ -124,47 +110,11 @@
     cursor: not-allowed;
   }
 
-  .submit-button {
-    padding: 0.5rem 1.25rem;
-    font-size: var(--card-font-size, 24px);
-    font-weight: 600;
-    color: var(--main-button-text-color);
-    background-color: var(--main-button-color);
-    border: 2px solid color-mix(
-      in srgb,
-      var(--main-button-color) calc(100% - (var(--button-border-darkness) * 1%)),
-      black calc(var(--button-border-darkness) * 1%)
-    );
-    border-radius: var(--border-radius-sm);
-    cursor: pointer;
-    transition: background-color var(--transition-fast) ease;
-    white-space: nowrap;
-  }
-
-  .submit-button:hover:not(.disabled) {
-    background-color: color-mix(
-      in srgb,
-      var(--main-button-color) calc(100% - (var(--button-hover-darkness) * 1%)),
-      black calc(var(--button-hover-darkness) * 1%)
-    );
-  }
-
-  .submit-button.disabled {
-    background-color: var(--secondary-color);
-    color: var(--secondary-text-color);
-    cursor: not-allowed;
-  }
-
   /* Mobile responsiveness */
   @media (max-width: 768px) {
     .text-input-container {
-      flex-direction: column;
       width: 100%;
       max-width: 100%;
-    }
-
-    .submit-button {
-      width: 100%;
     }
   }
 </style>

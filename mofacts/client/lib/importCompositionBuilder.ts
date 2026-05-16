@@ -11,7 +11,7 @@ type BuildImportLessonDraftOptions = {
   sourceConfig?: Record<string, unknown>;
   skippedItems?: number;
   manifestMeta?: Record<string, unknown>;
-  uiSettings?: Record<string, unknown>;
+  deliverySettings?: Record<string, unknown>;
 };
 
 export function sanitizeImportName(rawName: unknown, fallback = 'Imported_Lesson') {
@@ -76,12 +76,12 @@ export function buildTutorFromNormalizedItems(
   instructions: unknown,
   items: NormalizedImportItem[],
   options: {
-    uiSettings?: Record<string, unknown>;
+    deliverySettings?: Record<string, unknown>;
   } = {}
 ) {
   const { safeName, stimFileName } = getImportFileNames(lessonName);
   const parameters = cloneImportParameterDefaults();
-  const { lfparameter, ...deliveryparams } = parameters;
+  const { lfparameter, ...deliverySettingsDefaults } = parameters;
   const cardCount = items.length;
   const clusterRange = cardCount > 0 ? `0-${cardCount - 1}` : '0-0';
 
@@ -92,9 +92,9 @@ export function buildTutorFromNormalizedItems(
         stimulusfile: stimFileName,
         shuffleclusters: clusterRange,
         userselect: 'true',
-        lfparameter,
-        ...(options.uiSettings ? { uiSettings: options.uiSettings } : {})
+        lfparameter
       },
+      ...(options.deliverySettings ? { deliverySettings: options.deliverySettings } : {}),
       unit: [
         {
           unitname: 'Instructions',
@@ -107,7 +107,10 @@ export function buildTutorFromNormalizedItems(
             unitMode: 'distance',
             calculateProbability: CALCULATE_PROBABILITY_FORMULA
           },
-          deliveryparams
+          deliverySettings: {
+            ...deliverySettingsDefaults,
+            ...(options.deliverySettings || {})
+          }
         }
       ]
     }
@@ -120,7 +123,7 @@ export function buildImportLessonDraft(options: BuildImportLessonDraftOptions): 
     options.lessonName,
     options.instructions,
     options.items,
-    options.uiSettings ? { uiSettings: options.uiSettings } : {}
+    options.deliverySettings ? { deliverySettings: options.deliverySettings } : {}
   );
 
   return {

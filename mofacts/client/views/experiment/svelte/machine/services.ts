@@ -38,7 +38,7 @@ interface AnswerEvaluationContext extends ServiceRecord {
   userAnswer?: unknown;
   currentAnswer?: string;
   originalAnswer?: string;
-  uiSettings?: {
+  deliverySettings?: {
     caseSensitive?: boolean;
   };
   setspec?: unknown;
@@ -46,7 +46,7 @@ interface AnswerEvaluationContext extends ServiceRecord {
 }
 
 interface TimedDisplayContext extends ServiceRecord {
-  deliveryParams?: Record<string, unknown>;
+  deliverySettings?: Record<string, unknown>;
 }
 
 interface AudioGateContext extends TimedDisplayContext {
@@ -74,12 +74,11 @@ interface AudioGateContext extends TimedDisplayContext {
  * @param {CardMachineEvent} event
  * @returns {Promise<CardSelectionResult>}
  */
-async function selectNextCard(context: { uiSettings?: unknown }, _event: unknown) {
+async function selectNextCard(context: { deliverySettings?: unknown }, _event: unknown) {
   
 
   try {
-    // TODO: Call unitEngine.js to get next card
-    // This is a placeholder - actual implementation will integrate with unitEngine
+    // Legacy placeholder path; current card selection is handled by selectCardService.
     //
     // const result = await window.unitEngine.selectNextCard({
     //   sessionId: context.sessionId,
@@ -101,8 +100,7 @@ async function selectNextCard(context: { uiSettings?: unknown }, _event: unknown
       testType: 'd',
       buttonTrial: false,
       buttonList: [],
-      deliveryParams: {},
-      uiSettings: context.uiSettings, // Pass through from context
+      deliverySettings: context.deliverySettings, // Pass through from context
       engineIndices: { /* engine-specific indices */ },
       unitFinished: false,
     };
@@ -202,9 +200,9 @@ function feedbackTimeout(context: TimeoutContextLike, _event: unknown) {
     feedbackStart,
     elapsed,
     remaining,
-    correctprompt: context.deliveryParams?.correctprompt,
-    reviewstudy: context.deliveryParams?.reviewstudy,
-    purestudy: context.deliveryParams?.purestudy,
+    correctprompt: context.deliverySettings?.correctprompt,
+    reviewstudy: context.deliverySettings?.reviewstudy,
+    purestudy: context.deliverySettings?.purestudy,
   });
 
   return new Promise<void>((resolve) => {
@@ -404,7 +402,7 @@ async function evaluateAnswerService(context: AnswerEvaluationContext) {
   const userAnswer = rawAnswer.trim();
   const currentAnswer = context.currentAnswer || '';
   const originalAnswer = context.originalAnswer || '';
-  const caseSensitive = context.uiSettings?.caseSensitive === true;
+  const caseSensitive = context.deliverySettings?.caseSensitive === true;
   const setspec = context.setspec || (context.buttonTrial
     ? undefined
     : Session.get('currentTdfFile')?.tdfs?.tutor?.setspec);
@@ -429,7 +427,7 @@ async function evaluateAnswerService(context: AnswerEvaluationContext) {
  * Mirrors Blaze readyPromptStringDisplayTime behavior.
  */
 export async function readyPromptDelayService(context: TimedDisplayContext) {
-  const delivery = context.deliveryParams || {};
+  const delivery = context.deliverySettings || {};
   const delayMs = parseInt(String(delivery.readyPromptStringDisplayTime ?? ''), 10) || 0;
   if (delayMs > 0) {
     
@@ -442,7 +440,7 @@ export async function readyPromptDelayService(context: TimedDisplayContext) {
  * Prestimulus display delay.
  */
 export async function prestimulusDelayService(context: TimedDisplayContext) {
-  const delivery = context.deliveryParams || {};
+  const delivery = context.deliverySettings || {};
   const delayMs = parseInt(String(delivery.prestimulusdisplaytime ?? ''), 10) || 0;
   if (delayMs > 0) {
     
@@ -469,7 +467,7 @@ async function uiPaintService() {
  * Delay + play question audio before enabling input.
  */
 export async function questionAudioGateService(context: AudioGateContext) {
-  const delivery = context.deliveryParams || {};
+  const delivery = context.deliverySettings || {};
   const audioSrc = context.currentDisplay?.audioSrc || '';
   if (!audioSrc) {
     return { skipped: true };

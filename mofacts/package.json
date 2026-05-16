@@ -124,6 +124,7 @@
     "license:audit": "npx license-checker --production --summary && npx license-checker --production --csv --out ../dependency-licenses.csv",
     "license:audit:all": "npx license-checker --summary && npx license-checker --csv --out ../dependency-licenses-all.csv",
     "audit:fields": "node --experimental-strip-types scripts/auditFields.ts",
+    "convert:config-delivery-settings": "node --experimental-strip-types scripts/convertConfigDeliverySettings.ts",
     "prepare": "node scripts/prepare-husky.cjs",
     "precommit:lint-staged": "lint-staged",
     "secret:scan:staged": "node scripts/scan-staged-secrets.cjs",

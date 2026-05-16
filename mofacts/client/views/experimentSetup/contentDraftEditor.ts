@@ -1,4 +1,5 @@
 import { clientConsole } from '../../lib/clientLogger';
+import { sortPropertiesModal } from '../../lib/schemaApplicabilityEditor';
 
 const JSONEditorAny = (globalThis as any).JSONEditor;
 
@@ -110,6 +111,11 @@ function syncDraftEditorChrome(container: HTMLElement, editor: any, rootArg?: Pa
       label.setAttribute('for', input.id);
     }
   });
+
+  const modals = root.matches?.('.je-modal')
+    ? [root]
+    : root.querySelectorAll?.('.je-modal');
+  modals?.forEach((modal: Element) => sortPropertiesModal(modal));
 }
 
 async function loadStimSchema() {

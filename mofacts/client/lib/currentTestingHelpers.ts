@@ -1,21 +1,16 @@
-import {KC_MULTIPLE, MODEL_UNIT} from '../../common/Definitions';
+import {KC_MULTIPLE} from '../../common/Definitions';
 import { _ as underscore } from 'meteor/underscore';
 import { Meteor } from 'meteor/meteor';
 import { clientConsole } from './userSessionHelpers';
 import { Tracker } from 'meteor/tracker';
 import { Session } from 'meteor/session';
 import { meteorCallAsync } from './meteorAsync';
-import { DeliveryParamsStore } from './state/deliveryParamsStore';
+import { deliverySettingsStore } from './state/deliverySettingsStore';
+import { resolveCurrentDeliverySettings } from './deliverySettingsResolver';
 import { loadSessionMappingRecord, resolveOriginalClusterIndex } from '../views/experiment/svelte/services/mappingRecordService';
 import { createStimClusterMapping as createStimClusterMappingCore } from './clusterMappingUtils';
 import { normalizeThemePropertyValue } from '../../common/themePropertyNormalization';
 import { resolveThemeBrandLabel } from '../../common/themeBranding';
-import {
-  DELIVERY_PARAM_DEFAULTS,
-  normalizeDeliveryParamSource,
-  normalizeDeliveryParamValue,
-} from '../../common/fieldRegistry';
-
 import { legacyInt, legacyTrim } from '../../common/underscoreCompat';
 
 type IntValFn = (src: unknown, defaultVal?: unknown) => number;
@@ -152,17 +147,9 @@ type StudentPerformanceAccumulator = {
   stimsIntroduced: number;
 };
 
-type DeliveryParamValue = string | number | boolean | undefined;
-type DeliveryParams = Record<string, DeliveryParamValue>;
+type DeliverySettings = Record<string, unknown>;
 
-function isDeliveryParamValue(value: unknown): value is DeliveryParamValue {
-  return value === undefined ||
-    typeof value === 'string' ||
-    typeof value === 'number' ||
-    typeof value === 'boolean';
-}
-
-export { extractDelimFields, rangeVal, shuffle, randomChoice, search, getUserDisplayIdentifier, haveMeteorUser, updateCurStudentPerformance, updateCurStudedentPracticeTime, setStudentPerformance, getStimCount, getStimCluster, getStimKCBaseForCurrentStimuliSet, createStimClusterMapping, getAllCurrentStimAnswers, getStimAnswerDisplayCase, getTestType, getCurrentDeliveryParams, getCurrentTheme };
+export { extractDelimFields, rangeVal, shuffle, randomChoice, search, getUserDisplayIdentifier, haveMeteorUser, updateCurStudentPerformance, updateCurStudedentPracticeTime, setStudentPerformance, getStimCount, getStimCluster, getStimKCBaseForCurrentStimuliSet, createStimClusterMapping, getAllCurrentStimAnswers, getStimAnswerDisplayCase, getTestType, getCurrentDeliverySettings, refreshCurrentDeliverySettingsStore, getCurrentTheme };
 
 
 // ===== PHASE 1.5 OPTIMIZATION: Theme Subscription =====
@@ -522,7 +509,7 @@ async function setStudentPerformance(
   studentUsername: string,
   tdfId: string,
   unitNumber = Number(Session.get('currentUnitNumber')),
-  unitScopedOnly = Boolean((DeliveryParamsStore.get() as Record<string, unknown>)?.resetStudentPerformance)
+  unitScopedOnly = Boolean((deliverySettingsStore.get() as Record<string, unknown>)?.resetStudentPerformance)
 ) {
   clientConsole(2, 'setStudentPerformance:', studentID, studentUsername, tdfId);
   const historyPerformance = await meteorCallAsync<Record<string, unknown> | null>(
@@ -708,97 +695,50 @@ function getTestType() {
   return legacyTrim(Session.get('testType')).toLowerCase();
 }
 
-// Return the delivery parms for the current unit. Note that we provide default
+// Return the delivery settings for the current unit. Note that we provide default
 // values AND eliminate the single-value array issue from our XML-2-JSON mapping
 //
 // Note that the default mode is to use the current unit (thus the name), but we
 // allow callers to override the unit assumed to be current
 //
-// IMPORTANT: we also support selecting one of multiple delivery params via
+// IMPORTANT: we also support selecting one of multiple delivery settings entries via
 // experimentXCond (which can be specified in the URL or system-assigned)
-function getCurrentDeliveryParams() {
+function getCurrentDeliverySettings() {
   let currUnit = Session.get('currentTdfUnit');
   const currentTdfFile = Session.get('currentTdfFile');
   const currentUnitNumber = Number(Session.get('currentUnitNumber') || 0);
+  const tutor = currentTdfFile?.tdfs?.tutor;
 
   if (!currUnit && currentTdfFile?.tdfs?.tutor?.unit && Array.isArray(currentTdfFile.tdfs.tutor.unit)) {
     const fallbackUnit = currentTdfFile.tdfs.tutor.unit[currentUnitNumber];
     if (fallbackUnit) {
       currUnit = fallbackUnit;
       Session.set('currentTdfUnit', fallbackUnit);
-      clientConsole(1, '[DeliveryParams] currentTdfUnit missing; restored from currentTdfFile/currentUnitNumber', {
+      clientConsole(1, '[DeliverySettings] currentTdfUnit missing; restored from currentTdfFile/currentUnitNumber', {
         currentUnitNumber,
         unitname: fallbackUnit.unitname,
       });
     }
   }
 
-  const isLearningSession = Session.get('unitType') == MODEL_UNIT;
+  const resolved = resolveCurrentDeliverySettings({
+    tdfFile: currentTdfFile,
+    tutor,
+    unit: currUnit,
+    unitIndex: currentUnitNumber,
+    experimentXCond: Session.get('experimentXCond'),
+    unitType: Session.get('unitType'),
+  });
 
-  clientConsole(2, 'getCurrentDeliveryParams:', currUnit ? 'unit found' : 'no unit', isLearningSession);
+  clientConsole(2, 'getCurrentDeliverySettings:', currUnit ? 'unit found' : 'no unit', resolved.settings.scoringEnabled);
 
-  const deliveryParams: DeliveryParams = {
-    ...DELIVERY_PARAM_DEFAULTS,
-    scoringEnabled: isLearningSession,
-  };
+  return resolved.settings as DeliverySettings;
+}
 
-  let modified = false;
-  let fieldName; // Used in loops below
-
-  // Note that if there is no XCond or if they specify something
-  // wacky we'll just go with index 0
-  let xcondIndex = legacyInt(Session.get('experimentXCond'));
-
-  function selectDeliveryParamSource(source: unknown) {
-    if (!Array.isArray(source)) {
-      return source;
-    }
-    if (xcondIndex < 0 || xcondIndex >= source.length) {
-      xcondIndex = 0;
-    }
-    return source[xcondIndex];
-  }
-
-  // Use the current unit specified to get the deliveryparams array. If there
-  // isn't a unit then we use the top-level deliveryparams (if there are)
-  let sourceDelParams = null;
-  if (currUnit) {
-    // We have a unit
-    if (currUnit.deliveryparams) {
-      sourceDelParams = selectDeliveryParamSource(currUnit.deliveryparams);
-    }
-    } else {
-      // No unit - we look for the top-level deliveryparams
-      const tdf = currentTdfFile;
-      if (tdf && typeof tdf.tdfs.tutor.deliveryparams !== 'undefined') {
-        sourceDelParams = selectDeliveryParamSource(tdf.tdfs.tutor.deliveryparams);
-      }
-    }
-
-  const normalizedSourceDelParams = normalizeDeliveryParamSource(
-    sourceDelParams as Record<string, unknown> | null | undefined
-  );
-
-  if (Object.keys(normalizedSourceDelParams).length > 0) {
-    // If found del params, then replace the defaults with the values
-    for (fieldName in normalizedSourceDelParams) {
-      const srcVal = normalizedSourceDelParams[fieldName];
-      if (isDeliveryParamValue(srcVal)) {
-        deliveryParams[fieldName] = srcVal;
-        modified = true;
-      }
-    }
-  }
-
-  // If we changed anything from the default, we should make sure
-  // everything is properly xlated
-  if (modified) {
-    for (fieldName in deliveryParams) {
-      deliveryParams[fieldName] = normalizeDeliveryParamValue(fieldName, deliveryParams[fieldName]);
-    }
-  }
-
-  return deliveryParams;
+function refreshCurrentDeliverySettingsStore() {
+  const settings = getCurrentDeliverySettings();
+  deliverySettingsStore.set(settings);
+  return settings;
 }
 
 

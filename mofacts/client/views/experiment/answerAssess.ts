@@ -1,7 +1,7 @@
 /* eslint-disable no-useless-escape */
 import {getAllCurrentStimAnswers} from '../../lib/currentTestingHelpers';
 import {doubleMetaphone} from 'double-metaphone'
-import { DeliveryParamsStore } from '../../lib/state/deliveryParamsStore';
+import { deliverySettingsStore } from '../../lib/state/deliverySettingsStore';
 
 import { legacyTrim } from '../../../common/underscoreCompat';
 
@@ -84,7 +84,7 @@ function getEditDistance(a: string, b: string): number {
  * */
 // Return true if the answer is a "branched answer"
 function answerIsBranched(answer: string): boolean {
-  const delParams = DeliveryParamsStore.get() as { branchingEnabled?: unknown };
+  const delParams = deliverySettingsStore.get() as { branchingEnabled?: unknown };
   const branchingEnabled = Boolean(delParams?.branchingEnabled);
   return legacyTrim(answer).indexOf(';') >= 0 && branchingEnabled;
 }
@@ -132,8 +132,8 @@ async function simpleStringMatch(
   const s1 = normalizeAnswerValue(userAnswer, caseSensitive);
   const s2 = normalizeAnswerValue(correctAnswer, caseSensitive);
   const fullAnswerText = normalizeAnswerValue(fullAnswerStr, caseSensitive);
-  const deliveryParams = DeliveryParamsStore.get();
-  const allowPhoneticMatching = deliveryParams.allowPhoneticMatching || false;
+  const deliverySettings = deliverySettingsStore.get();
+  const allowPhoneticMatching = deliverySettings.allowPhoneticMatching || false;
 
   if (s1.localeCompare(s2) === 0) {
     // Exact match!
@@ -142,7 +142,7 @@ async function simpleStringMatch(
   else {
     // See if they were close enough
     if (lfparameter) {
-      const checkOtherAnswers = deliveryParams.checkOtherAnswers;
+      const checkOtherAnswers = deliverySettings.checkOtherAnswers;
       // Check to see if the user answer is an exact match for other answers in the stim file,
       // If not we'll do an edit distance calculation to determine if they were close enough to the correct answer
       let matchOther;
@@ -364,11 +364,7 @@ async function checkAnswer(
     }
     
     if (!matchText) {
-      if (userAnswer === '' || userInput === '') {
-        matchText = 'The correct answer is ' + dispAnswer + '.';
-      } else {
-        matchText = isCorrect ? 'Correct' : 'Incorrect. The correct answer is ' + dispAnswer + '.';
-      }
+      matchText = isCorrect ? 'Correct' : 'Incorrect.';
     }
   }
   return {isCorrect, matchText};

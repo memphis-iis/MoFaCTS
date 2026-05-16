@@ -1,15 +1,16 @@
 import {
-  DELIVERY_PARAM_DEFAULTS,
-  DELIVERY_PARAM_APPLICABILITY,
-  DELIVERY_PARAM_FIELD_REGISTRY,
-  DELIVERY_PARAM_LEARNER_CONFIGURABLE_KEYS,
-  UI_SETTINGS_APPLICABILITY,
-  UI_SETTINGS_RUNTIME_DEFAULTS,
-  UI_SETTINGS_LEARNER_CONFIGURABLE_KEYS,
-  coerceAndValidateUiSetting,
+  DELIVERY_SETTINGS_DEFAULTS,
+  DELIVERY_SETTINGS_APPLICABILITY,
+  DELIVERY_SETTINGS_FIELD_REGISTRY,
+  DELIVERY_SETTINGS_LEARNER_CONFIGURABLE_KEYS,
+  DELIVERY_DISPLAY_SETTINGS_APPLICABILITY,
+  DELIVERY_DISPLAY_SETTINGS_RUNTIME_DEFAULTS,
+  DELIVERY_DISPLAY_SETTINGS_LEARNER_CONFIGURABLE_KEYS,
+  coerceAndValidateDeliveryDisplaySetting,
   createTdfSchemaFromRegistry,
   createTdfValidatorMap,
-  normalizeDeliveryParamValue
+  normalizeDeliverySettingsSource,
+  normalizeDeliverySettingValue as normalizeRegistryDeliverySettingValue
 } from '../fieldRegistry';
 import {
   detectTdfUnitType,
@@ -18,7 +19,7 @@ import {
 } from '../fieldApplicability';
 
 type LearnerTdfScope = 'setspec' | 'unit';
-type LearnerTdfFamily = 'ui' | 'delivery';
+type LearnerTdfFamily = 'deliverySettings';
 type LearnerTdfControl = 'toggle' | 'select' | 'slider' | 'number' | 'text';
 type JsonRecord = Record<string, unknown>;
 
@@ -32,13 +33,12 @@ export type LearnerTdfSourceMetadata = {
 export type LearnerTdfOverrides = {
   setspec?: {
     audioPromptMode?: string;
+    audioInputEnabled?: string;
     audioInputSensitivity?: number;
-    uiSettings?: Record<string, unknown>;
   };
-  deliveryparams?: Record<string, unknown>;
+  deliverySettings?: Record<string, unknown>;
   unit?: Record<string, {
-    deliveryparams?: Record<string, unknown>;
-    uiSettings?: Record<string, unknown>;
+    deliverySettings?: Record<string, unknown>;
   }>;
 };
 
@@ -92,10 +92,9 @@ function getSetSpecSchemaProperty(key: string): JsonRecord {
   return asRecord(schemaProperties(asRecord(schemaProperties(getTutorSchema()).setspec))[key]);
 }
 
-function getUiSettingsSchemaProperty(key: string): JsonRecord {
-  const setspec = asRecord(schemaProperties(getTutorSchema()).setspec);
-  const uiSettings = asRecord(schemaProperties(setspec).uiSettings);
-  return asRecord(schemaProperties(uiSettings)[key]);
+function getDeliverySettingsSchemaProperty(key: string): JsonRecord {
+  const deliverySettings = asRecord(schemaProperties(getTutorSchema()).deliverySettings);
+  return asRecord(schemaProperties(deliverySettings)[key]);
 }
 
 function getSchemaDefault(schema: JsonRecord, fallback: string | number | boolean): string | number | boolean {
@@ -174,18 +173,18 @@ function fieldDefinitionFromSchema(args: {
 }
 
 function deliveryFieldDefinition(scope: LearnerTdfScope, key: string): LearnerTdfFieldDefinition | null {
-  const registry = DELIVERY_PARAM_FIELD_REGISTRY[key];
+  const registry = DELIVERY_SETTINGS_FIELD_REGISTRY[key];
   if (!registry) return null;
   const label = registry.tooltip.brief.trim();
   if (!label) {
-    throw new Error(`Missing delivery-param learner-config label for ${key}`);
+    throw new Error(`Missing delivery-setting learner-config label for ${key}`);
   }
-  const tdfPath = scope === 'unit' ? `unit[].deliveryparams.${key}` : `deliveryparams.${key}`;
+  const tdfPath = scope === 'unit' ? `unit[].deliverySettings.${key}` : `deliverySettings.${key}`;
   const enumValues = registry.authoring.enum || [];
   const isBoolean = registry.authoring.type === 'booleanString';
   const isNumber = registry.authoring.type === 'integer' || registry.authoring.type === 'number';
   const validator = firstNumericValidator(tdfPath);
-  const defaultValue = DELIVERY_PARAM_DEFAULTS[key];
+  const defaultValue = DELIVERY_SETTINGS_DEFAULTS[key];
   const safeDefault = typeof defaultValue === 'string' || typeof defaultValue === 'number' || typeof defaultValue === 'boolean'
     ? defaultValue
     : isBoolean
@@ -197,7 +196,7 @@ function deliveryFieldDefinition(scope: LearnerTdfScope, key: string): LearnerTd
   return {
     id: tdfPath,
     scope,
-    family: 'delivery',
+    family: 'deliverySettings',
     label,
     tdfPath,
     control: isBoolean ? 'toggle' : enumValues.length ? 'select' : isNumber ? 'number' : 'text',
@@ -206,24 +205,36 @@ function deliveryFieldDefinition(scope: LearnerTdfScope, key: string): LearnerTd
     ...(isNumber && typeof validator?.min === 'number' ? { min: validator.min } : {}),
     ...(isNumber && typeof validator?.max === 'number' ? { max: validator.max } : {}),
     ...(isNumber ? { step: registry.authoring.type === 'integer' ? 1 : 0.1 } : {}),
-    ...(DELIVERY_PARAM_APPLICABILITY[key] ? { appliesToUnitTypes: DELIVERY_PARAM_APPLICABILITY[key] } : {})
+    ...(DELIVERY_SETTINGS_APPLICABILITY[key] ? { appliesToUnitTypes: DELIVERY_SETTINGS_APPLICABILITY[key] } : {})
   };
 }
 
 function uiFieldDefinition(scope: LearnerTdfScope, key: string): LearnerTdfFieldDefinition {
-  const schema = getUiSettingsSchemaProperty(key);
+  const schema = getDeliverySettingsSchemaProperty(key);
   const definition = fieldDefinitionFromSchema({
-    id: `${scope === 'unit' ? 'unit[]' : 'setspec'}.uiSettings.${key}`,
+    id: `${scope === 'unit' ? 'unit[].' : ''}deliverySettings.${key}`,
     scope,
-    family: 'ui',
-    tdfPath: `${scope === 'unit' ? 'unit[]' : 'setspec'}.uiSettings.${key}`,
+    family: 'deliverySettings',
+    tdfPath: `${scope === 'unit' ? 'unit[].' : ''}deliverySettings.${key}`,
     key,
     schema,
-    defaultValue: UI_SETTINGS_RUNTIME_DEFAULTS[key]
+    defaultValue: DELIVERY_DISPLAY_SETTINGS_RUNTIME_DEFAULTS[key]
   });
+  const controlOverride = key === 'displayUserAnswerInFeedback'
+    ? {
+      control: 'select' as const,
+      options: [
+        { value: 'onIncorrect', label: 'Incorrect answers only' },
+        { value: 'true', label: 'All answers' },
+        { value: 'false', label: 'Never' },
+        { value: 'onCorrect', label: 'Correct answers only' },
+      ],
+    }
+    : {};
   return {
     ...definition,
-    ...(UI_SETTINGS_APPLICABILITY[key] ? { appliesToUnitTypes: UI_SETTINGS_APPLICABILITY[key] } : {}),
+    ...controlOverride,
+    ...(DELIVERY_DISPLAY_SETTINGS_APPLICABILITY[key] ? { appliesToUnitTypes: DELIVERY_DISPLAY_SETTINGS_APPLICABILITY[key] } : {}),
   };
 }
 
@@ -241,11 +252,24 @@ function getAudioPromptOptions() {
   }));
 }
 
+const LEARNER_TDF_UNIT_DELIVERY_SETTING_KEYS = Object.freeze([
+  'fontsize',
+  'studyFirst',
+] as const);
+
+const LEARNER_TDF_UNIT_DISPLAY_SETTING_KEYS = Object.freeze([
+  'displayTimeoutCountdown',
+  'displayTimeoutBar',
+  'displayPerformance',
+  'stimuliPosition',
+  'displayUserAnswerInFeedback',
+] as const);
+
 export const LEARNER_TDF_FIELD_DEFINITIONS: readonly LearnerTdfFieldDefinition[] = [
   {
     id: 'setspec.audioPromptMode',
     scope: 'setspec',
-    family: 'ui',
+    family: 'deliverySettings',
     label: 'Spoken audio mode',
     tdfPath: 'setspec.audioPromptMode',
     control: 'select',
@@ -253,29 +277,26 @@ export const LEARNER_TDF_FIELD_DEFINITIONS: readonly LearnerTdfFieldDefinition[]
     options: getAudioPromptOptions()
   },
   {
-    id: 'setspec.audioInputSensitivity',
+    id: 'setspec.audioInputEnabled',
     scope: 'setspec',
-    family: 'ui',
-    label: 'Microphone sensitivity',
-    tdfPath: 'setspec.audioInputSensitivity',
-    control: 'slider',
-    defaultValue: getSchemaDefault(getSetSpecSchemaProperty('audioInputSensitivity'), 60),
-    min: 20,
-    max: 80,
-    step: 1,
-    unit: 'dB'
+    family: 'deliverySettings',
+    label: 'Speech recognition mode',
+    tdfPath: 'setspec.audioInputEnabled',
+    control: 'select',
+    defaultValue: getSchemaDefault(getSetSpecSchemaProperty('audioInputEnabled'), 'false'),
+    options: [
+      { value: 'false', label: 'Disabled' },
+      { value: 'true', label: 'Enabled' },
+    ]
   },
-  ...UI_SETTINGS_LEARNER_CONFIGURABLE_KEYS.map((key) => uiFieldDefinition('setspec', key)),
-  ...UI_SETTINGS_LEARNER_CONFIGURABLE_KEYS.map((key) => uiFieldDefinition('unit', key)),
-  ...DELIVERY_PARAM_LEARNER_CONFIGURABLE_KEYS
-    .map((key) => deliveryFieldDefinition('setspec', key))
-    .filter((field): field is LearnerTdfFieldDefinition => Boolean(field)),
-  ...DELIVERY_PARAM_LEARNER_CONFIGURABLE_KEYS
+  ...LEARNER_TDF_UNIT_DISPLAY_SETTING_KEYS.map((key) => uiFieldDefinition('unit', key)),
+  ...LEARNER_TDF_UNIT_DELIVERY_SETTING_KEYS
     .map((key) => deliveryFieldDefinition('unit', key))
     .filter((field): field is LearnerTdfFieldDefinition => Boolean(field))
 ];
 
 const AUDIO_PROMPT_MODES = new Set(['silent', 'question', 'feedback', 'all']);
+const SPEECH_RECOGNITION_MODES = new Set(['false', 'true']);
 
 function isRecord(value: unknown): value is JsonRecord {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -312,9 +333,9 @@ function learnerConfigurableKeyAppliesToUnit(
   unit: unknown
 ): boolean {
   const unitType = detectTdfUnitType(unit);
-  const applicability = family === 'delivery'
-    ? DELIVERY_PARAM_APPLICABILITY[key]
-    : UI_SETTINGS_APPLICABILITY[key];
+  const applicability = DELIVERY_SETTINGS_LEARNER_CONFIGURABLE_KEYS.includes(key)
+    ? DELIVERY_SETTINGS_APPLICABILITY[key]
+    : DELIVERY_DISPLAY_SETTINGS_APPLICABILITY[key];
   return unitTypeApplies(applicability, unitType);
 }
 
@@ -351,17 +372,23 @@ function stableStringify(value: unknown): string {
 }
 
 function unitSignatureEntry(unit: JsonRecord): string {
-  const deliveryparams = asRecord(unit.deliveryparams);
-  const allowedDeliveryparams: Record<string, unknown> = {};
-  for (const key of DELIVERY_PARAM_LEARNER_CONFIGURABLE_KEYS) {
-    if (deliveryparams[key] !== undefined) {
-      allowedDeliveryparams[key] = deliveryparams[key];
+  const deliverySettings = asRecord(unit.deliverySettings);
+  const normalizedDeliverySettings = normalizeDeliverySettingsSource(deliverySettings);
+  const allowedDeliverySettings: Record<string, unknown> = {};
+  for (const key of DELIVERY_SETTINGS_LEARNER_CONFIGURABLE_KEYS) {
+    if (normalizedDeliverySettings[key] !== undefined) {
+      allowedDeliverySettings[key] = normalizedDeliverySettings[key];
+    }
+  }
+  for (const key of DELIVERY_DISPLAY_SETTINGS_LEARNER_CONFIGURABLE_KEYS) {
+    if (deliverySettings[key] !== undefined) {
+      allowedDeliverySettings[key] = deliverySettings[key];
     }
   }
 
   return stableStringify({
     unitname: unit.unitname ?? unit.name ?? '',
-    deliveryparams: allowedDeliveryparams
+    deliverySettings: allowedDeliverySettings
   });
 }
 
@@ -378,11 +405,11 @@ function sourceMatches(current: LearnerTdfSourceMetadata, saved: LearnerTdfSourc
   return stableStringify(saved.unitSignature) === stableStringify(current.unitSignature);
 }
 
-function normalizeUiSettingValue(path: string, value: unknown, errors: string[]): unknown {
+function normalizeDeliveryDisplaySettingValue(path: string, value: unknown, errors: string[]): unknown {
   const fieldName = path.split('.').pop() || '';
-  const result = coerceAndValidateUiSetting(fieldName, value);
+  const result = coerceAndValidateDeliveryDisplaySetting(fieldName, value);
   if (!result.valid) {
-    errors.push(`${path} is not a valid UI setting value`);
+    errors.push(`${path} is not a valid delivery setting value`);
     return undefined;
   }
   return result.value;
@@ -396,42 +423,76 @@ function normalizeAudioPromptMode(value: unknown, path: string, errors: string[]
   return value;
 }
 
+function normalizeSpeechRecognitionMode(value: unknown, path: string, errors: string[]): string | undefined {
+  const normalized = typeof value === 'boolean' ? String(value) : String(value ?? '').trim().toLowerCase();
+  if (!SPEECH_RECOGNITION_MODES.has(normalized)) {
+    errors.push(`${path} must be enabled or disabled`);
+    return undefined;
+  }
+  return normalized;
+}
+
 function getBaseSetSpecValue(tdf: unknown, key: string): unknown {
   const setspec = asRecord(getTutorRoot(tdf).setspec);
   if (key === 'setspec.audioPromptMode') {
     return typeof setspec.audioPromptMode === 'string' ? setspec.audioPromptMode : 'silent';
   }
+  if (key === 'setspec.audioInputEnabled') {
+    return setspec.audioInputEnabled === 'true' || setspec.audioInputEnabled === true ? 'true' : 'false';
+  }
   if (key === 'setspec.audioInputSensitivity') {
     const value = Number(setspec.audioInputSensitivity);
     return Number.isFinite(value) ? value : 60;
   }
-  if (key.startsWith('setspec.uiSettings.')) {
-    const fieldName = key.split('.').pop() || '';
-    const uiSettings = asRecord(setspec.uiSettings);
-    const result = coerceAndValidateUiSetting(fieldName, uiSettings[fieldName]);
-    return result.valid ? result.value : result.defaultValue;
+  return undefined;
+}
+
+function normalizeDeliverySettingValue(key: string, value: unknown, errors?: string[], path?: string): unknown {
+  if (DELIVERY_SETTINGS_LEARNER_CONFIGURABLE_KEYS.includes(key)) {
+    return normalizeRegistryDeliverySettingValue(key, value);
+  }
+  if (DELIVERY_DISPLAY_SETTINGS_LEARNER_CONFIGURABLE_KEYS.includes(key)) {
+    return normalizeDeliveryDisplaySettingValue(path || `deliverySettings.${key}`, value, errors || []);
+  }
+  return value;
+}
+
+function getDefaultDeliverySettingValue(key: string): unknown {
+  if (DELIVERY_SETTINGS_LEARNER_CONFIGURABLE_KEYS.includes(key)) {
+    return DELIVERY_SETTINGS_DEFAULTS[key];
+  }
+  if (DELIVERY_DISPLAY_SETTINGS_LEARNER_CONFIGURABLE_KEYS.includes(key)) {
+    return DELIVERY_DISPLAY_SETTINGS_RUNTIME_DEFAULTS[key];
   }
   return undefined;
 }
 
-function getBaseDeliveryValue(tdf: unknown, key: string): unknown {
-  const value = asRecord(getTutorRoot(tdf).deliveryparams)[key];
-  return value !== undefined ? normalizeDeliveryParamValue(key, value) : DELIVERY_PARAM_DEFAULTS[key];
+function getBaseDeliverySettingsValue(source: JsonRecord | undefined, key: string): unknown {
+  const sourceDeliverySettings = DELIVERY_SETTINGS_LEARNER_CONFIGURABLE_KEYS.includes(key)
+    ? normalizeDeliverySettingsSource(asRecord(source?.deliverySettings))
+    : asRecord(source?.deliverySettings);
+  const value = sourceDeliverySettings[key];
+  return value !== undefined ? normalizeDeliverySettingValue(key, value) : getDefaultDeliverySettingValue(key);
 }
 
-function getBaseUnitDeliveryValue(tdf: unknown, unitIndex: string, key: string): unknown {
-  const index = Number(unitIndex);
-  const unit = getUnitArray(tdf)[index];
-  const value = asRecord(unit?.deliveryparams)[key];
-  return value !== undefined ? normalizeDeliveryParamValue(key, value) : DELIVERY_PARAM_DEFAULTS[key];
+function getBaseTutorDeliverySettingsValue(tdf: unknown, key: string): unknown {
+  return getBaseDeliverySettingsValue(getTutorRoot(tdf), key);
 }
 
-function getBaseUnitUiValue(tdf: unknown, unitIndex: string, key: string): unknown {
+function hasDeliverySettingsValue(source: JsonRecord | undefined, key: string): boolean {
+  const deliverySettings = asRecord(source?.deliverySettings);
+  if (DELIVERY_SETTINGS_LEARNER_CONFIGURABLE_KEYS.includes(key)) {
+    return normalizeDeliverySettingsSource(deliverySettings)[key] !== undefined;
+  }
+  return deliverySettings[key] !== undefined;
+}
+
+function getBaseUnitDeliverySettingsValue(tdf: unknown, unitIndex: string, key: string): unknown {
   const index = Number(unitIndex);
   const unit = getUnitArray(tdf)[index];
-  const uiSettings = asRecord(unit?.uiSettings);
-  const value = coerceAndValidateUiSetting(key, uiSettings[key]);
-  return value.valid ? value.value : value.defaultValue;
+  return hasDeliverySettingsValue(unit, key)
+    ? getBaseDeliverySettingsValue(unit, key)
+    : getBaseTutorDeliverySettingsValue(tdf, key);
 }
 
 function pruneRecordByBase(
@@ -454,44 +515,29 @@ function setSpecOverridesEqualBase(tdf: unknown, overrides: Required<LearnerTdfO
   if (overrides.audioPromptMode !== undefined && overrides.audioPromptMode !== getBaseSetSpecValue(tdf, 'setspec.audioPromptMode')) {
     pruned.audioPromptMode = overrides.audioPromptMode;
   }
+  if (overrides.audioInputEnabled !== undefined && overrides.audioInputEnabled !== getBaseSetSpecValue(tdf, 'setspec.audioInputEnabled')) {
+    pruned.audioInputEnabled = overrides.audioInputEnabled;
+  }
   if (overrides.audioInputSensitivity !== undefined && overrides.audioInputSensitivity !== getBaseSetSpecValue(tdf, 'setspec.audioInputSensitivity')) {
     pruned.audioInputSensitivity = overrides.audioInputSensitivity;
   }
-  const uiSettings = pruneRecordByBase(
-    overrides.uiSettings,
-    (key) => getBaseSetSpecValue(tdf, `setspec.uiSettings.${key}`)
-  );
-  if (uiSettings) {
-    pruned.uiSettings = uiSettings;
-  }
-
-  return Object.keys(pruned).length || pruned.uiSettings ? pruned : undefined;
+  return Object.keys(pruned).length ? pruned : undefined;
 }
 
-function pruneDeliveryOverrides(tdf: unknown, deliveryparams: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
-  return pruneRecordByBase(deliveryparams, (key) => getBaseDeliveryValue(tdf, key));
+function pruneDeliverySettingsOverrides(tdf: unknown, deliverySettings: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
+  return pruneRecordByBase(deliverySettings, (key) => getBaseTutorDeliverySettingsValue(tdf, key));
 }
 
 function pruneUnitOverrides(tdf: unknown, unitOverrides: NonNullable<LearnerTdfOverrides['unit']>): LearnerTdfOverrides['unit'] | undefined {
   const prunedUnits: NonNullable<LearnerTdfOverrides['unit']> = {};
 
   for (const [unitIndex, unitConfig] of Object.entries(unitOverrides)) {
-    const prunedDeliveryparams = pruneRecordByBase(
-      unitConfig.deliveryparams,
-      (key) => getBaseUnitDeliveryValue(tdf, unitIndex, key)
+    const prunedDeliverySettings = pruneRecordByBase(
+      unitConfig.deliverySettings,
+      (key) => getBaseUnitDeliverySettingsValue(tdf, unitIndex, key)
     );
-    if (prunedDeliveryparams) {
-      prunedUnits[unitIndex] = { deliveryparams: prunedDeliveryparams };
-    }
-    const prunedUiSettings = pruneRecordByBase(
-      unitConfig.uiSettings,
-      (key) => getBaseUnitUiValue(tdf, unitIndex, key)
-    );
-    if (prunedUiSettings) {
-      prunedUnits[unitIndex] = {
-        ...(prunedUnits[unitIndex] || {}),
-        uiSettings: prunedUiSettings
-      };
+    if (prunedDeliverySettings) {
+      prunedUnits[unitIndex] = { deliverySettings: prunedDeliverySettings };
     }
   }
 
@@ -518,23 +564,13 @@ function applySetSpecOverrides(tutor: JsonRecord, overrides: NonNullable<Learner
   if (overrides.audioPromptMode !== undefined) {
     setspec.audioPromptMode = overrides.audioPromptMode;
   }
+  if (overrides.audioInputEnabled !== undefined) {
+    setspec.audioInputEnabled = overrides.audioInputEnabled;
+  }
   if (overrides.audioInputSensitivity !== undefined) {
     setspec.audioInputSensitivity = overrides.audioInputSensitivity;
   }
-  if (overrides.uiSettings && Object.keys(overrides.uiSettings).length) {
-    setspec.uiSettings = {
-      ...asRecord(setspec.uiSettings),
-      ...overrides.uiSettings
-    };
-  }
   tutor.setspec = setspec;
-}
-
-function applyDeliveryOverrides(tutor: JsonRecord, overrides: Record<string, unknown>): void {
-  tutor.deliveryparams = {
-    ...asRecord(tutor.deliveryparams),
-    ...overrides
-  };
 }
 
 function applyUnitOverrides(tutor: JsonRecord, overrides: NonNullable<LearnerTdfOverrides['unit']>): void {
@@ -542,15 +578,11 @@ function applyUnitOverrides(tutor: JsonRecord, overrides: NonNullable<LearnerTdf
   for (const [unitIndex, unitConfig] of Object.entries(overrides)) {
     const index = Number(unitIndex);
     const unit = asRecord(units[index]);
-    const deliveryparams = unitConfig.deliveryparams;
-    const uiSettings = unitConfig.uiSettings;
+    const deliverySettings = unitConfig.deliverySettings;
     units[index] = {
       ...unit,
-      ...(deliveryparams && Object.keys(deliveryparams).length
-        ? { deliveryparams: { ...asRecord(unit.deliveryparams), ...deliveryparams } }
-        : {}),
-      ...(uiSettings && Object.keys(uiSettings).length
-        ? { uiSettings: { ...asRecord(unit.uiSettings), ...uiSettings } }
+      ...(deliverySettings && Object.keys(deliverySettings).length
+        ? { deliverySettings: { ...asRecord(unit.deliverySettings), ...deliverySettings } }
         : {})
     };
   }
@@ -585,7 +617,7 @@ export function normalizeLearnerTdfOverrides(tdf: unknown, overrides: unknown): 
 function normalizeLearnerTdfOverridesWithErrors(tdf: unknown, overrides: unknown, errors: string[]): LearnerTdfOverrides {
   const input = asRecord(overrides);
   const normalized: LearnerTdfOverrides = {};
-  const allowedTopLevel = new Set(['setspec', 'deliveryparams', 'unit']);
+  const allowedTopLevel = new Set(['setspec', 'deliverySettings', 'unit']);
   for (const key of Object.keys(input)) {
     if (!allowedTopLevel.has(key)) {
       errors.push(`${key} is not a configurable learner TDF scope`);
@@ -594,7 +626,7 @@ function normalizeLearnerTdfOverridesWithErrors(tdf: unknown, overrides: unknown
 
   if (input.setspec !== undefined) {
     const setspec = asRecord(input.setspec);
-    const allowedSetSpec = new Set(['audioPromptMode', 'audioInputSensitivity', 'uiSettings']);
+    const allowedSetSpec = new Set(['audioPromptMode', 'audioInputEnabled', 'audioInputSensitivity']);
     for (const key of Object.keys(setspec)) {
       if (!allowedSetSpec.has(key)) {
         errors.push(`setspec.${key} is not learner configurable`);
@@ -608,6 +640,12 @@ function normalizeLearnerTdfOverridesWithErrors(tdf: unknown, overrides: unknown
         normalizedSetSpec.audioPromptMode = audioPromptMode;
       }
     }
+    if (setspec.audioInputEnabled !== undefined) {
+      const audioInputEnabled = normalizeSpeechRecognitionMode(setspec.audioInputEnabled, 'setspec.audioInputEnabled', errors);
+      if (audioInputEnabled !== undefined) {
+        normalizedSetSpec.audioInputEnabled = audioInputEnabled;
+      }
+    }
     if (setspec.audioInputSensitivity !== undefined) {
       const audioInputSensitivity = Number(setspec.audioInputSensitivity);
       if (!Number.isFinite(audioInputSensitivity) || audioInputSensitivity < 20 || audioInputSensitivity > 80) {
@@ -616,43 +654,28 @@ function normalizeLearnerTdfOverridesWithErrors(tdf: unknown, overrides: unknown
         normalizedSetSpec.audioInputSensitivity = audioInputSensitivity;
       }
     }
-    if (setspec.uiSettings !== undefined) {
-      const uiSettings = asRecord(setspec.uiSettings);
-      const normalizedUiSettings: Record<string, unknown> = {};
-      for (const key of Object.keys(uiSettings)) {
-        if (!UI_SETTINGS_LEARNER_CONFIGURABLE_KEYS.includes(key)) {
-          errors.push(`setspec.uiSettings.${key} is not learner configurable`);
-          continue;
-        }
-        const value = normalizeUiSettingValue(`setspec.uiSettings.${key}`, uiSettings[key], errors);
-        if (value !== undefined) {
-          normalizedUiSettings[key] = value;
-        }
-      }
-      if (Object.keys(normalizedUiSettings).length) {
-        normalizedSetSpec.uiSettings = normalizedUiSettings;
-      }
-    }
-
     const prunedSetSpec = setSpecOverridesEqualBase(tdf, normalizedSetSpec);
     if (prunedSetSpec) {
       normalized.setspec = prunedSetSpec;
     }
   }
 
-  if (input.deliveryparams !== undefined) {
-    const deliveryparams = asRecord(input.deliveryparams);
-    const normalizedDeliveryparams: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(deliveryparams)) {
-      if (!DELIVERY_PARAM_LEARNER_CONFIGURABLE_KEYS.includes(key)) {
-        errors.push(`deliveryparams.${key} is not learner configurable`);
+  if (input.deliverySettings !== undefined) {
+    const deliverySettings = asRecord(input.deliverySettings);
+    const normalizedDeliverySettings: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(deliverySettings)) {
+      if (!DELIVERY_SETTINGS_LEARNER_CONFIGURABLE_KEYS.includes(key) && !DELIVERY_DISPLAY_SETTINGS_LEARNER_CONFIGURABLE_KEYS.includes(key)) {
+        errors.push(`deliverySettings.${key} is not learner configurable`);
         continue;
       }
-      normalizedDeliveryparams[key] = normalizeDeliveryParamValue(key, value);
+      const normalizedValue = normalizeDeliverySettingValue(key, value, errors, `deliverySettings.${key}`);
+      if (normalizedValue !== undefined) {
+        normalizedDeliverySettings[key] = normalizedValue;
+      }
     }
-    const prunedDeliveryparams = pruneDeliveryOverrides(tdf, normalizedDeliveryparams);
-    if (prunedDeliveryparams) {
-      normalized.deliveryparams = prunedDeliveryparams;
+    const prunedDeliverySettings = pruneDeliverySettingsOverrides(tdf, normalizedDeliverySettings);
+    if (prunedDeliverySettings) {
+      normalized.deliverySettings = prunedDeliverySettings;
     }
   }
 
@@ -670,52 +693,30 @@ function normalizeLearnerTdfOverridesWithErrors(tdf: unknown, overrides: unknown
       const unitConfig = asRecord(unitConfigValue);
       const sourceUnit = units[index];
       for (const key of Object.keys(unitConfig)) {
-        if (key !== 'deliveryparams' && key !== 'uiSettings') {
+        if (key !== 'deliverySettings') {
           errors.push(`unit.${unitIndex}.${key} is not learner configurable`);
         }
       }
 
-      const deliveryparams = asRecord(unitConfig.deliveryparams);
-      const normalizedDeliveryparams: Record<string, unknown> = {};
-      for (const [key, value] of Object.entries(deliveryparams)) {
-        if (!DELIVERY_PARAM_LEARNER_CONFIGURABLE_KEYS.includes(key)) {
-          errors.push(`unit.${unitIndex}.deliveryparams.${key} is not learner configurable`);
+      const deliverySettings = asRecord(unitConfig.deliverySettings);
+      const normalizedDeliverySettings: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(deliverySettings)) {
+        if (!DELIVERY_SETTINGS_LEARNER_CONFIGURABLE_KEYS.includes(key) && !DELIVERY_DISPLAY_SETTINGS_LEARNER_CONFIGURABLE_KEYS.includes(key)) {
+          errors.push(`unit.${unitIndex}.deliverySettings.${key} is not learner configurable`);
           continue;
         }
-        if (!learnerConfigurableKeyAppliesToUnit('delivery', key, sourceUnit)) {
-          errors.push(`unit.${unitIndex}.deliveryparams.${key} does not apply to this unit type`);
+        if (!learnerConfigurableKeyAppliesToUnit('deliverySettings', key, sourceUnit)) {
+          errors.push(`unit.${unitIndex}.deliverySettings.${key} does not apply to this unit type`);
           continue;
         }
-        normalizedDeliveryparams[key] = normalizeDeliveryParamValue(key, value);
+        const normalizedValue = normalizeDeliverySettingValue(key, value, errors, `unit.${unitIndex}.deliverySettings.${key}`);
+        if (normalizedValue !== undefined) {
+          normalizedDeliverySettings[key] = normalizedValue;
+        }
       }
 
-      if (Object.keys(normalizedDeliveryparams).length) {
-        normalizedUnit[unitIndex] = { deliveryparams: normalizedDeliveryparams };
-      }
-
-      if (unitConfig.uiSettings !== undefined) {
-        const uiSettings = asRecord(unitConfig.uiSettings);
-        const normalizedUiSettings: Record<string, unknown> = {};
-        for (const key of Object.keys(uiSettings)) {
-          if (!UI_SETTINGS_LEARNER_CONFIGURABLE_KEYS.includes(key)) {
-            errors.push(`unit.${unitIndex}.uiSettings.${key} is not learner configurable`);
-            continue;
-          }
-          if (!learnerConfigurableKeyAppliesToUnit('ui', key, sourceUnit)) {
-            errors.push(`unit.${unitIndex}.uiSettings.${key} does not apply to this unit type`);
-            continue;
-          }
-          const value = normalizeUiSettingValue(`unit.${unitIndex}.uiSettings.${key}`, uiSettings[key], errors);
-          if (value !== undefined) {
-            normalizedUiSettings[key] = value;
-          }
-        }
-        if (Object.keys(normalizedUiSettings).length) {
-          normalizedUnit[unitIndex] = {
-            ...(normalizedUnit[unitIndex] || {}),
-            uiSettings: normalizedUiSettings
-          };
-        }
+      if (Object.keys(normalizedDeliverySettings).length) {
+        normalizedUnit[unitIndex] = { deliverySettings: normalizedDeliverySettings };
       }
     }
 
@@ -753,7 +754,7 @@ export function validateLearnerTdfConfig(tdf: unknown, config: LearnerTdfConfig 
 
 export function applyLearnerTdfConfig<T>(tdf: T, config: LearnerTdfConfig | undefined): LearnerTdfApplyResult<T> {
   const overrides = config?.overrides;
-  if (!overrides || (!overrides.setspec && !overrides.deliveryparams && !overrides.unit)) {
+  if (!overrides || (!overrides.setspec && !overrides.deliverySettings && !overrides.unit)) {
     return { tdf, applied: false, warnings: [] };
   }
 
@@ -770,7 +771,7 @@ export function applyLearnerTdfConfig<T>(tdf: T, config: LearnerTdfConfig | unde
     ? ['Unit-specific learner settings are stale for this TDF and were not applied']
     : [];
 
-  if (!normalized.setspec && !normalized.deliveryparams && !applicableUnitOverrides) {
+  if (!normalized.setspec && !normalized.deliverySettings && !applicableUnitOverrides) {
     return { tdf, applied: false, warnings };
   }
 
@@ -778,8 +779,11 @@ export function applyLearnerTdfConfig<T>(tdf: T, config: LearnerTdfConfig | unde
     if (normalized.setspec) {
       applySetSpecOverrides(tutor, normalized.setspec);
     }
-    if (normalized.deliveryparams) {
-      applyDeliveryOverrides(tutor, normalized.deliveryparams);
+    if (normalized.deliverySettings) {
+      tutor.deliverySettings = {
+        ...asRecord(tutor.deliverySettings),
+        ...normalized.deliverySettings
+      };
     }
     if (applicableUnitOverrides) {
       applyUnitOverrides(tutor, applicableUnitOverrides);

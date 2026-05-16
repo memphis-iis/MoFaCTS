@@ -32,6 +32,8 @@ DEFAULT_EXCLUDED_PARTS = {
 DEFAULT_EXCLUDED_NAMES = {
     "fieldRegistry.ts",
     "fieldRegistrySections.ts",
+    "deliverySettingsMigration.ts",
+    "deliverySettings.test.ts",
     "test.ts",
     "svelteCardTester.html",
     "tdfSchema.json",
@@ -40,8 +42,8 @@ DEFAULT_EXCLUDED_NAMES = {
 
 # These are intentionally not authored TDF-schema fields.
 KNOWN_NON_TDF_FIELDS: dict[str, set[str]] = {
-    # Resolved at runtime from video session data, not authored under uiSettings.
-    "uiSettings": {"isVideoSession", "videoUrl"},
+    # Resolved at runtime from video session data, not authored under deliverySettings.
+    "deliverySettings": {"isVideoSession", "videoUrl"},
     # Stimulus-file schema, package metadata, or system-managed publish metadata,
     # not tutor.setspec authoring fields.
     "setspec": {
@@ -77,13 +79,11 @@ def load_schema_properties(schema_path: Path) -> dict[str, set[str]]:
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
     tutor = schema["properties"]["tutor"]["properties"]
     setspec = tutor["setspec"]["properties"]
-    ui_settings = setspec["uiSettings"]["properties"]
-    deliveryparams = tutor["deliveryparams"]["properties"]
+    delivery_settings = tutor["deliverySettings"]["properties"]
     unit = tutor["unit"]["items"]["properties"]
     return {
         "setspec": set(setspec),
-        "uiSettings": set(ui_settings),
-        "deliveryparams": set(deliveryparams),
+        "deliverySettings": set(delivery_settings),
         "unit": set(unit),
         "learningsession": set(unit["learningsession"]["properties"]),
         "assessmentsession": set(unit["assessmentsession"]["properties"]),
@@ -114,12 +114,8 @@ DOT_PATTERNS: dict[str, tuple[re.Pattern[str], ...]] = {
         re.compile(rf"\bsetspec\s*\??\s*\.\s*{IDENT}"),
         re.compile(rf"\bsetSpec\s*\??\s*\.\s*{IDENT}"),
     ),
-    "uiSettings": (
-        re.compile(rf"\buiSettings\s*\??\s*\.\s*{IDENT}"),
-    ),
-    "deliveryparams": (
-        re.compile(rf"\bdeliveryparams\s*\??\s*\.\s*{IDENT}"),
-        re.compile(rf"\bdeliveryParams\s*\??\s*\.\s*{IDENT}"),
+    "deliverySettings": (
+        re.compile(rf"\bdeliverySettings\s*\??\s*\.\s*{IDENT}"),
     ),
     "unit": (
         re.compile(rf"\bcurTdfUnit\s*\??\s*\.\s*{IDENT}"),
@@ -141,12 +137,9 @@ STRING_PATH_PATTERNS: dict[str, tuple[re.Pattern[str], ...]] = {
         re.compile(rf"(?:content\.tdfs\.tutor\.|tutor\.)setspec\.{IDENT}"),
         re.compile(rf"\bsetspec\.{IDENT}"),
     ),
-    "uiSettings": (
-        re.compile(rf"(?:setspec|unit\[\]|unit\.\d+)\.uiSettings\.{IDENT}"),
-    ),
-    "deliveryparams": (
-        re.compile(rf"(?:unit\[\]|unit\.\d+|tutor)\.deliveryparams\.{IDENT}"),
-        re.compile(rf"\bdeliveryparams\.{IDENT}"),
+    "deliverySettings": (
+        re.compile(rf"(?:unit\[\]|unit\.\d+|setspec\.unitTemplate\[\]|tutor)\.deliverySettings\.{IDENT}"),
+        re.compile(rf"\bdeliverySettings\.{IDENT}"),
     ),
     "learningsession": (
         re.compile(rf"(?:unit\[\]|unit\.\d+)\.learningsession\.{IDENT}"),
@@ -161,8 +154,7 @@ STRING_PATH_PATTERNS: dict[str, tuple[re.Pattern[str], ...]] = {
 
 DESTRUCTURING_PATTERNS: dict[str, re.Pattern[str]] = {
     "setspec": re.compile(r"\b(?:const|let|var)\s*{([^}]+)}\s*=\s*[^;]*\bsetspec\b"),
-    "uiSettings": re.compile(r"\b(?:const|let|var)\s*{([^}]+)}\s*=\s*[^;]*\buiSettings\b"),
-    "deliveryparams": re.compile(r"\b(?:const|let|var)\s*{([^}]+)}\s*=\s*[^;]*\bdelivery[Pp]arams\b"),
+    "deliverySettings": re.compile(r"\b(?:const|let|var)\s*{([^}]+)}\s*=\s*[^;]*\bdeliverySettings\b"),
 }
 
 

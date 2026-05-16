@@ -29,8 +29,9 @@ describe('mappingProgressPolicy', function() {
   it('detects meaningful progress from action/history markers', function() {
     expect(hasMeaningfulMappingProgress({})).to.equal(false);
     expect(hasMeaningfulMappingProgress({ id: 'state-1' } as Record<string, unknown>)).to.equal(false);
-    expect(hasMeaningfulMappingProgress({ currentUnitNumber: 0 })).to.equal(true);
+    expect(hasMeaningfulMappingProgress({ currentUnitNumber: 1, lastUnitCompleted: 0 })).to.equal(false);
     expect(hasMeaningfulMappingProgress({ overallStudyHistory: [{ x: 1 }] })).to.equal(true);
+    expect(hasMeaningfulMappingProgress({ scheduleUnitNumber: 1 })).to.equal(true);
   });
 
   it('defaults strict mismatch enforcement to enabled', function() {

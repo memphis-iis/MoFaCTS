@@ -180,7 +180,7 @@ describe('prepared advance integration seams', function() {
         currentAnswer: 'alpha',
         buttonTrial: false,
         buttonList: [],
-        deliveryParams: { feedbackTimeout: 2000 },
+        deliverySettings: { feedbackTimeout: 2000 },
         engineIndices: { clusterIndex: 0, stimIndex: 0 },
         questionIndex: 4,
       },

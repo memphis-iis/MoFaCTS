@@ -15,7 +15,7 @@ import {
 import { createExperimentState } from './svelte/services/experimentState';
 import { unitIsFinished } from './unitProgression';
 import { CardStore } from './modules/cardStore';
-import { DeliveryParamsStore } from '../../lib/state/deliveryParamsStore';
+import { deliverySettingsStore } from '../../lib/state/deliverySettingsStore';
 import { ExperimentStateStore } from '../../lib/state/experimentStateStore';
 import {MODEL_UNIT, SCHEDULE_UNIT} from '../../../common/Definitions';
 import {meteorCallAsync} from '../../index';
@@ -207,7 +207,7 @@ async function defaultUnitEngine(curExperimentData: any) {
       const testType = options?.testType || Session.get('testType') || 'd';
       const originalDisplay = JSON.parse(JSON.stringify(currentDisplay));
       currentDisplay = JSON.parse(JSON.stringify(
-        applyDisplayFieldSubset(currentDisplay, DeliveryParamsStore.get(), testType)
+        applyDisplayFieldSubset(currentDisplay, deliverySettingsStore.get(), testType)
       ));
       newExperimentState.originalDisplay = originalDisplay;
 
@@ -217,7 +217,6 @@ async function defaultUnitEngine(curExperimentData: any) {
       let currentStimAnswer = getStimAnswer(cardIndex, whichStim);
 
       newExperimentState.originalAnswer = currentStimAnswer;
-      currentStimAnswer = currentStimAnswer.toLowerCase();
 
       // If we have a dual prompt question populate the spare data field
       if (currentQuestion && currentQuestion.indexOf('|') != -1) {
@@ -496,14 +495,14 @@ async function modelUnitEngine(): Promise<any> {
   }
 
   // Select card closest to optimal probability threshold
-  function selectCardClosestToOptimalProbability(cards: any, hiddenItems: any, currentDeliveryParams: any, selectionOptions: any = {}) {
+  function selectCardClosestToOptimalProbability(cards: any, hiddenItems: any, currentDeliverySettings: any, selectionOptions: any = {}) {
     clientConsole(1, 'selectCardClosestToOptimalProbability');
     const hiddenItemKeys = buildHiddenItemKeySet(hiddenItems);
     let currentMin = 50.0;
     let clusterIndex = -1;
     let stimIndex = -1;
     let optimalProb;
-    const forceSpacing = currentDeliveryParams.forceSpacing;
+    const forceSpacing = currentDeliverySettings.forceSpacing;
     const minTrialDistance = forceSpacing ? 1 : -1;
 
     for (let i = 0; i < cards.length; i++) {
@@ -516,8 +515,8 @@ async function modelUnitEngine(): Promise<any> {
         if (shouldExcludeCurrentCard(i, j, selectionOptions)) continue;
         if (hiddenItemKeys.has(String(stim.stimulusKC)) || !stim.canUse) continue;
         const parameters = stim.parameter;
-        const deliveryParams: any = DeliveryParamsStore.get();
-        optimalProb = Math.log(Number(deliveryParams.optimalThreshold) / (1 - Number(deliveryParams.optimalThreshold))) || false;
+        const deliverySettings: any = deliverySettingsStore.get();
+        optimalProb = Math.log(Number(deliverySettings.optimalThreshold) / (1 - Number(deliverySettings.optimalThreshold))) || false;
         if (!optimalProb) optimalProb = Math.log(parameters[1] / (1 - parameters[1])) || false;
         if (!optimalProb) {
           clientConsole(2, "NO OPTIMAL PROBABILITY SPECIFIED IN STIM, THROWING ERROR");
@@ -536,13 +535,13 @@ async function modelUnitEngine(): Promise<any> {
   }
 
   // Select card below optimal probability threshold
-  function selectCardBelowOptimalProbability(cards: any, hiddenItems: any, currentDeliveryParams: any, selectionOptions: any = {}) {
+  function selectCardBelowOptimalProbability(cards: any, hiddenItems: any, currentDeliverySettings: any, selectionOptions: any = {}) {
     clientConsole(1, 'selectCardBelowOptimalProbability');
     const hiddenItemKeys = buildHiddenItemKeySet(hiddenItems);
     let currentMax = 0;
     let clusterIndex = -1;
     let stimIndex = -1;
-    const forceSpacing = currentDeliveryParams.forceSpacing;
+    const forceSpacing = currentDeliverySettings.forceSpacing;
     const minTrialDistance = forceSpacing ? 1 : -1;
 
     for (let i = 0; i < cards.length; i++) {
@@ -557,7 +556,7 @@ async function modelUnitEngine(): Promise<any> {
         const parameters = stim.parameter;
         let thresholdCeiling = parameters[1];
         if (!thresholdCeiling) {
-          thresholdCeiling = currentDeliveryParams.optimalThreshold || 0.90;
+          thresholdCeiling = currentDeliverySettings.optimalThreshold || 0.90;
         }
         if (stim.probabilityEstimate > currentMax && stim.probabilityEstimate < thresholdCeiling) {
           currentMax = stim.probabilityEstimate;
@@ -787,9 +786,9 @@ async function modelUnitEngine(): Promise<any> {
       p.responseStudyTrialCount = p.resp.priorStudy;
 
       p.stimParameters = stimCluster.stims[stimIndex].params.split(',').map((x: any) => legacyFloat(x));
-      const currentDeliveryParams = DeliveryParamsStore.get();
-      if (currentDeliveryParams.optimalThreshold) {
-        p.stimParameters[1] = currentDeliveryParams.optimalThreshold;
+      const currentDeliverySettings = deliverySettingsStore.get();
+      if (currentDeliverySettings.optimalThreshold) {
+        p.stimParameters[1] = currentDeliverySettings.optimalThreshold;
       }
 
       p.clusterPreviousCalculatedProbabilities = JSON.parse(JSON.stringify(card.previousCalculatedProbabilities));
@@ -1015,7 +1014,7 @@ async function modelUnitEngine(): Promise<any> {
       const userId = Meteor.userId();
       const tdfId = Session.get('currentTdfId');
       const currentUnitNumber = Number(Session.get('currentUnitNumber') || 0);
-      const resetStudentPerformance = Boolean((DeliveryParamsStore.get() as Record<string, unknown>)?.resetStudentPerformance);
+      const resetStudentPerformance = Boolean((deliverySettingsStore.get() as Record<string, unknown>)?.resetStudentPerformance);
       const historyRows = await meteorCallAsync(
         'getLearningHistoryForUnit',
         userId,
@@ -1107,7 +1106,7 @@ async function modelUnitEngine(): Promise<any> {
       this.calculateCardProbabilities();
       const hiddenItems = CardStore.getHiddenItems();
       const cards = cardProbabilities.cards;
-      const currentDeliveryParams = DeliveryParamsStore.get();
+      const currentDeliverySettings = deliverySettingsStore.get();
       const selectionOptions = {
         excludeCurrentCardRef: options?.excludeCurrentCardRef || null,
       };
@@ -1115,17 +1114,17 @@ async function modelUnitEngine(): Promise<any> {
         let indices;
         switch (this.unitMode) {
           case 'thresholdCeiling':
-            indices = selectCardBelowOptimalProbability(cards, hiddenItems, currentDeliveryParams, selectorOptions);
+            indices = selectCardBelowOptimalProbability(cards, hiddenItems, currentDeliverySettings, selectorOptions);
             clientConsole(2, 'thresholdCeiling, indicies:', JSON.parse(JSON.stringify(indices)));
             if (indices.clusterIndex === -1) {
               clientConsole(2, 'thresholdCeiling failed, reverting to min prob dist');
-              indices = selectCardClosestToOptimalProbability(cards, hiddenItems, currentDeliveryParams, selectorOptions);
+              indices = selectCardClosestToOptimalProbability(cards, hiddenItems, currentDeliverySettings, selectorOptions);
             }
             return indices;
           case 'distance':
-            return selectCardClosestToOptimalProbability(cards, hiddenItems, currentDeliveryParams, selectorOptions);
+            return selectCardClosestToOptimalProbability(cards, hiddenItems, currentDeliverySettings, selectorOptions);
           default:
-            return selectCardClosestToOptimalProbability(cards, hiddenItems, currentDeliveryParams, selectorOptions);
+            return selectCardClosestToOptimalProbability(cards, hiddenItems, currentDeliverySettings, selectorOptions);
         }
       };
 
@@ -1155,8 +1154,8 @@ async function modelUnitEngine(): Promise<any> {
 
     _resolveSelectionTestType: function(card: any, stim: any) {
       let testType = 'd';
-      const currentDeliveryParams = DeliveryParamsStore.get();
-      const studyFirstProbability = Number(currentDeliveryParams.studyFirst || 0);
+      const currentDeliverySettings = deliverySettingsStore.get();
+      const studyFirstProbability = Number(currentDeliverySettings.studyFirst || 0);
       const shouldShowStudyFirst = !card.hasBeenIntroduced &&
         studyFirstProbability > 0 &&
         (studyFirstProbability >= 1 || Math.random() < studyFirstProbability);
@@ -1195,7 +1194,7 @@ async function modelUnitEngine(): Promise<any> {
        const card = cardProbabilities.cards[newClusterIndex];
        const stim = card.stims[newStimIndex];
        const testType = this._resolveSelectionTestType(card, stim);
-       const currentDeliveryParams = DeliveryParamsStore.get() as Record<string, unknown>;
+       const currentDeliverySettings = deliverySettingsStore.get() as Record<string, unknown>;
        const preparationDiagnostic = {
         currentTdfName: Session.get('currentTdfName') || null,
         currentTdfId: Session.get('currentTdfId') || null,
@@ -1205,9 +1204,9 @@ async function modelUnitEngine(): Promise<any> {
         currentUnitName: Session.get('currentTdfUnit')?.unitname || null,
         clusterIndex: newClusterIndex,
         stimIndex: newStimIndex,
-        studyFirst: currentDeliveryParams.studyFirst,
-        studyOnlyFields: currentDeliveryParams.studyOnlyFields || null,
-        drillFields: currentDeliveryParams.drillFields || null,
+        studyFirst: currentDeliverySettings.studyFirst,
+        studyOnlyFields: currentDeliverySettings.studyOnlyFields || null,
+        drillFields: currentDeliverySettings.drillFields || null,
         cardHasBeenIntroduced: card.hasBeenIntroduced,
         stimHasBeenIntroduced: stim.hasBeenIntroduced,
         stimAvailable: stim.available || null,
@@ -1239,9 +1238,9 @@ async function modelUnitEngine(): Promise<any> {
           currentUnitName: Session.get('currentTdfUnit')?.unitname || null,
           clusterIndex: newClusterIndex,
           stimIndex: newStimIndex,
-          studyFirst: currentDeliveryParams.studyFirst,
-          studyOnlyFields: currentDeliveryParams.studyOnlyFields || null,
-          drillFields: currentDeliveryParams.drillFields || null,
+          studyFirst: currentDeliverySettings.studyFirst,
+          studyOnlyFields: currentDeliverySettings.studyOnlyFields || null,
+          drillFields: currentDeliverySettings.drillFields || null,
           resolvedTestType: testType,
         };
         Session.set('firstCardPreparationDiagnostic', {
@@ -1681,12 +1680,12 @@ async function modelUnitEngine(): Promise<any> {
 
     unitFinished: async function() {
       const session = this.curUnit.learningsession || this.curUnit.videosession;
-      const deliveryParams = DeliveryParamsStore.get() as Record<string, unknown>;
-      const minSecs = Number(deliveryParams.displayMinSeconds || 0);
-      const maxSecs = Number(deliveryParams.displayMaxSeconds || 0);
+      const deliverySettings = deliverySettingsStore.get() as Record<string, unknown>;
+      const minSecs = Number(deliverySettings.displayMinSeconds || 0);
+      const maxSecs = Number(deliverySettings.displayMaxSeconds || 0);
       const maxTrials = parseInt(session.maxTrials || 0);
       const numTrialsSoFar = cardProbabilities.numQuestionsAnsweredCurrentSession || 0;
-      const practicetimer = deliveryParams.practicetimer;
+      const practicetimer = deliverySettings.practicetimer;
 
       if (maxTrials > 0 && numTrialsSoFar >= maxTrials) {
         return true;
@@ -1703,7 +1702,7 @@ async function modelUnitEngine(): Promise<any> {
 
       // If we're still here, check practice seconds.
       // If we're still here, check practice seconds
-      const practiceSeconds = Number((DeliveryParamsStore.get() as any).practiceseconds || 0);
+      const practiceSeconds = Number((deliverySettingsStore.get() as any).practiceseconds || 0);
       if (practiceSeconds < 1.0) {
         // Less than a second is an error or a missing values
         clientConsole(2, 'No Practice Time Found and display timer: user must quit with Continue button');

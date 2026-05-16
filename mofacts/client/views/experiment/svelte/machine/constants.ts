@@ -1,4 +1,4 @@
-import { UI_SETTINGS_RUNTIME_DEFAULTS } from '../../../../../common/fieldRegistry.ts';
+import { DELIVERY_DISPLAY_SETTINGS_RUNTIME_DEFAULTS } from '../../../../../common/fieldRegistry.ts';
 
 /**
  * @fileoverview Constants for card state machine
@@ -39,7 +39,7 @@ export const SUPPORTED_TRIAL_TYPES = new Set([
 
 /**
  * Default timing values
- * These are fallbacks if not specified in deliveryParams
+ * These are fallbacks if not specified in DeliverySettings
  */
 export const DEFAULT_TIMINGS = {
   /** Default main trial timeout (30 seconds) */
@@ -223,8 +223,8 @@ export const LOG_PREFIXES = {
 // =============================================================================
 
 /**
- * Default UI settings
+ * Default delivery settings
  * Used when TDF doesn't specify values
  */
-export const DEFAULT_UI_SETTINGS = UI_SETTINGS_RUNTIME_DEFAULTS;
+export const DEFAULT_DELIVERY_SETTINGS = DELIVERY_DISPLAY_SETTINGS_RUNTIME_DEFAULTS;
 

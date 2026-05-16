@@ -106,6 +106,7 @@ export interface VideoPlayerServiceContext {
   videoCheckpoints?: string[];
   videoPlayer?: VideoPlayerLike | null;
   videoCurrentTime?: number;
+  engine?: UnitEngineLike | null;
 }
 
 export interface VideoPlayerServiceEvent {
@@ -222,7 +223,7 @@ export interface HistoryLoggingContext {
   };
   source?: string;
   userAnswer?: string;
-  deliveryParams: Record<string, unknown>;
+  deliverySettings: Record<string, unknown>;
   wasReportedForRemoval?: boolean;
   engine?: UnitEngineLike | null;
   currentDisplay?: Record<string, unknown>;
@@ -231,6 +232,8 @@ export interface HistoryLoggingContext {
   questionIndex?: number;
   alternateDisplayIndex?: number | null;
   reviewEntry?: string;
+  feedbackText?: string;
+  feedbackSuppressed?: boolean;
 }
 
 export interface HistoryLoggingEvent {

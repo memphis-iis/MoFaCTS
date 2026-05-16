@@ -10,8 +10,7 @@ import { resetSrAttempts as resetSrAttemptsService } from '../services/speechRec
 import { ttsPlaybackService, shouldPlayAudioPrompt, stopTtsPlayback } from '../services/ttsService';
 import { getFeedbackTimeoutMs } from '../utils/timeoutUtils';
 import { Answers } from '../../answerAssess';
-import { UiSettingsStore } from '../../../../lib/state/uiSettingsStore';
-import { DeliveryParamsStore } from '../../../../lib/state/deliveryParamsStore';
+import { deliverySettingsStore } from '../../../../lib/state/deliverySettingsStore';
 import { clientConsole } from '../../../../lib/clientLogger';
 import { getStimAnswerDisplayCase } from '../../../../lib/currentTestingHelpers';
 import { CardStore } from '../../modules/cardStore';
@@ -29,8 +28,7 @@ type ActionContext = {
   buttonTrial: boolean;
   buttonList: unknown[];
   testType: string;
-  deliveryParams?: unknown;
-  uiSettings: { caseSensitive?: boolean; correctMessage?: string; incorrectMessage?: string };
+  deliverySettings: { caseSensitive?: boolean; correctLabelText?: string; incorrectLabelText?: string };
   setspec?: unknown;
   engine?: unknown;
   engineIndices?: { clusterIndex?: number; whichStim?: number; stimIndex?: number } | null;
@@ -89,8 +87,7 @@ type ActionEvent = {
   buttonTrial?: boolean;
   buttonList?: unknown[];
   testType?: string;
-  deliveryParams?: unknown;
-  uiSettings?: unknown;
+  deliverySettings?: unknown;
   setspec?: unknown;
   engineIndices?: { clusterIndex?: number; whichStim?: number; stimIndex?: number };
   speechHintExclusionList?: string;
@@ -132,13 +129,9 @@ export const loadCardData = assign({
   buttonTrial: ({ event }: ActionArgs) => event?.buttonTrial,
   buttonList: ({ event }: ActionArgs) => event?.buttonList || [],
   testType: ({ event }: ActionArgs) => event?.testType,
-  deliveryParams: ({ context, event }: ActionArgs) => ({
-    ...(context.deliveryParams || {}),
-    ...(event?.deliveryParams || {}),
-  }),
-  uiSettings: ({ context, event }: ActionArgs) => ({
-    ...(context.uiSettings || {}),
-    ...(event?.uiSettings || {}),
+  deliverySettings: ({ context, event }: ActionArgs) => ({
+    ...(context.deliverySettings || {}),
+    ...(event?.deliverySettings || {}),
   }),
   setspec: ({ event }: ActionArgs) => event?.setspec,
   engineIndices: ({ event }: ActionArgs) => event?.engineIndices,
@@ -169,8 +162,7 @@ export const initializeSession = assign({
   tdfId: ({ event }: ActionArgs) => event?.tdfId,
   consecutiveTimeouts: () => 0,
   errorMessage: () => undefined,
-  uiSettings: () => UiSettingsStore.get(),
-  deliveryParams: () => DeliveryParamsStore.get(),
+  deliverySettings: () => deliverySettingsStore.get(),
 });
 
 export const clearUserAnswer = assign({
@@ -179,15 +171,10 @@ export const clearUserAnswer = assign({
 
 /**
  */
-export const syncDeliveryParams = ({ context }: ActionArgs) => {
-  if (context.deliveryParams) {
-    Session.set('currentDeliveryParams', context.deliveryParams);
-  }
-};
-
-export const syncUiSettings = ({ context }: ActionArgs) => {
-  if (context.uiSettings) {
-    UiSettingsStore.set(context.uiSettings as Parameters<typeof UiSettingsStore.set>[0]);
+export const syncDeliverySettings = ({ context }: ActionArgs) => {
+  if (context.deliverySettings) {
+    Session.set('currentDeliverySettings', context.deliverySettings);
+    deliverySettingsStore.set(context.deliverySettings as Parameters<typeof deliverySettingsStore.set>[0]);
   }
 };
 
@@ -540,7 +527,7 @@ export const applyValidationResult = assign({
   feedbackMessage: ({ event }: ActionArgs) => event?.output?.matchText || '',
   feedbackTimeoutMs: ({ context, event }: ActionArgs) => {
     const timeoutContext: {
-      deliveryParams?: Record<string, unknown>;
+      deliverySettings?: Record<string, unknown>;
       testType?: string;
       isCorrect?: boolean;
     } = {
@@ -548,8 +535,8 @@ export const applyValidationResult = assign({
       isCorrect: event?.output?.isCorrect ?? false,
     };
 
-    if (context.deliveryParams && typeof context.deliveryParams === 'object') {
-      timeoutContext.deliveryParams = context.deliveryParams as Record<string, unknown>;
+    if (context.deliverySettings && typeof context.deliverySettings === 'object') {
+      timeoutContext.deliverySettings = context.deliverySettings as Record<string, unknown>;
     }
 
     const timeoutMs = getFeedbackTimeoutMs(timeoutContext);
@@ -558,9 +545,9 @@ export const applyValidationResult = assign({
       testType: context.testType,
       isCorrect: timeoutContext.isCorrect,
       feedbackTimeoutMs: timeoutMs,
-      correctprompt: timeoutContext.deliveryParams?.correctprompt,
-      reviewstudy: timeoutContext.deliveryParams?.reviewstudy,
-      purestudy: timeoutContext.deliveryParams?.purestudy,
+      correctprompt: timeoutContext.deliverySettings?.correctprompt,
+      reviewstudy: timeoutContext.deliverySettings?.reviewstudy,
+      purestudy: timeoutContext.deliverySettings?.purestudy,
     });
 
     return timeoutMs;
@@ -586,7 +573,7 @@ export const validateAnswer = assign({
     }
 
     // Case-sensitive comparison if enabled
-    if (context.uiSettings.caseSensitive) {
+    if (context.deliverySettings.caseSensitive) {
       return userAnswer === correctAnswer;
     }
 
@@ -725,9 +712,6 @@ export function enableInput() {
  * @param {CardMachineActorArgs} args
  */
 export function clearFeedback() {
-  CardStore.setCardValue('feedbackTtsText', '');
-  
-
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('cardMachine:clearFeedback'));
   }
@@ -742,9 +726,9 @@ export function announceToScreenReader({ context }: ActionArgs) {
   let message = '';
 
   if (context.isCorrect) {
-    message = context.uiSettings.correctMessage || 'Correct';
+    message = context.deliverySettings.correctLabelText || 'Correct.';
   } else if (!context.isCorrect && context.userAnswer) {
-    message = context.uiSettings.incorrectMessage || 'Incorrect';
+    message = context.deliverySettings.incorrectLabelText || 'Incorrect.';
   } else if (context.isTimeout) {
     message = 'Time out';
   }
@@ -821,9 +805,6 @@ export function commitPreparedTrialRuntime({ context }: ActionArgs) {
  * @param {CardMachineActorArgs} args
  */
 export function displayFeedback({ context }: ActionArgs) {
-  CardStore.setCardValue('feedbackTtsText', '');
-  
-
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('cardMachine:displayFeedback', {
       detail: {

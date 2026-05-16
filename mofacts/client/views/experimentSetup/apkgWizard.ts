@@ -637,13 +637,6 @@ Template.apkgWizard.events({
               for (const res of processResult.results) {
                 if (res.data && res.data.res === 'awaitClientTDF') {
                   const reasons = Array.isArray(res.data.reason) ? res.data.reason : [];
-                  if (reasons.includes('breakingVersionRequired')) {
-                    template.uploadStatus.set(null);
-                    template.uploadError.set(
-                      `Breaking change detected for ${res.data.TDF.content.fileName}. Publish a new version (vN+1) instead of overwrite.`
-                    );
-                    return;
-                  }
                   let reason = [];
                   if (res.data.reason.includes('prevTDFExists'))
                     reason.push(`Previous ${res.data.TDF.content.fileName} already exists, continuing the upload will overwrite the old file. Continue?`);

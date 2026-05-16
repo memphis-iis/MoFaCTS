@@ -59,7 +59,6 @@ import { getMemphisSamlClientConfig } from './lib/memphisSaml';
 import { createTdfLookupHelpers } from './lib/tdfLookup';
 import {
   hasMeaningfulProgressSignal,
-  isBreakingMappingChange,
 } from './lib/mappingPolicyClassifier';
 import {
   canAccessContentUploadTdf,
@@ -359,7 +358,6 @@ const packageMethods = createPackageMethods({
   getNewItemFormat,
   legacyTrim,
   encryptData,
-  isBreakingMappingChange,
   updateStimDisplayTypeMap,
   rebuildStimDisplayTypeMapSnapshot,
   getStimDisplayTypeMapDeps,
@@ -683,8 +681,11 @@ async function getTdfByFileNamePublic(this: MethodContext, filename: string) {
 }
 
 function buildPublicExperimentEntry(tdf: any) {
-  const setspec = isPlainRecord(tdf?.content?.tdfs?.tutor?.setspec)
-    ? tdf.content.tdfs.tutor.setspec
+  const tutor = isPlainRecord(tdf?.content?.tdfs?.tutor)
+    ? tdf.content.tdfs.tutor
+    : {};
+  const setspec = isPlainRecord(tutor.setspec)
+    ? tutor.setspec
     : {};
   const publicSetSpec: UnknownRecord = {};
   for (const key of [
@@ -708,12 +709,13 @@ function buildPublicExperimentEntry(tdf: any) {
       publicSetSpec[key] = cloneJsonLike((setspec as UnknownRecord)[key]);
     }
   }
-  const uiSettings = isPlainRecord((setspec as UnknownRecord).uiSettings)
-    ? (setspec as { uiSettings?: UnknownRecord }).uiSettings
+  const tutorDeliverySettings = isPlainRecord((tutor as UnknownRecord).deliverySettings)
+    ? (tutor as { deliverySettings?: UnknownRecord }).deliverySettings
     : null;
-  if (uiSettings && typeof uiSettings.experimentLoginText === 'string') {
-    publicSetSpec.uiSettings = { experimentLoginText: uiSettings.experimentLoginText };
-  }
+  const publicDeliverySettings =
+    tutorDeliverySettings && typeof tutorDeliverySettings.experimentLoginText === 'string'
+      ? { experimentLoginText: tutorDeliverySettings.experimentLoginText }
+      : undefined;
 
   return {
     _id: tdf?._id || null,
@@ -723,6 +725,7 @@ function buildPublicExperimentEntry(tdf: any) {
       tdfs: {
         tutor: {
           setspec: publicSetSpec,
+          ...(publicDeliverySettings ? { deliverySettings: publicDeliverySettings } : {}),
         },
       },
     },

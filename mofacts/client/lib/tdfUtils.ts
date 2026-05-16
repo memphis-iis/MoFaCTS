@@ -65,6 +65,35 @@ export function normalizeTutorUnits(tdfContent: any): void {
 }
 
 /**
+ * Dashboard list subscriptions intentionally publish a partial unit projection.
+ * A partial list can still be an array, but instruction units may be empty
+ * objects, which is not enough for card launch.
+ *
+ * @param {any} tdfContent - Parsed TDF content object
+ * @returns {boolean}
+ */
+export function hasLaunchReadyTutorUnits(tdfContent: any): boolean {
+  const units = tdfContent?.tdfs?.tutor?.unit;
+  if (!Array.isArray(units) || units.length === 0) {
+    return false;
+  }
+
+  return units.every((unit: any) => {
+    if (!unit || typeof unit !== 'object') {
+      return false;
+    }
+    return Boolean(
+      unit.assessmentsession ||
+      unit.learningsession ||
+      unit.videosession ||
+      unit.unitinstructions ||
+      unit.picture ||
+      unit.unitinstructionsquestion
+    );
+  });
+}
+
+/**
  * Returns true when a TDF has a condition list but no direct unit array.
  * This indicates a condition-root TDF that resolves to child TDFs.
  *

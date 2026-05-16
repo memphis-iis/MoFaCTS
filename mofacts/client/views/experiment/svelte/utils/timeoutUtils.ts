@@ -1,7 +1,7 @@
 import { DEFAULT_TIMINGS } from '../machine/constants';
 
 type TimeoutContext = {
-  deliveryParams?: Record<string, unknown>;
+  deliverySettings?: Record<string, unknown>;
   testType?: string;
   isCorrect?: boolean;
 };
@@ -16,7 +16,7 @@ function parseTimeoutMs(value: unknown, options: { allowZero?: boolean } = {}): 
 }
 
 export function getMainTimeoutMs(context: TimeoutContext): number {
-  const delivery = context.deliveryParams || {};
+  const delivery = context.deliverySettings || {};
   if (context.testType === 's') {
     const studyMs = parseTimeoutMs((delivery as Record<string, unknown>).purestudy);
     if (studyMs !== null) return studyMs;
@@ -29,7 +29,7 @@ export function getMainTimeoutMs(context: TimeoutContext): number {
 }
 
 export function getFeedbackTimeoutMs(context: TimeoutContext): number {
-  const delivery = context.deliveryParams || {};
+  const delivery = context.deliverySettings || {};
 
   
 

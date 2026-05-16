@@ -2,7 +2,7 @@ import {currentUserHasRole} from '../../lib/roleUtils';
 import {secsIntervalString} from '../../../common/globalHelpers';
 import {haveMeteorUser} from '../../lib/currentTestingHelpers';
 import './instructions.html';
-import { createExperimentState, getExperimentState } from './svelte/services/experimentState';
+import { createExperimentState } from './svelte/services/experimentState';
 import { revisitUnit, unitIsFinished } from './unitProgression';
 import {routeToSignin} from '../../lib/router';
 import { meteorCallAsync } from '../../index';
@@ -10,8 +10,7 @@ import { clientConsole } from '../../lib/userSessionHelpers';
 import _ from 'underscore';
 import DOMPurify from 'dompurify';
 import {audioManager} from '../../lib/audioContextManager';
-import { DeliveryParamsStore } from '../../lib/state/deliveryParamsStore';
-import { UiSettingsStore } from '../../lib/state/uiSettingsStore';
+import { deliverySettingsStore } from '../../lib/state/deliverySettingsStore';
 import { CardStore } from './modules/cardStore';
 import { resolveDynamicAssetPath } from './svelte/services/mediaResolver';
 import { assertIdInvariants, logIdInvariantBreachOnce } from '../../lib/idContext';
@@ -106,8 +105,8 @@ function getLockoutMinutesFromParams(params: any) {
 }
 
 function getConfiguredLockoutMinutes() {
-  // Canonical source: resolved active delivery params for this unit/xcond.
-  const storeParams = DeliveryParamsStore.get();
+  // Canonical source: resolved active delivery settings for this unit/xcond.
+  const storeParams = deliverySettingsStore.get();
   if (!storeParams || typeof storeParams !== 'object') {
     return null;
   }
@@ -495,19 +494,16 @@ async function instructContinue() {
     const currentUnitNumber = Session.get('currentUnitNumber') || 0;
     const tdfFile = Session.get('currentTdfFile');
     const unitList = tdfFile?.tdfs?.tutor?.unit;
+    if (!Array.isArray(unitList)) {
+      throw new Error(`[Instructions] Missing currentTdfFile.tdfs.tutor.unit while continuing instructions (currentTdfId=${Session.get('currentTdfId')})`);
+    }
     let curUnit = Session.get('currentTdfUnit');
     if(!curUnit){
-      markLaunchLoadingTiming('instructionContinue:getExperimentState:start');
-      let experimentState: any = await getExperimentState();
-      markLaunchLoadingTiming('instructionContinue:getExperimentState:complete');
-      const stateUnitList = experimentState?.currentTdfFile?.tdfs?.tutor?.unit;
-      if (!Array.isArray(stateUnitList)) {
-        throw new Error(`[Instructions] Missing experimentState.currentTdfFile.tdfs.tutor.unit while resolving current unit (currentTdfId=${Session.get('currentTdfId')})`);
-      }
-      curUnit = stateUnitList[currentUnitNumber];
+      curUnit = unitList[currentUnitNumber];
       if (!curUnit) {
-        throw new Error(`[Instructions] Current unit ${currentUnitNumber} not found in experimentState unit list (currentTdfId=${Session.get('currentTdfId')}, unitCount=${stateUnitList.length})`);
+        throw new Error(`[Instructions] Current unit ${currentUnitNumber} not found in current TDF unit list (currentTdfId=${Session.get('currentTdfId')}, unitCount=${unitList.length})`);
       }
+      Session.set('currentTdfUnit', curUnit);
     }
 
     // Check if this is an instruction-only unit (has instructions but no session)
@@ -525,15 +521,12 @@ async function instructContinue() {
         Session.set('curUnitInstructionsSeen', false);
         await createExperimentState({
           currentUnitNumber: nextUnitNumber,
-          currentTdfUnit: nextUnit,
           lastUnitCompleted: currentUnitNumber,
-          lastUnitStarted: nextUnitNumber,
         } as any);
       } else {
         await createExperimentState({
           currentUnitNumber: nextUnitNumber,
           lastUnitCompleted: currentUnitNumber,
-          lastUnitStarted: currentUnitNumber,
         } as any);
         navigationTarget = '/learningDashboard';
       }
@@ -614,8 +607,15 @@ Template.instructions.helpers({
     }
   },
 
-  UISettings: function() {
-    return UiSettingsStore.get() ;
+  deliverySettings: function() {
+    return deliverySettingsStore.get() ;
+  },
+
+  continueButtonText: function() {
+    const value = deliverySettingsStore.get()?.continueButtonText;
+    return typeof value === 'string' && value.trim().length > 0
+      ? value
+      : 'Continue';
   },
 
   isLeavingInstructions: function() {
@@ -638,11 +638,12 @@ Template.instructions.helpers({
   },
   'allowGoBack': function() {
     //check if this is allowed
-    const deliveryParams = DeliveryParamsStore.get() || {};
+    const deliverySettings = deliverySettingsStore.get() || {};
     const currentTdfFile = Session.get('currentTdfFile');
-    const allowRevisitFromTdf = currentTdfFile?.tdfs?.tutor?.setspec?.allowRevistUnit;
+    const setspec = currentTdfFile?.tdfs?.tutor?.setspec;
+    const allowRevisitFromTdf = setspec?.allowRevisitUnit ?? setspec?.allowRevistUnit;
     const unitList = currentTdfFile?.tdfs?.tutor?.unit;
-    if(deliveryParams.allowRevistUnit || allowRevisitFromTdf){
+    if(deliverySettings.allowRevisitUnit || deliverySettings.allowRevistUnit || allowRevisitFromTdf){
       //get the current unit number and decrement it by 1, and see if it exists
       let curUnitNumber = Session.get('currentUnitNumber');
       let newUnitNumber = curUnitNumber - 1;
@@ -655,8 +656,8 @@ Template.instructions.helpers({
       return false;
     }
   },
-  'UIsettings': function() {
-    return UiSettingsStore.get();
+  'DeliverySettings': function() {
+    return deliverySettingsStore.get();
   },
 });
 
@@ -924,8 +925,8 @@ async function recordCurrentInstructionContinue(trialStartTimeStamp: any = timeR
 async function handleInstructionContinueAction(forceBypassLockout = false) {
   if (forceBypassLockout) {
     // Prevent stale lockout config from bleeding into the next unit after manual bypass.
-    Session.set('currentDeliveryParams', null);
-    DeliveryParamsStore.set({});
+    Session.set('currentDeliverySettings', null);
+    deliverySettingsStore.set({});
   }
   if (!forceBypassLockout) {
     const lockoutRemainingMs = currLockOut();
@@ -957,8 +958,8 @@ async function handleInstructionContinueAction(forceBypassLockout = false) {
 
 async function handleInstructionSkipUnitAction() {
   // Manual admin skip should bypass any stale unit lockout state.
-  Session.set('currentDeliveryParams', null);
-  DeliveryParamsStore.set({});
+  Session.set('currentDeliverySettings', null);
+  deliverySettingsStore.set({});
   await unitIsFinished('Admin Teacher Shortcut Ctrl+Shift+S');
 }
 

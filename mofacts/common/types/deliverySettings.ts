@@ -1,31 +1,32 @@
 // Owner: Learning Runtime Team
-// Shared contracts for setspec/unit UI setting overlays.
+// Shared contracts for setspec/unit delivery setting overlays.
 
 export type FeedbackDisplayMode = boolean | 'onCorrect' | 'onIncorrect';
+export type FeedbackLayout = 'inline' | 'stacked';
 export type StimuliPosition = 'top' | 'left';
 
-export interface UiSettings {
+export interface DeliverySettings {
+  [key: string]: unknown;
   stimuliPosition?: StimuliPosition;
   isVideoSession?: boolean;
   videoUrl?: string;
   displayCorrectFeedback?: boolean;
   displayIncorrectFeedback?: boolean;
-  correctMessage?: string;
-  incorrectMessage?: string;
+  correctLabelText?: string;
+  incorrectLabelText?: string;
   correctColor?: string;
   incorrectColor?: string;
   displayUserAnswerInFeedback?: FeedbackDisplayMode;
-  singleLineFeedback?: boolean;
-  onlyShowSimpleFeedback?: FeedbackDisplayMode;
+  feedbackLayout?: FeedbackLayout;
   displayCorrectAnswerInIncorrectFeedback?: boolean;
   displayPerformance?: boolean;
   displayTimeoutBar?: boolean;
+  displayTimeoutCountdown?: boolean;
   choiceButtonCols?: number;
-  displaySubmitButton?: boolean;
   inputPlaceholderText?: string;
-  displayConfirmButton?: boolean;
   continueButtonText?: string;
   skipStudyButtonText?: string;
   caseSensitive?: boolean;
   displayQuestionNumber?: boolean;
+  allowRevisitUnit?: boolean;
 }

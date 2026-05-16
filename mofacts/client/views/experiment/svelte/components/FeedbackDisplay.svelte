@@ -5,9 +5,8 @@
    */
   import DOMPurify from 'dompurify';
   import { createEventDispatcher, tick } from 'svelte';
-  import { buildFeedbackHtml, shouldShow, stripTags } from '../utils/feedbackTextBuilder';
+  import { buildFeedbackContent, shouldShow } from '../utils/feedbackTextBuilder';
   import { clientConsole } from '../../../../lib/clientLogger';
-  import { CardStore } from '../../modules/cardStore';
   import { waitForBrowserPaint } from '../utils/paintTiming';
 
   const dispatch = createEventDispatcher();
@@ -30,11 +29,11 @@
   /** @type {string} Correct answer image URL (button trials) */
   export let correctAnswerImageSrc = '';
 
-  /** @type {string} Correct message */
-  export let correctMessage = 'Correct.';
+  /** @type {string} Correct outcome label */
+  export let correctLabelText = 'Correct.';
 
-  /** @type {string} Incorrect message */
-  export let incorrectMessage = 'Incorrect.';
+  /** @type {string} Incorrect outcome label */
+  export let incorrectLabelText = 'Incorrect.';
 
   /** @type {string} Feedback message from answer evaluation */
   export let feedbackMessage = '';
@@ -54,14 +53,11 @@
   /** @type {'onCorrect' | 'onIncorrect' | boolean} Display user answer rules */
   export let displayUserAnswerInFeedback = 'onIncorrect';
 
-  /** @type {boolean} Render feedback in a single line */
-  export let singleLineFeedback = false;
-
-  /** @type {'onCorrect' | 'onIncorrect' | boolean} Show only "Correct." / "Incorrect." */
-  export let onlyShowSimpleFeedback = false;
+  /** @type {'inline' | 'stacked'} Feedback segment layout */
+  export let feedbackLayout = 'stacked';
 
   /** @type {boolean} Show the correct answer on incorrect feedback */
-  export let displayCorrectAnswerInIncorrectFeedback = false;
+  export let displayCorrectAnswerInIncorrectFeedback = true;
 
   $: shouldDisplay = visible && (
     (isCorrect && displayCorrectFeedback) ||
@@ -69,12 +65,7 @@
   );
 
   $: feedbackColor = isCorrect ? correctColor : incorrectColor;
-  $: feedbackText = feedbackMessage || '';
-  // Keep legacy message props as live inputs without using them as fallback text.
-  $: {
-    void correctMessage;
-    void incorrectMessage;
-  }
+  $: feedbackMessageText = feedbackMessage || '';
 
   const ALLOWED_TAGS = ['b', 'br', 'span', 'img'];
   const ALLOWED_ATTR = ['class', 'src', 'alt'];
@@ -86,7 +77,6 @@
   let blockingAssetSequence = 0;
 
   $: showUserAnswer = shouldShow(displayUserAnswerInFeedback, isCorrect);
-  $: showSimpleFeedback = shouldShow(onlyShowSimpleFeedback, isCorrect);
 
   $: {
     clientConsole(2, '[FeedbackDisplay] userAnswer:', userAnswer, 'showUserAnswer:', showUserAnswer, 'displayUserAnswerInFeedback:', displayUserAnswerInFeedback, 'isCorrect:', isCorrect);
@@ -96,28 +86,37 @@
   $: sanitizedCorrectAnswer = DOMPurify.sanitize(correctAnswer, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
   $: sanitizedCorrectAnswerImage = DOMPurify.sanitize(correctAnswerImageSrc, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
 
-  $: feedbackHtml = buildFeedbackHtml({
-    message: feedbackText,
+  $: feedbackContent = buildFeedbackContent({
+    message: feedbackMessageText,
     isCorrectAnswer: isCorrect,
     isTimeoutAnswer: isTimeout,
     showUserAnswer,
-    showSimpleFeedback,
     userAnswerText: sanitizedUserAnswer,
     correctAnswerText: sanitizedCorrectAnswer,
     displayCorrectAnswer: displayCorrectAnswerInIncorrectFeedback,
     correctAnswerImage: sanitizedCorrectAnswerImage,
-    singleLine: singleLineFeedback,
+    feedbackLayout,
+    correctLabelText,
+    incorrectLabelText,
   });
+
+  $: feedbackHtml = feedbackContent.feedbackHtml;
 
   $: sanitizedFeedbackHtml = DOMPurify.sanitize(feedbackHtml, {
     ALLOWED_TAGS,
     ALLOWED_ATTR,
   });
 
-  $: feedbackSpeechText = stripTags(feedbackHtml).replace(/\s+/g, ' ').trim();
+  $: feedbackText = feedbackContent.feedbackText.replace(/\s+/g, ' ').trim();
   $: {
-    if (shouldDisplay && feedbackSpeechText) {
-      CardStore.setCardValue('feedbackTtsText', feedbackSpeechText);
+    if (shouldDisplay && feedbackText) {
+      dispatch('feedbackcontent', feedbackContent);
+    } else if (visible && !shouldDisplay) {
+      dispatch('feedbackcontent', {
+        feedbackText: '',
+        feedbackHtml: '',
+        suppressed: true,
+      });
     }
   }
 

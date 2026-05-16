@@ -1,6 +1,5 @@
 import { Meteor } from 'meteor/meteor';
 import { check, Match } from 'meteor/check';
-import { randomBytes } from 'crypto';
 import type { UploadedPackageFile } from '../lib/packageParser';
 import { processPackageUploadWorkflow } from '../lib/packageUpload';
 import type { PackageUploadIntegrity } from '../lib/packageUploadShared';
@@ -98,7 +97,6 @@ type PackageMethodsDeps = {
   getNewItemFormat: (oldStimFormat: any, fileName: string, stimuliSetId: any, responseKCMap: Record<string, unknown>) => any[];
   legacyTrim: (value: unknown) => string;
   encryptData: (value: string) => string;
-  isBreakingMappingChange: (params: any) => boolean;
   updateStimDisplayTypeMap: (stimuliSetIds: unknown[] | null) => Promise<unknown>;
   rebuildStimDisplayTypeMapSnapshot: (deps: any) => Promise<unknown>;
   getStimDisplayTypeMapDeps: () => any;
@@ -115,8 +113,6 @@ type PackageMethodsDeps = {
   canonicalizeStimDisplayMediaRefs: (stimuliDoc: any, stimuliSetId: any, options: any) => Promise<any>;
   canonicalizeFlatStimuliMediaRefs: (canonicalStimuli: any, stimuliSetId: any, options: any) => Promise<any>;
 };
-
-const BREAKING_VERSION_REQUIRED_REASON = 'breakingVersionRequired';
 
 export function createPackageMethods(deps: PackageMethodsDeps) {
   async function requireContentUploadActor(thisArg: MethodContext, requestedOwner: unknown) {
@@ -508,127 +504,12 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     }
   }
 
-  async function lookupStimuliByFilename(stimulusFileName: unknown): Promise<unknown[] | null> {
-    if (typeof stimulusFileName !== 'string' || !stimulusFileName.trim()) {
-      return null;
-    }
-
-    const byStimDoc = await deps.Tdfs.findOneAsync({ stimulusFileName });
-    if (Array.isArray(byStimDoc?.stimuli) && byStimDoc.stimuli.length > 0) {
-      return byStimDoc.stimuli as unknown[];
-    }
-
-    const byContentRef = await deps.Tdfs.findOneAsync({ "content.tdfs.tutor.setspec.stimulusfile": stimulusFileName });
-    if (Array.isArray(byContentRef?.stimuli) && byContentRef.stimuli.length > 0) {
-      return byContentRef.stimuli as unknown[];
-    }
-
-    return null;
-  }
-
   function normalizeOptionalString(value: unknown): string | null {
     if (typeof value !== 'string') {
       return null;
     }
     const normalized = value.trim();
     return normalized.length > 0 ? normalized : null;
-  }
-
-  function parseOptionalVersionMajor(value: unknown): number | null {
-    if (typeof value === 'number' && Number.isInteger(value)) {
-      return value;
-    }
-    if (typeof value === 'string' && value.trim().length > 0) {
-      const parsed = Number(value.trim());
-      if (Number.isInteger(parsed)) {
-        return parsed;
-      }
-    }
-    return null;
-  }
-
-  function extractVersionMetadataFromSetSpec(setspec: any) {
-    const lessonLineageId = normalizeOptionalString(
-      setspec?.lessonLineageId ?? setspec?.lessonlineageid ?? setspec?.lineageId ?? setspec?.lineageid
-    );
-    const versionMajor = parseOptionalVersionMajor(
-      setspec?.versionMajor ?? setspec?.versionmajor
-    );
-    return { lessonLineageId, versionMajor };
-  }
-
-  function hasVersionMetadataField(setspec: any, field: 'lessonLineageId' | 'versionMajor'): boolean {
-    if (!setspec || typeof setspec !== 'object') {
-      return false;
-    }
-    if (field === 'lessonLineageId') {
-      return Object.prototype.hasOwnProperty.call(setspec, 'lessonLineageId')
-        || Object.prototype.hasOwnProperty.call(setspec, 'lessonlineageid')
-        || Object.prototype.hasOwnProperty.call(setspec, 'lineageId')
-        || Object.prototype.hasOwnProperty.call(setspec, 'lineageid');
-    }
-    return Object.prototype.hasOwnProperty.call(setspec, 'versionMajor')
-      || Object.prototype.hasOwnProperty.call(setspec, 'versionmajor');
-  }
-
-  function ensureVersionMetadataDefaults(setspec: any): void {
-    if (!setspec || typeof setspec !== 'object') return;
-    const lineagePresent = hasVersionMetadataField(setspec, 'lessonLineageId');
-    const versionPresent = hasVersionMetadataField(setspec, 'versionMajor');
-    if (!lineagePresent) {
-      setspec.lessonLineageId = randomBytes(12).toString('hex');
-    }
-    if (!versionPresent) {
-      setspec.versionMajor = 1;
-      if (!setspec.versionLabel) {
-        setspec.versionLabel = 'v1';
-      }
-    }
-    if (!setspec.publishedAt) {
-      setspec.publishedAt = new Date().toISOString();
-    }
-    if (setspec.isPublished === undefined || setspec.isPublished === null) {
-      setspec.isPublished = true;
-    }
-  }
-
-  async function assertVersionMetadataContract(params: {
-    setspec: any;
-    currentTdfId?: string | null;
-    rejectOnMissingPair?: boolean;
-  }) {
-    const { setspec } = params;
-    const lineagePresent = hasVersionMetadataField(setspec, 'lessonLineageId');
-    const versionPresent = hasVersionMetadataField(setspec, 'versionMajor');
-    if (!lineagePresent && !versionPresent) {
-      return;
-    }
-
-    const { lessonLineageId, versionMajor } = extractVersionMetadataFromSetSpec(setspec);
-    if (lineagePresent && !lessonLineageId) {
-      throw new Meteor.Error('invalid-version-metadata', 'lessonLineageId must be a non-empty string when provided.');
-    }
-    if (versionPresent && (versionMajor === null || versionMajor < 1)) {
-      throw new Meteor.Error('invalid-version-metadata', 'versionMajor must be an integer >= 1 when provided.');
-    }
-    if (params.rejectOnMissingPair && (lineagePresent !== versionPresent)) {
-      throw new Meteor.Error('invalid-version-metadata', 'lessonLineageId and versionMajor must be provided together.');
-    }
-    if (!lessonLineageId || versionMajor === null || versionMajor < 1) {
-      return;
-    }
-
-    const duplicate = await deps.Tdfs.findOneAsync({
-      _id: { $ne: params.currentTdfId || null },
-      "content.tdfs.tutor.setspec.lessonLineageId": lessonLineageId,
-      "content.tdfs.tutor.setspec.versionMajor": versionMajor,
-    });
-    if (duplicate?._id) {
-      throw new Meteor.Error(
-        'duplicate-version-metadata',
-        `Duplicate version metadata for lineage "${lessonLineageId}" and versionMajor ${versionMajor}.`
-      );
-    }
   }
 
   async function upsertTDFFile(tdfFilename: string, tdfJSON: TdfPayload, ownerId: string, packagePath: string | null = null): Promise<UpsertResult> {
@@ -677,12 +558,6 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       formattedStims = prev.formattedStims;
       deps.serverConsole('updating tdf', tdfFilename, formattedStims);
       tdfJSONtoUpsert = tdfJSON;
-      ensureVersionMetadataDefaults(tdfJSONtoUpsert?.tdfs?.tutor?.setspec);
-      await assertVersionMetadataContract({
-        setspec: tdfJSONtoUpsert?.tdfs?.tutor?.setspec,
-        currentTdfId: prev._id,
-        rejectOnMissingPair: false,
-      });
       const updateObj = {
         _id: prev._id,
         ownerId: ownerId,
@@ -695,56 +570,12 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       ret.stimuliSetId = stimuliSetId;
       ret.TDF = updateObj;
       ret.reason.push('prevTDFExists');
-      const previousStimuliForPolicy = prev.stimuli || [];
-      const previousStimulusFile = normalizeOptionalString(prev?.content?.tdfs?.tutor?.setspec?.stimulusfile);
-      const nextStimulusFile = normalizeOptionalString((tdfJSONtoUpsert?.tdfs?.tutor?.setspec as any)?.stimulusfile);
-      const stimulusRefChanged = previousStimulusFile !== nextStimulusFile;
-      let nextStimuliForPolicy = previousStimuliForPolicy;
-
-      if (!nextStimulusFile) {
-        if (!ret.reason.includes(BREAKING_VERSION_REQUIRED_REASON)) {
-          ret.reason.push(BREAKING_VERSION_REQUIRED_REASON);
-        }
-        return ret;
-      }
-
-      if (stimulusRefChanged) {
-        const resolvedNextStimuli = await lookupStimuliByFilename(nextStimulusFile);
-        if (!Array.isArray(resolvedNextStimuli) || resolvedNextStimuli.length < 1) {
-          ret.reason.push(BREAKING_VERSION_REQUIRED_REASON);
-          return ret;
-        }
-        nextStimuliForPolicy = resolvedNextStimuli;
-      } else {
-        const freshStimuli = await lookupStimuliByFilename(nextStimulusFile);
-        if (Array.isArray(freshStimuli) && freshStimuli.length > 0) {
-          nextStimuliForPolicy = freshStimuli;
-        }
-      }
-      const breakingOverwrite = deps.isBreakingMappingChange({
-        prevTdfFile: prev.content,
-        nextTdfFile: tdfJSONtoUpsert,
-        prevStimuliSet: previousStimuliForPolicy,
-        nextStimuliSet: nextStimuliForPolicy,
-        rootTdfId: prev._id,
-        conditionTdfId: null,
-        stimuliSetId,
-      });
-      if (breakingOverwrite && !ret.reason.includes(BREAKING_VERSION_REQUIRED_REASON)) {
-        ret.reason.push(BREAKING_VERSION_REQUIRED_REASON);
-      }
       return ret;
     } else {
       formattedStims = [];
       deps.serverConsole('inserting tdf', tdfFilename, formattedStims);
       tdfJSON.createdAt = new Date();
       tdfJSONtoUpsert = tdfJSON;
-      ensureVersionMetadataDefaults(tdfJSONtoUpsert?.tdfs?.tutor?.setspec);
-      await assertVersionMetadataContract({
-        setspec: tdfJSONtoUpsert?.tdfs?.tutor?.setspec,
-        currentTdfId: null,
-        rejectOnMissingPair: false,
-      });
     }
     const conditionCounts = tdfJSONtoUpsert.tdfs.tutor.setspec.condition ? new Array(tdfJSONtoUpsert.tdfs.tutor.setspec.condition.length).fill(0) : [];
 
@@ -828,12 +659,6 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     let tdfJSONtoUpsert: TdfPayload;
     if (prev && prev._id) {
       tdfJSONtoUpsert = tdfJSON;
-      ensureVersionMetadataDefaults(tdfJSONtoUpsert?.tdfs?.tutor?.setspec);
-      await assertVersionMetadataContract({
-        setspec: tdfJSONtoUpsert?.tdfs?.tutor?.setspec,
-        currentTdfId: prev._id,
-        rejectOnMissingPair: false,
-      });
       const updateObj = {
         _id: prev._id,
         tdfFileName: packageJSON.fileName,
@@ -851,28 +676,10 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       ret.stimuliSetId = stimuliSetId;
       ret.TDF = updateObj;
       ret.reason.push('prevTDFExists');
-      const breakingOverwrite = deps.isBreakingMappingChange({
-        prevTdfFile: prev.content,
-        nextTdfFile: tdfJSONtoUpsert,
-        prevStimuliSet: prev.stimuli || [],
-        nextStimuliSet: formattedStims,
-        rootTdfId: prev._id,
-        conditionTdfId: null,
-        stimuliSetId,
-      });
-      if (breakingOverwrite) {
-        ret.reason.push(BREAKING_VERSION_REQUIRED_REASON);
-      }
       return ret;
     } else {
       tdfJSON.createdAt = new Date();
       tdfJSONtoUpsert = tdfJSON;
-      ensureVersionMetadataDefaults(tdfJSONtoUpsert?.tdfs?.tutor?.setspec);
-      await assertVersionMetadataContract({
-        setspec: tdfJSONtoUpsert?.tdfs?.tutor?.setspec,
-        currentTdfId: null,
-        rejectOnMissingPair: false,
-      });
     }
     const conditionCounts = tdfJSONtoUpsert.tdfs.tutor.setspec.condition ? new Array(tdfJSONtoUpsert.tdfs.tutor.setspec.condition.length).fill(0) : [];
 
@@ -927,12 +734,8 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
         updateObj.ownerId = actingUserId;
       }
     }
-    if (resetShuffleClusters || policyReasons.includes(BREAKING_VERSION_REQUIRED_REASON)) {
-      throw new Meteor.Error(
-        'breaking-version-required',
-        'This overwrite changes mapping semantics. Publish a new lesson version (vN+1) instead of overwriting this version.'
-      );
-    }
+    void resetShuffleClusters;
+    void policyReasons;
     await deps.Tdfs.upsertAsync({_id: updateObj._id},{$set:updateObj});
     const confirmedConditionTdfIds = (updateObj as any)?.content?.tdfs?.tutor?.setspec?.conditionTdfIds;
     if (Array.isArray(confirmedConditionTdfIds)) {
@@ -995,22 +798,6 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       });
     }
 
-    const breakingChange = deps.isBreakingMappingChange({
-      prevTdfFile: tdf.content,
-      nextTdfFile: tdf.content,
-      prevStimuliSet: tdf.stimuli || [],
-      nextStimuliSet: stimuliToSave,
-      rootTdfId: tdf._id,
-      conditionTdfId: null,
-      stimuliSetId,
-    });
-    if (breakingChange) {
-      throw new Meteor.Error(
-        'breaking-version-required',
-        'This stimuli edit changes mapping semantics. Publish a new lesson version (vN+1) instead of overwriting this version.'
-      );
-    }
-
     await deps.Tdfs.updateAsync({_id: tdfId}, {
       $set: {
         rawStimuliFile: updatedRawStimuliFile,
@@ -1066,49 +853,6 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
         rejectUnresolved: true,
         allowFilenameLookup: true
       });
-    }
-
-    const existingVersionMeta = extractVersionMetadataFromSetSpec(tdf?.content?.tdfs?.tutor?.setspec);
-    const incomingVersionMeta = extractVersionMetadataFromSetSpec(tdfContent?.tdfs?.tutor?.setspec);
-    const incomingHasLineage = incomingVersionMeta.lessonLineageId !== null;
-    const incomingHasMajor = incomingVersionMeta.versionMajor !== null;
-    const lineageChanged = incomingHasLineage && existingVersionMeta.lessonLineageId !== incomingVersionMeta.lessonLineageId;
-    const majorChanged = incomingHasMajor && existingVersionMeta.versionMajor !== incomingVersionMeta.versionMajor;
-    if (lineageChanged || majorChanged) {
-      throw new Meteor.Error(
-        'version-metadata-edit-disallowed',
-        'lessonLineageId/versionMajor are managed automatically. Create a new version instead of editing these fields.'
-      );
-    }
-
-    if (tdfContent?.tdfs?.tutor?.setspec && (existingVersionMeta.lessonLineageId || existingVersionMeta.versionMajor !== null)) {
-      const incomingSetspec = tdfContent.tdfs.tutor.setspec as Record<string, unknown>;
-      if (!incomingHasLineage && existingVersionMeta.lessonLineageId) {
-        incomingSetspec.lessonLineageId = existingVersionMeta.lessonLineageId;
-      }
-      if (!incomingHasMajor && existingVersionMeta.versionMajor !== null) {
-        incomingSetspec.versionMajor = existingVersionMeta.versionMajor;
-      }
-      const existingLabel = tdf?.content?.tdfs?.tutor?.setspec?.versionLabel;
-      if (existingLabel && !incomingSetspec.versionLabel) {
-        incomingSetspec.versionLabel = existingLabel;
-      }
-    }
-
-    const breakingChange = deps.isBreakingMappingChange({
-      prevTdfFile: tdf.content,
-      nextTdfFile: tdfContent,
-      prevStimuliSet: tdf.stimuli || [],
-      nextStimuliSet: tdf.stimuli || [],
-      rootTdfId: tdf._id,
-      conditionTdfId: null,
-      stimuliSetId: tdf.stimuliSetId,
-    });
-    if (breakingChange) {
-      throw new Meteor.Error(
-        'breaking-version-required',
-        'This TDF edit changes mapping semantics. Publish a new lesson version (vN+1) instead of overwriting this version.'
-      );
     }
 
     await deps.Tdfs.updateAsync({_id: tdfId}, {

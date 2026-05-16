@@ -8,6 +8,7 @@ import { STIM_TOOLTIPS, getTooltipMode, setTooltipMode, injectDescriptions, upda
 import { clientConsole } from '../../lib/clientLogger';
 import { ValidatorEngine, ValidationContext } from '../../lib/validatorCore';
 import { createValidationSummary, applyFieldErrors, initValidationUI } from '../../lib/validatorUI';
+import { sortPropertiesModal } from '../../lib/schemaApplicabilityEditor';
 
 const FlowRouter = (globalThis as any).FlowRouter;
 const TdfsCollection = (globalThis as any).Tdfs || (globalThis as any).TdfsCollection;
@@ -26,26 +27,6 @@ const clone = (obj: any) => JSON.parse(JSON.stringify(obj));
  * - Server: Only used for initial TDF load and final save
  * - Client: All editing, validation, and UI rendering happens in browser
  */
-
-/**
- * Detect if changes break existing experiment data (cluster/stim counts changed)
- * NOTE: responseType check removed - image detection is now automatic via isImagePath()
- */
-function isBreakingStimChange(originalClusters: any, newClusters: any) {
-    if (!originalClusters || !newClusters) return false;
-
-    // Cluster count changed
-    if (originalClusters.length !== newClusters.length) return true;
-
-    // Stim count per cluster changed
-    for (let i = 0; i < originalClusters.length; i++) {
-        const origCount = originalClusters[i]?.stims?.length || 0;
-        const newCount = newClusters[i]?.stims?.length || 0;
-        if (origCount !== newCount) return true;
-    }
-
-    return false;
-}
 
 // Cache the schema after first load
 let cachedStimSchema: any = null;
@@ -399,15 +380,6 @@ Template.contentEdit.events({
                 alert('Please fix the validation errors before saving.');
                 return;
             }
-        }
-
-        // Check if this is a breaking change
-        const originalClusters = instance.originalClusters || [];
-        const breaking = isBreakingStimChange(originalClusters, editedClusters);
-
-        if (breaking) {
-            alert('This edit changes mapping semantics and cannot overwrite this lesson version.\n\nCreate/publish a new version (vN+1) and apply the breaking changes there.');
-            return;
         }
 
         instance.saving.set(true);
@@ -1374,17 +1346,7 @@ function renderClusterEditor(instance: any, clusterIndex: any) {
                 if (modal.dataset.labelsProcessed) continue;
                 modal.dataset.labelsProcessed = 'true';
 
-                // Reorder: unchecked properties first, checked last
-                const formGroups = modal.querySelectorAll(':scope > .form-group');
-                if (formGroups.length > 0) {
-                    const groupArray = Array.from(formGroups);
-                    groupArray.sort((a: any, b: any) => {
-                        const aChecked = a.querySelector('input[type="checkbox"]')?.checked ? 1 : 0;
-                        const bChecked = b.querySelector('input[type="checkbox"]')?.checked ? 1 : 0;
-                        return aChecked - bChecked;
-                    });
-                    groupArray.forEach(group => modal.appendChild(group));
-                }
+                sortPropertiesModal(modal);
             }
 
             // Fix "properties" button text in added nodes only

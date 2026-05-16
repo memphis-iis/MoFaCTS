@@ -20,7 +20,7 @@ The card runtime presents trials, manages learner response UI, coordinates speec
 - Multiple-choice responses.
 - Typed responses.
 - Speech-recognition-based responses.
-- Image, audio, and video media paths when configured by the TDF and UI settings.
+- Image, audio, and video media paths when configured by the TDF and delivery settings.
 
 ## Development Notes
 

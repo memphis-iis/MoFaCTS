@@ -6,7 +6,7 @@ import { clientConsole } from "./clientLogger";
 import { clearEngine } from "./engineManager";
 import { clearCardEntryContext } from "./cardEntryIntent";
 import { CardStore } from "../views/experiment/modules/cardStore";
-import { DeliveryParamsStore } from "./state/deliveryParamsStore";
+import { deliverySettingsStore } from "./state/deliverySettingsStore";
 import { ExperimentStateStore } from "./state/experimentStateStore";
 import { clearMappingRecordFromSession } from "../views/experiment/svelte/services/mappingRecordService";
 declare const Session: any;
@@ -100,7 +100,7 @@ function sessionCleanUp() {
     Session.set('currentStimuliSet', undefined);
     Session.set('submmissionLock', false);
     // curStudentPerformance preserved for continuity
-    // DeliveryParamsStore preserved
+    // deliverySettingsStore preserved
     // ExperimentStateStore preserved
     // currentRootTdfId preserved
 
@@ -194,7 +194,7 @@ function sessionCleanUp() {
   Session.set('currentStimuliSet', undefined);
   Session.set('submmissionLock', false);
   Session.set('curStudentPerformance', undefined);
-  DeliveryParamsStore.set({});
+  deliverySettingsStore.set({});
   ExperimentStateStore.clear();
   Session.set('currentRootTdfId', undefined);
   Session.set('conditionTdfId', undefined);

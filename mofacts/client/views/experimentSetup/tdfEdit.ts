@@ -12,7 +12,7 @@ import { clientConsole } from '../../lib/clientLogger';
 import { TDF_TOOLTIPS, getTooltipMode, setTooltipMode, injectDescriptions, updateDescriptionsInPlace, buildDescriptionCache } from '../../lib/tooltipContent';
 import { ValidatorEngine, ValidationContext } from '../../lib/validatorCore';
 import { createValidationSummary, applyFieldErrors, initValidationUI } from '../../lib/validatorUI';
-import { installSchemaApplicabilityControls } from '../../lib/schemaApplicabilityEditor';
+import { installSchemaApplicabilityControls, sortPropertiesModal } from '../../lib/schemaApplicabilityEditor';
 
 /**
  * TDF Editor - Schema-driven editor using json-editor library
@@ -21,40 +21,6 @@ import { installSchemaApplicabilityControls } from '../../lib/schemaApplicabilit
  * - Server: Only used for initial TDF load and final save
  * - Client: All editing, validation, and UI rendering happens in browser
  */
-
-// Fields that affect cluster mapping and require data reset when changed
-const BREAKING_FIELDS = ['shuffleclusters', 'swapclusters'];
-
-/**
- * Detect if TDF changes will break existing experiment data
- * Checks shuffle/swap settings and unit clusterlists
- */
-function isBreakingTdfChange(originalTutor: any, newTutor: any) {
-    if (!originalTutor || !newTutor) return false;
-
-    const origSetspec = originalTutor.setspec || {};
-    const newSetspec = newTutor.setspec || {};
-
-    // Check setspec-level breaking fields
-    for (const field of BREAKING_FIELDS) {
-        if (JSON.stringify(origSetspec[field]) !== JSON.stringify(newSetspec[field])) {
-            return true;
-        }
-    }
-
-    // Check unit-level clusterlist changes
-    const origUnits = originalTutor.unit || [];
-    const newUnits = newTutor.unit || [];
-
-    const maxUnits = Math.max(origUnits.length, newUnits.length);
-    for (let i = 0; i < maxUnits; i++) {
-        const origList = origUnits[i]?.learningsession?.clusterlist;
-        const newList = newUnits[i]?.learningsession?.clusterlist;
-        if (origList !== newList) return true;
-    }
-
-    return false;
-}
 
 // Cache the schema after first load
 let cachedSchema: any = null;
@@ -267,15 +233,6 @@ Template.tdfEdit.events({
                 alert('Please fix the validation errors before saving.');
                 return;
             }
-        }
-
-        // Check if this is a breaking change
-        const originalTutor = instance.originalTdf?.tutor;
-        const breaking = isBreakingTdfChange(originalTutor, editedTutor);
-
-        if (breaking) {
-            alert('This edit changes mapping semantics and cannot overwrite this lesson version.\n\nCreate/publish a new version (vN+1) and apply the breaking changes there.');
-            return;
         }
 
         instance.saving.set(true);
@@ -911,17 +868,7 @@ function initEditor(instance: any, tdf: any) {
                 if (modal.dataset.labelsProcessed) continue;
                 modal.dataset.labelsProcessed = 'true';
 
-                // Reorder: unchecked properties first, checked last
-                const formGroups = modal.querySelectorAll(':scope > .form-group');
-                if (formGroups.length > 0) {
-                    const groupArray = Array.from(formGroups);
-                    groupArray.sort((a: any, b: any) => {
-                        const aChecked = a.querySelector('input[type="checkbox"]')?.checked ? 1 : 0;
-                        const bChecked = b.querySelector('input[type="checkbox"]')?.checked ? 1 : 0;
-                        return aChecked - bChecked;
-                    });
-                    groupArray.forEach((group: any) => modal.appendChild(group));
-                }
+                sortPropertiesModal(modal);
             }
         });
     };

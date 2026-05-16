@@ -1,6 +1,6 @@
 
 
-export type { UiSettings } from './uiSettings';
+export type { DeliverySettings } from './deliverySettings';
 
 export type { ExperimentState } from './experiment';
 
