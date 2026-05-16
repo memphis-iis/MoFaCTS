@@ -159,6 +159,7 @@ export { extractDelimFields, rangeVal, shuffle, randomChoice, search, getUserDis
 // Track if CSS has been applied this page session (resets on refresh, unlike Session)
 let themeCssAppliedThisSession = false;
 const THEME_CACHE_KEY = 'mofacts.theme.v1';
+const THEME_FONT_STYLESHEET_LINK_ID = 'mofacts-theme-font-stylesheet';
 
 function cacheTheme(themeData: ThemeData) {
   try {
@@ -197,6 +198,28 @@ function applyThemeCssVariable(property: string, rawValue: unknown) {
   document.documentElement.style.setProperty(propConverted, String(normalizedText));
 }
 
+function applyThemeFontStylesheet(rawValue: unknown) {
+  const href = asNonEmptyString(rawValue);
+  const existingLink = document.getElementById(THEME_FONT_STYLESHEET_LINK_ID) as HTMLLinkElement | null;
+
+  if (!href) {
+    existingLink?.remove();
+    return;
+  }
+
+  const link = existingLink || document.createElement('link');
+  link.id = THEME_FONT_STYLESHEET_LINK_ID;
+  link.rel = 'stylesheet';
+
+  if (!existingLink) {
+    document.head.appendChild(link);
+  }
+
+  if (link.getAttribute('href') !== href) {
+    link.href = href;
+  }
+}
+
 // Helper function to apply theme CSS properties
 function applyThemeCSSProperties(themeData: ThemeData | null | undefined) {
   if (!themeData) {
@@ -222,6 +245,7 @@ function applyThemeCSSProperties(themeData: ThemeData | null | undefined) {
       for (const prop in themeProps) {
         applyThemeCssVariable(prop, themeProps[prop]);
       }
+      applyThemeFontStylesheet(themeProps.font_stylesheet_url);
     }
 
     // Set document title

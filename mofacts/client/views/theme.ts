@@ -15,6 +15,8 @@ import './theme.html';
 declare const DynamicSettings: any;
 declare const $: any;
 
+const THEME_FONT_STYLESHEET_LINK_ID = 'mofacts-theme-font-stylesheet';
+
 function getThemeLibrary() {
     const library = DynamicSettings.findOne({key: 'themeLibrary'});
     return library?.value || [];
@@ -228,8 +230,12 @@ function validateThemePropInput(inputEl: any, propId: any, rawValue: any) {
         valid = typeof value === 'string' && isValidThemeCssTime(value);
     }
 
-    if (propId === 'font_family') {
+    if (propId === 'font_family' || propId === 'heading_font_family') {
         valid = typeof value === 'string' && value.length > 0;
+    }
+
+    if (propId === 'font_stylesheet_url') {
+        valid = typeof value === 'string';
     }
 
     if (propId === 'font_size_base' || isThemeLengthProperty(propId)) {
@@ -258,6 +264,35 @@ function applyThemeCssVariable(property: string, rawValue: unknown) {
     }
 
     document.documentElement.style.setProperty(propConverted, String(normalizedText));
+}
+
+function applyThemeFontStylesheet(rawValue: unknown) {
+    const href = typeof rawValue === 'string' ? rawValue.trim() : '';
+    const existingLink = document.getElementById(THEME_FONT_STYLESHEET_LINK_ID) as HTMLLinkElement | null;
+
+    if (!href) {
+        existingLink?.remove();
+        return;
+    }
+
+    const link = existingLink || document.createElement('link');
+    link.id = THEME_FONT_STYLESHEET_LINK_ID;
+    link.rel = 'stylesheet';
+
+    if (!existingLink) {
+        document.head.appendChild(link);
+    }
+
+    if (link.getAttribute('href') !== href) {
+        link.href = href;
+    }
+}
+
+function applyThemePropertyPreview(property: string, value: unknown) {
+    applyThemeCssVariable(property, value);
+    if (property === 'font_stylesheet_url') {
+        applyThemeFontStylesheet(value);
+    }
 }
 
 function getThemeIconBackgroundColor() {
@@ -454,8 +489,8 @@ Template.theme.events({
             Session.set('curTheme', updatedTheme);
         }
 
-        // Apply CSS variable immediately for instant preview
-        applyThemeCssVariable(data_id, value);
+        // Apply CSS immediately for instant preview
+        applyThemePropertyPreview(data_id, value);
 
         // Auto-save with debounce (wait 1 second after user stops typing)
         clearTimeout((window as any).themeSaveTimeout);
@@ -505,7 +540,7 @@ Template.theme.events({
         }
 
         // Apply CSS variable immediately for instant visual feedback
-        applyThemeCssVariable(data_id, value);
+        applyThemePropertyPreview(data_id, value);
 
         // Auto-save with debounce (prevents network thrashing during color picker drag)
         clearTimeout((window as any).themeColorSaveTimeout);
@@ -540,8 +575,8 @@ Template.theme.events({
             Session.set('curTheme', updatedTheme);
         }
 
-        // Apply CSS variable immediately for instant visual feedback
-        applyThemeCssVariable(data_id, value);
+        // Apply CSS immediately for instant visual feedback
+        applyThemePropertyPreview(data_id, value);
 
         // Auto-save immediately for dropdowns
         (async () => {

@@ -102,12 +102,30 @@
                             {{/with}}
                         </div>
                         <div class="col text-end">
-                            Font Family:
+                            Body Font Family:
                         </div>
                         <div class="col">
-                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.font_family}}" data-id="font_family" placeholder="system-ui, -apple-system, &quot;Segoe UI&quot;, sans-serif">
+                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.font_family}}" data-id="font_family" placeholder="&quot;Atkinson Hyperlegible&quot;, &quot;Segoe UI&quot;, sans-serif">
                             <small class="form-text text-muted">
-                                CSS font-family stack applied across the app
+                                CSS font-family stack applied to body text and app UI
+                            </small>
+                        </div>
+                        <div class="col text-end">
+                            Heading & Brand Font Family:
+                        </div>
+                        <div class="col">
+                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.heading_font_family}}" data-id="heading_font_family" placeholder="Fraunces, Georgia, serif">
+                            <small class="form-text text-muted">
+                                CSS font-family stack for h1, h2, page headers, and brand text
+                            </small>
+                        </div>
+                        <div class="col text-end">
+                            Web Font Stylesheet URL:
+                        </div>
+                        <div class="col">
+                            <input type="url" class="currentThemeProp form-control" value="{{currentTheme.properties.font_stylesheet_url}}" data-id="font_stylesheet_url" placeholder="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&amp;family=Fraunces:wght@700;800&amp;display=swap">
+                            <small class="form-text text-muted">
+                                Optional hosted font CSS URL loaded for the theme font stacks
                             </small>
                         </div>
                         <div class="col text-end">
