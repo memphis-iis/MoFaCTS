@@ -193,6 +193,10 @@ const EXPERIMENT_PORTAL_DESCRIPTION =
 const DEFAULT_SIGNIN_DESCRIPTION =
   'Sign in to access your learning dashboard, saved progress, and account tools.';
 
+function queueMainMenuReturnTour() {
+  Session.set('showMainMenuReturnTour', true);
+}
+
 Session.setDefault('allowPublicSignup', false);
 Session.setDefault('requireEmailVerification', false);
 Session.setDefault('minPasswordLength', 8);
@@ -445,6 +449,7 @@ Template.signIn.events({
 
       // Route to /profile like password login does
       clientConsole(2, '[MS-LOGIN] Routing to /profile');
+      queueMainMenuReturnTour();
       FlowRouter.go('/home');
 
     } catch (error) {
@@ -520,6 +525,7 @@ Template.signIn.events({
       void meteorCallAsync('recordSessionRevocation', 'logout-other-clients-memphis-saml');
 
       clientConsole(2, '[MEMPHIS-SAML] Routing to /home');
+      queueMainMenuReturnTour();
       FlowRouter.go('/home');
     } catch (error) {
       clientConsole(1, '[MEMPHIS-SAML] Login Error:', error);
@@ -644,6 +650,7 @@ Template.signIn.events({
 
       // Route to /profile like password login does
       clientConsole(2, '[GOOGLE-LOGIN] Routing to /profile');
+      queueMainMenuReturnTour();
       FlowRouter.go('/home');
 
     } catch (error) {
@@ -795,8 +802,10 @@ async function signInNotify(landingPage: string | false = '/profile') {
   } catch (error) {
     clientConsole(1, '[AUTH] logoutOtherClients failed after sign-in:', error);
   }
-  if(landingPage)
+  if(landingPage) {
+    queueMainMenuReturnTour();
     FlowRouter.go(landingPage);
+  }
 }
 
 async function resolveExperimentTargetForLogin() {
