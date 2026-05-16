@@ -1,7 +1,14 @@
 import { meteorCallAsync, clientConsole } from "../../index";
+import { KC_MULTIPLE } from "../../../common/Definitions";
 declare const Session: any;
 declare const Meteor: any;
 declare const alert: (message?: string) => void;
+
+type AdaptiveOutcomeRows = Array<{
+    KCId?: number | string;
+    outcome?: string;
+}>;
+type AdaptiveOutcomes = Record<string, boolean>;
 
 export class AdaptiveQuestionLogic {  
     schedule: Array<any>;
@@ -60,9 +67,40 @@ export class AdaptiveQuestionLogic {
         }
         videoSession.checkpoints.sort((a: any, b: any) => Number(a.time) - Number(b.time));
     }
+
+    private buildAdaptiveOutcomes(rows: AdaptiveOutcomeRows): AdaptiveOutcomes {
+        const outcomes: AdaptiveOutcomes = {};
+        for (const historyRow of rows) {
+            const kcId = Number(historyRow?.KCId);
+            if (Number.isFinite(kcId)) {
+                outcomes[String(kcId % KC_MULTIPLE)] = historyRow.outcome === 'correct';
+            }
+        }
+
+        const currentStimuliSet = Session.get('currentStimuliSet');
+        if (Array.isArray(currentStimuliSet)) {
+            for (const stim of currentStimuliSet) {
+                const clusterKC = Number(stim?.clusterKC);
+                if (!Number.isFinite(clusterKC)) {
+                    continue;
+                }
+                const clusterKey = String(clusterKC % KC_MULTIPLE);
+                if (!Object.prototype.hasOwnProperty.call(outcomes, clusterKey)) {
+                    outcomes[clusterKey] = false;
+                }
+            }
+        }
+
+        return outcomes;
+    }
+
+    async getAdaptiveOutcomes(): Promise<AdaptiveOutcomes> {
+        const rows = (await meteorCallAsync('getAdaptiveOutcomeRows', this.userId, this.tdfId)) as AdaptiveOutcomeRows;
+        return this.buildAdaptiveOutcomes(rows);
+    }
     
     //translate the logic to javascript code    
-    async evaluate(logicString: string){
+    async evaluate(logicString: string, adaptiveOutcomes?: AdaptiveOutcomes){
         //logic string is a string that contains the logic to be evaluated using IF THEN logic, 
         //currentUnit is the current unit that the logic is being evaluated for
 
@@ -116,7 +154,7 @@ export class AdaptiveQuestionLogic {
         // Allowed math operators
         const mathOperators = "+-*/%()=";
 
-        const history = (await meteorCallAsync('getOutcomesForAdaptiveLearning', this.userId, this.tdfId)) as any[];
+        const history = adaptiveOutcomes || await this.getAdaptiveOutcomes();
 
         for(const token of conditionTokens){
             if(operators[token]){
@@ -133,7 +171,7 @@ export class AdaptiveQuestionLogic {
                 let stimulusIndex = parseInt(stimulusPart);
                 //get the performance for this cluster and stimulus
                 clientConsole(2, 'getting component state for cluster:', clusterIndex, 'stimulus:', stimulusIndex, history[stimulusIndex]);
-                let outcome = history[clusterIndex];
+                let outcome = history[String(clusterIndex)] ?? false;
                 //if the outcome is 1, lastOutcome is true, otherwise false
                 clientConsole(2, 'lastOutcome for ' + token + ':', outcome);
                 conditionExpression += outcome;
@@ -260,8 +298,9 @@ export class AdaptiveQuestionLogic {
         }
 
         const allCheckpoints: any[] = [];
+        const adaptiveOutcomes = await this.getAdaptiveOutcomes();
         for(const logic of adaptiveLogic){
-            let ret = await this.evaluate(logic);
+            let ret = await this.evaluate(logic, adaptiveOutcomes);
             if (!ret || !ret.conditionResult) {
                 continue;
             }

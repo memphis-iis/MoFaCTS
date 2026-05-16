@@ -53,7 +53,8 @@ type AdaptiveLogicOutput = {
 
 type AdaptiveQuestionLogic = {
   curUnit?: { adaptiveLogic?: unknown };
-  evaluate: (rule: unknown) => Promise<AdaptiveLogicOutput | undefined>;
+  evaluate: (rule: unknown, adaptiveOutcomes?: Record<string, boolean>) => Promise<AdaptiveLogicOutput | undefined>;
+  getAdaptiveOutcomes?: () => Promise<Record<string, boolean>>;
   unitBuilder: (template: unknown, adaptiveQuestionTimes: unknown[], adaptiveQuestions: unknown[], adaptiveCheckpoints?: unknown[]) => unknown;
   modifyUnit: (logic: unknown, unit: unknown) => Promise<unknown>;
   when?: unknown;
@@ -140,6 +141,9 @@ export async function unitIsFinished(_reason: string): Promise<void> {
       const logic = engine.adaptiveQuestionLogic.curUnit?.adaptiveLogic;
       if (logic !== '' && logic !== undefined) {
         clientConsole(2, 'adaptive schedule');
+        const adaptiveOutcomes = typeof engine.adaptiveQuestionLogic.getAdaptiveOutcomes === 'function'
+          ? await engine.adaptiveQuestionLogic.getAdaptiveOutcomes()
+          : undefined;
         for (const adaptiveUnitIndex in adaptive) {
           const adaptiveEntry = String(adaptive[adaptiveUnitIndex]);
           const newUnitIndex = Number(adaptiveEntry.split(',')[0]);
@@ -150,7 +154,7 @@ export async function unitIsFinished(_reason: string): Promise<void> {
           const adaptiveCheckpoints: unknown[] = [];
 
           for (const logicRule of (adaptiveLogic?.[newUnitIndex] || [])) {
-            const logicOutput = await engine.adaptiveQuestionLogic.evaluate(logicRule);
+            const logicOutput = await engine.adaptiveQuestionLogic.evaluate(logicRule, adaptiveOutcomes);
             if (logicOutput?.conditionResult) {
               if (logicOutput.questions) {
                 for (const adaptiveQuestion of logicOutput.questions) {

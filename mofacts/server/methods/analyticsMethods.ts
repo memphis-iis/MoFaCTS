@@ -1104,6 +1104,38 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       const scopedUserId = requireSelfScopedUserId(this, userId);
       return await getHiddenStimulusKCsFromHistory(scopedUserId, requireNormalizedTdfId(TDFId));
     },
+    getAdaptiveOutcomeRows: async function(this: MethodContext, userId: string, TDFId: string) {
+      const actingUserId = requireAuthenticatedUser(this.userId, 'Must be logged in', 401);
+      const requestedUserId = deps.normalizeCanonicalId(userId) || actingUserId;
+      const normalizedTdfId = deps.normalizeCanonicalId(TDFId);
+      if (!normalizedTdfId) {
+        throw new Meteor.Error(400, 'Invalid TDF');
+      }
+      await requireUserMatchesOrHasRole(deps.getMethodAuthorizationDeps(), {
+        actingUserId,
+        subjectUserId: requestedUserId,
+        roles: ['admin'],
+        notLoggedInMessage: 'Must be logged in',
+        notLoggedInCode: 401,
+        forbiddenMessage: 'Can only read adaptive outcomes for the current user',
+        forbiddenCode: 403,
+      });
+      if (requestedUserId === actingUserId) {
+        await validateExperimentStateMutation(
+          actingUserId,
+          normalizedTdfId,
+          { currentTdfId: normalizedTdfId },
+          'methods.getAdaptiveOutcomeRows'
+        );
+      }
+      return await deps.Histories.find(
+        { userId: requestedUserId, TDFId: normalizedTdfId },
+        {
+          fields: { _id: 0, KCId: 1, outcome: 1, recordedServerTime: 1, time: 1 },
+          sort: { recordedServerTime: 1, time: 1 },
+        }
+      ).fetchAsync();
+    },
     getNumDroppedItemsByUserIDAndTDFId: async function(this: MethodContext, userId: string, TDFId: string) {
       const scopedUserId = requireSelfScopedUserId(this, userId);
       return await getNumDroppedItemsByUserIDAndTDFId(scopedUserId, requireNormalizedTdfId(TDFId));
@@ -1276,24 +1308,15 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       }
       const history = await deps.Histories.find(
         { userId: requestedUserId, TDFId: normalizedTdfId },
-        { fields: { KCId: 1, outcome: 1 }, $sort: { recordedServerTime: -1 } }
+        {
+          fields: { _id: 0, KCId: 1, outcome: 1, recordedServerTime: 1, time: 1 },
+          sort: { recordedServerTime: 1, time: 1 },
+        }
       ).fetchAsync();
       const outcomes: Record<string, boolean> = {};
       for (const historyRow of history as Array<{ KCId?: number; outcome?: string }>) {
         if (historyRow.KCId) {
           outcomes[historyRow.KCId % 1000] = historyRow.outcome === 'correct';
-        }
-      }
-      const tdf = await deps.Tdfs.findOneAsync({ _id: normalizedTdfId });
-      const stimSet = Array.isArray(tdf?.stimuli) ? tdf.stimuli : [];
-      const clusterStimSet: Record<string, unknown> = {};
-      for (const stim of stimSet as Array<{ clusterKC: number }>) {
-        clusterStimSet[stim.clusterKC % 1000] = stim;
-      }
-
-      for (const cluster of Object.keys(clusterStimSet)) {
-        if (!outcomes[cluster]) {
-          outcomes[cluster] = false;
         }
       }
 
