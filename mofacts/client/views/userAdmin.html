@@ -30,6 +30,10 @@
                             <small class="text-muted d-block">{{usageAggregateSummary}}</small>
                         </div>
                         <div class="btn-group" role="group">
+                            <button type="button" id="composeNewsEmail" class="btn btn-sm btn-outline-primary" {{newsEmailAttrs}}>
+                                <i class="fa {{#if isPreparingNewsEmail}}fa-spinner fa-spin{{else}}fa-envelope{{/if}}"></i>
+                                Compose News Email
+                            </button>
                             <button type="button" id="refreshUsageCaches" class="btn btn-sm btn-outline-primary" {{refreshUsageAttrs}}>
                                 <i class="fa {{#if isRefreshingUsage}}fa-spinner fa-spin{{else}}fa-refresh{{/if}}"></i>
                                 Refresh Usage
@@ -46,6 +50,11 @@
                     {{#if usageRefreshMessage}}
                     <div class="alert {{usageRefreshAlertClass}} py-2" role="alert">
                         {{usageRefreshMessage}}
+                    </div>
+                    {{/if}}
+                    {{#if newsEmailMessage}}
+                    <div class="alert {{newsEmailAlertClass}} py-2" role="alert">
+                        {{newsEmailMessage}}
                     </div>
                     {{/if}}
                     <div class="admin-table-wrapper">

@@ -17,11 +17,15 @@ type CountAndFetchCursor = {
   countAsync: () => Promise<number>;
   fetchAsync: () => Promise<any[]>;
 };
+type FetchCursor = {
+  fetchAsync: () => Promise<any[]>;
+};
 
 type AdminMethodsDeps = {
   serverConsole: Logger;
   csvParser?: CsvParser | undefined;
   usersCollection: {
+    find: (selector: UnknownRecord, options?: UnknownRecord) => FetchCursor;
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
     removeAsync: (selector: UnknownRecord) => Promise<unknown>;
   };
@@ -84,6 +88,34 @@ type AdminMethodsDeps = {
 
 function trimString(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function addEmailCandidate(emailSet: Map<string, string>, candidate: unknown) {
+  const email = trimString(candidate);
+  if (!email.includes('@')) {
+    return;
+  }
+  const canonical = email.toLowerCase();
+  if (!emailSet.has(canonical)) {
+    emailSet.set(canonical, email);
+  }
+}
+
+function getUserAdminEmailCandidates(user: any) {
+  const candidates: unknown[] = [
+    user?.email_canonical,
+    user?.email_original,
+    user?.username,
+    user?.email,
+  ];
+
+  if (Array.isArray(user?.emails)) {
+    for (const emailEntry of user.emails) {
+      candidates.push(emailEntry?.address);
+    }
+  }
+
+  return candidates;
 }
 
 async function getUserDeletionBlockingReasons(deps: AdminMethodsDeps, targetUserId: string) {
@@ -186,6 +218,49 @@ async function upsertManagedUser(
 
 export function createAdminMethods(deps: AdminMethodsDeps) {
   return {
+    userAdminNewsEmailRecipients: async function(this: MethodContext) {
+      await deps.requireAdminUser(this.userId, 'Only admins can compose news emails');
+
+      const users = await deps.usersCollection.find(
+        {
+          $or: [
+            { email_canonical: { $regex: '@' } },
+            { email_original: { $regex: '@' } },
+            { 'emails.address': { $regex: '@' } },
+            { username: { $regex: '@' } },
+            { email: { $regex: '@' } },
+          ],
+        },
+        {
+          fields: {
+            username: 1,
+            email: 1,
+            email_canonical: 1,
+            email_original: 1,
+            emails: 1,
+          },
+          sort: { email_canonical: 1, username: 1 },
+        }
+      ).fetchAsync();
+
+      const emailSet = new Map<string, string>();
+      for (const user of users) {
+        for (const candidate of getUserAdminEmailCandidates(user)) {
+          addEmailCandidate(emailSet, candidate);
+        }
+      }
+
+      const emails = Array.from(emailSet.values()).sort((a, b) => a.localeCompare(b));
+      await deps.writeAuditLog('admin.newsEmailComposeRequested', this.userId || null, null, {
+        recipientCount: emails.length,
+      });
+
+      return {
+        emails,
+        count: emails.length,
+      };
+    },
+
     adminCreateOrUpdateUser: async function(this: MethodContext, rawUserName: string, newUserPassword: string) {
       check(rawUserName, String);
       check(newUserPassword, String);

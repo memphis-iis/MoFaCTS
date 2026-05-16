@@ -81,7 +81,8 @@ export function registerDdpRateLimits(deps: DdpRateLimitDeps) {
         'assignAccessors',
         'resolveUsersForTdf',
         'adminCreateOrUpdateUser',
-        'insertNewUsers'
+        'insertNewUsers',
+        'userAdminNewsEmailRecipients'
       ].includes(name);
     },
     userId(userId: string | null | undefined) { return !!userId; }

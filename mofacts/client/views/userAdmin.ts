@@ -17,6 +17,17 @@ const MeteorCompat = Meteor as typeof Meteor & { callAsync: (name: string, ...ar
 declare const UserDashboardCache: Mongo.Collection<any>;
 
 const USERS_PER_PAGE = 50;
+const NEWS_EMAIL_SUBJECT = 'MoFaCTS News';
+const NEWS_EMAIL_BODY = [
+  'Hello,',
+  '',
+  'Here is the latest MoFaCTS news:',
+  '',
+  '- ',
+  '',
+  'Best,',
+  'The MoFaCTS Team',
+].join('\n');
 
 type SortDirection = 'asc' | 'desc';
 
@@ -25,6 +36,15 @@ function getPagedUserIds(): string[] {
     .fetch()
     .map((doc: any) => doc.userId)
     .filter((id: unknown): id is string => typeof id === 'string' && id.trim().length > 0);
+}
+
+function buildNewsEmailMailto(emails: string[]): string {
+  const params = [
+    `bcc=${encodeURIComponent(emails.join(','))}`,
+    `subject=${encodeURIComponent(NEWS_EMAIL_SUBJECT)}`,
+    `body=${encodeURIComponent(NEWS_EMAIL_BODY)}`,
+  ].join('&');
+  return `mailto:?${params}`;
 }
 
 function getDisplayIdentifier(user: any): { displayIdentifier: string; hasIdentifierInvariantViolation: boolean } {
@@ -162,6 +182,9 @@ Template.userAdmin.onCreated(function(this: any) {
   this.isRefreshingUsage = new ReactiveVar(false);
   this.usageRefreshMessage = new ReactiveVar('');
   this.usageRefreshMessageType = new ReactiveVar('info');
+  this.isPreparingNewsEmail = new ReactiveVar(false);
+  this.newsEmailMessage = new ReactiveVar('');
+  this.newsEmailMessageType = new ReactiveVar('info');
   this.sortField = new ReactiveVar('identifier');
   this.sortDirection = new ReactiveVar('asc' as SortDirection);
   this.autoruns = [];
@@ -320,6 +343,27 @@ Template.userAdmin.helpers({
     return isRefreshing ? { disabled: true } : {};
   },
 
+  isPreparingNewsEmail: function() {
+    return (Template.instance() as any).isPreparingNewsEmail.get();
+  },
+
+  newsEmailMessage: function() {
+    return (Template.instance() as any).newsEmailMessage.get();
+  },
+
+  newsEmailAlertClass: function() {
+    const messageType = (Template.instance() as any).newsEmailMessageType.get();
+    if (messageType === 'success') return 'alert-success';
+    if (messageType === 'warning') return 'alert-warning';
+    if (messageType === 'danger') return 'alert-danger';
+    return 'alert-info';
+  },
+
+  newsEmailAttrs: function() {
+    const isPreparing = (Template.instance() as any).isPreparingNewsEmail.get();
+    return isPreparing ? { disabled: true } : {};
+  },
+
   sortIndicator: function(field: string) {
     const instance = Template.instance() as any;
     if (instance.sortField.get() !== field) {
@@ -403,6 +447,7 @@ Template.userAdmin.events({
       instance.filter.set(value);
       instance.currentPage.set(0); // Reset to first page on filter change
       instance.usageRefreshMessage.set('');
+      instance.newsEmailMessage.set('');
     }, 300);
   },
 
@@ -426,6 +471,7 @@ Template.userAdmin.events({
     if (current > 0) {
       instance.currentPage.set(current - 1);
       instance.usageRefreshMessage.set('');
+      instance.newsEmailMessage.set('');
     }
   },
 
@@ -440,6 +486,36 @@ Template.userAdmin.events({
     if (current < totalPages - 1) {
       instance.currentPage.set(current + 1);
       instance.usageRefreshMessage.set('');
+      instance.newsEmailMessage.set('');
+    }
+  },
+
+  'click #composeNewsEmail': async function(event: any, instance: any) {
+    event.preventDefault();
+    instance.isPreparingNewsEmail.set(true);
+    instance.newsEmailMessageType.set('info');
+    instance.newsEmailMessage.set('Preparing MoFaCTS news email recipients...');
+
+    try {
+      const result = await MeteorCompat.callAsync('userAdminNewsEmailRecipients');
+      const emails = Array.isArray(result?.emails)
+        ? result.emails.filter((email: unknown): email is string => typeof email === 'string' && email.includes('@'))
+        : [];
+
+      if (emails.length === 0) {
+        instance.newsEmailMessageType.set('warning');
+        instance.newsEmailMessage.set('No user email addresses were found.');
+        return;
+      }
+
+      window.location.href = buildNewsEmailMailto(emails);
+      instance.newsEmailMessageType.set('success');
+      instance.newsEmailMessage.set(`Opened MoFaCTS news email compose with ${emails.length} BCC recipient${emails.length === 1 ? '' : 's'}.`);
+    } catch (error: unknown) {
+      instance.newsEmailMessageType.set('danger');
+      instance.newsEmailMessage.set('Failed to prepare news email recipients: ' + getErrorMessage(error));
+    } finally {
+      instance.isPreparingNewsEmail.set(false);
     }
   },
 
