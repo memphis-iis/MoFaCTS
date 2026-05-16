@@ -168,8 +168,8 @@ export const DELIVERY_SETTINGS_FIELD_REGISTRY: DeliverySettingRegistry = {
   },
   optimalThreshold: {
     appliesToUnitTypes: ['learning'],
-    authoring: { type: 'number', default: 0.9, editor: { gridColumns: 4 } },
-    runtime: { default: 0.9, normalize: 'number' },
+    authoring: { type: 'number', default: 0.8, editor: { gridColumns: 4 } },
+    runtime: { default: 0.8, normalize: 'number' },
     lifecycle: { status: 'supported' },
     tooltip: {
       brief: 'Target recall probability for adaptive scheduling.',

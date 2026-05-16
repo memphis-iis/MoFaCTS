@@ -60,6 +60,10 @@ type LearnerTdfFieldDefinition = {
   max?: number;
   step?: number;
   unit?: string;
+  displayScale?: number;
+  displaySuffix?: string;
+  lowerLabel?: string;
+  upperLabel?: string;
   appliesToUnitTypes?: readonly TdfUnitType[];
 };
 
@@ -253,6 +257,7 @@ function getAudioPromptOptions() {
 }
 
 const LEARNER_TDF_UNIT_DELIVERY_SETTING_KEYS = Object.freeze([
+  'optimalThreshold',
   'fontsize',
   'studyFirst',
 ] as const);
@@ -292,6 +297,21 @@ export const LEARNER_TDF_FIELD_DEFINITIONS: readonly LearnerTdfFieldDefinition[]
   ...LEARNER_TDF_UNIT_DISPLAY_SETTING_KEYS.map((key) => uiFieldDefinition('unit', key)),
   ...LEARNER_TDF_UNIT_DELIVERY_SETTING_KEYS
     .map((key) => deliveryFieldDefinition('unit', key))
+    .map((field) => field?.id === 'unit[].deliverySettings.optimalThreshold'
+      ? {
+        ...field,
+        label: 'Optimal threshold',
+        control: 'slider' as const,
+        min: 0.7,
+        max: 0.9,
+        step: 0.01,
+        defaultValue: 0.8,
+        displayScale: 100,
+        displaySuffix: '%',
+        lowerLabel: 'More new items',
+        upperLabel: 'Mastery first',
+      }
+      : field)
     .filter((field): field is LearnerTdfFieldDefinition => Boolean(field))
 ];
 
@@ -449,7 +469,15 @@ function getBaseSetSpecValue(tdf: unknown, key: string): unknown {
 
 function normalizeDeliverySettingValue(key: string, value: unknown, errors?: string[], path?: string): unknown {
   if (DELIVERY_SETTINGS_LEARNER_CONFIGURABLE_KEYS.includes(key)) {
-    return normalizeRegistryDeliverySettingValue(key, value);
+    const normalizedValue = normalizeRegistryDeliverySettingValue(key, value);
+    if (key === 'optimalThreshold') {
+      const threshold = Number(normalizedValue);
+      if (!Number.isFinite(threshold) || threshold < 0.7 || threshold > 0.9) {
+        errors?.push(`${path || 'deliverySettings.optimalThreshold'} must be between 70% and 90%`);
+        return undefined;
+      }
+    }
+    return normalizedValue;
   }
   if (DELIVERY_DISPLAY_SETTINGS_LEARNER_CONFIGURABLE_KEYS.includes(key)) {
     return normalizeDeliveryDisplaySettingValue(path || `deliverySettings.${key}`, value, errors || []);

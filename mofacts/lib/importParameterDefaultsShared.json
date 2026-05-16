@@ -6,7 +6,7 @@
     "skipstudy": "false",
     "reviewstudy": "5000",
     "correctprompt": "500",
-    "optimalThreshold": "0.9",
+    "optimalThreshold": "0.8",
     "practiceseconds": "0",
     "fontsize": "24"
   },

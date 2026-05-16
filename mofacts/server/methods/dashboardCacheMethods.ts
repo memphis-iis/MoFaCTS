@@ -44,9 +44,7 @@ export function computeCacheStats(
     totalTimeMinutes: 0,
     itemsPracticedCount: 0,
     totalSessions: 0,
-    recentOutcomes: [],
     overallAccuracy: 0,
-    last10Accuracy: 0,
     firstPracticeDate: null,
     lastPracticeDate: null,
     lastProcessedHistoryId: null,
@@ -83,9 +81,6 @@ export function computeCacheStats(
     stats.lastProcessedTimestamp = record.recordedServerTime ?? null;
   }
 
-  const recentTrials = history.slice(-10);
-  stats.recentOutcomes = recentTrials.map((trial) => trial.outcome ?? '');
-
   stats.itemsPracticedCount = uniqueItems.size;
   stats.totalSessions = sessions.size;
   stats.totalTimeMinutes = Number((stats.totalTimeMs / 60000).toFixed(1));
@@ -93,11 +88,6 @@ export function computeCacheStats(
   const totalAnswered = stats.correctTrials + stats.incorrectTrials;
   stats.overallAccuracy = totalAnswered > 0
     ? Number(((stats.correctTrials / totalAnswered) * 100).toFixed(1))
-    : 0;
-
-  const recentCorrect = stats.recentOutcomes.filter((outcome: string) => outcome === 'correct').length;
-  stats.last10Accuracy = stats.recentOutcomes.length > 0
-    ? Number(((recentCorrect / stats.recentOutcomes.length) * 100).toFixed(1))
     : 0;
 
   return stats;

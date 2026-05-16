@@ -29,7 +29,6 @@
                     <col class="learning-dashboard-col-stat">
                     <col class="learning-dashboard-col-stat">
                     <col class="learning-dashboard-col-stat">
-                    <col class="learning-dashboard-col-stat">
                     <col class="learning-dashboard-col-last-practice">
                     <col class="learning-dashboard-col-action">
                   </colgroup>
@@ -39,7 +38,6 @@
                       <th scope="col" class="text-center">Features</th>
                       <th scope="col" class="text-center">Total Trials</th>
                       <th scope="col" class="text-center">Overall Accuracy</th>
-                      <th scope="col" class="text-center">Last 10 Accuracy</th>
                       <th scope="col" class="text-center">Time (min)</th>
                       <th scope="col" class="text-center">Items Practiced</th>
                       <th scope="col" class="text-center">Days with Sessions</th>
@@ -54,7 +52,7 @@
                           <span class="responsive-table-label">Lesson</span>
                           <div class="learning-dashboard-cell__value learning-dashboard-lesson">
                             <div class="d-flex align-items-center gap-2 flex-wrap">
-                              <strong class="learning-dashboard-lesson-title" title="{{displayLabel}}">{{displayLabel}}</strong>
+                              <span class="learning-dashboard-lesson-title" title="{{displayLabel}}">{{displayLabel}}</span>
                               {{#if this.conditions}}
                                 <select class="form-select form-select-sm condition-tdf-selector" style="width:auto;min-width:14rem;"
                                   data-roottdfid="{{this.TDFId}}">
@@ -90,10 +88,6 @@
                         <td class="learning-dashboard-cell learning-dashboard-cell--stat text-center" data-label="Overall Accuracy">
                           <span class="responsive-table-label">Overall Accuracy</span>
                           <span class="learning-dashboard-cell__value">{{#if this.isUsed}}{{this.overallAccuracy}}%{{else}}-{{/if}}</span>
-                        </td>
-                        <td class="learning-dashboard-cell learning-dashboard-cell--stat text-center" data-label="Last 10 Accuracy">
-                          <span class="responsive-table-label">Last 10 Accuracy</span>
-                          <span class="learning-dashboard-cell__value">{{#if this.isUsed}}{{this.last10Accuracy}}%{{else}}-{{/if}}</span>
                         </td>
                         <td class="learning-dashboard-cell learning-dashboard-cell--stat text-center" data-label="Time (min)">
                           <span class="responsive-table-label">Time (min)</span>
@@ -152,7 +146,7 @@
                       </tr>
                       {{#with configForTableRow}}
                         <tr class="learner-config-row">
-                          <td colspan="10">
+                          <td colspan="9">
                             {{> learnerTdfConfigPanel}}
                           </td>
                         </tr>
@@ -174,7 +168,7 @@
             <div class="learning-dashboard-cards learning-dashboard-content-ready">
               {{#each allTdfsList}}
                 <div class="learning-dashboard-card border rounded p-3 mb-3 shadow-sm {{#unless this.isUsed}}lesson-card-unused{{/unless}}">
-                  <div class="fw-bold learning-dashboard-card-title">
+                  <div class="learning-dashboard-card-title">
                     {{displayLabel}}
                     {{#if this.conditions}}
                       <select class="form-select form-select-sm mt-1 condition-tdf-selector"
@@ -274,10 +268,6 @@
                           <span class="fw-bold">{{this.totalTrials}}</span>
                         </div>
                         <div class="d-flex justify-content-between py-1 border-bottom">
-                          <span>Last 10 Accuracy:</span>
-                          <span class="fw-bold">{{this.last10Accuracy}}%</span>
-                        </div>
-                        <div class="d-flex justify-content-between py-1 border-bottom">
                           <span>Time Spent:</span>
                           <span class="fw-bold">{{this.totalTimeMinutes}} min</span>
                         </div>
@@ -353,6 +343,12 @@
 
                   {{#if this.isSlider}}
                     <input class="form-range learner-config-slider" type="range" min="{{this.inputMin}}" max="{{this.inputMax}}" step="{{this.inputStep}}" value="{{this.value}}" data-config-field="{{this.id}}" data-value-suffix="{{this.displaySuffix}}">
+                    {{#if this.lowerLabel}}
+                      <div class="learner-config-slider-labels">
+                        <span>{{this.lowerLabel}}</span>
+                        <span>{{this.upperLabel}}</span>
+                      </div>
+                    {{/if}}
                   {{/if}}
 
                   {{#if this.isNumber}}

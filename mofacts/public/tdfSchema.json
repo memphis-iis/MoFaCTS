@@ -1112,7 +1112,7 @@
                               "grid_columns": 4
                             },
                             "type": "number",
-                            "default": 0.9,
+                            "default": 0.8,
                             "x-appliesToUnitTypes": [
                               "learning"
                             ]
@@ -1849,7 +1849,7 @@
                                 "grid_columns": 4
                               },
                               "type": "number",
-                              "default": 0.9,
+                              "default": 0.8,
                               "x-appliesToUnitTypes": [
                                 "learning"
                               ]
@@ -3215,7 +3215,7 @@
                           "grid_columns": 4
                         },
                         "type": "number",
-                        "default": 0.9,
+                        "default": 0.8,
                         "x-appliesToUnitTypes": [
                           "learning"
                         ]
@@ -3952,7 +3952,7 @@
                             "grid_columns": 4
                           },
                           "type": "number",
-                          "default": 0.9,
+                          "default": 0.8,
                           "x-appliesToUnitTypes": [
                             "learning"
                           ]
@@ -5073,7 +5073,7 @@
                 "grid_columns": 4
               },
               "type": "number",
-              "default": 0.9,
+              "default": 0.8,
               "x-appliesToUnitTypes": [
                 "learning"
               ]

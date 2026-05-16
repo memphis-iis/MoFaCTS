@@ -78,6 +78,7 @@ const EMPTY_CONFIG_STATE: LearnerConfigState = {
 
 const LEARNER_CONFIG_CLOSE_FALLBACK_MS = 200;
 const LEARNER_CONFIG_AUTOSAVE_DELAY_MS = 500;
+const LEARNER_CONFIG_SLIDER_DISPLAY_SESSION_KEY = 'learnerConfigSliderDisplayValues';
 
 function parseCssDurationMs(rawValue: string | null | undefined) {
   const value = String(rawValue || '').trim();
@@ -185,6 +186,7 @@ function closeLearnerConfigPanel(instance: any) {
   clearLearnerConfigCloseTimer(instance);
   instance.learnerConfigState.set({ ...current, closing: true });
   instance.learnerConfigCloseTimer = setTimeout(() => {
+    clearLearnerConfigSliderDisplayValues(current.tdfId);
     instance.learnerConfigState.set(EMPTY_CONFIG_STATE);
     instance.learnerConfigCloseTimer = null;
   }, getLearnerConfigCloseDurationMs());
@@ -347,6 +349,70 @@ function isFieldCustomized(field: any, state: LearnerConfigState) {
   return getEffectiveForField(field, state) !== getDefaultForField(field, state);
 }
 
+function getFieldDisplayScale(field: any) {
+  const scale = Number(field.displayScale);
+  return Number.isFinite(scale) && scale > 0 ? scale : 1;
+}
+
+function toFieldInputValue(field: any, value: unknown) {
+  const numeric = Number(value);
+  if (Number.isFinite(numeric) && getFieldDisplayScale(field) !== 1) {
+    return Math.round(numeric * getFieldDisplayScale(field) * 1000) / 1000;
+  }
+  return value;
+}
+
+function fromFieldInputValue(field: any, value: unknown) {
+  const numeric = Number(value);
+  if (Number.isFinite(numeric) && getFieldDisplayScale(field) !== 1) {
+    return Math.round((numeric / getFieldDisplayScale(field)) * 1000) / 1000;
+  }
+  return numeric;
+}
+
+function appendValueSuffix(value: unknown, suffix: string) {
+  return suffix === '%' ? `${value}%` : `${value}${suffix ? ` ${suffix}` : ''}`;
+}
+
+function getLearnerConfigSliderDisplayKey(tdfId: string | null | undefined, fieldId: string) {
+  return `${tdfId || ''}:${fieldId}`;
+}
+
+function getLearnerConfigSliderDisplayValues(): Record<string, string> {
+  const values = Session.get(LEARNER_CONFIG_SLIDER_DISPLAY_SESSION_KEY);
+  return values && typeof values === 'object' ? values : {};
+}
+
+function setLearnerConfigSliderDisplayValue(tdfId: string | null | undefined, fieldId: string, displayValue: string) {
+  if (!tdfId || !fieldId) {
+    return;
+  }
+  Session.set(LEARNER_CONFIG_SLIDER_DISPLAY_SESSION_KEY, {
+    ...getLearnerConfigSliderDisplayValues(),
+    [getLearnerConfigSliderDisplayKey(tdfId, fieldId)]: displayValue,
+  });
+}
+
+function clearLearnerConfigSliderDisplayValues(tdfId: string | null | undefined) {
+  if (!tdfId) {
+    return;
+  }
+  const nextValues = { ...getLearnerConfigSliderDisplayValues() };
+  const prefix = `${tdfId}:`;
+  for (const key of Object.keys(nextValues)) {
+    if (key.startsWith(prefix)) {
+      delete nextValues[key];
+    }
+  }
+  Session.set(LEARNER_CONFIG_SLIDER_DISPLAY_SESSION_KEY, nextValues);
+}
+
+function formatFieldDisplayValue(field: any, value: unknown) {
+  const suffix = field.displaySuffix || field.unit || '';
+  const inputValue = toFieldInputValue(field, value);
+  return appendValueSuffix(inputValue, suffix);
+}
+
 function buildConfigPatchFromForm(container: JQuery<HTMLElement>, state: LearnerConfigState) {
   const patch: any = { setspec: {}, unit: {} };
   const learningUnitIndexes = getLearningUnitIndexes(state.content);
@@ -359,7 +425,9 @@ function buildConfigPatchFromForm(container: JQuery<HTMLElement>, state: Learner
     let value: string | number | boolean;
     if (field.control === 'toggle') {
       value = Boolean((input.get(0) as HTMLInputElement).checked);
-    } else if (field.control === 'number' || field.control === 'slider' || field.id === 'setspec.audioInputSensitivity') {
+    } else if (field.control === 'slider') {
+      value = fromFieldInputValue(field, input.val()) as number;
+    } else if (field.control === 'number' || field.id === 'setspec.audioInputSensitivity') {
       value = Number(input.val());
     } else {
       value = String(input.val());
@@ -486,6 +554,7 @@ Template.learnerTdfConfigPanel.helpers({
   },
 
   settingFields() {
+    const sliderDisplayValues = getLearnerConfigSliderDisplayValues();
     return getSettingFields(this as LearnerConfigState).slice().sort((left, right) =>
       left.label.localeCompare(right.label, undefined, {
         numeric: true,
@@ -494,10 +563,24 @@ Template.learnerTdfConfigPanel.helpers({
     ).map((field) => {
       const effectiveValue = getEffectiveForField(field, this as LearnerConfigState);
       const defaultValue = getDefaultForField(field, this as LearnerConfigState);
-      const value = field.control === 'select' ? String(effectiveValue) : effectiveValue;
-      const defaultInputValue = field.control === 'select' ? String(defaultValue) : defaultValue;
-      const displayValue = field.unit ? `${value} ${field.unit}` : String(value);
-      const displaySuffix = field.unit;
+      const value = field.control === 'select'
+        ? String(effectiveValue)
+        : field.control === 'slider'
+          ? toFieldInputValue(field, effectiveValue)
+          : effectiveValue;
+      const defaultInputValue = field.control === 'select'
+        ? String(defaultValue)
+        : field.control === 'slider'
+          ? toFieldInputValue(field, defaultValue)
+          : defaultValue;
+      const displayValue = field.control === 'slider'
+        ? sliderDisplayValues[getLearnerConfigSliderDisplayKey(this.tdfId, field.id)]
+          || formatFieldDisplayValue(field, effectiveValue)
+        : field.unit
+          ? `${value} ${field.unit}`
+          : String(value);
+      const displaySuffix = field.displaySuffix || field.unit;
+      const displayScale = getFieldDisplayScale(field);
       return {
         ...field,
         value,
@@ -510,9 +593,10 @@ Template.learnerTdfConfigPanel.helpers({
           selected: option.value === String(value)
         })),
         customized: isFieldCustomized(field, this as LearnerConfigState),
-        inputMin: field.min,
-        inputMax: field.max,
-        inputStep: field.step,
+        inputMax: field.max === undefined ? undefined : toFieldInputValue(field, field.max),
+        inputMin: field.min === undefined ? undefined : toFieldInputValue(field, field.min),
+        inputStep: field.step === undefined ? undefined : toFieldInputValue(field, field.step),
+        displayScale,
         isToggle: field.control === 'toggle',
         isSelect: field.control === 'select',
         isSlider: field.control === 'slider',
@@ -643,6 +727,7 @@ Template.learningDashboard.events({
       return;
     }
 
+    clearLearnerConfigSliderDisplayValues(existingState.tdfId);
     clearLearnerConfigCloseTimer(instance);
     instance.learnerConfigState.set({
       ...EMPTY_CONFIG_STATE,
@@ -703,16 +788,23 @@ Template.learningDashboard.events({
     const valueTarget = container.find(`[data-config-value-for="${fieldId}"]`);
     if (valueTarget.length) {
       const suffix = input.data('value-suffix') || '';
-      valueTarget.text(`${input.val()}${suffix ? ` ${suffix}` : ''}`);
+      const state = instance.learnerConfigState.get() as LearnerConfigState;
+      setLearnerConfigSliderDisplayValue(state.tdfId, fieldId, appendValueSuffix(input.val(), suffix));
     }
     scheduleLearnerConfigAutosave(instance, button.closest('.learner-config-form'));
   },
 
   'change [data-config-field]': function(_event: any, instance: any) {
+    if ($(_event.currentTarget).hasClass('learner-config-slider')) {
+      return;
+    }
     scheduleLearnerConfigAutosave(instance, $(_event.currentTarget).closest('.learner-config-form'));
   },
 
   'input [data-config-field]': function(_event: any, instance: any) {
+    if ($(_event.currentTarget).hasClass('learner-config-slider')) {
+      return;
+    }
     scheduleLearnerConfigAutosave(instance, $(_event.currentTarget).closest('.learner-config-form'));
   },
 
@@ -720,7 +812,8 @@ Template.learningDashboard.events({
     const input = $(event.currentTarget);
     const fieldId = input.data('config-field');
     const suffix = input.data('value-suffix') || '';
-    input.closest('.learner-config-field').find(`[data-config-value-for="${fieldId}"]`).text(`${input.val()}${suffix ? ` ${suffix}` : ''}`);
+    const state = instance.learnerConfigState.get() as LearnerConfigState;
+    setLearnerConfigSliderDisplayValue(state.tdfId, fieldId, appendValueSuffix(input.val(), suffix));
     scheduleLearnerConfigAutosave(instance, input.closest('.learner-config-form'));
   },
 
@@ -832,7 +925,6 @@ Template.learningDashboard.rendered = async function(this: any) {
         statsMap.set(TDFId, {
           totalTrials: stats.totalTrials,
           overallAccuracy: stats.overallAccuracy,
-          last10Accuracy: stats.last10Accuracy,
           totalTimeMinutes: stats.totalTimeMinutes,
           itemsPracticed: practicedCount,
           lastPracticeDate: stats.lastPracticeDate
@@ -973,7 +1065,6 @@ Template.learningDashboard.rendered = async function(this: any) {
         // Add stats if available (inline instead of second pass)
         totalTrials: stats?.totalTrials,
         overallAccuracy: stats?.overallAccuracy,
-        last10Accuracy: stats?.last10Accuracy,
         totalTimeMinutes: stats?.totalTimeMinutes,
         itemsPracticed: stats?.itemsPracticed,
         lastPracticeDate: stats?.lastPracticeDate,

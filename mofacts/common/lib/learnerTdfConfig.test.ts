@@ -21,6 +21,7 @@ describe('learner TDF config', function() {
             audioInputSensitivity: 60,
           },
           deliverySettings: {
+            optimalThreshold: 0.8,
             drill: 25000,
             displayPerformance: false,
             displayTimeoutBar: false
@@ -30,6 +31,7 @@ describe('learner TDF config', function() {
               unitname: 'Intro',
               learningsession: {},
               deliverySettings: {
+                optimalThreshold: 0.8,
                 drill: 30000,
                 reviewstudy: 6000,
                 correctprompt: 1000,
@@ -42,6 +44,7 @@ describe('learner TDF config', function() {
               unitname: 'Practice',
               learningsession: {},
               deliverySettings: {
+                optimalThreshold: 0.8,
                 drill: 45000,
                 reviewstudy: 8000,
                 correctprompt: 1500,
@@ -83,6 +86,7 @@ describe('learner TDF config', function() {
       unit: {
         '1': {
           deliverySettings: {
+            optimalThreshold: 0.85,
             drill: 60000,
             reviewstudy: 9000,
             studyFirst: 1
@@ -98,6 +102,7 @@ describe('learner TDF config', function() {
     expect(firstUnit).to.not.equal(undefined);
     expect(secondUnit).to.not.equal(undefined);
     expect(firstUnit!.deliverySettings.drill).to.equal(30000);
+    expect(secondUnit!.deliverySettings.optimalThreshold).to.equal(0.85);
     expect(secondUnit!.deliverySettings.drill).to.equal(60000);
     expect(secondUnit!.deliverySettings.reviewstudy).to.equal(9000);
     expect(secondUnit!.deliverySettings.studyFirst).to.equal(1);
@@ -148,6 +153,7 @@ describe('learner TDF config', function() {
       'unit[].deliverySettings.displayPerformance',
       'unit[].deliverySettings.stimuliPosition',
       'unit[].deliverySettings.displayUserAnswerInFeedback',
+      'unit[].deliverySettings.optimalThreshold',
       'unit[].deliverySettings.fontsize',
       'unit[].deliverySettings.studyFirst'
     ]);
@@ -171,6 +177,19 @@ describe('learner TDF config', function() {
       'false',
       'onCorrect'
     ]);
+
+    const optimalThresholdField = LEARNER_TDF_FIELD_DEFINITIONS.find((definition) =>
+      definition.id === 'unit[].deliverySettings.optimalThreshold'
+    );
+    expect(optimalThresholdField?.control).to.equal('slider');
+    expect(optimalThresholdField?.defaultValue).to.equal(0.8);
+    expect(optimalThresholdField?.min).to.equal(0.7);
+    expect(optimalThresholdField?.max).to.equal(0.9);
+    expect(optimalThresholdField?.step).to.equal(0.01);
+    expect(optimalThresholdField?.displayScale).to.equal(100);
+    expect(optimalThresholdField?.displaySuffix).to.equal('%');
+    expect(optimalThresholdField?.lowerLabel).to.equal('More new items');
+    expect(optimalThresholdField?.upperLabel).to.equal('Mastery first');
   });
 
   it('makes unit delivery settings configurable even when overrides are sparse', function() {
@@ -209,11 +228,12 @@ describe('learner TDF config', function() {
         '0': {
           deliverySettings: {
             madeUpTiming: 5,
+            optimalThreshold: 0.95,
             purestudy: -1
           }
         }
       }
-    })).to.throw('setspec.shuffleclusters is not learner configurable');
+    })).to.throw('unit.0.deliverySettings.optimalThreshold must be between 70% and 90%');
   });
 
   it('prunes values that match the current TDF defaults', function() {

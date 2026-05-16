@@ -556,7 +556,10 @@ async function modelUnitEngine(): Promise<any> {
         const parameters = stim.parameter;
         let thresholdCeiling = parameters[1];
         if (!thresholdCeiling) {
-          thresholdCeiling = currentDeliverySettings.optimalThreshold || 0.90;
+          thresholdCeiling = currentDeliverySettings.optimalThreshold;
+          if (thresholdCeiling === undefined || thresholdCeiling === null || thresholdCeiling === '') {
+            throw new Error('Missing deliverySettings.optimalThreshold while selecting a card below optimal probability.');
+          }
         }
         if (stim.probabilityEstimate > currentMax && stim.probabilityEstimate < thresholdCeiling) {
           currentMax = stim.probabilityEstimate;

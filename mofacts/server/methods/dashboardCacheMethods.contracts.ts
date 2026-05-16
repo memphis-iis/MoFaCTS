@@ -26,9 +26,7 @@ export interface DashboardTdfStats {
   totalTimeMinutes: number;
   itemsPracticedCount: number;
   totalSessions: number;
-  recentOutcomes: DashboardOutcome[];
   overallAccuracy: number;
-  last10Accuracy: number;
   firstPracticeDate: Date | null;
   lastPracticeDate: Date | null;
   lastProcessedHistoryId: string | null;
