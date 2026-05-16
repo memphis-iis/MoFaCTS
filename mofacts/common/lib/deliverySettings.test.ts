@@ -1,4 +1,5 @@
 import { expect } from 'chai';
+import { DELIVERY_DISPLAY_SETTINGS_RUNTIME_DEFAULTS } from '../fieldRegistrySections';
 import {
   migrateLearnerConfigDeliverySettings,
   migrateTdfDeliverySettings,
@@ -285,7 +286,7 @@ describe('deliverySettings migration', function() {
     });
 
     const tutor = (result.tdf as any).tdfs.tutor;
-    expect(tutor.deliverySettings.choiceButtonCols).to.equal(2);
+    expect(tutor.deliverySettings.choiceButtonCols).to.equal(DELIVERY_DISPLAY_SETTINGS_RUNTIME_DEFAULTS.choiceButtonCols);
     expect(result.warnings.some((warning) => warning.message.includes('Invalid value'))).to.equal(true);
   });
 
