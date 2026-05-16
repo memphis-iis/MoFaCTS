@@ -182,12 +182,16 @@
       return false;
     }
 
-    const blockRect = imageBlockElement.getBoundingClientRect();
+    const blockStyle = window.getComputedStyle(imageBlockElement);
+    const horizontalPadding = parseFloat(blockStyle.paddingLeft || '0') + parseFloat(blockStyle.paddingRight || '0');
+    const verticalPadding = parseFloat(blockStyle.paddingTop || '0') + parseFloat(blockStyle.paddingBottom || '0');
+    const availableBlockWidth = imageBlockElement.clientWidth - horizontalPadding;
+    const availableBlockHeight = imageBlockElement.clientHeight - verticalPadding;
     const attributionHeight = needsAttributedImageLayout
       ? attributionElement.getBoundingClientRect().height
       : 0;
 
-    if (!blockRect.height || !blockRect.width || (needsAttributedImageLayout && !attributionHeight)) {
+    if (!availableBlockHeight || !availableBlockWidth || (needsAttributedImageLayout && !attributionHeight)) {
       return false;
     }
 
@@ -198,8 +202,8 @@
       return false;
     }
 
-    const availableWidth = blockRect.width;
-    const availableHeight = blockRect.height - attributionHeight - (needsAttributedImageLayout ? attributionGapPx : 0);
+    const availableWidth = availableBlockWidth;
+    const availableHeight = availableBlockHeight - attributionHeight - (needsAttributedImageLayout ? attributionGapPx : 0);
 
     if (availableWidth <= 0 || availableHeight <= 0) {
       return false;
@@ -739,6 +743,12 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    padding: 1em;
+    border: 1px solid var(--secondary-color);
+    border-radius: var(--border-radius-lg);
+    background: var(--stimuli-box-color);
+    box-sizing: border-box;
+    overflow: hidden;
     width: 100%;
     height: 100%;
     min-height: 0;
