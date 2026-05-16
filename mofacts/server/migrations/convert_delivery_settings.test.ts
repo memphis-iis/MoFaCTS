@@ -49,8 +49,11 @@ function createMemoryCollection<T extends MutableDoc>(docs: T[]) {
   const updates: Array<{ selector: Record<string, unknown>; modifier: Record<string, any> }> = [];
   return {
     updates,
-    find: () => ({
-      fetchAsync: async () => docs,
+    find: (_selector: Record<string, unknown>, options?: Record<string, any>) => ({
+      fetchAsync: async () => {
+        const limit = Number(options?.limit);
+        return Number.isInteger(limit) && limit > 0 ? docs.slice(0, limit) : docs;
+      },
     }),
     updateAsync: async (selector: Record<string, unknown>, modifier: Record<string, any>) => {
       updates.push({ selector, modifier });
@@ -172,6 +175,71 @@ describe('delivery settings production migration', function() {
 
     expect(error?.message).to.include('requires confirmWrite');
     expect(tdfs.updates).to.have.length(0);
+  });
+
+  it('applies the scan limit to dashboard cache documents as well as TDF documents', async function() {
+    const tdfs = createMemoryCollection([
+      { _id: 'tdf-a', content: { tdfs: { tutor: withOldFields({ setspec: {} }, { drill: '30000' }) } } },
+      { _id: 'tdf-b', content: { tdfs: { tutor: withOldFields({ setspec: {} }, { drill: '45000' }) } } },
+    ]);
+    const dashboardCache = createMemoryCollection([
+      {
+        _id: 'cache-a',
+        learnerTdfConfigs: {
+          'tdf-a': {
+            overrides: withOldFields({}, { drill: '30000' }),
+          },
+        },
+      },
+      {
+        _id: 'cache-b',
+        learnerTdfConfigs: {
+          'tdf-b': {
+            overrides: withOldFields({}, { drill: '45000' }),
+          },
+        },
+      },
+    ]);
+
+    const report = await convertDeliverySettingsInCollections(
+      { Tdfs: tdfs, UserDashboardCache: dashboardCache },
+      { limit: 1 }
+    );
+
+    expect(report.scanned).to.equal(1);
+    expect(report.cacheScanned).to.equal(1);
+    expect(report.docs.map((doc) => doc._id)).to.deep.equal(['tdf-a']);
+    expect(report.cacheDocs.map((doc) => doc._id)).to.deep.equal(['cache-a']);
+  });
+
+  it('rejects limited write mode to avoid partially migrated database state', async function() {
+    const tdfs = createMemoryCollection([
+      { _id: 'tdf-a', content: { tdfs: { tutor: withOldFields({ setspec: {} }, { drill: '30000' }) } } },
+    ]);
+    const dashboardCache = createMemoryCollection([
+      {
+        _id: 'cache-a',
+        learnerTdfConfigs: {
+          'tdf-a': {
+            overrides: withOldFields({}, { drill: '30000' }),
+          },
+        },
+      },
+    ]);
+
+    let error: Error | null = null;
+    try {
+      await convertDeliverySettingsInCollections(
+        { Tdfs: tdfs, UserDashboardCache: dashboardCache },
+        { dryRun: false, confirmWrite: 'convert-delivery-settings', limit: 1 }
+      );
+    } catch (caught) {
+      error = caught as Error;
+    }
+
+    expect(error?.message).to.include('write mode does not support limit');
+    expect(tdfs.updates).to.have.length(0);
+    expect(dashboardCache.updates).to.have.length(0);
   });
 });
 

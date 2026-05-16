@@ -131,6 +131,10 @@ export async function convertDeliverySettingsInCollections(
     throw new Error('convertDeliverySettingsInDatabase write mode requires confirmWrite: "convert-delivery-settings"');
   }
 
+  if (!dryRun && options.limit && options.limit > 0) {
+    throw new Error('convertDeliverySettingsInDatabase write mode does not support limit. Back up the database, dry-run first, then run the full confirmed migration.');
+  }
+
   const queryOptions: Record<string, unknown> = {
     fields: {
       _id: 1,
@@ -199,9 +203,17 @@ export async function convertDeliverySettingsInCollections(
     }
   }
 
+  const cacheQueryOptions: Record<string, unknown> = {
+    fields: { _id: 1, userId: 1, learnerTdfConfigs: 1 },
+  };
+
+  if (options.limit && options.limit > 0) {
+    cacheQueryOptions.limit = options.limit;
+  }
+
   const cacheDocs = await collections.UserDashboardCache.find(
     { learnerTdfConfigs: { $exists: true } },
-    { fields: { _id: 1, userId: 1, learnerTdfConfigs: 1 } },
+    cacheQueryOptions,
   ).fetchAsync() as UserDashboardCacheDocument[];
   report.cacheScanned = cacheDocs.length;
 
