@@ -5,6 +5,7 @@ const SUPPORTED_DISPLAY_FIELDS = Object.freeze([
   'imgSrc',
   'audioSrc',
   'videoSrc',
+  'h5p',
   'attribution',
 ]);
 

@@ -6,6 +6,11 @@ describe('display field subsets', function() {
     text: 'глаз - ',
     imgSrc: '12.jpg',
     audioSrc: 'eye_audio.mp3',
+    h5p: {
+      sourceType: 'external-embed',
+      embedUrl: 'https://h5p.example/embed/1',
+      completionPolicy: 'manual-continue',
+    },
     attribution: { sourceName: 'Source' },
   };
 
@@ -18,6 +23,13 @@ describe('display field subsets', function() {
     expect(applyDisplayFieldSubset(display, { studyOnlyFields: 'imgSrc,audioSrc' }, 's')).to.deep.equal({
       imgSrc: '12.jpg',
       audioSrc: 'eye_audio.mp3',
+    });
+  });
+
+  it('preserves h5p only when the subset includes it', function() {
+    expect(applyDisplayFieldSubset(display, { drillFields: 'h5p,text' }, 'd')).to.deep.equal({
+      h5p: display.h5p,
+      text: 'глаз - ',
     });
   });
 

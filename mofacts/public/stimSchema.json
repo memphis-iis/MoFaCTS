@@ -154,6 +154,61 @@
                               "grid_columns": 12
                             }
                           },
+                          "h5p": {
+                            "title": "H5P display",
+                            "description": "H5P activity metadata for learner display. Phase 1 supports passive external iframe embeds only.",
+                            "type": "object",
+                            "required": [
+                              "sourceType",
+                              "completionPolicy"
+                            ],
+                            "additionalProperties": false,
+                            "properties": {
+                              "sourceType": {
+                                "type": "string",
+                                "enum": [
+                                  "external-embed",
+                                  "self-hosted"
+                                ],
+                                "default": "external-embed"
+                              },
+                              "embedUrl": {
+                                "type": "string",
+                                "default": ""
+                              },
+                              "completionPolicy": {
+                                "type": "string",
+                                "enum": [
+                                  "viewed",
+                                  "manual-continue",
+                                  "xapi-completed",
+                                  "xapi-passed"
+                                ],
+                                "default": "manual-continue"
+                              },
+                              "preferredHeight": {
+                                "type": "number",
+                                "minimum": 1
+                              },
+                              "scorePolicy": {
+                                "type": "string",
+                                "enum": [
+                                  "correct-if-passed",
+                                  "correct-if-full-score",
+                                  "record-only"
+                                ]
+                              },
+                              "contentId": {
+                                "type": "string"
+                              },
+                              "packageAssetId": {
+                                "type": "string"
+                              },
+                              "library": {
+                                "type": "string"
+                              }
+                            }
+                          },
                           "attribution": {
                             "title": "Attribution",
                             "description": "Creator, source, and license metadata rendered as a linked caption for the prompt media.",
@@ -269,6 +324,61 @@
                           "default": "",
                           "options": {
                             "grid_columns": 12
+                          }
+                        },
+                        "h5p": {
+                          "title": "H5P display",
+                          "description": "H5P activity metadata for learner display. Phase 1 supports passive external iframe embeds only.",
+                          "type": "object",
+                          "required": [
+                            "sourceType",
+                            "completionPolicy"
+                          ],
+                          "additionalProperties": false,
+                          "properties": {
+                            "sourceType": {
+                              "type": "string",
+                              "enum": [
+                                "external-embed",
+                                "self-hosted"
+                              ],
+                              "default": "external-embed"
+                            },
+                            "embedUrl": {
+                              "type": "string",
+                              "default": ""
+                            },
+                            "completionPolicy": {
+                              "type": "string",
+                              "enum": [
+                                "viewed",
+                                "manual-continue",
+                                "xapi-completed",
+                                "xapi-passed"
+                              ],
+                              "default": "manual-continue"
+                            },
+                            "preferredHeight": {
+                              "type": "number",
+                              "minimum": 1
+                            },
+                            "scorePolicy": {
+                              "type": "string",
+                              "enum": [
+                                "correct-if-passed",
+                                "correct-if-full-score",
+                                "record-only"
+                              ]
+                            },
+                            "contentId": {
+                              "type": "string"
+                            },
+                            "packageAssetId": {
+                              "type": "string"
+                            },
+                            "library": {
+                              "type": "string"
+                            }
                           }
                         },
                         "attribution": {
