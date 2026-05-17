@@ -29,6 +29,7 @@ const AuthThrottleState = new Mongo.Collection('auth_throttle_state');
 const UserDashboardCache = new Mongo.Collection('user_dashboard_cache');
 const UserUploadQuota = new Mongo.Collection('user_upload_quota');
 const ManualContentDrafts = new Mongo.Collection('manual_content_drafts');
+const H5PContents = new Mongo.Collection('h5p_contents');
 
 // Init DynamicAssets Collection
 const DynamicAssets = new FilesCollection({
@@ -125,10 +126,11 @@ Object.assign(globalThis, {
   UserDashboardCache,
   UserUploadQuota,
   ManualContentDrafts,
+  H5PContents,
   DynamicAssets,
 });
 
-export { Tdfs, GlobalExperimentStates, UserDashboardCache };
+export { Tdfs, GlobalExperimentStates, UserDashboardCache, H5PContents };
 
 GlobalExperimentStates.allow({
   update: function(userId: string, doc: unknown, _fieldNames: string[], _modifier: any) {

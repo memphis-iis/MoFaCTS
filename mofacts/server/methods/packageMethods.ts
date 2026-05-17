@@ -80,6 +80,7 @@ type UpsertResult = {
 type PackageMethodsDeps = {
   Tdfs: any;
   DynamicAssets: any;
+  H5PContents?: any;
   UserUploadQuota: any;
   AuditLog: any;
   ownerEmail: string;
@@ -194,6 +195,7 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       UserUploadQuota: deps.UserUploadQuota,
       AuditLog: deps.AuditLog,
       Tdfs: deps.Tdfs,
+      H5PContents: deps.H5PContents,
       resolveConditionTdfIds,
       getResponseKCMapForTdf,
       processAudioFilesForTDF: deps.processAudioFilesForTDF,
@@ -265,7 +267,9 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
         if (!stim || typeof stim !== 'object') {
           return { result: false, errmsg: `Stim ${stimIdx} in cluster ${clusterIdx} is not an object.` };
         }
-        if (!stim.response || typeof stim.response !== 'object' || !Object.prototype.hasOwnProperty.call(stim.response, 'correctResponse')) {
+        const h5pOwnsResponse = (stim.display as Record<string, unknown> | undefined)?.h5p
+          && ((stim.display as Record<string, unknown>).h5p as Record<string, unknown>).sourceType === 'self-hosted';
+        if (!h5pOwnsResponse && (!stim.response || typeof stim.response !== 'object' || !Object.prototype.hasOwnProperty.call(stim.response, 'correctResponse'))) {
           return { result: false, errmsg: `Stim ${stimIdx} in cluster ${clusterIdx} missing correctResponse.` };
         }
         if (stim.display) {

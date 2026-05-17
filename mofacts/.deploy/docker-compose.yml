@@ -19,6 +19,16 @@ services:
         target: /root/dynamic-assets
         bind:
           create_host_path: true
+      - type: bind
+        source: /h5p-content
+        target: /root/h5p-content
+        bind:
+          create_host_path: true
+      - type: bind
+        source: /h5p-libraries
+        target: /root/h5p-libraries
+        bind:
+          create_host_path: true
     ports:
       - '3000:3000'
     depends_on:

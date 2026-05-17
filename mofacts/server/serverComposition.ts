@@ -338,6 +338,7 @@ const {
 const packageMethods = createPackageMethods({
   Tdfs,
   DynamicAssets,
+  H5PContents,
   UserUploadQuota,
   AuditLog,
   ownerEmail,

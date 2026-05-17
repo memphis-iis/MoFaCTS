@@ -13,6 +13,12 @@ services:
         source: ./local-data/dynamic-assets
         target: /root/dynamic-assets
       - type: bind
+        source: ./local-data/h5p-content
+        target: /root/h5p-content
+      - type: bind
+        source: ./local-data/h5p-libraries
+        target: /root/h5p-libraries
+      - type: bind
         source: ./settings.local.json
         target: /run/local-settings/settings.local.json
         read_only: true

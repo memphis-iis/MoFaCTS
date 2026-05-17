@@ -61,6 +61,7 @@
     "dompurify": "^3.4.0",
     "double-metaphone": "^2.0.0",
     "fast-xml-parser": "^5.7.1",
+    "h5p-standalone": "3.8.2",
     "jquery": "^3.7.1",
     "jszip": "^3.10.1",
     "marked": "^18.0.2",
@@ -135,7 +136,7 @@
   },
   "lint-staged": {
     "*.{js,mjs,cjs,ts,svelte}": [
-      "eslint --ignore-pattern .meteor/** --fix"
+      "eslint --ignore-pattern .meteor/** --ignore-pattern public/h5p-standalone/** --fix"
     ]
   },
   "author": "",

@@ -50,6 +50,7 @@ export type PackageUploadRuntimeState = {
 
 export type ProcessPackageUploadDeps = {
   DynamicAssets: {
+    findOneAsync?: (selector: Record<string, unknown>, options?: Record<string, unknown>) => Promise<DynamicAssetLike | null>;
     collection: {
       findOneAsync: (selector: Record<string, unknown>) => Promise<DynamicAssetLike | null>;
     };
@@ -82,6 +83,9 @@ export type ProcessPackageUploadDeps = {
   Tdfs: {
     findOneAsync: (selector: Record<string, unknown>) => Promise<any>;
     upsertAsync: (selector: Record<string, unknown>, document: Record<string, unknown>) => Promise<unknown>;
+  };
+  H5PContents?: {
+    upsertAsync: (selector: Record<string, unknown>, modifier: Record<string, unknown>) => Promise<unknown>;
   };
   resolveConditionTdfIds: (setspec?: { condition?: string[] }) => Promise<Array<string | null>>;
   getResponseKCMapForTdf: (tdfId: string) => Promise<Record<string, unknown>>;

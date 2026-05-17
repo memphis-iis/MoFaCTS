@@ -93,11 +93,20 @@ function getNewItemFormat(stimFile: any, stimulusFileName: string, stimuliSetId:
       if (!stim || typeof stim !== 'object') {
         throw new Error(`Stim ${stimIdx} in cluster ${clusterIdx} of "${stimulusFileName}" is undefined or not an object.`);
       }
+      const h5pOwnsResponse = stim.display?.h5p?.sourceType === 'self-hosted';
       if (!stim.response || typeof stim.response !== 'object') {
+        if (h5pOwnsResponse) {
+          stim.response = { correctResponse: '__H5P_COMPLETED__' };
+        } else {
         throw new Error(`Stim ${stimIdx} in cluster ${clusterIdx} of "${stimulusFileName}" missing 'response' property.`);
+        }
       }
       if (!Object.prototype.hasOwnProperty.call(stim.response, 'correctResponse')) {
-        throw new Error(`Stim ${stimIdx} in cluster ${clusterIdx} of "${stimulusFileName}" missing 'correctResponse' property in 'response'.`);
+        if (h5pOwnsResponse) {
+          stim.response.correctResponse = '__H5P_COMPLETED__';
+        } else {
+          throw new Error(`Stim ${stimIdx} in cluster ${clusterIdx} of "${stimulusFileName}" missing 'correctResponse' property in 'response'.`);
+        }
       }
 
       let incorrectResponses = stim.response.incorrectResponses;
