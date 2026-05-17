@@ -22,6 +22,23 @@ H5P should be integrated as an interaction renderer plus event adapter, not as a
 - Preserve the existing text, image, audio, and video stimulus paths.
 - Prefer same-origin/self-hosted H5P for scored trials because cross-origin iframe embeds are not reliable for learner result tracking.
 
+## Scope and Non-Goals (Refined)
+
+### In Scope
+
+- Adding `display.h5p` as a first-class display payload on prepared stimuli.
+- Rendering H5P inline and in existing overlay surfaces.
+- Mapping H5P completion/result events into MoFaCTS trial semantics via a normalized adapter.
+- Recording bounded H5P result metadata in trial history.
+- Supporting two hosting modes with explicit capability limits: external embed and self-hosted.
+
+### Out of Scope (for initial rollout)
+
+- Replacing MoFaCTS scheduling/session engines with H5P runtime behavior.
+- Mirroring full H5P authoring schema inside stimulus JSON.
+- Introducing compatibility fallbacks that silently downgrade scored behavior.
+- Building a Meteor-local release confidence workflow (Docker Compose remains canonical).
+
 ## Proposed Stimulus Contract
 
 Add a shared typed contract, likely in `mofacts/common/types/h5p.ts`, and allow prepared displays to include an optional H5P payload:
@@ -262,6 +279,16 @@ The resolved trial payload should continue to expose a normal `currentDisplay`. 
 
 The engine should not decide how H5P is rendered. It should only select the trial and provide the prepared display data.
 
+### Validation Rules (Refined)
+
+Validate `display.h5p` during preparation and fail fast with explicit authoring errors:
+
+- `sourceType: 'external-embed'` requires `embedUrl`, forbids `packageAssetId`.
+- `sourceType: 'self-hosted'` requires `contentId` or `packageAssetId`; `embedUrl` is optional only if it resolves from stored metadata.
+- `completionPolicy: 'xapi-passed'` requires a result-capable source (self-hosted/same-origin integration).
+- `scorePolicy` may be set only when completion policy/result path can produce score/pass data.
+- `preferredHeight`, when provided, must be a sane positive integer within UI constraints.
+
 ### Rendering Components
 
 Add focused components under `mofacts/client/views/experiment/svelte/components/`:
@@ -294,6 +321,13 @@ export interface H5PTrialResult {
 ```
 
 The bridge should be the only place that knows about H5P xAPI statement structure. The rest of the card flow should receive normalized trial result events.
+
+Bridge behavior should include:
+
+- Origin checks for `postMessage`-based events.
+- Session-trial correlation IDs to ignore stale or cross-trial events.
+- Explicit timeout/error events so UI can surface actionable failure states instead of stalling.
+- Idempotency guards so duplicate xAPI statements do not double-record results.
 
 ### Result Mapping
 
@@ -383,6 +417,12 @@ h5p: {
 
 Raw xAPI statements should be stored only if there is a clear analytics/debugging requirement. If stored, keep them bounded and separate from the core trial result summary.
 
+Recommended additional history metadata:
+
+- `sourceType` and `completionPolicy` used at runtime (for later auditability).
+- `resultSource` enum such as `h5p`, `mofacts-native`, or `mixed`.
+- `integrationErrorCode` when a trial fails due to H5P integration/runtime issues.
+
 ## Phased Implementation
 
 ### Phase 1: Passive H5P Stimulus
@@ -394,12 +434,24 @@ Raw xAPI statements should be stored only if there is a clear analytics/debuggin
 - Support `completionPolicy: 'viewed'` or `manual-continue`.
 - Add focused tests for display preparation and config validation.
 
+Phase 1 exit criteria:
+
+- External embed renders in learning trials without regressing existing media stimuli.
+- Misconfigured `display.h5p` fails with explicit, user-visible authoring errors.
+- Typecheck and targeted test coverage pass in CI for touched modules.
+
 ### Phase 2: H5P Owned Response Surface
 
 - Add `H5PStimulus.svelte` events for loaded, failed, completed, and result.
 - Add `h5pResultMapper.ts`.
 - Let `TrialContent.svelte` suppress native text/buttons/SR response controls when the prepared trial determines that H5P owns the response result.
 - Record normalized H5P result metadata in trial history.
+
+Phase 2 exit criteria:
+
+- H5P-owned trials can complete/advance strictly via configured completion policy.
+- Duplicate or late events do not create duplicate history writes.
+- Failure states are surfaced inline (not modal) and block silent progression.
 
 ### Phase 3: Video and Session Overlays
 
@@ -415,6 +467,12 @@ Raw xAPI statements should be stored only if there is a clear analytics/debuggin
 - Wire H5P xAPI events into `h5pEventBridge.ts`.
 - Require self-hosted mode for scored H5P assessment trials.
 
+Phase 4 exit criteria:
+
+- Package validation rejects malformed `.h5p` artifacts with clear diagnostics.
+- Same-origin scored trials produce deterministic pass/score mapping.
+- Public/unauthenticated upload or fetch methods are authorization-checked and rate-limited.
+
 ### Phase 5: Authoring and Documentation
 
 - Add authoring UI support for H5P display fields.
@@ -428,6 +486,14 @@ Raw xAPI statements should be stored only if there is a clear analytics/debuggin
 - Should incorrect H5P results trigger force-correct behavior, ordinary feedback, video rewind, or a content-type-specific retry?
 - How much raw xAPI data should be retained for research use?
 - Should an H5P activity be allowed to contribute partial credit to adaptive scheduling, or should scheduling initially consume only correct/incorrect?
+
+## Risks and Mitigations (Refined)
+
+- Cross-origin event reliability risk (external embeds): keep external mode non-authoritative for scored correctness.
+- Event duplication/out-of-order risk: enforce correlation IDs and idempotent history writes.
+- Package security risk: validate zip structure, whitelist expected file paths, and reject executable/unexpected payloads.
+- UX dead-end risk when H5P fails to load: always provide explicit inline error plus a deterministic continue/block policy.
+- Schema drift risk across repos: update field-registry docs and validate compatibility with configuration/content repositories when field names evolve.
 
 ## Suggested First Slice
 
