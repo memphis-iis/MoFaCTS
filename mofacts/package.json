@@ -74,7 +74,7 @@
     "xstate": "^5.31.0"
   },
   "devDependencies": {
-    "@eslint/js": "^9.0.0",
+    "@eslint/js": "^10.0.1",
     "@meteorjs/rspack": "^2.0.1",
     "@rsdoctor/rspack-plugin": "^1.5.11",
     "@rspack/cli": "^1.7.1",
