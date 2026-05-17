@@ -78,7 +78,7 @@
     "@meteorjs/rspack": "^2.0.1",
     "@rsdoctor/rspack-plugin": "^1.5.11",
     "@rspack/cli": "^1.7.1",
-    "@rspack/core": "^1.7.1",
+    "@rspack/core": "^2.0.3",
     "@types/chai": "^5.2.3",
     "@types/jquery": "^3.5.13",
     "@types/meteor": "^2.9.11",
