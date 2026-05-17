@@ -53,7 +53,7 @@
     }
   },
   "dependencies": {
-    "@aws-sdk/client-mturk": "^3.1014.0",
+    "@aws-sdk/client-mturk": "^3.1045.0",
     "@babel/runtime": "^7.29.2",
     "@node-saml/node-saml": "^5.1.0",
     "@swc/helpers": "^0.5.21",
