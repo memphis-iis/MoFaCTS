@@ -63,14 +63,11 @@
 
 <div class="card-screen" class:video-mode={isVideoSession} style={cardFontSizeStyle}>
   {#if isVideoSession}
-    <VideoSessionMode
-      videoUrl={videoUrl}
-      showOverlay={displayVisible || feedbackVisible}
-    >
+    {#if showPerformanceStats}
       <PerformanceArea
-        {showPerformanceStats}
-        {showTimeoutBar}
-        {showTimeoutCountdown}
+        showPerformanceStats={true}
+        showTimeoutBar={false}
+        showTimeoutCountdown={false}
         {totalTimeDisplay}
         {percentCorrect}
         {cardsSeen}
@@ -80,6 +77,27 @@
         {timeoutProgress}
         {remainingTime}
       />
+    {/if}
+
+    <VideoSessionMode
+      videoUrl={videoUrl}
+      showOverlay={displayVisible || feedbackVisible}
+    >
+      {#if showTimeoutBar || showTimeoutCountdown}
+        <PerformanceArea
+          showPerformanceStats={false}
+          {showTimeoutBar}
+          {showTimeoutCountdown}
+          {totalTimeDisplay}
+          {percentCorrect}
+          {cardsSeen}
+          {totalCards}
+          {currentTrial}
+          {timeoutMode}
+          {timeoutProgress}
+          {remainingTime}
+        />
+      {/if}
 
       <TrialContent
         {layoutMode}
@@ -120,19 +138,37 @@
       />
     </VideoSessionMode>
   {:else}
-    <PerformanceArea
-      {showPerformanceStats}
-      {showTimeoutBar}
-      {showTimeoutCountdown}
-      {totalTimeDisplay}
-      {percentCorrect}
-      {cardsSeen}
-      {totalCards}
-      {currentTrial}
-      {timeoutMode}
-      {timeoutProgress}
-      {remainingTime}
-    />
+    {#if showPerformanceStats}
+      <PerformanceArea
+        showPerformanceStats={true}
+        showTimeoutBar={false}
+        showTimeoutCountdown={false}
+        {totalTimeDisplay}
+        {percentCorrect}
+        {cardsSeen}
+        {totalCards}
+        {currentTrial}
+        {timeoutMode}
+        {timeoutProgress}
+        {remainingTime}
+      />
+    {/if}
+
+    {#if showTimeoutBar || showTimeoutCountdown}
+      <PerformanceArea
+        showPerformanceStats={false}
+        {showTimeoutBar}
+        {showTimeoutCountdown}
+        {totalTimeDisplay}
+        {percentCorrect}
+        {cardsSeen}
+        {totalCards}
+        {currentTrial}
+        {timeoutMode}
+        {timeoutProgress}
+        {remainingTime}
+      />
+    {/if}
 
     <TrialContent
       {layoutMode}
@@ -195,5 +231,10 @@
 
   .card-screen.video-mode {
     background-color: var(--text-color);
+  }
+
+  .card-screen.video-mode :global(.video-session-mode) {
+    flex: 1 1 auto;
+    min-height: 0;
   }
 </style>

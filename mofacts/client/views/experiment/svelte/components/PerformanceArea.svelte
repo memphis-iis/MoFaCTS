@@ -33,7 +33,11 @@
 
 </script>
 
-<div class="performance-area">
+<div
+  class="performance-area"
+  class:performance-area-stats-only={showPerformanceStats && !showTimeoutBar && !showTimeoutCountdown}
+  class:performance-area-timeout-only={!showPerformanceStats && (showTimeoutBar || showTimeoutCountdown)}
+>
   {#if showPerformanceStats}
     <div class="performance-stats">
       <div class="stat-item">
@@ -93,6 +97,14 @@
     margin-bottom: 0.5rem;
     flex-shrink: 0;
     text-align: center;
+  }
+
+  .performance-area-stats-only {
+    margin-bottom: 0;
+  }
+
+  .performance-area-timeout-only {
+    padding-top: 0.25rem;
   }
 
   .performance-stats {

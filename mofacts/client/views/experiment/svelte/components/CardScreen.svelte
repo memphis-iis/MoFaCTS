@@ -352,7 +352,6 @@
   $: showTimeoutBar = deliverySettings.displayTimeoutBar;
   $: showTimeoutCountdown = deliverySettings.displayTimeoutCountdown;
   $: showPerformanceStats = deliverySettings.displayPerformance;
-  $: showPerformanceArea = showPerformanceStats || showTimeoutBar || showTimeoutCountdown;
 
   // Audio & SR settings
   let user = null;
@@ -891,6 +890,17 @@
   };
 
   $: performanceSlotProps = livePerformanceSlotProps;
+  $: performanceStatsProps = {
+    ...performanceSlotProps,
+    showPerformanceStats: true,
+    showTimeoutBar: false,
+    showTimeoutCountdown: false,
+  };
+  $: trialTimerProps = {
+    ...performanceSlotProps,
+    showPerformanceStats: false,
+  };
+  $: showTrialTimerArea = showTimeoutBar || showTimeoutCountdown;
 
   function getTimeoutMode(currentState) {
     if (isOutgoingFreezeState && timeoutModeState !== 'none') return timeoutModeState;
@@ -2220,6 +2230,10 @@
 {#if testMode || initializedForRender}
 <div class="card-screen" class:video-mode={isVideoSession} bind:this={cardScreenElement} style={cardFontSizeStyle}>
   {#if isVideoSession}
+    {#if showPerformanceStats}
+      <PerformanceArea {...performanceStatsProps} />
+    {/if}
+
     <VideoSessionMode
       bind:this={videoPlayer}
       videoUrl={deliverySettings.videoUrl}
@@ -2249,8 +2263,8 @@
         on:transitionstart={logTrialFadeEvent}
         on:transitionend={logTrialFadeEvent}
       >
-        {#if showPerformanceArea}
-        <PerformanceArea {...performanceSlotProps} />
+        {#if showTrialTimerArea}
+        <PerformanceArea {...trialTimerProps} />
         {/if}
 
         <TrialContent
@@ -2300,6 +2314,10 @@
       </div>
     {/if}
   {:else}
+    {#if showPerformanceStats}
+      <PerformanceArea {...performanceStatsProps} />
+    {/if}
+
     <div class="trial-content-stack">
       <div
         class="trial-content-fade trial-content-slot"
@@ -2310,8 +2328,8 @@
         on:transitionstart={logTrialFadeEvent}
         on:transitionend={logTrialFadeEvent}
       >
-        {#if showPerformanceArea}
-        <PerformanceArea {...performanceSlotProps} />
+        {#if showTrialTimerArea}
+        <PerformanceArea {...trialTimerProps} />
         {/if}
 
         <TrialContent
@@ -2402,6 +2420,11 @@
 
   .card-screen.video-mode {
     background-color: var(--text-color);
+  }
+
+  .card-screen.video-mode :global(.video-session-mode) {
+    flex: 1 1 auto;
+    min-height: 0;
   }
 
   .video-instruction-overlay {
