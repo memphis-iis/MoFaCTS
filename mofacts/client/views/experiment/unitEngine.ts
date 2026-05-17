@@ -1807,13 +1807,15 @@ async function scheduleUnitEngine(): Promise<any> {
           // 3 - location (added to qidx)
           const groupEntry: any = group[index * templateSize + k];
           const parts = groupEntry.split(',');
+          const inputMethod = String(parts[1] || '').trim().toLowerCase()[0] || '';
+          const trialTypeMarker = String(parts[2] || '').trim().toLowerCase()[0] || '';
 
           let forceButtonTrial = false;
-          if (parts[1].toLowerCase()[0] === 'b') {
+          if (inputMethod === 'b') {
             forceButtonTrial = true;
           }
 
-          let type = parts[2].toUpperCase()[0];
+          let type = trialTypeMarker === 'h' ? 'H' : trialTypeMarker.toUpperCase();
           if (type === 'Z') {
             const stud = Math.floor(Math.random() * 10);
             if (stud === 0) {

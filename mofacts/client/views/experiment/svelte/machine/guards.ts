@@ -115,7 +115,7 @@ export function isDrillTrial({ context }: CardMachineActorArgs): boolean {
  * @returns {boolean}
  */
 export function isTestTrial({ context }: CardMachineActorArgs): boolean {
-  return context.testType === TRIAL_TYPES.TEST;
+  return context.testType === TRIAL_TYPES.TEST || context.testType === TRIAL_TYPES.H5P;
 }
 
 /**

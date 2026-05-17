@@ -17,6 +17,7 @@ export const TRIAL_TYPES = {
   STUDY: 's',    // Study trial: display answer immediately
   DRILL: 'd',    // Drill trial: require input, show feedback
   TEST: 't',     // Test trial: require input, no feedback
+  H5P: 'h',      // H5P-owned trial: H5P emits the response result
   FORCE_CORRECT: 'm', // Force correction: require typing correct answer
   TIMED_PROMPT: 'n',  // Timed prompt: require input within time limit
 };
@@ -29,6 +30,7 @@ export const SUPPORTED_TRIAL_TYPES = new Set([
   TRIAL_TYPES.STUDY,
   TRIAL_TYPES.DRILL,
   TRIAL_TYPES.TEST,
+  TRIAL_TYPES.H5P,
   TRIAL_TYPES.FORCE_CORRECT,
   TRIAL_TYPES.TIMED_PROMPT,
 ]);

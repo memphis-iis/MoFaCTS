@@ -413,6 +413,19 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       recordedServerTime: (new Date()).getTime(),
     });
     const recordBuildMs = elapsedMsSince(recordBuildStartTime);
+    const h5pIdempotencyKey = typeof (decompressedRecord.h5p as Record<string, unknown> | undefined)?.idempotencyKey === 'string'
+      ? String((decompressedRecord.h5p as Record<string, unknown>).idempotencyKey)
+      : '';
+    if (h5pIdempotencyKey) {
+      const existingH5PHistory = await deps.Histories.findOneAsync({
+        userId: actingUserId,
+        TDFId: tdfId,
+        'h5p.idempotencyKey': h5pIdempotencyKey,
+      });
+      if (existingH5PHistory) {
+        return { duplicate: true };
+      }
+    }
 
     let rawPayloadBytes: number | undefined;
     let finalRecordBytes: number | undefined;

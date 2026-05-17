@@ -38,7 +38,7 @@ export function getFeedbackTimeoutMs(context: TimeoutContext): number {
     if (studyMs !== null) return studyMs;
   }
 
-  if (context.testType === 't' || context.testType === 'i') {
+  if (context.testType === 't' || context.testType === 'h' || context.testType === 'i') {
     return 1;
   }
 

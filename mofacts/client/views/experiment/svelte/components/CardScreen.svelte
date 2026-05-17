@@ -166,6 +166,10 @@
       audioSrc: display?.audioSrc || '',
     };
 
+    if (display?.h5p && typeof display.h5p === 'object') {
+      cloned.h5p = JSON.parse(JSON.stringify(display.h5p));
+    }
+
     const attribution = cloneAttribution(display?.attribution);
     if (attribution) {
       cloned.attribution = attribution;
@@ -308,6 +312,7 @@
   let videoInstructionStartBlocked = false;
   let videoInstructionsShownAt = 0;
   let videoPlayerReady = false;
+  let submittedH5PResultKey = '';
   const send = (event) => {
     if (testMode) {
       clientConsole(2, '[CardScreen] Ignoring event in test mode:', event?.type || event);
@@ -473,7 +478,11 @@
           : 'none')));
   $: baseDisplayVisible = baseTrialSubsetKind !== 'none';
   $: baseFeedbackVisible = baseTrialSubsetKind === 'feedback' || baseTrialSubsetKind === 'study';
-  $: baseResponseVisible = baseTrialSubsetKind === 'question' || baseTrialSubsetKind === 'forceCorrect';
+  $: h5pOwnsResponse = context.currentDisplay?.h5p?.sourceType === 'self-hosted' && baseTrialSubsetKind === 'question';
+  $: baseResponseVisible = !h5pOwnsResponse && (baseTrialSubsetKind === 'question' || baseTrialSubsetKind === 'forceCorrect');
+  $: if (baseTrialSubsetKind !== 'question') {
+    submittedH5PResultKey = '';
+  }
   let studyInteractionText = '';
   $: baseShowSkipStudyButton = isStudyState && toBoolean(deliverySettings.skipstudy);
   $: baseFeedbackIsCorrect = isStudyState ? true : context.isCorrect;
@@ -1018,6 +1027,25 @@
       userAnswer: event.detail.answer,
       timestamp: event.detail.timestamp,
       source: 'buttonClick'
+    });
+  }
+
+  function handleH5PResult(event) {
+    const detail = event.detail || {};
+    if (!h5pOwnsResponse || detail.contentId !== context.currentDisplay?.h5p?.contentId) {
+      return;
+    }
+    const resultKey = `${detail.contentId || ''}|${detail.batchId || ''}`;
+    if (submittedH5PResultKey === resultKey) {
+      return;
+    }
+    submittedH5PResultKey = resultKey;
+    Session.set('currentH5PResultBatch', detail);
+    send({
+      type: 'SUBMIT',
+      userAnswer: detail.completed ? '__H5P_COMPLETED__' : '__H5P_INCOMPLETE__',
+      timestamp: Date.now(),
+      source: 'h5p'
     });
   }
 
@@ -2278,6 +2306,7 @@
           on:feedbackcontent={handleFeedbackContent}
           on:blockingassetstate={handleBlockingAssetState}
           on:reviewrevealstarted={handleReviewRevealStarted}
+          on:h5presult={handleH5PResult}
         />
       </div>
 
@@ -2344,6 +2373,7 @@
           on:replay={handleReplay}
           on:blockingassetstate={handleBlockingAssetState}
           on:reviewrevealstarted={handleReviewRevealStarted}
+          on:h5presult={handleH5PResult}
         />
         {#if trialSubset.showSkipStudyButton}
           <div class="skip-study-container">

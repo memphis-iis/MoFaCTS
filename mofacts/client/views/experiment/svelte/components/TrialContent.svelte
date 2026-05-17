@@ -17,6 +17,10 @@
     dispatch('feedbackcontent', event.detail);
   }
 
+  function handleH5PResult(event) {
+    dispatch('h5presult', event.detail);
+  }
+
   /** @type {'top' | 'left'} Layout mode (top = over-under, left = split) */
   export let layoutMode = 'top';
 
@@ -138,6 +142,8 @@
   $: isSplitLayout = normalizedLayoutMode === 'left';
   $: isOverUnder = !isSplitLayout;
   $: isImageStimulus = Boolean(display?.imgSrc || display?.videoSrc);
+  $: isH5PStimulus = Boolean(display?.h5p);
+  $: h5pOwnsInteraction = Boolean(display?.h5p?.sourceType === 'self-hosted');
   $: requestedInteractionKind = feedbackVisible ? 'feedback' : (responseVisible ? 'response' : 'none');
 
   let interactionFadeElement;
@@ -292,6 +298,8 @@
   class:split={isSplitLayout}
   class:over-under={isOverUnder}
   class:image-stimulus={isImageStimulus}
+  class:h5p-stimulus={isH5PStimulus}
+  class:h5p-owned={h5pOwnsInteraction}
   class:non-image-stimulus={!isImageStimulus}
   data-subset-kind={subsetKind}
 >
@@ -306,9 +314,11 @@
         {replayEnabled}
         on:replay
         on:blockingassetstate
+        on:h5presult={handleH5PResult}
       />
     </div>
 
+    {#if !(h5pOwnsInteraction && requestedInteractionKind === 'none')}
     <div class="interaction-container">
       <div
         class="interaction-fade"
@@ -361,6 +371,7 @@
       {/if}
       </div>
     </div>
+    {/if}
   </div>
 </div>
 
@@ -396,6 +407,22 @@
     flex: 3 0 0%;
     height: 0; /* Force height from flex only, not content */
     min-height: 0;
+  }
+
+  .trial-content.over-under.h5p-owned .stimulus-container {
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 0;
+  }
+
+  .trial-content.h5p-owned .trial-main {
+    overflow: hidden;
+  }
+
+  .trial-content.h5p-owned .stimulus-container {
+    align-items: stretch;
+    justify-content: stretch;
+    overflow: hidden;
   }
 
   .trial-content.over-under.image-stimulus .interaction-container {

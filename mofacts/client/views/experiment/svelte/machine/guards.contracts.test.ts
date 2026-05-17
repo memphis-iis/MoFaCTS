@@ -41,6 +41,7 @@ describe('machine guard contracts', function() {
     expect(isSupportedTrialType(makeArgs({ context: { testType: 's' } }))).to.equal(true);
     expect(isSupportedTrialType(makeArgs({ context: { testType: 'd' } }))).to.equal(true);
     expect(isSupportedTrialType(makeArgs({ context: { testType: 't' } }))).to.equal(true);
+    expect(isSupportedTrialType(makeArgs({ context: { testType: 'h' } }))).to.equal(true);
     expect(isSupportedTrialType(makeArgs({ context: { testType: 'm' } }))).to.equal(true);
     expect(isSupportedTrialType(makeArgs({ context: { testType: 'n' } }))).to.equal(true);
 

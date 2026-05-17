@@ -21,6 +21,7 @@ import { CardStore } from '../../modules/cardStore';
 import { resolveDynamicAssetPath } from './mediaResolver';
 import { assertIdInvariants, logIdInvariantBreachOnce } from '../../../../lib/idContext';
 import { applyDisplayFieldSubset } from '../../../../../common/lib/displayFieldSubsets';
+import { normalizeH5PDisplayConfig } from '../../../../../common/lib/h5pDisplay';
 import type {
   EngineServiceResult,
   ExperimentState,
@@ -301,6 +302,22 @@ function resolveStimMediaSource(
     displayObj.videoSrc,
     stim.videoStimulus
   );
+}
+
+function getClientBaseUrl(): string {
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return `${window.location.origin}/`;
+  }
+  return 'https://mofacts.local/';
+}
+
+function resolveH5PDisplayConfig(...sources: unknown[]): Record<string, unknown> | undefined {
+  for (const source of sources) {
+    if (source && typeof source === 'object' && !Array.isArray(source)) {
+      return normalizeH5PDisplayConfig(source, getClientBaseUrl()) as unknown as Record<string, unknown>;
+    }
+  }
+  return undefined;
 }
 
 function normalizeDisplayAttribution(
@@ -629,9 +646,11 @@ function getPreparedCardDataFromSelection(
     preparedDisplay.attribution,
     stim.display?.attribution,
   );
+  const h5pDisplay = resolveH5PDisplayConfig(preparedDisplay.h5p, stim.display?.h5p);
+  const h5pOwnsPrompt = h5pDisplay?.sourceType === 'self-hosted';
   const resolvedDisplay = {
-    text: String(preparedDisplay.text ?? stim.display?.text ?? stim.text ?? stim.textStimulus ?? ''),
-    clozeText: String(preparedDisplay.clozeText ?? stim.display?.clozeText ?? stim.clozeText ?? stim.clozeStimulus ?? ''),
+    text: h5pOwnsPrompt ? '' : String(preparedDisplay.text ?? stim.display?.text ?? stim.text ?? stim.textStimulus ?? ''),
+    clozeText: h5pOwnsPrompt ? '' : String(preparedDisplay.clozeText ?? stim.display?.clozeText ?? stim.clozeText ?? stim.clozeStimulus ?? ''),
     imgSrc: typeof preparedDisplay.imgSrc === 'string' && preparedDisplay.imgSrc.trim().length > 0
       ? preparedDisplay.imgSrc
       : resolveImageUrl(rawImgSrc, stimScopedSetId),
@@ -641,6 +660,7 @@ function getPreparedCardDataFromSelection(
     audioSrc: typeof preparedDisplay.audioSrc === 'string' && preparedDisplay.audioSrc.trim().length > 0
       ? preparedDisplay.audioSrc
       : resolveImageUrl(rawAudioSrc, stimScopedSetId),
+    ...(h5pDisplay ? { h5p: h5pDisplay } : {}),
     ...(displayAttribution ? { attribution: displayAttribution } : {}),
   };
   const deliverySettings = getCurrentDeliverySettings();
@@ -655,10 +675,10 @@ function getPreparedCardDataFromSelection(
   const fullAnswer = typeof preparedState.newExperimentState === 'object' &&
     typeof (preparedState.newExperimentState as Record<string, unknown>).originalAnswer === 'string'
     ? String((preparedState.newExperimentState as Record<string, unknown>).originalAnswer)
-    : resolveStimAnswer(stim);
+    : (h5pDisplay?.sourceType === 'self-hosted' ? '__H5P_COMPLETED__' : resolveStimAnswer(stim));
   const correctAnswer = typeof preparedState.currentAnswer === 'string'
     ? String(preparedState.currentAnswer)
-    : (fullAnswer.split('~')[0] ?? '').trim();
+    : (h5pDisplay?.sourceType === 'self-hosted' ? '__H5P_COMPLETED__' : (fullAnswer.split('~')[0] ?? '').trim());
 
   return buildCardDataFromResolvedTrial({
     resolvedClusterIndex,
