@@ -6,6 +6,9 @@ import { getH5PLibraryStorageRoot } from '../lib/h5pPackage';
 
 type UnknownRecord = Record<string, unknown>;
 
+const H5P_ASSET_ROUTE_VERSION = 'embedded-h5p-v2';
+const H5P_ASSET_VERSION_PREFIX = '__mofacts-v';
+
 function escapeHtml(value: unknown): string {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -51,6 +54,22 @@ function resolveInside(root: string, routePath: string): string {
   return resolved;
 }
 
+function stripAssetVersionPrefix(routePath: string): string {
+  const parts = routePath.split('/').filter(Boolean);
+  if (parts[0] === H5P_ASSET_VERSION_PREFIX && parts.length >= 3) {
+    return parts.slice(2).join('/');
+  }
+  return routePath;
+}
+
+function h5pAssetBasePath(content: UnknownRecord, contentId: string): string {
+  const packageHash = String(content.packageHash || '').trim();
+  const version = packageHash
+    ? `${H5P_ASSET_ROUTE_VERSION}-${packageHash.slice(0, 12)}`
+    : H5P_ASSET_ROUTE_VERSION;
+  return `/h5p-content/${encodeURIComponent(contentId)}/files/${H5P_ASSET_VERSION_PREFIX}/${encodeURIComponent(version)}`;
+}
+
 async function sendFile(res: ServerResponse, method: string, filePath: string, cacheControl: string) {
   const stat = await fs.stat(filePath);
   if (!stat.isFile()) {
@@ -78,17 +97,211 @@ async function fileExists(filePath: string): Promise<boolean> {
   }
 }
 
+async function resolveLibraryFilePath(requestedPath: string): Promise<string> {
+  const libraryRoot = getH5PLibraryStorageRoot();
+  const directPath = resolveInside(libraryRoot, requestedPath);
+  if (await fileExists(directPath)) {
+    return directPath;
+  }
+
+  const parts = requestedPath.split('/');
+  const libraryFolder = parts[0] || '';
+  if (!/^[A-Za-z0-9_.]+$/.test(libraryFolder) || parts.length < 2) {
+    return directPath;
+  }
+
+  const entries = await fs.readdir(libraryRoot, { withFileTypes: true });
+  const matchingFolder = entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .filter((name) => name.startsWith(`${libraryFolder}-`))
+    .sort()
+    .pop();
+
+  if (!matchingFolder) {
+    return directPath;
+  }
+
+  return resolveInside(libraryRoot, [matchingFolder, ...parts.slice(1)].join('/'));
+}
+
+function parseH5PLibraryReference(value: unknown): UnknownRecord | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const match = value.trim().match(/^([A-Za-z0-9_.]+)\s+(\d+)\.(\d+)$/);
+  if (!match) {
+    return undefined;
+  }
+  return {
+    machineName: match[1],
+    majorVersion: Number(match[2]),
+    minorVersion: Number(match[3]),
+  };
+}
+
+function collectNestedContentLibraries(value: unknown, dependencies: Map<string, UnknownRecord>) {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectNestedContentLibraries(item, dependencies);
+    }
+    return;
+  }
+
+  if (!value || typeof value !== 'object') {
+    return;
+  }
+
+  for (const [key, childValue] of Object.entries(value as UnknownRecord)) {
+    if (key === 'library') {
+      const dependency = parseH5PLibraryReference(childValue);
+      if (dependency) {
+        const id = `${dependency.machineName}-${dependency.majorVersion}.${dependency.minorVersion}`;
+        dependencies.set(id, dependency);
+      }
+    }
+    collectNestedContentLibraries(childValue, dependencies);
+  }
+}
+
+function mergeH5PDependencies(h5pJson: UnknownRecord, contentParams: UnknownRecord): UnknownRecord {
+  const dependencies = new Map<string, UnknownRecord>();
+  const nestedDependencies = new Map<string, UnknownRecord>();
+  const existingDependencies = Array.isArray(h5pJson.preloadedDependencies)
+    ? h5pJson.preloadedDependencies
+    : [];
+
+  for (const dependency of existingDependencies) {
+    if (!dependency || typeof dependency !== 'object') {
+      continue;
+    }
+    const dep = dependency as UnknownRecord;
+    const machineName = String(dep.machineName || '').trim();
+    const majorVersion = Number(dep.majorVersion);
+    const minorVersion = Number(dep.minorVersion);
+    if (!machineName || !Number.isFinite(majorVersion) || !Number.isFinite(minorVersion)) {
+      continue;
+    }
+    dependencies.set(`${machineName}-${majorVersion}.${minorVersion}`, {
+      ...dep,
+      machineName,
+      majorVersion,
+      minorVersion,
+    });
+  }
+
+  collectNestedContentLibraries(contentParams, nestedDependencies);
+  for (const [id, dependency] of nestedDependencies) {
+    dependencies.set(id, dependency);
+  }
+
+  const mainLibrary = String(h5pJson.mainLibrary || '').trim();
+  if (mainLibrary) {
+    for (const dependency of dependencies.values()) {
+      if (dependency.machineName !== mainLibrary) {
+        continue;
+      }
+      const existingPreloads = Array.isArray(dependency.preloadedDependencies)
+        ? dependency.preloadedDependencies
+        : [];
+      const childDependencies = Array.from(nestedDependencies.values())
+        .filter((nestedDependency) => nestedDependency.machineName !== mainLibrary);
+      if (childDependencies.length) {
+        dependency.preloadedDependencies = [
+          ...existingPreloads,
+          ...childDependencies,
+        ];
+      }
+      break;
+    }
+  }
+
+  return {
+    ...h5pJson,
+    preloadedDependencies: Array.from(dependencies.values()),
+  };
+}
+
+function sanitizeEmbeddedH5PParams(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeEmbeddedH5PParams(item));
+  }
+
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+
+  const source = value as UnknownRecord;
+  const clone: UnknownRecord = {};
+  for (const [key, childValue] of Object.entries(source)) {
+    clone[key] = sanitizeEmbeddedH5PParams(childValue);
+  }
+
+  const behaviour = clone.behaviour;
+  if (behaviour && typeof behaviour === 'object' && !Array.isArray(behaviour)) {
+    clone.behaviour = {
+      ...(behaviour as UnknownRecord),
+      enableFullScreen: false,
+    };
+  }
+
+  return clone;
+}
+
+async function sendH5PJsonWithNestedDependencies(args: {
+  res: ServerResponse;
+  method: string;
+  h5pJsonPath: string;
+  contentJsonPath: string;
+}) {
+  const h5pJson = JSON.parse(await fs.readFile(args.h5pJsonPath, 'utf8')) as UnknownRecord;
+  let contentParams: UnknownRecord = {};
+  if (await fileExists(args.contentJsonPath)) {
+    contentParams = JSON.parse(await fs.readFile(args.contentJsonPath, 'utf8')) as UnknownRecord;
+  }
+  const body = JSON.stringify(mergeH5PDependencies(h5pJson, contentParams));
+  args.res.writeHead(200, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store',
+  });
+  if (args.method === 'HEAD') {
+    args.res.end();
+    return;
+  }
+  args.res.end(body);
+}
+
+async function sendH5PContentJson(args: {
+  res: ServerResponse;
+  method: string;
+  contentJsonPath: string;
+}) {
+  const contentParams = JSON.parse(await fs.readFile(args.contentJsonPath, 'utf8')) as UnknownRecord;
+  const body = JSON.stringify(sanitizeEmbeddedH5PParams(contentParams));
+  args.res.writeHead(200, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store',
+  });
+  if (args.method === 'HEAD') {
+    args.res.end();
+    return;
+  }
+  args.res.end(body);
+}
+
 export function renderH5PPlayerHtml(content: UnknownRecord): string {
   const contentId = String(content.contentId || '');
   const library = String(content.library || '');
+  const contentParams = sanitizeEmbeddedH5PParams(content.contentParams || {}) as UnknownRecord;
+  const assetBasePath = h5pAssetBasePath(content, contentId);
   const payload = {
     contentId,
     library,
     mainLibrary: content.mainLibrary,
     title: content.title,
-    params: content.contentParams || {},
+    params: contentParams,
     paths: {
-      content: `/h5p-content/${encodeURIComponent(contentId)}/files`,
+      content: assetBasePath,
       playerMain: '/h5p-standalone/main.bundle.js',
       frameJs: '/h5p-standalone/frame.bundle.js',
       frameCss: '/h5p-standalone/styles/h5p.css',
@@ -103,12 +316,10 @@ export function renderH5PPlayerHtml(content: UnknownRecord): string {
   <title>${escapeHtml(content.title || 'H5P activity')}</title>
   <link rel="stylesheet" href="/h5p-standalone/styles/h5p.css">
   <style>
-    html,body{width:100%;height:100%;margin:0;padding:0;background:#fff;color:#1f2933;font-family:system-ui,-apple-system,Segoe UI,sans-serif;overflow:hidden}
-    #h5p-container{box-sizing:border-box;width:100%;height:100vh;padding:16px;overflow:hidden}
-    #h5p-container .h5p-iframe,
-    #h5p-container .h5p-content,
-    #h5p-container .h5p-container{box-sizing:border-box;width:100%!important;max-width:100%!important;height:100%!important;max-height:100%!important;overflow:hidden!important}
-    #h5p-container iframe{width:100%!important;max-width:100%!important;height:100%!important;border:0!important;overflow:hidden!important}
+    html,body{width:100%;min-height:100%;margin:0;padding:0;background:#fff;color:#1f2933;font-family:system-ui,-apple-system,Segoe UI,sans-serif;overflow:hidden}
+    #h5p-container{box-sizing:border-box;width:100%;min-height:120px;padding:16px;overflow:visible}
+    #h5p-container .h5p-content{box-sizing:border-box;width:100%!important;max-width:100%!important;overflow:visible}
+    #h5p-container iframe{width:100%!important;max-width:100%!important;border:0!important}
     #h5p-error{display:none;margin:16px;padding:12px;border:1px solid #b91c1c;color:#7f1d1d;background:#fef2f2}
   </style>
 </head>
@@ -121,38 +332,55 @@ export function renderH5PPlayerHtml(content: UnknownRecord): string {
     const startedAt = Date.now();
     let lastEventAt = startedAt;
     let batchSequence = 0;
-    let sizePollCount = 0;
 
-    function postSize() {
-      const height = Math.min(window.innerHeight || 900, Math.max(
+    function currentSizePayload(request) {
+      const scrollHeight = Math.max(
         document.documentElement ? document.documentElement.scrollHeight : 0,
         document.body ? document.body.scrollHeight : 0,
         document.getElementById('h5p-container')?.scrollHeight || 0,
         120
-      ));
-      parent.postMessage({
-        type: 'mofacts:h5p-resize',
+      );
+      const clientHeight = Math.max(
+        document.documentElement ? document.documentElement.clientHeight : 0,
+        document.body ? document.body.clientHeight : 0,
+        120
+      );
+      return {
         contentId: data.contentId,
-        height,
+        requestId: request && request.requestId,
+        measurementWidth: request && request.measurementWidth,
+        phase: request && request.phase,
+        epoch: request && request.epoch,
+        scrollHeight,
+        clientHeight,
+      };
+    }
+
+    function postH5PResizeAction(action, request) {
+      parent.postMessage({
+        context: 'h5p',
+        action,
+        ...currentSizePayload(request),
       }, window.location.origin);
     }
 
-    function startSizeReporting() {
-      postSize();
-      if (window.ResizeObserver) {
-        const observer = new ResizeObserver(postSize);
-        observer.observe(document.documentElement);
-        observer.observe(document.body);
-        const container = document.getElementById('h5p-container');
-        if (container) observer.observe(container);
+    window.addEventListener('message', function (event) {
+      if (event.data?.context !== 'h5p') {
+        return;
       }
-      const intervalId = setInterval(function () {
-        postSize();
-        sizePollCount += 1;
-        if (sizePollCount > 20) {
-          clearInterval(intervalId);
-        }
-      }, 500);
+      if (event.data.action === 'ready') {
+        postH5PResizeAction('hello');
+      } else if (event.data.action === 'resize') {
+        postH5PResizeAction('prepareResize', event.data);
+      }
+    });
+
+    if (parent && parent !== window) {
+      postH5PResizeAction('hello');
+    }
+
+    function announceH5PReadyForMeasurement() {
+      postH5PResizeAction('hello');
     }
 
     function textFromHtml(value) {
@@ -366,13 +594,13 @@ export function renderH5PPlayerHtml(content: UnknownRecord): string {
         export: false,
         embed: false,
         embedType: 'div',
-        fullScreen: true,
+        fullScreen: false,
         reportingIsEnabled: true,
         xAPIObjectIRI: window.location.origin + '/h5p-content/' + encodeURIComponent(data.contentId),
       };
       new H5PStandalone.H5P(el, options).then(function () {
         parent.postMessage({ type: 'mofacts:h5p-loaded', contentId: data.contentId }, window.location.origin);
-        startSizeReporting();
+        announceH5PReadyForMeasurement();
         if (!window.H5P || !H5P.externalDispatcher) {
           showError('H5P runtime loaded without an xAPI dispatcher.');
           return;
@@ -386,7 +614,7 @@ export function renderH5PPlayerHtml(content: UnknownRecord): string {
             statement,
           }, window.location.origin);
           if (shouldNormalize(statement)) {
-          emitNormalizedResult(statement, event);
+            emitNormalizedResult(statement, event);
           }
         });
       }).catch(function (error) {
@@ -443,15 +671,32 @@ WebApp.connectHandlers.use('/h5p-content', async (req: IncomingMessage, res: Ser
       res.end('H5P content storage path is missing');
       return;
     }
-    const routePath = decodeRoutePath(parts.slice(2));
+    const routePath = stripAssetVersionPrefix(decodeRoutePath(parts.slice(2)));
     const requestedPath = routePath || 'h5p.json';
     const contentFilePath = resolveInside(storagePath, requestedPath);
     if (await fileExists(contentFilePath)) {
+      if (requestedPath === 'h5p.json') {
+        await sendH5PJsonWithNestedDependencies({
+          res,
+          method,
+          h5pJsonPath: contentFilePath,
+          contentJsonPath: resolveInside(storagePath, 'content/content.json'),
+        });
+        return;
+      }
+      if (requestedPath === 'content/content.json') {
+        await sendH5PContentJson({
+          res,
+          method,
+          contentJsonPath: contentFilePath,
+        });
+        return;
+      }
       await sendFile(res, method, contentFilePath, 'public, max-age=31536000, immutable');
       return;
     }
 
-    const libraryFilePath = resolveInside(getH5PLibraryStorageRoot(), requestedPath);
+    const libraryFilePath = await resolveLibraryFilePath(requestedPath);
     await sendFile(res, method, libraryFilePath, 'public, max-age=31536000, immutable');
   } catch (_error) {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
