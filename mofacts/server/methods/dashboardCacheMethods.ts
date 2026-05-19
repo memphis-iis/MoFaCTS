@@ -30,6 +30,15 @@ function roundOneDecimal(value: number): number {
   return Number(value.toFixed(1));
 }
 
+function historyRecordTimestamp(record: DashboardHistoryRecord): number {
+  const rawTimestamp = record.recordedServerTime ?? record.time;
+  if (!rawTimestamp) {
+    return 0;
+  }
+  const timestamp = new Date(rawTimestamp).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
 export function computeCacheStats(
   history: DashboardHistoryRecord[],
   displayName: string | null | undefined,
@@ -47,6 +56,7 @@ export function computeCacheStats(
     overallAccuracy: 0,
     firstPracticeDate: null,
     lastPracticeDate: null,
+    lastPracticeTimestamp: 0,
     lastProcessedHistoryId: null,
     lastProcessedTimestamp: null
   };
@@ -65,20 +75,22 @@ export function computeCacheStats(
       uniqueItems.add(String(itemId));
     }
 
-    if (record.recordedServerTime) {
-      const date = new Date(record.recordedServerTime);
+    const timestamp = historyRecordTimestamp(record);
+    if (timestamp > 0) {
+      const date = new Date(timestamp);
       sessions.add(date.toDateString());
 
       if (!stats.firstPracticeDate || date < stats.firstPracticeDate) {
         stats.firstPracticeDate = date;
       }
-      if (!stats.lastPracticeDate || date > stats.lastPracticeDate) {
+      if (timestamp > stats.lastPracticeTimestamp) {
         stats.lastPracticeDate = date;
+        stats.lastPracticeTimestamp = timestamp;
       }
     }
 
     stats.lastProcessedHistoryId = record._id ?? null;
-    stats.lastProcessedTimestamp = record.recordedServerTime ?? null;
+    stats.lastProcessedTimestamp = record.recordedServerTime ?? record.time ?? null;
   }
 
   stats.itemsPracticedCount = uniqueItems.size;

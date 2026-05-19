@@ -470,6 +470,47 @@ function getSettingFields(state: LearnerConfigState) {
   return getLearnerConfigurableFieldsForState(state);
 }
 
+function getVisibleTdfs(instance: any) {
+  const filtered = instance.filteredTdfsList.get();
+  return filtered || instance.allTdfsList.get();
+}
+
+function sortUsedTdfsByRecency(tdfs: any[]) {
+  return tdfs.sort((a, b) =>
+    (b.lastPracticeTimestamp || 0) - (a.lastPracticeTimestamp || 0)
+  );
+}
+
+function sortUnusedTdfsByName(tdfs: any[]) {
+  return tdfs.sort((a, b) =>
+    a.displayName.localeCompare(b.displayName, 'en', {
+      numeric: true,
+      sensitivity: 'base'
+    })
+  );
+}
+
+function splitTdfsByUsage(tdfs: any[]) {
+  return {
+    used: sortUsedTdfsByRecency(tdfs.filter(tdf => tdf.isUsed)),
+    unused: sortUnusedTdfsByName(tdfs.filter(tdf => !tdf.isUsed))
+  };
+}
+
+function displayLabelForTdf(tdf: any) {
+  if (currentUserHasRole('admin,teacher')) {
+    const fileName = tdf.fileName || 'unknown';
+    return `${tdf.displayName} (${fileName} - ${tdf.TDFId})`;
+  }
+  return tdf.displayName;
+}
+
+function configForLessonCard(tdf: any) {
+  const templateData = Template.parentData(1) as { learnerConfigState?: LearnerConfigState } | undefined;
+  const state = templateData?.learnerConfigState;
+  return tdf.hasLearningSession && state?.tdfId === tdf.TDFId ? { ...state, location: 'card' } : null;
+}
+
 Template.learningDashboard.onCreated(function(this: any) {
   this.allTdfsList = new ReactiveVar([]);
   this.filteredTdfsList = new ReactiveVar(false);
@@ -490,48 +531,48 @@ Template.learningDashboard.helpers({
   },
 
   hasTdfs: () => {
-    const allTdfs = ((Template.instance() as any) as any).allTdfsList.get();
-    const filtered = ((Template.instance() as any) as any).filteredTdfsList.get();
-    const list = filtered || allTdfs;
+    const list = getVisibleTdfs(Template.instance());
     return list && list.length > 0;
   },
 
-  allTdfsList: () => {
-    const filtered = ((Template.instance() as any) as any).filteredTdfsList.get();
-    if (filtered) {
-      return filtered;
-    }
-    return ((Template.instance() as any) as any).allTdfsList.get();
+  usedTdfsList: () => {
+    return splitTdfsByUsage(getVisibleTdfs(Template.instance())).used;
   },
 
-  // Return CSS class for TTS (headphones) icon based on whether TDF has API key
+  unusedTdfsList: () => {
+    return splitTdfsByUsage(getVisibleTdfs(Template.instance())).unused;
+  },
+
+  hasUsedTdfs: () => {
+    return splitTdfsByUsage(getVisibleTdfs(Template.instance())).used.length > 0;
+  },
+
+  hasUnusedTdfs: () => {
+    return splitTdfsByUsage(getVisibleTdfs(Template.instance())).unused.length > 0;
+  },
+
+  learnerConfigState: () => {
+    return ((Template.instance() as any) as any).learnerConfigState.get();
+  },
+
+});
+
+Template.learningDashboardLessonCards.helpers({
+  displayLabel() {
+    return displayLabelForTdf(this);
+  },
+
+  configForCardRow() {
+    return configForLessonCard(this);
+  },
+
   ttsIconClass() {
     return this.hasTTSAPIKey ? 'icon-configured' : 'icon-needs-config';
   },
 
-  // Return CSS class for SR (microphone) icon based on whether TDF has API key
   srIconClass() {
     return this.hasSpeechAPIKey ? 'icon-configured' : 'icon-needs-config';
   },
-
-  displayLabel() {
-    if (currentUserHasRole('admin,teacher')) {
-      const fileName = this.fileName || 'unknown';
-      return `${this.displayName} (${fileName} - ${this.TDFId})`;
-    }
-    return this.displayName;
-  },
-
-  configForTableRow() {
-    const state = (Template.instance() as any).learnerConfigState.get() as LearnerConfigState;
-    return this.hasLearningSession && state.tdfId === this.TDFId ? { ...state, location: 'table' } : null;
-  },
-
-  configForCardRow() {
-    const state = (Template.instance() as any).learnerConfigState.get() as LearnerConfigState;
-    return this.hasLearningSession && state.tdfId === this.TDFId ? { ...state, location: 'card' } : null;
-  },
-
 });
 
 Template.learnerTdfConfigPanel.helpers({
@@ -922,11 +963,15 @@ Template.learningDashboard.rendered = async function(this: any) {
       if (stats.totalTrials > 0) {
         const practicedCount = stats.itemsPracticedCount ?? stats.itemsPracticed ?? stats.uniqueItemIds?.length ?? 0;
         const totalSessions = stats.totalSessions ?? stats.sessionDates?.length ?? 0;
+        const lastPracticeTimestamp = Number(stats.lastPracticeTimestamp) || (stats.lastPracticeDate
+          ? new Date(stats.lastPracticeDate).getTime()
+          : 0);
         statsMap.set(TDFId, {
           totalTrials: stats.totalTrials,
           overallAccuracy: stats.overallAccuracy,
           totalTimeMinutes: stats.totalTimeMinutes,
           itemsPracticed: practicedCount,
+          lastPracticeTimestamp: Number.isFinite(lastPracticeTimestamp) ? lastPracticeTimestamp : 0,
           lastPracticeDate: stats.lastPracticeDate
             ? new Date(stats.lastPracticeDate).toLocaleDateString()
             : 'N/A',
@@ -1067,6 +1112,7 @@ Template.learningDashboard.rendered = async function(this: any) {
         overallAccuracy: stats?.overallAccuracy,
         totalTimeMinutes: stats?.totalTimeMinutes,
         itemsPracticed: stats?.itemsPracticed,
+        lastPracticeTimestamp: stats?.lastPracticeTimestamp,
         lastPracticeDate: stats?.lastPracticeDate,
         totalSessions: stats?.totalSessions
       };
@@ -1075,21 +1121,7 @@ Template.learningDashboard.rendered = async function(this: any) {
     }
   }
 
-  // Separate into used and unused for sorting
-  const usedTdfs = allTdfObjects.filter(t => t.isUsed);
-  const unusedTdfs = allTdfObjects.filter(t => !t.isUsed);
-
-  // Sort used TDFs by lastPracticeDate (most recent first)
-  usedTdfs.sort((a: any, b: any) => {
-    const dateA = new Date(a.lastPracticeDate || 0);
-    const dateB = new Date(b.lastPracticeDate || 0);
-    return dateB.getTime() - dateA.getTime();
-  });
-
-  // Sort unused TDFs alphabetically by name
-  unusedTdfs.sort((a, b) => a.displayName.localeCompare(b.displayName, 'en', {numeric: true, sensitivity: 'base'}));
-
-  // Combine: used first (sorted by recent), then unused (sorted alphabetically)
+  const { used: usedTdfs, unused: unusedTdfs } = splitTdfsByUsage(allTdfObjects);
   const combinedTdfs = [...usedTdfs, ...unusedTdfs];
 
   this.allTdfsList.set(combinedTdfs);

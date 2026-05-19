@@ -12,6 +12,7 @@ export interface DashboardHistoryRecord {
   CFStimFileIndex?: string | number | null;
   problemName?: string | number | null;
   recordedServerTime?: string | Date | null;
+  time?: number | string | Date | null;
   TDFId?: string;
   userId?: string;
   levelUnitType?: string;
@@ -29,8 +30,9 @@ export interface DashboardTdfStats {
   overallAccuracy: number;
   firstPracticeDate: Date | null;
   lastPracticeDate: Date | null;
+  lastPracticeTimestamp: number;
   lastProcessedHistoryId: string | null;
-  lastProcessedTimestamp: string | Date | null;
+  lastProcessedTimestamp: string | number | Date | null;
 }
 
 export type DashboardStatsByTdf = Record<string, DashboardTdfStats>;

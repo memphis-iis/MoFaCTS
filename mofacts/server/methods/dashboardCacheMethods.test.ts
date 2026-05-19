@@ -31,6 +31,32 @@ describe('dashboardCacheMethods', function() {
     expect(stats.totalTimeMs).to.equal(6300);
     expect(stats.itemsPracticedCount).to.equal(2);
     expect(stats.overallAccuracy).to.equal(50);
+    expect(stats.lastPracticeTimestamp).to.equal(new Date('2026-02-11T10:00:00.000Z').getTime());
+  });
+
+  it('computeCacheStats uses the latest trial history timestamp for recency', function() {
+    const history = [
+      {
+        _id: 'h1',
+        outcome: 'correct',
+        recordedServerTime: new Date('2026-02-11T10:00:00.000Z')
+      },
+      {
+        _id: 'h2',
+        outcome: 'correct',
+        recordedServerTime: new Date('2026-02-10T10:00:00.000Z')
+      },
+      {
+        _id: 'h3',
+        outcome: 'correct',
+        time: new Date('2026-02-12T10:00:00.000Z').getTime()
+      }
+    ];
+
+    const stats = computeCacheStats(history, 'Demo', () => 0);
+
+    expect(stats.lastPracticeTimestamp).to.equal(new Date('2026-02-12T10:00:00.000Z').getTime());
+    expect(stats.lastPracticeDate?.toISOString()).to.equal('2026-02-12T10:00:00.000Z');
   });
 
   it('computeSummaryStats combines multiple TDF stats', function() {
@@ -47,6 +73,7 @@ describe('dashboardCacheMethods', function() {
         overallAccuracy: 80,
         firstPracticeDate: new Date('2026-02-12T00:00:00.000Z'),
         lastPracticeDate: new Date('2026-02-12T00:00:00.000Z'),
+        lastPracticeTimestamp: new Date('2026-02-12T00:00:00.000Z').getTime(),
         lastProcessedHistoryId: null,
         lastProcessedTimestamp: null
       },
@@ -62,6 +89,7 @@ describe('dashboardCacheMethods', function() {
         overallAccuracy: 60,
         firstPracticeDate: new Date('2026-02-13T00:00:00.000Z'),
         lastPracticeDate: new Date('2026-02-13T00:00:00.000Z'),
+        lastPracticeTimestamp: new Date('2026-02-13T00:00:00.000Z').getTime(),
         lastProcessedHistoryId: null,
         lastProcessedTimestamp: null
       }
@@ -88,6 +116,7 @@ describe('dashboardCacheMethods', function() {
         overallAccuracy: 75,
         firstPracticeDate: new Date('2026-02-12T00:00:00.000Z'),
         lastPracticeDate: new Date('2026-02-12T00:00:00.000Z'),
+        lastPracticeTimestamp: new Date('2026-02-12T00:00:00.000Z').getTime(),
         lastProcessedHistoryId: null,
         lastProcessedTimestamp: null
       },
@@ -103,6 +132,7 @@ describe('dashboardCacheMethods', function() {
         overallAccuracy: 50,
         firstPracticeDate: new Date('2026-02-13T00:00:00.000Z'),
         lastPracticeDate: new Date('2026-02-13T00:00:00.000Z'),
+        lastPracticeTimestamp: new Date('2026-02-13T00:00:00.000Z').getTime(),
         lastProcessedHistoryId: null,
         lastProcessedTimestamp: null
       },
@@ -118,6 +148,7 @@ describe('dashboardCacheMethods', function() {
         overallAccuracy: 0,
         firstPracticeDate: null,
         lastPracticeDate: null,
+        lastPracticeTimestamp: 0,
         lastProcessedHistoryId: null,
         lastProcessedTimestamp: null
       }
