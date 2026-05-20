@@ -1,0 +1,11 @@
+title = "MoFaCTS gitleaks configuration"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Vendored h5p-standalone bundle minifies object property names that match generic-api-key."
+targetRules = ["generic-api-key"]
+paths = [
+  '''mofacts/public/h5p-standalone/main\.bundle\.js$''',
+]
