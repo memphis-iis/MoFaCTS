@@ -48,6 +48,7 @@
   let measuring = false;
   let timedOut = false;
   let lastFitLogSignature = '';
+  let loggedMeasurementRequestForEpoch = false;
 
   $: baseUrl = typeof window !== 'undefined' && window.location?.origin
     ? `${window.location.origin}/`
@@ -116,6 +117,7 @@
     measuring = false;
     timedOut = false;
     lastFitLogSignature = '';
+    loggedMeasurementRequestForEpoch = false;
     clearMeasurementTimeout();
     void requestMeasurementAfterPaint(reason);
   }
@@ -140,6 +142,7 @@
     measurementWidth = candidateWidths[0] ?? firstMeasurementWidth;
     measuring = true;
     timedOut = false;
+    loggedMeasurementRequestForEpoch = false;
     clearMeasurementTimeout();
     scheduleMeasurementTimeout(fitEpoch, phase);
     void requestMeasurementAfterPaint(reason);
@@ -241,18 +244,7 @@
     activeMeasurementRequestId = measurementRequestId;
     measuring = true;
     scheduleMeasurementTimeout(fitEpoch, fitPhase);
-    clientConsole(2, '[H5PFrame][Fit] request-measurement', {
-      reason,
-      requestId: activeMeasurementRequestId,
-      phase: fitPhase,
-      epoch: fitEpoch,
-      stageWidth,
-      stageHeight,
-      measurementWidth,
-      activeCandidateIndex,
-      candidateWidths,
-      contentId: config?.contentId,
-    });
+    logMeasurementRequest(reason, activeMeasurementRequestId);
     postH5PAction('resize', {
       requestId: activeMeasurementRequestId,
       measurementWidth,
@@ -283,6 +275,26 @@
       viewportResizeObserver.observe(viewportElement);
       void requestMeasurementAfterPaint('viewport-observer');
     }
+  }
+
+  function logMeasurementRequest(reason, requestId) {
+    if (loggedMeasurementRequestForEpoch) {
+      return;
+    }
+
+    loggedMeasurementRequestForEpoch = true;
+    clientConsole(2, '[H5PFrame][Fit] request-measurement', {
+      reason,
+      requestId,
+      phase: fitPhase,
+      epoch: fitEpoch,
+      stageWidth,
+      stageHeight,
+      measurementWidth,
+      activeCandidateIndex,
+      candidateWidths,
+      contentId: config?.contentId,
+    });
   }
 
   function updateStageSize(reason) {
