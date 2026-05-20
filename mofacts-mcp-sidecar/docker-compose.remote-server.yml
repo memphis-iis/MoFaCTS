@@ -1,0 +1,16 @@
+services:
+  playwright-mcp:
+    environment:
+      BASE_URL: https://mofacts.optimallearning.org
+
+  mongo-mcp:
+    environment:
+      MONGO_URI: mongodb://mongodb:27017/MoFACT-meteor3
+      DB_NAME: MoFACT-meteor3
+    networks:
+      - mofacts_app
+
+networks:
+  mofacts_app:
+    external: true
+    name: mofacts_mofacts

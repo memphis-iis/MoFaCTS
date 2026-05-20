@@ -1,0 +1,15 @@
+{
+  "name": "mofacts-mongo-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Minimal read-only Mongo MCP server for MoFaCTS analytics queries.",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "mongodb": "^7.1.1",
+    "zod": "^4.1.12"
+  }
+}

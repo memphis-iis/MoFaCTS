@@ -1,0 +1,39 @@
+services:
+  playwright-mcp:
+    environment:
+      BASE_URL: ${BASE_URL:-https://mofacts.optimallearning.org}
+      HOME: /home/node
+      TEMP: /tmp
+      TMPDIR: /tmp
+      PLAYWRIGHT_MCP_OUTPUT_DIR: /tmp/playwright-mcp/output
+
+  ssh-tunnel:
+    image: alpine:3.20
+    command:
+      - /bin/sh
+      - -lc
+      - |
+        apk add --no-cache openssh-client >/dev/null
+        cp /keys/prodkey.pem /tmp/prodkey.pem
+        chmod 600 /tmp/prodkey.pem
+        exec ssh \
+          -i /tmp/prodkey.pem \
+          -o StrictHostKeyChecking=accept-new \
+          -o ExitOnForwardFailure=yes \
+          -o ServerAliveInterval=30 \
+          -o ServerAliveCountMax=3 \
+          -N \
+          -L 0.0.0.0:27017:${PROD_MONGO_HOST}:27017 \
+          ${SSH_HOST}
+    volumes:
+      - ${SSH_KEY_PATH}:/keys/prodkey.pem:ro
+    expose:
+      - "27017"
+    restart: unless-stopped
+
+  mongo-mcp:
+    depends_on:
+      - ssh-tunnel
+    environment:
+      MONGO_URI: mongodb://ssh-tunnel:27017/${DB_NAME:-MoFACT-meteor3}
+      DB_NAME: ${DB_NAME:-MoFACT-meteor3}

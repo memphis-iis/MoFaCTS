@@ -1,0 +1,50 @@
+services:
+  playwright-mcp:
+    build:
+      context: ./services/playwright-mcp
+    image: mofacts-playwright-mcp
+    init: true
+    command:
+      # Force Linux-native writable paths inside the container.
+      # Without these, some MCP clients send a Windows cwd like C:\... during init,
+      # and Playwright MCP may derive /C:/... output paths that crash in Linux.
+      #
+      # Use isolated browser contexts by default for repeatable experiment smoke tests.
+      # This avoids stale cookies and profile lock errors between AI-driven runs.
+      - --isolated
+      - --output-dir
+      - /tmp/playwright-mcp/output
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8931"
+    environment:
+      # Playwright MCP does not enforce a base URL itself.       
+      # Keep the target site in one place so your AI client knows what to open first.
+      BASE_URL: ${BASE_URL:-http://host.docker.internal:3100}
+      HOME: /home/node
+      TEMP: /tmp
+      TMPDIR: /tmp
+      PLAYWRIGHT_MCP_OUTPUT_DIR: /tmp/playwright-mcp/output
+    ports:
+      # Bind to localhost only so the MCP endpoint stays local to this machine by default.
+      - "127.0.0.1:8931:8931"
+    extra_hosts:
+      # Lets the container reach services running directly on your host machine.
+      # On Docker Desktop this usually already works; this line helps on Linux too.
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  mongo-mcp:
+    build:
+      context: ./services/mongo-mcp
+    environment:
+      MONGO_URI: ${MONGO_URI:-mongodb://host.docker.internal:27017/MoFACT}
+      DB_NAME: ${DB_NAME:-MoFACT}
+      PORT: 8932
+    ports:
+      # Local-only exposure, same idea as Playwright above.      
+      - "127.0.0.1:8932:8932"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
