@@ -28,6 +28,9 @@ The application source tree lives under `mofacts/`.
 ## Operational Rules
 
 - Silent fallbacks are not allowed; fail clearly when invariants break.
+- Do not make "patch" fixes that leave broken or rickety wiring in place and merely make the immediate symptom appear to work. When a subsystem boundary or flow is wrong, analyze the whole flow, name the invariants, and rebuild the subsystem or integration point so it is coherent and durable.
+- When a plan and its invariants make sense, work toward it incrementally using hill climbing: make the smallest coherent move, verify whether it improved the system, and continue. Stop and re-analyze only when the plan or invariants no longer make sense.
+- Do not fix a new behavior by changing unrelated working behavior. Existing working paths, especially explicitly identified reference paths, must be treated as regression-sensitive and preserved unless the user explicitly asks to redesign them.
 - Stay on the current branch for local commits and pushes unless the user explicitly asks to create or switch branches.
 - Do not create `codex/*` or other work branches automatically.
 - This repository normally expects agent commits to be made on `main` when the checkout is on `main`.
