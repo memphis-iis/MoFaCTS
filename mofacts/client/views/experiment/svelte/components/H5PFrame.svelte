@@ -78,6 +78,7 @@
   $: surfaceStyle = `width:${visibleNaturalWidth}px;height:${visibleNaturalHeight}px;transform:scale(${frameScale});`;
   $: frameStyle = `width:${measurementFrameWidth}px;height:${measurementFrameHeight}px;`;
   $: continueReady = Boolean(pendingResult);
+  $: showInitialFitMask = isSelfHosted && !fitResult && !timedOut;
 
   $: if (embedUrl !== currentEmbedUrl) {
     currentEmbedUrl = embedUrl;
@@ -584,6 +585,9 @@
         </button>
       </div>
     {/if}
+    {#if showInitialFitMask}
+      <div class="h5p-initial-fit-mask" aria-hidden="true"></div>
+    {/if}
   {:else}
     <div class="h5p-frame-error" role="alert">
       {validation.message || 'Invalid H5P display configuration'}
@@ -604,6 +608,7 @@
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
+    position: relative;
   }
 
   .h5p-frame-viewport {
@@ -637,6 +642,14 @@
     min-height: 0;
     background: var(--background-color, #fff);
     overflow: clip;
+  }
+
+  .h5p-initial-fit-mask {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background: var(--stimuli-box-color);
+    pointer-events: auto;
   }
 
   .h5p-continue-bar {
