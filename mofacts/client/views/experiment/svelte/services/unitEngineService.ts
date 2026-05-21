@@ -22,9 +22,11 @@ import { resolveDynamicAssetPath } from './mediaResolver';
 import { assertIdInvariants, logIdInvariantBreachOnce } from '../../../../lib/idContext';
 import { applyDisplayFieldSubset } from '../../../../../common/lib/displayFieldSubsets';
 import { isSelfHostedH5PConfig, normalizeH5PDisplayConfig } from '../../../../../common/lib/h5pDisplay';
+import { resolveH5PModelOutcomes } from '../../../../../common/lib/h5pTrialResult';
 import type {
   EngineServiceResult,
   ExperimentState,
+  H5PTrialResult,
   SelectCardServiceEvent,
   UnitEngineLike,
   UpdateEngineServiceEvent,
@@ -37,6 +39,7 @@ interface UnitEngineServiceContext extends Record<string, unknown> {
   engine?: UnitEngineLike | null;
   questionIndex?: number;
   isCorrect?: boolean;
+  h5pResult?: H5PTrialResult | null;
   testType?: string;
   timestamps?: {
     trialEnd: number;
@@ -55,6 +58,7 @@ interface UnitEngineServiceContext extends Record<string, unknown> {
 }
 
 interface UpdateEngineServiceContext extends UnitEngineServiceContext {
+  h5pResult?: H5PTrialResult | null;
   timestamps: {
     trialEnd: number;
     trialStart: number;
@@ -1216,8 +1220,24 @@ export async function updateEngineService(
         testType
       );
       const practiceTime = computePracticeTimeMs(timings.endLatency, timings.feedbackLatency);
-      
-      await engine.cardAnswered(isCorrect, practiceTime, testType);
+      const h5pOutcomes = context.h5pResult
+        ? resolveH5PModelOutcomes(context.h5pResult)
+        : null;
+
+      if (h5pOutcomes) {
+        clientConsole(2, '[Unit Engine] H5P model outcome batch', {
+          contentId: context.h5pResult?.contentId,
+          batchId: context.h5pResult?.batchId,
+          outcomes: h5pOutcomes.map((outcome) => outcome.correct ? 1 : 0),
+          practiceTime,
+        });
+
+        for (const outcome of h5pOutcomes) {
+          await engine.cardAnswered(outcome.correct, practiceTime, testType);
+        }
+      } else {
+        await engine.cardAnswered(isCorrect, practiceTime, testType);
+      }
 
       if (!Session.get('isVideoSession')) {
         if (engine.unitType === 'model' && engine.currentCardRef) {

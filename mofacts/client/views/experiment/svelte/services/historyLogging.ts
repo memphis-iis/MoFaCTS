@@ -31,6 +31,7 @@ import {
   insertH5PHistoryRows,
   resolveH5PResultForHistory,
 } from './historyH5P';
+import { resolveH5PModelOutcomes } from '../../../../../common/lib/h5pTrialResult';
 import type {
   HistoryLoggingEvent,
   HistoryLoggingResult,
@@ -351,7 +352,7 @@ function checkAudioInputMode(): boolean {
   return userAudioToggled && tdfAudioEnabled;
 }
 
-function recordSessionOutcomeHistories(testType: string, isCorrect: boolean): void {
+function recordSessionOutcomeHistories(testType: string, outcomes: boolean[]): void {
   if (typeof testType !== 'string') {
     throw new Error('[History Logging] testType is missing or invalid');
   }
@@ -361,10 +362,12 @@ function recordSessionOutcomeHistories(testType: string, isCorrect: boolean): vo
   }
 
   if (testType !== 'i' && testType !== 's') {
-    if (typeof isCorrect !== 'boolean') {
-      throw new Error('[History Logging] isCorrect is invalid for outcome history update');
+    if (!Array.isArray(outcomes) || outcomes.length === 0 || outcomes.some((outcome) => typeof outcome !== 'boolean')) {
+      throw new Error('[History Logging] outcome history update requires at least one boolean outcome');
     }
-    overallOutcomeHistory.push(isCorrect ? 1 : 0);
+    for (const outcome of outcomes) {
+      overallOutcomeHistory.push(outcome ? 1 : 0);
+    }
     Session.set('overallOutcomeHistory', overallOutcomeHistory);
   }
 
@@ -665,9 +668,13 @@ export async function historyLoggingService(
 ): Promise<HistoryLoggingResult> {
   try {
     
+    const h5pBatch = resolveH5PResultForHistory(context.currentDisplay, context.h5pResult);
+    const outcomeHistoryValues = h5pBatch
+      ? resolveH5PModelOutcomes(h5pBatch).map((outcome) => outcome.correct)
+      : [context.isCorrect];
 
     if (!(event as Record<string, unknown>)?.skipOutcomeHistoryUpdate) {
-      recordSessionOutcomeHistories(context.testType, context.isCorrect);
+      recordSessionOutcomeHistories(context.testType, outcomeHistoryValues);
     }
 
     // Calculate timings
@@ -683,9 +690,10 @@ export async function historyLoggingService(
       ? context.timestamps.trialStart
       : context.timestamps.firstKeypress ?? context.timestamps.trialEnd;
 
-    const feedbackText = getDisplayedFeedbackText(context.testType, context.feedbackText, context.feedbackSuppressed === true);
-
-    const h5pBatch = resolveH5PResultForHistory(context.currentDisplay, context.h5pResult);
+    const feedbackSuppressed = context.feedbackSuppressed === true || Boolean(h5pBatch);
+    const feedbackText = h5pBatch
+      ? ''
+      : getDisplayedFeedbackText(context.testType, context.feedbackText, feedbackSuppressed);
 
     // Create record
     const engine = (event.engine || context.engine) as HistoryEngineLike;
@@ -707,7 +715,7 @@ export async function historyLoggingService(
       questionIndex: context.questionIndex ?? 1,
       alternateDisplayIndex: context.alternateDisplayIndex ?? null,
       feedbackText,
-      feedbackSuppressed: context.feedbackSuppressed === true,
+      feedbackSuppressed,
       reviewEntry: context.reviewEntry || '',
       answerContext: {
         originalDisplay: context.currentDisplay?.text || context.currentDisplay?.clozeText || '',

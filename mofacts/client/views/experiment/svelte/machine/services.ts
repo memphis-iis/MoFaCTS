@@ -18,6 +18,8 @@ import { speechRecognitionService as srService } from '../services/speechRecogni
 import { videoPlayerService as videoService } from '../services/videoPlayerService';
 import { CardStore } from '../../modules/cardStore';
 import { fromCallback, fromPromise, type AnyEventObject } from 'xstate';
+import { resolveH5PModelOutcomes } from '../../../../../common/lib/h5pTrialResult';
+import type { H5PTrialResult } from '../../../../../common/types';
 
 type TimeoutContextLike = Parameters<typeof getMainTimeoutMs>[0] & {
   feedbackTimeoutMs?: number;
@@ -41,6 +43,7 @@ interface AnswerEvaluationContext extends ServiceRecord {
   userAnswer?: unknown;
   currentAnswer?: string;
   originalAnswer?: string;
+  h5pResult?: H5PTrialResult | null;
   deliverySettings?: {
     caseSensitive?: boolean;
   };
@@ -452,7 +455,15 @@ export function createServices() {
  * (the user said a recognized word), NOT whether the answer is correct.
  * We still need to evaluate the transcript against the actual answer.
  */
-async function evaluateAnswerService(context: AnswerEvaluationContext) {
+export async function evaluateAnswerService(context: AnswerEvaluationContext) {
+  if (context.h5pResult) {
+    const outcomes = resolveH5PModelOutcomes(context.h5pResult);
+    return {
+      isCorrect: outcomes.every((outcome) => outcome.correct),
+      matchText: outcomes.map((outcome) => outcome.correct ? '1' : '0').join(''),
+    };
+  }
+
   const rawAnswer = typeof context.userAnswer === 'string' ? context.userAnswer : '';
   const userAnswer = rawAnswer.trim();
   const currentAnswer = context.currentAnswer || '';

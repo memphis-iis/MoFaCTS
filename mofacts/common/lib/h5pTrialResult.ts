@@ -1,5 +1,11 @@
 import type { H5PTrialResult } from '../types/h5p';
 
+export interface H5PModelOutcome {
+  correct: boolean;
+  eventIndex: number;
+  source: 'event' | 'score';
+}
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
@@ -101,4 +107,44 @@ export function normalizeH5PTrialResult(
   }
 
   return normalized;
+}
+
+export function resolveH5PModelOutcomes(result: H5PTrialResult): H5PModelOutcome[] {
+  if (result.completed !== true) {
+    throw new Error('H5P model outcomes require a completed trial result');
+  }
+
+  const eventOutcomes: H5PModelOutcome[] = [];
+  result.events.forEach((event, index) => {
+    if (typeof event.correct !== 'boolean') {
+      return;
+    }
+    eventOutcomes.push({
+      correct: event.correct,
+      eventIndex: Number.isFinite(Number(event.eventIndex)) ? Number(event.eventIndex) : index,
+      source: 'event',
+    });
+  });
+
+  if (eventOutcomes.length > 0) {
+    return eventOutcomes;
+  }
+
+  if (
+    typeof result.score === 'number' &&
+    Number.isInteger(result.score) &&
+    result.score >= 0 &&
+    typeof result.maxScore === 'number' &&
+    Number.isInteger(result.maxScore) &&
+    result.maxScore > 0 &&
+    result.score <= result.maxScore
+  ) {
+    return Array.from({ length: result.maxScore }, (_, index) => ({
+      correct: index < Number(result.score),
+      eventIndex: index,
+      source: 'score' as const,
+    }));
+  }
+
+  throw new Error('H5P model outcomes require event correctness or integer score/maxScore');
 }

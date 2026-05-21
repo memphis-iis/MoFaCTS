@@ -768,6 +768,7 @@
         incomingSlot.props.display?.imgSrc || '',
         incomingSlot.props.display?.videoSrc || '',
         incomingSlot.props.display?.audioSrc || '',
+        incomingSlot.props.display?.h5p?.contentId || '',
       ].join('::')
     : 'none';
   $: if (incomingSlotKey !== lastIncomingSlotKey) {
