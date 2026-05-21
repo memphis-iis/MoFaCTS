@@ -5,6 +5,20 @@ const { defineConfig } = require("@meteorjs/rspack");
 const sveltePreprocess = require("svelte-preprocess");
 const svelteLoaderPath = require.resolve("./scripts/loaders/svelte-loader-wrapper.cjs");
 
+function getDevServerAllowedHosts() {
+  const configuredHosts = String(process.env.MOFACTS_RSPACK_ALLOWED_HOSTS || "")
+    .split(",")
+    .map((host) => host.trim())
+    .filter(Boolean);
+
+  return Array.from(new Set([
+    "localhost",
+    "127.0.0.1",
+    "host.docker.internal",
+    ...configuredHosts,
+  ]));
+}
+
 export default defineConfig((Meteor) => {
   return {
     // Split node_modules into a separate "vendor" chunk for parallel loading
@@ -12,6 +26,11 @@ export default defineConfig((Meteor) => {
     // Client-only — server must emit a single bundle file.
     ...(Meteor.isClient && Meteor.splitVendorChunk()),
     ...(Meteor.isClient && {
+      ...(!Meteor.isProduction && {
+        devServer: {
+          allowedHosts: getDevServerAllowedHosts(),
+        },
+      }),
       optimization: {
         splitChunks: {
           chunks: 'all',

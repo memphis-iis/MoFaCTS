@@ -55,6 +55,8 @@ mofacts/.deploy/.env*.production
 mofacts/.deploy/.env.staging
 mofacts/.deploy/.env*.staging
 mofacts/.deploy/local-data/
+mofacts/.deploy/local-build/
+mofacts/.deploy/local-dev/
 
 
 # Backup files from async/await conversion

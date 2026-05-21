@@ -42,6 +42,16 @@ That starts:
 - Playwright MCP at `http://localhost:8931/mcp`
 - Mongo MCP at `http://localhost:8932/mcp`
 
+## Local Hotfix Dev Target
+
+When testing the MoFaCTS hotfix dev server at `http://localhost:3200`, start the sidecar with:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.hotfix-dev.yml up -d
+```
+
+That points Playwright MCP at `http://host.docker.internal:3200` and connects Mongo MCP to the local Docker database `MoFACT-meteor3` on the `deploy_mofacts` network.
+
 ## OpenAI Runner
 
 If you want an OpenAI-native local client instead of Gemini, use the small Agents SDK runner in `openai-runner/`.
