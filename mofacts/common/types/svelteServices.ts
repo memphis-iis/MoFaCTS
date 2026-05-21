@@ -1,6 +1,8 @@
 // Owner: Learning Runtime Team
 // Shared service contracts for Svelte card initialization/resume flows.
 
+import type { H5PTrialResult } from './h5p';
+
 export type UnitType = 'schedule' | 'video' | 'model' | 'instruction-only';
 
 export type VideoCheckpointBehavior = 'none' | 'pause' | 'all' | 'some' | 'adaptive';
@@ -234,6 +236,7 @@ export interface HistoryLoggingContext {
   reviewEntry?: string;
   feedbackText?: string;
   feedbackSuppressed?: boolean;
+  h5pResult?: H5PTrialResult | null;
 }
 
 export interface HistoryLoggingEvent {

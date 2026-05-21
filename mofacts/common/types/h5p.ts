@@ -23,3 +23,17 @@ export interface H5PDisplayConfig {
   scorePolicy?: H5PScorePolicy;
   preferredHeight?: number;
 }
+
+export interface H5PTrialResult {
+  contentId: string;
+  batchId: string;
+  library?: string;
+  widgetType?: string;
+  completed: boolean;
+  passed?: boolean;
+  score?: number;
+  maxScore?: number;
+  scaledScore?: number;
+  responseSummary?: unknown;
+  events: Array<Record<string, unknown>>;
+}

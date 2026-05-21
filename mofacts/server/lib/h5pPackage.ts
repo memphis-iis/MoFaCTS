@@ -73,12 +73,53 @@ function hasUnsafeZipPath(path: string): boolean {
   );
 }
 
-function getH5PStorageRoot(): string {
+const CANONICAL_H5P_STORAGE_ROOT = '/root/h5p-content';
+
+export function getH5PStorageRoot(): string {
   return path.resolve(process.env.HOME || process.cwd(), 'h5p-content');
 }
 
 export function getH5PLibraryStorageRoot(): string {
   return path.resolve(process.env.HOME || process.cwd(), 'h5p-libraries');
+}
+
+function pathIsInsideDirectory(targetPath: string, parentPath: string): boolean {
+  const relative = path.relative(parentPath, targetPath);
+  return !relative.startsWith('..') && !path.isAbsolute(relative);
+}
+
+function canonicalStorageRelativePath(storagePath: string): string | null {
+  const normalized = storagePath.replace(/\\/g, '/');
+  const canonicalRoot = CANONICAL_H5P_STORAGE_ROOT;
+  if (normalized === canonicalRoot) {
+    return '';
+  }
+  if (!normalized.startsWith(`${canonicalRoot}/`)) {
+    return null;
+  }
+  return normalized.slice(canonicalRoot.length + 1);
+}
+
+export function resolveStoredH5PStoragePath(storagePath: string): string {
+  const trimmedStoragePath = storagePath.trim();
+  if (!trimmedStoragePath) {
+    throw new Error('H5P content storage path is missing');
+  }
+
+  const currentStorageRoot = getH5PStorageRoot();
+  const resolvedStoragePath = path.resolve(trimmedStoragePath);
+  if (pathIsInsideDirectory(resolvedStoragePath, currentStorageRoot)) {
+    return resolvedStoragePath;
+  }
+
+  const relativeCanonicalPath = canonicalStorageRelativePath(trimmedStoragePath);
+  if (relativeCanonicalPath === null) {
+    return resolvedStoragePath;
+  }
+
+  const rebasedStoragePath = path.resolve(currentStorageRoot, relativeCanonicalPath);
+  assertInsideDirectory(rebasedStoragePath, currentStorageRoot);
+  return rebasedStoragePath;
 }
 
 function sanitizeStorageSegment(value: string): string {

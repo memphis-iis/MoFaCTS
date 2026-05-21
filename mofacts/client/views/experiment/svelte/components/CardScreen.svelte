@@ -36,6 +36,8 @@
   import { deriveSrStatus } from '../utils/srStatus';
   import { getMainTimeoutMs, getFeedbackTimeoutMs } from '../utils/timeoutUtils';
   import { recordCurrentInstructionContinue } from '../../instructions';
+  import { isSelfHostedH5PDisplay } from '../../../../../common/lib/h5pDisplay';
+  import { normalizeH5PTrialResult } from '../../../../../common/lib/h5pTrialResult';
   import PerformanceArea from './PerformanceArea.svelte';
   import TrialContent from './TrialContent.svelte';
   import VideoSessionMode from './VideoSessionMode.svelte';
@@ -478,7 +480,7 @@
           : 'none')));
   $: baseDisplayVisible = baseTrialSubsetKind !== 'none';
   $: baseFeedbackVisible = baseTrialSubsetKind === 'feedback' || baseTrialSubsetKind === 'study';
-  $: h5pOwnsResponse = context.currentDisplay?.h5p?.sourceType === 'self-hosted' && baseTrialSubsetKind === 'question';
+  $: h5pOwnsResponse = isSelfHostedH5PDisplay(context.currentDisplay) && baseTrialSubsetKind === 'question';
   $: baseResponseVisible = !h5pOwnsResponse && (baseTrialSubsetKind === 'question' || baseTrialSubsetKind === 'forceCorrect');
   $: if (baseTrialSubsetKind !== 'question') {
     submittedH5PResultKey = '';
@@ -1032,20 +1034,21 @@
 
   function handleH5PResult(event) {
     const detail = event.detail || {};
-    if (!h5pOwnsResponse || detail.contentId !== context.currentDisplay?.h5p?.contentId) {
+    if (!h5pOwnsResponse) {
       return;
     }
-    const resultKey = `${detail.contentId || ''}|${detail.batchId || ''}`;
-    if (submittedH5PResultKey === resultKey) {
+    if (submittedH5PResultKey) {
       return;
     }
+    const h5pResult = normalizeH5PTrialResult(detail, context.currentDisplay?.h5p?.contentId);
+    const resultKey = h5pResult.batchId;
     submittedH5PResultKey = resultKey;
-    Session.set('currentH5PResultBatch', detail);
     send({
       type: 'SUBMIT',
-      userAnswer: detail.completed ? '__H5P_COMPLETED__' : '__H5P_INCOMPLETE__',
+      userAnswer: h5pResult.completed ? '__H5P_COMPLETED__' : '__H5P_INCOMPLETE__',
       timestamp: Date.now(),
-      source: 'h5p'
+      source: 'h5p',
+      h5pResult
     });
   }
 
@@ -2572,7 +2575,7 @@
 
   .debug-state {
     position: fixed;
-    bottom: 10px;
+    top: 10px;
     right: 10px;
     background: color-mix(in srgb, var(--text-color) 80%, transparent);
     color: var(--accent-color);

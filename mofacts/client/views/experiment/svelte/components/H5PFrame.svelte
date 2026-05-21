@@ -1,34 +1,43 @@
 <script>
-  import { createEventDispatcher, onDestroy, tick } from 'svelte';
+  import { createEventDispatcher, flushSync, onDestroy, tick } from 'svelte';
   import {
     clampH5PPreferredHeight,
     H5P_DEFAULT_PREFERRED_HEIGHT,
+    isSelfHostedH5PConfig,
     validateH5PDisplayConfig,
   } from '../../../../../common/lib/h5pDisplay';
   import { clientConsole } from '../../../../lib/clientLogger';
   import {
+    buildH5PCandidateWidths,
     chooseH5PFit,
     getH5PScaleFloor,
   } from '../utils/h5pFitPolicy';
+  import { buildH5PFrameLayout } from '../utils/h5pFrameLayout';
+  import { parseH5PFrameMessage } from '../utils/h5pFrameMessages';
   import { waitForBrowserPaint } from '../utils/paintTiming';
+  import H5PFrameView from './H5PFrameView.svelte';
 
   const dispatch = createEventDispatcher();
-  const BOOTSTRAP_FRAME_WIDTH = 640;
-  const MIN_FRAME_HEIGHT = 120;
   const FIT_VERTICAL_SAFETY_PX = 8;
   const MEASUREMENT_TIMEOUT_MS = 1500;
   const CANDIDATE_MEASUREMENT_TIMEOUT_MS = 750;
+  const FEEDBACK_RESIZE_SETTLE_MS = 120;
+  const FEEDBACK_RESIZE_MAX_SETTLE_MS = 360;
 
   export let config = null;
 
   let pendingResult = null;
+  let resultLifecycle = 'idle';
   let frameElement;
   let viewportElement;
   let continueBarElement;
   let viewportResizeObserver;
+  let observedViewportElement;
   let resizeFrameId = 0;
   let measurementTimeoutId = 0;
-  let currentEmbedUrl = '';
+  let feedbackSettleTimeoutId = 0;
+  let feedbackMaxSettleTimeoutId = 0;
+  let currentConfigSignature = '';
 
   let fitPhase = 'question';
   let fitEpoch = 0;
@@ -55,34 +64,39 @@
     : 'https://mofacts.local/';
   $: validation = validateH5PDisplayConfig(config, baseUrl);
   $: embedUrl = validation.valid
-    ? (config?.sourceType === 'self-hosted'
+    ? (isSelfHostedH5PConfig(config)
       ? `/h5p-content/${encodeURIComponent(String(config?.contentId || ''))}/play`
       : String(config?.embedUrl || '').trim())
     : '';
-  $: isSelfHosted = config?.sourceType === 'self-hosted';
+  $: configSignature = validation.valid
+    ? [
+      String(config?.sourceType || ''),
+      String(config?.contentId || ''),
+      String(config?.packageAssetId || ''),
+      String(config?.library || ''),
+      embedUrl,
+      String(config?.preferredHeight ?? ''),
+    ].join('|')
+    : '';
+  $: isSelfHosted = isSelfHostedH5PConfig(config);
   $: preferredHeight = clampH5PPreferredHeight(config?.preferredHeight ?? H5P_DEFAULT_PREFERRED_HEIGHT);
   $: reservedControlHeight = isSelfHosted && continueBarElement ? continueBarElement.offsetHeight : 0;
-  $: bootstrapFrameWidth = Math.max(1, Math.floor(stageWidth || BOOTSTRAP_FRAME_WIDTH));
-  $: bootstrapFrameHeight = Math.max(
-    MIN_FRAME_HEIGHT,
-    Math.floor(Math.min(stageHeight || preferredHeight, preferredHeight))
-  );
-  $: visibleNaturalWidth = Math.max(1, fitResult?.naturalWidth ?? naturalWidth ?? measurementWidth ?? bootstrapFrameWidth);
-  $: visibleNaturalHeight = Math.max(MIN_FRAME_HEIGHT, fitResult?.naturalHeight ?? naturalHeight ?? bootstrapFrameHeight);
-  $: measurementFrameWidth = Math.max(1, measurementWidth ?? visibleNaturalWidth);
-  $: measurementFrameHeight = Math.max(MIN_FRAME_HEIGHT, naturalHeight ?? fitResult?.naturalHeight ?? bootstrapFrameHeight);
-  $: frameScale = fitResult?.scale > 0 ? fitResult.scale : 1;
-  $: frameVisualWidth = Math.max(1, Math.floor(visibleNaturalWidth * frameScale));
-  $: frameVisualHeight = Math.max(1, Math.floor(visibleNaturalHeight * frameScale));
-  $: stageStyle = `width:${frameVisualWidth}px;height:${frameVisualHeight}px;`;
-  $: surfaceStyle = `width:${visibleNaturalWidth}px;height:${visibleNaturalHeight}px;transform:scale(${frameScale});`;
-  $: frameStyle = `width:${measurementFrameWidth}px;height:${measurementFrameHeight}px;`;
-  $: continueReady = Boolean(pendingResult);
-  $: showInitialFitMask = isSelfHosted && !fitResult && !timedOut;
+  $: frameLayout = buildH5PFrameLayout({
+    isSelfHosted,
+    stageWidth,
+    stageHeight,
+    preferredHeight,
+    fitResult,
+    naturalWidth,
+    naturalHeight,
+    measurementWidth,
+    measuring,
+  });
+  $: continueReady = Boolean(pendingResult && resultLifecycle === 'available');
 
-  $: if (embedUrl !== currentEmbedUrl) {
-    currentEmbedUrl = embedUrl;
-    resetH5PState('embed-url');
+  $: if (configSignature !== currentConfigSignature) {
+    currentConfigSignature = configSignature;
+    resetH5PState('config');
   }
 
   $: {
@@ -101,8 +115,25 @@
     }
   }
 
+  function clearFeedbackSettleTimers() {
+    if (feedbackSettleTimeoutId) {
+      clearTimeout(feedbackSettleTimeoutId);
+      feedbackSettleTimeoutId = 0;
+    }
+    if (feedbackMaxSettleTimeoutId) {
+      clearTimeout(feedbackMaxSettleTimeoutId);
+      feedbackMaxSettleTimeoutId = 0;
+    }
+  }
+
+  function finalizeSettledFeedbackResize(source) {
+    clearFeedbackSettleTimers();
+    completeCurrentCandidate(source);
+  }
+
   function resetH5PState(reason) {
     pendingResult = null;
+    resultLifecycle = 'idle';
     fitPhase = 'question';
     fitEpoch += 1;
     naturalWidth = null;
@@ -120,11 +151,48 @@
     lastFitLogSignature = '';
     loggedMeasurementRequestForEpoch = false;
     clearMeasurementTimeout();
+    clearFeedbackSettleTimers();
     void requestMeasurementAfterPaint(reason);
   }
 
+  function prepareNextH5PItemLayout(reason) {
+    fitPhase = 'question';
+    fitEpoch += 1;
+    naturalWidth = null;
+    naturalHeight = null;
+    measurementWidth = availableMeasurementWidth();
+    candidateWidths = measurementWidth > 0 ? [measurementWidth] : [];
+    measuredCandidates = [];
+    activeCandidateIndex = 0;
+    fitResult = null;
+    resizeMessageCount = 0;
+    fitAttemptCount = 0;
+    activeMeasurementRequestId = null;
+    measuring = measurementWidth > 0;
+    timedOut = false;
+    lastFitLogSignature = '';
+    loggedMeasurementRequestForEpoch = false;
+    clearMeasurementTimeout();
+    clearFeedbackSettleTimers();
+    void requestMeasurementAfterPaint(reason);
+  }
+
+  function availableMeasurementWidth() {
+    return Math.floor(viewportElement?.clientWidth || stageWidth || 0);
+  }
+
+  function beginCandidateMeasurements(availableWidth, allowAlternateWidths) {
+    const widths = allowAlternateWidths && !isSelfHosted
+      ? buildH5PCandidateWidths(availableWidth)
+      : [availableWidth];
+    candidateWidths = widths.length > 0 ? widths : [availableWidth];
+    measuredCandidates = [];
+    activeCandidateIndex = 0;
+    measurementWidth = candidateWidths[0] ?? availableWidth;
+  }
+
   function startFitEpoch(phase, reason) {
-    const firstMeasurementWidth = Math.floor(stageWidth || frameElement?.clientWidth || 0);
+    const firstMeasurementWidth = availableMeasurementWidth();
     if (firstMeasurementWidth <= 0) {
       clientConsole(1, '[H5PFrame][Fit] cannot start epoch without a measured stage width', {
         phase,
@@ -137,14 +205,13 @@
     fitEpoch += 1;
     naturalWidth = null;
     naturalHeight = null;
-    candidateWidths = [firstMeasurementWidth];
-    measuredCandidates = [];
-    activeCandidateIndex = 0;
-    measurementWidth = candidateWidths[0] ?? firstMeasurementWidth;
+    fitResult = null;
+    beginCandidateMeasurements(firstMeasurementWidth, true);
     measuring = true;
     timedOut = false;
     loggedMeasurementRequestForEpoch = false;
     clearMeasurementTimeout();
+    clearFeedbackSettleTimers();
     scheduleMeasurementTimeout(fitEpoch, phase);
     void requestMeasurementAfterPaint(reason);
   }
@@ -207,17 +274,14 @@
       return;
     }
     if (measurementWidth === null) {
-      const nextMeasurementWidth = Math.floor(stageWidth || viewportElement?.clientWidth || frameElement?.clientWidth || 0);
+      const nextMeasurementWidth = availableMeasurementWidth();
       if (nextMeasurementWidth <= 0) {
         logMeasurementIssue('measurement-request-without-width', { reason });
         measuring = false;
         activeMeasurementRequestId = null;
         return;
       }
-      candidateWidths = [nextMeasurementWidth];
-      measuredCandidates = [];
-      activeCandidateIndex = 0;
-      measurementWidth = candidateWidths[0] ?? nextMeasurementWidth;
+      beginCandidateMeasurements(nextMeasurementWidth, true);
       measuring = true;
       await tick();
       await waitForBrowserPaint();
@@ -246,11 +310,22 @@
     measuring = true;
     scheduleMeasurementTimeout(fitEpoch, fitPhase);
     logMeasurementRequest(reason, activeMeasurementRequestId);
+    frameElement.getBoundingClientRect();
     postH5PAction('resize', {
       requestId: activeMeasurementRequestId,
       measurementWidth,
       phase: fitPhase,
       epoch: fitEpoch,
+    });
+  }
+
+  function scheduleStageSizeUpdate(reason) {
+    if (resizeFrameId) {
+      cancelAnimationFrame(resizeFrameId);
+    }
+    resizeFrameId = requestAnimationFrame(() => {
+      resizeFrameId = 0;
+      updateStageSize(reason);
     });
   }
 
@@ -263,17 +338,18 @@
       return;
     }
 
+    if (viewportResizeObserver && observedViewportElement !== viewportElement) {
+      viewportResizeObserver.disconnect();
+      viewportResizeObserver = undefined;
+      observedViewportElement = undefined;
+    }
+
     if (!viewportResizeObserver) {
       viewportResizeObserver = new ResizeObserver(() => {
-        if (resizeFrameId) {
-          cancelAnimationFrame(resizeFrameId);
-        }
-        resizeFrameId = requestAnimationFrame(() => {
-          resizeFrameId = 0;
-          updateStageSize('resize-observer');
-        });
+        scheduleStageSizeUpdate('resize-observer');
       });
       viewportResizeObserver.observe(viewportElement);
+      observedViewportElement = viewportElement;
       void requestMeasurementAfterPaint('viewport-observer');
     }
   }
@@ -399,6 +475,26 @@
     }
   }
 
+  function measureNextCandidate(source) {
+    const nextIndex = activeCandidateIndex + 1;
+    const nextWidth = candidateWidths[nextIndex];
+    if (!nextWidth) {
+      completeCurrentCandidate(source);
+      return;
+    }
+
+    activeMeasurementRequestId = null;
+    activeCandidateIndex = nextIndex;
+    measurementWidth = nextWidth;
+    naturalWidth = null;
+    naturalHeight = null;
+    measuring = true;
+    loggedMeasurementRequestForEpoch = false;
+    clearMeasurementTimeout();
+    clearFeedbackSettleTimers();
+    void requestMeasurementAfterPaint(`${source}:candidate-${nextIndex}`);
+  }
+
   function completeCurrentCandidate(source) {
     if (!measuring || measuredCandidates.length === 0) {
       return;
@@ -416,6 +512,18 @@
       activeMeasurementRequestId = null;
       return;
     }
+
+    const hasMoreCandidates = activeCandidateIndex + 1 < candidateWidths.length;
+    const canStop =
+      nextFit.mode === 'native' ||
+      nextFit.mode === 'width-adjusted' ||
+      !hasMoreCandidates;
+
+    if (!canStop) {
+      measureNextCandidate(source);
+      return;
+    }
+
     completeFit(nextFit, source);
   }
 
@@ -448,7 +556,21 @@
     });
 
     if (finalize) {
-      completeCurrentCandidate(source);
+      if (fitPhase === 'feedback' && source === 'resize') {
+        if (feedbackSettleTimeoutId) {
+          clearTimeout(feedbackSettleTimeoutId);
+        }
+        feedbackSettleTimeoutId = setTimeout(() => {
+          finalizeSettledFeedbackResize('resize-settled');
+        }, FEEDBACK_RESIZE_SETTLE_MS);
+        if (!feedbackMaxSettleTimeoutId) {
+          feedbackMaxSettleTimeoutId = setTimeout(() => {
+            finalizeSettledFeedbackResize('resize-max-settled');
+          }, FEEDBACK_RESIZE_MAX_SETTLE_MS);
+        }
+      } else {
+        completeCurrentCandidate(source);
+      }
     }
   }
 
@@ -463,52 +585,64 @@
     }
 
     if (data.action === 'prepareResize') {
-      recordNaturalSize(data, 'prepareResize', true);
+      recordNaturalSize(data, 'prepareResize');
+      postH5PAction('resizePrepared', {
+        requestId: activeMeasurementRequestId,
+        measurementWidth,
+        phase: fitPhase,
+        epoch: fitEpoch,
+      });
       return;
     }
 
     if (data.action === 'resize') {
-      recordNaturalSize(data, 'resize');
+      recordNaturalSize(data, 'resize', true);
     }
   }
 
   function handleMessage(event) {
-    const data = event.data || {};
-    if (data.context === 'h5p') {
-      if (typeof window !== 'undefined' && event.origin !== window.location.origin) {
-        return;
-      }
-      if (data.contentId && data.contentId !== config?.contentId) {
-        return;
-      }
-      handleH5PResizerMessage(data);
-      return;
-    }
-
     if (typeof window !== 'undefined' && event.origin !== window.location.origin) {
       return;
     }
-    if (data.type === 'mofacts:h5p-result') {
-      pendingResult = data;
-      startFitEpoch('feedback', 'h5p-result');
-    } else if (data.type === 'mofacts:h5p-loaded') {
-      dispatch('loaded', data);
-      void requestMeasurementAfterPaint('h5p-loaded');
-    } else if (data.type === 'mofacts:h5p-failed') {
-      clientConsole(1, '[H5PFrame] H5P runtime reported a failure', data);
-      dispatch('failed', data);
-    } else if (data.type === 'mofacts:h5p-xapi') {
-      dispatch('h5pxapi', data);
+
+    const message = parseH5PFrameMessage(event.data, config?.contentId);
+    if (!message) {
+      return;
     }
+
+    if (message.kind === 'resizer') {
+      handleH5PResizerMessage(message.data);
+    } else if (message.kind === 'result') {
+      if (resultLifecycle === 'continued') {
+        return;
+      }
+      pendingResult = message.result;
+      resultLifecycle = 'available';
+      startFitEpoch('feedback', 'h5p-result');
+    } else if (message.kind === 'loaded') {
+      dispatch('loaded', message.data);
+      void requestMeasurementAfterPaint('h5p-loaded');
+    } else if (message.kind === 'failed') {
+      clientConsole(1, '[H5PFrame] H5P runtime reported a failure', message.data);
+      dispatch('failed', message.data);
+    } else if (message.kind === 'xapi') {
+      dispatch('h5pxapi', message.data);
+    }
+  }
+
+  function handleWindowResize() {
+    scheduleStageSizeUpdate('window-resize');
   }
 
   if (typeof window !== 'undefined') {
     window.addEventListener('message', handleMessage);
+    window.addEventListener('resize', handleWindowResize);
   }
 
   onDestroy(() => {
     if (typeof window !== 'undefined') {
       window.removeEventListener('message', handleMessage);
+      window.removeEventListener('resize', handleWindowResize);
     }
     if (viewportResizeObserver) {
       viewportResizeObserver.disconnect();
@@ -519,6 +653,7 @@
       resizeFrameId = 0;
     }
     clearMeasurementTimeout();
+    clearFeedbackSettleTimers();
   });
 
   function handleLoad() {
@@ -534,158 +669,36 @@
     dispatch('failed', { embedUrl });
   }
 
-  function handleContinue() {
-    if (!pendingResult) {
+  async function handleContinue() {
+    if (!continueReady) {
       return;
     }
-    dispatch('h5presult', pendingResult);
+    const result = pendingResult;
     pendingResult = null;
+    resultLifecycle = 'continued';
+    flushSync(() => {
+      prepareNextH5PItemLayout('continue');
+    });
+    dispatch('h5presult', result);
   }
 
 </script>
 
-<div class="h5p-frame-shell">
-  {#if validation.valid}
-    <div bind:this={viewportElement} class="h5p-frame-viewport">
-      <div
-        class="h5p-frame-stage"
-        class:h5p-frame-stage-measuring={measuring}
-        style={stageStyle}
-      >
-        <div class="h5p-frame-surface" style={surfaceStyle}>
-          <iframe
-            bind:this={frameElement}
-            class="h5p-frame"
-            src={embedUrl}
-            title="H5P activity"
-            style={frameStyle}
-            loading="lazy"
-            referrerpolicy="strict-origin-when-cross-origin"
-            allow="fullscreen; autoplay; clipboard-read; clipboard-write"
-            allowfullscreen
-            scrolling="no"
-            on:load={handleLoad}
-            on:error={handleError}
-          ></iframe>
-        </div>
-      </div>
-    </div>
-    {#if isSelfHosted}
-      <div bind:this={continueBarElement} class="h5p-continue-bar" aria-hidden={!continueReady}>
-        {#if continueReady}
-          <button type="button" class="h5p-continue-button" on:click={handleContinue}>
-            Continue
-          </button>
-        {/if}
-      </div>
-    {:else if pendingResult}
-      <div bind:this={continueBarElement} class="h5p-continue-bar">
-        <button type="button" class="h5p-continue-button" on:click={handleContinue}>
-          Continue
-        </button>
-      </div>
-    {/if}
-    {#if showInitialFitMask}
-      <div class="h5p-initial-fit-mask" aria-hidden="true"></div>
-    {/if}
-  {:else}
-    <div class="h5p-frame-error" role="alert">
-      {validation.message || 'Invalid H5P display configuration'}
-    </div>
-  {/if}
-</div>
-
-<style>
-  .h5p-frame-shell {
-    width: 100%;
-    max-width: 100%;
-    height: 100%;
-    min-height: 0;
-    border: 0;
-    border-radius: 0;
-    background: var(--stimuli-box-color);
-    overflow: hidden;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    position: relative;
-  }
-
-  .h5p-frame-viewport {
-    position: relative;
-    flex: 1 1 auto;
-    min-height: 0;
-    width: 100%;
-    overflow: hidden;
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    box-sizing: border-box;
-  }
-
-  .h5p-frame-stage {
-    flex: 0 0 auto;
-    overflow: hidden;
-    max-width: 100%;
-    max-height: 100%;
-  }
-
-  .h5p-frame-surface {
-    transform-origin: top left;
-    overflow: hidden;
-  }
-
-  .h5p-frame {
-    display: block;
-    border: 0;
-    min-width: 0;
-    min-height: 0;
-    background: var(--background-color, #fff);
-    overflow: clip;
-  }
-
-  .h5p-initial-fit-mask {
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    background: var(--stimuli-box-color);
-    pointer-events: auto;
-  }
-
-  .h5p-continue-bar {
-    flex: 0 0 var(--h5p-action-bar-height, 3.75rem);
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    min-height: var(--h5p-action-bar-height, 3.75rem);
-    padding: 0 0.75rem;
-    border-top: 1px solid var(--secondary-color);
-    background: var(--stimuli-box-color);
-    box-sizing: border-box;
-  }
-
-  .h5p-continue-button {
-    min-width: 8rem;
-    padding: 0.625rem 1rem;
-    border: 1px solid var(--accent-color);
-    border-radius: var(--border-radius-md, 6px);
-    background: var(--accent-color);
-    color: var(--button-text-color, #fff);
-    font: inherit;
-    font-weight: 600;
-    cursor: pointer;
-  }
-
-  .h5p-continue-button:hover,
-  .h5p-continue-button:focus-visible {
-    filter: brightness(0.95);
-  }
-
-  .h5p-frame-error {
-    padding: 1rem;
-    color: var(--alert-color);
-    text-align: center;
-    font-size: 0.95rem;
-    line-height: 1.4;
-  }
-</style>
+<H5PFrameView
+  bind:frameElement
+  bind:viewportElement
+  bind:continueBarElement
+  {validation}
+  {embedUrl}
+  {isSelfHosted}
+  {continueReady}
+  manualContinueVisible={Boolean(pendingResult)}
+  {measuring}
+  stageStyle={frameLayout.stageStyle}
+  visualStyle={frameLayout.visualStyle}
+  surfaceStyle={frameLayout.surfaceStyle}
+  frameStyle={frameLayout.frameStyle}
+  on:load={handleLoad}
+  on:error={handleError}
+  on:continue={handleContinue}
+/>

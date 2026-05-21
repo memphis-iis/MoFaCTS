@@ -19,6 +19,7 @@ import * as guards from './guards';
 import * as actions from './actions';
 import { createServices } from './services';
 import { clientConsole } from '../../../../lib/clientLogger';
+import type { H5PTrialResult } from '../../../../../common/types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Narrow exception: current XState v5 config/actor typings in this file are not modeled well enough yet, but we can still type the machine callback payloads locally.
 const createMachine: any = xCreateMachine;
@@ -85,6 +86,7 @@ interface CardMachineContext {
   feedbackText: string;
   feedbackRevealStarted: boolean;
   feedbackSuppressed: boolean;
+  h5pResult: H5PTrialResult | null;
   isCorrect: boolean;
   isTimeout: boolean;
   feedbackTimeoutMs: number | undefined;
@@ -132,6 +134,7 @@ interface CardMachineEvent extends Record<string, unknown> {
   feedbackText?: string;
   feedbackHtml?: string;
   feedbackSuppressed?: boolean;
+  h5pResult?: H5PTrialResult | null;
 }
 
 interface CardSelectionResult extends Record<string, unknown> {
@@ -295,6 +298,7 @@ const initialContext = {
   feedbackText: '',
   feedbackRevealStarted: false,
   feedbackSuppressed: false,
+  h5pResult: null,
   isCorrect: false,
   isTimeout: false,
   feedbackTimeoutMs: undefined,
@@ -478,6 +482,7 @@ export const cardMachine = createMachine(
                       feedbackText: () => '',
                       feedbackRevealStarted: () => false,
                       feedbackSuppressed: () => false,
+                      h5pResult: () => null,
                       isCorrect: () => false,
                       isTimeout: () => false,
                       feedbackTimeoutMs: () => undefined,
@@ -1446,6 +1451,7 @@ export const cardMachine = createMachine(
                       feedbackText: () => '',
                       feedbackRevealStarted: () => false,
                       feedbackSuppressed: () => false,
+                      h5pResult: () => null,
                       isCorrect: () => false,
                       isTimeout: () => false,
                       feedbackTimeoutMs: () => undefined,

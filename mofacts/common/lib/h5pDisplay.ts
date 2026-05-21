@@ -17,6 +17,29 @@ function hasNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+export function getH5PDisplayConfig(display: unknown): H5PDisplayConfig | null {
+  if (!isPlainObject(display) || !isPlainObject(display.h5p)) {
+    return null;
+  }
+  return display.h5p as unknown as H5PDisplayConfig;
+}
+
+export function isSelfHostedH5PConfig(config: unknown): boolean {
+  return isPlainObject(config) && config.sourceType === 'self-hosted';
+}
+
+export function isExternalH5PConfig(config: unknown): boolean {
+  return isPlainObject(config) && config.sourceType === 'external-embed';
+}
+
+export function isSelfHostedH5PDisplay(display: unknown): boolean {
+  return isSelfHostedH5PConfig(getH5PDisplayConfig(display));
+}
+
+export function isExternalH5PDisplay(display: unknown): boolean {
+  return isExternalH5PConfig(getH5PDisplayConfig(display));
+}
+
 function normalizeEmbedUrl(embedUrl: string, baseUrl: string): string | null {
   const trimmed = embedUrl.trim();
   if (!trimmed || trimmed.startsWith('//')) {

@@ -2,7 +2,7 @@ import { WebApp } from 'meteor/webapp';
 import type { IncomingMessage, ServerResponse } from 'http';
 import fs from 'fs/promises';
 import path from 'path';
-import { getH5PLibraryStorageRoot } from '../lib/h5pPackage';
+import { getH5PLibraryStorageRoot, resolveStoredH5PStoragePath } from '../lib/h5pPackage';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -333,11 +333,37 @@ export function renderH5PPlayerHtml(content: UnknownRecord): string {
     let lastEventAt = startedAt;
     let batchSequence = 0;
 
+    function renderedContentHeight() {
+      const container = document.getElementById('h5p-container');
+      if (!container) {
+        return 0;
+      }
+
+      const containerRect = container.getBoundingClientRect();
+      let bottom = containerRect.bottom;
+      const elements = container.querySelectorAll('*');
+      for (let i = 0; i < elements.length; i += 1) {
+        const element = elements[i];
+        const style = window.getComputedStyle(element);
+        if (style.display === 'none' || style.visibility === 'hidden') {
+          continue;
+        }
+        const rect = element.getBoundingClientRect();
+        if (rect.width <= 0 && rect.height <= 0) {
+          continue;
+        }
+        bottom = Math.max(bottom, rect.bottom);
+      }
+
+      return Math.ceil(bottom - Math.min(0, containerRect.top));
+    }
+
     function currentSizePayload(request) {
       const scrollHeight = Math.max(
         document.documentElement ? document.documentElement.scrollHeight : 0,
         document.body ? document.body.scrollHeight : 0,
         document.getElementById('h5p-container')?.scrollHeight || 0,
+        renderedContentHeight(),
         120
       );
       const clientHeight = Math.max(
@@ -372,6 +398,8 @@ export function renderH5PPlayerHtml(content: UnknownRecord): string {
         postH5PResizeAction('hello');
       } else if (event.data.action === 'resize') {
         postH5PResizeAction('prepareResize', event.data);
+      } else if (event.data.action === 'resizePrepared') {
+        postH5PResizeAction('resize', event.data);
       }
     });
 
@@ -665,8 +693,10 @@ WebApp.connectHandlers.use('/h5p-content', async (req: IncomingMessage, res: Ser
       return;
     }
 
-    const storagePath = String(content.storagePath || '');
-    if (!storagePath) {
+    let storagePath = '';
+    try {
+      storagePath = resolveStoredH5PStoragePath(String(content.storagePath || ''));
+    } catch (_error) {
       res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
       res.end('H5P content storage path is missing');
       return;

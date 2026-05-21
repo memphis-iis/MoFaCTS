@@ -21,7 +21,7 @@ import { CardStore } from '../../modules/cardStore';
 import { resolveDynamicAssetPath } from './mediaResolver';
 import { assertIdInvariants, logIdInvariantBreachOnce } from '../../../../lib/idContext';
 import { applyDisplayFieldSubset } from '../../../../../common/lib/displayFieldSubsets';
-import { normalizeH5PDisplayConfig } from '../../../../../common/lib/h5pDisplay';
+import { isSelfHostedH5PConfig, normalizeH5PDisplayConfig } from '../../../../../common/lib/h5pDisplay';
 import type {
   EngineServiceResult,
   ExperimentState,
@@ -647,7 +647,7 @@ function getPreparedCardDataFromSelection(
     stim.display?.attribution,
   );
   const h5pDisplay = resolveH5PDisplayConfig(preparedDisplay.h5p, stim.display?.h5p);
-  const h5pOwnsPrompt = h5pDisplay?.sourceType === 'self-hosted';
+  const h5pOwnsPrompt = isSelfHostedH5PConfig(h5pDisplay);
   const resolvedDisplay = {
     text: h5pOwnsPrompt ? '' : String(preparedDisplay.text ?? stim.display?.text ?? stim.text ?? stim.textStimulus ?? ''),
     clozeText: h5pOwnsPrompt ? '' : String(preparedDisplay.clozeText ?? stim.display?.clozeText ?? stim.clozeText ?? stim.clozeStimulus ?? ''),
@@ -675,10 +675,10 @@ function getPreparedCardDataFromSelection(
   const fullAnswer = typeof preparedState.newExperimentState === 'object' &&
     typeof (preparedState.newExperimentState as Record<string, unknown>).originalAnswer === 'string'
     ? String((preparedState.newExperimentState as Record<string, unknown>).originalAnswer)
-    : (h5pDisplay?.sourceType === 'self-hosted' ? '__H5P_COMPLETED__' : resolveStimAnswer(stim));
+    : (isSelfHostedH5PConfig(h5pDisplay) ? '__H5P_COMPLETED__' : resolveStimAnswer(stim));
   const correctAnswer = typeof preparedState.currentAnswer === 'string'
     ? String(preparedState.currentAnswer)
-    : (h5pDisplay?.sourceType === 'self-hosted' ? '__H5P_COMPLETED__' : (fullAnswer.split('~')[0] ?? '').trim());
+    : (isSelfHostedH5PConfig(h5pDisplay) ? '__H5P_COMPLETED__' : (fullAnswer.split('~')[0] ?? '').trim());
 
   return buildCardDataFromResolvedTrial({
     resolvedClusterIndex,

@@ -6,8 +6,9 @@
    */
   import { createEventDispatcher, tick } from 'svelte';
   import StimulusDisplay from './StimulusDisplay.svelte';
-  import ResponseArea from './ResponseArea.svelte';
-  import FeedbackDisplay from './FeedbackDisplay.svelte';
+  import H5PTrialSurface from './H5PTrialSurface.svelte';
+  import TrialInteractionPane from './TrialInteractionPane.svelte';
+  import { isSelfHostedH5PDisplay } from '../../../../../common/lib/h5pDisplay';
   import { clientConsole } from '../../../../lib/clientLogger';
   import { waitForBrowserPaint } from '../utils/paintTiming';
 
@@ -143,7 +144,8 @@
   $: isOverUnder = !isSplitLayout;
   $: isImageStimulus = Boolean(display?.imgSrc || display?.videoSrc);
   $: isH5PStimulus = Boolean(display?.h5p);
-  $: h5pOwnsInteraction = Boolean(display?.h5p?.sourceType === 'self-hosted');
+  $: h5pOwnsInteraction = isSelfHostedH5PDisplay(display);
+  $: useH5POwnedSurface = h5pOwnsInteraction && displayVisible;
   $: requestedInteractionKind = feedbackVisible ? 'feedback' : (responseVisible ? 'response' : 'none');
 
   let interactionFadeElement;
@@ -303,53 +305,69 @@
   class:non-image-stimulus={!isImageStimulus}
   data-subset-kind={subsetKind}
 >
-  <div class="trial-main">
-    <div class="stimulus-container">
-      <StimulusDisplay
-        {display}
-        visible={displayVisible}
-        {showQuestionNumber}
-        {questionNumber}
-        componentFlow={isSplitLayout ? 'column' : 'row'}
-        {replayEnabled}
-        on:replay
-        on:blockingassetstate
-        on:h5presult={handleH5PResult}
-      />
-    </div>
-
-    {#if !(h5pOwnsInteraction && requestedInteractionKind === 'none')}
-    <div class="interaction-container">
-      <div
-        class="interaction-fade"
-        bind:this={interactionFadeElement}
-        class:interaction-fade-visible={interactionVisible}
-      >
-      {#if mountedFeedbackVisible}
-        <FeedbackDisplay
-          visible={mountedFeedbackVisible}
-          {isCorrect}
-          {isTimeout}
-          userAnswer={feedbackUserAnswer}
-          {correctAnswer}
-          {correctAnswerImageSrc}
-          {correctLabelText}
-          {incorrectLabelText}
-          {feedbackMessage}
-          {correctColor}
-          {incorrectColor}
-          {displayCorrectFeedback}
-          {displayIncorrectFeedback}
-          {displayUserAnswerInFeedback}
-          {feedbackLayout}
-          {displayCorrectAnswerInIncorrectFeedback}
-          on:feedbackcontent={handleFeedbackContent}
-          on:blockingassetstate
+  {#if useH5POwnedSurface}
+    <div class="h5p-owned-main">
+      <div class="h5p-owned-surface">
+        <H5PTrialSurface
+          config={display.h5p}
+          {showQuestionNumber}
+          {questionNumber}
+          on:h5presult={handleH5PResult}
         />
-      {:else if mountedResponseVisible}
-        <ResponseArea
+      </div>
+
+      {#if requestedInteractionKind === 'feedback'}
+        <div class="interaction-container h5p-feedback-container">
+          <TrialInteractionPane
+            bind:fadeElement={interactionFadeElement}
+            {interactionVisible}
+            {mountedFeedbackVisible}
+            mountedResponseVisible={false}
+            {isCorrect}
+            {isTimeout}
+            {feedbackUserAnswer}
+            {correctAnswer}
+            {correctAnswerImageSrc}
+            {correctLabelText}
+            {incorrectLabelText}
+            {feedbackMessage}
+            {correctColor}
+            {incorrectColor}
+            {displayCorrectFeedback}
+            {displayIncorrectFeedback}
+            {displayUserAnswerInFeedback}
+            {feedbackLayout}
+            {displayCorrectAnswerInIncorrectFeedback}
+            on:feedbackcontent={handleFeedbackContent}
+            on:blockingassetstate
+          />
+        </div>
+      {/if}
+    </div>
+  {:else}
+    <div class="trial-main">
+      <div class="stimulus-container">
+        <StimulusDisplay
+          {display}
+          visible={displayVisible}
+          {showQuestionNumber}
+          {questionNumber}
+          componentFlow={isSplitLayout ? 'column' : 'row'}
+          {replayEnabled}
+          on:replay
+          on:blockingassetstate
+          on:h5presult={handleH5PResult}
+        />
+      </div>
+
+      <div class="interaction-container">
+        <TrialInteractionPane
+          bind:fadeElement={interactionFadeElement}
+          {interactionVisible}
+          {mountedFeedbackVisible}
+          {mountedResponseVisible}
           {inputMode}
-          enabled={inputEnabled}
+          {inputEnabled}
           {isForceCorrecting}
           {forceCorrectPrompt}
           {userAnswer}
@@ -362,17 +380,32 @@
           {srMaxAttempts}
           {srError}
           {srTranscript}
+          {isCorrect}
+          {isTimeout}
+          {feedbackUserAnswer}
+          {correctAnswer}
+          {correctAnswerImageSrc}
+          {correctLabelText}
+          {incorrectLabelText}
+          {feedbackMessage}
+          {correctColor}
+          {incorrectColor}
+          {displayCorrectFeedback}
+          {displayIncorrectFeedback}
+          {displayUserAnswerInFeedback}
+          {feedbackLayout}
+          {displayCorrectAnswerInIncorrectFeedback}
           on:submit
           on:input
           on:activity
           on:firstKeypress
           on:choice
+          on:feedbackcontent={handleFeedbackContent}
+          on:blockingassetstate
         />
-      {/if}
       </div>
     </div>
-    {/if}
-  </div>
+  {/if}
 </div>
 
 <style>
@@ -393,6 +426,29 @@
     overflow: hidden;
   }
 
+  .h5p-owned-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    width: 100%;
+    overflow: hidden;
+  }
+
+  .h5p-owned-surface {
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    overflow: hidden;
+  }
+
+  .h5p-feedback-container {
+    flex: 0 0 min(28%, 14rem);
+    min-height: 8rem;
+    width: 100%;
+    border-top: 1px solid var(--secondary-color);
+  }
+
   /* Over-under layout (vertical stack) */
   .trial-content.over-under .trial-main {
     flex-direction: column;
@@ -407,22 +463,6 @@
     flex: 3 0 0%;
     height: 0; /* Force height from flex only, not content */
     min-height: 0;
-  }
-
-  .trial-content.over-under.h5p-owned .stimulus-container {
-    flex: 1 1 auto;
-    height: auto;
-    min-height: 0;
-  }
-
-  .trial-content.h5p-owned .trial-main {
-    overflow: hidden;
-  }
-
-  .trial-content.h5p-owned .stimulus-container {
-    align-items: stretch;
-    justify-content: stretch;
-    overflow: hidden;
   }
 
   .trial-content.over-under.image-stimulus .interaction-container {
@@ -463,17 +503,6 @@
 
   .interaction-container {
     overflow: hidden;
-  }
-
-  .interaction-fade {
-    width: 100%;
-    height: 100%;
-    opacity: 0;
-    transition: opacity var(--transition-smooth) ease;
-  }
-
-  .interaction-fade.interaction-fade-visible {
-    opacity: 1;
   }
 
   /* For image stimuli, prevent scrolling - images must fit within bounds */

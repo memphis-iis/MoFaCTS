@@ -18,6 +18,7 @@ import {
   startEarlyLockForCurrentTrial as startEarlyLockForCurrentTrialService,
   commitPreparedTrialRuntime as commitPreparedTrialRuntimeService,
 } from '../services/unitEngineService';
+import type { H5PTrialResult } from '../../../../../common/types';
 
 type ActionContext = {
   [key: string]: unknown;
@@ -44,6 +45,7 @@ type ActionContext = {
   preparedAdvanceMode?: string;
   preparedTrial?: Record<string, unknown> | null;
   source?: string;
+  h5pResult?: H5PTrialResult | null;
   questionIndex: number;
   videoSession?: { isActive?: boolean; currentCheckpointIndex?: number };
   timestamps: {
@@ -78,6 +80,7 @@ type ActionEvent = {
   output?: ActionEventOutput;
   timestamp?: number;
   userAnswer?: string;
+  h5pResult?: H5PTrialResult | null;
   transcript?: string;
   isCorrect?: boolean;
   sessionId?: string;
@@ -108,6 +111,16 @@ type ActionArgs = {
 type AssignmentShape = Record<string, (args: ActionArgs) => unknown>;
 
 const assign = xAssign as unknown as (shape: AssignmentShape) => unknown;
+
+function getH5PSubmitResult(event?: ActionEvent): H5PTrialResult | null {
+  if (event?.source !== 'h5p') {
+    return null;
+  }
+  if (!event.h5pResult) {
+    throw new Error('[CardMachine] H5P submit event missing h5pResult');
+  }
+  return event.h5pResult;
+}
 
 /**
  * @typedef {import('./types').CardMachineContext} CardMachineContext
@@ -226,6 +239,7 @@ export const syncCurrentAnswer = ({ context }: ActionArgs) => {
 export const captureAnswer = assign({
   userAnswer: ({ event }: ActionArgs) => event?.userAnswer,
   source: ({ event, context }: ActionArgs) => event?.source || context.source || 'keyboard',
+  h5pResult: ({ event }: ActionArgs) => getH5PSubmitResult(event),
   timestamps: ({ context, event }: ActionArgs) => ({
     ...context.timestamps,
     // Submit timestamp anchors end latency.

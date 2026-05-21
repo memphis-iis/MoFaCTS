@@ -1,6 +1,10 @@
 import { expect } from 'chai';
 import {
   clampH5PPreferredHeight,
+  isExternalH5PConfig,
+  isExternalH5PDisplay,
+  isSelfHostedH5PConfig,
+  isSelfHostedH5PDisplay,
   normalizeH5PDisplayConfig,
   validateH5PDisplayConfig,
 } from './h5pDisplay';
@@ -72,5 +76,26 @@ describe('h5p display config', function() {
     expect(clampH5PPreferredHeight(10)).to.equal(240);
     expect(clampH5PPreferredHeight(1200)).to.equal(900);
     expect(clampH5PPreferredHeight(640)).to.equal(640);
+  });
+
+  it('classifies H5P display ownership from the shared contract', function() {
+    expect(isExternalH5PDisplay({
+      h5p: {
+        sourceType: 'external-embed',
+        embedUrl: 'https://h5p.example/embed/1',
+        completionPolicy: 'manual-continue',
+      },
+    })).to.equal(true);
+
+    expect(isSelfHostedH5PDisplay({
+      h5p: {
+        sourceType: 'self-hosted',
+        contentId: 'content-a',
+      },
+    })).to.equal(true);
+
+    expect(isSelfHostedH5PDisplay({ text: 'plain prompt' })).to.equal(false);
+    expect(isExternalH5PConfig({ sourceType: 'external-embed' })).to.equal(true);
+    expect(isSelfHostedH5PConfig({ sourceType: 'self-hosted' })).to.equal(true);
   });
 });

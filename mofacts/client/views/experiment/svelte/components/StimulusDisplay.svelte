@@ -6,6 +6,7 @@
   import DOMPurify from 'dompurify';
   import { marked } from 'marked';
   import { createEventDispatcher, onDestroy, tick } from 'svelte';
+  import { isExternalH5PDisplay } from '../../../../../common/lib/h5pDisplay';
   import { waitForBrowserPaint } from '../utils/paintTiming';
   import H5PFrame from './H5PFrame.svelte';
 
@@ -76,7 +77,7 @@
     displayAttribution.sourceUrl,
     displayAttribution.licenseUrl,
   ].join('::');
-  $: h5pOwnsPrompt = safeDisplay?.h5p?.sourceType === 'self-hosted';
+  $: hasExternalH5PContent = isExternalH5PDisplay(safeDisplay);
   $: needsImageLayout = Boolean(safeDisplay.imgSrc);
   $: needsAttributedImageLayout = needsImageLayout && hasAttribution && Boolean(attributionCaption);
   $: imageViewportStyle = imageViewportWidthPx === null || imageViewportHeightPx === null
@@ -90,7 +91,7 @@
   let cachedSanitizedCloze = '';
 
   $: {
-    const currentText = h5pOwnsPrompt ? '' : (safeDisplay.text || '');
+    const currentText = safeDisplay.text || '';
     if (currentText !== lastTextContent) {
       lastTextContent = currentText;
       cachedSanitizedText = currentText ? DOMPurify.sanitize(marked.parse(currentText)) : '';
@@ -98,7 +99,7 @@
   }
 
   $: {
-    const currentCloze = h5pOwnsPrompt ? '' : (safeDisplay.clozeText || '');
+    const currentCloze = safeDisplay.clozeText || '';
     if (currentCloze !== lastClozeContent) {
       lastClozeContent = currentCloze;
       cachedSanitizedCloze = currentCloze ? DOMPurify.sanitize(marked.parse(currentCloze)) : '';
@@ -168,9 +169,8 @@
     dispatch('h5presult', event.detail);
   }
 
-  $: hasTextContent = !h5pOwnsPrompt && Boolean(safeDisplay.clozeText || safeDisplay.text);
-  $: hasVisualContent = Boolean(safeDisplay.imgSrc || safeDisplay.videoSrc || safeDisplay.h5p);
-  $: hasH5PContent = Boolean(safeDisplay.h5p);
+  $: hasTextContent = Boolean(safeDisplay.clozeText || safeDisplay.text);
+  $: hasVisualContent = Boolean(safeDisplay.imgSrc || safeDisplay.videoSrc || hasExternalH5PContent);
   $: isAudioOnly = Boolean(safeDisplay.audioSrc) && !hasTextContent && !hasVisualContent;
   $: showTextAttribution = hasTextContent && !safeDisplay.imgSrc && hasAttribution && Boolean(attributionCaption);
   $: waitingForImage = Boolean(safeDisplay.imgSrc) && !imageReady;
@@ -394,7 +394,7 @@
     class:flow-row={componentFlow === 'row'}
     class:flow-column={componentFlow !== 'row'}
     class:loading-image={waitingForImage}
-    class:h5p-display={hasH5PContent}
+    class:h5p-display={hasExternalH5PContent}
   >
     {#if !waitingForImage}
       {#if showQuestionNumber && questionNumber > 0}
@@ -473,13 +473,13 @@
           </div>
         {/if}
 
-        {#if safeDisplay.h5p}
+        {#if hasExternalH5PContent}
           <div class="stimulus-h5p">
             <H5PFrame config={safeDisplay.h5p} on:h5presult={handleH5PResult} />
           </div>
         {/if}
 
-        {#if !h5pOwnsPrompt && safeDisplay.clozeText}
+        {#if safeDisplay.clozeText}
           <div class="stimulus-text-box">
             <div class="stimulus-text-content">
               <div class="stimulus-text cloze">
@@ -531,7 +531,7 @@
               </span>
             {/if}
           </div>
-        {:else if !h5pOwnsPrompt && safeDisplay.text}
+        {:else if safeDisplay.text}
           <div class="stimulus-text-box">
             <div class="stimulus-text-content">
               <div class="stimulus-text">

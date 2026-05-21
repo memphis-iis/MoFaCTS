@@ -26,10 +26,16 @@ import {
   resolveOriginalClusterIndex,
   validateMappingRecord,
 } from './mappingRecordService';
+import {
+  applyH5PSummaryToRecord,
+  insertH5PHistoryRows,
+  resolveH5PResultForHistory,
+} from './historyH5P';
 import type {
   HistoryLoggingEvent,
   HistoryLoggingResult,
   HistoryRecord,
+  H5PTrialResult,
   TrialTimingSummary,
   UnitEngineLike,
 } from '../../../../../common/types';
@@ -63,6 +69,7 @@ type HistoryLoggingServiceContext = {
   currentAnswer?: unknown;
   feedbackText?: string;
   feedbackSuppressed?: boolean;
+  h5pResult?: H5PTrialResult | null;
 };
 type HistoryAnswerContext = {
   originalDisplay?: unknown;
@@ -81,19 +88,6 @@ type HistoryStimLike = {
   clusterKC?: string;
   stimulusKC?: string;
 };
-type H5PResultBatch = {
-  contentId?: string;
-  library?: string;
-  widgetType?: string;
-  completed?: boolean;
-  passed?: boolean;
-  score?: number;
-  maxScore?: number;
-  scaledScore?: number;
-  responseSummary?: unknown;
-  events?: Array<Record<string, unknown>>;
-};
-
 function getTrialSelection(wasButtonTrial: boolean): string {
   return wasButtonTrial ? 'multiple choice' : 'answer';
 }
@@ -647,70 +641,6 @@ async function insertHistoryRecord(answerLogRecord: HistoryRecord): Promise<void
   }
 }
 
-function getCurrentH5PResultBatch(display: Record<string, unknown> | undefined): H5PResultBatch | null {
-  const h5p = display?.h5p as Record<string, unknown> | undefined;
-  if (!h5p || h5p.sourceType !== 'self-hosted') {
-    return null;
-  }
-  const batch = Session.get('currentH5PResultBatch') as H5PResultBatch | null;
-  if (!batch || batch.contentId !== h5p.contentId) {
-    return null;
-  }
-  return batch;
-}
-
-async function insertH5PHistoryRows(baseRecord: HistoryRecord, batch: H5PResultBatch): Promise<void> {
-  const events = Array.isArray(batch.events) ? batch.events : [];
-  const batchId = [
-    baseRecord.TDFId,
-    baseRecord.sessionID,
-    baseRecord.levelUnit,
-    baseRecord.levelUnitName,
-    baseRecord.CFStimFileIndex,
-    batch.contentId,
-    baseRecord.problemStartTime,
-  ].map((part) => String(part ?? '')).join('|');
-
-  for (const [index, event] of events.entries()) {
-    const eventIndex = Number.isFinite(Number(event.eventIndex)) ? Number(event.eventIndex) : index;
-    const isCorrect = event.correct === true;
-    const row: HistoryRecord = {
-      ...baseRecord,
-      input: String(event.response ?? batch.responseSummary ?? ''),
-      outcome: isCorrect ? 'correct' : 'incorrect',
-      typeOfResponse: 'h5p',
-      responseValue: String(event.response ?? ''),
-      selection: 'h5p interaction',
-      action: 'h5p interaction',
-      eventType: 'h5p',
-      responseDuration: Number(event.latencyMs) || baseRecord.responseDuration,
-      h5p: {
-        contentId: batch.contentId,
-        library: batch.library,
-        widgetType: batch.widgetType,
-        eventType: 'part',
-        subContentId: event.partId,
-        targetId: event.targetId,
-        targetLabel: event.targetLabel,
-        label: event.label,
-        batchId,
-        eventIndex,
-        completed: batch.completed === true,
-        passed: batch.passed,
-        score: batch.score,
-        maxScore: batch.maxScore,
-        scaledScore: batch.scaledScore,
-        response: event.response,
-        correct: isCorrect,
-        timestamp: event.timestamp,
-        latencyMs: event.latencyMs,
-        idempotencyKey: `${batchId}|${eventIndex}`,
-      },
-    };
-    await insertHistoryRecord(row);
-  }
-}
-
 /**
  * XState service for logging trial completion.
  * Invoked when transitioning out of feedback or test trial.
@@ -755,7 +685,7 @@ export async function historyLoggingService(
 
     const feedbackText = getDisplayedFeedbackText(context.testType, context.feedbackText, context.feedbackSuppressed === true);
 
-    const h5pBatch = getCurrentH5PResultBatch(context.currentDisplay);
+    const h5pBatch = resolveH5PResultForHistory(context.currentDisplay, context.h5pResult);
 
     // Create record
     const engine = (event.engine || context.engine) as HistoryEngineLike;
@@ -792,25 +722,13 @@ export async function historyLoggingService(
     record.CFEndLatency = timings.endLatency;
     record.CFFeedbackLatency = timings.feedbackLatency;
     if (h5pBatch) {
-      record.h5p = {
-        contentId: h5pBatch.contentId,
-        library: h5pBatch.library,
-        widgetType: h5pBatch.widgetType,
-        eventType: 'summary',
-        completed: h5pBatch.completed === true,
-        passed: h5pBatch.passed,
-        score: h5pBatch.score,
-        maxScore: h5pBatch.maxScore,
-        scaledScore: h5pBatch.scaledScore,
-        response: h5pBatch.responseSummary,
-      };
+      applyH5PSummaryToRecord(record, h5pBatch);
     }
 
     // Insert record
     await insertHistoryRecord(record);
     if (h5pBatch) {
-      await insertH5PHistoryRows(record, h5pBatch);
-      Session.set('currentH5PResultBatch', null);
+      await insertH5PHistoryRows(record, h5pBatch, insertHistoryRecord);
     }
 
     return { status: 'logged', record };

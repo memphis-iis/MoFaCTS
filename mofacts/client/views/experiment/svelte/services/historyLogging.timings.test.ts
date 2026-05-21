@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import { calculateTrialTimings } from './historyLogging';
+import { resolveH5PResultForHistory } from './historyH5P';
 
 describe('history logging timing semantics', function() {
   it('computes start and end latency from trial start and submit time', function() {
@@ -49,5 +50,33 @@ describe('history logging timing semantics', function() {
     expect(result.startLatency).to.equal(-1);
     expect(result.endLatency).to.equal(-1);
     expect(result.feedbackLatency).to.equal(1200);
+  });
+
+  it('does not require H5P result context for non-H5P displays', function() {
+    expect(resolveH5PResultForHistory({ text: 'Prompt' }, null)).to.equal(null);
+  });
+
+  it('requires the machine-owned H5P result for self-hosted H5P displays', function() {
+    const display = {
+      h5p: {
+        sourceType: 'self-hosted',
+        contentId: 'content-a',
+      },
+    };
+    const result = {
+      contentId: 'content-a',
+      batchId: 'batch-a',
+      completed: true,
+      events: [],
+    };
+
+    expect(resolveH5PResultForHistory(display, result)).to.deep.equal(result);
+    expect(() => resolveH5PResultForHistory(display, null)).to.throw('H5P result missing');
+    expect(() => resolveH5PResultForHistory(display, {
+      contentId: 'content-b',
+      batchId: 'batch-b',
+      completed: true,
+      events: [],
+    })).to.throw('contentId does not match');
   });
 });
