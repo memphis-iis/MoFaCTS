@@ -50,6 +50,7 @@ export const outputFields = [
   'CF (Set Shuffled Index)', // shufIndex
   'CF (Alternate Display Index)', // index of which alternate display used, if applicable
   'CF (Stimulus Version)', // whichStim
+  'CF (Probability Estimate)', // model probability estimate at selection time
   'CF (Correct Answer)', // CF correctAnswer
   'CF (Overlearning)', // CF isOverlearning
   'CF (Response Duration)',

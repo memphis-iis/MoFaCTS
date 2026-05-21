@@ -51,6 +51,7 @@ const FALLBACK_THEME = {
     admin_button_color: '#F5B57C',
     admin_button_text_color: '#000000',
     home_hero_image_url: '',
+    home_welcome_html: '<h1>Welcome back!</h1><p>Access your teaching tools, resources, and system functions.</p>',
     brand_label: '',
     logo_url: '/images/themes/brain-logo.png',
     favicon_16_url: '/images/themes/brain-16.png',

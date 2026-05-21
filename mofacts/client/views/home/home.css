@@ -1,4 +1,95 @@
 /* Button grid gap override for home page */
+.home-underlay {
+    min-height: calc(100svh - var(--home-nav-height));
+    min-height: calc(100dvh - var(--home-nav-height));
+    background-color: var(--background-color);
+    position: relative;
+    isolation: isolate;
+}
+
+.home-underlay-has-image::before,
+.home-underlay-has-image::after {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    height: clamp(12rem, 27svh, 18rem);
+    pointer-events: none;
+}
+
+.home-underlay-has-image::before {
+    background-image: var(--home-underlay-image);
+    background-position: center top;
+    background-repeat: no-repeat;
+    background-size: cover;
+    opacity: 0.75;
+    z-index: 0;
+}
+
+.home-underlay-has-image::after {
+    background: linear-gradient(
+        to bottom,
+        transparent 0%,
+        transparent 55%,
+        var(--background-color) 100%
+    );
+    z-index: 1;
+}
+
+#homeContainer {
+    position: relative;
+    z-index: 2;
+    max-width: 1350px;
+    padding-top: clamp(1.5rem, 4vw, 2.5rem);
+    padding-bottom: 2rem;
+}
+
+.home-welcome {
+    margin-bottom: clamp(1.5rem, 4vw, 2rem);
+}
+
+.home-welcome h1,
+.home-welcome h2,
+.home-welcome h3 {
+    color: var(--page-header-text-color);
+    font-family: var(--heading-font-family);
+    font-size: clamp(1.75rem, 3vw, 2.35rem);
+    font-weight: 800;
+    line-height: 1.05;
+    margin: 0 0 0.45rem;
+}
+
+.home-welcome p {
+    color: var(--text-color);
+    font-size: clamp(0.95rem, 1.8vw, 1.1rem);
+    margin: 0;
+}
+
+.home-welcome ul,
+.home-welcome ol {
+    color: var(--text-color);
+    font-size: clamp(0.95rem, 1.8vw, 1.1rem);
+    margin: 0.35rem 0 0;
+    padding-left: 1.35rem;
+}
+
+.home-welcome li {
+    margin: 0.15rem 0;
+}
+
+.home-welcome a {
+    color: var(--accent-color);
+}
+
+.home-welcome::after {
+    content: "";
+    display: block;
+    width: 4rem;
+    height: 0.25rem;
+    border-radius: var(--border-radius-pill);
+    background: var(--accent-color);
+    margin-top: 1rem;
+}
+
 .button-menu {
     gap: 0.5rem;
 }
@@ -39,15 +130,6 @@
     font-weight: 400;
     white-space: normal;
     align-self: start;
-}
-
-/* Hero banner with optional background image */
-.home-hero {
-    background-size: auto;
-    background-position: center center;
-    background-repeat: no-repeat;
-    min-height: 130px;
-    overflow: hidden;
 }
 
 .main-menu-return-tour[hidden] {

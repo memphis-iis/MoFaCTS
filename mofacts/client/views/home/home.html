@@ -1,16 +1,12 @@
 <!-- MAIN home template - Unified home page for all users -->
 <template name="home">
 
-    <div class="container page-loading" id="homeContainer" style="margin-top: 1rem; max-width: 1350px;">
+    <div class="home-underlay {{#if homeUnderlayStyle}}home-underlay-has-image{{/if}}" style="{{homeUnderlayStyle}}">
+        <div class="container page-loading" id="homeContainer">
 
-        <!-- HERO BANNER (only shown when a hero image URL is configured in the theme) -->
-        {{#if homeHeroStyle}}
-        <div class="card mb-4 home-hero" style="{{homeHeroStyle}}">
-            <div class="card-body">
-                <p class="mb-0" style="color: var(--text-color);">Access your teaching tools, resources, and system functions.</p>
-            </div>
+        <div class="home-welcome">
+            {{{homeWelcomeHtml}}}
         </div>
-        {{/if}}
 
         <!-- MAIN MENU Section (Everyone) -->
         <div class="card mb-4">
@@ -150,6 +146,7 @@
         </div>
         {{/if}}
 
+        </div>
     </div>
     <div id="mainMenuReturnTour" class="main-menu-return-tour" role="status" aria-live="polite" hidden>
         <span class="main-menu-return-tour-arrow" aria-hidden="true"></span>

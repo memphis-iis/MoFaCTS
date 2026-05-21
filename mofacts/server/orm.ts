@@ -106,6 +106,7 @@ function getHistory(history: any) {
     'CF (Set Shuffled Index)': history.CFSetShuffledIndex,
     'CF (Alternate Display Index)': history.CFAlternateDisplayIndex,
     'CF (Stimulus Version)': history.CFStimulusVersion,
+    'CF (Probability Estimate)': history.probabilityEstimate,
     'CF (Correct Answer)': history.CFCorrectAnswer,
     'CF (Response Duration)': history.responseDuration,
     'CF (Start Latency)': history.CFStartLatency,

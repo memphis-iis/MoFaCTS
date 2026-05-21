@@ -2,6 +2,7 @@ import {checkUserSession, clientConsole} from '../../lib/userSessionHelpers';
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra');
 import {Cookie} from '../../lib/cookies';
 import { Tracker } from 'meteor/tracker';
+import DOMPurify from 'dompurify';
 import './home.html';
 import './home.css';
 
@@ -10,18 +11,36 @@ declare const Session: any;
 declare const Meteor: any;
 
 const MAIN_MENU_RETURN_TOUR_DURATION_MS = 5000;
+const HOME_NAV_HEIGHT_PROPERTY = '--home-nav-height';
+const HOME_WELCOME_ALLOWED_TAGS = ['h1', 'h2', 'h3', 'p', 'br', 'span', 'strong', 'em', 'b', 'i', 'u', 'a', 'ul', 'ol', 'li'];
+const HOME_WELCOME_ALLOWED_ATTR = ['href', 'title', 'target', 'rel', 'class', 'style'];
 
 // //////////////////////////////////////////////////////////////////////////
 // Template storage and helpers
 
 Template.home.helpers({
-  homeHeroStyle(): string {
+  homeUnderlayStyle(): string {
     const theme = Session.get('curTheme');
     const url = (theme?.properties?.home_hero_image_url as string | undefined);
     if (typeof url === 'string' && url.trim().length > 0) {
-      return `background-image: url('${url.trim()}');`;
+      const escapedUrl = url.trim().replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      return `--home-underlay-image: url("${escapedUrl}");`;
     }
     return '';
+  },
+
+  homeWelcomeHtml(): string {
+    const theme = Session.get('curTheme');
+    const html = theme?.properties?.home_welcome_html;
+    if (typeof html !== 'string') {
+      clientConsole(1, '[HOME] Missing required theme property: home_welcome_html');
+      return '';
+    }
+
+    return DOMPurify.sanitize(html, {
+      ALLOWED_TAGS: HOME_WELCOME_ALLOWED_TAGS,
+      ALLOWED_ATTR: HOME_WELCOME_ALLOWED_ATTR,
+    });
   }
 });
 
@@ -231,6 +250,17 @@ function showMainMenuReturnTour(templateInstance: any): void {
   }, MAIN_MENU_RETURN_TOUR_DURATION_MS);
 }
 
+function updateHomeNavHeightVariable(): void {
+  const navbar = document.querySelector('.navbar') as HTMLElement | null;
+  if (!navbar) {
+    clientConsole(1, '[HOME] Home underlay could not find the navbar height anchor.');
+    document.documentElement.style.removeProperty(HOME_NAV_HEIGHT_PROPERTY);
+    return;
+  }
+
+  document.documentElement.style.setProperty(HOME_NAV_HEIGHT_PROPERTY, `${navbar.offsetHeight}px`);
+}
+
 Template.home.onRendered(async function(this: any) {
   
   clientConsole(2, '[HOME] Template.home.onRendered called');
@@ -247,6 +277,9 @@ Template.home.onRendered(async function(this: any) {
   Session.set('showSpeechAPISetup', true);
 
   const templateInstance = this;
+  updateHomeNavHeightVariable();
+  templateInstance._homeNavHeightHandler = updateHomeNavHeightVariable;
+  window.addEventListener('resize', updateHomeNavHeightVariable);
   // Trigger fade-in after theme is ready and CSS is painted
   // Store handle for cleanup
   templateInstance._themeAutorunHandle = Tracker.autorun(() => {
@@ -288,6 +321,11 @@ Template.home.onDestroyed(function(this: any) {
     this._themeAutorunHandle.stop();
     this._themeAutorunHandle = null;
   }
+  if (this._homeNavHeightHandler) {
+    window.removeEventListener('resize', this._homeNavHeightHandler);
+    this._homeNavHeightHandler = null;
+  }
+  document.documentElement.style.removeProperty(HOME_NAV_HEIGHT_PROPERTY);
   hideMainMenuReturnTour(this);
 });
 

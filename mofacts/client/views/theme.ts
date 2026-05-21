@@ -16,6 +16,7 @@ declare const DynamicSettings: any;
 declare const $: any;
 
 const THEME_FONT_STYLESHEET_LINK_ID = 'mofacts-theme-font-stylesheet';
+const HOME_UNDERLAY_MAX_FILE_BYTES = 5 * 1024 * 1024;
 
 function getThemeLibrary() {
     const library = DynamicSettings.findOne({key: 'themeLibrary'});
@@ -293,6 +294,24 @@ function applyThemePropertyPreview(property: string, value: unknown) {
     if (property === 'font_stylesheet_url') {
         applyThemeFontStylesheet(value);
     }
+}
+
+function updateCurrentThemeSessionProperty(property: string, value: unknown) {
+    const theme = Session.get('curTheme');
+    if (theme && theme.properties) {
+        const updatedTheme = {
+            ...theme,
+            properties: {
+                ...theme.properties,
+                [property]: value
+            }
+        };
+        Session.set('curTheme', updatedTheme);
+    }
+}
+
+async function saveThemeProperty(property: string, value: unknown) {
+    await (Meteor as any).callAsync('setCustomThemeProperty', property, value);
 }
 
 function getThemeIconBackgroundColor() {
@@ -588,6 +607,52 @@ Template.theme.events({
                 alert(`Error saving ${data_id}: ${err}`);
             }
         })();
+    },
+    'change #homeUnderlayUpload': function(event: any) {
+        const fileInput = event.target;
+        const file = fileInput.files?.[0];
+        if (!file) {
+            return;
+        }
+
+        if (!file.type.startsWith('image/')) {
+            alert('Please select an image file');
+            fileInput.value = '';
+            return;
+        }
+
+        if (file.size > HOME_UNDERLAY_MAX_FILE_BYTES) {
+            alert('Underlay image file size must be less than 5MB');
+            fileInput.value = '';
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = async function(e: any) {
+            const base64Data = e.target.result;
+            try {
+                updateCurrentThemeSessionProperty('home_hero_image_url', base64Data);
+                await saveThemeProperty('home_hero_image_url', base64Data);
+                fileInput.value = '';
+            } catch (err: any) {
+                alert('Error uploading home underlay image: ' + (err?.message || err));
+            }
+        };
+        reader.onerror = function() {
+            alert('Error reading home underlay image');
+            fileInput.value = '';
+        };
+        reader.readAsDataURL(file);
+    },
+    'click #clearHomeUnderlay': async function() {
+        try {
+            updateCurrentThemeSessionProperty('home_hero_image_url', '');
+            await saveThemeProperty('home_hero_image_url', '');
+            $('#homeUnderlayUpload').val('');
+            $('.currentThemeProp[data-id=home_hero_image_url]').val('');
+        } catch (err: any) {
+            alert('Error clearing home underlay image: ' + (err?.message || err));
+        }
     },
     'change #logoUpload': function(event: any) {
         const file = event.target.files[0];

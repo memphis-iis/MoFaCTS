@@ -563,12 +563,34 @@
                             </small>
                         </div>
                         <div class="col text-end">
-                            Home Page Hero Image URL:
+                            Home Page Underlay Image:
                         </div>
                         <div class="col">
-                            <input type="text" class="form-control currentThemeProp" value="{{currentTheme.properties.home_hero_image_url}}" data-id="home_hero_image_url" placeholder="https://example.com/hero.jpg">
+                            <input type="file" class="form-control mb-2" id="homeUnderlayUpload" accept="image/*">
+                            <input type="text" class="form-control currentThemeProp" value="{{currentTheme.properties.home_hero_image_url}}" data-id="home_hero_image_url" placeholder="https://example.com/underlay.jpg">
                             <small class="form-text text-muted">
-                                Background image shown in the banner at the top of the home page. Leave blank for no image.
+                                Upload an image or enter a hosted image URL. The image is shown behind the home page content below the navigation bar.
+                            </small>
+                            {{#if currentTheme.properties.home_hero_image_url}}
+                            <div class="mt-2 d-flex flex-column align-items-start gap-2">
+                                <button type="button" id="clearHomeUnderlay" class="btn btn-secondary btn-sm">Clear Underlay Image</button>
+                                <img src="{{currentTheme.properties.home_hero_image_url}}"
+                                     alt="Home underlay preview"
+                                     class="img-thumbnail"
+                                     loading="lazy"
+                                     decoding="async"
+                                     fetchpriority="low"
+                                     style="max-width: min(420px, 100%); max-height: 160px; object-fit: cover;">
+                            </div>
+                            {{/if}}
+                        </div>
+                        <div class="col text-end">
+                            Home Welcome HTML:
+                        </div>
+                        <div class="col">
+                            <textarea class="form-control currentThemeProp" rows="5" data-id="home_welcome_html">{{currentTheme.properties.home_welcome_html}}</textarea>
+                            <small class="form-text text-muted">
+                                HTML shown over the home page underlay. Supports simple text formatting and links.
                             </small>
                         </div>
                         <div class="col text-end">
