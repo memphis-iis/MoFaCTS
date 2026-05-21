@@ -9,6 +9,8 @@
   export let continueReady = false;
   export let manualContinueVisible = false;
   export let measuring = false;
+  export let frameVisible = false;
+  export let transitionReady = false;
   export let stageStyle = '';
   export let visualStyle = '';
   export let surfaceStyle = '';
@@ -24,6 +26,8 @@
       <div
         class="h5p-frame-stage"
         class:h5p-frame-stage-measuring={measuring}
+        class:h5p-frame-stage-hidden={!frameVisible}
+        class:h5p-frame-stage-transition-ready={transitionReady}
         style={stageStyle}
       >
         <div class="h5p-frame-visual" style={visualStyle}>
@@ -104,6 +108,17 @@
     display: flex;
     align-items: flex-start;
     justify-content: center;
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .h5p-frame-stage-hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .h5p-frame-stage-transition-ready {
+    transition: opacity var(--transition-smooth, 180ms) ease;
   }
 
   .h5p-frame-visual {
@@ -111,20 +126,26 @@
     max-width: 100%;
     max-height: 100%;
     overflow: hidden;
-    transition:
-      width var(--transition-smooth, 180ms) ease,
-      height var(--transition-smooth, 180ms) ease;
     will-change: width, height;
   }
 
   .h5p-frame-surface {
     transform-origin: top left;
     overflow: hidden;
+    will-change: width, height, transform;
+  }
+
+  .h5p-frame-stage-transition-ready .h5p-frame-visual {
+    transition:
+      width var(--transition-smooth, 180ms) ease,
+      height var(--transition-smooth, 180ms) ease;
+  }
+
+  .h5p-frame-stage-transition-ready .h5p-frame-surface {
     transition:
       width var(--transition-smooth, 180ms) ease,
       height var(--transition-smooth, 180ms) ease,
       transform var(--transition-smooth, 180ms) ease;
-    will-change: width, height, transform;
   }
 
   .h5p-frame {

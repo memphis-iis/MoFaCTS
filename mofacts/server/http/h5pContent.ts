@@ -334,14 +334,17 @@ export function renderH5PPlayerHtml(content: UnknownRecord): string {
     let batchSequence = 0;
 
     function renderedContentHeight() {
-      const container = document.getElementById('h5p-container');
-      if (!container) {
+      const root = document.body || document.documentElement;
+      if (!root) {
         return 0;
       }
 
-      const containerRect = container.getBoundingClientRect();
-      let bottom = containerRect.bottom;
-      const elements = container.querySelectorAll('*');
+      const container = document.getElementById('h5p-container');
+      const rootRect = root.getBoundingClientRect();
+      const containerRect = container ? container.getBoundingClientRect() : rootRect;
+      let top = Math.min(0, rootRect.top, containerRect.top);
+      let bottom = Math.max(rootRect.bottom, containerRect.bottom);
+      const elements = root.querySelectorAll('*');
       for (let i = 0; i < elements.length; i += 1) {
         const element = elements[i];
         const style = window.getComputedStyle(element);
@@ -352,10 +355,11 @@ export function renderH5PPlayerHtml(content: UnknownRecord): string {
         if (rect.width <= 0 && rect.height <= 0) {
           continue;
         }
+        top = Math.min(top, rect.top);
         bottom = Math.max(bottom, rect.bottom);
       }
 
-      return Math.ceil(bottom - Math.min(0, containerRect.top));
+      return Math.ceil(bottom - top);
     }
 
     function currentSizePayload(request) {
@@ -409,6 +413,65 @@ export function renderH5PPlayerHtml(content: UnknownRecord): string {
 
     function announceH5PReadyForMeasurement() {
       postH5PResizeAction('hello');
+    }
+
+    function startContentSizeObserver(root) {
+      if (!window.ResizeObserver) {
+        showError('H5P requires ResizeObserver for content sizing.');
+        return;
+      }
+
+      let lastSignature = '';
+      const observed = new WeakSet();
+      function postContentChanged(reason) {
+        const payload = currentSizePayload({ reason });
+        const signature = [
+          payload.scrollHeight,
+          payload.clientHeight,
+        ].join(':');
+        if (signature === lastSignature) {
+          return;
+        }
+        lastSignature = signature;
+        parent.postMessage({
+          context: 'h5p',
+          action: 'contentChanged',
+          reason,
+          ...payload,
+        }, window.location.origin);
+      }
+
+      const resizeObserver = new ResizeObserver(function () {
+        postContentChanged('content-resize');
+      });
+
+      function observeElement(element) {
+        if (!observed.has(element)) {
+          observed.add(element);
+          resizeObserver.observe(element);
+        }
+      }
+
+      root.querySelectorAll('*').forEach(function (element) {
+        observeElement(element);
+      });
+      observeElement(root);
+
+      const mutationObserver = new MutationObserver(function (mutations) {
+        mutations.forEach(function (mutation) {
+          mutation.addedNodes.forEach(function (node) {
+            if (node.nodeType !== Node.ELEMENT_NODE) {
+              return;
+            }
+            observeElement(node);
+            node.querySelectorAll?.('*').forEach(function (element) {
+              observeElement(element);
+            });
+          });
+        });
+        postContentChanged('content-mutation');
+      });
+      mutationObserver.observe(root, { childList: true, subtree: true });
     }
 
     function textFromHtml(value) {
@@ -628,6 +691,7 @@ export function renderH5PPlayerHtml(content: UnknownRecord): string {
       };
       new H5PStandalone.H5P(el, options).then(function () {
         parent.postMessage({ type: 'mofacts:h5p-loaded', contentId: data.contentId }, window.location.origin);
+        startContentSizeObserver(el);
         announceH5PReadyForMeasurement();
         if (!window.H5P || !H5P.externalDispatcher) {
           showError('H5P runtime loaded without an xAPI dispatcher.');

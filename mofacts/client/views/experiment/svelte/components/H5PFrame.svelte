@@ -55,6 +55,8 @@
   let measurementRequestId = 0;
   let activeMeasurementRequestId = null;
   let measuring = false;
+  let h5pRuntimeReady = false;
+  let transitionReady = false;
   let timedOut = false;
   let lastFitLogSignature = '';
   let loggedMeasurementRequestForEpoch = false;
@@ -92,18 +94,12 @@
     measurementWidth,
     measuring,
   });
-  $: continueReady = Boolean(pendingResult && resultLifecycle === 'available');
+  $: frameVisible = Boolean(h5pRuntimeReady && fitResult);
+  $: continueReady = Boolean(pendingResult && resultLifecycle === 'available' && !measuring && fitResult);
 
   $: if (configSignature !== currentConfigSignature) {
     currentConfigSignature = configSignature;
     resetH5PState('config');
-  }
-
-  $: {
-    const nextPhase = pendingResult ? 'feedback' : 'question';
-    if (nextPhase !== fitPhase) {
-      startFitEpoch(nextPhase, 'phase-change');
-    }
   }
 
   $: syncViewportResizeObserver();
@@ -147,6 +143,8 @@
     fitAttemptCount = 0;
     activeMeasurementRequestId = null;
     measuring = false;
+    h5pRuntimeReady = false;
+    transitionReady = false;
     timedOut = false;
     lastFitLogSignature = '';
     loggedMeasurementRequestForEpoch = false;
@@ -169,6 +167,8 @@
     fitAttemptCount = 0;
     activeMeasurementRequestId = null;
     measuring = measurementWidth > 0;
+    h5pRuntimeReady = false;
+    transitionReady = false;
     timedOut = false;
     lastFitLogSignature = '';
     loggedMeasurementRequestForEpoch = false;
@@ -191,7 +191,7 @@
     measurementWidth = candidateWidths[0] ?? availableWidth;
   }
 
-  function startFitEpoch(phase, reason) {
+  function startFitEpoch(phase, reason, preservePresentedFit = true) {
     const firstMeasurementWidth = availableMeasurementWidth();
     if (firstMeasurementWidth <= 0) {
       clientConsole(1, '[H5PFrame][Fit] cannot start epoch without a measured stage width', {
@@ -205,8 +205,11 @@
     fitEpoch += 1;
     naturalWidth = null;
     naturalHeight = null;
-    fitResult = null;
+    if (!preservePresentedFit) {
+      fitResult = null;
+    }
     beginCandidateMeasurements(firstMeasurementWidth, true);
+    activeMeasurementRequestId = null;
     measuring = true;
     timedOut = false;
     loggedMeasurementRequestForEpoch = false;
@@ -440,6 +443,7 @@
       activeMeasurementRequestId = null;
       return;
     }
+    const wasVisible = frameVisible;
     fitResult = nextFit;
     measuring = false;
     activeMeasurementRequestId = null;
@@ -472,6 +476,18 @@
         timedOut,
         fit: nextFit,
       });
+    }
+
+    if (h5pRuntimeReady && !wasVisible && !transitionReady) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (h5pRuntimeReady && fitResult) {
+            transitionReady = true;
+          }
+        });
+      });
+    } else if (h5pRuntimeReady && wasVisible) {
+      transitionReady = true;
     }
   }
 
@@ -578,9 +594,17 @@
     if (!frameElement) {
       return;
     }
+    if (isSelfHosted && data.contentId !== config?.contentId) {
+      return;
+    }
 
     if (data.action === 'hello') {
       void requestMeasurementAfterPaint('hello');
+      return;
+    }
+
+    if (data.action === 'contentChanged') {
+      startFitEpoch(fitPhase, 'content-changed');
       return;
     }
 
@@ -620,8 +644,10 @@
       resultLifecycle = 'available';
       startFitEpoch('feedback', 'h5p-result');
     } else if (message.kind === 'loaded') {
+      const wasVisible = frameVisible;
+      h5pRuntimeReady = true;
       dispatch('loaded', message.data);
-      void requestMeasurementAfterPaint('h5p-loaded');
+      startFitEpoch(fitPhase, 'h5p-loaded', wasVisible);
     } else if (message.kind === 'failed') {
       clientConsole(1, '[H5PFrame] H5P runtime reported a failure', message.data);
       dispatch('failed', message.data);
@@ -694,6 +720,8 @@
   {continueReady}
   manualContinueVisible={Boolean(pendingResult)}
   {measuring}
+  {frameVisible}
+  {transitionReady}
   stageStyle={frameLayout.stageStyle}
   visualStyle={frameLayout.visualStyle}
   surfaceStyle={frameLayout.surfaceStyle}
