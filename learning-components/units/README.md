@@ -2,7 +2,7 @@
 
 Target home for unit engines and unit-level orchestration.
 
-Current status: active executable source. The legacy app path `mofacts/client/views/experiment/unitEngine.ts` is now a Meteor-facing compatibility facade that supplies app dependencies and delegates unit-engine construction here.
+Current status: active executable source. The legacy app path `mofacts/client/views/experiment/unitEngine.ts` is now a Meteor-facing behavior-preserving import facade that supplies app dependencies and delegates unit-engine construction here.
 
 Belongs here:
 

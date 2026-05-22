@@ -2,7 +2,7 @@
 
 Target home for external learning-component adapters.
 
-Current status: architectural scaffold. Existing H5P integration remains under current `mofacts/` paths.
+Current status: planned external-widget boundary. Existing H5P integration remains under current `mofacts/` paths until the adapter contract is deliberately extracted.
 
 Belongs here:
 

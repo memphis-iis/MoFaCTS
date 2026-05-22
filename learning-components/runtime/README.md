@@ -2,7 +2,7 @@
 
 Target home for runtime contracts used by learning components.
 
-Current status: active migration source for learning-component runtime contracts. Keep this layer small: it defines explicit dependencies for learning components and thin adapters used during migration.
+Current status: learning-component runtime contract source. Keep this layer small: it defines explicit dependencies for learning components and thin adapters used while legacy app paths delegate into `learning-components/`.
 
 Belongs here:
 

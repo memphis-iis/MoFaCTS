@@ -2,7 +2,7 @@
 
 Target home for learning-content interpretation.
 
-Current status: active migration source. TDF cluster-list parsing, response normalization, and related content interpretation helpers are being extracted here as first-class learning-component code.
+Current status: shared content-interpretation source. TDF cluster-list parsing and response normalization live here as first-class learning-component code.
 
 Belongs here:
 

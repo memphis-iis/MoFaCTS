@@ -1,7 +1,13 @@
 $ErrorActionPreference = 'Stop'
 
 $deployDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$caddyExe = 'C:\Users\ppavl\AppData\Local\Microsoft\WinGet\Packages\CaddyServer.Caddy_Microsoft.Winget.Source_8wekyb3d8bbwe\caddy.exe'
+$caddyExe = $env:MOFACTS_CADDY_EXE
+if (-not $caddyExe) {
+  throw 'Set MOFACTS_CADDY_EXE to the full path of caddy.exe before running start-lan-https.ps1'
+}
+if (-not (Test-Path -LiteralPath $caddyExe)) {
+  throw "MOFACTS_CADDY_EXE does not point to an existing file: $caddyExe"
+}
 $caddyConfig = Join-Path $deployDir 'Caddyfile.local'
 $caddyStdout = Join-Path $deployDir 'caddy.stdout.log'
 $caddyStderr = Join-Path $deployDir 'caddy.stderr.log'
@@ -19,7 +25,7 @@ try {
     -RedirectStandardError $caddyStderr `
     -WindowStyle Hidden
 
-  Write-Host 'LAN HTTPS started at https://192.168.50.44:3000'
+  Write-Host 'LAN HTTPS started at https://localhost:3000'
 }
 finally {
   Pop-Location

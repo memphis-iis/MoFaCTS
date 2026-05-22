@@ -2,7 +2,7 @@
 
 Target home for trial-type contracts and trial interaction implementations.
 
-Current status: architectural scaffold. Existing trial UI and service code remains under `mofacts/client/views/experiment/`.
+Current status: planned contributor extension boundary. Existing trial UI and service code remains under `mofacts/client/views/experiment/` until each trial type is deliberately extracted.
 
 Belongs here:
 

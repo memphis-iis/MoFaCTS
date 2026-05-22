@@ -33,6 +33,8 @@ The full TypeScript check is the required TypeScript verification path for app c
 
 The repository defines test scripts in `mofacts/package.json`. Some local Meteor workflows may require additional environment setup. For release preparation, record any test limitations explicitly rather than treating a narrowed check as full release confidence.
 
+`npm run test:ci` runs the Meteor server test suite and compiles the client test bundle. Browser-side client tests require a configured `TEST_BROWSER_DRIVER`.
+
 ## Docker Build and Deployment
 
 The canonical build and deployment workflow lives in `deploy/`. Do not substitute a local Meteor build for release-confidence deployment validation.

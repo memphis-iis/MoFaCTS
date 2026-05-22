@@ -1,7 +1,7 @@
 services:
   playwright-mcp:
     environment:
-      BASE_URL: http://192.168.50.44:3100
+      BASE_URL: http://localhost:3100
 
   mongo-mcp:
     environment:

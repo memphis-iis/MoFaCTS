@@ -2,7 +2,7 @@
 
 This directory is the target home for contributor-facing pedagogical extension points.
 
-Current status: active migration source root. TypeScript and lint now include this directory, and unit-engine code is being extracted here behind behavior-preserving import facades from legacy app paths.
+Current status: contributor-facing source root under active expansion. TypeScript, lint, and CI test bundling include this directory. Unit-engine code now runs here behind behavior-preserving import facades from legacy app paths.
 
 Before adding new executable areas here, make sure Meteor/Rspack, Docker, lint, and tests cover the path deliberately so unresolved imports fail clearly.
 

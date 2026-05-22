@@ -2,7 +2,7 @@ services:
   mofacts:
     container_name: mofacts
     restart: always
-    image: ${DOCKER_REGISTRY:-ppavlikmemphis}/${IMAGE_NAME:-mofacts-mini}:${IMAGE_TAG:-upgrades}
+    image: ${DOCKER_REGISTRY:-mofacts-local}/${IMAGE_NAME:-mofacts-mini}:${IMAGE_TAG:-local}
     build:
       context: ../
       dockerfile: Dockerfile

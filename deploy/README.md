@@ -34,6 +34,13 @@ For local Docker Compose validation, start from the tracked template:
 cp .env.local.example .env.local
 ```
 
+The LAN HTTPS helper also requires an explicit Caddy executable path:
+
+```powershell
+$env:MOFACTS_CADDY_EXE = 'C:\Path\To\caddy.exe'
+.\start-lan-https.ps1
+```
+
 ## Typical Local Validation
 
 Only run Docker commands when you intend to validate the container workflow:
