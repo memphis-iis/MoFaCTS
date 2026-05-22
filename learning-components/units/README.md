@@ -14,7 +14,8 @@ Belongs here:
 Does not belong here:
 
 - App routing, subscriptions, or server methods.
-- Probability formulas and selection policy internals; those belong under `learning-components/models/`.
+- Shared probability formulas and shared selection policy internals; those belong under `learning-components/models/` after they are promoted to reusable primitives.
+- Unit-specific probability, selection, scoring, or state files; keep those inside the owning unit folder.
 - TDF parsing that is reusable beyond units; that belongs under `learning-components/content/`.
 
 Use deliberate, behavior-preserving import facades when moving code from legacy paths. Do not create alternate implementations, recovery paths, or duplicated legacy behavior.

@@ -41,10 +41,11 @@ db/mongodump.tar.gz
 .claude/settings.local.json
 
 # Shareable local Docker/dev config
-!deploy/.env.local
+!deploy/.env.local.example
 !deploy/docker-compose.local.yml
 
 # Private deploy config and generated local deploy state
+deploy/.env.local
 deploy/settings.local.json
 deploy/settings.json
 deploy/settingsproduction.json

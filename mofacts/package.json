@@ -109,6 +109,10 @@
       "client": "client/index.ts",
       "server": "server/main.ts"
     },
+    "testModule": {
+      "client": "tests/client-entry.js",
+      "server": "tests/server-entry.js"
+    },
     "modules": [
       "client"
     ]

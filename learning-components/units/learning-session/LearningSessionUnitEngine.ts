@@ -3,24 +3,32 @@ import {
   getHistoryCorrectAnswer,
   getHistoryResponseKey as getAppHistoryResponseKey,
 } from '../../../mofacts/common/history/historyResponseKey';
-import { resolveSelectionTestType } from '../../models/selection/testTypePolicy';
 import { stripSpacesAndLowerCase } from '../../content/response-normalization/responseKey';
-import {
-  applyClusterListAvailability,
-  parseUnitClusterList,
-  resolveModelClusterList,
-} from '../../content/tdf/clusterListParser';
-import { createTdfProbabilityFunction } from '../../models/probability/tdfProbabilityFunction';
-import { calculateCardProbabilities as runCalculateCardProbabilities } from '../../models/probability/probabilityCalculation';
-import { applyAnswerUpdate } from '../../models/answer-updates/answerUpdates';
-import { applyPracticeTimeUpdate } from '../../models/answer-updates/practiceTimeUpdates';
 import { createMeteorLearningComponentContext } from '../../runtime/MeteorLearningComponentContext';
+import { applyPracticeTimeUpdate } from './model/practiceTimeUpdates';
+import { createTdfProbabilityFunction } from './model/tdfProbabilityFunction';
+import { resolveSelectionTestType } from './model/testTypePolicy';
 import { buildNextCardSelection } from './learningSessionRuntime';
 import { selectLearningSessionIndices } from './learningSessionSelection';
 import { commitPreparedSelection as runCommitPreparedSelection } from './cardCommit';
 import { learningUnitFinished } from './learningUnitFinished';
 import { initializeLearningModelState } from './initializeLearningModelState';
 import { loadLearningSessionResumeState } from './loadLearningSessionResumeState';
+import {
+  createCurrentLearningCardInfoTracker,
+  recordLearningCardAdminMetrics,
+  updateCardAndStimExposure,
+} from './learningSessionCardState';
+import { applyLearningSessionAnswer } from './learningSessionAnswerCoordinator';
+import {
+  calculateLearningSessionCardProbabilities,
+  setUpLearningSessionClusterList,
+} from './learningSessionModelPreparation';
+import {
+  createEmptyLogisticModelProbabilityState,
+  getStimParameterArray as getLogisticStimParameterArray,
+  getStimParameterArrayFromCluster as getLogisticStimParameterArrayFromCluster,
+} from './logisticModelStateBootstrap';
 import {
   applyLockedNextCard as runApplyLockedNextCard,
   applyPrefetchedNextCard as runApplyPrefetchedNextCard,
@@ -84,41 +92,29 @@ export async function createLearningSessionUnitEngine(deps: CreateLearningSessio
   }
 
   function getStimParameterArray(clusterIndex: any, whichStim: any) {
-    const cluster = deps.getStimCluster(clusterIndex);
-    const stim = cluster.stims[whichStim];
-    if (!stim) {
-      throw new Error(`Params not found for cluster ${clusterIndex}, stim ${whichStim}`);
-    }
-    return stim.params.split(',').map((x: any) => deps.legacyFloat(x));
+    return getLogisticStimParameterArray({
+      getStimCluster: deps.getStimCluster,
+      clusterIndex,
+      whichStim,
+      parseNumber: deps.legacyFloat,
+    });
   }
 
   function getStimParameterArrayFromCluster(cluster: any, whichStim: any) {
-    return cluster.stims[whichStim].params.split(',').map((x: any) => deps.legacyFloat(x));
-  }
-
-  const currentCardInfo = {
-    testType: 'd',
-    clusterIndex: -1,
-    whichStim: -1,
-    forceButtonTrial: false,
-    probabilityEstimate: -1,
-  };
-
-  function setCurrentCardInfo(clusterIndex: any, whichStim: any, forceButtonTrial: any = false) {
-    currentCardInfo.clusterIndex = clusterIndex;
-    currentCardInfo.whichStim = whichStim;
-    currentCardInfo.forceButtonTrial = forceButtonTrial;
-    currentCardInfo.probabilityEstimate = cardProbabilities.cards[clusterIndex].stims[whichStim].probabilityEstimate;
-    deps.log(1, 'MODEL UNIT card (selection: any) => ',
-        'cluster-idx:', clusterIndex,
-        'whichStim:', whichStim,
-        'forceButtonTrial:', forceButtonTrial,
-        'parameter', getStimParameterArray(clusterIndex, whichStim),
-    );
+    return getLogisticStimParameterArrayFromCluster({
+      cluster,
+      whichStim,
+      parseNumber: deps.legacyFloat,
+    });
   }
 
   let cardProbabilities: any = [];
   const stimClusters: any[] = [];
+  const currentCardTracker = createCurrentLearningCardInfoTracker({
+    getCardProbabilities: () => cardProbabilities,
+    getStimParameterArray,
+    log: deps.log,
+  });
   const learningComponentContext = createMeteorLearningComponentContext({
     getSessionValue: deps.getSessionValue,
     setSessionValue: deps.setSessionValue,
@@ -130,102 +126,42 @@ export async function createLearningSessionUnitEngine(deps: CreateLearningSessio
     stimClusters.push(deps.getStimCluster(i));
   }
   function initCardProbs(overrideData: any) {
-    let initVals = {
-      numQuestionsAnswered: 0,
-      numQuestionsAnsweredCurrentSession: 0,
-      numCorrectAnswers: 0,
-      cards: [],
-    };
-
-    if (overrideData) {
-      initVals = Object.assign(initVals, overrideData);
-    }
-    cardProbabilities = initVals;
-  }
-
-  function secs(t: any) {
-    return t / 1000.0;
+    cardProbabilities = createEmptyLogisticModelProbabilityState(overrideData);
   }
 
   const probFunction = createTdfProbabilityFunction(deps.getSessionValue('currentTdfUnit'));
 
   function updateCardAndStimData(cardIndex: any, whichStim: any) {
-    const card = cardProbabilities.cards[cardIndex];
-    const stim = card.stims[whichStim];
-    const responseText = stripSpacesAndLowerCase(deps.getDisplayAnswerText(getStimAnswer(cardIndex, whichStim)));
-
-    cardProbabilities.instructionQuestionResult = deps.getSessionValue('instructionQuestionResults');
-
-    card.lastSeen = Date.now();
-    if (card.firstSeen < 1) {
-      card.firstSeen = card.lastSeen;
-    }
-
-    stim.lastSeen = Date.now();
-    if (stim.firstSeen < 1) {
-      stim.firstSeen = stim.lastSeen;
-    }
-
-    if (responseText && responseText in cardProbabilities.responses) {
-      const resp = cardProbabilities.responses[responseText];
-      resp.lastSeen = Date.now();
-      if (resp.firstSeen < 1) {
-        resp.firstSeen = resp.lastSeen;
-      }
-      if (deps.getTestType() === 's') {
-        resp.priorStudy += 1;
-      }
-    }
-    card.trialsSinceLastSeen = 0;
-    card.hasBeenIntroduced = true;
-    stim.hasBeenIntroduced = true;
-    if (deps.getTestType() === 's') {
-      card.priorStudy += 1;
-      stim.priorStudy += 1;
-    }
+    updateCardAndStimExposure({
+      cardProbabilities,
+      cardIndex,
+      whichStim,
+      instructionQuestionResults: deps.getSessionValue('instructionQuestionResults'),
+      testType: deps.getTestType(),
+      correctAnswer: getStimAnswer(cardIndex, whichStim),
+      getDisplayAnswerText: deps.getDisplayAnswerText,
+    });
   }
 
   return {
     calculateCardProbabilities: function calculateCardProbabilities() {
-      const unitNumber = deps.getSessionValue('currentUnitNumber');
-      const curTdf = deps.findTdfById(deps.getSessionValue('currentTdfId'));
-      const unitTypeParams = curTdf.content.tdfs.tutor.unit[unitNumber].assessmentsession || curTdf.content.tdfs.tutor.unit[unitNumber].learningsession;
-      let clusterList;
-      unitTypeParams ? clusterList = unitTypeParams.clusterlist : clusterList = false;
-      if (!clusterList) { deps.log(2, 'no clusterlist found for unit ' + unitNumber); }
-      const unitClusterList = parseUnitClusterList(clusterList);
-      runCalculateCardProbabilities({
+      calculateLearningSessionCardProbabilities({
         cardProbabilities,
         stimClusters,
-        unitClusterList,
         probabilityFunction: probFunction,
-        deliverySettings: deps.getDeliverySettings(),
-        overallOutcomeHistory: deps.getSessionValue('overallOutcomeHistory'),
-        overallStudyHistory: deps.getSessionValue('overallStudyHistory'),
-        getDisplayAnswerText: deps.getDisplayAnswerText,
-        normalizeResponseText: (answer) => stripSpacesAndLowerCase(answer),
-        legacyFloat: deps.legacyFloat,
-        log: (...args) => deps.log(2, ...args),
+        deps,
       });
     },
 
     setUpClusterList: function setUpClusterList(cards: any) {
-      const clusterList = resolveModelClusterList({
-        currentTdfFile: deps.getSessionValue('currentTdfFile'),
-        currentUnitNumber: deps.getSessionValue('currentUnitNumber'),
-        subTdfIndex: deps.getSessionValue('subTdfIndex'),
-        isVideoSession: deps.getSessionValue('isVideoSession'),
+      setUpLearningSessionClusterList({
+        cards,
         curUnit: this.curUnit,
-        currentSessionUnit: JSON.parse(JSON.stringify(deps.getSessionValue('currentTdfUnit'))),
-        extractDelimFields: deps.extractDelimFields,
-        log: deps.log,
+        deps,
       });
-      deps.log(2, 'clusterList', clusterList);
-      applyClusterListAvailability(cards, clusterList, deps.rangeVal, deps.legacyInt);
-      deps.log(1, 'setupClusterList,cards:', cards);
     },
 
-    initializeActRModel: async function() {
+    initializeLogisticModelState: async function() {
       await initializeLearningModelState({
         numQuestions: deps.getStimCount(),
         curKCBase: deps.getStimKCBaseForCurrentStimuliSet(),
@@ -278,7 +214,7 @@ export async function createLearningSessionUnitEngine(deps: CreateLearningSessio
     },
 
     findCurrentCardInfo: function() {
-      return currentCardInfo;
+      return currentCardTracker.findCurrentCardInfo();
     },
 
     unitType: MODEL_UNIT,
@@ -298,7 +234,7 @@ export async function createLearningSessionUnitEngine(deps: CreateLearningSessio
 
     initImpl: async function() {
       deps.setSessionValue('unitType', MODEL_UNIT);
-      await this.initializeActRModel();
+      await this.initializeLogisticModelState();
     },
 
     calculateIndices: async function(options: any = {}) {
@@ -363,7 +299,7 @@ export async function createLearningSessionUnitEngine(deps: CreateLearningSessio
         },
         resolveSelectionTestType: (card, stim) => this._resolveSelectionTestType(card, stim),
         buildCurrentOwnerToken: (cardRef) => this._buildCurrentOwnerToken(cardRef),
-        setCurrentCardInfo,
+        setCurrentCardInfo: currentCardTracker.setCurrentCardInfo,
         findCurrentCardInfo: () => this.findCurrentCardInfo(),
         applyPreparedCardQuestionAndAnswerGlobals: (preparedState) => this.applyPreparedCardQuestionAndAnswerGlobals(preparedState),
         setRuntimeCurrentPreparedState: (preparedState) => {
@@ -380,33 +316,17 @@ export async function createLearningSessionUnitEngine(deps: CreateLearningSessio
           if (!deps.currentUserHasRole('admin,teacher')) {
             return;
           }
-          deps.log(1, '>>>BEGIN METRICS>>>>>>>\n',
-          'Overall user (stats: any) => ',
-              'total responses:', cardProbabilities.numQuestionsAnswered,
-              'total correct responses:', cardProbabilities.numCorrectAnswers,
-          );
-
-          deps.log(1, 'Model selected card:', card);
-          deps.log(1, 'Model selected stim:', stim);
-
-          const elapsedStr = function(t: any) {
-            return t < 1 ? 'Never Seen': secs(Date.now() - t);
-          };
-          deps.log(1,
-              'Card First Seen:', elapsedStr(card.firstSeen),
-              'Card Last Seen:', elapsedStr(card.lastSeen),
-              'Total time in other practice:', secs(card.otherPracticeTime),
-              'Stim First Seen:', elapsedStr(stim.firstSeen),
-              'Stim Last Seen:', elapsedStr(stim.lastSeen),
-              'Stim Total time in other practice:', secs(stim.otherPracticeTime),
-          );
-
-          const responseText = stripSpacesAndLowerCase(deps.getDisplayAnswerText(getStimAnswer(cardIndex, whichStim)));
-          if (responseText && responseText in cardProbabilities.responses) {
-            deps.log(1, 'Response is', responseText, deps.displayify(cardProbabilities.responses[responseText]));
-          }
-
-          deps.log(1, '<<<END   METRICS<<<<<<<');
+          recordLearningCardAdminMetrics({
+            cardProbabilities,
+            cardIndex,
+            whichStim,
+            card,
+            stim,
+            correctAnswer: getStimAnswer(cardIndex, whichStim),
+            getDisplayAnswerText: deps.getDisplayAnswerText,
+            displayify: deps.displayify,
+            log: deps.log,
+          });
         }
       });
     },
@@ -503,48 +423,30 @@ export async function createLearningSessionUnitEngine(deps: CreateLearningSessio
       applyPracticeTimeUpdate({
         cardProbabilities,
         clusterIndex: deps.getSessionValue('clusterIndex'),
-        whichStim: currentCardInfo.whichStim,
+        whichStim: currentCardTracker.currentCardInfo.whichStim,
         practiceTime,
       });
       deps.updateCurStudedentPracticeTime(practiceTime);
     },
 
     cardAnswered: async function(wasCorrect: any, practiceTime: any) {
-      const cards = cardProbabilities.cards;
       const selectedClusterIndex = deps.getSessionValue('clusterIndex');
-      const cluster = stimClusters[selectedClusterIndex];
-      const card = cards[selectedClusterIndex];
       const testType = deps.getTestType();
-      deps.log(1, 'cardAnswered, card: ', card, 'clusterIndex: ', selectedClusterIndex);
-
       const {whichStim} = this.findCurrentCardInfo();
-      const stim = card.stims[whichStim];
-      const answerText = stripSpacesAndLowerCase(deps.getDisplayAnswerText(
-        cluster.stims[currentCardInfo.whichStim].correctResponse));
-
-      deps.updateCurStudentPerformance(wasCorrect, practiceTime, testType);
-
-      const currentStimProbability = stim.probabilityEstimate;
-
-      deps.log(2, 'cardAnswered, curTrialInfo:', currentStimProbability, card, stim);
-
-      applyAnswerUpdate({
+      await applyLearningSessionAnswer({
         cardProbabilities,
-        cards,
+        stimClusters,
         selectedClusterIndex,
-        currentStimIndex: currentCardInfo.whichStim,
         whichStim,
-        practiceTime,
+        currentStimIndex: currentCardTracker.currentCardInfo.whichStim,
         wasCorrect,
+        practiceTime,
         testType,
-        answerText,
-        onMissingResponseMetrics: () => deps.log(1, 'COULD NOT STORE RESPONSE METRICS',
-            answerText,
-            currentCardInfo.whichStim,
-            deps.displayify(cluster.stims[currentCardInfo.whichStim].correctResponse),
-            deps.displayify(cardProbabilities.responses)),
+        getDisplayAnswerText: deps.getDisplayAnswerText,
+        updateCurStudentPerformance: deps.updateCurStudentPerformance,
+        displayify: deps.displayify,
+        log: deps.log,
       });
-
     },
 
     unitFinished: async function() {

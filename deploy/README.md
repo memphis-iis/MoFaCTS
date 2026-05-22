@@ -8,7 +8,7 @@ This folder contains the canonical Docker Compose deployment workflow for the Mo
 - `docker-compose.local.yml`: local override file for development or staging-style checks.
 - `docker-compose.hotfix-native.yml`: publishes local MongoDB to `127.0.0.1:27017` for the native hotfix dev server.
 - `docker-compose.hotfix-local.yml`: local-only bundle runner for faster code hotfix loops without producing a deploy image.
-- `.env.local`, `.env.staging`, `.env.production`: environment variable examples for supported targets.
+- `.env.local.example`: shareable local environment template. Copy it to ignored `.env.local` for machine-specific values.
 - `settings.json`, `settings.local.json`: application settings sources used by the container runtime.
 - `docker/`: scripts copied into the app image.
 - `hotfix-dev.ps1`: native Windows Meteor hotfix dev server launcher.
@@ -27,6 +27,12 @@ Run Docker Compose from this folder.
 ## Local Settings
 
 Keep private settings and secrets out of commits. Use local environment files and local settings files for deployment-specific values.
+
+For local Docker Compose validation, start from the tracked template:
+
+```bash
+cp .env.local.example .env.local
+```
 
 ## Typical Local Validation
 

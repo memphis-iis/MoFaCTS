@@ -88,22 +88,7 @@ learning-components/
 │       └── learningUnitFinished.ts
 │
 ├── models/
-│   ├── ModelState.ts
-│   ├── modelStateFactory.ts
-│   ├── probability/
-│   │   ├── probabilityFunctions.ts
-│   │   ├── probabilityCalculation.ts
-│   │   └── tdfProbabilityFunction.ts
-│   ├── selection/
-│   │   ├── selectionPolicy.ts
-│   │   ├── thresholdCeilingPolicy.ts
-│   │   └── distancePolicy.ts
-│   ├── history/
-│   │   └── resumeModelState.ts
-│   └── answer-updates/
-│       ├── answerUpdates.ts
-│       ├── responseMetrics.ts
-│       └── practiceTimeUpdates.ts
+│   └── README.md                # shared model contracts/primitives only after promotion
 │
 ├── content/
 │   ├── tdf/
@@ -239,7 +224,7 @@ Target locations:
 ```text
 app/runtime/history/
 learning-components/content/stimuli/stimulusAnswers.ts
-learning-components/models/selection/selectionPolicy.ts
+learning-components/units/learning-session/model/selectionPolicy.ts
 ```
 
 History helpers such as `getHistoryCorrectAnswer` and `getHistoryResponseKey` belong under the app-owned history boundary, not under adaptive model modules.
@@ -367,11 +352,11 @@ This is important because TDF interpretation is a major contributor-facing bound
 
 ### Step 7: Extract model-state initialization
 
-Move the ACT-R/model state initialization into:
+Move the logistic/LKT model-state initialization into:
 
 ```text
-learning-components/models/modelStateFactory.ts
-learning-components/models/ModelState.ts
+learning-components/units/learning-session/model/modelStateFactory.ts
+learning-components/units/learning-session/model/ModelState.ts
 ```
 
 Responsibilities:
@@ -390,14 +375,14 @@ This should leave the learning-session unit with a model state object instead of
 Move probability-function construction into:
 
 ```text
-learning-components/models/probability/probabilityFunctions.ts
-learning-components/models/probability/tdfProbabilityFunction.ts
+learning-components/units/learning-session/model/probabilityFunctions.ts
+learning-components/units/learning-session/model/tdfProbabilityFunction.ts
 ```
 
 Move calculation into:
 
 ```text
-learning-components/models/probability/probabilityCalculation.ts
+learning-components/units/learning-session/model/probabilityCalculation.ts
 ```
 
 Responsibilities:
@@ -415,9 +400,7 @@ Keep this behavior-preserving first. Do not try to redesign the model in the sam
 Move card-selection logic into:
 
 ```text
-learning-components/models/selection/selectionPolicy.ts
-learning-components/models/selection/distancePolicy.ts
-learning-components/models/selection/thresholdCeilingPolicy.ts
+learning-components/units/learning-session/model/selectionPolicy.ts
 ```
 
 Responsibilities:
@@ -459,9 +442,9 @@ This layer should orchestrate the model. It should not own all model internals.
 Move `cardAnswered` logic into:
 
 ```text
-learning-components/models/answer-updates/answerUpdates.ts
-learning-components/models/answer-updates/responseMetrics.ts
-learning-components/models/answer-updates/practiceTimeUpdates.ts
+learning-components/units/learning-session/model/answerUpdates.ts
+learning-components/units/learning-session/model/responseMetrics.ts
+learning-components/units/learning-session/model/practiceTimeUpdates.ts
 ```
 
 Responsibilities:
@@ -481,7 +464,7 @@ This should eventually accept an explicit state object and result object, not pu
 Move resume-specific model restoration into:
 
 ```text
-learning-components/models/history/resumeModelState.ts
+learning-components/units/learning-session/model/resumeModelState.ts
 ```
 
 Responsibilities:
@@ -503,7 +486,7 @@ app/runtime/history/
 
 or, during migration while executable source still lives under `mofacts/`, an equivalent `mofacts/` app-runtime path.
 
-Model-specific resume code may consume reconstructed history through explicit inputs or adapters. It should not fetch history rows itself unless the app supplies that behavior through a context callback.
+Learning-session-specific resume code may consume reconstructed history through explicit inputs or adapters. It should stay with the learning-session component unless it becomes a shared model contract. It should not fetch history rows itself unless the app supplies that behavior through a context callback.
 
 During migration, old UI-local imports such as:
 
@@ -578,6 +561,8 @@ Specifically:
 - Anything that interprets TDF/stimulus/display semantics.
 - Anything that adapts external learning widgets like H5P.
 
+Prefer component-owned folders for code that contributors will edit together. The current learning-session LKT/logistic implementation should live under `learning-components/units/learning-session/`, including its local model state, probability, selection, answer-update, and resume helpers. Promote a file to `learning-components/models/`, `learning-components/content/`, or another top-level category only when it is intentionally shared across components or becomes a stable public contract.
+
 ## Efficient implementation strategy
 
 ### Best order
@@ -590,7 +575,7 @@ The best order is:
 3. Extract shared card preparation.
 4. Extract simple engines.
 5. Extract assessment scheduler.
-6. Extract model state, probability, and selection.
+6. Extract learning-session-owned model state, probability, and selection into the learning-session component folder.
 7. Extract learning-session runtime.
 8. Extract answer updates and resume logic.
 9. Add trial-type interfaces.
@@ -621,9 +606,9 @@ A good PR sequence would be:
 4. `refactor: extract card preparation helpers`
 5. `refactor: extract instruction and video unit engines`
 6. `refactor: extract assessment schedule engine`
-7. `refactor: extract model state factory`
-8. `refactor: extract probability calculation`
-9. `refactor: extract selection policies`
+7. `refactor: extract learning-session model state factory`
+8. `refactor: extract learning-session probability calculation`
+9. `refactor: extract learning-session selection policies`
 10. `refactor: extract learning-session runtime`
 11. `refactor: extract answer update and resume logic`
 12. `test: add unit engine boundary fixtures`
@@ -639,8 +624,7 @@ Add tests around boundaries, not just implementation details:
 tests/learning-components/units/instruction/
 tests/learning-components/units/video-session/
 tests/learning-components/units/assessment-session/
-tests/learning-components/models/probability/
-tests/learning-components/models/selection/
+tests/learning-components/units/learning-session/model/
 tests/learning-components/content/tdf/
 ```
 
@@ -673,8 +657,8 @@ The target is not just smaller files. The target is a codebase where a contribut
 ```text
 I want to add a unit type. Go to learning-components/units.
 I want to add an H5P interaction. Go to learning-components/trials/h5p.
-I want to change adaptive selection. Go to learning-components/models/selection.
-I want to change probability calculation. Go to learning-components/models/probability.
+I want to change learning-session adaptive selection. Go to learning-components/units/learning-session/model.
+I want to change learning-session probability calculation. Go to learning-components/units/learning-session/model.
 I want to change TDF interpretation. Go to learning-components/content/tdf.
 I want to work on Meteor data or server methods. Go to app/data or app/meteor/server.
 I want to deploy it. Go to deploy.

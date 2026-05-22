@@ -74,6 +74,7 @@ MoFaCTS/
 │   │
 │   ├── runtime/
 │   │   ├── MeteorRuntimeContext.ts
+│   │   ├── history/
 │   │   ├── sessionKeys.ts
 │   │   ├── runtimeEvents.ts
 │   │   └── appConfig.ts
@@ -108,8 +109,6 @@ MoFaCTS/
 │   │   ├── ModelState.ts
 │   │   ├── probability/
 │   │   ├── selection/
-│   │   ├── history/
-│   │   ├── answer-updates/
 │   │   └── policies/
 │   │
 │   ├── content/
@@ -282,6 +281,8 @@ At first, this can be backed by Meteor. Later, it gives MoFaCTS a cleaner pedago
 
 Learner history is an app-owned runtime/data boundary, not a model-owned learning component. Components should emit history event data through one canonical recorder contract. They may pass existing fields and approved component-specific payload fields, but they should not redefine, replace, or directly modify the recorder. Model code may consume reconstructed history as input, while app/runtime code owns history field acceptance, normalization, persistence, reconstruction, and server/database access.
 
+Prefer contributor-owned component folders over purity-by-category when code is naturally changed together. A contributed unit, trial, adapter, or model policy should keep its component-specific selection, scoring, state, display, and tests near the component unless a piece is deliberately promoted to a shared primitive. Top-level category folders such as `learning-components/models/`, `learning-components/content/`, and `learning-components/runtime/` are for shared contracts, reusable primitives, and stable APIs, not for scattering one component's private implementation across the tree.
+
 ## Recommended migration sequence
 
 ### Phase 1: Add the visible scaffold
@@ -437,7 +438,7 @@ Prefer domain names:
 
 - `selection`
 - `probability`
-- `history`
+- `history` for app-owned runtime/data history contracts, not model internals
 - `schedule`
 - `tdf`
 - `stimuli`

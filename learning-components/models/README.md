@@ -1,16 +1,15 @@
 # Models
 
-Target home for adaptive model state, probability calculation, selection policies, history reconstruction, and answer updates.
+Target home for adaptive model contracts and reusable model primitives.
 
-Current status: active migration source. Probability calculation, selection policies, model-state initialization, answer updates, practice-time updates, and model-specific resume restoration are being extracted here from the learning-session unit flow.
+Current status: shared-boundary scaffold. The current learning-session LKT/logistic model implementation lives with its owning component under `learning-components/units/learning-session/model/`. Move code here only when it is intentionally shared across units/components or promoted into a stable model API.
 
 Belongs here:
 
-- Model state interfaces and factories.
-- Probability functions and calculation.
-- Selection policies.
-- Model-specific resume-state restoration from app-owned reconstructed history.
-- Answer and practice-time updates.
+- Shared model state interfaces and factories.
+- Shared probability functions and calculation.
+- Shared selection policies.
+- Stable model-policy contracts.
 
 Does not belong here:
 
@@ -18,5 +17,6 @@ Does not belong here:
 - App persistence and server methods.
 - TDF parsing that is not model-specific.
 - Canonical learner history recording, persistence, accepted fields, or reconstruction. Those are app/runtime responsibilities.
+- Unit-specific LKT/logistic implementation files that a contributor would edit as part of one unit component.
 
 This directory should make the adaptive sequencing behavior inspectable and testable for research contributors.

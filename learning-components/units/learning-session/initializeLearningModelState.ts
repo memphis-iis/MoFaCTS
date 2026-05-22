@@ -1,4 +1,4 @@
-import { createInitialModelState } from '../../models/modelStateFactory';
+import { createInitialModelState } from './model/modelStateFactory';
 
 export interface InitializeLearningModelStateParams {
   readonly numQuestions: number;
@@ -20,10 +20,10 @@ export interface InitializeLearningModelStateParams {
 export async function initializeLearningModelState(
   params: InitializeLearningModelStateParams,
 ): Promise<void> {
-  params.log(1, 'initializeActRModel', params.numQuestions, params.curKCBase);
+  params.log(1, 'initializeLogisticModelState', params.numQuestions, params.curKCBase);
   const responseKCMap = await params.getResponseKCMapForTdf(params.currentTdfId);
   params.setResponseKCMap(responseKCMap);
-  params.log(2, 'initializeActRModel,responseKCMap', responseKCMap);
+  params.log(2, 'initializeLogisticModelState,responseKCMap', responseKCMap);
 
   const initialModelState = createInitialModelState({
     stimClusters: params.stimClusters,
