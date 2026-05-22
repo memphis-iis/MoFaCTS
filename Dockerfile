@@ -1,6 +1,7 @@
 # The tag here should match the Meteor version of your app, per .meteor/release
 FROM geoffreybooth/meteor-base:3.4.1 AS meteor_builder
 ENV METEOR_ALLOW_SUPERUSER=1
+ENV APP_SOURCE_FOLDER=/opt/mofacts
 
 # Use the repo-owned deploy scripts so deploy/ is the only source of truth.
 COPY ./deploy/docker/ $SCRIPTS_FOLDER/
@@ -11,8 +12,8 @@ RUN sed -i 's/\r$//' $SCRIPTS_FOLDER/*.sh && \
 COPY ./mofacts/ $APP_SOURCE_FOLDER/
 
 # Function: copy root-level source roots used by the application.
-# Relative imports from /opt/app/... resolve these as /opt/learning-components
-# and /opt/packages, matching the repository layout during local development.
+# Relative imports from /opt/learning-components/... resolve the app as
+# /opt/mofacts, matching the repository layout during local development.
 COPY ./learning-components/ /opt/learning-components/
 COPY ./packages/ /opt/packages/
 

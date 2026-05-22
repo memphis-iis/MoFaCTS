@@ -23,7 +23,9 @@ npm-debug.log*
 Thumbs.db
 
 # Testing
-mofacts/tests/
+mofacts/tests/*
+!mofacts/tests/client-entry.js
+!mofacts/tests/server-entry.js
 
 # Documentation (optional, can remove if needed in image)
 docs/
