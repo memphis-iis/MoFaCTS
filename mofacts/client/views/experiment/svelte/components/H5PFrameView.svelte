@@ -172,10 +172,10 @@
   .h5p-continue-button {
     min-width: 8rem;
     padding: 0.625rem 1rem;
-    border: 1px solid var(--accent-color);
+    border: 1px solid var(--main-button-color);
     border-radius: var(--border-radius-md, 6px);
-    background: var(--accent-color);
-    color: var(--button-text-color, #fff);
+    background: var(--main-button-color);
+    color: var(--main-button-text-color);
     font: inherit;
     font-weight: 600;
     cursor: pointer;

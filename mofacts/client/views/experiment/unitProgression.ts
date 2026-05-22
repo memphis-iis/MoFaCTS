@@ -193,7 +193,7 @@ export async function unitIsFinished(reason: string, options: { engine?: unknown
         await meteorCallAsync('incrementTdfConditionCount', Session.get('currentRootTdfId'), curConditionNumber);
       }
     }
-    leaveTarget = curTdfUnit?.videosession ? '/card' : '/instructions';
+    leaveTarget = curTdfUnit?.videosession || curTdfUnit?.autotutorsession ? '/card' : '/instructions';
   } else {
     // We have run out of units - return home for now
     clientConsole(2, 'UNIT FINISHED: No More Units');

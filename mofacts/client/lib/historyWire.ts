@@ -5,7 +5,7 @@ type HistoryWireRecord = Record<string, unknown>;
 
 function normalizeHistoryValueForWire(value: unknown): unknown {
   if (typeof value === 'number' && Number.isFinite(value)) {
-    return value === 0 ? undefined : value;
+    return value;
   }
   if (value === '' || value === null || value === false) {
     return undefined;

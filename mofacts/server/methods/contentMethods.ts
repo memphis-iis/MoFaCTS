@@ -45,6 +45,7 @@ type TdfLike = {
           userselect?: string;
           textToSpeechAPIKey?: unknown;
           speechAPIKey?: unknown;
+          openRouterApiKey?: unknown;
           condition?: string[];
           conditionTdfIds?: Array<string | null>;
           stimulusfile?: string;
@@ -202,6 +203,7 @@ async function getContentUploadSummariesForIds(
         'content.tdfs.tutor.setspec.userselect': 1,
         'content.tdfs.tutor.setspec.textToSpeechAPIKey': 1,
         'content.tdfs.tutor.setspec.speechAPIKey': 1,
+        'content.tdfs.tutor.setspec.openRouterApiKey': 1,
         'content.tdfs.tutor.setspec.condition': 1,
         'content.tdfs.tutor.setspec.conditionTdfIds': 1,
         'content.tdfs.tutor.setspec.stimulusfile': 1,
@@ -285,7 +287,7 @@ async function getContentUploadSummariesForIds(
       lessonName: setspec?.lessonname || 'Unknown Lesson',
       fileName: tdf.content?.fileName || 'unknown.xml',
       isPublic: setspec?.userselect === 'true',
-      hasAPIKeys: !!(setspec?.textToSpeechAPIKey || setspec?.speechAPIKey),
+      hasAPIKeys: !!(setspec?.textToSpeechAPIKey || setspec?.speechAPIKey || setspec?.openRouterApiKey),
       conditions: [] as Array<{ condition: string; tdfId: string | null; count: number | null }>,
       errors: [] as string[],
       stimFiles: [] as Array<{ filename: string; stimId: string | null; exists: boolean }>,

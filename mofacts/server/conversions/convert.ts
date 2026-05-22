@@ -94,9 +94,12 @@ function getNewItemFormat(stimFile: any, stimulusFileName: string, stimuliSetId:
         throw new Error(`Stim ${stimIdx} in cluster ${clusterIdx} of "${stimulusFileName}" is undefined or not an object.`);
       }
       const h5pOwnsResponse = stim.display?.h5p?.sourceType === 'self-hosted';
+      const autoTutorOwnsResponse = Boolean(stim.autoTutor);
       if (!stim.response || typeof stim.response !== 'object') {
         if (h5pOwnsResponse) {
           stim.response = { correctResponse: '__H5P_COMPLETED__' };
+        } else if (autoTutorOwnsResponse) {
+          stim.response = { correctResponse: '__AUTOTUTOR_SESSION__' };
         } else {
         throw new Error(`Stim ${stimIdx} in cluster ${clusterIdx} of "${stimulusFileName}" missing 'response' property.`);
         }
@@ -104,6 +107,8 @@ function getNewItemFormat(stimFile: any, stimulusFileName: string, stimuliSetId:
       if (!Object.prototype.hasOwnProperty.call(stim.response, 'correctResponse')) {
         if (h5pOwnsResponse) {
           stim.response.correctResponse = '__H5P_COMPLETED__';
+        } else if (autoTutorOwnsResponse) {
+          stim.response.correctResponse = '__AUTOTUTOR_SESSION__';
         } else {
           throw new Error(`Stim ${stimIdx} in cluster ${clusterIdx} of "${stimulusFileName}" missing 'correctResponse' property in 'response'.`);
         }
@@ -145,6 +150,7 @@ function getNewItemFormat(stimFile: any, stimulusFileName: string, stimuliSetId:
         imageStimulus: stim.display?.imgSrc,
         videoStimulus: stim.display?.videoSrc,
         display: cloneDisplayObject(stim.display),
+        autoTutor: cloneDisplayObject(stim.autoTutor),
         alternateDisplays: stim.alternateDisplays,
       };
 

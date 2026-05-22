@@ -693,6 +693,14 @@ const SETSPEC_FIELD_REGISTRY: SectionFieldRegistry = {
     brief: 'Text-to-speech API key.',
     verbose: 'Google TTS API key used for lesson audio output.'
   }),
+  openRouterApiKey: simpleField(stringField('', 12), {
+    brief: 'OpenRouter API key.',
+    verbose: 'OpenRouter API key used by AutoTutor units. The key is authored runtime configuration and is stripped from committed config content by the config sync script.'
+  }),
+  openRouterModel: simpleField(stringField('openai/gpt-4.1-mini', 12), {
+    brief: 'Default OpenRouter model.',
+    verbose: 'Default OpenRouter model identifier used by AutoTutor units unless a unit overrides it.'
+  }),
   audioInputEnabled: simpleField(legacyBooleanField('false'), {
     brief: 'Enable speech recognition.',
     verbose: 'Enables microphone-based speech recognition for the lesson.'
@@ -1600,6 +1608,43 @@ const STIM_DISPLAY_FIELD_REGISTRY: SectionFieldRegistry = {
   }),
 };
 
+const AUTOTUTOR_SESSION_FIELD_REGISTRY: SectionFieldRegistry = {
+  cluster: simpleField(integerField(0, 4), {
+    brief: 'AutoTutor stimulus cluster.',
+    verbose: 'Stimulus cluster index whose first stim contains the AutoTutor prompt and structured curriculum script.'
+  }),
+  openRouterModel: simpleField(stringField('', 12), {
+    brief: 'AutoTutor model override.',
+    verbose: 'Optional OpenRouter model identifier used for this AutoTutor unit instead of the lesson default.'
+  }),
+  graduation: simpleField({
+    type: 'object',
+    title: 'AutoTutor Graduation',
+    additionalProperties: false,
+    required: ['minExpectationScore', 'requireNoCurrentMisconceptions', 'maxTurns'],
+    properties: {
+      minExpectationScore: {
+        type: 'number',
+        minimum: 0,
+        maximum: 1,
+        default: 1,
+      },
+      requireNoCurrentMisconceptions: {
+        type: 'boolean',
+        default: true,
+      },
+      maxTurns: {
+        type: 'integer',
+        minimum: 1,
+        default: 20,
+      },
+    },
+  }, {
+    brief: 'AutoTutor graduation rule.',
+    verbose: 'Completion threshold for the AutoTutor unit, including expectation score, misconception requirement, and maximum learner turns.'
+  }),
+};
+
 const STIM_RESPONSE_FIELD_REGISTRY: SectionFieldRegistry = {
   correctResponse: simpleField(stringField('', 12), {
     brief: 'Expected correct response.',
@@ -1649,6 +1694,90 @@ const STIM_FIELD_REGISTRY: SectionFieldRegistry = {
   speechHintExclusionList: simpleField(stringField('', 12), {
     brief: 'Speech-hint exclusion list.',
     verbose: 'Comma-delimited words to exclude from speech-recognition matching, helping prevent false positives for common words.'
+  }),
+  autoTutor: simpleField({
+    type: 'object',
+    title: 'AutoTutor Script',
+    additionalProperties: false,
+    required: ['id', 'topic', 'learningGoal', 'idealAnswer', 'expectations', 'misconceptions', 'dialogPolicy', 'summary'],
+    properties: {
+      id: stringField('', 6),
+      topic: stringField('', 6),
+      learningGoal: textareaField(''),
+      idealAnswer: textareaField(''),
+      expectations: {
+        type: 'array',
+        title: 'Expectations',
+        minItems: 1,
+        items: {
+          type: 'object',
+          title: 'Expectation',
+          additionalProperties: false,
+          required: ['id', 'label', 'proposition', 'hints', 'prompts', 'assertion'],
+          properties: {
+            id: stringField('', 4),
+            label: stringField('', 6),
+            proposition: textareaField(''),
+            acceptableVariants: stringArrayField('Acceptable Variants', 'Acceptable Variant'),
+            commonPartialAnswers: stringArrayField('Common Partial Answers', 'Common Partial Answer'),
+            hints: stringArrayField('Hints', 'Hint'),
+            prompts: {
+              type: 'array',
+              title: 'Prompts',
+              items: {
+                type: 'object',
+                title: 'Prompt',
+                additionalProperties: false,
+                required: ['stem', 'target'],
+                properties: {
+                  stem: textareaField(''),
+                  target: stringField('', 12),
+                },
+              },
+            },
+            assertion: textareaField(''),
+          },
+        },
+      },
+      misconceptions: {
+        type: 'array',
+        title: 'Misconceptions',
+        items: {
+          type: 'object',
+          title: 'Misconception',
+          additionalProperties: false,
+          required: ['id', 'label', 'misconception', 'detectionCues', 'contrastWithExpectations', 'correction', 'repairQuestion'],
+          properties: {
+            id: stringField('', 4),
+            label: stringField('', 6),
+            misconception: textareaField(''),
+            detectionCues: stringArrayField('Detection Cues', 'Detection Cue'),
+            contrastWithExpectations: stringArrayField('Contrasted Expectations', 'Expectation ID'),
+            correction: textareaField(''),
+            repairQuestion: textareaField(''),
+          },
+        },
+      },
+      dialogPolicy: {
+        type: 'object',
+        title: 'Dialogue Policy',
+        additionalProperties: false,
+        required: ['allowAnyOrder', 'requiredExpectations', 'completionRule'],
+        properties: {
+          allowAnyOrder: booleanField(true, 4),
+          requiredExpectations: stringArrayField('Required Expectations', 'Expectation ID'),
+          optionalExpectations: stringArrayField('Optional Expectations', 'Expectation ID'),
+          ifStudentIsClose: textareaField(''),
+          ifStudentIsWrong: textareaField(''),
+          ifStudentIsStuck: textareaField(''),
+          completionRule: textareaField(''),
+        },
+      },
+      summary: textareaField(''),
+    },
+  }, {
+    brief: 'AutoTutor curriculum script.',
+    verbose: 'Structured AutoTutor script for the first stim in a referenced AutoTutor cluster, including expectations, misconceptions, prompts, corrections, and summary.'
   }),
   alternateDisplays: simpleField({
     type: 'array',
@@ -1746,6 +1875,12 @@ const VIDEO_SESSION_DIRECT_RUNTIME_KEYS = Object.freeze([
   'videosource',
 ]);
 
+const AUTOTUTOR_SESSION_DIRECT_RUNTIME_KEYS = Object.freeze([
+  'cluster',
+  'graduation',
+  'openRouterModel',
+]);
+
 const STIM_CLUSTER_DIRECT_RUNTIME_KEYS = Object.freeze([
   'audioStimulus',
   'imageStimulus',
@@ -1754,6 +1889,7 @@ const STIM_CLUSTER_DIRECT_RUNTIME_KEYS = Object.freeze([
 
 const STIM_DIRECT_RUNTIME_KEYS = Object.freeze([
   'alternateDisplays',
+  'autoTutor',
   'optimalProb',
   'parameter',
   'speechHintExclusionList',
@@ -1893,12 +2029,17 @@ function createVideoSessionSchema(): Record<string, unknown> {
   return createClosedObjectSchema('Video Session', VIDEO_SESSION_FIELD_REGISTRY);
 }
 
+function createAutoTutorSessionSchema(): Record<string, unknown> {
+  return createClosedObjectSchema('AutoTutor Session', AUTOTUTOR_SESSION_FIELD_REGISTRY);
+}
+
 function createUnitSchema(title = 'Unit'): Record<string, unknown> {
   const schema = createClosedObjectSchema(title, UNIT_FIELD_REGISTRY);
   (schema.properties as Record<string, unknown>).deliverySettings = createUnitDeliverySettingsSchema();
   (schema.properties as Record<string, unknown>).learningsession = createLearningSessionSchema();
   (schema.properties as Record<string, unknown>).assessmentsession = createAssessmentSessionSchema();
   (schema.properties as Record<string, unknown>).videosession = createVideoSessionSchema();
+  (schema.properties as Record<string, unknown>).autotutorsession = createAutoTutorSessionSchema();
   return schema;
 }
 
@@ -2017,6 +2158,10 @@ export function createTdfTooltipMap(): Record<string, TooltipContent> {
       'unit[].videosession',
       'setspec.unitTemplate[].videosession',
     ]),
+    ...createTooltipMapForRegistry(AUTOTUTOR_SESSION_FIELD_REGISTRY, [
+      'unit[].autotutorsession',
+      'setspec.unitTemplate[].autotutorsession',
+    ]),
   };
 }
 
@@ -2056,6 +2201,10 @@ export function createTdfValidatorMap(): Record<string, ValidatorConfig> {
     ...createValidatorMapForRegistry(VIDEO_SESSION_FIELD_REGISTRY, [
       'unit[].videosession',
       'setspec.unitTemplate[].videosession',
+    ]),
+    ...createValidatorMapForRegistry(AUTOTUTOR_SESSION_FIELD_REGISTRY, [
+      'unit[].autotutorsession',
+      'setspec.unitTemplate[].autotutorsession',
     ]),
   };
 }
@@ -2117,6 +2266,13 @@ export const TDF_REGISTRY_SECTIONS: RegistrySectionDescriptor[] = [
     registry: VIDEO_SESSION_FIELD_REGISTRY,
     directRuntimeKeys: VIDEO_SESSION_DIRECT_RUNTIME_KEYS,
   },
+  {
+    schemaLabel: 'tutor.unit[].autotutorsession',
+    schemaPath: ['tutor', 'unit', 'items', 'autotutorsession'],
+    tooltipPrefixes: ['unit[].autotutorsession', 'setspec.unitTemplate[].autotutorsession'],
+    registry: AUTOTUTOR_SESSION_FIELD_REGISTRY,
+    directRuntimeKeys: AUTOTUTOR_SESSION_DIRECT_RUNTIME_KEYS,
+  },
 ];
 
 export const STIM_REGISTRY_SECTIONS: RegistrySectionDescriptor[] = [
@@ -2158,6 +2314,7 @@ export const TDF_VALIDATION_COVERAGE = Object.freeze({
   assessmentsession: createValidationCoverageForRegistry(ASSESSMENT_SESSION_FIELD_REGISTRY),
   conditiontemplatesbygroup: createValidationCoverageForRegistry(ASSESSMENT_CONDITION_TEMPLATES_FIELD_REGISTRY),
   videosession: createValidationCoverageForRegistry(VIDEO_SESSION_FIELD_REGISTRY),
+  autotutorsession: createValidationCoverageForRegistry(AUTOTUTOR_SESSION_FIELD_REGISTRY),
 });
 
 export const STIM_VALIDATION_COVERAGE = Object.freeze({

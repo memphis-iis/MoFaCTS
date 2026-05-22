@@ -507,7 +507,10 @@ async function instructContinue() {
     }
 
     // Check if this is an instruction-only unit (has instructions but no session)
-    const isInstructionOnly = !curUnit.assessmentsession && !curUnit.learningsession && !curUnit.videosession;
+    const isInstructionOnly = !curUnit.assessmentsession &&
+      !curUnit.learningsession &&
+      !curUnit.videosession &&
+      !curUnit.autotutorsession;
     const nextUnitNumber = currentUnitNumber + 1;
     Session.set('instructionClientStart', 0);
 

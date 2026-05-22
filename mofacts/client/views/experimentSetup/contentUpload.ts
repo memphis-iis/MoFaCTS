@@ -2017,10 +2017,10 @@ async function doPackageUpload(file: any, template: any){
               if (res.data && res.data.res == 'awaitClientTDF') {
                 let reason = []
                 const reasons = Array.isArray(res.data.reason) ? res.data.reason : [];
-                if(res.data.reason.includes('prevTDFExists'))
+                if(reasons.includes('prevTDFExists'))
                   reason.push(`Previous ${res.data.TDF.content.fileName} already exists, continuing the upload will overwrite the old file. Continue?`)
-                if(res.data.reason.includes(`prevStimExists`))
-                  reason.push(`Previous ${res.data.TDF.content.TdfsCollection.tutor.setspec.stimulusfile} already exists, continuing the upload will overwrite the old file. Continue?`)
+                if(reasons.includes(`prevStimExists`))
+                  reason.push(`Previous ${res.data.TDF.content.tdfs.tutor.setspec.stimulusfile} already exists, continuing the upload will overwrite the old file. Continue?`)
                 
                 if(confirm(reason.join('\n'))){
                   try {

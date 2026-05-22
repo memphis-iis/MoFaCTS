@@ -3,6 +3,7 @@ import { check, Match } from 'meteor/check';
 import type { UploadedPackageFile } from '../lib/packageParser';
 import { processPackageUploadWorkflow } from '../lib/packageUpload';
 import type { PackageUploadIntegrity } from '../lib/packageUploadShared';
+import { validateAutoTutorContent } from '../../common/lib/autoTutorContract';
 
 type UnknownRecord = Record<string, unknown>;
 type MethodContext = {
@@ -36,6 +37,7 @@ type TdfSetspecLike = {
   condition?: string[];
   conditionTdfIds?: Array<string | null>;
   shuffleclusters?: unknown;
+  openRouterModel?: string;
 };
 
 type TdfPayload = {
@@ -251,6 +253,16 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     if (!stimDoc || !stimDoc.setspec || !Array.isArray(stimDoc.setspec.clusters)) {
       return { result: false, errmsg: `Stimulus file "${stimFileName}" missing clusters array.` };
     }
+    const autoTutorValidation = validateAutoTutorContent({
+      tdf: tdfJson,
+      stimuli: stimJson,
+    });
+    if (!autoTutorValidation.valid) {
+      return {
+        result: false,
+        errmsg: `Invalid AutoTutor content in TDF "${tdfFileName}": ${autoTutorValidation.errors.join('; ')}`,
+      };
+    }
     const clusters = stimDoc.setspec.clusters;
     if (!clusters.length) {
       return { result: false, errmsg: `Stimulus file "${stimFileName}" has no clusters.` };
@@ -269,7 +281,8 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
         }
         const h5pOwnsResponse = (stim.display as Record<string, unknown> | undefined)?.h5p
           && ((stim.display as Record<string, unknown>).h5p as Record<string, unknown>).sourceType === 'self-hosted';
-        if (!h5pOwnsResponse && (!stim.response || typeof stim.response !== 'object' || !Object.prototype.hasOwnProperty.call(stim.response, 'correctResponse'))) {
+        const autoTutorOwnsResponse = Object.prototype.hasOwnProperty.call(stim, 'autoTutor');
+        if (!h5pOwnsResponse && !autoTutorOwnsResponse && (!stim.response || typeof stim.response !== 'object' || !Object.prototype.hasOwnProperty.call(stim.response, 'correctResponse'))) {
           return { result: false, errmsg: `Stim ${stimIdx} in cluster ${clusterIdx} missing correctResponse.` };
         }
         if (stim.display) {
@@ -318,12 +331,15 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     function extractClusterIndicesFromTDF(tdf: { tutor?: { unit?: unknown[]; unitTemplate?: unknown[] } }): number[] {
       const indices = new Set<number>();
       const units = [
-        ...((tdf.tutor?.unit || []) as Array<{ clusterIndex?: unknown; assessmentsession?: { clusterlist?: string } }>),
-        ...((tdf.tutor?.unitTemplate || []) as Array<{ clusterIndex?: unknown; assessmentsession?: { clusterlist?: string } }>)
+        ...((tdf.tutor?.unit || []) as Array<{ clusterIndex?: unknown; assessmentsession?: { clusterlist?: string }; autotutorsession?: { cluster?: unknown } }>),
+        ...((tdf.tutor?.unitTemplate || []) as Array<{ clusterIndex?: unknown; assessmentsession?: { clusterlist?: string }; autotutorsession?: { cluster?: unknown } }>)
       ];
       for (const [_unitIdx, unit] of units.entries()) {
         if (Object.prototype.hasOwnProperty.call(unit, 'clusterIndex')) {
           indices.add(Number(unit.clusterIndex));
+        }
+        if (unit.autotutorsession && Object.prototype.hasOwnProperty.call(unit.autotutorsession, 'cluster')) {
+          indices.add(Number(unit.autotutorsession.cluster));
         }
         if (unit.assessmentsession && unit.assessmentsession.clusterlist) {
           const cl = unit.assessmentsession.clusterlist;
@@ -389,6 +405,13 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
           results.result = false;
           results.errmsg = validation.errmsg || 'Validation failed';
           return results;
+        }
+        const setspec = jsonContents.tutor?.setspec;
+        if (setspec?.textToSpeechAPIKey) {
+          setspec.textToSpeechAPIKey = deps.encryptData(setspec.textToSpeechAPIKey);
+        }
+        if (setspec?.speechAPIKey) {
+          setspec.speechAPIKey = deps.encryptData(setspec.speechAPIKey);
         }
         const upsertResult = await upsertTDFFile(
           filename,
@@ -607,6 +630,12 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     const Tdf = packageJSON.tdfs;
     const lessonName = deps.legacyTrim(Tdf.tutor.setspec.lessonname);
     const prev = await deps.getTdfByFileName(packageJSON.fileName);
+    if (prev?._id && !(await deps.userCanManageTdf(ownerId, prev))) {
+      return {
+        result: false,
+        errmsg: `TDF file name "${packageJSON.fileName}" is already used by another user. Choose a unique TDF JSON filename in the package, or ask the owner to share access before replacing it.`
+      };
+    }
     const responseKCMap = prev?._id ? await getResponseKCMapForTdf(prev._id) : {};
     let stimuliSetId = prev ? prev.stimuliSetId : null;
     if (!stimuliSetId) {
@@ -726,7 +755,13 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     if (existingTdf) {
       const canManage = await deps.userCanManageTdf(actingUserId, existingTdf);
       if (!canManage) {
-        throw new Meteor.Error(403, 'You do not have permission to confirm this TDF update');
+        const existingFileName = typeof existingTdf?.content?.fileName === 'string'
+          ? existingTdf.content.fileName
+          : targetTdfId;
+        throw new Meteor.Error(
+          403,
+          `TDF file name "${existingFileName}" is already used by another user. Choose a unique TDF JSON filename in the package, or ask the owner to share access before replacing it.`
+        );
       }
     } else {
       const requestedOwnerId = deps.normalizeCanonicalId((updateObj as any).ownerId);
@@ -774,6 +809,13 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     if (!canManage) {
       throw new Meteor.Error('not-authorized', 'You do not have permission to edit this content');
     }
+    const autoTutorValidation = validateAutoTutorContent({
+      tdf: tdf.content?.tdfs,
+      stimuli: updatedRawStimuliFile,
+    });
+    if (!autoTutorValidation.valid) {
+      throw new Meteor.Error('invalid-autotutor-content', autoTutorValidation.errors.join('; '));
+    }
 
     const stimuliSetId = tdf.stimuliSetId;
     await deps.canonicalizeStimDisplayMediaRefs(updatedRawStimuliFile, stimuliSetId, {
@@ -818,7 +860,7 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
   async function saveTdfContent(
     this: MethodContext,
     tdfId: string,
-    tdfContent: { tdfs?: { tutor?: { setspec?: { lessonname?: string; speechAPIKey?: string; textToSpeechAPIKey?: string; condition?: string[]; conditionTdfIds?: Array<string | null>; [key: string]: unknown } } } } & UnknownRecord,
+    tdfContent: { tdfs?: { tutor?: { setspec?: { lessonname?: string; speechAPIKey?: string; textToSpeechAPIKey?: string; openRouterApiKey?: string; condition?: string[]; conditionTdfIds?: Array<string | null>; [key: string]: unknown } } } } & UnknownRecord,
     apiKeyUpdates: { speechAPIKey?: boolean; textToSpeechAPIKey?: boolean } = {}
   ) {
     check(tdfId, String);
@@ -850,6 +892,13 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
         deps.serverConsole('saveTdfContent: Encrypted new textToSpeechAPIKey');
       }
       setspec.conditionTdfIds = await resolveConditionTdfIds(setspec);
+    }
+    const autoTutorValidation = validateAutoTutorContent({
+      tdf: tdfContent.tdfs,
+      stimuli: tdf.rawStimuliFile,
+    });
+    if (!autoTutorValidation.valid) {
+      throw new Meteor.Error('invalid-autotutor-content', autoTutorValidation.errors.join('; '));
     }
     const tutor = tdfContent.tdfs?.tutor as { unit?: Array<{ unitinstructions?: string; unitinstructionsquestion?: string }> } | undefined;
     if (tutor?.unit && Array.isArray(tutor.unit)) {

@@ -1,0 +1,340 @@
+<script>
+  import { createEventDispatcher, onMount } from 'svelte';
+  import 'deep-chat';
+  import { createAutoTutorRuntime } from '../services/autoTutorClient';
+  import { clientConsole } from '../../../../lib/clientLogger';
+
+  const dispatch = createEventDispatcher();
+
+  let chatElement;
+  let runtime = null;
+  let errorMessage = '';
+  let progress = 0;
+  let turnCount = 0;
+  let costUsd = 0;
+  let completed = false;
+  let stoppedByCost = false;
+  let questionPrompt = '';
+  let unitName = 'AutoTutor';
+
+  function toDeepChatHistory(dialogue) {
+    return dialogue.map((message) => ({
+      role: message.role === 'student' ? 'user' : 'ai',
+      text: message.text,
+    }));
+  }
+
+  function refreshRuntimeState() {
+    if (!runtime) {
+      return;
+    }
+    const state = runtime.getState();
+    progress = runtime.getProgress();
+    turnCount = state.turnCount;
+    costUsd = state.costUsd;
+    completed = state.completed;
+    stoppedByCost = state.stoppedByCost;
+  }
+
+  function extractStudentText(body) {
+    if (typeof body === 'string' && body.trim()) {
+      return body.trim();
+    }
+    if (typeof body?.text === 'string' && body.text.trim()) {
+      return body.text.trim();
+    }
+    if (typeof body?.message?.text === 'string' && body.message.text.trim()) {
+      return body.message.text.trim();
+    }
+    if (Array.isArray(body?.messages)) {
+      for (let i = body.messages.length - 1; i >= 0; i -= 1) {
+        const message = body.messages[i];
+        const role = message?.role || message?.sender;
+        const text = message?.text || message?.content;
+        if ((role === 'user' || role === 'human' || !role) && typeof text === 'string' && text.trim()) {
+          return text.trim();
+        }
+      }
+    }
+    throw new Error('Deep Chat request body did not contain a student text message');
+  }
+
+  function handleContinue() {
+    if (!completed) {
+      return;
+    }
+    dispatch('complete', {
+      stoppedByCost,
+      turnCount,
+      costUsd,
+      progress,
+    });
+  }
+
+  function configureDeepChat() {
+    chatElement.connect = {
+      handler: async (body, signals) => {
+        try {
+          const studentText = extractStudentText(body);
+          const result = await runtime.submitStudentAnswer(studentText);
+          refreshRuntimeState();
+          await signals.onResponse({ text: result.message });
+        } catch (error) {
+          errorMessage = error?.message || String(error);
+          clientConsole(1, '[AutoTutor] Chat turn failed', error);
+          await signals.onResponse({
+            text: 'This AutoTutor session hit a configuration or service error. Please contact the lesson author.',
+          });
+        }
+      },
+    };
+
+    chatElement.introMessage = {
+      text: 'Tell me what you think. A short answer is fine.',
+    };
+    chatElement.textInput = {
+      placeholder: { text: 'Type your answer...' },
+    };
+    chatElement.displayLoadingBubble = true;
+    chatElement.submitButtonStyles = {
+      submit: {
+        container: {
+          default: {
+            backgroundColor: 'var(--main-button-color)',
+            borderRadius: '6px',
+          },
+        },
+        svg: {
+          default: {
+            color: 'var(--main-button-text-color)',
+          },
+        },
+      },
+    };
+    chatElement.messageStyles = {
+      default: {
+        user: {
+          bubble: {
+            backgroundColor: 'var(--main-button-color)',
+            color: 'var(--main-button-text-color)',
+            borderRadius: '8px',
+          },
+        },
+        ai: {
+          bubble: {
+            backgroundColor: 'var(--card-background-color)',
+            color: 'var(--text-color)',
+            border: '1px solid var(--secondary-color)',
+            borderRadius: '8px',
+          },
+        },
+      },
+    };
+    chatElement.chatStyle = {
+      width: '100%',
+      height: '100%',
+      border: '1px solid var(--secondary-color)',
+      borderRadius: '8px',
+      backgroundColor: 'var(--background-color)',
+    };
+    chatElement.history = toDeepChatHistory(runtime.getDialogue());
+  }
+
+  onMount(async () => {
+    try {
+      runtime = await createAutoTutorRuntime();
+      questionPrompt = runtime.config.prompt;
+      unitName = runtime.config.unitName;
+      refreshRuntimeState();
+      configureDeepChat();
+    } catch (error) {
+      errorMessage = error?.message || String(error);
+      clientConsole(1, '[AutoTutor] Runtime initialization failed', error);
+    }
+  });
+</script>
+
+<section class="auto-tutor-session" aria-label={unitName}>
+  <header class="auto-tutor-header">
+    <div class="auto-tutor-question">
+      <div class="auto-tutor-kicker">{unitName}</div>
+      <h1>{questionPrompt}</h1>
+    </div>
+    <div class="auto-tutor-progress" aria-label="AutoTutor progress">
+      <div class="auto-tutor-progress-track">
+        <div class="auto-tutor-progress-fill" style={`width: ${Math.round(progress * 100)}%;`}></div>
+      </div>
+      <div class="auto-tutor-meta">
+        <span>{Math.round(progress * 100)}%</span>
+        <span>{turnCount} turns</span>
+        <span>${costUsd.toFixed(4)}</span>
+      </div>
+    </div>
+  </header>
+
+  {#if errorMessage}
+    <div class="auto-tutor-error" role="alert">
+      {errorMessage}
+    </div>
+  {/if}
+
+  {#if completed}
+    <div class="auto-tutor-complete" role="status">
+      {stoppedByCost ? 'Cost cap reached. Review the conversation, then continue.' : 'Nice work. Review the conversation, then continue.'}
+    </div>
+  {/if}
+
+  <div class="auto-tutor-chat" class:auto-tutor-chat-disabled={!!errorMessage || completed}>
+    <deep-chat bind:this={chatElement}></deep-chat>
+  </div>
+
+  <div class="auto-tutor-continue-bar" aria-label="AutoTutor continue controls">
+    <button
+      type="button"
+      class="auto-tutor-continue-button"
+      disabled={!completed}
+      on:click={handleContinue}
+    >
+      Continue
+    </button>
+  </div>
+</section>
+
+<style>
+  .auto-tutor-session {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    padding: clamp(12px, 2vw, 24px);
+    gap: 12px;
+    background: var(--background-color);
+    color: var(--text-color);
+  }
+
+  .auto-tutor-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 320px);
+    gap: 16px;
+    align-items: end;
+    flex: 0 0 auto;
+  }
+
+  .auto-tutor-question {
+    min-width: 0;
+  }
+
+  .auto-tutor-kicker {
+    margin-bottom: 4px;
+    font-size: 0.8rem;
+    color: var(--secondary-text-color);
+  }
+
+  .auto-tutor-question h1 {
+    margin: 0;
+    font-size: 1.25rem;
+    line-height: 1.35;
+    font-weight: 700;
+    letter-spacing: 0;
+  }
+
+  .auto-tutor-progress {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .auto-tutor-progress-track {
+    width: 100%;
+    height: 10px;
+    overflow: hidden;
+    border: 1px solid var(--secondary-color);
+    border-radius: 999px;
+    background: var(--card-background-color);
+  }
+
+  .auto-tutor-progress-fill {
+    height: 100%;
+    min-width: 0;
+    background: var(--main-button-color);
+    transition: width 160ms ease;
+  }
+
+  .auto-tutor-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    color: var(--secondary-text-color);
+    font-size: 0.78rem;
+  }
+
+  .auto-tutor-error,
+  .auto-tutor-complete {
+    flex: 0 0 auto;
+    padding: 10px 12px;
+    border: 1px solid var(--secondary-color);
+    border-radius: 6px;
+    background: var(--card-background-color);
+    font-weight: 600;
+  }
+
+  .auto-tutor-error {
+    color: var(--alert-color);
+  }
+
+  .auto-tutor-chat {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .auto-tutor-chat-disabled {
+    opacity: 0.72;
+    pointer-events: none;
+  }
+
+  .auto-tutor-continue-bar {
+    flex: 0 0 var(--h5p-action-bar-height, 3.75rem);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-height: var(--h5p-action-bar-height, 3.75rem);
+    padding: 0 0.75rem;
+    border-top: 1px solid var(--secondary-color);
+    background: var(--stimuli-box-color);
+    box-sizing: border-box;
+  }
+
+  .auto-tutor-continue-button {
+    min-width: 8rem;
+    padding: 0.625rem 1rem;
+    border: 1px solid var(--main-button-color);
+    border-radius: var(--border-radius-md, 6px);
+    background: var(--main-button-color);
+    color: var(--main-button-text-color);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .auto-tutor-continue-button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .auto-tutor-continue-button:not(:disabled):hover,
+  .auto-tutor-continue-button:not(:disabled):focus-visible {
+    filter: brightness(0.95);
+  }
+
+  @media (max-width: 768px) {
+    .auto-tutor-header {
+      grid-template-columns: 1fr;
+      align-items: stretch;
+    }
+
+    .auto-tutor-question h1 {
+      font-size: 1.05rem;
+    }
+  }
+</style>

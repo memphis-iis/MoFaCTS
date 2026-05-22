@@ -23,12 +23,14 @@
                 {{#if hasUsedTdfs}}
                   <div class="learning-dashboard-section-card">
                     <div class="learning-dashboard-section-heading">Previously used systems</div>
+                    {{> learningDashboardLessonTable tdfs=usedTdfsList learnerConfigState=learnerConfigState}}
                     {{> learningDashboardLessonCards tdfs=usedTdfsList learnerConfigState=learnerConfigState}}
                   </div>
                 {{/if}}
                 {{#if hasUnusedTdfs}}
                   <div class="learning-dashboard-section-card">
                     <div class="learning-dashboard-section-heading">Unused systems</div>
+                    {{> learningDashboardLessonTable tdfs=unusedTdfsList learnerConfigState=learnerConfigState}}
                     {{> learningDashboardLessonCards tdfs=unusedTdfsList learnerConfigState=learnerConfigState}}
                   </div>
                 {{/if}}
@@ -41,6 +43,137 @@
           {{/if}}
         </div>
       </div>
+    </div>
+  </div>
+</template>
+
+<template name="learningDashboardLessonTable">
+  <div class="admin-table-wrapper learning-dashboard-table-shell">
+    <div class="table-responsive table-display-shell learning-dashboard-table-wrapper">
+      <table class="table table-striped table-hover table-shell-content learning-dashboard-table mb-0">
+        <colgroup>
+          <col class="learning-dashboard-col-lesson">
+          <col class="learning-dashboard-col-features">
+          <col class="learning-dashboard-col-stat">
+          <col class="learning-dashboard-col-stat">
+          <col class="learning-dashboard-col-stat">
+          <col class="learning-dashboard-col-stat">
+          <col class="learning-dashboard-col-stat">
+          <col class="learning-dashboard-col-last-practice">
+          <col class="learning-dashboard-col-action">
+        </colgroup>
+        <thead>
+          <tr>
+            <th scope="col">Lesson</th>
+            <th scope="col" class="text-center">Features</th>
+            <th scope="col" class="text-center">Total Trials</th>
+            <th scope="col" class="text-center">Overall Accuracy</th>
+            <th scope="col" class="text-center">Time (min)</th>
+            <th scope="col" class="text-center">Items Practiced</th>
+            <th scope="col" class="text-center">Days with Sessions</th>
+            <th scope="col">Last Practice</th>
+            <th scope="col" class="text-center">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each tdfs}}
+            <tr class="learning-dashboard-row {{#if this.isUsed}}learning-dashboard-row--used{{else}}learning-dashboard-row--unused{{/if}}">
+              <th scope="row" class="learning-dashboard-cell learning-dashboard-cell--lesson" data-label="Lesson">
+                <div class="learning-dashboard-cell__value learning-dashboard-lesson">
+                  <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="learning-dashboard-lesson-title" title="{{displayLabel}}">{{displayLabel}}</span>
+                    {{#if this.conditions}}
+                      <select class="form-select form-select-sm condition-tdf-selector learning-dashboard-condition-selector"
+                        data-roottdfid="{{this.TDFId}}">
+                        <option value="{{this.TDFId}}">{{this.displayName}} (auto-assign)</option>
+                        {{#each this.conditions}}
+                          <option value="{{this.tdfId}}">{{this.fileName}} ({{this.count}})</option>
+                        {{/each}}
+                      </select>
+                    {{/if}}
+                  </div>
+                </div>
+              </th>
+              <td class="learning-dashboard-cell learning-dashboard-cell--features text-center" data-label="Features">
+                <div class="learning-dashboard-cell__value learning-dashboard-feature-icons">
+                  {{#if this.enableAudioPromptAndFeedback}}
+                    <span class="fa fa-headphones {{ttsIconClass}}" title="Text-to-Speech {{#if this.hasTTSAPIKey}}(API key available){{else}}(needs API key in Audio Settings){{/if}}"></span>
+                  {{/if}}
+                  {{#if this.audioInputEnabled}}
+                    <span class="fa fa-microphone {{srIconClass}}" title="Speech Recognition {{#if this.hasSpeechAPIKey}}(API key available){{else}}(needs API key in Audio Settings){{/if}}"></span>
+                  {{/if}}
+                  {{#unless this.enableAudioPromptAndFeedback}}
+                    {{#unless this.audioInputEnabled}}
+                      <span class="learning-dashboard-empty-value">None</span>
+                    {{/unless}}
+                  {{/unless}}
+                </div>
+              </td>
+              <td class="learning-dashboard-cell learning-dashboard-cell--stat text-center" data-label="Total Trials">
+                <span class="learning-dashboard-cell__value">{{#if this.isUsed}}{{this.totalTrials}}{{else}}-{{/if}}</span>
+              </td>
+              <td class="learning-dashboard-cell learning-dashboard-cell--stat text-center" data-label="Overall Accuracy">
+                <span class="learning-dashboard-cell__value">{{#if this.isUsed}}{{this.overallAccuracy}}%{{else}}-{{/if}}</span>
+              </td>
+              <td class="learning-dashboard-cell learning-dashboard-cell--stat text-center" data-label="Time (min)">
+                <span class="learning-dashboard-cell__value">{{#if this.isUsed}}{{this.totalTimeMinutes}}{{else}}-{{/if}}</span>
+              </td>
+              <td class="learning-dashboard-cell learning-dashboard-cell--stat text-center" data-label="Items Practiced">
+                <span class="learning-dashboard-cell__value">{{#if this.isUsed}}{{this.itemsPracticed}}{{else}}-{{/if}}</span>
+              </td>
+              <td class="learning-dashboard-cell learning-dashboard-cell--stat text-center" data-label="Days with Sessions">
+                <span class="learning-dashboard-cell__value">{{#if this.isUsed}}{{this.totalSessions}}{{else}}-{{/if}}</span>
+              </td>
+              <td class="learning-dashboard-cell learning-dashboard-cell--last-practice" data-label="Last Practice">
+                <span class="learning-dashboard-cell__value">{{#if this.isUsed}}{{this.lastPracticeDate}}{{else}}-{{/if}}</span>
+              </td>
+              <td class="learning-dashboard-cell learning-dashboard-cell--action text-center" data-label="Action">
+                <div class="learning-dashboard-cell__value learning-dashboard-action">
+                  {{#if this.conditions}}
+                    <div class="d-flex gap-1 justify-content-center flex-wrap">
+                      <button class="btn btn-sm btn-success learning-dashboard-action-button start-condition-root">Start</button>
+                      {{#if this.hasLearningSession}}
+                        <button class="btn btn-sm btn-outline-secondary learning-dashboard-action-button configure-lesson" data-tdfid="{{this.TDFId}}">Settings</button>
+                      {{/if}}
+                    </div>
+                  {{else if this.isUsed}}
+                    <div class="d-flex gap-1 justify-content-center flex-wrap">
+                      <button class="btn btn-sm btn-primary learning-dashboard-action-button continue-lesson"
+                        data-tdfid="{{this.TDFId}}"
+                        data-lessonname="{{this.displayName}}"
+                        data-currentstimulisetid="{{this.currentStimuliSetId}}"
+                        data-ismultitdf="{{this.isMultiTdf}}">Continue</button>
+                      {{#if this.hasLearningSession}}
+                        <button class="btn btn-sm btn-outline-secondary learning-dashboard-action-button configure-lesson" data-tdfid="{{this.TDFId}}">Settings</button>
+                      {{/if}}
+                    </div>
+                  {{else}}
+                    <div class="d-flex gap-1 justify-content-center flex-wrap">
+                      <button class="btn btn-sm btn-success learning-dashboard-action-button start-lesson"
+                        data-tdfid="{{this.TDFId}}"
+                        data-lessonname="{{this.displayName}}"
+                        data-currentstimulisetid="{{this.currentStimuliSetId}}"
+                        data-ignoreoutofgrammarresponses="{{this.ignoreOutOfGrammarResponses}}"
+                        data-speechoutofgrammarfeedback="{{this.speechOutOfGrammarFeedback}}"
+                        data-ismultitdf="{{this.isMultiTdf}}">Start</button>
+                      {{#if this.hasLearningSession}}
+                        <button class="btn btn-sm btn-outline-secondary learning-dashboard-action-button configure-lesson" data-tdfid="{{this.TDFId}}">Settings</button>
+                      {{/if}}
+                    </div>
+                  {{/if}}
+                </div>
+              </td>
+            </tr>
+            {{#with configForTableRow}}
+              <tr class="learner-config-row">
+                <td colspan="9">
+                  {{> learnerTdfConfigPanel}}
+                </td>
+              </tr>
+            {{/with}}
+          {{/each}}
+        </tbody>
+      </table>
     </div>
   </div>
 </template>

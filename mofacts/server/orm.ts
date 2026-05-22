@@ -63,7 +63,7 @@ function getHistory(history: any) {
     'KC Category(Default)': '',
     'KC Category(Cluster)': '',
     'CF (Overlearning)': false,
-    'CF (Note)': '',
+    'CF (Note)': history.CFNote,
     'itemid': history.itemId,
     'useridtdfid': history.userIdTDFId,
     'kcid': history.KCId,

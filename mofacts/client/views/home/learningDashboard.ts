@@ -511,6 +511,26 @@ function configForLessonCard(tdf: any) {
   return tdf.hasLearningSession && state?.tdfId === tdf.TDFId ? { ...state, location: 'card' } : null;
 }
 
+function configForLessonTable(tdf: any) {
+  const templateData = Template.parentData(1) as { learnerConfigState?: LearnerConfigState } | undefined;
+  const state = templateData?.learnerConfigState;
+  return tdf.hasLearningSession && state?.tdfId === tdf.TDFId ? { ...state, location: 'table' } : null;
+}
+
+const lessonRowHelpers = {
+  displayLabel(this: any): string {
+    return displayLabelForTdf(this);
+  },
+
+  ttsIconClass(this: any): string {
+    return this.hasTTSAPIKey ? 'icon-configured' : 'icon-needs-config';
+  },
+
+  srIconClass(this: any): string {
+    return this.hasSpeechAPIKey ? 'icon-configured' : 'icon-needs-config';
+  },
+};
+
 Template.learningDashboard.onCreated(function(this: any) {
   this.allTdfsList = new ReactiveVar([]);
   this.filteredTdfsList = new ReactiveVar(false);
@@ -557,21 +577,19 @@ Template.learningDashboard.helpers({
 
 });
 
-Template.learningDashboardLessonCards.helpers({
-  displayLabel() {
-    return displayLabelForTdf(this);
+Template.learningDashboardLessonTable.helpers({
+  ...lessonRowHelpers,
+
+  configForTableRow() {
+    return configForLessonTable(this);
   },
+});
+
+Template.learningDashboardLessonCards.helpers({
+  ...lessonRowHelpers,
 
   configForCardRow() {
     return configForLessonCard(this);
-  },
-
-  ttsIconClass() {
-    return this.hasTTSAPIKey ? 'icon-configured' : 'icon-needs-config';
-  },
-
-  srIconClass() {
-    return this.hasSpeechAPIKey ? 'icon-configured' : 'icon-needs-config';
   },
 });
 

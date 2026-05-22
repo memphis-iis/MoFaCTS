@@ -41,6 +41,7 @@ type TdfUnitState = Record<string, unknown> & {
   adaptiveUnitTemplate?: unknown[];
   countcompletion?: unknown;
   learningsession?: unknown;
+  autotutorsession?: unknown;
   deliverySettings?: Record<string, unknown>;
 };
 
@@ -257,7 +258,7 @@ export async function unitIsFinished(_reason: string): Promise<void> {
       await meteorCallAsync('incrementTdfConditionCount', rootTdfId, curConditionNumber);
     }
 
-    leaveTarget = curTdfUnit?.videosession ? '/card' : '/instructions';
+    leaveTarget = curTdfUnit?.videosession || curTdfUnit?.autotutorsession ? '/card' : '/instructions';
   } else {
     clientConsole(2, 'UNIT FINISHED: No More Units');
 

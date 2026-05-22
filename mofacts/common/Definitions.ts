@@ -6,6 +6,7 @@ export const STIM_PARAMETER = '0,.7';
 export const MODEL_UNIT = 'model';
 export const SCHEDULE_UNIT = 'schedule';
 export const VIDEO_UNIT = 'video';
+export const AUTO_TUTOR_UNIT = 'autotutor';
 // Define an ordering for the fields and the column name we'll put in the
 // output file. Note that these names must match the fields used in populate
 // record.

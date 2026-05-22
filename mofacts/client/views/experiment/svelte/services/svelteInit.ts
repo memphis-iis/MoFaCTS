@@ -96,6 +96,7 @@ interface TdfUnitLike extends UnknownRecord {
   assessmentsession?: unknown;
   videosession?: VideoSessionLike;
   learningsession?: unknown;
+  autotutorsession?: unknown;
   unitinstructions?: unknown;
   picture?: unknown;
   unitinstructionsquestion?: unknown;
@@ -198,6 +199,7 @@ function deriveUnitType(unit: TdfUnitLike | null | undefined): UnitType | undefi
   if (unit.assessmentsession) return 'schedule';
   if (unit.videosession) return 'video';
   if (unit.learningsession) return 'model';
+  if (unit.autotutorsession) return 'autotutor';
 
   // Check if this is a legitimate instruction-only unit
   const hasInstructions = unit.unitinstructions || unit.picture || unit.unitinstructionsquestion;
@@ -745,7 +747,7 @@ async function initializeStandardCardEntry(
   const unit = assertStandardCardPreconditions(tdfFile, tutor, currentUnitNumber);
   const derivedUnitType = deriveUnitType(unit);
   if (!derivedUnitType) {
-    throw new Error(`Cannot determine unit type for unit "${unit.unitname}" at index ${currentUnitNumber}. Unit has no assessmentsession, learningsession, videosession, or valid instructions-only configuration.`);
+    throw new Error(`Cannot determine unit type for unit "${unit.unitname}" at index ${currentUnitNumber}. Unit has no assessmentsession, learningsession, videosession, autotutorsession, or valid instructions-only configuration.`);
   }
   const unitType = derivedUnitType;
   Session.set('unitType', unitType);

@@ -90,6 +90,307 @@
                         "grid_columns": 12
                       }
                     },
+                    "autoTutor": {
+                      "title": "AutoTutor Script",
+                      "description": "Structured AutoTutor script for the first stim in a referenced AutoTutor cluster, including expectations, misconceptions, prompts, corrections, and summary.",
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "id",
+                        "topic",
+                        "learningGoal",
+                        "idealAnswer",
+                        "expectations",
+                        "misconceptions",
+                        "dialogPolicy",
+                        "summary"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "default": "",
+                          "options": {
+                            "grid_columns": 6
+                          }
+                        },
+                        "topic": {
+                          "type": "string",
+                          "default": "",
+                          "options": {
+                            "grid_columns": 6
+                          }
+                        },
+                        "learningGoal": {
+                          "type": "string",
+                          "default": "",
+                          "format": "textarea",
+                          "options": {
+                            "grid_columns": 12
+                          }
+                        },
+                        "idealAnswer": {
+                          "type": "string",
+                          "default": "",
+                          "format": "textarea",
+                          "options": {
+                            "grid_columns": 12
+                          }
+                        },
+                        "expectations": {
+                          "type": "array",
+                          "title": "Expectations",
+                          "minItems": 1,
+                          "items": {
+                            "type": "object",
+                            "title": "Expectation",
+                            "additionalProperties": false,
+                            "required": [
+                              "id",
+                              "label",
+                              "proposition",
+                              "hints",
+                              "prompts",
+                              "assertion"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "default": "",
+                                "options": {
+                                  "grid_columns": 4
+                                }
+                              },
+                              "label": {
+                                "type": "string",
+                                "default": "",
+                                "options": {
+                                  "grid_columns": 6
+                                }
+                              },
+                              "proposition": {
+                                "type": "string",
+                                "default": "",
+                                "format": "textarea",
+                                "options": {
+                                  "grid_columns": 12
+                                }
+                              },
+                              "acceptableVariants": {
+                                "type": "array",
+                                "title": "Acceptable Variants",
+                                "items": {
+                                  "type": "string",
+                                  "title": "Acceptable Variant"
+                                }
+                              },
+                              "commonPartialAnswers": {
+                                "type": "array",
+                                "title": "Common Partial Answers",
+                                "items": {
+                                  "type": "string",
+                                  "title": "Common Partial Answer"
+                                }
+                              },
+                              "hints": {
+                                "type": "array",
+                                "title": "Hints",
+                                "items": {
+                                  "type": "string",
+                                  "title": "Hint"
+                                }
+                              },
+                              "prompts": {
+                                "type": "array",
+                                "title": "Prompts",
+                                "items": {
+                                  "type": "object",
+                                  "title": "Prompt",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "stem",
+                                    "target"
+                                  ],
+                                  "properties": {
+                                    "stem": {
+                                      "type": "string",
+                                      "default": "",
+                                      "format": "textarea",
+                                      "options": {
+                                        "grid_columns": 12
+                                      }
+                                    },
+                                    "target": {
+                                      "type": "string",
+                                      "default": "",
+                                      "options": {
+                                        "grid_columns": 12
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "assertion": {
+                                "type": "string",
+                                "default": "",
+                                "format": "textarea",
+                                "options": {
+                                  "grid_columns": 12
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "misconceptions": {
+                          "type": "array",
+                          "title": "Misconceptions",
+                          "items": {
+                            "type": "object",
+                            "title": "Misconception",
+                            "additionalProperties": false,
+                            "required": [
+                              "id",
+                              "label",
+                              "misconception",
+                              "detectionCues",
+                              "contrastWithExpectations",
+                              "correction",
+                              "repairQuestion"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "default": "",
+                                "options": {
+                                  "grid_columns": 4
+                                }
+                              },
+                              "label": {
+                                "type": "string",
+                                "default": "",
+                                "options": {
+                                  "grid_columns": 6
+                                }
+                              },
+                              "misconception": {
+                                "type": "string",
+                                "default": "",
+                                "format": "textarea",
+                                "options": {
+                                  "grid_columns": 12
+                                }
+                              },
+                              "detectionCues": {
+                                "type": "array",
+                                "title": "Detection Cues",
+                                "items": {
+                                  "type": "string",
+                                  "title": "Detection Cue"
+                                }
+                              },
+                              "contrastWithExpectations": {
+                                "type": "array",
+                                "title": "Contrasted Expectations",
+                                "items": {
+                                  "type": "string",
+                                  "title": "Expectation ID"
+                                }
+                              },
+                              "correction": {
+                                "type": "string",
+                                "default": "",
+                                "format": "textarea",
+                                "options": {
+                                  "grid_columns": 12
+                                }
+                              },
+                              "repairQuestion": {
+                                "type": "string",
+                                "default": "",
+                                "format": "textarea",
+                                "options": {
+                                  "grid_columns": 12
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "dialogPolicy": {
+                          "type": "object",
+                          "title": "Dialogue Policy",
+                          "additionalProperties": false,
+                          "required": [
+                            "allowAnyOrder",
+                            "requiredExpectations",
+                            "completionRule"
+                          ],
+                          "properties": {
+                            "allowAnyOrder": {
+                              "type": "boolean",
+                              "default": true,
+                              "options": {
+                                "grid_columns": 4
+                              }
+                            },
+                            "requiredExpectations": {
+                              "type": "array",
+                              "title": "Required Expectations",
+                              "items": {
+                                "type": "string",
+                                "title": "Expectation ID"
+                              }
+                            },
+                            "optionalExpectations": {
+                              "type": "array",
+                              "title": "Optional Expectations",
+                              "items": {
+                                "type": "string",
+                                "title": "Expectation ID"
+                              }
+                            },
+                            "ifStudentIsClose": {
+                              "type": "string",
+                              "default": "",
+                              "format": "textarea",
+                              "options": {
+                                "grid_columns": 12
+                              }
+                            },
+                            "ifStudentIsWrong": {
+                              "type": "string",
+                              "default": "",
+                              "format": "textarea",
+                              "options": {
+                                "grid_columns": 12
+                              }
+                            },
+                            "ifStudentIsStuck": {
+                              "type": "string",
+                              "default": "",
+                              "format": "textarea",
+                              "options": {
+                                "grid_columns": 12
+                              }
+                            },
+                            "completionRule": {
+                              "type": "string",
+                              "default": "",
+                              "format": "textarea",
+                              "options": {
+                                "grid_columns": 12
+                              }
+                            }
+                          }
+                        },
+                        "summary": {
+                          "type": "string",
+                          "default": "",
+                          "format": "textarea",
+                          "options": {
+                            "grid_columns": 12
+                          }
+                        }
+                      }
+                    },
                     "alternateDisplays": {
                       "title": "Alternate Displays",
                       "description": "Array of alternate display objects, such as clozeText/clozeStimulus pairs, that provide additional question variations for the same item.",

@@ -23,6 +23,7 @@ import { reconstructLearningStateFromHistory } from '../../lib/history/historyRe
 import { hasScheduleArtifactForUnit } from './svelte/services/assessmentResume';
 import {
   createEmptyUnit as createEmptyUnitWithDeps,
+  createAutoTutorUnit as createAutoTutorUnitWithDeps,
   createModelUnit as createModelUnitWithDeps,
   createScheduleUnit as createScheduleUnitWithDeps,
   createVideoUnit as createVideoUnitWithDeps,
@@ -34,7 +35,7 @@ const Tdfs = (globalThis as any).Tdfs;
 
 import { legacyFloat, legacyInt } from '../../../common/underscoreCompat';
 
-export {createScheduleUnit, createModelUnit, createEmptyUnit, createVideoUnit};
+export {createScheduleUnit, createModelUnit, createEmptyUnit, createVideoUnit, createAutoTutorUnit};
 
 // Must be global: TDF calculateProbability snippets call getRandomInt() via eval.
 function getRandomInt(max: any) {
@@ -95,4 +96,8 @@ async function createScheduleUnit(curExperimentData: any) {
 
 async function createVideoUnit(curExperimentData: any) {
   return await createVideoUnitWithDeps(createUnitEngineDeps(), curExperimentData);
+}
+
+async function createAutoTutorUnit(curExperimentData: any) {
+  return await createAutoTutorUnitWithDeps(createUnitEngineDeps(), curExperimentData);
 }

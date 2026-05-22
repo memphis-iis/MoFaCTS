@@ -830,6 +830,35 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     }).fetchAsync();
   }
 
+  async function getAutoTutorHistoryForUnit(
+    userId: string,
+    TDFId: string,
+    levelUnit: number
+  ) {
+    return await deps.Histories.find({
+      userId,
+      TDFId,
+      levelUnitType: 'autotutor',
+      levelUnit: Number(levelUnit),
+      eventType: 'autotutor-turn',
+    }, {
+      fields: {
+        time: 1,
+        problemStartTime: 1,
+        responseDuration: 1,
+        input: 1,
+        responseValue: 1,
+        feedbackText: 1,
+        CFNote: 1,
+        CFStartLatency: 1,
+        CFEndLatency: 1,
+        CFFeedbackLatency: 1,
+        eventType: 1,
+      },
+      sort: { time: 1, recordedServerTime: 1 },
+    }).fetchAsync();
+  }
+
   async function getHiddenStimulusKCsFromHistory(userId: string, TDFId: string) {
     const rows = await deps.Histories.find({
       userId,
@@ -1112,6 +1141,15 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     ) {
       const scopedUserId = requireSelfScopedUserId(this, userId);
       return await getLearningHistoryForUnit(scopedUserId, requireNormalizedTdfId(TDFId), levelUnit, unitScopedOnly);
+    },
+    getAutoTutorHistoryForUnit: async function(
+      this: MethodContext,
+      userId: string,
+      TDFId: string,
+      levelUnit: number
+    ) {
+      const scopedUserId = requireSelfScopedUserId(this, userId);
+      return await getAutoTutorHistoryForUnit(scopedUserId, requireNormalizedTdfId(TDFId), levelUnit);
     },
     getHiddenStimulusKCsFromHistory: async function(this: MethodContext, userId: string, TDFId: string) {
       const scopedUserId = requireSelfScopedUserId(this, userId);

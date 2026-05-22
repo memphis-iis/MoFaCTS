@@ -14,6 +14,7 @@ const INSTRUCTION_UNIT_TYPE = 'instruction-only';
 const LEARNING_SESSION_UNIT_TYPE = 'model';
 const ASSESSMENT_SESSION_UNIT_TYPE = 'schedule';
 const VIDEO_SESSION_UNIT_TYPE = 'video';
+const AUTO_TUTOR_SESSION_UNIT_TYPE = 'autotutor';
 
 export interface CreateUnitEngineDeps {
   readonly extend: (target: any, source: any) => any;
@@ -149,6 +150,17 @@ function registerDefaultUnitEngines(_deps: CreateUnitEngineDeps): void {
       log: currentDeps.log,
     }));
   }
+  if (!hasRegisteredUnitEngine(AUTO_TUTOR_SESSION_UNIT_TYPE)) {
+    registerUnitEngine(AUTO_TUTOR_SESSION_UNIT_TYPE, () => ({
+      unitType: AUTO_TUTOR_SESSION_UNIT_TYPE,
+      async cardAnswered() {},
+      selectNextCard() {},
+      findCurrentCardInfo() {},
+      unitFinished() {
+        return false;
+      },
+    }));
+  }
 }
 
 export async function createEmptyUnit(deps: CreateUnitEngineDeps, curExperimentData: any) {
@@ -169,4 +181,9 @@ export async function createScheduleUnit(deps: CreateUnitEngineDeps, curExperime
 export async function createVideoUnit(deps: CreateUnitEngineDeps, curExperimentData: any) {
   registerDefaultUnitEngines(deps);
   return await createWithBase(deps, curExperimentData, VIDEO_SESSION_UNIT_TYPE);
+}
+
+export async function createAutoTutorUnit(deps: CreateUnitEngineDeps, curExperimentData: any) {
+  registerDefaultUnitEngines(deps);
+  return await createWithBase(deps, curExperimentData, AUTO_TUTOR_SESSION_UNIT_TYPE);
 }

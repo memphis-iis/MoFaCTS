@@ -1,4 +1,5 @@
 import type { UploadedPackageFile } from './packageParser';
+import { validateAutoTutorContent } from '../../common/lib/autoTutorContract';
 import {
   failPackageUpload,
   getStimuliSetIdFromPackageResult,
@@ -123,6 +124,13 @@ export async function processParsedPackageTdfs(args: {
           throw new Error('No matching stimulus file found for TDF');
         }
         const stimContents = typeof stim.contents === 'string' ? JSON.parse(stim.contents) : stim.contents;
+        const autoTutorValidation = validateAutoTutorContent({
+          tdf: json,
+          stimuli: stimContents,
+        });
+        if (!autoTutorValidation.valid) {
+          throw new Error(`Invalid AutoTutor content: ${autoTutorValidation.errors.join('; ')}`);
+        }
         const record = {
           fileName: tdf.name,
           tdfs: json,

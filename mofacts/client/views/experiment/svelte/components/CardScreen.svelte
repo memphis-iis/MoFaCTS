@@ -41,6 +41,7 @@
   import { buildLearningProgressPanelSnapshot } from '../services/learningProgressPanel';
   import { CardStore } from '../../modules/cardStore';
   import LearningProgressPanel from './LearningProgressPanel.svelte';
+  import AutoTutorSession from './AutoTutorSession.svelte';
   import PerformanceArea from './PerformanceArea.svelte';
   import TrialContent from './TrialContent.svelte';
   import VideoSessionMode from './VideoSessionMode.svelte';
@@ -341,6 +342,7 @@
   let videoInstructionsShownAt = 0;
   let videoPlayerReady = false;
   let submittedH5PResultKey = '';
+  let sessionUnitModeVersion = 0;
   const send = (event) => {
     if (testMode) {
       clientConsole(2, '[CardScreen] Ignoring event in test mode:', event?.type || event);
@@ -361,10 +363,12 @@
   $: preparedTrial = context.preparedTrial || null;
   $: deliverySettings = { ...DEFAULT_DELIVERY_SETTINGS, ...(context.deliverySettings || {}) };
   $: audioState = context.audio || { waitingForTranscription: false, srAttempts: 0, maxSrAttempts: 0 };
-  $: isVideoSession = deliverySettings.isVideoSession === true ||
+  $: isVideoSession = (sessionUnitModeVersion, deliverySettings.isVideoSession === true ||
     Session.get('isVideoSession') === true ||
-    !!Session.get('currentTdfUnit')?.videosession;
-  $: currentTdfUnit = Session.get('currentTdfUnit') || {};
+    !!Session.get('currentTdfUnit')?.videosession);
+  $: currentTdfUnit = (sessionUnitModeVersion, Session.get('currentTdfUnit') || {});
+  $: isAutoTutorSession = (sessionUnitModeVersion, Session.get('unitType') === 'autotutor' ||
+    !!currentTdfUnit?.autotutorsession);
   $: rawVideoInstructionText = typeof currentTdfUnit?.unitinstructions === 'string'
     ? currentTdfUnit.unitinstructions.trim()
     : '';
@@ -1910,8 +1914,15 @@
         return;
       }
 
+      sessionUnitModeVersion += 1;
       initializedForRender = true;
       await tick();
+      if (Session.get('currentTdfUnit')?.autotutorsession && isLaunchLoadingActive()) {
+        await waitForBrowserPaint();
+        markLaunchLoadingTiming('autoTutorUnit:rendered');
+        finishLaunchLoading('autotutor-unit-rendered');
+        return;
+      }
       if (Session.get('currentTdfUnit')?.videosession && isLaunchLoadingActive()) {
         await waitForBrowserPaint();
         markLaunchLoadingTiming('videoUnit:rendered', {
@@ -2312,8 +2323,10 @@
 </script>
 
 {#if testMode || initializedForRender}
-<div class="card-screen" class:video-mode={isVideoSession} bind:this={cardScreenElement} style={cardFontSizeStyle}>
-  {#if isVideoSession}
+<div class="card-screen" class:video-mode={isVideoSession} class:auto-tutor-mode={isAutoTutorSession} bind:this={cardScreenElement} style={cardFontSizeStyle}>
+  {#if isAutoTutorSession}
+    <AutoTutorSession on:complete={() => forceAdvanceToNextUnit('AutoTutor Complete')} />
+  {:else if isVideoSession}
     {#if showPerformanceStats}
       <PerformanceArea {...performanceStatsProps} />
     {/if}
@@ -2521,6 +2534,10 @@
 
   .card-screen.video-mode {
     background-color: var(--text-color);
+  }
+
+  .card-screen.auto-tutor-mode {
+    background-color: var(--background-color);
   }
 
   .card-screen.video-mode :global(.video-session-mode) {
