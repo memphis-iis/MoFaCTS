@@ -735,13 +735,16 @@ Template.learningDashboard.events({
     const rootId = selector.data('roottdfid') as string;
     if (!selectedId) return;
 
-    const tdfDoc = Tdfs.findOne({ _id: selectedId });
+    const isExplicitCondition = selectedId !== rootId;
+    const tdfDoc = Tdfs.findOne({ _id: isExplicitCondition ? rootId : selectedId });
     if (!tdfDoc) return;
     const setspec = tdfDoc.content?.tdfs?.tutor?.setspec || {};
+    Session.set('preselectedConditionTdfId', isExplicitCondition ? selectedId : null);
+    Session.set('tdfFamilyRootTdfId', rootId);
 
     // isOwnerLaunch = true: owner's session does not increment conditionCounts
     await safeSelectTdf(
-      selectedId,
+      rootId,
       setspec.lessonname || tdfDoc.content?.fileName || selectedId,
       tdfDoc.stimuliSetId,
       setspec.speechIgnoreOutOfGrammarResponses === 'true',
@@ -752,10 +755,6 @@ Template.learningDashboard.events({
       false,
       true, // isOwnerLaunch
     );
-    // For the root option, also store the root TDF id so resumeService can resolve conditions
-    if (selectedId === rootId) {
-      Session.set('tdfFamilyRootTdfId', rootId);
-    }
   },
 
   'click .configure-lesson': async function(event: any, instance: any) {

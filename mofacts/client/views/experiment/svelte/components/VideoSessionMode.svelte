@@ -7,6 +7,7 @@
   import { onMount, onDestroy, createEventDispatcher, tick } from 'svelte';
   import { Meteor } from 'meteor/meteor';
   import { Session } from 'meteor/session';
+  import Plyr from 'plyr';
   import { ExperimentStateStore } from '../../../../lib/state/experimentStateStore';
   import { clientConsole } from '../../../../lib/userSessionHelpers';
   import { legacyTrim } from '../../../../../common/underscoreCompat';
@@ -119,8 +120,6 @@
     if (videoElement.tagName !== expectedTag) {
       return;
     }
-
-    const Plyr = typeof window !== 'undefined' ? window.Plyr : null;
 
     if (!Plyr) {
       clientConsole(1, '[VideoSessionMode] Plyr not loaded');

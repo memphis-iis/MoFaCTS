@@ -15,7 +15,7 @@ The application source tree lives under `mofacts/`.
 ## Subtree Roles
 
 - `mofacts/`: application source.
-- `mofacts/.deploy/`: canonical Docker Compose build and deploy workflow.
+- `deploy/`: canonical Docker Compose build and deploy workflow.
 - `docs/`: concise public repository documentation.
 - `.github/`: GitHub workflow, issue, and pull request metadata.
 
@@ -48,11 +48,11 @@ The application source tree lives under `mofacts/`.
 
 For fast UI/application hot fixes on Windows, use the native local hotfix dev server. This is the intended 10-20 second observe/edit/reload loop after the first startup has warmed caches.
 
-- Start the dev service from `mofacts/.deploy/` with `.\hotfix-dev.ps1 start`.
+- Start the dev service from `deploy/` with `.\hotfix-dev.ps1 start`.
 - The dev app runs at `http://localhost:3200` and uses the same local MongoDB database, `MoFACT-meteor3`.
 - The dev server runs Meteor natively from the Windows checkout and uses Docker only for MongoDB.
 - The script publishes MongoDB on `127.0.0.1:27017` with `docker-compose.hotfix-native.yml`.
-- Local dev logs and PID files belong under ignored local state in `mofacts/.deploy/local-dev/`.
+- Local dev logs and PID files belong under ignored local state in `deploy/local-dev/`.
 - The dev launcher maintains an ignored `.meteor/local/build/package.json` CommonJS marker required by native Meteor dev on this `"type": "module"` app.
 - Rspack dev-server host checking explicitly allows `host.docker.internal` so Playwright MCP can inspect the native dev app from its container.
 - Agents may run this hotfix dev server even though it starts Meteor in watch mode; this is the only automation exception to "Never run `meteor run`", and it is limited to local interactive UI observation.
@@ -62,12 +62,12 @@ For fast UI/application hot fixes on Windows, use the native local hotfix dev se
 
 ## Local Hotfix Loop
 
-The repository also supports a local-only bundle loop under `mofacts/.deploy/` for production-shaped app-code verification without creating a deployable Docker image. This is slower than the real hotfix dev loop.
+The repository also supports a local-only bundle loop under `deploy/` for production-shaped app-code verification without creating a deployable Docker image. This is slower than the real hotfix dev loop.
 
 - Code hot fixes still require a Meteor bundle rebuild. Do not monkey-patch compiled files inside a running container.
 - The local hotfix loop may rebuild the bundle and restart the local app container without running a Docker image build.
 - Use `docker-compose.hotfix-local.yml` together with `docker-compose.yml` and `docker-compose.local.yml`.
-- On Windows, `mofacts/.deploy/hotfix-local.ps1` runs the standard local loop: typecheck, compose config validation, hotfix bundle build, bundle dependency install, and app restart.
+- On Windows, `deploy/hotfix-local.ps1` runs the standard local loop: typecheck, compose config validation, hotfix bundle build, bundle dependency install, and app restart.
 - Generated hotfix output belongs in the Docker volume `deploy_hotfix_bundle`; do not run the generated bundle from a Windows bind mount.
 - For TypeScript-bearing app changes, run `npm run typecheck` from `mofacts/` before rebuilding the hotfix bundle.
 - After rebuilding, either tell the user the local app is ready for manual testing or continue with local browser/MCP testing when the task calls for production-shaped verification.

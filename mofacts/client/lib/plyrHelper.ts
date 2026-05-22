@@ -1,4 +1,5 @@
-// Plyr loaded from CDN in index.html
+import Plyr from 'plyr';
+
 import { Session } from 'meteor/session';
 import { extractDelimFields, rangeVal } from './currentTestingHelpers';
 import { ExperimentStateStore } from './state/experimentStateStore';
@@ -9,7 +10,7 @@ import { insertCompressedHistory } from './historyWire';
 import { legacyTrim } from '../../common/underscoreCompat';
 
 const MeteorAny = Meteor as any;
-const PlyrAny = (globalThis as any).Plyr;
+const PlyrAny = Plyr as any;
 
 export let playerController: any;
 

@@ -41,22 +41,24 @@ db/mongodump.tar.gz
 .claude/settings.local.json
 
 # Shareable local Docker/dev config
-!mofacts/.deploy/.env.local
-!mofacts/.deploy/docker-compose.local.yml
+!deploy/.env.local
+!deploy/docker-compose.local.yml
 
-# Private deploy config
-mofacts/.deploy/settings.local.json
-mofacts/.deploy/settings.json
-mofacts/.deploy/settingsproduction.json
-mofacts/.deploy/settingsstaging.json
-mofacts/.deploy/.env
-mofacts/.deploy/.env.production
-mofacts/.deploy/.env*.production
-mofacts/.deploy/.env.staging
-mofacts/.deploy/.env*.staging
-mofacts/.deploy/local-data/
-mofacts/.deploy/local-build/
-mofacts/.deploy/local-dev/
+# Private deploy config and generated local deploy state
+deploy/settings.local.json
+deploy/settings.json
+deploy/settingsproduction.json
+deploy/settingsstaging.json
+deploy/.env
+deploy/.env.production
+deploy/.env*.production
+deploy/.env.staging
+deploy/.env*.staging
+deploy/local-data/
+deploy/local-build/
+deploy/local-dev/
+deploy/caddy.stdout.log
+deploy/caddy.stderr.log
 
 
 # Backup files from async/await conversion

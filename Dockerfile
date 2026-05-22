@@ -2,13 +2,19 @@
 FROM geoffreybooth/meteor-base:3.4.1 AS meteor_builder
 ENV METEOR_ALLOW_SUPERUSER=1
 
-# Use the repo-owned deploy scripts so .deploy is the only source of truth.
-COPY ./mofacts/.deploy/docker/ $SCRIPTS_FOLDER/
+# Use the repo-owned deploy scripts so deploy/ is the only source of truth.
+COPY ./deploy/docker/ $SCRIPTS_FOLDER/
 RUN sed -i 's/\r$//' $SCRIPTS_FOLDER/*.sh && \
     chmod +x $SCRIPTS_FOLDER/*.sh
 
 # Function: copy application source into container build context.
 COPY ./mofacts/ $APP_SOURCE_FOLDER/
+
+# Function: copy root-level source roots used by the application.
+# Relative imports from /opt/app/... resolve these as /opt/learning-components
+# and /opt/packages, matching the repository layout during local development.
+COPY ./learning-components/ /opt/learning-components/
+COPY ./packages/ /opt/packages/
 
 # Function: clear Meteor cache so the image build compiles from a clean state.
 RUN echo "[Function] Clean Meteor local cache" && \
@@ -128,8 +134,8 @@ COPY --from=bundle_deps_builder $APP_BUNDLE_FOLDER/bundle $APP_BUNDLE_FOLDER/bun
 # Placed at /app/settings.json to avoid being shadowed by the /mofactsAssets bind mount
 # (which holds SSL certs, feedback data, and dictionaries).
 RUN mkdir -p /app
-COPY ./mofacts/.deploy/settings.json /app/settings.json
-COPY ./mofacts/.deploy/settingsstaging.json /app/settingsstaging.json
+COPY ./deploy/settings.json /app/settings.json
+COPY ./deploy/settingsstaging.json /app/settingsstaging.json
 
 # Function: remove platform-specific binaries not needed in linux container runtime.
 RUN rm -rf $APP_BUNDLE_FOLDER/bundle/programs/server/npm/node_modules/@swc/core-darwin* \

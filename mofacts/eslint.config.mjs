@@ -11,6 +11,7 @@ export default [
       'node_modules/**',
       '_build/**',
       'coverage/**',
+      'public/h5p-standalone/**',
     ],
   },
   js.configs.recommended,

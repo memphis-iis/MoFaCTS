@@ -29,14 +29,18 @@ mofacts/tests/
 docs/
 docs_dev/
 
-# Local settings (will be copied separately via .deploy/assets/)
+# Local settings. Deploy settings are copied explicitly by Dockerfile.
 mofacts/settings.json
 settings.json
+!deploy/settings.json
+!deploy/settingsstaging.json
 
 # Private deploy/runtime state
-mofacts/.deploy/.env*
-mofacts/.deploy/.gemini/
-mofacts/.deploy/local-data/
+deploy/.env*
+deploy/.gemini/
+deploy/local-data/
+deploy/local-dev/
+deploy/local-build/
 
 # Build artifacts
 *.pyc

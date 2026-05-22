@@ -32,7 +32,7 @@ For institutional or course deployment, coordinate with the maintainers so confi
 - `mofacts/`: main Meteor/Svelte application source.
 - `mofacts/client/`, `mofacts/common/`, `mofacts/server/`: application code.
 - `mofacts/packages/`: local Meteor packages.
-- `mofacts/.deploy/`: canonical Docker Compose build and deployment workflow.
+- `deploy/`: canonical Docker Compose build and deployment workflow.
 - `docs/`: concise public repository documentation.
 - `.github/`: GitHub issue templates, pull request template, CI, and security workflow.
 
@@ -45,7 +45,8 @@ Short version:
 ```bash
 cd mofacts
 npm ci
-cp example.settings.json settings.json
+# Create settings.json with local/private values before running the app.
+# Do not commit local settings or secrets.
 npm run typecheck
 ```
 

@@ -9,7 +9,7 @@ MoFaCTS, the Mobile Fact and Concept Training System, is a Meteor/Svelte web app
 - `mofacts/server/`: server startup, publications, methods, authentication, imports, exports, and persistence logic.
 - `mofacts/packages/`: local Meteor packages used by the application.
 - `mofacts/public/`: static client assets and theme resources.
-- `mofacts/.deploy/`: Docker Compose build and deployment workflow.
+- `deploy/`: Docker Compose build and deployment workflow.
 
 ## Learning Content
 
@@ -31,4 +31,4 @@ New server methods should be added only when the task requires database access, 
 
 ## Deployment
 
-The canonical deployment workflow is Docker Compose under `mofacts/.deploy/`. Public documentation should point to that workflow for release-confidence build and deployment validation.
+The canonical deployment workflow is Docker Compose under `deploy/`. Public documentation should point to that workflow for release-confidence build and deployment validation.

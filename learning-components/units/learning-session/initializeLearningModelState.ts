@@ -1,0 +1,58 @@
+import { createInitialModelState } from '../../models/modelStateFactory';
+
+export interface InitializeLearningModelStateParams {
+  readonly numQuestions: number;
+  readonly curKCBase: any;
+  readonly currentTdfId: any;
+  readonly currentTdfUnit: any;
+  readonly currentUnitNumber: any;
+  readonly stimClusters: any[];
+  readonly getResponseKCMapForTdf: (tdfId: any) => Promise<Record<string, unknown>>;
+  readonly setResponseKCMap: (responseKCMap: Record<string, unknown>) => void;
+  readonly getStimParameterArrayFromCluster: (cluster: any, whichStim: number) => unknown[];
+  readonly normalizeResponseText: (rawResponse: unknown) => string;
+  readonly setUpClusterList: (cards: any[]) => void;
+  readonly initCardProbs: (overrideData: any) => void;
+  readonly alertUser: (message: string) => void;
+  readonly log: (level: number, ...args: unknown[]) => void;
+}
+
+export async function initializeLearningModelState(
+  params: InitializeLearningModelStateParams,
+): Promise<void> {
+  params.log(1, 'initializeActRModel', params.numQuestions, params.curKCBase);
+  const responseKCMap = await params.getResponseKCMapForTdf(params.currentTdfId);
+  params.setResponseKCMap(responseKCMap);
+  params.log(2, 'initializeActRModel,responseKCMap', responseKCMap);
+
+  const initialModelState = createInitialModelState({
+    stimClusters: params.stimClusters,
+    responseKCMap,
+    getStimParameterArrayFromCluster: params.getStimParameterArrayFromCluster,
+    normalizeResponseText: params.normalizeResponseText,
+  });
+  const initCards = initialModelState.cards;
+  const initResponses = initialModelState.responses;
+  const initProbs = initialModelState.probabilities;
+
+  params.setUpClusterList(initCards);
+
+  params.initCardProbs({
+    cards: initCards,
+    responses: initResponses,
+  });
+
+  params.log(2, 'initCards:', initCards, initProbs);
+
+  if (!initCards || initCards.length === 0) {
+    const session = params.currentTdfUnit.learningsession || params.currentTdfUnit.videosession || {};
+    const errorMsg = `Learning/video session in unit "${params.currentTdfUnit.unitname}" (unit ${params.currentUnitNumber}) has no cards. ` +
+      `Check clusterlist configuration. ` +
+      `Clusterlist: "${session.clusterlist || 'MISSING'}", ` +
+      `NumQuestions: ${params.numQuestions}, ` +
+      `InitCards length: ${initCards ? initCards.length : 'null'}`;
+    params.log(1, '[Unit Engine] EMPTY MODEL ERROR:', errorMsg);
+    params.alertUser('Learning session has no cards - check TDF clusterlist configuration');
+    throw new Error(errorMsg);
+  }
+}

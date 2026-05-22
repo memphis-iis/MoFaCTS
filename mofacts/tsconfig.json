@@ -24,6 +24,9 @@
     "server/**/*.ts",
     "common/**/*.ts",
     "common/**/*.d.ts",
-    "packages/**/*.ts"
+    "packages/**/*.ts",
+    "../learning-components/**/*.ts",
+    "../examples/**/*.ts",
+    "../packages/**/*.ts"
   ]
 }

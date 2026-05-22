@@ -480,13 +480,32 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
     if (needExpCondition) {
       clientConsole(2, 'Experimental condition is required: searching');
       const prevCondition = curExperimentState.conditionTdfId;
+      const preselectedCondition = Session.get('preselectedConditionTdfId');
+      const resolvedConditionIds = Array.isArray(setspec.conditionTdfIds) ? setspec.conditionTdfIds : [];
 
       let conditionTdfId: string | null = null;
 
-      if (prevCondition) {
+      if (preselectedCondition) {
+        if (!resolvedConditionIds.includes(preselectedCondition)) {
+          throw new Error(`Preselected condition TDF "${preselectedCondition}" is not valid for root TDF "${Session.get('currentRootTdfId')}"`);
+        }
+        clientConsole(2, 'Using dashboard-selected experimental condition');
+        conditionTdfId = preselectedCondition;
+        newExperimentState.conditionTdfId = conditionTdfId;
+        setActiveTdfContext({
+          currentRootTdfId: Session.get('currentRootTdfId'),
+          currentTdfId: conditionTdfId,
+        }, 'resume.condition.preselected');
+        setConditionResolutionContext({ conditionTdfId }, 'resume.condition.preselected');
+        await createExperimentState({
+          currentRootTdfId: Session.get('currentRootTdfId'),
+          currentTdfId: conditionTdfId,
+          conditionTdfId,
+        });
+        Session.set('preselectedConditionTdfId', null);
+      } else if (prevCondition) {
         clientConsole(2, 'Found previous experimental condition: using that');
         conditionTdfId = prevCondition;
-        setConditionResolutionContext({ conditionTdfId }, 'resume.condition.previous');
       } else {
         // No previous condition - need to select one
         if(!setspec.loadbalancing){
@@ -612,6 +631,10 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
         }
 
         newExperimentState.conditionTdfId = conditionTdfId;
+        setActiveTdfContext({
+          currentRootTdfId: Session.get('currentRootTdfId'),
+          currentTdfId: conditionTdfId,
+        }, 'resume.condition.resolve');
         setConditionResolutionContext({ conditionTdfId }, 'resume.condition.resolve');
         await createExperimentState({
           currentRootTdfId: Session.get('currentRootTdfId'),

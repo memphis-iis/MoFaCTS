@@ -46,4 +46,4 @@ For production or institutional pilots:
 - review authentication and identity-provider settings before use,
 - coordinate with maintainers before exposing a new deployment to learners or research participants.
 
-The Docker Compose workflow under `mofacts/.deploy/` is the canonical deployment path for this repository.
+The Docker Compose workflow under `deploy/` is the canonical deployment path for this repository.

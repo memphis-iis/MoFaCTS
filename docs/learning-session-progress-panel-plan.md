@@ -67,7 +67,7 @@ The model engine already maintains the most relevant live item data:
 - `canUse` and hidden-item filtering for the active learning unit
 - current selection metadata such as `currentCardRef`
 
-Resume reconstructs learning state from history in `mofacts/client/views/experiment/svelte/services/historyReconstruction.ts`, then loads it back into the engine through `loadResumeState()`.
+Resume reconstructs learning state through the app-owned history reconstruction boundary. The old Svelte service path may remain as a behavior-preserving import facade during migration, but it should not own reconstruction logic.
 
 Existing relevant settings include:
 

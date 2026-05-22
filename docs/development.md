@@ -15,7 +15,7 @@ This guide covers the public contributor baseline for MoFaCTS.
 git clone https://github.com/memphis-iis/mofacts.git
 cd mofacts/mofacts
 npm ci
-cp example.settings.json settings.json
+# Create settings.json with local/private values before running the app.
 ```
 
 Adjust `settings.json` for your local environment. Do not commit local settings or secrets.
@@ -35,7 +35,7 @@ The repository defines test scripts in `mofacts/package.json`. Some local Meteor
 
 ## Docker Build and Deployment
 
-The canonical build and deployment workflow lives in `mofacts/.deploy/`. Do not substitute a local Meteor build for release-confidence deployment validation.
+The canonical build and deployment workflow lives in `deploy/`. Do not substitute a local Meteor build for release-confidence deployment validation.
 
 Do not run Docker build, push, or deploy commands unless a maintainer explicitly asks for that task.
 

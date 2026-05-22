@@ -34,7 +34,7 @@ npm run typecheck
 npm run license:audit
 ```
 
-Record any test limitations explicitly. If maintainers want release-confidence build validation, use the Docker Compose workflow under `mofacts/.deploy/`.
+Record any test limitations explicitly. If maintainers want release-confidence build validation, use the Docker Compose workflow under `deploy/`.
 
 ## Pre-Tag Checklist
 

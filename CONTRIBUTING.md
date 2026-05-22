@@ -15,7 +15,8 @@ Thank you for helping improve MoFaCTS. This project is in a pre-1.0 alpha stage,
 git clone https://github.com/memphis-iis/mofacts.git
 cd mofacts/mofacts
 npm ci
-cp example.settings.json settings.json
+# Create settings.json with local/private values before running the app.
+# Do not commit local settings or secrets.
 npm run typecheck
 ```
 
@@ -39,7 +40,7 @@ npm run lint
 npm run typecheck
 ```
 
-The repository also defines `npm run test:ci`, but release confidence for this repository should be recorded through the supported checks and the canonical Docker Compose workflow under `mofacts/.deploy/` when a release owner explicitly requests build or deploy validation.
+The repository also defines `npm run test:ci`, but release confidence for this repository should be recorded through the supported checks and the canonical Docker Compose workflow under `deploy/` when a release owner explicitly requests build or deploy validation.
 
 ## Documentation Changes
 
