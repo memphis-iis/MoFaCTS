@@ -6,6 +6,16 @@ Add an optional right-side progress panel during learning sessions, inspired by 
 
 The panel should help learners or instructors understand item-level progress without changing the adaptive scheduler, adding per-trial server round trips, or creating a second progress model that can drift from the engine.
 
+Confirmed product direction:
+
+- Learners should see the panel.
+- The panel should be enabled by default.
+- The default visible footprint should be only a small side tab.
+- Opening the panel should make room for itself in the learning layout rather than covering the card.
+- Bars should represent the model's current per-item probability estimate: the same probability computed by the adaptive model for item selection.
+- Learners should not see answers, item text, or item labels in the panel.
+- The threshold reference should come from the resolved unit delivery settings, including any learner-dashboard override, not a hardcoded mockup value.
+
 ## Mockup Observations
 
 The standalone HTML demonstrates these behaviors:
@@ -25,6 +35,14 @@ The standalone HTML demonstrates these behaviors:
 - Hover tooltips expose item name and score.
 - `Escape` closes the panel.
 - The panel opens by default on desktop in the mockup.
+
+Differences from the mockup for MoFaCTS:
+
+- The panel should not open by default; only the side tab should be visible until clicked.
+- Item-name tooltips from the mockup should not be copied for learners.
+- Fixed `85%` and `95%` thresholds should not be copied as hardcoded product values.
+- The open desktop panel should push/reflow the learning content.
+- The standalone HTML/JS should be treated as a prototype reference only. The app implementation should be Svelte, integrated with the existing Svelte card runtime.
 
 ## Current Runtime Findings
 
@@ -70,9 +88,10 @@ For model learning units:
 1. Read the active engine from CardScreen context or `getEngine()`.
 2. Require `engine.unitType === 'model'`.
 3. Require `engine.getCardProbabilitiesNoCalc()` or another explicit panel snapshot API.
-4. Use existing `probabilityEstimate` values for bar widths unless a different mastery metric is chosen.
+4. Use existing `probabilityEstimate` values for bar widths.
 5. Use the same active cards, stims, and hidden-item behavior as the scheduler.
 6. Recompute the panel snapshot after trial selection and after answer updates.
+7. Use the resolved `deliverySettings.optimalThreshold` as the primary threshold line and band boundary.
 
 Do not add a pure-compute server method for panel calculations. This fits the repository rule that the server should stay minimized and the client should do safe processor work.
 
@@ -81,15 +100,19 @@ Do not add a pure-compute server method for panel calculations. This fits the re
 - The panel must not change scheduler selection behavior.
 - The panel must read the same item state the scheduler uses.
 - If the panel is enabled for a unit that cannot provide item-level model data, show a clear unavailable state or block enablement. Do not silently render fake or stale data.
-- The panel must not reveal answer text to learners unless that is explicitly approved.
+- The panel must not reveal answer text, item text, or item labels to learners.
 - The panel must respect hidden items and `resetStudentPerformance` semantics.
 - The panel must not add database round trips during the per-trial learning loop.
 - The panel should use existing theme CSS variables where possible.
 - Client logging must use `clientLogger.ts`, not raw `console.*`.
 - The desktop layout should avoid covering the active response controls.
 - The mobile layout should not squeeze the card into an unusable narrow column.
+- The default learner-facing state is closed, with only a side tab visible.
+- Opening the desktop panel should reserve layout space for the panel.
 
 ## First Implementation Shape
+
+The production UI should be implemented as Svelte, not by embedding the standalone HTML file or copying its imperative DOM script into the app.
 
 ### 1. Create A Panel Snapshot Helper
 
@@ -105,6 +128,7 @@ Responsibilities:
 - classify rows into threshold bands
 - compute counts and mean
 - return a serializable panel snapshot for Svelte rendering
+- avoid learner-facing labels that expose item or answer content
 
 The helper should be unit-tested separately from the visual component.
 
@@ -116,11 +140,13 @@ Suggested file:
 
 Responsibilities:
 
-- render the toggle tab, drawer, counts, bars, axis, and tooltips
+- render the toggle tab, drawer, counts, bars, axis, and optional non-identifying tooltips if approved
 - support keyboard close behavior
 - support desktop push layout and mobile full-screen drawer
 - accept a precomputed snapshot as props
 - support test fixtures without needing a Meteor session
+- render bars without answer or item text
+- use generic accessibility text only, such as row position and probability, if accessible labels are needed
 
 ### 3. Integrate In CardScreen
 
@@ -131,16 +157,18 @@ In `CardScreen.svelte`:
 - render the panel as a sibling to the existing learning content inside `.card-screen`
 - add a layout class only when the panel is open on desktop
 - keep video and assessment behavior explicit
+- expose the side tab by default for model learning sessions
 
 ### 4. Add A Feature Gate
 
-Likely options:
+Confirmed direction:
 
-- reuse `disableProgressReport` as a hard off switch
-- add a new delivery setting for this panel
-- initially allow only admin/teacher or development use
+- The panel should be available to learners by default.
+- A small side tab is visible by default; the full panel appears only after the learner opens it.
 
-This needs a product decision before code.
+Open implementation choice:
+
+- Reuse `disableProgressReport` as a hard off switch, add a separate delivery setting, or both.
 
 ### 5. Verify
 
@@ -166,11 +194,17 @@ After visual implementation, verify with Browser against the local app or a comp
 
 ### Availability
 
-1. Should this panel be shown to learners, instructors/admins, or both?
-2. Should it be available in all learning sessions, or only when a TDF setting enables it?
-3. Should `disableProgressReport` hide this new panel too?
-4. Should the panel be open by default on desktop, like the mockup, or closed by default?
-5. Should panel open/closed state persist per learner locally?
+Resolved:
+
+- Learners should see it.
+- It should be enabled by default.
+- It should be closed by default, leaving only the side tab visible.
+- Opening it should resize/reflow the learning session layout so the panel takes its own space.
+
+Still open:
+
+1. Should `disableProgressReport` hide this new panel too?
+2. Should panel open/closed state persist per learner locally?
 
 ### Unit Scope
 
@@ -180,15 +214,25 @@ After visual implementation, verify with Browser against the local app or a comp
 
 ### Mastery Metric
 
-1. Is `probabilityEstimate` the correct item mastery score for the bar width?
-2. Should the score be displayed as `0-100%`, a probability like `0.82`, or hidden from learners?
-3. Should the mockup's `85%` and `95%` lines be kept?
-4. Should one reference line instead use the current `optimalThreshold` setting, which defaults to `0.8`?
-5. What exactly makes an item `Graduated`?
-6. What exactly makes an item `At Practice Level`?
-7. Should the mean line include hidden or unavailable items?
+Resolved:
+
+- Use the adaptive model's current per-item `probabilityEstimate`.
+- Use the actual threshold from the resolved unit settings: the unit TDF value, or the learner-dashboard override when present.
+- Do not use hardcoded `85%` or `95%` threshold lines from the mockup.
+
+Still open:
+
+1. Should the score be visible numerically anywhere, or should bars be the only learner-visible score display?
+2. What labels should replace `Graduated`, `At Practice Level`, and `Below Threshold` now that there is one actual threshold?
+3. Should the mean line include hidden or unavailable items?
 
 ### Item Rows
+
+Resolved:
+
+- Learners should see bars only, with no answer text, item text, or item labels.
+
+Still open:
 
 1. Should each row represent a stimulus, a cluster, or a response concept?
 2. Should hidden items be omitted from the panel?
@@ -199,19 +243,33 @@ After visual implementation, verify with Browser against the local app or a comp
 
 ### Labels And Answer Leakage
 
-1. What should the learner see in row tooltips?
-2. Is it acceptable to show correct-answer text during a learning trial?
-3. If not, should tooltips use item numbers, stimulus text, cluster labels, or anonymized labels?
-4. Should instructors/admins get richer labels than learners?
+Resolved:
+
+- Do not show answers.
+- Do not show item text.
+- Do not show item labels in the compact learner panel.
+- Each item should be represented by a very thin bar.
+
+Still open:
+
+1. Should bars have no hover tooltip at all, or a generic tooltip such as `Item 12: 82%`?
+2. Should instructors/admins get a richer variant with labels, or should the first version be learner-only and label-free for everyone?
 
 ### Visual Behavior
 
-1. Should desktop opening push the card content left, or overlay the right edge?
-2. Is `320px` the desired desktop width?
-3. Should mobile be full-screen, bottom sheet, or hidden?
-4. Should the tab label be text, icon-only, or configurable?
-5. Should the panel use existing MoFaCTS theme colors rather than fixed mockup colors?
-6. Should the panel keep the mockup's very dense 3px bars, or use taller rows for accessibility?
+Resolved:
+
+- Desktop opening should push/reflow the card content rather than overlaying it.
+- The closed default should be a small side tab.
+- Bars should be very thin because the panel is dense and label-free.
+
+Still open:
+
+1. Is `320px` the desired desktop width?
+2. Should mobile be full-screen, bottom sheet, or hidden?
+3. Should the tab label be text, icon-only, or configurable?
+4. Should the panel use existing MoFaCTS theme colors rather than fixed mockup colors?
+5. How thin can bars be while still meeting accessibility and touch-target expectations?
 
 ### Timing And Updates
 
@@ -225,7 +283,7 @@ After visual implementation, verify with Browser against the local app or a comp
 1. Could showing mastery estimates change learner behavior in a way that affects study data?
 2. Should panel visibility be recorded in history or analytics?
 3. Should learners be able to disable it during a session?
-4. Should this be excluded for experiments unless explicitly enabled?
+4. Is a study/experiment-specific opt-out needed even though the default product behavior is enabled?
 
 ## Open Technical Questions
 
@@ -243,8 +301,8 @@ Start read-only and low risk:
 1. Add the snapshot helper.
 2. Add tests using fabricated engine snapshots.
 3. Add a static/test-mode Svelte panel component.
-4. Integrate behind a hardcoded development/admin-only gate.
+4. Integrate for learner-facing model learning sessions with the side tab closed by default.
 5. Verify layout.
-6. Then decide the product-facing setting and learner visibility.
+6. Then decide whether `disableProgressReport` or a separate setting controls opt-out behavior.
 
 This lets us validate the data shape and the visual behavior before committing to broader learner-facing product semantics.
