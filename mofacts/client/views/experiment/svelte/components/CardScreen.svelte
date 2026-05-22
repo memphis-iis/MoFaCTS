@@ -38,6 +38,9 @@
   import { recordCurrentInstructionContinue } from '../../instructions';
   import { isSelfHostedH5PDisplay } from '../../../../../common/lib/h5pDisplay';
   import { normalizeH5PTrialResult } from '../../../../../common/lib/h5pTrialResult';
+  import { buildLearningProgressPanelSnapshot } from '../services/learningProgressPanel';
+  import { CardStore } from '../../modules/cardStore';
+  import LearningProgressPanel from './LearningProgressPanel.svelte';
   import PerformanceArea from './PerformanceArea.svelte';
   import TrialContent from './TrialContent.svelte';
   import VideoSessionMode from './VideoSessionMode.svelte';
@@ -141,6 +144,29 @@
       return false;
     }
     return Boolean(value);
+  }
+
+  function progressPanelDisabled(settings) {
+    const value = settings?.disableProgressReport;
+    return value === true || value === 'true' || value === 1 || value === '1';
+  }
+
+  function cardDebugStateEnabled() {
+    if (!Meteor.isDevelopment || typeof window === 'undefined') {
+      return false;
+    }
+    const queryValue = new URLSearchParams(window.location.search).get('cardDebugState');
+    if (queryValue !== null) {
+      return queryValue === '1' || queryValue === 'true';
+    }
+    return window.localStorage.getItem('mofacts.cardDebugState') === '1';
+  }
+
+  function setLearningProgressViewportOpen(open) {
+    if (typeof document === 'undefined') {
+      return;
+    }
+    document.documentElement.classList.toggle('learning-progress-panel-viewport-open', open);
   }
 
   function cloneAttribution(attribution) {
@@ -849,6 +875,28 @@
   $: correctAnswerImageSrc = getCorrectAnswerImageSrc(context.buttonList, context.currentAnswer);
 
   let performanceData = buildPerformanceData();
+  let learningProgressPanelOpen = false;
+  let learningProgressSnapshot = buildLearningProgressPanelSnapshot(null, DEFAULT_DELIVERY_SETTINGS);
+  $: learningProgressRefreshKey = [
+    currentState,
+    performanceData.currentTrial,
+    context.engine,
+    context.h5pResult?.batchId || '',
+  ].join(':');
+  $: {
+    learningProgressRefreshKey;
+    learningProgressSnapshot = buildLearningProgressPanelSnapshot(context.engine, deliverySettings, {
+      hiddenItems: CardStore.getHiddenItems(),
+    });
+  }
+  $: showLearningProgressPanel = !isVideoSession &&
+    !progressPanelDisabled(deliverySettings) &&
+    learningProgressSnapshot.available;
+  $: if (!showLearningProgressPanel && learningProgressPanelOpen) {
+    learningProgressPanelOpen = false;
+  }
+  $: learningProgressViewportOpen = learningProgressPanelOpen && showLearningProgressPanel;
+  $: setLearningProgressViewportOpen(learningProgressViewportOpen);
 
   // Timeout tracking
   $: timeoutMode = testMode && testTimeout?.mode ? testTimeout.mode : getTimeoutMode(state);
@@ -2037,6 +2085,7 @@
       completeCleanup();
       cleanupAudioRecorder();
     }
+    setLearningProgressViewportOpen(false);
     // Machine cleanup handled by XState
   });
 
@@ -2052,8 +2101,7 @@
   $: if (pendingMachineVideoResume && videoPlayer && state.matches('videoWaiting')) {
     void flushPendingMachineVideoResume('reactive-ready');
   }
-  // Meteor provides an environment flag we can safely use in Svelte
-  const isDev = Meteor.isDevelopment;
+  const showCardDebugState = cardDebugStateEnabled();
 
   $: {
     if (testMode) {
@@ -2226,6 +2274,10 @@
     }
   }
 
+  function handleLearningProgressPanelToggle(event) {
+    learningProgressPanelOpen = Boolean(event?.detail?.open);
+  }
+
   async function handleFooterContinue(event) {
     event?.preventDefault?.();
     await forceAdvanceToNextUnit('Continue Button Pressed');
@@ -2347,59 +2399,74 @@
       </div>
     {/if}
   {:else}
-    {#if showPerformanceStats}
-      <PerformanceArea {...performanceStatsProps} />
-    {/if}
-
-    <div class="trial-content-stack">
-      <div
-        class="trial-content-fade trial-content-slot"
-        bind:this={trialContentFadeElement}
-        class:trial-content-visible={trialContentVisible}
-        class:trial-content-fading-out={isFadingOut}
-        on:transitionrun={logTrialFadeEvent}
-        on:transitionstart={logTrialFadeEvent}
-        on:transitionend={logTrialFadeEvent}
-      >
-        {#if showTrialTimerArea}
-        <PerformanceArea {...trialTimerProps} />
+    <div
+      class="learning-session-layout"
+      class:learning-session-layout-panel-open={learningProgressPanelOpen && showLearningProgressPanel}
+    >
+      <div class="learning-session-main">
+        {#if showPerformanceStats}
+          <PerformanceArea {...performanceStatsProps} />
         {/if}
 
-        <TrialContent
-          {...trialContentProps}
-          parentVisible={trialContentVisible}
-          on:submit={handleSubmit}
-          on:choice={handleChoice}
-          on:input={handleInput}
-          on:activity={handleInputActivity}
-          on:firstKeypress={handleFirstKeypress}
-          on:feedbackcontent={handleFeedbackContent}
-          on:replay={handleReplay}
-          on:blockingassetstate={handleBlockingAssetState}
-          on:reviewrevealstarted={handleReviewRevealStarted}
-          on:h5presult={handleH5PResult}
-        />
-        {#if trialSubset.showSkipStudyButton}
-          <div class="skip-study-container">
-            <button type="button" class="skip-study-button" on:click={handleSkipStudy}>
-              {deliverySettings.skipStudyButtonText || 'Skip'}
-            </button>
+        <div class="trial-content-stack">
+          <div
+            class="trial-content-fade trial-content-slot"
+            bind:this={trialContentFadeElement}
+            class:trial-content-visible={trialContentVisible}
+            class:trial-content-fading-out={isFadingOut}
+            on:transitionrun={logTrialFadeEvent}
+            on:transitionstart={logTrialFadeEvent}
+            on:transitionend={logTrialFadeEvent}
+          >
+            {#if showTrialTimerArea}
+            <PerformanceArea {...trialTimerProps} />
+            {/if}
+
+            <TrialContent
+              {...trialContentProps}
+              parentVisible={trialContentVisible}
+              on:submit={handleSubmit}
+              on:choice={handleChoice}
+              on:input={handleInput}
+              on:activity={handleInputActivity}
+              on:firstKeypress={handleFirstKeypress}
+              on:feedbackcontent={handleFeedbackContent}
+              on:replay={handleReplay}
+              on:blockingassetstate={handleBlockingAssetState}
+              on:reviewrevealstarted={handleReviewRevealStarted}
+              on:h5presult={handleH5PResult}
+            />
+            {#if trialSubset.showSkipStudyButton}
+              <div class="skip-study-container">
+                <button type="button" class="skip-study-button" on:click={handleSkipStudy}>
+                  {deliverySettings.skipStudyButtonText || 'Skip'}
+                </button>
+              </div>
+            {/if}
           </div>
-        {/if}
+
+          {#if incomingSlot}
+            <div
+              class="trial-content-fade trial-content-slot trial-content-slot-incoming-prepared"
+              aria-hidden="true"
+            >
+              <TrialContent
+                {...incomingSlot.props}
+                parentVisible={false}
+                on:feedbackcontent={handleFeedbackContent}
+                on:blockingassetstate={(event) => handleBlockingAssetState(event, 'incoming')}
+              />
+            </div>
+          {/if}
+        </div>
       </div>
 
-      {#if incomingSlot}
-        <div
-          class="trial-content-fade trial-content-slot trial-content-slot-incoming-prepared"
-          aria-hidden="true"
-        >
-          <TrialContent
-            {...incomingSlot.props}
-            parentVisible={false}
-            on:feedbackcontent={handleFeedbackContent}
-            on:blockingassetstate={(event) => handleBlockingAssetState(event, 'incoming')}
-          />
-        </div>
+      {#if showLearningProgressPanel}
+        <LearningProgressPanel
+          snapshot={learningProgressSnapshot}
+          open={learningProgressPanelOpen}
+          on:toggle={handleLearningProgressPanelToggle}
+        />
       {/if}
     </div>
   {/if}
@@ -2422,7 +2489,7 @@
   {/if}
 
   <!-- Debug state display (development only) -->
-  {#if isDev}
+  {#if showCardDebugState}
     <div class="debug-state">
       <details>
         <summary>State: {JSON.stringify(currentState)}</summary>
@@ -2459,6 +2526,46 @@
   .card-screen.video-mode :global(.video-session-mode) {
     flex: 1 1 auto;
     min-height: 0;
+  }
+
+  .learning-session-layout {
+    --learning-progress-panel-width: 320px;
+
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    align-items: stretch;
+    width: 100%;
+    overflow: hidden;
+  }
+
+  .learning-session-main {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding-right: 0;
+    transition: padding-right var(--transition-smooth) ease;
+  }
+
+  .learning-session-layout-panel-open .learning-session-main {
+    padding-right: min(var(--learning-progress-panel-width), 40vw);
+  }
+
+  :global(body:has(.svelte-card-container) .navbar) {
+    width: 100%;
+    margin-right: 0;
+    align-self: flex-start;
+    transition: width var(--transition-smooth) ease, margin-right var(--transition-smooth) ease;
+  }
+
+  @media (min-width: 769px) {
+    :global(html.learning-progress-panel-viewport-open .navbar) {
+      width: calc(100% - min(320px, 40vw));
+      margin-right: min(320px, 40vw);
+    }
   }
 
   .video-instruction-overlay {
@@ -2599,6 +2706,12 @@
     margin: 0.5rem 0 0 0;
     white-space: pre-wrap;
     word-wrap: break-word;
+  }
+
+  @media (max-width: 768px) {
+    .learning-session-layout-panel-open .learning-session-main {
+      padding-right: 0;
+    }
   }
 
   .video-end-overlay {
