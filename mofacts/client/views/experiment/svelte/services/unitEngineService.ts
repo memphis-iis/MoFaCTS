@@ -7,7 +7,7 @@
 
 import { Session } from 'meteor/session';
 import { createUnitEngine } from '../../engineConstructors';
-import { getStimCluster, getCurrentDeliverySettings } from '../../../../lib/currentTestingHelpers';
+import { getCurrentDeliverySettings } from '../../../../lib/currentTestingHelpers';
 import { clientConsole } from '../../../../lib/clientLogger';
 import { deliverySettingsStore } from '../../../../lib/state/deliverySettingsStore';
 import { getEngine } from '../../../../lib/engineManager';
@@ -15,14 +15,10 @@ import { ExperimentStateStore } from '../../../../lib/state/experimentStateStore
 import { computePracticeTimeMs } from '../../../../../lib/practiceTime';
 import { calculateTrialTimings } from './historyLogging';
 import { getExperimentState } from './experimentState';
-import { sanitizeHTML, nextChar } from '../../../../lib/stringUtils';
-import { Answers } from '../../answerAssess';
 import { CardStore } from '../../modules/cardStore';
-import { resolveDynamicAssetPath } from './mediaResolver';
 import { assertIdInvariants, logIdInvariantBreachOnce } from '../../../../lib/idContext';
-import { applyDisplayFieldSubset } from '../../../../../common/lib/displayFieldSubsets';
-import { isSelfHostedH5PConfig, normalizeH5PDisplayConfig } from '../../../../../common/lib/h5pDisplay';
 import { resolveH5PModelOutcomes } from '../../../../../common/lib/h5pTrialResult';
+import { getPreparedCardDataFromSelection as buildPreparedCardDataFromSelection } from './cardPayloadBuilder';
 import type {
   EngineServiceResult,
   ExperimentState,
@@ -68,39 +64,6 @@ interface UpdateEngineServiceContext extends UnitEngineServiceContext {
   };
 }
 
-interface StimResponseLike {
-  incorrectResponses?: unknown;
-}
-
-interface StimLike extends Record<string, unknown> {
-  _id?: unknown;
-  display?: Record<string, unknown> & {
-    attribution?: unknown;
-  };
-  text?: string;
-  textStimulus?: string;
-  clozeText?: string;
-  clozeStimulus?: string;
-  imageStimulus?: string;
-  audioStimulus?: string;
-  videoStimulus?: string;
-  correctResponse?: string;
-  answer?: string;
-  response?: string | StimResponseLike;
-  testType?: string;
-  incorrectResponses?: unknown;
-  stimuliSetId?: unknown;
-  stimulusKC?: unknown;
-  clusterKC?: unknown;
-  speechHintExclusionList?: string;
-  probFunctionParameters?: unknown;
-}
-
-interface StimClusterLike extends Record<string, unknown> {
-  stims: StimLike[];
-  clusterKC?: unknown;
-}
-
 interface TdfUnitLike extends Record<string, unknown> {
   assessmentsession?: unknown;
   learningsession?: unknown;
@@ -126,11 +89,6 @@ interface TdfFileLike extends Record<string, unknown> {
   name?: string;
 }
 
-type RuntimeDeliverySettings = Record<string, unknown> & {
-  isVideoSession?: boolean;
-  videoUrl?: string;
-};
-
 interface EngineCardInfo extends Record<string, unknown> {
   whichStim: number;
   probabilityEstimate?: unknown;
@@ -151,10 +109,12 @@ interface PreparedTrialContent extends Record<string, unknown> {
   engine?: UnitEngineLike | null;
   unitFinished?: boolean;
   questionIndex?: number;
-  preparedAdvanceMode?: string;
+  preparedAdvanceMode?: PreparedAdvanceMode;
   speechHintExclusionList?: string;
   preparedSelection?: Record<string, unknown> | null;
 }
+
+type PreparedAdvanceMode = 'none' | 'seamless' | 'direct';
 
 function requireScheduleDisplayQuestionIndex(selection: Record<string, unknown>): number {
   const scheduleIndex = Number(selection.scheduleIndex);
@@ -180,29 +140,6 @@ function getFiniteNumber(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
-function resolveStimAnswer(stim: StimLike): string {
-  const candidates = [stim.correctResponse, stim.answer];
-  for (const candidate of candidates) {
-    if (typeof candidate === 'string') {
-      return candidate;
-    }
-  }
-  if (typeof stim.response === 'string') {
-    return stim.response;
-  }
-  return '';
-}
-
-function hasIncorrectResponses(value: unknown): boolean {
-  if (Array.isArray(value)) {
-    return value.length > 0;
-  }
-  if (typeof value === 'string') {
-    return value.trim().length > 0;
-  }
-  return false;
-}
-
 /**
  * Initialize unit engine based on TDF and unit type.
  * Creates schedule unit, model unit, or empty unit.
@@ -214,42 +151,20 @@ function hasIncorrectResponses(value: unknown): boolean {
  */
 export async function initializeEngine(tdf: TdfFileLike, unitNumber: number, unitType: string) {
   assertIdInvariants('unitEngine.initializeEngine', { requireCurrentTdfId: true, requireStimuliSetId: false });
-  
 
-  // Validate inputs
-  if (!tdf) {
-    throw new Error('initializeEngine: tdf is null/undefined');
-  }
-
-  if (!Number.isInteger(unitNumber) || unitNumber < 0) {
-    throw new Error(`initializeEngine: invalid unitNumber ${unitNumber}`);
-  }
-
-  const unit = tdf.tdfs?.tutor?.unit?.[unitNumber];
-  if (!unit) {
-    throw new Error(`initializeEngine: unit at index ${unitNumber} is null/undefined`);
-  }
-
-  
-
-  const sessionUnitNumber = Session.get('currentUnitNumber');
-  if (!Number.isInteger(sessionUnitNumber) || sessionUnitNumber !== unitNumber) {
-    clientConsole(1, '[Unit Engine] Session currentUnitNumber mismatch - resetting', {
-      sessionUnitNumber,
-      unitNumber,
-    });
+  const units = tdf?.tdfs?.tutor?.unit;
+  const unit = Array.isArray(units) ? units[unitNumber] : undefined;
+  if (unit) {
+    Session.set('currentTdfUnit', unit);
     Session.set('currentUnitNumber', unitNumber);
   }
 
-  // PHASE 8 FIX: Load experiment state and wrap in curExperimentData
   const experimentState = await getExperimentState();
   const normalizedExperimentState = experimentState || {};
   const curExperimentData = {
-    experimentState: normalizedExperimentState, // Engine expects experimentState
-    curExperimentState: normalizedExperimentState
+    experimentState: normalizedExperimentState,
+    curExperimentState: normalizedExperimentState,
   };
-
-  
 
   return await createUnitEngine(unitType, curExperimentData, {
     source: 'initializeEngine',
@@ -258,457 +173,18 @@ export async function initializeEngine(tdf: TdfFileLike, unitNumber: number, uni
   });
 }
 
-/**
- * @param {string} src
- * @returns {string}
- */
-function resolveImageUrl(src: unknown, fallbackStimuliSetId: unknown = null): string {
-  return resolveDynamicAssetPath(src, {
-    logPrefix: '[Unit Engine]',
-    fallbackStimuliSetId
-  });
-}
-
-/**
- * Return first non-empty string from candidate list.
- */
-function firstNonEmptyString(...values: unknown[]): string {
-  for (const value of values) {
-    if (typeof value === 'string') {
-      const trimmed = value.trim();
-      if (trimmed) return trimmed;
-    }
-  }
-  return '';
-}
-
-function resolveStimMediaSource(
-  stim: Record<string, unknown>,
-  kind: 'image' | 'audio' | 'video'
-): string {
-  const displayObj = (stim.display && typeof stim.display === 'object')
-    ? (stim.display as Record<string, unknown>)
-    : {};
-
-  if (kind === 'image') {
-    return firstNonEmptyString(
-      displayObj.imgSrc,
-      stim.imageStimulus
-    );
-  }
-  if (kind === 'audio') {
-    return firstNonEmptyString(
-      displayObj.audioSrc,
-      stim.audioStimulus
-    );
-  }
-  return firstNonEmptyString(
-    displayObj.videoSrc,
-    stim.videoStimulus
-  );
-}
-
-function getClientBaseUrl(): string {
-  if (typeof window !== 'undefined' && window.location?.origin) {
-    return `${window.location.origin}/`;
-  }
-  return 'https://mofacts.local/';
-}
-
-function resolveH5PDisplayConfig(...sources: unknown[]): Record<string, unknown> | undefined {
-  for (const source of sources) {
-    if (source && typeof source === 'object' && !Array.isArray(source)) {
-      return normalizeH5PDisplayConfig(source, getClientBaseUrl()) as unknown as Record<string, unknown>;
-    }
-  }
-  return undefined;
-}
-
-function normalizeDisplayAttribution(
-  ...sources: unknown[]
-): Record<string, string> | undefined {
-  const attributionSources = sources
-    .filter((value): value is Record<string, unknown> => typeof value === 'object' && value !== null);
-
-  const creatorName = firstNonEmptyString(...attributionSources.map((value) => value.creatorName));
-  const sourceName = firstNonEmptyString(...attributionSources.map((value) => value.sourceName));
-  const sourceUrl = firstNonEmptyString(...attributionSources.map((value) => value.sourceUrl));
-  const licenseName = firstNonEmptyString(...attributionSources.map((value) => value.licenseName));
-  const licenseUrl = firstNonEmptyString(...attributionSources.map((value) => value.licenseUrl));
-
-  if (!creatorName && !sourceName && !sourceUrl && !licenseName && !licenseUrl) {
-    return undefined;
-  }
-
-  return {
-    ...(creatorName ? { creatorName } : {}),
-    ...(sourceName ? { sourceName } : {}),
-    ...(sourceUrl ? { sourceUrl } : {}),
-    ...(licenseName ? { licenseName } : {}),
-    ...(licenseUrl ? { licenseUrl } : {}),
-  };
-}
-
-/**
- * @param {unknown} value
- * @returns {boolean}
- */
-function isImagePath(value: unknown): boolean {
-  if (!value || typeof value !== 'string') return false;
-  const imageExtensions = /\.(png|jpe?g|gif|svg|webp|bmp|ico|tiff?)$/i;
-  return imageExtensions.test(value.trim());
-}
-
-/**
- * @param {unknown} buttonOptions
- * @returns {string[]}
- */
-function normalizeButtonOptions(buttonOptions: unknown): string[] {
-  if (!buttonOptions) return [];
-  if (Array.isArray(buttonOptions)) {
-    return buttonOptions.slice();
-  }
-  if (typeof buttonOptions === 'string') {
-    return buttonOptions.split(',').map((item) => item.trim()).filter(Boolean);
-  }
-  if (typeof buttonOptions === 'object') {
-    return Array.isArray(buttonOptions) ? buttonOptions.slice() : [];
-  }
-  return [];
-}
-
-/**
- * @param {Record<string, unknown> | null | undefined} stim
- * @returns {Array<string | unknown>}
- */
-function getStimIncorrectResponses(stim: Record<string, unknown> | null | undefined): Array<string | unknown> {
-  if (!stim) return [];
-  const response = stim.response as { incorrectResponses?: unknown } | undefined;
-  const raw = stim.incorrectResponses ?? response?.incorrectResponses;
-  if (!raw) return [];
-  if (typeof raw === 'string') {
-    return raw.split(',').map((item) => item.trim()).filter(Boolean);
-  }
-  if (Array.isArray(raw)) {
-    return raw.map((item) => (typeof item === 'string' ? item.trim() : item)).filter(Boolean);
-  }
-  return [];
-}
-
-/**
- * @template T
- * @param {T[]} values
- * @returns {T[]}
- */
-function shuffleArray<T>(values: T[]): T[] {
-  const arr = values.slice();
-  for (let i = arr.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j]!, arr[i]!];
-  }
-  return arr;
-}
-
-/**
- * @param {{
- *   curUnit: Record<string, unknown> | null | undefined;
- *   stim: Record<string, unknown>;
- *   originalAnswer: string;
- *   correctAnswer: string;
- *   deliverySettings: Record<string, unknown> | null | undefined;
- * }} params
- * @returns {Array<{
- *   verbalChoice: string;
- *   buttonName: unknown;
- *   buttonValue: string;
- *   isImage: boolean;
- * }>}
- */
-function buildButtonList({
-  curUnit,
-  stim,
-  originalAnswer,
-  correctAnswer,
-  deliverySettings,
-}: {
-  curUnit: TdfUnitLike | null | undefined;
-  stim: StimLike;
-  originalAnswer: string;
-  correctAnswer: string;
-  deliverySettings: Record<string, unknown> | null | undefined;
-}) {
-  const buttonOrder = curUnit?.buttonorder ? curUnit.buttonorder.trim().toLowerCase() : '';
-  const unitButtonOptions = normalizeButtonOptions(curUnit?.buttonOptions);
-  let buttonChoices = [];
-  let correctButtonPopulated = null;
-
-  if (unitButtonOptions.length) {
-    buttonChoices = unitButtonOptions;
-    correctButtonPopulated = true;
-  } else {
-    buttonChoices = getStimIncorrectResponses(stim);
-    correctButtonPopulated = false;
-  }
-
-  if (correctButtonPopulated === null) {
-    throw new Error('Bad TDF/Stim file - no buttonOptions and no false responses');
-  }
-
-  const displayCorrectAnswer = Answers.getDisplayAnswerText(originalAnswer || correctAnswer || '');
-  const wrongButtonLimitValue = deliverySettings?.falseAnswerLimit;
-  const wrongButtonLimit = typeof wrongButtonLimitValue === 'number'
-    ? wrongButtonLimitValue
-    : Number(wrongButtonLimitValue);
-
-  if (wrongButtonLimit) {
-    let foundIsCurrentAnswer = undefined;
-    let correctAnswerIndex = undefined;
-    if (correctButtonPopulated) {
-      correctAnswerIndex = buttonChoices.findIndex((answer) => {
-        if (answer === originalAnswer) {
-          foundIsCurrentAnswer = true;
-          return true;
-        }
-        if (answer === displayCorrectAnswer) {
-          foundIsCurrentAnswer = false;
-          return true;
-        }
-        return false;
-      });
-      if (correctAnswerIndex !== -1) buttonChoices.splice(correctAnswerIndex, 1);
-      else correctAnswerIndex = undefined;
-    }
-
-    const numberOfWrongButtonsToPrune = buttonChoices.length - wrongButtonLimit;
-    for (let i = 0; i < numberOfWrongButtonsToPrune; i += 1) {
-      const randomIndex = Math.floor(Math.random() * buttonChoices.length);
-      buttonChoices.splice(randomIndex, 1);
-    }
-
-    if (correctAnswerIndex) {
-      buttonChoices.unshift(foundIsCurrentAnswer ? originalAnswer : displayCorrectAnswer);
-    }
-  }
-
-  if (!correctButtonPopulated) {
-    buttonChoices.unshift(displayCorrectAnswer);
-  }
-
-  if (buttonOrder === 'random') {
-    buttonChoices = shuffleArray(buttonChoices);
-  }
-
-  let curChar = 'a';
-  return buttonChoices.map((value) => {
-    const rawValue = value ?? '';
-    const entry = {
-      verbalChoice: curChar,
-      buttonName: rawValue,
-      buttonValue: sanitizeHTML(String(rawValue)),
-      isImage: isImagePath(String(rawValue)),
-    };
-    curChar = nextChar(curChar);
-    return entry;
-  });
-}
-
-function buildCardDataFromResolvedTrial(params: {
-  resolvedClusterIndex: number;
-  whichStim: number;
-  probabilityEstimate?: unknown;
-  forceButtonTrial?: boolean;
-  questionIndex: number;
-  currentDisplay: Record<string, unknown>;
-  fullAnswer: string;
-  correctAnswer: string;
-  testTypeOverride?: string;
-}) {
-  const {
-    resolvedClusterIndex,
-    whichStim,
-    probabilityEstimate,
-    forceButtonTrial,
-    questionIndex,
-    currentDisplay,
-    fullAnswer,
-    correctAnswer,
-    testTypeOverride,
-  } = params;
-  const cluster = getStimCluster(resolvedClusterIndex) as StimClusterLike;
-  const stim = cluster.stims[whichStim] as StimLike;
-  const curUnit = Session.get('currentTdfUnit') as TdfUnitLike | null | undefined;
-  let buttonTrial = false;
-
-  if (typeof curUnit?.isButtonTrial === 'string' ||
-      typeof curUnit?.buttonTrial === 'string' ||
-      typeof curUnit?.buttontrial === 'string') {
-    buttonTrial = (
-      curUnit.isButtonTrial === 'true' ||
-      curUnit.buttonTrial === 'true' ||
-      curUnit.buttontrial === 'true'
-    );
-  } else if (typeof curUnit?.isButtonTrial === 'undefined' &&
-             typeof curUnit?.buttonTrial === 'undefined' &&
-             typeof curUnit?.buttontrial === 'undefined') {
-    buttonTrial = false;
-  } else {
-    buttonTrial = Boolean(curUnit?.isButtonTrial || curUnit?.buttonTrial || curUnit?.buttontrial);
-  }
-
-  if (forceButtonTrial) {
-    buttonTrial = true;
-  } else if (
-    hasIncorrectResponses(stim.incorrectResponses) ||
-    (typeof stim.response === 'object' &&
-      stim.response !== null &&
-      hasIncorrectResponses((stim.response as StimResponseLike).incorrectResponses))
-  ) {
-    buttonTrial = true;
-  } else {
-    const currentUnitUsesSchedule = Boolean(curUnit?.assessmentsession);
-    const schedule = currentUnitUsesSchedule ? Session.get('schedule') : null;
-    if (schedule?.isButtonTrial) {
-      buttonTrial = true;
-    }
-  }
-
-  const baseDeliverySettings = getCurrentDeliverySettings();
-  const existingDeliverySettings = (deliverySettingsStore.get() || {}) as RuntimeDeliverySettings;
-  const deliverySettings = {
-    ...baseDeliverySettings,
-  } as RuntimeDeliverySettings;
-  if (Session.get('isVideoSession') === true) {
-    deliverySettings.isVideoSession = true;
-    if (
-      (typeof deliverySettings.videoUrl !== 'string' || deliverySettings.videoUrl.trim().length === 0) &&
-      typeof existingDeliverySettings.videoUrl === 'string' &&
-      existingDeliverySettings.videoUrl.trim().length > 0
-    ) {
-      deliverySettings.videoUrl = existingDeliverySettings.videoUrl;
-    }
-  }
-  const currentTdfFile = Session.get('currentTdfFile') as TdfFileLike | null | undefined;
-  const setspec = currentTdfFile?.tdfs?.tutor?.setspec || {};
-
-  const sessionTestType = typeof Session.get('testType') === 'string'
-    ? String(Session.get('testType')).trim().toLowerCase()
-    : '';
-  const stimTestType = typeof stim.testType === 'string'
-    ? String(stim.testType).trim().toLowerCase()
-    : '';
-  const testType = testTypeOverride || stimTestType || sessionTestType || 'd';
-
-  const buttonList = buttonTrial
-    ? buildButtonList({
-        curUnit,
-        stim,
-        originalAnswer: fullAnswer,
-        correctAnswer,
-        deliverySettings,
-      })
-    : [];
-
-  return {
-    currentDisplay,
-    originalAnswer: fullAnswer,
-    currentAnswer: correctAnswer,
-    questionIndex,
-    testType,
-    buttonTrial,
-    buttonList,
-    deliverySettings,
-    setspec,
-    engineIndices: {
-      clusterIndex: resolvedClusterIndex,
-      stimIndex: whichStim,
-      whichStim,
-      probabilityEstimate,
-    },
-    itemId: stim._id,
-    stimulusKC: stim.stimulusKC,
-    clusterKC: stim.clusterKC || cluster.clusterKC,
-    speechHintExclusionList: stim.speechHintExclusionList || '',
-  };
-}
-
-function getPreparedCardDataFromSelection(
-  engine: UnitEngineLike,
-  selection: Record<string, unknown>,
-  questionIndex: number,
-) {
-  const resolvedClusterIndex = Number(selection.clusterIndex ?? 0);
-  const whichStim = Number(selection.stimIndex ?? selection.whichStim ?? 0);
-  const cluster = getStimCluster(resolvedClusterIndex) as StimClusterLike;
-  const stim = cluster.stims[whichStim] as StimLike;
-  const preparedState = (selection.preparedState || selection.currentPreparedState || {}) as Record<string, unknown>;
-  const stimScopedSetId = stim?.stimuliSetId ?? Session.get('currentStimuliSetId') ?? null;
-  const rawImgSrc = resolveStimMediaSource(stim, 'image');
-  const rawVideoSrc = resolveStimMediaSource(stim, 'video');
-  const rawAudioSrc = resolveStimMediaSource(stim, 'audio');
-  const preparedDisplay = (preparedState.currentDisplay || preparedState.currentDisplayEngine || {}) as Record<string, unknown>;
-  const displayAttribution = normalizeDisplayAttribution(
-    preparedDisplay.attribution,
-    stim.display?.attribution,
-  );
-  const h5pDisplay = resolveH5PDisplayConfig(preparedDisplay.h5p, stim.display?.h5p);
-  const h5pOwnsPrompt = isSelfHostedH5PConfig(h5pDisplay);
-  const resolvedDisplay = {
-    text: h5pOwnsPrompt ? '' : String(preparedDisplay.text ?? stim.display?.text ?? stim.text ?? stim.textStimulus ?? ''),
-    clozeText: h5pOwnsPrompt ? '' : String(preparedDisplay.clozeText ?? stim.display?.clozeText ?? stim.clozeText ?? stim.clozeStimulus ?? ''),
-    imgSrc: typeof preparedDisplay.imgSrc === 'string' && preparedDisplay.imgSrc.trim().length > 0
-      ? preparedDisplay.imgSrc
-      : resolveImageUrl(rawImgSrc, stimScopedSetId),
-    videoSrc: typeof preparedDisplay.videoSrc === 'string' && preparedDisplay.videoSrc.trim().length > 0
-      ? preparedDisplay.videoSrc
-      : resolveImageUrl(rawVideoSrc, stimScopedSetId),
-    audioSrc: typeof preparedDisplay.audioSrc === 'string' && preparedDisplay.audioSrc.trim().length > 0
-      ? preparedDisplay.audioSrc
-      : resolveImageUrl(rawAudioSrc, stimScopedSetId),
-    ...(h5pDisplay ? { h5p: h5pDisplay } : {}),
-    ...(displayAttribution ? { attribution: displayAttribution } : {}),
-  };
-  const deliverySettings = getCurrentDeliverySettings();
-  const testType = typeof selection.testType === 'string'
-    ? selection.testType
-    : typeof stim.testType === 'string'
-      ? stim.testType
-      : typeof Session.get('testType') === 'string'
-        ? Session.get('testType')
-        : 'd';
-  const currentDisplay = applyDisplayFieldSubset(resolvedDisplay, deliverySettings, testType);
-  const fullAnswer = typeof preparedState.newExperimentState === 'object' &&
-    typeof (preparedState.newExperimentState as Record<string, unknown>).originalAnswer === 'string'
-    ? String((preparedState.newExperimentState as Record<string, unknown>).originalAnswer)
-    : (isSelfHostedH5PConfig(h5pDisplay) ? '__H5P_COMPLETED__' : resolveStimAnswer(stim));
-  const correctAnswer = typeof preparedState.currentAnswer === 'string'
-    ? String(preparedState.currentAnswer)
-    : (isSelfHostedH5PConfig(h5pDisplay) ? '__H5P_COMPLETED__' : (fullAnswer.split('~')[0] ?? '').trim());
-
-  return buildCardDataFromResolvedTrial({
-    resolvedClusterIndex,
-    whichStim,
-    probabilityEstimate: selection.probabilityEstimate,
-    forceButtonTrial: selection.forceButtonTrial === true,
-    questionIndex,
-    currentDisplay,
-    fullAnswer,
-    correctAnswer,
-    testTypeOverride: testType,
-  });
-}
-
 function buildPreparedTrialPayload(params: {
   engine: UnitEngineLike;
   selection: Record<string, unknown>;
   questionIndex: number;
-  preparedAdvanceMode: 'seamless' | 'fallback';
+  preparedAdvanceMode: Exclude<PreparedAdvanceMode, 'none'>;
 }): PreparedTrialContent {
   const { engine, selection, questionIndex, preparedAdvanceMode } = params;
   const resolvedQuestionIndex = engine.unitType === 'schedule'
     ? requireScheduleDisplayQuestionIndex(selection)
     : questionIndex;
   return {
-    ...getPreparedCardDataFromSelection(engine, selection, resolvedQuestionIndex),
+    ...buildPreparedCardDataFromSelection(engine, selection, resolvedQuestionIndex),
     engine,
     unitFinished: false,
     preparedAdvanceMode,
@@ -785,7 +261,7 @@ async function prepareNextScheduledTrial(
     engine,
     selection,
     questionIndex,
-    preparedAdvanceMode: 'fallback',
+    preparedAdvanceMode: 'direct',
   });
 }
 
@@ -803,7 +279,7 @@ export function getCardDataFromEngine(engine: UnitEngineLike, clusterIndex: numb
   const { whichStim, probabilityEstimate, clusterIndex: engineClusterIndex, forceButtonTrial } =
     engine.findCurrentCardInfo?.() as EngineCardInfo;
   const resolvedClusterIndex = engineClusterIndex ?? clusterIndex ?? 0;
-  return getPreparedCardDataFromSelection(
+  return buildPreparedCardDataFromSelection(
     engine,
     {
       clusterIndex: resolvedClusterIndex,
@@ -931,7 +407,7 @@ export function startEarlyLockForCurrentTrial(
       if (lockedOwnerToken && engine.currentCardOwnerToken && lockedOwnerToken !== engine.currentCardOwnerToken) {
         return;
       }
-      const nextTrialContent = getPreparedCardDataFromSelection(engine, selection, nextQuestionIndex);
+      const nextTrialContent = buildPreparedCardDataFromSelection(engine, selection, nextQuestionIndex);
       engine.setPreparedNextTrialContent({
         ...nextTrialContent,
         preparedAdvanceMode: 'seamless',
@@ -985,7 +461,7 @@ export async function prepareIncomingTrialService(
 
   return {
     unitFinished: await isUnitFinished(engine),
-    preparedAdvanceMode: engine.unitType === 'model' ? 'seamless' : 'fallback',
+    preparedAdvanceMode: engine.unitType === 'model' ? 'seamless' : 'direct',
     engine,
     questionIndex: nextQuestionIndex,
   };
@@ -1206,8 +682,7 @@ export async function updateEngineService(
     
 
     if (!engine) {
-      clientConsole(1, '[Unit Engine] No engine - skipping update');
-      return { status: 'skipped' };
+      throw new Error('No engine available for engine update');
     }
 
     if (typeof engine.cardAnswered === 'function') {

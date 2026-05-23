@@ -561,6 +561,34 @@ function waitForAuthenticatedRoute(
   });
 }
 
+function waitForPublicAuthHydration(
+  controller: any,
+  routeName: string,
+  onReady: () => void
+) {
+  renderLayout(controller, 'customLoading');
+  if (pendingAuthRouteHandles[routeName]) {
+    return;
+  }
+
+  pendingAuthRouteHandles[routeName] = Tracker.autorun(() => {
+    const currentRoute = FlowRouter.current()?.route?.name;
+    if (currentRoute !== routeName) {
+      pendingAuthRouteHandles[routeName]?.stop();
+      delete pendingAuthRouteHandles[routeName];
+      return;
+    }
+
+    if (shouldWaitForAuthHydration()) {
+      return;
+    }
+
+    pendingAuthRouteHandles[routeName]?.stop();
+    delete pendingAuthRouteHandles[routeName];
+    onReady();
+  });
+}
+
 const getRestrictedRouteAction = function(routeName: any) {
   return async function(this: any) {
     const fullRouteName = 'client.' + routeName;
@@ -588,16 +616,18 @@ for (const route of defaultBehaviorRoutes) {
 
 function renderSignInRoute(controller: any) {
   if (shouldWaitForAuthHydration()) {
-    Session.set('currentTemplate', 'customLoading');
-    renderLayout(controller, 'customLoading');
+    waitForPublicAuthHydration(controller, 'client.authLogin', () => {
+      renderSignInRoute(controller);
+    });
     return;
   }
 
   const userId = Meteor.userId();
   const user = Meteor.user();
   if (userId && !user) {
-    Session.set('currentTemplate', 'customLoading');
-    renderLayout(controller, 'customLoading');
+    waitForPublicAuthHydration(controller, 'client.authLogin', () => {
+      renderSignInRoute(controller);
+    });
     return;
   }
   if (user && getUserLoginMode(user) !== 'experiment') {

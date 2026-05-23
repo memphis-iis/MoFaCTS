@@ -9,6 +9,11 @@ import { CardStore } from "../views/experiment/modules/cardStore";
 import { deliverySettingsStore } from "./state/deliverySettingsStore";
 import { ExperimentStateStore } from "./state/experimentStateStore";
 import { clearMappingRecordFromSession } from "../views/experiment/svelte/services/mappingRecordService";
+import {
+  applySessionCleanupEntries,
+  CARD_RUNTIME_SESSION_DEFAULTS,
+  FULL_LAUNCH_SESSION_DEFAULTS,
+} from "./sessionCleanupRegistry";
 declare const Session: any;
 declare const Meteor: any;
 declare const GlobalExperimentStates: any;
@@ -64,198 +69,67 @@ function clearMappingSessionStateForCleanup() {
   clearMappingRecordFromSession();
 }
 
-function sessionCleanUp() {
-  
+function clearSessionTimersForCleanup() {
+  Meteor.clearInterval(Session.get('CurIntervalId'));
+  Session.set('CurIntervalId', undefined);
+  Meteor.clearTimeout(Session.get('CurTimeoutId'));
+  Session.set('CurTimeoutId', undefined);
+  Meteor.clearInterval(Session.get('varLenTimeoutName'));
+  Session.set('varLenTimeoutName', null);
+}
 
-  // CRITICAL: Add protection - don't clear unit state if navigating to /card from /instructions
+function resetSharedCardRuntimeState() {
+  Session.set('currentAnswer', undefined);
+  resetAudioState();
+  CardStore.resetHiddenItems();
+  applySessionCleanupEntries(Session, CARD_RUNTIME_SESSION_DEFAULTS);
+  clearMappingSessionStateForCleanup();
+  clearCardEntryContext();
+  CardStore.resetQuestionIndex();
+  clearSessionTimersForCleanup();
+  CardStore.resetReactiveDefaults();
+
+  if (playerController) {
+    destroyPlyr();
+  }
+
+  audioManager.cleanup();
+}
+
+function shouldPreserveUnitStateForCard() {
   const fromInstructions = Session.get('fromInstructions');
   const cardBootstrapInProgress = Session.get('cardBootstrapInProgress') === true;
   const targetPath = document?.location?.pathname;
-  const preserveUnitStateForCard = targetPath === '/card' && (fromInstructions || cardBootstrapInProgress);
+  return targetPath === '/card' && (fromInstructions || cardBootstrapInProgress);
+}
 
-  if (preserveUnitStateForCard) {
+function sessionCleanUp() {
+  const fromInstructions = Session.get('fromInstructions');
+
+  if (shouldPreserveUnitStateForCard()) {
     clientConsole(1, '[Session] Skipping unit state cleanup on /card to avoid init race', {
       reason: fromInstructions ? 'instructions-transition' : 'card-bootstrap',
       currentUnitNumber: Session.get('currentUnitNumber'),
       currentTdfUnit: Session.get('currentTdfUnit')?.unitname,
     });
 
-    // Clean up other session vars but PRESERVE unit state
-    Session.get('currentAnswer', undefined);
-    Session.set('alternateDisplayIndex', undefined);
-
-    // Reset all audio state (Phase 3 migration)
-    resetAudioState();
-
-    Session.set('buttonTrial', false);
-    Session.set('showPageNumbers', false);
-    Session.set('schedule', undefined);
-
-    Session.set('wasReportedForRemoval', false);
-    CardStore.resetHiddenItems();
-    Session.set('numVisibleCards', 0);
-
-    // PRESERVE: currentTdfName, currentTdfId, currentUnitNumber, currentTdfUnit
-
-    Session.set('currentStimuliSet', undefined);
-    Session.set('submmissionLock', false);
-    // curStudentPerformance preserved for continuity
-    // deliverySettingsStore preserved
-    // ExperimentStateStore preserved
-    // currentRootTdfId preserved
-
-    Session.set('clusterIndex', undefined);
-    clearMappingSessionStateForCleanup();
-
-    Session.set('displayReady', undefined);
-    Session.set('currentDisplay', undefined);
-    Session.set('originalQuestion', undefined);
-    Session.set('engineIndices', undefined);
-
-    // currentUnitStartTime preserved
-    // currentScore preserved
-    // overallOutcomeHistory preserved
-    Session.set('enableAudioPromptAndFeedback', false);
-    Session.set('errorReportStart', undefined);
-    Session.set('mainCardTimeoutStart', undefined);
-    Session.set('pausedLocks', 0);
-    Session.set('experimentPasswordRequired', false);
-    Session.set('filter', '@gmail.com');
-    Session.set('ignoreOutOfGrammarResponses', false);
-    Session.set('inResume', false);
-    Session.set('resumeInProgress', false);
-    clearCardEntryContext();
-    CardStore.resetQuestionIndex();
-    Session.set('recording', false);
-    Session.set('sampleRate', undefined);
-    // unitType preserved
-    Session.set('speechOutOfGrammarFeedback', undefined);
-    Session.set('subTdfIndex', undefined);
-    Session.set('testType', undefined);
-    Session.set('scoringEnabled', undefined);
-    Session.set('feedbackParamsSet', undefined);
-    Session.set('instructionQuestionResult', undefined);
-    Session.set('curTdfTips', undefined);
-    Meteor.clearInterval(Session.get('CurIntervalId'));
-    Session.set('CurIntervalId', undefined);
-    Meteor.clearTimeout(Session.get('CurTimeoutId'));
-    Session.set('CurTimeoutId', undefined);
-    Meteor.clearInterval(Session.get('varLenTimeoutName'));
-    Session.set('varLenTimeoutName', null);
-    Session.set('recordingLocked', false);
-    Session.set('selectedTdfDueDate', undefined);
-    Session.set('currentStimProbFunctionParameters', undefined);
-    // furthestUnit preserved
-    // curUnitInstructionsSeen preserved (will be used to skip re-showing instructions)
-
-    // Reset CardStore (source of truth for card-scoped state)
-    CardStore.resetReactiveDefaults();
-
-    // Engine preserved - don't clear it
-
-    if (playerController) {
-      destroyPlyr();
-    }
-
-    // Clean up all audio resources (Phase 4 migration)
-    audioManager.cleanup();
-
-    // Reset flag after use
+    resetSharedCardRuntimeState();
     Session.set('fromInstructions', false);
-
-    
-    return; // Early exit - preserve unit state
+    return;
   }
 
-  
+  resetSharedCardRuntimeState();
 
-  Session.get('currentAnswer', undefined);
-  Session.set('alternateDisplayIndex', undefined);
-
-  // Reset all audio state (Phase 3 migration)
-  resetAudioState();
-
-  Session.set('buttonTrial', false);
-  Session.set('showPageNumbers', false);
-  Session.set('schedule', undefined);
-
-  Session.set('wasReportedForRemoval', false);
-  CardStore.resetHiddenItems();
-  Session.set('numVisibleCards', 0);
-
-  Session.set('currentTdfName', undefined);
-  Session.set('currentTdfId', undefined);
-  Session.set('currentUnitNumber', undefined);
   clientConsole(1, '[Session] Clearing currentTdfUnit during session cleanup', {
     path: document?.location?.pathname,
     stack: new Error().stack,
   });
-  Session.set('currentTdfUnit', undefined);
-  Session.set('currentStimuliSet', undefined);
-  Session.set('submmissionLock', false);
-  Session.set('curStudentPerformance', undefined);
+  applySessionCleanupEntries(Session, FULL_LAUNCH_SESSION_DEFAULTS);
   deliverySettingsStore.set({});
   ExperimentStateStore.clear();
-  Session.set('currentRootTdfId', undefined);
-  Session.set('conditionTdfId', undefined);
   ExperimentStateStore.clear();
 
-  Session.set('clusterIndex', undefined);
-  clearMappingSessionStateForCleanup();
-
-  Session.set('displayReady', undefined);
-  Session.set('currentDisplay', undefined);
-  Session.set('originalQuestion', undefined);
-  Session.set('engineIndices', undefined);
-
-  Session.set('currentUnitStartTime', Date.now());
-  Session.set('currentScore', 0);
-  Session.set('overallOutcomeHistory', []);
-  Session.set('overallStudyHistory', []);
-  Session.set('enableAudioPromptAndFeedback', false);
-  Session.set('errorReportStart', undefined);
-  Session.set('mainCardTimeoutStart', undefined);
-  Session.set('pausedLocks', 0);
-  Session.set('experimentPasswordRequired', false);
-  Session.set('filter', '@gmail.com');
-  Session.set('ignoreOutOfGrammarResponses', false);
-  Session.set('inResume', false);
-  Session.set('resumeInProgress', false);
-  clearCardEntryContext();
-  CardStore.resetQuestionIndex();
-  Session.set('recording', false);
-  Session.set('sampleRate', undefined);
-  Session.set('unitType', undefined);
-  Session.set('speechOutOfGrammarFeedback', undefined);
-  Session.set('subTdfIndex', undefined);
-  Session.set('testType', undefined);
-  Session.set('scoringEnabled', undefined);
-  Session.set('feedbackParamsSet', undefined);
-  Session.set('instructionQuestionResult', undefined);
-  Session.set('curTdfTips', undefined)
-  Meteor.clearInterval(Session.get('CurIntervalId'))
-  Session.set('CurIntervalId', undefined)
-  Meteor.clearTimeout(Session.get('CurTimeoutId'));
-  Session.set('CurTimeoutId', undefined);
-  Meteor.clearInterval(Session.get('varLenTimeoutName'));
-  Session.set('varLenTimeoutName', null)
-  Session.set('recordingLocked', false);
-  Session.set('selectedTdfDueDate', undefined);
-  Session.set('currentStimProbFunctionParameters', undefined);
-  Session.set('furthestUnit', undefined);
-  Session.set('curUnitInstructionsSeen', false);
-
-  // Reset CardStore (source of truth for card-scoped state)
-  CardStore.resetReactiveDefaults();
-
   clearEngine();
-
-  if(playerController) {
-    destroyPlyr();
-  }
-
-  // Clean up all audio resources (Phase 4 migration)
-  audioManager.cleanup();
   const currentExperimentState = ExperimentStateStore.get();
   if (currentExperimentState) {
     let mergedExperimentState = currentExperimentState;
@@ -267,7 +141,6 @@ function sessionCleanUp() {
   }
   Session.set('currentRootTdfId', undefined);
   Session.set('conditionTdfId', undefined);
-  Session.set('ownerDashboardLaunch', false);
 }
 
 

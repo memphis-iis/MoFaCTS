@@ -1,6 +1,11 @@
 import { expect } from 'chai';
 import { Session } from 'meteor/session';
 import { sessionCleanUp, clearMappingSessionStateForCleanup } from './sessionUtils';
+import {
+  CARD_LAUNCH_PRESERVED_UNIT_KEYS,
+  LEGACY_SUBMISSION_LOCK_KEY,
+  USER_ADMIN_DEFAULT_FILTER,
+} from './sessionCleanupRegistry';
 
 describe('sessionUtils mapping cleanup', function() {
   beforeEach(function() {
@@ -13,6 +18,13 @@ describe('sessionUtils mapping cleanup', function() {
     Session.set('mappingSignature', null);
     Session.set('fromInstructions', false);
     Session.set('cardBootstrapInProgress', false);
+    Session.set('currentTdfName', undefined);
+    Session.set('currentTdfId', undefined);
+    Session.set('currentUnitNumber', undefined);
+    Session.set('currentTdfUnit', undefined);
+    Session.set('currentRootTdfId', undefined);
+    Session.set('currentAnswer', undefined);
+    Session.set(LEGACY_SUBMISSION_LOCK_KEY, false);
   });
 
   it('clears mapping and signature session keys via cleanup helper', function() {
@@ -59,5 +71,58 @@ describe('sessionUtils mapping cleanup', function() {
 
     expect(Session.get('clusterMapping')).to.equal('');
     expect(Session.get('mappingSignature')).to.equal(null);
+  });
+
+  it('preserves documented unit launch keys when moving from instructions to /card', function() {
+    Session.set('fromInstructions', true);
+    Session.set('currentTdfName', 'Lesson A');
+    Session.set('currentTdfId', 'tdf-a');
+    Session.set('currentUnitNumber', 2);
+    Session.set('currentTdfUnit', { unitname: 'Unit 2' });
+    Session.set('currentRootTdfId', 'root-a');
+    Session.set('currentAnswer', 'stale answer');
+    Session.set(LEGACY_SUBMISSION_LOCK_KEY, true);
+    Object.defineProperty(document, 'location', {
+      value: { pathname: '/card' },
+      writable: true,
+      configurable: true,
+    });
+
+    sessionCleanUp();
+
+    expect(CARD_LAUNCH_PRESERVED_UNIT_KEYS).to.include('currentTdfId');
+    expect(Session.get('currentTdfName')).to.equal('Lesson A');
+    expect(Session.get('currentTdfId')).to.equal('tdf-a');
+    expect(Session.get('currentUnitNumber')).to.equal(2);
+    expect(Session.get('currentTdfUnit')).to.deep.equal({ unitname: 'Unit 2' });
+    expect(Session.get('currentRootTdfId')).to.equal('root-a');
+    expect(Session.get('currentAnswer')).to.equal(undefined);
+    expect(Session.get(LEGACY_SUBMISSION_LOCK_KEY)).to.equal(false);
+    expect(Session.get('filter')).to.equal(USER_ADMIN_DEFAULT_FILTER);
+  });
+
+  it('clears unit launch keys during full cleanup', function() {
+    Session.set('fromInstructions', false);
+    Session.set('currentTdfName', 'Lesson A');
+    Session.set('currentTdfId', 'tdf-a');
+    Session.set('currentUnitNumber', 2);
+    Session.set('currentTdfUnit', { unitname: 'Unit 2' });
+    Session.set('currentRootTdfId', 'root-a');
+    Session.set('currentScore', 12);
+    Object.defineProperty(document, 'location', {
+      value: { pathname: '/experimentList' },
+      writable: true,
+      configurable: true,
+    });
+
+    sessionCleanUp();
+
+    expect(Session.get('currentTdfName')).to.equal(undefined);
+    expect(Session.get('currentTdfId')).to.equal(undefined);
+    expect(Session.get('currentUnitNumber')).to.equal(undefined);
+    expect(Session.get('currentTdfUnit')).to.equal(undefined);
+    expect(Session.get('currentRootTdfId')).to.equal(undefined);
+    expect(Session.get('currentScore')).to.equal(0);
+    expect(Session.get('curUnitInstructionsSeen')).to.equal(false);
   });
 });

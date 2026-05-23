@@ -3,6 +3,26 @@ import { Session } from 'meteor/session';
 import { updateEngineService } from './unitEngineService';
 
 describe('unit engine H5P model updates', function() {
+  it('reports missing engine state as an explicit update error', async function() {
+    const result = await updateEngineService({
+      testType: 'd',
+      isCorrect: true,
+      timestamps: {
+        trialStart: 1000,
+        firstKeypress: 1100,
+        trialEnd: 1500,
+        feedbackStart: 1500,
+        feedbackEnd: 1500,
+      },
+      engine: null,
+    }, {});
+
+    expect(result).to.deep.equal({
+      status: 'error',
+      error: 'No engine available for engine update',
+    });
+  });
+
   it('counts every H5P part outcome against the selected model card', async function() {
     const calls: Array<{ isCorrect: boolean; practiceTime: number; testType: string }> = [];
 
