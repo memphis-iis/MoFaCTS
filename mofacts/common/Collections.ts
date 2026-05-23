@@ -2,38 +2,45 @@ import { Meteor } from 'meteor/meteor';
 import { Mongo } from 'meteor/mongo';
 import { Roles } from 'meteor/alanning:roles';
 import { FilesCollection } from 'meteor/ostrio:files';
+import { collectionMongoName } from './collectionOwnership';
 
-/* Collections - our data collections stored in MongoDB
+/*
+ * Collection declarations are the persistence boundary for MoFaCTS.
+ *
+ * Add new collections only when there is a clear owner and persistence contract
+ * in common/collectionOwnership.ts. This file still also hosts the DynamicAssets
+ * upload policy and legacy global bridge; keep those concerns labeled until they
+ * are split into dedicated modules.
  */
 
-const Tdfs = new Mongo.Collection('tdfs');
-const Assignments = new Mongo.Collection('assessments');
-const Courses = new Mongo.Collection('course');
-const GlobalExperimentStates = new Mongo.Collection('global_experiment_state');
-const Histories = new Mongo.Collection('history');
-const Items = new Mongo.Collection('stimuli');
-const Stims = new Mongo.Collection('stim_files');
-const itemSourceSentences = new Mongo.Collection('item_source_sentences');
-const Sections = new Mongo.Collection('section');
-const SectionUserMap = new Mongo.Collection('section_user_map');
-const UserTimesLog = new Mongo.Collection('userTimesLog');
-const UserMetrics = new Mongo.Collection('userMetrics');
-const DynamicSettings = new Mongo.Collection('dynaminc_settings');
-const ScheduledTurkMessages = new Mongo.Collection('scheduledTurkMessages');
-const ClozeEditHistory = new Mongo.Collection('clozeEditHistory');
-const ErrorReports = new Mongo.Collection('errorReports');
-const DynamicConfig = new Mongo.Collection('dynamicConfig');
-const PasswordResetTokens = new Mongo.Collection('passwordResetTokens');
-const AuditLog = new Mongo.Collection('auditLog');
-const AuthThrottleState = new Mongo.Collection('auth_throttle_state');
-const UserDashboardCache = new Mongo.Collection('user_dashboard_cache');
-const UserUploadQuota = new Mongo.Collection('user_upload_quota');
-const ManualContentDrafts = new Mongo.Collection('manual_content_drafts');
-const H5PContents = new Mongo.Collection('h5p_contents');
+const Tdfs = new Mongo.Collection(collectionMongoName('Tdfs'));
+const Assignments = new Mongo.Collection(collectionMongoName('Assignments'));
+const Courses = new Mongo.Collection(collectionMongoName('Courses'));
+const GlobalExperimentStates = new Mongo.Collection(collectionMongoName('GlobalExperimentStates'));
+const Histories = new Mongo.Collection(collectionMongoName('Histories'));
+const Items = new Mongo.Collection(collectionMongoName('Items'));
+const Stims = new Mongo.Collection(collectionMongoName('Stims'));
+const itemSourceSentences = new Mongo.Collection(collectionMongoName('itemSourceSentences'));
+const Sections = new Mongo.Collection(collectionMongoName('Sections'));
+const SectionUserMap = new Mongo.Collection(collectionMongoName('SectionUserMap'));
+const UserTimesLog = new Mongo.Collection(collectionMongoName('UserTimesLog'));
+const UserMetrics = new Mongo.Collection(collectionMongoName('UserMetrics'));
+const DynamicSettings = new Mongo.Collection(collectionMongoName('DynamicSettings'));
+const ScheduledTurkMessages = new Mongo.Collection(collectionMongoName('ScheduledTurkMessages'));
+const ClozeEditHistory = new Mongo.Collection(collectionMongoName('ClozeEditHistory'));
+const ErrorReports = new Mongo.Collection(collectionMongoName('ErrorReports'));
+const DynamicConfig = new Mongo.Collection(collectionMongoName('DynamicConfig'));
+const PasswordResetTokens = new Mongo.Collection(collectionMongoName('PasswordResetTokens'));
+const AuditLog = new Mongo.Collection(collectionMongoName('AuditLog'));
+const AuthThrottleState = new Mongo.Collection(collectionMongoName('AuthThrottleState'));
+const UserDashboardCache = new Mongo.Collection(collectionMongoName('UserDashboardCache'));
+const UserUploadQuota = new Mongo.Collection(collectionMongoName('UserUploadQuota'));
+const ManualContentDrafts = new Mongo.Collection(collectionMongoName('ManualContentDrafts'));
+const H5PContents = new Mongo.Collection(collectionMongoName('H5PContents'));
 
-// Init DynamicAssets Collection
+// DynamicAssets upload policy. Later split target: common/fileUploadPolicy.ts.
 const DynamicAssets = new FilesCollection({
-  collectionName: 'Assets',
+  collectionName: collectionMongoName('DynamicAssets'),
   storagePath: process.env.HOME + '/dynamic-assets',
   allowClientCode: false, // Security: Disallow file operations from client (use server methods)
   onBeforeUpload(this: { userId?: string }, file: { name?: string; extension?: string }) {
@@ -101,7 +108,8 @@ const DynamicAssets = new FilesCollection({
   }
 });
 
-// Backward-compat: many modules still reference these as globals.
+// Legacy global bridge. Later split target: common/collectionGlobals.ts.
+// Do not add to this bridge without adding an ownership entry above.
 Object.assign(globalThis, {
   Tdfs,
   Assignments,
@@ -130,7 +138,7 @@ Object.assign(globalThis, {
   DynamicAssets,
 });
 
-export { Tdfs, GlobalExperimentStates, UserDashboardCache, H5PContents };
+export { Tdfs, GlobalExperimentStates, DynamicSettings, UserDashboardCache, H5PContents };
 
 GlobalExperimentStates.allow({
   update: function(userId: string, doc: unknown, _fieldNames: string[], _modifier: any) {

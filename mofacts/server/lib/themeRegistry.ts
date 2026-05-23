@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { randomBytes } from 'crypto';
 import { Meteor } from 'meteor/meteor';
-import { Mongo } from 'meteor/mongo';
+import { DynamicSettings } from '../../common/Collections';
 
 const { promises: fsp } = fs;
 
@@ -11,8 +11,6 @@ const ACTIVE_THEME_KEY = 'customTheme';
 const DEFAULT_THEME_ID = 'mofacts-default';
 const PUBLIC_THEME_ENV = process.env.MOFACTS_DEFAULT_THEME_DIR;
 const CUSTOM_THEME_DIR = process.env.MOFACTS_THEME_DIR || path.join(process.cwd(), 'theme-library');
-const DynamicSettings =
-  (globalThis as any).DynamicSettings || new Mongo.Collection('dynaminc_settings');
 
 const FALLBACK_THEME = {
   id: DEFAULT_THEME_ID,
