@@ -676,7 +676,6 @@ export async function createAutoTutorRuntime(): Promise<AutoTutorRuntime> {
       nextState.selectedMove = envelope.stateUpdate.selectedMove;
       nextState.turnCount += 1;
       nextState.dialogue.push({ role: 'student', text: cleanedAnswer });
-      nextState.dialogue.push({ role: 'tutor', text: envelope.tutorMessage });
 
       if (nextState.costUsd > AUTO_TUTOR_COST_CAP_USD) {
         nextState.stoppedByCost = true;
@@ -684,10 +683,14 @@ export async function createAutoTutorRuntime(): Promise<AutoTutorRuntime> {
       } else {
         nextState.completed = computeCompleted(nextState, config.graduation);
       }
+      const tutorMessage = nextState.stoppedByCost
+        ? 'We need to stop here because this AutoTutor session reached the configured cost cap.'
+        : (nextState.completed ? config.script.summary : envelope.tutorMessage);
+      nextState.dialogue.push({ role: 'tutor', text: tutorMessage });
       const turnEndedAt = Date.now();
       await insertAutoTutorHistoryTurn(config, nextState, {
         studentAnswer: cleanedAnswer,
-        tutorMessage: envelope.tutorMessage,
+        tutorMessage,
         turnStartedAt,
         turnEndedAt,
       });
@@ -695,7 +698,7 @@ export async function createAutoTutorRuntime(): Promise<AutoTutorRuntime> {
       publishState(state);
 
       return {
-        message: envelope.tutorMessage,
+        message: tutorMessage,
         completed: state.completed,
         stoppedByCost: state.stoppedByCost,
       };

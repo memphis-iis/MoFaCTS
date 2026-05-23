@@ -12,11 +12,8 @@ import {
   refreshCurrentDeliverySettingsStore,
   getUserDisplayIdentifier,
   setStudentPerformance,
-  getStimCount,
-  extractDelimFields,
-  rangeVal
+  getStimCount
 } from '../../../../lib/currentTestingHelpers';
-import { deliverySettingsStore } from '../../../../lib/state/deliverySettingsStore';
 import {
   getAudioInputSensitivity,
   getAudioPromptSpeakingRate,
@@ -25,6 +22,7 @@ import {
 import { audioManager } from '../../../../lib/audioContextManager';
 import { getEngine, setEngine } from '../../../../lib/engineManager';
 import { initializeEngine } from '../services/unitEngineService';
+import { initVideoSessionData } from '../services/videoCardInit';
 import { getExperimentState, createExperimentState } from '../services/experimentState';
 import { resumeFromExperimentState } from '../services/resumeService';
 import { createMappingSignature } from '../../../../lib/mappingSignature';
@@ -39,34 +37,33 @@ import { CardStore } from '../../modules/cardStore';
 import { checkForFileImage, unitHasLockout } from '../../instructions';
 import { initializeAudioRecorder } from './speechRecognitionService';
 import { leavePage } from './navigationCleanup';
-import { ensureCurrentStimuliSetId, resolveDynamicAssetPath } from './mediaResolver';
-import { resolveVideoResumeAnchor } from './videoResume';
+import { ensureCurrentStimuliSetId } from './mediaResolver';
 import { withStartupTimeout } from '../../../../lib/audioStartup';
 import { evaluateSrAvailability } from '../../../../lib/audioAvailability';
 import { markLaunchLoadingTiming, setLaunchLoadingMessage } from '../../../../lib/launchLoading';
 import {
   CARD_ENTRY_INTENT,
-  COMPLETED_LESSON_REDIRECT,
-  classifyCardRefreshRebuild,
   clearCardEntryContext,
   getCardEntryContext,
   setCardEntryIntent,
   shouldUseProgressBootstrapForEntryIntent,
 } from '../../../../lib/cardEntryIntent';
-import { isConditionRootWithoutUnitArray } from '../../../../lib/tdfUtils';
+import {
+  describeCardEntryBootstrapMode,
+  resolveCardEntryBootstrap,
+  type CardEntryIntentValue,
+  type CardRefreshRebuildClassification,
+} from './cardEntryBootstrap';
 import {
   assertIdInvariants,
   setActiveTdfContext,
 } from '../../../../lib/idContext';
 import type {
   ExperimentState,
-  RewindCheckpointData,
   SvelteCardInitResult,
   UnitEngineLike,
   UnitType,
-  VideoCheckpointBehavior,
 } from '../../../../../common/types';
-import type { DeliverySettings } from '../../../../../common/types';
 import { repairFormattedStimuliResponsesFromRaw } from '../../../../../common/lib/stimuliResponseRepair';
 import '../../../../../common/Collections';
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra');
@@ -78,17 +75,13 @@ type MeteorUserLike = {
 
 type UnknownRecord = Record<string, unknown>;
 
-interface VideoCheckpointLike extends UnknownRecord {
-  time?: unknown;
-}
-
 interface VideoSessionLike extends UnknownRecord {
   videosource?: string;
   questions?: unknown;
   questiontimes?: unknown;
   checkpointQuestions?: unknown;
   checkpointBehavior?: unknown;
-  checkpoints?: VideoCheckpointLike[];
+  checkpoints?: unknown[];
   rewindOnIncorrect?: unknown;
 }
 
@@ -137,11 +130,6 @@ interface RuntimeEngine extends UnitEngineLike {
   __unitName?: string | null;
   loadResumeState?: () => Promise<void> | void;
 }
-
-type RuntimeDeliverySettings = DeliverySettings & {
-  isVideoSession?: boolean;
-  videoUrl?: string;
-};
 
 type CardPopstateHandler = (this: Window, event: PopStateEvent) => void;
 type TutorLike = NonNullable<NonNullable<TdfFileLike['tdfs']>['tutor']>;
@@ -214,244 +202,6 @@ function deriveUnitType(unit: TdfUnitLike | null | undefined): UnitType | undefi
     unitStructure: Object.keys(unit),
   });
   return undefined;
-}
-
-const VIDEO_CHECKPOINT_BEHAVIORS = new Set(['none', 'pause', 'all', 'some', 'adaptive']);
-
-function normalizeVideoBoolean(value: unknown): boolean {
-  return value === true || value === 'true' || value === 1 || value === '1';
-}
-
-/**
- * @param {unknown} value
- * @returns {VideoCheckpointBehavior}
- */
-function parseVideoCheckpointBehavior(value: unknown): VideoCheckpointBehavior {
-  if (value == null || value === '') {
-    return 'none';
-  }
-  if (typeof value !== 'string') {
-    throw new Error('[Svelte Init] Video session checkpointBehavior must be a string');
-  }
-  const normalized = value.trim().toLowerCase();
-  if (!VIDEO_CHECKPOINT_BEHAVIORS.has(normalized)) {
-    throw new Error(`[Svelte Init] Unsupported checkpointBehavior "${value}"`);
-  }
-  return normalized as VideoCheckpointBehavior;
-}
-
-/**
- * @param {unknown} values
- * @param {string} fieldName
- * @returns {number[]}
- */
-function parseNumericArray(values: unknown, fieldName: string): number[] {
-  if (!Array.isArray(values)) {
-    throw new Error(`[Svelte Init] ${fieldName} must be an array`);
-  }
-  return values.map((value: unknown, index: number) => {
-    const parsed = Number(value);
-    if (!Number.isFinite(parsed)) {
-      throw new Error(`[Svelte Init] ${fieldName}[${index}] is not numeric`);
-    }
-    return parsed;
-  });
-}
-
-/**
- * @param {number[]} values
- * @returns {number[]}
- */
-function uniqueSortedNumeric(values: number[]): number[] {
-  return [...new Set(values)].sort((a, b) => a - b);
-}
-
-/**
- * @param {number[]} questionTimes
- * @param {Record<string, unknown> | null | undefined} videoSession
- * @returns {number[]}
- */
-function buildSelectiveCheckpointTimes(questionTimes: number[], videoSession: VideoSessionLike | null | undefined): number[] {
-  const checkpointQuestions = videoSession?.checkpointQuestions;
-  if (Array.isArray(checkpointQuestions) && checkpointQuestions.length > 0) {
-    const selected = checkpointQuestions.map((value: unknown, index: number) => {
-      const parsed = Number(value);
-      if (!Number.isInteger(parsed)) {
-        throw new Error(`[Svelte Init] checkpointQuestions[${index}] must be an integer`);
-      }
-      const timeIndex = parsed - 1;
-      if (timeIndex < 0 || timeIndex >= questionTimes.length) {
-        throw new Error(`[Svelte Init] checkpointQuestions[${index}] is out of range`);
-      }
-      return questionTimes[timeIndex]!;
-    });
-    return uniqueSortedNumeric(selected);
-  }
-
-  const currentStimuliSet = Session.get('currentStimuliSet') as Array<{ checkpoint?: boolean }> | null | undefined;
-  if (!Array.isArray(currentStimuliSet) || currentStimuliSet.length === 0) {
-    throw new Error('[Svelte Init] checkpointBehavior "some" requires checkpointQuestions or currentStimuliSet checkpoint flags');
-  }
-
-  const selected: number[] = [];
-  for (let i = 0; i < questionTimes.length; i++) {
-    if (currentStimuliSet[i]?.checkpoint === true) {
-      selected.push(questionTimes[i]!);
-    }
-  }
-
-  if (selected.length === 0) {
-    throw new Error('[Svelte Init] checkpointBehavior "some" resolved no checkpoint times');
-  }
-
-  return uniqueSortedNumeric(selected);
-}
-
-/**
- * @param {Record<string, unknown> | null | undefined} videoSession
- * @returns {number[]}
- */
-function buildAdaptiveCheckpointTimes(videoSession: VideoSessionLike | null | undefined): number[] {
-  if (!Array.isArray(videoSession?.checkpoints) || videoSession.checkpoints.length === 0) {
-    throw new Error('[Svelte Init] checkpointBehavior "adaptive" requires videosession.checkpoints');
-  }
-  const selected = videoSession.checkpoints.map((checkpoint: VideoCheckpointLike, index: number) => {
-    const parsed = Number(checkpoint?.time);
-    if (!Number.isFinite(parsed)) {
-      throw new Error(`[Svelte Init] checkpoints[${index}].time is not numeric`);
-    }
-    return parsed;
-  });
-  return uniqueSortedNumeric(selected);
-}
-
-/**
- * @param {Record<string, unknown> | null | undefined} videoSession
- * @param {number[]} questionTimes
- * @returns {RewindCheckpointData}
- */
-function buildRewindCheckpointData(
-  videoSession: VideoSessionLike | null | undefined,
-  questionTimes: number[]
-): RewindCheckpointData {
-  const checkpointBehavior = parseVideoCheckpointBehavior(videoSession?.checkpointBehavior);
-
-  if (!normalizeVideoBoolean(videoSession?.rewindOnIncorrect)) {
-    return {
-      checkpointBehavior,
-      rewindCheckpoints: [],
-    };
-  }
-
-  if (checkpointBehavior === 'pause' || checkpointBehavior === 'all') {
-    return {
-      checkpointBehavior,
-      rewindCheckpoints: uniqueSortedNumeric(questionTimes),
-    };
-  }
-  if (checkpointBehavior === 'some') {
-    return {
-      checkpointBehavior,
-      rewindCheckpoints: buildSelectiveCheckpointTimes(questionTimes, videoSession),
-    };
-  }
-  if (checkpointBehavior === 'adaptive') {
-    return {
-      checkpointBehavior,
-      rewindCheckpoints: buildAdaptiveCheckpointTimes(videoSession),
-    };
-  }
-
-  return {
-    checkpointBehavior,
-    rewindCheckpoints: [],
-  };
-}
-
-/**
- * @param {Record<string, unknown> | null | undefined} curTdfUnit
- * @returns {void}
- */
-async function initVideoSessionData(curTdfUnit: TdfUnitLike | null | undefined) {
-  const videoSession = curTdfUnit?.videosession;
-  if (!videoSession) {
-    Session.set('isVideoSession', false);
-    Session.set('videoResumeAnchor', null);
-    return;
-  }
-
-  Session.set('isVideoSession', true);
-
-  if (!videoSession.videosource) {
-    throw new Error('[Svelte Init] Video session missing videosource');
-  }
-
-  let questions = videoSession.questions;
-  if (typeof questions === 'string') {
-    const questionIndices = [];
-    const clusterList: string[] = [];
-    extractDelimFields(questions, clusterList);
-    for (let i = 0; i < clusterList.length; i++) {
-      const nums = rangeVal(clusterList[i]);
-      questionIndices.push(...nums);
-    }
-    questions = questionIndices;
-  } else if (questions == null) {
-    throw new Error('[Svelte Init] Video session missing questions list');
-  } else if (!Array.isArray(questions)) {
-    throw new Error('[Svelte Init] Video session questions must be an array or range string');
-  }
-  const parsedQuestions = parseNumericArray(questions, 'Video session questions').map((value: number, index: number) => {
-    if (!Number.isInteger(value)) {
-      throw new Error(`[Svelte Init] Video session questions[${index}] must be an integer`);
-    }
-    return value;
-  });
-
-  const questionTimes = videoSession.questiontimes;
-  if (questionTimes == null) {
-    throw new Error('[Svelte Init] Video session missing question times');
-  } else if (!Array.isArray(questionTimes)) {
-    throw new Error('[Svelte Init] Video session questiontimes must be an array');
-  }
-
-  const times = parseNumericArray(questionTimes, 'Video session questiontimes');
-  if (parsedQuestions.length !== times.length) {
-    throw new Error('[Svelte Init] Video session questions do not match question times length');
-  }
-
-  const { checkpointBehavior, rewindCheckpoints } = buildRewindCheckpointData(videoSession, times);
-
-  Session.set('videoCheckpoints', {
-    times,
-    questions: parsedQuestions,
-    checkpointBehavior,
-    rewindCheckpoints,
-  });
-
-  let completedCheckpointQuestionCount = 0;
-  const userId = Meteor.userId();
-  const currentTdfId = Session.get('currentTdfId');
-  const currentUnitNumber = Number(Session.get('currentUnitNumber') || 0);
-  if (userId && typeof currentTdfId === 'string' && currentTdfId.trim() !== '' && Number.isFinite(currentUnitNumber)) {
-    completedCheckpointQuestionCount = await meteorCallAsync(
-      'getVideoCompletedCheckpointQuestionCountFromHistory',
-      userId,
-      currentTdfId,
-      currentUnitNumber
-    );
-  }
-  const videoResumeAnchor = resolveVideoResumeAnchor(times, completedCheckpointQuestionCount);
-  Session.set('videoResumeAnchor', videoResumeAnchor);
-
-  let resolvedVideoUrl = resolveDynamicAssetPath(videoSession.videosource, { logPrefix: '[Svelte Init]' });
-
-  const currentDeliverySettings = (deliverySettingsStore.get() || {}) as RuntimeDeliverySettings;
-  deliverySettingsStore.set({
-    ...currentDeliverySettings,
-    isVideoSession: true,
-    videoUrl: resolvedVideoUrl,
-  } as Parameters<typeof deliverySettingsStore.set>[0]);
 }
 
 function restoreCanonicalTdfFileForStandardInit(
@@ -632,29 +382,14 @@ async function ensureCanonicalStimuliSetLoadedForStandardInit(tdfFile: TdfFileLi
   ensureCurrentStimuliSetId(tdfFile.stimuliSetId);
 }
 
-type CardEntryIntentValue = ReturnType<typeof getCardEntryContext>['intent'];
-
 type CardEntryDispatchContext = {
   requestedIntent: CardEntryIntentValue;
   effectiveIntent: CardEntryIntentValue;
   prefetchedExperimentState: ExperimentState | null;
-  refreshRebuildClassification: ReturnType<typeof classifyCardRefreshRebuild> | null;
+  refreshRebuildClassification: CardRefreshRebuildClassification | null;
   requiresConditionResolution: boolean;
   shouldUseProgressBootstrap: boolean;
 };
-
-function describeCardEntryBootstrapMode(
-  shouldUseProgressBootstrap: boolean,
-  requiresConditionResolution: boolean
-): 'standard' | 'persisted-progress' | 'condition-resolve' {
-  if (!shouldUseProgressBootstrap) {
-    return 'standard';
-  }
-  if (requiresConditionResolution) {
-    return 'condition-resolve';
-  }
-  return 'persisted-progress';
-}
 
 async function initializePersistedProgressResumeCard(
   tdfFile: TdfFileLike,
@@ -1075,9 +810,6 @@ export async function initializeSvelteCard(): Promise<SvelteCardInitResult> {
 
   const cardEntryContext = getCardEntryContext();
   const requestedCardEntryIntent = cardEntryContext.intent;
-  let effectiveCardEntryIntent = requestedCardEntryIntent;
-  let prefetchedExperimentState: ExperimentState | null = null;
-  let refreshRebuildClassification: ReturnType<typeof classifyCardRefreshRebuild> | null = null;
 
   let tdfFile = Session.get('currentTdfFile') as TdfFileLike | null | undefined;
   if (!tdfFile || !tdfFile.tdfs || !tdfFile.tdfs.tutor) {
@@ -1086,34 +818,23 @@ export async function initializeSvelteCard(): Promise<SvelteCardInitResult> {
   }
   tdfFile = tdfFile as TdfFileLike;
   let tutor = tdfFile.tdfs!.tutor!;
-  const unitCount = Array.isArray(tutor.unit) ? tutor.unit.length : 0;
-
-  if (requestedCardEntryIntent === CARD_ENTRY_INTENT.CARD_REFRESH_REBUILD) {
-    markLaunchLoadingTiming('getExperimentState:start', { source: 'cardRefreshRebuild' });
-    prefetchedExperimentState = await getExperimentState();
-    markLaunchLoadingTiming('getExperimentState:complete', { source: 'cardRefreshRebuild' });
-    refreshRebuildClassification = classifyCardRefreshRebuild(prefetchedExperimentState, unitCount);
-    if (refreshRebuildClassification.moduleCompleted) {
-      clientConsole(2, '[Svelte Init] card_refresh_rebuild resolved to completed lesson', refreshRebuildClassification);
-      clearCardEntryContext();
-      Session.set('uiMessage', {
-        text: 'This lesson has already been completed and cannot be reopened.',
-        variant: 'warning',
-      });
-      await leavePage(COMPLETED_LESSON_REDIRECT);
-      return {
-        redirected: true,
-        redirectTo: COMPLETED_LESSON_REDIRECT,
-        moduleCompleted: true,
-      };
-    }
-    effectiveCardEntryIntent = refreshRebuildClassification.intent;
+  const bootstrapResult = await resolveCardEntryBootstrap({
+    requestedCardEntryIntent,
+    tdfFile,
+    shouldUseProgressBootstrapForEntryIntent,
+  });
+  if (bootstrapResult.kind === 'redirected') {
+    clientConsole(2, '[Svelte Init] card_refresh_rebuild resolved to completed lesson');
+    clearCardEntryContext();
+    return bootstrapResult.result;
   }
-  const requiresConditionResolution =
-    effectiveCardEntryIntent === CARD_ENTRY_INTENT.INITIAL_TDF_ENTRY &&
-    isConditionRootWithoutUnitArray(Session.get('currentTdfFile'));
-  const shouldUseProgressBootstrap =
-    shouldUseProgressBootstrapForEntryIntent(effectiveCardEntryIntent) || requiresConditionResolution;
+  const {
+    effectiveCardEntryIntent,
+    prefetchedExperimentState,
+    refreshRebuildClassification,
+    requiresConditionResolution,
+    shouldUseProgressBootstrap,
+  } = bootstrapResult.resolution;
   clientConsole(2, '[Svelte Init] card entry context', {
     ...cardEntryContext,
     requestedIntent: requestedCardEntryIntent,

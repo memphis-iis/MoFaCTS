@@ -32,6 +32,25 @@
   import { DEFAULT_DELIVERY_SETTINGS, EVENTS } from '../machine/constants';
   import { initializeSvelteCard } from '../services/svelteInit';
   import { createExperimentState } from '../services/experimentState';
+  import {
+    buildCardReadinessDiagnostic,
+    getCardReadinessState,
+    waitForCardReadiness as waitForCardReadinessService,
+  } from '../services/cardReadiness';
+  import { routeCardInitializationFailure } from '../services/cardLaunchFailure';
+  import {
+    createFirstTrialRevealController,
+    getElementTransitionDurationMs,
+  } from '../services/firstTrialReveal';
+  import {
+    buildTrialSubset,
+    buildTrialSubsetKey,
+    cloneDisplay,
+    getBaseTrialSubsetKind,
+    isOutgoingFreezeState as isOutgoingFreezeSnapshot,
+    isPreparedAdvanceWaitState as isPreparedAdvanceWaitSnapshot,
+  } from '../services/trialDisplayState';
+  import { createVideoMachineBridge } from '../services/videoMachineBridge';
   import { waitForBrowserPaint } from '../utils/paintTiming';
   import { deriveSrStatus } from '../utils/srStatus';
   import { getMainTimeoutMs, getFeedbackTimeoutMs } from '../utils/timeoutUtils';
@@ -170,60 +189,6 @@
     document.documentElement.classList.toggle('learning-progress-panel-viewport-open', open);
   }
 
-  function cloneAttribution(attribution) {
-    if (!attribution || typeof attribution !== 'object') {
-      return undefined;
-    }
-
-    const cloned = {
-      creatorName: attribution.creatorName || '',
-      sourceName: attribution.sourceName || '',
-      sourceUrl: attribution.sourceUrl || '',
-      licenseName: attribution.licenseName || '',
-      licenseUrl: attribution.licenseUrl || '',
-    };
-
-    return Object.values(cloned).some(Boolean) ? cloned : undefined;
-  }
-
-  function cloneDisplay(display) {
-    const cloned = {
-      text: display?.text || '',
-      clozeText: display?.clozeText || '',
-      imgSrc: display?.imgSrc || '',
-      videoSrc: display?.videoSrc || '',
-      audioSrc: display?.audioSrc || '',
-    };
-
-    if (display?.h5p && typeof display.h5p === 'object') {
-      cloned.h5p = JSON.parse(JSON.stringify(display.h5p));
-    }
-
-    const attribution = cloneAttribution(display?.attribution);
-    if (attribution) {
-      cloned.attribution = attribution;
-    }
-
-    return cloned;
-  }
-
-  function buildTrialSubset(args) {
-    const kind = args.kind || 'none';
-    return {
-      kind,
-      display: cloneDisplay(args.display),
-      displayVisible: Boolean(args.displayVisible),
-      feedbackVisible: Boolean(args.feedbackVisible),
-      responseVisible: Boolean(args.responseVisible),
-      isForceCorrecting: Boolean(args.isForceCorrecting),
-      showQuestionNumber: Boolean(args.showQuestionNumber),
-      questionNumber: Number.isFinite(Number(args.questionNumber)) ? Number(args.questionNumber) : 0,
-      replayEnabled: Boolean(args.replayEnabled),
-      showOverlay: kind !== 'none',
-      showSkipStudyButton: Boolean(args.showSkipStudyButton) && kind === 'study',
-    };
-  }
-
   function buildTrialSlotProps(trialLike, slotState = {}) {
     const trial = trialLike || {};
     const subset = buildTrialSubset({
@@ -297,41 +262,6 @@
       return false;
     }
     return snapshot.matches(value);
-  }
-
-  function getRewindCheckpointTimes(checkpoints) {
-    const source = Array.isArray(checkpoints?.rewindCheckpoints)
-      ? checkpoints.rewindCheckpoints
-      : checkpoints?.times;
-
-    if (!Array.isArray(source)) {
-      throw new Error('[CardScreen] Video checkpoints missing rewind times');
-    }
-
-    return source
-      .map((time, index) => {
-        const parsed = Number(time);
-        if (!Number.isFinite(parsed)) {
-          throw new Error(`[CardScreen] Video rewind checkpoint time at index ${index} is invalid`);
-        }
-        return parsed;
-      })
-      .sort((a, b) => a - b);
-  }
-
-  function getCheckpointResetIndex(questionTimes, rewindTime) {
-    if (!Array.isArray(questionTimes)) {
-      throw new Error('[CardScreen] Video checkpoints missing question times');
-    }
-    const normalizedTimes = questionTimes.map((time, index) => {
-      const parsed = Number(time);
-      if (!Number.isFinite(parsed)) {
-        throw new Error(`[CardScreen] Video question time at index ${index} is invalid`);
-      }
-      return parsed;
-    });
-    const nextCheckpointIndex = normalizedTimes.findIndex((time) => time >= (rewindTime - 0.001));
-    return nextCheckpointIndex >= 0 ? nextCheckpointIndex : normalizedTimes.length;
   }
 
   // Initialize XState machine using a local actor to avoid version mismatches
@@ -468,8 +398,18 @@
     visibleSetAt: 0,
     configuredDurationMs: 0,
   };
-  let pendingLaunchRevealKey = '';
-  let launchRevealFinishScheduled = false;
+  const firstTrialReveal = createFirstTrialRevealController({
+    finishLaunchLoading,
+    getFadeContext: () => lastFadeLogContext,
+    isLaunchLoadingActive,
+    markLaunchLoadingTiming,
+    now: () => performance.now(),
+    scheduleTimeout: (callback, delayMs) => {
+      setTimeout(callback, delayMs);
+    },
+    waitForBrowserPaint,
+    waitForDomUpdate: tick,
+  });
   let stimulusBlockingAssetReady = true;
   let feedbackBlockingAssetReady = true;
   let incomingStimulusBlockingAssetReady = true;
@@ -499,15 +439,13 @@
   $: isFeedbackState = state.matches('feedback');
   $: isStudyState = state.matches('study');
   $: baseIsForceCorrecting = state.matches('feedback.forceCorrecting');
-  $: baseTrialSubsetKind = baseIsForceCorrecting
-    ? 'forceCorrect'
-    : (isStudyState
-      ? 'study'
-      : (isFeedbackState
-        ? 'feedback'
-        : (isQuestionState
-          ? (isPrestimulusState ? 'prestimulus' : 'question')
-          : 'none')));
+  $: baseTrialSubsetKind = getBaseTrialSubsetKind({
+    isFeedbackState,
+    isForceCorrecting: baseIsForceCorrecting,
+    isPrestimulusState,
+    isQuestionState,
+    isStudyState,
+  });
   $: baseDisplayVisible = baseTrialSubsetKind !== 'none';
   $: baseFeedbackVisible = baseTrialSubsetKind === 'feedback' || baseTrialSubsetKind === 'study';
   $: h5pOwnsResponse = isSelfHostedH5PDisplay(context.currentDisplay) && baseTrialSubsetKind === 'question';
@@ -531,19 +469,8 @@
   $: baseDisplayCorrectFeedback = isStudyState ? true : deliverySettings.displayCorrectFeedback;
   $: baseDisplayIncorrectFeedback = isStudyState ? false : deliverySettings.displayIncorrectFeedback;
   $: inputEnabled = state.matches('presenting.awaiting') || state.matches('feedback.forceCorrecting');
-  $: isOutgoingFreezeState = state.matches('transition.logging') ||
-    state.matches('transition.updatingState') ||
-    state.matches('transition.trackingPerformance') ||
-    state.matches('transition.maybePrepareIncoming') ||
-    state.matches('transition.prepareIncoming') ||
-    state.matches('transition.seamlessAdvance') ||
-    state.matches('transition.fallbackAdvance') ||
-    state.matches('transition.fadingOut');
-  $: isPreparedAdvanceWaitState =
-    state.matches('study') ||
-    state.matches('feedback') ||
-    state.matches('transition.seamlessAdvance') ||
-    state.matches('transition.fallbackAdvance');
+  $: isOutgoingFreezeState = isOutgoingFreezeSnapshot(state);
+  $: isPreparedAdvanceWaitState = isPreparedAdvanceWaitSnapshot(state);
   $: isFadingOut = state.matches('transition.fadingOut');
   $: isPreparedFadingOut = isFadingOut && Boolean(preparedTrial);
 
@@ -589,24 +516,11 @@
   });
   $: expectedStimulusBlockerSrc = trialSubset.displayVisible ? String(trialSubset.display?.imgSrc || '') : '';
   $: expectedFeedbackBlockerSrc = trialSubset.feedbackVisible && !feedbackIsCorrect ? String(correctAnswerImageSrc || '') : '';
-  $: trialSubsetKey = trialSubset.showOverlay
-    ? [
-        context.timestamps?.trialStart || 0,
-        isVideoSession ? context.videoSession?.currentCheckpointIndex ?? '' : '',
-        isVideoSession ? context.engineIndices?.clusterIndex ?? '' : '',
-        isVideoSession ? context.questionIndex ?? '' : '',
-        trialSubset.display?.text || '',
-        trialSubset.display?.clozeText || '',
-        trialSubset.display?.imgSrc || '',
-        trialSubset.display?.videoSrc || '',
-        trialSubset.display?.audioSrc || '',
-        trialSubset.display?.attribution?.creatorName || '',
-        trialSubset.display?.attribution?.sourceName || '',
-        trialSubset.display?.attribution?.sourceUrl || '',
-        trialSubset.display?.attribution?.licenseName || '',
-        trialSubset.display?.attribution?.licenseUrl || '',
-      ].join('::')
-    : 'none';
+  $: trialSubsetKey = buildTrialSubsetKey({
+    context,
+    isVideoSession,
+    subset: trialSubset,
+  });
   $: allBlockingAssetsReady = (!expectedStimulusBlockerSrc || stimulusBlockingAssetReady) &&
     (!expectedFeedbackBlockerSrc || feedbackBlockingAssetReady);
   $: if (isOutgoingFreezeState) {
@@ -740,7 +654,10 @@
           key: preparedRevealKey,
           subsetKind: trialSubset.kind,
           visibleSetAt: performance.now(),
-          configuredDurationMs: getElementTransitionDurationMs(trialContentFadeElement),
+          configuredDurationMs: getElementTransitionDurationMs(
+            trialContentFadeElement,
+            (element) => getComputedStyle(element),
+          ),
         };
         trialSubsetVisible = true;
         activeSlotMounted = true;
@@ -1253,7 +1170,10 @@
         key,
         subsetKind: trialSubset.kind,
         visibleSetAt: performance.now(),
-        configuredDurationMs: getElementTransitionDurationMs(trialContentFadeElement),
+        configuredDurationMs: getElementTransitionDurationMs(
+          trialContentFadeElement,
+          (element) => getComputedStyle(element),
+        ),
       };
       clientConsole(2, '[CardScreen][FadeTiming] reveal-trigger', {
         key,
@@ -1264,15 +1184,7 @@
       trialSubsetVisible = true;
       activeSlotMounted = true;
       activeSlotVisible = true;
-      if (isLaunchLoadingActive()) {
-        pendingLaunchRevealKey = key;
-        launchRevealFinishScheduled = false;
-        markLaunchLoadingTiming('firstReveal:classSet', {
-          key,
-          subsetKind: trialSubset.kind,
-        });
-        scheduleLaunchRevealPaintFallback(key, trialSubset.kind);
-      }
+      firstTrialReveal.markRevealClassSet({ key, subsetKind: trialSubset.kind });
       if (!testMode) {
         send({
           type: EVENTS.TRIAL_REVEAL_STARTED,
@@ -1292,34 +1204,6 @@
     // opacity unless it observes the hidden start state before fade-in begins.
     void trialContentFadeElement.offsetWidth;
     void getComputedStyle(trialContentFadeElement).opacity;
-  }
-
-  function getElementTransitionDurationMs(element) {
-    if (!element || typeof window === 'undefined') {
-      return 0;
-    }
-
-    const style = getComputedStyle(element);
-    const durationValue = style.transitionDuration?.split(',')?.[0]?.trim() || '';
-    const delayValue = style.transitionDelay?.split(',')?.[0]?.trim() || '';
-
-    return parseCssTimeToMs(durationValue) + parseCssTimeToMs(delayValue);
-  }
-
-  function parseCssTimeToMs(value) {
-    if (!value) {
-      return 0;
-    }
-    if (value.endsWith('ms')) {
-      const parsed = Number(value.slice(0, -2));
-      return Number.isFinite(parsed) ? parsed : 0;
-    }
-    if (value.endsWith('s')) {
-      const parsed = Number(value.slice(0, -1));
-      return Number.isFinite(parsed) ? parsed * 1000 : 0;
-    }
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : 0;
   }
 
   function logTrialFadeEvent(event) {
@@ -1346,14 +1230,7 @@
       pseudoElement: event.pseudoElement || '',
     });
 
-    if (
-      isLaunchLoadingActive() &&
-      pendingLaunchRevealKey &&
-      pendingLaunchRevealKey === lastFadeLogContext.key &&
-      (event.type === 'transitionrun' || event.type === 'transitionstart')
-    ) {
-      finishFirstLaunchRevealLoading(`first-trial-${event.type}`);
-    }
+    firstTrialReveal.finishFromTransitionEvent({ eventType: event.type });
 
     if (!testMode && event.type === 'transitionend' && isFadingOut && !transitionCompleteSent) {
       if (isPreparedFadingOut) {
@@ -1457,8 +1334,26 @@
   let videoAnswerHandler;
   let forceUnitAdvanceShortcutHandler;
   let completedVideoQuestions = new Set();
-  let pendingMachineVideoResume = false;
-  let flushingMachineVideoResume = false;
+  const videoMachineBridge = createVideoMachineBridge({
+    addCompletedVideoQuestion: (questionIndex) => {
+      completedVideoQuestions.add(questionIndex);
+    },
+    getCompletedVideoQuestions: () => completedVideoQuestions,
+    getCurrentState: () => currentState,
+    getRepeatQuestionsSinceCheckpointEnabled: () => repeatQuestionsSinceCheckpointEnabled,
+    getRewindOnIncorrectEnabled: () => rewindOnIncorrectEnabled,
+    getVideoCheckpoints: () => videoCheckpoints,
+    getVideoPlayer: () => videoPlayer,
+    log: clientConsole,
+    scheduleRetry: (callback, delayMs) => {
+      setTimeout(callback, delayMs);
+    },
+    setQuestionsToRepeat: (questionsToRepeat) => {
+      Session.set('questionsToRepeat', questionsToRepeat);
+    },
+    stateMatches: (path) => state.matches(path),
+    waitForDomUpdate: tick,
+  });
 
   function getCorrectAnswerImageSrc(buttonList, correctAnswer) {
     if (!Array.isArray(buttonList) || !correctAnswer) return '';
@@ -1557,247 +1452,41 @@
     await releaseScreenWakeLock(reason);
   }
 
-  function hasDeliverySettingsReady() {
-    const deliverySettingsState = deliverySettingsStore.get();
-    return !!deliverySettingsState &&
-      typeof deliverySettingsState === 'object' &&
-      Object.keys(deliverySettingsState).length > 0;
-  }
-
-  function hasVideoSessionReadiness() {
-    const unit = Session.get('currentTdfUnit');
-    if (!unit?.videosession) {
-      return true;
-    }
-
-    const checkpoints = Session.get('videoCheckpoints');
-    const times = checkpoints?.times;
-    const questions = checkpoints?.questions;
-    const deliverySettingsState = deliverySettingsStore.get() || {};
-    const hasVideoUrl = typeof deliverySettingsState.videoUrl === 'string' &&
-      deliverySettingsState.videoUrl.trim().length > 0;
-
-    return Array.isArray(times) &&
-      times.length > 0 &&
-      Array.isArray(questions) &&
-      questions.length === times.length &&
-      hasVideoUrl;
-  }
-
-  function hasCardReadiness() {
-    return !!Session.get('currentTdfUnit') &&
-      hasDeliverySettingsReady() &&
-      hasVideoSessionReadiness();
-  }
-
-  async function waitForCardReadiness(timeoutMs = 4000, pollMs = 50) {
-    const start = Date.now();
-    while ((Date.now() - start) < timeoutMs) {
-      if (hasCardReadiness()) {
-        return true;
-      }
-      await new Promise((resolve) => setTimeout(resolve, pollMs));
-    }
-    return false;
-  }
-
-  function getCardReadinessState() {
+  function getCurrentCardReadinessDependencies() {
     return {
-      hasCurrentTdfUnit: !!Session.get('currentTdfUnit'),
-      hasDeliverySettings: hasDeliverySettingsReady(),
-      hasVideoReadiness: hasVideoSessionReadiness(),
-      isVideoUnit: !!Session.get('currentTdfUnit')?.videosession
+      getCurrentTdfUnit: () => Session.get('currentTdfUnit'),
+      getDeliverySettings: () => deliverySettingsStore.get(),
+      getVideoCheckpoints: () => Session.get('videoCheckpoints'),
     };
   }
 
-  function isExperimentParticipantSession() {
-    return Meteor.user()?.loginParams?.loginMode === 'experiment' ||
-      Session.get('loginMode') === 'experiment';
+  function buildCurrentCardReadinessDiagnostic() {
+    const unit = Session.get('currentTdfUnit');
+    return buildCardReadinessDiagnostic({
+      readiness: getCardReadinessState(getCurrentCardReadinessDependencies()),
+      currentTdfId: Session.get('currentTdfId') || null,
+      currentRootTdfId: Session.get('currentRootTdfId') || null,
+      currentStimuliSetId: Session.get('currentStimuliSetId') || null,
+      currentUnitNumber: Session.get('currentUnitNumber') ?? null,
+      currentUnitName: unit?.unitname || null,
+      deliverySettingsState: deliverySettingsStore.get() || {},
+    });
   }
 
   function routeInitializationFailure() {
-    finishLaunchLoading('card-initialization-failed');
-    Session.set('appLoading', false);
-
-    if (isExperimentParticipantSession()) {
-      Session.set('uiMessage', null);
-      Session.set('experimentError', {
-        title: 'Experiment paused',
-        message: 'This practice activity did not start correctly.',
-        note: 'Please email the experiment coordinator or study contact with your participant ID.',
-      });
-      Session.set('suppressAuthenticatedChrome', true);
-      FlowRouter.go('/experimentError');
-      return;
-    }
-
-    Session.set('uiMessage', {
-      text: 'Lesson did not initialize correctly. Please restart from the Learning Dashboard.',
-      variant: 'danger'
+    routeCardInitializationFailure({
+      finishLaunchLoading,
+      getLoginMode: () => Session.get('loginMode'),
+      getUser: () => Meteor.user(),
+      routeTo: (path) => FlowRouter.go(path),
+      setSessionValue: (key, value) => {
+        Session.set(key, value);
+      },
     });
-    FlowRouter.go('/learningDashboard');
-  }
-
-  async function flushPendingMachineVideoResume(reason) {
-    if (flushingMachineVideoResume || !pendingMachineVideoResume) {
-      return;
-    }
-
-    flushingMachineVideoResume = true;
-    await tick();
-    flushingMachineVideoResume = false;
-
-    if (!pendingMachineVideoResume) {
-      return;
-    }
-    if (!state.matches('videoWaiting')) {
-      clientConsole(1, '[CardScreen] Machine video resume command is pending outside videoWaiting', {
-        reason,
-        state: currentState,
-      });
-      setTimeout(() => {
-        void flushPendingMachineVideoResume('retry-state');
-      }, 50);
-      return;
-    }
-    if (!videoPlayer || typeof videoPlayer.resumeAfterQuestion !== 'function') {
-      clientConsole(1, '[CardScreen] Machine video resume command is pending before player is ready', {
-        reason,
-        hasVideoPlayer: !!videoPlayer,
-      });
-      setTimeout(() => {
-        void flushPendingMachineVideoResume('retry-player');
-      }, 50);
-      return;
-    }
-
-    pendingMachineVideoResume = false;
-    videoPlayer.resumeAfterQuestion();
   }
 
   function handleMachineVideoAnswer(event) {
-    const { isCorrect, checkpointIndex } = event.detail || {};
-    clientConsole(2, '[VIDEO-REWIND-DEBUG] videoAnswerHandler received:', {
-      isCorrect,
-      checkpointIndex,
-      rewindOnIncorrectEnabled,
-      hasVideoCheckpoints: !!videoCheckpoints,
-      hasVideoPlayer: !!videoPlayer,
-      videoCheckpointsTimes: videoCheckpoints?.times,
-      videoCheckpointsRewind: videoCheckpoints?.rewindCheckpoints,
-    });
-    const questionIndex = Number.isFinite(checkpointIndex)
-      ? videoCheckpoints?.questions?.[checkpointIndex]
-      : undefined;
-    if (isCorrect && Number.isFinite(questionIndex)) {
-      completedVideoQuestions.add(questionIndex);
-      clientConsole(2, '[VIDEO-REWIND-DEBUG] Correct answer, marking completed:', questionIndex);
-      return;
-    }
-    if (!rewindOnIncorrectEnabled) {
-      clientConsole(1, '[VIDEO-REWIND-DEBUG] rewindOnIncorrect disabled, skipping rewind');
-      return;
-    }
-    if (!Number.isFinite(checkpointIndex)) {
-      throw new Error('[CardScreen] Video answer missing checkpoint index');
-    }
-    if (!videoCheckpoints || !Array.isArray(videoCheckpoints.times)) {
-      throw new Error('[CardScreen] Video checkpoints not initialized');
-    }
-    if (!videoPlayer) {
-      throw new Error('[CardScreen] Video player missing for rewind');
-    }
-    const currentTime = videoPlayer.getCurrentTime?.() ?? 0;
-    const currentQuestionTime = Number(videoCheckpoints.times[checkpointIndex]);
-    if (!Number.isFinite(currentQuestionTime)) {
-      throw new Error('[CardScreen] Video checkpoint time is invalid for rewind');
-    }
-
-    const checkpointTimes = [0, ...getRewindCheckpointTimes(videoCheckpoints)]
-      .filter((time) => Number.isFinite(time))
-      .sort((a, b) => a - b);
-    let previousCheckpointTime = 0;
-    for (const time of checkpointTimes) {
-      if (time < (currentQuestionTime - 0.001)) {
-        previousCheckpointTime = time;
-      } else {
-        break;
-      }
-    }
-    const rewindTime = Math.max(0, previousCheckpointTime + 0.1);
-    const rewindIndex = getCheckpointResetIndex(videoCheckpoints.times, rewindTime);
-    clientConsole(2, '[VIDEO-REWIND-DEBUG] Rewind calculation:', {
-      currentTime,
-      currentQuestionTime,
-      previousCheckpointTime,
-      rewindTime,
-      rewindIndex,
-      checkpointTimes,
-    });
-    if (repeatQuestionsSinceCheckpointEnabled) {
-      markQuestionsForRepetition(rewindTime, currentTime);
-    }
-    if (typeof videoPlayer.resetCheckpointTo === 'function') {
-      clientConsole(2, '[VIDEO-REWIND-DEBUG] Calling resetCheckpointTo:', rewindIndex);
-      videoPlayer.resetCheckpointTo(rewindIndex);
-    } else {
-      clientConsole(1, '[VIDEO-REWIND-DEBUG] resetCheckpointTo is not a function');
-    }
-    if (typeof videoPlayer.rewindTo === 'function') {
-      clientConsole(2, '[VIDEO-REWIND-DEBUG] Calling rewindTo:', rewindTime);
-      videoPlayer.rewindTo(rewindTime);
-    } else {
-      clientConsole(1, '[VIDEO-REWIND-DEBUG] rewindTo is not a function');
-    }
-    if (typeof videoPlayer.logAction === 'function') {
-      videoPlayer.logAction('rewind_to_checkpoint');
-    }
-  }
-
-  function finishFirstLaunchRevealLoading(reason) {
-    if (!isLaunchLoadingActive()) {
-      pendingLaunchRevealKey = '';
-      return;
-    }
-    markLaunchLoadingTiming('firstReveal:fadeStarted', {
-      reason,
-      key: lastFadeLogContext.key,
-      subsetKind: lastFadeLogContext.subsetKind,
-      elapsedSinceRevealTriggerMs: lastFadeLogContext.visibleSetAt
-        ? Math.round(performance.now() - lastFadeLogContext.visibleSetAt)
-        : null,
-    });
-    pendingLaunchRevealKey = '';
-    finishLaunchLoading(reason);
-  }
-
-  function scheduleLaunchRevealPaintFallback(key, subsetKind) {
-    if (launchRevealFinishScheduled) {
-      return;
-    }
-    launchRevealFinishScheduled = true;
-    void (async () => {
-      await tick();
-      await waitForBrowserPaint();
-      if (!isLaunchLoadingActive() || pendingLaunchRevealKey !== key) {
-        return;
-      }
-      if (lastFadeLogContext.configuredDurationMs > 0) {
-        window.setTimeout(() => {
-          if (isLaunchLoadingActive() && pendingLaunchRevealKey === key) {
-            markLaunchLoadingTiming('firstReveal:transitionEventFallback', {
-              key,
-              subsetKind,
-              configuredDurationMs: lastFadeLogContext.configuredDurationMs,
-            });
-            finishFirstLaunchRevealLoading('first-trial-paint-fallback');
-          }
-        }, 80);
-        return;
-      }
-      markLaunchLoadingTiming('firstReveal:noTransitionFallback', { key, subsetKind });
-      finishFirstLaunchRevealLoading('first-trial-no-transition');
-    })();
+    videoMachineBridge.handleVideoAnswer(event.detail || {});
   }
 
   function registerMachineWindowListeners() {
@@ -1807,8 +1496,7 @@
 
     if (!resumeVideoHandler) {
       resumeVideoHandler = () => {
-        pendingMachineVideoResume = true;
-        void flushPendingMachineVideoResume('cardMachine:resumeVideo');
+        videoMachineBridge.requestResume('cardMachine:resumeVideo');
       };
       window.addEventListener('cardMachine:resumeVideo', resumeVideoHandler);
     }
@@ -1892,18 +1580,10 @@
       }
 
       markLaunchLoadingTiming('cardReadinessWait:start');
-      const ready = await waitForCardReadiness();
+      const ready = await waitForCardReadinessService(getCurrentCardReadinessDependencies());
       markLaunchLoadingTiming('cardReadinessWait:complete', { ready });
       if (!ready) {
-        const diagnostic = {
-          ...getCardReadinessState(),
-          currentTdfId: Session.get('currentTdfId') || null,
-          currentRootTdfId: Session.get('currentRootTdfId') || null,
-          currentStimuliSetId: Session.get('currentStimuliSetId') || null,
-          currentUnitNumber: Session.get('currentUnitNumber') ?? null,
-          currentUnitName: Session.get('currentTdfUnit')?.unitname || null,
-          deliveryParamKeys: Object.keys(deliverySettingsStore.get() || {}),
-        };
+        const diagnostic = buildCurrentCardReadinessDiagnostic();
         Session.set('cardInitFailureDiagnostic', {
           stage: 'cardReadinessTimeout',
           capturedAt: Date.now(),
@@ -2109,8 +1789,8 @@
   $: preventScrubbingEnabled = normalizeVideoBoolean(videoSession?.preventScrubbing);
   $: rewindOnIncorrectEnabled = normalizeVideoBoolean(videoSession?.rewindOnIncorrect);
   $: repeatQuestionsSinceCheckpointEnabled = normalizeVideoBoolean(videoSession?.repeatQuestionsSinceCheckpoint);
-  $: if (pendingMachineVideoResume && videoPlayer && state.matches('videoWaiting')) {
-    void flushPendingMachineVideoResume('reactive-ready');
+  $: if (videoMachineBridge.hasPendingResume() && videoPlayer && state.matches('videoWaiting')) {
+    void videoMachineBridge.flushPendingResume('reactive-ready');
   }
   const showCardDebugState = cardDebugStateEnabled();
 
@@ -2202,7 +1882,7 @@
 
   function handleVideoReady() {
     videoPlayerReady = true;
-    void flushPendingMachineVideoResume('video-ready');
+    void videoMachineBridge.flushPendingResume('video-ready');
     if (!state.matches('videoWaiting') || !videoPlayer || showVideoInstructionOverlay) return;
     const player = typeof videoPlayer.getPlayer === 'function'
       ? videoPlayer.getPlayer()
@@ -2294,32 +1974,6 @@
     await forceAdvanceToNextUnit('Continue Button Pressed');
   }
 
-  function markQuestionsForRepetition(checkpointTime, currentTime) {
-    if (!videoCheckpoints || !Array.isArray(videoCheckpoints.times)) {
-      return;
-    }
-    const questionsToRepeat = [];
-    const times = videoCheckpoints.times;
-    const questions = videoCheckpoints.questions || [];
-
-    for (let i = 0; i < times.length; i++) {
-      const time = Number(times[i]);
-      if (!Number.isFinite(time)) continue;
-      if (time >= checkpointTime && time <= currentTime) {
-        const questionIndex = questions[i];
-        if (!Number.isFinite(questionIndex)) continue;
-        if (!completedVideoQuestions.has(questionIndex)) {
-          questionsToRepeat.push({
-            index: i,
-            time,
-            question: questionIndex,
-          });
-        }
-      }
-    }
-
-    Session.set('questionsToRepeat', questionsToRepeat);
-  }
 </script>
 
 {#if testMode || initializedForRender}

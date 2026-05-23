@@ -194,17 +194,21 @@
 <section class="auto-tutor-session" aria-label={unitName}>
   <header class="auto-tutor-header">
     <div class="auto-tutor-question">
-      <div class="auto-tutor-kicker">{unitName}</div>
       <h1>{questionPrompt}</h1>
     </div>
     <div class="auto-tutor-progress" aria-label="AutoTutor progress">
+      <div class="auto-tutor-progress-label">
+        Progress
+      </div>
       <div class="auto-tutor-progress-track">
         <div class="auto-tutor-progress-fill" style={`width: ${Math.round(progress * 100)}%;`}></div>
       </div>
-      <div class="auto-tutor-meta">
-        <span>{Math.round(progress * 100)}%</span>
-        <span>{turnCount} turns</span>
-        <span>${costUsd.toFixed(4)}</span>
+      <div class="auto-tutor-progress-scale" aria-hidden="true">
+        <span>0%</span>
+        <span>100%</span>
+      </div>
+      <div class="auto-tutor-turns">
+        {turnCount === 1 ? '1 turn' : `${turnCount} turns`}
       </div>
     </div>
   </header>
@@ -258,18 +262,12 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(220px, 320px);
     gap: 16px;
-    align-items: end;
+    align-items: center;
     flex: 0 0 auto;
   }
 
   .auto-tutor-question {
     min-width: 0;
-  }
-
-  .auto-tutor-kicker {
-    margin-bottom: 4px;
-    font-size: 0.8rem;
-    color: var(--secondary-text-color);
   }
 
   .auto-tutor-question h1 {
@@ -283,7 +281,20 @@
   .auto-tutor-progress {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
+  }
+
+  .auto-tutor-progress-scale {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .auto-tutor-progress-label {
+    text-align: center;
+    color: var(--text-color);
+    font-size: 0.82rem;
+    font-weight: 600;
   }
 
   .auto-tutor-progress-track {
@@ -302,10 +313,8 @@
     transition: width 160ms ease;
   }
 
-  .auto-tutor-meta {
-    display: flex;
-    justify-content: space-between;
-    gap: 8px;
+  .auto-tutor-progress-scale,
+  .auto-tutor-turns {
     color: var(--secondary-text-color);
     font-size: 0.78rem;
   }
@@ -395,10 +404,9 @@
       padding-right: 2px;
     }
 
-    .auto-tutor-meta {
-      justify-content: flex-start;
-      flex-wrap: wrap;
-      gap: 6px 12px;
+    .auto-tutor-progress-label,
+    .auto-tutor-progress-scale,
+    .auto-tutor-turns {
       font-size: 0.75rem;
     }
 
