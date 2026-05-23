@@ -44,6 +44,15 @@ The application source tree lives under `mofacts/`.
 - Do not use local Meteor CLI workflows as release-confidence substitutes for the supported Docker Compose workflow.
 - Do not run Docker build, push, or deploy commands unless explicitly requested.
 
+## Architecture Boundaries
+
+- Executable application code currently lives under `mofacts/`. Root `app/`, `tests/`, and `packages/` are architectural scaffolds unless the local README and build/test wiring say the relevant runner is active.
+- Put pedagogical extension logic in `learning-components/`: unit engines, trial behavior, adaptive model logic, TDF/stimulus interpretation, response normalization, and external learning adapters.
+- Put Meteor routing, collections, publications, server methods, app shell UI, persistence, logging, and migrations in `mofacts/`.
+- New unit types should go through the unit-engine registry and expose explicit lifecycle methods. Do not duplicate legacy behavior in the old `mofacts/client/views/experiment/unitEngine.ts` path; keep that path as an app dependency facade.
+- Learning components should depend on explicit runtime context/dependency interfaces. Avoid reaching from `learning-components/` into deep Meteor client/server paths unless a temporary facade is already documented and behavior-preserving.
+- If an alternate runtime path is intentional, name it by the domain behavior it provides. Do not call a deliberate path a fallback, and do not add recovery behavior that masks a broken invariant.
+
 ## Real Hotfix Dev Loop
 
 For fast UI/application hot fixes on Windows, use the native local hotfix dev server. This is the intended 10-20 second observe/edit/reload loop after the first startup has warmed caches.

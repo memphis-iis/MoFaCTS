@@ -13,10 +13,12 @@ The card state machine coordinates learner trial lifecycle for the Svelte card r
 ## Files
 
 - `cardMachine.ts`: main state machine.
-- `types.ts`: machine and trial-flow types.
+- `cardMachineTypes.ts`: machine and trial-flow types.
 - `constants.ts`: timing values, trial codes, and defaults.
 - `guards.ts`: transition predicates.
-- `actions.ts`: state assignment and side-effect dispatch.
+- `cardMachineActions.ts`: composed action map used by the machine.
+- `*Actions.ts`: domain-scoped state assignment and side-effect dispatch.
+- `*Machine.ts`: domain-scoped context defaults and state fragments.
 - `services.ts`: invoked runtime services.
 - `index.ts`: exports.
 

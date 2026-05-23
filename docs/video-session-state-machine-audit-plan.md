@@ -249,7 +249,7 @@ The card screen should not render the video player until initialization has conf
    - prepare an incoming trial,
    - wait on incoming asset readiness,
    - commit prepared trial runtime,
-   - depend on normal seamless/fallback card advance.
+   - depend on normal seamless/direct card advance.
 
    It should end at `videoWaiting` or a hard error.
 
