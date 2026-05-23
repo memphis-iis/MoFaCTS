@@ -1,3 +1,11 @@
+import type {
+  AutoTutorExpectationScore,
+  AutoTutorLearnerQuestionScore,
+  AutoTutorMisconceptionScore,
+  AutoTutorMove,
+  AutoTutorTargetType,
+} from './autoTutorPlanner.ts';
+
 export type AutoTutorValidationResult = {
   valid: boolean;
   errors: string[];
@@ -200,15 +208,18 @@ export function validateAutoTutorContent(context: AutoTutorValidationContext): A
   return { valid: errors.length === 0, errors };
 }
 
-export type AutoTutorResponseEnvelope = {
+export type AutoTutorScoreEnvelope = {
+  expectationScores: Record<string, AutoTutorExpectationScore>;
+  misconceptionScores: Record<string, AutoTutorMisconceptionScore>;
+  answerQuality: 'low' | 'partial' | 'high';
+  learnerQuestion: AutoTutorLearnerQuestionScore;
+};
+
+export type AutoTutorUtteranceEnvelope = {
+  targetType: AutoTutorTargetType;
+  targetId?: string;
+  selectedMove: AutoTutorMove;
   tutorMessage: string;
-  stateUpdate: {
-    expectations: Record<string, { current: boolean; evidence?: string }>;
-    misconceptions: Record<string, { current: boolean; evidence?: string }>;
-    answerQuality: 'low' | 'partial' | 'high';
-    studentAskedQuestion: boolean;
-    selectedMove: 'feedback' | 'pump' | 'hint' | 'prompt' | 'assertion' | 'correction' | 'answer_question' | 'summary';
-  };
 };
 
 const ANSWER_QUALITIES = new Set(['low', 'partial', 'high']);
@@ -220,8 +231,12 @@ const SELECTED_MOVES = new Set([
   'assertion',
   'correction',
   'answer_question',
+  'question_prompt',
+  'final_answer_prompt',
   'summary',
 ]);
+
+const TARGET_TYPES = new Set(['expectation', 'misconception', 'learner_question', 'completion']);
 
 function parseMaybeJsonObject(value: unknown): unknown {
   if (isRecord(value)) {
@@ -240,69 +255,149 @@ function parseMaybeJsonObject(value: unknown): unknown {
   }
 }
 
-function parseStateMap(value: unknown, fieldName: string): Record<string, { current: boolean; evidence?: string }> {
-  if (!isRecord(value)) {
-    throw new Error(`AutoTutor response stateUpdate.${fieldName} must be an object`);
+function requireScore(value: unknown, fieldName: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1) {
+    throw new Error(`AutoTutor score response ${fieldName} must be a number from 0 to 1`);
   }
-  const parsed: Record<string, { current: boolean; evidence?: string }> = {};
-  for (const [id, state] of Object.entries(value)) {
-    if (!isRecord(state) || typeof state.current !== 'boolean') {
-      throw new Error(`AutoTutor response stateUpdate.${fieldName}.${id}.current must be boolean`);
+  return value;
+}
+
+function parseExpectationScores(value: unknown): Record<string, AutoTutorExpectationScore> {
+  if (!isRecord(value)) {
+    throw new Error('AutoTutor score response expectationScores must be an object');
+  }
+  const parsed: Record<string, AutoTutorExpectationScore> = {};
+  for (const [id, score] of Object.entries(value)) {
+    if (!isRecord(score) || typeof score.current !== 'boolean') {
+      throw new Error(`AutoTutor score response expectationScores.${id}.current must be boolean`);
+    }
+    let missing: string[] | undefined;
+    if (score.missing !== undefined) {
+      if (!Array.isArray(score.missing) || score.missing.some((entry) => typeof entry !== 'string')) {
+        throw new Error(`AutoTutor score response expectationScores.${id}.missing must be a string array`);
+      }
+      missing = score.missing;
     }
     parsed[id] = {
-      current: state.current,
-      ...(typeof state.evidence === 'string' ? { evidence: state.evidence } : {}),
+      current: score.current,
+      coverage: requireScore(score.coverage, `expectationScores.${id}.coverage`),
+      ...(typeof score.evidence === 'string' ? { evidence: score.evidence } : {}),
+      ...(missing ? { missing } : {}),
+      ...(typeof score.tutoredByAssertion === 'boolean' ? { tutoredByAssertion: score.tutoredByAssertion } : {}),
+      ...(typeof score.learnerRestatedAfterAssertion === 'boolean' ? { learnerRestatedAfterAssertion: score.learnerRestatedAfterAssertion } : {}),
+      frontier: requireScore(score.frontier, `expectationScores.${id}.frontier`),
+      coherence: requireScore(score.coherence, `expectationScores.${id}.coherence`),
+      centrality: requireScore(score.centrality, `expectationScores.${id}.centrality`),
+      priority: requireScore(score.priority, `expectationScores.${id}.priority`),
     };
   }
   return parsed;
 }
 
-export function parseAutoTutorResponseEnvelope(value: unknown): AutoTutorResponseEnvelope {
+function parseMisconceptionScores(value: unknown): Record<string, AutoTutorMisconceptionScore> {
+  if (!isRecord(value)) {
+    throw new Error('AutoTutor score response misconceptionScores must be an object');
+  }
+  const parsed: Record<string, AutoTutorMisconceptionScore> = {};
+  for (const [id, score] of Object.entries(value)) {
+    if (!isRecord(score) || typeof score.current !== 'boolean') {
+      throw new Error(`AutoTutor score response misconceptionScores.${id}.current must be boolean`);
+    }
+    parsed[id] = {
+      current: score.current,
+      confidence: requireScore(score.confidence, `misconceptionScores.${id}.confidence`),
+      ...(typeof score.evidence === 'string' ? { evidence: score.evidence } : {}),
+    };
+  }
+  return parsed;
+}
+
+export function parseAutoTutorScoreEnvelope(value: unknown): AutoTutorScoreEnvelope {
   const parsed = parseMaybeJsonObject(value);
   if (!isRecord(parsed)) {
-    throw new Error('AutoTutor response envelope must be a JSON object');
+    throw new Error('AutoTutor score response envelope must be a JSON object');
   }
-  if (!nonEmptyString(parsed.tutorMessage)) {
-    throw new Error('AutoTutor response envelope requires non-empty tutorMessage');
-  }
-  if (!isRecord(parsed.stateUpdate)) {
-    throw new Error('AutoTutor response envelope requires stateUpdate object');
-  }
-  const answerQuality = parsed.stateUpdate.answerQuality;
+  const answerQuality = parsed.answerQuality;
   if (typeof answerQuality !== 'string' || !ANSWER_QUALITIES.has(answerQuality)) {
-    throw new Error('AutoTutor response stateUpdate.answerQuality is invalid');
+    throw new Error('AutoTutor score response answerQuality is invalid');
   }
-  const selectedMove = parsed.stateUpdate.selectedMove;
-  if (typeof selectedMove !== 'string' || !SELECTED_MOVES.has(selectedMove)) {
-    throw new Error('AutoTutor response stateUpdate.selectedMove is invalid');
+  if (!isRecord(parsed.learnerQuestion) || typeof parsed.learnerQuestion.current !== 'boolean') {
+    throw new Error('AutoTutor score response learnerQuestion.current must be boolean');
   }
-  if (typeof parsed.stateUpdate.studentAskedQuestion !== 'boolean') {
-    throw new Error('AutoTutor response stateUpdate.studentAskedQuestion must be boolean');
+  if (typeof parsed.learnerQuestion.answerableFromAuthoredContent !== 'boolean') {
+    throw new Error('AutoTutor score response learnerQuestion.answerableFromAuthoredContent must be boolean');
   }
 
   return {
-    tutorMessage: parsed.tutorMessage,
-    stateUpdate: {
-      expectations: parseStateMap(parsed.stateUpdate.expectations, 'expectations'),
-      misconceptions: parseStateMap(parsed.stateUpdate.misconceptions, 'misconceptions'),
-      answerQuality: answerQuality as AutoTutorResponseEnvelope['stateUpdate']['answerQuality'],
-      studentAskedQuestion: parsed.stateUpdate.studentAskedQuestion,
-      selectedMove: selectedMove as AutoTutorResponseEnvelope['stateUpdate']['selectedMove'],
+    expectationScores: parseExpectationScores(parsed.expectationScores),
+    misconceptionScores: parseMisconceptionScores(parsed.misconceptionScores),
+    answerQuality: answerQuality as AutoTutorScoreEnvelope['answerQuality'],
+    learnerQuestion: {
+      current: parsed.learnerQuestion.current,
+      answerableFromAuthoredContent: parsed.learnerQuestion.answerableFromAuthoredContent,
+      ...(typeof parsed.learnerQuestion.evidence === 'string' ? { evidence: parsed.learnerQuestion.evidence } : {}),
     },
   };
 }
 
-export const AUTO_TUTOR_RESPONSE_ENVELOPE_SCHEMA = Object.freeze({
-  tutorMessage: 'string',
-  stateUpdate: {
-    expectations: {
-      '<expectationId>': { current: 'boolean', evidence: 'string optional' },
+export function parseAutoTutorUtteranceEnvelope(value: unknown): AutoTutorUtteranceEnvelope {
+  const parsed = parseMaybeJsonObject(value);
+  if (!isRecord(parsed)) {
+    throw new Error('AutoTutor utterance response envelope must be a JSON object');
+  }
+  if (!nonEmptyString(parsed.tutorMessage)) {
+    throw new Error('AutoTutor utterance response requires non-empty tutorMessage');
+  }
+  if (typeof parsed.targetType !== 'string' || !TARGET_TYPES.has(parsed.targetType)) {
+    throw new Error('AutoTutor utterance response targetType is invalid');
+  }
+  if (typeof parsed.selectedMove !== 'string' || !SELECTED_MOVES.has(parsed.selectedMove)) {
+    throw new Error('AutoTutor utterance response selectedMove is invalid');
+  }
+  if (parsed.targetId !== undefined && parsed.targetId !== null && typeof parsed.targetId !== 'string') {
+    throw new Error('AutoTutor utterance response targetId must be string or null when present');
+  }
+  return {
+    targetType: parsed.targetType as AutoTutorTargetType,
+    ...(typeof parsed.targetId === 'string' ? { targetId: parsed.targetId } : {}),
+    selectedMove: parsed.selectedMove as AutoTutorMove,
+    tutorMessage: parsed.tutorMessage,
+  };
+}
+
+export const AUTO_TUTOR_SCORE_ENVELOPE_SCHEMA = Object.freeze({
+  expectationScores: {
+    '<expectationId>': {
+      current: 'boolean',
+      coverage: 'number 0..1',
+      evidence: 'string optional',
+      missing: 'string[] optional',
+      tutoredByAssertion: 'boolean optional',
+      learnerRestatedAfterAssertion: 'boolean optional',
+      frontier: 'number 0..1',
+      coherence: 'number 0..1',
+      centrality: 'number 0..1',
+      priority: 'number 0..1',
     },
-    misconceptions: {
-      '<misconceptionId>': { current: 'boolean', evidence: 'string optional' },
-    },
-    answerQuality: 'low | partial | high',
-    studentAskedQuestion: 'boolean',
-    selectedMove: 'feedback | pump | hint | prompt | assertion | correction | answer_question | summary',
   },
+  misconceptionScores: {
+    '<misconceptionId>': {
+      current: 'boolean',
+      confidence: 'number 0..1',
+      evidence: 'string optional',
+    },
+  },
+  answerQuality: 'low | partial | high',
+  learnerQuestion: {
+    current: 'boolean',
+    answerableFromAuthoredContent: 'boolean',
+    evidence: 'string optional',
+  },
+});
+
+export const AUTO_TUTOR_UTTERANCE_ENVELOPE_SCHEMA = Object.freeze({
+  targetType: 'expectation | misconception | learner_question | completion',
+  targetId: 'string | null',
+  selectedMove: 'feedback | pump | hint | prompt | assertion | correction | answer_question | question_prompt | final_answer_prompt | summary',
+  tutorMessage: 'string',
 });

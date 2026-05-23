@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 
-import { parseAutoTutorResponseEnvelope, validateAutoTutorContent } from './autoTutorContract';
+import { parseAutoTutorScoreEnvelope, parseAutoTutorUtteranceEnvelope, validateAutoTutorContent } from './autoTutorContract';
 
 function buildValidTdf() {
   return {
@@ -138,59 +138,122 @@ describe('AutoTutor content contract', function() {
     );
   });
 
-  it('parses the required AutoTutor response JSON envelope', function() {
-    const envelope = parseAutoTutorResponseEnvelope(JSON.stringify({
-      tutorMessage: 'Good start. What happens over repeated samples?',
-      stateUpdate: {
-        expectations: {
-          E1: { current: false, evidence: 'not yet stated' },
+  it('parses the required AutoTutor score JSON envelope', function() {
+    const envelope = parseAutoTutorScoreEnvelope(JSON.stringify({
+      expectationScores: {
+        E1: {
+          current: false,
+          coverage: 0.4,
+          evidence: 'mentioned intervals',
+          missing: ['repeated samples'],
+          frontier: 0.4,
+          coherence: 0.7,
+          centrality: 0.8,
+          priority: 0.57,
         },
-        misconceptions: {
-          M1: { current: true, evidence: 'said 95% chance' },
-        },
-        answerQuality: 'partial',
-        studentAskedQuestion: false,
-        selectedMove: 'correction',
+      },
+      misconceptionScores: {
+        M1: { current: true, confidence: 0.9, evidence: 'said 95% chance' },
+      },
+      answerQuality: 'partial',
+      learnerQuestion: {
+        current: false,
+        answerableFromAuthoredContent: false,
       },
     }));
 
-    const expectation = envelope.stateUpdate.expectations.E1;
-    const misconception = envelope.stateUpdate.misconceptions.M1;
+    const expectation = envelope.expectationScores.E1;
+    const misconception = envelope.misconceptionScores.M1;
     expect(expectation).to.not.equal(undefined);
     expect(misconception).to.not.equal(undefined);
     if (!expectation || !misconception) {
       throw new Error('Parsed envelope omitted expected test fixture IDs');
     }
 
-    expect(envelope.tutorMessage).to.equal('Good start. What happens over repeated samples?');
-    expect(expectation.current).to.equal(false);
-    expect(misconception.current).to.equal(true);
-    expect(envelope.stateUpdate.selectedMove).to.equal('correction');
+    expect(expectation.coverage).to.equal(0.4);
+    expect(misconception.confidence).to.equal(0.9);
+    expect(envelope.answerQuality).to.equal('partial');
   });
 
-  it('parses the required envelope when the model wraps JSON in a fenced block', function() {
-    const envelope = parseAutoTutorResponseEnvelope(`\`\`\`json
+  it('parses the score envelope when the model wraps JSON in a fenced block', function() {
+    const envelope = parseAutoTutorScoreEnvelope(`\`\`\`json
 {
-  "tutorMessage": "Good start. What happens over repeated samples?",
-  "stateUpdate": {
-    "expectations": {
-      "E1": { "current": true, "evidence": "mentioned repeated sampling" }
-    },
-    "misconceptions": {},
-    "answerQuality": "high",
-    "studentAskedQuestion": false,
-    "selectedMove": "summary"
+  "expectationScores": {
+    "E1": {
+      "current": true,
+      "coverage": 0.85,
+      "evidence": "mentioned repeated sampling",
+      "frontier": 0.85,
+      "coherence": 0.7,
+      "centrality": 0.6,
+      "priority": 0.755
+    }
+  },
+  "misconceptionScores": {},
+  "answerQuality": "high",
+  "learnerQuestion": {
+    "current": false,
+    "answerableFromAuthoredContent": false
   }
 }
 \`\`\``);
 
-    expect(envelope.stateUpdate.expectations.E1?.current).to.equal(true);
-    expect(envelope.stateUpdate.selectedMove).to.equal('summary');
+    expect(envelope.expectationScores.E1?.current).to.equal(true);
+    expect(envelope.answerQuality).to.equal('high');
+  });
+
+  it('parses the required AutoTutor utterance JSON envelope', function() {
+    const envelope = parseAutoTutorUtteranceEnvelope(JSON.stringify({
+      targetType: 'misconception',
+      targetId: 'M1',
+      selectedMove: 'correction',
+      tutorMessage: 'The parameter is fixed after the interval is computed. What happens over repeated samples?',
+    }));
+
+    expect(envelope.targetType).to.equal('misconception');
+    expect(envelope.targetId).to.equal('M1');
+    expect(envelope.selectedMove).to.equal('correction');
+    expect(envelope.tutorMessage).to.contain('parameter is fixed');
+  });
+
+  it('parses null utterance target IDs for ID-less targets', function() {
+    const envelope = parseAutoTutorUtteranceEnvelope(JSON.stringify({
+      targetType: 'completion',
+      targetId: null,
+      selectedMove: 'final_answer_prompt',
+      tutorMessage: 'Great. Now restate the whole interpretation in one answer.',
+    }));
+
+    expect(envelope.targetType).to.equal('completion');
+    expect(envelope.targetId).to.equal(undefined);
+    expect(envelope.selectedMove).to.equal('final_answer_prompt');
   });
 
   it('fails clearly when the model returns malformed JSON', function() {
-    expect(() => parseAutoTutorResponseEnvelope('{ not json')).to.throw(
+    expect(() => parseAutoTutorScoreEnvelope('{ not json')).to.throw(
       'AutoTutor response envelope is not valid JSON'
     );
+  });
+
+  it('fails clearly when score missing elements are not strings', function() {
+    expect(() => parseAutoTutorScoreEnvelope(JSON.stringify({
+      expectationScores: {
+        E1: {
+          current: false,
+          coverage: 0.4,
+          missing: ['repeated samples', 42],
+          frontier: 0.4,
+          coherence: 0.7,
+          centrality: 0.8,
+          priority: 0.57,
+        },
+      },
+      misconceptionScores: {},
+      answerQuality: 'partial',
+      learnerQuestion: {
+        current: false,
+        answerableFromAuthoredContent: false,
+      },
+    }))).to.throw('AutoTutor score response expectationScores.E1.missing must be a string array');
   });
 });

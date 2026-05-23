@@ -1,10 +1,22 @@
 import { Meteor } from 'meteor/meteor';
 import { Session } from 'meteor/session';
 import {
-  AUTO_TUTOR_RESPONSE_ENVELOPE_SCHEMA,
-  parseAutoTutorResponseEnvelope,
-  type AutoTutorResponseEnvelope,
+  AUTO_TUTOR_SCORE_ENVELOPE_SCHEMA,
+  AUTO_TUTOR_UTTERANCE_ENVELOPE_SCHEMA,
+  parseAutoTutorScoreEnvelope,
+  parseAutoTutorUtteranceEnvelope,
+  type AutoTutorScoreEnvelope,
+  type AutoTutorUtteranceEnvelope,
 } from '../../../../../common/lib/autoTutorContract';
+import {
+  createInitialAutoTutorPlannerState,
+  planAutoTutorTurn,
+  recomputeExpectationPriorities,
+  validatePlannerState,
+  type AutoTutorMove,
+  type AutoTutorPlan,
+  type AutoTutorPlannerState,
+} from '../../../../../common/lib/autoTutorPlanner';
 import { getStimCluster } from '../../../../lib/currentTestingHelpers';
 import { insertCompressedHistory } from '../../../../lib/historyWire';
 import { meteorCallAsync } from '../../../../lib/meteorAsync';
@@ -62,11 +74,12 @@ type AutoTutorConfig = {
 };
 
 type AutoTutorState = {
-  expectations: Record<string, { current: boolean; evidence?: string }>;
-  misconceptions: Record<string, { current: boolean; evidence?: string }>;
+  expectations: AutoTutorPlannerState['expectationScores'];
+  misconceptions: AutoTutorPlannerState['misconceptionScores'];
+  planner: AutoTutorPlannerState;
   answerQuality: 'low' | 'partial' | 'high' | 'none';
   studentAskedQuestion: boolean;
-  selectedMove: string;
+  selectedMove: AutoTutorMove | '';
   turnCount: number;
   costUsd: number;
   completed: boolean;
@@ -84,7 +97,7 @@ export type AutoTutorRuntime = {
 
 type AutoTutorHistoryNote = {
   kind: 'autotutor';
-  schemaVersion: 1;
+  schemaVersion: 2;
   model: string;
   scriptId: string;
   state: ReturnType<typeof summarizeState>;
@@ -213,17 +226,11 @@ function readAutoTutorConfig(): AutoTutorConfig {
 }
 
 function createInitialState(script: AutoTutorScript): AutoTutorState {
-  const expectations: AutoTutorState['expectations'] = {};
-  for (const expectation of script.expectations) {
-    expectations[expectation.id] = { current: false };
-  }
-  const misconceptions: AutoTutorState['misconceptions'] = {};
-  for (const misconception of script.misconceptions || []) {
-    misconceptions[misconception.id] = { current: false };
-  }
+  const planner = createInitialAutoTutorPlannerState(script);
   return {
-    expectations,
-    misconceptions,
+    expectations: planner.expectationScores,
+    misconceptions: planner.misconceptionScores,
+    planner,
     answerQuality: 'none',
     studentAskedQuestion: false,
     selectedMove: '',
@@ -239,6 +246,7 @@ function summarizeState(state: AutoTutorState) {
   return {
     expectations: state.expectations,
     misconceptions: state.misconceptions,
+    planner: state.planner,
     answerQuality: state.answerQuality,
     studentAskedQuestion: state.studentAskedQuestion,
     selectedMove: state.selectedMove,
@@ -247,16 +255,20 @@ function summarizeState(state: AutoTutorState) {
   };
 }
 
-function buildSystemPrompt(config: AutoTutorConfig): string {
+function buildScoringSystemPrompt(config: AutoTutorConfig): string {
   return [
-    'You are the MoFaCTS AutoTutor controller and tutor voice for one learner.',
-    'Evaluate the latest student answer against the authored AutoTutor script, update the tutor state, choose the next dialogue move, and write the next tutor utterance.',
-    'Use AutoTutor-style expectation and misconception tutoring: ask short targeted prompts, give hints before assertions when the student is stuck, correct misconceptions briefly, and keep the learner doing the cognitive work.',
+    'You are the MoFaCTS AutoTutor semantic scorer for one learner.',
+    'Score the latest learner answer against the authored AutoTutor script and role-preserving dialogue history.',
+    'Only learner-generated text may count as expectation coverage. Tutor turns may provide context for short learner answers, but tutor hints, prompts, assertions, summaries, and corrections are not learner knowledge.',
+    'Classify whether the learner asked a substantive question and whether it is answerable from the provided authored lesson content or dialogue context.',
+    'Do not choose a dialogue target, choose a dialogue move, or write the tutor response.',
     'Return JSON only. Do not wrap it in Markdown. The JSON object must exactly follow this envelope shape:',
-    JSON.stringify(AUTO_TUTOR_RESPONSE_ENVELOPE_SCHEMA, null, 2),
-    'Include every authored expectation ID under stateUpdate.expectations and every authored misconception ID under stateUpdate.misconceptions on every turn.',
+    JSON.stringify(AUTO_TUTOR_SCORE_ENVELOPE_SCHEMA, null, 2),
+    'Include every authored expectation ID under expectationScores and every authored misconception ID under misconceptionScores on every turn.',
     'Do not invent expectation or misconception IDs.',
-    'Keep tutorMessage concise, conversational, and addressed to the student.',
+    'Set expectation coverage from 0 to 1, provide brief evidence, and include missing elements when coverage is incomplete.',
+    'Set misconception confidence from 0 to 1.',
+    'Set coherence and centrality from 0 to 1. Set frontier equal to coverage. Set priority using frontierWeight 0.5, coherenceWeight 0.3, and centralityWeight 0.2; the app will recompute priority after validation.',
     '',
     'Question prompt:',
     config.prompt,
@@ -266,7 +278,7 @@ function buildSystemPrompt(config: AutoTutorConfig): string {
   ].join('\n');
 }
 
-function buildUserPrompt(studentAnswer: string, state: AutoTutorState): string {
+function buildScoringUserPrompt(studentAnswer: string, state: AutoTutorState): string {
   return [
     'Latest student answer:',
     studentAnswer,
@@ -279,11 +291,65 @@ function buildUserPrompt(studentAnswer: string, state: AutoTutorState): string {
   ].join('\n');
 }
 
-function validateEnvelopeIds(envelope: AutoTutorResponseEnvelope, state: AutoTutorState): void {
+function buildUtteranceSystemPrompt(config: AutoTutorConfig): string {
+  return [
+    'You are the MoFaCTS AutoTutor tutor voice for one learner.',
+    'The application has already selected the tutorial target and dialogue move. You must not change them.',
+    'Echo the selected targetType, targetId, and selectedMove exactly. If targetId is null, return null; do not invent a script ID or lesson ID.',
+    'Use only the authored AutoTutor lesson content and the supplied dialogue context. For out-of-scope learner questions, state that this tutor can only answer from the lesson content, then continue with the selected move.',
+    'Keep the tutor message concise, conversational, and addressed to the student.',
+    'Return JSON only. Do not wrap it in Markdown. The JSON object must exactly follow this envelope shape:',
+    JSON.stringify(AUTO_TUTOR_UTTERANCE_ENVELOPE_SCHEMA, null, 2),
+    '',
+    'Question prompt:',
+    config.prompt,
+    '',
+    'Authored AutoTutor script:',
+    JSON.stringify(config.script, null, 2),
+  ].join('\n');
+}
+
+function getTargetContent(config: AutoTutorConfig, plan: AutoTutorPlan): unknown {
+  if (plan.target.type === 'expectation') {
+    return config.script.expectations.find((expectation) => expectation.id === plan.target.id);
+  }
+  if (plan.target.type === 'misconception') {
+    return (config.script.misconceptions || []).find((misconception) => misconception.id === plan.target.id);
+  }
+  if (plan.target.type === 'completion') {
+    return { summary: config.script.summary };
+  }
+  return { authoredContentBoundary: 'Answer only from the supplied lesson content and dialogue history.' };
+}
+
+function buildUtteranceUserPrompt(config: AutoTutorConfig, studentAnswer: string, state: AutoTutorState, plan: AutoTutorPlan): string {
+  return [
+    'Latest student answer:',
+    studentAnswer,
+    '',
+    'App-selected plan. Echo these fields exactly in the response:',
+    JSON.stringify({
+      targetType: plan.target.type,
+      targetId: plan.target.id || null,
+      selectedMove: plan.selectedMove,
+    }, null, 2),
+    '',
+    'Relevant authored target content:',
+    JSON.stringify(getTargetContent(config, plan), null, 2),
+    '',
+    'Current scored planner state:',
+    JSON.stringify(state.planner, null, 2),
+    '',
+    'Recent dialogue history:',
+    JSON.stringify(state.dialogue.slice(-8), null, 2),
+  ].join('\n');
+}
+
+function validateScoreEnvelopeIds(envelope: AutoTutorScoreEnvelope, state: AutoTutorState): void {
   const expectationIds = Object.keys(state.expectations);
   const misconceptionIds = Object.keys(state.misconceptions);
-  const returnedExpectationIds = Object.keys(envelope.stateUpdate.expectations);
-  const returnedMisconceptionIds = Object.keys(envelope.stateUpdate.misconceptions);
+  const returnedExpectationIds = Object.keys(envelope.expectationScores);
+  const returnedMisconceptionIds = Object.keys(envelope.misconceptionScores);
 
   for (const id of expectationIds) {
     if (!returnedExpectationIds.includes(id)) {
@@ -307,11 +373,23 @@ function validateEnvelopeIds(envelope: AutoTutorResponseEnvelope, state: AutoTut
   }
 }
 
-function validateStateMapIds(
+function validateUtteranceEnvelope(envelope: AutoTutorUtteranceEnvelope, plan: AutoTutorPlan): void {
+  if (envelope.targetType !== plan.target.type) {
+    throw new Error(`AutoTutor utterance response changed target type from "${plan.target.type}" to "${envelope.targetType}"`);
+  }
+  if ((envelope.targetId || undefined) !== (plan.target.id || undefined)) {
+    throw new Error(`AutoTutor utterance response changed target ID from "${plan.target.id || ''}" to "${envelope.targetId || ''}"`);
+  }
+  if (envelope.selectedMove !== plan.selectedMove) {
+    throw new Error(`AutoTutor utterance response changed selected move from "${plan.selectedMove}" to "${envelope.selectedMove}"`);
+  }
+}
+
+function validateSavedExpectationScores(
   value: unknown,
   expectedIds: string[],
-  fieldName: 'expectations' | 'misconceptions',
-): Record<string, { current: boolean; evidence?: string }> {
+): AutoTutorState['expectations'] {
+  const fieldName = 'expectations';
   if (!isRecord(value)) {
     throw new Error(`AutoTutor saved history state.${fieldName} must be an object`);
   }
@@ -327,20 +405,93 @@ function validateStateMapIds(
     }
   }
 
-  const parsed: Record<string, { current: boolean; evidence?: string }> = {};
+  const parsed: AutoTutorState['expectations'] = {};
+  for (const [id, entry] of Object.entries(value)) {
+    if (!isRecord(entry) || typeof entry.current !== 'boolean') {
+      throw new Error(`AutoTutor saved history state.${fieldName}.${id}.current must be boolean`);
+    }
+    let missing: string[] | undefined;
+    if (entry.missing !== undefined) {
+      if (!Array.isArray(entry.missing) || entry.missing.some((item) => typeof item !== 'string')) {
+        throw new Error(`AutoTutor saved history state.${fieldName}.${id}.missing must be a string array`);
+      }
+      missing = entry.missing;
+    }
+    parsed[id] = {
+      current: entry.current,
+      coverage: requiredScore(entry.coverage, `state.${fieldName}.${id}.coverage`),
+      ...(typeof entry.evidence === 'string' ? { evidence: entry.evidence } : {}),
+      ...(missing ? { missing } : {}),
+      ...(typeof entry.tutoredByAssertion === 'boolean' ? { tutoredByAssertion: entry.tutoredByAssertion } : {}),
+      ...(typeof entry.learnerRestatedAfterAssertion === 'boolean' ? { learnerRestatedAfterAssertion: entry.learnerRestatedAfterAssertion } : {}),
+      frontier: requiredScore(entry.frontier, `state.${fieldName}.${id}.frontier`),
+      coherence: requiredScore(entry.coherence, `state.${fieldName}.${id}.coherence`),
+      centrality: requiredScore(entry.centrality, `state.${fieldName}.${id}.centrality`),
+      priority: requiredScore(entry.priority, `state.${fieldName}.${id}.priority`),
+    };
+  }
+  return parsed;
+}
+
+function validateSavedMisconceptionScores(
+  value: unknown,
+  expectedIds: string[],
+): AutoTutorState['misconceptions'] {
+  const fieldName = 'misconceptions';
+  if (!isRecord(value)) {
+    throw new Error(`AutoTutor saved history state.${fieldName} must be an object`);
+  }
+  const returnedIds = Object.keys(value);
+  for (const id of expectedIds) {
+    if (!returnedIds.includes(id)) {
+      throw new Error(`AutoTutor saved history omitted ${fieldName.slice(0, -1)} "${id}"`);
+    }
+  }
+  for (const id of returnedIds) {
+    if (!expectedIds.includes(id)) {
+      throw new Error(`AutoTutor saved history included unknown ${fieldName.slice(0, -1)} "${id}"`);
+    }
+  }
+
+  const parsed: AutoTutorState['misconceptions'] = {};
   for (const [id, entry] of Object.entries(value)) {
     if (!isRecord(entry) || typeof entry.current !== 'boolean') {
       throw new Error(`AutoTutor saved history state.${fieldName}.${id}.current must be boolean`);
     }
     parsed[id] = {
       current: entry.current,
+      confidence: requiredScore(entry.confidence, `state.${fieldName}.${id}.confidence`),
       ...(typeof entry.evidence === 'string' ? { evidence: entry.evidence } : {}),
     };
   }
   return parsed;
 }
 
-function validateSavedState(state: AutoTutorHistoryNote['state'], expectedState: AutoTutorState): AutoTutorHistoryNote['state'] {
+function requiredScore(value: unknown, field: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1) {
+    throw new Error(`AutoTutor saved history ${field} must be a number from 0 to 1`);
+  }
+  return value;
+}
+
+function validateSavedPlannerState(value: unknown, expectedState: AutoTutorState): AutoTutorPlannerState {
+  if (!isRecord(value)) {
+    throw new Error('AutoTutor saved history state.planner must be an object');
+  }
+  const planner = value as AutoTutorPlannerState;
+  validatePlannerState({
+    expectations: Object.keys(expectedState.expectations).map((id) => ({ id, proposition: id, assertion: id })),
+    misconceptions: Object.keys(expectedState.misconceptions).map((id) => ({ id, correction: id, repairQuestion: id })),
+    dialogPolicy: { requiredExpectations: Object.keys(expectedState.expectations) },
+    summary: '',
+  }, planner);
+  return planner;
+}
+
+function validateSavedState(
+  state: AutoTutorHistoryNote['state'],
+  expectedState: AutoTutorState,
+): AutoTutorHistoryNote['state'] {
   const answerQuality = state.answerQuality;
   if (!['low', 'partial', 'high', 'none'].includes(answerQuality)) {
     throw new Error('AutoTutor saved history state.answerQuality is invalid');
@@ -357,12 +508,17 @@ function validateSavedState(state: AutoTutorHistoryNote['state'], expectedState:
   if (typeof state.costUsd !== 'number' || !Number.isFinite(state.costUsd) || state.costUsd < 0) {
     throw new Error('AutoTutor saved history state.costUsd must be a non-negative number');
   }
+  const expectations = validateSavedExpectationScores(state.expectations, Object.keys(expectedState.expectations));
+  const misconceptions = validateSavedMisconceptionScores(state.misconceptions, Object.keys(expectedState.misconceptions));
+  const planner = validateSavedPlannerState(state.planner, expectedState);
+
   return {
-    expectations: validateStateMapIds(state.expectations, Object.keys(expectedState.expectations), 'expectations'),
-    misconceptions: validateStateMapIds(state.misconceptions, Object.keys(expectedState.misconceptions), 'misconceptions'),
+    expectations,
+    misconceptions,
+    planner,
     answerQuality,
     studentAskedQuestion: state.studentAskedQuestion,
-    selectedMove: state.selectedMove,
+    selectedMove: state.selectedMove as AutoTutorMove | '',
     turnCount: state.turnCount,
     costUsd: state.costUsd,
   };
@@ -402,7 +558,7 @@ async function readOpenRouterResponseBody(response: Response): Promise<unknown> 
   }
 }
 
-async function callOpenRouter(config: AutoTutorConfig, state: AutoTutorState, studentAnswer: string) {
+async function callOpenRouter(config: AutoTutorConfig, messages: Array<{ role: 'system' | 'user'; content: string }>) {
   const response = await fetch(OPEN_ROUTER_CHAT_COMPLETIONS_URL, {
     method: 'POST',
     headers: {
@@ -413,10 +569,7 @@ async function callOpenRouter(config: AutoTutorConfig, state: AutoTutorState, st
     },
     body: JSON.stringify({
       model: config.model,
-      messages: [
-        { role: 'system', content: buildSystemPrompt(config) },
-        { role: 'user', content: buildUserPrompt(studentAnswer, state) },
-      ],
+      messages,
       temperature: 0.2,
       stream: false,
     }),
@@ -439,24 +592,57 @@ async function callOpenRouter(config: AutoTutorConfig, state: AutoTutorState, st
   };
 }
 
+async function callOpenRouterScoring(config: AutoTutorConfig, state: AutoTutorState, studentAnswer: string) {
+  return await callOpenRouter(config, [
+    { role: 'system', content: buildScoringSystemPrompt(config) },
+    { role: 'user', content: buildScoringUserPrompt(studentAnswer, state) },
+  ]);
+}
+
+async function callOpenRouterUtterance(config: AutoTutorConfig, state: AutoTutorState, studentAnswer: string, plan: AutoTutorPlan) {
+  return await callOpenRouter(config, [
+    { role: 'system', content: buildUtteranceSystemPrompt(config) },
+    { role: 'user', content: buildUtteranceUserPrompt(config, studentAnswer, state, plan) },
+  ]);
+}
+
 function computeProgress(state: AutoTutorState): number {
   const expectationCount = Object.keys(state.expectations).length;
   if (expectationCount === 0) {
     throw new Error('AutoTutor state has no expectations');
   }
-  const currentExpectations = Object.values(state.expectations).filter((entry) => entry.current).length;
-  const currentMisconceptions = Object.values(state.misconceptions).filter((entry) => entry.current).length;
-  return Math.max(0, currentExpectations - currentMisconceptions) / expectationCount;
+  const coverageSum = Object.values(state.expectations).reduce((sum, entry) => sum + entry.coverage, 0);
+  const activeMisconceptionPenalty = Object.values(state.misconceptions).filter((entry) => entry.current && entry.confidence >= 0.65).length;
+  return Math.max(0, coverageSum - activeMisconceptionPenalty) / expectationCount;
 }
 
-function computeCompleted(state: AutoTutorState, graduation: AutoTutorGraduation): boolean {
-  if (state.turnCount >= graduation.maxTurns) {
+function getRequiredExpectationIds(script: AutoTutorScript): string[] {
+  const required = script.dialogPolicy.requiredExpectations;
+  if (!Array.isArray(required) || required.length === 0) {
+    throw new Error('AutoTutor runtime requires autoTutor.dialogPolicy.requiredExpectations');
+  }
+  const authoredIds = new Set(script.expectations.map((expectation) => expectation.id));
+  return required.map((id) => {
+    if (typeof id !== 'string' || !authoredIds.has(id)) {
+      throw new Error(`AutoTutor runtime required expectation references unknown ID "${String(id)}"`);
+    }
+    return id;
+  });
+}
+
+function computeCompleted(state: AutoTutorState, config: AutoTutorConfig): boolean {
+  if (state.turnCount >= config.graduation.maxTurns) {
     return true;
   }
-  const progress = computeProgress(state);
-  const hasCurrentMisconceptions = Object.values(state.misconceptions).some((entry) => entry.current);
-  return progress >= graduation.minExpectationScore &&
-    (!graduation.requireNoCurrentMisconceptions || !hasCurrentMisconceptions);
+  const requiredExpectations = getRequiredExpectationIds(config.script);
+  const requiredCovered = requiredExpectations.every((id) => {
+    const score = state.expectations[id];
+    return Boolean(score && score.coverage >= 0.8);
+  });
+  const hasCurrentMisconceptions = Object.values(state.misconceptions).some((entry) => entry.current && entry.confidence >= 0.65);
+  return requiredCovered &&
+    computeProgress(state) >= config.graduation.minExpectationScore &&
+    (!config.graduation.requireNoCurrentMisconceptions || !hasCurrentMisconceptions);
 }
 
 function publishState(state: AutoTutorState): void {
@@ -478,7 +664,7 @@ function readHistoryNote(row: AutoTutorHistoryRow): AutoTutorHistoryNote {
   } catch {
     throw new Error('AutoTutor history row CFNote is not valid JSON');
   }
-  if (!isRecord(note) || note.kind !== 'autotutor' || note.schemaVersion !== 1 || !isRecord(note.state)) {
+  if (!isRecord(note) || note.kind !== 'autotutor' || note.schemaVersion !== 2 || !isRecord(note.state)) {
     throw new Error('AutoTutor history row CFNote has an invalid AutoTutor payload');
   }
   return note as AutoTutorHistoryNote;
@@ -515,6 +701,7 @@ function applySavedHistory(config: AutoTutorConfig, state: AutoTutorState, rows:
   const savedState = validateSavedState(latest.state, state);
   state.expectations = savedState.expectations;
   state.misconceptions = savedState.misconceptions;
+  state.planner = savedState.planner;
   state.answerQuality = savedState.answerQuality;
   state.studentAskedQuestion = savedState.studentAskedQuestion;
   state.selectedMove = savedState.selectedMove;
@@ -538,7 +725,7 @@ async function loadSavedAutoTutorHistory(): Promise<AutoTutorHistoryRow[]> {
 function buildHistoryNote(config: AutoTutorConfig, state: AutoTutorState, tutorMessage: string): AutoTutorHistoryNote {
   return {
     kind: 'autotutor',
-    schemaVersion: 1,
+    schemaVersion: 2,
     model: config.model,
     scriptId: config.script.id,
     state: summarizeState(state),
@@ -663,17 +850,27 @@ export async function createAutoTutorRuntime(): Promise<AutoTutorRuntime> {
       }
 
       const turnStartedAt = Date.now();
-      const result = await callOpenRouter(config, state, cleanedAnswer);
-      const envelope = parseAutoTutorResponseEnvelope(result.content);
-      validateEnvelopeIds(envelope, state);
+      const scoreResult = await callOpenRouterScoring(config, state, cleanedAnswer);
+      const scoreEnvelope = parseAutoTutorScoreEnvelope(scoreResult.content);
+      validateScoreEnvelopeIds(scoreEnvelope, state);
 
       const nextState = cloneJson(state);
-      nextState.costUsd += result.costUsd;
-      nextState.expectations = envelope.stateUpdate.expectations;
-      nextState.misconceptions = envelope.stateUpdate.misconceptions;
-      nextState.answerQuality = envelope.stateUpdate.answerQuality;
-      nextState.studentAskedQuestion = envelope.stateUpdate.studentAskedQuestion;
-      nextState.selectedMove = envelope.stateUpdate.selectedMove;
+      nextState.costUsd += scoreResult.costUsd;
+      const scoredExpectations = recomputeExpectationPriorities(config.script, scoreEnvelope.expectationScores);
+      nextState.expectations = scoredExpectations;
+      nextState.misconceptions = scoreEnvelope.misconceptionScores;
+      nextState.planner.expectationScores = scoredExpectations;
+      nextState.planner.misconceptionScores = scoreEnvelope.misconceptionScores;
+      nextState.answerQuality = scoreEnvelope.answerQuality;
+      nextState.studentAskedQuestion = scoreEnvelope.learnerQuestion.current;
+      const plan = planAutoTutorTurn({
+        script: config.script,
+        plannerState: nextState.planner,
+        learnerQuestion: scoreEnvelope.learnerQuestion,
+        answerQuality: scoreEnvelope.answerQuality,
+      });
+      nextState.planner = plan.nextPlannerState;
+      nextState.selectedMove = plan.selectedMove;
       nextState.turnCount += 1;
       nextState.dialogue.push({ role: 'student', text: cleanedAnswer });
 
@@ -681,11 +878,24 @@ export async function createAutoTutorRuntime(): Promise<AutoTutorRuntime> {
         nextState.stoppedByCost = true;
         nextState.completed = true;
       } else {
-        nextState.completed = computeCompleted(nextState, config.graduation);
+        nextState.completed = computeCompleted(nextState, config);
+        if (plan.target.type === 'completion') {
+          nextState.completed = plan.selectedMove === 'summary';
+        }
       }
-      const tutorMessage = nextState.stoppedByCost
-        ? 'We need to stop here because this AutoTutor session reached the configured cost cap.'
-        : (nextState.completed ? config.script.summary : envelope.tutorMessage);
+      let tutorMessage = 'We need to stop here because this AutoTutor session reached the configured cost cap.';
+      if (!nextState.stoppedByCost) {
+        const utteranceResult = await callOpenRouterUtterance(config, nextState, cleanedAnswer, plan);
+        nextState.costUsd += utteranceResult.costUsd;
+        const utteranceEnvelope = parseAutoTutorUtteranceEnvelope(utteranceResult.content);
+        validateUtteranceEnvelope(utteranceEnvelope, plan);
+        tutorMessage = utteranceEnvelope.tutorMessage;
+        if (nextState.costUsd > AUTO_TUTOR_COST_CAP_USD) {
+          nextState.stoppedByCost = true;
+          nextState.completed = true;
+          tutorMessage = 'We need to stop here because this AutoTutor session reached the configured cost cap.';
+        }
+      }
       nextState.dialogue.push({ role: 'tutor', text: tutorMessage });
       const turnEndedAt = Date.now();
       await insertAutoTutorHistoryTurn(config, nextState, {
