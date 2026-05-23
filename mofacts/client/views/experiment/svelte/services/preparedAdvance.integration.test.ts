@@ -129,7 +129,7 @@ describe('prepared advance integration seams', function() {
 
     expect(prepareNextScheduledCardCalls).to.equal(1);
     expect(selectNextCardCalls).to.equal(0);
-    expect(result.preparedAdvanceMode).to.equal('fallback');
+    expect(result.preparedAdvanceMode).to.equal('direct');
     expect(result.questionIndex).to.equal(4);
     expect(result.preparedSelection).to.deep.equal(selection);
   });
@@ -153,6 +153,19 @@ describe('prepared advance integration seams', function() {
     expect(result.unitFinished).to.equal(false);
     expect(result.questionIndex).to.equal(3);
     expect(result.engine).to.equal(engine);
+  });
+
+  it('prepareIncomingTrialService rejects missing engine state instead of treating the unit as finished', async function() {
+    try {
+      await prepareIncomingTrialService(
+        { engine: null, questionIndex: 2 },
+        {}
+      );
+      throw new Error('Expected prepareIncomingTrialService to reject missing engine state');
+    } catch (error: unknown) {
+      expect(error).to.be.instanceOf(Error);
+      expect((error as Error).message).to.equal('No engine available for prepared incoming trial');
+    }
   });
 
   it('commitPreparedTrialRuntime applies schedule mirrors only at commit', function() {

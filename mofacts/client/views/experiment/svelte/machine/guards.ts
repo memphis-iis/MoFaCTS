@@ -11,6 +11,7 @@ import { evaluateSrAvailability } from '../../../../lib/audioAvailability';
 import { isSelfHostedH5PDisplay } from '../../../../../common/lib/h5pDisplay';
 
 type FeedbackTimeoutContext = Parameters<typeof getFeedbackTimeoutMs>[0];
+type PreparedAdvanceMode = 'none' | 'seamless' | 'direct';
 
 type CardMachineActorArgs = {
   context: {
@@ -29,7 +30,7 @@ type CardMachineActorArgs = {
       maxSrAttempts?: number | undefined;
     };
     unitFinished?: boolean | undefined;
-    preparedAdvanceMode?: string | undefined;
+    preparedAdvanceMode?: PreparedAdvanceMode | undefined;
     preparedTrial?: Record<string, unknown> | null | undefined;
     engine?: unknown;
     userAnswer?: string | undefined;

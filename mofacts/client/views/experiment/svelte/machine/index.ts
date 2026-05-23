@@ -6,8 +6,8 @@ export * from './constants';
 // Guards
 export * as guards from './guards';
 
-// Actions
-export * as actions from './actions';
+// Card-machine actions grouped by runtime domain.
+export * as cardMachineActions from './cardMachineActions';
 
 // Services
 export * from './services';

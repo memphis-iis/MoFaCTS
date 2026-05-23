@@ -12,360 +12,71 @@
  * Other trial types trigger error state
  */
 
-import { createMachine as xCreateMachine, assign as xAssign } from 'xstate';
-import { Session } from 'meteor/session';
-import { EVENTS, STATES, DEFAULT_DELIVERY_SETTINGS, SR_CONFIG } from './constants';
+import { createMachine as xCreateMachine } from 'xstate';
+import { EVENTS, STATES } from './constants';
 import * as guards from './guards';
-import * as actions from './actions';
+import * as cardMachineActions from './cardMachineActions';
 import { createServices } from './services';
-import { clientConsole } from '../../../../lib/clientLogger';
-import type { H5PTrialResult } from '../../../../../common/types';
+import {
+  initialContext,
+  type MachineArgs,
+} from './cardMachineTypes';
+import {
+  markIncomingPreparationFailed,
+  markIncomingReady,
+  storePreparedIncomingTrial,
+} from './preparedAdvanceMachine';
+import {
+  clearIncomingPreparationState,
+  commitPreparedTrialToActiveContext,
+  loadSelectedTrialIntoActiveContext,
+  markUnitFinishedAfterEngineUpdate,
+} from './trialContextMachine';
+import {
+  acceptVideoCheckpoint,
+  activateVideoSessionAtStart,
+  markVideoEnded,
+  resumeVideoSessionAfterClearing,
+  resumeVideoSessionAfterQuestion,
+} from './videoSessionMachine';
+import {
+  markFeedbackRevealStarted,
+  resetFeedbackRevealState,
+  storeFeedbackContent,
+} from './feedbackContextMachine';
+import {
+  setExternalUnitFinishedMessage,
+  setFadeOutStallError,
+  setInvalidVideoCheckpointError,
+  setUnexpectedVideoCheckpointError,
+  setUnsupportedTrialTypeError,
+} from './machineErrorContext';
+import {
+  toDisplayedTrialStateInput,
+  toEvaluateAnswerInput,
+  toFeedbackTtsInput,
+  toHistoryLoggingInput,
+  toOutcomeHistoryStateInput,
+  toPrepareIncomingTrialInput,
+  toSelectCardInput,
+  toServiceInput,
+  toSpeechRecognitionInput,
+  toStudyAnswerTtsInput,
+  toUpdateEngineInput,
+} from './cardMachineServiceInputs';
+import {
+  activeTrialIsDrillOrTest,
+  engineUpdateFinishedUnit,
+  feedbackAdvanceIsReady,
+  incomingPreparationAlreadyComplete,
+  preparedResultFinishedUnit,
+  preparedResultHasNoAdvance,
+  preparedResultUsesDirectAdvance,
+  questionAudioIsAvailable,
+} from './cardMachineTransitionGuards';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Narrow exception: current XState v5 config/actor typings in this file are not modeled well enough yet, but we can still type the machine callback payloads locally.
 const createMachine: any = xCreateMachine;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Same narrow exception as above for `assign`; this keeps runtime semantics unchanged while we remove the many broader `any` callback usages in the machine body.
-const assign: any = xAssign;
-
-type DeliverySettings = typeof DEFAULT_DELIVERY_SETTINGS & Record<string, unknown>;
-
-interface CurrentDisplay extends Record<string, unknown> {
-  text?: string;
-  clozeText?: string;
-  audioSrc?: string;
-  videoSrc?: string;
-  imgSrc?: string;
-}
-
-interface ButtonChoice extends Record<string, unknown> {
-  verbalChoice?: string;
-  buttonName?: unknown;
-  buttonValue?: string;
-  isImage?: boolean;
-}
-
-interface EngineIndices extends Record<string, unknown> {
-  clusterIndex?: number;
-  stimIndex?: number;
-  whichStim?: number;
-  probabilityEstimate?: unknown;
-}
-
-interface AudioState {
-  ttsRequested: boolean;
-  recordingLocked: boolean;
-  waitingForTranscription: boolean;
-  srAttempts: number;
-  maxSrAttempts: number;
-}
-
-interface VideoSessionState {
-  isActive: boolean;
-  checkpoints: unknown[];
-  currentCheckpointIndex: number;
-  pendingQuestionIndex: number | null;
-  ended: boolean;
-}
-
-interface TrialTimestamps {
-  trialStart: number;
-  trialEnd: number | undefined;
-  firstKeypress: number | undefined;
-  timeoutStart: number | undefined;
-  inputEnabled: number | undefined;
-  feedbackStart: number | undefined;
-  feedbackEnd: number | undefined;
-}
-
-interface CardMachineContext {
-  currentDisplay: CurrentDisplay;
-  questionDisplay: CurrentDisplay | undefined;
-  currentAnswer: string;
-  originalAnswer: string;
-  userAnswer: string;
-  feedbackMessage: string;
-  feedbackText: string;
-  feedbackRevealStarted: boolean;
-  feedbackSuppressed: boolean;
-  h5pResult: H5PTrialResult | null;
-  isCorrect: boolean;
-  isTimeout: boolean;
-  feedbackTimeoutMs: number | undefined;
-  reviewEntry: string;
-  buttonTrial: boolean;
-  buttonList: ButtonChoice[];
-  testType: string;
-  deliverySettings: DeliverySettings;
-  setspec: Record<string, unknown> | undefined;
-  audio: AudioState;
-  srGrammarMatch: boolean | null;
-  engine: unknown;
-  engineIndices: EngineIndices | null;
-  sessionId: string;
-  unitId: string;
-  tdfId: string;
-  speechHintExclusionList: string;
-  questionIndex: number;
-  alternateDisplayIndex: number | null;
-  source: string;
-  wasReportedForRemoval: boolean;
-  timeoutResetCounter: number;
-  consecutiveTimeouts: number;
-  errorMessage: string | undefined;
-  unitFinished: boolean | undefined;
-  preparedAdvanceMode: string;
-  preparedTrial: PreparedAdvanceResult | null;
-  incomingPreparationComplete: boolean;
-  incomingReady: boolean;
-  videoSession: VideoSessionState;
-  timestamps: TrialTimestamps;
-}
-
-interface CardMachineEvent extends Record<string, unknown> {
-  type: string;
-  sessionId?: string;
-  unitId?: string;
-  tdfId?: string;
-  source?: string;
-  userAnswer?: string;
-  timestamp?: number;
-  checkpointIndex?: number;
-  questionIndex?: number;
-  unitFinished?: boolean;
-  feedbackText?: string;
-  feedbackHtml?: string;
-  feedbackSuppressed?: boolean;
-  h5pResult?: H5PTrialResult | null;
-}
-
-interface CardSelectionResult extends Record<string, unknown> {
-  currentDisplay?: CurrentDisplay;
-  currentAnswer?: string;
-  originalAnswer?: string;
-  buttonTrial?: boolean;
-  buttonList?: ButtonChoice[];
-  testType?: string;
-  deliverySettings?: Partial<DeliverySettings>;
-  setspec?: Record<string, unknown>;
-  engineIndices?: EngineIndices | null;
-  engine?: unknown;
-  unitFinished?: boolean;
-  questionIndex?: number;
-  preparedAdvanceMode?: string;
-  speechHintExclusionList?: string;
-}
-
-interface UpdateEngineResult {
-  unitFinished?: boolean;
-}
-
-interface PreparedAdvanceResult extends CardSelectionResult {
-  preparedAdvanceMode?: string;
-  preparedSelection?: Record<string, unknown> | null;
-}
-
-type MachineArgs = {
-  context: CardMachineContext;
-  event: CardMachineEvent;
-};
-
-type CardSelectionDoneArgs = {
-  context: CardMachineContext;
-  event: { output?: CardSelectionResult };
-};
-
-type UpdateEngineDoneArgs = {
-  event: { output?: UpdateEngineResult };
-};
-
-type PreparedAdvanceDoneArgs = {
-  context: CardMachineContext;
-  event: { output?: PreparedAdvanceResult };
-};
-
-function toServiceInput({ context, event }: MachineArgs) {
-  return { context, event };
-}
-
-function hasQuestionAudioFromContext(context: CardMachineContext): boolean {
-  return guards.hasQuestionAudio({ context, event: { type: '__machine_internal__' } });
-}
-
-function isDrillOrTestTrial(context: CardMachineContext): boolean {
-  const event = { type: '__machine_internal__' };
-  return guards.isDrillTrial({ context, event }) || guards.isTestTrial({ context, event });
-}
-
-function getPreparedTrial(context: CardMachineContext): PreparedAdvanceResult | null {
-  return context.preparedTrial || null;
-}
-
-function isFeedbackAdvanceReady(context: CardMachineContext): boolean {
-  clientConsole(2, '[CardMachine][FeedbackAdvanceReady]', {
-    incomingPreparationComplete: context.incomingPreparationComplete,
-    unitFinished: context.unitFinished,
-    hasPreparedTrial: !!context.preparedTrial,
-    incomingReady: context.incomingReady,
-    preparedAdvanceMode: context.preparedAdvanceMode,
-    testType: context.testType,
-  });
-
-  if (!context.incomingPreparationComplete) {
-    return false;
-  }
-  if (context.unitFinished || !context.preparedTrial) {
-    return true;
-  }
-  return context.incomingReady === true;
-}
-
-const storePreparedIncomingTrial = assign({
-  preparedTrial: ({ event }: PreparedAdvanceDoneArgs) => (
-    event.output?.unitFinished === true ||
-    event.output?.preparedAdvanceMode === 'none' ||
-    !event.output?.currentDisplay
-  )
-    ? null
-    : event.output || null,
-  engine: ({ context, event }: PreparedAdvanceDoneArgs) => event.output?.engine || context.engine,
-  unitFinished: ({ event }: PreparedAdvanceDoneArgs) => event.output?.unitFinished === true,
-  preparedAdvanceMode: ({ event }: PreparedAdvanceDoneArgs) => event.output?.unitFinished === true
-    ? 'none'
-    : event.output?.preparedAdvanceMode || 'seamless',
-  incomingPreparationComplete: () => true,
-  incomingReady: () => false,
-});
-
-const markIncomingPreparationFailed = assign({
-  preparedTrial: () => null,
-  incomingPreparationComplete: () => true,
-  incomingReady: () => false,
-  preparedAdvanceMode: () => 'none',
-});
-
-const markIncomingReady = assign({
-  incomingReady: () => true,
-});
-
-function resolveSelectedQuestionIndex(context: CardMachineContext, event: CardSelectionDoneArgs['event']): number {
-  const outputQuestionIndex = event.output?.questionIndex;
-  const outputEngine = event.output?.engine as { unitType?: string } | undefined;
-  const contextEngine = context.engine as { unitType?: string } | undefined;
-  const unitType = String(outputEngine?.unitType || contextEngine?.unitType || '');
-
-  if (unitType === 'schedule') {
-    if (typeof outputQuestionIndex !== 'number' || !Number.isFinite(outputQuestionIndex)) {
-      throw new Error('Schedule card selection must provide a live questionIndex');
-    }
-    return outputQuestionIndex;
-  }
-
-  return (typeof outputQuestionIndex === 'number' && Number.isFinite(outputQuestionIndex))
-    ? outputQuestionIndex
-    : (context.questionIndex || 1);
-}
-
-function resolvePreparedQuestionIndex(context: CardMachineContext): number {
-  const preparedQuestionIndex = getPreparedTrial(context)?.questionIndex;
-  const preparedEngine = getPreparedTrial(context)?.engine as { unitType?: string } | undefined;
-  const contextEngine = context.engine as { unitType?: string } | undefined;
-  const unitType = String(preparedEngine?.unitType || contextEngine?.unitType || '');
-
-  if (unitType === 'schedule') {
-    if (typeof preparedQuestionIndex !== 'number' || !Number.isFinite(preparedQuestionIndex)) {
-      throw new Error('Prepared schedule transition must provide a live questionIndex');
-    }
-    return preparedQuestionIndex;
-  }
-
-  return Number(preparedQuestionIndex || context.questionIndex || 1);
-}
-
-// =============================================================================
-// INITIAL CONTEXT
-// =============================================================================
-
-/**
- * Initial machine context
- * @type {CardMachineContext}
- */
-const initialContext = {
-  // Display & answer
-  currentDisplay: {},
-  currentAnswer: '',
-  originalAnswer: '',
-  userAnswer: '',
-  feedbackMessage: '',
-  feedbackText: '',
-  feedbackRevealStarted: false,
-  feedbackSuppressed: false,
-  h5pResult: null,
-  isCorrect: false,
-  isTimeout: false,
-  feedbackTimeoutMs: undefined,
-  reviewEntry: '',
-
-  // Trial configuration
-  buttonTrial: false,
-  buttonList: [],
-  testType: 'd', // Default to drill
-
-  // Settings & params (defaults)
-  deliverySettings: DEFAULT_DELIVERY_SETTINGS,
-  setspec: {},
-
-  // Audio & SR state
-  audio: {
-    ttsRequested: false,
-    recordingLocked: false,
-    waitingForTranscription: false,
-    srAttempts: 0,
-    maxSrAttempts: SR_CONFIG.MAX_ATTEMPTS,
-  },
-  srGrammarMatch: null,
-
-  // Engine & session
-  engine: null, // Unit engine instance (schedule/model/empty)
-  engineIndices: null,
-  sessionId: '',
-  unitId: '',
-  tdfId: '',
-  speechHintExclusionList: '',
-
-  // Trial metadata
-  questionIndex: 1, // Current question index (1-based)
-  alternateDisplayIndex: null, // For alternate displays
-  source: 'keyboard', // How answer was provided: 'keyboard', 'button', 'timeout', 'SR', 'simulation'
-  wasReportedForRemoval: false, // Was item flagged for removal
-  timeoutResetCounter: 0,
-
-  // Performance tracking
-  consecutiveTimeouts: 0,
-  errorMessage: undefined,
-  preparedAdvanceMode: 'none',
-  preparedTrial: null,
-  incomingPreparationComplete: false,
-  incomingReady: false,
-
-  // Video session state
-  videoSession: {
-    isActive: false,
-    checkpoints: [],
-    currentCheckpointIndex: 0,
-    pendingQuestionIndex: null,
-    ended: false,
-  },
-
-  // Timestamps
-  timestamps: {
-    trialStart: 0,
-    trialEnd: undefined,
-    firstKeypress: undefined,
-    timeoutStart: undefined,
-    inputEnabled: undefined,
-    feedbackStart: undefined,
-    feedbackEnd: undefined,
-  },
-};
 
 // =============================================================================
 // MACHINE DEFINITION
@@ -400,15 +111,7 @@ export const cardMachine = createMachine(
                   guard: 'isVideoSession',
                   actions: [
                     'initializeSession',
-                    assign({
-                      videoSession: ({ context }: MachineArgs) => ({
-                        ...context.videoSession,
-                        isActive: true,
-                        currentCheckpointIndex: 0,
-                        pendingQuestionIndex: null,
-                        ended: false,
-                      }),
-                    }),
+                    activateVideoSessionAtStart,
                     'logStateTransition',
                   ],
                 },
@@ -439,66 +142,13 @@ export const cardMachine = createMachine(
             invoke: {
               id: 'selectCardService',
               src: 'selectCardService',
-              input: ({ context, event }: MachineArgs) => ({
-                context,
-                event,
-                // Pass current engine and session info
-                engine: context.engine,
-                sessionId: context.sessionId,
-                unitId: context.unitId,
-                tdfId: context.tdfId,
-              }),
+              input: toSelectCardInput,
               onDone: [
                 {
                   target: STATES.READY_PROMPT,
                   guard: 'isSupportedTrialType',
                   actions: [
-                    assign({
-                      // Load card data from service result
-                      currentDisplay: ({ context, event }: CardSelectionDoneArgs) => event.output?.currentDisplay || context.currentDisplay,
-                      questionDisplay: ({ context, event }: CardSelectionDoneArgs) => event.output?.currentDisplay || context.questionDisplay,
-                      currentAnswer: ({ context, event }: CardSelectionDoneArgs) => event.output?.currentAnswer || context.currentAnswer,
-                      originalAnswer: ({ context, event }: CardSelectionDoneArgs) => event.output?.originalAnswer || context.originalAnswer,
-                      buttonTrial: ({ context, event }: CardSelectionDoneArgs) => event.output?.buttonTrial ?? context.buttonTrial,
-                      buttonList: ({ context, event }: CardSelectionDoneArgs) => event.output?.buttonList || context.buttonList || [],
-                      testType: ({ context, event }: CardSelectionDoneArgs) => event.output?.testType || context.testType,
-                      deliverySettings: ({ context, event }: CardSelectionDoneArgs) => ({
-                        ...DEFAULT_DELIVERY_SETTINGS,
-                        ...(context.deliverySettings || {}),
-                        ...(event.output?.deliverySettings || {}),
-                      }),
-                      setspec: ({ context, event }: CardSelectionDoneArgs) => event.output?.setspec || context.setspec,
-                      engineIndices: ({ context, event }: CardSelectionDoneArgs) => event.output?.engineIndices || context.engineIndices,
-                      engine: ({ context, event }: CardSelectionDoneArgs) => event.output?.engine || context.engine, // Update engine reference
-                      unitFinished: ({ event }: CardSelectionDoneArgs) => event.output?.unitFinished || false,
-                      questionIndex: ({ context, event }: CardSelectionDoneArgs) => resolveSelectedQuestionIndex(context, event),
-                      preparedAdvanceMode: () => 'none',
-                      preparedTrial: () => null,
-                      incomingPreparationComplete: () => false,
-                      incomingReady: () => false,
-                      // Reset trial state
-                      userAnswer: () => '',
-                      feedbackMessage: () => '',
-                      feedbackText: () => '',
-                      feedbackRevealStarted: () => false,
-                      feedbackSuppressed: () => false,
-                      h5pResult: () => null,
-                      isCorrect: () => false,
-                      isTimeout: () => false,
-                      feedbackTimeoutMs: () => undefined,
-                      srGrammarMatch: () => null,
-                      reviewEntry: () => '',
-                      source: () => 'keyboard', // Default source, updated by input method
-                      timestamps: () => ({
-                        trialStart: 0,
-                        trialEnd: undefined,
-                        firstKeypress: undefined,
-                        timeoutStart: undefined,
-                        inputEnabled: undefined,
-                        feedbackStart: undefined,
-                        feedbackEnd: undefined,
-                      }),
-                    }),
+                    loadSelectedTrialIntoActiveContext,
                     'syncDeliverySettings',
                     'syncCardStore',
                     'syncSessionIndices',
@@ -512,9 +162,7 @@ export const cardMachine = createMachine(
                 {
                   target: '#cardMachine.error',
                   actions: [
-                    assign({
-                      errorMessage: ({ context }: MachineArgs) => `Unsupported trial type: ${context.testType}`,
-                    }),
+                    setUnsupportedTrialTypeError,
                     'logError',
                     'logStateTransition',
                   ],
@@ -531,9 +179,7 @@ export const cardMachine = createMachine(
                 target: '#cardMachine.error',
                 guard: 'isUnsupportedTrialType',
                 actions: [
-                  assign({
-                    errorMessage: ({ context }: MachineArgs) => `Unsupported trial type: ${context.testType}`,
-                  }),
+                  setUnsupportedTrialTypeError,
                   'logError',
                 ],
               },
@@ -563,17 +209,7 @@ export const cardMachine = createMachine(
             invoke: {
               id: 'experimentStateService',
               src: 'experimentStateService',
-              input: ({ context, event }: MachineArgs) => ({
-                context,
-                event,
-                stateUpdate: {
-                  clusterIndex: context.engineIndices?.clusterIndex,
-                  originalDisplay: context.currentDisplay?.text || context.currentDisplay?.clozeText || '',
-                  originalAnswer: context.originalAnswer,
-                  currentAnswer: context.currentAnswer,
-                },
-                source: 'cardMachine.displaying',
-              }),
+              input: toDisplayedTrialStateInput,
               onDone: [
                 {
                   target: `#cardMachine.${STATES.STUDY}`,
@@ -582,20 +218,18 @@ export const cardMachine = createMachine(
                 },
                 {
                   target: STATES.AUDIO_GATE,
-                  guard: ({ context }: MachineArgs) => hasQuestionAudioFromContext(context),
+                  guard: questionAudioIsAvailable,
                   actions: ['logStateTransition'],
                 },
                 {
                   target: STATES.AWAITING,
-                  guard: ({ context }: MachineArgs) => isDrillOrTestTrial(context),
+                  guard: activeTrialIsDrillOrTest,
                   actions: ['logStateTransition'],
                 },
                 {
                   target: '#cardMachine.error',
                   actions: [
-                    assign({
-                      errorMessage: ({ context }: MachineArgs) => `Unsupported trial type: ${context.testType}`,
-                    }),
+                    setUnsupportedTrialTypeError,
                     'logError',
                     'logStateTransition',
                   ],
@@ -749,14 +383,7 @@ export const cardMachine = createMachine(
                     invoke: {
                       id: 'speechRecognitionService',
                       src: 'speechRecognitionService',
-                      input: ({ context, event }: MachineArgs) => ({
-                        context,
-                        event,
-                        // Pass answer and context for phonetic matching
-                        correctAnswer: context.currentAnswer,
-                        deliverySettings: context.deliverySettings,
-                        speechHintExclusionList: context.speechHintExclusionList,
-                      }),
+                      input: toSpeechRecognitionInput,
                     },
                     initial: 'ready',
                     states: {
@@ -906,7 +533,7 @@ export const cardMachine = createMachine(
             invoke: {
               id: 'evaluateAnswerService',
               src: 'evaluateAnswerService',
-              input: ({ context }: MachineArgs) => ({ context }),
+              input: toEvaluateAnswerInput,
               onDone: [
                 {
                   target: `#cardMachine.${STATES.FEEDBACK}`,
@@ -948,11 +575,7 @@ export const cardMachine = createMachine(
         invoke: {
           id: 'prepareIncomingDuringStudyService',
           src: 'prepareIncomingTrialService',
-          input: ({ context, event }: MachineArgs) => ({
-            context,
-            event,
-            engine: context.engine,
-          }),
+          input: toPrepareIncomingTrialInput,
           onDone: {
             actions: [storePreparedIncomingTrial, 'logStateTransition'],
           },
@@ -1005,17 +628,7 @@ export const cardMachine = createMachine(
             invoke: {
               id: 'ttsService',
               src: 'ttsService',
-              input: ({ context, event }: MachineArgs) => ({
-                context,
-                event,
-                text: context.currentAnswer,
-                questionText: context.currentDisplay?.clozeText || context.currentDisplay?.text || '',
-                questionAudioSrc: context.currentDisplay?.audioSrc || '',
-                delayAfterQuestionMs: 1000,
-                display: context.currentDisplay,
-                isQuestion: false, // This is the answer (study mode)
-                deliverySettings: context.deliverySettings,
-              }),
+              input: toStudyAnswerTtsInput,
               onDone: {
                 target: 'waiting',
                 actions: ['logStateTransition'],
@@ -1046,7 +659,7 @@ export const cardMachine = createMachine(
           readyToFade: {
             entry: ['logStateTransition'],
             always: {
-              guard: ({ context }: MachineArgs) => isFeedbackAdvanceReady(context),
+              guard: feedbackAdvanceIsReady,
               target: `#cardMachine.${STATES.TRANSITION}`,
               actions: ['logStateTransition'],
             },
@@ -1064,11 +677,7 @@ export const cardMachine = createMachine(
         invoke: {
           id: 'prepareIncomingDuringFeedbackService',
           src: 'prepareIncomingTrialService',
-          input: ({ context, event }: MachineArgs) => ({
-            context,
-            event,
-            engine: context.engine,
-          }),
+          input: toPrepareIncomingTrialInput,
           onDone: {
             actions: [storePreparedIncomingTrial, 'logStateTransition'],
           },
@@ -1087,7 +696,7 @@ export const cardMachine = createMachine(
            * Display feedback and start review timing with presentation start.
            */
           preparing: {
-            entry: [assign({ feedbackText: () => '', feedbackRevealStarted: () => false, feedbackSuppressed: () => false }), 'displayFeedback', 'announceToScreenReader', 'logStateTransition'],
+            entry: [resetFeedbackRevealState, 'displayFeedback', 'announceToScreenReader', 'logStateTransition'],
             always: [
               {
                 target: 'speaking',
@@ -1103,7 +712,7 @@ export const cardMachine = createMachine(
             on: {
               [EVENTS.REVIEW_REVEAL_STARTED]: {
                 actions: [
-                  assign({ feedbackRevealStarted: () => true }),
+                  markFeedbackRevealStarted,
                   'markFeedbackStart',
                   'logStateTransition',
                 ],
@@ -1140,25 +749,7 @@ export const cardMachine = createMachine(
             invoke: {
               id: 'ttsService',
               src: 'ttsService',
-              input: ({ context, event }: MachineArgs) => {
-                const feedbackText = context.feedbackText;
-                if (context.feedbackSuppressed === true) {
-                  throw new Error('[cardMachine] suppressed feedback should not enter feedback.speaking');
-                }
-                if (typeof feedbackText !== 'string' || feedbackText.trim() === '') {
-                  throw new Error('[cardMachine] feedbackText missing at feedback.speaking handoff');
-                }
-
-                return {
-                  context,
-                  event,
-                  text: feedbackText,
-                  isQuestion: false, // This is feedback
-                  display: context.currentDisplay,
-                  deliverySettings: context.deliverySettings,
-                  feedbackType: context.isCorrect ? 'correct' : 'incorrect',
-                };
-              },
+              input: toFeedbackTtsInput,
               onDone: {
                 target: 'waiting',
                 actions: ['logStateTransition'],
@@ -1196,7 +787,7 @@ export const cardMachine = createMachine(
           readyToFade: {
             entry: ['logStateTransition'],
             always: {
-              guard: ({ context }: MachineArgs) => isFeedbackAdvanceReady(context),
+              guard: feedbackAdvanceIsReady,
               target: `#cardMachine.${STATES.TRANSITION}`,
               actions: ['logStateTransition'],
             },
@@ -1215,7 +806,7 @@ export const cardMachine = createMachine(
           maybePrepareIncoming: {
             always: [
               {
-                guard: ({ context }: MachineArgs) => context.incomingPreparationComplete === true,
+                guard: incomingPreparationAlreadyComplete,
                 target: 'logging',
                 actions: ['logStateTransition'],
               },
@@ -1234,12 +825,7 @@ export const cardMachine = createMachine(
             invoke: {
               id: 'historyLoggingService',
               src: 'historyLoggingService',
-              input: ({ context, event }: MachineArgs) => ({
-                context,
-                event,
-                // Pass engine reference via event data
-                engine: context.engine,
-              }),
+              input: toHistoryLoggingInput,
               onDone: {
                 target: 'updatingState',
                 actions: ['logStateTransition'],
@@ -1255,14 +841,7 @@ export const cardMachine = createMachine(
             invoke: {
               id: 'experimentStateService',
               src: 'experimentStateService',
-              input: ({ context, event }: MachineArgs) => ({
-                context,
-                event,
-                stateUpdate: {
-                  overallOutcomeHistory: Session.get('overallOutcomeHistory'),
-                },
-                source: 'cardMachine.transition.logging',
-              }),
+              input: toOutcomeHistoryStateInput,
               onDone: {
                 target: 'trackingPerformance',
                 actions: ['logStateTransition'],
@@ -1278,28 +857,16 @@ export const cardMachine = createMachine(
             invoke: {
               id: 'updateEngineService',
               src: 'updateEngineService',
-              input: ({ context, event }: MachineArgs) => ({
-                context,
-                event,
-                isCorrect: context.isCorrect,
-                responseTime: context.timestamps.trialEnd
-                  ? context.timestamps.trialEnd - context.timestamps.trialStart
-                  : 0,
-              }),
+              input: toUpdateEngineInput,
               onDone: [
                 {
                   // MEDIUM FIX #1: Check if unit finished after engine update
                   // If so, trigger unit completion instead of continuing to next card
-                  guard: ({ event }: UpdateEngineDoneArgs) => event.output?.unitFinished === true,
+                  guard: engineUpdateFinishedUnit,
                   target: '#cardMachine.transition.fadingOut',
                   actions: [
                     'logStateTransition',
-                    assign({
-                      unitFinished: true,
-                      preparedTrial: () => null,
-                      incomingPreparationComplete: () => false,
-                      incomingReady: () => false,
-                    }),
+                    markUnitFinishedAfterEngineUpdate,
                   ],
                 },
                 {
@@ -1307,19 +874,7 @@ export const cardMachine = createMachine(
                   target: '#cardMachine.videoWaiting',
                   actions: [
                     'incrementQuestionIndex',
-                    assign({
-                      preparedTrial: () => null,
-                      incomingPreparationComplete: () => false,
-                      incomingReady: () => false,
-                      preparedAdvanceMode: () => 'none',
-                      unitFinished: () => false,
-                      videoSession: ({ context }: MachineArgs) => ({
-                        ...context.videoSession,
-                        isActive: true,
-                        pendingQuestionIndex: null,
-                        ended: false,
-                      }),
-                    }),
+                    resumeVideoSessionAfterQuestion,
                     'clearFeedback',
                     'resetTimers',
                     'resumeVideoPlayback',
@@ -1348,14 +903,10 @@ export const cardMachine = createMachine(
             invoke: {
               id: 'prepareIncomingTrialService',
               src: 'prepareIncomingTrialService',
-              input: ({ context, event }: MachineArgs) => ({
-                context,
-                event,
-                engine: context.engine,
-              }),
+              input: toPrepareIncomingTrialInput,
               onDone: [
                 {
-                  guard: ({ event }: PreparedAdvanceDoneArgs) => event.output?.unitFinished === true,
+                  guard: preparedResultFinishedUnit,
                   target: 'logging',
                   actions: [
                     storePreparedIncomingTrial,
@@ -1363,7 +914,7 @@ export const cardMachine = createMachine(
                   ],
                 },
                 {
-                  guard: ({ event }: PreparedAdvanceDoneArgs) => event.output?.preparedAdvanceMode === 'none',
+                  guard: preparedResultHasNoAdvance,
                   target: 'logging',
                   actions: [
                     storePreparedIncomingTrial,
@@ -1371,8 +922,8 @@ export const cardMachine = createMachine(
                   ],
                 },
                 {
-                  guard: ({ event }: PreparedAdvanceDoneArgs) => event.output?.preparedAdvanceMode === 'fallback',
-                  target: 'fallbackAdvance',
+                  guard: preparedResultUsesDirectAdvance,
+                  target: 'directAdvance',
                   actions: [
                     storePreparedIncomingTrial,
                     'logStateTransition',
@@ -1405,7 +956,7 @@ export const cardMachine = createMachine(
               },
             },
           },
-          fallbackAdvance: {
+          directAdvance: {
             entry: ['logStateTransition'],
             on: {
               [EVENTS.INCOMING_READY]: {
@@ -1423,51 +974,7 @@ export const cardMachine = createMachine(
                   target: `#cardMachine.${STATES.PRESENTING}.${STATES.DISPLAYING}`,
                   actions: [
                     'commitPreparedTrialRuntime',
-                    assign({
-                      currentDisplay: ({ context }: MachineArgs) => getPreparedTrial(context)?.currentDisplay || context.currentDisplay,
-                      questionDisplay: ({ context }: MachineArgs) => getPreparedTrial(context)?.currentDisplay || context.questionDisplay,
-                      currentAnswer: ({ context }: MachineArgs) => String(getPreparedTrial(context)?.currentAnswer || context.currentAnswer || ''),
-                      originalAnswer: ({ context }: MachineArgs) => String(getPreparedTrial(context)?.originalAnswer || context.originalAnswer || ''),
-                      buttonTrial: ({ context }: MachineArgs) => getPreparedTrial(context)?.buttonTrial ?? context.buttonTrial,
-                      buttonList: ({ context }: MachineArgs) => getPreparedTrial(context)?.buttonList || context.buttonList || [],
-                      testType: ({ context }: MachineArgs) => String(getPreparedTrial(context)?.testType || context.testType || 'd'),
-                      deliverySettings: ({ context }: MachineArgs) => ({
-                        ...DEFAULT_DELIVERY_SETTINGS,
-                        ...(context.deliverySettings || {}),
-                        ...(getPreparedTrial(context)?.deliverySettings || {}),
-                      }),
-                      setspec: ({ context }: MachineArgs) => getPreparedTrial(context)?.setspec || context.setspec,
-                      engineIndices: ({ context }: MachineArgs) => getPreparedTrial(context)?.engineIndices || context.engineIndices,
-                      engine: ({ context }: MachineArgs) => getPreparedTrial(context)?.engine || context.engine,
-                      unitFinished: () => false,
-                      questionIndex: ({ context }: MachineArgs) => resolvePreparedQuestionIndex(context),
-                      preparedAdvanceMode: ({ context }: MachineArgs) => String(getPreparedTrial(context)?.preparedAdvanceMode || context.preparedAdvanceMode || 'none'),
-                      preparedTrial: () => null,
-                      incomingPreparationComplete: () => false,
-                      incomingReady: () => false,
-                      speechHintExclusionList: ({ context }: MachineArgs) => String(getPreparedTrial(context)?.speechHintExclusionList || context.speechHintExclusionList || ''),
-                      userAnswer: () => '',
-                      feedbackMessage: () => '',
-                      feedbackText: () => '',
-                      feedbackRevealStarted: () => false,
-                      feedbackSuppressed: () => false,
-                      h5pResult: () => null,
-                      isCorrect: () => false,
-                      isTimeout: () => false,
-                      feedbackTimeoutMs: () => undefined,
-                      srGrammarMatch: () => null,
-                      reviewEntry: () => '',
-                      source: () => 'keyboard',
-                      timestamps: () => ({
-                        trialStart: 0,
-                        trialEnd: undefined,
-                        firstKeypress: undefined,
-                        timeoutStart: undefined,
-                        inputEnabled: undefined,
-                        feedbackStart: undefined,
-                        feedbackEnd: undefined,
-                      }),
-                    }),
+                    commitPreparedTrialToActiveContext,
                     'resetSrState',
                     'resetSrAttempts',
                     'clearErrorMessage',
@@ -1488,9 +995,7 @@ export const cardMachine = createMachine(
             after: {
               FADE_OUT_STALL_TIMEOUT: {
                 target: `#cardMachine.${STATES.ERROR}`,
-                actions: assign({
-                  errorMessage: ({ context }: MachineArgs) => `transition.fadingOut stalled without TRANSITION_COMPLETE (preparedAdvanceMode=${String(context.preparedAdvanceMode || 'none')})`,
-                }),
+                actions: setFadeOutStallError,
               },
             },
           },
@@ -1500,11 +1005,7 @@ export const cardMachine = createMachine(
               'setInputNotReady',
               'clearFeedback',
               'resetTimers',
-              assign({
-                preparedTrial: () => null,
-                incomingPreparationComplete: () => false,
-                incomingReady: () => false,
-              }),
+              clearIncomingPreparationState,
               'logStateTransition',
             ],
             always: [
@@ -1520,14 +1021,7 @@ export const cardMachine = createMachine(
                 guard: 'isVideoSession',
                 target: '#cardMachine.videoWaiting',
                 actions: [
-                  assign({
-                    videoSession: ({ context }: MachineArgs) => ({
-                      ...context.videoSession,
-                      isActive: true,
-                      pendingQuestionIndex: null,
-                      ended: false,
-                    }),
-                  }),
+                  resumeVideoSessionAfterClearing,
                   'resumeVideoPlayback',
                   'logStateTransition',
                 ],
@@ -1554,25 +1048,14 @@ export const cardMachine = createMachine(
               target: `#cardMachine.${STATES.PRESENTING}`,
               guard: 'canAcceptVideoCheckpoint',
               actions: [
-                assign({
-                  videoSession: ({ context, event }: MachineArgs) => ({
-                    ...context.videoSession,
-                    currentCheckpointIndex: Number(event.checkpointIndex),
-                    pendingQuestionIndex: Number(event.questionIndex),
-                    ended: false,
-                  }),
-              }),
+                acceptVideoCheckpoint,
               'logStateTransition',
             ],
             },
             {
               target: `#cardMachine.${STATES.ERROR}`,
               actions: [
-                assign({
-                  errorMessage: ({ event }: MachineArgs) => (
-                    `[CardMachine] Invalid video checkpoint event: checkpointIndex=${String(event.checkpointIndex)}, questionIndex=${String(event.questionIndex)}`
-                  ),
-                }),
+                setInvalidVideoCheckpointError,
                 'logError',
                 'logStateTransition',
               ],
@@ -1582,12 +1065,7 @@ export const cardMachine = createMachine(
             target: 'videoEnded',
               guard: 'isVideoSession',
               actions: [
-                assign({
-                  videoSession: ({ context }: MachineArgs) => ({
-                    ...context.videoSession,
-                    ended: true,
-                  }),
-              }),
+                markVideoEnded,
               'logStateTransition',
             ],
           },
@@ -1620,10 +1098,7 @@ export const cardMachine = createMachine(
     // Global error handler
     on: {
       FEEDBACK_CONTENT: {
-        actions: assign({
-          feedbackText: ({ event }: MachineArgs) => String(event.feedbackText || '').trim(),
-          feedbackSuppressed: ({ event }: MachineArgs) => event.feedbackSuppressed === true,
-        }),
+        actions: storeFeedbackContent,
       },
       [EVENTS.TRIAL_REVEAL_STARTED]: {
         actions: ['markTrialRevealStart', 'logStateTransition'],
@@ -1645,18 +1120,14 @@ export const cardMachine = createMachine(
       [EVENTS.UNIT_FINISHED]: {
         target: `#cardMachine.${STATES.IDLE}`,
         actions: [
-          assign({ errorMessage: () => 'Unit finished by external event' }),
+          setExternalUnitFinishedMessage,
           'logStateTransition',
         ],
       },
       [EVENTS.VIDEO_CHECKPOINT]: {
         target: `#cardMachine.${STATES.ERROR}`,
         actions: [
-          assign({
-            errorMessage: ({ event }: MachineArgs) => (
-              `[CardMachine] VIDEO_CHECKPOINT received outside videoWaiting: checkpointIndex=${String(event.checkpointIndex)}, questionIndex=${String(event.questionIndex)}`
-            ),
-          }),
+          setUnexpectedVideoCheckpointError,
           'logError',
           'logStateTransition',
         ],
@@ -1736,68 +1207,68 @@ export const cardMachine = createMachine(
 
     actions: {
       // Context assignment actions
-      initializeSession: actions.initializeSession,
-      loadCardData: actions.loadCardData,
-      captureAnswer: actions.captureAnswer,
-      setReviewEntry: actions.setReviewEntry,
-      captureTranscription: actions.captureTranscription,
-      markTimeout: actions.markTimeout,
-      markTimeoutReset: actions.markTimeoutReset,
-      resetTimeoutCounter: actions.resetTimeoutCounter,
-      incrementSrAttempt: actions.incrementSrAttempt,
-      resetSrState: actions.resetSrState,
-      resetSrAttempts: actions.resetSrAttempts,
-      lockRecording: actions.lockRecording,
-      unlockRecording: actions.unlockRecording,
-      setWaitingForTranscription: actions.setWaitingForTranscription,
-      clearWaitingForTranscription: actions.clearWaitingForTranscription,
-      markInputEnabled: actions.markInputEnabled,
-      markFirstKeypress: actions.markFirstKeypress,
-      markTrialRevealStart: actions.markTrialRevealStart,
-      markFeedbackStart: actions.markFeedbackStart,
-      markFeedbackEnd: actions.markFeedbackEnd,
-      markTrialEnd: actions.markTrialEnd,
-      setErrorMessage: actions.setErrorMessage,
-      clearErrorMessage: actions.clearErrorMessage,
-      validateAnswer: actions.validateAnswer,
-      applyValidationResult: actions.applyValidationResult,
-      clearUserAnswer: actions.clearUserAnswer,
-      syncDeliverySettings: actions.syncDeliverySettings,
-      syncCardStore: actions.syncCardStore,
-      syncSessionIndices: actions.syncSessionIndices,
-      syncCurrentAnswer: actions.syncCurrentAnswer,
-      incrementQuestionIndex: actions.incrementQuestionIndex,
-      setPrestimulusDisplay: actions.setPrestimulusDisplay,
-      restoreQuestionDisplay: actions.restoreQuestionDisplay,
-      forceSrFailureAnswer: actions.forceSrFailureAnswer,
+      initializeSession: cardMachineActions.initializeSession,
+      loadCardData: cardMachineActions.loadCardData,
+      captureAnswer: cardMachineActions.captureAnswer,
+      setReviewEntry: cardMachineActions.setReviewEntry,
+      captureTranscription: cardMachineActions.captureTranscription,
+      markTimeout: cardMachineActions.markTimeout,
+      markTimeoutReset: cardMachineActions.markTimeoutReset,
+      resetTimeoutCounter: cardMachineActions.resetTimeoutCounter,
+      incrementSrAttempt: cardMachineActions.incrementSrAttempt,
+      resetSrState: cardMachineActions.resetSrState,
+      resetSrAttempts: cardMachineActions.resetSrAttempts,
+      lockRecording: cardMachineActions.lockRecording,
+      unlockRecording: cardMachineActions.unlockRecording,
+      setWaitingForTranscription: cardMachineActions.setWaitingForTranscription,
+      clearWaitingForTranscription: cardMachineActions.clearWaitingForTranscription,
+      markInputEnabled: cardMachineActions.markInputEnabled,
+      markFirstKeypress: cardMachineActions.markFirstKeypress,
+      markTrialRevealStart: cardMachineActions.markTrialRevealStart,
+      markFeedbackStart: cardMachineActions.markFeedbackStart,
+      markFeedbackEnd: cardMachineActions.markFeedbackEnd,
+      markTrialEnd: cardMachineActions.markTrialEnd,
+      setErrorMessage: cardMachineActions.setErrorMessage,
+      clearErrorMessage: cardMachineActions.clearErrorMessage,
+      validateAnswer: cardMachineActions.validateAnswer,
+      applyValidationResult: cardMachineActions.applyValidationResult,
+      clearUserAnswer: cardMachineActions.clearUserAnswer,
+      syncDeliverySettings: cardMachineActions.syncDeliverySettings,
+      syncCardStore: cardMachineActions.syncCardStore,
+      syncSessionIndices: cardMachineActions.syncSessionIndices,
+      syncCurrentAnswer: cardMachineActions.syncCurrentAnswer,
+      incrementQuestionIndex: cardMachineActions.incrementQuestionIndex,
+      setPrestimulusDisplay: cardMachineActions.setPrestimulusDisplay,
+      restoreQuestionDisplay: cardMachineActions.restoreQuestionDisplay,
+      forceSrFailureAnswer: cardMachineActions.forceSrFailureAnswer,
 
       // Side effect actions
-      logStateTransition: actions.logStateTransition,
-      logError: actions.logError,
-      focusInput: actions.focusInput,
-      disableInput: actions.disableInput,
-      enableInput: actions.enableInput,
-      clearFeedback: actions.clearFeedback,
-      announceToScreenReader: actions.announceToScreenReader,
-      handleUnitCompletion: actions.handleUnitCompletion,
-      displayAnswer: actions.displayAnswer,
-      displayFeedback: actions.displayFeedback,
-      setDisplayReady: actions.setDisplayReady,
-      setDisplayNotReady: actions.setDisplayNotReady,
-      setInputNotReady: actions.setInputNotReady,
-      startRecording: actions.startRecording,
-      maybeSpeakQuestion: actions.maybeSpeakQuestion,
-      startEarlyLockForCurrentTrial: actions.startEarlyLockForCurrentTrial,
-      commitPreparedTrialRuntime: actions.commitPreparedTrialRuntime,
-      stopRecording: actions.stopRecording,
-      playTTS: actions.playTTS,
-      stopTTS: actions.stopTTS,
-      notifyVideoAnswer: actions.notifyVideoAnswer,
-      resumeVideoPlayback: actions.resumeVideoPlayback,
-      resetTimers: actions.resetTimers,
+      logStateTransition: cardMachineActions.logStateTransition,
+      logError: cardMachineActions.logError,
+      focusInput: cardMachineActions.focusInput,
+      disableInput: cardMachineActions.disableInput,
+      enableInput: cardMachineActions.enableInput,
+      clearFeedback: cardMachineActions.clearFeedback,
+      announceToScreenReader: cardMachineActions.announceToScreenReader,
+      handleUnitCompletion: cardMachineActions.handleUnitCompletion,
+      displayAnswer: cardMachineActions.displayAnswer,
+      displayFeedback: cardMachineActions.displayFeedback,
+      setDisplayReady: cardMachineActions.setDisplayReady,
+      setDisplayNotReady: cardMachineActions.setDisplayNotReady,
+      setInputNotReady: cardMachineActions.setInputNotReady,
+      startRecording: cardMachineActions.startRecording,
+      maybeSpeakQuestion: cardMachineActions.maybeSpeakQuestion,
+      startEarlyLockForCurrentTrial: cardMachineActions.startEarlyLockForCurrentTrial,
+      commitPreparedTrialRuntime: cardMachineActions.commitPreparedTrialRuntime,
+      stopRecording: cardMachineActions.stopRecording,
+      playTTS: cardMachineActions.playTTS,
+      stopTTS: cardMachineActions.stopTTS,
+      notifyVideoAnswer: cardMachineActions.notifyVideoAnswer,
+      resumeVideoPlayback: cardMachineActions.resumeVideoPlayback,
+      resetTimers: cardMachineActions.resetTimers,
 
       // Composite actions
-      errorActions: actions.errorActions,
+      errorActions: cardMachineActions.errorActions,
     },
 
     actors: createServices(),
