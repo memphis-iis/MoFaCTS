@@ -97,7 +97,6 @@ export type AutoTutorRuntime = {
 
 type AutoTutorHistoryNote = {
   kind: 'autotutor';
-  schemaVersion: 2;
   model: string;
   scriptId: string;
   state: ReturnType<typeof summarizeState>;
@@ -664,8 +663,11 @@ function readHistoryNote(row: AutoTutorHistoryRow): AutoTutorHistoryNote {
   } catch {
     throw new Error('AutoTutor history row CFNote is not valid JSON');
   }
-  if (!isRecord(note) || note.kind !== 'autotutor' || note.schemaVersion !== 2 || !isRecord(note.state)) {
+  if (!isRecord(note) || note.kind !== 'autotutor' || !isRecord(note.state)) {
     throw new Error('AutoTutor history row CFNote has an invalid AutoTutor payload');
+  }
+  if ('schemaVersion' in note) {
+    throw new Error('AutoTutor history row CFNote must not include schemaVersion');
   }
   return note as AutoTutorHistoryNote;
 }
@@ -725,7 +727,6 @@ async function loadSavedAutoTutorHistory(): Promise<AutoTutorHistoryRow[]> {
 function buildHistoryNote(config: AutoTutorConfig, state: AutoTutorState, tutorMessage: string): AutoTutorHistoryNote {
   return {
     kind: 'autotutor',
-    schemaVersion: 2,
     model: config.model,
     scriptId: config.script.id,
     state: summarizeState(state),
