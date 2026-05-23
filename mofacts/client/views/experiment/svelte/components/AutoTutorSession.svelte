@@ -34,6 +34,22 @@
     costUsd = state.costUsd;
     completed = state.completed;
     stoppedByCost = state.stoppedByCost;
+    updateChatInputState();
+  }
+
+  function updateChatInputState() {
+    if (!chatElement) {
+      return;
+    }
+    const disabled = completed || !!errorMessage;
+    chatElement.setPlaceholderText?.(disabled ? 'Conversation complete' : 'Type your answer...');
+    chatElement.disableSubmitButton?.(disabled);
+    const textInput = chatElement.shadowRoot?.querySelector('#text-input');
+    if (textInput) {
+      textInput.contentEditable = disabled ? 'false' : 'true';
+      textInput.classList.toggle('text-input-disabled', disabled);
+      textInput.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+    }
   }
 
   function extractStudentText(body) {
@@ -77,10 +93,11 @@
         try {
           const studentText = extractStudentText(body);
           const result = await runtime.submitStudentAnswer(studentText);
-          refreshRuntimeState();
           await signals.onResponse({ text: result.message });
+          refreshRuntimeState();
         } catch (error) {
           errorMessage = error?.message || String(error);
+          updateChatInputState();
           clientConsole(1, '[AutoTutor] Chat turn failed', error);
           await signals.onResponse({
             text: 'This AutoTutor session hit a configuration or service error. Please contact the lesson author.',
@@ -94,6 +111,24 @@
     };
     chatElement.textInput = {
       placeholder: { text: 'Type your answer...' },
+      styles: {
+        container: {
+          backgroundColor: 'var(--card-background-color)',
+          border: '1px solid var(--secondary-color)',
+          borderRadius: '6px',
+          boxShadow: 'none',
+          width: 'calc(100% - 1.5rem)',
+          maxHeight: '7rem',
+        },
+        text: {
+          color: 'var(--text-color)',
+          minHeight: '1.5rem',
+        },
+      },
+    };
+    chatElement.inputAreaStyle = {
+      backgroundColor: 'var(--background-color)',
+      borderTop: '1px solid var(--secondary-color)',
     };
     chatElement.displayLoadingBubble = true;
     chatElement.submitButtonStyles = {
@@ -138,6 +173,7 @@
       backgroundColor: 'var(--background-color)',
     };
     chatElement.history = toDeepChatHistory(runtime.getDialogue());
+    updateChatInputState();
   }
 
   onMount(async () => {
@@ -149,6 +185,7 @@
       configureDeepChat();
     } catch (error) {
       errorMessage = error?.message || String(error);
+      updateChatInputState();
       clientConsole(1, '[AutoTutor] Runtime initialization failed', error);
     }
   });
@@ -205,12 +242,16 @@
     display: flex;
     flex-direction: column;
     flex: 1 1 auto;
+    height: 100%;
+    max-height: 100%;
     min-height: 0;
     width: 100%;
     padding: clamp(12px, 2vw, 24px);
     gap: 12px;
     background: var(--background-color);
     color: var(--text-color);
+    box-sizing: border-box;
+    overflow: hidden;
   }
 
   .auto-tutor-header {
@@ -286,11 +327,18 @@
   .auto-tutor-chat {
     flex: 1 1 auto;
     min-height: 0;
+    overflow: hidden;
   }
 
   .auto-tutor-chat-disabled {
     opacity: 0.72;
-    pointer-events: none;
+  }
+
+  .auto-tutor-chat :global(deep-chat) {
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
   }
 
   .auto-tutor-continue-bar {
@@ -328,13 +376,46 @@
   }
 
   @media (max-width: 768px) {
+    .auto-tutor-session {
+      padding: 10px;
+      gap: 8px;
+    }
+
     .auto-tutor-header {
       grid-template-columns: 1fr;
       align-items: stretch;
+      gap: 8px;
     }
 
     .auto-tutor-question h1 {
       font-size: 1.05rem;
+      line-height: 1.3;
+      max-height: 5.5rem;
+      overflow: auto;
+      padding-right: 2px;
+    }
+
+    .auto-tutor-meta {
+      justify-content: flex-start;
+      flex-wrap: wrap;
+      gap: 6px 12px;
+      font-size: 0.75rem;
+    }
+
+    .auto-tutor-error,
+    .auto-tutor-complete {
+      padding: 8px 10px;
+      font-size: 0.9rem;
+    }
+
+    .auto-tutor-continue-bar {
+      min-height: 3.25rem;
+      padding: 0;
+    }
+
+    .auto-tutor-continue-button {
+      width: 100%;
+      min-height: 2.5rem;
     }
   }
 </style>
