@@ -1932,6 +1932,9 @@ async function doPackageUpload(file: any, template: any){
     // OPTIMISTIC UI: Replace temp ID with actual upload ID
     const actualId = this._id;
     const pendingData = template.pendingUploads.get(tempId);
+    if (!pendingData || typeof pendingData.fileName !== 'string') {
+      throw new Error('Pending package upload metadata is missing before upload start.');
+    }
     template.pendingUploads.set(tempId, undefined);
     template.pendingUploads.set(actualId, {
       ...pendingData,
@@ -2084,7 +2087,7 @@ async function doPackageUpload(file: any, template: any){
                 ...uploadData,
                 status: "error",
                 packageAssetId: packageAssetId,
-                error: err.message || err.toString()
+                error: err.reason || err.message || err.toString()
               });
               assetsHelperLastRun = 0;
               assetsHelperCachedResult = [];

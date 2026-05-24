@@ -139,7 +139,10 @@ export async function failPackageUpload(
     ',',
     params.message + ' on file: ' + params.filePath
   );
-  throw new Meteor.Error(params.errorTextPrefix + params.message + ' on file: ' + params.filePath);
+  throw new Meteor.Error(
+    'package-upload-failed',
+    params.errorTextPrefix + params.message + ' on file: ' + params.filePath
+  );
 }
 
 export function getStimuliSetIdFromPackageResult(packageResult: SaveContentResult) {

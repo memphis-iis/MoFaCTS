@@ -180,6 +180,7 @@ export async function processPackageUploadWorkflow(
     throw new Meteor.Error(500, 'Uploaded package asset id missing');
   }
   const packageFile = `${fileObj._id}.${packageExt}`;
+  let failureStage = 'initialization';
   const state: PackageUploadRuntimeState = {
     fileName: '',
     filePath: '',
@@ -191,6 +192,7 @@ export async function processPackageUploadWorkflow(
     await validateUploadedPackageFile(zipPath, fileObj, deps, integrity);
     unzippedFiles = await parsePackageZip(zipPath, packageFile, deps.serverConsole);
 
+    failureStage = 'content processing';
     const { results, touchedStimuliSetIds } = await processParsedPackageTdfs({
       unzippedFiles,
       fileObj,
@@ -203,6 +205,7 @@ export async function processPackageUploadWorkflow(
       deps,
       state
     });
+    failureStage = 'media upload';
     await uploadParsedPackageMedia({
       unzippedFiles,
       owner,
@@ -212,6 +215,9 @@ export async function processPackageUploadWorkflow(
       state,
       touchedStimuliSetIds
     });
+    failureStage = 'H5P post-processing';
+    await postProcessUploadedTdfs({ unzippedFiles, deps, state });
+    failureStage = 'side effects';
     await applyPackageUploadSideEffects({
       context,
       fileObj,
@@ -224,9 +230,12 @@ export async function processPackageUploadWorkflow(
 
     return { results, stimSetId: state.stimSetId };
   } catch (error: unknown) {
+    if (error && typeof error === 'object' && (error as { error?: unknown }).error === 'package-upload-failed') {
+      throw error;
+    }
     const message = normalizePackageInitializationError(error);
     deps.serverConsole(
-      'Package upload initialization failure details:',
+      `Package upload ${failureStage} failure details:`,
       fileObj._id,
       fileObj.name || fileObj.fileName || '',
       'path=',
@@ -252,11 +261,9 @@ export async function processPackageUploadWorkflow(
       zipPath,
       filePath: state.filePath,
       message,
-      emailTextPrefix: 'Package upload failed at initialization: ',
-      errorTextPrefix: 'package upload failed at initialization: ',
+      emailTextPrefix: `Package upload failed at ${failureStage}: `,
+      errorTextPrefix: `package upload failed at ${failureStage}: `,
       logPrefix: '3'
     });
-  } finally {
-    await postProcessUploadedTdfs({ unzippedFiles, deps, state });
   }
 }

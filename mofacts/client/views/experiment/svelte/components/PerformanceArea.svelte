@@ -91,7 +91,7 @@
 
 <style>
   .performance-area {
-    background-color: var(--stimuli-box-color);
+    background-color: var(--background-color);
     border-bottom: 1px solid var(--secondary-color);
     padding: 0.375rem 0.5rem;
     margin-bottom: 0.5rem;
@@ -116,7 +116,7 @@
     height: 24px;
     line-height: 1;
     border-radius: var(--border-radius-pill, 999px);
-    background-color: var(--neutral-color, #ffffff);
+    background-color: var(--background-color);
     margin: 0 auto;
     width: fit-content;
     min-width: 220px;
@@ -175,7 +175,7 @@
   .timeout-bar-wrapper {
     width: 100%;
     height: 8px;
-    background-color: var(--secondary-color);
+    background-color: var(--background-color);
     border-radius: var(--border-radius-sm);
     overflow: hidden;
   }

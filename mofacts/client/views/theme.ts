@@ -16,6 +16,7 @@ declare const DynamicSettings: any;
 declare const $: any;
 
 const THEME_FONT_STYLESHEET_LINK_ID = 'mofacts-theme-font-stylesheet';
+const THEME_IMPORT_MAX_FILE_BYTES = 10 * 1024 * 1024;
 const HOME_UNDERLAY_MAX_FILE_BYTES = 5 * 1024 * 1024;
 
 function getThemeLibrary() {
@@ -467,8 +468,8 @@ Template.theme.events({
             alert('Select a theme JSON file to import.');
             return;
         }
-        if (file.size > 1024 * 1024) {
-            alert('Theme files must be smaller than 1MB.');
+        if (file.size > THEME_IMPORT_MAX_FILE_BYTES) {
+            alert('Theme files must be smaller than 10MB.');
             return;
         }
         try {
