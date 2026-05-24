@@ -10,6 +10,8 @@ export type AutoTutorMove =
   | 'final_answer_prompt'
   | 'summary';
 
+export type AutoTutorCorrectionStage = 'hint' | 'prompt' | 'assertion';
+
 export type AutoTutorTargetType = 'expectation' | 'misconception' | 'learner_question' | 'completion';
 
 export type AutoTutorExpectationScore = {
@@ -39,11 +41,13 @@ export type AutoTutorLearnerQuestionScore = {
 
 export type AutoTutorPlannerState = {
   focusedExpectationId?: string;
+  focusedMisconceptionId?: string;
   lastCoveredExpectationId?: string;
   lastSelectedTargetId?: string;
   lastSelectedTargetType?: AutoTutorTargetType;
   focusTurnCount: number;
   moveCycleIndex: number;
+  misconceptionCycleIndex?: number;
   expectationScores: Record<string, AutoTutorExpectationScore>;
   misconceptionScores: Record<string, AutoTutorMisconceptionScore>;
 };
@@ -83,6 +87,7 @@ export type AutoTutorTarget = {
 export type AutoTutorPlan = {
   target: AutoTutorTarget;
   selectedMove: AutoTutorMove;
+  correctionStage?: AutoTutorCorrectionStage;
   nextPlannerState: AutoTutorPlannerState;
 };
 
@@ -98,6 +103,7 @@ export const AUTO_TUTOR_DEFAULT_WEIGHTS: AutoTutorPlannerWeights = Object.freeze
 });
 
 const EXPECTATION_CYCLE: AutoTutorMove[] = ['hint', 'prompt', 'assertion'];
+const MISCONCEPTION_CYCLE: AutoTutorCorrectionStage[] = ['hint', 'prompt', 'assertion'];
 const MAX_FOCUS_TURNS = 6;
 
 function assertScore(value: number, field: string): void {
@@ -219,6 +225,12 @@ export function validatePlannerState(script: AutoTutorPlannerScript, plannerStat
   if (!Number.isInteger(plannerState.moveCycleIndex) || plannerState.moveCycleIndex < 0) {
     throw new Error('AutoTutor planner state moveCycleIndex must be a non-negative integer');
   }
+  if (
+    plannerState.misconceptionCycleIndex !== undefined &&
+    (!Number.isInteger(plannerState.misconceptionCycleIndex) || plannerState.misconceptionCycleIndex < 0)
+  ) {
+    throw new Error('AutoTutor planner state misconceptionCycleIndex must be a non-negative integer when present');
+  }
 }
 
 export function recomputeExpectationPriorities(
@@ -245,6 +257,38 @@ export function recomputeExpectationPriorities(
     };
   }
   return nextScores;
+}
+
+export function preserveDurableExpectationCoverage(
+  script: AutoTutorPlannerScript,
+  previousScores: Record<string, AutoTutorExpectationScore>,
+  nextScores: Record<string, AutoTutorExpectationScore>,
+): Record<string, AutoTutorExpectationScore> {
+  const mergedScores: Record<string, AutoTutorExpectationScore> = {};
+  for (const expectation of script.expectations) {
+    const previousScore = previousScores[expectation.id];
+    const nextScore = nextScores[expectation.id];
+    if (!nextScore) {
+      throw new Error(`AutoTutor score response omitted expectation "${expectation.id}"`);
+    }
+    if (!previousScore || nextScore.coverage >= previousScore.coverage) {
+      mergedScores[expectation.id] = nextScore;
+      continue;
+    }
+    mergedScores[expectation.id] = {
+      ...previousScore,
+      current: previousScore.current || nextScore.current,
+      ...(previousScore.evidence || nextScore.evidence
+        ? { evidence: previousScore.evidence || nextScore.evidence }
+        : {}),
+      ...(previousScore.missing || nextScore.missing
+        ? { missing: previousScore.missing || nextScore.missing }
+        : {}),
+      coherence: Math.max(previousScore.coherence, nextScore.coherence),
+      centrality: Math.max(previousScore.centrality, nextScore.centrality),
+    };
+  }
+  return mergedScores;
 }
 
 function selectHighestPriorityExpectation(
@@ -359,13 +403,16 @@ export function selectAutoTutorMove(input: AutoTutorPlannerInput, target: AutoTu
   if (score.coverage >= thresholds.coverageThreshold * 0.75 && score.coverage < thresholds.coverageThreshold) {
     return 'prompt';
   }
-  return EXPECTATION_CYCLE[input.plannerState.moveCycleIndex % EXPECTATION_CYCLE.length] || 'hint';
+  const cycleIndex = firstFocusTurn ? 0 : input.plannerState.moveCycleIndex;
+  return EXPECTATION_CYCLE[cycleIndex % EXPECTATION_CYCLE.length] || 'hint';
 }
 
 export function planAutoTutorTurn(input: AutoTutorPlannerInput): AutoTutorPlan {
   const target = selectAutoTutorTarget(input);
   const selectedMove = selectAutoTutorMove(input, target);
   const nextPlannerState: AutoTutorPlannerState = JSON.parse(JSON.stringify(input.plannerState));
+  let correctionStage: AutoTutorCorrectionStage | undefined;
+  const thresholds = mergeThresholds(input.thresholds);
   nextPlannerState.lastSelectedTargetType = target.type;
   if (target.id) {
     nextPlannerState.lastSelectedTargetId = target.id;
@@ -393,7 +440,26 @@ export function planAutoTutorTurn(input: AutoTutorPlannerInput): AutoTutorPlan {
     nextPlannerState.moveCycleIndex += 1;
   }
 
-  const thresholds = mergeThresholds(input.thresholds);
+  if (target.type === 'misconception') {
+    if (!target.id) {
+      throw new Error('AutoTutor planner misconception target requires an ID');
+    }
+    if (nextPlannerState.focusedMisconceptionId !== target.id) {
+      nextPlannerState.focusedMisconceptionId = target.id;
+      nextPlannerState.misconceptionCycleIndex = 0;
+    }
+    const cycleIndex = nextPlannerState.misconceptionCycleIndex || 0;
+    correctionStage = MISCONCEPTION_CYCLE[cycleIndex % MISCONCEPTION_CYCLE.length] || 'hint';
+    nextPlannerState.misconceptionCycleIndex = cycleIndex + 1;
+  } else {
+    const hasActiveMisconception = Object.values(input.plannerState.misconceptionScores)
+      .some((score) => score.current && score.confidence >= thresholds.misconceptionThreshold);
+    if (!hasActiveMisconception) {
+      delete nextPlannerState.focusedMisconceptionId;
+      delete nextPlannerState.misconceptionCycleIndex;
+    }
+  }
+
   for (const [id, score] of Object.entries(input.plannerState.expectationScores)) {
     if (isCovered(score, thresholds.coverageThreshold)) {
       nextPlannerState.lastCoveredExpectationId = id;
@@ -401,5 +467,5 @@ export function planAutoTutorTurn(input: AutoTutorPlannerInput): AutoTutorPlan {
   }
 
   validatePlannerState(input.script, nextPlannerState);
-  return { target, selectedMove, nextPlannerState };
+  return { target, selectedMove, ...(correctionStage ? { correctionStage } : {}), nextPlannerState };
 }

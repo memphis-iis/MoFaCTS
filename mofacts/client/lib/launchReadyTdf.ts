@@ -45,6 +45,21 @@ function isLaunchReadyContent(content: any, allowConditionRoot: boolean): boolea
   return allowConditionRoot && isConditionRootWithoutUnitArray(content);
 }
 
+function hasAutoTutorUnit(content: any): boolean {
+  const units = content?.tdfs?.tutor?.unit;
+  return Array.isArray(units) && units.some((unit: any) =>
+    unit && typeof unit === 'object' && unit.autotutorsession && typeof unit.autotutorsession === 'object'
+  );
+}
+
+function hasAutoTutorLaunchConfig(content: any): boolean {
+  if (!hasAutoTutorUnit(content)) {
+    return true;
+  }
+  const setspec = content?.tdfs?.tutor?.setspec;
+  return typeof setspec?.openRouterApiKey === 'string' && setspec.openRouterApiKey.trim().length > 0;
+}
+
 function describeLaunchReadyFailure(tdfId: unknown, content: any): string {
   const units = content?.tdfs?.tutor?.unit;
   const unitSummary = Array.isArray(units)
@@ -79,7 +94,7 @@ export async function loadLaunchReadyTdf(
   let content = tdfDoc?.content;
   normalizeTutorUnits(content);
 
-  if (!isLaunchReadyContent(content, allowConditionRoot)) {
+  if (!isLaunchReadyContent(content, allowConditionRoot) || !hasAutoTutorLaunchConfig(content)) {
     clientConsole(1, `[${source}] TDF content is not launch-ready after subscription; fetching full TDF by id`, {
       currentTdfId,
     });
@@ -91,6 +106,10 @@ export async function loadLaunchReadyTdf(
   const isConditionRoot = isConditionRootWithoutUnitArray(content);
   if (!isLaunchReadyContent(content, allowConditionRoot)) {
     throw new Error(`[${source}] ${describeLaunchReadyFailure(currentTdfId, content)}`);
+  }
+
+  if (!hasAutoTutorLaunchConfig(content)) {
+    throw new Error(`[${source}] AutoTutor TDF ${currentTdfId} is missing tutor.setspec.openRouterApiKey after full TDF load`);
   }
 
   if (isConditionRoot && !allowConditionRoot) {

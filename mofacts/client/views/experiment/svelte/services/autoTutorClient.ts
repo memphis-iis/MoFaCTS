@@ -11,6 +11,7 @@ import {
 import {
   createInitialAutoTutorPlannerState,
   planAutoTutorTurn,
+  preserveDurableExpectationCoverage,
   recomputeExpectationPriorities,
   validatePlannerState,
   type AutoTutorMove,
@@ -259,6 +260,7 @@ function buildScoringSystemPrompt(config: AutoTutorConfig): string {
     'You are the MoFaCTS AutoTutor semantic scorer for one learner.',
     'Score the latest learner answer against the authored AutoTutor script and role-preserving dialogue history.',
     'Only learner-generated text may count as expectation coverage. Tutor turns may provide context for short learner answers, but tutor hints, prompts, assertions, summaries, and corrections are not learner knowledge.',
+    'If the latest learner answer is abusive, profane, hostile, playful, or otherwise off-task rather than a substantive content claim, ignore that behavior for semantic scoring: do not mark any expectation covered, do not mark or strengthen any misconception, and do not reduce previously demonstrated expectation coverage.',
     'Classify whether the learner asked a substantive question and whether it is answerable from the provided authored lesson content or dialogue context.',
     'Do not choose a dialogue target, choose a dialogue move, or write the tutor response.',
     'Return JSON only. Do not wrap it in Markdown. The JSON object must exactly follow this envelope shape:',
@@ -285,8 +287,8 @@ function buildScoringUserPrompt(studentAnswer: string, state: AutoTutorState): s
     'Prior tutor state:',
     JSON.stringify(summarizeState(state), null, 2),
     '',
-    'Recent dialogue history:',
-    JSON.stringify(state.dialogue.slice(-8), null, 2),
+    'Full dialogue history:',
+    JSON.stringify(state.dialogue, null, 2),
   ].join('\n');
 }
 
@@ -296,6 +298,14 @@ function buildUtteranceSystemPrompt(config: AutoTutorConfig): string {
     'The application has already selected the tutorial target and dialogue move. You must not change them.',
     'Echo the selected targetType, targetId, and selectedMove exactly. If targetId is null, return null; do not invent a script ID or lesson ID.',
     'Use only the authored AutoTutor lesson content and the supplied dialogue context. For out-of-scope learner questions, state that this tutor can only answer from the lesson content, then continue with the selected move.',
+    'Every non-summary move must keep the dialogue going with a concrete follow-up question to the learner.',
+    'When the learner has made progress on or covered a prior expectation, briefly acknowledge that progress before continuing.',
+    'The user prompt includes transition metadata. When targetChanged is true, begin tutorMessage with a brief acknowledgement of what the learner just contributed or repaired, then name the new focus before asking the next hint, prompt, pump, or correction.',
+    'Use the full dialogue history to avoid repeating failed attempts. When a hint, prompt, assertion, or correction has not helped the learner make progress, take a new pathway or perspective toward the unspoken expectation or unresolved misconception.',
+    'If the latest learner answer is abusive, profane, hostile, playful, or otherwise off-task, do not scold or analyze the behavior. Re-prompt from a new angle for the app-selected target and move.',
+    'Correction moves include an app-selected correctionStage. For correctionStage "hint", give a light cue that helps the learner notice why the misconception may not work. For "prompt", ask a targeted question that helps the learner explain why it is wrong. For "assertion", state exactly how it is wrong and ask the learner to restate or apply the repair.',
+    'If the same misconception remains active across turns, continue the repair from the selected correctionStage and full dialogue history rather than repeating the same angle.',
+    'For assertion moves, supply the missing content briefly, then ask the learner to restate or apply that idea.',
     'Keep the tutor message concise, conversational, and addressed to the student.',
     'Return JSON only. Do not wrap it in Markdown. The JSON object must exactly follow this envelope shape:',
     JSON.stringify(AUTO_TUTOR_UTTERANCE_ENVELOPE_SCHEMA, null, 2),
@@ -321,17 +331,37 @@ function getTargetContent(config: AutoTutorConfig, plan: AutoTutorPlan): unknown
   return { authoredContentBoundary: 'Answer only from the supplied lesson content and dialogue history.' };
 }
 
+function getPlanTransitionMetadata(state: AutoTutorState, plan: AutoTutorPlan) {
+  const previousTargetType = state.planner.lastSelectedTargetType || null;
+  const previousTargetId = state.planner.lastSelectedTargetId || null;
+  const currentTargetType = plan.target.type;
+  const currentTargetId = plan.target.id || null;
+  const targetChanged = previousTargetType !== currentTargetType || previousTargetId !== currentTargetId;
+  return {
+    previousTargetType,
+    previousTargetId,
+    currentTargetType,
+    currentTargetId,
+    targetChanged,
+  };
+}
+
 function buildUtteranceUserPrompt(config: AutoTutorConfig, studentAnswer: string, state: AutoTutorState, plan: AutoTutorPlan): string {
+  const transition = getPlanTransitionMetadata(state, plan);
   return [
     'Latest student answer:',
     studentAnswer,
     '',
-    'App-selected plan. Echo these fields exactly in the response:',
+    'App-selected plan. Echo targetType, targetId, and selectedMove exactly in the response. Use correctionStage when present:',
     JSON.stringify({
       targetType: plan.target.type,
       targetId: plan.target.id || null,
       selectedMove: plan.selectedMove,
+      correctionStage: plan.correctionStage || null,
     }, null, 2),
+    '',
+    'Transition metadata. If targetChanged is true, begin tutorMessage with a brief acknowledgement of the learner contribution or repaired understanding that allowed the transition, then name the new focus before asking the selected move:',
+    JSON.stringify(transition, null, 2),
     '',
     'Relevant authored target content:',
     JSON.stringify(getTargetContent(config, plan), null, 2),
@@ -339,8 +369,8 @@ function buildUtteranceUserPrompt(config: AutoTutorConfig, studentAnswer: string
     'Current scored planner state:',
     JSON.stringify(state.planner, null, 2),
     '',
-    'Recent dialogue history:',
-    JSON.stringify(state.dialogue.slice(-8), null, 2),
+    'Full dialogue history:',
+    JSON.stringify(state.dialogue, null, 2),
   ].join('\n');
 }
 
@@ -857,13 +887,19 @@ export async function createAutoTutorRuntime(): Promise<AutoTutorRuntime> {
 
       const nextState = cloneJson(state);
       nextState.costUsd += scoreResult.costUsd;
-      const scoredExpectations = recomputeExpectationPriorities(config.script, scoreEnvelope.expectationScores);
+      const durableExpectationScores = preserveDurableExpectationCoverage(
+        config.script,
+        state.expectations,
+        scoreEnvelope.expectationScores,
+      );
+      const scoredExpectations = recomputeExpectationPriorities(config.script, durableExpectationScores);
       nextState.expectations = scoredExpectations;
       nextState.misconceptions = scoreEnvelope.misconceptionScores;
       nextState.planner.expectationScores = scoredExpectations;
       nextState.planner.misconceptionScores = scoreEnvelope.misconceptionScores;
       nextState.answerQuality = scoreEnvelope.answerQuality;
       nextState.studentAskedQuestion = scoreEnvelope.learnerQuestion.current;
+      const stateForUtterancePlan = cloneJson(nextState);
       const plan = planAutoTutorTurn({
         script: config.script,
         plannerState: nextState.planner,
@@ -886,7 +922,7 @@ export async function createAutoTutorRuntime(): Promise<AutoTutorRuntime> {
       }
       let tutorMessage = 'We need to stop here because this AutoTutor session reached the configured cost cap.';
       if (!nextState.stoppedByCost) {
-        const utteranceResult = await callOpenRouterUtterance(config, nextState, cleanedAnswer, plan);
+        const utteranceResult = await callOpenRouterUtterance(config, stateForUtterancePlan, cleanedAnswer, plan);
         nextState.costUsd += utteranceResult.costUsd;
         const utteranceEnvelope = parseAutoTutorUtteranceEnvelope(utteranceResult.content);
         validateUtteranceEnvelope(utteranceEnvelope, plan);
