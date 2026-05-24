@@ -93,6 +93,17 @@ npm run typecheck
 
 Do not treat per-file checks or targeted `tsc` invocations as a substitute for full-app TypeScript verification.
 
+## Verification Strategy
+
+Use the verification path that matches the change, and say clearly when a check could not be run in the local environment.
+
+- TypeScript-bearing app changes: run `npm run typecheck` from `mofacts/`.
+- Lintable TypeScript, JavaScript, or Svelte changes: run `npm run lint` from `mofacts/`.
+- TDF field registry or schema changes: run `npm run generate:schemas` from `mofacts/` and inspect generated schema diffs.
+- UI/runtime behavior changes: use the native hotfix dev server plus browser smoke testing at `http://localhost:3200`.
+- Meteor integration or client contract coverage: use CI or another supported Meteor test environment. Do not run `npm run test:ci` as routine local Windows verification; the script refuses local Windows execution unless `MOFACTS_ALLOW_WINDOWS_METEOR_TESTS=1` is set for deliberate harness debugging. If Meteor coverage is needed but unavailable locally, document that explicitly instead of substituting a narrower check.
+- Docker build, push, or deploy verification: run only when explicitly requested.
+
 ## Server Method Design
 
 The server should stay minimized; the client should do as much processor work as safely possible.

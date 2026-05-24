@@ -13,6 +13,17 @@ The card runtime presents trials, manages learner response UI, coordinates speec
 - `services/`: runtime services for initialization, resume behavior, history logging, media, speech recognition, and unit-engine integration.
 - `utils/`: local helpers and validators.
 
+## Runtime Boundaries
+
+- `meteorIntegration.ts` owns the Blaze-to-Svelte mount bridge.
+- `services/svelteInit.ts` owns card launch bootstrap: entry intent resolution, TDF/unit preconditions, stimuli loading, engine initialization, resume dispatch, and instruction redirects.
+- `services/cardEntryBootstrap.ts` owns card-entry intent classification before initialization dispatch.
+- `services/cardReadiness.ts` owns card display readiness predicates and diagnostics.
+- `machine/` owns trial lifecycle state, transition guards, actions, invoked service contracts, and fail-clear machine errors.
+- `components/CardScreen.svelte` coordinates UI composition and wires Svelte state to services and the machine; new domain behavior should move into a service or machine file before the component grows new business logic.
+- `services/videoMachineBridge.ts`, `services/videoCardInit.ts`, and `components/VideoSessionMode.svelte` own video-session bridge behavior until a stable unit-runtime adapter boundary exists.
+- `components/AutoTutorSession.svelte` and `services/autoTutorClient.ts` own current AutoTutor client integration. H5P display behavior belongs in the H5P components, H5P utilities, and `services/unitEngineService.ts` integration points.
+
 ## Supported Interaction Patterns
 
 - Study, drill, and test trials.
@@ -26,7 +37,9 @@ The card runtime presents trials, manages learner response UI, coordinates speec
 
 - Keep routine browser diagnostics behind the project client logging gate.
 - Keep state-machine changes paired with type and behavior checks.
+- Keep launch, readiness, machine, and rendering bridge concerns in their named homes above.
 - Prefer explicit error states over silent fallback behavior when card runtime invariants break.
+- Missing TDF/unit data, stale launch context, invalid card-entry intent, video readiness mismatch, and unknown unit type must fail clearly or route through an intentional user-facing stop path.
 - Run the full app TypeScript check after TypeScript-bearing changes:
 
 ```bash

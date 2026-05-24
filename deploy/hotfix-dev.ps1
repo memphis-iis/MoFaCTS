@@ -20,6 +20,7 @@ $watcherStderrPath = Join-Path $localDevDir "commonjs-watcher.stderr.log"
 $settingsPath = Join-Path $deployDir "settings.local.json"
 $localDataHome = Join-Path $deployDir "local-data"
 $commonJsWatcherScript = Join-Path $deployDir "hotfix-dev\ensure-commonjs-build.ps1"
+$meteorReleasePath = Join-Path $appDir ".meteor\release"
 
 $mongoUrl = "mongodb://127.0.0.1:27017/MoFACT-meteor3"
 $expectedMongoDbName = "MoFACT-meteor3"
@@ -51,6 +52,36 @@ function Resolve-ExternalCommandName {
 
     $command = Get-Command $CommandName -ErrorAction Stop
     return $command.Source
+}
+
+function Get-ProjectMeteorTool {
+    if (-not (Test-Path $meteorReleasePath)) {
+        throw "Missing Meteor release file at $meteorReleasePath"
+    }
+
+    $release = (Get-Content $meteorReleasePath -Raw).Trim()
+    if (-not $release.StartsWith("METEOR@", [System.StringComparison]::Ordinal)) {
+        throw "Unexpected Meteor release format in ${meteorReleasePath}: $release"
+    }
+
+    $version = $release.Substring("METEOR@".Length)
+    if (-not $version) {
+        throw "Meteor release version is empty in $meteorReleasePath"
+    }
+
+    $meteorInstall = Join-Path $env:LOCALAPPDATA ".meteor"
+    $toolDir = Join-Path $meteorInstall "packages\meteor-tool\$version\mt-os.windows.x86_64"
+    $toolBat = Join-Path $toolDir "meteor.bat"
+    if (-not (Test-Path $toolBat)) {
+        throw "Project requires Meteor $version, but the matching tool is missing at $toolBat"
+    }
+
+    return @{
+        Version = $version
+        InstallDir = $meteorInstall
+        ToolDir = $toolDir
+        ToolBat = $toolBat
+    }
 }
 
 function Invoke-ExternalChecked {
@@ -158,7 +189,7 @@ function Start-HotfixDev {
     }
 
     $dockerExe = Resolve-ExternalCommandName -CommandName "docker"
-    $meteorExe = Resolve-ExternalCommandName -CommandName "meteor"
+    $meteorTool = Get-ProjectMeteorTool
 
     Invoke-ExternalChecked -CommandLine (@($dockerExe) + $composeArgs + @("config")) -WorkingDirectory $deployDir
     Invoke-ExternalChecked -CommandLine (@($dockerExe) + $composeArgs + @("up", "-d", "mongodb")) -WorkingDirectory $deployDir
@@ -172,6 +203,8 @@ function Start-HotfixDev {
     $previousPort = $env:PORT
     $previousMeteorSettingsWorkaround = $env:METEOR_SETTINGS_WORKAROUND
     $previousHome = $env:HOME
+    $previousPath = $env:PATH
+    $previousMeteorInstallation = $env:METEOR_INSTALLATION
 
     try {
         $env:MONGO_URL = $mongoUrl
@@ -180,6 +213,8 @@ function Start-HotfixDev {
         $env:PORT = $port
         $env:METEOR_SETTINGS_WORKAROUND = $settingsPath
         $env:HOME = $localDataHome
+        $env:METEOR_INSTALLATION = "$($meteorTool.InstallDir)\"
+        $env:PATH = "$($meteorTool.ToolDir);$previousPath"
 
         Set-Content -Path $pidPath -Value ([string]$PID)
 
@@ -195,7 +230,7 @@ function Start-HotfixDev {
         Set-Content -Path $watcherPidPath -Value ([string]$watcher.Id)
 
         $process = Start-Process `
-            -FilePath $meteorExe `
+            -FilePath $meteorTool.ToolBat `
             -ArgumentList @("--settings", $settingsPath, "--port", $port) `
             -WorkingDirectory $appDir `
             -RedirectStandardOutput $stdoutPath `
@@ -204,7 +239,7 @@ function Start-HotfixDev {
             -PassThru
 
         Set-Content -Path $pidPath -Value ([string]$process.Id)
-        Write-Host "Started native Meteor hotfix dev server with PID $($process.Id)."
+        Write-Host "Started native Meteor hotfix dev server with PID $($process.Id) using Meteor $($meteorTool.Version)."
         Write-Host "URL: $rootUrl"
         Write-Host "Stdout: $stdoutPath"
         Write-Host "Stderr: $stderrPath"
@@ -215,6 +250,8 @@ function Start-HotfixDev {
         $env:PORT = $previousPort
         $env:METEOR_SETTINGS_WORKAROUND = $previousMeteorSettingsWorkaround
         $env:HOME = $previousHome
+        $env:PATH = $previousPath
+        $env:METEOR_INSTALLATION = $previousMeteorInstallation
     }
 }
 

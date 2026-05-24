@@ -35,6 +35,10 @@ The goal is to make MoFaCTS easier for future AI coding agents and human maintai
 - Meteor collection construction and global bridge ordering must remain compatible with current startup code.
 - Session cleanup must preserve the documented launch/resume boundaries.
 
+## Execution Rule
+
+Implement phases in the recommended order. Within a phase, continue from discovery through the smallest coherent implementation, verification, and documentation updates without pausing for non-blocking preferences. Pause only when a listed stop condition is hit, when an invariant cannot be preserved, or when a required product or repository decision cannot be inferred from existing code and documentation.
+
 ## Phase 1: Collection Boundary Split
 
 ### Problem
@@ -64,13 +68,14 @@ mofacts/common/collectionGlobals.ts
 2. Keep the policy pure where possible: constants and small validation helpers first, wiring second.
 3. Extract the `globalThis` assignment into `collectionGlobals.ts`.
 4. Keep `Collections.ts` responsible for constructing collections and invoking the bridge.
-5. Add or update tests that verify canonical collection names and the intended global bridge keys.
+5. Extend `mofacts/common/collectionOwnership.test.ts` to verify canonical collection names and the intended global bridge keys remain aligned with the extracted bridge.
+6. If the extracted bridge needs direct behavioral coverage, add a focused `mofacts/common/collectionGlobals.test.ts` rather than expanding unrelated collection tests.
 
 ### Verification
 
 - `npm run typecheck`
 - `npm run lint`
-- Server startup or existing composition tests when available
+- Meteor startup-order coverage in CI or another supported Meteor test environment when collection construction or startup ordering changes. Do not run `npm run test:ci` as routine local Windows verification.
 - Confirm `DynamicSettings` still uses `dynaminc_settings`
 
 ### Do Not Combine With
@@ -89,7 +94,7 @@ This is acceptable for now, but future agents need explicit guidance about where
 
 ### Target Shape
 
-Add local runtime boundary documentation near the Svelte experiment code:
+Add or update local runtime boundary documentation near the Svelte experiment code:
 
 ```text
 mofacts/client/views/experiment/svelte/README.md
@@ -173,9 +178,9 @@ interface UnitRuntimeAdapter {
 
 ### Target Shape
 
-Introduce small typed adapters for the highest-risk session domains. Start with wrappers over existing `Session` keys rather than replacing storage.
+Introduce small typed adapters for the highest-risk session domains. Start with the card-display/readiness domain already documented by `CARD_RUNTIME_SESSION_DEFAULTS` in `mofacts/client/lib/sessionCleanupRegistry.ts`; use wrappers over existing `Session` keys rather than replacing storage.
 
-Possible files:
+Initial adapter files:
 
 ```text
 mofacts/client/lib/cardRuntimeSession.ts
@@ -185,8 +190,8 @@ mofacts/client/lib/adminSessionState.ts
 
 ### Steps
 
-1. Pick one domain with clear key ownership, likely card runtime state.
-2. Move reads/writes for that domain behind named functions.
+1. Start with the card-display/readiness keys: `displayReady`, `currentDisplay`, `originalQuestion`, `buttonTrial`, `alternateDisplayIndex`, `numVisibleCards`, and `testType`.
+2. Move reads/writes for those keys behind named functions in `mofacts/client/lib/cardRuntimeSession.ts`.
 3. Keep keys centralized in `sessionCleanupRegistry.ts` or an adjacent key registry.
 4. Add tests for cleanup and launch/resume preservation behavior.
 5. Repeat only after the first adapter proves useful.
@@ -214,7 +219,7 @@ The assessment schedule parser is now pure and fail-clear, but it still lacks go
 
 Add fixture-based tests around `learning-components/units/assessment-session/assessmentSettings.ts`.
 
-Possible structure:
+Fixture and test structure:
 
 ```text
 learning-components/units/assessment-session/__fixtures__/
@@ -233,7 +238,7 @@ mofacts/client/views/experiment/assessmentSettings.contracts.test.ts
 
 - `npm run typecheck`
 - `npm run lint`
-- Meteor client test runner or CI test runner where available
+- Meteor client contract coverage in CI or another supported Meteor test environment. Do not run `npm run test:ci` as routine local Windows verification; document that this coverage remains CI-only for the patch.
 
 ### Do Not Combine With
 
@@ -323,19 +328,19 @@ Local Windows development does not reliably run the full Meteor test harness. Fu
 
 ### Target Shape
 
-Update developer documentation with a verification matrix:
+Update `AGENTS.md` for agent-facing operating rules and `docs/contributors/README.md` or a new file under `docs/contributors/` for human contributor guidance with a verification matrix:
 
 - TypeScript changes: `npm run typecheck`
 - Lintable changes: `npm run lint`
 - Schema registry changes: `npm run generate:schemas`
 - UI changes: hotfix dev server plus browser smoke
-- Meteor integration tests: CI or supported environment
+- Meteor integration/client contract tests: CI or another supported Meteor test environment; do not run `npm run test:ci` as routine local Windows verification
 - Docker/deploy verification: only when explicitly requested
 
 ### Verification
 
 - Documentation-only review
-- Confirm commands match `package.json`
+- Confirm commands match `mofacts/package.json`
 
 ### Do Not Combine With
 
