@@ -1,5 +1,5 @@
 <script>
-  import { createEventDispatcher, onMount } from 'svelte';
+  import { createEventDispatcher, onMount, tick } from 'svelte';
   import 'deep-chat';
   import { createAutoTutorRuntime } from '../services/autoTutorClient';
   import { clientConsole } from '../../../../lib/clientLogger';
@@ -87,24 +87,20 @@
     });
   }
 
-  function configureDeepChat() {
-    chatElement.connect = {
-      handler: async (body, signals) => {
-        try {
-          const studentText = extractStudentText(body);
-          const result = await runtime.submitStudentAnswer(studentText);
-          await signals.onResponse({ text: result.message });
-          refreshRuntimeState();
-        } catch (error) {
-          errorMessage = error?.message || String(error);
-          updateChatInputState();
-          clientConsole(1, '[AutoTutor] Chat turn failed', error);
-          await signals.onResponse({
-            text: 'This AutoTutor session hit a configuration or service error. Please contact the lesson author.',
-          });
-        }
-      },
-    };
+  function applyDeepChatHostLayout() {
+    if (!chatElement) {
+      return;
+    }
+    chatElement.style.setProperty('display', 'block');
+    chatElement.style.setProperty('width', '100%');
+    chatElement.style.setProperty('height', '100%');
+    chatElement.style.setProperty('min-width', '0');
+    chatElement.style.setProperty('min-height', '0');
+    chatElement.style.setProperty('box-sizing', 'border-box');
+  }
+
+  function configureDeepChatVisuals() {
+    applyDeepChatHostLayout();
 
     chatElement.introMessage = {
       text: 'Tell me what you think. A short answer is fine.',
@@ -172,17 +168,45 @@
       borderRadius: '8px',
       backgroundColor: 'var(--background-color)',
     };
+  }
+
+  function configureDeepChatRuntime() {
+    chatElement.connect = {
+      handler: async (body, signals) => {
+        try {
+          if (!runtime) {
+            throw new Error('AutoTutor runtime is not ready');
+          }
+          const studentText = extractStudentText(body);
+          const result = await runtime.submitStudentAnswer(studentText);
+          await signals.onResponse({ text: result.message });
+          refreshRuntimeState();
+        } catch (error) {
+          errorMessage = error?.message || String(error);
+          updateChatInputState();
+          clientConsole(1, '[AutoTutor] Chat turn failed', error);
+          await signals.onResponse({
+            text: 'This AutoTutor session hit a configuration or service error. Please contact the lesson author.',
+          });
+        }
+      },
+    };
+
     chatElement.history = toDeepChatHistory(runtime.getDialogue());
     updateChatInputState();
+    chatElement.onRender?.();
   }
 
   onMount(async () => {
     try {
+      configureDeepChatVisuals();
       runtime = await createAutoTutorRuntime();
       questionPrompt = runtime.config.prompt;
       unitName = runtime.config.unitName;
       refreshRuntimeState();
-      configureDeepChat();
+      configureDeepChatRuntime();
+      await tick();
+      applyDeepChatHostLayout();
     } catch (error) {
       errorMessage = error?.message || String(error);
       updateChatInputState();
@@ -226,7 +250,10 @@
   {/if}
 
   <div class="auto-tutor-chat" class:auto-tutor-chat-disabled={!!errorMessage || completed}>
-    <deep-chat bind:this={chatElement}></deep-chat>
+    <deep-chat
+      bind:this={chatElement}
+      style="display: block; width: 100%; height: 100%; min-width: 0; min-height: 0; box-sizing: border-box;"
+    ></deep-chat>
   </div>
 
   <div class="auto-tutor-continue-bar" aria-label="AutoTutor continue controls">
@@ -345,9 +372,11 @@
 
   .auto-tutor-chat :global(deep-chat) {
     display: block;
-    width: 100%;
-    height: 100%;
-    min-height: 0;
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    box-sizing: border-box;
   }
 
   .auto-tutor-continue-bar {

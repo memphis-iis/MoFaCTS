@@ -62,6 +62,8 @@
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius-sm);
     background: color-mix(in srgb, var(--card-background-color) 96%, var(--accent-color) 4%);
+    min-width: 0;
+    overflow: hidden;
 }
 
 .learning-dashboard-section-card .learning-dashboard-section-heading {
@@ -74,9 +76,16 @@
 
 .learning-dashboard-table {
     width: 100%;
-    min-width: 1076px;
+    min-width: 1040px;
     table-layout: fixed;
     color: var(--text-color);
+    --bs-table-cell-padding-x: 0.55rem;
+    --bs-table-cell-padding-y: 0.42rem;
+}
+
+.learning-dashboard-table > :not(caption) > * > * {
+    padding: 0.42rem 0.55rem;
+    line-height: 1.22;
 }
 
 .learning-dashboard-col-lesson {
@@ -84,19 +93,19 @@
 }
 
 .learning-dashboard-col-features {
-    width: 92px;
+    width: 82px;
 }
 
 .learning-dashboard-col-stat {
-    width: 104px;
+    width: 96px;
 }
 
 .learning-dashboard-col-last-practice {
-    width: 140px;
+    width: 126px;
 }
 
 .learning-dashboard-col-action {
-    width: 136px;
+    width: 168px;
 }
 
 .learning-dashboard-cell {
@@ -147,10 +156,21 @@
     width: 100%;
 }
 
+.learning-dashboard-action-group {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+}
+
 .learning-dashboard-action-button {
-    min-width: 6.5rem;
-    max-width: 9rem;
-    flex: 0 1 9rem;
+    min-width: 4.8rem;
+    max-width: 6rem;
+    flex: 0 0 auto;
+    padding: 0.18rem 0.72rem;
+    line-height: 1.15;
 }
 
 .learning-dashboard-empty-state {
@@ -163,6 +183,9 @@
 }
 
 .learning-dashboard-card {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
     border-radius: var(--border-radius-sm) !important;
     background: var(--card-background-color);
     color: var(--text-color);
@@ -177,13 +200,23 @@
     min-height: 2rem;
 }
 
-.learning-dashboard-card-button {
-    min-height: var(--button-height);
+.learning-dashboard-card-actions {
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.35rem;
+}
+
+.learning-dashboard-card-button {
+    min-height: var(--button-height);
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
     max-width: 9.5rem;
-    flex: 0 1 9.5rem !important;
+    flex: 0 0 auto !important;
+    white-space: nowrap;
 }
 
 .card-expand-icon {
@@ -364,9 +397,37 @@ button[aria-expanded="true"] .card-expand-icon {
 }
 
 @media (max-width: 767px) {
+    .learning-dashboard-section-card {
+        padding: 0.5rem;
+    }
+
+    .learning-dashboard-section-card .learning-dashboard-section-heading {
+        margin-bottom: 0.45rem;
+    }
+
+    .learning-dashboard-card {
+        padding: 0.65rem !important;
+        margin-bottom: 0.5rem !important;
+    }
+
+    .learning-dashboard-card-actions {
+        justify-content: flex-start;
+        gap: 0.3rem;
+    }
+
+    .learning-dashboard-card-button {
+        min-width: 4.2rem;
+        max-width: 5.8rem;
+        min-height: calc(var(--button-height) * 0.68);
+        padding: 0.16rem 0.55rem;
+        line-height: 1.15;
+        flex: 0 0 auto !important;
+    }
+
     .learner-config-panel-card {
         width: 100%;
         max-width: 100%;
+        box-sizing: border-box;
     }
 
     .learner-config-fields-grid {

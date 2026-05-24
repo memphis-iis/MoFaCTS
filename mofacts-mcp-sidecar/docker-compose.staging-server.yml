@@ -1,7 +1,7 @@
 services:
   playwright-mcp:
     environment:
-      BASE_URL: http://host.docker.internal:3100
+      BASE_URL: https://staging.optimallearning.org
 
   mongo-mcp:
     environment:
@@ -13,4 +13,4 @@ services:
 networks:
   mofacts_app:
     external: true
-    name: deploy_mofacts
+    name: mofacts_mofacts

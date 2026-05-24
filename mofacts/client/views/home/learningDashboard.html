@@ -130,14 +130,14 @@
               <td class="learning-dashboard-cell learning-dashboard-cell--action text-center" data-label="Action">
                 <div class="learning-dashboard-cell__value learning-dashboard-action">
                   {{#if this.conditions}}
-                    <div class="d-flex gap-1 justify-content-center flex-wrap">
+                    <div class="learning-dashboard-action-group">
                       <button class="btn btn-sm btn-success learning-dashboard-action-button start-condition-root">Start</button>
                       {{#if this.hasConfigurableSettings}}
                         <button class="btn btn-sm btn-outline-secondary learning-dashboard-action-button configure-lesson" data-tdfid="{{this.TDFId}}">Settings</button>
                       {{/if}}
                     </div>
                   {{else if this.isUsed}}
-                    <div class="d-flex gap-1 justify-content-center flex-wrap">
+                    <div class="learning-dashboard-action-group">
                       <button class="btn btn-sm btn-primary learning-dashboard-action-button continue-lesson"
                         data-tdfid="{{this.TDFId}}"
                         data-lessonname="{{this.displayName}}"
@@ -148,7 +148,7 @@
                       {{/if}}
                     </div>
                   {{else}}
-                    <div class="d-flex gap-1 justify-content-center flex-wrap">
+                    <div class="learning-dashboard-action-group">
                       <button class="btn btn-sm btn-success learning-dashboard-action-button start-lesson"
                         data-tdfid="{{this.TDFId}}"
                         data-lessonname="{{this.displayName}}"
@@ -220,22 +220,22 @@
 
       {{#if this.conditions}}
         {{!-- Owner of a condition-pool root TDF: selector is in the card title; just show Start --}}
-        <div class="d-flex gap-1 mt-1 justify-content-center flex-wrap">
-          <button class="btn btn-sm btn-success flex-grow-1 start-condition-root learning-dashboard-card-button">Start</button>
+        <div class="learning-dashboard-card-actions">
+          <button class="btn btn-sm btn-success start-condition-root learning-dashboard-card-button">Start</button>
           {{#if this.hasConfigurableSettings}}
-            <button class="btn btn-sm btn-outline-secondary flex-grow-1 configure-lesson learning-dashboard-card-button" data-tdfid="{{this.TDFId}}">Settings</button>
+            <button class="btn btn-sm btn-outline-secondary configure-lesson learning-dashboard-card-button" data-tdfid="{{this.TDFId}}">Settings</button>
           {{/if}}
         </div>
       {{else if this.isUsed}}
-        <div class="d-flex gap-1 mt-1 align-items-center justify-content-center flex-wrap">
-          <button class="btn btn-sm btn-primary flex-grow-1 continue-lesson learning-dashboard-card-button"
+        <div class="learning-dashboard-card-actions">
+          <button class="btn btn-sm btn-primary continue-lesson learning-dashboard-card-button"
             data-tdfid="{{this.TDFId}}"
             data-lessonname="{{this.displayName}}"
             data-currentstimulisetid="{{this.currentStimuliSetId}}"
             data-ismultitdf="{{this.isMultiTdf}}">
             Continue
           </button>
-          <button class="btn btn-sm btn-primary flex-grow-1 learning-dashboard-card-button"
+          <button class="btn btn-sm btn-primary learning-dashboard-card-button"
             type="button"
             data-bs-toggle="collapse"
             data-bs-target="#details-{{this.TDFId}}"
@@ -245,14 +245,14 @@
             <span class="fa fa-chevron-down card-expand-icon ms-1"></span>
           </button>
           {{#if this.hasConfigurableSettings}}
-            <button class="btn btn-sm btn-outline-secondary flex-grow-1 configure-lesson learning-dashboard-card-button" data-tdfid="{{this.TDFId}}">
+            <button class="btn btn-sm btn-outline-secondary configure-lesson learning-dashboard-card-button" data-tdfid="{{this.TDFId}}">
               Settings
             </button>
           {{/if}}
         </div>
       {{else}}
-        <div class="d-flex gap-1 mt-1 justify-content-center flex-wrap">
-          <button class="btn btn-sm btn-success flex-grow-1 start-lesson learning-dashboard-card-button"
+        <div class="learning-dashboard-card-actions">
+          <button class="btn btn-sm btn-success start-lesson learning-dashboard-card-button"
             data-tdfid="{{this.TDFId}}"
             data-lessonname="{{this.displayName}}"
             data-currentstimulisetid="{{this.currentStimuliSetId}}"
@@ -262,7 +262,7 @@
             Start
           </button>
           {{#if this.hasConfigurableSettings}}
-            <button class="btn btn-sm btn-outline-secondary flex-grow-1 configure-lesson learning-dashboard-card-button" data-tdfid="{{this.TDFId}}">
+            <button class="btn btn-sm btn-outline-secondary configure-lesson learning-dashboard-card-button" data-tdfid="{{this.TDFId}}">
               Settings
             </button>
           {{/if}}
