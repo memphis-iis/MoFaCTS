@@ -332,6 +332,19 @@ button[aria-expanded="true"] .card-expand-icon {
     text-align: right;
 }
 
+.learner-config-admin-reset {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-right: auto;
+}
+
+.learner-config-reset-progress.btn,
+.learner-config-reset-progress-cancel.btn {
+    min-height: calc(var(--button-height) * 0.72);
+    line-height: 1.1;
+}
+
 @keyframes learner-config-panel-open {
     from {
         grid-template-rows: 0fr;

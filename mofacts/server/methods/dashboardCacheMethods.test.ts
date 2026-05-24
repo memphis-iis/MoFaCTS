@@ -244,4 +244,144 @@ describe('dashboardCacheMethods', function() {
     expect(lastModifier.$set).to.not.have.property('learnerTdfConfigs');
     expect(cacheDoc.learnerTdfConfigs.tdfA.overrides.setspec.audioPromptMode).to.equal('feedback');
   });
+
+  it('resetAdminLessonProgress clears admin history, experiment state, and root cache stats for a condition family', async function() {
+    const userId = 'admin-1';
+    const docs = {
+      root: {
+        _id: 'root',
+        content: {
+          fileName: 'root.json',
+          tdfs: {
+            tutor: {
+              setspec: {
+                lessonname: 'Root Lesson',
+                condition: ['condition-a.json'],
+                conditionTdfIds: ['condition-a']
+              }
+            }
+          }
+        }
+      },
+      child: {
+        _id: 'condition-a',
+        content: {
+          fileName: 'condition-a.json',
+          tdfs: { tutor: { setspec: { lessonname: 'Condition A' } } }
+        }
+      }
+    };
+    const removedSelectors: any[] = [];
+    const stateRemovedSelectors: any[] = [];
+    let cacheDoc: any = {
+      _id: 'cache-1',
+      userId,
+      tdfStats: {
+        root: {
+          displayName: 'Root Lesson',
+          totalTrials: 3,
+          correctTrials: 2,
+          incorrectTrials: 1,
+          totalTimeMs: 1000,
+          totalTimeMinutes: 0.1,
+          itemsPracticedCount: 2,
+          totalSessions: 1,
+          overallAccuracy: 66.7,
+          firstPracticeDate: new Date('2026-05-01T00:00:00.000Z'),
+          lastPracticeDate: new Date('2026-05-01T00:00:00.000Z'),
+          lastPracticeTimestamp: new Date('2026-05-01T00:00:00.000Z').getTime(),
+          lastProcessedHistoryId: null,
+          lastProcessedTimestamp: null
+        },
+        other: {
+          displayName: 'Other Lesson',
+          totalTrials: 1,
+          correctTrials: 1,
+          incorrectTrials: 0,
+          totalTimeMs: 100,
+          totalTimeMinutes: 0.1,
+          itemsPracticedCount: 1,
+          totalSessions: 1,
+          overallAccuracy: 100,
+          firstPracticeDate: new Date('2026-05-02T00:00:00.000Z'),
+          lastPracticeDate: new Date('2026-05-02T00:00:00.000Z'),
+          lastPracticeTimestamp: new Date('2026-05-02T00:00:00.000Z').getTime(),
+          lastProcessedHistoryId: null,
+          lastProcessedTimestamp: null
+        }
+      },
+      learnerTdfConfigs: {
+        root: {
+          source: { tdfId: 'root', unitCount: 0, unitSignature: [] },
+          overrides: { setspec: { audioPromptMode: 'feedback' } }
+        }
+      }
+    };
+
+    const methods = createDashboardCacheMethods({
+      Meteor: {
+        Error: class MeteorError extends Error {
+          error: string;
+          constructor(error: string, reason?: string) {
+            super(reason || error);
+            this.error = error;
+          }
+        }
+      },
+      Roles: { userIsInRoleAsync: async () => true },
+      Histories: {
+        removeAsync: async (selector: any) => {
+          removedSelectors.push(selector);
+          return 2;
+        },
+        find: () => ({ fetchAsync: async () => [] }),
+        rawCollection: () => ({ distinct: async () => [] })
+      },
+      GlobalExperimentStates: {
+        removeAsync: async (selector: any) => {
+          stateRemovedSelectors.push(selector);
+          return 1;
+        }
+      },
+      Tdfs: {
+        findOneAsync: async (selector: any) => {
+          if (selector._id === 'root') return docs.root;
+          if (selector._id === 'condition-a') return docs.child;
+          return null;
+        },
+        find: (selector: any) => ({
+          fetchAsync: async () => {
+            if (selector.$or?.some((entry: any) => entry._id?.$in?.includes('condition-a') || entry['content.fileName']?.$in?.includes('condition-a.json'))) {
+              return [docs.child];
+            }
+            return [];
+          }
+        })
+      },
+      UserDashboardCache: {
+        findOneAsync: async () => cacheDoc,
+        updateAsync: async (_selector: any, modifier: any) => {
+          cacheDoc = {
+            ...cacheDoc,
+            ...(modifier.$set || {})
+          };
+        },
+        upsertAsync: async () => undefined
+      },
+      usersCollection: { findOneAsync: async () => ({ _id: userId }) },
+      serverConsole: () => undefined,
+      computePracticeTimeMs: (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0),
+      canViewDashboardTdf: () => true
+    });
+
+    const result = await methods.resetAdminLessonProgress.call({ userId }, 'root');
+
+    expect(result.success).to.equal(true);
+    expect(result.cacheTdfIds).to.deep.equal(['root']);
+    expect(removedSelectors[0].TDFId.$in).to.include.members(['root', 'root.json', 'condition-a', 'condition-a.json']);
+    expect(stateRemovedSelectors[0].$or).to.deep.include({ TDFId: { $in: removedSelectors[0].TDFId.$in } });
+    expect(cacheDoc.tdfStats).to.not.have.property('root');
+    expect(cacheDoc.tdfStats).to.have.property('other');
+    expect(cacheDoc.learnerTdfConfigs).to.have.property('root');
+  });
 });

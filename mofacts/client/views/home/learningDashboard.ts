@@ -34,6 +34,7 @@ import {
   learnerTdfFieldAppliesToUnit,
   type LearnerTdfConfig
 } from '../../../common/lib/learnerTdfConfig';
+import { detectTdfUnitType } from '../../../common/fieldApplicability';
 import {
   finishLaunchLoading,
   markLaunchLoadingTiming,
@@ -60,6 +61,8 @@ type LearnerConfigState = {
   saving: boolean;
   closing: boolean;
   dirty: boolean;
+  resetConfirming: boolean;
+  resettingProgress: boolean;
 };
 
 const EMPTY_CONFIG_STATE: LearnerConfigState = {
@@ -74,6 +77,8 @@ const EMPTY_CONFIG_STATE: LearnerConfigState = {
   saving: false,
   closing: false,
   dirty: false,
+  resetConfirming: false,
+  resettingProgress: false,
 };
 
 const LEARNER_CONFIG_CLOSE_FALLBACK_MS = 200;
@@ -284,35 +289,92 @@ function getTutorUnits(content: any) {
   return Array.isArray(units) ? units : [];
 }
 
-function unitHasLearningSession(unit: any) {
-  return Boolean(unit?.learningsession && typeof unit.learningsession === 'object');
+function unitHasConfigurableRuntime(unit: any) {
+  const unitType = detectTdfUnitType(unit);
+  return unitType === 'learning' || unitType === 'autotutor';
 }
 
-function getLearningUnitIndexes(content: any) {
+function unitHasLearnerConfigurableFields(unit: any) {
+  return LEARNER_TDF_FIELD_DEFINITIONS.some((field) => {
+    if (field.scope === 'setspec') {
+      return false;
+    }
+    return learnerTdfFieldAppliesToUnit(field, unit);
+  });
+}
+
+function getConfigurableRuntimeUnitIndexes(content: any) {
   return getTutorUnits(content)
-    .map((unit: any, index: number) => unitHasLearningSession(unit) ? index : -1)
+    .map((unit: any, index: number) => unitHasConfigurableRuntime(unit) ? index : -1)
     .filter((index: number) => index >= 0);
 }
 
-function tdfHasLearningSession(content: any) {
-  return getLearningUnitIndexes(content).length > 0;
+function getLearnerConfigurableUnitIndexes(content: any) {
+  return getTutorUnits(content)
+    .map((unit: any, index: number) => unitHasLearnerConfigurableFields(unit) ? index : -1)
+    .filter((index: number) => index >= 0);
 }
 
-function getPrimaryLearningUnitIndex(state: LearnerConfigState) {
-  return getLearningUnitIndexes(state.content)[0] ?? null;
+function tdfHasConfigurableRuntime(content: any) {
+  return getConfigurableRuntimeUnitIndexes(content).length > 0;
+}
+
+function tdfHasLearnerConfigurableFields(content: any) {
+  return getLearnerConfigurableUnitIndexes(content).length > 0;
+}
+
+function getConditionRefs(setspec: any) {
+  const refs = new Set<string>();
+  const conditionFileNames = Array.isArray(setspec?.condition) ? setspec.condition : [];
+  const conditionTdfIds = Array.isArray(setspec?.conditionTdfIds) ? setspec.conditionTdfIds : [];
+  for (const fileName of conditionFileNames) {
+    if (typeof fileName === 'string' && fileName.trim()) refs.add(fileName.trim());
+  }
+  for (const tdfId of conditionTdfIds) {
+    if (typeof tdfId === 'string' && tdfId.trim()) refs.add(tdfId.trim());
+  }
+  return Array.from(refs);
+}
+
+function tdfFamilyHasConfigurableRuntime(tdfObject: any, tdfsById: Map<string, any>, tdfsByFileName: Map<string, any>) {
+  if (tdfHasConfigurableRuntime(tdfObject)) {
+    return true;
+  }
+
+  const refs = getConditionRefs(tdfObject?.tdfs?.tutor?.setspec);
+  return refs.some((ref) => {
+    const child = tdfsById.get(ref) || tdfsByFileName.get(ref);
+    return tdfHasConfigurableRuntime(child?.content);
+  });
+}
+
+function tdfFamilyHasLearnerConfigurableFields(tdfObject: any, tdfsById: Map<string, any>, tdfsByFileName: Map<string, any>) {
+  if (tdfHasLearnerConfigurableFields(tdfObject)) {
+    return true;
+  }
+
+  const refs = getConditionRefs(tdfObject?.tdfs?.tutor?.setspec);
+  return refs.some((ref) => {
+    const child = tdfsById.get(ref) || tdfsByFileName.get(ref);
+    return tdfHasLearnerConfigurableFields(child?.content);
+  });
+}
+
+function getPrimaryConfigurableUnitIndex(state: LearnerConfigState) {
+  return getLearnerConfigurableUnitIndexes(state.content)[0] ?? null;
 }
 
 function getLearnerConfigurableFieldsForState(state: LearnerConfigState) {
-  const primaryLearningUnitIndex = getPrimaryLearningUnitIndex(state);
-  const primaryLearningUnit = primaryLearningUnitIndex === null
+  const primaryConfigurableUnitIndex = getPrimaryConfigurableUnitIndex(state);
+  const primaryConfigurableUnit = primaryConfigurableUnitIndex === null
     ? null
-    : getTutorUnits(state.content)[primaryLearningUnitIndex];
+    : getTutorUnits(state.content)[primaryConfigurableUnitIndex];
 
   return LEARNER_TDF_FIELD_DEFINITIONS.filter((field) => {
     if (field.scope === 'setspec') {
       return true;
     }
-    return Boolean(primaryLearningUnit) && learnerTdfFieldAppliesToUnit(field, primaryLearningUnit);
+    return Boolean(primaryConfigurableUnit) && learnerTdfFieldAppliesToUnit(field, primaryConfigurableUnit);
   });
 }
 
@@ -336,12 +398,12 @@ function getPathValue(source: any, path: string, unitIndex: number | null = null
 }
 
 function getDefaultForField(field: any, state: LearnerConfigState) {
-  const unitIndex = field.scope === 'unit' ? getPrimaryLearningUnitIndex(state) : null;
+  const unitIndex = field.scope === 'unit' ? getPrimaryConfigurableUnitIndex(state) : null;
   return getPathValue(state.content, field.tdfPath, unitIndex) ?? field.defaultValue;
 }
 
 function getEffectiveForField(field: any, state: LearnerConfigState) {
-  const unitIndex = field.scope === 'unit' ? getPrimaryLearningUnitIndex(state) : null;
+  const unitIndex = field.scope === 'unit' ? getPrimaryConfigurableUnitIndex(state) : null;
   return getPathValue(getConfigurableContent(state), field.tdfPath, unitIndex) ?? field.defaultValue;
 }
 
@@ -415,7 +477,7 @@ function formatFieldDisplayValue(field: any, value: unknown) {
 
 function buildConfigPatchFromForm(container: JQuery<HTMLElement>, state: LearnerConfigState) {
   const patch: any = { setspec: {}, unit: {} };
-  const learningUnitIndexes = getLearningUnitIndexes(state.content);
+  const configurableUnitIndexes = getLearnerConfigurableUnitIndexes(state.content);
   const fields = getSettingFields(state);
 
   for (const field of fields) {
@@ -442,7 +504,7 @@ function buildConfigPatchFromForm(container: JQuery<HTMLElement>, state: Learner
     } else if (field.tdfPath.startsWith('deliverySettings.')) {
       const key = field.tdfPath.split('.').pop();
       if (key) {
-        for (const index of learningUnitIndexes) {
+        for (const index of configurableUnitIndexes) {
           const unitIndex = String(index);
           patch.unit[unitIndex] ||= { deliverySettings: {} };
           patch.unit[unitIndex].deliverySettings[key] = value;
@@ -451,7 +513,7 @@ function buildConfigPatchFromForm(container: JQuery<HTMLElement>, state: Learner
     } else if (field.tdfPath.startsWith('unit[].deliverySettings.')) {
       const key = field.tdfPath.split('.').pop();
       if (key) {
-        for (const index of learningUnitIndexes) {
+        for (const index of configurableUnitIndexes) {
           const unitIndex = String(index);
           patch.unit[unitIndex] ||= { deliverySettings: {} };
           patch.unit[unitIndex].deliverySettings[key] = value;
@@ -464,7 +526,7 @@ function buildConfigPatchFromForm(container: JQuery<HTMLElement>, state: Learner
 }
 
 function getSettingFields(state: LearnerConfigState) {
-  if (!tdfHasLearningSession(state.content)) {
+  if (!tdfHasLearnerConfigurableFields(state.content)) {
     return [];
   }
   return getLearnerConfigurableFieldsForState(state);
@@ -497,6 +559,35 @@ function splitTdfsByUsage(tdfs: any[]) {
   };
 }
 
+function clearLessonProgressStats(tdf: any, affectedTdfIds: Set<string>) {
+  if (!affectedTdfIds.has(String(tdf.TDFId))) {
+    return tdf;
+  }
+
+  return {
+    ...tdf,
+    isUsed: false,
+    hasBeenAttempted: false,
+    totalTrials: undefined,
+    overallAccuracy: undefined,
+    totalTimeMinutes: undefined,
+    itemsPracticed: undefined,
+    lastPracticeTimestamp: undefined,
+    lastPracticeDate: undefined,
+    totalSessions: undefined
+  };
+}
+
+function applyProgressResetToDashboardList(list: any[] | false, cacheTdfIds: string[]) {
+  if (!Array.isArray(list)) {
+    return list;
+  }
+  const affectedTdfIds = new Set(cacheTdfIds.map((id) => String(id)));
+  const nextList = list.map((tdf) => clearLessonProgressStats(tdf, affectedTdfIds));
+  const { used, unused } = splitTdfsByUsage(nextList);
+  return [...used, ...unused];
+}
+
 function displayLabelForTdf(tdf: any) {
   if (currentUserHasRole('admin,teacher')) {
     const fileName = tdf.fileName || 'unknown';
@@ -508,13 +599,13 @@ function displayLabelForTdf(tdf: any) {
 function configForLessonCard(tdf: any) {
   const templateData = Template.parentData(1) as { learnerConfigState?: LearnerConfigState } | undefined;
   const state = templateData?.learnerConfigState;
-  return tdf.hasLearningSession && state?.tdfId === tdf.TDFId ? { ...state, location: 'card' } : null;
+  return tdf.hasConfigurableSettings && state?.tdfId === tdf.TDFId ? { ...state, location: 'card' } : null;
 }
 
 function configForLessonTable(tdf: any) {
   const templateData = Template.parentData(1) as { learnerConfigState?: LearnerConfigState } | undefined;
   const state = templateData?.learnerConfigState;
-  return tdf.hasLearningSession && state?.tdfId === tdf.TDFId ? { ...state, location: 'table' } : null;
+  return tdf.hasConfigurableSettings && state?.tdfId === tdf.TDFId ? { ...state, location: 'table' } : null;
 }
 
 const lessonRowHelpers = {
@@ -664,6 +755,19 @@ Template.learnerTdfConfigPanel.helpers({
       };
     });
   },
+
+  hasSettingFields() {
+    return getSettingFields(this as LearnerConfigState).length > 0;
+  },
+
+  currentUserIsAdmin() {
+    return currentUserHasRole('admin');
+  },
+
+  resetProgressButtonLabel() {
+    if (this.resettingProgress) return 'Resetting...';
+    return this.resetConfirming ? 'Confirm reset' : 'Reset test progress';
+  },
 });
 
 Template.learningDashboard.events({
@@ -805,11 +909,11 @@ Template.learningDashboard.events({
         });
         return;
       }
-      if (!tdfHasLearningSession(content)) {
+      if (!tdfHasConfigurableRuntime(content)) {
         instance.learnerConfigState.set({
           ...EMPTY_CONFIG_STATE,
           tdfId,
-          error: 'Settings are available for lessons with practice units.'
+          error: 'Settings are available for lessons with configurable runtime units.'
         });
         return;
       }
@@ -875,6 +979,64 @@ Template.learningDashboard.events({
     scheduleLearnerConfigAutosave(instance, input.closest('.learner-config-form'));
   },
 
+  'click .learner-config-reset-progress': async function(event: any, instance: any) {
+    event.preventDefault();
+    const current = instance.learnerConfigState.get() as LearnerConfigState;
+    if (!current.tdfId || current.resettingProgress) {
+      return;
+    }
+
+    if (!current.resetConfirming) {
+      instance.learnerConfigState.set({ ...current, resetConfirming: true, error: null });
+      return;
+    }
+
+    instance.learnerConfigState.set({ ...current, resettingProgress: true, error: null });
+    try {
+      const result = await meteorCallAsync('resetAdminLessonProgress', current.tdfId) as {
+        cacheTdfIds?: string[];
+      };
+      if (!Array.isArray(result?.cacheTdfIds) || result.cacheTdfIds.length === 0) {
+        throw new Error('Reset completed without a dashboard refresh scope');
+      }
+      const cacheTdfIds = result.cacheTdfIds;
+      instance.allTdfsList.set(applyProgressResetToDashboardList(instance.allTdfsList.get(), cacheTdfIds));
+      const filteredList = instance.filteredTdfsList.get();
+      if (Array.isArray(filteredList)) {
+        instance.filteredTdfsList.set(applyProgressResetToDashboardList(filteredList, cacheTdfIds));
+      }
+      const latest = instance.learnerConfigState.get() as LearnerConfigState;
+      instance.learnerConfigState.set({
+        ...latest,
+        resetConfirming: false,
+        resettingProgress: false,
+        error: null
+      });
+      Session.set('uiMessage', {
+        text: 'Practice history and experiment state were reset for this lesson.',
+        variant: 'success',
+      });
+    } catch (error: any) {
+      clientConsole(1, '[Dashboard Config] Failed to reset admin lesson progress:', error);
+      const latest = instance.learnerConfigState.get() as LearnerConfigState;
+      instance.learnerConfigState.set({
+        ...latest,
+        resetConfirming: false,
+        resettingProgress: false,
+        error: error?.reason || error?.message || 'Unable to reset lesson progress.'
+      });
+    }
+  },
+
+  'click .learner-config-reset-progress-cancel': function(event: any, instance: any) {
+    event.preventDefault();
+    const current = instance.learnerConfigState.get() as LearnerConfigState;
+    if (!current.tdfId || current.resettingProgress) {
+      return;
+    }
+    instance.learnerConfigState.set({ ...current, resetConfirming: false });
+  },
+
   'submit .learner-config-form': function(event: any) {
     event.preventDefault();
   },
@@ -927,8 +1089,9 @@ Template.learningDashboard.rendered = async function(this: any) {
     'content.tdfs.tutor.setspec.speechOutOfGrammarFeedback': 1,
     'content.tdfs.tutor.setspec.audioInputEnabled': 1,
     'content.tdfs.tutor.setspec.enableAudioPromptAndFeedback': 1,
-    'content.tdfs.tutor.unit.learningsession': 1
-    // Include only the learning-session marker from units so Configure can stay hidden for non-practice lessons.
+    'content.tdfs.tutor.unit.learningsession': 1,
+    'content.tdfs.tutor.unit.autotutorsession': 1
+    // Include only runtime markers from units so Configure can stay hidden for non-configurable lessons.
   };
   let allTdfs = Tdfs.find({}, { fields: tdfFields }).fetch();
   Session.set('allTdfs', allTdfs);
@@ -1029,7 +1192,15 @@ Template.learningDashboard.rendered = async function(this: any) {
   // as standalone rows (they are only accessible via their owner's condition selector).
   const conditionChildFileNames = new Set<string>();
   const conditionChildIds = new Set<string>();
+  const tdfsById = new Map<string, any>();
+  const tdfsByFileName = new Map<string, any>();
   for (const tdf of allTdfs) {
+    if (tdf?._id) {
+      tdfsById.set(String(tdf._id), tdf);
+    }
+    if (tdf?.content?.fileName) {
+      tdfsByFileName.set(String(tdf.content.fileName), tdf);
+    }
     const sp = tdf?.content?.tdfs?.tutor?.setspec;
     const conditionFileNames: unknown[] = Array.isArray(sp?.condition) ? sp.condition : [];
     const conditionTdfIds: unknown[] = Array.isArray(sp?.conditionTdfIds) ? sp.conditionTdfIds : [];
@@ -1062,7 +1233,8 @@ Template.learningDashboard.rendered = async function(this: any) {
 
     const name = setspec.lessonname;
     const fileName = tdfObject.fileName;
-    const hasLearningSession = tdfHasLearningSession(tdfObject);
+    const hasConfigurableRuntime = tdfFamilyHasConfigurableRuntime(tdfObject, tdfsById, tdfsByFileName);
+    const hasLearnerConfigurableFields = tdfFamilyHasLearnerConfigurableFields(tdfObject, tdfsById, tdfsByFileName);
     const ignoreOutOfGrammarResponses = setspec.speechIgnoreOutOfGrammarResponses ?
       setspec.speechIgnoreOutOfGrammarResponses.toLowerCase() == 'true' : false;
     const speechOutOfGrammarFeedback = setspec.speechOutOfGrammarFeedback ?
@@ -1117,7 +1289,7 @@ Template.learningDashboard.rendered = async function(this: any) {
         enableAudioPromptAndFeedback: enableAudioPromptAndFeedback,
         hasSpeechAPIKey: hasSpeechAPIKey,
         hasTTSAPIKey: hasTTSAPIKey,
-        hasLearningSession: hasLearningSession,
+        hasConfigurableSettings: hasLearnerConfigurableFields || (currentUserHasRole('admin') && hasConfigurableRuntime),
         isMultiTdf: isMultiTdf,
         tags: setspec.tags || [],
         isOwner: isOwner,

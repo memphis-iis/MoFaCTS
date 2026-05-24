@@ -4,6 +4,7 @@ import {
   applyLearnerTdfConfig,
   buildLearnerTdfConfig,
   buildLearnerTdfSourceMetadata,
+  learnerTdfFieldAppliesToUnit,
   normalizeLearnerTdfOverrides,
   validateLearnerTdfConfig
 } from './learnerTdfConfig';
@@ -190,6 +191,16 @@ describe('learner TDF config', function() {
     expect(optimalThresholdField?.displaySuffix).to.equal('%');
     expect(optimalThresholdField?.lowerLabel).to.equal('More new items');
     expect(optimalThresholdField?.upperLabel).to.equal('Mastery first');
+  });
+
+  it('keeps current learner-config unit fields scoped to learning sessions, not AutoTutor', function() {
+    const autoTutorUnit = { autotutorsession: {} };
+    const learningUnit = { learningsession: {} };
+    const unitFields = LEARNER_TDF_FIELD_DEFINITIONS.filter((definition) => definition.scope === 'unit');
+
+    expect(unitFields.length).to.be.greaterThan(0);
+    expect(unitFields.every((definition) => learnerTdfFieldAppliesToUnit(definition, learningUnit))).to.equal(true);
+    expect(unitFields.some((definition) => learnerTdfFieldAppliesToUnit(definition, autoTutorUnit))).to.equal(false);
   });
 
   it('makes unit delivery settings configurable even when overrides are sparse', function() {

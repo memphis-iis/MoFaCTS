@@ -18,6 +18,7 @@ type DashboardCacheDeps = {
   Meteor: any;
   Roles: any;
   Histories: any;
+  GlobalExperimentStates?: any;
   Tdfs: any;
   UserDashboardCache: any;
   usersCollection: any;
@@ -193,6 +194,7 @@ export function createDashboardCacheMethods({
   Meteor,
   Roles,
   Histories,
+  GlobalExperimentStates,
   Tdfs,
   UserDashboardCache,
   usersCollection,
@@ -280,6 +282,140 @@ export function createDashboardCacheMethods({
         }
       }
     );
+  }
+
+  function addNonEmptyString(target: Set<string>, value: unknown) {
+    if (typeof value !== 'string') {
+      return;
+    }
+    const trimmed = value.trim();
+    if (trimmed) {
+      target.add(trimmed);
+    }
+  }
+
+  async function collectLessonFamilyResetScope(tdfId: string) {
+    const target = await Tdfs.findOneAsync(
+      { _id: tdfId },
+      {
+        fields: {
+          _id: 1,
+          'content.fileName': 1,
+          'content.tdfs.tutor.setspec.condition': 1,
+          'content.tdfs.tutor.setspec.conditionTdfIds': 1
+        }
+      }
+    );
+    if (!target) {
+      throw new Meteor.Error('not-found', 'TDF not found');
+    }
+
+    const tdfIds = new Set<string>();
+    const tdfKeys = new Set<string>();
+    const cacheTdfIds = new Set<string>();
+    addNonEmptyString(tdfIds, target._id);
+    addNonEmptyString(tdfKeys, target._id);
+    addNonEmptyString(tdfKeys, target.content?.fileName);
+    addNonEmptyString(cacheTdfIds, target._id);
+
+    const targetFileName = String(target.content?.fileName || '').trim();
+    const parentRoots = await Tdfs.find({
+      $or: [
+        { 'content.tdfs.tutor.setspec.condition': tdfId },
+        ...(targetFileName ? [{ 'content.tdfs.tutor.setspec.condition': targetFileName }] : []),
+        { 'content.tdfs.tutor.setspec.conditionTdfIds': tdfId }
+      ]
+    }, {
+      fields: {
+        _id: 1,
+        'content.fileName': 1,
+        'content.tdfs.tutor.setspec.condition': 1,
+        'content.tdfs.tutor.setspec.conditionTdfIds': 1
+      }
+    }).fetchAsync();
+
+    const roots = [target, ...parentRoots];
+    const childRefs = new Set<string>();
+    for (const root of roots) {
+      addNonEmptyString(tdfIds, root._id);
+      addNonEmptyString(tdfKeys, root._id);
+      addNonEmptyString(tdfKeys, root.content?.fileName);
+      addNonEmptyString(cacheTdfIds, root._id);
+
+      const setspec = root.content?.tdfs?.tutor?.setspec || {};
+      if (Array.isArray(setspec.condition)) {
+        for (const conditionRef of setspec.condition) {
+          addNonEmptyString(childRefs, conditionRef);
+          addNonEmptyString(tdfKeys, conditionRef);
+        }
+      }
+      if (Array.isArray(setspec.conditionTdfIds)) {
+        for (const conditionTdfId of setspec.conditionTdfIds) {
+          addNonEmptyString(childRefs, conditionTdfId);
+          addNonEmptyString(tdfIds, conditionTdfId);
+          addNonEmptyString(tdfKeys, conditionTdfId);
+        }
+      }
+    }
+
+    if (childRefs.size > 0) {
+      const children = await Tdfs.find({
+        $or: [
+          { _id: { $in: Array.from(childRefs) } },
+          { 'content.fileName': { $in: Array.from(childRefs) } }
+        ]
+      }, {
+        fields: {
+          _id: 1,
+          'content.fileName': 1
+        }
+      }).fetchAsync();
+
+      for (const child of children) {
+        addNonEmptyString(tdfIds, child._id);
+        addNonEmptyString(tdfKeys, child._id);
+        addNonEmptyString(tdfKeys, child.content?.fileName);
+      }
+    }
+
+    return {
+      tdfIds: Array.from(tdfIds),
+      tdfKeys: Array.from(tdfKeys),
+      cacheTdfIds: Array.from(cacheTdfIds)
+    };
+  }
+
+  async function removeLessonProgressFromCache(userId: string, cacheTdfIds: string[]) {
+    const cache = await UserDashboardCache.findOneAsync({ userId });
+    if (!cache?.tdfStats) {
+      return false;
+    }
+
+    const nextTdfStats = { ...(cache.tdfStats || {}) };
+    let changed = false;
+    for (const cacheTdfId of cacheTdfIds) {
+      if (Object.prototype.hasOwnProperty.call(nextTdfStats, cacheTdfId)) {
+        delete nextTdfStats[cacheTdfId];
+        changed = true;
+      }
+    }
+
+    if (!changed) {
+      return false;
+    }
+
+    await UserDashboardCache.updateAsync(
+      { _id: cache._id },
+      {
+        $set: {
+          tdfStats: nextTdfStats,
+          summary: computeSummaryStats(nextTdfStats),
+          usageSummary: computeUsageSummary(nextTdfStats),
+          lastUpdated: new Date()
+        }
+      }
+    );
+    return true;
   }
 
   const methods = {
@@ -645,6 +781,54 @@ export function createDashboardCacheMethods({
 
       await UserDashboardCache.removeAsync({ userId: this.userId });
       return await methods.initializeDashboardCache.call(this);
+    },
+
+    resetAdminLessonProgress: async function(this: any, tdfId: string) {
+      if (!this.userId) {
+        throw new Meteor.Error('not-authorized', 'Must be logged in');
+      }
+
+      const isAdmin = await Roles.userIsInRoleAsync(this.userId, ['admin']);
+      if (!isAdmin) {
+        throw new Meteor.Error('not-authorized', 'Admin only');
+      }
+      if (!GlobalExperimentStates) {
+        throw new Meteor.Error('server-misconfigured', 'Experiment state collection is unavailable');
+      }
+
+      const normalizedTdfId = typeof tdfId === 'string' ? tdfId.trim() : '';
+      if (!normalizedTdfId) {
+        throw new Meteor.Error('invalid-args', 'TDF ID is required');
+      }
+
+      const scope = await collectLessonFamilyResetScope(normalizedTdfId);
+      if (scope.tdfKeys.length === 0) {
+        throw new Meteor.Error('invalid-state', 'No lesson progress scope could be resolved');
+      }
+
+      const historyRemoved = await Histories.removeAsync({
+        userId: this.userId,
+        TDFId: { $in: scope.tdfKeys }
+      });
+      const experimentStateRemoved = await GlobalExperimentStates.removeAsync({
+        userId: this.userId,
+        $or: [
+          { TDFId: { $in: scope.tdfKeys } },
+          { 'experimentState.currentRootTdfId': { $in: scope.tdfKeys } },
+          { 'experimentState.currentTdfId': { $in: scope.tdfKeys } },
+          { 'experimentState.conditionTdfId': { $in: scope.tdfKeys } }
+        ]
+      });
+      const cacheChanged = await removeLessonProgressFromCache(this.userId, scope.cacheTdfIds);
+
+      return {
+        success: true,
+        tdfIds: scope.tdfIds,
+        cacheTdfIds: scope.cacheTdfIds,
+        historyRemoved,
+        experimentStateRemoved,
+        cacheChanged
+      };
     },
 
     refreshUserAdminUsageCaches: async function(this: any, userIds: unknown) {

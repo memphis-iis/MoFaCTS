@@ -852,6 +852,7 @@ export const asyncMethods: Record<string, unknown> = {
     Meteor,
     Roles,
     Histories,
+    GlobalExperimentStates,
     Tdfs,
     UserDashboardCache,
     usersCollection: MeteorAny.users,

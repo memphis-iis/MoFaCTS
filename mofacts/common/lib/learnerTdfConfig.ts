@@ -270,6 +270,15 @@ const LEARNER_TDF_UNIT_DISPLAY_SETTING_KEYS = Object.freeze([
   'displayUserAnswerInFeedback',
 ] as const);
 
+const LEARNING_UNIT_TYPES = Object.freeze(['learning'] as const);
+
+function learningOnlyLearnerField(field: LearnerTdfFieldDefinition): LearnerTdfFieldDefinition {
+  return {
+    ...field,
+    appliesToUnitTypes: LEARNING_UNIT_TYPES
+  };
+}
+
 export const LEARNER_TDF_FIELD_DEFINITIONS: readonly LearnerTdfFieldDefinition[] = [
   {
     id: 'setspec.audioPromptMode',
@@ -294,7 +303,7 @@ export const LEARNER_TDF_FIELD_DEFINITIONS: readonly LearnerTdfFieldDefinition[]
       { value: 'true', label: 'Enabled' },
     ]
   },
-  ...LEARNER_TDF_UNIT_DISPLAY_SETTING_KEYS.map((key) => uiFieldDefinition('unit', key)),
+  ...LEARNER_TDF_UNIT_DISPLAY_SETTING_KEYS.map((key) => learningOnlyLearnerField(uiFieldDefinition('unit', key))),
   ...LEARNER_TDF_UNIT_DELIVERY_SETTING_KEYS
     .map((key) => deliveryFieldDefinition('unit', key))
     .map((field) => field?.id === 'unit[].deliverySettings.optimalThreshold'
@@ -313,6 +322,7 @@ export const LEARNER_TDF_FIELD_DEFINITIONS: readonly LearnerTdfFieldDefinition[]
       }
       : field)
     .filter((field): field is LearnerTdfFieldDefinition => Boolean(field))
+    .map((field) => learningOnlyLearnerField(field))
 ];
 
 const AUDIO_PROMPT_MODES = new Set(['silent', 'question', 'feedback', 'all']);

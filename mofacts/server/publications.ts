@@ -622,8 +622,9 @@ const TDF_LISTING_FIELDS = {
     'content.tdfs.tutor.setspec.audioPromptQuestionVolume': 1,
     'content.tdfs.tutor.setspec.audioPromptFeedbackVolume': 1,
     'content.tdfs.tutor.setspec.audioPromptFeedbackVoice': 1,
-    'content.tdfs.tutor.unit.learningsession': 1
-    // Includes only the learning-session marker from units; still excludes full unit content.
+    'content.tdfs.tutor.unit.learningsession': 1,
+    'content.tdfs.tutor.unit.autotutorsession': 1
+    // Includes only runtime markers from units; still excludes full unit content.
 };
 
 const TDF_CONTENT_UPLOAD_DETAIL_FIELDS = {
@@ -740,6 +741,45 @@ Meteor.publish('dashboardTdfsListing', async function() {
     ];
     if (explicitDashboardIds.length > 0) {
         visibilityTerms.push({ _id: { $in: explicitDashboardIds } });
+    }
+
+    const accessibleRoots = await Tdfs.find(
+        { $or: visibilityTerms },
+        {
+            fields: {
+                _id: 1,
+                'content.fileName': 1,
+                'content.tdfs.tutor.setspec.condition': 1,
+                'content.tdfs.tutor.setspec.conditionTdfIds': 1
+            }
+        }
+    ).fetchAsync();
+
+    const conditionFileNames = new Set<string>();
+    const conditionTdfIds = new Set<string>();
+    for (const root of accessibleRoots) {
+        const setspec = root?.content?.tdfs?.tutor?.setspec || {};
+        const conditions = Array.isArray(setspec.condition) ? setspec.condition : [];
+        const resolvedIds = Array.isArray(setspec.conditionTdfIds) ? setspec.conditionTdfIds : [];
+        for (const condition of conditions) {
+            const normalized = normalizeOptionalStringId(condition);
+            if (normalized) {
+                conditionFileNames.add(normalized);
+            }
+        }
+        for (const conditionTdfId of resolvedIds) {
+            const normalized = normalizeOptionalStringId(conditionTdfId);
+            if (normalized) {
+                conditionTdfIds.add(normalized);
+            }
+        }
+    }
+
+    if (conditionFileNames.size > 0) {
+        visibilityTerms.push({ 'content.fileName': { $in: Array.from(conditionFileNames) } });
+    }
+    if (conditionTdfIds.size > 0) {
+        visibilityTerms.push({ _id: { $in: Array.from(conditionTdfIds) } });
     }
 
     return Tdfs.find({ $or: visibilityTerms }, { fields: TDF_LISTING_FIELDS });
