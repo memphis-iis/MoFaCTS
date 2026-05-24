@@ -85,7 +85,6 @@ export default [
         AudioContext: 'readonly',
         webkitAudioContext: 'readonly',
         JSONEditor: 'readonly',
-        SyncedCron: 'readonly',
         Email: 'readonly',
         Papa: 'readonly',
 

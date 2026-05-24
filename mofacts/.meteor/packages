@@ -24,7 +24,6 @@ underscore
 
 alanning:roles
 http
-quave:synced-cron
 standard-minifier-css@1.10.0
 service-configuration@1.3.5
 accounts-google@1.4.1

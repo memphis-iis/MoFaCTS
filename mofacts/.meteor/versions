@@ -71,7 +71,6 @@ ostrio:cookies@2.9.1
 ostrio:files@3.0.1
 ostrio:flow-router-extra@3.12.1
 promise@1.0.0
-quave:synced-cron@2.2.1
 random@1.2.2
 rate-limit@1.1.2
 react-fast-refresh@0.3.0

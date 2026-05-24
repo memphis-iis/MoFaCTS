@@ -19,7 +19,7 @@ import { cleanExperimentStateDupesAndAddUniqueIndex } from '../migrations/clean_
 import { runStartupCleanupMigrations } from '../migrations/startup_cleanup_migrations';
 import { sendScheduledTurkMessages } from '../turk_methods';
 import { bootstrapPrivateRepoContentIfNeeded } from './bootstrapPrivateRepoContent';
-import { startConfiguredSyncedCronJobs } from './syncedCronRuntime';
+import { startConfiguredMofactsCronJobs } from './mofactsCronRuntime';
 
 type UnknownRecord = Record<string, unknown>;
 type Logger = (...args: unknown[]) => void;
@@ -632,7 +632,7 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
   await deps.AuthThrottleState.rawCollection().createIndex({ updatedAt: 1 });
   await deps.ManualContentDrafts.rawCollection().createIndex({ ownerId: 1, updatedAt: -1 });
 
-  await startConfiguredSyncedCronJobs({
+  await startConfiguredMofactsCronJobs({
     Meteor,
     isProd: deps.isProd,
     serverConsole: deps.serverConsole,
