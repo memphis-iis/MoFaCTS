@@ -68,6 +68,7 @@ type AutoTutorConfig = {
   apiKey: string;
   model: string;
   graduation: AutoTutorGraduation;
+  requireFinalAnswerPrompt: boolean;
   prompt: string;
   script: AutoTutorScript;
   unitName: string;
@@ -218,6 +219,7 @@ function readAutoTutorConfig(): AutoTutorConfig {
     apiKey: requiredString(setspec.openRouterApiKey, 'tutor.setspec.openRouterApiKey'),
     model: requiredString(session.openRouterModel || setspec.openRouterModel, 'openRouterModel'),
     graduation: readGraduation(session),
+    requireFinalAnswerPrompt: session.requireFinalAnswerPrompt === true,
     prompt: requiredString(display.text, `cluster ${clusterIndex} display.text`),
     script: cloneJson(script as AutoTutorScript),
     unitName: typeof unit.unitname === 'string' ? unit.unitname : 'AutoTutor',
@@ -905,6 +907,7 @@ export async function createAutoTutorRuntime(): Promise<AutoTutorRuntime> {
         plannerState: nextState.planner,
         learnerQuestion: scoreEnvelope.learnerQuestion,
         answerQuality: scoreEnvelope.answerQuality,
+        requireFinalAnswerPrompt: config.requireFinalAnswerPrompt,
       });
       nextState.planner = plan.nextPlannerState;
       nextState.selectedMove = plan.selectedMove;

@@ -108,7 +108,27 @@ describe('AutoTutor planner', function() {
     expect(plan.nextPlannerState.focusedExpectationId).to.equal(undefined);
   });
 
-  it('prompts for a final integrated answer before summary completion', function() {
+  it('summarizes immediately at completion by default', function() {
+    const script = buildScript();
+    const plannerState = createInitialAutoTutorPlannerState(script);
+    plannerState.expectationScores = recomputeExpectationPriorities(script, {
+      ...plannerState.expectationScores,
+      E1: { ...plannerState.expectationScores.E1!, current: true, coverage: 0.9, coherence: 0.5, centrality: 0.5 },
+      E2: { ...plannerState.expectationScores.E2!, current: true, coverage: 0.95, coherence: 0.5, centrality: 0.5 },
+    });
+
+    const summaryPlan = planAutoTutorTurn({
+      script,
+      plannerState,
+      learnerQuestion: { current: false, answerableFromAuthoredContent: false },
+      answerQuality: 'high',
+    });
+
+    expect(summaryPlan.target).to.deep.equal({ type: 'completion' });
+    expect(summaryPlan.selectedMove).to.equal('summary');
+  });
+
+  it('prompts for a final integrated answer before summary completion when enabled', function() {
     const script = buildScript();
     let plannerState = createInitialAutoTutorPlannerState(script);
     plannerState.expectationScores = recomputeExpectationPriorities(script, {
@@ -122,6 +142,7 @@ describe('AutoTutor planner', function() {
       plannerState,
       learnerQuestion: { current: false, answerableFromAuthoredContent: false },
       answerQuality: 'high',
+      requireFinalAnswerPrompt: true,
     });
 
     expect(finalPromptPlan.target).to.deep.equal({ type: 'completion' });
@@ -133,6 +154,7 @@ describe('AutoTutor planner', function() {
       plannerState,
       learnerQuestion: { current: false, answerableFromAuthoredContent: false },
       answerQuality: 'high',
+      requireFinalAnswerPrompt: true,
     });
 
     expect(summaryPlan.target).to.deep.equal({ type: 'completion' });

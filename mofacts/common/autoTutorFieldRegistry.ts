@@ -1,4 +1,5 @@
 import {
+  booleanField,
   integerField,
   simpleField,
   stringField,
@@ -13,6 +14,10 @@ export const AUTOTUTOR_SESSION_FIELD_REGISTRY: SectionFieldRegistry = {
   openRouterModel: simpleField(stringField('', 12), {
     brief: 'AutoTutor model override.',
     verbose: 'Optional OpenRouter model identifier used for this AutoTutor unit instead of the lesson default.'
+  }),
+  requireFinalAnswerPrompt: simpleField(booleanField(false, 4), {
+    brief: 'Require final answer prompt.',
+    verbose: 'When enabled, AutoTutor asks the learner for one final integrated answer before giving the summary. Disabled by default.'
   }),
   graduation: simpleField({
     type: 'object',
@@ -47,4 +52,5 @@ export const AUTOTUTOR_SESSION_DIRECT_RUNTIME_KEYS = Object.freeze([
   'cluster',
   'graduation',
   'openRouterModel',
+  'requireFinalAnswerPrompt',
 ]);

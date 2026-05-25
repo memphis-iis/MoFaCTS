@@ -103,7 +103,7 @@
     applyDeepChatHostLayout();
 
     chatElement.introMessage = {
-      text: 'Tell me what you think. A short answer is fine.',
+      text: questionPrompt ? `${questionPrompt}\n\nTell me what you think. A short answer is fine.` : 'Tell me what you think. A short answer is fine.',
     };
     chatElement.textInput = {
       placeholder: { text: 'Type your answer...' },
@@ -171,6 +171,9 @@
   }
 
   function configureDeepChatRuntime() {
+    chatElement.introMessage = {
+      text: `${questionPrompt}\n\nTell me what you think. A short answer is fine.`,
+    };
     chatElement.connect = {
       handler: async (body, signals) => {
         try {
@@ -250,6 +253,14 @@
   {/if}
 
   <div class="auto-tutor-chat" class:auto-tutor-chat-disabled={!!errorMessage || completed}>
+    <div class="auto-tutor-mobile-progress" aria-label="AutoTutor progress">
+      <div class="auto-tutor-progress-track">
+        <div class="auto-tutor-progress-fill" style={`width: ${Math.round(progress * 100)}%;`}></div>
+      </div>
+      <div class="auto-tutor-turns">
+        {turnCount === 1 ? '1 turn' : `${turnCount} turns`}
+      </div>
+    </div>
     <deep-chat
       bind:this={chatElement}
       style="display: block; width: 100%; height: 100%; min-width: 0; min-height: 0; box-sizing: border-box;"
@@ -257,6 +268,7 @@
   </div>
 
   <div class="auto-tutor-continue-bar" aria-label="AutoTutor continue controls">
+    <div class="auto-tutor-footer-label" aria-hidden="true">AutoTutor</div>
     <button
       type="button"
       class="auto-tutor-continue-button"
@@ -283,6 +295,7 @@
     color: var(--text-color);
     box-sizing: border-box;
     overflow: hidden;
+    position: relative;
   }
 
   .auto-tutor-header {
@@ -364,6 +377,7 @@
     flex: 1 1 auto;
     min-height: 0;
     overflow: hidden;
+    position: relative;
   }
 
   .auto-tutor-chat-disabled {
@@ -379,21 +393,43 @@
     box-sizing: border-box;
   }
 
+  .auto-tutor-mobile-progress {
+    display: none;
+  }
+
   .auto-tutor-continue-bar {
-    flex: 0 0 var(--h5p-action-bar-height, 3.75rem);
+    flex: 0 0 auto;
     display: flex;
     align-items: center;
-    justify-content: flex-end;
-    min-height: var(--h5p-action-bar-height, 3.75rem);
-    padding: 0 0.75rem;
+    justify-content: space-between;
+    gap: 0.75rem;
+    min-height: 0;
+    padding: 0.35rem 0.75rem;
     border-top: 1px solid var(--secondary-color);
     background: var(--stimuli-box-color);
     box-sizing: border-box;
   }
 
+  .auto-tutor-footer-label {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+    min-height: var(--button-height);
+    color: var(--navbar-text-color, var(--text-color));
+    font-family: var(--heading-font-family, var(--font-family));
+    font-size: calc(1.25rem * 0.8);
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .auto-tutor-continue-button {
     min-width: 8rem;
-    padding: 0.625rem 1rem;
+    min-height: var(--button-height);
+    padding: 0 1rem;
     border: 1px solid var(--main-button-color);
     border-radius: var(--border-radius-md, 6px);
     background: var(--main-button-color);
@@ -420,23 +456,43 @@
     }
 
     .auto-tutor-header {
-      grid-template-columns: 1fr;
-      align-items: stretch;
-      gap: 8px;
+      display: none;
     }
 
-    .auto-tutor-question h1 {
-      font-size: 1.05rem;
-      line-height: 1.3;
-      max-height: 5.5rem;
-      overflow: auto;
-      padding-right: 2px;
+    .auto-tutor-mobile-progress {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      width: min(42vw, 156px);
+      gap: 2px;
+      padding: 0.35rem 0.45rem;
+      border: 1px solid var(--secondary-color);
+      border-radius: var(--border-radius-sm);
+      background: color-mix(in srgb, var(--background-color) 88%, transparent);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+      backdrop-filter: blur(3px);
+      pointer-events: none;
     }
 
-    .auto-tutor-progress-label,
-    .auto-tutor-progress-scale,
+    .auto-tutor-progress-label {
+      display: none;
+    }
+
     .auto-tutor-turns {
       font-size: 0.75rem;
+      line-height: 1.1;
+      text-align: center;
+    }
+
+    .auto-tutor-progress-scale {
+      display: none;
+    }
+
+    .auto-tutor-progress-track {
+      height: 8px;
     }
 
     .auto-tutor-error,
@@ -446,13 +502,13 @@
     }
 
     .auto-tutor-continue-bar {
-      min-height: 3.25rem;
-      padding: 0;
+      padding: 0.3rem 0.4rem;
     }
 
     .auto-tutor-continue-button {
-      width: 100%;
-      min-height: 2.5rem;
+      width: auto;
+      min-width: 7rem;
+      min-height: var(--button-height);
     }
   }
 </style>

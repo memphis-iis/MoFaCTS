@@ -75,6 +75,7 @@ export type AutoTutorPlannerInput = {
   plannerState: AutoTutorPlannerState;
   learnerQuestion: AutoTutorLearnerQuestionScore;
   answerQuality: 'low' | 'partial' | 'high';
+  requireFinalAnswerPrompt?: boolean;
   thresholds?: Partial<AutoTutorPlannerThresholds>;
   weights?: Partial<AutoTutorPlannerWeights>;
 };
@@ -385,6 +386,9 @@ export function selectAutoTutorMove(input: AutoTutorPlannerInput, target: AutoTu
     return 'correction';
   }
   if (target.type === 'completion') {
+    if (!input.requireFinalAnswerPrompt) {
+      return 'summary';
+    }
     return input.plannerState.lastSelectedTargetType === 'completion'
       ? 'summary'
       : 'final_answer_prompt';

@@ -190,6 +190,12 @@ export function validateAutoTutorContent(context: AutoTutorValidationContext): A
     }
 
     validateGraduation(session.graduation, unitPrefix, errors);
+    if (
+      session.requireFinalAnswerPrompt !== undefined &&
+      typeof session.requireFinalAnswerPrompt !== 'boolean'
+    ) {
+      errors.push(`${unitPrefix}.requireFinalAnswerPrompt must be boolean`);
+    }
 
     const firstStim = getClusterFirstStim(context.stimuli, Number(session.cluster));
     const stimPrefix = `setspec.clusters[${Number(session.cluster)}].stims[0]`;
