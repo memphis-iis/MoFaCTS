@@ -9,7 +9,7 @@ This folder contains the canonical Docker Compose deployment workflow for the Mo
 - `docker-compose.hotfix-native.yml`: publishes local MongoDB to `127.0.0.1:27017` for the native hotfix dev server.
 - `docker-compose.hotfix-local.yml`: local-only bundle runner for faster code hotfix loops without producing a deploy image.
 - `.env.local.example`: shareable local environment template. Copy it to ignored `.env.local` for machine-specific values.
-- `settings.json`, `settings.local.json`: application settings sources used by the container runtime.
+- `settings.json`, `settingsstaging.json`, `settings.local.json`: private application settings sources mounted into the container at runtime; they are not copied into the image.
 - `docker/`: scripts copied into the app image.
 - `hotfix-dev.ps1`: native Windows Meteor hotfix dev server launcher.
 - `hotfix/`: scripts used by the local-only bundle runner.
@@ -23,6 +23,8 @@ This folder contains the canonical Docker Compose deployment workflow for the Mo
 Run Docker Compose from this folder.
 
 `docker-compose.yml` sets the build context to `../`, which resolves to the repository root that contains the application Dockerfile.
+
+Private settings files under `deploy/` are ignored by Docker build context. Production and staging settings must be copied to the server separately and mounted into the app container at `/run/mofacts/settings.json`.
 
 ## Local Settings
 

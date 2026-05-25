@@ -59,7 +59,7 @@ services:
       MONGO_URL: mongodb://mongodb:27017/MoFACT-meteor3
       EXPECTED_MONGO_DB_NAME: MoFACT-meteor3
       WAIT_HOSTS: mongodb:27017
-      METEOR_SETTINGS_WORKAROUND: /run/local-settings/settings.local.json
+      METEOR_SETTINGS_WORKAROUND: /run/mofacts/settings.json
       APP_BUNDLE_FOLDER: /local-build
     volumes:
       - type: bind
@@ -83,7 +83,7 @@ services:
         target: /root/h5p-libraries
       - type: bind
         source: ./settings.local.json
-        target: /run/local-settings/settings.local.json
+        target: /run/mofacts/settings.json
         read_only: true
 
 volumes:

@@ -131,13 +131,6 @@ COPY --from=bundle_deps_builder $SCRIPTS_FOLDER $SCRIPTS_FOLDER/
 # Function: copy app bundle with built dependencies from dependency builder stage.
 COPY --from=bundle_deps_builder $APP_BUNDLE_FOLDER/bundle $APP_BUNDLE_FOLDER/bundle/
 
-# Function: bake settings.json into the image so deploys are self-contained.
-# Placed at /app/settings.json to avoid being shadowed by the /mofactsAssets bind mount
-# (which holds SSL certs, feedback data, and dictionaries).
-RUN mkdir -p /app
-COPY ./deploy/settings.json /app/settings.json
-COPY ./deploy/settingsstaging.json /app/settingsstaging.json
-
 # Function: remove platform-specific binaries not needed in linux container runtime.
 RUN rm -rf $APP_BUNDLE_FOLDER/bundle/programs/server/npm/node_modules/@swc/core-darwin* \
            $APP_BUNDLE_FOLDER/bundle/programs/server/npm/node_modules/@swc/core-linux-x64-gnu \

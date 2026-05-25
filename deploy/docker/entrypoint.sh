@@ -16,8 +16,12 @@ source ./connect-to-mongo.sh
 
 echo 'Starting app...'
 
-# Prefer the compose-provided settings path and fall back to the baked-in copy.
-export METEOR_SETTINGS_WORKAROUND=${METEOR_SETTINGS_WORKAROUND:-/app/settings.json}
+: "${METEOR_SETTINGS_WORKAROUND:?METEOR_SETTINGS_WORKAROUND is required}"
+if [ ! -f "$METEOR_SETTINGS_WORKAROUND" ]; then
+	echo "Meteor settings file not found: $METEOR_SETTINGS_WORKAROUND" >&2
+	exit 1
+fi
+export METEOR_SETTINGS_WORKAROUND
 
 cd $APP_BUNDLE_FOLDER/bundle
 

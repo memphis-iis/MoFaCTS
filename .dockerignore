@@ -31,11 +31,11 @@ mofacts/tests/*
 docs/
 docs_dev/
 
-# Local settings. Deploy settings are copied explicitly by Dockerfile.
+# Local and deploy settings. Runtime settings are copied to servers separately
+# and mounted into containers; they must never enter image build context.
 mofacts/settings.json
 settings.json
-!deploy/settings.json
-!deploy/settingsstaging.json
+deploy/settings*.json
 
 # Private deploy/runtime state
 deploy/.env*

@@ -29,6 +29,10 @@ services:
         target: /root/h5p-libraries
         bind:
           create_host_path: true
+      - type: bind
+        source: ${METEOR_SETTINGS_HOST_PATH:-./settingsstaging.json}
+        target: /run/mofacts/settings.json
+        read_only: true
     ports:
       - '3000:3000'
     depends_on:
@@ -39,9 +43,7 @@ services:
       EXPECTED_MONGO_DB_NAME: ${EXPECTED_MONGO_DB_NAME:-MoFACT-meteor3}
       PORT: ${PORT:-3000}
       WAIT_HOSTS: mongodb:27017
-      # Settings are baked into the image at /app/settings.json (outside the
-      # /mofactsAssets bind mount so deploys are self-contained).
-      METEOR_SETTINGS_WORKAROUND: '${METEOR_SETTINGS_PATH:-/app/settingsstaging.json}'
+      METEOR_SETTINGS_WORKAROUND: /run/mofacts/settings.json
     networks:
       - mofacts
 
