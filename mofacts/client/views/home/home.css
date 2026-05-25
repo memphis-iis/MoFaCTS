@@ -143,14 +143,15 @@
     z-index: 11000;
     max-width: min(270px, calc(100vw - 24px));
     padding: 0.625rem 0.75rem;
-    border: 1px solid var(--accent-color, #7ed957);
+    border: 1px solid color-mix(in srgb, var(--teacher-button-color, #7CB8F5) 76%, var(--text-color, #333333));
     border-radius: 8px;
-    background: var(--secondary-color, #ffffff);
-    color: var(--text-color, #333333);
+    background: var(--teacher-button-color, #7CB8F5);
+    color: var(--teacher-button-text-color, var(--text-color, #333333));
     box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.18);
     font-size: 0.875rem;
     font-weight: 600;
     line-height: 1.25;
+    text-align: center;
     opacity: 0;
     transform: translateY(-4px);
     transition: opacity 150ms ease-out, transform 150ms ease-out;
@@ -168,7 +169,7 @@
     top: -34px;
     width: 2px;
     height: 28px;
-    background: var(--accent-color, #7ed957);
+    background: color-mix(in srgb, var(--teacher-button-color, #7CB8F5) 76%, var(--text-color, #333333));
     transform: translateX(-50%);
 }
 
@@ -181,12 +182,13 @@
     height: 0;
     border-left: 6px solid transparent;
     border-right: 6px solid transparent;
-    border-bottom: 9px solid var(--accent-color, #7ed957);
+    border-bottom: 9px solid color-mix(in srgb, var(--teacher-button-color, #7CB8F5) 76%, var(--text-color, #333333));
     transform: translateX(-50%);
 }
 
-.navbar .home-link.main-menu-return-tour-target {
+.navbar .home-link.main-menu-return-tour-target,
+.main-menu-return-tour-target {
     border-radius: 6px;
-    outline: 3px solid color-mix(in srgb, var(--accent-color, #7ed957) 72%, transparent);
+    outline: 3px solid color-mix(in srgb, var(--teacher-button-color, #7CB8F5) 72%, transparent);
     outline-offset: 4px;
 }

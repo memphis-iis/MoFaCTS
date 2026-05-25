@@ -2503,6 +2503,11 @@ tfoot th {
     border-color: color-mix(in srgb, var(--teacher-button-color) calc((100 - var(--button-border-darkness, 20) - var(--button-hover-darkness, 15)) * 1%), black calc((var(--button-border-darkness, 20) + var(--button-hover-darkness, 15)) * 1%));
 }
 
+.spinner-border,
+.fa-spinner {
+    color: var(--text-color) !important;
+}
+
 /* Shared Functions buttons - Theme-configurable (teachers & admins) */
 .btn-role-shared {
     background-color: var(--shared-button-color);

@@ -585,12 +585,21 @@
                             {{/if}}
                         </div>
                         <div class="col text-end">
-                            Home Welcome HTML:
+                            Home Welcome Back HTML:
                         </div>
                         <div class="col">
                             <textarea class="form-control currentThemeProp" rows="5" data-id="home_welcome_html">{{currentTheme.properties.home_welcome_html}}</textarea>
                             <small class="form-text text-muted">
-                                HTML shown over the home page underlay. Supports simple text formatting and links.
+                                HTML shown over the home page underlay for users with practice records. Supports simple text formatting and links.
+                            </small>
+                        </div>
+                        <div class="col text-end">
+                            Home First Practice HTML:
+                        </div>
+                        <div class="col">
+                            <textarea class="form-control currentThemeProp" rows="5" data-id="home_no_practice_welcome_html">{{currentTheme.properties.home_no_practice_welcome_html}}</textarea>
+                            <small class="form-text text-muted">
+                                HTML shown over the home page underlay for users whose learning dashboard has no practice records yet.
                             </small>
                         </div>
                         <div class="col text-end">
