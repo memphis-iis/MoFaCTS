@@ -1,13 +1,14 @@
 # Self-Hosted MoFaCTS Implementation Plan
 
-This plan defines the work required to finish the Self-Hosted MoFaCTS deployment system before starting hosted or enterprise-layer implementation.
+This plan defines the work required to finish the Self-Hosted MoFaCTS deployment system and public open-core distribution before starting hosted or enterprise-layer implementation.
 
-The enterprise goal is preserved as an architectural constraint, but enterprise infrastructure work is out of scope until Self-Hosted MoFaCTS is complete.
+The enterprise goal is preserved as an architectural constraint, but enterprise infrastructure work is out of scope until the public open-core distribution is complete.
 
 Related docs:
 
 - `open-core-baseline-inventory.md`: current deployment inventory.
 - `open-core-architecture-vetting.md`: target architecture, Redis assessment, and gap analysis.
+- `open-core-decision-answers.md`: worksheet for recording pre-implementation decisions.
 - `../license-compliance.md`: AGPL, third-party notices, and source-availability obligations.
 - `../release-process.md`: public release and license audit checks.
 
@@ -24,36 +25,63 @@ Self-Hosted MoFaCTS is complete when a technically capable operator can:
 7. Validate readiness.
 8. Back up and restore all required state.
 9. Upgrade safely.
-10. Understand which features require optional services such as Redis.
+10. Understand required services, including Redis, and any intentionally optional integrations.
 11. Verify that the deployed app and distributed artifacts satisfy AGPL/source-availability expectations.
 12. Trace a running self-hosted deployment back to the exact source tag, image tag, release notes, settings template, and operator documentation used to create it.
+13. Build the app from a clean public source checkout or run a corresponding prebuilt image, with both paths documented and traceable to the same release.
 
 The system must fail clearly when required configuration or dependencies are missing. Silent fallbacks are not allowed.
 
-Each implementation phase must end with a concrete acceptance check. Documentation-only completion is acceptable only for documentation-only work; behavior-changing phases need an executable check, test, smoke run, or explicitly recorded local limitation.
+This plan should be executed start to finish as one continuous open-core readiness effort. Phases are ordered workstreams, not stopping points. Continue into the next workstream whenever the current work and invariants still make sense; stop only for a true blocking question, a broken invariant, or a verification result that changes the plan.
+
+Each workstream must leave behind a concrete completion check. Documentation-only completion is acceptable only for documentation-only work; behavior-changing workstreams need an executable check, test, smoke run, or explicitly recorded local limitation.
+
+## Repository Implementation Rules
+
+Open-core work must follow the repository rules in `../../AGENTS.md`:
+
+- Work in `mofacts/` for application behavior, UI, state machines, server methods, publications, persistence, logging, migrations, and runtime validation.
+- Keep executable deployment examples and scripts in `deploy/`; keep concise public operator docs in `docs/deployment/`.
+- Coordinate with the public config/content repository for sample TDF/config content and for any change that alters required TDF fields, config names, structures, or expectations.
+- Do not add compatibility fallbacks or silent in-process substitutes for required services. If a dependency or invariant is missing, fail clearly.
+- Preserve existing working paths unless a task explicitly changes them; do not solve open-core readiness by changing unrelated user-facing behavior.
+- Keep server methods narrow: database access, auth/authorization, encryption, secrets, and external API calls belong server-side; pure compute should stay client-side, in `common/`, or in focused helpers.
+- Extract large server helpers out of `methods.ts` into `server/lib/` or `common/`.
+- For TypeScript-bearing app changes, run `npm run typecheck` from `mofacts/`. For lintable TypeScript, JavaScript, or Svelte changes, run `npm run lint` from `mofacts/`.
+- For UI/runtime behavior changes, use the native hotfix dev loop at `http://localhost:3200`; do not treat it as release confidence.
+- Do not run Docker build, push, or deploy commands unless explicitly requested. Docker Compose config validation and local runtime checks are useful, but release-confidence image builds require explicit direction.
 
 ## Pre-Implementation Decision Register
 
-These decisions must be resolved before the phase that depends on them starts. Do not build around temporary compatibility behavior to avoid deciding.
+These decisions guide the workstreams that depend on them. Use the current default for planning unless implementation discovers a contradiction. Do not build around temporary compatibility behavior to avoid deciding; ask only when the next coherent implementation step truly depends on an unresolved choice.
 
 | Decision | Needed by | Current default for planning |
 | --- | --- | --- |
 | Public name | Phase 0 | Use "Self-Hosted MoFaCTS" in operator docs. |
 | Canonical operator docs location | Phase 0 | Human docs in `docs/deployment/`; executable scripts and examples in `deploy/`. |
-| Production self-hosted email default | Phase 1 | Disabled unless explicitly configured; email-dependent features fail clearly when enabled without settings. |
-| First-admin bootstrap model | Phase 1 | Prefer a deliberate bootstrap command or documented one-time admin assignment over silent role assignment. |
+| Production self-hosted email behavior | Phase 1 | Preserve the current `enableEmail`/`prod` behavior: localhost/local examples do not send mail; deployments that enable email require valid mail settings. |
+| First-admin bootstrap model | Phase 1 | Preserve the current settings-file model: `owner` and `initRoles.admins` identify admin emails, and matching users receive roles through the existing startup/login role assignment flow. |
 | Baseline auth modes | Phase 1 | Password auth baseline; OAuth/SAML optional integrations with explicit enablement. |
 | Canonical runtime settings path | Phase 1 | A mounted private settings file path under `/run/mofacts/`; no production self-hosted default to baked settings. |
 | Self-hosted Compose file naming | Phase 2 | Keep `deploy/docker-compose.yml` only if it can become safe public operator defaults; otherwise add a clearly named self-hosted file. |
-| Asset state default | Phase 2 | Prefer named volumes for a simple first run, with documented host-directory overrides for operators who need direct filesystem backups. |
-| Direct port exposure | Phase 2 | Bind localhost by default when reverse proxy guidance is the production path; document public HTTP only as local/LAN evaluation. |
-| Readiness access model | Phase 4 | Prefer local-command or protected endpoint; public readiness must not expose secrets. |
-| Backup/restore script policy | Phase 5 | Docs first; scripts only when non-destructive defaults and restore warnings are clear. |
-| Storage backend scope | Phase 7 | Local filesystem is required for first Self-Hosted MoFaCTS completion; S3-compatible storage is deferred unless explicitly pulled in. |
-| First Redis-backed subsystem | Phase 8 | Content/package import and validation jobs are the preferred first candidate if Redis lands in Self-Hosted MoFaCTS. |
-| Redis requirement model | Phase 8 | Redis is optional until a named enabled feature requires it; enabled Redis-backed features fail clearly without Redis. |
-| Worker requirement model | Phase 9 | Worker service is added only when actual queued work exists. |
-| Versioning and migration policy | Phase 10 | Public release tags and forward-only migration notes until a stronger migration contract exists. |
+| Public signup default | Phase 1 | Self-hosted installs normally allow public signup through `auth.allowPublicSignup`; keep it configurable for operators who need closed registration. |
+| First-admin owner requirement | Phase 1 | Require an `owner` setting and at least one configured admin email. Fresh installs may allow the matching account to be created through public signup, but readiness should clearly report when the configured owner/admin account is not usable yet. |
+| OAuth/SAML baseline | Phase 1 | Password auth is the required local account path. OAuth/SAML providers are optional integrations, but baseline tests should cover disabled-provider behavior and enabled-provider validation where credentials/fixtures are available. |
+| Asset state default | Phase 2 | Preserve the current production-shaped asset model: MongoDB in a named volume, dynamic assets/H5P content/H5P libraries in explicit host directories so backup scope is visible. Consider named asset volumes only as a separate quickstart if backup scripts can still make the state obvious. |
+| Direct port exposure | Phase 2 | Current Compose exposes `3000:3000`. For public HTTPS deployments, document binding the app port to localhost behind a reverse proxy; direct public HTTP is only for local/LAN evaluation. |
+| Readiness access model | Phase 4 | Extend the existing admin-only `/admin/tests` route into readiness/deployment diagnostics; keep `/health` public liveness only. |
+| Backup/restore script policy | Phase 5 | Ship guarded backup/restore scripts; restore that overwrites state must require an explicit destructive confirmation flag. |
+| Storage backend scope | Phase 7 | Local filesystem remains the default baseline. S3-compatible storage is included in the first public milestone as an explicit optional backend, and configured storage must fail clearly when invalid. |
+| First Redis-backed subsystem | Phase 8 | Start with the existing user dashboard cache/dashboard analytics refresh path. |
+| Redis requirement model | Phase 8 | Redis is part of the completed open-core distribution; Redis-backed behavior must fail clearly when Redis is configured but unavailable. |
+| Worker requirement model | Phase 9 | Do not require a separate worker for the first pass unless the dashboard-cache design proves it needs one; preserve a clean path to add one later. |
+| Versioning and migration policy | Phase 10 | Public release-to-release upgrades only for now; any database structure or persistence-contract change requires a written migration note and explicit approval. |
+| Public image distribution | Phase 10 | Support both prebuilt images and local builds from source, with both paths tied to the same public release tag. |
+| Runtime source link | Phase 10 | The running app should expose a visible License / Source link to the exact public source tag or archive for that build. |
+| Sample content | Phase 6 | Use the world countries system as the public smoke-test content path. Do not require H5P for the beginner smoke test. |
+| MongoDB authentication | Phase 2 | Canonical self-hosted production Compose uses authenticated MongoDB. Preserve unauthenticated Mongo only for clearly labeled local developer loops. |
+| Redis persistence model | Phase 8 | MongoDB remains the durable record; Redis provides coordination/cache behavior that can be rebuilt from MongoDB. |
+| S3-compatible storage | Phase 7 | Include S3-compatible storage in the first public milestone as an explicit optional backend. Local filesystem remains the default baseline; configured S3 must fail clearly when invalid. |
 
 ## Phase 0: Baseline and Scope Lock
 
@@ -64,15 +92,15 @@ Tasks:
 - [x] Create baseline inventory for current Compose services, volumes, settings, health checks, and persistent state.
 - [x] Create architecture vetting note for open-core target shape and Redis direction.
 - [x] Use "Self-Hosted MoFaCTS" as the public operator-facing deployment name.
-- [ ] Decide whether the canonical self-hosted docs live primarily in `docs/deployment/` with operational scripts in `deploy/`.
-- [ ] Resolve or explicitly accept the planning defaults in the pre-implementation decision register for Phases 0 through 2.
+- [x] Use `docs/deployment/` for human-facing operator docs and `deploy/` for executable scripts/examples.
+- [ ] Keep the pre-implementation decision register aligned as decisions are discovered or confirmed.
 - [x] Add an index link from `docs/deployment/README.md` to the open-core docs.
 
-Exit criteria:
+Completion checks:
 
 - Current runtime state and target open-core scope are documented.
-- The plan excludes enterprise implementation until open-core completion.
-- Phase 1 is not started until settings, auth, email, and first-admin bootstrap decisions have an accepted direction.
+- The plan excludes enterprise implementation until the public open-core distribution is complete.
+- Settings, auth, email, and first-admin role-assignment invariants have an accepted direction before code changes rely on them.
 
 ## Phase 1: Configuration and Secret Hygiene
 
@@ -87,22 +115,25 @@ Tasks:
 - [ ] Create a local-development example settings file if the current local settings are not sufficient.
 - [ ] Move institution-specific examples, credentials, emails, SAML paths, and secrets out of tracked defaults.
 - [ ] Ensure Docker image build does not require real private settings baked into the image.
-- [ ] Decide whether the image should bake only example settings or no settings at all.
+- [ ] Ensure the image does not bake private runtime settings; tracked examples may exist only as examples.
 - [ ] Define the canonical runtime settings mount path for self-hosted deployments.
 - [ ] Update Compose to mount/use the private runtime settings path deliberately.
 - [ ] Remove the self-hosted production runtime fallback that defaults `METEOR_SETTINGS_WORKAROUND` to `/app/settings.json`.
 - [ ] Ensure missing runtime settings path, inline settings JSON, unreadable settings files, and example placeholder values fail with actionable errors.
 - [ ] Add fail-fast startup validation for required settings.
 - [ ] Validate `ROOT_URL` shape and consistency with public deployment docs.
-- [ ] Validate `owner` and `initRoles.admins` expectations for first-admin bootstrap.
+- [ ] Require `owner` and at least one configured admin email for self-hosted production settings.
+- [ ] Validate `owner` and `initRoles.admins` expectations for first-admin role assignment.
 - [ ] Validate `encryptionKey` presence and minimum strength/format.
 - [ ] Validate auth-related settings and email verification constraints.
 - [ ] Validate email settings when email is enabled.
 - [ ] Validate SAML/OAuth settings only when those providers are enabled.
+- [ ] Add MongoDB authentication settings to the self-hosted `.env` and settings reference, including root/admin credentials, app credentials, and authenticated `MONGO_URL` expectations.
+- [ ] Keep unauthenticated MongoDB examples limited to clearly labeled local developer loops.
 - [ ] Document every required and optional setting in an operator-facing settings reference.
 - [ ] Add tests for settings validation helpers.
 
-Exit criteria:
+Completion checks:
 
 - Tracked settings are safe examples.
 - A fresh self-hosted install either starts with complete settings or fails with actionable configuration errors.
@@ -110,11 +141,11 @@ Exit criteria:
 - The current baked-settings image behavior is either removed from self-hosted production or documented as example-only and never used as a silent runtime default.
 - Acceptance check: start once with a missing settings mount and verify startup fails with the documented error; start once with complete example-derived private settings and verify startup proceeds to Mongo readiness.
 
-Blocking questions:
+Resolved direction:
 
-- Should production self-hosted email be required, optional, or disabled by default?
-- Should first-admin bootstrap require a preexisting account, automatic role assignment after signup, or a deliberate admin creation command?
-- Should OAuth/SAML be part of baseline open core or documented as optional integrations?
+- Self-hosted installs normally allow public signup through `auth.allowPublicSignup`, but operators can turn it off deliberately.
+- The `owner` setting and at least one admin email are required. If the configured account does not exist yet, first-run docs should explain that the matching user signs up and receives roles through the existing startup/login assignment path; readiness should surface that the configured admin is not usable yet.
+- Password auth is the baseline local account path. OAuth/SAML providers are optional integrations, and baseline testing should still cover disabled-provider behavior plus enabled-provider validation where credentials or fixtures are available.
 
 ## Phase 2: Canonical Open-Core Compose Runtime
 
@@ -122,31 +153,35 @@ Goal: make Docker Compose a credible self-hosted runtime, not only a maintainer 
 
 Tasks:
 
-- [ ] Decide whether `deploy/docker-compose.yml` remains the canonical production-shaped file or whether a new self-hosted file is clearer.
+- [ ] Make `deploy/docker-compose.yml` safe as the canonical production-shaped self-hosted file, or add a clearly named self-hosted file if preserving maintainer deploy behavior requires separation.
 - [ ] Normalize service names, network names, volume names, and environment variable names for self-hosted use.
-- [ ] Convert absolute host bind defaults where appropriate into named volumes or clearly documented host paths.
+- [ ] Preserve explicit host-directory asset mounts for production-shaped self-hosting unless a separate beginner quickstart is added.
 - [ ] Keep MongoDB as a required service.
+- [ ] Make authenticated MongoDB the canonical self-hosted production baseline.
+- [ ] Configure MongoDB root/admin credentials and MoFaCTS app-user credentials through `.env` values, not tracked secrets.
+- [ ] Ensure canonical `MONGO_URL` uses the app MongoDB user and targets the expected database.
+- [ ] Preserve current unauthenticated MongoDB only in clearly labeled local hotfix/developer workflows.
 - [ ] Add MongoDB health check if practical with the selected Mongo image.
 - [ ] Add app container health check against `/health` or a future readiness command.
 - [ ] Define app restart policy for self-hosted deployments.
-- [ ] Document port exposure and when to bind only to localhost behind a reverse proxy.
+- [ ] Document current direct port exposure, when to bind only to localhost behind a reverse proxy, and why public HTTP is local/LAN-only guidance.
 - [ ] Add or refine `.env` example for self-hosted Compose.
 - [ ] Separate local hotfix/dev Compose docs from self-hosted operator docs.
-- [ ] Decide whether Redis appears in Compose before Phase 8.
-- [ ] If Redis appears before a Redis-backed feature exists, mark it as disabled/reserved and ensure no app behavior silently depends on it.
+- [ ] Add Redis to the self-hosted Compose shape in coordination with Phase 8.
+- [ ] Ensure the app has no silent in-process substitute for required Redis-backed behavior.
 - [ ] Validate Compose config in docs and scripts.
 
-Exit criteria:
+Completion checks:
 
 - A new operator can run the self-hosted Compose stack from documented files.
 - Required services and optional services are unambiguous.
 - Local developer loops remain intact but are not confused with the open-core operator path.
 - Acceptance check: run `docker compose config` against the documented self-hosted files and verify the app, MongoDB, volumes, settings mount, network, and port bindings match the operator guide.
 
-Blocking questions:
+Resolved direction:
 
-- Should local asset state be named Docker volumes or host directories by default?
-- Should the direct app port be publicly exposed by default or bound to localhost for reverse-proxy use?
+- MongoDB currently uses a named volume; dynamic assets and H5P state currently use host directories. Keep that production-shaped model because backup-visible state matters.
+- Current Compose exposes `3000:3000`. Public deployments should use HTTPS through a reverse proxy and bind the app port to localhost when the proxy is on the same host.
 
 ## Phase 3: Reverse Proxy and HTTPS
 
@@ -154,24 +189,24 @@ Goal: provide production-ready guidance for exposing a self-hosted instance.
 
 Tasks:
 
-- [ ] Decide the first supported reverse proxy example: Caddy only, or Caddy plus nginx/Traefik.
+- [x] Use Caddy as the first supported reverse proxy example.
 - [ ] Add a self-hosted Caddyfile example for a real domain.
 - [ ] Document WebSocket behavior required by Meteor.
 - [ ] Document `ROOT_URL` and HTTPS consistency requirements.
 - [ ] Document local-only HTTP, LAN HTTPS, and public HTTPS as separate cases.
 - [ ] Document certificate ownership and renewal expectations.
 - [ ] Add troubleshooting notes for mixed content, wrong host, websocket failures, and login redirect mismatch.
-- [ ] Optionally add Compose override for reverse proxy if maintaining it in-repo is worthwhile.
+- [ ] Provide config examples first; add a maintained reverse-proxy Compose override only if implementation shows it improves operator clarity enough to justify maintaining it.
 
-Exit criteria:
+Completion checks:
 
 - Operators can put MoFaCTS behind HTTPS without guessing at headers or app URL settings.
 - The direct app port exposure story is explicit.
 - Acceptance check: validate the reverse-proxy example renders a complete config with a real-domain placeholder, WebSocket-compatible proxying, and matching `ROOT_URL` documentation.
 
-Blocking questions:
+Resolved direction:
 
-- Do we want to maintain a reverse proxy container as part of open-core Compose or provide config examples only?
+- Document the current state and provide a Caddy-first production example. There is no maintained production reverse-proxy service in Compose today.
 
 ## Phase 4: Readiness and Operational Validation
 
@@ -180,28 +215,31 @@ Goal: make deployment correctness inspectable.
 Tasks:
 
 - [ ] Keep `/health` as lightweight liveness.
-- [ ] Add a distinct readiness check or validation command.
+- [ ] Extend the existing admin-only `/admin/tests` route and `testRunner` template with deployment readiness diagnostics.
+- [ ] Add a distinct readiness helper or validation command behind the admin tests route.
 - [ ] Validate MongoDB connectivity.
+- [ ] Validate MongoDB authentication is enabled for the canonical self-hosted production path.
 - [ ] Validate expected Mongo database name.
 - [ ] Validate settings file was loaded from the intended path.
 - [ ] Validate required settings after parsing.
 - [ ] Validate dynamic asset storage root existence and read/write access.
 - [ ] Validate H5P content and library directory existence and access.
 - [ ] Validate `ROOT_URL` and app-visible public settings.
-- [ ] Validate Redis connectivity only when Redis-backed features are enabled.
+- [ ] Validate Redis connectivity for the canonical completed open-core runtime; during implementation, validate Redis only once Redis-backed features are enabled.
 - [ ] Add a deployment validation script or extend `server-deploy-validate.sh` to call readiness.
 - [ ] Document expected pass/fail output.
 - [ ] Add automated tests for readiness helper logic where feasible.
+- [ ] Add route/access tests proving deployment diagnostics remain admin-only.
 
-Exit criteria:
+Completion checks:
 
 - Operators can distinguish "process is alive" from "deployment is ready."
 - Missing dependencies or misconfiguration fail loudly.
 - Acceptance check: run readiness against one valid deployment and at least one intentionally broken dependency or configuration, then document both outputs.
 
-Blocking questions:
+Resolved direction:
 
-- Should readiness be public, admin-only, local-command-only, or protected by a token?
+- Readiness diagnostics belong behind the existing admin-only `/admin/tests` route. Public `/health` remains a lightweight liveness endpoint.
 
 ## Phase 5: Backup and Restore
 
@@ -211,30 +249,33 @@ Tasks:
 
 - [ ] Define complete backup scope.
 - [ ] Include MongoDB data.
+- [ ] Include MongoDB authentication credentials and explain their relationship to restore.
 - [ ] Include dynamic assets.
 - [ ] Include H5P content.
 - [ ] Include H5P libraries.
 - [ ] Include deployment settings and `.env`.
 - [ ] Include SAML/OAuth certificates or key material where configured.
 - [ ] Include theme/customization assets if used.
-- [ ] Decide whether generated previews, logs, and local dev state are in or out of backup scope.
+- [ ] Include all production state that exists in the deployed instance; exclude ignored local dev state unless the operator deliberately points production settings there.
 - [ ] Document backup procedure using Compose.
 - [ ] Document restore procedure to a clean host.
+- [ ] Ensure backup and restore scripts authenticate to MongoDB deliberately instead of assuming unauthenticated local access.
 - [ ] Document restore verification steps.
 - [ ] Document upgrade-safe backup timing.
 - [ ] Add scripts only if they can be clear, portable, and non-destructive.
 - [ ] Add warnings for destructive restore operations.
 
-Exit criteria:
+Completion checks:
 
 - A self-hosted operator can back up and restore a complete MoFaCTS instance.
 - The backup docs identify every stateful component.
 - Acceptance check: perform at least one restore rehearsal to a clean volume or clean host equivalent, then verify login, content listing, dynamic asset serving, and H5P content serving where applicable.
 
-Blocking questions:
+Resolved direction:
 
-- Should the repo ship scripts for backup/restore, or docs first?
-- What is the minimum supported restore target: same host, new host, or both?
+- Ship guarded backup/restore scripts.
+- Support same-host restore and clean-host or clean-volume restore.
+- Require an explicit destructive confirmation flag for restore operations that overwrite existing state.
 
 ## Phase 6: First-Run Admin and Content Authoring
 
@@ -242,27 +283,31 @@ Goal: make a fresh self-hosted instance usable without institutional tribal know
 
 Tasks:
 
-- [ ] Define first-admin bootstrap flow.
-- [ ] Ensure the selected bootstrap flow is compatible with Phase 1 settings validation.
-- [ ] Document how `owner` and `initRoles.admins` work.
-- [ ] Ensure first admin assignment fails clearly when the configured admin account cannot be resolved.
-- [ ] Decide whether to add an admin bootstrap command for self-hosted installs.
-- [ ] Document public signup settings and email verification implications.
+- [ ] Document the current first-admin settings-file flow.
+- [ ] Ensure the documented flow is compatible with Phase 1 settings validation.
+- [ ] Document how `owner` and `initRoles.admins` work at startup and on login.
+- [ ] Ensure missing configured admin accounts are surfaced clearly without implying a separate bootstrap mechanism.
+- [ ] Verify teachers cannot grant roles; role changes must remain admin-only.
+- [ ] Document public signup as normally enabled for self-hosted installs, with `auth.allowPublicSignup` as the operator flag for closed registration.
 - [ ] Document teacher/admin role assignment path.
 - [ ] Document first content upload path.
+- [ ] Use the world countries system as the public beginner smoke-test content path.
+- [ ] Document where the world countries package lives, how to import or enable it, and how to launch one learner flow from it.
+- [ ] Verify the world countries package is redistributable and carries any required attribution or provenance metadata before shipping it as public sample content.
+- [ ] Keep H5P out of the beginner smoke-test requirement; verify H5P only where the deployment uses H5P content.
 - [ ] Document dynamic asset and H5P storage implications for content upload.
-- [ ] Add a minimal smoke checklist: create admin, sign in, upload content, launch learner flow.
+- [ ] Add a minimal smoke checklist: create admin, sign in, load the world countries system, launch learner flow.
 - [ ] Add tests for any new bootstrap helper logic.
 
-Exit criteria:
+Completion checks:
 
-- A new operator can create the first usable admin and verify content authoring.
-- Acceptance check: from a clean database, bootstrap the first admin through the documented flow, sign in as that admin, assign any required instructor/teacher role, upload or create first content, and launch one learner flow.
+- A new operator can create or sign in as the first configured admin and verify content authoring.
+- Acceptance check: from a clean database, configure `owner`/`initRoles.admins`, create or sign in as the matching user through the existing account path, verify the user receives admin role through the documented startup/login flow, assign any required instructor/teacher role as admin, load the world countries system, and launch one learner flow.
 
-Blocking questions:
+Resolved direction:
 
-- Should self-hosted installs default to public signup enabled or disabled?
-- Is a CLI/server method/admin-only UI path preferred for bootstrapping the first admin?
+- Self-hosted installs normally allow public signup. Closed registration remains available through `auth.allowPublicSignup: false`.
+- First-admin setup uses the settings-file owner/admin email list plus the existing account path. In the normal self-hosted path, the configured owner/admin signs up and receives roles through startup/login role assignment.
 
 ## Phase 7: Storage Boundary
 
@@ -273,83 +318,80 @@ Tasks:
 - [ ] Inventory all app code paths that read/write dynamic assets, H5P content, H5P libraries, and generated files.
 - [ ] Define storage responsibilities: upload storage, public asset serving, H5P package storage, H5P library storage, generated media/previews.
 - [ ] Introduce a storage configuration model.
-- [ ] Keep local filesystem as the first required open-core backend unless S3 is selected for this milestone.
+- [ ] Keep local filesystem as the default open-core storage backend.
 - [ ] Move hard-coded path assumptions behind a small storage boundary.
 - [ ] Add storage validation for configured local paths.
 - [ ] Add tests around path resolution and safety invariants.
-- [ ] Decide whether S3-compatible storage is implemented now or deferred after local boundary cleanup.
-- [ ] If S3-compatible storage is included, implement one adapter path without local silent fallback.
+- [ ] Add S3-compatible storage only as an explicit optional backend with clear configuration and validation.
+- [ ] Include one S3-compatible adapter path in the first public milestone.
+- [ ] Keep local filesystem as the default backend for self-hosted installs.
+- [ ] Ensure configured S3-compatible storage fails clearly when bucket, endpoint, credentials, permissions, or path settings are invalid; do not fall back to local storage.
 - [ ] Document migration implications from local storage to object storage.
 
-Exit criteria:
+Completion checks:
 
 - Local storage remains fully supported.
 - Storage behavior is explicit enough that S3-compatible support can be added without scattering conditional code.
-- Acceptance check: run storage validation against configured local paths and verify path traversal, missing directory, and read/write failure cases fail clearly.
+- Acceptance check: run storage validation against configured local paths and configured S3-compatible storage. Verify path traversal, missing local directory, local read/write failure, invalid S3 endpoint, invalid credentials, missing bucket, and insufficient S3 permissions fail clearly.
 
-Blocking questions:
+Resolved direction:
 
-- Is S3-compatible object storage required for "open core complete", or only for enterprise readiness later?
-- Which assets must be served by the app versus directly by a proxy/object store?
+- Local filesystem remains the default storage backend. S3-compatible storage is included in the first public milestone as an explicit optional backend, not a hidden replacement for local storage.
+- Keep app-served dynamic assets and H5P routes as the default because the app enforces path safety, visibility, H5P runtime behavior, and metadata coupling. A proxy or object store can serve immutable blobs later only behind the same storage boundary and authorization/provenance rules.
 
 ## Phase 8: Redis Boundary
 
-Goal: introduce Redis as a real open-core subsystem boundary.
+Goal: introduce Redis as a required open-core subsystem boundary with at least one real Redis-backed feature.
 
 Tasks:
 
-- [ ] Choose the first Redis-backed subsystem.
-- [ ] Preferred candidates:
-  - Package/content import and validation jobs.
-  - Dashboard or analytics refresh queue.
-  - Scheduled notification/message dispatch.
-  - Distributed cron coordination for multi-app support.
+- [ ] Implement Redis-backed behavior for the existing user dashboard cache/dashboard analytics refresh path.
 - [ ] Define Redis role: queue, cache, pub/sub, lock, or some combination.
-- [ ] Decide persistence model: Redis durable queue, Mongo durable record plus Redis coordination, or both.
+- [ ] Implement the selected persistence model: MongoDB is the durable record; Redis provides coordination/cache behavior that can be rebuilt from MongoDB.
 - [ ] Add Redis service to open-core Compose.
 - [ ] Add Redis environment variables and example config.
-- [ ] Add startup validation when Redis-backed features are enabled.
+- [ ] Add startup validation for required Redis configuration and connectivity.
 - [ ] Add a small queue/cache/lock abstraction instead of direct Redis calls across app code.
-- [ ] Add tests for missing Redis, disabled Redis feature, and working Redis feature behavior.
+- [ ] Add tests for missing Redis configuration, unavailable Redis, and working Redis-backed behavior.
 - [ ] Document operational expectations: persistence, memory, backups, and what happens if Redis is unavailable.
-- [ ] Ensure no feature silently falls back to in-process behavior when configured to use Redis.
+- [ ] Document that Redis state is reconstructable from MongoDB for the first public milestone unless a later feature explicitly introduces durable Redis queue state.
+- [ ] Ensure no feature silently substitutes in-process behavior for required Redis-backed behavior.
 
-Exit criteria:
+Completion checks:
 
 - Redis is a real part of Open Core through at least one named feature.
-- Redis absence is either explicitly valid because Redis-backed features are disabled, or a clear startup/configuration failure.
-- Acceptance check: test the selected feature with Redis enabled and available, Redis enabled and unavailable, and Redis-backed features explicitly disabled.
+- Required Redis-backed behavior fails clearly when Redis is unavailable.
+- Acceptance check: test the selected feature with Redis available, Redis configured but unavailable, and Redis configuration missing.
 
-Blocking questions:
+Resolved direction:
 
-- Which subsystem gives the best first value with the least migration risk?
-- Should Redis be treated as optional for single-host installs after the first Redis feature lands, or required for the completed open-core distribution?
+- Start with `UserDashboardCache`/dashboard analytics refresh. Use MongoDB as the durable record and Redis as coordination/cache state. Do not require a separate worker for the first pass unless implementation proves the dashboard-cache design needs one.
 
 ## Phase 9: Background Worker Shape
 
-Goal: separate background work from web request handling where useful, while keeping single-host Open Core simple.
+Goal: decide whether the selected Redis-backed subsystem requires a separate background worker service, while keeping single-host Open Core understandable.
 
 Tasks:
 
-- [ ] Identify jobs that should not run inside user-facing requests.
-- [ ] Decide whether a separate worker service is required for open-core completion.
-- [ ] If yes, define worker entrypoint and role.
+- [ ] Identify whether the selected Redis-backed subsystem performs long-running, retryable, or separately scalable work.
+- [ ] Confirm the dashboard-cache Redis design can run coherently in the app process for the first pass.
+- [ ] If it cannot run coherently in the app process, define worker entrypoint and role.
 - [ ] Ensure web and worker processes share the same application image where possible.
 - [ ] Add worker service to Compose only when there is actual queued work.
 - [ ] Validate worker dependencies at startup.
 - [ ] Document how many worker replicas are supported in self-hosted mode.
 - [ ] Add logs/readiness guidance for workers.
-- [ ] Add tests for job ownership, retries, and idempotency where the first queued subsystem requires them.
+- [ ] Add tests for job ownership, retries, and idempotency where the first Redis-backed subsystem requires them.
 
-Exit criteria:
+Completion checks:
 
-- Background work has a clear runtime home.
+- The first Redis-backed subsystem has a clear runtime home.
 - Self-Hosted MoFaCTS can run simply on one host and still preserves the later hosted scaling path.
 - Acceptance check: if a worker service exists, run one documented job through it and verify ownership, retry/idempotency expectations, logs, and readiness behavior; if no worker exists, document why queued structure is sufficient for open-core completion.
 
-Blocking questions:
+Resolved direction:
 
-- Is worker separation required before enterprise, or is Redis-backed job structure enough for the first open-core completion?
+- No separate worker service is required for the first pass unless implementation proves the dashboard-cache design needs one.
 
 ## Phase 10: Upgrade, Migration, and Public Release Discipline
 
@@ -369,22 +411,23 @@ Tasks:
 - [ ] Add an operator smoke test checklist after upgrade.
 - [ ] Define the public versioning scheme operators see in tags, image names, docs, and release notes.
 - [ ] Define the public distribution contract: source archive/tag, Docker image tag if published, settings examples, `.env` example, release notes, and upgrade notes.
+- [ ] Document both public image paths: pulling a prebuilt image and building locally from source.
 - [ ] Ensure AGPL license text, third-party notices, dependency license artifacts, build scripts, and lockfiles are included or linked as required by `docs/license-compliance.md`.
 - [ ] Ensure the deployed app's visible "License / Source" link points to the exact public source tag or source archive for the deployed version.
 - [ ] Add release-note requirements for deployment-impacting changes, settings changes, storage changes, Redis/worker changes, migrations, and backup/restore implications.
-- [ ] Add license audit and stale-license/provenance scans to the public open-core release checklist.
+- [ ] Add public-repository readiness checks: secret scan, institution-specific data scan, redistributable sample content audit, dependency license audit, clean-clone build check, and stale-license/provenance scans.
 
-Exit criteria:
+Completion checks:
 
 - Operators can upgrade without guessing which state or config might change.
 - Operators can trace a running deployment and any distributed image back to corresponding source, notices, and release documentation.
 - Acceptance check: produce a draft release checklist for one open-core version and verify it names the source tag/archive, image tag if applicable, settings template version, license artifacts, migration notes, backup requirement, and post-upgrade smoke test.
 
-Blocking questions:
+Resolved direction:
 
-- What versioning scheme will self-hosted operators see?
-- Are database migrations reversible, forward-only, or mixed?
-- Will public operators pull prebuilt images, build locally from source, or both?
+- Operators should see semantic public release tags starting from the current `v0.1.0-alpha.1` baseline, with matching source tags, image tags when images are published, release notes, and settings template versions.
+- Database changes are forward-only unless explicitly designed otherwise. Any Mongo collection shape, migration, index, or persistence contract change requires a written migration note and explicit approval before implementation.
+- Support both prebuilt images and local source builds so public operators and approved consortium contributors can run, inspect, and improve the code. Contributor governance details should be documented in release/contribution docs without changing the self-hosted runtime contract.
 
 ## Phase 11: Documentation and Operator Experience
 
@@ -406,7 +449,7 @@ Tasks:
 - [ ] Keep local developer hotfix docs separate from operator docs.
 - [ ] Review docs for "no fallback" language and remove ambiguous optionality.
 
-Exit criteria:
+Completion checks:
 
 - A self-hosting operator has a coherent path through install, configure, run, validate, operate, and upgrade.
 - Acceptance check: run a docs walkthrough from a clean checkout using only tracked examples and private values supplied by the operator guide; record every place where a reader would otherwise need source-code knowledge.
@@ -423,10 +466,13 @@ Tasks:
 - [ ] Build the image through the canonical workflow when explicitly doing release-confidence validation.
 - [ ] Start a clean self-hosted stack.
 - [ ] Run readiness validation.
+- [ ] Verify canonical self-hosted MongoDB uses authentication and the app connects with the app MongoDB user.
 - [ ] Bootstrap first admin.
-- [ ] Upload or create test content.
+- [ ] Load the world countries system as test content.
 - [ ] Complete learner smoke flow.
 - [ ] Verify dynamic asset serving.
+- [ ] Verify the default local filesystem storage backend.
+- [ ] Verify configured S3-compatible storage works, and intentionally broken S3-compatible storage fails clearly without falling back to local storage.
 - [ ] Verify H5P content serving if relevant.
 - [ ] Verify backup.
 - [ ] Restore to a clean volume or clean host.
@@ -437,7 +483,7 @@ Tasks:
 - [ ] Verify public self-hosted install can be performed from tracked examples plus private operator-provided settings, without source edits or undocumented defaults.
 - [ ] Record any environment limitations that prevented a check.
 
-Exit criteria:
+Completion checks:
 
 - Self-Hosted MoFaCTS is demonstrably usable and recoverable.
 - Remaining limitations are documented, not hidden.
