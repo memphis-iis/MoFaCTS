@@ -920,7 +920,7 @@ export async function createAutoTutorRuntime(): Promise<AutoTutorRuntime> {
       } else {
         nextState.completed = computeCompleted(nextState, config);
         if (plan.target.type === 'completion') {
-          nextState.completed = plan.selectedMove === 'summary';
+          nextState.completed = nextState.completed && plan.selectedMove === 'summary';
         }
       }
       let tutorMessage = 'We need to stop here because this AutoTutor session reached the configured cost cap.';

@@ -5,6 +5,7 @@
   import { clientConsole } from '../../../../lib/clientLogger';
 
   const dispatch = createEventDispatcher();
+  const MOBILE_LAYOUT_QUERY = '(max-width: 768px)';
 
   let chatElement;
   let runtime = null;
@@ -16,6 +17,7 @@
   let stoppedByCost = false;
   let questionPrompt = '';
   let unitName = 'AutoTutor';
+  let isMobileLayout = false;
 
   function toDeepChatHistory(dialogue) {
     return dialogue.map((message) => ({
@@ -99,12 +101,20 @@
     chatElement.style.setProperty('box-sizing', 'border-box');
   }
 
+  function applyDeepChatIntroMessage() {
+    if (!chatElement) {
+      return;
+    }
+    chatElement.introMessage = {
+      text: isMobileLayout && questionPrompt
+        ? `${questionPrompt}\n\nTell me what you think. A short answer is fine.`
+        : 'Tell me what you think. A short answer is fine.',
+    };
+  }
+
   function configureDeepChatVisuals() {
     applyDeepChatHostLayout();
-
-    chatElement.introMessage = {
-      text: questionPrompt ? `${questionPrompt}\n\nTell me what you think. A short answer is fine.` : 'Tell me what you think. A short answer is fine.',
-    };
+    applyDeepChatIntroMessage();
     chatElement.textInput = {
       placeholder: { text: 'Type your answer...' },
       styles: {
@@ -171,9 +181,7 @@
   }
 
   function configureDeepChatRuntime() {
-    chatElement.introMessage = {
-      text: `${questionPrompt}\n\nTell me what you think. A short answer is fine.`,
-    };
+    applyDeepChatIntroMessage();
     chatElement.connect = {
       handler: async (body, signals) => {
         try {
@@ -200,21 +208,38 @@
     chatElement.onRender?.();
   }
 
-  onMount(async () => {
-    try {
-      configureDeepChatVisuals();
-      runtime = await createAutoTutorRuntime();
-      questionPrompt = runtime.config.prompt;
-      unitName = runtime.config.unitName;
-      refreshRuntimeState();
-      configureDeepChatRuntime();
-      await tick();
-      applyDeepChatHostLayout();
-    } catch (error) {
-      errorMessage = error?.message || String(error);
-      updateChatInputState();
-      clientConsole(1, '[AutoTutor] Runtime initialization failed', error);
+  onMount(() => {
+    const mobileLayoutQuery = window.matchMedia(MOBILE_LAYOUT_QUERY);
+    isMobileLayout = mobileLayoutQuery.matches;
+    const handleLayoutChange = (event) => {
+      isMobileLayout = event.matches;
+      applyDeepChatIntroMessage();
+      chatElement?.onRender?.();
+    };
+    mobileLayoutQuery.addEventListener('change', handleLayoutChange);
+
+    async function initializeAutoTutor() {
+      try {
+        configureDeepChatVisuals();
+        runtime = await createAutoTutorRuntime();
+        questionPrompt = runtime.config.prompt;
+        unitName = runtime.config.unitName;
+        refreshRuntimeState();
+        configureDeepChatRuntime();
+        await tick();
+        applyDeepChatHostLayout();
+      } catch (error) {
+        errorMessage = error?.message || String(error);
+        updateChatInputState();
+        clientConsole(1, '[AutoTutor] Runtime initialization failed', error);
+      }
     }
+
+    initializeAutoTutor();
+
+    return () => {
+      mobileLayoutQuery.removeEventListener('change', handleLayoutChange);
+    };
   });
 </script>
 
