@@ -16,6 +16,13 @@ export interface DashboardHistoryRecord {
   TDFId?: string;
   userId?: string;
   levelUnitType?: string;
+  levelUnit?: number | string | null;
+  sessionID?: string | null;
+  CFNote?: string | null;
+  h5p?: {
+    eventType?: string;
+    latencyMs?: number | null;
+  } | null;
 }
 
 export interface DashboardTdfStats {
@@ -26,8 +33,11 @@ export interface DashboardTdfStats {
   totalTimeMs: number;
   totalTimeMinutes: number;
   itemsPracticedCount: number;
+  itemsPracticedApplies?: boolean;
   totalSessions: number;
   overallAccuracy: number;
+  accuracyWeightedCorrect?: number;
+  accuracyWeightedTotal?: number;
   firstPracticeDate: Date | null;
   lastPracticeDate: Date | null;
   lastPracticeTimestamp: number;

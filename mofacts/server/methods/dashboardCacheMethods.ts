@@ -27,6 +27,9 @@ type DashboardCacheDeps = {
   canViewDashboardTdf: (userId: unknown, tdf: any) => boolean;
 };
 
+const DASHBOARD_LEVEL_UNIT_TYPES = ['model', 'schedule', 'autotutor'];
+const DASHBOARD_CACHE_VERSION = 2;
+
 function roundOneDecimal(value: number): number {
   return Number(value.toFixed(1));
 }
@@ -40,19 +43,87 @@ function historyRecordTimestamp(record: DashboardHistoryRecord): number {
   return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
+function getH5PEventType(record: DashboardHistoryRecord): string {
+  return typeof record.h5p?.eventType === 'string' ? record.h5p.eventType : '';
+}
+
+function isH5PSummaryRecord(record: DashboardHistoryRecord): boolean {
+  return getH5PEventType(record) === 'summary';
+}
+
+function isH5PPartRecord(record: DashboardHistoryRecord): boolean {
+  return getH5PEventType(record) === 'part';
+}
+
+function isAutoTutorRecord(record: DashboardHistoryRecord): boolean {
+  return record.levelUnitType === 'autotutor';
+}
+
+function shouldCountDashboardHistoryRecord(record: DashboardHistoryRecord): boolean {
+  if (isH5PSummaryRecord(record)) {
+    return false;
+  }
+  return true;
+}
+
+function getHistoryPracticeTimeMs(
+  record: DashboardHistoryRecord,
+  computePracticeTimeMs: ComputePracticeTimeMs
+): number {
+  if (isH5PPartRecord(record) && typeof record.h5p?.latencyMs === 'number' && Number.isFinite(record.h5p.latencyMs)) {
+    return Math.max(0, record.h5p.latencyMs);
+  }
+  return computePracticeTimeMs(record.CFEndLatency, record.CFFeedbackLatency);
+}
+
+function readAutoTutorProgress(record: DashboardHistoryRecord): number {
+  if (typeof record.CFNote !== 'string' || !record.CFNote.trim()) {
+    throw new Error('AutoTutor dashboard stats require CFNote progress');
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(record.CFNote);
+  } catch {
+    throw new Error('AutoTutor dashboard stats require valid JSON in CFNote');
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('AutoTutor dashboard stats require an object CFNote payload');
+  }
+  const progress = (parsed as { progress?: unknown }).progress;
+  if (typeof progress !== 'number' || !Number.isFinite(progress) || progress < 0 || progress > 1) {
+    throw new Error('AutoTutor dashboard stats require CFNote.progress from 0 to 1');
+  }
+  return progress;
+}
+
+function getAutoTutorSessionKey(record: DashboardHistoryRecord): string {
+  const sessionId = typeof record.sessionID === 'string' && record.sessionID.trim()
+    ? record.sessionID.trim()
+    : null;
+  const levelUnit = record.levelUnit !== undefined && record.levelUnit !== null
+    ? String(record.levelUnit)
+    : null;
+  if (!sessionId || !levelUnit) {
+    throw new Error('AutoTutor dashboard stats require sessionID and levelUnit');
+  }
+  return `${sessionId}|${levelUnit}`;
+}
+
 export function computeCacheStats(
   history: DashboardHistoryRecord[],
   displayName: string | null | undefined,
   computePracticeTimeMs: ComputePracticeTimeMs
 ): DashboardTdfStats {
+  const countableHistory = history.filter(shouldCountDashboardHistoryRecord);
   const stats: DashboardTdfStats = {
     displayName: displayName || 'Unnamed',
-    totalTrials: history.length,
+    totalTrials: countableHistory.length,
     correctTrials: 0,
     incorrectTrials: 0,
     totalTimeMs: 0,
     totalTimeMinutes: 0,
     itemsPracticedCount: 0,
+    itemsPracticedApplies: false,
     totalSessions: 0,
     overallAccuracy: 0,
     firstPracticeDate: null,
@@ -64,15 +135,22 @@ export function computeCacheStats(
 
   const uniqueItems = new Set<string>();
   const sessions = new Set<string>();
+  const autoTutorProgressBySession = new Map<string, number>();
 
-  for (const record of history) {
-    if (record.outcome === 'correct') stats.correctTrials++;
-    else if (record.outcome === 'incorrect') stats.incorrectTrials++;
+  for (const record of countableHistory) {
+    if (isAutoTutorRecord(record)) {
+      autoTutorProgressBySession.set(getAutoTutorSessionKey(record), readAutoTutorProgress(record));
+    } else if (record.outcome === 'correct') {
+      stats.correctTrials++;
+    } else if (record.outcome === 'incorrect') {
+      stats.incorrectTrials++;
+    }
 
-    stats.totalTimeMs += computePracticeTimeMs(record.CFEndLatency, record.CFFeedbackLatency);
+    stats.totalTimeMs += getHistoryPracticeTimeMs(record, computePracticeTimeMs);
 
     const itemId = record.itemId || record.CFStimFileIndex || record.problemName;
-    if (itemId !== undefined && itemId !== null) {
+    if (record.levelUnitType === 'model' && !isH5PPartRecord(record) && itemId !== undefined && itemId !== null) {
+      stats.itemsPracticedApplies = true;
       uniqueItems.add(String(itemId));
     }
 
@@ -98,9 +176,14 @@ export function computeCacheStats(
   stats.totalSessions = sessions.size;
   stats.totalTimeMinutes = Number((stats.totalTimeMs / 60000).toFixed(1));
 
-  const totalAnswered = stats.correctTrials + stats.incorrectTrials;
-  stats.overallAccuracy = totalAnswered > 0
-    ? Number(((stats.correctTrials / totalAnswered) * 100).toFixed(1))
+  const autoTutorProgressTotal = Array.from(autoTutorProgressBySession.values())
+    .reduce((sum, progress) => sum + progress, 0);
+  const accuracyWeightedCorrect = stats.correctTrials + autoTutorProgressTotal;
+  const accuracyWeightedTotal = stats.correctTrials + stats.incorrectTrials + autoTutorProgressBySession.size;
+  stats.accuracyWeightedCorrect = accuracyWeightedCorrect;
+  stats.accuracyWeightedTotal = accuracyWeightedTotal;
+  stats.overallAccuracy = accuracyWeightedTotal > 0
+    ? Number(((accuracyWeightedCorrect / accuracyWeightedTotal) * 100).toFixed(1))
     : 0;
 
   return stats;
@@ -116,8 +199,12 @@ export function computeSummaryStats(tdfStats: DashboardStatsByTdf | null | undef
 
   for (const statsAny of Object.values(safeStats) as DashboardTdfStats[]) {
     totalTrials += statsAny.totalTrials;
-    totalCorrect += statsAny.correctTrials;
-    totalIncorrect += statsAny.incorrectTrials;
+    totalCorrect += Number(statsAny.accuracyWeightedCorrect ?? statsAny.correctTrials);
+    totalIncorrect += Number(
+      statsAny.accuracyWeightedTotal !== undefined
+        ? statsAny.accuracyWeightedTotal - Number(statsAny.accuracyWeightedCorrect || 0)
+        : statsAny.incorrectTrials
+    );
     totalTime += statsAny.totalTimeMs;
 
     if (statsAny.lastPracticeDate) {
@@ -156,8 +243,12 @@ export function computeUsageSummary(tdfStats: DashboardStatsByTdf | null | undef
 
   for (const statsAny of practicedStats) {
     totalTrials += Number(statsAny.totalTrials || 0);
-    totalCorrect += Number(statsAny.correctTrials || 0);
-    totalIncorrect += Number(statsAny.incorrectTrials || 0);
+    totalCorrect += Number(statsAny.accuracyWeightedCorrect ?? statsAny.correctTrials ?? 0);
+    totalIncorrect += Number(
+      statsAny.accuracyWeightedTotal !== undefined
+        ? statsAny.accuracyWeightedTotal - Number(statsAny.accuracyWeightedCorrect || 0)
+        : statsAny.incorrectTrials || 0
+    );
     totalTimeMs += Number(statsAny.totalTimeMs || 0);
     totalSessionDays += Number(statsAny.totalSessions || 0);
     totalItemsPracticed += Number(statsAny.itemsPracticedCount || 0);
@@ -272,7 +363,7 @@ export function createDashboardCacheMethods({
           userId,
           learnerTdfConfigs,
           lastUpdated: new Date(),
-          version: cache?.version || 1
+          version: DASHBOARD_CACHE_VERSION
         },
         $setOnInsert: {
           createdAt: new Date(),
@@ -510,7 +601,7 @@ export function createDashboardCacheMethods({
 
       const attemptedTdfIds = await Histories.rawCollection().distinct('TDFId', {
         userId: targetUserId,
-        levelUnitType: 'model'
+        levelUnitType: { $in: DASHBOARD_LEVEL_UNIT_TYPES }
       });
 
       if (attemptedTdfIds.length === 0) {
@@ -529,7 +620,7 @@ export function createDashboardCacheMethods({
               },
               usageSummary: computeUsageSummary({}),
               lastUpdated: new Date(),
-              version: 1
+              version: DASHBOARD_CACHE_VERSION
             },
             $setOnInsert: {
               createdAt: new Date()
@@ -587,7 +678,7 @@ export function createDashboardCacheMethods({
       const allHistory: DashboardHistoryRecord[] = await Histories.find({
         userId: targetUserId,
         TDFId: { $in: attemptedTdfIds },
-        levelUnitType: 'model'
+        levelUnitType: { $in: DASHBOARD_LEVEL_UNIT_TYPES }
       }, {
         sort: { recordedServerTime: 1 }
       }).fetchAsync();
@@ -637,7 +728,7 @@ export function createDashboardCacheMethods({
             summary,
             usageSummary,
             lastUpdated: new Date(),
-            version: 1
+            version: DASHBOARD_CACHE_VERSION
           },
           $setOnInsert: {
             createdAt: new Date()
@@ -714,7 +805,7 @@ export function createDashboardCacheMethods({
         allHistory = await Histories.find({
           userId,
           TDFId: { $in: childTdfIds },
-          levelUnitType: 'model'
+          levelUnitType: { $in: DASHBOARD_LEVEL_UNIT_TYPES }
         }, {
           sort: { recordedServerTime: 1 }
         }).fetchAsync();
@@ -724,7 +815,7 @@ export function createDashboardCacheMethods({
         allHistory = await Histories.find({
           userId,
           TDFId,
-          levelUnitType: 'model'
+          levelUnitType: { $in: DASHBOARD_LEVEL_UNIT_TYPES }
         }, {
           sort: { recordedServerTime: 1 }
         }).fetchAsync();
@@ -742,7 +833,7 @@ export function createDashboardCacheMethods({
       const cache = await UserDashboardCache.findOneAsync({ userId }) || {
         userId,
         tdfStats: {},
-        version: 1
+        version: DASHBOARD_CACHE_VERSION
       };
 
       const updatedTdfStats = {
@@ -762,7 +853,7 @@ export function createDashboardCacheMethods({
             summary,
             usageSummary,
             lastUpdated: new Date(),
-            version: cache.version || 1
+            version: DASHBOARD_CACHE_VERSION
           },
           $setOnInsert: {
             createdAt: new Date()

@@ -81,6 +81,7 @@ const EMPTY_CONFIG_STATE: LearnerConfigState = {
   resettingProgress: false,
 };
 
+const DASHBOARD_CACHE_VERSION = 2;
 const LEARNER_CONFIG_CLOSE_FALLBACK_MS = 200;
 const LEARNER_CONFIG_AUTOSAVE_DELAY_MS = 500;
 const LEARNER_CONFIG_SLIDER_DISPLAY_SESSION_KEY = 'learnerConfigSliderDisplayValues';
@@ -1113,9 +1114,9 @@ Template.learningDashboard.rendered = async function(this: any) {
   let cache = UserDashboardCache.findOne({ userId: studentID });
   clientConsole(2, '[Dashboard] Cache found:', cache ? 'yes' : 'no', cache ? `with ${Object.keys(cache.tdfStats || {}).length} TDFs` : '');
 
-  // If no cache exists, initialize it
-  if (!cache) {
-    clientConsole(2, '[Dashboard] No cache found, initializing...');
+  // If no current cache exists, initialize it.
+  if (!cache || cache.version !== DASHBOARD_CACHE_VERSION) {
+    clientConsole(2, '[Dashboard] Cache missing or stale, initializing...');
     try {
       /** @type {InitializeDashboardCacheResult} */
       const initResult = await meteorCallAsync('initializeDashboardCache');
@@ -1141,7 +1142,9 @@ Template.learningDashboard.rendered = async function(this: any) {
         tdfsWithMeaningfulProgress.add(TDFId);
       }
       if (stats.totalTrials > 0) {
-        const practicedCount = stats.itemsPracticedCount ?? stats.itemsPracticed ?? stats.uniqueItemIds?.length ?? 0;
+        const practicedCount = stats.itemsPracticedApplies === false
+          ? '-'
+          : stats.itemsPracticedCount ?? stats.itemsPracticed ?? stats.uniqueItemIds?.length ?? 0;
         const totalSessions = stats.totalSessions ?? stats.sessionDates?.length ?? 0;
         const lastPracticeTimestamp = Number(stats.lastPracticeTimestamp) || (stats.lastPracticeDate
           ? new Date(stats.lastPracticeDate).getTime()
@@ -1313,6 +1316,7 @@ Template.learningDashboard.rendered = async function(this: any) {
   const { used: usedTdfs, unused: unusedTdfs } = splitTdfsByUsage(allTdfObjects);
   const combinedTdfs = [...usedTdfs, ...unusedTdfs];
 
+  Session.set('homeHasPracticeRecords', usedTdfs.length > 0);
   this.allTdfsList.set(combinedTdfs);
   this.isLoading.set(false);
 

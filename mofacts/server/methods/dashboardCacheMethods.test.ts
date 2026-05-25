@@ -7,6 +7,7 @@ describe('dashboardCacheMethods', function() {
       {
         _id: 'h1',
         outcome: 'correct',
+        levelUnitType: 'model',
         CFEndLatency: 2000,
         CFFeedbackLatency: 500,
         itemId: 'item-a',
@@ -15,6 +16,7 @@ describe('dashboardCacheMethods', function() {
       {
         _id: 'h2',
         outcome: 'incorrect',
+        levelUnitType: 'model',
         CFEndLatency: 3000,
         CFFeedbackLatency: 800,
         itemId: 'item-b',
@@ -30,8 +32,128 @@ describe('dashboardCacheMethods', function() {
     expect(stats.incorrectTrials).to.equal(1);
     expect(stats.totalTimeMs).to.equal(6300);
     expect(stats.itemsPracticedCount).to.equal(2);
+    expect(stats.itemsPracticedApplies).to.equal(true);
     expect(stats.overallAccuracy).to.equal(50);
     expect(stats.lastPracticeTimestamp).to.equal(new Date('2026-02-11T10:00:00.000Z').getTime());
+  });
+
+  it('computeCacheStats includes assessment rows in trial and accuracy metrics', function() {
+    const stats = computeCacheStats([
+      {
+        _id: 'assessment-1',
+        outcome: 'correct',
+        levelUnitType: 'schedule',
+        CFEndLatency: 4000,
+        CFFeedbackLatency: -1,
+        itemId: 'assessment-item-a',
+        recordedServerTime: new Date('2026-02-10T10:00:00.000Z')
+      },
+      {
+        _id: 'assessment-2',
+        outcome: 'incorrect',
+        levelUnitType: 'schedule',
+        CFEndLatency: 3000,
+        CFFeedbackLatency: -1,
+        itemId: 'assessment-item-b',
+        recordedServerTime: new Date('2026-02-11T10:00:00.000Z')
+      }
+    ], 'Assessment Demo', (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0));
+
+    expect(stats.totalTrials).to.equal(2);
+    expect(stats.correctTrials).to.equal(1);
+    expect(stats.incorrectTrials).to.equal(1);
+    expect(stats.overallAccuracy).to.equal(50);
+    expect(stats.itemsPracticedCount).to.equal(0);
+    expect(stats.itemsPracticedApplies).to.equal(false);
+    expect(stats.totalSessions).to.equal(2);
+  });
+
+  it('computeCacheStats counts H5P exercise part rows without double-counting the summary row', function() {
+    const stats = computeCacheStats([
+      {
+        _id: 'h5p-summary',
+        outcome: 'incorrect',
+        levelUnitType: 'schedule',
+        CFEndLatency: 10000,
+        CFFeedbackLatency: 0,
+        h5p: { eventType: 'summary' },
+        recordedServerTime: new Date('2026-02-10T10:00:00.000Z')
+      },
+      {
+        _id: 'h5p-part-1',
+        outcome: 'correct',
+        levelUnitType: 'schedule',
+        CFEndLatency: 10000,
+        CFFeedbackLatency: 0,
+        h5p: { eventType: 'part', latencyMs: 1200 },
+        recordedServerTime: new Date('2026-02-10T10:00:01.000Z')
+      },
+      {
+        _id: 'h5p-part-2',
+        outcome: 'incorrect',
+        levelUnitType: 'schedule',
+        CFEndLatency: 10000,
+        CFFeedbackLatency: 0,
+        h5p: { eventType: 'part', latencyMs: 800 },
+        recordedServerTime: new Date('2026-02-10T10:00:02.000Z')
+      }
+    ], 'H5P Demo', (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0));
+
+    expect(stats.totalTrials).to.equal(2);
+    expect(stats.correctTrials).to.equal(1);
+    expect(stats.incorrectTrials).to.equal(1);
+    expect(stats.overallAccuracy).to.equal(50);
+    expect(stats.totalTimeMs).to.equal(2000);
+    expect(stats.itemsPracticedApplies).to.equal(false);
+  });
+
+  it('computeCacheStats uses latest AutoTutor progress per unit session as the accuracy measure', function() {
+    const firstNote = JSON.stringify({ progress: 0.25 });
+    const latestNote = JSON.stringify({ progress: 0.75 });
+    const secondSessionNote = JSON.stringify({ progress: 0.5 });
+    const stats = computeCacheStats([
+      {
+        _id: 'auto-1',
+        outcome: 'incorrect',
+        levelUnitType: 'autotutor',
+        levelUnit: 0,
+        sessionID: 'session-a',
+        CFEndLatency: 5000,
+        CFFeedbackLatency: 0,
+        CFNote: firstNote,
+        recordedServerTime: new Date('2026-02-10T10:00:00.000Z')
+      },
+      {
+        _id: 'auto-2',
+        outcome: 'incorrect',
+        levelUnitType: 'autotutor',
+        levelUnit: 0,
+        sessionID: 'session-a',
+        CFEndLatency: 6000,
+        CFFeedbackLatency: 0,
+        CFNote: latestNote,
+        recordedServerTime: new Date('2026-02-10T10:01:00.000Z')
+      },
+      {
+        _id: 'auto-3',
+        outcome: 'incorrect',
+        levelUnitType: 'autotutor',
+        levelUnit: 1,
+        sessionID: 'session-b',
+        CFEndLatency: 4000,
+        CFFeedbackLatency: 0,
+        CFNote: secondSessionNote,
+        recordedServerTime: new Date('2026-02-11T10:01:00.000Z')
+      }
+    ], 'AutoTutor Demo', (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0));
+
+    expect(stats.totalTrials).to.equal(3);
+    expect(stats.correctTrials).to.equal(0);
+    expect(stats.incorrectTrials).to.equal(0);
+    expect(stats.overallAccuracy).to.equal(62.5);
+    expect(stats.totalTimeMinutes).to.equal(0.3);
+    expect(stats.itemsPracticedApplies).to.equal(false);
+    expect(stats.totalSessions).to.equal(2);
   });
 
   it('computeCacheStats uses the latest trial history timestamp for recency', function() {
