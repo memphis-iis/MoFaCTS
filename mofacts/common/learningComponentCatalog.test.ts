@@ -3,6 +3,7 @@ import { defaultLearningComponentCatalog } from '../../learning-components/defau
 import {
   createLearningComponentCatalog,
   summarizeLearningComponentCatalog,
+  validateLearningComponentCatalog,
 } from '../../learning-components/runtime/LearningComponentCatalog';
 import type { LearningComponentManifest } from '../../learning-components/runtime/ComponentManifest';
 
@@ -63,5 +64,31 @@ describe('Learning component catalog', function() {
       displayTypes: ['h5p'],
       requiredCapabilities: ['history', 'media'],
     }]);
+  });
+
+  it('rejects duplicate component ids across unit and trial-display catalog entries', function() {
+    const unitManifest: LearningComponentManifest = {
+      id: 'sample.duplicate',
+      kind: 'unit',
+      unitTypes: ['sample'],
+      requiredCapabilities: ['logging'],
+      register() {},
+    };
+    const displayManifest: LearningComponentManifest = {
+      id: 'sample.duplicate',
+      kind: 'trial-display',
+      displayTypes: ['sample-display'],
+      requiredCapabilities: ['media'],
+      register() {},
+    };
+
+    expect(() => validateLearningComponentCatalog({
+      unitManifests: [unitManifest],
+      trialDisplayManifests: [displayManifest],
+    })).to.throw('Learning component "sample.duplicate" is declared more than once in the catalog');
+    expect(() => createLearningComponentCatalog({
+      unitManifests: [unitManifest],
+      trialDisplayManifests: [displayManifest],
+    })).to.throw('Learning component "sample.duplicate" is declared more than once in the catalog');
   });
 });

@@ -16,9 +16,22 @@ export interface LearningComponentCatalogSummary {
   readonly trialDisplays: readonly LearningComponentManifestSummary[];
 }
 
+export function validateLearningComponentCatalog(catalog: LearningComponentCatalog): void {
+  const summary = summarizeLearningComponentCatalog(catalog);
+  const componentIds = new Set<string>();
+
+  for (const manifest of [...summary.units, ...summary.trialDisplays]) {
+    if (componentIds.has(manifest.id)) {
+      throw new Error(`Learning component "${manifest.id}" is declared more than once in the catalog`);
+    }
+    componentIds.add(manifest.id);
+  }
+}
+
 export function createLearningComponentCatalog<TUnitDeps>(
   catalog: LearningComponentCatalog<TUnitDeps>,
 ): LearningComponentCatalog<TUnitDeps> {
+  validateLearningComponentCatalog(catalog);
   return {
     unitManifests: [...catalog.unitManifests],
     trialDisplayManifests: [...catalog.trialDisplayManifests],
