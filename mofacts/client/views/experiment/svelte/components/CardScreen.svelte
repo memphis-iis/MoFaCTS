@@ -60,6 +60,7 @@
     selfHostedH5PTrialDisplayOwnsInteraction,
   } from '../services/h5pTrialDisplay';
   import { buildLearningProgressPanelSnapshot } from '../services/learningProgressPanel';
+  import { resolveSessionSurfaceState } from '../services/sessionSurfaceMode';
   import { CardStore } from '../../modules/cardStore';
   import LearningProgressPanel from './LearningProgressPanel.svelte';
   import AutoTutorSession from './AutoTutorSession.svelte';
@@ -295,12 +296,15 @@
   $: preparedTrial = context.preparedTrial || null;
   $: deliverySettings = { ...DEFAULT_DELIVERY_SETTINGS, ...(context.deliverySettings || {}) };
   $: audioState = context.audio || { waitingForTranscription: false, srAttempts: 0, maxSrAttempts: 0 };
-  $: isVideoSession = (sessionUnitModeVersion, deliverySettings.isVideoSession === true ||
-    Session.get('isVideoSession') === true ||
-    !!Session.get('currentTdfUnit')?.videosession);
   $: currentTdfUnit = (sessionUnitModeVersion, Session.get('currentTdfUnit') || {});
-  $: isAutoTutorSession = (sessionUnitModeVersion, Session.get('unitType') === 'autotutor' ||
-    !!currentTdfUnit?.autotutorsession);
+  $: sessionSurfaceState = (sessionUnitModeVersion, resolveSessionSurfaceState({
+    deliverySettings,
+    sessionIsVideoSession: Session.get('isVideoSession'),
+    sessionUnitType: Session.get('unitType'),
+    currentTdfUnit,
+  }));
+  $: isVideoSession = sessionSurfaceState.isVideoSession;
+  $: isAutoTutorSession = sessionSurfaceState.isAutoTutorSession;
   $: rawVideoInstructionText = typeof currentTdfUnit?.unitinstructions === 'string'
     ? currentTdfUnit.unitinstructions.trim()
     : '';
