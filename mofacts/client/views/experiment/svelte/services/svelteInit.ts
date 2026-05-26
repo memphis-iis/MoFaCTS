@@ -21,6 +21,7 @@ import {
 } from '../../../../lib/state/audioState';
 import { audioManager } from '../../../../lib/audioContextManager';
 import { getEngine, setEngine } from '../../../../lib/engineManager';
+import { resolveUnitEngineTypeForUnit } from '../../engineConstructors';
 import { initializeEngine } from '../services/unitEngineService';
 import { initVideoSessionData } from '../services/videoCardInit';
 import { getExperimentState, createExperimentState } from '../services/experimentState';
@@ -62,7 +63,6 @@ import type {
   ExperimentState,
   SvelteCardInitResult,
   UnitEngineLike,
-  UnitType,
 } from '../../../../../common/types';
 import { repairFormattedStimuliResponsesFromRaw } from '../../../../../common/lib/stimuliResponseRepair';
 import '../../../../../common/Collections';
@@ -166,42 +166,6 @@ async function restoreHiddenItemsFromHistory(): Promise<void> {
     clientConsole(1, '[Svelte Init] Failed to restore hidden items from history:', error);
     CardStore.resetHiddenItems();
   }
-}
-
-/**
- * @param {Record<string, unknown> | null | undefined} unit
- * @returns {UnitType | undefined}
- */
-function deriveUnitType(unit: TdfUnitLike | null | undefined): UnitType | undefined {
-  if (!unit) {
-    clientConsole(1, '[Svelte Init] deriveUnitType: unit is null/undefined', {
-      stack: new Error().stack,
-      currentUnitNumber: Session.get('currentUnitNumber'),
-      currentTdfUnit: Session.get('currentTdfUnit'),
-    });
-    return undefined;
-  }
-
-  
-
-  if (unit.assessmentsession) return 'schedule';
-  if (unit.videosession) return 'video';
-  if (unit.learningsession) return 'model';
-  if (unit.autotutorsession) return 'autotutor';
-
-  // Check if this is a legitimate instruction-only unit
-  const hasInstructions = unit.unitinstructions || unit.picture || unit.unitinstructionsquestion;
-  if (hasInstructions && !unit.assessmentsession && !unit.learningsession && !unit.videosession) {
-    
-    return 'instruction-only';
-  }
-
-  clientConsole(1, '[Svelte Init] deriveUnitType: Cannot determine type for unit', {
-    unitname: unit.unitname,
-    hasInstructions,
-    unitStructure: Object.keys(unit),
-  });
-  return undefined;
 }
 
 function restoreCanonicalTdfFileForStandardInit(
@@ -480,11 +444,7 @@ async function initializeStandardCardEntry(
 
   const currentUnitNumber = resolveCardUnitNumberForStandardInit(dispatchContext);
   const unit = assertStandardCardPreconditions(tdfFile, tutor, currentUnitNumber);
-  const derivedUnitType = deriveUnitType(unit);
-  if (!derivedUnitType) {
-    throw new Error(`Cannot determine unit type for unit "${unit.unitname}" at index ${currentUnitNumber}. Unit has no assessmentsession, learningsession, videosession, autotutorsession, or valid instructions-only configuration.`);
-  }
-  const unitType = derivedUnitType;
+  const unitType = resolveUnitEngineTypeForUnit(unit, '[Svelte Init]');
   Session.set('unitType', unitType);
   clientConsole(2, '[Svelte Init] Resolved unitType:', unitType);
 

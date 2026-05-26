@@ -41,7 +41,7 @@ function hasInstructionContent(unit: EngineUnitLike): boolean {
   return Boolean(unit.unitinstructions || unit.picture || unit.unitinstructionsquestion);
 }
 
-function deriveEngineUnitType(unit: EngineUnitLike | null | undefined, source: string): UnitType {
+export function resolveUnitEngineTypeForUnit(unit: EngineUnitLike | null | undefined, source: string): UnitType {
   if (!unit) {
     throw new Error(`${source}: Cannot create unit engine without currentTdfUnit`);
   }
@@ -90,7 +90,7 @@ export async function createUnitEngineForUnit(
   context: EngineCreationContext,
 ): Promise<UnitEngineLike> {
   return await createUnitEngine(
-    deriveEngineUnitType(unit, context.source),
+    resolveUnitEngineTypeForUnit(unit, context.source),
     curExperimentData,
     { ...context, unit },
   );

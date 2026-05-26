@@ -4,7 +4,7 @@ This directory contains side-effectful runtime services and pure helpers used by
 
 ## Ownership
 
-- `svelteInit.ts`: launch bootstrap orchestration, including entry intent resolution, TDF/unit preconditions, stimuli loading, engine initialization, resume dispatch, instruction redirects, audio startup, and launch-time diagnostics.
+- `svelteInit.ts`: launch bootstrap orchestration, including entry intent resolution, TDF/unit preconditions, stimuli loading, shared unit-engine type resolution, engine initialization, resume dispatch, instruction redirects, audio startup, and launch-time diagnostics.
 - `cardEntryBootstrap.ts`: card-entry intent classification before initialization dispatch.
 - `cardReadiness.ts`: card display readiness predicates and diagnostics.
 - `cardLaunchFailure.ts`: launch failure reporting and diagnostic state.

@@ -1,7 +1,15 @@
 import { expect } from 'chai';
-import { createUnitEngine, createUnitEngineForUnit } from './engineConstructors';
+import { createUnitEngine, createUnitEngineForUnit, resolveUnitEngineTypeForUnit } from './engineConstructors';
 
 describe('unit engine creation contracts', function() {
+  it('derives unit engine types from runnable unit shape in one shared boundary', function() {
+    expect(resolveUnitEngineTypeForUnit({ assessmentsession: {} }, 'unit-engine-contract-test')).to.equal('schedule');
+    expect(resolveUnitEngineTypeForUnit({ videosession: {} }, 'unit-engine-contract-test')).to.equal('video');
+    expect(resolveUnitEngineTypeForUnit({ learningsession: {} }, 'unit-engine-contract-test')).to.equal('model');
+    expect(resolveUnitEngineTypeForUnit({ autotutorsession: {} }, 'unit-engine-contract-test')).to.equal('autotutor');
+    expect(resolveUnitEngineTypeForUnit({ unitinstructions: 'Read this first' }, 'unit-engine-contract-test')).to.equal('instruction-only');
+  });
+
   it('rejects missing unit data before choosing an engine implementation', async function() {
     try {
       await createUnitEngineForUnit(null, { experimentState: {} }, {
