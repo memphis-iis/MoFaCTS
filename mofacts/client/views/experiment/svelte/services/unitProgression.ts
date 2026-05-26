@@ -13,6 +13,11 @@ import { refreshCurrentDeliverySettingsStore, setStudentPerformance } from '../.
 import { deliverySettingsStore } from '../../../../lib/state/deliverySettingsStore';
 import { CardStore } from '../../modules/cardStore';
 import { getExperimentState, createExperimentState } from './experimentState';
+import {
+  resolveSessionContentSurface,
+  resolveSessionSurfaceState,
+  resolveSessionSurfaceUnitEntryRoute,
+} from './sessionSurfaceMode';
 import '../../../../../common/Collections';
 import type { ExperimentState } from '../../../../../common/types/experiment';
 import type { UnitCompletionEngine } from '../../../../../common/types/svelteServices';
@@ -258,7 +263,9 @@ export async function unitIsFinished(_reason: string): Promise<void> {
       await meteorCallAsync('incrementTdfConditionCount', rootTdfId, curConditionNumber);
     }
 
-    leaveTarget = curTdfUnit?.videosession || curTdfUnit?.autotutorsession ? '/card' : '/instructions';
+    leaveTarget = resolveSessionSurfaceUnitEntryRoute(resolveSessionContentSurface(resolveSessionSurfaceState({
+      currentTdfUnit: curTdfUnit,
+    })));
   } else {
     clientConsole(2, 'UNIT FINISHED: No More Units');
 

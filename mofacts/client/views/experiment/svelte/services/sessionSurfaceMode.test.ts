@@ -5,6 +5,7 @@ import {
   resolveSessionSurfaceLearningProgressPanel,
   resolveSessionSurfaceShell,
   resolveSessionSurfaceState,
+  resolveSessionSurfaceUnitEntryRoute,
   shouldInlineSessionVideoInstructions,
   shouldShowSessionVideoInstructionOverlay,
 } from './sessionSurfaceMode';
@@ -111,6 +112,8 @@ describe('session surface mode', function() {
       hasUnitImage: false,
       hasUnitQuestion: false,
     })).to.throw('shouldInlineSessionVideoInstructions received an invalid session content surface');
+    expect(() => resolveSessionSurfaceUnitEntryRoute(invalidContentSurface))
+      .to.throw('resolveSessionSurfaceUnitEntryRoute received an invalid session content surface');
   });
 
   it('fails clearly when deriving a content surface from an unknown mode', function() {
@@ -236,6 +239,18 @@ describe('session surface mode', function() {
       hasUnitImage: false,
       hasUnitQuestion: false,
     })).to.equal(false);
+  });
+
+  it('routes specialized session surfaces directly to card entry', function() {
+    expect(resolveSessionSurfaceUnitEntryRoute(
+      resolveSessionContentSurface(resolveSessionSurfaceState({})),
+    )).to.equal('/instructions');
+    expect(resolveSessionSurfaceUnitEntryRoute(
+      resolveSessionContentSurface(resolveSessionSurfaceState({ currentTdfUnit: { videosession: {} } })),
+    )).to.equal('/card');
+    expect(resolveSessionSurfaceUnitEntryRoute(
+      resolveSessionContentSurface(resolveSessionSurfaceState({ sessionUnitType: 'autotutor' })),
+    )).to.equal('/card');
   });
 
   it('describes standard card shell behavior with learning progress enabled', function() {

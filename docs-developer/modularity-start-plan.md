@@ -53,6 +53,7 @@ Make a new in-repo component feel like a small package:
    Session shell handling now uses `mofacts/client/views/experiment/svelte/services/sessionSurfaceMode.ts` for AutoTutor/video/card mode detection, shell CSS and learning-progress-panel behavior, and specialized launch-completion behavior.
    The session surface service now also exposes an explicit content-surface adapter for AutoTutor/video/card render ownership, video instruction overlay eligibility, and learning-progress viewport state so `CardScreen.svelte` can keep DOM/event wiring local while the shared surface rules stay tested.
    Svelte launch bootstrap now asks `sessionSurfaceMode.ts` whether text-only video instructions can render inline instead of branching directly on the video unit type.
+   Legacy and Svelte unit progression now ask `sessionSurfaceMode.ts` whether the next unit enters through `/card` or `/instructions` instead of branching directly on video/AutoTutor unit shape.
    Svelte launch bootstrap now uses the shared `resolveUnitEngineTypeForUnit` boundary from `engineConstructors.ts` instead of maintaining its own unit-shape branch.
 
 ## Pause/Resume Checkpoint

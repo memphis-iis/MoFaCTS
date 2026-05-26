@@ -45,6 +45,8 @@ export type SessionSurfaceLearningProgressPanelState = {
   viewportOpen: boolean;
 };
 
+export type SessionSurfaceUnitEntryRoute = '/card' | '/instructions';
+
 export type SessionSurfaceLaunchCompletion = {
   timingName: 'autoTutorUnit:rendered' | 'videoUnit:rendered';
   finishReason: 'autotutor-unit-rendered' | 'video-unit-rendered';
@@ -179,6 +181,16 @@ export function shouldInlineSessionVideoInstructions(input: SessionInlineVideoIn
     input.hasUnitText &&
     !input.hasUnitImage &&
     !input.hasUnitQuestion;
+}
+
+export function resolveSessionSurfaceUnitEntryRoute(
+  contentSurface: SessionContentSurface,
+): SessionSurfaceUnitEntryRoute {
+  assertValidSessionContentSurface(contentSurface, 'resolveSessionSurfaceUnitEntryRoute');
+
+  return contentSurface.showAutoTutorSession || contentSurface.showVideoSession
+    ? '/card'
+    : '/instructions';
 }
 
 export function resolveSessionSurfaceLaunchCompletion(

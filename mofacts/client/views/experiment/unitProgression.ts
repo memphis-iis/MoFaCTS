@@ -7,6 +7,11 @@ import { refreshCurrentDeliverySettingsStore, setStudentPerformance } from '../.
 import { clientConsole } from '../../lib/userSessionHelpers';
 import { meteorCallAsync } from '../../index';
 import { getExperimentState, createExperimentState } from './svelte/services/experimentState';
+import {
+  resolveSessionContentSurface,
+  resolveSessionSurfaceState,
+  resolveSessionSurfaceUnitEntryRoute,
+} from './svelte/services/sessionSurfaceMode';
 import { playerController, destroyPlyr } from '../../lib/plyrHelper';
 import '../../../common/Collections';
 
@@ -193,7 +198,9 @@ export async function unitIsFinished(reason: string, options: { engine?: unknown
         await meteorCallAsync('incrementTdfConditionCount', Session.get('currentRootTdfId'), curConditionNumber);
       }
     }
-    leaveTarget = curTdfUnit?.videosession || curTdfUnit?.autotutorsession ? '/card' : '/instructions';
+    leaveTarget = resolveSessionSurfaceUnitEntryRoute(resolveSessionContentSurface(resolveSessionSurfaceState({
+      currentTdfUnit: curTdfUnit,
+    })));
   } else {
     // We have run out of units - return home for now
     clientConsole(2, 'UNIT FINISHED: No More Units');
