@@ -9,7 +9,9 @@ Before adding new executable areas here, make sure Meteor/Rspack, Docker, lint, 
 Current extension boundaries:
 
 - `runtime/ComponentManifest.ts`: learning component manifests with explicit runtime capabilities.
+- `runtime/LearningComponentCatalog.ts`: catalog packaging for unit and trial-display manifest groups.
 - `runtime/registerLearningComponents.ts`: shared manifest-list bootstrap and manifest summary helpers.
+- `defaultLearningComponentCatalog.ts`: default in-repo component package used by app bootstraps.
 - `runtime/TrialDisplayAdapterRegistry.ts`: display-owned trial adapter registry for H5P-style interactions.
 - `units/UnitEngineRegistry.ts`: unit engine registration and creation.
 

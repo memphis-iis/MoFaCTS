@@ -8,10 +8,10 @@ import {
   hasTrialDisplayAdapter,
   registerTrialDisplayAdapter,
 } from '../../learning-components/runtime/TrialDisplayAdapterRegistry';
-import { h5pTrialDisplayComponentManifest } from '../../learning-components/trial-displays/h5p/H5PTrialDisplayAdapter';
+import { defaultTrialDisplayComponentManifestsFromCatalog } from '../../learning-components/defaultLearningComponentCatalog';
 
 export const defaultTrialDisplayComponentManifests: readonly LearningComponentManifest[] = [
-  h5pTrialDisplayComponentManifest,
+  ...defaultTrialDisplayComponentManifestsFromCatalog,
 ];
 
 const defaultTrialDisplayCapabilities = new Set<LearningComponentCapability>([

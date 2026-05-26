@@ -7,10 +7,10 @@ import {
 } from './UnitEngineRegistry';
 import { registerLearningComponents } from '../runtime/registerLearningComponents';
 import { registerTrialDisplayAdapter } from '../runtime/TrialDisplayAdapterRegistry';
+import { defaultUnitComponentManifestsFromCatalog } from '../defaultLearningComponentCatalog';
 import {
   ASSESSMENT_SESSION_UNIT_TYPE,
   AUTO_TUTOR_SESSION_UNIT_TYPE,
-  defaultUnitComponentManifests,
   INSTRUCTION_UNIT_TYPE,
   LEARNING_SESSION_UNIT_TYPE,
   VIDEO_SESSION_UNIT_TYPE,
@@ -111,7 +111,7 @@ function registerDefaultUnitEngines(_deps: CreateUnitEngineDeps): void {
     'ui-alerts',
   ] as const);
 
-  registerLearningComponents(defaultUnitComponentManifests, {
+  registerLearningComponents(defaultUnitComponentManifestsFromCatalog, {
     capabilities,
     registerUnitEngine,
     registerUnitEngineWithDeps,
