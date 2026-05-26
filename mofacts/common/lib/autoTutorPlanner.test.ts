@@ -288,6 +288,56 @@ describe('AutoTutor planner', function() {
     expect(mergedScores.E1?.evidence).to.equal('Learner connected repeated sampling to long-run coverage.');
   });
 
+  it('lets a post-assertion restatement replace prior low coverage', function() {
+    const script = buildScript();
+    const previousScores = recomputeExpectationPriorities(script, {
+      E1: {
+        current: false,
+        coverage: 0.1,
+        evidence: 'Prior attempts did not explain repeated sampling.',
+        tutoredByAssertion: true,
+        frontier: 0.1,
+        coherence: 0.2,
+        centrality: 0.5,
+        priority: 0,
+      },
+      E2: {
+        current: false,
+        coverage: 0,
+        frontier: 0,
+        coherence: 0.2,
+        centrality: 0.5,
+        priority: 0,
+      },
+    });
+    const latestScores = recomputeExpectationPriorities(script, {
+      E1: {
+        current: true,
+        coverage: 0.85,
+        evidence: 'Learner restated that repeated samples produce repeated intervals.',
+        tutoredByAssertion: true,
+        learnerRestatedAfterAssertion: true,
+        frontier: 0.85,
+        coherence: 0.8,
+        centrality: 0.7,
+        priority: 0,
+      },
+      E2: {
+        current: false,
+        coverage: 0,
+        frontier: 0,
+        coherence: 0.2,
+        centrality: 0.5,
+        priority: 0,
+      },
+    });
+
+    const mergedScores = preserveDurableExpectationCoverage(script, previousScores, latestScores);
+
+    expect(mergedScores.E1?.coverage).to.equal(0.85);
+    expect(mergedScores.E1?.learnerRestatedAfterAssertion).to.equal(true);
+  });
+
   it('preserves repaired misconception state until the learner reintroduces it', function() {
     const script = buildScript();
     const previousScores = {

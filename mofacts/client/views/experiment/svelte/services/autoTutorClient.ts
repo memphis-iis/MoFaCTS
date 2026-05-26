@@ -138,7 +138,7 @@ type AutoTutorHistoryRow = {
 };
 
 function createMeteorAutoTutorRuntimeCapabilities(): AutoTutorRuntimeCapabilities {
-  return {
+  const capabilities: AutoTutorRuntimeCapabilities = {
     session: {
       getSessionValue(key: string) {
         return Session.get(key);
@@ -147,6 +147,8 @@ function createMeteorAutoTutorRuntimeCapabilities(): AutoTutorRuntimeCapabilitie
         Session.set(key, value);
       },
       getAutoTutorSessionSnapshot() {
+        const meteorUser = Meteor.user() as { username?: string; loginParams?: { entryPoint?: string } } | null;
+        const currentUserId = Meteor.userId();
         const currentTdfId = requiredString(Session.get('currentTdfId'), 'currentTdfId');
         const currentTdfName = requiredString(Session.get('currentTdfName'), 'currentTdfName');
         const currentUnitNumber = Number(Session.get('currentUnitNumber'));
@@ -154,6 +156,8 @@ function createMeteorAutoTutorRuntimeCapabilities(): AutoTutorRuntimeCapabilitie
           throw new Error('AutoTutor runtime requires currentUnitNumber to be a non-negative integer');
         }
         return {
+          ...(currentUserId ? { currentUserId } : {}),
+          ...(meteorUser?.username ? { currentUsername: meteorUser.username } : {}),
           currentTdfId,
           currentTdfName,
           currentUnitNumber,
@@ -162,6 +166,7 @@ function createMeteorAutoTutorRuntimeCapabilities(): AutoTutorRuntimeCapabilitie
           sectionId: Session.get('curSectionId'),
           teacherId: Session.get('curTeacher')?._id,
           conditionName: Session.get('experimentXCond') || null,
+          entryPoint: meteorUser?.loginParams?.entryPoint,
         };
       },
       publishAutoTutorState(state: unknown) {
@@ -185,6 +190,7 @@ function createMeteorAutoTutorRuntimeCapabilities(): AutoTutorRuntimeCapabilitie
       },
       async writeAutoTutorTurn(turn: AutoTutorHistoryTurn) {
         await insertAutoTutorHistoryTurn(turn.config as AutoTutorConfig, turn.state as AutoTutorState, {
+          capabilities,
           studentAnswer: turn.studentAnswer,
           tutorMessage: turn.tutorMessage,
           turnStartedAt: turn.startedAt,
@@ -198,6 +204,7 @@ function createMeteorAutoTutorRuntimeCapabilities(): AutoTutorRuntimeCapabilitie
       },
     },
   };
+  return capabilities;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -227,19 +234,21 @@ function redactSecrets(message: string): string {
   return message.replace(/sk-or-v1-[A-Za-z0-9_-]+/g, '[redacted OpenRouter key]');
 }
 
-function getTutorFromSession(): Record<string, unknown> {
-  const currentTdfFile = Session.get('currentTdfFile');
+function getTutorFromSession(capabilities: AutoTutorRuntimeCapabilities): Record<string, unknown> {
+  const currentTdfFile = capabilities.session.getAutoTutorSessionSnapshot().currentTdfFile as {
+    tdfs?: { tutor?: unknown };
+  } | null | undefined;
   const tutor = currentTdfFile?.tdfs?.tutor;
   if (!isRecord(tutor)) {
-    throw new Error('AutoTutor runtime requires currentTdfFile.tdfs.tutor in Session');
+    throw new Error('AutoTutor runtime requires currentTdfFile.tdfs.tutor in session capabilities');
   }
   return tutor;
 }
 
-function getCurrentUnit(): Record<string, unknown> {
-  const unit = Session.get('currentTdfUnit');
+function getCurrentUnit(capabilities: AutoTutorRuntimeCapabilities): Record<string, unknown> {
+  const unit = capabilities.session.getAutoTutorSessionSnapshot().currentTdfUnit;
   if (!isRecord(unit)) {
-    throw new Error('AutoTutor runtime requires currentTdfUnit in Session');
+    throw new Error('AutoTutor runtime requires currentTdfUnit in session capabilities');
   }
   if (!isRecord(unit.autotutorsession)) {
     throw new Error(`Unit "${String(unit.unitname || '<unnamed>')}" is not an AutoTutor session`);
@@ -282,10 +291,10 @@ function readTurnLimit(session: Record<string, unknown>): AutoTutorTurnLimit {
   };
 }
 
-function readAutoTutorConfig(): AutoTutorConfig {
-  const tutor = getTutorFromSession();
+function readAutoTutorConfig(capabilities: AutoTutorRuntimeCapabilities): AutoTutorConfig {
+  const tutor = getTutorFromSession(capabilities);
   const setspec = isRecord(tutor.setspec) ? tutor.setspec : {};
-  const unit = getCurrentUnit();
+  const unit = getCurrentUnit(capabilities);
   const session = unit.autotutorsession as Record<string, unknown>;
   const clusterIndex = requiredNumber(session.cluster, 'autotutorsession.cluster');
   if (!Number.isInteger(clusterIndex) || clusterIndex < 0) {
@@ -357,6 +366,9 @@ function buildScoringSystemPrompt(config: AutoTutorConfig): string {
     'A concise answer can repair a misconception when it directly answers the repair question or rejects the mistaken contrast, even if it does not cover a full expectation. For example, if the tutor asks whether an interval estimates individual scores or the population mean, "the population mean" repairs the individual-scores misconception.',
     'When the latest learner answer repairs a misconception, set that misconception to current false, confidence 0, repaired true, and explain the repair in repairEvidence. Do not carry forward a prior misconception solely because earlier dialogue showed it.',
     'For a previously repaired misconception, keep current false and confidence 0 unless the latest learner answer reintroduces that misconception. If it is reintroduced, set current true and repaired false.',
+    'Assertion restatement is also a first-class scoring decision. If the prior tutor state shows an expectation was tutoredByAssertion and the latest tutor turn asked the learner to restate or apply that asserted idea, score the latest learner answer first as uptake of that expectation.',
+    'A cooperative restatement or concrete application of the asserted idea counts as learner knowledge. When the latest learner answer adequately restates or applies the asserted expectation, set learnerRestatedAfterAssertion true and assign enough expectation coverage for that idea to count as learned, even if earlier learner attempts had low coverage.',
+    'Do not let prior failures prevent a proper post-assertion restatement from counting. Prior dialogue may explain why the assertion was needed, but the latest learner answer is the fresh evidence for whether the asserted idea is now understood.',
     'Do not choose a dialogue target, choose a dialogue move, or write the tutor response.',
     'Return JSON only. Do not wrap it in Markdown. The JSON object must exactly follow this envelope shape:',
     JSON.stringify(AUTO_TUTOR_SCORE_ENVELOPE_SCHEMA, null, 2),
@@ -878,13 +890,12 @@ function applySavedHistory(config: AutoTutorConfig, state: AutoTutorState, rows:
 }
 
 async function loadSavedAutoTutorHistory(capabilities: AutoTutorRuntimeCapabilities): Promise<AutoTutorHistoryRow[]> {
-  const userId = Meteor.userId();
   const snapshot = capabilities.session.getAutoTutorSessionSnapshot();
-  if (!userId) {
+  if (!snapshot.currentUserId) {
     throw new Error('AutoTutor resume requires current user, TDF id, and unit number');
   }
   return await capabilities.serverMethods.getAutoTutorHistoryForUnit(
-    userId,
+    snapshot.currentUserId,
     snapshot.currentTdfId,
     snapshot.currentUnitNumber,
   ) as AutoTutorHistoryRow[];
@@ -904,47 +915,50 @@ function buildHistoryNote(config: AutoTutorConfig, state: AutoTutorState, tutorM
 }
 
 async function insertAutoTutorHistoryTurn(config: AutoTutorConfig, state: AutoTutorState, args: {
+  capabilities: AutoTutorRuntimeCapabilities;
   studentAnswer: string;
   tutorMessage: string;
   turnStartedAt: number;
   turnEndedAt: number;
 }) {
-  const currentTdfFile = Session.get('currentTdfFile');
+  const snapshot = args.capabilities.session.getAutoTutorSessionSnapshot();
+  const currentTdfFile = snapshot.currentTdfFile as {
+    tdfs?: { tutor?: { unit?: unknown[] } };
+  } | null | undefined;
   const tutor = currentTdfFile?.tdfs?.tutor;
-  const unitNumber = Number(Session.get('currentUnitNumber'));
-  const unit = tutor?.unit?.[unitNumber] || {};
+  const unitNumber = snapshot.currentUnitNumber;
+  const unit = (tutor?.unit?.[unitNumber] || {}) as { unitname?: unknown };
   const unitName = typeof unit?.unitname === 'string' ? unit.unitname : config.unitName;
   const cluster = getStimCluster(config.clusterIndex) as { clusterKC?: unknown; stims?: unknown[] } | null;
   const stim = (cluster?.stims?.[0] || {}) as { _id?: unknown; stimulusKC?: unknown };
-  const meteorUser = Meteor.user() as { username?: string; loginParams?: { entryPoint?: string } } | null;
-  const sessionID = (new Date(args.turnStartedAt)).toUTCString().substr(0, 16) + ' ' + Session.get('currentTdfName');
+  const sessionID = (new Date(args.turnStartedAt)).toUTCString().substr(0, 16) + ' ' + snapshot.currentTdfName;
   const note = buildHistoryNote(config, state, args.tutorMessage);
 
   await insertCompressedHistory({
     itemId: stim?._id || config.script.id,
     KCId: stim?.stimulusKC || config.script.id,
-    userId: Meteor.userId(),
-    TDFId: Session.get('currentTdfId'),
+    userId: snapshot.currentUserId,
+    TDFId: snapshot.currentTdfId,
     outcome: state.completed ? 'correct' : 'incorrect',
     probabilityEstimate: null,
     typeOfResponse: 'autotutor-chat',
     responseValue: legacyTrim(args.studentAnswer),
     displayedStimulus: { text: config.prompt },
-    sectionId: Session.get('curSectionId'),
-    teacherId: Session.get('curTeacher')?._id,
-    anonStudentId: meteorUser?.username,
+    sectionId: snapshot.sectionId,
+    teacherId: snapshot.teacherId,
+    anonStudentId: snapshot.currentUsername,
     sessionID,
     conditionNameA: 'tdf file',
-    conditionTypeA: Session.get('currentTdfName'),
+    conditionTypeA: snapshot.currentTdfName,
     conditionNameB: 'xcondition',
-    conditionTypeB: Session.get('experimentXCond') || null,
+    conditionTypeB: snapshot.conditionName || null,
     conditionNameC: 'schedule condition',
     conditionTypeC: null,
     conditionNameD: 'how answered',
     conditionTypeD: 'autotutor-chat',
     conditionNameE: 'section',
-    conditionTypeE: meteorUser?.loginParams?.entryPoint && meteorUser.loginParams.entryPoint !== 'direct'
-      ? meteorUser.loginParams.entryPoint
+    conditionTypeE: snapshot.entryPoint && snapshot.entryPoint !== 'direct'
+      ? snapshot.entryPoint
       : null,
     responseDuration: args.turnEndedAt - args.turnStartedAt,
     levelUnit: unitNumber,
@@ -984,14 +998,14 @@ async function insertAutoTutorHistoryTurn(config: AutoTutorConfig, state: AutoTu
     feedbackText: legacyTrim(args.tutorMessage),
     feedbackType: state.completed ? 'correct' : 'autotutor',
     instructionQuestionResult: false,
-    entryPoint: meteorUser?.loginParams?.entryPoint || '',
+    entryPoint: snapshot.entryPoint || '',
     eventType: 'autotutor-turn',
   });
 }
 
 export async function createAutoTutorRuntime(): Promise<AutoTutorRuntime> {
   const capabilities = createMeteorAutoTutorRuntimeCapabilities();
-  const config = readAutoTutorConfig();
+  const config = readAutoTutorConfig(capabilities);
   validateGraduationAgainstScript(config);
   const state = createInitialState(config.script);
   applySavedHistory(config, state, await loadSavedAutoTutorHistory(capabilities));

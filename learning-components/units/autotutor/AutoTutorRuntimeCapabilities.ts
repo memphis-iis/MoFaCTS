@@ -14,6 +14,8 @@ export const AUTO_TUTOR_UNIT_REQUIRED_CAPABILITIES = [
 ] as const satisfies readonly LearningComponentCapability[];
 
 export type AutoTutorSessionSnapshot = {
+  currentUserId?: string;
+  currentUsername?: string;
   currentTdfId: string;
   currentTdfName: string;
   currentUnitNumber: number;
@@ -22,6 +24,7 @@ export type AutoTutorSessionSnapshot = {
   sectionId?: unknown;
   teacherId?: unknown;
   conditionName?: unknown;
+  entryPoint?: unknown;
 };
 
 export type AutoTutorHistoryTurn = {
