@@ -16,6 +16,8 @@ const completeSettings = {
   prod: true,
   enableEmail: true,
   MAIL_URL: 'smtp://smtp-user:smtp-password@mail.operator.test:587',
+  emailFrom: 'MoFaCTS <no-reply@operator.test>',
+  emailReplyTo: 'admin@operator.test',
   initRoles: {
     admins: ['admin@operator.test'],
     teachers: [],
@@ -84,5 +86,23 @@ describe('open-core settings validation', function() {
     });
     expect(result.ok).to.equal(false);
     expect(result.issues.map((issue) => issue.path)).to.include('REDIS_URL');
+  });
+
+  it('requires an authenticated sender address when email is enabled', function() {
+    const result = validateOpenCoreSettings({
+      ...completeSettings,
+      emailFrom: '',
+    }, completeEnv);
+    expect(result.ok).to.equal(false);
+    expect(result.issues.map((issue) => issue.path)).to.include('emailFrom');
+  });
+
+  it('validates optional reply-to address when email is enabled', function() {
+    const result = validateOpenCoreSettings({
+      ...completeSettings,
+      emailReplyTo: 'not-an-email',
+    }, completeEnv);
+    expect(result.ok).to.equal(false);
+    expect(result.issues.map((issue) => issue.path)).to.include('emailReplyTo');
   });
 });

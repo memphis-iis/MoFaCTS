@@ -19,6 +19,7 @@ type MethodContext = {
 type AuthMethodsDeps = {
   serverConsole: Logger;
   ownerEmail: string;
+  emailFrom: string;
   usersCollection: {
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
     updateAsync: (selector: UnknownRecord, modifier: UnknownRecord, options?: UnknownRecord) => Promise<unknown>;
@@ -216,7 +217,7 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
       try {
         deps.sendEmail(
           normalizedEmail,
-          deps.ownerEmail,
+          deps.emailFrom,
           'MoFaCTS Password Reset',
           'You requested a password reset.\n\n' +
             'Open this link to set a new password:\n' + resetUrl + '\n\n' +

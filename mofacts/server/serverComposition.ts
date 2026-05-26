@@ -223,6 +223,8 @@ let nextEventId = 1;
 process.env.MAIL_URL = Meteor.settings.MAIL_URL;
 const adminUsers = Meteor.settings.initRoles?.admins || [];
 const ownerEmail = Meteor.settings.owner;
+const emailFrom = Meteor.settings.emailFrom;
+const emailReplyTo = Meteor.settings.emailReplyTo;
 const isProd = Meteor.settings.prod || false;
 serverConsole('isProd: ' + isProd);
 
@@ -242,6 +244,8 @@ const serverUtilities = createServerUtilityHelpers({
   ).fetchAsync(),
   adminUsers,
   ownerEmail,
+  emailFrom,
+  emailReplyTo,
   thisServerUrl,
   isProd,
   serverConsole,
@@ -579,6 +583,7 @@ export const methods: any = {
   ...createAuthMethods({
     serverConsole,
     ownerEmail,
+    emailFrom,
     usersCollection: MeteorAny.users,
     PasswordResetTokens,
     requireAdminUser,
@@ -905,6 +910,8 @@ Meteor.startup(async function() {
     sendEmail,
     getDiskUsageInfo,
     ownerEmail,
+    emailFrom,
+    emailReplyTo,
     isProd,
     thisServerUrl,
     enforceCanonicalEmailIdentity,

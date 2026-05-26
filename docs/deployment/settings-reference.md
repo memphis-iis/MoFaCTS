@@ -12,6 +12,8 @@ Required settings:
 - `auth.requireEmailVerification`: boolean.
 - `auth.argon2Enabled`: boolean.
 - `MAIL_URL`: required when `enableEmail` or `prod` is true.
+- `emailFrom`: required when `enableEmail` or `prod` is true. Use a sender identity authenticated by the SMTP provider, for example `MoFaCTS <no-reply@example.org>`.
+- `emailReplyTo`: optional reply-to address for system mail.
 - `openCore.requireRedis`: `true` for the completed self-hosted runtime.
 - `public.sourceUrl`: exact public source tag or archive URL exposed by the app footer License / Source link.
 
@@ -48,5 +50,7 @@ S3-compatible storage settings:
 - `storage.s3.forcePathStyle`: optional boolean. Defaults to `true`, which is normally required for MinIO and many S3-compatible services.
 
 When `storage.backend` is `s3`, deployment readiness writes, heads, reads, and deletes a temporary `readiness/...txt` object. Missing bucket, invalid endpoint, invalid credentials, and insufficient object permissions fail readiness and do not switch to local storage. Dynamic assets, package export zips, H5P content, and H5P libraries are read from S3 metadata in S3 mode. Existing local-only asset records need migration metadata before switching an existing install to S3.
+
+For production deliverability, `emailFrom` should use a domain that has SPF, DKIM, and DMARC configured for the `MAIL_URL` provider. Do not use a personal Gmail address as the sender for SMTP mail sent through another provider.
 
 Placeholder values such as `example`, `your-domain`, `changeme`, and `replace-me` are rejected by startup validation.

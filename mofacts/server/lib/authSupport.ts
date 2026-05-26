@@ -592,8 +592,13 @@ export function createAuthSupport(deps: AuthSupportDeps) {
     const settings = (Meteor.settings || {}) as UnknownRecord;
     const missing: string[] = [];
 
-    const isNonEmptyString = (value: unknown) =>
+    const isNonEmptyString = (value: unknown): value is string =>
       typeof value === 'string' && value.trim().length > 0;
+    const extractEmailAddress = (value: string) => {
+      const trimmed = value.trim();
+      const displayAddress = trimmed.match(/<([^<>]+)>$/);
+      return (displayAddress?.[1] || trimmed).trim();
+    };
 
     if (!isNonEmptyString(settings.owner)) {
       missing.push('owner');
@@ -614,6 +619,30 @@ export function createAuthSupport(deps: AuthSupportDeps) {
     const emailEnabled = settings.enableEmail ?? settings.prod ?? false;
     if (emailEnabled && !isNonEmptyString(settings.MAIL_URL)) {
       missing.push('MAIL_URL (required when enableEmail/prod is true)');
+    }
+    const rawEmailFrom = settings.emailFrom;
+    const rawEmailReplyTo = settings.emailReplyTo;
+    if (emailEnabled && !isNonEmptyString(rawEmailFrom)) {
+      missing.push('emailFrom (required when enableEmail/prod is true)');
+    }
+    const emailFrom = isNonEmptyString(rawEmailFrom) ? rawEmailFrom : '';
+    const emailReplyTo = isNonEmptyString(rawEmailReplyTo) ? rawEmailReplyTo : '';
+    if (
+      emailEnabled &&
+      emailFrom &&
+      !isValidEmailAddress(extractEmailAddress(emailFrom))
+    ) {
+      missing.push('emailFrom (must be an email address or display name with address)');
+    }
+    if (
+      emailEnabled &&
+      rawEmailReplyTo !== undefined &&
+      (
+        !emailReplyTo ||
+        !isValidEmailAddress(emailReplyTo)
+      )
+    ) {
+      missing.push('emailReplyTo (must be an email address when provided)');
     }
 
     const allowPublicSignup = (settings as any)?.auth?.allowPublicSignup;

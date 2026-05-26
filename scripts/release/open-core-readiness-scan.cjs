@@ -57,6 +57,7 @@ const requiredSelfHostedSettingsKeys = [
   'auth.requireEmailVerification',
   'auth.argon2Enabled',
   'MAIL_URL',
+  'emailFrom',
   'openCore.requireRedis',
   'storage.backend',
   'storage.local.dynamicAssetsPath',

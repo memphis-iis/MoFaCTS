@@ -5,6 +5,8 @@
   "ROOT_URL": "https://mofacts.example.org",
   "MAIL_URL": "smtp://smtp-user:smtp-password@mail.example.org:587",
   "owner": "admin@example.org",
+  "emailFrom": "MoFaCTS <no-reply@example.org>",
+  "emailReplyTo": "admin@example.org",
   "encryptionKey": "replace-with-at-least-32-random-characters",
   "initRoles": {
     "admins": [

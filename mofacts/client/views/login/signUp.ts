@@ -106,7 +106,7 @@ Template.signUp.events({
       sessionCleanUp();
       const requireEmailVerification = !!Session.get('requireEmailVerification');
       if (requireEmailVerification) {
-        showServerSuccess('Your account has been created. Check your email for a verification link before signing in.');
+        showServerSuccess('Your account has been created. Check your email for a verification link before signing in. If you do not see it soon, check your spam folder.');
         setTimeout(() => {
           FlowRouter.go('/auth/verify-email');
         }, 1200);
@@ -191,7 +191,7 @@ Template.signUp.helpers({
   },
   signUpInstructionCopy() {
     return Session.get('requireEmailVerification')
-      ? 'If email verification is enabled, we’ll email you a confirmation link before you can sign in.'
+      ? 'We will email you a confirmation link before you can sign in. If it does not arrive soon, check your spam folder.'
       : 'You can sign in as soon as your account is created.';
   }
 });

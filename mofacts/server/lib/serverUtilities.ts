@@ -17,6 +17,8 @@ type ServerUtilityDeps = {
   findUsersByIds: (userIds: string[]) => Promise<any[]>;
   adminUsers: string[];
   ownerEmail: string;
+  emailFrom: string;
+  emailReplyTo?: string;
   thisServerUrl: string;
   isProd: boolean;
   serverConsole: (...args: unknown[]) => void;
@@ -79,13 +81,21 @@ export function createServerUtilityHelpers(deps: ServerUtilityDeps) {
   }
 
   function sendEmail(to: string, from: string, subject: string, text: string) {
-    deps.serverConsole('sendEmail', to, from, subject, '[body redacted, length=' + (text?.length || 0) + ']');
-    check([to, from, subject, text], [String]);
+    const deliveryFrom = from === deps.ownerEmail ? deps.emailFrom : from;
+    deps.serverConsole('sendEmail', to, deliveryFrom, subject, '[body redacted, length=' + (text?.length || 0) + ']');
     const emailEnabled = Meteor.settings.enableEmail ?? deps.isProd;
-    if (emailEnabled)
-      Email.send({ to, from, subject, text });
-    else
+    if (emailEnabled) {
+      check([to, deliveryFrom, subject, text], [String]);
+      Email.send({
+        to,
+        from: deliveryFrom,
+        ...(deps.emailReplyTo ? { replyTo: deps.emailReplyTo } : {}),
+        subject,
+        text,
+      });
+    } else {
       deps.serverConsole('sendEmail SKIPPED (enableEmail is false and prod is false)');
+    }
   }
 
   async function sendErrorReportSummaries() {

@@ -27,6 +27,12 @@ function emailLike(value: unknown): value is string {
   return nonEmptyString(value) && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
+function extractEmailAddress(value: string) {
+  const trimmed = value.trim();
+  const displayAddress = trimmed.match(/<([^<>]+)>$/);
+  return (displayAddress?.[1] || trimmed).trim();
+}
+
 function addIssue(issues: SettingsValidationIssue[], path: string, message: string) {
   issues.push({ path, message });
 }
@@ -220,6 +226,13 @@ export function validateOpenCoreSettings(
     const mailUrl = requireString({ issues, settings, path: 'MAIL_URL' });
     if (mailUrl) {
       validateUrl(issues, 'MAIL_URL', mailUrl, ['smtp:', 'smtps:']);
+    }
+    const emailFrom = requireString({ issues, settings, path: 'emailFrom' });
+    if (emailFrom && !emailLike(extractEmailAddress(emailFrom))) {
+      addIssue(issues, 'emailFrom', 'must be an email address or display name with address, such as "MoFaCTS <no-reply@example.org>"');
+    }
+    if (settings.emailReplyTo !== undefined && !emailLike(settings.emailReplyTo)) {
+      addIssue(issues, 'emailReplyTo', 'must be an email address when provided');
     }
   }
 

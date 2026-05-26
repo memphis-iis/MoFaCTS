@@ -63,6 +63,8 @@ type RunServerStartupDeps = {
   sendEmail: (to: string, from: string, subject: string, text: string) => void;
   getDiskUsageInfo: (path?: string) => { free: number; total: number } | null;
   ownerEmail: string;
+  emailFrom: string;
+  emailReplyTo?: string;
   isProd: boolean;
   thisServerUrl: string;
   enforceCanonicalEmailIdentity: (userId: string, rawEmail?: unknown, options?: UnknownRecord) => Promise<void>;
@@ -119,7 +121,7 @@ function checkDriveSpace(deps: RunServerStartupDeps) {
       deps.serverConsole('Low disk space: ' + percentFree + '%');
       const subject = 'MoFaCTs Low Disk Space - ' + deps.thisServerUrl;
       const text = 'Low disk space: ' + percentFree + '%';
-      deps.sendEmail(deps.ownerEmail, deps.ownerEmail, subject, text);
+      deps.sendEmail(deps.ownerEmail, deps.emailFrom, subject, text);
     }
   } catch (error: unknown) {
     deps.serverConsole(error);
@@ -418,14 +420,19 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     return `${baseUrl}/auth/verify-email?token=${encodeURIComponent(token)}`;
   };
   Accounts.emailTemplates.siteName = Meteor.settings.public?.systemName || 'MoFaCTS';
-  Accounts.emailTemplates.from = deps.ownerEmail;
+  Accounts.emailTemplates.from = deps.emailFrom;
+  if (deps.emailReplyTo) {
+    (Accounts.emailTemplates as unknown as { headers?: Record<string, string> }).headers = {
+      'Reply-To': deps.emailReplyTo,
+    };
+  }
   Accounts.emailTemplates.verifyEmail = {
     subject() {
-      return `${Accounts.emailTemplates.siteName}: verify your email`;
+      return `${Accounts.emailTemplates.siteName} account verification`;
     },
     text(_user: unknown, url: string) {
       return [
-        'Verify your email address for MoFaCTS.',
+        `Verify your email address for ${Accounts.emailTemplates.siteName}.`,
         '',
         `Open this link to verify your email: ${url}`,
         '',
@@ -646,6 +653,6 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
   for (const emailaddr of allEmails) {
     let server = Meteor.absoluteUrl().split('//')[1] || Meteor.absoluteUrl();
     server = server.substring(0, server.length - 1);
-    deps.sendEmail(emailaddr, deps.ownerEmail, `MoFaCTs Deployed on ${server}`, `The server has restarted.\nServer: ${server}`);
+    deps.sendEmail(emailaddr, deps.emailFrom, `MoFaCTs Deployed on ${server}`, `The server has restarted.\nServer: ${server}`);
   }
 }

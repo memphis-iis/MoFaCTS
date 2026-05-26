@@ -4,6 +4,8 @@
   "mturkSandbox": true,
   "ROOT_URL": "http://localhost:3200",
   "owner": "admin@localhost.test",
+  "emailFrom": "MoFaCTS Local <no-reply@localhost.test>",
+  "emailReplyTo": "admin@localhost.test",
   "encryptionKey": "local-development-only-32-character-key",
   "initRoles": {
     "admins": [

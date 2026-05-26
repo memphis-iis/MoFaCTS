@@ -19,7 +19,9 @@ cp .env.self-hosted.example .env.self-hosted
 cp settings.self-hosted.example.json settings.self-hosted.json
 ```
 
-Edit both files. Replace every placeholder, especially passwords, `ROOT_URL`, `MAIL_URL`, `owner`, `initRoles.admins`, and `encryptionKey`. `METEOR_SETTINGS_HOST_PATH` must point to the private settings file. The app fails startup when required settings are missing, examples are still present, MongoDB is unauthenticated in the self-hosted path, or Redis is required but unavailable.
+Edit both files. Replace every placeholder, especially passwords, `ROOT_URL`, `MAIL_URL`, `owner`, `emailFrom`, `initRoles.admins`, and `encryptionKey`. `METEOR_SETTINGS_HOST_PATH` must point to the private settings file. The app fails startup when required settings are missing, examples are still present, MongoDB is unauthenticated in the self-hosted path, or Redis is required but unavailable.
+
+For email verification deliverability, set `emailFrom` to an address on a domain authenticated with your SMTP provider, for example `MoFaCTS <no-reply@your-domain.example>`, and use `emailReplyTo` for the admin contact address. Do not send production verification mail from a personal Gmail address through a separate SMTP provider.
 
 `storage.backend` defaults to `local`. To use S3-compatible object storage, set `storage.backend` to `s3` and configure `storage.s3.endpoint`, `bucket`, `region`, `accessKeyId`, and `secretAccessKey`. Optional `storage.s3.prefix` scopes object keys for one MoFaCTS instance, and `storage.s3.forcePathStyle` defaults to `true` for MinIO-style endpoints. Readiness writes and deletes a temporary object, so the configured credentials need object write, read, head, list-prefix, and delete permissions.
 
