@@ -51,7 +51,7 @@
     isPreparedAdvanceWaitState as isPreparedAdvanceWaitSnapshot,
   } from '../services/trialDisplayState';
   import { createVideoMachineBridge } from '../services/videoMachineBridge';
-  import { resolveVideoPlaybackPolicy } from '../services/videoCardInit';
+  import { resolveVideoPlaybackPolicyForUnit } from '../services/videoCardInit';
   import { waitForBrowserPaint } from '../utils/paintTiming';
   import { deriveSrStatus } from '../utils/srStatus';
   import { getMainTimeoutMs, getFeedbackTimeoutMs } from '../utils/timeoutUtils';
@@ -1806,7 +1806,7 @@
   let videoCheckpoints = null;
   let videoResumeAnchor = null;
   $: videoResumeAnchor = Session.get('videoResumeAnchor');
-  $: videoPlaybackPolicy = resolveVideoPlaybackPolicy(currentTdfUnit?.videosession);
+  $: videoPlaybackPolicy = resolveVideoPlaybackPolicyForUnit(currentTdfUnit);
   $: preventScrubbingEnabled = videoPlaybackPolicy.preventScrubbing;
   $: rewindOnIncorrectEnabled = videoPlaybackPolicy.rewindOnIncorrect;
   $: repeatQuestionsSinceCheckpointEnabled = videoPlaybackPolicy.repeatQuestionsSinceCheckpoint;

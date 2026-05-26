@@ -52,6 +52,10 @@ export function resolveVideoPlaybackPolicy(videoSession: VideoSessionLike | null
   };
 }
 
+export function resolveVideoPlaybackPolicyForUnit(curTdfUnit: VideoTdfUnitLike | null | undefined) {
+  return resolveVideoPlaybackPolicy(curTdfUnit?.videosession);
+}
+
 export function parseVideoCheckpointBehavior(value: unknown): VideoCheckpointBehavior {
   if (value == null || value === '') {
     return 'none';
