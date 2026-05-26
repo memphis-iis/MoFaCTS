@@ -11,6 +11,7 @@ Component-owned:
 - Generation configuration constants and temperature validation in `AutoTutorGenerationConfig.ts`.
 - Authored runtime configuration interpretation in `AutoTutorRuntimeConfig.ts`.
 - Saved-history row/note parsing and completion flag validation in `AutoTutorSavedHistory.ts`.
+- Saved-state validation in `AutoTutorSavedState.ts`.
 - AutoTutor planning, scoring, and response contract helpers in shared common code.
 
 App-owned for the current milestone:
