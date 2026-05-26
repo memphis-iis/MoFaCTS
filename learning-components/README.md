@@ -15,6 +15,7 @@ Current extension boundaries:
 - `samples/echo-unit/`: test-only sample component package that demonstrates the manifest, implementation, fixture, and README shape for future component bundles.
 - `runtime/TrialDisplayAdapterRegistry.ts`: display-owned trial adapter registry for H5P-style interactions.
 - `units/UnitEngineRegistry.ts`: unit engine registration and creation.
+- `units/learning-session/`: model learning-session unit package, including learning/video session runtime-config interpretation and model-card selection behavior.
 
 Belongs here:
 

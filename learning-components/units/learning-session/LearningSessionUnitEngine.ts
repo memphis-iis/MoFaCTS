@@ -15,6 +15,10 @@ import { learningUnitFinished } from './learningUnitFinished';
 import { initializeLearningModelState } from './initializeLearningModelState';
 import { loadLearningSessionResumeState } from './loadLearningSessionResumeState';
 import {
+  resolveLearningSessionRuntimeConfig,
+  resolveLearningSessionUnitMode,
+} from './learningSessionRuntimeConfig';
+import {
   createCurrentLearningCardInfoTracker,
   recordLearningCardAdminMetrics,
   updateCardAndStimExposure,
@@ -223,11 +227,7 @@ export async function createLearningSessionUnitEngine(deps: CreateLearningSessio
 
     unitMode: (function() {
       const unit = deps.getSessionValue('currentTdfUnit');
-      let unitMode = 'default';
-      if (unit.learningsession && unit.learningsession.unitMode)
-        unitMode = unit.learningsession.unitMode.trim();
-      else if (unit.videosession && unit.videosession.unitMode)
-        unitMode = unit.videosession.unitMode.trim();
+      const unitMode = resolveLearningSessionUnitMode(unit);
       deps.log(1, 'UNIT MODE: ' + unitMode);
       return unitMode;
     })(),
@@ -450,7 +450,7 @@ export async function createLearningSessionUnitEngine(deps: CreateLearningSessio
     },
 
     unitFinished: async function() {
-      const session = this.curUnit.learningsession || this.curUnit.videosession;
+      const session = resolveLearningSessionRuntimeConfig(this.curUnit);
       return learningUnitFinished({
         session,
         deliverySettings: deps.getDeliverySettings(),
