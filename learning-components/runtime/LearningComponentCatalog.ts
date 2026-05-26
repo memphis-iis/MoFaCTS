@@ -19,12 +19,32 @@ export interface LearningComponentCatalogSummary {
 export function validateLearningComponentCatalog(catalog: LearningComponentCatalog): void {
   const summary = summarizeLearningComponentCatalog(catalog);
   const componentIds = new Set<string>();
+  const unitTypes = new Set<string>();
+  const displayTypes = new Set<string>();
 
   for (const manifest of [...summary.units, ...summary.trialDisplays]) {
     if (componentIds.has(manifest.id)) {
       throw new Error(`Learning component "${manifest.id}" is declared more than once in the catalog`);
     }
     componentIds.add(manifest.id);
+  }
+
+  for (const manifest of summary.units) {
+    for (const unitType of manifest.unitTypes) {
+      if (unitTypes.has(unitType)) {
+        throw new Error(`Unit type "${unitType}" is declared more than once in the catalog`);
+      }
+      unitTypes.add(unitType);
+    }
+  }
+
+  for (const manifest of summary.trialDisplays) {
+    for (const displayType of manifest.displayTypes) {
+      if (displayTypes.has(displayType)) {
+        throw new Error(`Display type "${displayType}" is declared more than once in the catalog`);
+      }
+      displayTypes.add(displayType);
+    }
   }
 }
 

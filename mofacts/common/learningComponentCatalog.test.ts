@@ -91,4 +91,45 @@ describe('Learning component catalog', function() {
       trialDisplayManifests: [displayManifest],
     })).to.throw('Learning component "sample.duplicate" is declared more than once in the catalog');
   });
+
+  it('rejects duplicate unit and display declarations while assembling a catalog', function() {
+    const unitManifestOne: LearningComponentManifest = {
+      id: 'sample.unit-one',
+      kind: 'unit',
+      unitTypes: ['sample'],
+      requiredCapabilities: ['logging'],
+      register() {},
+    };
+    const unitManifestTwo: LearningComponentManifest = {
+      id: 'sample.unit-two',
+      kind: 'unit',
+      unitTypes: ['sample'],
+      requiredCapabilities: ['logging'],
+      register() {},
+    };
+    const displayManifestOne: LearningComponentManifest = {
+      id: 'sample.display-one',
+      kind: 'trial-display',
+      displayTypes: ['sample-display'],
+      requiredCapabilities: ['media'],
+      register() {},
+    };
+    const displayManifestTwo: LearningComponentManifest = {
+      id: 'sample.display-two',
+      kind: 'trial-display',
+      displayTypes: ['sample-display'],
+      requiredCapabilities: ['history'],
+      register() {},
+    };
+
+    expect(() => createLearningComponentCatalog({
+      unitManifests: [unitManifestOne, unitManifestTwo],
+      trialDisplayManifests: [],
+    })).to.throw('Unit type "sample" is declared more than once in the catalog');
+
+    expect(() => createLearningComponentCatalog({
+      unitManifests: [],
+      trialDisplayManifests: [displayManifestOne, displayManifestTwo],
+    })).to.throw('Display type "sample-display" is declared more than once in the catalog');
+  });
 });

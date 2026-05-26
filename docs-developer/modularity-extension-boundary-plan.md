@@ -73,7 +73,7 @@ Current evidence: `mofacts/common/learningComponentManifest.test.ts` proves the 
 ## Next Modularity Pass
 
 1. Define a small component catalog API that combines unit and trial-display manifests without each app bootstrap owning its own default list shape.
-   Initial slice: `learning-components/runtime/LearningComponentCatalog.ts` and `learning-components/defaultLearningComponentCatalog.ts` now package default unit and trial-display manifests together, while app bootstraps consume the catalog-projected manifest lists. Catalog creation validates manifest shape and rejects duplicate component IDs across unit and trial-display entries.
+   Initial slice: `learning-components/runtime/LearningComponentCatalog.ts` and `learning-components/defaultLearningComponentCatalog.ts` now package default unit and trial-display manifests together, while app bootstraps consume the catalog-projected manifest lists. Catalog creation validates manifest shape and rejects duplicate component IDs, duplicate unit declarations, and duplicate trial-display declarations before runtime registration starts.
 2. Add one production-quality sample component package under `learning-components/` that includes its manifest, unit or display implementation, fixtures, and tests.
    Initial slice: `learning-components/samples/echo-unit/` now provides a test-only sample package with implementation, manifest, fixture dependencies, README, and registry creation coverage. It is intentionally not included in the default runtime catalog.
 3. Replace central imports one at a time with catalog entries, preserving the compatibility facades until app imports are retired.
