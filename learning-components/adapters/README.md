@@ -2,7 +2,7 @@
 
 Target home for external learning-component adapters.
 
-Current status: planned external-widget boundary. Existing H5P integration remains under current `mofacts/` paths until the adapter contract is deliberately extracted.
+Current status: planned external-widget boundary. The first H5P trial-display adapter now lives under `learning-components/trial-displays/h5p/`; app-owned H5P storage, upload, routing, publications, and persistence remain in `mofacts/`.
 
 Belongs here:
 
