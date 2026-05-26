@@ -169,4 +169,4 @@ Do not use OpenRouter automatic fallback routing for the first version. If the s
 
 ## Open Questions
 
-See `docs/autotutor-implementation-questions.md` for the working decision log and remaining follow-up questions.
+See `autotutor-implementation-questions.md` for the working decision log and remaining follow-up questions.

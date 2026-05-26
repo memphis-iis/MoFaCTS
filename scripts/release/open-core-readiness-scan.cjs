@@ -263,6 +263,9 @@ function main() {
     if (!isTextFile(file)) {
       continue;
     }
+    if (!fs.existsSync(path.join(repoRoot, file))) {
+      continue;
+    }
     scanTextFile(file, findings);
   }
   for (const file of requiredFiles) {

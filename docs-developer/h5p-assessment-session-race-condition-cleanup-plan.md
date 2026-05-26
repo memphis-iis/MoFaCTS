@@ -2,7 +2,7 @@
 
 Date: 2026-05-20
 
-Source audit: `docs/h5p-assessment-session-playback-audit.md`
+Source audit: `h5p-assessment-session-playback-audit.md`
 
 Scope: H5P activities as they play inside assessment sessions.
 
