@@ -128,3 +128,23 @@ Modularity evidence added:
 - `learning-components/README.md` now contains a component package checklist for new unit engines, trial-display adapters, H5P-style widgets, and future external-widget components.
 - `docs-developer/modularity-start-plan.md` now includes a concrete starter path: begin from the echo sample and AutoTutor boundary, choose unit versus trial-display, write manifest/capability tests first, compose through the catalog, and preserve compatibility facades while app callers migrate.
 - `learning-components/samples/echo-unit/README.md` now states what a production package README must name before a sample-shape package becomes a real component.
+
+## 2026-05-26 Field Registry Readiness Scan Pass
+
+Completed:
+
+- `npm run audit:fields`
+  - Result: passed.
+  - Coverage: verifies generated public schemas are fresh relative to registry generation, closed against supported registry keys, and aligned with tooltip, validator, runtime-inventory, alias, and import-default coverage.
+- `node scripts/release/open-core-readiness-scan.cjs`
+  - Result: passed.
+  - Coverage: the open-core readiness scan now invokes the field registry audit directly, so stale generated TDF/stimulus schema artifacts fail the same release-readiness check as missing settings/docs artifacts.
+- `npm run typecheck`
+  - Result: passed.
+- `npm run lint`
+  - Result: passed.
+
+Readiness evidence added:
+
+- `scripts/release/open-core-readiness-scan.cjs` now runs `mofacts/scripts/auditFields.ts` through Node from the app workspace.
+- `mofacts/scripts/auditFields.ts` now treats `autotutorsession` as an intentional nested `tutor.unit[]` schema section, matching the AutoTutor registry section added for modular unit configuration.

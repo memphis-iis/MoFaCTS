@@ -107,6 +107,14 @@ function git(args) {
   }).trim();
 }
 
+function runMofactsNodeScript(args) {
+  return execFileSync(process.execPath, args, {
+    cwd: path.join(repoRoot, 'mofacts'),
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+}
+
 function getTrackedFiles() {
   const output = git(['ls-files']);
   return output ? output.split(/\r?\n/) : [];
@@ -253,11 +261,32 @@ function scanSelfHostedSettingsAlignment(findings) {
   }
 }
 
+function scanFieldRegistryAudit(findings) {
+  try {
+    runMofactsNodeScript(['--experimental-strip-types', 'scripts/auditFields.ts']);
+  } catch (error) {
+    const output = `${error.stdout || ''}\n${error.stderr || ''}`.trim();
+    const firstFailure = output
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .find((line) => line.startsWith('- ['));
+    pushFinding(
+      findings,
+      'mofacts/scripts/auditFields.ts',
+      0,
+      'field-registry-audit',
+      firstFailure || 'field registry audit failed',
+      '',
+    );
+  }
+}
+
 function main() {
   const findings = [];
   scanRequiredFiles(findings);
   scanRequiredContent(findings);
   scanSelfHostedSettingsAlignment(findings);
+  scanFieldRegistryAudit(findings);
   const trackedFiles = getTrackedFiles();
 
   for (const file of trackedFiles) {
