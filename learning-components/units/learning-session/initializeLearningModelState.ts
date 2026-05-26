@@ -1,4 +1,5 @@
 import { createInitialModelState } from './model/modelStateFactory';
+import { resolveLearningSessionRuntimeConfig } from './learningSessionRuntimeConfig';
 
 export interface InitializeLearningModelStateParams {
   readonly numQuestions: number;
@@ -45,7 +46,7 @@ export async function initializeLearningModelState(
   params.log(2, 'initCards:', initCards, initProbs);
 
   if (!initCards || initCards.length === 0) {
-    const session = params.currentTdfUnit.learningsession || params.currentTdfUnit.videosession || {};
+    const session = resolveLearningSessionRuntimeConfig(params.currentTdfUnit) || {};
     const errorMsg = `Learning/video session in unit "${params.currentTdfUnit.unitname}" (unit ${params.currentUnitNumber}) has no cards. ` +
       `Check clusterlist configuration. ` +
       `Clusterlist: "${session.clusterlist || 'MISSING'}", ` +
