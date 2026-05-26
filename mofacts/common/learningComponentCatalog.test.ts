@@ -59,7 +59,7 @@ describe('Learning component catalog', function() {
       'mofacts.learning-session-unit',
       'mofacts.assessment-session-unit',
       'mofacts.video-session-unit',
-      'mofacts.autotutor-unit-placeholder',
+      'mofacts.autotutor-unit',
     ]);
     expect(summary.trialDisplays).to.deep.equal([{
       id: 'mofacts.h5p-trial-display',

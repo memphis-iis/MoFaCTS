@@ -5,9 +5,9 @@ import {
   ASSESSMENT_SESSION_UNIT_TYPE,
 } from './assessment-session/manifest';
 import {
-  autoTutorUnitComponentManifest,
   AUTO_TUTOR_SESSION_UNIT_TYPE,
 } from './autotutor/AutoTutorUnitEngine';
+import { autoTutorUnitComponentManifest } from './autotutor/manifest';
 import {
   instructionUnitComponentManifest,
   INSTRUCTION_UNIT_TYPE,

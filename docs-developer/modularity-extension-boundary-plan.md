@@ -20,7 +20,7 @@ Documentation note: this is a developer-facing planning document and now lives u
 - Unit engines already route through `learning-components/units/UnitEngineRegistry.ts`.
 - `mofacts/client/views/experiment/unitEngine.ts` is intended to stay an app dependency facade.
 - `learning-components/runtime/LearningComponentContext.ts` exists but is still much smaller than the current `CreateUnitEngineDeps` surface.
-- AutoTutor is currently registered as a minimal unit-engine placeholder in `createUnitEngine.ts`.
+- AutoTutor is registered as a unit component with its manifest colocated under `learning-components/units/autotutor/`.
 - H5P behavior is mostly routed through app/server storage, package, display, and history paths rather than a single component manifest.
 
 ## First Implementation Slice
@@ -33,14 +33,14 @@ Documentation note: this is a developer-facing planning document and now lives u
    Initial slice: named capability interfaces now exist for session state, delivery settings, media resolution, history, server methods, authorization, logging, and user alerts. Runtime capability helpers now project a typed dependency bag into manifest capability names, so missing dependencies remain visible to registration validation.
 
 3. Move default unit registration out of `createUnitEngine.ts`.
-   Initial slice: default unit component manifests now register instruction, learning-session, assessment-session, video, and the current AutoTutor placeholder through the manifest path. Instruction, learning-session, assessment-session, video, and AutoTutor manifests now live with their owning unit folders; `defaultUnitComponents.ts` is only the default catalog aggregator.
+   Initial slice: default unit component manifests now register instruction, learning-session, assessment-session, video, and AutoTutor through the manifest path. Instruction, learning-session, assessment-session, video, and AutoTutor manifests now live with their owning unit folders; `defaultUnitComponents.ts` is only the default catalog aggregator.
 
 4. Add registry contract tests.
    Cover duplicate registration, missing capabilities, unknown unit type, and successful creation for each default unit type.
    Initial slice: manifest tests now include a sample `sample-echo` unit that registers through `LearningComponentManifest`, appears in `UnitEngineRegistry`, and is created without changing the core unit factory.
 
-5. Convert AutoTutor from placeholder to component boundary first.
-   Current slice: the AutoTutor placeholder now lives in `learning-components/units/autotutor/AutoTutorUnitEngine.ts` with its own unit component manifest and explicit `logging` capability requirement. Keep current behavior if the deeper AutoTutor implementation is not ready, but keep the placeholder as a registered component with an explicit lifecycle boundary.
+5. Expand AutoTutor from its current component boundary into a fuller component package first.
+   Current slice: AutoTutor has its unit engine extension in `learning-components/units/autotutor/AutoTutorUnitEngine.ts`, its manifest in `learning-components/units/autotutor/manifest.ts`, and an explicit `logging` capability requirement. Keep app-owned UI, server methods, and history persistence in place until explicit capability interfaces are ready.
 
 6. Map H5P as the second component.
    Identify which H5P responsibilities are component-owned versus app-owned: package import, content storage, display rendering, xAPI/result normalization, history writing, and asset serving.
@@ -68,7 +68,7 @@ The first modularity slice is complete when a new in-repo sample unit component 
 3. Adding its unit type to a test fixture.
 4. Passing registry and unit creation tests without editing the core unit factory logic beyond the bootstrap import.
 
-Current evidence: `mofacts/common/learningComponentManifest.test.ts` proves the registry/manifest side with a sample unit and no core factory edits, and proves the AutoTutor placeholder is now provided by its own unit component manifest. `mofacts/common/registerLearningComponents.test.ts` proves shared manifest-list bootstrapping, duplicate declaration checks, and all-or-nothing preflight before registry mutation. A production sample module under `learning-components/` can now follow that pattern; the remaining future hardening is to expose package discovery/loading for external component bundles instead of importing each in-repo manifest from a central default list.
+Current evidence: `mofacts/common/learningComponentManifest.test.ts` proves the registry/manifest side with a sample unit and no core factory edits, and proves AutoTutor is provided by its own unit component manifest. `mofacts/common/registerLearningComponents.test.ts` proves shared manifest-list bootstrapping, duplicate declaration checks, and all-or-nothing preflight before registry mutation. A production sample module under `learning-components/` can now follow that pattern; the remaining future hardening is to expose package discovery/loading for external component bundles instead of importing each in-repo manifest from a central default list.
 
 ## Next Modularity Pass
 

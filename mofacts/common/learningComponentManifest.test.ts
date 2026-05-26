@@ -14,9 +14,9 @@ import {
   resetUnitEngineRegistryForTests,
 } from '../../learning-components/units/UnitEngineRegistry';
 import {
-  autoTutorUnitComponentManifest,
   AUTO_TUTOR_SESSION_UNIT_TYPE,
 } from '../../learning-components/units/autotutor/AutoTutorUnitEngine';
+import { autoTutorUnitComponentManifest } from '../../learning-components/units/autotutor/manifest';
 import { sampleEchoUnitFixtureDeps } from '../../learning-components/samples/echo-unit/fixtures';
 import { sampleEchoUnitComponentManifest } from '../../learning-components/samples/echo-unit/manifest';
 import { SAMPLE_ECHO_UNIT_TYPE } from '../../learning-components/samples/echo-unit/EchoUnitEngine';
@@ -196,7 +196,7 @@ describe('Learning component manifests', function() {
     expect(await engine.selectNextCard?.()).to.deep.equal({ testType: SAMPLE_ECHO_UNIT_TYPE });
   });
 
-  it('keeps the AutoTutor placeholder behind its own unit component manifest', async function() {
+  it('keeps the AutoTutor unit behind its own component manifest', async function() {
     registerLearningComponent(autoTutorUnitComponentManifest, {
       capabilities: new Set<LearningComponentCapability>(['logging']),
       registerUnitEngine,
