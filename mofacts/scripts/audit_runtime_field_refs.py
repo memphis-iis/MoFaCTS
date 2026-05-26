@@ -35,7 +35,6 @@ DEFAULT_EXCLUDED_NAMES = {
     "deliverySettingsMigration.ts",
     "deliverySettings.test.ts",
     "test.ts",
-    "svelteCardTester.html",
     "tdfSchema.json",
     "stimSchema.json",
 }
