@@ -167,10 +167,15 @@ function scanTextFile(file, findings) {
   });
 }
 
-function scanRequiredFiles(findings) {
+function scanRequiredFiles(findings, trackedFiles) {
+  const trackedFileSet = new Set(trackedFiles);
   for (const file of requiredFiles) {
     if (!fs.existsSync(path.join(repoRoot, file))) {
       pushFinding(findings, file, 0, 'missing-artifact', 'required release artifact is missing', '');
+      continue;
+    }
+    if (!trackedFileSet.has(file)) {
+      pushFinding(findings, file, 0, 'untracked-artifact', 'required release artifact must be tracked for clean public checkouts', '');
     }
   }
 }
@@ -283,11 +288,11 @@ function scanFieldRegistryAudit(findings) {
 
 function main() {
   const findings = [];
-  scanRequiredFiles(findings);
+  const trackedFiles = getTrackedFiles();
+  scanRequiredFiles(findings, trackedFiles);
   scanRequiredContent(findings);
   scanSelfHostedSettingsAlignment(findings);
   scanFieldRegistryAudit(findings);
-  const trackedFiles = getTrackedFiles();
 
   for (const file of trackedFiles) {
     if (!isTextFile(file)) {

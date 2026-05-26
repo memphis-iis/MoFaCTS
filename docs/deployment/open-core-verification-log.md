@@ -148,3 +148,18 @@ Readiness evidence added:
 
 - `scripts/release/open-core-readiness-scan.cjs` now runs `mofacts/scripts/auditFields.ts` through Node from the app workspace.
 - `mofacts/scripts/auditFields.ts` now treats `autotutorsession` as an intentional nested `tutor.unit[]` schema section, matching the AutoTutor registry section added for modular unit configuration.
+
+## 2026-05-26 Required Release Artifact Tracking Pass
+
+Completed:
+
+- `node scripts/release/open-core-readiness-scan.cjs`
+  - Result: passed.
+  - Coverage: the open-core readiness scan now fails when required release/source-availability artifacts exist only as untracked local files, protecting clean public checkouts from missing required docs, notices, lockfiles, and settings examples.
+- `npm run lint`
+  - Result: passed.
+
+Readiness evidence added:
+
+- `scripts/release/open-core-readiness-scan.cjs` now checks required artifacts against `git ls-files`.
+- `scripts/release/README.md` now describes tracked-artifact, checklist-topic, settings-reference, field-registry/schema, secret, and private-path scan coverage.
