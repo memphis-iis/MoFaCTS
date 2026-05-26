@@ -15,6 +15,22 @@ export const AUTOTUTOR_SESSION_FIELD_REGISTRY: SectionFieldRegistry = {
     brief: 'AutoTutor model override.',
     verbose: 'Optional OpenRouter model identifier used for this AutoTutor unit instead of the lesson default.'
   }),
+  utteranceTemperature: simpleField({
+    type: 'number',
+    minimum: 0,
+    maximum: 2,
+    default: 0.45,
+    options: { grid_columns: 4 },
+  }, {
+    brief: 'Tutor wording temperature.',
+    verbose: 'OpenRouter temperature used for generated tutor messages. Scoring stays at a lower fixed temperature so the student model remains stable.'
+  }, {
+    runtime: {
+      default: 0.45,
+      coerce: 'number',
+      validation: { kind: 'numberRange', min: 0, max: 2 },
+    },
+  }),
   requireFinalAnswerPrompt: simpleField(booleanField(false, 4), {
     brief: 'Require final answer prompt.',
     verbose: 'When enabled, AutoTutor asks the learner for one final integrated answer before giving the summary. Disabled by default.'
@@ -52,4 +68,5 @@ export const AUTOTUTOR_SESSION_DIRECT_RUNTIME_KEYS = Object.freeze([
   'maxTurns',
   'openRouterModel',
   'requireFinalAnswerPrompt',
+  'utteranceTemperature',
 ]);

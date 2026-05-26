@@ -222,6 +222,18 @@ export function validateAutoTutorContent(context: AutoTutorValidationContext): A
     }
 
     if (
+      session.utteranceTemperature !== undefined &&
+      (
+        typeof session.utteranceTemperature !== 'number' ||
+        !Number.isFinite(session.utteranceTemperature) ||
+        session.utteranceTemperature < 0 ||
+        session.utteranceTemperature > 2
+      )
+    ) {
+      errors.push(`${unitPrefix}.utteranceTemperature must be a number between 0 and 2`);
+    }
+
+    if (
       session.requireFinalAnswerPrompt !== undefined &&
       typeof session.requireFinalAnswerPrompt !== 'boolean'
     ) {

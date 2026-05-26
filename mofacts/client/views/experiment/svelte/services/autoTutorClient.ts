@@ -36,6 +36,11 @@ import {
   isAutoTutorEndReason,
   type AutoTutorEndReason,
 } from '../../../../../../learning-components/units/autotutor/AutoTutorEndState';
+import {
+  AUTO_TUTOR_DEFAULT_UTTERANCE_TEMPERATURE,
+  AUTO_TUTOR_SCORING_TEMPERATURE,
+  parseAutoTutorTemperature,
+} from '../../../../../../learning-components/units/autotutor/AutoTutorGenerationConfig';
 
 const OPEN_ROUTER_CHAT_COMPLETIONS_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const AUTO_TUTOR_COST_CAP_USD = 0.20;
@@ -93,6 +98,7 @@ type AutoTutorTurnLimit = {
 type AutoTutorConfig = {
   apiKey: string;
   model: string;
+  utteranceTemperature: number;
   graduation: AutoTutorGraduation;
   turnLimit: AutoTutorTurnLimit;
   requireFinalAnswerPrompt: boolean;
@@ -351,6 +357,11 @@ function readAutoTutorConfig(capabilities: AutoTutorRuntimeCapabilities): AutoTu
   return {
     apiKey: requiredString(setspec.openRouterApiKey, 'tutor.setspec.openRouterApiKey'),
     model: requiredString(session.openRouterModel || setspec.openRouterModel, 'openRouterModel'),
+    utteranceTemperature: parseAutoTutorTemperature(
+      session.utteranceTemperature,
+      'autotutorsession.utteranceTemperature',
+      AUTO_TUTOR_DEFAULT_UTTERANCE_TEMPERATURE,
+    ),
     graduation: readGraduation(session),
     turnLimit: readTurnLimit(session),
     requireFinalAnswerPrompt: session.requireFinalAnswerPrompt === true,
@@ -777,7 +788,11 @@ async function readOpenRouterResponseBody(response: Response): Promise<unknown> 
   }
 }
 
-async function callOpenRouter(config: AutoTutorConfig, messages: Array<{ role: 'system' | 'user'; content: string }>) {
+async function callOpenRouter(
+  config: AutoTutorConfig,
+  messages: Array<{ role: 'system' | 'user'; content: string }>,
+  temperature: number,
+) {
   const response = await fetch(OPEN_ROUTER_CHAT_COMPLETIONS_URL, {
     method: 'POST',
     headers: {
@@ -789,7 +804,7 @@ async function callOpenRouter(config: AutoTutorConfig, messages: Array<{ role: '
     body: JSON.stringify({
       model: config.model,
       messages,
-      temperature: 0.2,
+      temperature,
       stream: false,
     }),
   });
@@ -815,14 +830,14 @@ async function callOpenRouterScoring(config: AutoTutorConfig, state: AutoTutorSt
   return await callOpenRouter(config, [
     { role: 'system', content: buildScoringSystemPrompt(config) },
     { role: 'user', content: buildScoringUserPrompt(studentAnswer, state) },
-  ]);
+  ], AUTO_TUTOR_SCORING_TEMPERATURE);
 }
 
 async function callOpenRouterUtterance(config: AutoTutorConfig, state: AutoTutorState, studentAnswer: string, plan: AutoTutorPlan) {
   return await callOpenRouter(config, [
     { role: 'system', content: buildUtteranceSystemPrompt(config) },
     { role: 'user', content: buildUtteranceUserPrompt(config, studentAnswer, state, plan) },
-  ]);
+  ], config.utteranceTemperature);
 }
 
 function computeProgress(state: AutoTutorState): number {

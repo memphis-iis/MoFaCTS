@@ -17,6 +17,7 @@ The intended authoring shape is:
 - `unit[].autotutorsession`: marks the unit as an AutoTutor unit.
 - `unit[].autotutorsession.cluster`: the stimulus cluster index used as the AutoTutor content record.
 - `unit[].autotutorsession.openRouterModel`: optional unit-level model override for model-comparison studies.
+- `unit[].autotutorsession.utteranceTemperature`: optional OpenRouter temperature for tutor wording; scoring remains fixed at the lower component-owned scoring temperature.
 - `unit[].autotutorsession.maxTurns`: maximum learner turns before the unit ends.
 - `unit[].autotutorsession.graduation`: authored completion threshold for the unit, expressed as required covered expectations and maximum active misconceptions.
 - first stim in the referenced cluster: owns the AutoTutor content for that cluster.

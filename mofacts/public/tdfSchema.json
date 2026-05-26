@@ -3028,6 +3028,17 @@
                           "grid_columns": 12
                         }
                       },
+                      "utteranceTemperature": {
+                        "title": "Tutor wording temperature.",
+                        "description": "OpenRouter temperature used for generated tutor messages. Scoring stays at a lower fixed temperature so the student model remains stable.",
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 2,
+                        "default": 0.45,
+                        "options": {
+                          "grid_columns": 4
+                        }
+                      },
                       "requireFinalAnswerPrompt": {
                         "title": "Require final answer prompt.",
                         "description": "When enabled, AutoTutor asks the learner for one final integrated answer before giving the summary. Disabled by default.",
@@ -5261,6 +5272,17 @@
                     "default": "",
                     "options": {
                       "grid_columns": 12
+                    }
+                  },
+                  "utteranceTemperature": {
+                    "title": "Tutor wording temperature.",
+                    "description": "OpenRouter temperature used for generated tutor messages. Scoring stays at a lower fixed temperature so the student model remains stable.",
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 2,
+                    "default": 0.45,
+                    "options": {
+                      "grid_columns": 4
                     }
                   },
                   "requireFinalAnswerPrompt": {

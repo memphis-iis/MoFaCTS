@@ -122,6 +122,21 @@ describe('AutoTutor content contract', function() {
     );
   });
 
+  it('rejects invalid AutoTutor utterance temperature', function() {
+    const tdf = buildValidTdf();
+    (tdf.tutor.unit[0]!.autotutorsession as Record<string, unknown>).utteranceTemperature = 2.5;
+
+    const result = validateAutoTutorContent({
+      tdf,
+      stimuli: buildValidStimuli(),
+    });
+
+    expect(result.valid).to.equal(false);
+    expect(result.errors).to.include(
+      'tutor.unit[0].autotutorsession.utteranceTemperature must be a number between 0 and 2'
+    );
+  });
+
   it('requires AutoTutor content on the first stim in the referenced cluster', function() {
     const stimuli = buildValidStimuli();
     const firstStim = stimuli.setspec.clusters[0]?.stims[0] as Record<string, unknown> | undefined;
