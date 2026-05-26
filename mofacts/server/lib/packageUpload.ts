@@ -1,4 +1,5 @@
 import { Meteor } from 'meteor/meteor';
+import fs from 'fs/promises';
 
 import { parsePackageZip, type UploadedPackageFile } from './packageParser';
 import {
@@ -98,6 +99,30 @@ function computeFileSha256(zipPath: string) {
   return crypto.createHash('sha256').update(fs.readFileSync(zipPath)).digest('hex');
 }
 
+async function mirrorPackageAssetToS3(fileObj: DynamicAssetLike, deps: ProcessPackageUploadDeps) {
+  if (deps.storageBoundary.backend !== 's3') {
+    return;
+  }
+  if (!fileObj._id || !fileObj.path) {
+    throw new Error('S3 storage requires package asset id and local upload path');
+  }
+  if (typeof deps.DynamicAssets.collection.updateAsync !== 'function') {
+    throw new Error('S3 storage requires DynamicAssets.collection.updateAsync');
+  }
+  const name = String(fileObj.name || fileObj.fileName || `${fileObj._id}.${fileObj.ext || 'zip'}`).trim();
+  const key = `dynamic-assets/${fileObj._id}/${name}`;
+  await deps.storageBoundary.putObject(key, await fs.readFile(fileObj.path), fileObj.type || 'application/zip');
+  await deps.DynamicAssets.collection.updateAsync(
+    { _id: fileObj._id },
+    {
+      $set: {
+        'meta.storageBackend': 's3',
+        'meta.storageKey': key,
+      },
+    }
+  );
+}
+
 async function validateUploadedPackageFile(
   zipPath: string,
   fileObj: DynamicAssetLike,
@@ -190,6 +215,7 @@ export async function processPackageUploadWorkflow(
 
   try {
     await validateUploadedPackageFile(zipPath, fileObj, deps, integrity);
+    await mirrorPackageAssetToS3(fileObj, deps);
     unzippedFiles = await parsePackageZip(zipPath, packageFile, deps.serverConsole);
 
     failureStage = 'content processing';

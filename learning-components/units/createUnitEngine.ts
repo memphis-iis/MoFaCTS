@@ -1,20 +1,20 @@
 import { createBaseUnitEngine } from './createBaseUnitEngine';
-import { createAssessmentUnitEngine } from './assessment-session/AssessmentUnitEngine';
-import { createInstructionUnitEngine } from './instruction/InstructionUnitEngine';
-import { createLearningSessionUnitEngine } from './learning-session/LearningSessionUnitEngine';
-import { createVideoSessionUnitEngine } from './video-session/VideoUnitEngine';
 import {
   createRegisteredUnitEngine,
   hasRegisteredUnitEngine,
   registerUnitEngine,
   registerUnitEngineWithDeps,
 } from './UnitEngineRegistry';
-
-const INSTRUCTION_UNIT_TYPE = 'instruction-only';
-const LEARNING_SESSION_UNIT_TYPE = 'model';
-const ASSESSMENT_SESSION_UNIT_TYPE = 'schedule';
-const VIDEO_SESSION_UNIT_TYPE = 'video';
-const AUTO_TUTOR_SESSION_UNIT_TYPE = 'autotutor';
+import { registerLearningComponents } from '../runtime/registerLearningComponents';
+import { registerTrialDisplayAdapter } from '../runtime/TrialDisplayAdapterRegistry';
+import {
+  ASSESSMENT_SESSION_UNIT_TYPE,
+  AUTO_TUTOR_SESSION_UNIT_TYPE,
+  defaultUnitComponentManifests,
+  INSTRUCTION_UNIT_TYPE,
+  LEARNING_SESSION_UNIT_TYPE,
+  VIDEO_SESSION_UNIT_TYPE,
+} from './defaultUnitComponents';
 
 export interface CreateUnitEngineDeps {
   readonly extend: (target: any, source: any) => any;
@@ -98,69 +98,30 @@ export function createDefaultUnitEngine(deps: CreateUnitEngineDeps, curExperimen
 }
 
 function registerDefaultUnitEngines(_deps: CreateUnitEngineDeps): void {
-  if (!hasRegisteredUnitEngine(INSTRUCTION_UNIT_TYPE)) {
-    registerUnitEngine(INSTRUCTION_UNIT_TYPE, createInstructionUnitEngine);
-  }
-  if (!hasRegisteredUnitEngine(LEARNING_SESSION_UNIT_TYPE)) {
-    registerUnitEngineWithDeps<CreateUnitEngineDeps>(LEARNING_SESSION_UNIT_TYPE, (currentDeps) => createLearningSessionUnitEngine({
-      getSessionValue: currentDeps.getSessionValue,
-      setSessionValue: currentDeps.setSessionValue,
-      getDeliverySettings: currentDeps.getDeliverySettings,
-      getStimCount: currentDeps.getStimCount,
-      getStimCluster: currentDeps.getStimCluster,
-      getStimKCBaseForCurrentStimuliSet: currentDeps.getStimKCBaseForCurrentStimuliSet,
-      getTestType: currentDeps.getTestType,
-      getHiddenItems: currentDeps.getHiddenItems,
-      setNumVisibleCards: currentDeps.setNumVisibleCards,
-      setQuestionIndex: currentDeps.setQuestionIndex,
-      getDisplayAnswerText: currentDeps.getDisplayAnswerText,
-      updateCurStudentPerformance: currentDeps.updateCurStudentPerformance,
-      updateCurStudedentPracticeTime: currentDeps.updateCurStudedentPracticeTime,
-      meteorCallAsync: currentDeps.meteorCallAsync,
-      getCurrentUserId: currentDeps.getCurrentUserId,
-      reconstructLearningStateFromHistory: currentDeps.reconstructLearningStateFromHistory,
-      extractDelimFields: currentDeps.extractDelimFields,
-      rangeVal: currentDeps.rangeVal,
-      legacyFloat: currentDeps.legacyFloat,
-      legacyInt: currentDeps.legacyInt,
-      currentUserHasRole: currentDeps.currentUserHasRole,
-      displayify: currentDeps.displayify,
-      unitIsFinished: currentDeps.unitIsFinished,
-      findTdfById: currentDeps.findTdfById,
-      alertUser: currentDeps.alertUser,
-      log: currentDeps.log,
-    }));
-  }
-  if (!hasRegisteredUnitEngine(ASSESSMENT_SESSION_UNIT_TYPE)) {
-    registerUnitEngineWithDeps<CreateUnitEngineDeps>(ASSESSMENT_SESSION_UNIT_TYPE, (currentDeps) => createAssessmentUnitEngine({
-      getSessionValue: currentDeps.getSessionValue,
-      setSessionValue: currentDeps.setSessionValue,
-      getExperimentState: currentDeps.getExperimentState,
-      hasScheduleArtifactForUnit: currentDeps.hasScheduleArtifactForUnit,
-      createExperimentState: currentDeps.createExperimentState,
-      getStimCount: currentDeps.getStimCount,
-      setQuestionIndex: currentDeps.setQuestionIndex,
-      alertUser: currentDeps.alertUser,
-      log: currentDeps.log,
-    }));
-  }
-  if (!hasRegisteredUnitEngine(VIDEO_SESSION_UNIT_TYPE)) {
-    registerUnitEngineWithDeps<CreateUnitEngineDeps>(VIDEO_SESSION_UNIT_TYPE, (currentDeps) => createVideoSessionUnitEngine({
-      setSessionValue: currentDeps.setSessionValue,
-      log: currentDeps.log,
-    }));
-  }
-  if (!hasRegisteredUnitEngine(AUTO_TUTOR_SESSION_UNIT_TYPE)) {
-    registerUnitEngine(AUTO_TUTOR_SESSION_UNIT_TYPE, () => ({
-      unitType: AUTO_TUTOR_SESSION_UNIT_TYPE,
-      async cardAnswered() {},
-      selectNextCard() {},
-      findCurrentCardInfo() {},
-      unitFinished() {
-        return false;
-      },
-    }));
-  }
+  const capabilities = new Set([
+    'session',
+    'delivery-settings',
+    'stimuli',
+    'adaptive-model',
+    'assessment-state',
+    'history',
+    'server-methods',
+    'authz',
+    'logging',
+    'ui-alerts',
+  ] as const);
+
+  registerLearningComponents(defaultUnitComponentManifests, {
+    capabilities,
+    registerUnitEngine,
+    registerUnitEngineWithDeps,
+    registerTrialDisplayAdapter,
+  }, {
+    alreadyRegistered(manifest) {
+    const unitTypes = manifest.unitTypes ?? [];
+      return unitTypes.every((unitType) => hasRegisteredUnitEngine(unitType));
+    },
+  });
 }
 
 export async function createEmptyUnit(deps: CreateUnitEngineDeps, curExperimentData: any) {

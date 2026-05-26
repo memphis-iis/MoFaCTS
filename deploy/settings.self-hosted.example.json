@@ -1,0 +1,55 @@
+{
+  "prod": true,
+  "enableEmail": true,
+  "mturkSandbox": true,
+  "ROOT_URL": "https://mofacts.example.org",
+  "MAIL_URL": "smtp://smtp-user:smtp-password@mail.example.org:587",
+  "owner": "admin@example.org",
+  "encryptionKey": "replace-with-at-least-32-random-characters",
+  "initRoles": {
+    "admins": [
+      "admin@example.org"
+    ],
+    "teachers": []
+  },
+  "auth": {
+    "allowPublicSignup": true,
+    "requireEmailVerification": true,
+    "enableBreachedPasswordScreening": true,
+    "argon2Enabled": true
+  },
+  "openCore": {
+    "requireRedis": true
+  },
+  "storage": {
+    "backend": "local",
+    "local": {
+      "dynamicAssetsPath": "/root/dynamic-assets",
+      "h5pContentPath": "/root/h5p-content",
+      "h5pLibrariesPath": "/root/h5p-libraries"
+    }
+  },
+  "saml": {
+    "memphis": {
+      "enabled": false,
+      "displayName": "University of Memphis"
+    }
+  },
+  "public": {
+    "systemName": "MoFaCTS",
+    "forceSSL": true,
+    "sourceUrl": "https://github.com/optimallearning/mofacts/tree/v0.1.0-alpha.1",
+    "socialPreview": {
+      "title": "MoFaCTS | Mobile Fact and Concept Training System",
+      "type": "website",
+      "url": "https://mofacts.example.org/",
+      "description": "MoFaCTS is an open-source adaptive learning system for practice, assessment, instruction, and research.",
+      "image": "theme",
+      "imageType": "image/png",
+      "imageWidth": "1200",
+      "imageHeight": "630",
+      "imageAlt": "MoFaCTS adaptive practice learning system preview image"
+    }
+  },
+  "debug": false
+}

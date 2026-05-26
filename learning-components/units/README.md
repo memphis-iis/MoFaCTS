@@ -8,6 +8,7 @@ Belongs here:
 
 - The `UnitEngine` contract.
 - Unit engine registry and factory code.
+- Unit component manifests that declare unit types and required runtime capabilities.
 - Instruction, learning-session, assessment-session, and video-session engines.
 - Shared card preparation and unit progression logic.
 
@@ -19,3 +20,5 @@ Does not belong here:
 - TDF parsing that is reusable beyond units; that belongs under `learning-components/content/`.
 
 Use deliberate, behavior-preserving import facades when moving code from legacy paths. Do not create alternate implementations, recovery paths, or duplicated legacy behavior.
+
+New unit families should register through a `LearningComponentManifest` and name every required runtime capability. Missing capabilities must fail during component registration instead of being handled through silent fallback behavior.

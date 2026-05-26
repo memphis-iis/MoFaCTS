@@ -7,6 +7,7 @@ import {
   requireUserWithRoles,
   type MethodAuthorizationDeps,
 } from '../lib/methodAuthorization';
+import type { createStorageBoundary } from '../lib/storageBoundary';
 
 type UnknownRecord = Record<string, unknown>;
 type MethodContext = {
@@ -23,7 +24,7 @@ type DynamicAssetDoc = {
   size?: unknown;
   type?: unknown;
   uploadedAt?: unknown;
-  meta?: { public?: boolean; stimuliSetId?: unknown };
+  meta?: { public?: boolean; stimuliSetId?: unknown; storageBackend?: unknown; storageKey?: unknown };
 };
 
 type TdfLike = {
@@ -78,7 +79,13 @@ type ContentMethodsDeps = {
     find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]>; countAsync: () => Promise<number> };
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
     removeAsync: (selector: UnknownRecord) => Promise<unknown>;
+    writeAsync?: (data: Buffer, options: UnknownRecord) => Promise<DynamicAssetDoc>;
+    link?: (fileRef: UnknownRecord) => string | null;
+    collection?: {
+      updateAsync?: (selector: UnknownRecord, modifier: UnknownRecord) => Promise<unknown>;
+    };
   };
+  storageBoundary: ReturnType<typeof createStorageBoundary>;
   usersCollection: {
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
   };
@@ -589,6 +596,7 @@ export function createContentMethods(deps: ContentMethodsDeps) {
           decryptData: deps.decryptData,
           resolveConditionTdfIds: deps.resolveConditionTdfIds,
           DynamicAssets: deps.DynamicAssets,
+          storageBoundary: deps.storageBoundary,
           Tdfs: deps.Tdfs,
         });
         return { link: result.link };

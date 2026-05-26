@@ -23,6 +23,10 @@ The learner-facing flow combines content from TDFs with adaptive scheduling logi
 
 The active learner card experience uses Svelte components and state-machine-oriented runtime logic. Existing Meteor client code still provides routing, data subscriptions, account context, administrative workflows, and integration points.
 
+## Learning Component Modularity
+
+Reusable unit behavior lives under `learning-components/`. The next modularity pass should harden component registration, explicit runtime capabilities, and unit/trial boundaries so new component families such as AutoTutor or H5P can be added without editing central app switchboards. See `../docs-developer/modularity-extension-boundary-plan.md`.
+
 ## Server Runtime
 
 Server code handles persistence, authentication and authorization checks, content upload, external integrations, import/export workflows, and data access that cannot safely run on the client.

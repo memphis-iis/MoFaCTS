@@ -8,7 +8,7 @@ The design follows the paper's expectation- and misconception-tailored dialogue 
 
 ## Initial Content Contract
 
-The first target package is `C:\Users\ppavl\OneDrive\Active projects\mofacts_config\AutoTutor Confidence Interval\`.
+The first target package lives in the private configuration/content repository under `AutoTutor Confidence Interval/`.
 
 The intended authoring shape is:
 

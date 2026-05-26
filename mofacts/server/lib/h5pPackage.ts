@@ -2,7 +2,9 @@ import JSZip from 'jszip';
 import { createHash } from 'crypto';
 import fs from 'fs/promises';
 import path from 'path';
+import { Meteor } from 'meteor/meteor';
 import type { UploadedPackageFile } from './packageParser';
+import { createStorageBoundary } from './storageBoundary';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -27,6 +29,8 @@ export type ParsedH5PPackage = {
 
 export type StoredH5PPackage = ParsedH5PPackage & {
   storagePath: string;
+  storageBackend: 'local' | 's3';
+  storageKey?: string;
 };
 
 function asRecord(value: unknown): UnknownRecord | null {
@@ -205,6 +209,42 @@ async function writeZipFolder(args: {
   }
 }
 
+async function writeZipFolderToS3(args: {
+  zip: JSZip;
+  sourcePrefix: string;
+  targetPrefix: string;
+  stripPrefix?: boolean;
+}) {
+  const storage = createStorageBoundary(Meteor.settings);
+  if (storage.backend !== 's3') {
+    throw new Error('H5P S3 write requested while storage.backend is not s3');
+  }
+  const cleanPrefix = args.sourcePrefix.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+  const sourcePrefix = cleanPrefix ? `${cleanPrefix}/` : '';
+  const targetPrefix = args.targetPrefix.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+
+  for (const entryName of Object.keys(args.zip.files)) {
+    const normalizedEntry = entryName.replace(/\\/g, '/');
+    if (sourcePrefix && !normalizedEntry.startsWith(sourcePrefix)) {
+      continue;
+    }
+    const entry = args.zip.files[entryName];
+    if (!entry || entry.dir) {
+      continue;
+    }
+    const relativeName = args.stripPrefix
+      ? normalizedEntry.slice(sourcePrefix.length)
+      : normalizedEntry;
+    if (!relativeName) {
+      continue;
+    }
+    await storage.putObject(
+      `${targetPrefix}/${relativeName}`,
+      Buffer.from(await entry.async('uint8array')),
+    );
+  }
+}
+
 export function extractH5PContentReferences(rawStimuliFile: unknown): H5PContentReference[] {
   const root = asRecord(rawStimuliFile);
   const setspec = asRecord(root?.setspec);
@@ -268,6 +308,19 @@ export async function parseH5PPackageFile(file: UploadedPackageFile): Promise<Pa
 export async function storeH5PLibrariesFromPackage(file: UploadedPackageFile): Promise<string[]> {
   const zip = await loadSafeZip(file);
   const bundledLibraryFolders = getBundledLibraryFolders(zip);
+  const storage = createStorageBoundary(Meteor.settings);
+  if (storage.backend === 's3') {
+    for (const folder of bundledLibraryFolders) {
+      await writeZipFolderToS3({
+        zip,
+        sourcePrefix: folder,
+        targetPrefix: `h5p-libraries/${folder}`,
+        stripPrefix: true,
+      });
+    }
+    return bundledLibraryFolders;
+  }
+
   const libraryRoot = getH5PLibraryStorageRoot();
 
   for (const folder of bundledLibraryFolders) {
@@ -283,10 +336,17 @@ export async function storeH5PLibrariesFromPackage(file: UploadedPackageFile): P
 }
 
 export async function getMissingH5PLibraryFolders(requiredLibraryFolders: string[]): Promise<string[]> {
+  const storage = createStorageBoundary(Meteor.settings);
   const libraryRoot = getH5PLibraryStorageRoot();
   const missing: string[] = [];
   for (const folder of requiredLibraryFolders) {
     const safeFolder = sanitizeLibraryFolder(folder);
+    if (storage.backend === 's3') {
+      if (!(await storage.objectExists(`h5p-libraries/${safeFolder}/library.json`))) {
+        missing.push(safeFolder);
+      }
+      continue;
+    }
     try {
       const stat = await fs.stat(path.join(libraryRoot, safeFolder, 'library.json'));
       if (!stat.isFile()) {
@@ -302,9 +362,22 @@ export async function getMissingH5PLibraryFolders(requiredLibraryFolders: string
 export async function storeH5PPackageFile(file: UploadedPackageFile, contentId: string): Promise<StoredH5PPackage> {
   const parsed = await parseH5PPackageFile(file);
   const zip = await loadSafeZip(file);
+  const safeContentId = sanitizeStorageSegment(contentId);
+  const storage = createStorageBoundary(Meteor.settings);
+  if (storage.backend === 's3') {
+    const storageKey = `h5p-content/${safeContentId}/${parsed.hash}`;
+    await writeZipFolderToS3({ zip, sourcePrefix: '', targetPrefix: storageKey });
+    return {
+      ...parsed,
+      storageBackend: 's3',
+      storageKey,
+      storagePath: `s3://${storage.bucket}/${storage.key(storageKey)}`,
+    };
+  }
+
   const storagePath = path.join(
     getH5PStorageRoot(),
-    sanitizeStorageSegment(contentId),
+    safeContentId,
     parsed.hash
   );
   await fs.mkdir(storagePath, { recursive: true });
@@ -312,6 +385,7 @@ export async function storeH5PPackageFile(file: UploadedPackageFile, contentId: 
 
   return {
     ...parsed,
+    storageBackend: 'local',
     storagePath,
   };
 }

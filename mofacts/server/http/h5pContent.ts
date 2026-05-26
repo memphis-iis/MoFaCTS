@@ -1,8 +1,10 @@
 import { WebApp } from 'meteor/webapp';
+import { Meteor } from 'meteor/meteor';
 import type { IncomingMessage, ServerResponse } from 'http';
 import fs from 'fs/promises';
 import path from 'path';
 import { getH5PLibraryStorageRoot, resolveStoredH5PStoragePath } from '../lib/h5pPackage';
+import { createStorageBoundary } from '../lib/storageBoundary';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -97,6 +99,32 @@ async function fileExists(filePath: string): Promise<boolean> {
   }
 }
 
+const storageBoundary = createStorageBoundary(Meteor.settings);
+
+async function s3FileExists(key: string): Promise<boolean> {
+  if (storageBoundary.backend !== 's3') {
+    return false;
+  }
+  return await storageBoundary.objectExists(key);
+}
+
+async function sendS3File(res: ServerResponse, method: string, key: string, contentTypePath: string, cacheControl: string) {
+  if (storageBoundary.backend !== 's3') {
+    throw new Error('S3 file requested while storage.backend is not s3');
+  }
+  const object = await storageBoundary.getObject(key);
+  res.writeHead(200, {
+    'Content-Type': object.contentType || contentTypeFor(contentTypePath),
+    'Cache-Control': cacheControl,
+    'Content-Length': String(object.contentLength ?? object.body.length),
+  });
+  if (method === 'HEAD') {
+    res.end();
+    return;
+  }
+  res.end(object.body);
+}
+
 async function resolveLibraryFilePath(requestedPath: string): Promise<string> {
   const libraryRoot = getH5PLibraryStorageRoot();
   const directPath = resolveInside(libraryRoot, requestedPath);
@@ -123,6 +151,32 @@ async function resolveLibraryFilePath(requestedPath: string): Promise<string> {
   }
 
   return resolveInside(libraryRoot, [matchingFolder, ...parts.slice(1)].join('/'));
+}
+
+async function resolveLibraryS3Key(requestedPath: string): Promise<string> {
+  const directKey = `h5p-libraries/${requestedPath}`;
+  if (await s3FileExists(directKey)) {
+    return directKey;
+  }
+
+  const parts = requestedPath.split('/');
+  const libraryFolder = parts[0] || '';
+  if (!/^[A-Za-z0-9_.]+$/.test(libraryFolder) || parts.length < 2 || storageBoundary.backend !== 's3') {
+    return directKey;
+  }
+
+  const prefixes = await storageBoundary.listChildPrefixes('h5p-libraries');
+  const matchingPrefix = prefixes
+    .map((prefix) => prefix.replace(/^h5p-libraries\//, '').replace(/\/$/, ''))
+    .filter((name) => name.startsWith(`${libraryFolder}-`))
+    .sort()
+    .pop();
+
+  if (!matchingPrefix) {
+    return directKey;
+  }
+
+  return `h5p-libraries/${matchingPrefix}/${parts.slice(1).join('/')}`;
 }
 
 function parseH5PLibraryReference(value: unknown): UnknownRecord | undefined {
@@ -271,12 +325,59 @@ async function sendH5PJsonWithNestedDependencies(args: {
   args.res.end(body);
 }
 
+async function sendS3H5PJsonWithNestedDependencies(args: {
+  res: ServerResponse;
+  method: string;
+  h5pJsonKey: string;
+  contentJsonKey: string;
+}) {
+  if (storageBoundary.backend !== 's3') {
+    throw new Error('S3 H5P JSON requested while storage.backend is not s3');
+  }
+  const h5pJson = JSON.parse((await storageBoundary.getObject(args.h5pJsonKey)).body.toString('utf8')) as UnknownRecord;
+  let contentParams: UnknownRecord = {};
+  if (await s3FileExists(args.contentJsonKey)) {
+    contentParams = JSON.parse((await storageBoundary.getObject(args.contentJsonKey)).body.toString('utf8')) as UnknownRecord;
+  }
+  const body = JSON.stringify(mergeH5PDependencies(h5pJson, contentParams));
+  args.res.writeHead(200, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store',
+  });
+  if (args.method === 'HEAD') {
+    args.res.end();
+    return;
+  }
+  args.res.end(body);
+}
+
 async function sendH5PContentJson(args: {
   res: ServerResponse;
   method: string;
   contentJsonPath: string;
 }) {
   const contentParams = JSON.parse(await fs.readFile(args.contentJsonPath, 'utf8')) as UnknownRecord;
+  const body = JSON.stringify(sanitizeEmbeddedH5PParams(contentParams));
+  args.res.writeHead(200, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store',
+  });
+  if (args.method === 'HEAD') {
+    args.res.end();
+    return;
+  }
+  args.res.end(body);
+}
+
+async function sendS3H5PContentJson(args: {
+  res: ServerResponse;
+  method: string;
+  contentJsonKey: string;
+}) {
+  if (storageBoundary.backend !== 's3') {
+    throw new Error('S3 H5P content JSON requested while storage.backend is not s3');
+  }
+  const contentParams = JSON.parse((await storageBoundary.getObject(args.contentJsonKey)).body.toString('utf8')) as UnknownRecord;
   const body = JSON.stringify(sanitizeEmbeddedH5PParams(contentParams));
   args.res.writeHead(200, {
     'Content-Type': 'application/json; charset=utf-8',
@@ -757,6 +858,49 @@ WebApp.connectHandlers.use('/h5p-content', async (req: IncomingMessage, res: Ser
       return;
     }
 
+    const routePath = stripAssetVersionPrefix(decodeRoutePath(parts.slice(2)));
+    const requestedPath = routePath || 'h5p.json';
+
+    if (storageBoundary.backend === 's3') {
+      if (content.storageBackend !== 's3' || typeof content.storageKey !== 'string' || !content.storageKey.trim()) {
+        res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('H5P content S3 storage metadata is missing');
+        return;
+      }
+      const contentKey = `${content.storageKey.replace(/\/+$/, '')}/${requestedPath}`;
+      if (await s3FileExists(contentKey)) {
+        if (requestedPath === 'h5p.json') {
+          await sendS3H5PJsonWithNestedDependencies({
+            res,
+            method,
+            h5pJsonKey: contentKey,
+            contentJsonKey: `${content.storageKey.replace(/\/+$/, '')}/content/content.json`,
+          });
+          return;
+        }
+        if (requestedPath === 'content/content.json') {
+          await sendS3H5PContentJson({
+            res,
+            method,
+            contentJsonKey: contentKey,
+          });
+          return;
+        }
+        await sendS3File(res, method, contentKey, requestedPath, 'public, max-age=31536000, immutable');
+        return;
+      }
+
+      const libraryKey = await resolveLibraryS3Key(requestedPath);
+      await sendS3File(res, method, libraryKey, requestedPath, 'public, max-age=31536000, immutable');
+      return;
+    }
+
+    if (content.storageBackend === 's3') {
+      res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('H5P content is S3-backed but storage.backend is local');
+      return;
+    }
+
     let storagePath = '';
     try {
       storagePath = resolveStoredH5PStoragePath(String(content.storagePath || ''));
@@ -765,8 +909,6 @@ WebApp.connectHandlers.use('/h5p-content', async (req: IncomingMessage, res: Ser
       res.end('H5P content storage path is missing');
       return;
     }
-    const routePath = stripAssetVersionPrefix(decodeRoutePath(parts.slice(2)));
-    const requestedPath = routePath || 'h5p.json';
     const contentFilePath = resolveInside(storagePath, requestedPath);
     if (await fileExists(contentFilePath)) {
       if (requestedPath === 'h5p.json') {

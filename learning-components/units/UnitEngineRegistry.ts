@@ -63,3 +63,8 @@ export function getRegisteredUnitEngineTypes(): string[] {
     ...unitEngineFactoriesWithDeps.keys(),
   ])).sort();
 }
+
+export function resetUnitEngineRegistryForTests(): void {
+  unitEngineFactories.clear();
+  unitEngineFactoriesWithDeps.clear();
+}

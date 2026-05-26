@@ -9,8 +9,9 @@ The application source tree lives under `mofacts/`.
 ## Repo Selection
 
 - For runtime behavior, UI rendering, themes, transitions, Svelte components, state machines, or application logic, work in this repository and prefer `mofacts/`.
-- For TDF/config content or sync scripts, use the project configuration/content repository and inspect this repository only for compatibility checks.
-- For product and developer documentation that is too long for the public repo docs, use the project wiki.
+- For TDF/config content or sync scripts, use the project configuration/content repository identified by `MOFACTS_CONFIG_REPO` and inspect this repository only for compatibility checks.
+- For product and developer documentation that is too long for the public repo docs, use the project wiki identified by `MOFACTS_WIKI_REPO`.
+- Treat the `MOFACTS_CONFIG_REPO` and `MOFACTS_WIKI_REPO` repositories as critical MoFaCTS project components, not optional adjacent references.
 
 ## Subtree Roles
 
@@ -21,8 +22,8 @@ The application source tree lives under `mofacts/`.
 
 ## Cross-Repo Coordination
 
-- If user-facing behavior changes in `mofacts/`, check whether wiki documentation needs an update.
-- If code changes alter required TDF fields, config names, structures, or expectations, verify compatibility with the configuration/content repository.
+- If user-facing behavior changes in `mofacts/`, check whether wiki documentation in `MOFACTS_WIKI_REPO` needs an update.
+- If code changes alter required TDF fields, config names, structures, or expectations, verify compatibility with the configuration/content repository at `MOFACTS_CONFIG_REPO`.
 - If schemas, payloads, interfaces, or field names change, inspect dependent repositories for compatibility.
 
 ## Operational Rules

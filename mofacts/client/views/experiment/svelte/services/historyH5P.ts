@@ -1,6 +1,8 @@
+import { registerDefaultTrialDisplayComponents } from '../../../../../common/defaultTrialDisplayComponents';
+import { H5P_TRIAL_DISPLAY_TYPE } from '../../../../../common/h5pTrialDisplayAdapter';
 import { isSelfHostedH5PDisplay } from '../../../../../common/lib/h5pDisplay';
-import { normalizeH5PTrialResult } from '../../../../../common/lib/h5pTrialResult';
 import type { H5PTrialResult, HistoryRecord } from '../../../../../common/types';
+import { getTrialDisplayAdapter } from '../../../../../../learning-components/runtime/TrialDisplayAdapterRegistry';
 
 type InsertHistoryRecord = (answerLogRecord: HistoryRecord) => Promise<void>;
 
@@ -12,11 +14,16 @@ export function resolveH5PResultForHistory(
     return null;
   }
 
-  const h5p = display?.h5p as Record<string, unknown> | undefined;
   if (!result) {
     throw new Error('[History Logging] H5P result missing before history write');
   }
-  return normalizeH5PTrialResult(result, String(h5p?.contentId || ''));
+  registerDefaultTrialDisplayComponents();
+  const adapter = getTrialDisplayAdapter(H5P_TRIAL_DISPLAY_TYPE);
+  const normalizedDisplay = adapter.normalizeDisplay(display);
+  if (typeof adapter.normalizeResult !== 'function') {
+    throw new Error('[History Logging] H5P trial display adapter cannot normalize results');
+  }
+  return adapter.normalizeResult(result, normalizedDisplay) as H5PTrialResult;
 }
 
 export function applyH5PSummaryToRecord(record: HistoryRecord, batch: H5PTrialResult): void {

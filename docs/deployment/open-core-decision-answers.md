@@ -105,6 +105,6 @@ Notes:
 
 A public smoke test is easier if we ship sample TDF/H5P/media content, but only if redistribution rights are clear. Should the public repo include a small redistributable sample lesson/package, or should sample content wait until rights are verified?
 
-Answer: Include one small smoke-test package from the public config repository so beginners have content they can run immediately. Candidate source: `C:\Users\ppavl\OneDrive\Active projects\mofacts_config`.
+Answer: Include one small smoke-test package from the public config repository so beginners have content they can run immediately. Candidate source: the public configuration/content repository.
 
 Notes:

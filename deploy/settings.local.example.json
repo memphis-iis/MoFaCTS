@@ -1,0 +1,38 @@
+{
+  "prod": false,
+  "enableEmail": false,
+  "mturkSandbox": true,
+  "ROOT_URL": "http://localhost:3200",
+  "owner": "admin@localhost.test",
+  "encryptionKey": "local-development-only-32-character-key",
+  "initRoles": {
+    "admins": [
+      "admin@localhost.test"
+    ],
+    "teachers": []
+  },
+  "auth": {
+    "allowPublicSignup": true,
+    "requireEmailVerification": false,
+    "enableBreachedPasswordScreening": false,
+    "argon2Enabled": true
+  },
+  "openCore": {
+    "requireRedis": false
+  },
+  "storage": {
+    "backend": "local"
+  },
+  "saml": {
+    "memphis": {
+      "enabled": false,
+      "displayName": "University of Memphis"
+    }
+  },
+  "public": {
+    "systemName": "MoFaCTS",
+    "forceSSL": false,
+    "enableDeleteAllButton": false
+  },
+  "debug": false
+}

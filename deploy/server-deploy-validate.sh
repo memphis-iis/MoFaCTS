@@ -7,6 +7,8 @@ set -euo pipefail
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yaml}"
 SERVICE_NAME="${SERVICE_NAME:-mofacts}"
 WAIT_SECONDS="${WAIT_SECONDS:-45}"
+READINESS_COMMAND="${READINESS_COMMAND:-}"
+REQUIRE_READINESS="${REQUIRE_READINESS:-false}"
 
 TARGET_IMAGE=""
 while [[ $# -gt 0 ]]; do
@@ -26,6 +28,14 @@ while [[ $# -gt 0 ]]; do
     --wait-seconds)
       WAIT_SECONDS="${2:-}"
       shift 2
+      ;;
+    --readiness-command)
+      READINESS_COMMAND="${2:-}"
+      shift 2
+      ;;
+    --require-readiness)
+      REQUIRE_READINESS="true"
+      shift
       ;;
     *)
       echo "Unknown argument: $1" >&2
@@ -124,6 +134,17 @@ echo "Deployment succeeded. Current container image:"
 docker inspect "$SERVICE_NAME" --format '{{.Config.Image}}'
 echo "Container status:"
 docker inspect "$SERVICE_NAME" --format '{{.State.Status}}'
+
+if [[ -n "$READINESS_COMMAND" ]]; then
+  echo "Running deployment readiness command..."
+  bash -lc "$READINESS_COMMAND"
+elif [[ "$REQUIRE_READINESS" == "true" ]]; then
+  echo "Readiness validation was required, but no readiness command was provided." >&2
+  echo "Pass --readiness-command '<command>' or set READINESS_COMMAND." >&2
+  exit 1
+else
+  echo "Readiness validation not run. Pass --require-readiness with --readiness-command to make it mandatory."
+fi
 
 echo "Recent logs:"
 docker logs --tail 120 "$SERVICE_NAME" || true

@@ -1,11 +1,21 @@
 $ErrorActionPreference = 'Stop'
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$sshKey = 'C:\Users\ppavl\OneDrive\Desktop\prodkey.pem'
-$sshHost = 'ubuntu@52.89.109.53'
+$sshKey = $env:MOFACTS_PROD_SSH_KEY
+$sshHost = $env:MOFACTS_PROD_SSH_HOST
 $remoteMongoContainer = 'mofacts-mongodb-1'
-$publicBaseUrl = 'https://mofacts.optimallearning.org'
+$publicBaseUrl = $env:MOFACTS_PROD_BASE_URL
 $dbName = 'MoFACT-meteor3'
+
+if (-not $sshKey) {
+  throw 'MOFACTS_PROD_SSH_KEY is required.'
+}
+if (-not $sshHost) {
+  throw 'MOFACTS_PROD_SSH_HOST is required.'
+}
+if (-not $publicBaseUrl) {
+  throw 'MOFACTS_PROD_BASE_URL is required.'
+}
 
 $remoteMongoIp = ssh -i $sshKey $sshHost "docker inspect $remoteMongoContainer --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}'"
 $remoteMongoIp = $remoteMongoIp.Trim()

@@ -22,7 +22,6 @@ $localDataHome = Join-Path $deployDir "local-data"
 $commonJsWatcherScript = Join-Path $deployDir "hotfix-dev\ensure-commonjs-build.ps1"
 $meteorReleasePath = Join-Path $appDir ".meteor\release"
 
-$mongoUrl = "mongodb://127.0.0.1:27017/MoFACT-meteor3"
 $expectedMongoDbName = "MoFACT-meteor3"
 $rootUrl = "http://localhost:3200"
 $port = "3200"
@@ -110,6 +109,41 @@ function Invoke-ExternalChecked {
     } finally {
         Pop-Location
     }
+}
+
+function Read-LocalEnvValue {
+    param([string]$Name)
+
+    $envPath = Join-Path $deployDir ".env.local"
+    foreach ($line in Get-Content $envPath) {
+        $trimmed = $line.Trim()
+        if (-not $trimmed -or $trimmed.StartsWith("#")) {
+            continue
+        }
+
+        $separatorIndex = $trimmed.IndexOf("=")
+        if ($separatorIndex -lt 1) {
+            continue
+        }
+
+        $key = $trimmed.Substring(0, $separatorIndex).Trim()
+        if ($key -ne $Name) {
+            continue
+        }
+
+        return $trimmed.Substring($separatorIndex + 1).Trim().Trim('"').Trim("'")
+    }
+
+    return ""
+}
+
+function Get-NativeMongoUrl {
+    $composeMongoUrl = Read-LocalEnvValue -Name "MONGO_URL"
+    if (-not $composeMongoUrl) {
+        throw ".env.local must define MONGO_URL for the native hotfix dev server"
+    }
+
+    return $composeMongoUrl -replace "@mongodb:", "@127.0.0.1:" -replace "//mongodb:", "//127.0.0.1:"
 }
 
 function Get-HotfixDevProcess {
@@ -207,7 +241,7 @@ function Start-HotfixDev {
     $previousMeteorInstallation = $env:METEOR_INSTALLATION
 
     try {
-        $env:MONGO_URL = $mongoUrl
+        $env:MONGO_URL = Get-NativeMongoUrl
         $env:EXPECTED_MONGO_DB_NAME = $expectedMongoDbName
         $env:ROOT_URL = $rootUrl
         $env:PORT = $port

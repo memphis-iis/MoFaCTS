@@ -3,6 +3,7 @@ import { check, Match } from 'meteor/check';
 import type { UploadedPackageFile } from '../lib/packageParser';
 import { processPackageUploadWorkflow } from '../lib/packageUpload';
 import type { PackageUploadIntegrity } from '../lib/packageUploadShared';
+import type { createStorageBoundary } from '../lib/storageBoundary';
 import { validateAutoTutorContent } from '../../common/lib/autoTutorContract';
 
 type UnknownRecord = Record<string, unknown>;
@@ -83,6 +84,7 @@ type PackageMethodsDeps = {
   Tdfs: any;
   DynamicAssets: any;
   H5PContents?: any;
+  storageBoundary: ReturnType<typeof createStorageBoundary>;
   UserUploadQuota: any;
   AuditLog: any;
   ownerEmail: string;
@@ -179,6 +181,7 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
   async function processPackageUpload(this: MethodContext, fileObjOrId: string | DynamicAssetLike, owner: string, _zipLink: string, emailToggle: boolean, integrity?: PackageUploadIntegrity){
     return processPackageUploadWorkflow(this, fileObjOrId, owner, emailToggle, {
       DynamicAssets: deps.DynamicAssets,
+      storageBoundary: deps.storageBoundary,
       userIsInRoleAsync: deps.userIsInRoleAsync,
       normalizeCanonicalId: deps.normalizeCanonicalId,
       serverConsole: deps.serverConsole,
@@ -237,6 +240,30 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
           public: true
         }
       });
+      if (deps.storageBoundary.backend === 's3') {
+        if (!fileRef?._id) {
+          throw new Error(`S3 storage requires DynamicAssets.writeAsync to return an asset id for ${media.name}`);
+        }
+        const storageKey = `dynamic-assets/${fileRef._id}/${media.name}`;
+        await deps.storageBoundary.putObject(storageKey, media.contents as Buffer, mimeType);
+        if (typeof deps.DynamicAssets.collection?.updateAsync !== 'function') {
+          throw new Error('S3 storage requires DynamicAssets.collection.updateAsync');
+        }
+        await deps.DynamicAssets.collection.updateAsync(
+          { _id: fileRef._id },
+          {
+            $set: {
+              'meta.storageBackend': 's3',
+              'meta.storageKey': storageKey,
+            }
+          }
+        );
+        fileRef.meta = {
+          ...(fileRef.meta || {}),
+          storageBackend: 's3',
+          storageKey,
+        };
+      }
 
       deps.serverConsole(`File ${media.name} uploaded successfully`);
       return fileRef;

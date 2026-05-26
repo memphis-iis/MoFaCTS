@@ -19,6 +19,7 @@ import { legacyInt, legacyTrim } from '../../common/underscoreCompat';
 import { getErrorMessage } from './errorUtils';
 import { CARD_ENTRY_INTENT, setCardEntryIntent } from './cardEntryIntent';
 import { isLaunchLoadingActive } from './launchLoading';
+import { getRouteAccessPolicy, type RouteAccessPolicy } from './routeAccessPolicies';
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra');
 const BlazeLayout: any = (globalThis as any).BlazeLayout;
 const Tdfs: any = (globalThis as any).Tdfs;
@@ -100,11 +101,6 @@ let cardSubsWaitHandle: any = null;
 let rootUserWaitHandle: any = null;
 const pendingAuthRouteHandles: Record<string, any> = {};
 let homeUserHydrationHandle: any = null;
-
-type RouteAccessPolicy = {
-  requiresAuth: boolean;
-  allowedRoles?: string;
-};
 
 type RouteAccessDecision = 'allow' | 'signin' | 'forbidden';
 type UserWithLoginParams = Meteor.User & { loginParams?: { loginMode?: string } };
@@ -469,26 +465,6 @@ const restrictedRoutes = [
   'classControlPanel',
   'contentControlPanel',
 ];
-
-const routeAccessPolicies: Record<string, RouteAccessPolicy> = {
-  'client.turkWorkflow': { requiresAuth: true, allowedRoles: 'admin' },
-  'client.userAdmin': { requiresAuth: true, allowedRoles: 'admin' },
-  'client.tdfAssignmentEdit': { requiresAuth: true, allowedRoles: 'admin,teacher' },
-  'client.instructorReporting': { requiresAuth: true, allowedRoles: 'admin,teacher' },
-  'client.classEdit': { requiresAuth: true, allowedRoles: 'admin,teacher' },
-  'client.contentUpload': { requiresAuth: true },
-  'client.manualContentCreator': { requiresAuth: true },
-  'client.contentEdit': { requiresAuth: true },
-  'client.tdfEdit': { requiresAuth: true },
-  'client.dataDownload': { requiresAuth: true },
-  'client.adminControls': { requiresAuth: true, allowedRoles: 'admin' },
-  'client.adminTests': { requiresAuth: true, allowedRoles: 'admin' },
-  'client.theme': { requiresAuth: true, allowedRoles: 'admin' },
-};
-
-function getRouteAccessPolicy(routeName: string): RouteAccessPolicy {
-  return routeAccessPolicies[routeName] || { requiresAuth: true };
-}
 
 const getDefaultRouteAction = function(routeName: any) {
   return async function(this: any) {

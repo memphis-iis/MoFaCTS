@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from 'http';
 import * as fs from 'fs';
 import * as path from 'path';
 import { getMimeTypeForAssetName } from '../lib/mediaReferences';
+import type { createStorageBoundary } from '../lib/storageBoundary';
 
 type DynamicAssetLike = {
   _id: string;
@@ -14,6 +15,8 @@ type DynamicAssetLike = {
   size?: number;
   meta?: {
     public?: boolean;
+    storageBackend?: string;
+    storageKey?: string;
   };
 };
 
@@ -21,6 +24,7 @@ type DynamicAssetsRouteDeps = {
   DynamicAssets: {
     findOneAsync: (selector: Record<string, unknown>) => Promise<DynamicAssetLike | null>;
   };
+  storageBoundary: ReturnType<typeof createStorageBoundary>;
   serverConsole: (...args: unknown[]) => void;
 };
 
@@ -127,6 +131,41 @@ async function serveDynamicAssetById(
     }
 
     const storedAssetPath = typeof asset.path === 'string' ? asset.path : '';
+    const resolvedName = String(asset.name || asset.fileName || path.basename(storedAssetPath) || 'asset').trim();
+    const mimeType = typeof asset.type === 'string' && asset.type.trim().length > 0
+      ? asset.type
+      : getMimeTypeForAssetName(resolvedName);
+
+    if (deps.storageBoundary.backend === 's3') {
+      const storageKey = typeof asset.meta?.storageKey === 'string' ? asset.meta.storageKey.trim() : '';
+      if (asset.meta?.storageBackend !== 's3' || !storageKey) {
+        deps.serverConsole('[dynamic-assets] Missing S3 storage metadata for', assetId);
+        res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('Asset S3 storage metadata is unavailable');
+        return;
+      }
+      try {
+        const object = await deps.storageBoundary.getObject(storageKey);
+        const headers: Record<string, string> = {
+          'Content-Type': object.contentType || mimeType,
+          'Cache-Control': 'public, max-age=31536000, immutable',
+        };
+        const contentLength = typeof object.contentLength === 'number' && Number.isFinite(object.contentLength)
+          ? object.contentLength
+          : object.body.length;
+        headers['Content-Length'] = String(contentLength);
+        res.writeHead(200, headers);
+        res.end(object.body);
+        return;
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        deps.serverConsole('[dynamic-assets] S3 read failed for', assetId, storageKey, message);
+        res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('Failed to read asset from S3 storage');
+        return;
+      }
+    }
+
     if (!storedAssetPath) {
       deps.serverConsole('[dynamic-assets] Missing asset path for', assetId);
       res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -151,10 +190,6 @@ async function serveDynamicAssetById(
       return;
     }
 
-    const resolvedName = String(asset.name || asset.fileName || path.basename(assetPath) || 'asset').trim();
-    const mimeType = typeof asset.type === 'string' && asset.type.trim().length > 0
-      ? asset.type
-      : getMimeTypeForAssetName(resolvedName);
     const headers: Record<string, string> = {
       'Content-Type': mimeType,
       'Cache-Control': 'public, max-age=31536000, immutable'

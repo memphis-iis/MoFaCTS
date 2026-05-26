@@ -1,6 +1,13 @@
 import { expect } from 'chai';
 import { computeCacheStats, computeSummaryStats, computeUsageSummary, createDashboardCacheMethods } from './dashboardCacheMethods';
 
+const disabledRedisBoundary = {
+  enabled: false,
+  async withLock<T>(_key: string, _ttlMs: number, work: () => Promise<T>) {
+    return await work();
+  }
+};
+
 describe('dashboardCacheMethods', function() {
   it('computeCacheStats calculates aggregate metrics', function() {
     const history = [
@@ -299,6 +306,7 @@ describe('dashboardCacheMethods', function() {
       }
     };
     let lastModifier: any = null;
+    const lockKeys: string[] = [];
 
     const methods = createDashboardCacheMethods({
       Meteor: {
@@ -357,12 +365,20 @@ describe('dashboardCacheMethods', function() {
       usersCollection: { findOneAsync: async () => ({ _id: userId }) },
       serverConsole: () => undefined,
       computePracticeTimeMs: (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0),
-      canViewDashboardTdf: () => true
+      canViewDashboardTdf: () => true,
+      redisBoundary: {
+        enabled: true,
+        async withLock<T>(key: string, _ttlMs: number, work: () => Promise<T>) {
+          lockKeys.push(key);
+          return await work();
+        }
+      }
     });
 
     const result = await methods.updateDashboardCacheForTdf.call({ userId }, 'tdfA');
 
     expect(result.success).to.equal(true);
+    expect(lockKeys).to.deep.equal(['dashboard-cache:update:learner-1:tdfA']);
     expect(lastModifier.$set).to.not.have.property('learnerTdfConfigs');
     expect(cacheDoc.learnerTdfConfigs.tdfA.overrides.setspec.audioPromptMode).to.equal('feedback');
   });
@@ -493,7 +509,8 @@ describe('dashboardCacheMethods', function() {
       usersCollection: { findOneAsync: async () => ({ _id: userId }) },
       serverConsole: () => undefined,
       computePracticeTimeMs: (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0),
-      canViewDashboardTdf: () => true
+      canViewDashboardTdf: () => true,
+      redisBoundary: disabledRedisBoundary
     });
 
     const result = await methods.resetAdminLessonProgress.call({ userId }, 'root');

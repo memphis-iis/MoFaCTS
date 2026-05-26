@@ -2,7 +2,7 @@
 
 ## Goal
 
-Add an optional right-side progress panel during learning sessions, inspired by `C:\Users\ppavl\Downloads\My-Progress-Panel.html`.
+Add an optional right-side progress panel during learning sessions, inspired by the local `My-Progress-Panel.html` mockup used during planning.
 
 The panel should help learners or instructors understand item-level progress without changing the adaptive scheduler, adding per-trial server round trips, or creating a second progress model that can drift from the engine.
 

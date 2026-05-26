@@ -1,15 +1,18 @@
 # MoFaCTS Deployment Workflow
 
-This folder contains the canonical Docker Compose deployment workflow for the MoFaCTS application.
+This folder contains executable deployment examples and scripts for MoFaCTS. Human-facing self-hosted operator docs start at `../docs/deployment/self-hosted-guide.md`.
 
 ## Contents
 
-- `docker-compose.yml`: production-shaped app and MongoDB runtime.
+- `docker-compose.yml`: canonical Self-Hosted MoFaCTS app, authenticated MongoDB, and Redis runtime.
 - `docker-compose.local.yml`: local override file for development or staging-style checks.
 - `docker-compose.hotfix-native.yml`: publishes local MongoDB to `127.0.0.1:27017` for the native hotfix dev server.
 - `docker-compose.hotfix-local.yml`: local-only bundle runner for faster code hotfix loops without producing a deploy image.
+- `.env.self-hosted.example`: shareable self-hosted environment template. Copy it to ignored `.env.self-hosted`.
+- `settings.self-hosted.example.json`: shareable self-hosted settings template. Copy it to ignored private settings before use.
 - `.env.local.example`: shareable local environment template. Copy it to ignored `.env.local` for machine-specific values.
-- `settings.json`, `settingsstaging.json`, `settings.local.json`: private application settings sources mounted into the container at runtime; they are not copied into the image.
+- `settings.local.example.json`: shareable local settings template.
+- Private settings files under `deploy/` are mounted into the container at runtime; they are not copied into the image.
 - `docker/`: scripts copied into the app image.
 - `hotfix-dev.ps1`: native Windows Meteor hotfix dev server launcher.
 - `hotfix/`: scripts used by the local-only bundle runner.
@@ -24,7 +27,19 @@ Run Docker Compose from this folder.
 
 `docker-compose.yml` sets the build context to `../`, which resolves to the repository root that contains the application Dockerfile.
 
-Private settings files under `deploy/` are ignored by Docker build context. Production and staging settings must be copied to the server separately and mounted into the app container at `/run/mofacts/settings.json`.
+Private settings files under `deploy/` are ignored by Docker build context. Production and self-hosted settings must be copied to the server separately and mounted into the app container at `/run/mofacts/settings.json`.
+
+## Self-Hosted Operator Path
+
+Start with the docs, then use these tracked examples:
+
+```bash
+cd deploy
+cp .env.self-hosted.example .env.self-hosted
+cp settings.self-hosted.example.json settings.self-hosted.json
+```
+
+Replace every placeholder before startup. The app validates settings, MongoDB authentication, Redis configuration, and storage paths and fails clearly when required values are missing.
 
 ## Local Settings
 
@@ -53,6 +68,14 @@ docker compose --env-file .env.local -f docker-compose.yml -f docker-compose.loc
 ```
 
 Build, push, and deploy commands should be run only by maintainers or release owners with the appropriate environment access.
+
+`server-deploy-validate.sh` can make an operator-provided readiness probe mandatory after the container reaches running state:
+
+```bash
+READINESS_COMMAND='./run-admin-readiness-check.sh' ./server-deploy-validate.sh --require-readiness --image repo/mofacts:tag
+```
+
+The readiness command must call the admin-only deployment readiness path for that environment, such as an authenticated browser/DDP check against `/admin/tests`. The script fails the rollout when `--require-readiness` is set and no command is provided, or when the command exits non-zero.
 
 ## Real Hotfix Dev Loop
 

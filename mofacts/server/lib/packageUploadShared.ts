@@ -1,6 +1,7 @@
 import { Meteor } from 'meteor/meteor';
 
 import type { UploadedPackageFile } from './packageParser';
+import type { createStorageBoundary } from './storageBoundary';
 
 export type MethodContext = {
   userId?: string | null;
@@ -53,9 +54,11 @@ export type ProcessPackageUploadDeps = {
     findOneAsync?: (selector: Record<string, unknown>, options?: Record<string, unknown>) => Promise<DynamicAssetLike | null>;
     collection: {
       findOneAsync: (selector: Record<string, unknown>) => Promise<DynamicAssetLike | null>;
+      updateAsync?: (selector: Record<string, unknown>, modifier: Record<string, unknown>) => Promise<unknown>;
     };
     removeAsync?: (selector: Record<string, unknown>) => Promise<unknown>;
   };
+  storageBoundary: ReturnType<typeof createStorageBoundary>;
   userIsInRoleAsync: (userId: string, roles: string[]) => Promise<boolean>;
   normalizeCanonicalId: (value: unknown) => string | null;
   serverConsole: (...args: unknown[]) => void;

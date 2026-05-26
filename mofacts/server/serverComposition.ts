@@ -30,6 +30,8 @@ if (typeof underscoreAny.display !== 'function') {
 }
 import { applyMeteorSettingsWorkaround } from './startup/meteorSettingsWorkaround';
 import { runServerStartup } from './startup/serverStartup';
+import { createStorageBoundary } from './lib/storageBoundary';
+import { createRedisBoundary } from './lib/redisBoundary';
 import { registerServerRuntime } from './runtime/serverRuntime';
 import { getResponseKCAnswerKey } from '../common/lib/responseKCAnswerKey';
 import { computePracticeTimeMs } from '../lib/practiceTime';
@@ -42,6 +44,7 @@ import { createAuthMethods } from './methods/authMethods';
 import { createContentMethods } from './methods/contentMethods';
 import { createCourseMethods } from './methods/courseMethods';
 import { createDashboardCacheMethods } from './methods/dashboardCacheMethods';
+import { createDeploymentReadinessMethods } from './methods/deploymentReadinessMethods';
 import { createExperimentMethods } from './methods/experimentMethods';
 import { createPackageMethods } from './methods/packageMethods';
 import { createSpeechMethods } from './methods/speechMethods';
@@ -204,6 +207,8 @@ const {
 applyMeteorSettingsWorkaround({ serverConsole });
 
 assertRequiredMeteorSettings();
+const storageBoundary = createStorageBoundary(Meteor.settings);
+const redisBoundary = createRedisBoundary(Meteor.settings);
 
 // SECURITY FIX: Removed insecure TLS configuration
 // Setting NODE_TLS_REJECT_UNAUTHORIZED = 0 disables certificate verification
@@ -339,6 +344,7 @@ const packageMethods = createPackageMethods({
   Tdfs,
   DynamicAssets,
   H5PContents,
+  storageBoundary,
   UserUploadQuota,
   AuditLog,
   ownerEmail,
@@ -623,6 +629,7 @@ export const methods: any = {
     getTdfsByFileNameOrId,
     canAccessContentUploadTdf,
     getOrBuildCurrentPackageAsset,
+    storageBoundary,
     parseLocalMediaReference,
     extractSrcFromHtml,
     getStimuliSetIdCandidates,
@@ -858,7 +865,15 @@ export const asyncMethods: Record<string, unknown> = {
     usersCollection: MeteorAny.users,
     serverConsole,
     computePracticeTimeMs,
-    canViewDashboardTdf
+    canViewDashboardTdf,
+    redisBoundary
+  }),
+
+  ...createDeploymentReadinessMethods({
+    Roles,
+    Tdfs,
+    usersCollection: MeteorAny.users,
+    redisBoundary
   }),
 }
 
@@ -867,6 +882,7 @@ Meteor.methods({...methods, ...asyncMethods});
 
 registerServerRuntime({
   DynamicAssets,
+  storageBoundary,
   serverConsole,
 });
 

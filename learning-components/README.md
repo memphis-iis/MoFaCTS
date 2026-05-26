@@ -6,6 +6,13 @@ Current status: contributor-facing source root under active expansion. TypeScrip
 
 Before adding new executable areas here, make sure Meteor/Rspack, Docker, lint, and tests cover the path deliberately so unresolved imports fail clearly.
 
+Current extension boundaries:
+
+- `runtime/ComponentManifest.ts`: learning component manifests with explicit runtime capabilities.
+- `runtime/registerLearningComponents.ts`: shared manifest-list bootstrap and manifest summary helpers.
+- `runtime/TrialDisplayAdapterRegistry.ts`: display-owned trial adapter registry for H5P-style interactions.
+- `units/UnitEngineRegistry.ts`: unit engine registration and creation.
+
 Belongs here:
 
 - Unit engines.

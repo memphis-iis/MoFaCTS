@@ -65,6 +65,8 @@ async function upsertReferencedH5PContent(args: {
           packageHash: parsed.hash,
           contentParams: parsed.contentParams,
           storagePath: parsed.storagePath,
+          storageBackend: parsed.storageBackend,
+          storageKey: parsed.storageKey,
           requiredLibraryFolders: parsed.requiredLibraryFolders,
           bundledLibraryFolders: parsed.bundledLibraryFolders,
           updatedAt: new Date(),

@@ -25,6 +25,10 @@ type DashboardCacheDeps = {
   serverConsole: (...args: any[]) => void;
   computePracticeTimeMs: ComputePracticeTimeMs;
   canViewDashboardTdf: (userId: unknown, tdf: any) => boolean;
+  redisBoundary: {
+    enabled: boolean;
+    withLock: <T>(key: string, ttlMs: number, work: () => Promise<T>) => Promise<T>;
+  };
 };
 
 const DASHBOARD_LEVEL_UNIT_TYPES = ['model', 'schedule', 'autotutor'];
@@ -291,7 +295,8 @@ export function createDashboardCacheMethods({
   usersCollection,
   serverConsole,
   computePracticeTimeMs,
-  canViewDashboardTdf
+  canViewDashboardTdf,
+  redisBoundary
 }: DashboardCacheDeps) {
   async function getConfigurableTdfForUser(userId: string, tdfId: string) {
     const normalizedTdfId = typeof tdfId === 'string' ? tdfId.trim() : '';
@@ -589,6 +594,10 @@ export function createDashboardCacheMethods({
         }
       }
 
+      return await redisBoundary.withLock(
+        `dashboard-cache:initialize:${targetUserId}`,
+        120000,
+        async () => {
       serverConsole(`Initializing dashboard cache for user ${targetUserId}`);
 
       const targetUser = await usersCollection.findOneAsync(
@@ -738,6 +747,8 @@ export function createDashboardCacheMethods({
 
       serverConsole(`Cache initialized for user ${targetUserId}: ${Object.keys(tdfStats).length} TDFs`);
       return { success: true, tdfCount: Object.keys(tdfStats).length };
+        }
+      );
     },
 
     updateDashboardCacheForTdf: async function(this: any, TDFId: string) {
@@ -749,6 +760,10 @@ export function createDashboardCacheMethods({
 
       const userId = this.userId;
       serverConsole(`[Cache] User: ${userId}`);
+      return await redisBoundary.withLock(
+        `dashboard-cache:update:${userId}:${TDFId}`,
+        120000,
+        async () => {
 
       const tdf = await Tdfs.findOneAsync(
         { _id: TDFId },
@@ -863,6 +878,8 @@ export function createDashboardCacheMethods({
 
       serverConsole(`[Cache] Recomputed stats stored for ${rootTdf ? 'root' : 'regular'} TDF ${targetTdfId}`);
       return { success: true, action: 'updated', newRecords: allHistory.length };
+        }
+      );
     },
 
     refreshDashboardCache: async function(this: any) {

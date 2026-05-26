@@ -78,9 +78,9 @@ Rules:
 
 ## AdaptiveKeyword Config Plan
 
-After the app capability exists, update the OneDrive config directory:
+After the app capability exists, update the private configuration/content repository directory:
 
-`C:\Users\ppavl\OneDrive\Active projects\mofacts_config\AdaptiveKeyword_Prolific 1\AdaptiveKeyword`
+`AdaptiveKeyword_Prolific 1/AdaptiveKeyword`
 
 Planned edits:
 

@@ -1022,15 +1022,15 @@ The H5P Tester Items package intentionally answers implementation questions for 
 - Scoring policy is `record-only` for the assessment target.
 - Expected normalization targets are documented in this plan, not in a sidecar stimulus artifact.
 
-Package files:
+Package files in the private configuration/content repository under `H5P Tester Items/`:
 
-- `C:\Users\ppavl\OneDrive\Active projects\mofacts_config\H5P Tester Items\H5P_Tester_Items_TDF.json`
-- `C:\Users\ppavl\OneDrive\Active projects\mofacts_config\H5P Tester Items\H5P_Tester_Items_stims.json`
-- `C:\Users\ppavl\OneDrive\Active projects\mofacts_config\H5P Tester Items\multiple-choice-713.h5p`
-- `C:\Users\ppavl\OneDrive\Active projects\mofacts_config\H5P Tester Items\fill-in-the-blanks-837.h5p`
-- `C:\Users\ppavl\OneDrive\Active projects\mofacts_config\H5P Tester Items\drag-and-drop-712.h5p`
-- `C:\Users\ppavl\OneDrive\Active projects\mofacts_config\H5P Tester Items\drag-the-words-1399.h5p`
-- `C:\Users\ppavl\OneDrive\Active projects\mofacts_config\H5P Tester Items\true-false-question-34806.h5p`
+- `H5P_Tester_Items_TDF.json`
+- `H5P_Tester_Items_stims.json`
+- `multiple-choice-713.h5p`
+- `fill-in-the-blanks-837.h5p`
+- `drag-and-drop-712.h5p`
+- `drag-the-words-1399.h5p`
+- `true-false-question-34806.h5p`
 
 That system is the canonical final-test target, not the Phase 1 external-embed smoke file. It is a five-trial assessment session with self-hosted H5P package files and `h,h` assessment template entries. It covers Multiple Choice, Fill in the Blanks, Drag and Drop Matching, Drag the Words, and True/False Question. It should become runnable once self-hosted H5P package import/playback, event ingestion, explicit H5P assessment-template handling, normalizers, and H5P history emission land.
 

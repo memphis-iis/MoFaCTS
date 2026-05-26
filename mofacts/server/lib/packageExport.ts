@@ -1,4 +1,5 @@
 import { Meteor } from 'meteor/meteor';
+import type { createStorageBoundary } from './storageBoundary';
 
 const fs = require('fs');
 const path = require('path');
@@ -37,7 +38,11 @@ type BuildAndStoreCurrentPackageAssetDeps = {
     writeAsync: (data: Buffer, options: Record<string, unknown>) => Promise<DynamicAssetRef>;
     removeAsync: (selector: Record<string, unknown>) => Promise<unknown>;
     link: (fileRef: Record<string, unknown>) => string | null;
+    collection?: {
+      updateAsync?: (selector: Record<string, unknown>, modifier: Record<string, unknown>) => Promise<unknown>;
+    };
   };
+  storageBoundary: ReturnType<typeof createStorageBoundary>;
   Tdfs: {
     find: (selector: Record<string, unknown>, options?: Record<string, unknown>) => { fetchAsync: () => Promise<any[]> };
     findOneAsync: (selector: Record<string, unknown>, options?: Record<string, unknown>) => Promise<any>;
@@ -625,11 +630,20 @@ async function buildAndStorePreparedPackageAsset(
   }
 
   for (const [zipName, asset] of preparedState.assetsByZipName.entries()) {
-    const assetPath = typeof asset?.path === 'string' ? asset.path : '';
-    if (!assetPath) {
-      throw new Meteor.Error(404, `Media asset is missing a readable path: ${zipName}`);
+    let buffer: Buffer;
+    if (deps.storageBoundary.backend === 's3') {
+      const storageKey = typeof asset?.meta?.storageKey === 'string' ? asset.meta.storageKey.trim() : '';
+      if (asset?.meta?.storageBackend !== 's3' || !storageKey) {
+        throw new Meteor.Error(404, `Media asset is missing S3 storage metadata: ${zipName}`);
+      }
+      buffer = (await deps.storageBoundary.getObject(storageKey)).body;
+    } else {
+      const assetPath = typeof asset?.path === 'string' ? asset.path : '';
+      if (!assetPath) {
+        throw new Meteor.Error(404, `Media asset is missing a readable path: ${zipName}`);
+      }
+      buffer = await fs.promises.readFile(assetPath);
     }
-    const buffer = await fs.promises.readFile(assetPath);
     zip.file(zipName, buffer);
   }
 
@@ -651,6 +665,24 @@ async function buildAndStorePreparedPackageAsset(
   if (!packageAssetId) {
     throw new Meteor.Error(500, 'Package asset id missing after export');
   }
+
+  if (deps.storageBoundary.backend === 's3') {
+    const storageKey = `dynamic-assets/${packageAssetId}/${preparedState.zipFileName}`;
+    await deps.storageBoundary.putObject(storageKey, zipBuffer, 'application/zip');
+    if (!deps.DynamicAssets.collection?.updateAsync) {
+      throw new Meteor.Error(500, 'S3 storage requires DynamicAssets.collection.updateAsync for package export metadata');
+    }
+    await deps.DynamicAssets.collection.updateAsync(
+      { _id: packageAssetId },
+      { $set: { 'meta.storageBackend': 's3', 'meta.storageKey': storageKey } }
+    );
+    fileRef.meta = {
+      ...(fileRef.meta || {}),
+      storageBackend: 's3',
+      storageKey,
+    };
+  }
+
   const packageFile = `${packageAssetId}.${packageExt}`;
 
   if (preparedState.memberIds.length > 0) {

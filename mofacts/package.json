@@ -54,8 +54,10 @@
   },
   "dependencies": {
     "@aws-sdk/client-mturk": "^3.1014.0",
+    "@aws-sdk/client-s3": "^3.1053.0",
     "@babel/runtime": "^7.29.2",
     "@node-saml/node-saml": "^5.1.0",
+    "@smithy/types": "^4.14.2",
     "@swc/helpers": "^0.5.21",
     "connect": "^3.7.0",
     "deep-chat": "^2.4.2",

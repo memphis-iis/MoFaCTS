@@ -1,7 +1,7 @@
 services:
   mofacts:
     container_name: mofacts
-    restart: always
+    restart: unless-stopped
     image: ${DOCKER_REGISTRY:-mofacts-local}/${IMAGE_NAME:-mofacts-mini}:${IMAGE_TAG:-local}
     build:
       context: ../
@@ -30,35 +30,80 @@ services:
         bind:
           create_host_path: true
       - type: bind
-        source: ${METEOR_SETTINGS_HOST_PATH:-./settings.json}
+        source: ${METEOR_SETTINGS_HOST_PATH:?METEOR_SETTINGS_HOST_PATH must point to the private settings file}
         target: /run/mofacts/settings.json
         read_only: true
     ports:
-      - '3000:3000'
+      - '${MOFACTS_HTTP_BIND:-3000}:3000'
     depends_on:
-      - mongodb
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     environment:
-      ROOT_URL: ${ROOT_URL:-https://mofacts.optimallearning.org}
-      MONGO_URL: ${MONGO_URL:-mongodb://mongodb:27017/MoFACT-meteor3}
+      ROOT_URL: ${ROOT_URL:?ROOT_URL is required}
+      MONGO_URL: ${MONGO_URL:?MONGO_URL with MoFaCTS app-user credentials is required}
       EXPECTED_MONGO_DB_NAME: ${EXPECTED_MONGO_DB_NAME:-MoFACT-meteor3}
       PORT: ${PORT:-3000}
-      WAIT_HOSTS: mongodb:27017
+      WAIT_HOSTS: mongodb:27017,redis:6379
       METEOR_SETTINGS_WORKAROUND: /run/mofacts/settings.json
+      MOFACTS_SELF_HOSTED: 'true'
+      MOFACTS_REQUIRE_REDIS: 'true'
+      REDIS_URL: ${REDIS_URL:?REDIS_URL is required}
     networks:
       - mofacts
 
   mongodb:
     image: mongo:8.0
-    restart: always
+    restart: unless-stopped
     command:
       - --storageEngine=wiredTiger
+      - --auth
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:?MONGO_INITDB_ROOT_USERNAME is required}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:?MONGO_INITDB_ROOT_PASSWORD is required}
+      MOFACTS_MONGO_APP_DATABASE: ${MOFACTS_MONGO_APP_DATABASE:-MoFACT-meteor3}
+      MOFACTS_MONGO_APP_USERNAME: ${MOFACTS_MONGO_APP_USERNAME:?MOFACTS_MONGO_APP_USERNAME is required}
+      MOFACTS_MONGO_APP_PASSWORD: ${MOFACTS_MONGO_APP_PASSWORD:?MOFACTS_MONGO_APP_PASSWORD is required}
     volumes:
       - data:/data/db
+      - type: bind
+        source: ./mongo-init
+        target: /docker-entrypoint-initdb.d
+        read_only: true
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --username \"$${MONGO_INITDB_ROOT_USERNAME}\" --password \"$${MONGO_INITDB_ROOT_PASSWORD}\" --authenticationDatabase admin --eval \"db.adminCommand({ ping: 1 }).ok\" | grep 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - mofacts
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
     networks:
       - mofacts
 
 volumes:
   data:
+    driver: local
+  redis-data:
     driver: local
 
 networks:

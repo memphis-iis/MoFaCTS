@@ -4,6 +4,7 @@ const require = createRequire(import.meta.url);
 const { defineConfig } = require("@meteorjs/rspack");
 const sveltePreprocess = require("svelte-preprocess");
 const svelteLoaderPath = require.resolve("./scripts/loaders/svelte-loader-wrapper.cjs");
+const smithyTypesRuntimePath = require.resolve("@smithy/types/dist-cjs/index.js");
 
 function getDevServerAllowedHosts() {
   const configuredHosts = String(process.env.MOFACTS_RSPACK_ALLOWED_HOSTS || "")
@@ -92,6 +93,9 @@ export default defineConfig((Meteor) => {
       extensions: [".mjs", ".ts", ".js", ".svelte", ".json"],
       mainFields: ["svelte", "browser", "module", "main"],
       conditionNames: ["svelte", "..."],
+      alias: {
+        "@smithy/types$": smithyTypesRuntimePath,
+      },
       byDependency: {
         esm: {
           conditionNames: ["svelte", "..."],

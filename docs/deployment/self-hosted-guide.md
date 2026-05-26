@@ -1,0 +1,58 @@
+# Self-Hosted MoFaCTS Guide
+
+Self-Hosted MoFaCTS runs the app, authenticated MongoDB, Redis, local dynamic assets, and H5P storage on one Docker Compose host. Direct HTTP is for local or LAN evaluation. Public deployments should bind the app to localhost and expose HTTPS through a reverse proxy.
+
+## Files
+
+- `deploy/docker-compose.yml`: canonical self-hosted runtime.
+- `deploy/.env.self-hosted.example`: environment template.
+- `deploy/settings.self-hosted.example.json`: private Meteor settings template.
+- `deploy/Caddyfile.self-hosted.example`: HTTPS reverse proxy example.
+- `docs/deployment/settings-inventory.md`: release-readiness classification for settings and environment variables.
+
+## Configure
+
+From `deploy/`, copy the examples to private ignored files:
+
+```bash
+cp .env.self-hosted.example .env.self-hosted
+cp settings.self-hosted.example.json settings.self-hosted.json
+```
+
+Edit both files. Replace every placeholder, especially passwords, `ROOT_URL`, `MAIL_URL`, `owner`, `initRoles.admins`, and `encryptionKey`. `METEOR_SETTINGS_HOST_PATH` must point to the private settings file. The app fails startup when required settings are missing, examples are still present, MongoDB is unauthenticated in the self-hosted path, or Redis is required but unavailable.
+
+`storage.backend` defaults to `local`. To use S3-compatible object storage, set `storage.backend` to `s3` and configure `storage.s3.endpoint`, `bucket`, `region`, `accessKeyId`, and `secretAccessKey`. Optional `storage.s3.prefix` scopes object keys for one MoFaCTS instance, and `storage.s3.forcePathStyle` defaults to `true` for MinIO-style endpoints. Readiness writes and deletes a temporary object, so the configured credentials need object write, read, head, list-prefix, and delete permissions.
+
+## Start
+
+```bash
+cd deploy
+docker compose --env-file .env.self-hosted -f docker-compose.yml config
+docker compose --env-file .env.self-hosted -f docker-compose.yml up -d
+```
+
+After startup, sign up with the email configured as `owner` and included in `initRoles.admins`. The existing login/startup role-assignment flow grants that account the admin role. Then open `/admin/tests` and run Deployment Readiness.
+
+## State
+
+Back up all of these together:
+
+- MongoDB data volume.
+- `.env.self-hosted` and private settings JSON.
+- Dynamic assets mounted at `/dynamic-assets`.
+- H5P content mounted at `/h5p-content`.
+- H5P libraries mounted at `/h5p-libraries`.
+- SAML/OAuth certificate or key material when configured.
+
+When `storage.backend` is `s3`, object storage replaces the local dynamic asset, H5P content, and H5P library state for new uploads. Back up the bucket or bucket prefix with MongoDB and configuration. Do not switch an existing local-storage install to S3 until existing DynamicAssets and H5P content records have S3 metadata or have been re-imported.
+
+Redis is required for the completed open-core runtime, but current Redis dashboard-cache lock state is reconstructable from MongoDB and does not need restore.
+
+## Smoke Test
+
+1. Run readiness checks from `/admin/tests`.
+2. Create or sign in as the configured owner/admin.
+3. Upload or enable the public world countries system.
+4. Launch one learner flow.
+5. Confirm dynamic assets load.
+6. Run a backup before any upgrade.
