@@ -79,6 +79,7 @@ Make a new in-repo component feel like a small package:
    Learning-session model preparation now resolves assessment-vs-learning cluster-list source through the learning-session runtime-config owner instead of branching directly on authored session shapes.
    The Svelte card tester now uses the shared `resolveUnitEngineTypeForUnit` compatibility boundary instead of maintaining a local authored-shape unit-type resolver.
    Svelte machine prepared-advance eligibility now names the model/schedule engine policy before composing it with video-surface and resume guards.
+   Multi-TDF launch lock behavior now resolves through a shared launch policy helper, so dashboard and direct launch paths no longer duplicate authored-shape unit-type detection.
 
 ## Pause/Resume Checkpoint
 

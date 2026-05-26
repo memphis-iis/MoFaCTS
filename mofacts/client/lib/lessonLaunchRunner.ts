@@ -1,6 +1,5 @@
 import { Meteor } from 'meteor/meteor';
 import { Session } from 'meteor/session';
-import { MODEL_UNIT, SCHEDULE_UNIT, VIDEO_UNIT } from '../../common/Definitions';
 import { getExperimentState } from '../views/experiment/svelte/services/experimentState';
 import {
   CARD_ENTRY_INTENT,
@@ -9,6 +8,7 @@ import {
 } from './cardEntryIntent';
 import { clientConsole } from './clientLogger';
 import { prepareLessonLaunchContext } from './lessonLaunchInitializer';
+import { shouldLockMultiTdfLaunchToCurrentUnit } from './lessonLaunchLockPolicy';
 import { sessionCleanUp } from './sessionUtils';
 import {
   getAudioPromptFeedbackView,
@@ -34,19 +34,6 @@ const { FlowRouter } = require('meteor/ostrio:flow-router-extra');
 
 type SetSpecLike = Record<string, any>;
 
-function getUnitType(curUnit: any) {
-  if (curUnit?.assessmentsession) {
-    return SCHEDULE_UNIT;
-  }
-  if (curUnit?.videosession) {
-    return VIDEO_UNIT;
-  }
-  if (curUnit?.learningsession) {
-    return MODEL_UNIT;
-  }
-  return 'other';
-}
-
 async function navigateForMultiTdf(entryIntent: CardEntryIntent = CARD_ENTRY_INTENT.INITIAL_TDF_ENTRY) {
   const experimentState: any = await getExperimentState();
   const lastUnitCompleted = experimentState.lastUnitCompleted || -1;
@@ -58,20 +45,7 @@ async function navigateForMultiTdf(entryIntent: CardEntryIntent = CARD_ENTRY_INT
   if (currentUnitNumber > lastUnitCompleted) {
     const unitList = Session.get('currentTdfFile')?.tdfs?.tutor?.unit;
     const curUnit = Array.isArray(unitList) ? unitList[currentUnitNumber] : null;
-    const curUnitType = getUnitType(curUnit);
-    if (curUnitType === SCHEDULE_UNIT) {
-      unitLocked = true;
-    } else if (curUnitType === MODEL_UNIT || curUnitType === VIDEO_UNIT) {
-      const deliverySettings = curUnit?.deliverySettings || {};
-      if (
-        !!deliverySettings.displayMinSeconds ||
-        !!deliverySettings.displayMaxSeconds ||
-        !!curUnit.displayMinSeconds ||
-        !!curUnit.displayMaxSeconds
-      ) {
-        unitLocked = true;
-      }
-    }
+    unitLocked = shouldLockMultiTdfLaunchToCurrentUnit(curUnit);
   }
 
   if (unitLocked) {

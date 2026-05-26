@@ -3,7 +3,6 @@ import { Tracker } from 'meteor/tracker';
 import './learningDashboard.html';
 import './learningDashboard.css';
 import {getExperimentState} from '../experiment/svelte/services/experimentState';
-import {MODEL_UNIT, SCHEDULE_UNIT, VIDEO_UNIT} from '../../../common/Definitions';
 import {meteorCallAsync, clientConsole} from '../..';
 /** @typedef {import('../../../server/methods/dashboardCacheMethods.contracts').InitializeDashboardCacheResult} InitializeDashboardCacheResult */
 import {sessionCleanUp} from '../../lib/sessionUtils';
@@ -23,6 +22,7 @@ import {
 } from '../../lib/state/audioState';
 import { getAudioLaunchPreparationPlan, prepareAudioForLaunchIfNeeded } from '../../lib/audioStartup';
 import { unlockAppleMobileAudioForUserGesture } from '../../lib/audioUnlock';
+import { shouldLockMultiTdfLaunchToCurrentUnit } from '../../lib/lessonLaunchLockPolicy';
 import { CARD_ENTRY_INTENT, setCardEntryIntent, type CardEntryIntent } from '../../lib/cardEntryIntent';
 import { normalizeTutorUnits } from '../../lib/tdfUtils';
 import { prepareLessonLaunchContext } from '../../lib/lessonLaunchInitializer';
@@ -1587,18 +1587,6 @@ async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId
 }
 
 async function navigateForMultiTdf(entryIntent: CardEntryIntent = CARD_ENTRY_INTENT.INITIAL_TDF_ENTRY) {
-  function getUnitType(curUnit: any) {
-    let unitType = 'other';
-    if (curUnit.assessmentsession) {
-      unitType = SCHEDULE_UNIT;
-    } else if (curUnit.videosession) {
-      unitType = VIDEO_UNIT;
-    } else if (curUnit.learningsession) {
-      unitType = MODEL_UNIT;
-    }
-    return unitType;
-  }
-
   setLaunchLoadingMessage('Restoring progress...');
   markLaunchLoadingTiming('getExperimentState:start', { source: 'navigateForMultiTdf' });
   const experimentState: any = await getExperimentState();
@@ -1614,21 +1602,7 @@ async function navigateForMultiTdf(entryIntent: CardEntryIntent = CARD_ENTRY_INT
   if (currentUnitNumber > lastUnitCompleted) {
     const unitList = Session.get('currentTdfFile')?.tdfs?.tutor?.unit;
     const curUnit = Array.isArray(unitList) ? unitList[currentUnitNumber] : null;
-    const curUnitType = getUnitType(curUnit);
-    // We always want to lock users in to an assessment session
-    if (curUnitType === SCHEDULE_UNIT) {
-      unitLocked = true;
-    } else if (curUnitType === MODEL_UNIT || curUnitType === VIDEO_UNIT) {
-      const deliverySettings = curUnit?.deliverySettings || {};
-      if (
-        !!deliverySettings.displayMinSeconds ||
-        !!deliverySettings.displayMaxSeconds ||
-        !!curUnit.displayMinSeconds ||
-        !!curUnit.displayMaxSeconds
-      ) {
-        unitLocked = true;
-      }
-    }
+    unitLocked = shouldLockMultiTdfLaunchToCurrentUnit(curUnit);
   }
   // Only show selection if we're in a unit where it doesn't matter (infinite learning sessions)
   if (unitLocked) {
