@@ -24,6 +24,7 @@ This audit records the current extension-boundary readiness checkpoint for AutoT
 - AutoTutor client runtime now routes state publication, config/session reads, stimulus lookup, resume-history loading, user/session metadata reads, and typed history-turn writes through an app-owned capability adapter.
 - H5P trial-display ownership is documented beside the H5P component package.
 - H5P result normalization for card submission and history now routes through the registered trial-display adapter via one client service helper.
+- H5P owned-interaction decisions for Svelte trial content, card response visibility, feedback suppression, and history now route through the H5P trial-display service instead of page-level direct display-shape checks.
 - A test-only sample echo unit package demonstrates the expected component package shape.
 - `learning-components/README.md` now includes the component package checklist for adding the next unit or trial-display package through manifest, catalog, and explicit capability boundaries.
 - `docs-developer/modularity-start-plan.md` defines the short next-step plan.
@@ -60,6 +61,7 @@ This audit records the current extension-boundary readiness checkpoint for AutoT
 - `mofacts/common/autoTutorSavedState.test.ts`
 - `mofacts/client/views/experiment/engineConstructors.contracts.test.ts`
 - `mofacts/client/views/experiment/svelte/services/h5pTrialDisplay.test.ts`
+- `mofacts/client/views/experiment/svelte/services/h5pTrialDisplay.ts`
 - `mofacts/client/views/experiment/svelte/services/autoTutorClient.ts`
 - `learning-components/trial-displays/h5p/README.md`
 - `learning-components/README.md`
@@ -67,4 +69,4 @@ This audit records the current extension-boundary readiness checkpoint for AutoT
 
 ## Next Safe Step
 
-Next, continue reducing direct component branches in the Svelte trial surfaces so H5P/AutoTutor rendering ownership can move through component adapters instead of page-level conditionals.
+Next, continue reducing direct component branches at larger session boundaries, especially the AutoTutor/video/card-mode split in `CardScreen.svelte`, so unit/session rendering ownership can move behind explicit component adapters without changing runtime behavior.

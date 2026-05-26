@@ -8,7 +8,7 @@ import { Session } from 'meteor/session';
 import { TRIAL_TYPES, SUPPORTED_TRIAL_TYPES, THRESHOLDS, ERROR_SEVERITY_MAP, ERROR_SEVERITY } from './constants';
 import { getFeedbackTimeoutMs } from '../utils/timeoutUtils';
 import { evaluateSrAvailability } from '../../../../lib/audioAvailability';
-import { isSelfHostedH5PDisplay } from '../../../../../common/lib/h5pDisplay';
+import { selfHostedH5PTrialDisplayOwnsInteraction } from '../services/h5pTrialDisplay';
 
 type FeedbackTimeoutContext = Parameters<typeof getFeedbackTimeoutMs>[0];
 type PreparedAdvanceMode = 'none' | 'seamless' | 'direct';
@@ -323,7 +323,7 @@ export function feedbackReadyWithoutTts(args: CardMachineActorArgs): boolean {
  * @returns {boolean}
  */
 export function needsFeedback(args: CardMachineActorArgs): boolean {
-  if (isSelfHostedH5PDisplay(args.context.currentDisplay)) {
+  if (selfHostedH5PTrialDisplayOwnsInteraction(args.context.currentDisplay)) {
     return false;
   }
 

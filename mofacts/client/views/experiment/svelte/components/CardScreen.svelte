@@ -55,8 +55,10 @@
   import { deriveSrStatus } from '../utils/srStatus';
   import { getMainTimeoutMs, getFeedbackTimeoutMs } from '../utils/timeoutUtils';
   import { recordCurrentInstructionContinue } from '../../instructions';
-  import { isSelfHostedH5PDisplay } from '../../../../../common/lib/h5pDisplay';
-  import { resolveH5PTrialDisplayResult } from '../services/h5pTrialDisplay';
+  import {
+    resolveH5PTrialDisplayResult,
+    selfHostedH5PTrialDisplayOwnsInteraction,
+  } from '../services/h5pTrialDisplay';
   import { buildLearningProgressPanelSnapshot } from '../services/learningProgressPanel';
   import { CardStore } from '../../modules/cardStore';
   import LearningProgressPanel from './LearningProgressPanel.svelte';
@@ -448,7 +450,7 @@
   });
   $: baseDisplayVisible = baseTrialSubsetKind !== 'none';
   $: baseFeedbackVisible = baseTrialSubsetKind === 'feedback' || baseTrialSubsetKind === 'study';
-  $: h5pOwnsResponse = isSelfHostedH5PDisplay(context.currentDisplay) && baseTrialSubsetKind === 'question';
+  $: h5pOwnsResponse = selfHostedH5PTrialDisplayOwnsInteraction(context.currentDisplay) && baseTrialSubsetKind === 'question';
   $: baseResponseVisible = !h5pOwnsResponse && (baseTrialSubsetKind === 'question' || baseTrialSubsetKind === 'forceCorrect');
   $: if (baseTrialSubsetKind !== 'question') {
     submittedH5PResultKey = '';

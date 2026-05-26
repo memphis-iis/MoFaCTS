@@ -1,6 +1,8 @@
-import { isSelfHostedH5PDisplay } from '../../../../../common/lib/h5pDisplay';
 import type { H5PTrialResult, HistoryRecord } from '../../../../../common/types';
-import { resolveH5PTrialDisplayResult } from './h5pTrialDisplay';
+import {
+  resolveH5PTrialDisplayResult,
+  selfHostedH5PTrialDisplayOwnsInteraction,
+} from './h5pTrialDisplay';
 
 type InsertHistoryRecord = (answerLogRecord: HistoryRecord) => Promise<void>;
 
@@ -8,7 +10,7 @@ export function resolveH5PResultForHistory(
   display: Record<string, unknown> | undefined,
   result: H5PTrialResult | null | undefined
 ): H5PTrialResult | null {
-  if (!isSelfHostedH5PDisplay(display)) {
+  if (!selfHostedH5PTrialDisplayOwnsInteraction(display)) {
     return null;
   }
 

@@ -3,13 +3,43 @@ import { H5P_TRIAL_DISPLAY_TYPE } from '../../../../../common/h5pTrialDisplayAda
 import { isSelfHostedH5PDisplay } from '../../../../../common/lib/h5pDisplay';
 import type { H5PTrialResult } from '../../../../../common/types';
 import { getTrialDisplayAdapter } from '../../../../../../learning-components/runtime/TrialDisplayAdapterRegistry';
+import type { H5PTrialDisplay } from '../../../../../../learning-components/trial-displays/h5p/H5PTrialDisplayAdapter';
+
+function getH5PTrialDisplayAdapter() {
+  registerDefaultTrialDisplayComponents();
+  return getTrialDisplayAdapter(H5P_TRIAL_DISPLAY_TYPE);
+}
+
+export function resolveSelfHostedH5PTrialDisplay(
+  display: Record<string, unknown> | undefined,
+  source: string,
+): H5PTrialDisplay | null {
+  if (!isSelfHostedH5PDisplay(display)) {
+    return null;
+  }
+
+  const adapter = getH5PTrialDisplayAdapter();
+  try {
+    return adapter.normalizeDisplay(display) as H5PTrialDisplay;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`${source} H5P trial display invalid: ${message}`);
+  }
+}
+
+export function selfHostedH5PTrialDisplayOwnsInteraction(
+  display: Record<string, unknown> | undefined,
+): boolean {
+  return resolveSelfHostedH5PTrialDisplay(display, '[H5P Trial Display]') !== null;
+}
 
 export function resolveH5PTrialDisplayResult(
   display: Record<string, unknown> | undefined,
   result: unknown,
   source: string,
 ): H5PTrialResult | null {
-  if (!isSelfHostedH5PDisplay(display)) {
+  const normalizedDisplay = resolveSelfHostedH5PTrialDisplay(display, source);
+  if (!normalizedDisplay) {
     return null;
   }
 
@@ -17,9 +47,7 @@ export function resolveH5PTrialDisplayResult(
     throw new Error(`${source} H5P result missing`);
   }
 
-  registerDefaultTrialDisplayComponents();
-  const adapter = getTrialDisplayAdapter(H5P_TRIAL_DISPLAY_TYPE);
-  const normalizedDisplay = adapter.normalizeDisplay(display);
+  const adapter = getH5PTrialDisplayAdapter();
   if (typeof adapter.normalizeResult !== 'function') {
     throw new Error(`${source} H5P trial display adapter cannot normalize results`);
   }

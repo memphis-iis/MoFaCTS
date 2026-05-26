@@ -8,7 +8,7 @@
   import StimulusDisplay from './StimulusDisplay.svelte';
   import H5PTrialSurface from './H5PTrialSurface.svelte';
   import TrialInteractionPane from './TrialInteractionPane.svelte';
-  import { isSelfHostedH5PDisplay } from '../../../../../common/lib/h5pDisplay';
+  import { resolveSelfHostedH5PTrialDisplay } from '../services/h5pTrialDisplay';
   import { clientConsole } from '../../../../lib/clientLogger';
   import { waitForBrowserPaint } from '../utils/paintTiming';
 
@@ -144,7 +144,8 @@
   $: isOverUnder = !isSplitLayout;
   $: isImageStimulus = Boolean(display?.imgSrc || display?.videoSrc);
   $: isH5PStimulus = Boolean(display?.h5p);
-  $: h5pOwnsInteraction = isSelfHostedH5PDisplay(display);
+  $: selfHostedH5PTrialDisplay = resolveSelfHostedH5PTrialDisplay(display, '[TrialContent]');
+  $: h5pOwnsInteraction = Boolean(selfHostedH5PTrialDisplay);
   $: useH5POwnedSurface = h5pOwnsInteraction && displayVisible;
   $: requestedInteractionKind = feedbackVisible ? 'feedback' : (responseVisible ? 'response' : 'none');
 
@@ -309,7 +310,7 @@
     <div class="h5p-owned-main">
       <div class="h5p-owned-surface">
         <H5PTrialSurface
-          config={display.h5p}
+          config={selfHostedH5PTrialDisplay.h5p}
           {showQuestionNumber}
           {questionNumber}
           on:h5presult={handleH5PResult}
