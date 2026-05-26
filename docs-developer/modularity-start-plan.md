@@ -60,6 +60,7 @@ Make a new in-repo component feel like a small package:
    Card payload delivery settings now preserve active video-session fields through a tested helper that resolves video mode via `sessionSurfaceMode.ts`.
    Unit-engine prepared-advance eligibility, video checkpoint index selection, and post-answer engine-index mirroring now resolve active video surface state through `sessionSurfaceMode.ts`.
    Resume video-session detection and preload source resolution now live in `videoResume.ts`, with resume orchestration calling that tested boundary instead of branching directly on `videosession`.
+   Legacy instructions continue now uses the shared `resolveUnitEngineTypeForUnit` unit-shape resolver instead of branching directly on session fields to identify instruction-only units.
 
 ## Pause/Resume Checkpoint
 

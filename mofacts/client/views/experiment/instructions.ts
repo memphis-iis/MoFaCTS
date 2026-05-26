@@ -15,6 +15,7 @@ import { CardStore } from './modules/cardStore';
 import { resolveDynamicAssetPath } from './svelte/services/mediaResolver';
 import { assertIdInvariants, logIdInvariantBreachOnce } from '../../lib/idContext';
 import { CARD_ENTRY_INTENT, setCardEntryIntent } from '../../lib/cardEntryIntent';
+import { resolveUnitEngineTypeForUnit } from './engineConstructors';
 import {
   finishLaunchLoading,
   isLaunchLoadingActive,
@@ -506,11 +507,8 @@ async function instructContinue() {
       Session.set('currentTdfUnit', curUnit);
     }
 
-    // Check if this is an instruction-only unit (has instructions but no session)
-    const isInstructionOnly = !curUnit.assessmentsession &&
-      !curUnit.learningsession &&
-      !curUnit.videosession &&
-      !curUnit.autotutorsession;
+    const unitType = resolveUnitEngineTypeForUnit(curUnit, 'instructions.instructContinue');
+    const isInstructionOnly = unitType === 'instruction-only';
     const nextUnitNumber = currentUnitNumber + 1;
     Session.set('instructionClientStart', 0);
 
