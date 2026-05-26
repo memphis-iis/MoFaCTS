@@ -46,6 +46,12 @@ import {
 import {
   AUTO_TUTOR_SCORING_TEMPERATURE,
 } from '../../../../../../learning-components/units/autotutor/AutoTutorGenerationConfig';
+import {
+  readAutoTutorHistoryNote,
+  validateAutoTutorSavedEndState,
+  type AutoTutorHistoryNote,
+  type AutoTutorHistoryRow,
+} from '../../../../../../learning-components/units/autotutor/AutoTutorSavedHistory';
 
 const OPEN_ROUTER_CHAT_COMPLETIONS_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const AUTO_TUTOR_COST_CAP_USD = 0.20;
@@ -100,27 +106,7 @@ export type AutoTutorRuntime = {
   }>;
 };
 
-type AutoTutorHistoryNote = {
-  kind: 'autotutor';
-  model: string;
-  scriptId: string;
-  state: ReturnType<typeof summarizeState>;
-  progress: number;
-  completed: boolean;
-  mastered: boolean;
-  endReason: AutoTutorEndReason;
-  stoppedByCost: boolean;
-  tutorMessage: string;
-};
-
-type AutoTutorHistoryRow = {
-  time?: number;
-  problemStartTime?: number;
-  input?: string;
-  responseValue?: string;
-  feedbackText?: string;
-  CFNote?: string;
-};
+type AutoTutorSavedHistoryNote = AutoTutorHistoryNote<ReturnType<typeof summarizeState>>;
 
 function createMeteorAutoTutorRuntimeCapabilities(): AutoTutorRuntimeCapabilities {
   const capabilities: AutoTutorRuntimeCapabilities = {
@@ -552,9 +538,9 @@ function validateSavedPlannerState(value: unknown, expectedState: AutoTutorState
 }
 
 function validateSavedState(
-  state: AutoTutorHistoryNote['state'],
+  state: AutoTutorSavedHistoryNote['state'],
   expectedState: AutoTutorState,
-): AutoTutorHistoryNote['state'] {
+): AutoTutorSavedHistoryNote['state'] {
   const answerQuality = state.answerQuality;
   if (!['low', 'partial', 'high', 'none'].includes(answerQuality)) {
     throw new Error('AutoTutor saved history state.answerQuality is invalid');
@@ -741,34 +727,6 @@ function publishState(capabilities: AutoTutorRuntimeCapabilities, state: AutoTut
   });
 }
 
-function readHistoryNote(row: AutoTutorHistoryRow): AutoTutorHistoryNote {
-  if (typeof row.CFNote !== 'string' || !row.CFNote.trim()) {
-    throw new Error('AutoTutor history row is missing CFNote');
-  }
-  let note: unknown;
-  try {
-    note = JSON.parse(row.CFNote);
-  } catch {
-    throw new Error('AutoTutor history row CFNote is not valid JSON');
-  }
-  if (!isRecord(note) || note.kind !== 'autotutor' || !isRecord(note.state)) {
-    throw new Error('AutoTutor history row CFNote has an invalid AutoTutor payload');
-  }
-  if ('schemaVersion' in note) {
-    throw new Error('AutoTutor history row CFNote must not include schemaVersion');
-  }
-  return note as AutoTutorHistoryNote;
-}
-
-function validateSavedEndState(note: AutoTutorHistoryNote): void {
-  if (typeof note.completed !== 'boolean' || typeof note.stoppedByCost !== 'boolean') {
-    throw new Error('AutoTutor saved history completion flags must be boolean');
-  }
-  if (typeof note.mastered !== 'boolean' || !isAutoTutorEndReason(note.endReason)) {
-    throw new Error('AutoTutor saved history mastery flags must be present and valid');
-  }
-}
-
 function applySavedHistory(config: AutoTutorConfig, state: AutoTutorState, rows: AutoTutorHistoryRow[]): void {
   if (rows.length === 0) {
     return;
@@ -790,11 +748,11 @@ function applySavedHistory(config: AutoTutorConfig, state: AutoTutorState, rows:
   if (!latestRow) {
     throw new Error('AutoTutor history resume expected at least one row');
   }
-  const latest = readHistoryNote(latestRow);
+  const latest = readAutoTutorHistoryNote<ReturnType<typeof summarizeState>>(latestRow);
   if (latest.scriptId !== config.script.id) {
     throw new Error(`AutoTutor saved history scriptId "${latest.scriptId}" does not match current script "${config.script.id}"`);
   }
-  validateSavedEndState(latest);
+  validateAutoTutorSavedEndState(latest);
   const savedState = validateSavedState(latest.state, state);
   if (
     latest.completed !== savedState.completed ||
@@ -831,7 +789,7 @@ async function loadSavedAutoTutorHistory(capabilities: AutoTutorRuntimeCapabilit
   ) as AutoTutorHistoryRow[];
 }
 
-function buildHistoryNote(config: AutoTutorConfig, state: AutoTutorState, tutorMessage: string): AutoTutorHistoryNote {
+function buildHistoryNote(config: AutoTutorConfig, state: AutoTutorState, tutorMessage: string): AutoTutorSavedHistoryNote {
   return {
     kind: 'autotutor',
     model: config.model,

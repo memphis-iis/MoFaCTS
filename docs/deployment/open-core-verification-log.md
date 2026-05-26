@@ -182,3 +182,22 @@ Modularity evidence added:
 - `learning-components/units/autotutor/AutoTutorRuntimeConfig.ts` now owns AutoTutor authored session config interpretation, script cloning, required-expectation lookup, and graduation/script-bound validation.
 - `mofacts/client/views/experiment/svelte/services/autoTutorClient.ts` now consumes that package-owned config reader through explicit `AutoTutorRuntimeCapabilities`; `createAutoTutorRuntime` also accepts injected capabilities for future tests/package construction.
 - `mofacts/common/autoTutorRuntimeConfig.test.ts` covers capability-based config reading, script cloning, and fail-clear graduation validation.
+
+## 2026-05-26 AutoTutor Saved History Boundary Pass
+
+Completed:
+
+- `npm run typecheck`
+  - Result: passed.
+- `npm run lint`
+  - Result: passed.
+- `node scripts/release/open-core-readiness-scan.cjs`
+  - Result: passed.
+- `http://localhost:3200`
+  - Result: loaded through Playwright MCP with page title `MoFaCTS` and visible `License / Source` link.
+
+Modularity evidence added:
+
+- `learning-components/units/autotutor/AutoTutorSavedHistory.ts` now owns AutoTutor saved-history row/note parsing and saved completion/end-state validation.
+- `mofacts/client/views/experiment/svelte/services/autoTutorClient.ts` now delegates CFNote parsing and saved end-state checks to the AutoTutor component package.
+- `mofacts/common/autoTutorSavedHistory.test.ts` covers valid notes and fail-clear rejection of missing, malformed, legacy-versioned, non-AutoTutor, and invalid-end-reason notes.

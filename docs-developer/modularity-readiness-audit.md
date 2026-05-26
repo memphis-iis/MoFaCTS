@@ -18,6 +18,7 @@ This audit records the current extension-boundary readiness checkpoint for AutoT
 - AutoTutor completion semantics are now package-owned in `AutoTutorEndState.ts`, including the explicit `mastery`, `max_turns`, and `cost_cap` end reasons used by history logging.
 - AutoTutor generation configuration now has a package-owned boundary in `AutoTutorGenerationConfig.ts`, including fixed scoring temperature, default tutor-utterance temperature, and fail-clear authored temperature validation.
 - AutoTutor authored runtime configuration now has a package-owned boundary in `AutoTutorRuntimeConfig.ts`, so the Meteor client supplies capabilities while the component owns session config interpretation and script/graduation checks.
+- AutoTutor saved-history row/note parsing now has a package-owned boundary in `AutoTutorSavedHistory.ts`, keeping CFNote shape and saved end-state validation out of Meteor client glue.
 - AutoTutor client runtime now routes state publication, config/session reads, stimulus lookup, resume-history loading, user/session metadata reads, and typed history-turn writes through an app-owned capability adapter.
 - H5P trial-display ownership is documented beside the H5P component package.
 - A test-only sample echo unit package demonstrates the expected component package shape.
@@ -46,10 +47,12 @@ This audit records the current extension-boundary readiness checkpoint for AutoT
 - `learning-components/units/autotutor/AutoTutorEndState.ts`
 - `learning-components/units/autotutor/AutoTutorGenerationConfig.ts`
 - `learning-components/units/autotutor/AutoTutorRuntimeConfig.ts`
+- `learning-components/units/autotutor/AutoTutorSavedHistory.ts`
 - `learning-components/units/autotutor/README.md`
 - `mofacts/common/autoTutorEndState.test.ts`
 - `mofacts/common/autoTutorGenerationConfig.test.ts`
 - `mofacts/common/autoTutorRuntimeConfig.test.ts`
+- `mofacts/common/autoTutorSavedHistory.test.ts`
 - `mofacts/client/views/experiment/svelte/services/autoTutorClient.ts`
 - `learning-components/trial-displays/h5p/README.md`
 - `learning-components/README.md`
