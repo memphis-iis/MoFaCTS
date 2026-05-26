@@ -76,6 +76,7 @@ Make a new in-repo component feel like a small package:
    Svelte launch engine reuse/reinitialization now resolves through a tested app launch policy helper, keeping unit-type/context comparison out of the bootstrap orchestration.
    Legacy instruction continue now resolves instruction-only advance/dashboard behavior through a tested policy helper, leaving the template flow to apply the route/session/state decision.
    Adaptive assessment template cluster-list mutation now lives behind `assessmentAdaptiveSchedule.ts`, mirroring the video-owned adaptive schedule helper and keeping authored `assessmentsession` writes out of `AdaptiveQuestionLogic`.
+   Learning-session model preparation now resolves assessment-vs-learning cluster-list source through the learning-session runtime-config owner instead of branching directly on authored session shapes.
 
 ## Pause/Resume Checkpoint
 

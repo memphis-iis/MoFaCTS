@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   resolveLearningSessionClusterListSource,
+  resolveLearningSessionModelPreparationClusterListSource,
   resolveLearningSessionProbabilitySource,
   resolveLearningSessionRuntimeConfig,
   resolveLearningSessionUnitMode,
@@ -50,5 +51,18 @@ describe('learning session runtime config', function() {
     assert.equal(resolveLearningSessionClusterListSource(unit, false), '1 2 3');
     assert.deepEqual(resolveLearningSessionClusterListSource(unit, true), [4, 5]);
     assert.equal(resolveLearningSessionClusterListSource({}, false), undefined);
+  });
+
+  it('resolves model-preparation cluster-list source from assessment before learning content', function() {
+    assert.equal(resolveLearningSessionModelPreparationClusterListSource({
+      assessmentsession: { clusterlist: '4 5' },
+      learningsession: { clusterlist: '1 2 3' },
+    }), '4 5');
+
+    assert.equal(resolveLearningSessionModelPreparationClusterListSource({
+      learningsession: { clusterlist: '1 2 3' },
+    }), '1 2 3');
+
+    assert.equal(resolveLearningSessionModelPreparationClusterListSource({}), undefined);
   });
 });

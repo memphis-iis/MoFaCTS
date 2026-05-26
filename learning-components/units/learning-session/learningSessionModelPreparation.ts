@@ -5,7 +5,10 @@ import {
   resolveModelClusterList,
 } from '../../content/tdf/clusterListParser';
 import { calculateCardProbabilities as runCalculateCardProbabilities } from './model/probabilityCalculation';
-import { resolveLearningSessionClusterListSource } from './learningSessionRuntimeConfig';
+import {
+  resolveLearningSessionClusterListSource,
+  resolveLearningSessionModelPreparationClusterListSource,
+} from './learningSessionRuntimeConfig';
 
 export interface LearningSessionModelPreparationDeps {
   readonly getSessionValue: (key: string) => any;
@@ -27,10 +30,9 @@ export function calculateLearningSessionCardProbabilities(params: {
 }) {
   const unitNumber = params.deps.getSessionValue('currentUnitNumber');
   const curTdf = params.deps.findTdfById(params.deps.getSessionValue('currentTdfId'));
-  const unitTypeParams = curTdf.content.tdfs.tutor.unit[unitNumber].assessmentsession
-    || curTdf.content.tdfs.tutor.unit[unitNumber].learningsession;
-  let clusterList;
-  unitTypeParams ? clusterList = unitTypeParams.clusterlist : clusterList = false;
+  const clusterList = resolveLearningSessionModelPreparationClusterListSource(
+    curTdf.content.tdfs.tutor.unit[unitNumber],
+  );
   if (!clusterList) {
     params.deps.log(2, 'no clusterlist found for unit ' + unitNumber);
   }

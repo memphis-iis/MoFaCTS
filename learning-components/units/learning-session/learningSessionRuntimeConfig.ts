@@ -1,4 +1,5 @@
 type LearningSessionConfigUnit = {
+  assessmentsession?: Record<string, unknown> | null;
   learningsession?: Record<string, unknown> | null;
   videosession?: Record<string, unknown> | null;
 };
@@ -48,4 +49,15 @@ export function resolveLearningSessionClusterListSource(
   return typeof clusterlist === 'string'
     ? clusterlist.trim()
     : clusterlist;
+}
+
+export function resolveLearningSessionModelPreparationClusterListSource(
+  unit: LearningSessionConfigUnit | null | undefined,
+): unknown {
+  const assessmentClusterList = unit?.assessmentsession?.clusterlist;
+  if (assessmentClusterList) {
+    return assessmentClusterList;
+  }
+
+  return unit?.learningsession?.clusterlist;
 }
