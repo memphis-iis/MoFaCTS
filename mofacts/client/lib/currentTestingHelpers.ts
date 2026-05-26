@@ -12,6 +12,7 @@ import { createStimClusterMapping as createStimClusterMappingCore } from './clus
 import { normalizeThemePropertyValue } from '../../common/themePropertyNormalization';
 import { resolveThemeBrandLabel } from '../../common/themeBranding';
 import { legacyInt, legacyTrim } from '../../common/underscoreCompat';
+import { resolveLearningSessionClusterListSource } from '../../../learning-components/units/learning-session/learningSessionRuntimeConfig';
 
 type IntValFn = (src: unknown, defaultVal?: unknown) => number;
 const _ = underscore as typeof underscore & { intval?: IntValFn };
@@ -492,12 +493,13 @@ function getDashboardCacheTotalTimeMs(tdfId: string | null | undefined) {
 function getCurrentUnitStimulusCount(): number {
   const currentUnit = Session.get('currentTdfUnit');
   const currentStimuliSet = Session.get('currentStimuliSet');
-  if (!currentUnit?.learningsession?.clusterlist || !Array.isArray(currentStimuliSet)) {
+  const clusterListSource = resolveLearningSessionClusterListSource(currentUnit, false);
+  if (!clusterListSource || !Array.isArray(currentStimuliSet)) {
     return 0;
   }
 
   const clusterFields: string[] = [];
-  extractDelimFields(currentUnit.learningsession.clusterlist, clusterFields);
+  extractDelimFields(clusterListSource, clusterFields);
 
   const activeClusterIndexes = new Set<number>();
   for (const field of clusterFields) {
