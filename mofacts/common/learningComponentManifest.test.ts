@@ -78,6 +78,52 @@ describe('Learning component manifests', function() {
     })).to.throw('display type must be a non-empty string');
   });
 
+  it('rejects ambiguous kind-specific declarations', function() {
+    expect(() => validateLearningComponentManifest({
+      id: 'sample.unit',
+      kind: 'unit',
+      unitTypes: ['sample'],
+      displayTypes: ['sample-display'],
+      requiredCapabilities: [],
+      register() {},
+    })).to.throw('Learning component "sample.unit" is a unit component and must not declare display types');
+
+    expect(() => validateLearningComponentManifest({
+      id: 'sample.display',
+      kind: 'trial-display',
+      unitTypes: ['sample'],
+      displayTypes: ['sample-display'],
+      requiredCapabilities: [],
+      register() {},
+    })).to.throw('Learning component "sample.display" is a trial-display component and must not declare unit types');
+  });
+
+  it('requires valid declared capabilities even for loosely typed manifests', function() {
+    expect(() => validateLearningComponentManifest({
+      id: 'sample.capabilities',
+      kind: 'unit',
+      unitTypes: ['sample'],
+      requiredCapabilities: undefined as unknown as LearningComponentCapability[],
+      register() {},
+    })).to.throw('Learning component "sample.capabilities" must declare requiredCapabilities as an array');
+
+    expect(() => validateLearningComponentManifest({
+      id: 'sample.capabilities',
+      kind: 'unit',
+      unitTypes: ['sample'],
+      requiredCapabilities: [''] as unknown as LearningComponentCapability[],
+      register() {},
+    })).to.throw('required capability must be a non-empty string');
+
+    expect(() => validateLearningComponentManifest({
+      id: 'sample.capabilities',
+      kind: 'unit',
+      unitTypes: ['sample'],
+      requiredCapabilities: ['database'] as unknown as LearningComponentCapability[],
+      register() {},
+    })).to.throw('Learning component "sample.capabilities" requires unknown capability: database');
+  });
+
   it('fails clearly when required runtime capabilities are missing', function() {
     const manifest: LearningComponentManifest = {
       id: 'sample.component',
