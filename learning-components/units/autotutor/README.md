@@ -9,6 +9,7 @@ Component-owned:
 - Typed runtime capability contracts in `AutoTutorRuntimeCapabilities.ts`.
 - Explicit completion/end-state semantics in `AutoTutorEndState.ts`.
 - Generation configuration constants and temperature validation in `AutoTutorGenerationConfig.ts`.
+- Authored runtime configuration interpretation in `AutoTutorRuntimeConfig.ts`.
 - AutoTutor planning, scoring, and response contract helpers in shared common code.
 
 App-owned for the current milestone:

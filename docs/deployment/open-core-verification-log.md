@@ -163,3 +163,22 @@ Readiness evidence added:
 
 - `scripts/release/open-core-readiness-scan.cjs` now checks required artifacts against `git ls-files`.
 - `scripts/release/README.md` now describes tracked-artifact, checklist-topic, settings-reference, field-registry/schema, secret, and private-path scan coverage.
+
+## 2026-05-26 AutoTutor Runtime Config Boundary Pass
+
+Completed:
+
+- `npm run typecheck`
+  - Result: passed.
+- `npm run lint`
+  - Result: passed.
+- `node scripts/release/open-core-readiness-scan.cjs`
+  - Result: passed.
+- `http://localhost:3200`
+  - Result: loaded through Playwright MCP with page title `MoFaCTS` and visible `License / Source` link.
+
+Modularity evidence added:
+
+- `learning-components/units/autotutor/AutoTutorRuntimeConfig.ts` now owns AutoTutor authored session config interpretation, script cloning, required-expectation lookup, and graduation/script-bound validation.
+- `mofacts/client/views/experiment/svelte/services/autoTutorClient.ts` now consumes that package-owned config reader through explicit `AutoTutorRuntimeCapabilities`; `createAutoTutorRuntime` also accepts injected capabilities for future tests/package construction.
+- `mofacts/common/autoTutorRuntimeConfig.test.ts` covers capability-based config reading, script cloning, and fail-clear graduation validation.
