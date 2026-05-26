@@ -23,6 +23,8 @@ export type AutoTutorMisconception = {
   contrastWithExpectations?: string[];
   correction: string;
   repairQuestion: string;
+  repairCriteria?: string;
+  acceptableRepairAnswers?: string[];
 };
 
 export type AutoTutorScript = {

@@ -280,7 +280,7 @@
     <div class="auto-tutor-progress" aria-label="AutoTutor progress">
       <div class="auto-tutor-meter-row">
         <div class="auto-tutor-meter-copy">
-          <span>Ideas</span>
+          <span>Expectations</span>
           <strong>{progressCounts.coveredExpectations}/{progressCounts.requiredExpectations}</strong>
         </div>
         <div
@@ -356,7 +356,7 @@
     <div class="auto-tutor-mobile-progress" aria-label="AutoTutor progress">
       <div class="auto-tutor-meter-row">
         <div class="auto-tutor-meter-copy">
-          <span>Ideas</span>
+          <span>Expectations</span>
           <strong>{progressCounts.coveredExpectations}/{progressCounts.requiredExpectations}</strong>
         </div>
         <div class="auto-tutor-progress-track auto-tutor-progress-track-ideas">

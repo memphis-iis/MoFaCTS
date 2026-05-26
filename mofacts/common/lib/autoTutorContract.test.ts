@@ -60,6 +60,8 @@ function buildValidStimuli() {
                     contrastWithExpectations: ['E1'],
                     correction: 'The parameter is fixed after the interval is computed.',
                     repairQuestion: 'What happens over repeated samples?',
+                    repairCriteria: 'Repair when the learner describes repeated interval coverage.',
+                    acceptableRepairAnswers: ['About 95% of repeated intervals contain the mean.'],
                   },
                 ],
                 dialogPolicy: {
@@ -172,6 +174,33 @@ describe('AutoTutor content contract', function() {
     );
   });
 
+  it('rejects malformed misconception repair criteria fields', function() {
+    const stimuli = buildValidStimuli();
+    const firstMisconception = stimuli.setspec.clusters[0]?.stims[0]?.autoTutor.misconceptions[0];
+    expect(firstMisconception).to.not.equal(undefined);
+    if (!firstMisconception) {
+      throw new Error('Test fixture missing first misconception');
+    }
+    firstMisconception.repairCriteria = '';
+    (firstMisconception as unknown as Record<string, unknown>).acceptableRepairAnswers = [
+      'About 95% of repeated intervals contain the mean.',
+      42,
+    ];
+
+    const result = validateAutoTutorContent({
+      tdf: buildValidTdf(),
+      stimuli,
+    });
+
+    expect(result.valid).to.equal(false);
+    expect(result.errors).to.include(
+      'setspec.clusters[0].stims[0].autoTutor.misconceptions[0].repairCriteria must be a non-empty string when present'
+    );
+    expect(result.errors).to.include(
+      'setspec.clusters[0].stims[0].autoTutor.misconceptions[0].acceptableRepairAnswers must be a non-empty string array when present'
+    );
+  });
+
   it('parses the required AutoTutor score JSON envelope', function() {
     const envelope = parseAutoTutorScoreEnvelope(JSON.stringify({
       expectationScores: {
@@ -180,10 +209,8 @@ describe('AutoTutor content contract', function() {
           coverage: 0.4,
           evidence: 'mentioned intervals',
           missing: ['repeated samples'],
-          frontier: 0.4,
           coherence: 0.7,
           centrality: 0.8,
-          priority: 0.57,
         },
       },
       misconceptionScores: {
@@ -210,6 +237,8 @@ describe('AutoTutor content contract', function() {
     }
 
     expect(expectation.coverage).to.equal(0.4);
+    expect(expectation.frontier).to.equal(0.4);
+    expect(expectation.priority).to.equal(0.57);
     expect(misconception.confidence).to.equal(0.9);
     expect(misconception.repaired).to.equal(false);
     expect(envelope.learnerContribution.type).to.equal('assertion');
@@ -223,10 +252,8 @@ describe('AutoTutor content contract', function() {
           current: false,
           coverage: 0.2,
           evidence: 'named the population mean but not repeated sampling',
-          frontier: 0.2,
           coherence: 0.6,
           centrality: 0.7,
-          priority: 0.42,
         },
       },
       misconceptionScores: {
@@ -264,10 +291,8 @@ describe('AutoTutor content contract', function() {
       "current": true,
       "coverage": 0.85,
       "evidence": "mentioned repeated sampling",
-      "frontier": 0.85,
       "coherence": 0.7,
-      "centrality": 0.6,
-      "priority": 0.755
+      "centrality": 0.6
     }
   },
   "misconceptionScores": {},
@@ -284,7 +309,35 @@ describe('AutoTutor content contract', function() {
 \`\`\``);
 
     expect(envelope.expectationScores.E1?.current).to.equal(true);
+    expect(envelope.expectationScores.E1?.frontier).to.equal(0.85);
+    expect(envelope.expectationScores.E1?.priority).to.equal(0.755);
     expect(envelope.answerQuality).to.equal('high');
+  });
+
+  it('derives frontier and priority instead of requiring model-owned values', function() {
+    const envelope = parseAutoTutorScoreEnvelope(JSON.stringify({
+      expectationScores: {
+        E1: {
+          current: true,
+          coverage: 0.8,
+          coherence: 0.5,
+          centrality: 0.25,
+        },
+      },
+      misconceptionScores: {},
+      answerQuality: 'high',
+      learnerContribution: {
+        type: 'assertion',
+        confidence: 0.9,
+      },
+      learnerQuestion: {
+        current: false,
+        answerableFromAuthoredContent: false,
+      },
+    }));
+
+    expect(envelope.expectationScores.E1?.frontier).to.equal(0.8);
+    expect(envelope.expectationScores.E1?.priority).to.equal(0.6000000000000001);
   });
 
   it('parses the required AutoTutor utterance JSON envelope', function() {
@@ -327,10 +380,8 @@ describe('AutoTutor content contract', function() {
           current: false,
           coverage: 0.4,
           missing: ['repeated samples', 42],
-          frontier: 0.4,
           coherence: 0.7,
           centrality: 0.8,
-          priority: 0.57,
         },
       },
       misconceptionScores: {},

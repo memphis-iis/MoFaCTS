@@ -113,6 +113,18 @@ function validateAutoTutorScript(script: unknown, prefix: string, errors: string
         errors.push(`${misconceptionPrefix}.${field} must be a non-empty string`);
       }
     }
+    if (misconception.repairCriteria !== undefined && !nonEmptyString(misconception.repairCriteria)) {
+      errors.push(`${misconceptionPrefix}.repairCriteria must be a non-empty string when present`);
+    }
+    if (
+      misconception.acceptableRepairAnswers !== undefined &&
+      (
+        !Array.isArray(misconception.acceptableRepairAnswers) ||
+        misconception.acceptableRepairAnswers.some((answer: unknown) => !nonEmptyString(answer))
+      )
+    ) {
+      errors.push(`${misconceptionPrefix}.acceptableRepairAnswers must be a non-empty string array when present`);
+    }
     const contrastIds = Array.isArray(misconception.contrastWithExpectations)
       ? misconception.contrastWithExpectations
       : [];
@@ -324,6 +336,10 @@ function requireScore(value: unknown, fieldName: string): number {
   return value;
 }
 
+function computeExpectationPriority(frontier: number, coherence: number, centrality: number): number {
+  return Math.max(0, Math.min(1, (0.5 * frontier) + (0.3 * coherence) + (0.2 * centrality)));
+}
+
 function parseExpectationScores(value: unknown): Record<string, AutoTutorExpectationScore> {
   if (!isRecord(value)) {
     throw new Error('AutoTutor score response expectationScores must be an object');
@@ -340,17 +356,21 @@ function parseExpectationScores(value: unknown): Record<string, AutoTutorExpecta
       }
       missing = score.missing;
     }
+    const coverage = requireScore(score.coverage, `expectationScores.${id}.coverage`);
+    const coherence = requireScore(score.coherence, `expectationScores.${id}.coherence`);
+    const centrality = requireScore(score.centrality, `expectationScores.${id}.centrality`);
+    const frontier = coverage;
     parsed[id] = {
       current: score.current,
-      coverage: requireScore(score.coverage, `expectationScores.${id}.coverage`),
+      coverage,
       ...(typeof score.evidence === 'string' ? { evidence: score.evidence } : {}),
       ...(missing ? { missing } : {}),
       ...(typeof score.tutoredByAssertion === 'boolean' ? { tutoredByAssertion: score.tutoredByAssertion } : {}),
       ...(typeof score.learnerRestatedAfterAssertion === 'boolean' ? { learnerRestatedAfterAssertion: score.learnerRestatedAfterAssertion } : {}),
-      frontier: requireScore(score.frontier, `expectationScores.${id}.frontier`),
-      coherence: requireScore(score.coherence, `expectationScores.${id}.coherence`),
-      centrality: requireScore(score.centrality, `expectationScores.${id}.centrality`),
-      priority: requireScore(score.priority, `expectationScores.${id}.priority`),
+      frontier,
+      coherence,
+      centrality,
+      priority: computeExpectationPriority(frontier, coherence, centrality),
     };
   }
   return parsed;
@@ -459,10 +479,8 @@ export const AUTO_TUTOR_SCORE_ENVELOPE_SCHEMA = Object.freeze({
       missing: 'string[] optional',
       tutoredByAssertion: 'boolean optional',
       learnerRestatedAfterAssertion: 'boolean optional',
-      frontier: 'number 0..1',
       coherence: 'number 0..1',
       centrality: 'number 0..1',
-      priority: 'number 0..1',
     },
   },
   misconceptionScores: {

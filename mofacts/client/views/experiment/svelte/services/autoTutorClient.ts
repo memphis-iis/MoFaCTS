@@ -246,6 +246,13 @@ function buildScoringSystemPrompt(config: AutoTutorConfig): string {
     'When learnerContribution.type is question, set learnerQuestion.current true. For meta comments about procedure rather than lesson content, use learnerContribution.type meta and leave learnerQuestion.current false unless the learner also asks a substantive content question.',
     'Misconception repair is a first-class scoring decision. If the prior tutor state last selected a misconception target and the latest tutor turn asked its repair question or otherwise requested repair, score the latest learner answer first as a repair attempt for that misconception.',
     'A concise answer can repair a misconception when it directly answers the repair question or rejects the mistaken contrast, even if it does not cover a full expectation. For example, if the tutor asks whether an interval estimates individual scores or the population mean, "the population mean" repairs the individual-scores misconception.',
+    'When scoring a repair answer, interpret pronouns and short phrases in the context of the tutor question and active repair context. Do not require the learner to restate every contrast perfectly if their answer substantially accepts the repair target.',
+    'If an authored misconception includes repairCriteria or acceptableRepairAnswers, use those fields as the authoritative standard for whether the latest learner answer repaired that misconception.',
+    'If the latest learner answer uses words such as it, they, them, each one, repetitions, or those intervals, resolve those words from the latest tutor repair question before judging misconception evidence.',
+    'For confidence intervals, if the tutor asks about repeating the sampling and interval-construction process, an answer like "sometimes it would have the mean and sometimes not; 95% of the time, in the long run, it would have the mean" should repair the misconception that the fixed population mean has a 95% probability of lying in this one already-computed interval, because "it" refers to the repeated/new intervals in the asked context.',
+    'For confidence intervals, if the tutor asks whether newly computed intervals would contain the true mean about 95% of the time, an answer like "they would always or never have the true mean because it is fixed; 95% of repetitions would have the true mean; each one is yes or no" repairs the specific-interval probability misconception. It may still be missing some expectation wording, but it should not keep that misconception active.',
+    'When a latest repair answer is mostly right but slightly ambiguous, prefer lowering or clearing the active misconception and recording remaining missing expectation elements over keeping the misconception active from prior dialogue.',
+    'If you keep a misconception active after a repair question, the misconception evidence must quote or tightly paraphrase the latest learner answer itself. Do not use wording from earlier learner turns as evidence that the latest answer still has the misconception.',
     'When the latest learner answer repairs a misconception, set that misconception to current false, confidence 0, repaired true, and explain the repair in repairEvidence. Do not carry forward a prior misconception solely because earlier dialogue showed it.',
     'For a previously repaired misconception, keep current false and confidence 0 unless the latest learner answer reintroduces that misconception. If it is reintroduced, set current true and repaired false.',
     'Assertion restatement is also a first-class scoring decision. If the prior tutor state shows an expectation was tutoredByAssertion and the latest tutor turn asked the learner to restate or apply that asserted idea, score the latest learner answer first as uptake of that expectation.',
@@ -258,7 +265,7 @@ function buildScoringSystemPrompt(config: AutoTutorConfig): string {
     'Do not invent expectation or misconception IDs.',
     'Set expectation coverage from 0 to 1, provide brief evidence, and include missing elements when coverage is incomplete.',
     'Set misconception confidence from 0 to 1.',
-    'Set coherence and centrality from 0 to 1. Set frontier equal to coverage. Set priority using frontierWeight 0.5, coherenceWeight 0.3, and centralityWeight 0.2; the app will recompute priority after validation.',
+    'Set coherence and centrality from 0 to 1. Do not return frontier or priority; the app derives those values deterministically from coverage, coherence, and centrality.',
     '',
     'Question prompt:',
     config.prompt,
@@ -268,10 +275,35 @@ function buildScoringSystemPrompt(config: AutoTutorConfig): string {
   ].join('\n');
 }
 
-function buildScoringUserPrompt(studentAnswer: string, state: AutoTutorState): string {
+function getActiveRepairContext(config: AutoTutorConfig, state: AutoTutorState) {
+  const lastTargetType = state.planner.lastSelectedTargetType;
+  const lastTargetId = state.planner.lastSelectedTargetId;
+  if (lastTargetType !== 'misconception' || !lastTargetId) {
+    return null;
+  }
+  const misconception = (config.script.misconceptions || [])
+    .find((entry) => entry.id === lastTargetId);
+  if (!misconception) {
+    return null;
+  }
+  const latestTutorTurn = [...state.dialogue].reverse()
+    .find((turn) => turn.role === 'tutor');
+  return {
+    activeMisconceptionId: lastTargetId,
+    latestTutorRepairQuestionOrPrompt: latestTutorTurn?.text || '',
+    authoredRepairQuestion: misconception.repairQuestion,
+    repairCriteria: misconception.repairCriteria || '',
+    acceptableRepairAnswers: misconception.acceptableRepairAnswers || [],
+  };
+}
+
+function buildScoringUserPrompt(config: AutoTutorConfig, studentAnswer: string, state: AutoTutorState): string {
   return [
     'Latest student answer:',
     studentAnswer,
+    '',
+    'Active repair context. If present, score the latest answer against this repair context before carrying forward prior misconception state:',
+    JSON.stringify(getActiveRepairContext(config, state), null, 2),
     '',
     'Prior tutor state:',
     JSON.stringify(summarizeState(state), null, 2),
@@ -293,8 +325,11 @@ function buildUtteranceSystemPrompt(config: AutoTutorConfig): string {
     'The user prompt includes transition metadata. When targetChanged is true, begin tutorMessage with a brief acknowledgement of what the learner just contributed or repaired, then name the new focus before asking the next hint, prompt, pump, or correction.',
     'Use the full dialogue history to avoid repeating failed attempts. When a hint, prompt, assertion, or correction has not helped the learner make progress, take a new pathway or perspective toward the unspoken expectation or unresolved misconception.',
     'If the latest learner answer is abusive, profane, hostile, playful, or otherwise off-task, do not scold or analyze the behavior. Re-prompt from a new angle for the app-selected target and move.',
-    'Correction moves include an app-selected correctionStage. For correctionStage "hint", give a light cue that helps the learner notice why the misconception may not work. For "prompt", ask a targeted question that helps the learner explain why it is wrong. For "assertion", state exactly how it is wrong and ask the learner to restate or apply the repair.',
-    'If the same misconception remains active across turns, continue the repair from the selected correctionStage and full dialogue history rather than repeating the same angle.',
+    'Correction moves include an app-selected correctionStage. Treat the authored repairQuestion as the repair goal, not as a required verbatim line.',
+    'For correctionStage "hint", give a light cue that helps the learner notice why the misconception may not work, then ask a short question from a fresh angle.',
+    'For correctionStage "prompt", ask a targeted question that helps the learner explain why the misconception is wrong. Do not repeat the previous correction question verbatim.',
+    'For correctionStage "assertion", state exactly how the misconception is wrong and ask the learner to restate or apply the repair in their own words.',
+    'If the same misconception remains active across turns, continue the repair from the selected correctionStage and full dialogue history. Never ask the identical repair question twice in a row.',
     'For assertion moves, supply the missing content briefly, then ask the learner to restate or apply that idea.',
     'Keep the tutor message concise, conversational, and addressed to the student.',
     'Return JSON only. Do not wrap it in Markdown. The JSON object must exactly follow this envelope shape:',
@@ -306,6 +341,19 @@ function buildUtteranceSystemPrompt(config: AutoTutorConfig): string {
     'Authored AutoTutor script:',
     JSON.stringify(config.script, null, 2),
   ].join('\n');
+}
+
+function buildCorrectionStageGuidance(plan: AutoTutorPlan): string {
+  if (plan.target.type !== 'misconception' || !plan.correctionStage) {
+    return 'No correction-stage guidance applies.';
+  }
+  if (plan.correctionStage === 'hint') {
+    return 'Use a misconception repair hint. Point to the contrast the learner should notice, but do not fully state the repair yet. Ask a brief follow-up question that is not just the authored repairQuestion copied verbatim.';
+  }
+  if (plan.correctionStage === 'prompt') {
+    return 'Use a misconception repair prompt. Ask the learner to make the key contrast explicitly. If this misconception was already prompted earlier, change the wording and angle rather than repeating the same question.';
+  }
+  return 'Use a misconception repair assertion. State the correct distinction directly, then ask the learner to restate or apply it. Do not merely ask the authored repairQuestion again.';
 }
 
 function getTargetContent(config: AutoTutorConfig, plan: AutoTutorPlan): unknown {
@@ -352,6 +400,9 @@ function buildUtteranceUserPrompt(config: AutoTutorConfig, studentAnswer: string
       selectedMove: plan.selectedMove,
       correctionStage: plan.correctionStage || null,
     }, null, 2),
+    '',
+    'Correction-stage guidance:',
+    buildCorrectionStageGuidance(plan),
     '',
     'Transition metadata. If targetChanged is true, begin tutorMessage with a brief acknowledgement of the learner contribution or repaired understanding that allowed the transition, then name the new focus before asking the selected move:',
     JSON.stringify(transition, null, 2),
@@ -482,7 +533,7 @@ async function callOpenRouter(
 async function callOpenRouterScoring(config: AutoTutorConfig, state: AutoTutorState, studentAnswer: string) {
   return await callOpenRouter(config, [
     { role: 'system', content: buildScoringSystemPrompt(config) },
-    { role: 'user', content: buildScoringUserPrompt(studentAnswer, state) },
+    { role: 'user', content: buildScoringUserPrompt(config, studentAnswer, state) },
   ], AUTO_TUTOR_SCORING_TEMPERATURE);
 }
 
