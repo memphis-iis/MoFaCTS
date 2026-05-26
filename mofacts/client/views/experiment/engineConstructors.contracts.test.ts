@@ -51,7 +51,12 @@ describe('unit engine creation contracts', function() {
       expect(error).to.be.instanceOf(Error);
       const message = (error as Error).message;
       expect(message).to.include('Unknown unit type "quiz" for unit "Unit Q" at index 4');
-      expect(message).to.include("Expected 'schedule', 'model', 'video', 'autotutor', or 'instruction-only'");
+      expect(message).to.include("Registered unit engine types:");
+      expect(message).to.include("'schedule'");
+      expect(message).to.include("'model'");
+      expect(message).to.include("'video'");
+      expect(message).to.include("'autotutor'");
+      expect(message).to.include("'instruction-only'");
       expect(message).to.include('Unit has: learningsession');
     }
   });

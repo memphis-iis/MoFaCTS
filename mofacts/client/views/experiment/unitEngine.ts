@@ -24,9 +24,11 @@ import { hasScheduleArtifactForUnit } from './svelte/services/assessmentResume';
 import {
   createEmptyUnit as createEmptyUnitWithDeps,
   createAutoTutorUnit as createAutoTutorUnitWithDeps,
+  createUnitEngineByType as createUnitEngineByTypeWithDeps,
   createModelUnit as createModelUnitWithDeps,
   createScheduleUnit as createScheduleUnitWithDeps,
   createVideoUnit as createVideoUnitWithDeps,
+  getCreatableUnitEngineTypes as getCreatableUnitEngineTypesWithDeps,
   type CreateUnitEngineDeps,
 } from '../../../../learning-components/units/createUnitEngine';
 
@@ -101,3 +103,13 @@ async function createVideoUnit(curExperimentData: any) {
 async function createAutoTutorUnit(curExperimentData: any) {
   return await createAutoTutorUnitWithDeps(createUnitEngineDeps(), curExperimentData);
 }
+
+async function createUnitEngineByType(unitType: string, curExperimentData: any) {
+  return await createUnitEngineByTypeWithDeps(createUnitEngineDeps(), curExperimentData, unitType);
+}
+
+function getCreatableUnitEngineTypes(): string[] {
+  return getCreatableUnitEngineTypesWithDeps(createUnitEngineDeps());
+}
+
+export { createUnitEngineByType, getCreatableUnitEngineTypes };

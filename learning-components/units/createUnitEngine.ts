@@ -1,6 +1,7 @@
 import { createBaseUnitEngine } from './createBaseUnitEngine';
 import {
   createRegisteredUnitEngine,
+  getRegisteredUnitEngineTypes,
   hasRegisteredUnitEngine,
   registerUnitEngine,
   registerUnitEngineWithDeps,
@@ -118,33 +119,42 @@ function registerDefaultUnitEngines(_deps: CreateUnitEngineDeps): void {
     registerTrialDisplayAdapter,
   }, {
     alreadyRegistered(manifest) {
-    const unitTypes = manifest.unitTypes ?? [];
+      const unitTypes = manifest.unitTypes ?? [];
       return unitTypes.every((unitType) => hasRegisteredUnitEngine(unitType));
     },
   });
 }
 
 export async function createEmptyUnit(deps: CreateUnitEngineDeps, curExperimentData: any) {
-  registerDefaultUnitEngines(deps);
-  return await createWithBase(deps, curExperimentData, INSTRUCTION_UNIT_TYPE);
+  return await createUnitEngineByType(deps, curExperimentData, INSTRUCTION_UNIT_TYPE);
 }
 
 export async function createModelUnit(deps: CreateUnitEngineDeps, curExperimentData: any) {
-  registerDefaultUnitEngines(deps);
-  return await createWithBase(deps, curExperimentData, LEARNING_SESSION_UNIT_TYPE);
+  return await createUnitEngineByType(deps, curExperimentData, LEARNING_SESSION_UNIT_TYPE);
 }
 
 export async function createScheduleUnit(deps: CreateUnitEngineDeps, curExperimentData: any) {
-  registerDefaultUnitEngines(deps);
-  return await createWithBase(deps, curExperimentData, ASSESSMENT_SESSION_UNIT_TYPE);
+  return await createUnitEngineByType(deps, curExperimentData, ASSESSMENT_SESSION_UNIT_TYPE);
 }
 
 export async function createVideoUnit(deps: CreateUnitEngineDeps, curExperimentData: any) {
-  registerDefaultUnitEngines(deps);
-  return await createWithBase(deps, curExperimentData, VIDEO_SESSION_UNIT_TYPE);
+  return await createUnitEngineByType(deps, curExperimentData, VIDEO_SESSION_UNIT_TYPE);
 }
 
 export async function createAutoTutorUnit(deps: CreateUnitEngineDeps, curExperimentData: any) {
+  return await createUnitEngineByType(deps, curExperimentData, AUTO_TUTOR_SESSION_UNIT_TYPE);
+}
+
+export async function createUnitEngineByType(
+  deps: CreateUnitEngineDeps,
+  curExperimentData: any,
+  unitType: string,
+) {
   registerDefaultUnitEngines(deps);
-  return await createWithBase(deps, curExperimentData, AUTO_TUTOR_SESSION_UNIT_TYPE);
+  return await createWithBase(deps, curExperimentData, unitType);
+}
+
+export function getCreatableUnitEngineTypes(deps: CreateUnitEngineDeps): string[] {
+  registerDefaultUnitEngines(deps);
+  return getRegisteredUnitEngineTypes();
 }

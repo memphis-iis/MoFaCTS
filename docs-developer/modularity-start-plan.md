@@ -5,6 +5,7 @@ This is the short handoff plan for moving from the current extension-boundary gr
 ## Current Readiness
 
 - Unit engines register through `LearningComponentManifest` and `UnitEngineRegistry`.
+- The legacy client unit-engine constructor now calls the registered unit-engine path for explicit unit types, so a shipped unit component no longer needs a new central constructor branch.
 - Trial-display adapters register through `LearningComponentManifest` and `TrialDisplayAdapterRegistry`.
 - The default component catalog packages approved in-repo unit and trial-display manifests together.
 - Catalog assembly validates duplicate component IDs, unit types, and display types before runtime registration.
@@ -45,6 +46,9 @@ Make a new in-repo component feel like a small package:
 3. Add a small approved-catalog extension test.
    Compose the default catalog with the sample echo package using `combineLearningComponentCatalogs`, prove duplicate detection still fires, and prove the default runtime catalog is unchanged unless explicitly extended.
    Initial slice: `mofacts/common/learningComponentCatalog.test.ts` now covers default-catalog plus sample-package composition, verifies the sample is absent from defaults, and verifies duplicate default catalog composition fails clearly.
+
+4. Remove remaining central component branches where a registry already exists.
+   Initial slice: `mofacts/client/views/experiment/engineConstructors.ts` now delegates explicit unit-type engine creation through `createUnitEngineByType`, preserving contextual unknown-type errors while letting registered unit manifests own construction.
 
 ## Invariants
 

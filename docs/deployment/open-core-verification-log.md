@@ -220,3 +220,22 @@ Modularity evidence added:
 - `learning-components/units/autotutor/AutoTutorSavedState.ts` now owns saved AutoTutor score-id, learner-contribution, planner-state, and end-reason validation.
 - `mofacts/client/views/experiment/svelte/services/autoTutorClient.ts` now delegates saved-state validation to the AutoTutor component package during resume.
 - `mofacts/common/autoTutorSavedState.test.ts` covers valid saved state, unknown expectation rejection, invalid learner-contribution rejection, and invalid end-reason rejection.
+
+## 2026-05-26 Unit Engine Registry Constructor Pass
+
+Completed:
+
+- `npm run typecheck`
+  - Result: passed.
+- `npm run lint`
+  - Result: passed.
+- `node scripts/release/open-core-readiness-scan.cjs`
+  - Result: passed.
+- `http://localhost:3200`
+  - Result: loaded through Playwright MCP with page title `MoFaCTS` and visible `License / Source` link.
+
+Modularity evidence added:
+
+- `learning-components/units/createUnitEngine.ts` now exposes generic registered-unit creation and registered-type listing.
+- `mofacts/client/views/experiment/engineConstructors.ts` now delegates explicit unit-type creation to the registered unit-engine path instead of owning a central switch for every shipped unit type.
+- `mofacts/client/views/experiment/engineConstructors.contracts.test.ts` now expects unknown-type diagnostics to report registered unit-engine types.

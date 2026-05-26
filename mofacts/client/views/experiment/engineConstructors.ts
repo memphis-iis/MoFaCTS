@@ -1,6 +1,6 @@
 import { AUTO_TUTOR_UNIT, MODEL_UNIT, SCHEDULE_UNIT, VIDEO_UNIT } from '../../../common/Definitions';
 import type { UnitEngineLike, UnitType } from '../../../common/types';
-import { createAutoTutorUnit, createEmptyUnit, createModelUnit, createScheduleUnit, createVideoUnit } from './unitEngine';
+import { createUnitEngineByType, getCreatableUnitEngineTypes } from './unitEngine';
 
 type CurExperimentData = Record<string, unknown>;
 
@@ -66,27 +66,21 @@ export async function createUnitEngine(
   curExperimentData: CurExperimentData,
   context: EngineCreationContext,
 ): Promise<UnitEngineLike> {
-  switch (unitType) {
-    case SCHEDULE_UNIT:
-      return await createScheduleUnit(curExperimentData);
-    case MODEL_UNIT:
-      return await createModelUnit(curExperimentData);
-    case VIDEO_UNIT:
-      return await createVideoUnit(curExperimentData);
-    case AUTO_TUTOR_UNIT:
-      return await createAutoTutorUnit(curExperimentData);
-    case 'instruction-only':
-      return await createEmptyUnit(curExperimentData);
-    default: {
+  try {
+    return await createUnitEngineByType(unitType, curExperimentData);
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('No unit engine registered for ')) {
       const unitName = typeof context.unit?.unitname === 'string' ? context.unit.unitname : '<unnamed>';
       const unitPart = typeof context.unitNumber === 'number' ? ` at index ${context.unitNumber}` : '';
       const shapes = getAvailableUnitShapes(context.unit);
+      const registeredTypes = getCreatableUnitEngineTypes();
       throw new Error(
         `${context.source}: Unknown unit type "${unitType}" for unit "${unitName}"${unitPart}. ` +
-        `Expected '${SCHEDULE_UNIT}', '${MODEL_UNIT}', '${VIDEO_UNIT}', '${AUTO_TUTOR_UNIT}', or 'instruction-only'. ` +
+        `Registered unit engine types: ${registeredTypes.length ? registeredTypes.map((type) => `'${type}'`).join(', ') : 'none'}. ` +
         `Unit has: ${shapes.length ? shapes.join(', ') : 'no runnable unit shape'}`
       );
     }
+    throw error;
   }
 }
 

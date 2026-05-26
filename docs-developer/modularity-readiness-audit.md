@@ -5,6 +5,7 @@ This audit records the current extension-boundary readiness checkpoint for AutoT
 ## Ready
 
 - Unit engines are created through `UnitEngineRegistry`.
+- The legacy client unit-engine constructor now delegates explicit unit-type creation through the registered unit-engine path instead of a central switchboard.
 - Trial displays are created through `TrialDisplayAdapterRegistry`.
 - Components declare `LearningComponentManifest` records with explicit kind, unit/display types, required capabilities, and registration hooks.
 - Manifest validation rejects ambiguous unit/display declarations and unknown capability names.
@@ -56,6 +57,7 @@ This audit records the current extension-boundary readiness checkpoint for AutoT
 - `mofacts/common/autoTutorRuntimeConfig.test.ts`
 - `mofacts/common/autoTutorSavedHistory.test.ts`
 - `mofacts/common/autoTutorSavedState.test.ts`
+- `mofacts/client/views/experiment/engineConstructors.contracts.test.ts`
 - `mofacts/client/views/experiment/svelte/services/autoTutorClient.ts`
 - `learning-components/trial-displays/h5p/README.md`
 - `learning-components/README.md`
@@ -63,4 +65,4 @@ This audit records the current extension-boundary readiness checkpoint for AutoT
 
 ## Next Safe Step
 
-Next, continue moving AutoTutor runtime construction toward injectable capabilities so tests and future component packages do not need Meteor globals.
+Next, continue reducing direct component branches in the Svelte trial surfaces so H5P/AutoTutor display ownership can move through component adapters instead of page-level conditionals.
