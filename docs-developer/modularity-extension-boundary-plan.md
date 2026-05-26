@@ -30,7 +30,7 @@ Documentation note: this is a developer-facing planning document and now lives u
    Bootstrap slice: `registerLearningComponents` now registers manifest lists through one reusable runtime helper, with an explicit already-registered hook for idempotent default bootstraps and summary helpers for pre-registration diagnostics. The manifest-list bootstrap now preflights pending components for duplicate component IDs, duplicate unit/display declarations, and missing capabilities before mutating registries, so a bad dropped-in component cannot leave the app half-registered.
 
 2. Expand the runtime context deliberately.
-   Initial slice: named capability interfaces now exist for session state, delivery settings, media resolution, history, server methods, authorization, logging, and user alerts.
+   Initial slice: named capability interfaces now exist for session state, delivery settings, media resolution, history, server methods, authorization, logging, and user alerts. Runtime capability helpers now project a typed dependency bag into manifest capability names, so missing dependencies remain visible to registration validation.
 
 3. Move default unit registration out of `createUnitEngine.ts`.
    Initial slice: default unit component manifests now register instruction, learning-session, assessment-session, video, and the current AutoTutor placeholder through the manifest path.

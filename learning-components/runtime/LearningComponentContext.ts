@@ -1,3 +1,8 @@
+import type {
+  LearningComponentCapability,
+  LearningComponentRuntimeContext,
+} from './ComponentManifest';
+
 export interface LearningComponentContext {
   getSessionValue(key: string): any;
   setSessionValue(key: string, value: any): void;
@@ -42,10 +47,50 @@ export interface UserAlertRuntime {
 export interface LearningComponentCapabilities {
   session?: SessionRuntime;
   deliverySettings?: DeliverySettingsRuntime;
+  stimuli?: unknown;
+  adaptiveModel?: unknown;
+  assessmentState?: unknown;
   media?: MediaRuntime;
   history?: HistoryRuntime;
   serverMethods?: ServerMethodRuntime;
   authorization?: AuthorizationRuntime;
   logger?: ComponentLogger;
   userAlerts?: UserAlertRuntime;
+}
+
+const runtimeCapabilityEntries: readonly [
+  keyof LearningComponentCapabilities,
+  LearningComponentCapability,
+][] = [
+  ['session', 'session'],
+  ['deliverySettings', 'delivery-settings'],
+  ['stimuli', 'stimuli'],
+  ['adaptiveModel', 'adaptive-model'],
+  ['assessmentState', 'assessment-state'],
+  ['media', 'media'],
+  ['history', 'history'],
+  ['serverMethods', 'server-methods'],
+  ['authorization', 'authz'],
+  ['logger', 'logging'],
+  ['userAlerts', 'ui-alerts'],
+];
+
+export function getLearningComponentCapabilitySet(
+  capabilities: LearningComponentCapabilities,
+): ReadonlySet<LearningComponentCapability> {
+  const declared = new Set<LearningComponentCapability>();
+  for (const [runtimeKey, manifestCapability] of runtimeCapabilityEntries) {
+    if (capabilities[runtimeKey] !== undefined) {
+      declared.add(manifestCapability);
+    }
+  }
+  return declared;
+}
+
+export function createLearningComponentRuntimeContext(
+  capabilities: LearningComponentCapabilities,
+): Pick<LearningComponentRuntimeContext, 'capabilities'> {
+  return {
+    capabilities: getLearningComponentCapabilitySet(capabilities),
+  };
 }

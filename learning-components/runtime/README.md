@@ -7,6 +7,7 @@ Current status: learning-component runtime contract source. Keep this layer smal
 Belongs here:
 
 - `LearningComponentContext` and related interfaces.
+- Typed runtime capability bags and helpers that project those dependencies into manifest capability names.
 - Learning component manifests.
 - Component-level runtime events.
 - Trial-display adapters that declare interaction ownership and normalization contracts.
