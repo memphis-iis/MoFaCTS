@@ -1103,7 +1103,7 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
     await setStudentPerformance(userId, userDisplayIdentifier, currentTdfId);
 
     // Video sessions use time-based playback with Plyr, not probability-based card selection
-    if(Session.get('isVideoSession')){
+    if (isVideoResumeSession(curTdfUnit)) {
       let indices = Session.get('engineIndices');
       if(!indices){
         indices = {
