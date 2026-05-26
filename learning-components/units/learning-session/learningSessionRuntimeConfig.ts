@@ -35,3 +35,17 @@ export function resolveLearningSessionProbabilitySource(
   const trimmed = calculateProbability.trim();
   return trimmed || undefined;
 }
+
+export function resolveLearningSessionClusterListSource(
+  unit: LearningSessionConfigUnit | null | undefined,
+  activeVideoSession: boolean,
+): unknown {
+  if (activeVideoSession) {
+    return unit?.videosession?.questions;
+  }
+
+  const clusterlist = unit?.learningsession?.clusterlist;
+  return typeof clusterlist === 'string'
+    ? clusterlist.trim()
+    : clusterlist;
+}

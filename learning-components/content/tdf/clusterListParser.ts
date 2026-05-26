@@ -19,9 +19,7 @@ export interface ResolveModelClusterListParams {
   readonly currentTdfFile: any;
   readonly currentUnitNumber: any;
   readonly subTdfIndex: any;
-  readonly isVideoSession: boolean;
-  readonly curUnit: any;
-  readonly currentSessionUnit: any;
+  readonly unitClusterListSource: any;
   readonly extractDelimFields: (source: any, target: any[]) => void;
   readonly log: (level: number, ...args: unknown[]) => void;
 }
@@ -45,16 +43,8 @@ export function resolveModelClusterList(params: ResolveModelClusterListParams): 
       throw new Error('We shouldn\'t ever get here, dynamic tdf cluster list error');
     }
   } else {
-    params.log(1, 'setupclusterlist:', params.curUnit, params.currentSessionUnit);
-    let unitClusterList = "";
-    if (params.isVideoSession) {
-      if (params.curUnit && params.curUnit.videosession && params.curUnit.videosession.questions)
-        unitClusterList = params.curUnit.videosession.questions;
-    } else {
-      if (params.curUnit && params.curUnit.learningsession && params.curUnit.learningsession.clusterlist)
-        unitClusterList = params.curUnit.learningsession.clusterlist.trim();
-    }
-    params.extractDelimFields(unitClusterList, clusterList);
+    params.log(1, 'setupclusterlist:', params.unitClusterListSource);
+    params.extractDelimFields(params.unitClusterListSource || '', clusterList);
   }
 
   return clusterList;

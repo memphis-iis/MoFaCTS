@@ -5,6 +5,7 @@ import {
   resolveModelClusterList,
 } from '../../content/tdf/clusterListParser';
 import { calculateCardProbabilities as runCalculateCardProbabilities } from './model/probabilityCalculation';
+import { resolveLearningSessionClusterListSource } from './learningSessionRuntimeConfig';
 
 export interface LearningSessionModelPreparationDeps {
   readonly getSessionValue: (key: string) => any;
@@ -59,9 +60,10 @@ export function setUpLearningSessionClusterList(params: {
     currentTdfFile: params.deps.getSessionValue('currentTdfFile'),
     currentUnitNumber: params.deps.getSessionValue('currentUnitNumber'),
     subTdfIndex: params.deps.getSessionValue('subTdfIndex'),
-    isVideoSession: params.deps.getSessionValue('isVideoSession'),
-    curUnit: params.curUnit,
-    currentSessionUnit: JSON.parse(JSON.stringify(params.deps.getSessionValue('currentTdfUnit'))),
+    unitClusterListSource: resolveLearningSessionClusterListSource(
+      params.curUnit,
+      params.deps.getSessionValue('isVideoSession') === true,
+    ),
     extractDelimFields: params.deps.extractDelimFields,
     log: params.deps.log,
   });

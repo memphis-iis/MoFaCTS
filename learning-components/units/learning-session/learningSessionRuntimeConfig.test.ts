@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  resolveLearningSessionClusterListSource,
   resolveLearningSessionProbabilitySource,
   resolveLearningSessionRuntimeConfig,
   resolveLearningSessionUnitMode,
@@ -38,5 +39,16 @@ describe('learning session runtime config', function() {
     assert.equal(resolveLearningSessionProbabilitySource({
       videosession: { calculateProbability: '   ' },
     }), undefined);
+  });
+
+  it('resolves cluster-list source from active learning or video session content', function() {
+    const unit = {
+      learningsession: { clusterlist: ' 1 2 3 ' },
+      videosession: { questions: [4, 5] },
+    };
+
+    assert.equal(resolveLearningSessionClusterListSource(unit, false), '1 2 3');
+    assert.deepEqual(resolveLearningSessionClusterListSource(unit, true), [4, 5]);
+    assert.equal(resolveLearningSessionClusterListSource({}, false), undefined);
   });
 });
