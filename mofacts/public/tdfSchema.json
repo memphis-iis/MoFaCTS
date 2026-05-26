@@ -3028,31 +3028,42 @@
                           "grid_columns": 12
                         }
                       },
+                      "requireFinalAnswerPrompt": {
+                        "title": "Require final answer prompt.",
+                        "description": "When enabled, AutoTutor asks the learner for one final integrated answer before giving the summary. Disabled by default.",
+                        "type": "boolean",
+                        "default": false,
+                        "options": {
+                          "grid_columns": 4
+                        }
+                      },
+                      "maxTurns": {
+                        "title": "Maximum AutoTutor turns.",
+                        "description": "Maximum learner turns before the AutoTutor session ends. This is a session limit, not a graduation criterion.",
+                        "type": "integer",
+                        "default": 20,
+                        "options": {
+                          "grid_columns": 4
+                        }
+                      },
                       "graduation": {
                         "title": "AutoTutor Graduation",
-                        "description": "Completion threshold for the AutoTutor unit, including expectation score, misconception requirement, and maximum learner turns.",
+                        "description": "Completion threshold for the AutoTutor unit: required covered expectations and maximum active misconceptions.",
                         "type": "object",
                         "additionalProperties": false,
                         "required": [
-                          "minExpectationScore",
-                          "requireNoCurrentMisconceptions",
-                          "maxTurns"
+                          "requiredExpectationCount",
+                          "maxActiveMisconceptions"
                         ],
                         "properties": {
-                          "minExpectationScore": {
-                            "type": "number",
-                            "minimum": 0,
-                            "maximum": 1,
-                            "default": 1
-                          },
-                          "requireNoCurrentMisconceptions": {
-                            "type": "boolean",
-                            "default": true
-                          },
-                          "maxTurns": {
+                          "requiredExpectationCount": {
                             "type": "integer",
-                            "minimum": 1,
-                            "default": 20
+                            "minimum": 0
+                          },
+                          "maxActiveMisconceptions": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "default": 0
                           }
                         }
                       }
@@ -5252,31 +5263,42 @@
                       "grid_columns": 12
                     }
                   },
+                  "requireFinalAnswerPrompt": {
+                    "title": "Require final answer prompt.",
+                    "description": "When enabled, AutoTutor asks the learner for one final integrated answer before giving the summary. Disabled by default.",
+                    "type": "boolean",
+                    "default": false,
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "maxTurns": {
+                    "title": "Maximum AutoTutor turns.",
+                    "description": "Maximum learner turns before the AutoTutor session ends. This is a session limit, not a graduation criterion.",
+                    "type": "integer",
+                    "default": 20,
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
                   "graduation": {
                     "title": "AutoTutor Graduation",
-                    "description": "Completion threshold for the AutoTutor unit, including expectation score, misconception requirement, and maximum learner turns.",
+                    "description": "Completion threshold for the AutoTutor unit: required covered expectations and maximum active misconceptions.",
                     "type": "object",
                     "additionalProperties": false,
                     "required": [
-                      "minExpectationScore",
-                      "requireNoCurrentMisconceptions",
-                      "maxTurns"
+                      "requiredExpectationCount",
+                      "maxActiveMisconceptions"
                     ],
                     "properties": {
-                      "minExpectationScore": {
-                        "type": "number",
-                        "minimum": 0,
-                        "maximum": 1,
-                        "default": 1
-                      },
-                      "requireNoCurrentMisconceptions": {
-                        "type": "boolean",
-                        "default": true
-                      },
-                      "maxTurns": {
+                      "requiredExpectationCount": {
                         "type": "integer",
-                        "minimum": 1,
-                        "default": 20
+                        "minimum": 0
+                      },
+                      "maxActiveMisconceptions": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "default": 0
                       }
                     }
                   }

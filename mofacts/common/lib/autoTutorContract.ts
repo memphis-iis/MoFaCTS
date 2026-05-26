@@ -140,20 +140,48 @@ function validateAutoTutorScript(script: unknown, prefix: string, errors: string
   }
 }
 
-function validateGraduation(graduation: unknown, prefix: string, errors: string[]): void {
+function validateGraduation(
+  graduation: unknown,
+  prefix: string,
+  errors: string[],
+  script?: Record<string, unknown>,
+): void {
   if (!isRecord(graduation)) {
     errors.push(`${prefix}.graduation must be an object`);
     return;
   }
-  const minExpectationScore = graduation.minExpectationScore;
-  if (typeof minExpectationScore !== 'number' || minExpectationScore < 0 || minExpectationScore > 1) {
-    errors.push(`${prefix}.graduation.minExpectationScore must be a number from 0 to 1`);
+
+  const requiredExpectationCount = graduation.requiredExpectationCount;
+  if (!Number.isInteger(requiredExpectationCount) || Number(requiredExpectationCount) < 0) {
+    errors.push(`${prefix}.graduation.requiredExpectationCount must be a non-negative integer`);
   }
-  if (typeof graduation.requireNoCurrentMisconceptions !== 'boolean') {
-    errors.push(`${prefix}.graduation.requireNoCurrentMisconceptions must be boolean`);
+  const maxActiveMisconceptions = graduation.maxActiveMisconceptions;
+  if (!Number.isInteger(maxActiveMisconceptions) || Number(maxActiveMisconceptions) < 0) {
+    errors.push(`${prefix}.graduation.maxActiveMisconceptions must be a non-negative integer`);
   }
-  if (!Number.isInteger(graduation.maxTurns) || Number(graduation.maxTurns) < 1) {
-    errors.push(`${prefix}.graduation.maxTurns must be a positive integer`);
+
+  if (script) {
+    const dialogPolicy = isRecord(script.dialogPolicy) ? script.dialogPolicy : {};
+    const requiredExpectations = Array.isArray(dialogPolicy.requiredExpectations)
+      ? dialogPolicy.requiredExpectations
+      : [];
+    const misconceptions = Array.isArray(script.misconceptions) ? script.misconceptions : [];
+    if (
+      Number.isInteger(requiredExpectationCount) &&
+      Number(requiredExpectationCount) > requiredExpectations.length
+    ) {
+      errors.push(
+        `${prefix}.graduation.requiredExpectationCount cannot exceed ${requiredExpectations.length} required expectations`
+      );
+    }
+    if (
+      Number.isInteger(maxActiveMisconceptions) &&
+      Number(maxActiveMisconceptions) > misconceptions.length
+    ) {
+      errors.push(
+        `${prefix}.graduation.maxActiveMisconceptions cannot exceed ${misconceptions.length} authored misconceptions`
+      );
+    }
   }
 }
 
@@ -188,8 +216,10 @@ export function validateAutoTutorContent(context: AutoTutorValidationContext): A
       errors.push(`${unitPrefix}.cluster must be a non-negative integer`);
       continue;
     }
+    if (!Number.isInteger(session.maxTurns) || Number(session.maxTurns) < 1) {
+      errors.push(`${unitPrefix}.maxTurns must be a positive integer`);
+    }
 
-    validateGraduation(session.graduation, unitPrefix, errors);
     if (
       session.requireFinalAnswerPrompt !== undefined &&
       typeof session.requireFinalAnswerPrompt !== 'boolean'
@@ -208,7 +238,9 @@ export function validateAutoTutorContent(context: AutoTutorValidationContext): A
     if (!nonEmptyString(display.text)) {
       errors.push(`${stimPrefix}.display.text is required for AutoTutor`);
     }
+    const script = isRecord(firstStim.autoTutor) ? firstStim.autoTutor : undefined;
     validateAutoTutorScript(firstStim.autoTutor, stimPrefix, errors);
+    validateGraduation(session.graduation, unitPrefix, errors, script);
   }
 
   return { valid: errors.length === 0, errors };
@@ -309,10 +341,18 @@ function parseMisconceptionScores(value: unknown): Record<string, AutoTutorMisco
     if (!isRecord(score) || typeof score.current !== 'boolean') {
       throw new Error(`AutoTutor score response misconceptionScores.${id}.current must be boolean`);
     }
+    if (score.repaired !== undefined && typeof score.repaired !== 'boolean') {
+      throw new Error(`AutoTutor score response misconceptionScores.${id}.repaired must be boolean when present`);
+    }
+    if (score.repaired === true && score.current !== false) {
+      throw new Error(`AutoTutor score response misconceptionScores.${id} cannot be both current and repaired`);
+    }
     parsed[id] = {
       current: score.current,
       confidence: requireScore(score.confidence, `misconceptionScores.${id}.confidence`),
       ...(typeof score.evidence === 'string' ? { evidence: score.evidence } : {}),
+      ...(typeof score.repaired === 'boolean' ? { repaired: score.repaired } : {}),
+      ...(typeof score.repairEvidence === 'string' ? { repairEvidence: score.repairEvidence } : {}),
     };
   }
   return parsed;
@@ -391,6 +431,8 @@ export const AUTO_TUTOR_SCORE_ENVELOPE_SCHEMA = Object.freeze({
       current: 'boolean',
       confidence: 'number 0..1',
       evidence: 'string optional',
+      repaired: 'boolean optional; true only when the latest learner answer repaired this misconception',
+      repairEvidence: 'string optional',
     },
   },
   answerQuality: 'low | partial | high',

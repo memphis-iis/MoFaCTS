@@ -189,7 +189,7 @@ Use this file to add decisions inline before implementation. Each question has a
 
 41. What is the authored graduation threshold shape? Is it `requiredExpectations` plus zero active misconceptions, a numeric threshold such as three out of four expectations, or both?
 
-    Answer: Use an authored threshold in the unit TDF. Add a tag under `autotutorsession` for the graduation rule.
+    Answer: Use an authored threshold in the unit TDF. Phase 1 uses `autotutorsession.graduation.requiredExpectationCount`, `autotutorsession.graduation.maxActiveMisconceptions`, and a separate `autotutorsession.maxTurns` turn limit.
 
 42. How should the 20-cent session ceiling be calculated in phase 1: estimate locally from token counts and configured model pricing, or query/track OpenRouter usage metadata if available in responses?
 

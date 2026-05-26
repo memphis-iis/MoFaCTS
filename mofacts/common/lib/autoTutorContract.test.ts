@@ -14,10 +14,10 @@ function buildValidTdf() {
           unitname: 'AutoTutor',
           autotutorsession: {
             cluster: 0,
+            maxTurns: 20,
             graduation: {
-              minExpectationScore: 1,
-              requireNoCurrentMisconceptions: true,
-              maxTurns: 20,
+              requiredExpectationCount: 1,
+              maxActiveMisconceptions: 0,
             },
           },
         },
@@ -103,6 +103,25 @@ describe('AutoTutor content contract', function() {
     expect(result.errors).to.include('tutor.unit[0].autotutorsession requires openRouterModel or tutor.setspec.openRouterModel');
   });
 
+  it('rejects graduation counts that exceed the authored script', function() {
+    const tdf = buildValidTdf();
+    tdf.tutor.unit[0]!.autotutorsession.graduation.requiredExpectationCount = 2;
+    tdf.tutor.unit[0]!.autotutorsession.graduation.maxActiveMisconceptions = 2;
+
+    const result = validateAutoTutorContent({
+      tdf,
+      stimuli: buildValidStimuli(),
+    });
+
+    expect(result.valid).to.equal(false);
+    expect(result.errors).to.include(
+      'tutor.unit[0].autotutorsession.graduation.requiredExpectationCount cannot exceed 1 required expectations'
+    );
+    expect(result.errors).to.include(
+      'tutor.unit[0].autotutorsession.graduation.maxActiveMisconceptions cannot exceed 1 authored misconceptions'
+    );
+  });
+
   it('requires AutoTutor content on the first stim in the referenced cluster', function() {
     const stimuli = buildValidStimuli();
     const firstStim = stimuli.setspec.clusters[0]?.stims[0] as Record<string, unknown> | undefined;
@@ -153,7 +172,7 @@ describe('AutoTutor content contract', function() {
         },
       },
       misconceptionScores: {
-        M1: { current: true, confidence: 0.9, evidence: 'said 95% chance' },
+        M1: { current: true, confidence: 0.9, evidence: 'said 95% chance', repaired: false },
       },
       answerQuality: 'partial',
       learnerQuestion: {
@@ -172,7 +191,44 @@ describe('AutoTutor content contract', function() {
 
     expect(expectation.coverage).to.equal(0.4);
     expect(misconception.confidence).to.equal(0.9);
+    expect(misconception.repaired).to.equal(false);
     expect(envelope.answerQuality).to.equal('partial');
+  });
+
+  it('parses repaired misconception state with repair evidence', function() {
+    const envelope = parseAutoTutorScoreEnvelope(JSON.stringify({
+      expectationScores: {
+        E1: {
+          current: false,
+          coverage: 0.2,
+          evidence: 'named the population mean but not repeated sampling',
+          frontier: 0.2,
+          coherence: 0.6,
+          centrality: 0.7,
+          priority: 0.42,
+        },
+      },
+      misconceptionScores: {
+        M1: {
+          current: false,
+          confidence: 0,
+          repaired: true,
+          repairEvidence: 'The learner answered the repair question by identifying the population mean.',
+        },
+      },
+      answerQuality: 'partial',
+      learnerQuestion: {
+        current: false,
+        answerableFromAuthoredContent: false,
+      },
+    }));
+
+    expect(envelope.misconceptionScores.M1).to.include({
+      current: false,
+      confidence: 0,
+      repaired: true,
+      repairEvidence: 'The learner answered the repair question by identifying the population mean.',
+    });
   });
 
   it('parses the score envelope when the model wraps JSON in a fenced block', function() {

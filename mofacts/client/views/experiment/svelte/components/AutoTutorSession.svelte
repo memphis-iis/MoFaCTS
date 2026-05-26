@@ -11,6 +11,14 @@
   let runtime = null;
   let errorMessage = '';
   let progress = 0;
+  let progressCounts = {
+    coveredExpectations: 0,
+    requiredExpectations: 0,
+    neededExpectations: 0,
+    activeMisconceptions: 0,
+    totalMisconceptions: 0,
+    maxActiveMisconceptions: 0,
+  };
   let turnCount = 0;
   let costUsd = 0;
   let completed = false;
@@ -32,6 +40,7 @@
     }
     const state = runtime.getState();
     progress = runtime.getProgress();
+    progressCounts = runtime.getProgressCounts();
     turnCount = state.turnCount;
     costUsd = state.costUsd;
     completed = state.completed;
@@ -87,6 +96,20 @@
       costUsd,
       progress,
     });
+  }
+
+  function barWidth(value, total) {
+    if (!Number.isFinite(total) || total <= 0) {
+      return 0;
+    }
+    return Math.max(0, Math.min(100, (value / total) * 100));
+  }
+
+  function thresholdMarker(value, total) {
+    if (!Number.isFinite(total) || total <= 0) {
+      return 0;
+    }
+    return Math.max(0, Math.min(100, (value / total) * 100));
   }
 
   function applyDeepChatHostLayout() {
@@ -249,15 +272,53 @@
       <h1>{questionPrompt}</h1>
     </div>
     <div class="auto-tutor-progress" aria-label="AutoTutor progress">
-      <div class="auto-tutor-progress-label">
-        Progress
+      <div class="auto-tutor-meter-row">
+        <div class="auto-tutor-meter-copy">
+          <span>Ideas</span>
+          <strong>{progressCounts.coveredExpectations}/{progressCounts.requiredExpectations}</strong>
+        </div>
+        <div
+          class="auto-tutor-progress-track auto-tutor-progress-track-ideas"
+          role="meter"
+          aria-label="Covered ideas"
+          aria-valuemin="0"
+          aria-valuemax={progressCounts.requiredExpectations}
+          aria-valuenow={progressCounts.coveredExpectations}
+        >
+          <div
+            class="auto-tutor-progress-fill"
+            style={`width: ${barWidth(progressCounts.coveredExpectations, progressCounts.requiredExpectations)}%;`}
+          ></div>
+          <div
+            class="auto-tutor-progress-marker"
+            style={`left: ${thresholdMarker(progressCounts.neededExpectations, progressCounts.requiredExpectations)}%;`}
+            aria-hidden="true"
+          ></div>
+        </div>
       </div>
-      <div class="auto-tutor-progress-track">
-        <div class="auto-tutor-progress-fill" style={`width: ${Math.round(progress * 100)}%;`}></div>
-      </div>
-      <div class="auto-tutor-progress-scale" aria-hidden="true">
-        <span>0%</span>
-        <span>100%</span>
+      <div class="auto-tutor-meter-row">
+        <div class="auto-tutor-meter-copy">
+          <span>Misconceptions</span>
+          <strong>{progressCounts.activeMisconceptions}/{progressCounts.totalMisconceptions}</strong>
+        </div>
+        <div
+          class="auto-tutor-progress-track auto-tutor-progress-track-misconceptions"
+          role="meter"
+          aria-label="Active misconceptions"
+          aria-valuemin="0"
+          aria-valuemax={progressCounts.totalMisconceptions}
+          aria-valuenow={progressCounts.activeMisconceptions}
+        >
+          <div
+            class="auto-tutor-progress-fill auto-tutor-progress-fill-misconceptions"
+            style={`width: ${barWidth(progressCounts.activeMisconceptions, progressCounts.totalMisconceptions)}%;`}
+          ></div>
+          <div
+            class="auto-tutor-progress-marker"
+            style={`left: ${thresholdMarker(progressCounts.maxActiveMisconceptions, progressCounts.totalMisconceptions)}%;`}
+            aria-hidden="true"
+          ></div>
+        </div>
       </div>
       <div class="auto-tutor-turns">
         {turnCount === 1 ? '1 turn' : `${turnCount} turns`}
@@ -279,8 +340,29 @@
 
   <div class="auto-tutor-chat" class:auto-tutor-chat-disabled={!!errorMessage || completed}>
     <div class="auto-tutor-mobile-progress" aria-label="AutoTutor progress">
-      <div class="auto-tutor-progress-track">
-        <div class="auto-tutor-progress-fill" style={`width: ${Math.round(progress * 100)}%;`}></div>
+      <div class="auto-tutor-meter-row">
+        <div class="auto-tutor-meter-copy">
+          <span>Ideas</span>
+          <strong>{progressCounts.coveredExpectations}/{progressCounts.requiredExpectations}</strong>
+        </div>
+        <div class="auto-tutor-progress-track auto-tutor-progress-track-ideas">
+          <div
+            class="auto-tutor-progress-fill"
+            style={`width: ${barWidth(progressCounts.coveredExpectations, progressCounts.requiredExpectations)}%;`}
+          ></div>
+        </div>
+      </div>
+      <div class="auto-tutor-meter-row">
+        <div class="auto-tutor-meter-copy">
+          <span>Misconceptions</span>
+          <strong>{progressCounts.activeMisconceptions}/{progressCounts.totalMisconceptions}</strong>
+        </div>
+        <div class="auto-tutor-progress-track auto-tutor-progress-track-misconceptions">
+          <div
+            class="auto-tutor-progress-fill auto-tutor-progress-fill-misconceptions"
+            style={`width: ${barWidth(progressCounts.activeMisconceptions, progressCounts.totalMisconceptions)}%;`}
+          ></div>
+        </div>
       </div>
       <div class="auto-tutor-turns">
         {turnCount === 1 ? '1 turn' : `${turnCount} turns`}
@@ -346,39 +428,73 @@
   .auto-tutor-progress {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
   }
 
-  .auto-tutor-progress-scale {
-    display: flex;
-    justify-content: space-between;
+  .auto-tutor-meter-row {
+    display: grid;
+    grid-template-columns: minmax(6.5rem, 8.5rem) minmax(0, 1fr);
     gap: 8px;
+    align-items: center;
   }
 
-  .auto-tutor-progress-label {
-    text-align: center;
+  .auto-tutor-meter-copy {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 6px;
+    min-width: 0;
     color: var(--text-color);
-    font-size: 0.82rem;
+    font-size: 0.78rem;
     font-weight: 600;
   }
 
+  .auto-tutor-meter-copy span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .auto-tutor-meter-copy strong {
+    flex: 0 0 auto;
+    font-size: 0.82rem;
+  }
+
   .auto-tutor-progress-track {
+    position: relative;
     width: 100%;
     height: 10px;
-    overflow: hidden;
     border: 1px solid var(--secondary-color);
-    border-radius: 999px;
+    border-radius: 6px;
     background: var(--card-background-color);
+    box-sizing: border-box;
   }
 
   .auto-tutor-progress-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
     height: 100%;
     min-width: 0;
     background: var(--main-button-color);
+    border-radius: 5px;
     transition: width 160ms ease;
   }
 
-  .auto-tutor-progress-scale,
+  .auto-tutor-progress-fill-misconceptions {
+    background: var(--warning-color, var(--accent-color));
+  }
+
+  .auto-tutor-progress-marker {
+    position: absolute;
+    top: -3px;
+    bottom: -3px;
+    width: 2px;
+    border-radius: 999px;
+    background: var(--text-color);
+    opacity: 0.65;
+    transform: translateX(-1px);
+  }
+
   .auto-tutor-turns {
     color: var(--secondary-text-color);
     font-size: 0.78rem;
@@ -491,8 +607,8 @@
       z-index: 2;
       display: flex;
       flex-direction: column;
-      width: min(42vw, 156px);
-      gap: 2px;
+      width: min(58vw, 220px);
+      gap: 4px;
       padding: 0.35rem 0.45rem;
       border: 1px solid var(--secondary-color);
       border-radius: var(--border-radius-sm);
@@ -502,8 +618,18 @@
       pointer-events: none;
     }
 
-    .auto-tutor-progress-label {
-      display: none;
+    .auto-tutor-mobile-progress .auto-tutor-meter-row {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 2px;
+    }
+
+    .auto-tutor-mobile-progress .auto-tutor-meter-copy {
+      font-size: 0.68rem;
+      line-height: 1;
+    }
+
+    .auto-tutor-mobile-progress .auto-tutor-meter-copy strong {
+      font-size: 0.72rem;
     }
 
     .auto-tutor-turns {
@@ -512,12 +638,8 @@
       text-align: center;
     }
 
-    .auto-tutor-progress-scale {
-      display: none;
-    }
-
     .auto-tutor-progress-track {
-      height: 8px;
+      height: 7px;
     }
 
     .auto-tutor-error,

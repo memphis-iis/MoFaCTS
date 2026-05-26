@@ -31,6 +31,8 @@ export type AutoTutorMisconceptionScore = {
   current: boolean;
   confidence: number;
   evidence?: string;
+  repaired?: boolean;
+  repairEvidence?: string;
 };
 
 export type AutoTutorLearnerQuestionScore = {
@@ -219,6 +221,9 @@ export function validatePlannerState(script: AutoTutorPlannerScript, plannerStat
       throw new Error(`AutoTutor planner state misconceptionScores.${id}.current must be boolean`);
     }
     assertScore(score.confidence, `misconceptionScores.${id}.confidence`);
+    if (score.repaired !== undefined && typeof score.repaired !== 'boolean') {
+      throw new Error(`AutoTutor planner state misconceptionScores.${id}.repaired must be boolean when present`);
+    }
   }
   if (!Number.isInteger(plannerState.focusTurnCount) || plannerState.focusTurnCount < 0) {
     throw new Error('AutoTutor planner state focusTurnCount must be a non-negative integer');
@@ -292,6 +297,58 @@ export function preserveDurableExpectationCoverage(
   return mergedScores;
 }
 
+export function preserveRepairedMisconceptionState(
+  script: AutoTutorPlannerScript,
+  previousScores: Record<string, AutoTutorMisconceptionScore>,
+  nextScores: Record<string, AutoTutorMisconceptionScore>,
+): Record<string, AutoTutorMisconceptionScore> {
+  const mergedScores: Record<string, AutoTutorMisconceptionScore> = {};
+  for (const misconception of script.misconceptions || []) {
+    const previousScore = previousScores[misconception.id];
+    const nextScore = nextScores[misconception.id];
+    if (!nextScore) {
+      throw new Error(`AutoTutor score response omitted misconception "${misconception.id}"`);
+    }
+
+    if (nextScore.repaired) {
+      mergedScores[misconception.id] = {
+        ...nextScore,
+        current: false,
+        confidence: 0,
+        repaired: true,
+        ...(nextScore.repairEvidence || nextScore.evidence
+          ? { repairEvidence: nextScore.repairEvidence || nextScore.evidence }
+          : {}),
+      };
+      continue;
+    }
+
+    if (nextScore.current) {
+      mergedScores[misconception.id] = {
+        ...nextScore,
+        repaired: false,
+      };
+      continue;
+    }
+
+    if (previousScore?.repaired) {
+      mergedScores[misconception.id] = {
+        ...nextScore,
+        current: false,
+        confidence: 0,
+        repaired: true,
+        ...(previousScore.repairEvidence || nextScore.repairEvidence || nextScore.evidence
+          ? { repairEvidence: previousScore.repairEvidence || nextScore.repairEvidence || nextScore.evidence }
+          : {}),
+      };
+      continue;
+    }
+
+    mergedScores[misconception.id] = nextScore;
+  }
+  return mergedScores;
+}
+
 function selectHighestPriorityExpectation(
   requiredIds: string[],
   scores: Record<string, AutoTutorExpectationScore>,
@@ -334,7 +391,7 @@ export function selectAutoTutorTarget(input: AutoTutorPlannerInput): AutoTutorTa
   let selectedMisconceptionId = '';
   let selectedConfidence = thresholds.misconceptionThreshold;
   for (const [id, score] of Object.entries(input.plannerState.misconceptionScores)) {
-    if (score.current && score.confidence >= selectedConfidence) {
+    if (!score.repaired && score.current && score.confidence >= selectedConfidence) {
       selectedMisconceptionId = id;
       selectedConfidence = score.confidence;
     }
@@ -457,7 +514,7 @@ export function planAutoTutorTurn(input: AutoTutorPlannerInput): AutoTutorPlan {
     nextPlannerState.misconceptionCycleIndex = cycleIndex + 1;
   } else {
     const hasActiveMisconception = Object.values(input.plannerState.misconceptionScores)
-      .some((score) => score.current && score.confidence >= thresholds.misconceptionThreshold);
+      .some((score) => !score.repaired && score.current && score.confidence >= thresholds.misconceptionThreshold);
     if (!hasActiveMisconception) {
       delete nextPlannerState.focusedMisconceptionId;
       delete nextPlannerState.misconceptionCycleIndex;

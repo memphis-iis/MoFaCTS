@@ -4,6 +4,7 @@ import {
   createInitialAutoTutorPlannerState,
   planAutoTutorTurn,
   preserveDurableExpectationCoverage,
+  preserveRepairedMisconceptionState,
   recomputeExpectationPriorities,
   selectAutoTutorTarget,
   type AutoTutorPlannerScript,
@@ -70,6 +71,31 @@ describe('AutoTutor planner', function() {
     expect(stages).to.deep.equal(['hint', 'prompt', 'assertion', 'hint']);
     expect(plannerState.focusedMisconceptionId).to.equal('M1');
     expect(plannerState.misconceptionCycleIndex).to.equal(4);
+  });
+
+  it('does not target a repaired misconception', function() {
+    const script = buildScript();
+    const plannerState = createInitialAutoTutorPlannerState(script);
+    plannerState.expectationScores = recomputeExpectationPriorities(script, {
+      ...plannerState.expectationScores,
+      E1: { ...plannerState.expectationScores.E1!, coverage: 0.2, coherence: 0.2, centrality: 0.5 },
+      E2: { ...plannerState.expectationScores.E2!, coverage: 0.4, coherence: 0.3, centrality: 0.5 },
+    });
+    plannerState.misconceptionScores.M1 = {
+      current: false,
+      confidence: 0,
+      repaired: true,
+      repairEvidence: 'Learner answered the repair question.',
+    };
+
+    const target = selectAutoTutorTarget({
+      script,
+      plannerState,
+      learnerQuestion: { current: false, answerableFromAuthoredContent: false },
+      answerQuality: 'partial',
+    });
+
+    expect(target.type).to.equal('expectation');
   });
 
   it('selects the highest-priority uncovered required expectation', function() {
@@ -260,5 +286,44 @@ describe('AutoTutor planner', function() {
     expect(mergedScores.E1?.coverage).to.equal(0.75);
     expect(mergedScores.E1?.current).to.equal(true);
     expect(mergedScores.E1?.evidence).to.equal('Learner connected repeated sampling to long-run coverage.');
+  });
+
+  it('preserves repaired misconception state until the learner reintroduces it', function() {
+    const script = buildScript();
+    const previousScores = {
+      M1: {
+        current: false,
+        confidence: 0,
+        repaired: true,
+        repairEvidence: 'Learner said the parameter is fixed.',
+      },
+    };
+
+    const stillRepaired = preserveRepairedMisconceptionState(script, previousScores, {
+      M1: {
+        current: false,
+        confidence: 0.2,
+        evidence: 'No new misconception in the latest answer.',
+      },
+    });
+    expect(stillRepaired.M1).to.include({
+      current: false,
+      confidence: 0,
+      repaired: true,
+      repairEvidence: 'Learner said the parameter is fixed.',
+    });
+
+    const reintroduced = preserveRepairedMisconceptionState(script, stillRepaired, {
+      M1: {
+        current: true,
+        confidence: 0.9,
+        evidence: 'Learner again said there is a 95% chance the fixed mean is in this interval.',
+      },
+    });
+    expect(reintroduced.M1).to.include({
+      current: true,
+      confidence: 0.9,
+      repaired: false,
+    });
   });
 });

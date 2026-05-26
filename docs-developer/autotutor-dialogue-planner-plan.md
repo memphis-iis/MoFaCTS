@@ -283,12 +283,14 @@ Current progress is:
 The planner should preserve a simple progress value for the UI, but completion should be based on required expectations and active misconceptions:
 
 ```ts
-requiredCovered = all required expectations have coverage >= threshold;
-misconceptionsCleared = no misconception current above threshold;
-completed = requiredCovered && misconceptionsCleared;
+coveredExpectations = required expectations with coverage >= threshold;
+activeMisconceptions = unrepaired misconceptions current above threshold;
+completed =
+  coveredExpectations >= graduation.requiredExpectationCount &&
+  activeMisconceptions <= graduation.maxActiveMisconceptions;
 ```
 
-The existing `minExpectationScore` can remain as a coarse threshold, but the planner should also support a per-expectation coverage threshold. Initial default:
+The turn limit is separate from graduation and is read from `autotutorsession.maxTurns`. Initial scoring thresholds:
 
 ```ts
 coverageThreshold = 0.8;

@@ -12,6 +12,7 @@ import {
   createInitialAutoTutorPlannerState,
   planAutoTutorTurn,
   preserveDurableExpectationCoverage,
+  preserveRepairedMisconceptionState,
   recomputeExpectationPriorities,
   validatePlannerState,
   type AutoTutorMove,
@@ -59,8 +60,11 @@ type AutoTutorScript = {
 };
 
 type AutoTutorGraduation = {
-  minExpectationScore: number;
-  requireNoCurrentMisconceptions: boolean;
+  requiredExpectationCount: number;
+  maxActiveMisconceptions: number;
+};
+
+type AutoTutorTurnLimit = {
   maxTurns: number;
 };
 
@@ -68,6 +72,7 @@ type AutoTutorConfig = {
   apiKey: string;
   model: string;
   graduation: AutoTutorGraduation;
+  turnLimit: AutoTutorTurnLimit;
   requireFinalAnswerPrompt: boolean;
   prompt: string;
   script: AutoTutorScript;
@@ -89,10 +94,20 @@ type AutoTutorState = {
   dialogue: Array<{ role: 'student' | 'tutor'; text: string }>;
 };
 
+export type AutoTutorProgressCounts = {
+  coveredExpectations: number;
+  requiredExpectations: number;
+  neededExpectations: number;
+  activeMisconceptions: number;
+  totalMisconceptions: number;
+  maxActiveMisconceptions: number;
+};
+
 export type AutoTutorRuntime = {
   config: AutoTutorConfig;
   getState: () => AutoTutorState;
   getProgress: () => number;
+  getProgressCounts: () => AutoTutorProgressCounts;
   getDialogue: () => AutoTutorState['dialogue'];
   submitStudentAnswer: (studentAnswer: string) => Promise<{ message: string; completed: boolean; stoppedByCost: boolean }>;
 };
@@ -136,13 +151,6 @@ function requiredNumber(value: unknown, field: string): number {
   return parsed;
 }
 
-function requiredBoolean(value: unknown, field: string): boolean {
-  if (typeof value !== 'boolean') {
-    throw new Error(`AutoTutor runtime requires boolean ${field}`);
-  }
-  return value;
-}
-
 function cloneJson<T>(value: T): T {
   return JSON.parse(JSON.stringify(value));
 }
@@ -176,20 +184,32 @@ function readGraduation(session: Record<string, unknown>): AutoTutorGraduation {
   if (!isRecord(graduation)) {
     throw new Error('AutoTutor runtime requires autotutorsession.graduation');
   }
-  const minExpectationScore = requiredNumber(graduation.minExpectationScore, 'autotutorsession.graduation.minExpectationScore');
-  if (minExpectationScore < 0 || minExpectationScore > 1) {
-    throw new Error('AutoTutor runtime requires graduation.minExpectationScore from 0 to 1');
+  const requiredExpectationCount = requiredNumber(
+    graduation.requiredExpectationCount,
+    'autotutorsession.graduation.requiredExpectationCount',
+  );
+  if (!Number.isInteger(requiredExpectationCount) || requiredExpectationCount < 0) {
+    throw new Error('AutoTutor runtime requires graduation.requiredExpectationCount to be a non-negative integer');
   }
-  const maxTurns = requiredNumber(graduation.maxTurns, 'autotutorsession.graduation.maxTurns');
-  if (!Number.isInteger(maxTurns) || maxTurns < 1) {
-    throw new Error('AutoTutor runtime requires graduation.maxTurns to be a positive integer');
+  const maxActiveMisconceptions = requiredNumber(
+    graduation.maxActiveMisconceptions,
+    'autotutorsession.graduation.maxActiveMisconceptions',
+  );
+  if (!Number.isInteger(maxActiveMisconceptions) || maxActiveMisconceptions < 0) {
+    throw new Error('AutoTutor runtime requires graduation.maxActiveMisconceptions to be a non-negative integer');
   }
   return {
-    minExpectationScore,
-    requireNoCurrentMisconceptions: requiredBoolean(
-      graduation.requireNoCurrentMisconceptions,
-      'autotutorsession.graduation.requireNoCurrentMisconceptions',
-    ),
+    requiredExpectationCount,
+    maxActiveMisconceptions,
+  };
+}
+
+function readTurnLimit(session: Record<string, unknown>): AutoTutorTurnLimit {
+  const maxTurns = requiredNumber(session.maxTurns, 'autotutorsession.maxTurns');
+  if (!Number.isInteger(maxTurns) || maxTurns < 1) {
+    throw new Error('AutoTutor runtime requires autotutorsession.maxTurns to be a positive integer');
+  }
+  return {
     maxTurns,
   };
 }
@@ -219,6 +239,7 @@ function readAutoTutorConfig(): AutoTutorConfig {
     apiKey: requiredString(setspec.openRouterApiKey, 'tutor.setspec.openRouterApiKey'),
     model: requiredString(session.openRouterModel || setspec.openRouterModel, 'openRouterModel'),
     graduation: readGraduation(session),
+    turnLimit: readTurnLimit(session),
     requireFinalAnswerPrompt: session.requireFinalAnswerPrompt === true,
     prompt: requiredString(display.text, `cluster ${clusterIndex} display.text`),
     script: cloneJson(script as AutoTutorScript),
@@ -264,6 +285,10 @@ function buildScoringSystemPrompt(config: AutoTutorConfig): string {
     'Only learner-generated text may count as expectation coverage. Tutor turns may provide context for short learner answers, but tutor hints, prompts, assertions, summaries, and corrections are not learner knowledge.',
     'If the latest learner answer is abusive, profane, hostile, playful, or otherwise off-task rather than a substantive content claim, ignore that behavior for semantic scoring: do not mark any expectation covered, do not mark or strengthen any misconception, and do not reduce previously demonstrated expectation coverage.',
     'Classify whether the learner asked a substantive question and whether it is answerable from the provided authored lesson content or dialogue context.',
+    'Misconception repair is a first-class scoring decision. If the prior tutor state last selected a misconception target and the latest tutor turn asked its repair question or otherwise requested repair, score the latest learner answer first as a repair attempt for that misconception.',
+    'A concise answer can repair a misconception when it directly answers the repair question or rejects the mistaken contrast, even if it does not cover a full expectation. For example, if the tutor asks whether an interval estimates individual scores or the population mean, "the population mean" repairs the individual-scores misconception.',
+    'When the latest learner answer repairs a misconception, set that misconception to current false, confidence 0, repaired true, and explain the repair in repairEvidence. Do not carry forward a prior misconception solely because earlier dialogue showed it.',
+    'For a previously repaired misconception, keep current false and confidence 0 unless the latest learner answer reintroduces that misconception. If it is reintroduced, set current true and repaired false.',
     'Do not choose a dialogue target, choose a dialogue move, or write the tutor response.',
     'Return JSON only. Do not wrap it in Markdown. The JSON object must exactly follow this envelope shape:',
     JSON.stringify(AUTO_TUTOR_SCORE_ENVELOPE_SCHEMA, null, 2),
@@ -493,6 +518,8 @@ function validateSavedMisconceptionScores(
       current: entry.current,
       confidence: requiredScore(entry.confidence, `state.${fieldName}.${id}.confidence`),
       ...(typeof entry.evidence === 'string' ? { evidence: entry.evidence } : {}),
+      ...(typeof entry.repaired === 'boolean' ? { repaired: entry.repaired } : {}),
+      ...(typeof entry.repairEvidence === 'string' ? { repairEvidence: entry.repairEvidence } : {}),
     };
   }
   return parsed;
@@ -643,8 +670,34 @@ function computeProgress(state: AutoTutorState): number {
     throw new Error('AutoTutor state has no expectations');
   }
   const coverageSum = Object.values(state.expectations).reduce((sum, entry) => sum + entry.coverage, 0);
-  const activeMisconceptionPenalty = Object.values(state.misconceptions).filter((entry) => entry.current && entry.confidence >= 0.65).length;
+  const activeMisconceptionPenalty = Object.values(state.misconceptions)
+    .filter((entry) => !entry.repaired && entry.current && entry.confidence >= 0.65)
+    .length;
   return Math.max(0, coverageSum - activeMisconceptionPenalty) / expectationCount;
+}
+
+function countCoveredRequiredExpectations(state: AutoTutorState, config: AutoTutorConfig): number {
+  return getRequiredExpectationIds(config.script).filter((id) => {
+    const score = state.expectations[id];
+    return Boolean(score && score.coverage >= 0.8);
+  }).length;
+}
+
+function countActiveMisconceptions(state: AutoTutorState): number {
+  return Object.values(state.misconceptions)
+    .filter((entry) => !entry.repaired && entry.current && entry.confidence >= 0.65)
+    .length;
+}
+
+function computeProgressCounts(state: AutoTutorState, config: AutoTutorConfig): AutoTutorProgressCounts {
+  return {
+    coveredExpectations: countCoveredRequiredExpectations(state, config),
+    requiredExpectations: getRequiredExpectationIds(config.script).length,
+    neededExpectations: config.graduation.requiredExpectationCount,
+    activeMisconceptions: countActiveMisconceptions(state),
+    totalMisconceptions: Object.keys(state.misconceptions).length,
+    maxActiveMisconceptions: config.graduation.maxActiveMisconceptions,
+  };
 }
 
 function getRequiredExpectationIds(script: AutoTutorScript): string[] {
@@ -661,27 +714,37 @@ function getRequiredExpectationIds(script: AutoTutorScript): string[] {
   });
 }
 
-function computeCompleted(state: AutoTutorState, config: AutoTutorConfig): boolean {
-  if (state.turnCount >= config.graduation.maxTurns) {
-    return true;
+function validateGraduationAgainstScript(config: AutoTutorConfig): void {
+  const requiredExpectationCount = getRequiredExpectationIds(config.script).length;
+  if (config.graduation.requiredExpectationCount > requiredExpectationCount) {
+    throw new Error(
+      `AutoTutor graduation.requiredExpectationCount cannot exceed ${requiredExpectationCount} required expectations`
+    );
   }
-  const requiredExpectations = getRequiredExpectationIds(config.script);
-  const requiredCovered = requiredExpectations.every((id) => {
-    const score = state.expectations[id];
-    return Boolean(score && score.coverage >= 0.8);
-  });
-  const hasCurrentMisconceptions = Object.values(state.misconceptions).some((entry) => entry.current && entry.confidence >= 0.65);
-  return requiredCovered &&
-    computeProgress(state) >= config.graduation.minExpectationScore &&
-    (!config.graduation.requireNoCurrentMisconceptions || !hasCurrentMisconceptions);
+  const misconceptionCount = config.script.misconceptions?.length || 0;
+  if (config.graduation.maxActiveMisconceptions > misconceptionCount) {
+    throw new Error(
+      `AutoTutor graduation.maxActiveMisconceptions cannot exceed ${misconceptionCount} authored misconceptions`
+    );
+  }
 }
 
-function publishState(state: AutoTutorState): void {
+function computeCompleted(state: AutoTutorState, config: AutoTutorConfig): boolean {
+  if (state.turnCount >= config.turnLimit.maxTurns) {
+    return true;
+  }
+  const progressCounts = computeProgressCounts(state, config);
+  return progressCounts.coveredExpectations >= config.graduation.requiredExpectationCount &&
+    progressCounts.activeMisconceptions <= config.graduation.maxActiveMisconceptions;
+}
+
+function publishState(state: AutoTutorState, config: AutoTutorConfig): void {
   Session.set('autoTutorState', {
     ...summarizeState(state),
     completed: state.completed,
     stoppedByCost: state.stoppedByCost,
     progress: computeProgress(state),
+    progressCounts: computeProgressCounts(state, config),
   });
 }
 
@@ -857,14 +920,16 @@ async function insertAutoTutorHistoryTurn(config: AutoTutorConfig, state: AutoTu
 
 export async function createAutoTutorRuntime(): Promise<AutoTutorRuntime> {
   const config = readAutoTutorConfig();
+  validateGraduationAgainstScript(config);
   const state = createInitialState(config.script);
   applySavedHistory(config, state, await loadSavedAutoTutorHistory());
-  publishState(state);
+  publishState(state, config);
 
   return {
     config,
     getState: () => cloneJson(state),
     getProgress: () => computeProgress(state),
+    getProgressCounts: () => computeProgressCounts(state, config),
     getDialogue: () => cloneJson(state.dialogue),
     async submitStudentAnswer(studentAnswer: string) {
       const cleanedAnswer = requiredString(studentAnswer, 'student answer');
@@ -874,7 +939,7 @@ export async function createAutoTutorRuntime(): Promise<AutoTutorRuntime> {
       if (state.costUsd > AUTO_TUTOR_COST_CAP_USD) {
         state.stoppedByCost = true;
         state.completed = true;
-        publishState(state);
+        publishState(state, config);
         return {
           message: 'We need to stop here because this AutoTutor session reached the configured cost cap.',
           completed: true,
@@ -895,10 +960,15 @@ export async function createAutoTutorRuntime(): Promise<AutoTutorRuntime> {
         scoreEnvelope.expectationScores,
       );
       const scoredExpectations = recomputeExpectationPriorities(config.script, durableExpectationScores);
+      const scoredMisconceptions = preserveRepairedMisconceptionState(
+        config.script,
+        state.misconceptions,
+        scoreEnvelope.misconceptionScores,
+      );
       nextState.expectations = scoredExpectations;
-      nextState.misconceptions = scoreEnvelope.misconceptionScores;
+      nextState.misconceptions = scoredMisconceptions;
       nextState.planner.expectationScores = scoredExpectations;
-      nextState.planner.misconceptionScores = scoreEnvelope.misconceptionScores;
+      nextState.planner.misconceptionScores = scoredMisconceptions;
       nextState.answerQuality = scoreEnvelope.answerQuality;
       nextState.studentAskedQuestion = scoreEnvelope.learnerQuestion.current;
       const stateForUtterancePlan = cloneJson(nextState);
@@ -945,7 +1015,7 @@ export async function createAutoTutorRuntime(): Promise<AutoTutorRuntime> {
         turnEndedAt,
       });
       Object.assign(state, nextState);
-      publishState(state);
+      publishState(state, config);
 
       return {
         message: tutorMessage,

@@ -19,31 +19,29 @@ export const AUTOTUTOR_SESSION_FIELD_REGISTRY: SectionFieldRegistry = {
     brief: 'Require final answer prompt.',
     verbose: 'When enabled, AutoTutor asks the learner for one final integrated answer before giving the summary. Disabled by default.'
   }),
+  maxTurns: simpleField(integerField(20, 4), {
+    brief: 'Maximum AutoTutor turns.',
+    verbose: 'Maximum learner turns before the AutoTutor session ends. This is a session limit, not a graduation criterion.'
+  }),
   graduation: simpleField({
     type: 'object',
     title: 'AutoTutor Graduation',
     additionalProperties: false,
-    required: ['minExpectationScore', 'requireNoCurrentMisconceptions', 'maxTurns'],
+    required: ['requiredExpectationCount', 'maxActiveMisconceptions'],
     properties: {
-      minExpectationScore: {
-        type: 'number',
-        minimum: 0,
-        maximum: 1,
-        default: 1,
-      },
-      requireNoCurrentMisconceptions: {
-        type: 'boolean',
-        default: true,
-      },
-      maxTurns: {
+      requiredExpectationCount: {
         type: 'integer',
-        minimum: 1,
-        default: 20,
+        minimum: 0,
+      },
+      maxActiveMisconceptions: {
+        type: 'integer',
+        minimum: 0,
+        default: 0,
       },
     },
   }, {
     brief: 'AutoTutor graduation rule.',
-    verbose: 'Completion threshold for the AutoTutor unit, including expectation score, misconception requirement, and maximum learner turns.'
+    verbose: 'Completion threshold for the AutoTutor unit: required covered expectations and maximum active misconceptions.'
   }),
 };
 
@@ -51,6 +49,7 @@ export const AUTOTUTOR_SESSION_FIELD_REGISTRY: SectionFieldRegistry = {
 export const AUTOTUTOR_SESSION_DIRECT_RUNTIME_KEYS = Object.freeze([
   'cluster',
   'graduation',
+  'maxTurns',
   'openRouterModel',
   'requireFinalAnswerPrompt',
 ]);

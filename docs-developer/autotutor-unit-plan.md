@@ -17,7 +17,8 @@ The intended authoring shape is:
 - `unit[].autotutorsession`: marks the unit as an AutoTutor unit.
 - `unit[].autotutorsession.cluster`: the stimulus cluster index used as the AutoTutor content record.
 - `unit[].autotutorsession.openRouterModel`: optional unit-level model override for model-comparison studies.
-- `unit[].autotutorsession.graduation`: authored completion threshold for the unit.
+- `unit[].autotutorsession.maxTurns`: maximum learner turns before the unit ends.
+- `unit[].autotutorsession.graduation`: authored completion threshold for the unit, expressed as required covered expectations and maximum active misconceptions.
 - first stim in the referenced cluster: owns the AutoTutor content for that cluster.
 - stimulus `display.text`: the main question prompt shown at session start.
 - stimulus `autoTutor`: structured tutoring metadata, including topic, learning goal, ideal answer, expectations, misconceptions, dialogue policy, and summary.
@@ -35,7 +36,7 @@ No silent fallback behavior is allowed. Missing API key, missing effective model
 - The client owns the AutoTutor turn loop, prompt construction, OpenRouter call, response parsing, state update, progress calculation, and completion logic.
 - The server is not part of the AutoTutor reasoning loop. It remains storage and ordinary content access infrastructure.
 - The tutoring controller state is explicit and persisted with session history.
-- Completion is deterministic over current expectation and misconception state, with a phase-1 hard stop at 20 learner turns.
+- Completion is deterministic over required expectation coverage and active misconception counts, with a phase-1 default hard stop at 20 learner turns.
 - Existing learning, assessment, video, and instruction unit behavior remains unchanged.
 
 ## Tutor State
@@ -60,7 +61,7 @@ Progress is:
 max(0, current_expectation_count - current_misconception_count) / expectation_count
 ```
 
-Completion is based on the authored TDF graduation rule, with phase 1 supporting a numeric expectation threshold and no current misconceptions.
+Completion is based on the authored TDF graduation rule. Phase 1 uses `graduation.requiredExpectationCount`, `graduation.maxActiveMisconceptions`, and `autotutorsession.maxTurns`.
 
 ## Implementation Steps
 
@@ -68,7 +69,7 @@ Completion is based on the authored TDF graduation rule, with phase 1 supporting
    - Extend `fieldRegistrySections.ts` with `autotutorsession`.
    - Add `openRouterApiKey` and default `openRouterModel` to setspec.
    - Add optional `openRouterModel` to `autotutorsession` for per-unit overrides.
-   - Add authored `graduation` settings to `autotutorsession`.
+   - Add authored `graduation` settings and `maxTurns` to `autotutorsession`.
    - Add stimulus `autoTutor` schema to the first-stim content path.
    - Regenerate `mofacts/public/tdfSchema.json` and `mofacts/public/stimSchema.json`.
    - Update unit-type detection and field applicability to include `autotutor`.
@@ -82,7 +83,7 @@ Completion is based on the authored TDF graduation rule, with phase 1 supporting
 3. Add client-side AutoTutor service.
    - Add client/shared code for OpenRouter request construction, response parsing, cost tracking, and clear error handling.
    - Call OpenRouter directly from the browser with the TDF-provided key.
-   - Enforce 20 learner turns per session.
+   - Enforce the authored or default learner-turn limit per session.
    - Stop the session once tracked phase-1 session cost exceeds 20 cents for non-admin users.
    - Fail clearly on first tutor call if the OpenRouter key is invalid or insufficient.
    - Send only stable anonymous learner/session identifiers to OpenRouter.
@@ -99,7 +100,7 @@ Completion is based on the authored TDF graduation rule, with phase 1 supporting
    - Register a new `autotutor` unit engine from `autotutorsession`.
    - Initialize session state from the referenced stimulus prompt and `autoTutor` script.
    - Expose card data needed by the Svelte view, including the authored OpenRouter key, because the browser owns the AutoTutor call.
-   - Mark the unit finished after the completion rule succeeds, or after 20 learner turns.
+   - Mark the unit finished after the completion rule succeeds, or after the turn limit is reached.
 
 6. Add the client experience.
    - Use `deep-chat` for the chat UI: MIT-licensed, AI-chat focused, and usable as a web component from Svelte.
