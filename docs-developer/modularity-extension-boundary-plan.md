@@ -33,7 +33,7 @@ Documentation note: this is a developer-facing planning document and now lives u
    Initial slice: named capability interfaces now exist for session state, delivery settings, media resolution, history, server methods, authorization, logging, and user alerts. Runtime capability helpers now project a typed dependency bag into manifest capability names, so missing dependencies remain visible to registration validation.
 
 3. Move default unit registration out of `createUnitEngine.ts`.
-   Initial slice: default unit component manifests now register instruction, learning-session, assessment-session, video, and the current AutoTutor placeholder through the manifest path.
+   Initial slice: default unit component manifests now register instruction, learning-session, assessment-session, video, and the current AutoTutor placeholder through the manifest path. Instruction, learning-session, assessment-session, video, and AutoTutor manifests now live with their owning unit folders; `defaultUnitComponents.ts` is only the default catalog aggregator.
 
 4. Add registry contract tests.
    Cover duplicate registration, missing capabilities, unknown unit type, and successful creation for each default unit type.
@@ -77,5 +77,6 @@ Current evidence: `mofacts/common/learningComponentManifest.test.ts` proves the 
 2. Add one production-quality sample component package under `learning-components/` that includes its manifest, unit or display implementation, fixtures, and tests.
    Initial slice: `learning-components/samples/echo-unit/` now provides a test-only sample package with implementation, manifest, fixture dependencies, README, and registry creation coverage. It is intentionally not included in the default runtime catalog.
 3. Replace central imports one at a time with catalog entries, preserving the compatibility facades until app imports are retired.
+   Initial slice: default unit manifests were moved out of the central list and into their owning component folders. The remaining central surface is the default catalog/aggregator that composes approved in-repo component manifests.
 4. Expand capability interfaces only when a real component needs them, and fail manifest registration when those capabilities are absent.
 5. After in-repo component packaging is stable, evaluate controlled package discovery for approved local component bundles. Do not introduce arbitrary dynamic code loading before manifest validation, capability validation, and test fixtures are crisp.
