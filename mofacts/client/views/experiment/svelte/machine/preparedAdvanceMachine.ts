@@ -10,8 +10,16 @@ import type {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Matches cardMachine's XState v5 assign typing workaround.
 const assign: any = xAssign;
 
+export type PreparedQuestionIndexRoute = 'schedule-live-index' | 'context-counter';
+
 export function getPreparedTrial(context: CardMachineContext): PreparedAdvanceResult | null {
   return context.preparedTrial || null;
+}
+
+export function resolvePreparedQuestionIndexRoute(engine: { unitType?: string } | null | undefined): PreparedQuestionIndexRoute {
+  return engine?.unitType === 'schedule'
+    ? 'schedule-live-index'
+    : 'context-counter';
 }
 
 export function isFeedbackAdvanceReady(context: CardMachineContext): boolean {
@@ -68,9 +76,9 @@ export function resolveSelectedQuestionIndex(
   const outputQuestionIndex = event.output?.questionIndex;
   const outputEngine = event.output?.engine as { unitType?: string } | undefined;
   const contextEngine = context.engine as { unitType?: string } | undefined;
-  const unitType = String(outputEngine?.unitType || contextEngine?.unitType || '');
+  const route = resolvePreparedQuestionIndexRoute(outputEngine || contextEngine);
 
-  if (unitType === 'schedule') {
+  if (route === 'schedule-live-index') {
     if (typeof outputQuestionIndex !== 'number' || !Number.isFinite(outputQuestionIndex)) {
       throw new Error('Schedule card selection must provide a live questionIndex');
     }
@@ -86,9 +94,9 @@ export function resolvePreparedQuestionIndex(context: CardMachineContext): numbe
   const preparedQuestionIndex = getPreparedTrial(context)?.questionIndex;
   const preparedEngine = getPreparedTrial(context)?.engine as { unitType?: string } | undefined;
   const contextEngine = context.engine as { unitType?: string } | undefined;
-  const unitType = String(preparedEngine?.unitType || contextEngine?.unitType || '');
+  const route = resolvePreparedQuestionIndexRoute(preparedEngine || contextEngine);
 
-  if (unitType === 'schedule') {
+  if (route === 'schedule-live-index') {
     if (typeof preparedQuestionIndex !== 'number' || !Number.isFinite(preparedQuestionIndex)) {
       throw new Error('Prepared schedule transition must provide a live questionIndex');
     }
