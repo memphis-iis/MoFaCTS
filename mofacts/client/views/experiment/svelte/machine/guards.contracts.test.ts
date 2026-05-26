@@ -13,6 +13,7 @@ import {
   isSoftError,
   isHardError,
   hasQuestionAudio,
+  isVideoSession,
 } from './guards';
 
 function makeArgs(overrides: { context?: Record<string, unknown>; event?: Record<string, unknown> } = {}) {
@@ -137,6 +138,19 @@ describe('machine guard contracts', function() {
     expect(canUsePreparedAdvance(makeArgs({ context: { engine: { unitType: 'model' } } }))).to.equal(true);
     expect(canUsePreparedAdvance(makeArgs({ context: { engine: { unitType: 'schedule' } } }))).to.equal(true);
     expect(canUsePreparedAdvance(makeArgs({ context: { engine: { unitType: 'video' } } }))).to.equal(false);
+  });
+
+  it('uses the session surface adapter for machine video-session guards', function() {
+    expect(isVideoSession(makeArgs({ context: { deliverySettings: { isVideoSession: true } } }))).to.equal(true);
+    expect(canUsePreparedAdvance(makeArgs({
+      context: {
+        engine: { unitType: 'model' },
+        deliverySettings: { isVideoSession: true },
+      },
+    }))).to.equal(false);
+
+    Session.set('isVideoSession', true);
+    expect(isVideoSession(makeArgs())).to.equal(true);
   });
 
   it('accepts only configured video checkpoint mappings', function() {

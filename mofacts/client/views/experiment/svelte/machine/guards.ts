@@ -9,6 +9,7 @@ import { TRIAL_TYPES, SUPPORTED_TRIAL_TYPES, THRESHOLDS, ERROR_SEVERITY_MAP, ERR
 import { getFeedbackTimeoutMs } from '../utils/timeoutUtils';
 import { evaluateSrAvailability } from '../../../../lib/audioAvailability';
 import { selfHostedH5PTrialDisplayOwnsInteraction } from '../services/h5pTrialDisplay';
+import { resolveSessionSurfaceState } from '../services/sessionSurfaceMode';
 
 type FeedbackTimeoutContext = Parameters<typeof getFeedbackTimeoutMs>[0];
 type PreparedAdvanceMode = 'none' | 'seamless' | 'direct';
@@ -460,12 +461,13 @@ export function unitNotFinished(args: CardMachineActorArgs): boolean {
   return !unitFinished(args);
 }
 
-export function canUsePreparedAdvance({ context }: CardMachineActorArgs): boolean {
+export function canUsePreparedAdvance(args: CardMachineActorArgs): boolean {
+  const { context } = args;
   const engine = context.engine as { unitType?: string } | null | undefined;
   if (engine?.unitType !== 'model' && engine?.unitType !== 'schedule') {
     return false;
   }
-  if (Session.get('isVideoSession') === true) {
+  if (isVideoSession(args)) {
     return false;
   }
   if (Session.get('resumeToQuestion') === true || Session.get('resumeInProgress') === true) {
@@ -521,7 +523,10 @@ export function isSoftError({ event }: CardMachineActorArgs): boolean {
  * @returns {boolean}
  */
 export function isVideoSession({ context }: CardMachineActorArgs): boolean {
-  return context.deliverySettings?.isVideoSession === true || Session.get('isVideoSession') === true;
+  return resolveSessionSurfaceState({
+    deliverySettings: context.deliverySettings,
+    sessionIsVideoSession: Session.get('isVideoSession'),
+  }).isVideoSession;
 }
 
 /**
