@@ -19,6 +19,7 @@ import { CardStore } from '../../modules/cardStore';
 import { assertIdInvariants, logIdInvariantBreachOnce } from '../../../../lib/idContext';
 import { resolveH5PModelOutcomes } from '../../../../../common/lib/h5pTrialResult';
 import { getPreparedCardDataFromSelection as buildPreparedCardDataFromSelection } from './cardPayloadBuilder';
+import { resolveSessionSurfaceState } from './sessionSurfaceMode';
 import type {
   EngineServiceResult,
   ExperimentState,
@@ -115,6 +116,12 @@ interface PreparedTrialContent extends Record<string, unknown> {
 }
 
 type PreparedAdvanceMode = 'none' | 'seamless' | 'direct';
+
+function isUnitEngineVideoSurfaceActive(): boolean {
+  return resolveSessionSurfaceState({
+    sessionIsVideoSession: Session.get('isVideoSession'),
+  }).isVideoSession;
+}
 
 function requireScheduleDisplayQuestionIndex(selection: Record<string, unknown>): number {
   const scheduleIndex = Number(selection.scheduleIndex);
@@ -351,7 +358,7 @@ function isPreparedAdvanceEligible(
   if (!engine || engine.unitType !== 'model') {
     return false;
   }
-  if (Session.get('isVideoSession') === true) {
+  if (isUnitEngineVideoSurfaceActive()) {
     return false;
   }
   if (Session.get('resumeToQuestion') === true || Session.get('resumeInProgress') === true) {
@@ -557,7 +564,7 @@ export async function selectCardService(
       ? eventQuestionIndex
       : (context.questionIndex || 1);
     let engineIndices = Session.get('engineIndices');
-    if (Session.get('isVideoSession') && Number.isFinite(resolvedVideoClusterIndex)) {
+    if (isUnitEngineVideoSurfaceActive() && Number.isFinite(resolvedVideoClusterIndex)) {
       engineIndices = { clusterIndex: resolvedVideoClusterIndex, stimIndex: 0 };
       Session.set('engineIndices', engineIndices);
     }
@@ -714,7 +721,7 @@ export async function updateEngineService(
         await engine.cardAnswered(isCorrect, practiceTime, testType);
       }
 
-      if (!Session.get('isVideoSession')) {
+      if (!isUnitEngineVideoSurfaceActive()) {
         if (engine.unitType === 'model' && engine.currentCardRef) {
           Session.set('engineIndices', {
             clusterIndex: engine.currentCardRef.clusterIndex,

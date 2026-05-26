@@ -3,6 +3,11 @@ import { Session } from 'meteor/session';
 import { updateEngineService } from './unitEngineService';
 
 describe('unit engine H5P model updates', function() {
+  afterEach(function() {
+    Session.set('isVideoSession', false);
+    Session.set('engineIndices', undefined);
+  });
+
   it('reports missing engine state as an explicit update error', async function() {
     const result = await updateEngineService({
       testType: 'd',
@@ -61,5 +66,31 @@ describe('unit engine H5P model updates', function() {
     expect(calls.map((call) => call.practiceTime)).to.deep.equal([1500, 1500, 1500]);
     expect(calls.map((call) => call.testType)).to.deep.equal(['d', 'd', 'd']);
     expect(Session.get('engineIndices')).to.deep.equal({ clusterIndex: 4, stimIndex: 0 });
+  });
+
+  it('leaves video-session engine indices owned by the video surface', async function() {
+    Session.set('isVideoSession', true);
+    Session.set('engineIndices', { clusterIndex: 2, stimIndex: 0 });
+
+    const result = await updateEngineService({
+      testType: 'd',
+      isCorrect: true,
+      timestamps: {
+        trialStart: 1000,
+        firstKeypress: 1100,
+        trialEnd: 1800,
+        feedbackStart: 1800,
+        feedbackEnd: 1800,
+      },
+      engine: {
+        unitType: 'model',
+        currentCardRef: { clusterIndex: 4, stimIndex: 0 },
+        cardAnswered: async () => undefined,
+        unitFinished: async () => false,
+      },
+    }, {});
+
+    expect(result).to.deep.equal({ status: 'updated', unitFinished: false });
+    expect(Session.get('engineIndices')).to.deep.equal({ clusterIndex: 2, stimIndex: 0 });
   });
 });
