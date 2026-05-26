@@ -88,3 +88,24 @@ Modularity evidence added:
 - `learning-components/units/autotutor/AutoTutorGenerationConfig.ts` owns scoring temperature, default tutor-utterance temperature, and fail-clear authored temperature validation.
 - `mofacts/common/autoTutorGenerationConfig.test.ts` covers the generation-config contract.
 - `mofacts/common/lib/autoTutorContract.test.ts` covers invalid authored `autotutorsession.utteranceTemperature` rejection.
+
+## 2026-05-26 Self-Hosted Email Sender Settings Pass
+
+Completed:
+
+- `npm run typecheck`
+  - Result: passed.
+  - Coverage: TypeScript verifies the explicit `emailFrom` and optional `emailReplyTo` dependencies across startup, auth methods, and server utility wiring.
+- `npm run lint`
+  - Result: passed.
+- `node scripts/release/open-core-readiness-scan.cjs`
+  - Result: passed.
+  - Coverage: the static release scan now requires `emailFrom` in `deploy/settings.self-hosted.example.json` and `docs/deployment/settings-reference.md`.
+- `http://localhost:3200`
+  - Result: after fixing a local disabled-email boot crash caused by validating the sender before email-send gating, Playwright MCP loaded the normal `MoFaCTS` page with the visible `License / Source` link.
+
+Readiness evidence added:
+
+- Self-hosted production settings validation now requires `emailFrom` when `enableEmail` or `prod` enables mail, accepts display-name sender syntax, and validates optional `emailReplyTo`.
+- The self-hosted and local settings examples now include `emailFrom` and `emailReplyTo`.
+- Operator docs now call out sender-domain deliverability expectations for verification and system mail.
