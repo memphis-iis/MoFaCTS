@@ -80,6 +80,15 @@ Current pause point:
 - The open-core readiness scan, full TypeScript check, lint, staged secret scan, and `http://localhost:3200` smoke should pass before resuming code changes.
 - The next modularity move should avoid broad rewrites. Continue reducing central branches only where there is already a tested service, registry, manifest, or adapter boundary to receive the behavior.
 
+Current direct-branch audit:
+
+- `mofacts/client/views/experiment/engineConstructors.ts` is the app-owned compatibility resolver from authored unit shape to registered unit-engine type. It should keep the explicit shape checks until all callers enter through manifest/catalog metadata.
+- `learning-components/units/autotutor/AutoTutorRuntimeConfig.ts` is the AutoTutor package owner for authored `autotutorsession` validation.
+- `learning-components/units/learning-session/learningSessionRuntimeConfig.ts` is the learning-session package owner for learning/video session runtime config and cluster-list source selection.
+- `mofacts/client/views/experiment/videoAdaptiveQuestions.ts`, `mofacts/client/views/experiment/svelte/services/videoCardInit.ts`, and `videoResume.ts` are video-owned app services; their direct `videosession` reads are intentional integration boundaries.
+- `mofacts/client/views/experiment/svelte/services/sessionSurfaceMode.ts` is the shared session-surface owner for AutoTutor/video/card mode detection and diagnostics.
+- Remaining `engine.unitType` reads in `unitEngineService.ts`, `preparedAdvanceMachine.ts`, `historyLogging.ts`, and `learningProgressPanel.ts` are now behind named helpers or local service predicates. Prefer reusing those helpers before adding new raw unit-type branches.
+
 Resume with:
 
 1. Keep `CardScreen.svelte` stable and move only one remaining session-surface decision at a time behind `sessionSurfaceMode.ts`.
