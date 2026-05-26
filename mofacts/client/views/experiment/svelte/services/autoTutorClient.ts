@@ -26,6 +26,7 @@ import { insertCompressedHistory } from '../../../../lib/historyWire';
 import { meteorCallAsync } from '../../../../lib/meteorAsync';
 import { legacyTrim } from '../../../../../common/underscoreCompat';
 import type {
+  AutoTutorCompressedHistoryRecord,
   AutoTutorHistoryTurn,
   AutoTutorRuntimeCapabilities,
 } from '../../../../../../learning-components/units/autotutor/AutoTutorRuntimeCapabilities';
@@ -214,7 +215,7 @@ function createMeteorAutoTutorRuntimeCapabilities(): AutoTutorRuntimeCapabilitie
           turnEndedAt: turn.endedAt,
         });
       },
-      async writeCompressedHistory(record: Record<string, unknown>) {
+      async writeCompressedHistory(record: AutoTutorCompressedHistoryRecord) {
         await insertCompressedHistory(record);
       },
     },
@@ -983,7 +984,7 @@ async function insertAutoTutorHistoryTurn(config: AutoTutorConfig, state: AutoTu
   const sessionID = (new Date(args.turnStartedAt)).toUTCString().substr(0, 16) + ' ' + snapshot.currentTdfName;
   const note = buildHistoryNote(config, state, args.tutorMessage);
 
-  await args.capabilities.history.writeCompressedHistory({
+  const historyRecord: AutoTutorCompressedHistoryRecord = {
     itemId: stim?._id || config.script.id,
     KCId: stim?.stimulusKC || config.script.id,
     userId: snapshot.currentUserId,
@@ -1049,7 +1050,8 @@ async function insertAutoTutorHistoryTurn(config: AutoTutorConfig, state: AutoTu
     instructionQuestionResult: false,
     entryPoint: snapshot.entryPoint || '',
     eventType: 'autotutor-turn',
-  });
+  };
+  await args.capabilities.history.writeCompressedHistory(historyRecord);
 }
 
 export async function createAutoTutorRuntime(): Promise<AutoTutorRuntime> {
