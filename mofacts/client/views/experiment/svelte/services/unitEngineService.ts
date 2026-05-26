@@ -121,6 +121,7 @@ type PreparedIncomingTrialRoute =
   | { kind: 'model-lock'; preparedAdvanceMode: 'seamless' }
   | { kind: 'schedule-prepare'; preparedAdvanceMode: 'direct' }
   | { kind: 'finish-check'; preparedAdvanceMode: 'seamless' | 'direct' };
+type PreparedTrialCommitRoute = 'model-locked-card' | 'schedule-prepared-card' | 'unsupported';
 
 function isUnitEngineVideoSurfaceActive(): boolean {
   return resolveSessionSurfaceState({
@@ -175,6 +176,16 @@ export function resolvePreparedIncomingTrialRoute(engine: UnitEngineLike): Prepa
     kind: 'finish-check',
     preparedAdvanceMode: 'direct',
   };
+}
+
+export function resolvePreparedTrialCommitRoute(engine: UnitEngineLike | null | undefined): PreparedTrialCommitRoute {
+  if (engine?.unitType === 'model') {
+    return 'model-locked-card';
+  }
+  if (engine?.unitType === 'schedule') {
+    return 'schedule-prepared-card';
+  }
+  return 'unsupported';
 }
 
 /**
@@ -516,11 +527,12 @@ export function commitPreparedTrialRuntime(
   const engine = (preparedTrial.engine || context.engine || getEngine()) as UnitEngineLike | null | undefined;
   const curExperimentState = (ExperimentStateStore.get() || {}) as ExperimentState;
   const preparedSelection = preparedTrial.preparedSelection || null;
+  const commitRoute = resolvePreparedTrialCommitRoute(engine);
   let committed = false;
 
-  if (engine?.unitType === 'model' && typeof engine.commitLockedNextCard === 'function') {
+  if (commitRoute === 'model-locked-card' && typeof engine?.commitLockedNextCard === 'function') {
     committed = engine.commitLockedNextCard(curExperimentState);
-  } else if (engine?.unitType === 'schedule' && typeof engine.commitPreparedScheduledCard === 'function') {
+  } else if (commitRoute === 'schedule-prepared-card' && typeof engine?.commitPreparedScheduledCard === 'function') {
     committed = engine.commitPreparedScheduledCard(preparedSelection || preparedTrial);
   }
 

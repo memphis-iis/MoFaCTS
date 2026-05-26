@@ -6,6 +6,7 @@ import {
   commitPreparedTrialRuntime,
   prepareIncomingTrialService,
   resolvePreparedIncomingTrialRoute,
+  resolvePreparedTrialCommitRoute,
 } from './unitEngineService';
 
 function primeMinimalSession(): void {
@@ -189,6 +190,13 @@ describe('prepared advance integration seams', function() {
       expect(error).to.be.instanceOf(Error);
       expect((error as Error).message).to.equal('No engine available for prepared incoming trial');
     }
+  });
+
+  it('names prepared trial commit routes by behavior', function() {
+    expect(resolvePreparedTrialCommitRoute({ unitType: 'model' })).to.equal('model-locked-card');
+    expect(resolvePreparedTrialCommitRoute({ unitType: 'schedule' })).to.equal('schedule-prepared-card');
+    expect(resolvePreparedTrialCommitRoute({ unitType: 'video' })).to.equal('unsupported');
+    expect(resolvePreparedTrialCommitRoute(null)).to.equal('unsupported');
   });
 
   it('commitPreparedTrialRuntime applies schedule mirrors only at commit', function() {

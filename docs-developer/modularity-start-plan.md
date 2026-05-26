@@ -67,6 +67,7 @@ Make a new in-repo component feel like a small package:
    Video playback policy flags for scrubbing, rewind, and checkpoint-repeat behavior now resolve through `videoCardInit.ts`, keeping `CardScreen.svelte` from reading or normalizing authored `videosession` fields directly.
    Prepared incoming-trial orchestration now resolves named behavior routes before preparing the next card, so the service no longer spreads raw video/model/schedule unit-type branches across the flow.
    Prepared-advance machine question-index handling now resolves named transition routes before enforcing schedule live-index requirements, keeping schedule-specific transition policy tested in one helper.
+   Prepared-trial commit now resolves named commit routes before applying model locked-card or schedule prepared-card state, keeping commit behavior policy explicit and tested.
 
 ## Pause/Resume Checkpoint
 
