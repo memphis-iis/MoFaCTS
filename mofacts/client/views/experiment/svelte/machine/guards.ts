@@ -461,10 +461,18 @@ export function unitNotFinished(args: CardMachineActorArgs): boolean {
   return !unitFinished(args);
 }
 
+type PreparedAdvanceEngineLike = {
+  unitType?: unknown;
+};
+
+export function canEngineUsePreparedAdvance(engine: PreparedAdvanceEngineLike | null | undefined): boolean {
+  return engine?.unitType === 'model' || engine?.unitType === 'schedule';
+}
+
 export function canUsePreparedAdvance(args: CardMachineActorArgs): boolean {
   const { context } = args;
   const engine = context.engine as { unitType?: string } | null | undefined;
-  if (engine?.unitType !== 'model' && engine?.unitType !== 'schedule') {
+  if (!canEngineUsePreparedAdvance(engine)) {
     return false;
   }
   if (isVideoSession(args)) {

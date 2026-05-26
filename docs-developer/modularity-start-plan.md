@@ -78,6 +78,7 @@ Make a new in-repo component feel like a small package:
    Adaptive assessment template cluster-list mutation now lives behind `assessmentAdaptiveSchedule.ts`, mirroring the video-owned adaptive schedule helper and keeping authored `assessmentsession` writes out of `AdaptiveQuestionLogic`.
    Learning-session model preparation now resolves assessment-vs-learning cluster-list source through the learning-session runtime-config owner instead of branching directly on authored session shapes.
    The Svelte card tester now uses the shared `resolveUnitEngineTypeForUnit` compatibility boundary instead of maintaining a local authored-shape unit-type resolver.
+   Svelte machine prepared-advance eligibility now names the model/schedule engine policy before composing it with video-surface and resume guards.
 
 ## Pause/Resume Checkpoint
 

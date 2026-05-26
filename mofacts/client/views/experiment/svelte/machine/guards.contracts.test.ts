@@ -8,6 +8,7 @@ import {
   needsFeedback,
   noFeedback,
   unitFinished,
+  canEngineUsePreparedAdvance,
   canUsePreparedAdvance,
   canAcceptVideoCheckpoint,
   isSoftError,
@@ -135,6 +136,11 @@ describe('machine guard contracts', function() {
   });
 
   it('allows prepared advance for schedule and model card sessions', function() {
+    expect(canEngineUsePreparedAdvance({ unitType: 'model' })).to.equal(true);
+    expect(canEngineUsePreparedAdvance({ unitType: 'schedule' })).to.equal(true);
+    expect(canEngineUsePreparedAdvance({ unitType: 'video' })).to.equal(false);
+    expect(canEngineUsePreparedAdvance(null)).to.equal(false);
+
     expect(canUsePreparedAdvance(makeArgs({ context: { engine: { unitType: 'model' } } }))).to.equal(true);
     expect(canUsePreparedAdvance(makeArgs({ context: { engine: { unitType: 'schedule' } } }))).to.equal(true);
     expect(canUsePreparedAdvance(makeArgs({ context: { engine: { unitType: 'video' } } }))).to.equal(false);
