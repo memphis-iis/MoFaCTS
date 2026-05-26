@@ -119,4 +119,93 @@ describe('registerLearningComponents', function() {
 
     expect(registered).to.deep.equal([]);
   });
+
+  it('fails before partial registration when any pending manifest is missing capabilities', function() {
+    const registered: string[] = [];
+    const manifests: LearningComponentManifest[] = [
+      {
+        id: 'sample.ready',
+        kind: 'unit',
+        unitTypes: ['ready'],
+        requiredCapabilities: ['logging'],
+        register() {
+          registered.push('ready');
+        },
+      },
+      {
+        id: 'sample.not-ready',
+        kind: 'unit',
+        unitTypes: ['not-ready'],
+        requiredCapabilities: ['server-methods'],
+        register() {
+          registered.push('not-ready');
+        },
+      },
+    ];
+
+    expect(() => registerLearningComponents(manifests, createContext(['logging'])))
+      .to.throw('Learning component "sample.not-ready" requires missing capabilities: server-methods');
+
+    expect(registered).to.deep.equal([]);
+  });
+
+  it('rejects duplicate component ids, unit types, and display types before registration', function() {
+    const duplicateComponentId: LearningComponentManifest[] = [
+      {
+        id: 'sample.duplicate',
+        kind: 'unit',
+        unitTypes: ['one'],
+        requiredCapabilities: ['logging'],
+        register() {},
+      },
+      {
+        id: 'sample.duplicate',
+        kind: 'unit',
+        unitTypes: ['two'],
+        requiredCapabilities: ['logging'],
+        register() {},
+      },
+    ];
+
+    const duplicateUnitType: LearningComponentManifest[] = [
+      {
+        id: 'sample.one',
+        kind: 'unit',
+        unitTypes: ['sample-unit'],
+        requiredCapabilities: ['logging'],
+        register() {},
+      },
+      {
+        id: 'sample.two',
+        kind: 'unit',
+        unitTypes: ['sample-unit'],
+        requiredCapabilities: ['logging'],
+        register() {},
+      },
+    ];
+
+    const duplicateDisplayType: LearningComponentManifest[] = [
+      {
+        id: 'sample.display-one',
+        kind: 'trial-display',
+        displayTypes: ['sample-display'],
+        requiredCapabilities: ['logging'],
+        register() {},
+      },
+      {
+        id: 'sample.display-two',
+        kind: 'trial-display',
+        displayTypes: ['sample-display'],
+        requiredCapabilities: ['logging'],
+        register() {},
+      },
+    ];
+
+    expect(() => registerLearningComponents(duplicateComponentId, createContext(['logging'])))
+      .to.throw('Learning component "sample.duplicate" is declared more than once');
+    expect(() => registerLearningComponents(duplicateUnitType, createContext(['logging'])))
+      .to.throw('Unit type "sample-unit" is declared by more than one learning component');
+    expect(() => registerLearningComponents(duplicateDisplayType, createContext(['logging'])))
+      .to.throw('Display type "sample-display" is declared by more than one learning component');
+  });
 });

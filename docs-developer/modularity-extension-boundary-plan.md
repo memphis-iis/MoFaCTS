@@ -27,7 +27,7 @@ Documentation note: this is a developer-facing planning document and now lives u
 
 1. Define a component manifest type in `learning-components/runtime/`. Initial slice: `LearningComponentManifest` now exists with unit and trial-display capability validation.
    Include `id`, `kind`, `unitTypes` or `displayTypes`, `requiredCapabilities`, and a `register(context)` hook.
-   Bootstrap slice: `registerLearningComponents` now registers manifest lists through one reusable runtime helper, with an explicit already-registered hook for idempotent default bootstraps and summary helpers for pre-registration diagnostics.
+   Bootstrap slice: `registerLearningComponents` now registers manifest lists through one reusable runtime helper, with an explicit already-registered hook for idempotent default bootstraps and summary helpers for pre-registration diagnostics. The manifest-list bootstrap now preflights pending components for duplicate component IDs, duplicate unit/display declarations, and missing capabilities before mutating registries, so a bad dropped-in component cannot leave the app half-registered.
 
 2. Expand the runtime context deliberately.
    Initial slice: named capability interfaces now exist for session state, delivery settings, media resolution, history, server methods, authorization, logging, and user alerts.
@@ -68,4 +68,4 @@ The first modularity slice is complete when a new in-repo sample unit component 
 3. Adding its unit type to a test fixture.
 4. Passing registry and unit creation tests without editing the core unit factory logic beyond the bootstrap import.
 
-Current evidence: `mofacts/common/learningComponentManifest.test.ts` proves the registry/manifest side with a sample unit and no core factory edits. `mofacts/common/registerLearningComponents.test.ts` proves shared manifest-list bootstrapping. A production sample module under `learning-components/` can now follow that pattern; the remaining future hardening is to expose package discovery/loading for external component bundles instead of importing each in-repo manifest from a central default list.
+Current evidence: `mofacts/common/learningComponentManifest.test.ts` proves the registry/manifest side with a sample unit and no core factory edits. `mofacts/common/registerLearningComponents.test.ts` proves shared manifest-list bootstrapping, duplicate declaration checks, and all-or-nothing preflight before registry mutation. A production sample module under `learning-components/` can now follow that pattern; the remaining future hardening is to expose package discovery/loading for external component bundles instead of importing each in-repo manifest from a central default list.

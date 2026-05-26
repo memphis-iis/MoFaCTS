@@ -1,4 +1,5 @@
 import {
+  assertLearningComponentCapabilities,
   registerLearningComponent,
   validateLearningComponentManifest,
   type LearningComponentCapability,
@@ -47,10 +48,41 @@ export function registerLearningComponents<TDeps>(
     alreadyRegistered?: LearningComponentAlreadyRegistered<TDeps>;
   } = {},
 ): void {
+  const pendingManifests: LearningComponentManifest<TDeps>[] = [];
+  const componentIds = new Set<string>();
+  const unitTypes = new Set<string>();
+  const displayTypes = new Set<string>();
+
   for (const manifest of manifests) {
+    const summary = summarizeLearningComponentManifest(manifest);
+    if (componentIds.has(summary.id)) {
+      throw new Error(`Learning component "${summary.id}" is declared more than once`);
+    }
+    componentIds.add(summary.id);
+
     if (options.alreadyRegistered?.(manifest) === true) {
       continue;
     }
+
+    for (const unitType of summary.unitTypes) {
+      if (unitTypes.has(unitType)) {
+        throw new Error(`Unit type "${unitType}" is declared by more than one learning component`);
+      }
+      unitTypes.add(unitType);
+    }
+
+    for (const displayType of summary.displayTypes) {
+      if (displayTypes.has(displayType)) {
+        throw new Error(`Display type "${displayType}" is declared by more than one learning component`);
+      }
+      displayTypes.add(displayType);
+    }
+
+    assertLearningComponentCapabilities(manifest, context);
+    pendingManifests.push(manifest);
+  }
+
+  for (const manifest of pendingManifests) {
     registerLearningComponent(manifest, context);
   }
 }
