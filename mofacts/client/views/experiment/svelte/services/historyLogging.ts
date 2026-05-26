@@ -136,6 +136,17 @@ type HistoryClusterLike = {
   clusterIndex?: number;
   shufIndex?: number;
 };
+type HistoryScheduleLike = {
+  q?: Array<{
+    clusterIndex?: unknown;
+    condition?: unknown;
+  } | null | undefined>;
+};
+export type HistoryTrialIndexState = {
+  shufIndex: unknown;
+  stimFileIndex: unknown;
+  schedCondition: string;
+};
 type SessionWithAll = typeof Session & {
   all?: () => Record<string, unknown>;
 };
@@ -153,6 +164,53 @@ type MeteorUserLike = {
 
 function getMeteorUser(): MeteorUserLike | null | undefined {
   return Meteor.user() as MeteorUserLike | null | undefined;
+}
+
+function asHistorySchedule(value: unknown): HistoryScheduleLike | null {
+  return value && typeof value === 'object' ? value as HistoryScheduleLike : null;
+}
+
+export function resolveHistoryTrialIndexState(params: {
+  engineUnitType: unknown;
+  displayOrder: number;
+  schedule: unknown;
+  clusterIndex: number;
+  rawClusterIndex: number;
+  clusterShufIndex?: number | undefined;
+}): HistoryTrialIndexState {
+  if (params.engineUnitType === SCHEDULE_UNIT) {
+    const schedule = asHistorySchedule(params.schedule);
+    if (schedule && Array.isArray(schedule.q) && schedule.q.length > 0) {
+      const schedItemIndex = params.displayOrder - 1;
+      if (schedItemIndex >= 0 && schedItemIndex < schedule.q.length) {
+        const scheduleItem = schedule.q[schedItemIndex];
+        return {
+          shufIndex: schedItemIndex,
+          schedCondition: parseSchedItemCondition(
+            typeof scheduleItem?.condition === 'string' ? scheduleItem.condition : undefined,
+          ),
+          stimFileIndex: scheduleItem?.clusterIndex,
+        };
+      }
+      return {
+        shufIndex: schedItemIndex,
+        schedCondition: 'N/A',
+        stimFileIndex: params.rawClusterIndex,
+      };
+    }
+
+    return {
+      shufIndex: params.clusterIndex,
+      schedCondition: 'N/A',
+      stimFileIndex: params.rawClusterIndex,
+    };
+  }
+
+  return {
+    shufIndex: params.clusterShufIndex,
+    schedCondition: 'N/A',
+    stimFileIndex: params.rawClusterIndex,
+  };
 }
 
 /**
@@ -481,27 +539,20 @@ export function createHistoryRecord({
 
   // Determine indices based on unit type
   const isStudy = testType === 's';
-  let shufIndex = clusterIndex;
   const rawClusterIndex = typeof cluster.clusterIndex === 'number' ? cluster.clusterIndex : clusterIndex;
-  let stimFileIndex = rawClusterIndex;
-  let schedCondition = 'N/A';
-
   const displayOrder = Number(CardStore.getQuestionIndex() || questionIndex);
-
-  if (engine.unitType == SCHEDULE_UNIT) {
-    const sched = Session.get('schedule');
-    if (sched && sched.q && sched.q.length) {
-      const schedItemIndex = displayOrder - 1;
-      shufIndex = schedItemIndex;
-      if (schedItemIndex >= 0 && schedItemIndex < sched.q.length) {
-        schedCondition = parseSchedItemCondition(sched.q[schedItemIndex]?.condition);
-        stimFileIndex = sched.q[schedItemIndex]?.clusterIndex;
-      }
-    }
-  } else {
-    shufIndex = cluster.shufIndex;
-    stimFileIndex = rawClusterIndex;
-  }
+  const {
+    shufIndex,
+    stimFileIndex,
+    schedCondition,
+  } = resolveHistoryTrialIndexState({
+    engineUnitType: engine.unitType,
+    displayOrder,
+    schedule: Session.get('schedule'),
+    clusterIndex,
+    rawClusterIndex,
+    clusterShufIndex: cluster.shufIndex,
+  });
 
   // Get answers
   const originalAnswer = answerContext.originalAnswer ?? experimentState.originalAnswer;

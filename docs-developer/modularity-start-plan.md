@@ -69,6 +69,7 @@ Make a new in-repo component feel like a small package:
    Prepared-advance machine question-index handling now resolves named transition routes before enforcing schedule live-index requirements, keeping schedule-specific transition policy tested in one helper.
    Prepared-trial commit now resolves named commit routes before applying model locked-card or schedule prepared-card state, keeping commit behavior policy explicit and tested.
    Learning-progress panel availability now resolves through a named panel-owned engine predicate before shaping item progress, keeping adaptive-model-only display policy local to the progress service.
+   History logging now resolves schedule-vs-model trial index state through a tested helper before filling the history row, keeping live schedule display order policy local and explicit.
 
 ## Pause/Resume Checkpoint
 
