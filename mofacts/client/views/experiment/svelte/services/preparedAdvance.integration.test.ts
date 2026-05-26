@@ -2,7 +2,11 @@ import { expect } from 'chai';
 import { Session } from 'meteor/session';
 import { CardStore } from '../../modules/cardStore';
 import { ExperimentStateStore } from '../../../../lib/state/experimentStateStore';
-import { prepareIncomingTrialService, commitPreparedTrialRuntime } from './unitEngineService';
+import {
+  commitPreparedTrialRuntime,
+  prepareIncomingTrialService,
+  resolvePreparedIncomingTrialRoute,
+} from './unitEngineService';
 
 function primeMinimalSession(): void {
   Session.set('clusterMapping', [0]);
@@ -92,6 +96,25 @@ describe('prepared advance integration seams', function() {
     expect(result.currentAnswer).to.equal('alpha');
     expect(result.questionIndex).to.equal(2);
     expect(engine.getPreparedNextTrialContent()).to.not.equal(null);
+  });
+
+  it('names prepared incoming trial routes by behavior', function() {
+    expect(resolvePreparedIncomingTrialRoute({ unitType: 'video' })).to.deep.equal({
+      kind: 'video-noop',
+      preparedAdvanceMode: 'none',
+    });
+    expect(resolvePreparedIncomingTrialRoute({ unitType: 'model' })).to.deep.equal({
+      kind: 'model-lock',
+      preparedAdvanceMode: 'seamless',
+    });
+    expect(resolvePreparedIncomingTrialRoute({ unitType: 'schedule' })).to.deep.equal({
+      kind: 'schedule-prepare',
+      preparedAdvanceMode: 'direct',
+    });
+    expect(resolvePreparedIncomingTrialRoute({ unitType: 'custom' })).to.deep.equal({
+      kind: 'finish-check',
+      preparedAdvanceMode: 'direct',
+    });
   });
 
   it('prepareIncomingTrialService peeks schedule next card without advancing live selection', async function() {

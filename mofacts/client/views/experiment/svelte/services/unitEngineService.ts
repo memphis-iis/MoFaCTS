@@ -116,6 +116,11 @@ interface PreparedTrialContent extends Record<string, unknown> {
 }
 
 type PreparedAdvanceMode = 'none' | 'seamless' | 'direct';
+type PreparedIncomingTrialRoute =
+  | { kind: 'video-noop'; preparedAdvanceMode: 'none' }
+  | { kind: 'model-lock'; preparedAdvanceMode: 'seamless' }
+  | { kind: 'schedule-prepare'; preparedAdvanceMode: 'direct' }
+  | { kind: 'finish-check'; preparedAdvanceMode: 'seamless' | 'direct' };
 
 function isUnitEngineVideoSurfaceActive(): boolean {
   return resolveSessionSurfaceState({
@@ -145,6 +150,31 @@ function getErrorMessage(error: unknown): string {
 
 function getFiniteNumber(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+export function resolvePreparedIncomingTrialRoute(engine: UnitEngineLike): PreparedIncomingTrialRoute {
+  if (engine.unitType === 'video') {
+    return {
+      kind: 'video-noop',
+      preparedAdvanceMode: 'none',
+    };
+  }
+  if (engine.unitType === 'model') {
+    return {
+      kind: 'model-lock',
+      preparedAdvanceMode: 'seamless',
+    };
+  }
+  if (engine.unitType === 'schedule') {
+    return {
+      kind: 'schedule-prepare',
+      preparedAdvanceMode: 'direct',
+    };
+  }
+  return {
+    kind: 'finish-check',
+    preparedAdvanceMode: 'direct',
+  };
 }
 
 /**
@@ -442,24 +472,25 @@ export async function prepareIncomingTrialService(
   }
 
   const nextQuestionIndex = Number.isFinite(context.questionIndex) ? Number(context.questionIndex) + 1 : 1;
-  if (engine.unitType === 'video') {
+  const route = resolvePreparedIncomingTrialRoute(engine);
+  if (route.kind === 'video-noop') {
     return {
       unitFinished: false,
-      preparedAdvanceMode: 'none',
+      preparedAdvanceMode: route.preparedAdvanceMode,
       engine,
       questionIndex: nextQuestionIndex,
     };
   }
 
   const curExperimentState = (ExperimentStateStore.get() || {}) as ExperimentState;
-  if (engine.unitType === 'model') {
+  if (route.kind === 'model-lock') {
     const preparedTrial = await prepareLockedNextTrial(engine, context, curExperimentState, nextQuestionIndex);
     if (preparedTrial) {
       return preparedTrial;
     }
   }
 
-  if (engine.unitType === 'schedule') {
+  if (route.kind === 'schedule-prepare') {
     const preparedTrial = await prepareNextScheduledTrial(engine, nextQuestionIndex);
     if (preparedTrial) {
       return preparedTrial;
@@ -468,7 +499,7 @@ export async function prepareIncomingTrialService(
 
   return {
     unitFinished: await isUnitFinished(engine),
-    preparedAdvanceMode: engine.unitType === 'model' ? 'seamless' : 'direct',
+    preparedAdvanceMode: route.preparedAdvanceMode,
     engine,
     questionIndex: nextQuestionIndex,
   };

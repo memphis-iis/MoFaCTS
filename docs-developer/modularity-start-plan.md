@@ -65,6 +65,7 @@ Make a new in-repo component feel like a small package:
    Adaptive video question insertion, question-time mutation, and adaptive checkpoint mutation now live in `mofacts/client/views/experiment/videoAdaptiveQuestions.ts`, leaving `AdaptiveQuestionLogic` to evaluate rules and hand video-session mutations to a tested video-owned boundary.
    Svelte card initialization-failure diagnostics now ask `sessionSurfaceMode.ts` for the session diagnostic cluster list instead of reading learning/video/assessment unit shapes inline.
    Video playback policy flags for scrubbing, rewind, and checkpoint-repeat behavior now resolve through `videoCardInit.ts`, keeping `CardScreen.svelte` from reading or normalizing authored `videosession` fields directly.
+   Prepared incoming-trial orchestration now resolves named behavior routes before preparing the next card, so the service no longer spreads raw video/model/schedule unit-type branches across the flow.
 
 ## Pause/Resume Checkpoint
 
