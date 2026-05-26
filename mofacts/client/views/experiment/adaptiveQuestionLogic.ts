@@ -1,5 +1,11 @@
 import { meteorCallAsync, clientConsole } from "../../index";
 import { KC_MULTIPLE } from "../../../common/Definitions";
+import {
+    appendAdaptiveVideoCheckpoints,
+    appendAdaptiveVideoQuestions,
+    applyAdaptiveVideoTemplateSchedule,
+    requireAdaptiveVideoSession,
+} from "./videoAdaptiveQuestions";
 declare const Session: any;
 declare const Meteor: any;
 declare const alert: (message?: string) => void;
@@ -44,28 +50,6 @@ export class AdaptiveQuestionLogic {
             }
             return clusterIndex;
         });
-    }
-
-    private appendAdaptiveCheckpoints(videoSession: any, checkpoints: any[]) {
-        if (videoSession.checkpointBehavior !== 'adaptive' || checkpoints.length === 0) {
-            return;
-        }
-        if (!Array.isArray(videoSession.checkpoints)) {
-            videoSession.checkpoints = [];
-        }
-        for (const checkpoint of checkpoints) {
-            const checkpointTime = Number(checkpoint?.time);
-            if (!Number.isFinite(checkpointTime)) {
-                throw new Error('Adaptive checkpoint is missing a valid time');
-            }
-            const exists = videoSession.checkpoints.some((existing: any) =>
-                Number(existing?.time) === checkpointTime
-            );
-            if (!exists) {
-                videoSession.checkpoints.push({time: checkpointTime});
-            }
-        }
-        videoSession.checkpoints.sort((a: any, b: any) => Number(a.time) - Number(b.time));
     }
 
     private buildAdaptiveOutcomes(rows: AdaptiveOutcomeRows): AdaptiveOutcomes {
@@ -279,22 +263,9 @@ export class AdaptiveQuestionLogic {
         return {condition: condition, conditionExpression: conditionExpression, actions: actions, conditionResult: conditionResult, questions: questions, schedule: addToschedule, when: when, checkpoints: checkpoints};
     }
     async modifyUnit(adaptiveLogic: any[], curTdfUnit: any){
-        if (!curTdfUnit) {
-            throw new Error('Adaptive modifyUnit target unit is missing');
-        }
-        if (!curTdfUnit.videosession) {
-            throw new Error(`Adaptive modifyUnit only supports video-session targets; unit "${curTdfUnit.unitname || ''}" has no videosession`);
-        }
+        const videoSession = requireAdaptiveVideoSession(curTdfUnit);
         if (!Array.isArray(adaptiveLogic)) {
             throw new Error(`Adaptive modifyUnit rules must be an array for unit "${curTdfUnit.unitname || ''}"`);
-        }
-
-        const videoSession = curTdfUnit.videosession;
-        if (!Array.isArray(videoSession.questions)) {
-            videoSession.questions = [];
-        }
-        if (!Array.isArray(videoSession.questiontimes)) {
-            videoSession.questiontimes = [];
         }
 
         const allCheckpoints: any[] = [];
@@ -306,22 +277,12 @@ export class AdaptiveQuestionLogic {
             }
             const questions = ret.questions?.length ? ret.questions : this.getScheduleQuestions(ret.schedule || []);
             const when = ret.when;
-            if (questions.length > 0 && (when === null || when === undefined || !Number.isFinite(Number(when)))) {
-                throw new Error(`Adaptive video rule "${logic}" produced questions without a valid AT time`);
-            }
-            for (const question of questions) {
-                const clusterIndex = Number(question);
-                if (!Number.isInteger(clusterIndex)) {
-                    throw new Error(`Adaptive video rule "${logic}" produced an invalid question index`);
-                }
-                videoSession.questions.push(clusterIndex);
-                videoSession.questiontimes.push(Number(when));
-            }
+            appendAdaptiveVideoQuestions(videoSession, questions, when, logic);
             if(ret.checkpoints && ret.checkpoints.length > 0){
                 allCheckpoints.push(...ret.checkpoints);
             }
         }
-        this.appendAdaptiveCheckpoints(videoSession, allCheckpoints);
+        appendAdaptiveVideoCheckpoints(videoSession, allCheckpoints);
         return curTdfUnit;
     }
     unitBuilder(newUnit: any, adaptiveQuestionTimes: any[], adaptiveQuestions: any[], adaptiveCheckpoints: any[]){
@@ -337,27 +298,14 @@ export class AdaptiveQuestionLogic {
                 newUnit.assessmentsession.clusterlist += cluster + " ";
             }
             newUnit.assessmentsession.clusterlist = newUnit.assessmentsession.clusterlist.trim();
-        } else if (newUnit.videosession) {
-            const questionTimes = newUnit.videosession.questiontimes;
-            const sortedSchedule = this.schedule.sort((a: any, b: any) => questionTimes[a.clusterIndex] - questionTimes[b.clusterIndex]);
-
-            if(!newUnit.videosession.questions){
-                newUnit.videosession.questions = [];
-            }
-            if(!newUnit.videosession.questiontimes){
-                newUnit.videosession.questiontimes = [];
-            }
-            if(adaptiveQuestions){
-                newUnit.videosession.questions.push(...adaptiveQuestions);
-            }
-            else {
-                for(const item of sortedSchedule){
-                    newUnit.videosession.questions.push(item.clusterIndex)
-                }
-            }
-            newUnit.videosession.questiontimes.push(...adaptiveQuestionTimes)
-            
-            this.appendAdaptiveCheckpoints(newUnit.videosession, adaptiveCheckpoints || []);
+        } else {
+            applyAdaptiveVideoTemplateSchedule({
+                unit: newUnit,
+                schedule: this.schedule,
+                adaptiveQuestionTimes,
+                adaptiveQuestions,
+                adaptiveCheckpoints,
+            });
         }
         //injected the new unit into the session
         return newUnit;
