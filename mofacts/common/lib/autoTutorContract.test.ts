@@ -175,6 +175,11 @@ describe('AutoTutor content contract', function() {
         M1: { current: true, confidence: 0.9, evidence: 'said 95% chance', repaired: false },
       },
       answerQuality: 'partial',
+      learnerContribution: {
+        type: 'assertion',
+        confidence: 0.9,
+        evidence: 'Learner made a content claim.',
+      },
       learnerQuestion: {
         current: false,
         answerableFromAuthoredContent: false,
@@ -192,6 +197,7 @@ describe('AutoTutor content contract', function() {
     expect(expectation.coverage).to.equal(0.4);
     expect(misconception.confidence).to.equal(0.9);
     expect(misconception.repaired).to.equal(false);
+    expect(envelope.learnerContribution.type).to.equal('assertion');
     expect(envelope.answerQuality).to.equal('partial');
   });
 
@@ -217,6 +223,10 @@ describe('AutoTutor content contract', function() {
         },
       },
       answerQuality: 'partial',
+      learnerContribution: {
+        type: 'assertion',
+        confidence: 0.8,
+      },
       learnerQuestion: {
         current: false,
         answerableFromAuthoredContent: false,
@@ -247,6 +257,10 @@ describe('AutoTutor content contract', function() {
   },
   "misconceptionScores": {},
   "answerQuality": "high",
+  "learnerContribution": {
+    "type": "assertion",
+    "confidence": 0.9
+  },
   "learnerQuestion": {
     "current": false,
     "answerableFromAuthoredContent": false
@@ -306,10 +320,30 @@ describe('AutoTutor content contract', function() {
       },
       misconceptionScores: {},
       answerQuality: 'partial',
+      learnerContribution: {
+        type: 'assertion',
+        confidence: 0.9,
+      },
       learnerQuestion: {
         current: false,
         answerableFromAuthoredContent: false,
       },
     }))).to.throw('AutoTutor score response expectationScores.E1.missing must be a string array');
+  });
+
+  it('fails clearly when learner contribution type is invalid', function() {
+    expect(() => parseAutoTutorScoreEnvelope(JSON.stringify({
+      expectationScores: {},
+      misconceptionScores: {},
+      answerQuality: 'low',
+      learnerContribution: {
+        type: 'shrug',
+        confidence: 0.8,
+      },
+      learnerQuestion: {
+        current: false,
+        answerableFromAuthoredContent: false,
+      },
+    }))).to.throw('AutoTutor score response learnerContribution.type is invalid');
   });
 });

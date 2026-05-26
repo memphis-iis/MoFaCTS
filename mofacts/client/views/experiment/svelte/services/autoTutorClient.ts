@@ -15,6 +15,7 @@ import {
   preserveRepairedMisconceptionState,
   recomputeExpectationPriorities,
   validatePlannerState,
+  type AutoTutorLearnerContributionScore,
   type AutoTutorMove,
   type AutoTutorPlan,
   type AutoTutorPlannerState,
@@ -31,6 +32,16 @@ import type {
 
 const OPEN_ROUTER_CHAT_COMPLETIONS_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const AUTO_TUTOR_COST_CAP_USD = 0.20;
+const AUTO_TUTOR_LEARNER_CONTRIBUTION_TYPES = new Set([
+  'assertion',
+  'idk',
+  'help_request',
+  'uncertainty',
+  'affect',
+  'meta',
+  'question',
+  'off_task',
+]);
 
 type AutoTutorExpectation = {
   id: string;
@@ -90,6 +101,7 @@ type AutoTutorState = {
   misconceptions: AutoTutorPlannerState['misconceptionScores'];
   planner: AutoTutorPlannerState;
   answerQuality: 'low' | 'partial' | 'high' | 'none';
+  learnerContribution: AutoTutorLearnerContributionScore | null;
   studentAskedQuestion: boolean;
   selectedMove: AutoTutorMove | '';
   turnCount: number;
@@ -340,6 +352,7 @@ function createInitialState(script: AutoTutorScript): AutoTutorState {
     misconceptions: planner.misconceptionScores,
     planner,
     answerQuality: 'none',
+    learnerContribution: null,
     studentAskedQuestion: false,
     selectedMove: '',
     turnCount: 0,
@@ -356,6 +369,7 @@ function summarizeState(state: AutoTutorState) {
     misconceptions: state.misconceptions,
     planner: state.planner,
     answerQuality: state.answerQuality,
+    learnerContribution: state.learnerContribution,
     studentAskedQuestion: state.studentAskedQuestion,
     selectedMove: state.selectedMove,
     turnCount: state.turnCount,
@@ -370,6 +384,9 @@ function buildScoringSystemPrompt(config: AutoTutorConfig): string {
     'Only learner-generated text may count as expectation coverage. Tutor turns may provide context for short learner answers, but tutor hints, prompts, assertions, summaries, and corrections are not learner knowledge.',
     'If the latest learner answer is abusive, profane, hostile, playful, or otherwise off-task rather than a substantive content claim, ignore that behavior for semantic scoring: do not mark any expectation covered, do not mark or strengthen any misconception, and do not reduce previously demonstrated expectation coverage.',
     'Classify whether the learner asked a substantive question and whether it is answerable from the provided authored lesson content or dialogue context.',
+    'Classify the latest learner contribution as exactly one learnerContribution.type: assertion, idk, help_request, uncertainty, affect, meta, question, or off_task. Use assertion for substantive content claims or restatements. Use idk for "I do not know" or equivalent. Use help_request for requests for help, hints, or the answer. Use uncertainty for tentative or low-confidence content attempts. Use affect for frustration, confidence, boredom, or emotional comments. Use meta for comments about the task, interface, rules, progress, or procedure. Use question for substantive content questions. Use off_task for playful, abusive, irrelevant, or non-instructional turns.',
+    'Set learnerContribution.confidence from 0 to 1 and provide brief evidence.',
+    'When learnerContribution.type is question, set learnerQuestion.current true. For meta comments about procedure rather than lesson content, use learnerContribution.type meta and leave learnerQuestion.current false unless the learner also asks a substantive content question.',
     'Misconception repair is a first-class scoring decision. If the prior tutor state last selected a misconception target and the latest tutor turn asked its repair question or otherwise requested repair, score the latest learner answer first as a repair attempt for that misconception.',
     'A concise answer can repair a misconception when it directly answers the repair question or rejects the mistaken contrast, even if it does not cover a full expectation. For example, if the tutor asks whether an interval estimates individual scores or the population mean, "the population mean" repairs the individual-scores misconception.',
     'When the latest learner answer repairs a misconception, set that misconception to current false, confidence 0, repaired true, and explain the repair in repairEvidence. Do not carry forward a prior misconception solely because earlier dialogue showed it.',
@@ -415,6 +432,7 @@ function buildUtteranceSystemPrompt(config: AutoTutorConfig): string {
     'Use only the authored AutoTutor lesson content and the supplied dialogue context. For out-of-scope learner questions, state that this tutor can only answer from the lesson content, then continue with the selected move.',
     'Every non-summary move must keep the dialogue going with a concrete follow-up question to the learner.',
     'When the learner has made progress on or covered a prior expectation, briefly acknowledge that progress before continuing.',
+    'Use learnerContribution metadata to shape tone without changing the selected plan. For idk or help_request, be supportive and give the selected hint, prompt, or assertion. For uncertainty, validate the tentative attempt briefly before continuing. For affect, briefly acknowledge the feeling without analyzing it, then continue the selected instructional move. For meta, answer the procedural concern briefly if possible, then resume the selected instructional move. For off_task, redirect briefly into the selected move without scolding.',
     'The user prompt includes transition metadata. When targetChanged is true, begin tutorMessage with a brief acknowledgement of what the learner just contributed or repaired, then name the new focus before asking the next hint, prompt, pump, or correction.',
     'Use the full dialogue history to avoid repeating failed attempts. When a hint, prompt, assertion, or correction has not helped the learner make progress, take a new pathway or perspective toward the unspoken expectation or unresolved misconception.',
     'If the latest learner answer is abusive, profane, hostile, playful, or otherwise off-task, do not scold or analyze the behavior. Re-prompt from a new angle for the app-selected target and move.',
@@ -466,6 +484,9 @@ function buildUtteranceUserPrompt(config: AutoTutorConfig, studentAnswer: string
   return [
     'Latest student answer:',
     studentAnswer,
+    '',
+    'Learner contribution classification:',
+    JSON.stringify(state.learnerContribution, null, 2),
     '',
     'App-selected plan. Echo targetType, targetId, and selectedMove exactly in the response. Use correctionStage when present:',
     JSON.stringify({
@@ -613,6 +634,23 @@ function validateSavedMisconceptionScores(
   return parsed;
 }
 
+function validateSavedLearnerContribution(value: unknown): AutoTutorLearnerContributionScore | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (!isRecord(value)) {
+    throw new Error('AutoTutor saved history state.learnerContribution must be an object when present');
+  }
+  if (typeof value.type !== 'string' || !AUTO_TUTOR_LEARNER_CONTRIBUTION_TYPES.has(value.type)) {
+    throw new Error('AutoTutor saved history state.learnerContribution.type is invalid');
+  }
+  return {
+    type: value.type as AutoTutorLearnerContributionScore['type'],
+    confidence: requiredScore(value.confidence, 'state.learnerContribution.confidence'),
+    ...(typeof value.evidence === 'string' ? { evidence: value.evidence } : {}),
+  };
+}
+
 function requiredScore(value: unknown, field: string): number {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1) {
     throw new Error(`AutoTutor saved history ${field} must be a number from 0 to 1`);
@@ -656,6 +694,7 @@ function validateSavedState(
   }
   const expectations = validateSavedExpectationScores(state.expectations, Object.keys(expectedState.expectations));
   const misconceptions = validateSavedMisconceptionScores(state.misconceptions, Object.keys(expectedState.misconceptions));
+  const learnerContribution = validateSavedLearnerContribution(state.learnerContribution);
   const planner = validateSavedPlannerState(state.planner, expectedState);
 
   return {
@@ -663,6 +702,7 @@ function validateSavedState(
     misconceptions,
     planner,
     answerQuality,
+    learnerContribution,
     studentAskedQuestion: state.studentAskedQuestion,
     selectedMove: state.selectedMove as AutoTutorMove | '',
     turnCount: state.turnCount,
@@ -888,6 +928,7 @@ function applySavedHistory(config: AutoTutorConfig, state: AutoTutorState, rows:
   state.misconceptions = savedState.misconceptions;
   state.planner = savedState.planner;
   state.answerQuality = savedState.answerQuality;
+  state.learnerContribution = savedState.learnerContribution;
   state.studentAskedQuestion = savedState.studentAskedQuestion;
   state.selectedMove = savedState.selectedMove;
   state.turnCount = savedState.turnCount;
@@ -1064,12 +1105,14 @@ export async function createAutoTutorRuntime(): Promise<AutoTutorRuntime> {
       nextState.planner.expectationScores = scoredExpectations;
       nextState.planner.misconceptionScores = scoredMisconceptions;
       nextState.answerQuality = scoreEnvelope.answerQuality;
+      nextState.learnerContribution = scoreEnvelope.learnerContribution;
       nextState.studentAskedQuestion = scoreEnvelope.learnerQuestion.current;
       const stateForUtterancePlan = cloneJson(nextState);
       const plan = planAutoTutorTurn({
         script: config.script,
         plannerState: nextState.planner,
         learnerQuestion: scoreEnvelope.learnerQuestion,
+        learnerContribution: scoreEnvelope.learnerContribution,
         answerQuality: scoreEnvelope.answerQuality,
         requireFinalAnswerPrompt: config.requireFinalAnswerPrompt,
       });

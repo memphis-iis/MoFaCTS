@@ -1,5 +1,6 @@
 import type {
   AutoTutorExpectationScore,
+  AutoTutorLearnerContributionScore,
   AutoTutorLearnerQuestionScore,
   AutoTutorMisconceptionScore,
   AutoTutorMove,
@@ -250,6 +251,7 @@ export type AutoTutorScoreEnvelope = {
   expectationScores: Record<string, AutoTutorExpectationScore>;
   misconceptionScores: Record<string, AutoTutorMisconceptionScore>;
   answerQuality: 'low' | 'partial' | 'high';
+  learnerContribution: AutoTutorLearnerContributionScore;
   learnerQuestion: AutoTutorLearnerQuestionScore;
 };
 
@@ -261,6 +263,16 @@ export type AutoTutorUtteranceEnvelope = {
 };
 
 const ANSWER_QUALITIES = new Set(['low', 'partial', 'high']);
+const LEARNER_CONTRIBUTION_TYPES = new Set([
+  'assertion',
+  'idk',
+  'help_request',
+  'uncertainty',
+  'affect',
+  'meta',
+  'question',
+  'off_task',
+]);
 const SELECTED_MOVES = new Set([
   'feedback',
   'pump',
@@ -358,6 +370,20 @@ function parseMisconceptionScores(value: unknown): Record<string, AutoTutorMisco
   return parsed;
 }
 
+function parseLearnerContribution(value: unknown): AutoTutorLearnerContributionScore {
+  if (!isRecord(value)) {
+    throw new Error('AutoTutor score response learnerContribution must be an object');
+  }
+  if (typeof value.type !== 'string' || !LEARNER_CONTRIBUTION_TYPES.has(value.type)) {
+    throw new Error('AutoTutor score response learnerContribution.type is invalid');
+  }
+  return {
+    type: value.type as AutoTutorLearnerContributionScore['type'],
+    confidence: requireScore(value.confidence, 'learnerContribution.confidence'),
+    ...(typeof value.evidence === 'string' ? { evidence: value.evidence } : {}),
+  };
+}
+
 export function parseAutoTutorScoreEnvelope(value: unknown): AutoTutorScoreEnvelope {
   const parsed = parseMaybeJsonObject(value);
   if (!isRecord(parsed)) {
@@ -378,6 +404,7 @@ export function parseAutoTutorScoreEnvelope(value: unknown): AutoTutorScoreEnvel
     expectationScores: parseExpectationScores(parsed.expectationScores),
     misconceptionScores: parseMisconceptionScores(parsed.misconceptionScores),
     answerQuality: answerQuality as AutoTutorScoreEnvelope['answerQuality'],
+    learnerContribution: parseLearnerContribution(parsed.learnerContribution),
     learnerQuestion: {
       current: parsed.learnerQuestion.current,
       answerableFromAuthoredContent: parsed.learnerQuestion.answerableFromAuthoredContent,
@@ -436,6 +463,11 @@ export const AUTO_TUTOR_SCORE_ENVELOPE_SCHEMA = Object.freeze({
     },
   },
   answerQuality: 'low | partial | high',
+  learnerContribution: {
+    type: 'assertion | idk | help_request | uncertainty | affect | meta | question | off_task',
+    confidence: 'number 0..1',
+    evidence: 'string optional',
+  },
   learnerQuestion: {
     current: 'boolean',
     answerableFromAuthoredContent: 'boolean',

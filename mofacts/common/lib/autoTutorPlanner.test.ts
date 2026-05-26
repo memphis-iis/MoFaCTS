@@ -134,6 +134,88 @@ describe('AutoTutor planner', function() {
     expect(plan.nextPlannerState.focusedExpectationId).to.equal(undefined);
   });
 
+  it('uses current expectation hints for an initial idk instead of correcting misconceptions', function() {
+    const script = buildScript();
+    const plannerState = createInitialAutoTutorPlannerState(script);
+    plannerState.focusedExpectationId = 'E1';
+    plannerState.focusTurnCount = 2;
+    plannerState.moveCycleIndex = 2;
+    plannerState.expectationScores = recomputeExpectationPriorities(script, {
+      ...plannerState.expectationScores,
+      E1: { ...plannerState.expectationScores.E1!, coverage: 0.2, coherence: 0.2, centrality: 0.5 },
+      E2: { ...plannerState.expectationScores.E2!, coverage: 0.4, coherence: 0.3, centrality: 0.5 },
+    });
+    plannerState.misconceptionScores.M1 = { current: true, confidence: 0.95, evidence: 'Prior misconception' };
+
+    const plan = planAutoTutorTurn({
+      script,
+      plannerState,
+      learnerQuestion: { current: false, answerableFromAuthoredContent: false },
+      learnerContribution: { type: 'idk', confidence: 0.95 },
+      answerQuality: 'low',
+    });
+
+    expect(plan.target).to.deep.equal({ type: 'expectation', id: 'E1' });
+    expect(plan.selectedMove).to.equal('hint');
+    expect(plan.nextPlannerState.contributionStreakType).to.equal('idk');
+    expect(plan.nextPlannerState.contributionStreakCount).to.equal(1);
+  });
+
+  it('escalates repeated idk turns from hint to prompt to assertion', function() {
+    const script = buildScript();
+    let plannerState = createInitialAutoTutorPlannerState(script);
+    plannerState.expectationScores = recomputeExpectationPriorities(script, {
+      ...plannerState.expectationScores,
+      E1: { ...plannerState.expectationScores.E1!, coverage: 0.2, coherence: 0.2, centrality: 0.5 },
+      E2: { ...plannerState.expectationScores.E2!, coverage: 0.4, coherence: 0.3, centrality: 0.5 },
+    });
+
+    const moves = [];
+    for (let turn = 0; turn < 3; turn += 1) {
+      const plan = planAutoTutorTurn({
+        script,
+        plannerState,
+        learnerQuestion: { current: false, answerableFromAuthoredContent: false },
+        learnerContribution: { type: 'idk', confidence: 0.95 },
+        answerQuality: 'low',
+      });
+      moves.push(plan.selectedMove);
+      plannerState = plan.nextPlannerState;
+    }
+
+    expect(moves).to.deep.equal(['hint', 'prompt', 'assertion']);
+  });
+
+  it('answers substantive questions but resumes instruction for meta comments', function() {
+    const script = buildScript();
+    const plannerState = createInitialAutoTutorPlannerState(script);
+    plannerState.expectationScores = recomputeExpectationPriorities(script, {
+      ...plannerState.expectationScores,
+      E1: { ...plannerState.expectationScores.E1!, coverage: 0.2, coherence: 0.2, centrality: 0.5 },
+      E2: { ...plannerState.expectationScores.E2!, coverage: 0.4, coherence: 0.3, centrality: 0.5 },
+    });
+
+    const questionPlan = planAutoTutorTurn({
+      script,
+      plannerState,
+      learnerQuestion: { current: false, answerableFromAuthoredContent: true },
+      learnerContribution: { type: 'question', confidence: 0.9 },
+      answerQuality: 'partial',
+    });
+    expect(questionPlan.target).to.deep.equal({ type: 'learner_question' });
+    expect(questionPlan.selectedMove).to.equal('answer_question');
+
+    const metaPlan = planAutoTutorTurn({
+      script,
+      plannerState,
+      learnerQuestion: { current: false, answerableFromAuthoredContent: false },
+      learnerContribution: { type: 'meta', confidence: 0.9 },
+      answerQuality: 'low',
+    });
+    expect(metaPlan.target.type).to.equal('expectation');
+    expect(metaPlan.selectedMove).to.equal('hint');
+  });
+
   it('summarizes immediately at completion by default', function() {
     const script = buildScript();
     const plannerState = createInitialAutoTutorPlannerState(script);

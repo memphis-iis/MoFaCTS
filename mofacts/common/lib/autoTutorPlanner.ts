@@ -14,6 +14,16 @@ export type AutoTutorCorrectionStage = 'hint' | 'prompt' | 'assertion';
 
 export type AutoTutorTargetType = 'expectation' | 'misconception' | 'learner_question' | 'completion';
 
+export type AutoTutorLearnerContributionType =
+  | 'assertion'
+  | 'idk'
+  | 'help_request'
+  | 'uncertainty'
+  | 'affect'
+  | 'meta'
+  | 'question'
+  | 'off_task';
+
 export type AutoTutorExpectationScore = {
   current: boolean;
   coverage: number;
@@ -41,6 +51,12 @@ export type AutoTutorLearnerQuestionScore = {
   evidence?: string;
 };
 
+export type AutoTutorLearnerContributionScore = {
+  type: AutoTutorLearnerContributionType;
+  confidence: number;
+  evidence?: string;
+};
+
 export type AutoTutorPlannerState = {
   focusedExpectationId?: string;
   focusedMisconceptionId?: string;
@@ -50,6 +66,8 @@ export type AutoTutorPlannerState = {
   focusTurnCount: number;
   moveCycleIndex: number;
   misconceptionCycleIndex?: number;
+  contributionStreakType?: AutoTutorLearnerContributionType;
+  contributionStreakCount?: number;
   expectationScores: Record<string, AutoTutorExpectationScore>;
   misconceptionScores: Record<string, AutoTutorMisconceptionScore>;
 };
@@ -76,6 +94,7 @@ export type AutoTutorPlannerInput = {
   script: AutoTutorPlannerScript;
   plannerState: AutoTutorPlannerState;
   learnerQuestion: AutoTutorLearnerQuestionScore;
+  learnerContribution?: AutoTutorLearnerContributionScore;
   answerQuality: 'low' | 'partial' | 'high';
   requireFinalAnswerPrompt?: boolean;
   thresholds?: Partial<AutoTutorPlannerThresholds>;
@@ -237,6 +256,18 @@ export function validatePlannerState(script: AutoTutorPlannerScript, plannerStat
   ) {
     throw new Error('AutoTutor planner state misconceptionCycleIndex must be a non-negative integer when present');
   }
+  if (
+    plannerState.contributionStreakType !== undefined &&
+    !['assertion', 'idk', 'help_request', 'uncertainty', 'affect', 'meta', 'question', 'off_task'].includes(plannerState.contributionStreakType)
+  ) {
+    throw new Error('AutoTutor planner state contributionStreakType is invalid when present');
+  }
+  if (
+    plannerState.contributionStreakCount !== undefined &&
+    (!Number.isInteger(plannerState.contributionStreakCount) || plannerState.contributionStreakCount < 0)
+  ) {
+    throw new Error('AutoTutor planner state contributionStreakCount must be a non-negative integer when present');
+  }
 }
 
 export function recomputeExpectationPriorities(
@@ -379,25 +410,33 @@ function selectHighestPriorityExpectation(
   return selectedId;
 }
 
+function isLowAgencyContribution(type?: AutoTutorLearnerContributionType): boolean {
+  return type === 'idk' || type === 'help_request' || type === 'uncertainty' || type === 'affect' || type === 'meta' || type === 'off_task';
+}
+
 export function selectAutoTutorTarget(input: AutoTutorPlannerInput): AutoTutorTarget {
   const thresholds = mergeThresholds(input.thresholds);
   validatePlannerState(input.script, input.plannerState);
   const requiredIds = requiredExpectationIds(input.script);
 
-  if (input.learnerQuestion.current) {
+  const contributionType = input.learnerContribution?.type;
+
+  if (contributionType === 'question' || input.learnerQuestion.current) {
     return { type: 'learner_question' };
   }
 
-  let selectedMisconceptionId = '';
-  let selectedConfidence = thresholds.misconceptionThreshold;
-  for (const [id, score] of Object.entries(input.plannerState.misconceptionScores)) {
-    if (!score.repaired && score.current && score.confidence >= selectedConfidence) {
-      selectedMisconceptionId = id;
-      selectedConfidence = score.confidence;
+  if (!isLowAgencyContribution(contributionType)) {
+    let selectedMisconceptionId = '';
+    let selectedConfidence = thresholds.misconceptionThreshold;
+    for (const [id, score] of Object.entries(input.plannerState.misconceptionScores)) {
+      if (!score.repaired && score.current && score.confidence >= selectedConfidence) {
+        selectedMisconceptionId = id;
+        selectedConfidence = score.confidence;
+      }
     }
-  }
-  if (selectedMisconceptionId) {
-    return { type: 'misconception', id: selectedMisconceptionId };
+    if (selectedMisconceptionId) {
+      return { type: 'misconception', id: selectedMisconceptionId };
+    }
   }
 
   const requiredCovered = requiredIds.every((id) => {
@@ -415,7 +454,7 @@ export function selectAutoTutorTarget(input: AutoTutorPlannerInput): AutoTutorTa
     focusScore &&
     requiredIds.includes(focusId) &&
     !isCovered(focusScore, thresholds.coverageThreshold) &&
-    input.plannerState.focusTurnCount < MAX_FOCUS_TURNS
+    (isLowAgencyContribution(contributionType) || input.plannerState.focusTurnCount < MAX_FOCUS_TURNS)
   ) {
     return { type: 'expectation', id: focusId };
   }
@@ -458,6 +497,24 @@ export function selectAutoTutorMove(input: AutoTutorPlannerInput, target: AutoTu
     throw new Error(`AutoTutor planner selected unknown expectation "${target.id}"`);
   }
   const firstFocusTurn = input.plannerState.focusedExpectationId !== target.id || input.plannerState.focusTurnCount === 0;
+  const contributionType = input.learnerContribution?.type;
+  const contributionStreakCount = contributionType
+    ? (input.plannerState.contributionStreakType === contributionType
+      ? (input.plannerState.contributionStreakCount || 0) + 1
+      : 1)
+    : 0;
+  if (contributionType === 'idk' || contributionType === 'help_request') {
+    if (contributionStreakCount >= 3) {
+      return 'assertion';
+    }
+    if (contributionStreakCount >= 2) {
+      return 'prompt';
+    }
+    return 'hint';
+  }
+  if (contributionType === 'uncertainty' || contributionType === 'affect' || contributionType === 'meta' || contributionType === 'off_task') {
+    return 'hint';
+  }
   if (input.answerQuality === 'low' && firstFocusTurn) {
     return 'pump';
   }
@@ -474,6 +531,17 @@ export function planAutoTutorTurn(input: AutoTutorPlannerInput): AutoTutorPlan {
   const nextPlannerState: AutoTutorPlannerState = JSON.parse(JSON.stringify(input.plannerState));
   let correctionStage: AutoTutorCorrectionStage | undefined;
   const thresholds = mergeThresholds(input.thresholds);
+  if (input.learnerContribution) {
+    if (nextPlannerState.contributionStreakType === input.learnerContribution.type) {
+      nextPlannerState.contributionStreakCount = (nextPlannerState.contributionStreakCount || 0) + 1;
+    } else {
+      nextPlannerState.contributionStreakType = input.learnerContribution.type;
+      nextPlannerState.contributionStreakCount = 1;
+    }
+  } else {
+    delete nextPlannerState.contributionStreakType;
+    delete nextPlannerState.contributionStreakCount;
+  }
   nextPlannerState.lastSelectedTargetType = target.type;
   if (target.id) {
     nextPlannerState.lastSelectedTargetId = target.id;
