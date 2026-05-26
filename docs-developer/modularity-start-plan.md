@@ -50,6 +50,22 @@ Make a new in-repo component feel like a small package:
 4. Remove remaining central component branches where a registry already exists.
    Initial slice: `mofacts/client/views/experiment/engineConstructors.ts` now delegates explicit unit-type engine creation through `createUnitEngineByType`, preserving contextual unknown-type errors while letting registered unit manifests own construction.
    H5P result handling now uses `mofacts/client/views/experiment/svelte/services/h5pTrialDisplay.ts` so card submission and history both normalize through the registered H5P trial-display adapter.
+   Session shell handling now uses `mofacts/client/views/experiment/svelte/services/sessionSurfaceMode.ts` for AutoTutor/video/card mode detection, shell CSS and learning-progress-panel behavior, and specialized launch-completion behavior.
+
+## Pause/Resume Checkpoint
+
+Current pause point:
+
+- `open-core` is expected to be pushed and clean except local untracked notes that are not part of the repository checkpoint.
+- The open-core readiness scan, full TypeScript check, lint, staged secret scan, and `http://localhost:3200` smoke should pass before resuming code changes.
+- The next modularity move should avoid broad rewrites. Continue reducing central branches only where there is already a tested service, registry, manifest, or adapter boundary to receive the behavior.
+
+Resume with:
+
+1. Keep `CardScreen.svelte` stable and move only one remaining session-surface decision at a time behind `sessionSurfaceMode.ts`.
+2. Prefer a tested pure service boundary before touching Svelte markup.
+3. When the remaining AutoTutor/video render branches are ready to move, introduce an explicit session-surface adapter shape rather than adding another condition-specific helper.
+4. Leave dynamic plugin discovery and arbitrary code loading out of scope until manifests, capabilities, and in-repo package boundaries are crisp.
 
 ## Invariants
 

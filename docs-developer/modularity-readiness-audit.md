@@ -70,6 +70,18 @@ This audit records the current extension-boundary readiness checkpoint for AutoT
 - `learning-components/README.md`
 - `docs-developer/modularity-start-plan.md`
 
+## Stable Pause Point
+
+The current modularity checkpoint is a stable pause point when the branch is clean and the following checks pass:
+
+- `npm run typecheck` from `mofacts/`
+- `npm run lint` from `mofacts/`
+- `node scripts/release/open-core-readiness-scan.cjs` from the repository root
+- `npm run secret:scan:staged` from `mofacts/`
+- MCP/browser smoke of `http://localhost:3200`
+
+This checkpoint does not claim full dynamic plugin readiness. It preserves the intended next direction: explicit manifests, registries, typed lifecycle boundaries, and capability interfaces before arbitrary package discovery or dynamic code loading.
+
 ## Next Safe Step
 
 Next, continue reducing direct component branches at larger session boundaries by routing remaining AutoTutor and video render branches through explicit session-surface adapters without changing runtime behavior.
