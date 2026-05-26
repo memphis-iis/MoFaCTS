@@ -32,3 +32,18 @@ Does not belong here:
 - Deployment operations.
 
 Dependency direction: `app/` may import `learning-components/`; `learning-components/` should avoid deep dependence on `app/`.
+
+## Component Package Checklist
+
+Use this checklist before adding a production component such as a deeper AutoTutor unit, a new H5P-style display, or another external-widget adapter:
+
+1. Create one package folder under the relevant component family, for example `units/<component>/` or `trial-displays/<component>/`.
+2. Keep pedagogical behavior, display/result normalization, model policy, and authored-content interpretation in the package.
+3. Keep Meteor routing, publications, collections, authorization enforcement, server methods, upload/storage persistence, and app shell UI in `mofacts/`.
+4. Export exactly one `LearningComponentManifest` from the package entry point.
+5. Declare every required capability in the manifest. Do not read Meteor globals or app singletons to hide a missing dependency.
+6. Add focused fixtures/tests near the package or in `mofacts/common/` proving registration, capability failure, and runtime behavior.
+7. Add the manifest to the approved default catalog only when the component should ship by default.
+8. Run `npm run typecheck`, `npm run lint`, and any schema generation required by changed TDF/stimulus fields.
+
+External package discovery is intentionally not part of this checklist yet. Approved in-repo or local bundles should be explicitly imported and composed through the catalog validation boundary until manifest validation, capability validation, and package fixtures are strong enough to support discovery.

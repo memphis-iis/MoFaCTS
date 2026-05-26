@@ -22,6 +22,16 @@ Make a new in-repo component feel like a small package:
 4. Add fixtures/tests beside or near the component.
 5. Add the manifest to the approved default catalog only when it is intended to ship.
 
+## Starter Path For The Next Component
+
+1. Start from `learning-components/samples/echo-unit/` for package shape and `learning-components/units/autotutor/` for a production unit boundary with typed capabilities.
+2. Decide whether the component is a unit engine or trial-display adapter before writing runtime code. A component should not declare both unless a later design explicitly introduces a combined package type.
+3. Write the package manifest and failing capability test before wiring the component into the default catalog.
+4. Add package-owned fixtures for authored content, display data, or runtime dependencies. Keep app-owned persistence and authorization fixtures in `mofacts/`.
+5. Compose the manifest through `combineLearningComponentCatalogs` for tests or through the default catalog only when the component should ship.
+6. Preserve a compatibility facade for existing app imports until all callers can use the registry/catalog path directly.
+7. Update `learning-components/README.md` and the relevant package README with ownership boundaries and required capabilities.
+
 ## First Three Work Items
 
 1. Convert the AutoTutor unit into a fuller component package boundary.

@@ -9,3 +9,5 @@ The package demonstrates the minimum in-repo component shape:
 - `fixtures.ts`: test dependencies for registry and creation tests.
 
 Use this as the reference layout before adding production components such as deeper AutoTutor units or additional H5P-style displays.
+
+When turning this shape into a production component, add a package README that names component-owned behavior, app-owned boundaries, required capabilities, and the tests that prove missing capabilities fail clearly.

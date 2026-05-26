@@ -20,6 +20,7 @@ This audit records the current extension-boundary readiness checkpoint for AutoT
 - AutoTutor client runtime now routes state publication, config/session reads, stimulus lookup, resume-history loading, user/session metadata reads, and typed history-turn writes through an app-owned capability adapter.
 - H5P trial-display ownership is documented beside the H5P component package.
 - A test-only sample echo unit package demonstrates the expected component package shape.
+- `learning-components/README.md` now includes the component package checklist for adding the next unit or trial-display package through manifest, catalog, and explicit capability boundaries.
 - `docs-developer/modularity-start-plan.md` defines the short next-step plan.
 
 ## Not Yet Ready
@@ -48,6 +49,7 @@ This audit records the current extension-boundary readiness checkpoint for AutoT
 - `mofacts/common/autoTutorGenerationConfig.test.ts`
 - `mofacts/client/views/experiment/svelte/services/autoTutorClient.ts`
 - `learning-components/trial-displays/h5p/README.md`
+- `learning-components/README.md`
 - `docs-developer/modularity-start-plan.md`
 
 ## Next Safe Step
