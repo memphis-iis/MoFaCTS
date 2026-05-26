@@ -7,6 +7,7 @@ import {
   resolveSessionSurfaceState,
   resolveSessionSurfaceUnitEntryRoute,
   shouldInlineSessionVideoInstructions,
+  shouldRequireSessionVideoReadiness,
   shouldShowSessionVideoInstructionOverlay,
 } from './sessionSurfaceMode';
 
@@ -114,6 +115,8 @@ describe('session surface mode', function() {
     })).to.throw('shouldInlineSessionVideoInstructions received an invalid session content surface');
     expect(() => resolveSessionSurfaceUnitEntryRoute(invalidContentSurface))
       .to.throw('resolveSessionSurfaceUnitEntryRoute received an invalid session content surface');
+    expect(() => shouldRequireSessionVideoReadiness(invalidContentSurface))
+      .to.throw('shouldRequireSessionVideoReadiness received an invalid session content surface');
   });
 
   it('fails clearly when deriving a content surface from an unknown mode', function() {
@@ -251,6 +254,18 @@ describe('session surface mode', function() {
     expect(resolveSessionSurfaceUnitEntryRoute(
       resolveSessionContentSurface(resolveSessionSurfaceState({ sessionUnitType: 'autotutor' })),
     )).to.equal('/card');
+  });
+
+  it('requires video readiness only for the active video content surface', function() {
+    expect(shouldRequireSessionVideoReadiness(
+      resolveSessionContentSurface(resolveSessionSurfaceState({})),
+    )).to.equal(false);
+    expect(shouldRequireSessionVideoReadiness(
+      resolveSessionContentSurface(resolveSessionSurfaceState({ currentTdfUnit: { videosession: {} } })),
+    )).to.equal(true);
+    expect(shouldRequireSessionVideoReadiness(
+      resolveSessionContentSurface(resolveSessionSurfaceState({ sessionUnitType: 'autotutor' })),
+    )).to.equal(false);
   });
 
   it('describes standard card shell behavior with learning progress enabled', function() {

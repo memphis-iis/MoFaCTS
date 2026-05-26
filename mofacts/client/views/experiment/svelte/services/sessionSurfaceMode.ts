@@ -183,6 +183,12 @@ export function shouldInlineSessionVideoInstructions(input: SessionInlineVideoIn
     !input.hasUnitQuestion;
 }
 
+export function shouldRequireSessionVideoReadiness(contentSurface: SessionContentSurface): boolean {
+  assertValidSessionContentSurface(contentSurface, 'shouldRequireSessionVideoReadiness');
+
+  return contentSurface.showVideoSession;
+}
+
 export function resolveSessionSurfaceUnitEntryRoute(
   contentSurface: SessionContentSurface,
 ): SessionSurfaceUnitEntryRoute {

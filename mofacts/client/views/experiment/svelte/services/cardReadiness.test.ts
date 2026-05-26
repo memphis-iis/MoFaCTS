@@ -24,6 +24,19 @@ describe('card readiness service', function() {
     )).to.equal(true);
   });
 
+  it('uses the session surface adapter to decide whether video readiness is required', function() {
+    expect(hasVideoSessionReadiness(
+      { unitname: 'Practice', learningsession: {} },
+      null,
+      { isVideoSession: true, videoUrl: '/video.mp4' },
+    )).to.equal(false);
+    expect(hasVideoSessionReadiness(
+      { unitname: 'AutoTutor', autotutorsession: {}, videosession: {} },
+      null,
+      { videoUrl: '' },
+    )).to.equal(true);
+  });
+
   it('requires matched video checkpoint arrays and video URL for video units', function() {
     const unit = { unitname: 'Video', videosession: {} };
 
@@ -58,6 +71,21 @@ describe('card readiness service', function() {
       isVideoUnit: false,
     });
     expect(hasCardReadiness(deps)).to.equal(true);
+  });
+
+  it('reports video state from the session surface adapter', function() {
+    const deps: CardReadinessDependencies = {
+      getCurrentTdfUnit: () => ({ unitname: 'Practice', learningsession: {} }),
+      getDeliverySettings: () => ({ isVideoSession: true, videoUrl: '/video.mp4' }),
+      getVideoCheckpoints: () => ({ times: [10], questions: [0] }),
+    };
+
+    expect(getCardReadinessState(deps)).to.deep.equal({
+      hasCurrentTdfUnit: true,
+      hasDeliverySettings: true,
+      hasVideoReadiness: true,
+      isVideoUnit: true,
+    });
   });
 
   it('polls until readiness is available', async function() {

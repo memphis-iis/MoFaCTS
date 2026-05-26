@@ -55,6 +55,7 @@ Make a new in-repo component feel like a small package:
    Svelte launch bootstrap now asks `sessionSurfaceMode.ts` whether text-only video instructions can render inline instead of branching directly on the video unit type.
    Legacy and Svelte unit progression now ask `sessionSurfaceMode.ts` whether the next unit enters through `/card` or `/instructions` instead of branching directly on video/AutoTutor unit shape.
    Svelte launch bootstrap now uses the shared `resolveUnitEngineTypeForUnit` boundary from `engineConstructors.ts` instead of maintaining its own unit-shape branch.
+   Card readiness now asks `sessionSurfaceMode.ts` whether the active surface requires video readiness instead of branching directly on `videosession`.
 
 ## Pause/Resume Checkpoint
 

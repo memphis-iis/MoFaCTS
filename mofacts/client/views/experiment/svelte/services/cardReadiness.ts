@@ -1,6 +1,17 @@
+import {
+  resolveSessionContentSurface,
+  resolveSessionSurfaceState,
+  shouldRequireSessionVideoReadiness,
+} from './sessionSurfaceMode';
+
+type CardReadinessDeliverySettings = Record<string, unknown> & {
+  isVideoSession?: boolean;
+  videoUrl?: unknown;
+};
+
 export interface CardReadinessDependencies {
   readonly getCurrentTdfUnit: () => Record<string, unknown> | null | undefined;
-  readonly getDeliverySettings: () => Record<string, unknown> | null | undefined;
+  readonly getDeliverySettings: () => CardReadinessDeliverySettings | null | undefined;
   readonly getVideoCheckpoints: () => {
     times?: unknown;
     questions?: unknown;
@@ -29,12 +40,24 @@ export function hasDeliverySettingsReady(deliverySettingsState: unknown): boolea
     Object.keys(deliverySettingsState as Record<string, unknown>).length > 0;
 }
 
+function resolveCardReadinessContentSurface(
+  unit: Record<string, unknown> | null | undefined,
+  deliverySettingsState: CardReadinessDeliverySettings | null | undefined,
+) {
+  return resolveSessionContentSurface(resolveSessionSurfaceState({
+    currentTdfUnit: unit,
+    deliverySettings: deliverySettingsState ?? undefined,
+  }));
+}
+
 export function hasVideoSessionReadiness(
   unit: Record<string, unknown> | null | undefined,
   checkpoints: { times?: unknown; questions?: unknown } | null | undefined,
-  deliverySettingsState: Record<string, unknown> | null | undefined,
+  deliverySettingsState: CardReadinessDeliverySettings | null | undefined,
 ): boolean {
-  if (!unit?.videosession) {
+  const contentSurface = resolveCardReadinessContentSurface(unit, deliverySettingsState);
+
+  if (!shouldRequireSessionVideoReadiness(contentSurface)) {
     return true;
   }
 
@@ -61,7 +84,10 @@ export function getCardReadinessState(deps: CardReadinessDependencies): CardRead
       deps.getVideoCheckpoints(),
       deliverySettingsState,
     ),
-    isVideoUnit: !!currentTdfUnit?.videosession,
+    isVideoUnit: shouldRequireSessionVideoReadiness(resolveCardReadinessContentSurface(
+      currentTdfUnit,
+      deliverySettingsState,
+    )),
   };
 }
 
@@ -96,7 +122,7 @@ export function buildCardReadinessDiagnostic(params: {
   readonly currentStimuliSetId: unknown;
   readonly currentUnitNumber: unknown;
   readonly currentUnitName: unknown;
-  readonly deliverySettingsState: Record<string, unknown> | null | undefined;
+  readonly deliverySettingsState: CardReadinessDeliverySettings | null | undefined;
 }): CardReadinessDiagnostic {
   return {
     ...params.readiness,

@@ -19,7 +19,7 @@ The card runtime presents trials, manages learner response UI, coordinates speec
 - `services/svelteInit.ts` owns card launch bootstrap: entry intent resolution, TDF/unit preconditions, stimuli loading, engine initialization, resume dispatch, and instruction redirects.
 - `services/cardEntryBootstrap.ts` owns card-entry intent classification before initialization dispatch.
 - `services/cardReadiness.ts` owns card display readiness predicates and diagnostics.
-- `services/sessionSurfaceMode.ts` owns shared AutoTutor/video/card surface selection, shell classes, learning-progress-panel visibility, video instruction overlay eligibility, and specialized launch-completion decisions.
+- `services/sessionSurfaceMode.ts` owns shared AutoTutor/video/card surface selection, shell classes, learning-progress-panel visibility, video instruction overlay eligibility, video-readiness requirements, and specialized launch-completion decisions.
 - `machine/` owns trial lifecycle state, transition guards, actions, invoked service contracts, and fail-clear machine errors.
 - `components/CardScreen.svelte` coordinates UI composition and wires Svelte state to services and the machine; new domain behavior should move into a service or machine file before the component grows new business logic.
 - `services/videoMachineBridge.ts`, `services/videoCardInit.ts`, and `components/VideoSessionMode.svelte` own video-session bridge behavior until a stable unit-runtime adapter boundary exists.

@@ -13,7 +13,7 @@ This directory contains side-effectful runtime services and pure helpers used by
 - `historyLogging.ts`, `historyH5P.ts`, and `mappingRecordService.ts`: history, H5P history shaping, and mapping persistence.
 - `speechRecognitionService.ts` and `ttsService.ts`: speech recognition and text-to-speech runtime integration.
 - `videoCardInit.ts`, `videoMachineBridge.ts`, and `videoPlayerService.ts`: video-session initialization, machine bridge behavior, and player integration.
-- `sessionSurfaceMode.ts`: shared AutoTutor/video/card surface selection, shell classes, learning-progress-panel visibility, video instruction overlay eligibility, and specialized launch-completion decisions.
+- `sessionSurfaceMode.ts`: shared AutoTutor/video/card surface selection, shell classes, learning-progress-panel visibility, video instruction overlay eligibility, video-readiness requirements, and specialized launch-completion decisions.
 - `mediaResolver.ts`, `cardPayloadBuilder.ts`, and `trialDisplayState.ts`: media, card payload, and display-state helpers.
 
 ## Boundary Rules
