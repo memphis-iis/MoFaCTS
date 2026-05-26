@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import { defaultLearningComponentCatalog } from '../../learning-components/defaultLearningComponentCatalog';
 import {
+  combineLearningComponentCatalogs,
   createLearningComponentCatalog,
   summarizeLearningComponentCatalog,
   validateLearningComponentCatalog,
@@ -64,6 +65,69 @@ describe('Learning component catalog', function() {
       displayTypes: ['h5p'],
       requiredCapabilities: ['history', 'media'],
     }]);
+  });
+
+  it('combines approved catalogs through the same validation boundary', function() {
+    const unitManifest: LearningComponentManifest = {
+      id: 'sample.unit',
+      kind: 'unit',
+      unitTypes: ['sample'],
+      requiredCapabilities: ['logging'],
+      register() {},
+    };
+    const displayManifest: LearningComponentManifest = {
+      id: 'sample.display',
+      kind: 'trial-display',
+      displayTypes: ['sample-display'],
+      requiredCapabilities: ['media'],
+      register() {},
+    };
+    const duplicateUnitManifest: LearningComponentManifest = {
+      id: 'sample.unit-two',
+      kind: 'unit',
+      unitTypes: ['sample'],
+      requiredCapabilities: ['logging'],
+      register() {},
+    };
+
+    const combined = combineLearningComponentCatalogs([
+      createLearningComponentCatalog({
+        unitManifests: [unitManifest],
+        trialDisplayManifests: [],
+      }),
+      createLearningComponentCatalog({
+        unitManifests: [],
+        trialDisplayManifests: [displayManifest],
+      }),
+    ]);
+
+    expect(summarizeLearningComponentCatalog(combined)).to.deep.equal({
+      units: [{
+        id: 'sample.unit',
+        kind: 'unit',
+        unitTypes: ['sample'],
+        displayTypes: [],
+        requiredCapabilities: ['logging'],
+      }],
+      trialDisplays: [{
+        id: 'sample.display',
+        kind: 'trial-display',
+        unitTypes: [],
+        displayTypes: ['sample-display'],
+        requiredCapabilities: ['media'],
+      }],
+    });
+
+    expect(() => combineLearningComponentCatalogs([
+      createLearningComponentCatalog({
+        unitManifests: [unitManifest],
+        trialDisplayManifests: [],
+      }),
+      createLearningComponentCatalog({
+        unitManifests: [duplicateUnitManifest],
+        trialDisplayManifests: [],
+      }),
+    ])).to.throw('Unit type "sample" is declared more than once in the catalog');
   });
 
   it('rejects duplicate component ids across unit and trial-display catalog entries', function() {

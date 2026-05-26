@@ -58,6 +58,15 @@ export function createLearningComponentCatalog<TUnitDeps>(
   };
 }
 
+export function combineLearningComponentCatalogs<TUnitDeps>(
+  catalogs: readonly LearningComponentCatalog<TUnitDeps>[],
+): LearningComponentCatalog<TUnitDeps> {
+  return createLearningComponentCatalog({
+    unitManifests: catalogs.flatMap((catalog) => [...catalog.unitManifests]),
+    trialDisplayManifests: catalogs.flatMap((catalog) => [...catalog.trialDisplayManifests]),
+  });
+}
+
 export function summarizeLearningComponentCatalog(
   catalog: LearningComponentCatalog,
 ): LearningComponentCatalogSummary {

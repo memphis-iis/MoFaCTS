@@ -80,3 +80,4 @@ Current evidence: `mofacts/common/learningComponentManifest.test.ts` proves the 
    Initial slice: default unit manifests were moved out of the central list and into their owning component folders. The remaining central surface is the default catalog/aggregator that composes approved in-repo component manifests.
 4. Expand capability interfaces only when a real component needs them, and fail manifest registration when those capabilities are absent.
 5. After in-repo component packaging is stable, evaluate controlled package discovery for approved local component bundles. Do not introduce arbitrary dynamic code loading before manifest validation, capability validation, and test fixtures are crisp.
+   Initial slice: `combineLearningComponentCatalogs` composes explicitly imported catalogs through the same catalog validation boundary, giving approved local/in-repo bundles a deterministic composition path before any discovery mechanism exists.
