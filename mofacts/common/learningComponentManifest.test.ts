@@ -17,6 +17,9 @@ import {
   autoTutorUnitComponentManifest,
   AUTO_TUTOR_SESSION_UNIT_TYPE,
 } from '../../learning-components/units/autotutor/AutoTutorUnitEngine';
+import { sampleEchoUnitFixtureDeps } from '../../learning-components/samples/echo-unit/fixtures';
+import { sampleEchoUnitComponentManifest } from '../../learning-components/samples/echo-unit/manifest';
+import { SAMPLE_ECHO_UNIT_TYPE } from '../../learning-components/samples/echo-unit/EchoUnitEngine';
 
 function createContext(capabilities: LearningComponentCapability[] = []): LearningComponentRuntimeContext {
   const registeredUnitTypes: string[] = [];
@@ -130,27 +133,8 @@ describe('Learning component manifests', function() {
     expect(registered).to.equal(true);
   });
 
-  it('proves a new in-repo sample unit can register through the manifest bootstrap path', async function() {
-    const manifest: LearningComponentManifest<{ suffix: string }> = {
-      id: 'sample.echo-unit',
-      kind: 'unit',
-      unitTypes: ['sample-echo'],
-      requiredCapabilities: ['logging'],
-      register(context) {
-        context.registerUnitEngineWithDeps('sample-echo', (deps) => ({
-          unitType: `sample-echo:${deps.suffix}`,
-          async cardAnswered() {},
-          selectNextCard() {
-            return { testType: 'sample' };
-          },
-          unitFinished() {
-            return false;
-          },
-        }));
-      },
-    };
-
-    registerLearningComponent(manifest, {
+  it('proves a new in-repo sample unit package can register through the manifest bootstrap path', async function() {
+    registerLearningComponent(sampleEchoUnitComponentManifest, {
       capabilities: new Set<LearningComponentCapability>(['logging']),
       registerUnitEngine,
       registerUnitEngineWithDeps,
@@ -159,11 +143,11 @@ describe('Learning component manifests', function() {
       },
     });
 
-    expect(getRegisteredUnitEngineTypes()).to.deep.equal(['sample-echo']);
+    expect(getRegisteredUnitEngineTypes()).to.deep.equal([SAMPLE_ECHO_UNIT_TYPE]);
 
-    const engine = await createRegisteredUnitEngine('sample-echo', { suffix: 'manifest' });
-    expect(engine.unitType).to.equal('sample-echo:manifest');
-    expect(await engine.selectNextCard?.()).to.deep.equal({ testType: 'sample' });
+    const engine = await createRegisteredUnitEngine(SAMPLE_ECHO_UNIT_TYPE, sampleEchoUnitFixtureDeps);
+    expect(engine.unitType).to.equal('sample-echo:manifest-package');
+    expect(await engine.selectNextCard?.()).to.deep.equal({ testType: SAMPLE_ECHO_UNIT_TYPE });
   });
 
   it('keeps the AutoTutor placeholder behind its own unit component manifest', async function() {

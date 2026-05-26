@@ -12,6 +12,7 @@ Current extension boundaries:
 - `runtime/LearningComponentCatalog.ts`: catalog packaging for unit and trial-display manifest groups.
 - `runtime/registerLearningComponents.ts`: shared manifest-list bootstrap and manifest summary helpers.
 - `defaultLearningComponentCatalog.ts`: default in-repo component package used by app bootstraps.
+- `samples/echo-unit/`: test-only sample component package that demonstrates the manifest, implementation, fixture, and README shape for future component bundles.
 - `runtime/TrialDisplayAdapterRegistry.ts`: display-owned trial adapter registry for H5P-style interactions.
 - `units/UnitEngineRegistry.ts`: unit engine registration and creation.
 
