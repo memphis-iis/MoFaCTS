@@ -198,7 +198,7 @@ describe('Learning component manifests', function() {
 
   it('keeps the AutoTutor unit behind its own component manifest', async function() {
     registerLearningComponent(autoTutorUnitComponentManifest, {
-      capabilities: new Set<LearningComponentCapability>(['logging']),
+      capabilities: new Set<LearningComponentCapability>(['session', 'server-methods', 'history', 'logging']),
       registerUnitEngine,
       registerUnitEngineWithDeps,
       registerTrialDisplayAdapter() {
@@ -211,5 +211,16 @@ describe('Learning component manifests', function() {
     const engine = await createRegisteredUnitEngine(AUTO_TUTOR_SESSION_UNIT_TYPE);
     expect(engine.unitType).to.equal(AUTO_TUTOR_SESSION_UNIT_TYPE);
     expect(engine.unitFinished?.()).to.equal(false);
+  });
+
+  it('fails AutoTutor registration when app-owned runtime capabilities are missing', function() {
+    expect(() => registerLearningComponent(autoTutorUnitComponentManifest, {
+      capabilities: new Set<LearningComponentCapability>(['logging']),
+      registerUnitEngine,
+      registerUnitEngineWithDeps,
+      registerTrialDisplayAdapter() {
+        throw new Error('AutoTutor unit should not register trial display adapters');
+      },
+    })).to.throw('Learning component "mofacts.autotutor-unit" requires missing capabilities: session, server-methods, history');
   });
 });

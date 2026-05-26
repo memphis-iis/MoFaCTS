@@ -14,6 +14,7 @@ This audit records the current extension-boundary readiness checkpoint for AutoT
 - The default runtime catalog remains unchanged unless an approved extension catalog is deliberately composed in.
 - Default unit manifests live with their owning unit folders; the central default unit file is an aggregator only.
 - AutoTutor has a dedicated unit component manifest and package README.
+- AutoTutor declares typed session, server-method, history, and logging capability needs before deeper runtime extraction.
 - H5P trial-display ownership is documented beside the H5P component package.
 - A test-only sample echo unit package demonstrates the expected component package shape.
 - `docs-developer/modularity-start-plan.md` defines the short next-step plan.
@@ -36,10 +37,11 @@ This audit records the current extension-boundary readiness checkpoint for AutoT
 - `mofacts/common/h5pTrialDisplayAdapter.test.ts`
 - `learning-components/samples/echo-unit/`
 - `learning-components/units/autotutor/manifest.ts`
+- `learning-components/units/autotutor/AutoTutorRuntimeCapabilities.ts`
 - `learning-components/units/autotutor/README.md`
 - `learning-components/trial-displays/h5p/README.md`
 - `docs-developer/modularity-start-plan.md`
 
 ## Next Safe Step
 
-Next, extract explicit AutoTutor runtime capability interfaces for server methods, history persistence, and UI shell behavior before moving those app-owned dependencies under the AutoTutor package.
+Next, wire the current AutoTutor client/server integration through the typed AutoTutor runtime capabilities before moving app-owned behavior under the AutoTutor package.

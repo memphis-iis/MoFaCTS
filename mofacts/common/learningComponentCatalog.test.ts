@@ -61,6 +61,12 @@ describe('Learning component catalog', function() {
       'mofacts.video-session-unit',
       'mofacts.autotutor-unit',
     ]);
+    expect(summary.units.find((manifest) => manifest.id === 'mofacts.autotutor-unit'))
+      .to.deep.include({
+        id: 'mofacts.autotutor-unit',
+        kind: 'unit',
+        requiredCapabilities: ['session', 'server-methods', 'history', 'logging'],
+      });
     expect(summary.trialDisplays).to.deep.equal([{
       id: 'mofacts.h5p-trial-display',
       kind: 'trial-display',

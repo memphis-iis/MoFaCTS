@@ -26,7 +26,7 @@ Make a new in-repo component feel like a small package:
 
 1. Convert the AutoTutor unit into a fuller component package boundary.
    Keep app-owned server calls, history persistence, and UI shell behavior outside the component until explicit capability interfaces are ready.
-   Initial slice: `learning-components/units/autotutor/manifest.ts` and `README.md` now give AutoTutor the same package-owned manifest shape as other component packages.
+   Initial slice: `learning-components/units/autotutor/manifest.ts` and `README.md` now give AutoTutor the same package-owned manifest shape as other component packages. `AutoTutorRuntimeCapabilities.ts` declares the session, server-method, history, and logging seams that must be wired before deeper extraction.
 
 2. Split the H5P trial-display package into component-owned and app-owned files.
    Keep package upload, storage, asset serving, and persistence app-owned; keep display ownership, normalization, and result shaping component-owned.
