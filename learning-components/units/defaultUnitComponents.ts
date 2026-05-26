@@ -1,4 +1,8 @@
 import { createAssessmentUnitEngine } from './assessment-session/AssessmentUnitEngine';
+import {
+  autoTutorUnitComponentManifest,
+  AUTO_TUTOR_SESSION_UNIT_TYPE,
+} from './autotutor/AutoTutorUnitEngine';
 import { createInstructionUnitEngine } from './instruction/InstructionUnitEngine';
 import { createLearningSessionUnitEngine } from './learning-session/LearningSessionUnitEngine';
 import { createVideoSessionUnitEngine } from './video-session/VideoUnitEngine';
@@ -9,7 +13,6 @@ export const INSTRUCTION_UNIT_TYPE = 'instruction-only';
 export const LEARNING_SESSION_UNIT_TYPE = 'model';
 export const ASSESSMENT_SESSION_UNIT_TYPE = 'schedule';
 export const VIDEO_SESSION_UNIT_TYPE = 'video';
-export const AUTO_TUTOR_SESSION_UNIT_TYPE = 'autotutor';
 
 export const defaultUnitComponentManifests: readonly LearningComponentManifest<CreateUnitEngineDeps>[] = [
   {
@@ -105,21 +108,7 @@ export const defaultUnitComponentManifests: readonly LearningComponentManifest<C
       }));
     },
   },
-  {
-    id: 'mofacts.autotutor-unit-placeholder',
-    kind: 'unit',
-    unitTypes: [AUTO_TUTOR_SESSION_UNIT_TYPE],
-    requiredCapabilities: ['logging'],
-    register(context) {
-      context.registerUnitEngine(AUTO_TUTOR_SESSION_UNIT_TYPE, () => ({
-        unitType: AUTO_TUTOR_SESSION_UNIT_TYPE,
-        async cardAnswered() {},
-        selectNextCard() {},
-        findCurrentCardInfo() {},
-        unitFinished() {
-          return false;
-        },
-      }));
-    },
-  },
+  autoTutorUnitComponentManifest,
 ];
+
+export { AUTO_TUTOR_SESSION_UNIT_TYPE };

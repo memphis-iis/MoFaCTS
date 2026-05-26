@@ -13,6 +13,10 @@ import {
   registerUnitEngineWithDeps,
   resetUnitEngineRegistryForTests,
 } from '../../learning-components/units/UnitEngineRegistry';
+import {
+  autoTutorUnitComponentManifest,
+  AUTO_TUTOR_SESSION_UNIT_TYPE,
+} from '../../learning-components/units/autotutor/AutoTutorUnitEngine';
 
 function createContext(capabilities: LearningComponentCapability[] = []): LearningComponentRuntimeContext {
   const registeredUnitTypes: string[] = [];
@@ -160,5 +164,22 @@ describe('Learning component manifests', function() {
     const engine = await createRegisteredUnitEngine('sample-echo', { suffix: 'manifest' });
     expect(engine.unitType).to.equal('sample-echo:manifest');
     expect(await engine.selectNextCard?.()).to.deep.equal({ testType: 'sample' });
+  });
+
+  it('keeps the AutoTutor placeholder behind its own unit component manifest', async function() {
+    registerLearningComponent(autoTutorUnitComponentManifest, {
+      capabilities: new Set<LearningComponentCapability>(['logging']),
+      registerUnitEngine,
+      registerUnitEngineWithDeps,
+      registerTrialDisplayAdapter() {
+        throw new Error('AutoTutor unit should not register trial display adapters');
+      },
+    });
+
+    expect(getRegisteredUnitEngineTypes()).to.deep.equal([AUTO_TUTOR_SESSION_UNIT_TYPE]);
+
+    const engine = await createRegisteredUnitEngine(AUTO_TUTOR_SESSION_UNIT_TYPE);
+    expect(engine.unitType).to.equal(AUTO_TUTOR_SESSION_UNIT_TYPE);
+    expect(engine.unitFinished?.()).to.equal(false);
   });
 });
