@@ -198,6 +198,18 @@ export function resolvePreparedTrialCommitRoute(engine: UnitEngineLike | null | 
   return 'unsupported';
 }
 
+export function canEngineUseSeamlessPreparedAdvance(engine: UnitEngineLike | null | undefined): boolean {
+  return resolvePreparedTrialCommitRoute(engine) === 'model-locked-card';
+}
+
+export function resolveModelEngineCardRef(
+  engine: UnitEngineLike | null | undefined,
+): Record<string, unknown> | null {
+  return canEngineUseSeamlessPreparedAdvance(engine) && engine?.currentCardRef
+    ? engine.currentCardRef as Record<string, unknown>
+    : null;
+}
+
 /**
  * Initialize unit engine based on TDF and unit type.
  * Creates schedule unit, model unit, or empty unit.
@@ -406,7 +418,7 @@ function isPreparedAdvanceEligible(
   engine: UnitEngineLike | null | undefined,
   context?: UnitEngineServiceContext | UpdateEngineServiceContext,
 ): boolean {
-  if (!engine || engine.unitType !== 'model') {
+  if (!canEngineUseSeamlessPreparedAdvance(engine)) {
     return false;
   }
   if (isUnitEngineVideoSurfaceActive()) {
@@ -773,10 +785,11 @@ export async function updateEngineService(
       }
 
       if (!isUnitEngineVideoSurfaceActive()) {
-        if (engine.unitType === 'model' && engine.currentCardRef) {
+        const modelCardRef = resolveModelEngineCardRef(engine);
+        if (modelCardRef) {
           Session.set('engineIndices', {
-            clusterIndex: engine.currentCardRef.clusterIndex,
-            stimIndex: engine.currentCardRef.stimIndex,
+            clusterIndex: modelCardRef.clusterIndex,
+            stimIndex: modelCardRef.stimIndex,
           });
         } else {
           Session.set('engineIndices', undefined);

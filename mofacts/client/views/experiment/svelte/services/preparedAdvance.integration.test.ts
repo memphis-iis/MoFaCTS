@@ -3,8 +3,10 @@ import { Session } from 'meteor/session';
 import { CardStore } from '../../modules/cardStore';
 import { ExperimentStateStore } from '../../../../lib/state/experimentStateStore';
 import {
+  canEngineUseSeamlessPreparedAdvance,
   commitPreparedTrialRuntime,
   prepareIncomingTrialService,
+  resolveModelEngineCardRef,
   resolvePreparedIncomingTrialRoute,
   resolvePreparedTrialCommitRoute,
 } from './unitEngineService';
@@ -197,6 +199,17 @@ describe('prepared advance integration seams', function() {
     expect(resolvePreparedTrialCommitRoute({ unitType: 'schedule' })).to.equal('schedule-prepared-card');
     expect(resolvePreparedTrialCommitRoute({ unitType: 'video' })).to.equal('unsupported');
     expect(resolvePreparedTrialCommitRoute(null)).to.equal('unsupported');
+  });
+
+  it('names seamless prepared-advance and model card-ref ownership', function() {
+    const modelEngine = {
+      unitType: 'model',
+      currentCardRef: { clusterIndex: 2, stimIndex: 3 },
+    };
+    expect(canEngineUseSeamlessPreparedAdvance(modelEngine)).to.equal(true);
+    expect(resolveModelEngineCardRef(modelEngine)).to.deep.equal({ clusterIndex: 2, stimIndex: 3 });
+    expect(canEngineUseSeamlessPreparedAdvance({ unitType: 'schedule' })).to.equal(false);
+    expect(resolveModelEngineCardRef({ unitType: 'schedule', currentCardRef: { clusterIndex: 2 } })).to.equal(null);
   });
 
   it('commitPreparedTrialRuntime applies schedule mirrors only at commit', function() {

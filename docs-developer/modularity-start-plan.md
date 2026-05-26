@@ -80,6 +80,7 @@ Make a new in-repo component feel like a small package:
    The Svelte card tester now uses the shared `resolveUnitEngineTypeForUnit` compatibility boundary instead of maintaining a local authored-shape unit-type resolver.
    Svelte machine prepared-advance eligibility now names the model/schedule engine policy before composing it with video-surface and resume guards.
    Multi-TDF launch lock behavior now resolves through a shared launch policy helper, so dashboard and direct launch paths no longer duplicate authored-shape unit-type detection.
+   Unit-engine service now names seamless model prepared-advance eligibility and model card-ref export before composing them into prepared-advance and post-answer state publication.
 
 ## Pause/Resume Checkpoint
 
