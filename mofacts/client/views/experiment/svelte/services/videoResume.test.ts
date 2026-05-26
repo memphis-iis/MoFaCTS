@@ -1,6 +1,10 @@
 import { expect } from 'chai';
 
-import { resolveVideoResumeAnchor } from './videoResume';
+import {
+  isVideoResumeSession,
+  resolveVideoResumeAnchor,
+  resolveVideoResumeSource,
+} from './videoResume';
 
 describe('videoResume', function() {
   const checkpointTimes = [10, 20, 30];
@@ -29,5 +33,16 @@ describe('videoResume', function() {
 
   it('fails on invalid checkpoint times', function() {
     expect(() => resolveVideoResumeAnchor([10, 'bad', 30], 1)).to.throw(/invalid/);
+  });
+
+  it('detects video resume sessions through the shared session surface state', function() {
+    expect(isVideoResumeSession({ videosession: { videosource: 'intro.mp4' } })).to.equal(true);
+    expect(isVideoResumeSession({})).to.equal(false);
+  });
+
+  it('resolves the video source only for video resume sessions', function() {
+    expect(resolveVideoResumeSource({ videosession: { videosource: 'intro.mp4' } })).to.equal('intro.mp4');
+    expect(resolveVideoResumeSource({ videosession: { videosource: '' } })).to.equal(null);
+    expect(resolveVideoResumeSource({})).to.equal(null);
   });
 });

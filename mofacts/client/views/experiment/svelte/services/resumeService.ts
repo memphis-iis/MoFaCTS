@@ -50,7 +50,8 @@ import {
   applyLearnerTdfConfig,
   type LearnerTdfConfig,
 } from '../../../../../common/lib/learnerTdfConfig';
-import { ensureCurrentStimuliSetId, resolveDynamicAssetPath } from './mediaResolver';
+import { ensureCurrentStimuliSetId } from './mediaResolver';
+import { isVideoResumeSession, resolveVideoResumeSource } from './videoResume';
 import {
   assertIdInvariants,
   clearConditionResolutionContext,
@@ -383,16 +384,9 @@ function getConditionIndexOrThrow(conditions: string[], conditionFileName: unkno
  * @returns {void}
  */
 function preloadVideos(): void {
-  if (Session.get('currentTdfUnit') &&
-    Session.get('currentTdfUnit').videosession &&
-    Session.get('currentTdfUnit').videosession.videosource) {
-    const resolvedVideo = resolveDynamicAssetPath(
-      Session.get('currentTdfUnit').videosession.videosource,
-      { logPrefix: '[Resume Service]' }
-    );
-    if (resolvedVideo) {
-      CardStore.setVideoSource(resolvedVideo);
-    }
+  const resolvedVideo = resolveVideoResumeSource(Session.get('currentTdfUnit'));
+  if (resolvedVideo) {
+    CardStore.setVideoSource(resolvedVideo);
   }
 }
 
@@ -906,7 +900,7 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
       });
       return handleResumeFailure('Unable to load the current unit for this lesson. Please contact your administrator.');
     }
-    if (curTdfUnit.videosession) {
+    if (isVideoResumeSession(curTdfUnit)) {
       Session.set('isVideoSession', true)
       clientConsole(2, 'video type questions detected, pre-loading video');
       preloadVideos();

@@ -1,3 +1,13 @@
+import { resolveDynamicAssetPath } from './mediaResolver';
+import { resolveSessionSurfaceState } from './sessionSurfaceMode';
+
+type VideoResumeUnitLike = {
+  videosession?: {
+    videosource?: unknown;
+  } | null;
+  autotutorsession?: unknown;
+};
+
 function toNonNegativeInteger(value: unknown): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < 0) {
@@ -17,6 +27,24 @@ type VideoResumeAnchor = {
 };
 
 const RESUME_AFTER_CHECKPOINT_OFFSET_SECONDS = 0.1;
+
+export function isVideoResumeSession(unit: VideoResumeUnitLike | null | undefined): boolean {
+  return resolveSessionSurfaceState({ currentTdfUnit: unit }).isVideoSession;
+}
+
+export function resolveVideoResumeSource(
+  unit: VideoResumeUnitLike | null | undefined,
+): string | null {
+  if (!isVideoResumeSession(unit)) {
+    return null;
+  }
+
+  const resolvedVideo = resolveDynamicAssetPath(unit?.videosession?.videosource, {
+    logPrefix: '[Resume Service]',
+  });
+
+  return resolvedVideo || null;
+}
 
 export function resolveVideoResumeAnchor(
   checkpointTimes: unknown,
