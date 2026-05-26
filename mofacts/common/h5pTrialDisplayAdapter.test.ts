@@ -80,12 +80,17 @@ describe('H5P trial display adapter', function() {
   it('registers H5P through the learning component manifest', function() {
     registerLearningComponent(h5pTrialDisplayComponentManifest, {
       capabilities: new Set(['media', 'history']),
-      registerUnitEngine() {},
-      registerUnitEngineWithDeps() {},
+      registerUnitEngine() {
+        throw new Error('H5P trial display component must not register unit engines');
+      },
+      registerUnitEngineWithDeps() {
+        throw new Error('H5P trial display component must not register unit engines');
+      },
       registerTrialDisplayAdapter,
     });
 
     expect(getTrialDisplayAdapter(H5P_TRIAL_DISPLAY_TYPE)).to.equal(h5pTrialDisplayAdapter);
+    expect(h5pTrialDisplayComponentManifest.requiredCapabilities).to.deep.equal(['media', 'history']);
   });
 
   it('registers default trial display components idempotently without replacing existing adapters', function() {

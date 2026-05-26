@@ -29,6 +29,7 @@ Make a new in-repo component feel like a small package:
 
 2. Split the H5P trial-display package into component-owned and app-owned files.
    Keep package upload, storage, asset serving, and persistence app-owned; keep display ownership, normalization, and result shaping component-owned.
+   Initial slice: `learning-components/trial-displays/h5p/README.md` now records the component-owned/app-owned split, and the H5P manifest test proves the package registers only a trial-display adapter with explicit `media` and `history` capabilities.
 
 3. Add a small approved-catalog extension test.
    Compose the default catalog with the sample echo package using `combineLearningComponentCatalogs`, prove duplicate detection still fires, and prove the default runtime catalog is unchanged unless explicitly extended.
