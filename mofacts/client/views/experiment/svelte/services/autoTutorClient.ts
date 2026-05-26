@@ -931,10 +931,7 @@ function validateSavedEndState(note: AutoTutorHistoryNote): void {
   if (typeof note.completed !== 'boolean' || typeof note.stoppedByCost !== 'boolean') {
     throw new Error('AutoTutor saved history completion flags must be boolean');
   }
-  if (
-    typeof note.mastered !== 'boolean' ||
-    !isAutoTutorEndReason(note.endReason)
-  ) {
+  if (typeof note.mastered !== 'boolean' || !isAutoTutorEndReason(note.endReason)) {
     throw new Error('AutoTutor saved history mastery flags must be present and valid');
   }
 }

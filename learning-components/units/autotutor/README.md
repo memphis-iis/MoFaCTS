@@ -7,6 +7,7 @@ Component-owned:
 - Unit-type declaration and manifest registration.
 - The unit-engine extension registered for `autotutor`.
 - Typed runtime capability contracts in `AutoTutorRuntimeCapabilities.ts`.
+- Explicit completion/end-state semantics in `AutoTutorEndState.ts`.
 - AutoTutor planning, scoring, and response contract helpers in shared common code.
 
 App-owned for the current milestone:
