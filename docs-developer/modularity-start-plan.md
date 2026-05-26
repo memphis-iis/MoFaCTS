@@ -98,7 +98,8 @@ Current direct-branch audit:
 - `learning-components/units/learning-session/learningSessionRuntimeConfig.ts` is the learning-session package owner for learning/video session runtime config and cluster-list source selection.
 - `mofacts/client/views/experiment/videoAdaptiveQuestions.ts`, `mofacts/client/views/experiment/svelte/services/videoCardInit.ts`, and `videoResume.ts` are video-owned app services; their direct `videosession` reads are intentional integration boundaries.
 - `mofacts/client/views/experiment/svelte/services/sessionSurfaceMode.ts` is the shared session-surface owner for AutoTutor/video/card mode detection and diagnostics.
-- Remaining `engine.unitType` reads in `unitEngineService.ts`, `preparedAdvanceMachine.ts`, `historyLogging.ts`, and `learningProgressPanel.ts` are now behind named helpers or local service predicates. Resume learning/assessment history routing is similarly centralized in `assessmentResume.ts`. Prefer reusing those helpers before adding new raw unit-type or authored-shape branches.
+- Remaining `engine.unitType` reads in `unitEngineService.ts`, `preparedAdvanceMachine.ts`, `historyLogging.ts`, `learningProgressPanel.ts`, and machine guards are now behind named helpers or local service predicates. Resume learning/assessment history routing is similarly centralized in `assessmentResume.ts`. Prefer reusing those helpers before adding new raw unit-type or authored-shape branches.
+- Current targeted audit has no remaining local `getUnitType` helpers, no direct `newUnit.assessmentsession` writes, no direct `currentUnit.learningsession` reads in app helpers, and no duplicated model-only prepared-advance guard outside the named service helpers.
 
 Resume with:
 
