@@ -65,7 +65,7 @@ describe('Learning component catalog', function() {
       .to.deep.include({
         id: 'mofacts.autotutor-unit',
         kind: 'unit',
-        requiredCapabilities: ['session', 'server-methods', 'history', 'logging'],
+        requiredCapabilities: ['session', 'stimuli', 'server-methods', 'history', 'logging'],
       });
     expect(summary.trialDisplays).to.deep.equal([{
       id: 'mofacts.h5p-trial-display',

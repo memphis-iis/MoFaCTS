@@ -14,8 +14,8 @@ This audit records the current extension-boundary readiness checkpoint for AutoT
 - The default runtime catalog remains unchanged unless an approved extension catalog is deliberately composed in.
 - Default unit manifests live with their owning unit folders; the central default unit file is an aggregator only.
 - AutoTutor has a dedicated unit component manifest and package README.
-- AutoTutor declares typed session, server-method, history, and logging capability needs before deeper runtime extraction.
-- AutoTutor client runtime now routes state publication, config/session reads, resume-history loading, user/session metadata reads, and history-turn writes through an app-owned capability adapter.
+- AutoTutor declares typed session, stimuli, server-method, history, and logging capability needs before deeper runtime extraction.
+- AutoTutor client runtime now routes state publication, config/session reads, stimulus lookup, resume-history loading, user/session metadata reads, and history-turn writes through an app-owned capability adapter.
 - H5P trial-display ownership is documented beside the H5P component package.
 - A test-only sample echo unit package demonstrates the expected component package shape.
 - `docs-developer/modularity-start-plan.md` defines the short next-step plan.
@@ -46,4 +46,4 @@ This audit records the current extension-boundary readiness checkpoint for AutoT
 
 ## Next Safe Step
 
-Next, extract the remaining app-owned AutoTutor stimulus/history helpers behind typed capabilities before moving app-owned behavior under the AutoTutor package.
+Next, keep narrowing the app-owned AutoTutor history boundary by replacing the raw compressed-history payload with a typed AutoTutor turn/history record before moving app-owned behavior under the AutoTutor package.

@@ -8,6 +8,7 @@ import type {
 
 export const AUTO_TUTOR_UNIT_REQUIRED_CAPABILITIES = [
   'session',
+  'stimuli',
   'server-methods',
   'history',
   'logging',
@@ -36,9 +37,18 @@ export type AutoTutorHistoryTurn = {
   endedAt: number;
 };
 
+export type AutoTutorStimulusCluster = {
+  clusterKC?: unknown;
+  stims?: unknown[];
+};
+
 export interface AutoTutorSessionRuntime extends SessionRuntime {
   getAutoTutorSessionSnapshot(): AutoTutorSessionSnapshot;
   publishAutoTutorState(state: unknown): void;
+}
+
+export interface AutoTutorStimuliRuntime {
+  getStimCluster(clusterIndex: number): AutoTutorStimulusCluster | null;
 }
 
 export interface AutoTutorServerMethodsRuntime extends ServerMethodRuntime {
@@ -47,10 +57,12 @@ export interface AutoTutorServerMethodsRuntime extends ServerMethodRuntime {
 
 export interface AutoTutorHistoryRuntime extends HistoryRuntime<AutoTutorHistoryTurn> {
   writeAutoTutorTurn(turn: AutoTutorHistoryTurn): Promise<void>;
+  writeCompressedHistory(record: Record<string, unknown>): Promise<void>;
 }
 
 export type AutoTutorRuntimeCapabilities = {
   readonly session: AutoTutorSessionRuntime;
+  readonly stimuli: AutoTutorStimuliRuntime;
   readonly serverMethods: AutoTutorServerMethodsRuntime;
   readonly history: AutoTutorHistoryRuntime;
   readonly logger: ComponentLogger;

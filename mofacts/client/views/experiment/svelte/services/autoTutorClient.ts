@@ -181,6 +181,11 @@ function createMeteorAutoTutorRuntimeCapabilities(): AutoTutorRuntimeCapabilitie
         return await meteorCallAsync('getAutoTutorHistoryForUnit', userId, tdfId, unitNumber) as unknown[];
       },
     },
+    stimuli: {
+      getStimCluster(clusterIndex: number) {
+        return getStimCluster(clusterIndex) as { clusterKC?: unknown; stims?: unknown[] } | null;
+      },
+    },
     history: {
       normalizeResult(result: unknown) {
         return result as AutoTutorHistoryTurn;
@@ -196,6 +201,9 @@ function createMeteorAutoTutorRuntimeCapabilities(): AutoTutorRuntimeCapabilitie
           turnStartedAt: turn.startedAt,
           turnEndedAt: turn.endedAt,
         });
+      },
+      async writeCompressedHistory(record: Record<string, unknown>) {
+        await insertCompressedHistory(record);
       },
     },
     logger: {
@@ -301,7 +309,7 @@ function readAutoTutorConfig(capabilities: AutoTutorRuntimeCapabilities): AutoTu
     throw new Error('AutoTutor runtime requires autotutorsession.cluster to be a non-negative integer');
   }
 
-  const cluster = getStimCluster(clusterIndex);
+  const cluster = capabilities.stimuli.getStimCluster(clusterIndex);
   const stim = cluster?.stims?.[0];
   if (!isRecord(stim)) {
     throw new Error(`AutoTutor runtime could not find first stim for cluster ${clusterIndex}`);
@@ -929,12 +937,12 @@ async function insertAutoTutorHistoryTurn(config: AutoTutorConfig, state: AutoTu
   const unitNumber = snapshot.currentUnitNumber;
   const unit = (tutor?.unit?.[unitNumber] || {}) as { unitname?: unknown };
   const unitName = typeof unit?.unitname === 'string' ? unit.unitname : config.unitName;
-  const cluster = getStimCluster(config.clusterIndex) as { clusterKC?: unknown; stims?: unknown[] } | null;
+  const cluster = args.capabilities.stimuli.getStimCluster(config.clusterIndex);
   const stim = (cluster?.stims?.[0] || {}) as { _id?: unknown; stimulusKC?: unknown };
   const sessionID = (new Date(args.turnStartedAt)).toUTCString().substr(0, 16) + ' ' + snapshot.currentTdfName;
   const note = buildHistoryNote(config, state, args.tutorMessage);
 
-  await insertCompressedHistory({
+  await args.capabilities.history.writeCompressedHistory({
     itemId: stim?._id || config.script.id,
     KCId: stim?.stimulusKC || config.script.id,
     userId: snapshot.currentUserId,

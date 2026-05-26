@@ -19,6 +19,7 @@ App-owned for the current milestone:
 Current manifest requirements:
 
 - `session`
+- `stimuli`
 - `server-methods`
 - `history`
 - `logging`

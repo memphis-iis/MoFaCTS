@@ -198,7 +198,7 @@ describe('Learning component manifests', function() {
 
   it('keeps the AutoTutor unit behind its own component manifest', async function() {
     registerLearningComponent(autoTutorUnitComponentManifest, {
-      capabilities: new Set<LearningComponentCapability>(['session', 'server-methods', 'history', 'logging']),
+      capabilities: new Set<LearningComponentCapability>(['session', 'stimuli', 'server-methods', 'history', 'logging']),
       registerUnitEngine,
       registerUnitEngineWithDeps,
       registerTrialDisplayAdapter() {
@@ -221,6 +221,6 @@ describe('Learning component manifests', function() {
       registerTrialDisplayAdapter() {
         throw new Error('AutoTutor unit should not register trial display adapters');
       },
-    })).to.throw('Learning component "mofacts.autotutor-unit" requires missing capabilities: session, server-methods, history');
+    })).to.throw('Learning component "mofacts.autotutor-unit" requires missing capabilities: session, stimuli, server-methods, history');
   });
 });
