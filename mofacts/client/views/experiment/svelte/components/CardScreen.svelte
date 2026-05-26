@@ -62,6 +62,7 @@
   import { buildLearningProgressPanelSnapshot } from '../services/learningProgressPanel';
   import {
     resolveSessionSurfaceLaunchCompletion,
+    resolveSessionSurfaceShell,
     resolveSessionSurfaceState,
   } from '../services/sessionSurfaceMode';
   import { CardStore } from '../../modules/cardStore';
@@ -819,9 +820,12 @@
       hiddenItems: CardStore.getHiddenItems(),
     });
   }
-  $: showLearningProgressPanel = !isVideoSession &&
-    !progressPanelDisabled(deliverySettings) &&
-    learningProgressSnapshot.available;
+  $: sessionSurfaceShell = resolveSessionSurfaceShell({
+    surfaceState: sessionSurfaceState,
+    progressPanelDisabled: progressPanelDisabled(deliverySettings),
+    learningProgressAvailable: learningProgressSnapshot.available,
+  });
+  $: showLearningProgressPanel = sessionSurfaceShell.showLearningProgressPanel;
   $: if (!showLearningProgressPanel && learningProgressPanelOpen) {
     learningProgressPanelOpen = false;
   }
@@ -1989,7 +1993,13 @@
 </script>
 
 {#if testMode || initializedForRender}
-<div class="card-screen" class:video-mode={isVideoSession} class:auto-tutor-mode={isAutoTutorSession} bind:this={cardScreenElement} style={cardFontSizeStyle}>
+<div
+  class="card-screen"
+  class:video-mode={sessionSurfaceShell.cardScreenClasses.videoMode}
+  class:auto-tutor-mode={sessionSurfaceShell.cardScreenClasses.autoTutorMode}
+  bind:this={cardScreenElement}
+  style={cardFontSizeStyle}
+>
   {#if isAutoTutorSession}
     <AutoTutorSession on:complete={() => forceAdvanceToNextUnit('AutoTutor Complete')} />
   {:else if isVideoSession}

@@ -25,7 +25,7 @@ This audit records the current extension-boundary readiness checkpoint for AutoT
 - H5P trial-display ownership is documented beside the H5P component package.
 - H5P result normalization for card submission and history now routes through the registered trial-display adapter via one client service helper.
 - H5P owned-interaction decisions for Svelte trial content, card response visibility, feedback suppression, and history now route through the H5P trial-display service instead of page-level direct display-shape checks.
-- The Svelte card shell now resolves AutoTutor/video/card rendering mode and specialized launch-completion behavior through a tested session-surface service instead of inline session/unit-shape checks.
+- The Svelte card shell now resolves AutoTutor/video/card rendering mode, shell CSS/panel behavior, and specialized launch-completion behavior through a tested session-surface service instead of inline session/unit-shape checks.
 - A test-only sample echo unit package demonstrates the expected component package shape.
 - `learning-components/README.md` now includes the component package checklist for adding the next unit or trial-display package through manifest, catalog, and explicit capability boundaries.
 - `docs-developer/modularity-start-plan.md` defines the short next-step plan.
@@ -72,4 +72,4 @@ This audit records the current extension-boundary readiness checkpoint for AutoT
 
 ## Next Safe Step
 
-Next, continue reducing direct component branches at larger session boundaries by routing remaining AutoTutor and video shell/render hooks through explicit session-surface adapters without changing runtime behavior.
+Next, continue reducing direct component branches at larger session boundaries by routing remaining AutoTutor and video render branches through explicit session-surface adapters without changing runtime behavior.

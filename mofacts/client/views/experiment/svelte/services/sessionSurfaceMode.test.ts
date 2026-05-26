@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import {
   resolveSessionSurfaceLaunchCompletion,
+  resolveSessionSurfaceShell,
   resolveSessionSurfaceState,
 } from './sessionSurfaceMode';
 
@@ -77,5 +78,56 @@ describe('session surface mode', function() {
       },
       stopInitialization: false,
     });
+  });
+
+  it('describes standard card shell behavior with learning progress enabled', function() {
+    expect(resolveSessionSurfaceShell({
+      surfaceState: resolveSessionSurfaceState({}),
+      progressPanelDisabled: false,
+      learningProgressAvailable: true,
+    })).to.deep.equal({
+      mode: 'card',
+      isAutoTutorSession: false,
+      isVideoSession: false,
+      cardScreenClasses: {
+        videoMode: false,
+        autoTutorMode: false,
+      },
+      showLearningProgressPanel: true,
+    });
+  });
+
+  it('keeps specialized surfaces out of the learning progress panel shell', function() {
+    expect(resolveSessionSurfaceShell({
+      surfaceState: resolveSessionSurfaceState({ currentTdfUnit: { videosession: {} } }),
+      progressPanelDisabled: false,
+      learningProgressAvailable: true,
+    })).to.deep.include({
+      mode: 'video',
+      showLearningProgressPanel: false,
+    });
+    expect(resolveSessionSurfaceShell({
+      surfaceState: resolveSessionSurfaceState({ sessionUnitType: 'autotutor' }),
+      progressPanelDisabled: false,
+      learningProgressAvailable: true,
+    })).to.deep.include({
+      mode: 'autotutor',
+      showLearningProgressPanel: false,
+    });
+  });
+
+  it('keeps learning progress hidden when card progress is unavailable or disabled', function() {
+    const surfaceState = resolveSessionSurfaceState({});
+
+    expect(resolveSessionSurfaceShell({
+      surfaceState,
+      progressPanelDisabled: true,
+      learningProgressAvailable: true,
+    }).showLearningProgressPanel).to.equal(false);
+    expect(resolveSessionSurfaceShell({
+      surfaceState,
+      progressPanelDisabled: false,
+      learningProgressAvailable: false,
+    }).showLearningProgressPanel).to.equal(false);
   });
 });
