@@ -60,6 +60,7 @@ import {
   type CardEntryIntentValue,
   type CardRefreshRebuildClassification,
 } from './cardEntryBootstrap';
+import { resolveSvelteEngineInitPolicy } from './svelteEngineInitPolicy';
 import {
   assertIdInvariants,
   setActiveTdfContext,
@@ -613,22 +614,13 @@ async function initializeStandardCardEntry(
 
   const existingEngine = getEngine() as RuntimeEngine | null;
   const currentTdfId = Session.get('currentTdfId');
-
-  const existingEngineUnitNumber = existingEngine && Number.isFinite(existingEngine.__unitNumber)
-    ? existingEngine.__unitNumber
-    : null;
-  const existingEngineTdfId = existingEngine?.__tdfId || null;
-  const existingEngineUnitName = existingEngine?.__unitName || null;
-  const engineUnitContextChanged = !!existingEngine && (
-    existingEngineUnitNumber !== currentUnitNumber ||
-    existingEngineTdfId !== currentTdfId ||
-    existingEngineUnitName !== (unit?.unitname || null)
-  );
-
-  const shouldInitEngine = !existingEngine ||
-    (unitType && existingEngine.unitType !== unitType) ||
-    engineUnitContextChanged ||
-    existingEngine?.unitType === 'unknown';
+  const { shouldInitEngine } = resolveSvelteEngineInitPolicy({
+    existingEngine,
+    expectedUnitType: unitType,
+    currentUnitNumber,
+    currentTdfId,
+    currentUnitName: unit?.unitname,
+  });
 
   if (shouldInitEngine) {
     assertIdInvariants('svelteInit.before-engine-init', {

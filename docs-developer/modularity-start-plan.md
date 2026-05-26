@@ -73,6 +73,7 @@ Make a new in-repo component feel like a small package:
    Selected-card export now resolves schedule live-display question index through a named helper before card payload construction, so resume/start logic cannot silently reuse stale machine counters for fixed schedule positions.
    Resume history reconstruction now resolves learning-vs-assessment routes through `assessmentResume.ts`, so resume orchestration consumes explicit history, schedule-artifact, and instruction-skip policy instead of branching directly on authored `learningsession`/`assessmentsession` shapes.
    Card payload button-trial construction now asks a named schedule policy before reading assessment schedule state, keeping assessment-session gating out of the payload assembly branch.
+   Svelte launch engine reuse/reinitialization now resolves through a tested app launch policy helper, keeping unit-type/context comparison out of the bootstrap orchestration.
 
 ## Pause/Resume Checkpoint
 
