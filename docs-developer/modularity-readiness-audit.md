@@ -23,6 +23,7 @@ This audit records the current extension-boundary readiness checkpoint for AutoT
 - AutoTutor saved-state validation now has a package-owned boundary in `AutoTutorSavedState.ts`, keeping score-id, learner-contribution, planner-state, and end-reason validation with the AutoTutor component package.
 - AutoTutor client runtime now routes state publication, config/session reads, stimulus lookup, resume-history loading, user/session metadata reads, and typed history-turn writes through an app-owned capability adapter.
 - H5P trial-display ownership is documented beside the H5P component package.
+- H5P result normalization for card submission and history now routes through the registered trial-display adapter via one client service helper.
 - A test-only sample echo unit package demonstrates the expected component package shape.
 - `learning-components/README.md` now includes the component package checklist for adding the next unit or trial-display package through manifest, catalog, and explicit capability boundaries.
 - `docs-developer/modularity-start-plan.md` defines the short next-step plan.
@@ -58,6 +59,7 @@ This audit records the current extension-boundary readiness checkpoint for AutoT
 - `mofacts/common/autoTutorSavedHistory.test.ts`
 - `mofacts/common/autoTutorSavedState.test.ts`
 - `mofacts/client/views/experiment/engineConstructors.contracts.test.ts`
+- `mofacts/client/views/experiment/svelte/services/h5pTrialDisplay.test.ts`
 - `mofacts/client/views/experiment/svelte/services/autoTutorClient.ts`
 - `learning-components/trial-displays/h5p/README.md`
 - `learning-components/README.md`
@@ -65,4 +67,4 @@ This audit records the current extension-boundary readiness checkpoint for AutoT
 
 ## Next Safe Step
 
-Next, continue reducing direct component branches in the Svelte trial surfaces so H5P/AutoTutor display ownership can move through component adapters instead of page-level conditionals.
+Next, continue reducing direct component branches in the Svelte trial surfaces so H5P/AutoTutor rendering ownership can move through component adapters instead of page-level conditionals.

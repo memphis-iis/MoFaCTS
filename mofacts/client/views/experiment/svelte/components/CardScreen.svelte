@@ -56,7 +56,7 @@
   import { getMainTimeoutMs, getFeedbackTimeoutMs } from '../utils/timeoutUtils';
   import { recordCurrentInstructionContinue } from '../../instructions';
   import { isSelfHostedH5PDisplay } from '../../../../../common/lib/h5pDisplay';
-  import { normalizeH5PTrialResult } from '../../../../../common/lib/h5pTrialResult';
+  import { resolveH5PTrialDisplayResult } from '../services/h5pTrialDisplay';
   import { buildLearningProgressPanelSnapshot } from '../services/learningProgressPanel';
   import { CardStore } from '../../modules/cardStore';
   import LearningProgressPanel from './LearningProgressPanel.svelte';
@@ -1010,7 +1010,10 @@
     if (submittedH5PResultKey) {
       return;
     }
-    const h5pResult = normalizeH5PTrialResult(detail, context.currentDisplay?.h5p?.contentId);
+    const h5pResult = resolveH5PTrialDisplayResult(context.currentDisplay, detail, '[CardScreen]');
+    if (!h5pResult) {
+      throw new Error('[CardScreen] H5P result received for non-H5P display');
+    }
     const resultKey = h5pResult.batchId;
     submittedH5PResultKey = resultKey;
     send({

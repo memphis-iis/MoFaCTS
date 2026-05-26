@@ -49,6 +49,7 @@ Make a new in-repo component feel like a small package:
 
 4. Remove remaining central component branches where a registry already exists.
    Initial slice: `mofacts/client/views/experiment/engineConstructors.ts` now delegates explicit unit-type engine creation through `createUnitEngineByType`, preserving contextual unknown-type errors while letting registered unit manifests own construction.
+   H5P result handling now uses `mofacts/client/views/experiment/svelte/services/h5pTrialDisplay.ts` so card submission and history both normalize through the registered H5P trial-display adapter.
 
 ## Invariants
 

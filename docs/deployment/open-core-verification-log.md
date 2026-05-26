@@ -239,3 +239,23 @@ Modularity evidence added:
 - `learning-components/units/createUnitEngine.ts` now exposes generic registered-unit creation and registered-type listing.
 - `mofacts/client/views/experiment/engineConstructors.ts` now delegates explicit unit-type creation to the registered unit-engine path instead of owning a central switch for every shipped unit type.
 - `mofacts/client/views/experiment/engineConstructors.contracts.test.ts` now expects unknown-type diagnostics to report registered unit-engine types.
+
+## 2026-05-26 H5P Trial Display Result Adapter Pass
+
+Completed:
+
+- `npm run typecheck`
+  - Result: passed.
+- `npm run lint`
+  - Result: passed.
+- `node scripts/release/open-core-readiness-scan.cjs`
+  - Result: passed.
+- `http://localhost:3200`
+  - Result: loaded through Playwright MCP with page title `MoFaCTS` and visible `License / Source` link.
+
+Modularity evidence added:
+
+- `mofacts/client/views/experiment/svelte/services/h5pTrialDisplay.ts` now provides one adapter-backed H5P result normalization entry point for client trial surfaces.
+- `mofacts/client/views/experiment/svelte/components/CardScreen.svelte` now submits H5P results through the registered trial-display adapter instead of directly calling H5P result normalization.
+- `mofacts/client/views/experiment/svelte/services/historyH5P.ts` now reuses the same adapter-backed helper before writing history rows.
+- `mofacts/client/views/experiment/svelte/services/h5pTrialDisplay.test.ts` covers non-H5P no-op behavior, valid adapter normalization, and fail-clear missing/mismatched H5P result data.
