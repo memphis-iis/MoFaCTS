@@ -17,6 +17,10 @@ Keep `docs/` focused on software consortium, repository, user, author, operator,
 - `modularity-extension-boundary-plan.md`: extension-boundary starter plan for AutoTutor/H5P-style component drop-ins.
 - `modularity-readiness-audit.md`: current checkpoint of what is ready, intentionally deferred, and evidenced for modular component packages.
 - `modularity-start-plan.md`: short next-step plan for turning the current extension boundaries into practical component packages.
+- `open-core-baseline-inventory.md`: current self-hosted deployment inventory for open-core planning.
+- `open-core-architecture-vetting.md`: target open-core deployment shape, gap analysis, and Redis assessment.
+- `open-core-decision-answers.md`: worksheet for implementation decisions that are not already answered by code or docs.
+- `open-core-implementation-plan.md`: full task plan for finishing Self-Hosted MoFaCTS before enterprise-layer work.
 - `h5p-assessment-session-playback-audit.md`: H5P assessment playback flow audit.
 - `h5p-assessment-session-race-condition-cleanup-plan.md`: H5P assessment race-condition cleanup plan.
 - `h5p-no-scroll-container-policy.md`: H5P iframe sizing policy and implementation plan.

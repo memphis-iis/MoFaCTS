@@ -9,8 +9,8 @@ Related docs:
 - `open-core-baseline-inventory.md`: current deployment inventory.
 - `open-core-architecture-vetting.md`: target architecture, Redis assessment, and gap analysis.
 - `open-core-decision-answers.md`: worksheet for recording pre-implementation decisions.
-- `../license-compliance.md`: AGPL, third-party notices, and source-availability obligations.
-- `../release-process.md`: public release and license audit checks.
+- `../docs/license-compliance.md`: AGPL, third-party notices, and source-availability obligations.
+- `../docs/release-process.md`: public release and license audit checks.
 
 ## Completion Definition
 
