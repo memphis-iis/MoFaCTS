@@ -16,6 +16,7 @@ import { resolveDynamicAssetPath } from './svelte/services/mediaResolver';
 import { assertIdInvariants, logIdInvariantBreachOnce } from '../../lib/idContext';
 import { CARD_ENTRY_INTENT, setCardEntryIntent } from '../../lib/cardEntryIntent';
 import { resolveUnitEngineTypeForUnit } from './engineConstructors';
+import { resolveInstructionContinuePolicy } from './instructionContinuePolicy';
 import {
   finishLaunchLoading,
   isLaunchLoadingActive,
@@ -508,33 +509,22 @@ async function instructContinue() {
     }
 
     const unitType = resolveUnitEngineTypeForUnit(curUnit, 'instructions.instructContinue');
-    const isInstructionOnly = unitType === 'instruction-only';
-    const nextUnitNumber = currentUnitNumber + 1;
     Session.set('instructionClientStart', 0);
 
-    let navigationTarget = '/card';
+    const continuePolicy = resolveInstructionContinuePolicy({
+      unitType,
+      currentUnitNumber,
+      unitCount: unitList.length,
+    });
+    const navigationTarget = continuePolicy.navigationTarget;
 
-    if (isInstructionOnly) {
-      if (nextUnitNumber < unitList.length) {
-        const nextUnit = unitList[nextUnitNumber];
-        Session.set('currentUnitNumber', nextUnitNumber);
-        Session.set('currentTdfUnit', nextUnit);
-        Session.set('curUnitInstructionsSeen', false);
-        await createExperimentState({
-          currentUnitNumber: nextUnitNumber,
-          lastUnitCompleted: currentUnitNumber,
-        } as any);
-      } else {
-        await createExperimentState({
-          currentUnitNumber: nextUnitNumber,
-          lastUnitCompleted: currentUnitNumber,
-        } as any);
-        navigationTarget = '/learningDashboard';
-      }
-    } else {
-      Session.set('currentUnitNumber', currentUnitNumber);
-      Session.set('currentTdfUnit', curUnit);
-      Session.set('curUnitInstructionsSeen', true);
+    if (continuePolicy.sessionPatch) {
+      Session.set('currentUnitNumber', continuePolicy.sessionPatch.currentUnitNumber);
+      Session.set('currentTdfUnit', unitList[continuePolicy.sessionPatch.currentTdfUnitIndex]);
+      Session.set('curUnitInstructionsSeen', continuePolicy.sessionPatch.curUnitInstructionsSeen);
+    }
+    if (continuePolicy.experimentStatePatch) {
+      await createExperimentState(continuePolicy.experimentStatePatch as any);
     }
 
     if (navigationTarget === '/card') {
