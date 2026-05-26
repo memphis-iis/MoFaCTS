@@ -2,7 +2,10 @@ import { expect } from 'chai';
 import { Session } from 'meteor/session';
 import { CardStore } from '../../modules/cardStore';
 import { ExperimentStateStore } from '../../../../lib/state/experimentStateStore';
-import { selectCardService } from './unitEngineService';
+import {
+  resolveSelectedCardExportQuestionIndex,
+  selectCardService,
+} from './unitEngineService';
 import { createHistoryRecord, historyLoggingService } from './historyLogging';
 import type { HistoryLoggingContext } from '../../../../../common/types';
 
@@ -149,6 +152,22 @@ describe('resume runtime integration seams', function() {
     expect(selectNextCardCalls).to.equal(1);
     expect(result.questionIndex).to.equal(6);
     expect(CardStore.getQuestionIndex()).to.equal(6);
+  });
+
+  it('resolves selected-card export index from the live schedule pointer only for schedule units', function() {
+    expect(resolveSelectedCardExportQuestionIndex(
+      { unitType: 'schedule' },
+      2,
+      () => 8,
+    )).to.equal(8);
+
+    expect(resolveSelectedCardExportQuestionIndex(
+      { unitType: 'model' },
+      2,
+      () => {
+        throw new Error('model should not read schedule pointer');
+      },
+    )).to.equal(2);
   });
 
   it('selectCardService reselects fresh card for model resume when last action was CARD_DISPLAYED', async function() {

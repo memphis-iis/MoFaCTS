@@ -145,6 +145,16 @@ function requireLiveScheduleDisplayQuestionIndex(): number {
   return Math.floor(questionIndex);
 }
 
+export function resolveSelectedCardExportQuestionIndex(
+  engine: UnitEngineLike,
+  machineQuestionIndex: number,
+  getLiveScheduleQuestionIndex: () => number = requireLiveScheduleDisplayQuestionIndex,
+): number {
+  return engine.unitType === 'schedule'
+    ? getLiveScheduleQuestionIndex()
+    : machineQuestionIndex;
+}
+
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -673,9 +683,7 @@ export async function selectCardService(
     // Schedule units maintain the live pointer in CardStore during selectNextCard().
     // Use that runtime pointer as the exported question index so resume/start logic
     // cannot overwrite the fixed schedule position with a stale machine counter.
-    const exportedQuestionIndex = engine.unitType === 'schedule'
-      ? requireLiveScheduleDisplayQuestionIndex()
-      : questionIndex;
+    const exportedQuestionIndex = resolveSelectedCardExportQuestionIndex(engine, questionIndex);
 
     // Now get card data (engine has prepared internal state)
     const cardData = getCardDataFromEngine(engine, clusterIndex, exportedQuestionIndex);
