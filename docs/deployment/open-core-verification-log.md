@@ -65,3 +65,26 @@ Environment-heavy checks not run in this pass:
 - Backup and restore rehearsal.
 
 Reason: these remain the same release-confidence/runtime proof steps listed in the implementation plan and were not requested for this local modularity-boundary pass.
+
+## 2026-05-26 AutoTutor Generation Config Pass
+
+Completed:
+
+- `npm run generate:schemas`
+  - Result: passed.
+  - Coverage: regenerated `mofacts/public/tdfSchema.json` after adding `autotutorsession.utteranceTemperature` to the AutoTutor field registry.
+- `npm run typecheck`
+  - Result: passed.
+  - Coverage: TypeScript verifies the AutoTutor runtime uses the package-owned generation config contract and that the new tests compile.
+- `npm run lint`
+  - Result: passed.
+- `node scripts/release/open-core-readiness-scan.cjs`
+  - Result: passed.
+- `http://localhost:3200`
+  - Result: after one transient Meteor restart 503, reloading through Playwright MCP returned the normal `MoFaCTS` page and visible `License / Source` link.
+
+Modularity evidence added:
+
+- `learning-components/units/autotutor/AutoTutorGenerationConfig.ts` owns scoring temperature, default tutor-utterance temperature, and fail-clear authored temperature validation.
+- `mofacts/common/autoTutorGenerationConfig.test.ts` covers the generation-config contract.
+- `mofacts/common/lib/autoTutorContract.test.ts` covers invalid authored `autotutorsession.utteranceTemperature` rejection.
