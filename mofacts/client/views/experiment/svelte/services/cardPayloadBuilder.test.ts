@@ -4,6 +4,7 @@ import {
   getStimIncorrectResponses,
   normalizeButtonOptions,
   normalizeDisplayAttribution,
+  resolveCardPayloadDeliverySettings,
   resolveStimMediaSource,
 } from './cardPayloadBuilder';
 
@@ -40,5 +41,31 @@ describe('card payload builder helpers', function() {
       licenseUrl: 'https://license.test',
     });
     expect(normalizeDisplayAttribution({ creatorName: ' ' })).to.equal(undefined);
+  });
+
+  it('uses the session surface adapter to preserve active video delivery settings', function() {
+    expect(resolveCardPayloadDeliverySettings({
+      baseDeliverySettings: { displayQuestionNumber: true },
+      existingDeliverySettings: { videoUrl: '/video.mp4' },
+      sessionIsVideoSession: true,
+    })).to.deep.equal({
+      displayQuestionNumber: true,
+      isVideoSession: true,
+      videoUrl: '/video.mp4',
+    });
+    expect(resolveCardPayloadDeliverySettings({
+      baseDeliverySettings: { isVideoSession: true, videoUrl: '/tdf-video.mp4' },
+      existingDeliverySettings: { videoUrl: '/store-video.mp4' },
+    })).to.deep.equal({
+      isVideoSession: true,
+      videoUrl: '/tdf-video.mp4',
+    });
+    expect(resolveCardPayloadDeliverySettings({
+      baseDeliverySettings: { displayQuestionNumber: true },
+      existingDeliverySettings: { videoUrl: '/video.mp4' },
+      sessionIsVideoSession: false,
+    })).to.deep.equal({
+      displayQuestionNumber: true,
+    });
   });
 });

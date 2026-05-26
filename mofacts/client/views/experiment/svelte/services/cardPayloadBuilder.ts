@@ -7,6 +7,10 @@ import { resolveDynamicAssetPath } from './mediaResolver';
 import { applyDisplayFieldSubset } from '../../../../../common/lib/displayFieldSubsets';
 import { isSelfHostedH5PConfig, normalizeH5PDisplayConfig } from '../../../../../common/lib/h5pDisplay';
 import type { UnitEngineLike } from '../../../../../common/types';
+import {
+  resolveSessionContentSurface,
+  resolveSessionSurfaceState,
+} from './sessionSurfaceMode';
 
 interface StimResponseLike {
   incorrectResponses?: unknown;
@@ -61,6 +65,36 @@ type RuntimeDeliverySettings = Record<string, unknown> & {
   isVideoSession?: boolean;
   videoUrl?: string;
 };
+
+export function resolveCardPayloadDeliverySettings(params: {
+  baseDeliverySettings: RuntimeDeliverySettings;
+  existingDeliverySettings?: RuntimeDeliverySettings | null | undefined;
+  sessionIsVideoSession?: unknown;
+}): RuntimeDeliverySettings {
+  const deliverySettings = {
+    ...params.baseDeliverySettings,
+  };
+  const contentSurface = resolveSessionContentSurface(resolveSessionSurfaceState({
+    deliverySettings,
+    sessionIsVideoSession: params.sessionIsVideoSession,
+  }));
+
+  if (!contentSurface.showVideoSession) {
+    return deliverySettings;
+  }
+
+  deliverySettings.isVideoSession = true;
+  const existingVideoUrl = params.existingDeliverySettings?.videoUrl;
+  if (
+    (typeof deliverySettings.videoUrl !== 'string' || deliverySettings.videoUrl.trim().length === 0) &&
+    typeof existingVideoUrl === 'string' &&
+    existingVideoUrl.trim().length > 0
+  ) {
+    deliverySettings.videoUrl = existingVideoUrl;
+  }
+
+  return deliverySettings;
+}
 
 export function resolveStimAnswer(stim: StimLike): string {
   const candidates = [stim.correctResponse, stim.answer];
@@ -351,21 +385,13 @@ export function buildCardDataFromResolvedTrial(params: {
     }
   }
 
-  const baseDeliverySettings = getCurrentDeliverySettings();
+  const baseDeliverySettings = getCurrentDeliverySettings() as RuntimeDeliverySettings;
   const existingDeliverySettings = (deliverySettingsStore.get() || {}) as RuntimeDeliverySettings;
-  const deliverySettings = {
-    ...baseDeliverySettings,
-  } as RuntimeDeliverySettings;
-  if (Session.get('isVideoSession') === true) {
-    deliverySettings.isVideoSession = true;
-    if (
-      (typeof deliverySettings.videoUrl !== 'string' || deliverySettings.videoUrl.trim().length === 0) &&
-      typeof existingDeliverySettings.videoUrl === 'string' &&
-      existingDeliverySettings.videoUrl.trim().length > 0
-    ) {
-      deliverySettings.videoUrl = existingDeliverySettings.videoUrl;
-    }
-  }
+  const deliverySettings = resolveCardPayloadDeliverySettings({
+    baseDeliverySettings,
+    existingDeliverySettings,
+    sessionIsVideoSession: Session.get('isVideoSession'),
+  });
   const currentTdfFile = Session.get('currentTdfFile') as TdfFileLike | null | undefined;
   const setspec = currentTdfFile?.tdfs?.tutor?.setspec || {};
 

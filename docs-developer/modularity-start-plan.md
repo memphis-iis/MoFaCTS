@@ -57,6 +57,7 @@ Make a new in-repo component feel like a small package:
    Svelte launch bootstrap now uses the shared `resolveUnitEngineTypeForUnit` boundary from `engineConstructors.ts` instead of maintaining its own unit-shape branch.
    Card readiness now asks `sessionSurfaceMode.ts` whether the active surface requires video readiness instead of branching directly on `videosession`.
    Svelte machine video-session guards now resolve through `sessionSurfaceMode.ts`, and prepared-advance eligibility reuses that guard instead of reading `isVideoSession` separately.
+   Card payload delivery settings now preserve active video-session fields through a tested helper that resolves video mode via `sessionSurfaceMode.ts`.
 
 ## Pause/Resume Checkpoint
 
