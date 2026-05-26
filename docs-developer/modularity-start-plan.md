@@ -68,6 +68,7 @@ Make a new in-repo component feel like a small package:
    Prepared incoming-trial orchestration now resolves named behavior routes before preparing the next card, so the service no longer spreads raw video/model/schedule unit-type branches across the flow.
    Prepared-advance machine question-index handling now resolves named transition routes before enforcing schedule live-index requirements, keeping schedule-specific transition policy tested in one helper.
    Prepared-trial commit now resolves named commit routes before applying model locked-card or schedule prepared-card state, keeping commit behavior policy explicit and tested.
+   Learning-progress panel availability now resolves through a named panel-owned engine predicate before shaping item progress, keeping adaptive-model-only display policy local to the progress service.
 
 ## Pause/Resume Checkpoint
 

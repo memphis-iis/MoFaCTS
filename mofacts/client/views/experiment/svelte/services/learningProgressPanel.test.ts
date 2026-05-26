@@ -1,5 +1,8 @@
 import { expect } from 'chai';
-import { buildLearningProgressPanelSnapshot } from './learningProgressPanel';
+import {
+  buildLearningProgressPanelSnapshot,
+  isLearningProgressPanelEngine,
+} from './learningProgressPanel';
 
 describe('learningProgressPanel', function() {
   it('builds learner-safe item progress from model probability estimates', function() {
@@ -56,6 +59,10 @@ describe('learningProgressPanel', function() {
   });
 
   it('returns unavailable for non-model units', function() {
+    expect(isLearningProgressPanelEngine({ unitType: 'model' })).to.equal(true);
+    expect(isLearningProgressPanelEngine({ unitType: 'schedule' })).to.equal(false);
+    expect(isLearningProgressPanelEngine(null)).to.equal(false);
+
     const snapshot = buildLearningProgressPanelSnapshot({
       unitType: 'schedule',
       getCardProbabilitiesNoCalc: () => ({ cards: [] }),

@@ -150,6 +150,12 @@ function isCurrentRow(engine: ProgressEngineLike, clusterIndex: number, stimInde
   return currentClusterIndex === clusterIndex && currentStimIndex === stimIndex;
 }
 
+export function isLearningProgressPanelEngine(
+  engine: ProgressEngineLike | null | undefined,
+): engine is ProgressEngineLike {
+  return engine?.unitType === 'model';
+}
+
 export function buildLearningProgressPanelSnapshot(
   engineValue: unknown,
   deliverySettings: Record<string, unknown> | null | undefined,
@@ -157,7 +163,7 @@ export function buildLearningProgressPanelSnapshot(
 ): LearningProgressPanelSnapshot {
   const threshold = resolveThreshold(deliverySettings);
   const engine = asEngine(engineValue);
-  if (!engine || engine.unitType !== 'model') {
+  if (!isLearningProgressPanelEngine(engine)) {
     return unavailableSnapshot('Progress is available for adaptive learning sessions only.', threshold);
   }
   if (typeof engine.getCardProbabilitiesNoCalc !== 'function') {
