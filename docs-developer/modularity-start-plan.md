@@ -71,6 +71,7 @@ Make a new in-repo component feel like a small package:
    Learning-progress panel availability now resolves through a named panel-owned engine predicate before shaping item progress, keeping adaptive-model-only display policy local to the progress service.
    History logging now resolves schedule-vs-model trial index state through a tested helper before filling the history row, keeping live schedule display order policy local and explicit.
    Selected-card export now resolves schedule live-display question index through a named helper before card payload construction, so resume/start logic cannot silently reuse stale machine counters for fixed schedule positions.
+   Resume history reconstruction now resolves learning-vs-assessment routes through `assessmentResume.ts`, so resume orchestration consumes explicit history, schedule-artifact, and instruction-skip policy instead of branching directly on authored `learningsession`/`assessmentsession` shapes.
 
 ## Pause/Resume Checkpoint
 
@@ -87,7 +88,7 @@ Current direct-branch audit:
 - `learning-components/units/learning-session/learningSessionRuntimeConfig.ts` is the learning-session package owner for learning/video session runtime config and cluster-list source selection.
 - `mofacts/client/views/experiment/videoAdaptiveQuestions.ts`, `mofacts/client/views/experiment/svelte/services/videoCardInit.ts`, and `videoResume.ts` are video-owned app services; their direct `videosession` reads are intentional integration boundaries.
 - `mofacts/client/views/experiment/svelte/services/sessionSurfaceMode.ts` is the shared session-surface owner for AutoTutor/video/card mode detection and diagnostics.
-- Remaining `engine.unitType` reads in `unitEngineService.ts`, `preparedAdvanceMachine.ts`, `historyLogging.ts`, and `learningProgressPanel.ts` are now behind named helpers or local service predicates. Prefer reusing those helpers before adding new raw unit-type branches.
+- Remaining `engine.unitType` reads in `unitEngineService.ts`, `preparedAdvanceMachine.ts`, `historyLogging.ts`, and `learningProgressPanel.ts` are now behind named helpers or local service predicates. Resume learning/assessment history routing is similarly centralized in `assessmentResume.ts`. Prefer reusing those helpers before adding new raw unit-type or authored-shape branches.
 
 Resume with:
 

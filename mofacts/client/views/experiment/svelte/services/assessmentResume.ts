@@ -6,6 +6,54 @@ function toNonNegativeInteger(value: unknown): number {
   return Math.floor(parsed);
 }
 
+type ResumeUnitLike = {
+  learningsession?: unknown;
+  assessmentsession?: unknown;
+};
+
+export type ResumeHistoryRouteKind = 'learning' | 'assessment' | 'none';
+
+export type ResumeHistoryRoute = {
+  kind: ResumeHistoryRouteKind;
+  reconstructLearningHistory: boolean;
+  inferAssessmentPosition: boolean;
+  requiresAssessmentScheduleArtifact: boolean;
+};
+
+export function resolveResumeHistoryRoute(unit: ResumeUnitLike | null | undefined): ResumeHistoryRoute {
+  if (unit?.learningsession) {
+    return {
+      kind: 'learning',
+      reconstructLearningHistory: true,
+      inferAssessmentPosition: false,
+      requiresAssessmentScheduleArtifact: false,
+    };
+  }
+
+  if (unit?.assessmentsession) {
+    return {
+      kind: 'assessment',
+      reconstructLearningHistory: false,
+      inferAssessmentPosition: true,
+      requiresAssessmentScheduleArtifact: true,
+    };
+  }
+
+  return {
+    kind: 'none',
+    reconstructLearningHistory: false,
+    inferAssessmentPosition: false,
+    requiresAssessmentScheduleArtifact: false,
+  };
+}
+
+export function shouldSkipResumeInstructionsForHistoryRoute(
+  route: ResumeHistoryRoute,
+  assessmentHasDurableResumeProgress: boolean,
+): boolean {
+  return route.inferAssessmentPosition && assessmentHasDurableResumeProgress;
+}
+
 export function hasScheduleArtifactForUnit(
   experimentState: Record<string, unknown> | null | undefined,
   unitNumber: number

@@ -21,6 +21,8 @@ import {
   assertAssessmentScheduleBounds,
   deriveAssessmentScheduleCursor,
   hasAssessmentResumeProgress,
+  resolveResumeHistoryRoute,
+  shouldSkipResumeInstructionsForHistoryRoute,
 } from './assessmentResume';
 import {
   applyMappingRecordToSession,
@@ -925,13 +927,12 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
     // =========================================================================
     // HISTORY RECONSTRUCTION (CORE RESUME LOGIC)
     // =========================================================================
-    const isLearningUnit = !!curTdfUnit?.learningsession;
-    const isAssessmentUnit = !!curTdfUnit?.assessmentsession;
+    const resumeHistoryRoute = resolveResumeHistoryRoute(curTdfUnit);
 
     let completedAssessmentTrials = 0;
     let assessmentHasDurableResumeProgress = false;
 
-    if (isLearningUnit) {
+    if (resumeHistoryRoute.reconstructLearningHistory) {
       clientConsole(2, '[Resume Service] Learning unit detected; reconstructing state from history');
       const historyRows = await meteorCallAsync<LearningHistoryRecord[]>(
         'getLearningHistoryForUnit',
@@ -953,7 +954,7 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
         trialsReplayed: historyRows.length,
         outcomes: reconstruction.overallOutcomeHistory.length
       });
-    } else if (isAssessmentUnit) {
+    } else if (resumeHistoryRoute.inferAssessmentPosition) {
       clientConsole(2, '[Resume Service] Assessment unit detected; inferring position from history');
       completedAssessmentTrials = await meteorCallAsync<number>(
         'getAssessmentCompletedTrialCountFromHistory',
@@ -1038,7 +1039,7 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
       return { redirected: true, redirectTo: COMPLETED_LESSON_REDIRECT };
     }
 
-    if (curTdfUnit.assessmentsession) {
+    if (resumeHistoryRoute.requiresAssessmentScheduleArtifact) {
       try {
         assertAssessmentScheduleArtifactForUnit(curExperimentState, currentUnitNumber);
       } catch (error) {
@@ -1085,7 +1086,7 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
     const curUser = getMeteorUser();
     const userDisplayIdentifier = getUserDisplayIdentifier(curUser) || userId;
 
-    if (curTdfUnit.assessmentsession) {
+    if (resumeHistoryRoute.requiresAssessmentScheduleArtifact) {
       const scheduleArtifact = typeof engine.getSchedule === 'function'
         ? engine.getSchedule()
         : Session.get('schedule');
@@ -1131,9 +1132,13 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
     }
 
     // Simplified: check curUnitInstructionsSeen directly - all units treated equally
+    const skipInstructionsForResumeHistory = shouldSkipResumeInstructionsForHistoryRoute(
+      resumeHistoryRoute,
+      assessmentHasDurableResumeProgress,
+    );
     const shouldShowInstructions = !Session.get('curUnitInstructionsSeen')
       && typeof curTdfUnit.unitinstructions !== 'undefined'
-      && !(isAssessmentUnit && assessmentHasDurableResumeProgress);
+      && !skipInstructionsForResumeHistory;
 
     if (shouldShowInstructions) {
       clientConsole(2, 'RESUME FINISHED: displaying unit instructions');
@@ -1145,7 +1150,7 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
         engine
       };
     } else {
-      if (isAssessmentUnit && assessmentHasDurableResumeProgress) {
+      if (skipInstructionsForResumeHistory) {
         Session.set('curUnitInstructionsSeen', true);
         clientConsole(2, '[Resume Service] Skipping instruction redirect for in-progress assessment resume', {
           currentUnitNumber,

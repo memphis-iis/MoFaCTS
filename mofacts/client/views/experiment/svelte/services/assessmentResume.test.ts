@@ -7,9 +7,47 @@ import {
   deriveAssessmentScheduleCursor,
   hasAssessmentResumeProgress,
   hasScheduleArtifactForUnit,
+  resolveResumeHistoryRoute,
+  shouldSkipResumeInstructionsForHistoryRoute,
 } from './assessmentResume';
 
 describe('assessmentResume', function() {
+  describe('resolveResumeHistoryRoute', function() {
+    it('names learning resume history reconstruction policy', function() {
+      expect(resolveResumeHistoryRoute({ learningsession: {} })).to.deep.equal({
+        kind: 'learning',
+        reconstructLearningHistory: true,
+        inferAssessmentPosition: false,
+        requiresAssessmentScheduleArtifact: false,
+      });
+    });
+
+    it('names assessment resume schedule policy', function() {
+      const route = resolveResumeHistoryRoute({ assessmentsession: {} });
+
+      expect(route).to.deep.equal({
+        kind: 'assessment',
+        reconstructLearningHistory: false,
+        inferAssessmentPosition: true,
+        requiresAssessmentScheduleArtifact: true,
+      });
+      expect(shouldSkipResumeInstructionsForHistoryRoute(route, true)).to.equal(true);
+      expect(shouldSkipResumeInstructionsForHistoryRoute(route, false)).to.equal(false);
+    });
+
+    it('keeps non-history unit resume as an explicit no-op route', function() {
+      const route = resolveResumeHistoryRoute({});
+
+      expect(route).to.deep.equal({
+        kind: 'none',
+        reconstructLearningHistory: false,
+        inferAssessmentPosition: false,
+        requiresAssessmentScheduleArtifact: false,
+      });
+      expect(shouldSkipResumeInstructionsForHistoryRoute(route, true)).to.equal(false);
+    });
+  });
+
   describe('hasScheduleArtifactForUnit', function() {
     it('requires both a schedule artifact and matching unit number', function() {
       expect(hasScheduleArtifactForUnit({ schedule: { q: [] }, scheduleUnitNumber: 3 }, 3)).to.equal(true);
