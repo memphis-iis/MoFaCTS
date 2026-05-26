@@ -109,3 +109,22 @@ Readiness evidence added:
 - Self-hosted production settings validation now requires `emailFrom` when `enableEmail` or `prod` enables mail, accepts display-name sender syntax, and validates optional `emailReplyTo`.
 - The self-hosted and local settings examples now include `emailFrom` and `emailReplyTo`.
 - Operator docs now call out sender-domain deliverability expectations for verification and system mail.
+
+## 2026-05-26 Modularity Starter Checklist Pass
+
+Completed:
+
+- `npm run typecheck`
+  - Result: passed.
+- `npm run lint`
+  - Result: passed.
+- `node scripts/release/open-core-readiness-scan.cjs`
+  - Result: passed.
+- `http://localhost:3200`
+  - Result: loaded through Playwright MCP with page title `MoFaCTS` and visible `License / Source` link.
+
+Modularity evidence added:
+
+- `learning-components/README.md` now contains a component package checklist for new unit engines, trial-display adapters, H5P-style widgets, and future external-widget components.
+- `docs-developer/modularity-start-plan.md` now includes a concrete starter path: begin from the echo sample and AutoTutor boundary, choose unit versus trial-display, write manifest/capability tests first, compose through the catalog, and preserve compatibility facades while app callers migrate.
+- `learning-components/samples/echo-unit/README.md` now states what a production package README must name before a sample-shape package becomes a real component.
