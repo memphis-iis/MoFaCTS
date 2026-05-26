@@ -77,6 +77,7 @@ Make a new in-repo component feel like a small package:
    Legacy instruction continue now resolves instruction-only advance/dashboard behavior through a tested policy helper, leaving the template flow to apply the route/session/state decision.
    Adaptive assessment template cluster-list mutation now lives behind `assessmentAdaptiveSchedule.ts`, mirroring the video-owned adaptive schedule helper and keeping authored `assessmentsession` writes out of `AdaptiveQuestionLogic`.
    Learning-session model preparation now resolves assessment-vs-learning cluster-list source through the learning-session runtime-config owner instead of branching directly on authored session shapes.
+   The Svelte card tester now uses the shared `resolveUnitEngineTypeForUnit` compatibility boundary instead of maintaining a local authored-shape unit-type resolver.
 
 ## Pause/Resume Checkpoint
 

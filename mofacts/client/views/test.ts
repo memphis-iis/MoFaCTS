@@ -16,7 +16,8 @@ import { DEFAULT_DELIVERY_SETTINGS as BASE_DELIVERY_SETTINGS } from './experimen
 import { getCardDataFromEngine } from './experiment/svelte/services/unitEngineService';
 import { applyMappingRecordToSession } from './experiment/svelte/services/mappingRecordService';
 import { Answers } from './experiment/answerAssess';
-import { KC_MULTIPLE, MODEL_UNIT, SCHEDULE_UNIT, VIDEO_UNIT, STIM_PARAMETER } from '../../common/Definitions';
+import { resolveUnitEngineTypeForUnit } from './experiment/engineConstructors';
+import { KC_MULTIPLE, STIM_PARAMETER } from '../../common/Definitions';
 import { getErrorMessage, getErrorStack } from '../lib/errorUtils';
 import { clientConsole } from '../lib/clientLogger';
 
@@ -276,20 +277,13 @@ function validateStimFileName(tdf: any, stimFileName: any) {
   }
 }
 
-function getUnitType(unit: any) {
-  if (unit?.assessmentsession) return SCHEDULE_UNIT;
-  if (unit?.videosession) return VIDEO_UNIT;
-  if (unit?.learningsession) return MODEL_UNIT;
-  return 'instruction-only';
-}
-
 function configureTesterSession({ tdf, stimuli, unitIndex, testType, clusterCount }: any) {
   const unit = tdf?.tdfs?.tutor?.unit?.[unitIndex];
   if (!unit) {
     throw new Error(`Unit index ${unitIndex} not found in TDF.`);
   }
 
-  const unitType = getUnitType(unit);
+  const unitType = resolveUnitEngineTypeForUnit(unit, 'svelteCardTester.configureTesterSession');
   if (unitType === 'instruction-only') {
     throw new Error(`Unit "${unit.unitname}" has no session type with stimuli.`);
   }
