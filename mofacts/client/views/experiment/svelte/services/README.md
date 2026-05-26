@@ -13,6 +13,7 @@ This directory contains side-effectful runtime services and pure helpers used by
 - `historyLogging.ts`, `historyH5P.ts`, and `mappingRecordService.ts`: history, H5P history shaping, and mapping persistence.
 - `speechRecognitionService.ts` and `ttsService.ts`: speech recognition and text-to-speech runtime integration.
 - `videoCardInit.ts`, `videoMachineBridge.ts`, and `videoPlayerService.ts`: video-session initialization, machine bridge behavior, and player integration.
+- `sessionSurfaceMode.ts`: shared AutoTutor/video/card surface selection, shell classes, learning-progress-panel visibility, video instruction overlay eligibility, and specialized launch-completion decisions.
 - `mediaResolver.ts`, `cardPayloadBuilder.ts`, and `trialDisplayState.ts`: media, card payload, and display-state helpers.
 
 ## Boundary Rules
@@ -20,6 +21,7 @@ This directory contains side-effectful runtime services and pure helpers used by
 - Keep Meteor database calls, subscriptions, Session access, browser APIs, media APIs, and engine integration in services rather than machine files.
 - Keep pure predicates and payload builders small enough to test directly.
 - Keep `svelteInit.ts` as the launch bootstrap coordinator, but extract new domain-specific logic into a named service before it becomes another launch concern.
+- Keep shared AutoTutor/video/card surface decisions in `sessionSurfaceMode.ts`; `CardScreen.svelte` should compose the selected surface and keep DOM/event wiring local.
 - Keep video-session bridge behavior in the video service/component files until the unit-runtime adapter design is implemented.
 - Keep AutoTutor integration in `autoTutorClient.ts` and `components/AutoTutorSession.svelte`; shared launch or machine changes should only cover behavior common to all unit kinds.
 - Keep H5P integration in H5P components, utilities, `historyH5P.ts`, and unit-engine service integration points.

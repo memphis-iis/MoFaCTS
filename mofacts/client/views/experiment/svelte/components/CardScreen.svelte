@@ -61,9 +61,12 @@
   } from '../services/h5pTrialDisplay';
   import { buildLearningProgressPanelSnapshot } from '../services/learningProgressPanel';
   import {
+    resolveSessionContentSurface,
     resolveSessionSurfaceLaunchCompletion,
+    resolveSessionSurfaceLearningProgressPanel,
     resolveSessionSurfaceShell,
     resolveSessionSurfaceState,
+    shouldShowSessionVideoInstructionOverlay,
   } from '../services/sessionSurfaceMode';
   import { CardStore } from '../../modules/cardStore';
   import LearningProgressPanel from './LearningProgressPanel.svelte';
@@ -307,16 +310,17 @@
     sessionUnitType: Session.get('unitType'),
     currentTdfUnit,
   }));
-  $: isVideoSession = sessionSurfaceState.isVideoSession;
-  $: isAutoTutorSession = sessionSurfaceState.isAutoTutorSession;
+  $: sessionContentSurface = resolveSessionContentSurface(sessionSurfaceState);
   $: rawVideoInstructionText = typeof currentTdfUnit?.unitinstructions === 'string'
     ? currentTdfUnit.unitinstructions.trim()
     : '';
   $: sanitizedVideoInstructionText = sanitizeInstructionHtml(rawVideoInstructionText);
   $: videoInstructionsSeen = Session.get('curUnitInstructionsSeen') === true || videoInstructionDismissed;
-  $: showVideoInstructionOverlay = isVideoSession &&
-    !!rawVideoInstructionText &&
-    !videoInstructionsSeen;
+  $: showVideoInstructionOverlay = shouldShowSessionVideoInstructionOverlay({
+    contentSurface: sessionContentSurface,
+    instructionText: rawVideoInstructionText,
+    instructionsSeen: videoInstructionsSeen,
+  });
   $: if (showVideoInstructionOverlay && !videoInstructionsShownAt) {
     videoInstructionsShownAt = Date.now();
     Session.set('instructionClientStart', videoInstructionsShownAt);
@@ -528,7 +532,7 @@
   $: expectedFeedbackBlockerSrc = trialSubset.feedbackVisible && !feedbackIsCorrect ? String(correctAnswerImageSrc || '') : '';
   $: trialSubsetKey = buildTrialSubsetKey({
     context,
-    isVideoSession,
+    isVideoSession: sessionContentSurface.showVideoSession,
     subset: trialSubset,
   });
   $: allBlockingAssetsReady = (!expectedStimulusBlockerSrc || stimulusBlockingAssetReady) &&
@@ -825,11 +829,15 @@
     progressPanelDisabled: progressPanelDisabled(deliverySettings),
     learningProgressAvailable: learningProgressSnapshot.available,
   });
-  $: showLearningProgressPanel = sessionSurfaceShell.showLearningProgressPanel;
-  $: if (!showLearningProgressPanel && learningProgressPanelOpen) {
+  $: learningProgressPanelState = resolveSessionSurfaceLearningProgressPanel({
+    shell: sessionSurfaceShell,
+    requestedOpen: learningProgressPanelOpen,
+  });
+  $: showLearningProgressPanel = learningProgressPanelState.showPanel;
+  $: if (!sessionSurfaceShell.showLearningProgressPanel && learningProgressPanelOpen) {
     learningProgressPanelOpen = false;
   }
-  $: learningProgressViewportOpen = learningProgressPanelOpen && showLearningProgressPanel;
+  $: learningProgressViewportOpen = learningProgressPanelState.viewportOpen;
   $: setLearningProgressViewportOpen(learningProgressViewportOpen);
 
   // Timeout tracking
@@ -1614,7 +1622,7 @@
       initializedForRender = true;
       await tick();
       const launchCompletion = resolveSessionSurfaceLaunchCompletion({
-        surfaceState: sessionSurfaceState,
+        contentSurface: sessionContentSurface,
         isLaunchLoadingActive: isLaunchLoadingActive(),
         showVideoInstructionOverlay,
         videoPlayerReady,
@@ -2000,9 +2008,9 @@
   bind:this={cardScreenElement}
   style={cardFontSizeStyle}
 >
-  {#if isAutoTutorSession}
+  {#if sessionContentSurface.showAutoTutorSession}
     <AutoTutorSession on:complete={() => forceAdvanceToNextUnit('AutoTutor Complete')} />
-  {:else if isVideoSession}
+  {:else if sessionContentSurface.showVideoSession}
     {#if showPerformanceStats}
       <PerformanceArea {...performanceStatsProps} />
     {/if}
@@ -2087,10 +2095,10 @@
         </button>
       </div>
     {/if}
-  {:else}
+  {:else if sessionContentSurface.showStandardCardSession}
     <div
       class="learning-session-layout"
-      class:learning-session-layout-panel-open={learningProgressPanelOpen && showLearningProgressPanel}
+      class:learning-session-layout-panel-open={learningProgressPanelState.panelOpen}
     >
       <div class="learning-session-main">
         {#if showPerformanceStats}
@@ -2153,7 +2161,7 @@
       {#if showLearningProgressPanel}
         <LearningProgressPanel
           snapshot={learningProgressSnapshot}
-          open={learningProgressPanelOpen}
+          open={learningProgressPanelState.panelOpen}
           on:toggle={handleLearningProgressPanelToggle}
         />
       {/if}

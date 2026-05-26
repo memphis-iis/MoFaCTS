@@ -51,6 +51,7 @@ Make a new in-repo component feel like a small package:
    Initial slice: `mofacts/client/views/experiment/engineConstructors.ts` now delegates explicit unit-type engine creation through `createUnitEngineByType`, preserving contextual unknown-type errors while letting registered unit manifests own construction.
    H5P result handling now uses `mofacts/client/views/experiment/svelte/services/h5pTrialDisplay.ts` so card submission and history both normalize through the registered H5P trial-display adapter.
    Session shell handling now uses `mofacts/client/views/experiment/svelte/services/sessionSurfaceMode.ts` for AutoTutor/video/card mode detection, shell CSS and learning-progress-panel behavior, and specialized launch-completion behavior.
+   The session surface service now also exposes an explicit content-surface adapter for AutoTutor/video/card render ownership, video instruction overlay eligibility, and learning-progress viewport state so `CardScreen.svelte` can keep DOM/event wiring local while the shared surface rules stay tested.
 
 ## Pause/Resume Checkpoint
 

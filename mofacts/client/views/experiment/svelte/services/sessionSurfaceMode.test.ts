@@ -1,8 +1,11 @@
 import { expect } from 'chai';
 import {
+  resolveSessionContentSurface,
   resolveSessionSurfaceLaunchCompletion,
+  resolveSessionSurfaceLearningProgressPanel,
   resolveSessionSurfaceShell,
   resolveSessionSurfaceState,
+  shouldShowSessionVideoInstructionOverlay,
 } from './sessionSurfaceMode';
 
 describe('session surface mode', function() {
@@ -38,23 +41,97 @@ describe('session surface mode', function() {
     });
   });
 
+  it('describes the content surface that owns the render branch', function() {
+    expect(resolveSessionContentSurface(resolveSessionSurfaceState({}))).to.deep.equal({
+      mode: 'card',
+      showAutoTutorSession: false,
+      showVideoSession: false,
+      showStandardCardSession: true,
+    });
+    expect(resolveSessionContentSurface(resolveSessionSurfaceState({
+      currentTdfUnit: { videosession: {} },
+    }))).to.deep.equal({
+      mode: 'video',
+      showAutoTutorSession: false,
+      showVideoSession: true,
+      showStandardCardSession: false,
+    });
+    expect(resolveSessionContentSurface(resolveSessionSurfaceState({
+      currentTdfUnit: {
+        autotutorsession: {},
+        videosession: {},
+      },
+    }))).to.deep.equal({
+      mode: 'autotutor',
+      showAutoTutorSession: true,
+      showVideoSession: false,
+      showStandardCardSession: false,
+    });
+  });
+
+  it('assigns exactly one content surface for each resolved mode', function() {
+    for (const surfaceState of [
+      resolveSessionSurfaceState({}),
+      resolveSessionSurfaceState({ currentTdfUnit: { videosession: {} } }),
+      resolveSessionSurfaceState({ sessionUnitType: 'autotutor' }),
+    ]) {
+      const surface = resolveSessionContentSurface(surfaceState);
+      const activeSurfaceCount = [
+        surface.showAutoTutorSession,
+        surface.showVideoSession,
+        surface.showStandardCardSession,
+      ].filter(Boolean).length;
+
+      expect(activeSurfaceCount).to.equal(1);
+    }
+  });
+
+  it('fails clearly when a caller passes an invalid content surface adapter', function() {
+    const invalidContentSurface = {
+      mode: 'video' as const,
+      showAutoTutorSession: false,
+      showVideoSession: false,
+      showStandardCardSession: false,
+    };
+
+    expect(() => shouldShowSessionVideoInstructionOverlay({
+      contentSurface: invalidContentSurface,
+      instructionText: 'Watch the video before answering.',
+      instructionsSeen: false,
+    })).to.throw('shouldShowSessionVideoInstructionOverlay received an invalid session content surface');
+    expect(() => resolveSessionSurfaceLaunchCompletion({
+      contentSurface: invalidContentSurface,
+      isLaunchLoadingActive: true,
+    })).to.throw('resolveSessionSurfaceLaunchCompletion received an invalid session content surface');
+  });
+
+  it('fails clearly when deriving a content surface from an unknown mode', function() {
+    expect(() => resolveSessionContentSurface({
+      isAutoTutorSession: false,
+      isVideoSession: false,
+      mode: 'unknown',
+    } as unknown as ReturnType<typeof resolveSessionSurfaceState>)).to.throw(
+      'resolveSessionContentSurface received an unknown session surface mode "unknown"',
+    );
+  });
+
   it('does not complete launch loading for the standard card surface', function() {
     expect(resolveSessionSurfaceLaunchCompletion({
-      surfaceState: resolveSessionSurfaceState({}),
+      contentSurface: resolveSessionContentSurface(resolveSessionSurfaceState({})),
       isLaunchLoadingActive: true,
     })).to.equal(null);
   });
 
   it('does not complete launch loading when no launch overlay is active', function() {
     expect(resolveSessionSurfaceLaunchCompletion({
-      surfaceState: resolveSessionSurfaceState({ sessionUnitType: 'autotutor' }),
+      contentSurface: resolveSessionContentSurface(resolveSessionSurfaceState({ sessionUnitType: 'autotutor' })),
       isLaunchLoadingActive: false,
     })).to.equal(null);
   });
 
   it('describes AutoTutor launch completion as a terminal render action', function() {
     expect(resolveSessionSurfaceLaunchCompletion({
-      surfaceState: resolveSessionSurfaceState({ sessionUnitType: 'autotutor' }),
+      contentSurface: resolveSessionContentSurface(resolveSessionSurfaceState({ sessionUnitType: 'autotutor' })),
       isLaunchLoadingActive: true,
     })).to.deep.equal({
       timingName: 'autoTutorUnit:rendered',
@@ -65,7 +142,9 @@ describe('session surface mode', function() {
 
   it('describes video launch completion while allowing card initialization to continue', function() {
     expect(resolveSessionSurfaceLaunchCompletion({
-      surfaceState: resolveSessionSurfaceState({ currentTdfUnit: { videosession: {} } }),
+      contentSurface: resolveSessionContentSurface(resolveSessionSurfaceState({
+        currentTdfUnit: { videosession: {} },
+      })),
       isLaunchLoadingActive: true,
       showVideoInstructionOverlay: true,
       videoPlayerReady: false,
@@ -80,6 +159,34 @@ describe('session surface mode', function() {
     });
   });
 
+  it('shows video instructions only for unseen video surfaces with instruction text', function() {
+    const videoSurface = resolveSessionContentSurface(resolveSessionSurfaceState({
+      currentTdfUnit: { videosession: {} },
+    }));
+    const cardSurface = resolveSessionContentSurface(resolveSessionSurfaceState({}));
+
+    expect(shouldShowSessionVideoInstructionOverlay({
+      contentSurface: videoSurface,
+      instructionText: ' Watch the video before answering. ',
+      instructionsSeen: false,
+    })).to.equal(true);
+    expect(shouldShowSessionVideoInstructionOverlay({
+      contentSurface: videoSurface,
+      instructionText: 'Watch the video before answering.',
+      instructionsSeen: true,
+    })).to.equal(false);
+    expect(shouldShowSessionVideoInstructionOverlay({
+      contentSurface: videoSurface,
+      instructionText: '   ',
+      instructionsSeen: false,
+    })).to.equal(false);
+    expect(shouldShowSessionVideoInstructionOverlay({
+      contentSurface: cardSurface,
+      instructionText: 'Watch the video before answering.',
+      instructionsSeen: false,
+    })).to.equal(false);
+  });
+
   it('describes standard card shell behavior with learning progress enabled', function() {
     expect(resolveSessionSurfaceShell({
       surfaceState: resolveSessionSurfaceState({}),
@@ -89,6 +196,12 @@ describe('session surface mode', function() {
       mode: 'card',
       isAutoTutorSession: false,
       isVideoSession: false,
+      contentSurface: {
+        mode: 'card',
+        showAutoTutorSession: false,
+        showVideoSession: false,
+        showStandardCardSession: true,
+      },
       cardScreenClasses: {
         videoMode: false,
         autoTutorMode: false,
@@ -107,12 +220,32 @@ describe('session surface mode', function() {
       showLearningProgressPanel: false,
     });
     expect(resolveSessionSurfaceShell({
+      surfaceState: resolveSessionSurfaceState({ currentTdfUnit: { videosession: {} } }),
+      progressPanelDisabled: false,
+      learningProgressAvailable: true,
+    }).contentSurface).to.deep.equal({
+      mode: 'video',
+      showAutoTutorSession: false,
+      showVideoSession: true,
+      showStandardCardSession: false,
+    });
+    expect(resolveSessionSurfaceShell({
       surfaceState: resolveSessionSurfaceState({ sessionUnitType: 'autotutor' }),
       progressPanelDisabled: false,
       learningProgressAvailable: true,
     })).to.deep.include({
       mode: 'autotutor',
       showLearningProgressPanel: false,
+    });
+    expect(resolveSessionSurfaceShell({
+      surfaceState: resolveSessionSurfaceState({ sessionUnitType: 'autotutor' }),
+      progressPanelDisabled: false,
+      learningProgressAvailable: true,
+    }).contentSurface).to.deep.equal({
+      mode: 'autotutor',
+      showAutoTutorSession: true,
+      showVideoSession: false,
+      showStandardCardSession: false,
     });
   });
 
@@ -129,5 +262,48 @@ describe('session surface mode', function() {
       progressPanelDisabled: false,
       learningProgressAvailable: false,
     }).showLearningProgressPanel).to.equal(false);
+  });
+
+  it('closes the learning progress viewport when the active surface cannot show the panel', function() {
+    const cardShell = resolveSessionSurfaceShell({
+      surfaceState: resolveSessionSurfaceState({}),
+      progressPanelDisabled: false,
+      learningProgressAvailable: true,
+    });
+    const videoShell = resolveSessionSurfaceShell({
+      surfaceState: resolveSessionSurfaceState({ currentTdfUnit: { videosession: {} } }),
+      progressPanelDisabled: false,
+      learningProgressAvailable: true,
+    });
+    const disabledCardShell = resolveSessionSurfaceShell({
+      surfaceState: resolveSessionSurfaceState({}),
+      progressPanelDisabled: true,
+      learningProgressAvailable: true,
+    });
+
+    expect(resolveSessionSurfaceLearningProgressPanel({
+      shell: cardShell,
+      requestedOpen: true,
+    })).to.deep.equal({
+      showPanel: true,
+      panelOpen: true,
+      viewportOpen: true,
+    });
+    expect(resolveSessionSurfaceLearningProgressPanel({
+      shell: videoShell,
+      requestedOpen: true,
+    })).to.deep.equal({
+      showPanel: false,
+      panelOpen: false,
+      viewportOpen: false,
+    });
+    expect(resolveSessionSurfaceLearningProgressPanel({
+      shell: disabledCardShell,
+      requestedOpen: true,
+    })).to.deep.equal({
+      showPanel: false,
+      panelOpen: false,
+      viewportOpen: false,
+    });
   });
 });
