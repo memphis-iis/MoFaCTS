@@ -1,6 +1,8 @@
 export type SessionSurfaceMode = 'autotutor' | 'video' | 'card';
 
 type SessionUnitLike = {
+  assessmentsession?: unknown;
+  learningsession?: unknown;
   videosession?: unknown;
   autotutorsession?: unknown;
 };
@@ -54,6 +56,10 @@ export type SessionSurfaceLaunchCompletion = {
   stopInitialization: boolean;
 };
 
+export type SessionSurfaceDiagnostic = {
+  clusterlist: unknown;
+};
+
 type SessionSurfaceLaunchCompletionInput = {
   contentSurface: SessionContentSurface;
   isLaunchLoadingActive: boolean;
@@ -100,6 +106,28 @@ export function resolveSessionSurfaceState(input: SessionSurfaceStateInput): Ses
     isAutoTutorSession,
     isVideoSession,
     mode: isAutoTutorSession ? 'autotutor' : (isVideoSession ? 'video' : 'card'),
+  };
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+export function resolveSessionSurfaceDiagnostic(
+  currentTdfUnit: SessionUnitLike | null | undefined,
+): SessionSurfaceDiagnostic {
+  const learningSession = asRecord(currentTdfUnit?.learningsession);
+  const videoSession = asRecord(currentTdfUnit?.videosession);
+  const assessmentSession = asRecord(currentTdfUnit?.assessmentsession);
+
+  return {
+    clusterlist:
+      learningSession?.clusterlist ||
+      videoSession?.questions ||
+      assessmentSession?.clusterlist ||
+      null,
   };
 }
 

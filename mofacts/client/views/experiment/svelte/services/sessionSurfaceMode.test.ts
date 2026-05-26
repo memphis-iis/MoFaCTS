@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import {
   resolveSessionContentSurface,
+  resolveSessionSurfaceDiagnostic,
   resolveSessionSurfaceLaunchCompletion,
   resolveSessionSurfaceLearningProgressPanel,
   resolveSessionSurfaceShell,
@@ -42,6 +43,25 @@ describe('session surface mode', function() {
       isVideoSession: true,
       mode: 'autotutor',
     });
+  });
+
+  it('centralizes session diagnostic cluster-list precedence', function() {
+    expect(resolveSessionSurfaceDiagnostic({
+      learningsession: { clusterlist: '1 2' },
+      videosession: { questions: [3, 4] },
+      assessmentsession: { clusterlist: '5 6' },
+    })).to.deep.equal({ clusterlist: '1 2' });
+
+    expect(resolveSessionSurfaceDiagnostic({
+      videosession: { questions: [3, 4] },
+      assessmentsession: { clusterlist: '5 6' },
+    })).to.deep.equal({ clusterlist: [3, 4] });
+
+    expect(resolveSessionSurfaceDiagnostic({
+      assessmentsession: { clusterlist: '5 6' },
+    })).to.deep.equal({ clusterlist: '5 6' });
+
+    expect(resolveSessionSurfaceDiagnostic({})).to.deep.equal({ clusterlist: null });
   });
 
   it('describes the content surface that owns the render branch', function() {

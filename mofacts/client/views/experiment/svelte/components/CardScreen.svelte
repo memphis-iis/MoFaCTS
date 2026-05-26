@@ -62,6 +62,7 @@
   import { buildLearningProgressPanelSnapshot } from '../services/learningProgressPanel';
   import {
     resolveSessionContentSurface,
+    resolveSessionSurfaceDiagnostic,
     resolveSessionSurfaceLaunchCompletion,
     resolveSessionSurfaceLearningProgressPanel,
     resolveSessionSurfaceShell,
@@ -1571,6 +1572,8 @@
           redirected: !!initResult?.redirected,
         });
       } catch (error) {
+        const currentTdfUnitForDiagnostic = Session.get('currentTdfUnit');
+        const sessionSurfaceDiagnostic = resolveSessionSurfaceDiagnostic(currentTdfUnitForDiagnostic);
         const diagnostic = {
           error,
           currentTdfName: Session.get('currentTdfFile')?.name || Session.get('currentTdfFile')?.fileName || null,
@@ -1578,11 +1581,8 @@
           currentRootTdfId: Session.get('currentRootTdfId') || null,
           currentStimuliSetId: Session.get('currentStimuliSetId') || null,
           currentUnitNumber: Session.get('currentUnitNumber') ?? null,
-          currentUnitName: Session.get('currentTdfUnit')?.unitname || null,
-          clusterlist: Session.get('currentTdfUnit')?.learningsession?.clusterlist ||
-            Session.get('currentTdfUnit')?.videosession?.questions ||
-            Session.get('currentTdfUnit')?.assessmentsession?.clusterlist ||
-            null,
+          currentUnitName: currentTdfUnitForDiagnostic?.unitname || null,
+          clusterlist: sessionSurfaceDiagnostic.clusterlist,
           stimuliCount: Array.isArray(Session.get('currentStimuliSet'))
             ? Session.get('currentStimuliSet').length
             : null,

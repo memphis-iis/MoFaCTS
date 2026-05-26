@@ -63,6 +63,7 @@ Make a new in-repo component feel like a small package:
    Resume video-session detection, preload source resolution, and the video resume return path now live in `videoResume.ts` helpers, with resume orchestration calling that tested boundary instead of branching directly on video session state.
    Legacy instructions continue now uses the shared `resolveUnitEngineTypeForUnit` unit-shape resolver instead of branching directly on session fields to identify instruction-only units.
    Adaptive video question insertion, question-time mutation, and adaptive checkpoint mutation now live in `mofacts/client/views/experiment/videoAdaptiveQuestions.ts`, leaving `AdaptiveQuestionLogic` to evaluate rules and hand video-session mutations to a tested video-owned boundary.
+   Svelte card initialization-failure diagnostics now ask `sessionSurfaceMode.ts` for the session diagnostic cluster list instead of reading learning/video/assessment unit shapes inline.
 
 ## Pause/Resume Checkpoint
 
