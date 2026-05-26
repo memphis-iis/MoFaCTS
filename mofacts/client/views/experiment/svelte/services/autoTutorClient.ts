@@ -43,6 +43,7 @@ const AUTO_TUTOR_LEARNER_CONTRIBUTION_TYPES = new Set([
   'question',
   'off_task',
 ]);
+const AUTO_TUTOR_END_REASONS = new Set(['in_progress', 'mastery', 'max_turns', 'cost_cap']);
 
 type AutoTutorExpectation = {
   id: string;
@@ -108,9 +109,13 @@ type AutoTutorState = {
   turnCount: number;
   costUsd: number;
   completed: boolean;
+  mastered: boolean;
+  endReason: AutoTutorEndReason;
   stoppedByCost: boolean;
   dialogue: Array<{ role: 'student' | 'tutor'; text: string }>;
 };
+
+type AutoTutorEndReason = 'in_progress' | 'mastery' | 'max_turns' | 'cost_cap';
 
 export type AutoTutorProgressCounts = {
   coveredExpectations: number;
@@ -127,7 +132,13 @@ export type AutoTutorRuntime = {
   getProgress: () => number;
   getProgressCounts: () => AutoTutorProgressCounts;
   getDialogue: () => AutoTutorState['dialogue'];
-  submitStudentAnswer: (studentAnswer: string) => Promise<{ message: string; completed: boolean; stoppedByCost: boolean }>;
+  submitStudentAnswer: (studentAnswer: string) => Promise<{
+    message: string;
+    completed: boolean;
+    mastered: boolean;
+    endReason: AutoTutorEndReason;
+    stoppedByCost: boolean;
+  }>;
 };
 
 type AutoTutorHistoryNote = {
@@ -137,6 +148,8 @@ type AutoTutorHistoryNote = {
   state: ReturnType<typeof summarizeState>;
   progress: number;
   completed: boolean;
+  mastered: boolean;
+  endReason: AutoTutorEndReason;
   stoppedByCost: boolean;
   tutorMessage: string;
 };
@@ -359,6 +372,8 @@ function createInitialState(script: AutoTutorScript): AutoTutorState {
     turnCount: 0,
     costUsd: 0,
     completed: false,
+    mastered: false,
+    endReason: 'in_progress',
     stoppedByCost: false,
     dialogue: [],
   };
@@ -375,6 +390,9 @@ function summarizeState(state: AutoTutorState) {
     selectedMove: state.selectedMove,
     turnCount: state.turnCount,
     costUsd: state.costUsd,
+    completed: state.completed,
+    mastered: state.mastered,
+    endReason: state.endReason,
   };
 }
 
@@ -693,6 +711,15 @@ function validateSavedState(
   if (typeof state.costUsd !== 'number' || !Number.isFinite(state.costUsd) || state.costUsd < 0) {
     throw new Error('AutoTutor saved history state.costUsd must be a non-negative number');
   }
+  if (typeof state.completed !== 'boolean') {
+    throw new Error('AutoTutor saved history state.completed must be boolean');
+  }
+  if (typeof state.mastered !== 'boolean') {
+    throw new Error('AutoTutor saved history state.mastered must be boolean');
+  }
+  if (typeof state.endReason !== 'string' || !AUTO_TUTOR_END_REASONS.has(state.endReason)) {
+    throw new Error('AutoTutor saved history state.endReason is invalid');
+  }
   const expectations = validateSavedExpectationScores(state.expectations, Object.keys(expectedState.expectations));
   const misconceptions = validateSavedMisconceptionScores(state.misconceptions, Object.keys(expectedState.misconceptions));
   const learnerContribution = validateSavedLearnerContribution(state.learnerContribution);
@@ -708,6 +735,9 @@ function validateSavedState(
     selectedMove: state.selectedMove as AutoTutorMove | '',
     turnCount: state.turnCount,
     costUsd: state.costUsd,
+    completed: state.completed,
+    mastered: state.mastered,
+    endReason: state.endReason as AutoTutorEndReason,
   };
 }
 
@@ -858,19 +888,41 @@ function validateGraduationAgainstScript(config: AutoTutorConfig): void {
   }
 }
 
-function computeCompleted(state: AutoTutorState, config: AutoTutorConfig): boolean {
-  if (state.turnCount >= config.turnLimit.maxTurns) {
-    return true;
-  }
+function computeGraduationMet(state: AutoTutorState, config: AutoTutorConfig): boolean {
   const progressCounts = computeProgressCounts(state, config);
   return progressCounts.coveredExpectations >= config.graduation.requiredExpectationCount &&
     progressCounts.activeMisconceptions <= config.graduation.maxActiveMisconceptions;
+}
+
+function setEndState(state: AutoTutorState, endReason: AutoTutorEndReason): void {
+  state.endReason = endReason;
+  state.completed = endReason !== 'in_progress';
+  state.mastered = endReason === 'mastery';
+  state.stoppedByCost = endReason === 'cost_cap';
+}
+
+function getHistoryAction(state: AutoTutorState): AutoTutorCompressedHistoryRecord['action'] {
+  if (!state.completed) {
+    return 'autotutor-turn';
+  }
+  if (state.mastered) {
+    return 'autotutor-complete';
+  }
+  if (state.endReason === 'max_turns') {
+    return 'autotutor-ended-max_turns';
+  }
+  if (state.endReason === 'cost_cap') {
+    return 'autotutor-ended-cost_cap';
+  }
+  throw new Error(`AutoTutor completed state has invalid end reason: ${state.endReason}`);
 }
 
 function publishState(capabilities: AutoTutorRuntimeCapabilities, state: AutoTutorState, config: AutoTutorConfig): void {
   capabilities.session.publishAutoTutorState({
     ...summarizeState(state),
     completed: state.completed,
+    mastered: state.mastered,
+    endReason: state.endReason,
     stoppedByCost: state.stoppedByCost,
     progress: computeProgress(state),
     progressCounts: computeProgressCounts(state, config),
@@ -894,6 +946,19 @@ function readHistoryNote(row: AutoTutorHistoryRow): AutoTutorHistoryNote {
     throw new Error('AutoTutor history row CFNote must not include schemaVersion');
   }
   return note as AutoTutorHistoryNote;
+}
+
+function validateSavedEndState(note: AutoTutorHistoryNote): void {
+  if (typeof note.completed !== 'boolean' || typeof note.stoppedByCost !== 'boolean') {
+    throw new Error('AutoTutor saved history completion flags must be boolean');
+  }
+  if (
+    typeof note.mastered !== 'boolean' ||
+    typeof note.endReason !== 'string' ||
+    !AUTO_TUTOR_END_REASONS.has(note.endReason)
+  ) {
+    throw new Error('AutoTutor saved history mastery flags must be present and valid');
+  }
 }
 
 function applySavedHistory(config: AutoTutorConfig, state: AutoTutorState, rows: AutoTutorHistoryRow[]): void {
@@ -921,10 +986,15 @@ function applySavedHistory(config: AutoTutorConfig, state: AutoTutorState, rows:
   if (latest.scriptId !== config.script.id) {
     throw new Error(`AutoTutor saved history scriptId "${latest.scriptId}" does not match current script "${config.script.id}"`);
   }
-  if (typeof latest.completed !== 'boolean' || typeof latest.stoppedByCost !== 'boolean') {
-    throw new Error('AutoTutor saved history completion flags must be boolean');
-  }
+  validateSavedEndState(latest);
   const savedState = validateSavedState(latest.state, state);
+  if (
+    latest.completed !== savedState.completed ||
+    latest.mastered !== savedState.mastered ||
+    latest.endReason !== savedState.endReason
+  ) {
+    throw new Error('AutoTutor saved history top-level end state does not match state payload');
+  }
   state.expectations = savedState.expectations;
   state.misconceptions = savedState.misconceptions;
   state.planner = savedState.planner;
@@ -934,7 +1004,9 @@ function applySavedHistory(config: AutoTutorConfig, state: AutoTutorState, rows:
   state.selectedMove = savedState.selectedMove;
   state.turnCount = savedState.turnCount;
   state.costUsd = savedState.costUsd;
-  state.completed = latest.completed;
+  state.completed = savedState.completed;
+  state.mastered = savedState.mastered;
+  state.endReason = savedState.endReason;
   state.stoppedByCost = latest.stoppedByCost;
   state.dialogue = dialogue;
 }
@@ -959,6 +1031,8 @@ function buildHistoryNote(config: AutoTutorConfig, state: AutoTutorState, tutorM
     state: summarizeState(state),
     progress: computeProgress(state),
     completed: state.completed,
+    mastered: state.mastered,
+    endReason: state.endReason,
     stoppedByCost: state.stoppedByCost,
     tutorMessage,
   };
@@ -989,7 +1063,7 @@ async function insertAutoTutorHistoryTurn(config: AutoTutorConfig, state: AutoTu
     KCId: stim?.stimulusKC || config.script.id,
     userId: snapshot.currentUserId,
     TDFId: snapshot.currentTdfId,
-    outcome: state.completed ? 'correct' : 'incorrect',
+    outcome: state.mastered ? 'correct' : 'incorrect',
     probabilityEstimate: null,
     typeOfResponse: 'autotutor-chat',
     responseValue: legacyTrim(args.studentAnswer),
@@ -1019,7 +1093,7 @@ async function insertAutoTutorHistoryTurn(config: AutoTutorConfig, state: AutoTu
     time: args.turnEndedAt,
     problemStartTime: args.turnStartedAt,
     selection: 'autotutor-chat',
-    action: state.completed ? 'autotutor-complete' : 'autotutor-turn',
+    action: getHistoryAction(state),
     input: legacyTrim(args.studentAnswer),
     studentResponseType: 'ATTEMPT',
     studentResponseSubtype: 'autotutor',
@@ -1046,7 +1120,7 @@ async function insertAutoTutorHistoryTurn(config: AutoTutorConfig, state: AutoTu
     CFItemRemoved: false,
     CFNote: JSON.stringify(note),
     feedbackText: legacyTrim(args.tutorMessage),
-    feedbackType: state.completed ? 'correct' : 'autotutor',
+    feedbackType: state.mastered ? 'correct' : (state.completed ? 'incorrect' : 'autotutor'),
     instructionQuestionResult: false,
     entryPoint: snapshot.entryPoint || '',
     eventType: 'autotutor-turn',
@@ -1074,12 +1148,13 @@ export async function createAutoTutorRuntime(): Promise<AutoTutorRuntime> {
         throw new Error('AutoTutor session is already complete');
       }
       if (state.costUsd > AUTO_TUTOR_COST_CAP_USD) {
-        state.stoppedByCost = true;
-        state.completed = true;
+        setEndState(state, 'cost_cap');
         publishState(capabilities, state, config);
         return {
           message: 'We need to stop here because this AutoTutor session reached the configured cost cap.',
           completed: true,
+          mastered: false,
+          endReason: 'cost_cap',
           stoppedByCost: true,
         };
       }
@@ -1124,12 +1199,15 @@ export async function createAutoTutorRuntime(): Promise<AutoTutorRuntime> {
       nextState.dialogue.push({ role: 'student', text: cleanedAnswer });
 
       if (nextState.costUsd > AUTO_TUTOR_COST_CAP_USD) {
-        nextState.stoppedByCost = true;
-        nextState.completed = true;
+        setEndState(nextState, 'cost_cap');
       } else {
-        nextState.completed = computeCompleted(nextState, config);
-        if (plan.target.type === 'completion') {
-          nextState.completed = nextState.completed && plan.selectedMove === 'summary';
+        const graduationMet = computeGraduationMet(nextState, config);
+        if (graduationMet && (plan.target.type !== 'completion' || plan.selectedMove === 'summary')) {
+          setEndState(nextState, 'mastery');
+        } else if (nextState.turnCount >= config.turnLimit.maxTurns) {
+          setEndState(nextState, 'max_turns');
+        } else {
+          setEndState(nextState, 'in_progress');
         }
       }
       let tutorMessage = 'We need to stop here because this AutoTutor session reached the configured cost cap.';
@@ -1140,8 +1218,7 @@ export async function createAutoTutorRuntime(): Promise<AutoTutorRuntime> {
         validateUtteranceEnvelope(utteranceEnvelope, plan);
         tutorMessage = utteranceEnvelope.tutorMessage;
         if (nextState.costUsd > AUTO_TUTOR_COST_CAP_USD) {
-          nextState.stoppedByCost = true;
-          nextState.completed = true;
+          setEndState(nextState, 'cost_cap');
           tutorMessage = 'We need to stop here because this AutoTutor session reached the configured cost cap.';
         }
       }
@@ -1161,6 +1238,8 @@ export async function createAutoTutorRuntime(): Promise<AutoTutorRuntime> {
       return {
         message: tutorMessage,
         completed: state.completed,
+        mastered: state.mastered,
+        endReason: state.endReason,
         stoppedByCost: state.stoppedByCost,
       };
     },

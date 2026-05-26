@@ -22,6 +22,8 @@
   let turnCount = 0;
   let costUsd = 0;
   let completed = false;
+  let mastered = false;
+  let endReason = 'in_progress';
   let stoppedByCost = false;
   let questionPrompt = '';
   let unitName = 'AutoTutor';
@@ -44,6 +46,8 @@
     turnCount = state.turnCount;
     costUsd = state.costUsd;
     completed = state.completed;
+    mastered = state.mastered;
+    endReason = state.endReason;
     stoppedByCost = state.stoppedByCost;
     updateChatInputState();
   }
@@ -92,6 +96,8 @@
     }
     dispatch('complete', {
       stoppedByCost,
+      mastered,
+      endReason,
       turnCount,
       costUsd,
       progress,
@@ -334,7 +340,15 @@
 
   {#if completed}
     <div class="auto-tutor-complete" role="status">
-      {stoppedByCost ? 'Cost cap reached. Review the conversation, then continue.' : 'Nice work. Review the conversation, then continue.'}
+      {#if mastered}
+        Nice work. Review the conversation, then continue.
+      {:else if stoppedByCost}
+        Cost cap reached. Review the conversation, then continue.
+      {:else if endReason === 'max_turns'}
+        Turn limit reached. Review the conversation, then continue.
+      {:else}
+        Session ended. Review the conversation, then continue.
+      {/if}
     </div>
   {/if}
 

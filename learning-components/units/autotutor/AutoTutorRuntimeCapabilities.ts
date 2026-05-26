@@ -70,7 +70,7 @@ export type AutoTutorCompressedHistoryRecord = {
   time: number;
   problemStartTime: number;
   selection: 'autotutor-chat';
-  action: 'autotutor-complete' | 'autotutor-turn';
+  action: 'autotutor-complete' | 'autotutor-turn' | 'autotutor-ended-max_turns' | 'autotutor-ended-cost_cap';
   input: string;
   studentResponseType: 'ATTEMPT';
   studentResponseSubtype: 'autotutor';
@@ -97,7 +97,7 @@ export type AutoTutorCompressedHistoryRecord = {
   CFItemRemoved: false;
   CFNote: string;
   feedbackText: string;
-  feedbackType: 'correct' | 'autotutor';
+  feedbackType: 'correct' | 'incorrect' | 'autotutor';
   instructionQuestionResult: false;
   entryPoint: unknown;
   eventType: 'autotutor-turn';
