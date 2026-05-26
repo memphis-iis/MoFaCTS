@@ -15,6 +15,7 @@ Keep `docs/` focused on software consortium, repository, user, author, operator,
 ## Migrated Developer Docs
 
 - `modularity-extension-boundary-plan.md`: extension-boundary starter plan for AutoTutor/H5P-style component drop-ins.
+- `modularity-readiness-audit.md`: current checkpoint of what is ready, intentionally deferred, and evidenced for modular component packages.
 - `modularity-start-plan.md`: short next-step plan for turning the current extension boundaries into practical component packages.
 - `h5p-assessment-session-playback-audit.md`: H5P assessment playback flow audit.
 - `h5p-assessment-session-race-condition-cleanup-plan.md`: H5P assessment race-condition cleanup plan.
