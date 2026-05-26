@@ -34,3 +34,34 @@ Environment-heavy checks not run in this pass:
 - Upgrade rehearsal from a previous supported version.
 
 Reason: these are release-confidence/runtime proof steps that require deliberate operator values, Docker runtime work, or a clean state rehearsal. They remain open in the implementation plan until run directly.
+
+## 2026-05-26 AutoTutor Modularity Boundary Pass
+
+Completed:
+
+- `npm run typecheck`
+  - Result: passed after extracting the AutoTutor end-state contract into `learning-components/units/autotutor/AutoTutorEndState.ts`.
+  - Coverage: TypeScript verifies the AutoTutor client runtime, component-owned end-state helper, and compressed-history action types agree.
+- `npm run lint`
+  - Result: passed.
+  - Coverage: lint covers the updated AutoTutor client runtime and new common test file.
+- `node scripts/release/open-core-readiness-scan.cjs`
+  - Result: passed.
+  - Coverage: the public-readiness static gate still passes after the modularity-boundary changes.
+- `http://localhost:3200`
+  - Result: loaded through Playwright MCP with page title `MoFaCTS`.
+
+Modularity evidence added:
+
+- AutoTutor end reasons are explicit component-owned semantics: `in_progress`, `mastery`, `max_turns`, and `cost_cap`.
+- `mofacts/common/autoTutorEndState.test.ts` covers end-reason flag mapping, compressed-history action mapping, invalid completed-state rejection, and end-reason validation.
+- `docs-developer/modularity-readiness-audit.md`, `docs-developer/modularity-start-plan.md`, and `learning-components/units/autotutor/README.md` now name the AutoTutor end-state boundary as current modularity evidence.
+
+Environment-heavy checks not run in this pass:
+
+- Canonical Docker image build.
+- Clean self-hosted Docker Compose stack startup.
+- First-admin bootstrap on a clean database.
+- Backup and restore rehearsal.
+
+Reason: these remain the same release-confidence/runtime proof steps listed in the implementation plan and were not requested for this local modularity-boundary pass.
