@@ -76,6 +76,14 @@ type SessionSurfaceLearningProgressPanelInput = {
   requestedOpen: boolean;
 };
 
+type SessionInlineVideoInstructionInput = {
+  contentSurface: SessionContentSurface;
+  lockoutMinutes: number;
+  hasUnitText: boolean;
+  hasUnitImage: boolean;
+  hasUnitQuestion: boolean;
+};
+
 export function resolveSessionSurfaceState(input: SessionSurfaceStateInput): SessionSurfaceState {
   const currentTdfUnit = input.currentTdfUnit || {};
   const isAutoTutorSession =
@@ -161,6 +169,16 @@ export function resolveSessionSurfaceLearningProgressPanel(
     panelOpen,
     viewportOpen: panelOpen,
   };
+}
+
+export function shouldInlineSessionVideoInstructions(input: SessionInlineVideoInstructionInput): boolean {
+  assertValidSessionContentSurface(input.contentSurface, 'shouldInlineSessionVideoInstructions');
+
+  return input.contentSurface.showVideoSession &&
+    input.lockoutMinutes <= 0 &&
+    input.hasUnitText &&
+    !input.hasUnitImage &&
+    !input.hasUnitQuestion;
 }
 
 export function resolveSessionSurfaceLaunchCompletion(

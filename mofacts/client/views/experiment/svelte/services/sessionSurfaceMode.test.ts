@@ -5,6 +5,7 @@ import {
   resolveSessionSurfaceLearningProgressPanel,
   resolveSessionSurfaceShell,
   resolveSessionSurfaceState,
+  shouldInlineSessionVideoInstructions,
   shouldShowSessionVideoInstructionOverlay,
 } from './sessionSurfaceMode';
 
@@ -103,6 +104,13 @@ describe('session surface mode', function() {
       contentSurface: invalidContentSurface,
       isLaunchLoadingActive: true,
     })).to.throw('resolveSessionSurfaceLaunchCompletion received an invalid session content surface');
+    expect(() => shouldInlineSessionVideoInstructions({
+      contentSurface: invalidContentSurface,
+      lockoutMinutes: 0,
+      hasUnitText: true,
+      hasUnitImage: false,
+      hasUnitQuestion: false,
+    })).to.throw('shouldInlineSessionVideoInstructions received an invalid session content surface');
   });
 
   it('fails clearly when deriving a content surface from an unknown mode', function() {
@@ -184,6 +192,49 @@ describe('session surface mode', function() {
       contentSurface: cardSurface,
       instructionText: 'Watch the video before answering.',
       instructionsSeen: false,
+    })).to.equal(false);
+  });
+
+  it('inlines video instructions only for text-only video surfaces without lockout', function() {
+    const videoSurface = resolveSessionContentSurface(resolveSessionSurfaceState({
+      currentTdfUnit: { videosession: {} },
+    }));
+    const cardSurface = resolveSessionContentSurface(resolveSessionSurfaceState({}));
+
+    expect(shouldInlineSessionVideoInstructions({
+      contentSurface: videoSurface,
+      lockoutMinutes: 0,
+      hasUnitText: true,
+      hasUnitImage: false,
+      hasUnitQuestion: false,
+    })).to.equal(true);
+    expect(shouldInlineSessionVideoInstructions({
+      contentSurface: videoSurface,
+      lockoutMinutes: 1,
+      hasUnitText: true,
+      hasUnitImage: false,
+      hasUnitQuestion: false,
+    })).to.equal(false);
+    expect(shouldInlineSessionVideoInstructions({
+      contentSurface: videoSurface,
+      lockoutMinutes: 0,
+      hasUnitText: true,
+      hasUnitImage: true,
+      hasUnitQuestion: false,
+    })).to.equal(false);
+    expect(shouldInlineSessionVideoInstructions({
+      contentSurface: videoSurface,
+      lockoutMinutes: 0,
+      hasUnitText: true,
+      hasUnitImage: false,
+      hasUnitQuestion: true,
+    })).to.equal(false);
+    expect(shouldInlineSessionVideoInstructions({
+      contentSurface: cardSurface,
+      lockoutMinutes: 0,
+      hasUnitText: true,
+      hasUnitImage: false,
+      hasUnitQuestion: false,
     })).to.equal(false);
   });
 

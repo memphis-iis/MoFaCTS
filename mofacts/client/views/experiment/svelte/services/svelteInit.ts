@@ -39,6 +39,11 @@ import { checkForFileImage, unitHasLockout } from '../../instructions';
 import { initializeAudioRecorder } from './speechRecognitionService';
 import { leavePage } from './navigationCleanup';
 import { ensureCurrentStimuliSetId } from './mediaResolver';
+import {
+  resolveSessionContentSurface,
+  resolveSessionSurfaceState,
+  shouldInlineSessionVideoInstructions,
+} from './sessionSurfaceMode';
 import { withStartupTimeout } from '../../../../lib/audioStartup';
 import { evaluateSrAvailability } from '../../../../lib/audioAvailability';
 import { markLaunchLoadingTiming, setLaunchLoadingMessage } from '../../../../lib/launchLoading';
@@ -702,11 +707,17 @@ async function initializeStandardCardEntry(
   const instructionsSeen = Session.get('curUnitInstructionsSeen');
   const shouldShowInstructions = ((!instructionsSeen) && (hasUnitText || hasUnitImage || hasUnitQuestion)) ||
     lockoutMinutes > 0;
-  const canInlineVideoInstructions = unitType === 'video' &&
-    lockoutMinutes <= 0 &&
-    hasUnitText &&
-    !hasUnitImage &&
-    !hasUnitQuestion;
+  const sessionContentSurface = resolveSessionContentSurface(resolveSessionSurfaceState({
+    sessionUnitType: unitType,
+    currentTdfUnit: currentUnit,
+  }));
+  const canInlineVideoInstructions = shouldInlineSessionVideoInstructions({
+    contentSurface: sessionContentSurface,
+    lockoutMinutes,
+    hasUnitText,
+    hasUnitImage,
+    hasUnitQuestion,
+  });
 
   if (shouldShowInstructions && !canInlineVideoInstructions) {
     setLaunchLoadingMessage('Loading instructions...');
