@@ -27,6 +27,7 @@ export type AutoTutorSessionSnapshot = {
 export type AutoTutorHistoryTurn = {
   studentAnswer: string;
   tutorMessage: string;
+  config: unknown;
   state: unknown;
   startedAt: number;
   endedAt: number;

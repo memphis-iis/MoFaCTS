@@ -15,6 +15,7 @@ This audit records the current extension-boundary readiness checkpoint for AutoT
 - Default unit manifests live with their owning unit folders; the central default unit file is an aggregator only.
 - AutoTutor has a dedicated unit component manifest and package README.
 - AutoTutor declares typed session, server-method, history, and logging capability needs before deeper runtime extraction.
+- AutoTutor client runtime now routes state publication, resume-history loading, and history-turn writes through an app-owned capability adapter.
 - H5P trial-display ownership is documented beside the H5P component package.
 - A test-only sample echo unit package demonstrates the expected component package shape.
 - `docs-developer/modularity-start-plan.md` defines the short next-step plan.
@@ -39,9 +40,10 @@ This audit records the current extension-boundary readiness checkpoint for AutoT
 - `learning-components/units/autotutor/manifest.ts`
 - `learning-components/units/autotutor/AutoTutorRuntimeCapabilities.ts`
 - `learning-components/units/autotutor/README.md`
+- `mofacts/client/views/experiment/svelte/services/autoTutorClient.ts`
 - `learning-components/trial-displays/h5p/README.md`
 - `docs-developer/modularity-start-plan.md`
 
 ## Next Safe Step
 
-Next, wire the current AutoTutor client/server integration through the typed AutoTutor runtime capabilities before moving app-owned behavior under the AutoTutor package.
+Next, continue replacing direct AutoTutor client reads of Meteor `Session`/user state with the app-owned AutoTutor capability adapter before moving app-owned behavior under the AutoTutor package.

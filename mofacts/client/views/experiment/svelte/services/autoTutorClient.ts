@@ -20,9 +20,14 @@ import {
   type AutoTutorPlannerState,
 } from '../../../../../common/lib/autoTutorPlanner';
 import { getStimCluster } from '../../../../lib/currentTestingHelpers';
+import { clientConsole } from '../../../../lib/clientLogger';
 import { insertCompressedHistory } from '../../../../lib/historyWire';
 import { meteorCallAsync } from '../../../../lib/meteorAsync';
 import { legacyTrim } from '../../../../../common/underscoreCompat';
+import type {
+  AutoTutorHistoryTurn,
+  AutoTutorRuntimeCapabilities,
+} from '../../../../../../learning-components/units/autotutor/AutoTutorRuntimeCapabilities';
 
 const OPEN_ROUTER_CHAT_COMPLETIONS_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const AUTO_TUTOR_COST_CAP_USD = 0.20;
@@ -131,6 +136,69 @@ type AutoTutorHistoryRow = {
   feedbackText?: string;
   CFNote?: string;
 };
+
+function createMeteorAutoTutorRuntimeCapabilities(): AutoTutorRuntimeCapabilities {
+  return {
+    session: {
+      getSessionValue(key: string) {
+        return Session.get(key);
+      },
+      setSessionValue(key: string, value: unknown) {
+        Session.set(key, value);
+      },
+      getAutoTutorSessionSnapshot() {
+        const currentTdfId = requiredString(Session.get('currentTdfId'), 'currentTdfId');
+        const currentTdfName = requiredString(Session.get('currentTdfName'), 'currentTdfName');
+        const currentUnitNumber = Number(Session.get('currentUnitNumber'));
+        if (!Number.isInteger(currentUnitNumber) || currentUnitNumber < 0) {
+          throw new Error('AutoTutor runtime requires currentUnitNumber to be a non-negative integer');
+        }
+        return {
+          currentTdfId,
+          currentTdfName,
+          currentUnitNumber,
+          currentTdfFile: Session.get('currentTdfFile'),
+          currentTdfUnit: Session.get('currentTdfUnit'),
+          sectionId: Session.get('curSectionId'),
+          teacherId: Session.get('curTeacher')?._id,
+          conditionName: Session.get('experimentXCond') || null,
+        };
+      },
+      publishAutoTutorState(state: unknown) {
+        Session.set('autoTutorState', state);
+      },
+    },
+    serverMethods: {
+      async callMethod<T = unknown>(name: string, ...args: unknown[]) {
+        return await meteorCallAsync(name, ...args) as T;
+      },
+      async getAutoTutorHistoryForUnit(userId: string, tdfId: string, unitNumber: number) {
+        return await meteorCallAsync('getAutoTutorHistoryForUnit', userId, tdfId, unitNumber) as unknown[];
+      },
+    },
+    history: {
+      normalizeResult(result: unknown) {
+        return result as AutoTutorHistoryTurn;
+      },
+      async writeResult(result: AutoTutorHistoryTurn) {
+        await this.writeAutoTutorTurn(result);
+      },
+      async writeAutoTutorTurn(turn: AutoTutorHistoryTurn) {
+        await insertAutoTutorHistoryTurn(turn.config as AutoTutorConfig, turn.state as AutoTutorState, {
+          studentAnswer: turn.studentAnswer,
+          tutorMessage: turn.tutorMessage,
+          turnStartedAt: turn.startedAt,
+          turnEndedAt: turn.endedAt,
+        });
+      },
+    },
+    logger: {
+      log(level: number, ...args: unknown[]) {
+        clientConsole(level, '[AutoTutor]', ...args);
+      },
+    },
+  };
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -738,8 +806,8 @@ function computeCompleted(state: AutoTutorState, config: AutoTutorConfig): boole
     progressCounts.activeMisconceptions <= config.graduation.maxActiveMisconceptions;
 }
 
-function publishState(state: AutoTutorState, config: AutoTutorConfig): void {
-  Session.set('autoTutorState', {
+function publishState(capabilities: AutoTutorRuntimeCapabilities, state: AutoTutorState, config: AutoTutorConfig): void {
+  capabilities.session.publishAutoTutorState({
     ...summarizeState(state),
     completed: state.completed,
     stoppedByCost: state.stoppedByCost,
@@ -809,14 +877,17 @@ function applySavedHistory(config: AutoTutorConfig, state: AutoTutorState, rows:
   state.dialogue = dialogue;
 }
 
-async function loadSavedAutoTutorHistory(): Promise<AutoTutorHistoryRow[]> {
+async function loadSavedAutoTutorHistory(capabilities: AutoTutorRuntimeCapabilities): Promise<AutoTutorHistoryRow[]> {
   const userId = Meteor.userId();
-  const tdfId = Session.get('currentTdfId');
-  const unitNumber = Number(Session.get('currentUnitNumber'));
-  if (!userId || !tdfId || !Number.isInteger(unitNumber) || unitNumber < 0) {
+  const snapshot = capabilities.session.getAutoTutorSessionSnapshot();
+  if (!userId) {
     throw new Error('AutoTutor resume requires current user, TDF id, and unit number');
   }
-  return await meteorCallAsync('getAutoTutorHistoryForUnit', userId, tdfId, unitNumber);
+  return await capabilities.serverMethods.getAutoTutorHistoryForUnit(
+    userId,
+    snapshot.currentTdfId,
+    snapshot.currentUnitNumber,
+  ) as AutoTutorHistoryRow[];
 }
 
 function buildHistoryNote(config: AutoTutorConfig, state: AutoTutorState, tutorMessage: string): AutoTutorHistoryNote {
@@ -919,11 +990,12 @@ async function insertAutoTutorHistoryTurn(config: AutoTutorConfig, state: AutoTu
 }
 
 export async function createAutoTutorRuntime(): Promise<AutoTutorRuntime> {
+  const capabilities = createMeteorAutoTutorRuntimeCapabilities();
   const config = readAutoTutorConfig();
   validateGraduationAgainstScript(config);
   const state = createInitialState(config.script);
-  applySavedHistory(config, state, await loadSavedAutoTutorHistory());
-  publishState(state, config);
+  applySavedHistory(config, state, await loadSavedAutoTutorHistory(capabilities));
+  publishState(capabilities, state, config);
 
   return {
     config,
@@ -939,7 +1011,7 @@ export async function createAutoTutorRuntime(): Promise<AutoTutorRuntime> {
       if (state.costUsd > AUTO_TUTOR_COST_CAP_USD) {
         state.stoppedByCost = true;
         state.completed = true;
-        publishState(state, config);
+        publishState(capabilities, state, config);
         return {
           message: 'We need to stop here because this AutoTutor session reached the configured cost cap.',
           completed: true,
@@ -1008,14 +1080,16 @@ export async function createAutoTutorRuntime(): Promise<AutoTutorRuntime> {
       }
       nextState.dialogue.push({ role: 'tutor', text: tutorMessage });
       const turnEndedAt = Date.now();
-      await insertAutoTutorHistoryTurn(config, nextState, {
+      await capabilities.history.writeAutoTutorTurn({
+        config,
+        state: nextState,
         studentAnswer: cleanedAnswer,
         tutorMessage,
-        turnStartedAt,
-        turnEndedAt,
+        startedAt: turnStartedAt,
+        endedAt: turnEndedAt,
       });
       Object.assign(state, nextState);
-      publishState(state, config);
+      publishState(capabilities, state, config);
 
       return {
         message: tutorMessage,
