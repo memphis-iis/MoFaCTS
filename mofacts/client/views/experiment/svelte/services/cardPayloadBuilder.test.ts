@@ -6,6 +6,7 @@ import {
   normalizeDisplayAttribution,
   resolveCardPayloadDeliverySettings,
   resolveStimMediaSource,
+  shouldUseScheduleButtonTrial,
 } from './cardPayloadBuilder';
 
 describe('card payload builder helpers', function() {
@@ -67,5 +68,22 @@ describe('card payload builder helpers', function() {
     })).to.deep.equal({
       displayQuestionNumber: true,
     });
+  });
+
+  it('keeps schedule button-trial policy behind a named assessment boundary', function() {
+    expect(shouldUseScheduleButtonTrial({
+      currentUnit: { assessmentsession: {} },
+      schedule: { isButtonTrial: true },
+    })).to.equal(true);
+
+    expect(shouldUseScheduleButtonTrial({
+      currentUnit: {},
+      schedule: { isButtonTrial: true },
+    })).to.equal(false);
+
+    expect(shouldUseScheduleButtonTrial({
+      currentUnit: { assessmentsession: {} },
+      schedule: { isButtonTrial: false },
+    })).to.equal(false);
   });
 });

@@ -72,6 +72,7 @@ Make a new in-repo component feel like a small package:
    History logging now resolves schedule-vs-model trial index state through a tested helper before filling the history row, keeping live schedule display order policy local and explicit.
    Selected-card export now resolves schedule live-display question index through a named helper before card payload construction, so resume/start logic cannot silently reuse stale machine counters for fixed schedule positions.
    Resume history reconstruction now resolves learning-vs-assessment routes through `assessmentResume.ts`, so resume orchestration consumes explicit history, schedule-artifact, and instruction-skip policy instead of branching directly on authored `learningsession`/`assessmentsession` shapes.
+   Card payload button-trial construction now asks a named schedule policy before reading assessment schedule state, keeping assessment-session gating out of the payload assembly branch.
 
 ## Pause/Resume Checkpoint
 

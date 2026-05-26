@@ -66,6 +66,17 @@ type RuntimeDeliverySettings = Record<string, unknown> & {
   videoUrl?: string;
 };
 
+type ScheduleButtonTrialArtifact = {
+  isButtonTrial?: unknown;
+};
+
+export function shouldUseScheduleButtonTrial(params: {
+  currentUnit?: TdfUnitLike | null | undefined;
+  schedule?: ScheduleButtonTrialArtifact | null | undefined;
+}): boolean {
+  return Boolean(params.currentUnit?.assessmentsession && params.schedule?.isButtonTrial);
+}
+
 export function resolveCardPayloadDeliverySettings(params: {
   baseDeliverySettings: RuntimeDeliverySettings;
   existingDeliverySettings?: RuntimeDeliverySettings | null | undefined;
@@ -378,9 +389,10 @@ export function buildCardDataFromResolvedTrial(params: {
   ) {
     buttonTrial = true;
   } else {
-    const currentUnitUsesSchedule = Boolean(curUnit?.assessmentsession);
-    const schedule = currentUnitUsesSchedule ? Session.get('schedule') : null;
-    if (schedule?.isButtonTrial) {
+    if (shouldUseScheduleButtonTrial({
+      currentUnit: curUnit,
+      schedule: Session.get('schedule') as ScheduleButtonTrialArtifact | null | undefined,
+    })) {
       buttonTrial = true;
     }
   }
