@@ -1,5 +1,8 @@
 import { expect } from 'chai';
 import { defaultLearningComponentCatalog } from '../../learning-components/defaultLearningComponentCatalog';
+import { sampleEchoUnitComponentManifest } from '../../learning-components/samples/echo-unit/manifest';
+import { SAMPLE_ECHO_UNIT_TYPE } from '../../learning-components/samples/echo-unit/EchoUnitEngine';
+import type { CreateUnitEngineDeps } from '../../learning-components/units/createUnitEngine';
 import {
   combineLearningComponentCatalogs,
   createLearningComponentCatalog,
@@ -128,6 +131,39 @@ describe('Learning component catalog', function() {
         trialDisplayManifests: [],
       }),
     ])).to.throw('Unit type "sample" is declared more than once in the catalog');
+  });
+
+  it('extends the default catalog with an approved sample package without mutating defaults', function() {
+    const defaultSummary = summarizeLearningComponentCatalog(defaultLearningComponentCatalog);
+    const extensionCatalog = createLearningComponentCatalog<CreateUnitEngineDeps>({
+      unitManifests: [sampleEchoUnitComponentManifest as unknown as LearningComponentManifest<CreateUnitEngineDeps>],
+      trialDisplayManifests: [],
+    });
+
+    const extendedSummary = summarizeLearningComponentCatalog(
+      combineLearningComponentCatalogs([
+        defaultLearningComponentCatalog,
+        extensionCatalog,
+      ]),
+    );
+
+    expect(defaultSummary.units.map((manifest) => manifest.id))
+      .not.to.include(sampleEchoUnitComponentManifest.id);
+    expect(extendedSummary.units.map((manifest) => manifest.id))
+      .to.include(sampleEchoUnitComponentManifest.id);
+    expect(extendedSummary.units.find((manifest) => manifest.id === sampleEchoUnitComponentManifest.id))
+      .to.deep.equal({
+        id: sampleEchoUnitComponentManifest.id,
+        kind: 'unit',
+        unitTypes: [SAMPLE_ECHO_UNIT_TYPE],
+        displayTypes: [],
+        requiredCapabilities: ['logging'],
+      });
+
+    expect(() => combineLearningComponentCatalogs([
+      defaultLearningComponentCatalog,
+      defaultLearningComponentCatalog,
+    ])).to.throw('Learning component "mofacts.instruction-unit" is declared more than once in the catalog');
   });
 
   it('rejects duplicate component ids across unit and trial-display catalog entries', function() {

@@ -32,6 +32,7 @@ Make a new in-repo component feel like a small package:
 
 3. Add a small approved-catalog extension test.
    Compose the default catalog with the sample echo package using `combineLearningComponentCatalogs`, prove duplicate detection still fires, and prove the default runtime catalog is unchanged unless explicitly extended.
+   Initial slice: `mofacts/common/learningComponentCatalog.test.ts` now covers default-catalog plus sample-package composition, verifies the sample is absent from defaults, and verifies duplicate default catalog composition fails clearly.
 
 ## Invariants
 
