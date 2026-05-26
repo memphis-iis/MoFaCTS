@@ -60,7 +60,10 @@
     selfHostedH5PTrialDisplayOwnsInteraction,
   } from '../services/h5pTrialDisplay';
   import { buildLearningProgressPanelSnapshot } from '../services/learningProgressPanel';
-  import { resolveSessionSurfaceState } from '../services/sessionSurfaceMode';
+  import {
+    resolveSessionSurfaceLaunchCompletion,
+    resolveSessionSurfaceState,
+  } from '../services/sessionSurfaceMode';
   import { CardStore } from '../../modules/cardStore';
   import LearningProgressPanel from './LearningProgressPanel.svelte';
   import AutoTutorSession from './AutoTutorSession.svelte';
@@ -1606,19 +1609,19 @@
       sessionUnitModeVersion += 1;
       initializedForRender = true;
       await tick();
-      if (Session.get('currentTdfUnit')?.autotutorsession && isLaunchLoadingActive()) {
+      const launchCompletion = resolveSessionSurfaceLaunchCompletion({
+        surfaceState: sessionSurfaceState,
+        isLaunchLoadingActive: isLaunchLoadingActive(),
+        showVideoInstructionOverlay,
+        videoPlayerReady,
+      });
+      if (launchCompletion) {
         await waitForBrowserPaint();
-        markLaunchLoadingTiming('autoTutorUnit:rendered');
-        finishLaunchLoading('autotutor-unit-rendered');
-        return;
-      }
-      if (Session.get('currentTdfUnit')?.videosession && isLaunchLoadingActive()) {
-        await waitForBrowserPaint();
-        markLaunchLoadingTiming('videoUnit:rendered', {
-          showVideoInstructionOverlay,
-          videoPlayerReady,
-        });
-        finishLaunchLoading('video-unit-rendered');
+        markLaunchLoadingTiming(launchCompletion.timingName, launchCompletion.timingData);
+        finishLaunchLoading(launchCompletion.finishReason);
+        if (launchCompletion.stopInitialization) {
+          return;
+        }
       }
 
       if (typeof window !== 'undefined') {
@@ -1793,7 +1796,7 @@
   let videoPlayer;
   let videoCheckpoints = null;
   let videoResumeAnchor = null;
-  $: videoSession = Session.get('currentTdfUnit')?.videosession;
+  $: videoSession = currentTdfUnit?.videosession;
   $: videoResumeAnchor = Session.get('videoResumeAnchor');
   $: preventScrubbingEnabled = normalizeVideoBoolean(videoSession?.preventScrubbing);
   $: rewindOnIncorrectEnabled = normalizeVideoBoolean(videoSession?.rewindOnIncorrect);

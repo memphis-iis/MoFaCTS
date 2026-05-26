@@ -1,5 +1,8 @@
 import { expect } from 'chai';
-import { resolveSessionSurfaceState } from './sessionSurfaceMode';
+import {
+  resolveSessionSurfaceLaunchCompletion,
+  resolveSessionSurfaceState,
+} from './sessionSurfaceMode';
 
 describe('session surface mode', function() {
   it('uses the standard card surface when no specialized session is active', function() {
@@ -31,6 +34,48 @@ describe('session surface mode', function() {
       isAutoTutorSession: true,
       isVideoSession: true,
       mode: 'autotutor',
+    });
+  });
+
+  it('does not complete launch loading for the standard card surface', function() {
+    expect(resolveSessionSurfaceLaunchCompletion({
+      surfaceState: resolveSessionSurfaceState({}),
+      isLaunchLoadingActive: true,
+    })).to.equal(null);
+  });
+
+  it('does not complete launch loading when no launch overlay is active', function() {
+    expect(resolveSessionSurfaceLaunchCompletion({
+      surfaceState: resolveSessionSurfaceState({ sessionUnitType: 'autotutor' }),
+      isLaunchLoadingActive: false,
+    })).to.equal(null);
+  });
+
+  it('describes AutoTutor launch completion as a terminal render action', function() {
+    expect(resolveSessionSurfaceLaunchCompletion({
+      surfaceState: resolveSessionSurfaceState({ sessionUnitType: 'autotutor' }),
+      isLaunchLoadingActive: true,
+    })).to.deep.equal({
+      timingName: 'autoTutorUnit:rendered',
+      finishReason: 'autotutor-unit-rendered',
+      stopInitialization: true,
+    });
+  });
+
+  it('describes video launch completion while allowing card initialization to continue', function() {
+    expect(resolveSessionSurfaceLaunchCompletion({
+      surfaceState: resolveSessionSurfaceState({ currentTdfUnit: { videosession: {} } }),
+      isLaunchLoadingActive: true,
+      showVideoInstructionOverlay: true,
+      videoPlayerReady: false,
+    })).to.deep.equal({
+      timingName: 'videoUnit:rendered',
+      finishReason: 'video-unit-rendered',
+      timingData: {
+        showVideoInstructionOverlay: true,
+        videoPlayerReady: false,
+      },
+      stopInitialization: false,
     });
   });
 });
