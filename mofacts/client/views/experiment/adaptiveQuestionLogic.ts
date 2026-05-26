@@ -1,5 +1,6 @@
 import { meteorCallAsync, clientConsole } from "../../index";
 import { KC_MULTIPLE } from "../../../common/Definitions";
+import { applyAdaptiveAssessmentTemplateSchedule } from "./assessmentAdaptiveSchedule";
 import {
     appendAdaptiveVideoCheckpoints,
     appendAdaptiveVideoQuestions,
@@ -291,14 +292,11 @@ export class AdaptiveQuestionLogic {
             alert(`There was an error building the unit. Please contact the administrator`);
             throw new Error('Unit template not found');
         }
-        if(newUnit.assessmentsession){
-            newUnit.assessmentsession.clusterlist = ""
-            for(const item of this.schedule){
-                let cluster = item.clusterIndex;
-                newUnit.assessmentsession.clusterlist += cluster + " ";
-            }
-            newUnit.assessmentsession.clusterlist = newUnit.assessmentsession.clusterlist.trim();
-        } else {
+        const assessmentScheduleApplied = applyAdaptiveAssessmentTemplateSchedule({
+            unit: newUnit,
+            schedule: this.schedule,
+        });
+        if(!assessmentScheduleApplied){
             applyAdaptiveVideoTemplateSchedule({
                 unit: newUnit,
                 schedule: this.schedule,

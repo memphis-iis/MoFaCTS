@@ -75,6 +75,7 @@ Make a new in-repo component feel like a small package:
    Card payload button-trial construction now asks a named schedule policy before reading assessment schedule state, keeping assessment-session gating out of the payload assembly branch.
    Svelte launch engine reuse/reinitialization now resolves through a tested app launch policy helper, keeping unit-type/context comparison out of the bootstrap orchestration.
    Legacy instruction continue now resolves instruction-only advance/dashboard behavior through a tested policy helper, leaving the template flow to apply the route/session/state decision.
+   Adaptive assessment template cluster-list mutation now lives behind `assessmentAdaptiveSchedule.ts`, mirroring the video-owned adaptive schedule helper and keeping authored `assessmentsession` writes out of `AdaptiveQuestionLogic`.
 
 ## Pause/Resume Checkpoint
 
