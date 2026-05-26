@@ -51,6 +51,7 @@
     isPreparedAdvanceWaitState as isPreparedAdvanceWaitSnapshot,
   } from '../services/trialDisplayState';
   import { createVideoMachineBridge } from '../services/videoMachineBridge';
+  import { resolveVideoPlaybackPolicy } from '../services/videoCardInit';
   import { waitForBrowserPaint } from '../utils/paintTiming';
   import { deriveSrStatus } from '../utils/srStatus';
   import { getMainTimeoutMs, getFeedbackTimeoutMs } from '../utils/timeoutUtils';
@@ -156,10 +157,6 @@
       ? snapshot.matches
       : (state) => state === value;
     return { value, context, matches };
-  }
-
-  function normalizeVideoBoolean(value) {
-    return value === true || value === 'true' || value === 1 || value === '1';
   }
 
   function parsePositiveNumber(value) {
@@ -1808,11 +1805,11 @@
   let videoPlayer;
   let videoCheckpoints = null;
   let videoResumeAnchor = null;
-  $: videoSession = currentTdfUnit?.videosession;
   $: videoResumeAnchor = Session.get('videoResumeAnchor');
-  $: preventScrubbingEnabled = normalizeVideoBoolean(videoSession?.preventScrubbing);
-  $: rewindOnIncorrectEnabled = normalizeVideoBoolean(videoSession?.rewindOnIncorrect);
-  $: repeatQuestionsSinceCheckpointEnabled = normalizeVideoBoolean(videoSession?.repeatQuestionsSinceCheckpoint);
+  $: videoPlaybackPolicy = resolveVideoPlaybackPolicy(currentTdfUnit?.videosession);
+  $: preventScrubbingEnabled = videoPlaybackPolicy.preventScrubbing;
+  $: rewindOnIncorrectEnabled = videoPlaybackPolicy.rewindOnIncorrect;
+  $: repeatQuestionsSinceCheckpointEnabled = videoPlaybackPolicy.repeatQuestionsSinceCheckpoint;
   $: if (videoMachineBridge.hasPendingResume() && videoPlayer && state.matches('videoWaiting')) {
     void videoMachineBridge.flushPendingResume('reactive-ready');
   }

@@ -64,6 +64,7 @@ Make a new in-repo component feel like a small package:
    Legacy instructions continue now uses the shared `resolveUnitEngineTypeForUnit` unit-shape resolver instead of branching directly on session fields to identify instruction-only units.
    Adaptive video question insertion, question-time mutation, and adaptive checkpoint mutation now live in `mofacts/client/views/experiment/videoAdaptiveQuestions.ts`, leaving `AdaptiveQuestionLogic` to evaluate rules and hand video-session mutations to a tested video-owned boundary.
    Svelte card initialization-failure diagnostics now ask `sessionSurfaceMode.ts` for the session diagnostic cluster list instead of reading learning/video/assessment unit shapes inline.
+   Video playback policy flags for scrubbing, rewind, and checkpoint-repeat behavior now resolve through `videoCardInit.ts`, keeping `CardScreen.svelte` from normalizing authored `videosession` fields directly.
 
 ## Pause/Resume Checkpoint
 

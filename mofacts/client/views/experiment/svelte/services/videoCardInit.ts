@@ -24,6 +24,8 @@ export interface VideoSessionLike extends UnknownRecord {
   checkpointQuestions?: unknown;
   checkpointBehavior?: unknown;
   checkpoints?: VideoCheckpointLike[];
+  preventScrubbing?: unknown;
+  repeatQuestionsSinceCheckpoint?: unknown;
   rewindOnIncorrect?: unknown;
 }
 
@@ -40,6 +42,14 @@ const VIDEO_CHECKPOINT_BEHAVIORS = new Set(['none', 'pause', 'all', 'some', 'ada
 
 export function normalizeVideoBoolean(value: unknown): boolean {
   return value === true || value === 'true' || value === 1 || value === '1';
+}
+
+export function resolveVideoPlaybackPolicy(videoSession: VideoSessionLike | null | undefined) {
+  return {
+    preventScrubbing: normalizeVideoBoolean(videoSession?.preventScrubbing),
+    repeatQuestionsSinceCheckpoint: normalizeVideoBoolean(videoSession?.repeatQuestionsSinceCheckpoint),
+    rewindOnIncorrect: normalizeVideoBoolean(videoSession?.rewindOnIncorrect),
+  };
 }
 
 export function parseVideoCheckpointBehavior(value: unknown): VideoCheckpointBehavior {
