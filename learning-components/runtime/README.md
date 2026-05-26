@@ -9,6 +9,7 @@ Belongs here:
 - `LearningComponentContext` and related interfaces.
 - Learning component manifests.
 - Component-level runtime events.
+- Trial-display adapters that declare interaction ownership and normalization contracts.
 
 Does not belong here:
 

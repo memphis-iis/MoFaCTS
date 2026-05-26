@@ -49,7 +49,7 @@ Documentation note: this is a developer-facing planning document and now lives u
    Initial slice: `TrialDisplayAdapterRegistry` now provides a framework-neutral registry for display-owned interaction types such as H5P. A display adapter declares `displayType`, required capabilities, ownership detection, display normalization, and optional result normalization.
 
 8. Register H5P as a trial-display component.
-   Initial slice: `mofacts/common/h5pTrialDisplayAdapter.ts` now maps the existing H5P display/result contracts into the trial-display registry through a `trial-display` component manifest. `mofacts/common/defaultTrialDisplayComponents.ts` bootstraps the default H5P adapter, and H5P history normalization resolves the adapter through the registry. Package import, content storage, asset serving, and history persistence remain app-owned boundaries.
+   Initial slice: `learning-components/trial-displays/h5p/H5PTrialDisplayAdapter.ts` now maps the existing H5P display/result contracts into the trial-display registry through a `trial-display` component manifest. `mofacts/common/h5pTrialDisplayAdapter.ts` remains a compatibility facade for app imports, `mofacts/common/defaultTrialDisplayComponents.ts` bootstraps the default H5P adapter, and H5P history normalization resolves the adapter through the registry. Package import, content storage, asset serving, and history persistence remain app-owned boundaries.
 
 ## Non-Goals For The First Slice
 
@@ -69,3 +69,11 @@ The first modularity slice is complete when a new in-repo sample unit component 
 4. Passing registry and unit creation tests without editing the core unit factory logic beyond the bootstrap import.
 
 Current evidence: `mofacts/common/learningComponentManifest.test.ts` proves the registry/manifest side with a sample unit and no core factory edits, and proves the AutoTutor placeholder is now provided by its own unit component manifest. `mofacts/common/registerLearningComponents.test.ts` proves shared manifest-list bootstrapping, duplicate declaration checks, and all-or-nothing preflight before registry mutation. A production sample module under `learning-components/` can now follow that pattern; the remaining future hardening is to expose package discovery/loading for external component bundles instead of importing each in-repo manifest from a central default list.
+
+## Next Modularity Pass
+
+1. Define a small component catalog API that combines unit and trial-display manifests without each app bootstrap owning its own default list shape.
+2. Add one production-quality sample component package under `learning-components/` that includes its manifest, unit or display implementation, fixtures, and tests.
+3. Replace central imports one at a time with catalog entries, preserving the compatibility facades until app imports are retired.
+4. Expand capability interfaces only when a real component needs them, and fail manifest registration when those capabilities are absent.
+5. After in-repo component packaging is stable, evaluate controlled package discovery for approved local component bundles. Do not introduce arbitrary dynamic code loading before manifest validation, capability validation, and test fixtures are crisp.
