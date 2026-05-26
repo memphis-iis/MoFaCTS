@@ -82,6 +82,7 @@ Make a new in-repo component feel like a small package:
    Multi-TDF launch lock behavior now resolves through a shared launch policy helper, so dashboard and direct launch paths no longer duplicate authored-shape unit-type detection.
    Unit-engine service now names seamless model prepared-advance eligibility and model card-ref export before composing them into prepared-advance and post-answer state publication.
    Current testing helpers now ask the learning-session runtime-config owner for the active learning cluster-list source instead of reading `learningsession.clusterlist` directly.
+   Assessment, video, and instruction unit packages now each have package READMEs naming component-owned behavior, app-owned boundaries, and manifest capability expectations.
 
 ## Pause/Resume Checkpoint
 
