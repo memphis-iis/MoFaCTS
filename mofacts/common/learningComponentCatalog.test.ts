@@ -2,7 +2,11 @@ import { expect } from 'chai';
 import { defaultLearningComponentCatalog } from '../../learning-components/defaultLearningComponentCatalog';
 import { sampleEchoUnitComponentManifest } from '../../learning-components/samples/echo-unit/manifest';
 import { SAMPLE_ECHO_UNIT_TYPE } from '../../learning-components/samples/echo-unit/EchoUnitEngine';
-import type { CreateUnitEngineDeps } from '../../learning-components/units/createUnitEngine';
+import {
+  getCreateUnitEngineServerMethodSet,
+  getCreateUnitEngineCapabilitySet,
+  type CreateUnitEngineDeps,
+} from '../../learning-components/units/createUnitEngine';
 import {
   combineLearningComponentCatalogs,
   createLearningComponentCatalog,
@@ -12,6 +16,60 @@ import {
 import type { LearningComponentManifest } from '../../learning-components/runtime/ComponentManifest';
 
 describe('Learning component catalog', function() {
+  it('derives unit runtime capabilities from the concrete app adapter', function() {
+    const adapter: Partial<CreateUnitEngineDeps> = {
+      getSessionValue: () => undefined,
+      setSessionValue() {},
+      getDeliverySettings: () => ({}),
+      getStimCount: () => 0,
+      getStimCluster: () => ({}),
+      getStimKCBaseForCurrentStimuliSet: () => 0,
+      createAdaptiveQuestionLogic: () => ({}),
+      getExperimentState: () => ({}),
+      hasScheduleArtifactForUnit: () => false,
+      createExperimentState: async () => ({}),
+      reconstructLearningStateFromHistory: () => ({}),
+      serverMethods: {
+        getAutoTutorHistoryForUnit: async () => [],
+        getLearningHistoryForUnit: async () => [],
+        getResponseKCMapForTdf: async () => ({}),
+      },
+      currentUserHasRole: () => false,
+      log() {},
+      alertUser() {},
+    };
+
+    expect([...getCreateUnitEngineCapabilitySet(adapter)].sort()).to.deep.equal([
+      'adaptive-model',
+      'assessment-state',
+      'authz',
+      'delivery-settings',
+      'history',
+      'logging',
+      'server-methods',
+      'session',
+      'stimuli',
+      'ui-alerts',
+    ]);
+
+    const { serverMethods: _serverMethods, ...adapterWithoutServerMethods } = adapter;
+    expect([...getCreateUnitEngineCapabilitySet(adapterWithoutServerMethods)].sort())
+      .not.to.include('server-methods');
+    expect([...getCreateUnitEngineServerMethodSet(adapter)].sort()).to.deep.equal([
+      'getAutoTutorHistoryForUnit',
+      'getLearningHistoryForUnit',
+      'getResponseKCMapForTdf',
+    ]);
+    expect([...getCreateUnitEngineServerMethodSet(adapterWithoutServerMethods)].sort()).to.deep.equal([]);
+
+    expect([...getCreateUnitEngineCapabilitySet({
+      ...adapter,
+      serverMethods: {
+        getAutoTutorHistoryForUnit: async () => [],
+      } as any,
+    })].sort()).not.to.include('server-methods');
+  });
+
   it('summarizes unit and trial-display manifests through one package shape', function() {
     const unitManifest: LearningComponentManifest = {
       id: 'sample.unit',
@@ -40,6 +98,7 @@ describe('Learning component catalog', function() {
         unitTypes: ['sample'],
         displayTypes: [],
         requiredCapabilities: ['logging'],
+        requiredServerMethods: [],
       }],
       trialDisplays: [{
         id: 'sample.display',
@@ -47,6 +106,7 @@ describe('Learning component catalog', function() {
         unitTypes: [],
         displayTypes: ['sample-display'],
         requiredCapabilities: ['media'],
+        requiredServerMethods: [],
       }],
     });
   });
@@ -65,7 +125,21 @@ describe('Learning component catalog', function() {
       .to.deep.include({
         id: 'mofacts.autotutor-unit',
         kind: 'unit',
-        requiredCapabilities: ['session', 'stimuli', 'server-methods', 'history', 'logging'],
+        requiredCapabilities: ['history', 'logging', 'server-methods', 'session', 'stimuli'],
+        requiredServerMethods: ['getAutoTutorHistoryForUnit'],
+      });
+    expect(summary.units.find((manifest) => manifest.id === 'mofacts.learning-session-unit'))
+      .to.deep.include({
+        id: 'mofacts.learning-session-unit',
+        kind: 'unit',
+        requiredServerMethods: ['getLearningHistoryForUnit', 'getResponseKCMapForTdf'],
+      });
+    expect(summary.units.find((manifest) => manifest.id === 'mofacts.assessment-session-unit'))
+      .to.deep.include({
+        id: 'mofacts.assessment-session-unit',
+        kind: 'unit',
+        requiredCapabilities: ['assessment-state', 'logging', 'session', 'stimuli', 'ui-alerts'],
+        requiredServerMethods: [],
       });
     expect(summary.trialDisplays).to.deep.equal([{
       id: 'mofacts.h5p-trial-display',
@@ -73,6 +147,7 @@ describe('Learning component catalog', function() {
       unitTypes: [],
       displayTypes: ['h5p'],
       requiredCapabilities: ['history', 'media'],
+      requiredServerMethods: [],
     }]);
   });
 
@@ -117,6 +192,7 @@ describe('Learning component catalog', function() {
         unitTypes: ['sample'],
         displayTypes: [],
         requiredCapabilities: ['logging'],
+        requiredServerMethods: [],
       }],
       trialDisplays: [{
         id: 'sample.display',
@@ -124,6 +200,7 @@ describe('Learning component catalog', function() {
         unitTypes: [],
         displayTypes: ['sample-display'],
         requiredCapabilities: ['media'],
+        requiredServerMethods: [],
       }],
     });
 
@@ -164,12 +241,13 @@ describe('Learning component catalog', function() {
         unitTypes: [SAMPLE_ECHO_UNIT_TYPE],
         displayTypes: [],
         requiredCapabilities: ['logging'],
+        requiredServerMethods: [],
       });
 
     expect(() => combineLearningComponentCatalogs([
       defaultLearningComponentCatalog,
       defaultLearningComponentCatalog,
-    ])).to.throw('Learning component "mofacts.instruction-unit" is declared more than once in the catalog');
+    ])).to.throw('is declared more than once in the catalog');
   });
 
   it('rejects duplicate component ids across unit and trial-display catalog entries', function() {

@@ -124,6 +124,7 @@ function getHistory(history: any) {
     'CF (Video Previous Speed)': history.CFVideoPreviousSpeed,
     'CF (Video Previous Volume)': history.CFVideoPreviousVolume,
     'CF (Video Is Playing)': history.CFVideoIsPlaying,
+    'History Schema Version': history.historySchemaVersion,
     'Feedback Text': history.feedbackText,
     'Feedback Classification': history.feedbackType,
     'Event Type': history.eventType,

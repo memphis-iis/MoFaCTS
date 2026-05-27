@@ -6,6 +6,7 @@ import sinon from 'sinon';
 import StubCollections from 'meteor/hwillson:stub-collections';
 import { Random } from 'meteor/random';
 import { expect } from 'chai';
+import { compressHistoryRecord } from '../common/historyCompression';
 
 const MeteorAny = Meteor as any;
 const MeteorUsersAny = Meteor.users as any;
@@ -26,6 +27,29 @@ const AuthThrottleStateAny = (globalThis as any).AuthThrottleState as any;
 const PasswordResetTokensAny = (globalThis as any).PasswordResetTokens as any;
 
 (Meteor.settings as any).auth.requireEmailVerification = false;
+
+function createServerHistoryRecord(overrides: Record<string, unknown> = {}) {
+  return compressHistoryRecord({
+    historySchemaVersion: 1,
+    userId: 'current-user',
+    TDFId: 'history-root',
+    anonStudentId: 'student-1',
+    sessionID: 'session-1',
+    levelUnit: 0,
+    levelUnitType: 'model',
+    time: 2000,
+    problemStartTime: 1000,
+    selection: 'answer',
+    action: 'respond',
+    outcome: 'correct',
+    typeOfResponse: 'text',
+    responseValue: 'answer',
+    input: 'answer',
+    displayedStimulus: { text: 'Prompt' },
+    eventType: '',
+    ...overrides,
+  });
+}
 
 StubCollections.stub(AuditLogAny);
 StubCollections.stub(AssignmentsAny);
@@ -837,6 +861,91 @@ describe('condition count method authorization', function() {
     }
   });
 
+  it('rejects non-canonical history envelopes before writing', async function() {
+    try {
+      await (asyncMethods.insertHistory as any).call({ userId: 'current-user' }, {
+        userId: 'current-user',
+        TDFId: 'history-incomplete',
+      });
+      expect.fail('Expected incomplete history insertion to be rejected');
+    } catch (error: any) {
+      expect(error.error).to.equal(400);
+      expect(error.reason).to.contain('History record missing canonical core fields');
+    }
+
+    const insertedHistory = await HistoriesAny.findOneAsync({
+      userId: 'current-user',
+      TDFId: 'history-incomplete',
+    });
+    expect(insertedHistory).to.equal(undefined);
+  });
+
+  it('rejects oversized history wire payloads before writing', async function() {
+    try {
+      await (asyncMethods.insertHistory as any).call(
+        { userId: 'current-user' },
+        createServerHistoryRecord({
+          TDFId: 'history-oversized',
+          CFNote: 'x'.repeat(40 * 1024),
+        })
+      );
+      expect.fail('Expected oversized history insertion to be rejected');
+    } catch (error: any) {
+      expect(error.error).to.equal(400);
+      expect(error.reason).to.contain('History wire payload exceeds');
+    }
+
+    const insertedHistory = await HistoriesAny.findOneAsync({
+      userId: 'current-user',
+      TDFId: 'history-oversized',
+    });
+    expect(insertedHistory).to.equal(undefined);
+  });
+
+  it('rejects unsupported history schema versions before writing', async function() {
+    try {
+      await (asyncMethods.insertHistory as any).call(
+        { userId: 'current-user' },
+        createServerHistoryRecord({
+          TDFId: 'history-unsupported-version',
+          historySchemaVersion: 2,
+        })
+      );
+      expect.fail('Expected unsupported history schema version to be rejected');
+    } catch (error: any) {
+      expect(error.error).to.equal(400);
+      expect(error.reason).to.equal('History record historySchemaVersion must be 1');
+    }
+
+    const insertedHistory = await HistoriesAny.findOneAsync({
+      userId: 'current-user',
+      TDFId: 'history-unsupported-version',
+    });
+    expect(insertedHistory).to.equal(undefined);
+  });
+
+  it('rejects oversized history extension fields before writing', async function() {
+    try {
+      await (asyncMethods.insertHistory as any).call(
+        { userId: 'current-user' },
+        createServerHistoryRecord({
+          TDFId: 'history-extension-oversized',
+          CFNote: 'x'.repeat(20 * 1024),
+        })
+      );
+      expect.fail('Expected oversized history extension insertion to be rejected');
+    } catch (error: any) {
+      expect(error.error).to.equal(400);
+      expect(error.reason).to.contain('History extension field CFNote exceeds');
+    }
+
+    const insertedHistory = await HistoriesAny.findOneAsync({
+      userId: 'current-user',
+      TDFId: 'history-extension-oversized',
+    });
+    expect(insertedHistory).to.equal(undefined);
+  });
+
   it('allows regular TDF history insertion when experiment state currentTdfId is the root', async function() {
     await TdfsAny.insertAsync({
       _id: 'history-regular',
@@ -861,16 +970,17 @@ describe('condition count method authorization', function() {
       },
     });
 
-    await (asyncMethods.insertHistory as any).call({ userId: 'current-user' }, {
-      userId: 'current-user',
-      TDFId: 'history-regular',
-    });
+    await (asyncMethods.insertHistory as any).call(
+      { userId: 'current-user' },
+      createServerHistoryRecord({ TDFId: 'history-regular' })
+    );
 
     const insertedHistory = await HistoriesAny.findOneAsync({
       userId: 'current-user',
       TDFId: 'history-regular',
     }) as any;
     expect(insertedHistory).to.exist;
+    expect(insertedHistory.historySchemaVersion).to.equal(1);
   });
 
   it('allows history insertion for a condition assigned in root experiment state', async function() {
@@ -925,10 +1035,10 @@ describe('condition count method authorization', function() {
       },
     });
 
-    await (asyncMethods.insertHistory as any).call({ userId: 'current-user' }, {
-      userId: 'current-user',
-      TDFId: 'history-condition',
-    });
+    await (asyncMethods.insertHistory as any).call(
+      { userId: 'current-user' },
+      createServerHistoryRecord({ TDFId: 'history-condition' })
+    );
 
     const insertedHistory = await HistoriesAny.findOneAsync({
       userId: 'current-user',
@@ -988,10 +1098,10 @@ describe('condition count method authorization', function() {
       },
     });
 
-    await (asyncMethods.insertHistory as any).call({ userId: 'current-user' }, {
-      userId: 'current-user',
-      TDFId: 'history-condition',
-    });
+    await (asyncMethods.insertHistory as any).call(
+      { userId: 'current-user' },
+      createServerHistoryRecord({ TDFId: 'history-condition' })
+    );
 
     const insertedHistory = await HistoriesAny.findOneAsync({
       userId: 'current-user',

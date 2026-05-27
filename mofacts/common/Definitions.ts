@@ -71,6 +71,7 @@ export const outputFields = [
   'CF (Video Previous Speed)',
   'CF (Video Previous Volume)',
   'CF (Video Is Playing)',
+  'History Schema Version',
   'Event Type',
 ];
 
@@ -148,5 +149,6 @@ export const HISTORY_KEY_MAP: Record<string, string> = {
   '69': 'CFVideoPreviousSpeed',
   '70': 'CFVideoPreviousVolume',
   '71': 'CFVideoIsPlaying',
-  '72': 'CFVideoAction'
+  '72': 'CFVideoAction',
+  '73': 'historySchemaVersion'
 };

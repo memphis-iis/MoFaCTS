@@ -89,7 +89,6 @@ import {
   type MethodAuthorizationDeps,
 } from './lib/methodAuthorization';
 import { encryptData, decryptData } from './lib/encryption';
-import { HISTORY_KEY_MAP } from '../common/Definitions';
 
 const MeteorAny = Meteor as any;
 
@@ -425,7 +424,6 @@ const analyticsMethods = createAnalyticsMethods({
   getClassPerformanceByTdfWorkflow,
   getStimuliSetById,
   hasMeaningfulProgressSignal,
-  HISTORY_KEY_MAP,
 });
 
 const {

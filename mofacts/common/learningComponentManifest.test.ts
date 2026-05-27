@@ -122,6 +122,71 @@ describe('Learning component manifests', function() {
       requiredCapabilities: ['database'] as unknown as LearningComponentCapability[],
       register() {},
     })).to.throw('Learning component "sample.capabilities" requires unknown capability: database');
+
+    expect(() => validateLearningComponentManifest({
+      id: 'sample.capabilities',
+      kind: 'unit',
+      unitTypes: ['sample'],
+      requiredCapabilities: ['logging'],
+      requiredServerMethods: ['getLearningHistoryForUnit'],
+      register() {},
+    })).to.throw('Learning component "sample.capabilities" declares requiredServerMethods without server-methods capability');
+  });
+
+  it('rejects duplicate normalized manifest declarations', function() {
+    expect(() => validateLearningComponentManifest({
+      id: 'sample.duplicates',
+      kind: 'unit',
+      unitTypes: ['sample'],
+      requiredCapabilities: ['logging', 'logging'],
+      register() {},
+    })).to.throw('Learning component "sample.duplicates" declares duplicate required capability: logging');
+
+    expect(() => validateLearningComponentManifest({
+      id: 'sample.duplicates',
+      kind: 'unit',
+      unitTypes: ['sample'],
+      requiredCapabilities: ['server-methods'],
+      requiredServerMethods: ['getHistory', ' getHistory '],
+      register() {},
+    })).to.throw('Learning component "sample.duplicates" declares duplicate required server method: getHistory');
+
+    expect(() => validateLearningComponentManifest({
+      id: 'sample.duplicates',
+      kind: 'unit',
+      unitTypes: ['sample', ' sample '],
+      requiredCapabilities: [],
+      register() {},
+    })).to.throw('Learning component "sample.duplicates" declares duplicate unit type: sample');
+
+    expect(() => validateLearningComponentManifest({
+      id: 'sample.duplicates',
+      kind: 'trial-display',
+      displayTypes: ['h5p', ' h5p '],
+      requiredCapabilities: [],
+      register() {},
+    })).to.throw('Learning component "sample.duplicates" declares duplicate display type: h5p');
+  });
+
+  it('fails clearly when required named server methods are missing', function() {
+    const manifest: LearningComponentManifest = {
+      id: 'sample.component',
+      kind: 'unit',
+      unitTypes: ['sample'],
+      requiredCapabilities: ['server-methods'],
+      requiredServerMethods: ['getLearningHistoryForUnit'],
+      register() {},
+    };
+
+    expect(() => registerLearningComponent(manifest, {
+      ...createContext(['server-methods']),
+      serverMethods: new Set(),
+    })).to.throw('Learning component "sample.component" requires missing server methods: getLearningHistoryForUnit');
+
+    expect(() => registerLearningComponent(manifest, {
+      ...createContext(['server-methods']),
+      serverMethods: new Set(['getLearningHistoryForUnit']),
+    })).not.to.throw();
   });
 
   it('fails clearly when required runtime capabilities are missing', function() {
@@ -199,6 +264,7 @@ describe('Learning component manifests', function() {
   it('keeps the AutoTutor unit behind its own component manifest', async function() {
     registerLearningComponent(autoTutorUnitComponentManifest, {
       capabilities: new Set<LearningComponentCapability>(['session', 'stimuli', 'server-methods', 'history', 'logging']),
+      serverMethods: new Set(['getAutoTutorHistoryForUnit']),
       registerUnitEngine,
       registerUnitEngineWithDeps,
       registerTrialDisplayAdapter() {

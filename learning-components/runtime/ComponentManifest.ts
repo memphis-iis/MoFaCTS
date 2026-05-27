@@ -26,6 +26,7 @@ const knownLearningComponentCapabilities = new Set<string>(learningComponentCapa
 
 export type LearningComponentRuntimeContext<TDeps = unknown> = {
   readonly capabilities: ReadonlySet<LearningComponentCapability>;
+  readonly serverMethods?: ReadonlySet<string>;
   registerUnitEngine(unitType: string, factory: UnitEngineFactory): void;
   registerUnitEngineWithDeps(unitType: string, factory: UnitEngineFactoryWithDeps<TDeps>): void;
   registerTrialDisplayAdapter(adapter: TrialDisplayAdapter): void;
@@ -37,6 +38,7 @@ export type LearningComponentManifest<TDeps = unknown> = {
   readonly unitTypes?: readonly string[];
   readonly displayTypes?: readonly string[];
   readonly requiredCapabilities: readonly LearningComponentCapability[];
+  readonly requiredServerMethods?: readonly string[];
   register(context: LearningComponentRuntimeContext<TDeps>): void;
 };
 
@@ -52,19 +54,53 @@ function hasAnyEntries(value: unknown): boolean {
   return Array.isArray(value) && value.length > 0;
 }
 
+function assertUniqueNormalizedEntries(
+  entries: readonly unknown[],
+  normalizeLabel: string,
+  duplicateLabel: string,
+): string[] {
+  const seen = new Set<string>();
+  return entries.map((entry) => {
+    const normalized = normalizeNonEmpty(entry, normalizeLabel);
+    if (seen.has(normalized)) {
+      throw new Error(`${duplicateLabel}: ${normalized}`);
+    }
+    seen.add(normalized);
+    return normalized;
+  });
+}
+
 function validateRequiredCapabilities(manifest: LearningComponentManifest): void {
   if (!Array.isArray(manifest.requiredCapabilities)) {
     throw new Error(`Learning component "${manifest.id}" must declare requiredCapabilities as an array`);
   }
-  for (const capability of manifest.requiredCapabilities) {
-    const normalizedCapability = normalizeNonEmpty(
-      capability,
-      `Learning component "${manifest.id}" required capability`,
-    );
+  const normalizedCapabilities = assertUniqueNormalizedEntries(
+    manifest.requiredCapabilities,
+    `Learning component "${manifest.id}" required capability`,
+    `Learning component "${manifest.id}" declares duplicate required capability`,
+  );
+  for (const normalizedCapability of normalizedCapabilities) {
     if (!knownLearningComponentCapabilities.has(normalizedCapability)) {
       throw new Error(`Learning component "${manifest.id}" requires unknown capability: ${normalizedCapability}`);
     }
   }
+}
+
+function validateRequiredServerMethods(manifest: LearningComponentManifest): void {
+  if (manifest.requiredServerMethods === undefined) {
+    return;
+  }
+  if (!Array.isArray(manifest.requiredServerMethods)) {
+    throw new Error(`Learning component "${manifest.id}" must declare requiredServerMethods as an array`);
+  }
+  if (!manifest.requiredCapabilities.includes('server-methods')) {
+    throw new Error(`Learning component "${manifest.id}" declares requiredServerMethods without server-methods capability`);
+  }
+  assertUniqueNormalizedEntries(
+    manifest.requiredServerMethods,
+    `Learning component "${manifest.id}" required server method`,
+    `Learning component "${manifest.id}" declares duplicate required server method`,
+  );
 }
 
 export function validateLearningComponentManifest(manifest: LearningComponentManifest): void {
@@ -73,6 +109,7 @@ export function validateLearningComponentManifest(manifest: LearningComponentMan
     throw new Error(`Unsupported learning component kind: ${String(manifest.kind)}`);
   }
   validateRequiredCapabilities(manifest);
+  validateRequiredServerMethods(manifest);
   if (manifest.kind === 'unit' && (!Array.isArray(manifest.unitTypes) || manifest.unitTypes.length === 0)) {
     throw new Error(`Learning component "${manifest.id}" must declare at least one unit type`);
   }
@@ -80,9 +117,11 @@ export function validateLearningComponentManifest(manifest: LearningComponentMan
     throw new Error(`Learning component "${manifest.id}" is a unit component and must not declare display types`);
   }
   if (manifest.unitTypes) {
-    for (const unitType of manifest.unitTypes) {
-      normalizeNonEmpty(unitType, `Learning component "${manifest.id}" unit type`);
-    }
+    assertUniqueNormalizedEntries(
+      manifest.unitTypes,
+      `Learning component "${manifest.id}" unit type`,
+      `Learning component "${manifest.id}" declares duplicate unit type`,
+    );
   }
   if (manifest.kind === 'trial-display') {
     if (hasAnyEntries(manifest.unitTypes)) {
@@ -91,20 +130,28 @@ export function validateLearningComponentManifest(manifest: LearningComponentMan
     if (!Array.isArray(manifest.displayTypes) || manifest.displayTypes.length === 0) {
       throw new Error(`Learning component "${manifest.id}" must declare at least one display type`);
     }
-    for (const displayType of manifest.displayTypes) {
-      normalizeNonEmpty(displayType, `Learning component "${manifest.id}" display type`);
-    }
+    assertUniqueNormalizedEntries(
+      manifest.displayTypes,
+      `Learning component "${manifest.id}" display type`,
+      `Learning component "${manifest.id}" declares duplicate display type`,
+    );
   }
 }
 
 export function assertLearningComponentCapabilities(
   manifest: LearningComponentManifest,
-  context: Pick<LearningComponentRuntimeContext, 'capabilities'>,
+  context: Pick<LearningComponentRuntimeContext, 'capabilities' | 'serverMethods'>,
 ): void {
   const missing = manifest.requiredCapabilities
     .filter((capability) => !context.capabilities.has(capability));
   if (missing.length > 0) {
     throw new Error(`Learning component "${manifest.id}" requires missing capabilities: ${missing.join(', ')}`);
+  }
+  const missingServerMethods = (manifest.requiredServerMethods ?? [])
+    .map((methodName) => methodName.trim())
+    .filter((methodName) => !context.serverMethods?.has(methodName));
+  if (missingServerMethods.length > 0) {
+    throw new Error(`Learning component "${manifest.id}" requires missing server methods: ${missingServerMethods.join(', ')}`);
   }
 }
 

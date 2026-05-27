@@ -18,6 +18,7 @@ export type LearningComponentManifestSummary = {
   unitTypes: string[];
   displayTypes: string[];
   requiredCapabilities: LearningComponentCapability[];
+  requiredServerMethods: string[];
 };
 
 export function summarizeLearningComponentManifest(
@@ -30,6 +31,7 @@ export function summarizeLearningComponentManifest(
     unitTypes: [...(manifest.unitTypes ?? [])].map((unitType) => unitType.trim()).sort(),
     displayTypes: [...(manifest.displayTypes ?? [])].map((displayType) => displayType.trim()).sort(),
     requiredCapabilities: [...manifest.requiredCapabilities].sort(),
+    requiredServerMethods: [...(manifest.requiredServerMethods ?? [])].map((methodName) => methodName.trim()).sort(),
   };
 }
 

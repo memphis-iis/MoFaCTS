@@ -5,6 +5,8 @@ import {
   requireUserMatchesOrHasRole,
   type MethodAuthorizationDeps,
 } from '../lib/methodAuthorization';
+import { decompressHistoryRecord } from '../../common/historyCompression';
+import { assertCanonicalHistoryEnvelope, validateHistoryWirePayload } from '../../common/historyEnvelope';
 
 type UnknownRecord = Record<string, unknown>;
 type Logger = (...args: unknown[]) => void;
@@ -67,7 +69,6 @@ type AnalyticsMethodsDeps = {
   ) => Promise<unknown>;
   getStimuliSetById: (stimuliSetId: string | number) => Promise<Array<{ clusterKC?: string | number; stimulusKC?: string | number }>>;
   hasMeaningfulProgressSignal: (experimentState: unknown) => boolean;
-  HISTORY_KEY_MAP: Record<string, string>;
 };
 
 const INSERT_HISTORY_TIMING_ENABLED = process.env.MOFACTS_INSERT_HISTORY_TIMING === '1';
@@ -375,18 +376,14 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     if (!historyRecord || typeof historyRecord !== 'object' || Array.isArray(historyRecord)) {
       throw new Meteor.Error(400, 'Invalid history record');
     }
+    try {
+      validateHistoryWirePayload(historyRecord);
+    } catch (error: unknown) {
+      throw new Meteor.Error(400, error instanceof Error ? error.message : String(error));
+    }
 
     const decompressStartTime = Date.now();
-    // Decompress payload from short keys to standard field names
-    const decompressedRecord: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(historyRecord)) {
-      const fieldName = deps.HISTORY_KEY_MAP[key];
-      if (fieldName) {
-        decompressedRecord[fieldName] = value;
-      } else {
-        decompressedRecord[key] = value;
-      }
-    }
+    const decompressedRecord = decompressHistoryRecord(historyRecord);
     const decompressMs = elapsedMsSince(decompressStartTime);
 
     const sanitizeStartTime = Date.now();
@@ -397,6 +394,11 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     const tdfId = deps.normalizeCanonicalId(decompressedRecord.TDFId);
     if (!tdfId) {
       throw new Meteor.Error(400, 'History record requires a TDFId');
+    }
+    try {
+      assertCanonicalHistoryEnvelope(decompressedRecord);
+    } catch (error: unknown) {
+      throw new Meteor.Error(400, error instanceof Error ? error.message : String(error));
     }
     const sanitizeMs = elapsedMsSince(sanitizeStartTime);
 

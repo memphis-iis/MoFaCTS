@@ -2,6 +2,7 @@ import type {
   LearningComponentCapability,
   LearningComponentRuntimeContext,
 } from './ComponentManifest';
+import type { CanonicalHistoryRecord } from './historyEnvelope';
 
 export interface LearningComponentContext {
   getSessionValue(key: string): any;
@@ -26,11 +27,10 @@ export interface MediaRuntime {
 export interface HistoryRuntime<TResult = unknown> {
   normalizeResult(result: unknown, context: unknown): TResult;
   writeResult(result: TResult): Promise<void>;
+  writeCanonicalHistory(record: CanonicalHistoryRecord): Promise<void>;
 }
 
-export interface ServerMethodRuntime {
-  callMethod<T = unknown>(name: string, ...args: unknown[]): Promise<T>;
-}
+export type ServerMethodRuntime = Record<string, (...args: any[]) => Promise<unknown>>;
 
 export interface AuthorizationRuntime {
   currentUserHasRole(role: string): boolean;
@@ -75,12 +75,62 @@ const runtimeCapabilityEntries: readonly [
   ['userAlerts', 'ui-alerts'],
 ];
 
+const runtimeCapabilityFunctionRequirements: Partial<Record<
+  keyof LearningComponentCapabilities,
+  readonly string[]
+>> = {
+  session: ['getSessionValue', 'setSessionValue'],
+  deliverySettings: ['getDeliverySettings'],
+  media: ['resolveMediaUrl'],
+  history: ['normalizeResult', 'writeResult', 'writeCanonicalHistory'],
+  authorization: ['currentUserHasRole'],
+  logger: ['log'],
+  userAlerts: ['alertUser'],
+};
+
+function assertRuntimeCapabilityShape(
+  runtimeKey: keyof LearningComponentCapabilities,
+  value: unknown,
+): void {
+  const requiredFunctions = runtimeCapabilityFunctionRequirements[runtimeKey];
+  if (!requiredFunctions) {
+    if (runtimeKey === 'serverMethods') {
+      if (!value || typeof value !== 'object') {
+        throw new Error('Runtime capability "serverMethods" must be an object');
+      }
+      const methodNames = Object.keys(value as Record<string, unknown>);
+      const nonFunctionNames = methodNames.filter((methodName) =>
+        typeof (value as Record<string, unknown>)[methodName] !== 'function'
+      );
+      if (methodNames.length === 0) {
+        throw new Error('Runtime capability "serverMethods" must expose named method functions');
+      }
+      if (nonFunctionNames.length > 0) {
+        throw new Error(`Runtime capability "serverMethods" has non-function entries: ${nonFunctionNames.join(', ')}`);
+      }
+    }
+    return;
+  }
+  if (!value || typeof value !== 'object') {
+    throw new Error(`Runtime capability "${runtimeKey}" must be an object`);
+  }
+  const missingFunctions = requiredFunctions.filter((functionName) =>
+    typeof (value as Record<string, unknown>)[functionName] !== 'function'
+  );
+  if (missingFunctions.length > 0) {
+    throw new Error(
+      `Runtime capability "${runtimeKey}" is missing required functions: ${missingFunctions.join(', ')}`,
+    );
+  }
+}
+
 export function getLearningComponentCapabilitySet(
   capabilities: LearningComponentCapabilities,
 ): ReadonlySet<LearningComponentCapability> {
   const declared = new Set<LearningComponentCapability>();
   for (const [runtimeKey, manifestCapability] of runtimeCapabilityEntries) {
     if (capabilities[runtimeKey] !== undefined) {
+      assertRuntimeCapabilityShape(runtimeKey, capabilities[runtimeKey]);
       declared.add(manifestCapability);
     }
   }
@@ -89,8 +139,14 @@ export function getLearningComponentCapabilitySet(
 
 export function createLearningComponentRuntimeContext(
   capabilities: LearningComponentCapabilities,
-): Pick<LearningComponentRuntimeContext, 'capabilities'> {
-  return {
+): Pick<LearningComponentRuntimeContext, 'capabilities' | 'serverMethods'> {
+  const context: Pick<LearningComponentRuntimeContext, 'capabilities' | 'serverMethods'> = {
     capabilities: getLearningComponentCapabilitySet(capabilities),
   };
+  if (capabilities.serverMethods) {
+    return Object.assign(context, {
+      serverMethods: new Set(Object.keys(capabilities.serverMethods)),
+    });
+  }
+  return context;
 }

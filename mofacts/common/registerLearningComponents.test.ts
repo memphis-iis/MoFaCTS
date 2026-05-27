@@ -13,6 +13,7 @@ function createContext(capabilities: LearningComponentCapability[] = []): Learni
   const registeredUnitTypes: string[] = [];
   return {
     capabilities: new Set(capabilities),
+    serverMethods: new Set(),
     registerUnitEngine(unitType) {
       registeredUnitTypes.push(unitType);
     },
@@ -49,6 +50,7 @@ describe('registerLearningComponents', function() {
         unitTypes: [],
         displayTypes: ['h5p'],
         requiredCapabilities: ['history', 'media'],
+        requiredServerMethods: [],
       },
       {
         id: 'sample.unit',
@@ -56,8 +58,39 @@ describe('registerLearningComponents', function() {
         unitTypes: ['instruction-only', 'model'],
         displayTypes: [],
         requiredCapabilities: ['logging', 'session'],
+        requiredServerMethods: [],
       },
     ]);
+  });
+
+  it('fails before partial registration when a pending manifest is missing named server methods', function() {
+    const registered: string[] = [];
+    const manifests: LearningComponentManifest[] = [
+      {
+        id: 'sample.ready',
+        kind: 'unit',
+        unitTypes: ['ready'],
+        requiredCapabilities: ['logging'],
+        register() {
+          registered.push('ready');
+        },
+      },
+      {
+        id: 'sample.needs-method',
+        kind: 'unit',
+        unitTypes: ['needs-method'],
+        requiredCapabilities: ['server-methods'],
+        requiredServerMethods: ['getLearningHistoryForUnit'],
+        register() {
+          registered.push('needs-method');
+        },
+      },
+    ];
+    const context = createContext(['logging', 'server-methods']);
+
+    expect(() => registerLearningComponents(manifests, context))
+      .to.throw('Learning component "sample.needs-method" requires missing server methods: getLearningHistoryForUnit');
+    expect(registered).to.deep.equal([]);
   });
 
   it('registers manifest lists through one reusable bootstrap path', function() {
