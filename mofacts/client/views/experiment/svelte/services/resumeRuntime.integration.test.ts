@@ -278,6 +278,36 @@ describe('resume runtime integration seams', function() {
     expect(record.problemStartTime).to.equal(1000);
   });
 
+  it('history record construction fails clearly when display context is missing', function() {
+    expect(() => createHistoryRecord({
+      trialEndTimeStamp: 2000,
+      trialStartTimeStamp: 1000,
+      transactionTimeStamp: 1250,
+      source: 'keyboard',
+      userAnswer: 'alpha',
+      isCorrect: true,
+      testType: 'd',
+      deliverySettings: { feedbackType: 'full' },
+      engine: {
+        unitType: 'schedule',
+        findCurrentCardInfo: () => ({
+          clusterIndex: 0,
+          whichStim: 0,
+          probabilityEstimate: 0.7,
+        }),
+      },
+      currentDisplay: null,
+      buttonList: [],
+      wasButtonTrial: false,
+      questionIndex: 3,
+      answerContext: {
+        originalDisplay: 'Prompt 1',
+        originalAnswer: 'alpha',
+        currentAnswer: 'alpha',
+      },
+    })).to.throw('[History Logging] currentDisplay missing before history write');
+  });
+
   it('historyLoggingService rejects when outcome histories are uninitialized', async function() {
     Session.set('overallOutcomeHistory', undefined);
     Session.set('overallStudyHistory', undefined);

@@ -198,10 +198,6 @@ export async function unitIsFinished(_reason: string): Promise<void> {
           }
         }
       }
-
-      if (engine.adaptiveQuestionLogic.when === Session.get('currentUnitNumber')) {
-        // playerController.addStimToSchedule(curTdfUnit);
-      }
     }
 
     Session.set('currentTdfFile', curTdf);

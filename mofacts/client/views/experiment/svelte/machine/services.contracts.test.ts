@@ -20,7 +20,6 @@ describe('machine services contracts', function() {
     expect(services).to.have.property('prepareIncomingTrialService');
     expect(services).to.have.property('ttsService');
     expect(services).to.have.property('speechRecognitionService');
-    expect(services).to.have.property('videoPlayerService');
     expect(services).to.have.property('evaluateAnswerService');
     expect(services).to.have.property('readyPromptDelayService');
     expect(services).to.have.property('prestimulusDelayService');

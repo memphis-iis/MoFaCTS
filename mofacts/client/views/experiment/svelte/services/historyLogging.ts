@@ -563,8 +563,7 @@ export function createHistoryRecord({
 
   // Clone and fill in display object
   if (!currentDisplay) {
-    clientConsole(1, '[History Logging] currentDisplay is undefined in createHistoryRecord');
-    return {} as HistoryRecord;
+    throw new Error('[History Logging] currentDisplay missing before history write');
   }
   const filledInDisplay = JSON.parse(JSON.stringify(currentDisplay));
   if (filledInDisplay.attribution) {

@@ -11,6 +11,7 @@ export const autoTutorUnitComponentManifest: LearningComponentManifest<CreateUni
   kind: 'unit',
   unitTypes: [AUTO_TUTOR_SESSION_UNIT_TYPE],
   requiredCapabilities: AUTO_TUTOR_UNIT_REQUIRED_CAPABILITIES,
+  requiredServerMethods: ['getAutoTutorHistoryForUnit'],
   register(context) {
     context.registerUnitEngine(AUTO_TUTOR_SESSION_UNIT_TYPE, createAutoTutorUnitEngine);
   },

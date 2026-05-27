@@ -1,4 +1,5 @@
 import type { LearningComponentCapability } from '../../runtime/ComponentManifest';
+import type { CanonicalHistoryRecord } from '../../runtime/historyEnvelope';
 import type {
   ComponentLogger,
   HistoryRuntime,
@@ -37,7 +38,7 @@ export type AutoTutorHistoryTurn = {
   endedAt: number;
 };
 
-export type AutoTutorCompressedHistoryRecord = {
+export type AutoTutorCanonicalHistoryRecord = CanonicalHistoryRecord & {
   itemId: unknown;
   KCId: unknown;
   userId: string | undefined;
@@ -123,7 +124,7 @@ export interface AutoTutorServerMethodsRuntime extends ServerMethodRuntime {
 
 export interface AutoTutorHistoryRuntime extends HistoryRuntime<AutoTutorHistoryTurn> {
   writeAutoTutorTurn(turn: AutoTutorHistoryTurn): Promise<void>;
-  writeCompressedHistory(record: AutoTutorCompressedHistoryRecord): Promise<void>;
+  writeCanonicalHistory(record: AutoTutorCanonicalHistoryRecord): Promise<void>;
 }
 
 export type AutoTutorRuntimeCapabilities = {

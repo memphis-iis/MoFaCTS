@@ -9,7 +9,6 @@ import { sessionCleanUp } from '../../../../lib/sessionUtils';
 import { ExperimentStateStore } from '../../../../lib/state/experimentStateStore';
 import { clientConsole } from '../../../../lib/clientLogger';
 import { stopStimDisplayTypeMapVersionSync } from '../../../../lib/stimDisplayTypeMapSync';
-import { destroyPlyr } from '../../../../lib/plyrHelper';
 import { cleanupAudioRecorder } from './speechRecognitionService';
 import { stopTtsPlayback } from './ttsService';
 import { completeCleanup } from '../utils/lifecycleCleanup';
@@ -69,13 +68,6 @@ export async function leavePage(dest: NavigationDestination): Promise<void> {
 
     // Universal cleanup (all destinations)
     stopCardAudioNow();
-
-    // Destroy Plyr video player
-    try {
-      await destroyPlyr();
-    } catch (err) {
-      clientConsole(1, '[Navigation] destroyPlyr failed:', err);
-    }
 
     // Complete lifecycle cleanup (timers, trackers, etc.)
     await completeCleanup();

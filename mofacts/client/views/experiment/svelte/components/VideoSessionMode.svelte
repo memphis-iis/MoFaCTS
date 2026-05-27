@@ -662,7 +662,7 @@
       feedbackType: '',
       instructionQuestionResult: Session.get('instructionQuestionResult') || false,
       entryPoint: Meteor.user()?.loginParams?.entryPoint,
-      eventType: '',
+      eventType: 'video',
     };
 
     lastVolume = player.volume;

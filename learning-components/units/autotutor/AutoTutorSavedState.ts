@@ -3,7 +3,7 @@ import {
   type AutoTutorLearnerContributionScore,
   type AutoTutorMove,
   type AutoTutorPlannerState,
-} from '../../../mofacts/common/lib/autoTutorPlanner';
+} from './AutoTutorPlanner';
 import { isAutoTutorEndReason, type AutoTutorEndReason } from './AutoTutorEndState';
 
 export const AUTO_TUTOR_LEARNER_CONTRIBUTION_TYPES = new Set([

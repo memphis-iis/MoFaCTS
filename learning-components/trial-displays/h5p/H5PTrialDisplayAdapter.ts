@@ -1,8 +1,8 @@
 import type { LearningComponentManifest } from '../../runtime/ComponentManifest';
 import type { TrialDisplayAdapter } from '../../runtime/TrialDisplayAdapterRegistry';
-import { getH5PDisplayConfig, normalizeH5PDisplayConfig } from '../../../mofacts/common/lib/h5pDisplay';
-import { normalizeH5PTrialResult } from '../../../mofacts/common/lib/h5pTrialResult';
-import type { H5PDisplayConfig, H5PTrialResult } from '../../../mofacts/common/types/h5p';
+import { getH5PDisplayConfig, normalizeH5PDisplayConfig } from './h5pDisplay';
+import { normalizeH5PTrialResult } from './h5pTrialResult';
+import type { H5PDisplayConfig, H5PTrialResult } from './types';
 
 export const H5P_TRIAL_DISPLAY_TYPE = 'h5p';
 

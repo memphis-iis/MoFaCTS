@@ -1,5 +1,12 @@
 import { meteorCallAsync, clientConsole } from "../../index";
 import { KC_MULTIPLE } from "../../../common/Definitions";
+import {
+    buildAdaptiveOutcomes,
+    evaluateAdaptiveRule,
+    getAdaptiveScheduleQuestions,
+    type AdaptiveOutcomeRow,
+    type AdaptiveOutcomes,
+} from "../../../../learning-components/units/shared/adaptiveRuleEvaluation";
 import { applyAdaptiveAssessmentTemplateSchedule } from "./assessmentAdaptiveSchedule";
 import {
     appendAdaptiveVideoCheckpoints,
@@ -10,12 +17,6 @@ import {
 declare const Session: any;
 declare const Meteor: any;
 declare const alert: (message?: string) => void;
-
-type AdaptiveOutcomeRows = Array<{
-    KCId?: number | string;
-    outcome?: string;
-}>;
-type AdaptiveOutcomes = Record<string, boolean>;
 
 export class AdaptiveQuestionLogic {  
     schedule: Array<any>;
@@ -43,45 +44,13 @@ export class AdaptiveQuestionLogic {
         this.schedule = schedule
     }
 
-    private getScheduleQuestions(schedule: any[]): number[] {
-        return (schedule || []).map((item) => {
-            const clusterIndex = Number(item?.clusterIndex);
-            if (!Number.isInteger(clusterIndex)) {
-                throw new Error('Adaptive rule produced a scheduled question without a valid clusterIndex');
-            }
-            return clusterIndex;
-        });
-    }
-
-    private buildAdaptiveOutcomes(rows: AdaptiveOutcomeRows): AdaptiveOutcomes {
-        const outcomes: AdaptiveOutcomes = {};
-        for (const historyRow of rows) {
-            const kcId = Number(historyRow?.KCId);
-            if (Number.isFinite(kcId)) {
-                outcomes[String(kcId % KC_MULTIPLE)] = historyRow.outcome === 'correct';
-            }
-        }
-
-        const currentStimuliSet = Session.get('currentStimuliSet');
-        if (Array.isArray(currentStimuliSet)) {
-            for (const stim of currentStimuliSet) {
-                const clusterKC = Number(stim?.clusterKC);
-                if (!Number.isFinite(clusterKC)) {
-                    continue;
-                }
-                const clusterKey = String(clusterKC % KC_MULTIPLE);
-                if (!Object.prototype.hasOwnProperty.call(outcomes, clusterKey)) {
-                    outcomes[clusterKey] = false;
-                }
-            }
-        }
-
-        return outcomes;
-    }
-
     async getAdaptiveOutcomes(): Promise<AdaptiveOutcomes> {
-        const rows = (await meteorCallAsync('getAdaptiveOutcomeRows', this.userId, this.tdfId)) as AdaptiveOutcomeRows;
-        return this.buildAdaptiveOutcomes(rows);
+        const rows = (await meteorCallAsync('getAdaptiveOutcomeRows', this.userId, this.tdfId)) as AdaptiveOutcomeRow[];
+        return buildAdaptiveOutcomes({
+            rows,
+            currentStimuliSet: Session.get('currentStimuliSet'),
+            kcMultiple: KC_MULTIPLE,
+        });
     }
     
     //translate the logic to javascript code    
@@ -110,158 +79,20 @@ export class AdaptiveQuestionLogic {
 
 
         clientConsole(2, 'evaluate logicString:', logicString);
-        const operators: Record<string, string> = {
-            "NOT": "!",
-            "AND": "&&",
-            "OR": "||"
-        };
-
-        //remove the IF prefix and split on keyword THEN. Before then is the condition, after then is the action
-        //if parts
-        const [, whenSegment = ''] = logicString.split("AT");
-        let when = logicString.includes("AT") ? parseInt(whenSegment.trim()) : null;
-        let isCheckpoint = logicString.includes("CHECKPOINT");
-        let parts = logicString.replace("IF", "").replace("AT", "").replace("CHECKPOINT", "").split("THEN");
-        let condition = (parts[0] ?? '').trim();
-        let actions = (parts[1] ?? '').trim();
-
-        //if condition or action is empty, return
-        if(!condition || !actions){
-            return {condition: condition, action: actions, conditionResult: false};
-        }
-
-        //tokenize the condition
-        let conditionTokens = condition.split(" ");
-
-
-        //translate the condition
-        let conditionExpression = "";
-        // Allowed math operators
-        const mathOperators = "+-*/%()=";
-
         const history = adaptiveOutcomes || await this.getAdaptiveOutcomes();
-
-        for(const token of conditionTokens){
-            if(operators[token]){
-                conditionExpression += operators[token];
-            } else if (token.toLowerCase() === "true"){
-                conditionExpression += "true";
-            } else if (token.toLowerCase() === "false"){
-                conditionExpression += "false";
-            } else if (token.startsWith("C")){
-                //the format for this is C<cluster index>S<stimulus index>
-                const [, tokenBody = ''] = token.split("C");
-                const [clusterPart = '', stimulusPart = ''] = tokenBody.split("S");
-                let clusterIndex = parseInt(clusterPart);
-                let stimulusIndex = parseInt(stimulusPart);
-                //get the performance for this cluster and stimulus
-                clientConsole(2, 'getting component state for cluster:', clusterIndex, 'stimulus:', stimulusIndex, history[stimulusIndex]);
-                let outcome = history[String(clusterIndex)] ?? false;
-                //if the outcome is 1, lastOutcome is true, otherwise false
-                clientConsole(2, 'lastOutcome for ' + token + ':', outcome);
-                conditionExpression += outcome;
-            } else if (Number.isInteger(parseInt(token))){
-                conditionExpression += token;
-            } else {
-                //loop through each character in the token, if it is a math operator, add it to the expression. Otherwise, throw an error
-                for(const char of token){
-                    if(mathOperators.includes(char)){
-                        conditionExpression += char;
-                    } else if (Number.isInteger(parseInt(char))){
-                        conditionExpression += char;
-                    } else {
-                        throw new Error(`Invalid token: ${token}`);
-                    }
-                }
-            }
+        const result = evaluateAdaptiveRule(logicString, history);
+        if (result.conditionExpression) {
+            clientConsole(2, 'conditionExpression:', result.conditionExpression);
         }
-
-        clientConsole(2, 'conditionExpression:', conditionExpression);
-
-
-        //build a new function that will be called to evaluate the condition
-        let conditionFunction: Function | null = new Function(`return ${conditionExpression}`);
-
-        //evaluate the condition
-        let conditionResult = conditionFunction();
-
-        //destroy the function
-        conditionFunction = null;
-
-        //if the condition is false, end the function. Otherwise, evaluate the action
-        if(!conditionResult){
-            return;
+        if (result.conditionResult && result.actions) {
+            clientConsole(2, 'action:', result.actions);
+            this.schedule.push(...(result.schedule || []));
+            clientConsole(2, 'adding to adaptive schedule - count:', this.schedule.length);
         }
-
-        //the action can be either a single action as a string or an array of actions. To check, we will find if parenthesis are present
-        clientConsole(2, 'action:', actions);
-
-        const addToschedule: any[] = [];
-        const questions: any[] = [];
-        const checkpoints: any[] = [];
-        
-        ///check if there are parenthesis, if so interpret as an array of actions
-        if(actions.includes("(")){
-            let startIndex = actions.indexOf("(");
-            let endIndex = actions.indexOf(")");
-            let actionsString = actions.substring(startIndex + 1, endIndex);
-            //add each action to the schedule
-            for(const action of actionsString.split(",")){
-                //the format is C<cluster index>S<stimulus index>, we add these to the schedule 
-                if(action.startsWith("C")){
-                    const [, actionBody = ''] = action.split("C");
-                    const [clusterPart = '', stimulusPart = ''] = actionBody.split("S");
-                    let KCI = parseInt(clusterPart);
-                    let stimulusIndex = parseInt(stimulusPart);
-                    //if the outcome is string "correct", it is true, otherwise false
-                    addToschedule.push({
-                        clusterIndex: KCI,
-                        stimIndex: stimulusIndex,
-                        isCheckpoint: isCheckpoint
-                    });
-                    questions.push(KCI);
-                    if (isCheckpoint && when !== null) {
-                        checkpoints.push({
-                            clusterIndex: KCI,
-                            stimIndex: stimulusIndex,
-                            time: when
-                        });
-                    }
-                    clientConsole(2, 'adding to adaptive schedule - count:', addToschedule.length);
-                } else {
-                    //throw an error if the action is not a valid action
-                    throw new Error(`Invalid action: ${action}`);
-                }
-            }
-        } else {
-            //the action is a single action
-            if(actions.startsWith("C")){
-                const [, actionBody = ''] = actions.split("C");
-                const [clusterPart = '', stimulusPart = ''] = actionBody.split("S");
-                let clusterIndex = parseInt(clusterPart);
-                let stimulusIndex = parseInt(stimulusPart);
-                //if the outcome is string "correct", it is true, otherwise false
-                addToschedule.push({
-                    clusterIndex: clusterIndex,
-                    stimIndex: stimulusIndex,
-                    isCheckpoint: isCheckpoint
-                });
-                questions.push(clusterIndex);
-                if (isCheckpoint && when !== null) {
-                    checkpoints.push({
-                        clusterIndex: clusterIndex,
-                        stimIndex: stimulusIndex,
-                        time: when
-                    });
-                }
-                clientConsole(2, 'adding to adaptive schedule - count:', addToschedule.length);
-            } else {
-                //throw an error if the action is not a valid action
-                throw new Error(`Invalid action: ${actions}`);
-            }
+        if (!result.conditionResult && !result.conditionExpression) {
+            return result;
         }
-        this.schedule.push(...addToschedule);
-        return {condition: condition, conditionExpression: conditionExpression, actions: actions, conditionResult: conditionResult, questions: questions, schedule: addToschedule, when: when, checkpoints: checkpoints};
+        return result.conditionResult ? result : undefined;
     }
     async modifyUnit(adaptiveLogic: any[], curTdfUnit: any){
         const videoSession = requireAdaptiveVideoSession(curTdfUnit);
@@ -276,7 +107,7 @@ export class AdaptiveQuestionLogic {
             if (!ret || !ret.conditionResult) {
                 continue;
             }
-            const questions = ret.questions?.length ? ret.questions : this.getScheduleQuestions(ret.schedule || []);
+            const questions = ret.questions?.length ? ret.questions : getAdaptiveScheduleQuestions(ret.schedule || []);
             const when = ret.when;
             appendAdaptiveVideoQuestions(videoSession, questions, when, logic);
             if(ret.checkpoints && ret.checkpoints.length > 0){

@@ -1,4 +1,4 @@
-import { applyDisplayFieldSubset } from "../../../mofacts/common/lib/displayFieldSubsets";
+import { applyDisplayFieldSubset } from "../../content/display/displayFieldSubsets";
 
 const blank = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";
 

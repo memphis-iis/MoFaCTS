@@ -337,7 +337,8 @@ function requireScore(value: unknown, fieldName: string): number {
 }
 
 function computeExpectationPriority(frontier: number, coherence: number, centrality: number): number {
-  return Math.max(0, Math.min(1, (0.5 * frontier) + (0.3 * coherence) + (0.2 * centrality)));
+  const priority = (0.5 * frontier) + (0.3 * coherence) + (0.2 * centrality);
+  return Math.round(Math.max(0, Math.min(1, priority)) * 1_000_000) / 1_000_000;
 }
 
 function parseExpectationScores(value: unknown): Record<string, AutoTutorExpectationScore> {

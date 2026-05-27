@@ -1,5 +1,4 @@
 export {sessionCleanUp, clearMappingSessionStateForCleanup};
-import {playerController, destroyPlyr} from "../lib/plyrHelper";
 import {resetAudioState} from "./state/audioState";
 import {audioManager} from "./audioContextManager";
 import { clientConsole } from "./clientLogger";
@@ -88,10 +87,6 @@ function resetSharedCardRuntimeState() {
   CardStore.resetQuestionIndex();
   clearSessionTimersForCleanup();
   CardStore.resetReactiveDefaults();
-
-  if (playerController) {
-    destroyPlyr();
-  }
 
   audioManager.cleanup();
 }

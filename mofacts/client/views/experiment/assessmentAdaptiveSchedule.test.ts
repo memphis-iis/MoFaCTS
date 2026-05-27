@@ -1,8 +1,15 @@
 import { expect } from 'chai';
 
 import { applyAdaptiveAssessmentTemplateSchedule } from './assessmentAdaptiveSchedule';
+import {
+  applyAdaptiveAssessmentTemplateSchedule as applyComponentAdaptiveAssessmentTemplateSchedule,
+} from '../../../../learning-components/units/assessment-session/adaptiveAssessmentSchedule';
 
 describe('assessment adaptive schedule', function() {
+  it('keeps the app facade aligned with the component-owned assessment helper', function() {
+    expect(applyAdaptiveAssessmentTemplateSchedule).to.equal(applyComponentAdaptiveAssessmentTemplateSchedule);
+  });
+
   it('applies adaptive template schedule through the assessment-session owner', function() {
     const unit = {
       assessmentsession: {

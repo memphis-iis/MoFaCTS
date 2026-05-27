@@ -12,7 +12,6 @@ import {
   resolveSessionSurfaceState,
   resolveSessionSurfaceUnitEntryRoute,
 } from './svelte/services/sessionSurfaceMode';
-import { playerController, destroyPlyr } from '../../lib/plyrHelper';
 import '../../../common/Collections';
 
 type RootTdfBoxed = {
@@ -94,7 +93,6 @@ export async function unitIsFinished(reason: string, options: { engine?: unknown
   const prevUnit = curTdf.tdfs.tutor.unit[curUnitNum];
   const adaptive = prevUnit?.adaptive;
   const adaptiveLogic = prevUnit?.adaptiveLogic;
-  const curUnitForAdaptive = prevUnit;
   let newUnitNum = curUnitNum + 1;
   let countCompletion = prevUnit?.countcompletion;
   let adaptiveTemplate;
@@ -143,10 +141,6 @@ export async function unitIsFinished(reason: string, options: { engine?: unknown
           curTdf.tdfs.tutor.unit[targetUnitIndex] = unit;
         }
       }
-    }
-    // Add new question to current unit
-    if (engine.adaptiveQuestionLogic.when == curUnitNum && playerController) {
-      playerController.addStimToSchedule(curUnitForAdaptive);
     }
     Session.set('currentTdfFile', curTdf);
   }
@@ -261,7 +255,6 @@ export async function unitIsFinished(reason: string, options: { engine?: unknown
 
 export async function revisitUnit(unitNumber: string | number) {
   clientConsole(2, 'REVIST UNIT:', unitNumber);
-  await destroyPlyr();
 
   const curTdf = Session.get('currentTdfFile');
   if (!curTdf || !curTdf.tdfs?.tutor?.unit) {

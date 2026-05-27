@@ -1,8 +1,9 @@
 import type { LearningComponentManifest } from '../../runtime/ComponentManifest';
 import type { CreateUnitEngineDeps } from '../createUnitEngine';
+import { ASSESSMENT_SESSION_UNIT_TYPE } from '../unitTypes';
 import { createAssessmentUnitEngine } from './AssessmentUnitEngine';
 
-export const ASSESSMENT_SESSION_UNIT_TYPE = 'schedule';
+export { ASSESSMENT_SESSION_UNIT_TYPE };
 
 export const assessmentSessionUnitComponentManifest: LearningComponentManifest<CreateUnitEngineDeps> = {
   id: 'mofacts.assessment-session-unit',
@@ -12,7 +13,6 @@ export const assessmentSessionUnitComponentManifest: LearningComponentManifest<C
     'session',
     'assessment-state',
     'stimuli',
-    'server-methods',
     'logging',
     'ui-alerts',
   ],

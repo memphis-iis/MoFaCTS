@@ -1,4 +1,4 @@
-import { SCHEDULE_UNIT } from '../../../mofacts/common/Definitions';
+import { ASSESSMENT_SESSION_UNIT_TYPE } from '../unitTypes';
 import { createAssessmentSchedule } from './createAssessmentSchedule';
 
 export interface CreateAssessmentUnitEngineDeps {
@@ -17,10 +17,10 @@ export function createAssessmentUnitEngine(deps: CreateAssessmentUnitEngineDeps)
   let schedule: any;
   let scheduleCursor = 0;
   return {
-    unitType: SCHEDULE_UNIT,
+    unitType: ASSESSMENT_SESSION_UNIT_TYPE,
 
     initImpl: async function() {
-      deps.setSessionValue('unitType', SCHEDULE_UNIT);
+      deps.setSessionValue('unitType', ASSESSMENT_SESSION_UNIT_TYPE);
 
       const curUnitNum = deps.getSessionValue('currentUnitNumber');
       const file = deps.getSessionValue('currentTdfFile');

@@ -9,6 +9,11 @@ import {
 import { registerLearningComponents } from '../runtime/registerLearningComponents';
 import { registerTrialDisplayAdapter } from '../runtime/TrialDisplayAdapterRegistry';
 import { defaultUnitComponentManifestsFromCatalog } from '../defaultLearningComponentCatalog';
+import type { LearningComponentCapability } from '../runtime/ComponentManifest';
+import {
+  getUnitEngineServerMethodNames,
+  type UnitEngineServerMethods,
+} from './UnitEngineServerMethods';
 import {
   ASSESSMENT_SESSION_UNIT_TYPE,
   AUTO_TUTOR_SESSION_UNIT_TYPE,
@@ -33,7 +38,7 @@ export interface CreateUnitEngineDeps {
   readonly getDisplayAnswerText: (answer: any) => string;
   readonly updateCurStudentPerformance: (wasCorrect: any, practiceTime: any, testType: any) => void;
   readonly updateCurStudedentPracticeTime: (practiceTime: any) => void;
-  readonly meteorCallAsync: (name: string, ...args: any[]) => Promise<any>;
+  readonly serverMethods: UnitEngineServerMethods;
   readonly getCurrentUserId: () => any;
   readonly reconstructLearningStateFromHistory: (historyRows: any[]) => any;
   readonly extractDelimFields: (source: any, target: any[]) => void;
@@ -75,6 +80,65 @@ function getStimAnswer(deps: CreateUnitEngineDeps, clusterIndex: any, whichAnswe
   return stim.correctResponse;
 }
 
+function hasFunctions(deps: Partial<CreateUnitEngineDeps>, ...names: Array<keyof CreateUnitEngineDeps>): boolean {
+  return names.every((name) => typeof deps[name] === 'function');
+}
+
+function hasNamedServerMethods(deps: Partial<CreateUnitEngineDeps>): boolean {
+  if (!deps.serverMethods || typeof deps.serverMethods !== 'object') {
+    return false;
+  }
+  return [...getUnitEngineServerMethodNames()].every((methodName) =>
+    typeof deps.serverMethods?.[methodName] === 'function'
+  );
+}
+
+export function getCreateUnitEngineServerMethodSet(
+  deps: Partial<CreateUnitEngineDeps>,
+): Set<string> {
+  if (!hasNamedServerMethods(deps)) {
+    return new Set();
+  }
+  return new Set([...getUnitEngineServerMethodNames()]);
+}
+
+export function getCreateUnitEngineCapabilitySet(
+  deps: Partial<CreateUnitEngineDeps>,
+): Set<LearningComponentCapability> {
+  const capabilities = new Set<LearningComponentCapability>();
+  if (hasFunctions(deps, 'getSessionValue', 'setSessionValue')) {
+    capabilities.add('session');
+  }
+  if (hasFunctions(deps, 'getDeliverySettings')) {
+    capabilities.add('delivery-settings');
+  }
+  if (hasFunctions(deps, 'getStimCount', 'getStimCluster', 'getStimKCBaseForCurrentStimuliSet')) {
+    capabilities.add('stimuli');
+  }
+  if (hasFunctions(deps, 'createAdaptiveQuestionLogic')) {
+    capabilities.add('adaptive-model');
+  }
+  if (hasFunctions(deps, 'getExperimentState', 'hasScheduleArtifactForUnit', 'createExperimentState')) {
+    capabilities.add('assessment-state');
+  }
+  if (hasFunctions(deps, 'reconstructLearningStateFromHistory')) {
+    capabilities.add('history');
+  }
+  if (hasNamedServerMethods(deps)) {
+    capabilities.add('server-methods');
+  }
+  if (hasFunctions(deps, 'currentUserHasRole')) {
+    capabilities.add('authz');
+  }
+  if (hasFunctions(deps, 'log')) {
+    capabilities.add('logging');
+  }
+  if (hasFunctions(deps, 'alertUser')) {
+    capabilities.add('ui-alerts');
+  }
+  return capabilities;
+}
+
 export function createDefaultUnitEngine(deps: CreateUnitEngineDeps, curExperimentData: any): any {
   const stimClusters: any[] = [];
   const numQuestions = deps.getStimCount();
@@ -99,21 +163,11 @@ export function createDefaultUnitEngine(deps: CreateUnitEngineDeps, curExperimen
 }
 
 function registerDefaultUnitEngines(_deps: CreateUnitEngineDeps): void {
-  const capabilities = new Set([
-    'session',
-    'delivery-settings',
-    'stimuli',
-    'adaptive-model',
-    'assessment-state',
-    'history',
-    'server-methods',
-    'authz',
-    'logging',
-    'ui-alerts',
-  ] as const);
+  const capabilities = getCreateUnitEngineCapabilitySet(_deps);
 
   registerLearningComponents(defaultUnitComponentManifestsFromCatalog, {
     capabilities,
+    serverMethods: getCreateUnitEngineServerMethodSet(_deps),
     registerUnitEngine,
     registerUnitEngineWithDeps,
     registerTrialDisplayAdapter,

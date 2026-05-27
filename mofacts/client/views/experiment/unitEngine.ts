@@ -21,6 +21,7 @@ import {Answers} from './answerAssess';
 import { AdaptiveQuestionLogic } from './adaptiveQuestionLogic';
 import { reconstructLearningStateFromHistory } from '../../lib/history/historyReconstruction';
 import { hasScheduleArtifactForUnit } from './svelte/services/assessmentResume';
+import { createUnitEngineServerMethods } from './unitEngineServerMethods';
 import {
   createEmptyUnit as createEmptyUnitWithDeps,
   createAutoTutorUnit as createAutoTutorUnitWithDeps,
@@ -62,7 +63,7 @@ function createUnitEngineDeps(): CreateUnitEngineDeps {
     getDisplayAnswerText: (answer) => Answers.getDisplayAnswerText(answer),
     updateCurStudentPerformance,
     updateCurStudedentPracticeTime,
-    meteorCallAsync,
+    serverMethods: createUnitEngineServerMethods({ meteorCallAsync }),
     getCurrentUserId: () => Meteor.userId(),
     reconstructLearningStateFromHistory,
     extractDelimFields,

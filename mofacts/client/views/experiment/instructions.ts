@@ -12,6 +12,7 @@ import DOMPurify from 'dompurify';
 import {audioManager} from '../../lib/audioContextManager';
 import { deliverySettingsStore } from '../../lib/state/deliverySettingsStore';
 import { CardStore } from './modules/cardStore';
+import { insertCompressedHistory } from '../../lib/historyWire';
 import { resolveDynamicAssetPath } from './svelte/services/mediaResolver';
 import { assertIdInvariants, logIdInvariantBreachOnce } from '../../lib/idContext';
 import { CARD_ENTRY_INTENT, setCardEntryIntent } from '../../lib/cardEntryIntent';
@@ -838,6 +839,13 @@ function gatherInstructionLogRecord(trialEndTimeStamp: any, trialStartTimeStamp:
   const meteorUser = Meteor.user();
   const loginParams = meteorUser?.loginParams || {};
   const currentTdfId = Session.get('currentTdfId');
+  const currentUnitNumber = Session.get('currentUnitNumber');
+  const currentUnit = Session.get('currentTdfUnit');
+  const unitName = trimText(currentUnit?.unitname);
+  const displayedStimulus = {
+    text: trimText(currentUnit?.unitinstructions),
+    question: trimText(currentUnit?.unitinstructionsquestion),
+  };
   if (!currentTdfId) {
     logIdInvariantBreachOnce('instructions.gatherInstructionLogRecord:missing-currentTdfId');
   }
@@ -859,13 +867,20 @@ function gatherInstructionLogRecord(trialEndTimeStamp: any, trialStartTimeStamp:
     'conditionTypeE': loginParams.entryPoint &&
         loginParams.entryPoint !== 'direct' ? loginParams.entryPoint : null,
     'responseDuration': null,
-    'levelUnit': Session.get('currentUnitNumber'),
+    'levelUnit': currentUnitNumber,
+    'levelUnitName': unitName,
     'levelUnitType': "Instruction",
+    'problemName': unitName || 'Instruction',
+    'stepName': unitName || 'Instruction',
     'time': trialEndTimeStamp,
     'problemStartTime': trialStartTimeStamp,
     'selection': 'instruction',
     'action': 'continue',
+    'input': 'continue',
     'outcome': '',
+    'typeOfResponse': 'instruction',
+    'responseValue': 'continue',
+    'displayedStimulus': displayedStimulus,
     'eventType': 'instruct',
     'CFAudioInputEnabled': checkAudioInputMode(),
     'CFAudioOutputEnabled': Session.get('enableAudioPromptAndFeedback'),
@@ -908,7 +923,7 @@ async function recordCurrentInstructionContinue(trialStartTimeStamp: any = timeR
     const instructionLog = gatherInstructionLogRecord(Date.now(), trialStartTimeStamp);
     clientConsole(2, 'instructionLog', instructionLog);
     markLaunchLoadingTiming('instructionContinue:historyRecord:start');
-    await (Meteor as any).callAsync('insertHistory', instructionLog)
+    await insertCompressedHistory(instructionLog);
     markLaunchLoadingTiming('instructionContinue:historyRecord:complete');
   }
 }

@@ -78,14 +78,13 @@ function createCapabilities(overrides: {
       getStimCluster: () => ({ stims: [stim] }),
     },
     serverMethods: {
-      callMethod: async <T>() => undefined as T,
       getAutoTutorHistoryForUnit: async () => [],
     },
     history: {
       normalizeResult: (result) => result as any,
       writeResult: async () => undefined,
       writeAutoTutorTurn: async () => undefined,
-      writeCompressedHistory: async () => undefined,
+      writeCanonicalHistory: async () => undefined,
     },
     logger: {
       log() {},

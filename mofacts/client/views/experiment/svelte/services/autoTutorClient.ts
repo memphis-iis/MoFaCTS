@@ -25,7 +25,7 @@ import { insertCompressedHistory } from '../../../../lib/historyWire';
 import { meteorCallAsync } from '../../../../lib/meteorAsync';
 import { legacyTrim } from '../../../../../common/underscoreCompat';
 import type {
-  AutoTutorCompressedHistoryRecord,
+  AutoTutorCanonicalHistoryRecord,
   AutoTutorHistoryTurn,
   AutoTutorRuntimeCapabilities,
 } from '../../../../../../learning-components/units/autotutor/AutoTutorRuntimeCapabilities';
@@ -137,9 +137,6 @@ function createMeteorAutoTutorRuntimeCapabilities(): AutoTutorRuntimeCapabilitie
       },
     },
     serverMethods: {
-      async callMethod<T = unknown>(name: string, ...args: unknown[]) {
-        return await meteorCallAsync(name, ...args) as T;
-      },
       async getAutoTutorHistoryForUnit(userId: string, tdfId: string, unitNumber: number) {
         return await meteorCallAsync('getAutoTutorHistoryForUnit', userId, tdfId, unitNumber) as unknown[];
       },
@@ -165,7 +162,7 @@ function createMeteorAutoTutorRuntimeCapabilities(): AutoTutorRuntimeCapabilitie
           turnEndedAt: turn.endedAt,
         });
       },
-      async writeCompressedHistory(record: AutoTutorCompressedHistoryRecord) {
+      async writeCanonicalHistory(record: AutoTutorCanonicalHistoryRecord) {
         await insertCompressedHistory(record);
       },
     },
@@ -695,7 +692,7 @@ async function insertAutoTutorHistoryTurn(config: AutoTutorConfig, state: AutoTu
   const sessionID = (new Date(args.turnStartedAt)).toUTCString().substr(0, 16) + ' ' + snapshot.currentTdfName;
   const note = buildHistoryNote(config, state, args.tutorMessage);
 
-  const historyRecord: AutoTutorCompressedHistoryRecord = {
+  const historyRecord: AutoTutorCanonicalHistoryRecord = {
     itemId: stim?._id || config.script.id,
     KCId: stim?.stimulusKC || config.script.id,
     userId: snapshot.currentUserId,
@@ -762,7 +759,7 @@ async function insertAutoTutorHistoryTurn(config: AutoTutorConfig, state: AutoTu
     entryPoint: snapshot.entryPoint || '',
     eventType: 'autotutor-turn',
   };
-  await args.capabilities.history.writeCompressedHistory(historyRecord);
+  await args.capabilities.history.writeCanonicalHistory(historyRecord);
 }
 
 export async function createAutoTutorRuntime(

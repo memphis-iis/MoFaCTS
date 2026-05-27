@@ -337,7 +337,7 @@ describe('AutoTutor content contract', function() {
     }));
 
     expect(envelope.expectationScores.E1?.frontier).to.equal(0.8);
-    expect(envelope.expectationScores.E1?.priority).to.equal(0.6000000000000001);
+    expect(envelope.expectationScores.E1?.priority).to.equal(0.6);
   });
 
   it('parses the required AutoTutor utterance JSON envelope', function() {

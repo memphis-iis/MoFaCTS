@@ -15,7 +15,6 @@ import { experimentStateService } from '../services/experimentState';
 import { selectCardService, updateEngineService, prepareIncomingTrialService } from '../services/unitEngineService';
 import { ttsPlaybackService } from '../services/ttsService';
 import { speechRecognitionService as srService } from '../services/speechRecognitionService';
-import { videoPlayerService as videoService } from '../services/videoPlayerService';
 import { CardStore } from '../../modules/cardStore';
 import { fromCallback, fromPromise, type AnyEventObject } from 'xstate';
 import { resolveH5PModelOutcomes } from '../../../../../common/lib/h5pTrialResult';
@@ -292,15 +291,7 @@ async function ttsPlayback(_context: unknown, _event: unknown) {
   
 
   try {
-    // TODO: Integrate with plyrHelper.js or browser TTS API
-    //
-    // if (context.currentDisplay.audioSrc) {
-    //   // Pre-recorded audio
-    //   await window.plyrHelper.play(context.currentDisplay.audioSrc);
-    // } else if (context.currentDisplay.text) {
-    //   // Browser TTS
-    //   await window.speechSynthesis.speak(context.currentDisplay.text);
-    // }
+    // TODO: Integrate with the shared TTS/audio runtime.
 
     // Placeholder: simulate TTS playback
     await delay(1000);
@@ -432,7 +423,6 @@ export function createServices() {
     prepareIncomingTrialService: wrapPromiseService(prepareIncomingTrialService),
     ttsService: wrapPromiseService(ttsPlaybackService),
     speechRecognitionService: wrapCallbackService(srService),
-    videoPlayerService: wrapPromiseService(videoService),
     evaluateAnswerService: wrapPromiseService(evaluateAnswerService),
     readyPromptDelayService: wrapPromiseService(readyPromptDelayService),
     prestimulusDelayService: wrapPromiseService(prestimulusDelayService),

@@ -6,8 +6,17 @@ import {
   applyAdaptiveVideoTemplateSchedule,
   requireAdaptiveVideoSession,
 } from './videoAdaptiveQuestions';
+import {
+  appendAdaptiveVideoQuestions as appendComponentAdaptiveVideoQuestions,
+  requireAdaptiveVideoSession as requireComponentAdaptiveVideoSession,
+} from '../../../../learning-components/units/video-session/adaptiveVideoQuestions';
 
 describe('video adaptive questions', function() {
+  it('keeps the app facade aligned with the component-owned video helper', function() {
+    expect(appendAdaptiveVideoQuestions).to.equal(appendComponentAdaptiveVideoQuestions);
+    expect(requireAdaptiveVideoSession).to.equal(requireComponentAdaptiveVideoSession);
+  });
+
   it('requires a video-session target for adaptive unit mutation', function() {
     expect(() => requireAdaptiveVideoSession(null)).to.throw(/target unit is missing/);
     expect(() => requireAdaptiveVideoSession({ unitname: 'card unit' })).to.throw(/has no videosession/);

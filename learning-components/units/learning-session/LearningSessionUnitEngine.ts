@@ -1,10 +1,10 @@
-import { MODEL_UNIT } from '../../../mofacts/common/Definitions';
+import { LEARNING_SESSION_UNIT_TYPE } from '../unitTypes';
 import {
   getHistoryCorrectAnswer,
-  getHistoryResponseKey as getAppHistoryResponseKey,
-} from '../../../mofacts/common/history/historyResponseKey';
+  getHistoryResponseKey,
+} from '../../content/response-normalization/historyResponseKey';
 import { stripSpacesAndLowerCase } from '../../content/response-normalization/responseKey';
-import { createMeteorLearningComponentContext } from '../../runtime/MeteorLearningComponentContext';
+import { createLearningComponentAdapterContext } from '../../runtime/LearningComponentAdapterContext';
 import { applyPracticeTimeUpdate } from './model/practiceTimeUpdates';
 import { createTdfProbabilityFunction } from './model/tdfProbabilityFunction';
 import { resolveSelectionTestType } from './model/testTypePolicy';
@@ -53,6 +53,16 @@ type StimClusterLike = {
   }>;
 };
 
+export type LearningSessionServerMethods = {
+  readonly getResponseKCMapForTdf: (tdfId: any) => Promise<Record<string, unknown>>;
+  readonly getLearningHistoryForUnit: (
+    userId: any,
+    tdfId: any,
+    currentUnitNumber: number,
+    resetStudentPerformance: boolean,
+  ) => Promise<any[]>;
+};
+
 export interface CreateLearningSessionUnitEngineDeps {
   readonly getSessionValue: (key: string) => any;
   readonly setSessionValue: (key: string, value: any) => void;
@@ -67,7 +77,7 @@ export interface CreateLearningSessionUnitEngineDeps {
   readonly getDisplayAnswerText: (answer: any) => string;
   readonly updateCurStudentPerformance: (wasCorrect: any, practiceTime: any, testType: any) => void;
   readonly updateCurStudedentPracticeTime: (practiceTime: any) => void;
-  readonly meteorCallAsync: (name: string, ...args: any[]) => Promise<any>;
+  readonly serverMethods: LearningSessionServerMethods;
   readonly getCurrentUserId: () => any;
   readonly reconstructLearningStateFromHistory: (historyRows: any[]) => any;
   readonly extractDelimFields: (source: any, target: any[]) => void;
@@ -119,7 +129,7 @@ export async function createLearningSessionUnitEngine(deps: CreateLearningSessio
     getStimParameterArray,
     log: deps.log,
   });
-  const learningComponentContext = createMeteorLearningComponentContext({
+  const learningComponentContext = createLearningComponentAdapterContext({
     getSessionValue: deps.getSessionValue,
     setSessionValue: deps.setSessionValue,
     getDeliverySettings: deps.getDeliverySettings,
@@ -173,7 +183,7 @@ export async function createLearningSessionUnitEngine(deps: CreateLearningSessio
         currentTdfUnit: deps.getSessionValue('currentTdfUnit'),
         currentUnitNumber: deps.getSessionValue('currentUnitNumber'),
         stimClusters,
-        getResponseKCMapForTdf: async (tdfId) => await deps.meteorCallAsync('getResponseKCMapForTdf', tdfId) as Record<string, unknown>,
+        getResponseKCMapForTdf: deps.serverMethods.getResponseKCMapForTdf,
         setResponseKCMap: (responseKCMap) => deps.setSessionValue('responseKCMap', responseKCMap),
         getStimParameterArrayFromCluster,
         normalizeResponseText: (rawResponse) => stripSpacesAndLowerCase(deps.getDisplayAnswerText(rawResponse as string)),
@@ -193,18 +203,12 @@ export async function createLearningSessionUnitEngine(deps: CreateLearningSessio
         hiddenItems: deps.getHiddenItems(),
         cardProbabilities,
         stimClusters,
-        getLearningHistoryForUnit: async (userId, tdfId, currentUnitNumber, resetStudentPerformance) => await deps.meteorCallAsync(
-          'getLearningHistoryForUnit',
-          userId,
-          tdfId,
-          currentUnitNumber,
-          resetStudentPerformance,
-        ) as any[],
+        getLearningHistoryForUnit: deps.serverMethods.getLearningHistoryForUnit,
         reconstructLearningStateFromHistory: deps.reconstructLearningStateFromHistory,
         setOverallOutcomeHistory: (history) => deps.setSessionValue('overallOutcomeHistory', history),
         setOverallStudyHistory: (history) => deps.setSessionValue('overallStudyHistory', history),
         getHistoryCorrectAnswer,
-        getHistoryResponseKey: (rawResponse) => getAppHistoryResponseKey(
+        getHistoryResponseKey: (rawResponse) => getHistoryResponseKey(
           rawResponse,
           (answer) => deps.getDisplayAnswerText(answer),
           (answer) => stripSpacesAndLowerCase(answer),
@@ -221,7 +225,7 @@ export async function createLearningSessionUnitEngine(deps: CreateLearningSessio
       return currentCardTracker.findCurrentCardInfo();
     },
 
-    unitType: MODEL_UNIT,
+    unitType: LEARNING_SESSION_UNIT_TYPE,
 
     curUnit: (() => JSON.parse(JSON.stringify(deps.getSessionValue('currentTdfUnit'))))(),
 
@@ -233,7 +237,7 @@ export async function createLearningSessionUnitEngine(deps: CreateLearningSessio
     })(),
 
     initImpl: async function() {
-      deps.setSessionValue('unitType', MODEL_UNIT);
+      deps.setSessionValue('unitType', LEARNING_SESSION_UNIT_TYPE);
       await this.initializeLogisticModelState();
     },
 

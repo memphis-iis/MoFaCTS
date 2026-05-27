@@ -1,12 +1,11 @@
 /**
  * Text-to-Speech (TTS) Service
  *
- * Wraps existing TTS infrastructure (audioContextManager.js, plyrHelper.js) for XState machine.
+ * Wraps existing TTS infrastructure for the XState machine.
  * Handles both browser-based TTS and pre-recorded audio playback.
  *
  * Reference:
  * - client/lib/audioContextManager.js (audioManager)
- * - client/lib/plyrHelper.js (Plyr audio player)
  */
 
 import { Meteor } from 'meteor/meteor';

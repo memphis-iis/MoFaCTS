@@ -1,4 +1,4 @@
-import type { AutoTutorCompressedHistoryRecord } from './AutoTutorRuntimeCapabilities';
+import type { AutoTutorCanonicalHistoryRecord } from './AutoTutorRuntimeCapabilities';
 
 export type AutoTutorEndReason = 'in_progress' | 'mastery' | 'max_turns' | 'cost_cap';
 
@@ -32,7 +32,7 @@ export function applyAutoTutorEndReason<TState extends AutoTutorEndState>(
 
 export function getAutoTutorHistoryAction(
   state: AutoTutorEndState,
-): AutoTutorCompressedHistoryRecord['action'] {
+): AutoTutorCanonicalHistoryRecord['action'] {
   if (!state.completed) {
     return 'autotutor-turn';
   }
