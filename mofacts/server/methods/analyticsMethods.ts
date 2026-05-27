@@ -791,6 +791,10 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       levelUnit: Number(levelUnit),
       studentResponseType: 'ATTEMPT',
       outcome: { $in: ['correct', 'incorrect'] },
+      $or: [
+        { h5p: { $exists: false } },
+        { 'h5p.eventType': 'summary' },
+      ],
     }).countAsync();
   }
 

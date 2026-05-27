@@ -600,6 +600,49 @@ describe('learner analytics method authorization', function() {
     }
   });
 
+  it('counts one completed assessment trial per H5P summary row on resume', async function() {
+    const baseRecord = {
+      userId: 'current-user',
+      TDFId: 'h5p-assessment',
+      levelUnit: 0,
+      levelUnitType: 'schedule',
+      studentResponseType: 'ATTEMPT',
+      outcome: 'correct',
+    };
+
+    await HistoriesAny.insertAsync({
+      ...baseRecord,
+      _id: 'h5p-summary',
+      action: 'respond',
+      h5p: { eventType: 'summary', contentId: 'h5p-1' },
+    });
+    await HistoriesAny.insertAsync({
+      ...baseRecord,
+      _id: 'h5p-part-1',
+      action: 'h5p interaction',
+      h5p: { eventType: 'part', contentId: 'h5p-1', subContentId: 'blank-0' },
+    });
+    await HistoriesAny.insertAsync({
+      ...baseRecord,
+      _id: 'h5p-part-2',
+      action: 'h5p interaction',
+      h5p: { eventType: 'part', contentId: 'h5p-1', subContentId: 'blank-1' },
+    });
+    await HistoriesAny.insertAsync({
+      ...baseRecord,
+      _id: 'ordinary-assessment-row',
+    });
+
+    const count = await (asyncMethods.getAssessmentCompletedTrialCountFromHistory as any).call(
+      { userId: 'current-user' },
+      'current-user',
+      'h5p-assessment',
+      0
+    );
+
+    expect(count).to.equal(2);
+  });
+
   it('denies cross-user experiment-state and recent-TDF reads', async function() {
     try {
       await (asyncMethods.getExperimentState as any).call({ userId: 'current-user' }, 'other-user', 'tdf-1');
