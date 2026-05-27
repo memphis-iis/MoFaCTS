@@ -114,10 +114,7 @@ describe('dashboardCacheMethods', function() {
     expect(stats.itemsPracticedApplies).to.equal(false);
   });
 
-  it('computeCacheStats uses latest AutoTutor progress per unit session as the accuracy measure', function() {
-    const firstNote = JSON.stringify({ progress: 0.25 });
-    const latestNote = JSON.stringify({ progress: 0.75 });
-    const secondSessionNote = JSON.stringify({ progress: 0.5 });
+  it('computeCacheStats does not compute an accuracy percentage for AutoTutor rows', function() {
     const stats = computeCacheStats([
       {
         _id: 'auto-1',
@@ -127,7 +124,7 @@ describe('dashboardCacheMethods', function() {
         sessionID: 'session-a',
         CFEndLatency: 5000,
         CFFeedbackLatency: 0,
-        CFNote: firstNote,
+        CFNote: JSON.stringify({ progress: 0.25 }),
         recordedServerTime: new Date('2026-02-10T10:00:00.000Z')
       },
       {
@@ -138,7 +135,7 @@ describe('dashboardCacheMethods', function() {
         sessionID: 'session-a',
         CFEndLatency: 6000,
         CFFeedbackLatency: 0,
-        CFNote: latestNote,
+        CFNote: JSON.stringify({ progress: 0.75 }),
         recordedServerTime: new Date('2026-02-10T10:01:00.000Z')
       },
       {
@@ -149,7 +146,7 @@ describe('dashboardCacheMethods', function() {
         sessionID: 'session-b',
         CFEndLatency: 4000,
         CFFeedbackLatency: 0,
-        CFNote: secondSessionNote,
+        CFNote: JSON.stringify({ progress: 0.5 }),
         recordedServerTime: new Date('2026-02-11T10:01:00.000Z')
       }
     ], 'AutoTutor Demo', (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0));
@@ -157,7 +154,10 @@ describe('dashboardCacheMethods', function() {
     expect(stats.totalTrials).to.equal(3);
     expect(stats.correctTrials).to.equal(0);
     expect(stats.incorrectTrials).to.equal(0);
-    expect(stats.overallAccuracy).to.equal(62.5);
+    expect(stats.accuracyApplies).to.equal(false);
+    expect(stats.overallAccuracy).to.equal(null);
+    expect(stats.accuracyWeightedCorrect).to.equal(undefined);
+    expect(stats.accuracyWeightedTotal).to.equal(undefined);
     expect(stats.totalTimeMinutes).to.equal(0.3);
     expect(stats.itemsPracticedApplies).to.equal(false);
     expect(stats.totalSessions).to.equal(2);
@@ -200,6 +200,7 @@ describe('dashboardCacheMethods', function() {
         itemsPracticedCount: 5,
         totalSessions: 1,
         overallAccuracy: 80,
+        accuracyApplies: true,
         firstPracticeDate: new Date('2026-02-12T00:00:00.000Z'),
         lastPracticeDate: new Date('2026-02-12T00:00:00.000Z'),
         lastPracticeTimestamp: new Date('2026-02-12T00:00:00.000Z').getTime(),
@@ -216,6 +217,7 @@ describe('dashboardCacheMethods', function() {
         itemsPracticedCount: 5,
         totalSessions: 1,
         overallAccuracy: 60,
+        accuracyApplies: true,
         firstPracticeDate: new Date('2026-02-13T00:00:00.000Z'),
         lastPracticeDate: new Date('2026-02-13T00:00:00.000Z'),
         lastPracticeTimestamp: new Date('2026-02-13T00:00:00.000Z').getTime(),
@@ -243,6 +245,7 @@ describe('dashboardCacheMethods', function() {
         itemsPracticedCount: 8,
         totalSessions: 2,
         overallAccuracy: 75,
+        accuracyApplies: true,
         firstPracticeDate: new Date('2026-02-12T00:00:00.000Z'),
         lastPracticeDate: new Date('2026-02-12T00:00:00.000Z'),
         lastPracticeTimestamp: new Date('2026-02-12T00:00:00.000Z').getTime(),
@@ -259,6 +262,7 @@ describe('dashboardCacheMethods', function() {
         itemsPracticedCount: 4,
         totalSessions: 4,
         overallAccuracy: 50,
+        accuracyApplies: true,
         firstPracticeDate: new Date('2026-02-13T00:00:00.000Z'),
         lastPracticeDate: new Date('2026-02-13T00:00:00.000Z'),
         lastPracticeTimestamp: new Date('2026-02-13T00:00:00.000Z').getTime(),
@@ -274,7 +278,8 @@ describe('dashboardCacheMethods', function() {
         totalTimeMinutes: 999,
         itemsPracticedCount: 99,
         totalSessions: 99,
-        overallAccuracy: 0,
+        overallAccuracy: null,
+        accuracyApplies: false,
         firstPracticeDate: null,
         lastPracticeDate: null,
         lastPracticeTimestamp: 0,
@@ -381,6 +386,102 @@ describe('dashboardCacheMethods', function() {
     expect(lockKeys).to.deep.equal(['dashboard-cache:update:learner-1:tdfA']);
     expect(lastModifier.$set).to.not.have.property('learnerTdfConfigs');
     expect(cacheDoc.learnerTdfConfigs.tdfA.overrides.setspec.audioPromptMode).to.equal('feedback');
+  });
+
+  it('ensureDashboardCacheCurrent rebuilds a current-version cache when newer history exists', async function() {
+    const userId = 'learner-1';
+    let cacheDoc: any = {
+      userId,
+      version: 3,
+      tdfStats: {},
+      lastUpdated: new Date('2026-05-01T00:00:00.000Z')
+    };
+    const lockKeys: string[] = [];
+    const historyRows = [
+      {
+        _id: 'h1',
+        userId,
+        TDFId: 'tdfA',
+        outcome: 'correct',
+        CFEndLatency: 1000,
+        CFFeedbackLatency: 500,
+        itemId: 'item-1',
+        recordedServerTime: new Date('2026-05-01T00:01:00.000Z'),
+        levelUnitType: 'model'
+      }
+    ];
+
+    const methods = createDashboardCacheMethods({
+      Meteor: {
+        Error: class MeteorError extends Error {
+          error: string;
+          constructor(error: string, reason?: string) {
+            super(reason || error);
+            this.error = error;
+          }
+        }
+      },
+      Roles: { userIsInRoleAsync: async () => false },
+      Histories: {
+        findOneAsync: async () => historyRows[0],
+        find: () => ({
+          fetchAsync: async () => historyRows
+        }),
+        rawCollection: () => ({ distinct: async () => ['tdfA'] })
+      },
+      Tdfs: {
+        findOneAsync: async () => null,
+        find: (selector: any) => ({
+          fetchAsync: async () => {
+            if (selector?._id?.$in) {
+              return [{
+                _id: 'tdfA',
+                content: {
+                  fileName: 'tdf-a.json',
+                  tdfs: { tutor: { setspec: { lessonname: 'Lesson A' } } }
+                }
+              }];
+            }
+            return [];
+          }
+        })
+      },
+      UserDashboardCache: {
+        findOneAsync: async () => cacheDoc,
+        upsertAsync: async (_selector: any, modifier: any) => {
+          cacheDoc = {
+            ...cacheDoc,
+            ...(modifier.$set || {})
+          };
+        }
+      },
+      usersCollection: { findOneAsync: async () => ({ _id: userId }) },
+      serverConsole: () => undefined,
+      computePracticeTimeMs: (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0),
+      canViewDashboardTdf: () => true,
+      redisBoundary: {
+        enabled: true,
+        async withLock<T>(key: string, _ttlMs: number, work: () => Promise<T>) {
+          lockKeys.push(key);
+          return await work();
+        }
+      }
+    });
+
+    const result = await methods.ensureDashboardCacheCurrent.call({ userId });
+
+    expect(result).to.deep.include({
+      success: true,
+      action: 'refreshed',
+      reason: 'history-newer',
+      tdfCount: 1
+    });
+    expect(lockKeys).to.deep.equal([
+      'dashboard-cache:ensure:learner-1',
+      'dashboard-cache:initialize:learner-1'
+    ]);
+    expect(cacheDoc.tdfStats.tdfA.totalTrials).to.equal(1);
+    expect(cacheDoc.summary.totalTrialsAllTime).to.equal(1);
   });
 
   it('resetAdminLessonProgress clears admin history, experiment state, and root cache stats for a condition family', async function() {

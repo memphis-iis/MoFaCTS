@@ -35,7 +35,8 @@ export interface DashboardTdfStats {
   itemsPracticedCount: number;
   itemsPracticedApplies?: boolean;
   totalSessions: number;
-  overallAccuracy: number;
+  overallAccuracy: number | null;
+  accuracyApplies: boolean;
   accuracyWeightedCorrect?: number;
   accuracyWeightedTotal?: number;
   firstPracticeDate: Date | null;
@@ -80,4 +81,11 @@ export interface UpdateDashboardCacheResult {
   action?: 'updated' | 'no_history';
   error?: string;
   newRecords?: number;
+}
+
+export interface EnsureDashboardCacheCurrentResult {
+  success: true;
+  action: 'current' | 'refreshed';
+  tdfCount: number;
+  reason?: 'missing' | 'version' | 'history-newer';
 }

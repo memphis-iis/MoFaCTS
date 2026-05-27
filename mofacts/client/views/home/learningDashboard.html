@@ -113,7 +113,7 @@
                 <span class="learning-dashboard-cell__value">{{#if this.isUsed}}{{this.totalTrials}}{{else}}-{{/if}}</span>
               </td>
               <td class="learning-dashboard-cell learning-dashboard-cell--stat text-center" data-label="Overall Accuracy">
-                <span class="learning-dashboard-cell__value">{{#if this.isUsed}}{{this.overallAccuracy}}%{{else}}-{{/if}}</span>
+                <span class="learning-dashboard-cell__value">{{accuracyDisplay}}</span>
               </td>
               <td class="learning-dashboard-cell learning-dashboard-cell--stat text-center" data-label="Time (min)">
                 <span class="learning-dashboard-cell__value">{{#if this.isUsed}}{{this.totalTimeMinutes}}{{else}}-{{/if}}</span>
@@ -211,7 +211,7 @@
 
         <div>
           {{#if this.isUsed}}
-            <span class="badge bg-success">{{this.overallAccuracy}}%</span>
+            <span class="badge {{accuracyBadgeClass}}">{{accuracyBadgeLabel}}</span>
           {{else}}
             <span class="badge bg-secondary">New</span>
           {{/if}}

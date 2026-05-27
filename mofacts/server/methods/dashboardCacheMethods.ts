@@ -32,7 +32,7 @@ type DashboardCacheDeps = {
 };
 
 const DASHBOARD_LEVEL_UNIT_TYPES = ['model', 'schedule', 'autotutor'];
-const DASHBOARD_CACHE_VERSION = 2;
+const DASHBOARD_CACHE_VERSION = 3;
 
 function roundOneDecimal(value: number): number {
   return Number(value.toFixed(1));
@@ -44,6 +44,14 @@ function historyRecordTimestamp(record: DashboardHistoryRecord): number {
     return 0;
   }
   const timestamp = new Date(rawTimestamp).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function timestampValue(value: unknown): number {
+  if (!value) {
+    return 0;
+  }
+  const timestamp = new Date(value as string | number | Date).getTime();
   return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
@@ -80,39 +88,6 @@ function getHistoryPracticeTimeMs(
   return computePracticeTimeMs(record.CFEndLatency, record.CFFeedbackLatency);
 }
 
-function readAutoTutorProgress(record: DashboardHistoryRecord): number {
-  if (typeof record.CFNote !== 'string' || !record.CFNote.trim()) {
-    throw new Error('AutoTutor dashboard stats require CFNote progress');
-  }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(record.CFNote);
-  } catch {
-    throw new Error('AutoTutor dashboard stats require valid JSON in CFNote');
-  }
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    throw new Error('AutoTutor dashboard stats require an object CFNote payload');
-  }
-  const progress = (parsed as { progress?: unknown }).progress;
-  if (typeof progress !== 'number' || !Number.isFinite(progress) || progress < 0 || progress > 1) {
-    throw new Error('AutoTutor dashboard stats require CFNote.progress from 0 to 1');
-  }
-  return progress;
-}
-
-function getAutoTutorSessionKey(record: DashboardHistoryRecord): string {
-  const sessionId = typeof record.sessionID === 'string' && record.sessionID.trim()
-    ? record.sessionID.trim()
-    : null;
-  const levelUnit = record.levelUnit !== undefined && record.levelUnit !== null
-    ? String(record.levelUnit)
-    : null;
-  if (!sessionId || !levelUnit) {
-    throw new Error('AutoTutor dashboard stats require sessionID and levelUnit');
-  }
-  return `${sessionId}|${levelUnit}`;
-}
-
 export function computeCacheStats(
   history: DashboardHistoryRecord[],
   displayName: string | null | undefined,
@@ -129,7 +104,8 @@ export function computeCacheStats(
     itemsPracticedCount: 0,
     itemsPracticedApplies: false,
     totalSessions: 0,
-    overallAccuracy: 0,
+    overallAccuracy: null,
+    accuracyApplies: false,
     firstPracticeDate: null,
     lastPracticeDate: null,
     lastPracticeTimestamp: 0,
@@ -139,11 +115,11 @@ export function computeCacheStats(
 
   const uniqueItems = new Set<string>();
   const sessions = new Set<string>();
-  const autoTutorProgressBySession = new Map<string, number>();
-
   for (const record of countableHistory) {
     if (isAutoTutorRecord(record)) {
-      autoTutorProgressBySession.set(getAutoTutorSessionKey(record), readAutoTutorProgress(record));
+      // AutoTutor no longer has a dashboard accuracy percentage. Graduation is
+      // expectation/misconception based, so keep trial/time counts but exclude
+      // AutoTutor rows from accuracy aggregation.
     } else if (record.outcome === 'correct') {
       stats.correctTrials++;
     } else if (record.outcome === 'incorrect') {
@@ -180,15 +156,11 @@ export function computeCacheStats(
   stats.totalSessions = sessions.size;
   stats.totalTimeMinutes = Number((stats.totalTimeMs / 60000).toFixed(1));
 
-  const autoTutorProgressTotal = Array.from(autoTutorProgressBySession.values())
-    .reduce((sum, progress) => sum + progress, 0);
-  const accuracyWeightedCorrect = stats.correctTrials + autoTutorProgressTotal;
-  const accuracyWeightedTotal = stats.correctTrials + stats.incorrectTrials + autoTutorProgressBySession.size;
-  stats.accuracyWeightedCorrect = accuracyWeightedCorrect;
-  stats.accuracyWeightedTotal = accuracyWeightedTotal;
-  stats.overallAccuracy = accuracyWeightedTotal > 0
-    ? Number(((accuracyWeightedCorrect / accuracyWeightedTotal) * 100).toFixed(1))
-    : 0;
+  const answeredTrials = stats.correctTrials + stats.incorrectTrials;
+  stats.accuracyApplies = answeredTrials > 0;
+  stats.overallAccuracy = stats.accuracyApplies
+    ? Number(((stats.correctTrials / answeredTrials) * 100).toFixed(1))
+    : null;
 
   return stats;
 }
@@ -747,6 +719,70 @@ export function createDashboardCacheMethods({
 
       serverConsole(`Cache initialized for user ${targetUserId}: ${Object.keys(tdfStats).length} TDFs`);
       return { success: true, tdfCount: Object.keys(tdfStats).length };
+        }
+      );
+    },
+
+    ensureDashboardCacheCurrent: async function(this: any) {
+      if (!this.userId) {
+        throw new Meteor.Error('not-authorized', 'Must be logged in');
+      }
+
+      const userId = this.userId;
+      return await redisBoundary.withLock(
+        `dashboard-cache:ensure:${userId}`,
+        120000,
+        async () => {
+          const cache = await UserDashboardCache.findOneAsync({ userId });
+          const cacheTdfCount = Object.keys(cache?.tdfStats || {}).length;
+          if (!cache) {
+            const result = await methods.initializeDashboardCache.call(this);
+            return {
+              success: true,
+              action: 'refreshed',
+              reason: 'missing',
+              tdfCount: result.tdfCount
+            };
+          }
+
+          if (cache.version !== DASHBOARD_CACHE_VERSION) {
+            const result = await methods.initializeDashboardCache.call(this);
+            return {
+              success: true,
+              action: 'refreshed',
+              reason: 'version',
+              tdfCount: result.tdfCount
+            };
+          }
+
+          const latestHistory = await Histories.findOneAsync(
+            {
+              userId,
+              levelUnitType: { $in: DASHBOARD_LEVEL_UNIT_TYPES }
+            },
+            {
+              fields: { recordedServerTime: 1, time: 1 },
+              sort: { recordedServerTime: -1, time: -1 }
+            }
+          );
+          const latestHistoryTimestamp = latestHistory ? historyRecordTimestamp(latestHistory) : 0;
+          const cacheUpdatedTimestamp = timestampValue(cache.lastUpdated);
+
+          if (latestHistoryTimestamp > cacheUpdatedTimestamp) {
+            const result = await methods.initializeDashboardCache.call(this);
+            return {
+              success: true,
+              action: 'refreshed',
+              reason: 'history-newer',
+              tdfCount: result.tdfCount
+            };
+          }
+
+          return {
+            success: true,
+            action: 'current',
+            tdfCount: cacheTdfCount
+          };
         }
       );
     },

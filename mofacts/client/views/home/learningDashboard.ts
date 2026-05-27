@@ -5,6 +5,7 @@ import './learningDashboard.css';
 import {getExperimentState} from '../experiment/svelte/services/experimentState';
 import {meteorCallAsync, clientConsole} from '../..';
 /** @typedef {import('../../../server/methods/dashboardCacheMethods.contracts').InitializeDashboardCacheResult} InitializeDashboardCacheResult */
+/** @typedef {import('../../../server/methods/dashboardCacheMethods.contracts').EnsureDashboardCacheCurrentResult} EnsureDashboardCacheCurrentResult */
 import {sessionCleanUp} from '../../lib/sessionUtils';
 import {checkUserSession} from '../../lib/userSessionHelpers';
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra');
@@ -81,7 +82,7 @@ const EMPTY_CONFIG_STATE: LearnerConfigState = {
   resettingProgress: false,
 };
 
-const DASHBOARD_CACHE_VERSION = 2;
+const DASHBOARD_CACHE_VERSION = 3;
 const LEARNER_CONFIG_CLOSE_FALLBACK_MS = 200;
 const LEARNER_CONFIG_AUTOSAVE_DELAY_MS = 500;
 const LEARNER_CONFIG_SLIDER_DISPLAY_SESSION_KEY = 'learnerConfigSliderDisplayValues';
@@ -571,6 +572,7 @@ function clearLessonProgressStats(tdf: any, affectedTdfIds: Set<string>) {
     hasBeenAttempted: false,
     totalTrials: undefined,
     overallAccuracy: undefined,
+    accuracyApplies: undefined,
     totalTimeMinutes: undefined,
     itemsPracticed: undefined,
     lastPracticeTimestamp: undefined,
@@ -620,6 +622,32 @@ const lessonRowHelpers = {
 
   srIconClass(this: any): string {
     return this.hasSpeechAPIKey ? 'icon-configured' : 'icon-needs-config';
+  },
+
+  accuracyDisplay(this: any): string {
+    if (!this.isUsed || this.accuracyApplies === false || this.overallAccuracy === null || this.overallAccuracy === undefined) {
+      return '-';
+    }
+    return `${this.overallAccuracy}%`;
+  },
+
+  accuracyBadgeLabel(this: any): string {
+    if (!this.isUsed) {
+      return 'New';
+    }
+    if (this.accuracyApplies === false || this.overallAccuracy === null || this.overallAccuracy === undefined) {
+      return 'Used';
+    }
+    return `${this.overallAccuracy}%`;
+  },
+
+  accuracyBadgeClass(this: any): string {
+    if (!this.isUsed) {
+      return 'bg-secondary';
+    }
+    return this.accuracyApplies === false || this.overallAccuracy === null || this.overallAccuracy === undefined
+      ? 'bg-secondary'
+      : 'bg-success';
   },
 };
 
@@ -1114,6 +1142,18 @@ Template.learningDashboard.rendered = async function(this: any) {
   let cache = UserDashboardCache.findOne({ userId: studentID });
   clientConsole(2, '[Dashboard] Cache found:', cache ? 'yes' : 'no', cache ? `with ${Object.keys(cache.tdfStats || {}).length} TDFs` : '');
 
+  // The cache version only proves schema shape. Before trusting a current-version
+  // cache, verify it covers the learner's latest history writes.
+  try {
+    /** @type {EnsureDashboardCacheCurrentResult} */
+    const ensureResult = await meteorCallAsync('ensureDashboardCacheCurrent');
+    clientConsole(2, '[Dashboard] ensureDashboardCacheCurrent result:', ensureResult);
+    cache = UserDashboardCache.findOne({ userId: studentID });
+    clientConsole(2, '[Dashboard] Cache after freshness check:', cache ? `${Object.keys(cache.tdfStats || {}).length} TDFs` : 'still null');
+  } catch (err) {
+    clientConsole(1, '[Dashboard] Failed to ensure cache freshness:', err);
+  }
+
   // If no current cache exists, initialize it.
   if (!cache || cache.version !== DASHBOARD_CACHE_VERSION) {
     clientConsole(2, '[Dashboard] Cache missing or stale, initializing...');
@@ -1152,6 +1192,7 @@ Template.learningDashboard.rendered = async function(this: any) {
         statsMap.set(TDFId, {
           totalTrials: stats.totalTrials,
           overallAccuracy: stats.overallAccuracy,
+          accuracyApplies: stats.accuracyApplies !== false && stats.overallAccuracy !== null && stats.overallAccuracy !== undefined,
           totalTimeMinutes: stats.totalTimeMinutes,
           itemsPracticed: practicedCount,
           lastPracticeTimestamp: Number.isFinite(lastPracticeTimestamp) ? lastPracticeTimestamp : 0,
@@ -1302,6 +1343,7 @@ Template.learningDashboard.rendered = async function(this: any) {
         // Add stats if available (inline instead of second pass)
         totalTrials: stats?.totalTrials,
         overallAccuracy: stats?.overallAccuracy,
+        accuracyApplies: stats?.accuracyApplies,
         totalTimeMinutes: stats?.totalTimeMinutes,
         itemsPracticed: stats?.itemsPracticed,
         lastPracticeTimestamp: stats?.lastPracticeTimestamp,
