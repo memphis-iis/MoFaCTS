@@ -4,6 +4,8 @@ This directory is the target home for contributor-facing pedagogical extension p
 
 Current status: contributor-facing source root under active expansion. TypeScript, lint, and CI test bundling include this directory. Unit-engine code now runs here behind behavior-preserving import facades from legacy app paths.
 
+Start with `docs/learning-component-boundary-map.md` for the human/AI orientation map of component-owned code, app-owned services, manifest contracts, history flow, and current packages.
+
 Before adding new executable areas here, make sure Meteor/Rspack, Docker, lint, and tests cover the path deliberately so unresolved imports fail clearly.
 
 Current extension boundaries:
@@ -16,6 +18,11 @@ Current extension boundaries:
 - `runtime/TrialDisplayAdapterRegistry.ts`: display-owned trial adapter registry for H5P-style interactions.
 - `units/UnitEngineRegistry.ts`: unit engine registration and creation.
 - `units/learning-session/`: model learning-session unit package, including learning/video session runtime-config interpretation and model-card selection behavior.
+- `units/assessment-session/`: assessment schedule unit package and authored schedule construction.
+- `units/autotutor/`: AutoTutor unit package, runtime contracts, saved state/history validation, and planning helpers.
+- `units/instruction/`: instruction-only unit-engine package.
+- `units/video-session/`: minimal video-session unit package and adaptive video question helpers.
+- `trial-displays/h5p/`: H5P trial-display package and result/display normalization.
 
 Belongs here:
 

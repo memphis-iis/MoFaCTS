@@ -14,6 +14,6 @@ App-owned responsibilities:
 - H5P package import and validation.
 - H5P content/library storage and asset serving.
 - Server methods, authorization enforcement, and persistence.
-- History row writing and model update orchestration.
+- Canonical history envelope construction, compression, row writing, and model update orchestration.
 
 The component must fail clearly when required H5P display/result data is invalid. It must not substitute local storage, history writing, or server calls when those app-owned capabilities are unavailable.

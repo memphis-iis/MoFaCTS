@@ -106,7 +106,7 @@ learning-components/
 │
 └── runtime/
     ├── LearningComponentContext.ts
-    ├── MeteorLearningComponentContext.ts
+    ├── LearningComponentAdapterContext.ts
     └── learningSessionKeys.ts
 ```
 
@@ -502,7 +502,7 @@ Only after the first extractions are stable, introduce:
 
 ```text
 learning-components/runtime/LearningComponentContext.ts
-learning-components/runtime/MeteorLearningComponentContext.ts
+learning-components/runtime/LearningComponentAdapterContext.ts
 ```
 
 Purpose:

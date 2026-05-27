@@ -18,7 +18,7 @@ App-owned for the current milestone:
 
 - Svelte chat shell and browser OpenRouter calls.
 - Meteor session wiring, route flow, and card lifecycle integration.
-- History persistence and server methods.
+- Canonical history envelope validation, compression, persistence, and server methods.
 - Authoring, upload, encryption, and configuration repository sync.
 
 Current manifest requirements:
@@ -30,3 +30,7 @@ Current manifest requirements:
 - `logging`
 
 Future extraction should wire app-owned dependencies through these typed capabilities before moving them into this package. Missing capabilities must fail clearly during manifest registration rather than being inferred from global app state.
+
+AutoTutor writes turn telemetry through `AutoTutorHistoryRuntime.writeCanonicalHistory`. The component owns AutoTutor-specific note/state validation, but the app owns the final canonical history envelope, `historySchemaVersion`, extension-field size checks, wire compression, authorization, and persistence path.
+
+The manifest names `getAutoTutorHistoryForUnit` as its server-method dependency for resume/history loading.

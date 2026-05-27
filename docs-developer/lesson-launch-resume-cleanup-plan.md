@@ -273,7 +273,7 @@ Add tests for:
 - Collapsed `CARD_REFRESH_REBUILD` into a bootstrap-only signal. Card initialization dispatch now receives the resolved real intent, and refresh classification treats either `currentUnitNumber >= unitCount` or `lastUnitCompleted >= unitCount - 1` as completed.
 - Added `client/views/experiment/engineConstructors.ts` as the current engine-construction boundary. Svelte init/resume no longer import root `unitEngine.ts` constructors directly, and resume engine reset now fails clearly for units that have no runnable session or instruction-only content.
 - Added `client/lib/lessonLaunchRunner.ts` for experiment/direct-entry launch. `/card` bootstrap and experiment sign-in no longer import `selectTdf` from `home.ts`, and the home page no longer owns runnable lesson launch code.
-- Removed `Session.get('unitEngine')` coupling from `client/lib/plyrHelper.ts`. Plyr/video helper initialization now requires an explicit current engine handle, and the Svelte video service passes `context.engine` instead of relying on Session.
+- Removed the legacy `client/lib/plyrHelper.ts` video helper and the Svelte `videoPlayerService` bridge. Current video playback owns Plyr initialization directly in `VideoSessionMode.svelte`.
 - Removed lesson-version product architecture. Dashboard no longer gates by lineage/current-version metadata, upload/edit no longer blocks overwrites with "publish vN+1", and runtime resume warnings now describe saved-progress incompatibility instead of version routing.
 
 ## Mapping Signature Policy
@@ -303,7 +303,6 @@ Tester-only paths do not import the root engine directly:
 
 Related product residue:
 
-- `client/lib/plyrHelper.ts` is still product/compat-active for root video cleanup and helper paths, but it no longer reads `Session.get('unitEngine')`.
 - `client/views/home/home.ts` is not the normal content-launch UI and no longer exports `selectTdf`. Experiment/direct-entry launch now runs through `client/lib/lessonLaunchRunner.ts`.
 
 Safe cleanup applied there for now:
@@ -315,7 +314,7 @@ Deletion should wait for explicit extraction/replacement:
 - Move engine constructors out of `client/views/experiment/unitEngine.ts` into a neutral engine factory or Svelte-owned runtime module.
 - Move instruction progression off root `unitProgression.ts` or make a shared progression service used by both `/instructions` and Svelte card completion.
 - Done: experiment/direct-entry launch has moved off `home.selectTdf` and onto `client/lib/lessonLaunchRunner.ts`.
-- Done: remove `Session.get('unitEngine')` helper coupling after video/audio paths use an explicit current-engine handle.
+- Done: remove the legacy Plyr helper/service after video playback moved to direct component-owned initialization.
 
 ## Legacy Field Audit
 

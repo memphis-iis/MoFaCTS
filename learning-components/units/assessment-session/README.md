@@ -9,4 +9,4 @@ This package owns the in-repo assessment schedule unit engine.
 - `assessmentSettings.ts` and `createAssessmentSchedule.ts`: authored assessment-session settings parsing and schedule construction.
 - `__fixtures__/`: package-owned assessment schedule fixtures used by compatibility tests.
 
-App-owned Meteor Session, persistence, learner state, UI alerts, server methods, routing, and authorization stay outside this package and enter through the manifest dependency adapter. Missing runtime capabilities must fail during component registration rather than being recovered from globals.
+App-owned Meteor Session, persistence, learner state, UI alerts, routing, and authorization stay outside this package and enter through the manifest dependency adapter. This unit does not declare `server-methods`; schedule persistence is owned by the `assessment-state` capability. Missing runtime capabilities must fail during component registration rather than being recovered from globals.

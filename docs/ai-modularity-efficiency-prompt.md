@@ -2,6 +2,8 @@
 
 Use this prompt when evaluating or proposing architecture changes for MoFaCTS.
 
+For a human/AI orientation map of current component boundaries, start with `docs/learning-component-boundary-map.md`.
+
 ## Goal
 
 Improve modularity for ecosystem adoption **without breaking integrated-system behavior**.
@@ -25,11 +27,13 @@ MoFaCTS must remain one coherent runtime where components share:
    - All activity types must write to a compatible history envelope.
    - Keep event names/fields stable or versioned with migration notes.
    - Allow component-specific payload fields, but keep a common core schema for cross-component analysis.
+   - Current schema, event names, and migration policy live in `docs/history-envelope.md`.
 
 3. **Minimize server usage**
    - Keep pure compute on client/shared code when safe.
    - Use server methods only for DB access, auth/authorization, secrets, or external APIs.
    - Avoid introducing server-heavy orchestration for component logic.
+   - Treat modularity as an efficiency audit: a clearer boundary should remove duplicate interpretation, redundant payload shaping, or unnecessary server round-trips.
 
 4. **Keep per-trial logs small**
    - Send compact per-trial records (IDs, timestamps, outcome, key signals).
@@ -38,6 +42,7 @@ MoFaCTS must remain one coherent runtime where components share:
 
 5. **No fake modularity**
    - Reject “modular” proposals that still require hidden global state, route-only hooks, private services, or undocumented lifecycle side effects.
+   - Component manifest and capability rules live in `docs/learning-component-contracts.md`.
 
 ## What to Evaluate
 
@@ -45,6 +50,7 @@ For each proposal/change, answer:
 
 - Does it keep MoFaCTS as one integrated system?
 - Does it preserve shared history record comparability?
+- Does it remove unnecessary work, especially duplicate client parsing or avoidable server calls?
 - Does it reduce or at least not increase server load?
 - Does it keep per-trial payloads compact?
 - Can outside developers add content/components without learning unrelated internals?

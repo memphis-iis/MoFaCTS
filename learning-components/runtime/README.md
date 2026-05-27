@@ -11,10 +11,17 @@ Belongs here:
 - Learning component manifests.
 - Component-level runtime events.
 - Trial-display adapters that declare interaction ownership and normalization contracts.
+- The canonical history envelope contract in `historyEnvelope.ts`; app/common code may re-export it, but learning components should import the runtime-owned contract directly.
+- History runtime contracts such as `HistoryRuntime.writeCanonicalHistory`, which require components to emit the shared app history envelope instead of calling persistence directly. The app stamps and validates `historySchemaVersion`, total wire size, and known extension-field size on that envelope before persistence.
+- Named server-method requirements on manifests. A component that needs `server-methods` must declare the specific method names it expects instead of relying on an undocumented generic call pipe.
+- Adapter-context helpers that project app-supplied functions into component contracts without naming a specific host runtime.
 
 Does not belong here:
 
 - App-owned persistence, routing, startup, publications, or collections.
-- App routing, startup, publications, or collections.
+- Server method calls or direct history collection writes from component code.
 
-Runtime contracts should make dependencies explicit so learning components do not reach directly into Meteor `Session`, app globals, or unrelated helpers. During migration, a Meteor-backed adapter may exist here only as a bridge while the app/runtime tree is not yet executable.
+Runtime contracts should make dependencies explicit so learning components do not reach directly into Meteor `Session`, app globals, or unrelated helpers. App runtime code may supply adapters from Meteor-backed services, but component-owned runtime contracts should stay host-runtime neutral.
+
+The canonical history schema, stable event-type vocabulary, and migration rule are documented in `docs/history-envelope.md`.
+The manifest/runtime contract for component authors is documented in `docs/learning-component-contracts.md`.

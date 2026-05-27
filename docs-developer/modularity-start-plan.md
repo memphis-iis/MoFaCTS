@@ -62,7 +62,7 @@ Make a new in-repo component feel like a small package:
    Unit-engine prepared-advance eligibility, video checkpoint index selection, and post-answer engine-index mirroring now resolve active video surface state through `sessionSurfaceMode.ts`.
    Resume video-session detection, preload source resolution, and the video resume return path now live in `videoResume.ts` helpers, with resume orchestration calling that tested boundary instead of branching directly on video session state.
    Legacy instructions continue now uses the shared `resolveUnitEngineTypeForUnit` unit-shape resolver instead of branching directly on session fields to identify instruction-only units.
-   Adaptive video question insertion, question-time mutation, and adaptive checkpoint mutation now live in `mofacts/client/views/experiment/videoAdaptiveQuestions.ts`, leaving `AdaptiveQuestionLogic` to evaluate rules and hand video-session mutations to a tested video-owned boundary.
+   Adaptive video question insertion, question-time mutation, and adaptive checkpoint mutation now live in `learning-components/units/video-session/adaptiveVideoQuestions.ts`, leaving `AdaptiveQuestionLogic` to evaluate rules and hand video-session mutations to a tested video-owned boundary.
    Svelte card initialization-failure diagnostics now ask `sessionSurfaceMode.ts` for the session diagnostic cluster list instead of reading learning/video/assessment unit shapes inline.
    Video playback policy flags for scrubbing, rewind, and checkpoint-repeat behavior now resolve through `videoCardInit.ts`, keeping `CardScreen.svelte` from reading or normalizing authored `videosession` fields directly.
    Prepared incoming-trial orchestration now resolves named behavior routes before preparing the next card, so the service no longer spreads raw video/model/schedule unit-type branches across the flow.
@@ -75,7 +75,7 @@ Make a new in-repo component feel like a small package:
    Card payload button-trial construction now asks a named schedule policy before reading assessment schedule state, keeping assessment-session gating out of the payload assembly branch.
    Svelte launch engine reuse/reinitialization now resolves through a tested app launch policy helper, keeping unit-type/context comparison out of the bootstrap orchestration.
    Legacy instruction continue now resolves instruction-only advance/dashboard behavior through a tested policy helper, leaving the template flow to apply the route/session/state decision.
-   Adaptive assessment template cluster-list mutation now lives behind `assessmentAdaptiveSchedule.ts`, mirroring the video-owned adaptive schedule helper and keeping authored `assessmentsession` writes out of `AdaptiveQuestionLogic`.
+   Adaptive assessment template cluster-list mutation now lives behind `learning-components/units/assessment-session/adaptiveAssessmentSchedule.ts`, mirroring the video-owned adaptive schedule helper and keeping authored `assessmentsession` writes out of `AdaptiveQuestionLogic`.
    Learning-session model preparation now resolves assessment-vs-learning cluster-list source through the learning-session runtime-config owner instead of branching directly on authored session shapes.
    The Svelte card tester now uses the shared `resolveUnitEngineTypeForUnit` compatibility boundary instead of maintaining a local authored-shape unit-type resolver.
    Svelte machine prepared-advance eligibility now names the model/schedule engine policy before composing it with video-surface and resume guards.
