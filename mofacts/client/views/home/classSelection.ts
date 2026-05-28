@@ -115,7 +115,7 @@ Template.classSelection.events({
       Session.set('curTeacher', teacher);
       Session.set('curClass', curClass);
       alert('Class selection saved.');
-      FlowRouter.go('/learningDashboard');
+      FlowRouter.go('/home');
     } catch (error: unknown) {
       clientConsole(1, '[CLASS_SELECTION] Failed saving class selection:', error);
       alert('Could not save class selection. Please try again.');

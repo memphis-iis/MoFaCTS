@@ -799,7 +799,7 @@ Template.registerHelper('showAuthenticatedChrome', function() {
   }
 
   const currentTemplate = Session.get('currentTemplate');
-  return !['signIn', 'signUp', 'resetPassword', 'verifyEmail', 'experimentError'].includes(currentTemplate);
+  return !['signIn', 'signUp', 'resetPassword', 'verifyEmail', 'experimentError', 'home'].includes(currentTemplate);
 });
 Template.registerHelper('showPageNumbers', function() {
   return Session.get('showPageNumbers');

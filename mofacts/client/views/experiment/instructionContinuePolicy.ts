@@ -1,6 +1,6 @@
 import type { UnitType } from '../../../common/types';
 
-export type InstructionContinueNavigationTarget = '/card' | '/learningDashboard';
+export type InstructionContinueNavigationTarget = '/card' | '/home';
 
 export type InstructionContinuePolicy = {
   navigationTarget: InstructionContinueNavigationTarget;
@@ -33,7 +33,7 @@ export function resolveInstructionContinuePolicy(params: {
     };
   }
 
-  const navigationTarget = nextUnitNumber < params.unitCount ? '/card' : '/learningDashboard';
+  const navigationTarget = nextUnitNumber < params.unitCount ? '/card' : '/home';
   const policy: InstructionContinuePolicy = {
     navigationTarget,
     experimentStatePatch: {

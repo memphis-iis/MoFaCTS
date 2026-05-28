@@ -301,13 +301,7 @@ function handleIndexRoute(controller: any, user: any) {
       routeToSignin();
       return;
     }
-    // Check if user is admin or teacher, redirect to home
-    // Otherwise redirect to learning dashboard for students
-    if (currentUserHasRole('admin,teacher')) {
-      FlowRouter.go('/home');
-    } else {
-      FlowRouter.go('/learningDashboard');
-    }
+    FlowRouter.go('/home');
     return;
   }
 
@@ -751,25 +745,6 @@ FlowRouter.route('/experimentError', {
     Session.set('suppressAuthenticatedChrome', true);
     clearAppLoadingUnlessLaunch();
     await renderRouteTemplate(this, 'experimentError');
-  }
-})
-
-FlowRouter.route('/learningDashboard', {
-  name: 'client.learningDashboard',
-  action: function() {
-    waitForAuthenticatedRoute(this, 'client.learningDashboard', async (user: any) => {
-      if (getUserLoginMode(user) === 'experiment') {
-        Session.set('experimentError', {
-          title: 'Experiment paused',
-          message: 'This experiment link does not provide access to the general learning dashboard.',
-          note: 'Please email the experiment coordinator or study contact with your participant ID.',
-        });
-        FlowRouter.go('/experimentError');
-        return;
-      }
-      Session.set('curModule', 'learningDashboard');
-      renderLayout(this, 'learningDashboard');
-    });
   }
 })
 

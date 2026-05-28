@@ -37,13 +37,13 @@ describe('instructionContinuePolicy', function() {
     });
   });
 
-  it('routes past the final instruction-only unit to the dashboard', function() {
+  it('routes past the final instruction-only unit to the home dashboard', function() {
     expect(resolveInstructionContinuePolicy({
       unitType: 'instruction-only',
       currentUnitNumber: 4,
       unitCount: 5,
     })).to.deep.equal({
-      navigationTarget: '/learningDashboard',
+      navigationTarget: '/home',
       experimentStatePatch: {
         currentUnitNumber: 5,
         lastUnitCompleted: 4,

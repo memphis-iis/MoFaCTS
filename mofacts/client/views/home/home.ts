@@ -1,8 +1,9 @@
 import {checkUserSession, clientConsole} from '../../lib/userSessionHelpers';
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra');
-import {Cookie} from '../../lib/cookies';
 import { Tracker } from 'meteor/tracker';
 import DOMPurify from 'dompurify';
+import { Cookie } from '../../lib/cookies';
+import { currentUserHasRole } from '../../lib/roleUtils';
 import './home.html';
 import './home.css';
 
@@ -11,19 +12,15 @@ declare const Session: any;
 declare const Meteor: any;
 
 const MAIN_MENU_RETURN_TOUR_DURATION_MS = 5000;
-const HOME_NAV_HEIGHT_PROPERTY = '--home-nav-height';
+const HOME_SIDEBAR_COLLAPSED_KEY = 'mofacts.home.sidebarCollapsed';
 const HOME_WELCOME_ALLOWED_TAGS = ['h1', 'h2', 'h3', 'p', 'br', 'span', 'strong', 'em', 'b', 'i', 'u', 'a', 'ul', 'ol', 'li'];
 const HOME_WELCOME_ALLOWED_ATTR = ['href', 'title', 'target', 'rel', 'class', 'style'];
 
 type HomeTourStepId =
   | 'main-menu-return'
   | 'learning-dashboard'
-  | 'teacher-select'
   | 'content-manager'
-  | 'download-data'
-  | 'audio-settings'
-  | 'help'
-  | 'documentation';
+  | 'download-data';
 type HomeTourStep = {
   id: HomeTourStepId;
   text: string;
@@ -33,18 +30,13 @@ type HomeTourStep = {
 const HOME_TOUR_STEPS: HomeTourStep[] = [
   {
     id: 'main-menu-return',
-    text: 'Return to the main menu at any time. All prior practice is automatically saved.',
-    getTarget: () => document.querySelector('.navbar .home-link'),
+    text: 'Return here at any time. All prior practice is automatically saved.',
+    getTarget: () => document.getElementById('homePracticeButton'),
   },
   {
     id: 'learning-dashboard',
     text: 'Begin practice here',
-    getTarget: () => document.getElementById('myLessonsButton'),
-  },
-  {
-    id: 'teacher-select',
-    text: 'Ignore this one unless your teacher told you to come here.',
-    getTarget: () => document.getElementById('classSelectionButton'),
+    getTarget: () => document.getElementById('learningDashboardContainer'),
   },
   {
     id: 'content-manager',
@@ -55,21 +47,6 @@ const HOME_TOUR_STEPS: HomeTourStep[] = [
     id: 'download-data',
     text: "After you've created your own content, this will become relevant.",
     getTarget: () => document.getElementById('dataDownloadButton'),
-  },
-  {
-    id: 'audio-settings',
-    text: 'This is where you get text-to-speech and speech recognition.',
-    getTarget: () => document.getElementById('audioSettingsButton'),
-  },
-  {
-    id: 'help',
-    text: 'Basic information.',
-    getTarget: () => document.getElementById('helpButton'),
-  },
-  {
-    id: 'documentation',
-    text: 'The full story.',
-    getTarget: () => document.getElementById('wikiProfileButton'),
   },
 ];
 
@@ -98,10 +75,35 @@ Template.home.helpers({
       return '';
     }
 
-    return DOMPurify.sanitize(html, {
+    const practiceMenuHtml = html
+      .replace(/\bthe Learning Dashboard\b/g, 'the practice menu')
+      .replace(/\bLearning Dashboard\b/g, 'practice menu')
+      .replace(/\blearning dashboard\b/g, 'practice menu');
+
+    return DOMPurify.sanitize(practiceMenuHtml, {
       ALLOWED_TAGS: HOME_WELCOME_ALLOWED_TAGS,
       ALLOWED_ATTR: HOME_WELCOME_ALLOWED_ATTR,
     });
+  },
+
+  userInitials(): string {
+    const user = Meteor.user();
+    const raw = String(user?.username || user?.email_canonical || user?.emails?.[0]?.address || 'M');
+    const parts = raw.split(/[^A-Za-z0-9]+/).filter(Boolean);
+    const first = parts[0] || raw;
+    const second = parts[1] || '';
+    return (parts.length > 1 ? `${first.charAt(0)}${second.charAt(0)}` : raw.slice(0, 2)).toUpperCase();
+  },
+
+  userDisplayName(): string {
+    const user = Meteor.user();
+    return String(user?.username || user?.email_canonical || user?.emails?.[0]?.address || '').trim();
+  },
+
+  userRoleLabel(): string {
+    if (currentUserHasRole('admin')) return 'Admin';
+    if (currentUserHasRole('teacher')) return 'Teacher';
+    return 'Learner';
   }
 });
 
@@ -113,48 +115,14 @@ Template.home.events({
     advanceMainMenuTour(template);
   },
 
-  'click #tourButton': function(event: any, template: any) {
+  'click #homePracticeButton': function(event: any) {
     event.preventDefault();
-    startMainMenuTour(template, { manual: true });
-  },
-
-  'click #myLessonsButton': function(event: any) {
-    event.preventDefault();
-    FlowRouter.go('/learningDashboard');
-  },
-
-  'click #classSelectionButton': function(event: any) {
-    event.preventDefault();
-    FlowRouter.go('/classSelection');
+    document.getElementById('learningDashboardContainer')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   },
 
   'click #contentUploadButton': function(event: any) {
     event.preventDefault();
     FlowRouter.go('/contentUpload');
-  },
-
-  'click #audioSettingsButton': function(event: any) {
-    event.preventDefault();
-    FlowRouter.go('/audioSettings');
-  },
-
-  'click #helpButton': function(event: any) {
-    event.preventDefault();
-    FlowRouter.go('/help');
-  },
-
-  'click #logoutButton': function(event: any) {
-    event.preventDefault();
-    Session.set('loginMode', 'normal');
-    Cookie.set('isExperiment', '0', 1); // 1 day
-    Cookie.set('experimentTarget', '', 1);
-    Cookie.set('experimentXCond', '', 1);
-    Meteor.logout(function() {
-      Session.set('curModule', 'signinoauth');
-      Session.set('currentTemplate', 'signIn');
-      Session.set('appLoading', false);
-      routeAfterLogout('/');
-    });
   },
 
   'click #classEditButton': function(event: any) {
@@ -175,11 +143,6 @@ Template.home.events({
   'click #dataDownloadButton': function(event: any) {
     event.preventDefault();
     FlowRouter.go('/dataDownload');
-  },
-
-  'click #wikiProfileButton': function(event: any) {
-    event.preventDefault();
-    window.open('https://github.com/memphis-iis/mofacts/wiki', '_blank');
   },
 
   'click #adminControlsBtn': function(event: any) {
@@ -205,27 +168,72 @@ Template.home.events({
   'click #adminTestsButton': function(event: any) {
     event.preventDefault();
     FlowRouter.go('/admin/tests');
+  },
+
+  'click #sidebarToggle': function(event: any) {
+    event.preventDefault();
+    const sidebar = document.getElementById('sidebar');
+    const main = document.getElementById('homeMain');
+    const nextCollapsed = !sidebar?.classList.contains('sidebar-collapsed');
+    sidebar?.classList.toggle('sidebar-collapsed', nextCollapsed);
+    main?.classList.toggle('main-sidebar-collapsed', nextCollapsed);
+    window.localStorage.setItem(HOME_SIDEBAR_COLLAPSED_KEY, nextCollapsed ? '1' : '0');
+  },
+
+  'click #mobileSidebarToggle': function(event: any) {
+    event.preventDefault();
+    document.getElementById('sidebar')?.classList.toggle('sidebar-mobile-open', true);
+  },
+
+  'click #userToggle': function(event: any) {
+    event.preventDefault();
+    event.stopPropagation();
+    const dropdown = document.getElementById('userDropdown');
+    const toggle = document.getElementById('userToggle');
+    const open = !dropdown?.classList.contains('open');
+    dropdown?.classList.toggle('open', open);
+    toggle?.setAttribute('aria-expanded', open ? 'true' : 'false');
+  },
+
+  'click [data-home-action]': function(event: any, template: any) {
+    event.preventDefault();
+    event.stopPropagation();
+    const action = event.currentTarget.getAttribute('data-home-action');
+    document.getElementById('userDropdown')?.classList.remove('open');
+    document.getElementById('userToggle')?.setAttribute('aria-expanded', 'false');
+
+    if (action === 'tour') {
+      startMainMenuTour(template, { manual: true });
+      return;
+    }
+    if (action === 'documentation') {
+      window.open('https://github.com/memphis-iis/mofacts/wiki', '_blank');
+      return;
+    }
+    if (action === 'logout') {
+      Session.set('loginMode', 'normal');
+      Cookie.set('isExperiment', '0', 1);
+      Cookie.set('experimentTarget', '', 1);
+      Cookie.set('experimentXCond', '', 1);
+      Meteor.logout(() => {
+        Session.set('curModule', 'signinoauth');
+        Session.set('currentTemplate', 'signIn');
+        Session.set('appLoading', false);
+        FlowRouter.go('/');
+      });
+      return;
+    }
+
+    const routes: Record<string, string> = {
+      audioSettings: '/audioSettings',
+      classSelection: '/classSelection',
+      help: '/help',
+    };
+    if (routes[action]) {
+      FlowRouter.go(routes[action]);
+    }
   }
 });
-
-function routeAfterLogout(target = '/') {
-  let handle: any = null;
-  handle = Tracker.autorun(() => {
-    if (!Meteor.userId()) {
-      // Check if handle exists before stopping (prevents race condition)
-      if (handle) {
-        handle.stop();
-      }
-      FlowRouter.go(target);
-    }
-  });
-  Meteor.setTimeout(() => {
-    if (handle) {
-      handle.stop();
-      FlowRouter.go(target);
-    }
-  }, 3000);
-}
 
 // We'll use this in card.js if audio input is enabled and user has provided a
 // speech API key
@@ -375,32 +383,26 @@ function startMainMenuTour(templateInstance: any, options: { manual?: boolean } 
   showCurrentMainMenuTourStep(templateInstance);
 }
 
-async function hydrateHomePracticeState(templateInstance: any): Promise<void> {
+async function hydrateHomePracticeState(): Promise<void> {
   try {
     const result = await Meteor.callAsync('initializeDashboardCache', null);
     const practicedSystemCount = Number(result?.tdfCount || 0);
     const hasPracticeRecords = practicedSystemCount > 0;
     Session.set('homeHasPracticeRecords', hasPracticeRecords);
-    if (Session.get('homeHasPracticeRecords') === false && !templateInstance._mainMenuTourManual) {
-      Session.set('showMainMenuReturnTour', true);
-      if (templateInstance._homeReadyForTour) {
-        startMainMenuTour(templateInstance, { manual: false });
-      }
-    }
   } catch (error: unknown) {
     clientConsole(1, '[HOME] Failed to hydrate practice state for welcome/tour:', error);
   }
 }
 
-function updateHomeNavHeightVariable(): void {
-  const navbar = document.querySelector('.navbar') as HTMLElement | null;
-  if (!navbar) {
-    clientConsole(1, '[HOME] Home underlay could not find the navbar height anchor.');
-    document.documentElement.style.removeProperty(HOME_NAV_HEIGHT_PROPERTY);
+function restoreHomeSidebarPreference(): void {
+  const sidebar = document.getElementById('sidebar');
+  const main = document.getElementById('homeMain');
+  if (!sidebar || !main) {
     return;
   }
-
-  document.documentElement.style.setProperty(HOME_NAV_HEIGHT_PROPERTY, `${navbar.offsetHeight}px`);
+  const collapsed = window.localStorage.getItem(HOME_SIDEBAR_COLLAPSED_KEY) === '1';
+  sidebar.classList.toggle('sidebar-collapsed', collapsed);
+  main.classList.toggle('main-sidebar-collapsed', collapsed);
 }
 
 Template.home.onRendered(async function(this: any) {
@@ -420,10 +422,25 @@ Template.home.onRendered(async function(this: any) {
   Session.set('homeHasPracticeRecords', null);
 
   const templateInstance = this;
-  void hydrateHomePracticeState(templateInstance);
-  updateHomeNavHeightVariable();
-  templateInstance._homeNavHeightHandler = updateHomeNavHeightVariable;
-  window.addEventListener('resize', updateHomeNavHeightVariable);
+  void hydrateHomePracticeState();
+  restoreHomeSidebarPreference();
+  templateInstance._homeDocumentClickHandler = (event: Event) => {
+    const target = event.target as HTMLElement | null;
+    if (!target?.closest('#userToggle')) {
+      document.getElementById('userDropdown')?.classList.remove('open');
+      document.getElementById('userToggle')?.setAttribute('aria-expanded', 'false');
+    }
+    if (
+      window.matchMedia('(max-width: 1024px)').matches &&
+      !target?.closest('#sidebar') &&
+      !target?.closest('#mobileSidebarToggle')
+    ) {
+      document.getElementById('sidebar')?.classList.remove('sidebar-mobile-open');
+    }
+  };
+  document.addEventListener('click', templateInstance._homeDocumentClickHandler);
+  templateInstance._homeTourRequestHandler = () => startMainMenuTour(templateInstance, { manual: true });
+  window.addEventListener('mofacts:startHomeTour', templateInstance._homeTourRequestHandler);
   // Trigger fade-in after theme is ready and CSS is painted
   // Store handle for cleanup
   templateInstance._themeAutorunHandle = Tracker.autorun(() => {
@@ -446,9 +463,6 @@ Template.home.onRendered(async function(this: any) {
             container.classList.remove("page-loading");
             container.classList.add("page-loaded");
             templateInstance._homeReadyForTour = true;
-            if (Session.get('showMainMenuReturnTour') === true && Session.get('homeHasPracticeRecords') === false) {
-              startMainMenuTour(templateInstance, { manual: false });
-            }
             if (templateInstance._themeAutorunHandle) {
               templateInstance._themeAutorunHandle.stop();
               templateInstance._themeAutorunHandle = null;
@@ -468,11 +482,14 @@ Template.home.onDestroyed(function(this: any) {
     this._themeAutorunHandle.stop();
     this._themeAutorunHandle = null;
   }
-  if (this._homeNavHeightHandler) {
-    window.removeEventListener('resize', this._homeNavHeightHandler);
-    this._homeNavHeightHandler = null;
+  if (this._homeDocumentClickHandler) {
+    document.removeEventListener('click', this._homeDocumentClickHandler);
+    this._homeDocumentClickHandler = null;
   }
-  document.documentElement.style.removeProperty(HOME_NAV_HEIGHT_PROPERTY);
+  if (this._homeTourRequestHandler) {
+    window.removeEventListener('mofacts:startHomeTour', this._homeTourRequestHandler);
+    this._homeTourRequestHandler = null;
+  }
   hideMainMenuReturnTour(this);
 });
 

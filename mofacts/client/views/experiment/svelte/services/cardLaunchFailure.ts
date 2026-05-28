@@ -8,7 +8,7 @@ export interface CardLaunchFailureDependencies {
   readonly finishLaunchLoading: (reason: 'card-initialization-failed') => void;
   readonly getLoginMode: () => unknown;
   readonly getUser: () => CardLaunchFailureUser | null | undefined;
-  readonly routeTo: (path: '/experimentError' | '/learningDashboard') => void;
+  readonly routeTo: (path: '/experimentError' | '/home') => void;
   readonly setSessionValue: (key: string, value: unknown) => void;
 }
 
@@ -40,8 +40,8 @@ export function routeCardInitializationFailure(deps: CardLaunchFailureDependenci
   }
 
   deps.setSessionValue('uiMessage', {
-    text: 'Lesson did not initialize correctly. Please restart from the Learning Dashboard.',
+    text: 'Lesson did not initialize correctly. Please restart from the practice menu.',
     variant: 'danger',
   });
-  deps.routeTo('/learningDashboard');
+  deps.routeTo('/home');
 }

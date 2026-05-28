@@ -17,7 +17,7 @@ function createDeps(user: CardLaunchFailureUser | null, loginMode: unknown) {
       },
       getLoginMode: () => loginMode,
       getUser: () => user,
-      routeTo: (path: '/experimentError' | '/learningDashboard') => {
+      routeTo: (path: '/experimentError' | '/home') => {
         routes.push(path);
       },
       setSessionValue: (key: string, value: unknown) => {
@@ -63,16 +63,16 @@ describe('card launch failure routing', function() {
     });
   });
 
-  it('routes ordinary learners back to the dashboard with the existing message', function() {
+  it('routes ordinary learners back to the practice menu with the existing message', function() {
     const harness = createDeps(null, 'normal');
 
     routeCardInitializationFailure(harness.deps);
 
     expect(harness.launchReasons).to.deep.equal(['card-initialization-failed']);
-    expect(harness.routes).to.deep.equal(['/learningDashboard']);
+    expect(harness.routes).to.deep.equal(['/home']);
     expect(harness.sessionValues.get('appLoading')).to.equal(false);
     expect(harness.sessionValues.get('uiMessage')).to.deep.equal({
-      text: 'Lesson did not initialize correctly. Please restart from the Learning Dashboard.',
+      text: 'Lesson did not initialize correctly. Please restart from the practice menu.',
       variant: 'danger',
     });
     expect(harness.sessionValues.has('experimentError')).to.equal(false);

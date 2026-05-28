@@ -191,7 +191,7 @@ function showFieldSignInError(nextState: Partial<SignInState>, template?: any) {
 const EXPERIMENT_PORTAL_DESCRIPTION =
   'Welcome to the MoFaCTs experiment portal. This page is used to start a new experiment session or continue a previous one.';
 const DEFAULT_SIGNIN_DESCRIPTION =
-  'Sign in to access your learning dashboard, saved progress, and account tools.';
+  'Sign in to access your practice menu, saved progress, and account tools.';
 
 function queueMainMenuReturnTour() {
   Session.set('showMainMenuReturnTour', true);
@@ -789,7 +789,7 @@ Template.signIn.helpers({
 // Implementation functions
 
 // Called after we have signed in
-async function signInNotify(landingPage: string | false = '/profile') {
+async function signInNotify(landingPage: string | false = '/home') {
   if (Session.get('debugging')) {
     const currentUser = (Meteor.users.findOne({ _id: Meteor.userId() as string }) as any)?.username;
     clientConsole(2, currentUser + ' was logged in successfully! Current route is ', getCurrentRouteName());

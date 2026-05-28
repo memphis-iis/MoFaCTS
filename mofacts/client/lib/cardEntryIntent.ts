@@ -15,7 +15,7 @@ export const CARD_ENTRY_INTENT = {
 
 export type CardEntryIntent = typeof CARD_ENTRY_INTENT[keyof typeof CARD_ENTRY_INTENT];
 
-export const COMPLETED_LESSON_REDIRECT = '/learningDashboard' as const;
+export const COMPLETED_LESSON_REDIRECT = '/home' as const;
 
 export const CARD_REFRESH_REBUILD_REASON = {
   NO_EXPERIMENT_STATE: 'no_experiment_state',

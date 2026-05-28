@@ -1,34 +1,84 @@
 <template name="nav">
-<nav class="navbar bg-light">
+<nav class="navbar bg-light unified-navbar">
   {{#if themeReady}}
   <div class="container-fluid page-loading navbar-align-{{currentTheme.properties.navbar_alignment}}">
-    {{#unless isExperiment}}
-    <a class="navbar-brand home-link" href="#" aria-label="Return to main menu" style="cursor: pointer;">
-      {{#if currentTheme.properties.logo_url}}
-        <span
-          class="navbar-brand-icon"
-          aria-hidden="true"
-          style="--navbar-brand-icon-image: url('{{currentTheme.properties.logo_url}}');"></span>
+    <div class="unified-navbar-left">
+      {{#if isPracticeRoute}}
+        <span class="navbar-brand unified-navbar-title" title="{{practiceLessonTitle}}">
+          {{practiceLessonTitle}}
+        </span>
+      {{else if isHomeRoute}}
+        <span class="navbar-brand unified-navbar-title">Practice</span>
+      {{else}}
+        <a class="navbar-brand home-link" href="#" aria-label="Return to practice menu" style="cursor: pointer;">
+          {{#if currentTheme.properties.logo_url}}
+            <span
+              class="navbar-brand-icon"
+              aria-hidden="true"
+              style="--navbar-brand-icon-image: url('{{currentTheme.properties.logo_url}}');"></span>
+          {{/if}}
+          {{systemName}}
+        </a>
       {{/if}}
-      {{systemName}}
-    </a>
-    {{else}}
-    <span class="navbar-brand">
-      {{#if currentTheme.properties.logo_url}}
-        <span
-          class="navbar-brand-icon"
-          aria-hidden="true"
-          style="--navbar-brand-icon-image: url('{{currentTheme.properties.logo_url}}');"></span>
+    </div>
+
+    <div class="unified-navbar-right">
+      {{#if isPracticeRoute}}
+        <button type="button" class="btn btn-primary unified-navbar-return-button" id="saveReturnPracticeMenuButton">
+          Save and return to practice menu
+        </button>
+      {{else}}
+        <div class="unified-navbar-account" id="navbarAccountToggle" role="button" tabindex="0" aria-haspopup="true" aria-expanded="{{#if accountMenuOpen}}true{{else}}false{{/if}}">
+          <span class="unified-navbar-avatar" aria-hidden="true">{{userInitials}}</span>
+          <span class="unified-navbar-account-text">
+            <span class="unified-navbar-role">{{userRoleLabel}}</span>
+          </span>
+          <span class="fa fa-chevron-down unified-navbar-caret" aria-hidden="true"></span>
+        </div>
       {{/if}}
-      {{systemName}}
-    </span>
-    {{/unless}}
+
+      <div class="unified-navbar-menu {{#if accountMenuOpen}}is-open{{/if}}" id="navbarAccountMenu">
+        <button type="button" data-nav-action="audioSettings">Audio Settings</button>
+        <button type="button" data-nav-action="classSelection">Teacher Select</button>
+        <div class="unified-navbar-menu-divider"></div>
+        <button type="button" data-nav-action="help">Help</button>
+        <button type="button" data-nav-action="tour">Tour</button>
+        <button type="button" data-nav-action="documentation">Documentation</button>
+        <div class="unified-navbar-menu-divider"></div>
+        <button type="button" data-nav-action="logout">Log out</button>
+      </div>
+    </div>
   </div>
   {{else}}
-  <!-- Reserve space while loading to prevent layout shift -->
   <div class="container-fluid navbar-loading-placeholder">
     <span class="navbar-brand" style="visibility: hidden;">Loading</span>
   </div>
   {{/if}}
 </nav>
+
+{{#if showPracticeSidebar}}
+  <aside class="practice-sidebar {{#if practiceSidebarOpen}}is-open{{/if}}" aria-label="Practice tools">
+    <button type="button" class="practice-sidebar-toggle" id="practiceSidebarToggle" aria-expanded="{{#if practiceSidebarOpen}}true{{else}}false{{/if}}">
+      <span class="fa fa-bars" aria-hidden="true"></span>
+      <span>Menu</span>
+    </button>
+    <div class="practice-sidebar-panel">
+      <button type="button" data-nav-action="home"><span class="fa fa-play-circle" aria-hidden="true"></span> Practice</button>
+      <button type="button" data-nav-action="contentUpload"><span class="fa fa-folder-open" aria-hidden="true"></span> Create Content</button>
+      <button type="button" data-nav-action="dataDownload"><span class="fa fa-download" aria-hidden="true"></span> Download Data</button>
+      {{#if isInRole 'teacher'}}
+        <button type="button" data-nav-action="classEdit"><span class="fa fa-users" aria-hidden="true"></span> Class Management</button>
+        <button type="button" data-nav-action="instructorReporting"><span class="fa fa-bar-chart" aria-hidden="true"></span> Instructor Reporting</button>
+        <button type="button" data-nav-action="tdfAssignmentEdit"><span class="fa fa-tasks" aria-hidden="true"></span> Chapter Assignments</button>
+      {{/if}}
+      {{#if isInRole 'admin'}}
+        <button type="button" data-nav-action="adminControls"><span class="fa fa-cogs" aria-hidden="true"></span> Admin Control Panel</button>
+        <button type="button" data-nav-action="userAdmin"><span class="fa fa-user" aria-hidden="true"></span> User Admin</button>
+        <button type="button" data-nav-action="turkWorkflow"><span class="fa fa-wrench" aria-hidden="true"></span> Mechanical Turk</button>
+        <button type="button" data-nav-action="theme"><span class="fa fa-paint-brush" aria-hidden="true"></span> Theme</button>
+        <button type="button" data-nav-action="adminTests"><span class="fa fa-flask" aria-hidden="true"></span> Admin Tests</button>
+      {{/if}}
+    </div>
+  </aside>
+{{/if}}
 </template>

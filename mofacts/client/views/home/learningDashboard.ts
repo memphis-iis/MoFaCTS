@@ -631,6 +631,14 @@ const lessonRowHelpers = {
     return `${this.overallAccuracy}%`;
   },
 
+  accuracyBarWidth(this: any): string {
+    if (!this.isUsed || this.accuracyApplies === false || this.overallAccuracy === null || this.overallAccuracy === undefined) {
+      return '0%';
+    }
+    const value = Math.max(0, Math.min(100, Number(this.overallAccuracy)));
+    return `${Number.isFinite(value) ? value : 0}%`;
+  },
+
   accuracyBadgeLabel(this: any): string {
     if (!this.isUsed) {
       return 'New';
@@ -670,6 +678,19 @@ Template.learningDashboard.helpers({
     return ((Template.instance() as any) as any).isLoading.get();
   },
 
+  recentUsedTdf: () => {
+    return splitTdfsByUsage(getVisibleTdfs(Template.instance())).used[0] || null;
+  },
+
+  lessonSummaryText: () => {
+    const visible = getVisibleTdfs(Template.instance());
+    const { used, unused } = splitTdfsByUsage(visible);
+    if (!visible || visible.length === 0) {
+      return 'No lessons available';
+    }
+    return `${visible.length} lessons • ${used.length} in progress • ${unused.length} new`;
+  },
+
   hasTdfs: () => {
     const list = getVisibleTdfs(Template.instance());
     return list && list.length > 0;
@@ -693,6 +714,14 @@ Template.learningDashboard.helpers({
 
   learnerConfigState: () => {
     return ((Template.instance() as any) as any).learnerConfigState.get();
+  },
+
+  displayLabel(this: any): string {
+    return displayLabelForTdf(this);
+  },
+
+  accuracyDisplay(this: any): string {
+    return lessonRowHelpers.accuracyDisplay.call(this);
   },
 
 });
@@ -854,7 +883,7 @@ Template.learningDashboard.events({
         tdf.stimuliSetId,
         setspec.speechIgnoreOutOfGrammarResponses === 'true',
         setspec.speechOutOfGrammarFeedback || 'Response not in answer set',
-        'Continue from Learning Dashboard',
+        'Continue from practice menu',
         tdf.content.isMultiTdf,
         setspec,
       );
@@ -871,7 +900,7 @@ Template.learningDashboard.events({
       target.data('currentstimulisetid'),
       target.data('ignoreoutofgrammarresponses'),
       target.data('speechoutofgrammarfeedback'),
-      'Start from Learning Dashboard',
+      'Start from practice menu',
       target.data('ismultitdf'),
       null,
     );
@@ -900,7 +929,7 @@ Template.learningDashboard.events({
       tdfDoc.stimuliSetId,
       setspec.speechIgnoreOutOfGrammarResponses === 'true',
       setspec.speechOutOfGrammarFeedback || 'Response not in answer set',
-      'Owner condition launch from Learning Dashboard',
+      'Owner condition launch from practice menu',
       tdfDoc.content?.isMultiTdf,
       setspec,
       false,
@@ -1026,7 +1055,7 @@ Template.learningDashboard.events({
         cacheTdfIds?: string[];
       };
       if (!Array.isArray(result?.cacheTdfIds) || result.cacheTdfIds.length === 0) {
-        throw new Error('Reset completed without a dashboard refresh scope');
+        throw new Error('Reset completed without a practice refresh scope');
       }
       const cacheTdfIds = result.cacheTdfIds;
       instance.allTdfsList.set(applyProgressResetToDashboardList(instance.allTdfsList.get(), cacheTdfIds));
@@ -1452,10 +1481,10 @@ async function safeSelectTdf(...args: Parameters<typeof selectTdf>) {
   try {
     await selectTdf(...args);
   } catch (error) {
-    finishLaunchLoading('dashboard-launch-failed');
+    finishLaunchLoading('practice-launch-failed');
     clientConsole(1, '[LearningDashboard] Lesson launch failed:', error);
     Session.set('uiMessage', {
-      text: 'Lesson did not start correctly. Please try again from the Learning Dashboard.',
+      text: 'Lesson did not start correctly. Please try again from the practice menu.',
       variant: 'danger',
     });
   }
@@ -1464,8 +1493,8 @@ async function safeSelectTdf(...args: Parameters<typeof selectTdf>) {
 async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId: any, ignoreOutOfGrammarResponses: any,
   speechOutOfGrammarFeedback: any, how: any, isMultiTdf: any, setspec: any, isExperiment = false, isOwnerLaunch = false) {
 
-  startLaunchLoading('Preparing lesson...', 'learningDashboard');
-  markLaunchLoadingTiming('dashboardClick', { currentTdfId, lessonName, how, isMultiTdf });
+  startLaunchLoading('Preparing lesson...', 'practiceMenu');
+  markLaunchLoadingTiming('practiceMenuClick', { currentTdfId, lessonName, how, isMultiTdf });
   const audioPromptFeedbackView = getAudioPromptFeedbackView();
 
   // make sure session variables are cleared from previous tests
@@ -1480,7 +1509,7 @@ async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId
       currentStimuliSetId,
       ignoreOutOfGrammarResponses,
       speechOutOfGrammarFeedback,
-      source: 'learningDashboard.selectTdf',
+      source: 'practiceMenu.selectTdf',
       applyContent: (content) => applyDashboardLearnerConfig(content, String(currentTdfId)),
       setLaunchLoadingMessage,
       markLaunchLoadingTiming,
@@ -1621,7 +1650,7 @@ async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId
     } else {
       setLaunchLoadingMessage('Loading content...');
       setCardEntryIntent(launchProgress.intent, {
-        source: 'learningDashboard.selectTdf',
+        source: 'practiceMenu.selectTdf',
       });
       FlowRouter.go('/card');
     }
@@ -1650,7 +1679,7 @@ async function navigateForMultiTdf(entryIntent: CardEntryIntent = CARD_ENTRY_INT
   if (unitLocked) {
     setLaunchLoadingMessage('Loading content...');
     setCardEntryIntent(entryIntent, {
-      source: 'learningDashboard.navigateForMultiTdf',
+      source: 'practiceMenu.navigateForMultiTdf',
     });
     FlowRouter.go('/card');
   } else {
