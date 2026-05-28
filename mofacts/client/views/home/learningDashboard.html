@@ -15,10 +15,13 @@
             </div>
             <div class="metric">
               <div class="metric-value">{{accuracyDisplay}}</div>
+              {{#if this.isUsed}}
+                <div class="accuracy-bar resume-accuracy-bar"><div class="accuracy-fill" style="width:{{accuracyBarWidth}}"></div></div>
+              {{/if}}
               <div class="metric-label">overall accuracy</div>
             </div>
             <div class="metric">
-              <div class="metric-value">{{this.itemsPracticed}}</div>
+              <div class="metric-value">{{itemsPracticedDisplay}}</div>
               <div class="metric-label">items practiced</div>
             </div>
             <div class="metric">
@@ -188,7 +191,7 @@
                 {{/if}}
               </td>
               <td class="learning-dashboard-cell learning-dashboard-cell--stat num" data-label="Items Practiced">
-                <span class="learning-dashboard-cell__value">{{#if this.isUsed}}{{this.itemsPracticed}}{{else}}-{{/if}}</span>
+                <span class="learning-dashboard-cell__value">{{itemsPracticedDisplay}}</span>
               </td>
               <td class="learning-dashboard-cell learning-dashboard-cell--stat num" data-label="Days with Sessions">
                 <span class="learning-dashboard-cell__value">{{#if this.isUsed}}{{this.totalSessions}}{{else}}-{{/if}}</span>
@@ -322,7 +325,7 @@
             </div>
             <div class="d-flex justify-content-between py-1 border-bottom">
               <span>Items Practiced:</span>
-              <span class="fw-bold">{{this.itemsPracticed}}</span>
+              <span class="fw-bold">{{itemsPracticedDisplay}}</span>
             </div>
             <div class="d-flex justify-content-between py-1 border-bottom">
               <span>Days with Sessions:</span>

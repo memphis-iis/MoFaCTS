@@ -41,6 +41,8 @@ const FALLBACK_THEME = {
     loading_overlay_color: 'color-mix(in srgb, var(--background-color) 95%, transparent)',
     main_button_color: '#7FC89E',
     main_button_text_color: '#000000',
+    practice_menu_accuracy_bar_fill_color: '#7ed957',
+    practice_menu_accuracy_bar_track_color: 'color-mix(in srgb, var(--text-color) 12%, transparent)',
     home_hero_image_url: '',
     home_welcome_html: '<h1>Welcome back!</h1><p>Access your teaching tools, resources, and system functions.</p>',
     home_no_practice_welcome_html: '<h1>Welcome to MoFaCTS!</h1><p>Choose a lesson below to begin your first practice session.</p>',

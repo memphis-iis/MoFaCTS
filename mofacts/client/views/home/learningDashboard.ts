@@ -599,6 +599,75 @@ function displayLabelForTdf(tdf: any) {
   return tdf.displayName;
 }
 
+function expandClusterToken(token: string, tdfLabel: string): number[] {
+  const value = token.trim();
+  if (!value) {
+    return [];
+  }
+  if (!value.includes('-')) {
+    const item = Number(value);
+    if (!Number.isInteger(item) || item < 0) {
+      throw new Error(`[LearningDashboard] Invalid clusterlist item "${value}" in ${tdfLabel}`);
+    }
+    return [item];
+  }
+
+  const [startRaw, endRaw, extra] = value.split('-');
+  if (extra !== undefined) {
+    throw new Error(`[LearningDashboard] Invalid clusterlist range "${value}" in ${tdfLabel}`);
+  }
+  const start = Number(startRaw);
+  const end = Number(endRaw);
+  if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start) {
+    throw new Error(`[LearningDashboard] Invalid clusterlist range "${value}" in ${tdfLabel}`);
+  }
+
+  const items: number[] = [];
+  for (let item = start; item <= end; item += 1) {
+    items.push(item);
+  }
+  return items;
+}
+
+function addClusterListItems(totalItems: Set<number>, clusterList: unknown, tdfLabel: string) {
+  if (clusterList === undefined || clusterList === null || String(clusterList).trim() === '') {
+    return;
+  }
+  const tokens = String(clusterList).trim().split(/\s+/);
+  for (const token of tokens) {
+    for (const item of expandClusterToken(token, tdfLabel)) {
+      totalItems.add(item);
+    }
+  }
+}
+
+function getLearningSessionClusterList(unit: any): unknown {
+  return unit?.learningsession?.clusterlist;
+}
+
+function isConditionRootTdf(tdfContent: any): boolean {
+  return Array.isArray(tdfContent?.tdfs?.tutor?.setspec?.condition);
+}
+
+function countTotalPracticeItems(tdfContent: any, tdfLabel: string): number | null {
+  const units = tdfContent?.tdfs?.tutor?.unit;
+  if (!Array.isArray(units)) {
+    if (isConditionRootTdf(tdfContent)) {
+      return null;
+    }
+    throw new Error(`[LearningDashboard] TDF "${tdfLabel}" is missing tdfs.tutor.unit; cannot report total practice items`);
+  }
+
+  const totalItems = new Set<number>();
+  for (const unit of units) {
+    if (!unit?.learningsession) {
+      continue;
+    }
+    addClusterListItems(totalItems, getLearningSessionClusterList(unit), tdfLabel);
+  }
+  return totalItems.size;
+}
+
 function configForLessonCard(tdf: any) {
   const templateData = Template.parentData(1) as { learnerConfigState?: LearnerConfigState } | undefined;
   const state = templateData?.learnerConfigState;
@@ -637,6 +706,18 @@ const lessonRowHelpers = {
     }
     const value = Math.max(0, Math.min(100, Number(this.overallAccuracy)));
     return `${Number.isFinite(value) ? value : 0}%`;
+  },
+
+  itemsPracticedDisplay(this: any): string {
+    if (this.itemsPracticedApplies === false) {
+      return '-';
+    }
+    const practiced = this.isUsed ? Number(this.itemsPracticed || 0) : 0;
+    const total = Number(this.totalPracticeItems);
+    if (!Number.isFinite(total)) {
+      throw new Error(`[LearningDashboard] Missing totalPracticeItems for TDF "${this.TDFId}"`);
+    }
+    return `${Number.isFinite(practiced) ? practiced : 0} / ${total}`;
   },
 
   accuracyBadgeLabel(this: any): string {
@@ -722,6 +803,14 @@ Template.learningDashboard.helpers({
 
   accuracyDisplay(this: any): string {
     return lessonRowHelpers.accuracyDisplay.call(this);
+  },
+
+  accuracyBarWidth(this: any): string {
+    return lessonRowHelpers.accuracyBarWidth.call(this);
+  },
+
+  itemsPracticedDisplay(this: any): string {
+    return lessonRowHelpers.itemsPracticedDisplay.call(this);
   },
 
 });
@@ -1224,6 +1313,7 @@ Template.learningDashboard.rendered = async function(this: any) {
           accuracyApplies: stats.accuracyApplies !== false && stats.overallAccuracy !== null && stats.overallAccuracy !== undefined,
           totalTimeMinutes: stats.totalTimeMinutes,
           itemsPracticed: practicedCount,
+          itemsPracticedApplies: stats.itemsPracticedApplies !== false,
           lastPracticeTimestamp: Number.isFinite(lastPracticeTimestamp) ? lastPracticeTimestamp : 0,
           lastPracticeDate: stats.lastPracticeDate
             ? new Date(stats.lastPracticeDate).toLocaleDateString()
@@ -1306,6 +1396,8 @@ Template.learningDashboard.rendered = async function(this: any) {
 
     const name = setspec.lessonname;
     const fileName = tdfObject.fileName;
+    const totalPracticeItems = countTotalPracticeItems(tdfObject, fileName || name || TDFId);
+    const itemsPracticedApplies = typeof totalPracticeItems === 'number' && totalPracticeItems > 0;
     const hasConfigurableRuntime = tdfFamilyHasConfigurableRuntime(tdfObject, tdfsById, tdfsByFileName);
     const hasLearnerConfigurableFields = tdfFamilyHasLearnerConfigurableFields(tdfObject, tdfsById, tdfsByFileName);
     const ignoreOutOfGrammarResponses = setspec.speechIgnoreOutOfGrammarResponses ?
@@ -1375,6 +1467,8 @@ Template.learningDashboard.rendered = async function(this: any) {
         accuracyApplies: stats?.accuracyApplies,
         totalTimeMinutes: stats?.totalTimeMinutes,
         itemsPracticed: stats?.itemsPracticed,
+        itemsPracticedApplies: stats?.itemsPracticedApplies ?? itemsPracticedApplies,
+        totalPracticeItems,
         lastPracticeTimestamp: stats?.lastPracticeTimestamp,
         lastPracticeDate: stats?.lastPracticeDate,
         totalSessions: stats?.totalSessions

@@ -25,7 +25,9 @@ type HomeTourStepId =
 type HomeTourStep = {
   id: HomeTourStepId;
   text: string;
-  getTarget: () => HTMLElement | null;
+  targetSelector: string;
+  targetLabel: string;
+  placement: 'sidebar' | 'lesson-action';
 };
 
 const SIDEBAR_ACTION_ROUTES: Record<string, string> = {
@@ -58,23 +60,31 @@ const SIDEBAR_ACTIVE_MATCHERS: Record<string, string[]> = {
 const HOME_TOUR_STEPS: HomeTourStep[] = [
   {
     id: 'main-menu-return',
-    text: 'Return here at any time. All prior practice is automatically saved.',
-    getTarget: () => document.getElementById('homePracticeButton'),
+    text: 'Use Practice to return to this page. Your prior practice is saved automatically.',
+    targetSelector: '#homePracticeButton',
+    targetLabel: 'Practice menu button',
+    placement: 'sidebar',
   },
   {
     id: 'learning-dashboard',
-    text: 'Begin practice here',
-    getTarget: () => document.getElementById('learningDashboardContainer'),
+    text: 'Start or continue a lesson from the practice menu.',
+    targetSelector: '.learning-dashboard-action-button.start-lesson, .learning-dashboard-action-button.continue-lesson, .learning-dashboard-action-button.start-condition-root',
+    targetLabel: 'first lesson action button',
+    placement: 'lesson-action',
   },
   {
     id: 'content-manager',
-    text: 'Build your own lessons to have complete control over what you learn.',
-    getTarget: () => document.getElementById('contentUploadButton'),
+    text: 'Use Create Content to build or upload lessons.',
+    targetSelector: '#contentUploadButton',
+    targetLabel: 'Create Content menu button',
+    placement: 'sidebar',
   },
   {
     id: 'download-data',
-    text: "After you've created your own content, this will become relevant.",
-    getTarget: () => document.getElementById('dataDownloadButton'),
+    text: 'Use Detailed Data to review exported practice records.',
+    targetSelector: '#dataDownloadButton',
+    targetLabel: 'Detailed Data menu button',
+    placement: 'sidebar',
   },
 ];
 
@@ -466,21 +476,60 @@ function positionMainMenuReturnTour(overlay: HTMLElement, target: HTMLElement): 
   overlay.style.visibility = 'hidden';
 
   const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
+  const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
   const overlayWidth = overlay.offsetWidth || 270;
-  const targetCenterX = targetRect.left + targetRect.width / 2;
+  const overlayHeight = overlay.offsetHeight || 60;
+  const stepId = overlay.dataset.tourStepId as HomeTourStepId | undefined;
+  const step = HOME_TOUR_STEPS.find((candidate) => candidate.id === stepId);
+  const isLessonActionStep = step?.placement === 'lesson-action';
+  const targetPointX = isLessonActionStep
+    ? targetRect.right
+    : targetRect.right - 16;
+  const targetPointY = isLessonActionStep
+    ? targetRect.top + targetRect.height / 2
+    : targetRect.top + targetRect.height / 2;
+  const unclampedLeft = isLessonActionStep
+    ? targetPointX + 64
+    : targetRect.right + 48;
+  const unclampedTop = isLessonActionStep
+    ? targetPointY - overlayHeight - 44
+    : targetPointY + 30;
   const overlayLeft = Math.min(
-    Math.max(12, targetCenterX - overlayWidth / 2),
+    Math.max(12, unclampedLeft),
     Math.max(12, viewportWidth - overlayWidth - 12)
   );
-  const arrowLeft = Math.min(
-    Math.max(18, targetCenterX - overlayLeft),
-    Math.max(18, overlayWidth - 18)
+  const overlayTop = Math.min(
+    Math.max(12, unclampedTop),
+    Math.max(12, viewportHeight - overlayHeight - 12)
   );
+  const arrowOriginX = targetPointX < overlayLeft ? 0 : overlayWidth;
+  const arrowOriginY = targetPointY < overlayTop ? 0 : overlayHeight;
+  const arrowDeltaX = targetPointX - (overlayLeft + arrowOriginX);
+  const arrowDeltaY = targetPointY - (overlayTop + arrowOriginY);
+  const arrowLength = Math.max(24, Math.hypot(arrowDeltaX, arrowDeltaY));
+  const arrowAngle = Math.atan2(arrowDeltaY, arrowDeltaX);
 
   overlay.style.setProperty('--main-menu-tour-left', `${overlayLeft}px`);
-  overlay.style.setProperty('--main-menu-tour-top', `${targetRect.bottom + 42}px`);
-  overlay.style.setProperty('--main-menu-tour-arrow-left', `${arrowLeft}px`);
+  overlay.style.setProperty('--main-menu-tour-top', `${overlayTop}px`);
+  overlay.style.setProperty('--main-menu-tour-arrow-origin-x', `${arrowOriginX}px`);
+  overlay.style.setProperty('--main-menu-tour-arrow-origin-y', `${arrowOriginY}px`);
+  overlay.style.setProperty('--main-menu-tour-arrow-length', `${arrowLength}px`);
+  overlay.style.setProperty('--main-menu-tour-arrow-angle', `${arrowAngle}rad`);
   overlay.style.visibility = '';
+}
+
+function resolveHomeTourTarget(step: HomeTourStep): HTMLElement {
+  const target = document.querySelector<HTMLElement>(step.targetSelector);
+  if (!target) {
+    throw new Error(`[HOME] Tour step "${step.id}" requires ${step.targetLabel} (${step.targetSelector}), but it was not found.`);
+  }
+
+  const targetRect = target.getBoundingClientRect();
+  if (targetRect.width <= 0 || targetRect.height <= 0) {
+    throw new Error(`[HOME] Tour step "${step.id}" requires visible ${step.targetLabel} (${step.targetSelector}), but it has no rendered size.`);
+  }
+
+  return target;
 }
 
 function hideMainMenuReturnTour(templateInstance?: any): void {
@@ -522,14 +571,31 @@ function showCurrentMainMenuTourStep(templateInstance: any): void {
 
   const overlay = document.getElementById('mainMenuReturnTour') as HTMLElement | null;
   const step = getCurrentTourStep(templateInstance);
-  const target = step?.getTarget();
-  if (!overlay || !step || !target) {
-    clientConsole(1, '[HOME] Main menu tour skipped because a target was not found.', step?.id || 'missing-step');
-    Session.set('showMainMenuReturnTour', false);
+  if (!overlay || !step) {
     hideMainMenuReturnTour(templateInstance);
-    return;
+    throw new Error('[HOME] Main menu tour cannot continue because the overlay or step is missing.');
   }
 
+  let target: HTMLElement;
+  try {
+    target = resolveHomeTourTarget(step);
+  } catch (error: unknown) {
+    clientConsole(1, '[HOME] Main menu tour target invariant failed:', error);
+    hideMainMenuReturnTour(templateInstance);
+    throw error;
+  }
+
+  if (templateInstance._mainMenuReturnTourPositionHandler) {
+    window.removeEventListener('resize', templateInstance._mainMenuReturnTourPositionHandler);
+    window.removeEventListener('scroll', templateInstance._mainMenuReturnTourPositionHandler, true);
+    templateInstance._mainMenuReturnTourPositionHandler = null;
+  }
+  if (templateInstance._mainMenuReturnTourTimeout) {
+    clearTimeout(templateInstance._mainMenuReturnTourTimeout);
+    templateInstance._mainMenuReturnTourTimeout = null;
+  }
+
+  overlay.dataset.tourStepId = step.id;
   const text = overlay.querySelector('.main-menu-return-tour-text');
   if (text) {
     text.textContent = step.text;
@@ -540,10 +606,7 @@ function showCurrentMainMenuTourStep(templateInstance: any): void {
 
   const positionOverlay = () => positionMainMenuReturnTour(overlay, target);
   positionOverlay();
-  const highlightedTarget = step.id === 'main-menu-return'
-    ? (target.closest('.home-link') as HTMLElement | null) || target
-    : target;
-  highlightedTarget.classList.add('main-menu-return-tour-target');
+  target.classList.add('main-menu-return-tour-target');
   templateInstance._mainMenuReturnTourPositionHandler = positionOverlay;
   window.addEventListener('resize', positionOverlay);
   window.addEventListener('scroll', positionOverlay, true);

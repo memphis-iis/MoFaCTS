@@ -495,7 +495,7 @@
 .main-menu-return-tour {
     --home-tour-bg: var(--button-color, var(--home-accent));
     --home-tour-text: var(--primary-button-text-color, var(--home-text));
-    --home-tour-border: color-mix(in srgb, var(--home-tour-bg) 76%, var(--home-text));
+    --home-tour-border: var(--home-tour-text);
     position: fixed;
     top: var(--main-menu-tour-top, 88px);
     left: var(--main-menu-tour-left, 1rem);
@@ -519,25 +519,28 @@
 
 .main-menu-return-tour-arrow {
     position: absolute;
-    left: var(--main-menu-tour-arrow-left, 32px);
-    top: -34px;
-    width: 2px;
-    height: 28px;
+    left: var(--main-menu-tour-arrow-origin-x, 0);
+    top: var(--main-menu-tour-arrow-origin-y, 0);
+    width: var(--main-menu-tour-arrow-length, 42px);
+    height: 2px;
     background: var(--home-tour-border);
-    transform: translateX(-50%);
+    border-radius: 999px;
+    transform: rotate(var(--main-menu-tour-arrow-angle, -0.75rad));
+    transform-origin: 0 50%;
+    pointer-events: none;
 }
 
 .main-menu-return-tour-arrow::before {
     content: "";
     position: absolute;
-    top: -7px;
-    left: 50%;
+    right: -1px;
+    top: 50%;
     width: 0;
     height: 0;
-    border-left: 6px solid transparent;
-    border-right: 6px solid transparent;
-    border-bottom: 9px solid var(--home-tour-border);
-    transform: translateX(-50%);
+    border-top: 6px solid transparent;
+    border-bottom: 6px solid transparent;
+    border-left: 9px solid var(--home-tour-border);
+    transform: translateY(-50%);
 }
 
 .main-menu-return-tour.is-visible {
