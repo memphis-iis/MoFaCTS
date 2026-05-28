@@ -12,6 +12,13 @@ const validSelfHostedMongoUrl = [
   'secret',
   '@mongodb:27017/MoFACT-meteor3?authSource=MoFACT-meteor3',
 ].join('');
+const validEncryptionKeyFixture = [
+  'mofacts',
+  'readiness',
+  'fixture',
+  'key',
+  '0001',
+].join('-');
 
 async function makeLocalStorageSettings() {
   const base = await fs.mkdtemp(path.join(os.tmpdir(), 'mofacts-readiness-test-'));
@@ -91,7 +98,7 @@ describe('deploymentReadinessMethods', function() {
     (Meteor as any).settings = {
       owner: 'admin@operator.test',
       ROOT_URL: 'https://mofacts.operator.test',
-      encryptionKey: '0123456789abcdef0123456789abcdef',
+      encryptionKey: validEncryptionKeyFixture,
       prod: false,
       enableEmail: false,
       initRoles: {

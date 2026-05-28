@@ -8,11 +8,18 @@ const validSelfHostedMongoUrl = [
   'secret',
   '@mongodb:27017/MoFACT-meteor3?authSource=MoFACT-meteor3',
 ].join('');
+const validEncryptionKeyFixture = [
+  'mofacts',
+  'validation',
+  'fixture',
+  'key',
+  '0001',
+].join('-');
 
 const completeSettings = {
   owner: 'admin@operator.test',
   ROOT_URL: 'https://mofacts.operator.test',
-  encryptionKey: '0123456789abcdef0123456789abcdef',
+  encryptionKey: validEncryptionKeyFixture,
   prod: true,
   enableEmail: true,
   MAIL_URL: 'smtp://smtp-user:smtp-password@mail.operator.test:587',

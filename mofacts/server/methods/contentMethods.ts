@@ -291,7 +291,7 @@ async function getContentUploadSummariesForIds(
 
     const setspec = tdf.content?.tdfs?.tutor?.setspec;
     const assetCount = getStimuliSetIdCandidatesForSummary(tdf.stimuliSetId)
-      .reduce<number>((total, candidate) => total + (assetCountsByStimuliSetId.get(String(candidate)) || 0), 0);
+      .reduce<number>((total, candidate) => total + (assetCountsByStimuliSetId.get(getStimuliSetIdCountKey(candidate)) || 0), 0);
     const summary = {
       _id: tdf._id,
       ownerId: tdf.ownerId,
@@ -394,6 +394,10 @@ function getStimuliSetIdCandidatesForSummary(stimuliSetId: unknown) {
   return candidates;
 }
 
+function getStimuliSetIdCountKey(stimuliSetId: string | number) {
+  return `${typeof stimuliSetId}:${String(stimuliSetId)}`;
+}
+
 async function getAssetCountsByStimuliSetId(deps: ContentMethodsDeps, tdfs: TdfLike[]) {
   const lookupCandidates = [...new Set(
     tdfs.flatMap((tdf) => getStimuliSetIdCandidatesForSummary(tdf.stimuliSetId))
@@ -409,7 +413,10 @@ async function getAssetCountsByStimuliSetId(deps: ContentMethodsDeps, tdfs: TdfL
 
   const countByStimuliSetId = new Map<string, number>();
   for (const row of rows) {
-    countByStimuliSetId.set(String(row._id), Number(row.count) || 0);
+    if (typeof row._id !== 'string' && typeof row._id !== 'number') {
+      throw new Meteor.Error(500, 'Dynamic asset count aggregation returned a non-scalar stimuliSetId');
+    }
+    countByStimuliSetId.set(getStimuliSetIdCountKey(row._id), Number(row.count) || 0);
   }
   return countByStimuliSetId;
 }
