@@ -20,6 +20,7 @@
     --alert-color: #ff0000;
     --neutral-color: #ffffff;
     --card-background-color: #ffffff;
+    --border-color: color-mix(in srgb, var(--text-color) 12%, transparent);
     --stimuli-box-color: #ffffff;
     --video-overlay-surface-color: color-mix(in srgb, var(--card-background-color) 98%, transparent);
     --video-overlay-backdrop-color: color-mix(in srgb, var(--text-color) 60%, transparent);
@@ -59,12 +60,12 @@
     --card-feedback-reserved-height: 200px;
 
     /* Precomputed button colors - avoid repeated color-mix calculations */
-    --btn-border-color: color-mix(in srgb, var(--button-color) calc((100 - var(--button-border-darkness, 20)) * 1%), black calc(var(--button-border-darkness, 20) * 1%));
-    --btn-hover-bg: color-mix(in srgb, var(--button-color) calc((100 - var(--button-hover-darkness, 15)) * 1%), black calc(var(--button-hover-darkness, 15) * 1%));
-    --btn-hover-border: color-mix(in srgb, var(--button-color) calc((100 - var(--button-border-darkness, 20) - var(--button-hover-darkness, 15)) * 1%), black calc((var(--button-border-darkness, 20) + var(--button-hover-darkness, 15)) * 1%));
-    --btn-accent-border: color-mix(in srgb, var(--accent-color) calc((100 - var(--button-border-darkness, 20)) * 1%), black calc(var(--button-border-darkness, 20) * 1%));
-    --btn-secondary-border: color-mix(in srgb, var(--secondary-color) calc((100 - var(--button-border-darkness, 20)) * 1%), black calc(var(--button-border-darkness, 20) * 1%));
-    --btn-secondary-hover-bg: color-mix(in srgb, var(--secondary-color) calc((100 - var(--button-hover-darkness, 15)) * 1%), black calc(var(--button-hover-darkness, 15) * 1%));
+    --btn-border-color: color-mix(in srgb, var(--button-color) calc((100 - var(--button-border-darkness, 20)) * 1%), var(--text-color) calc(var(--button-border-darkness, 20) * 1%));
+    --btn-hover-bg: color-mix(in srgb, var(--button-color) calc((100 - var(--button-hover-darkness, 15)) * 1%), var(--text-color) calc(var(--button-hover-darkness, 15) * 1%));
+    --btn-hover-border: color-mix(in srgb, var(--button-color) calc((100 - var(--button-border-darkness, 20) - var(--button-hover-darkness, 15)) * 1%), var(--text-color) calc((var(--button-border-darkness, 20) + var(--button-hover-darkness, 15)) * 1%));
+    --btn-accent-border: color-mix(in srgb, var(--accent-color) calc((100 - var(--button-border-darkness, 20)) * 1%), var(--text-color) calc(var(--button-border-darkness, 20) * 1%));
+    --btn-secondary-border: color-mix(in srgb, var(--secondary-color) calc((100 - var(--button-border-darkness, 20)) * 1%), var(--text-color) calc(var(--button-border-darkness, 20) * 1%));
+    --btn-secondary-hover-bg: color-mix(in srgb, var(--secondary-color) calc((100 - var(--button-hover-darkness, 15)) * 1%), var(--text-color) calc(var(--button-hover-darkness, 15) * 1%));
 }
 /* ===== ACCESSIBILITY ===== */
 .sr-only {
@@ -99,7 +100,7 @@
     textarea:focus-visible,
     .multipleChoiceButton:focus-visible,
     .form-check-input:focus-visible {
-        outline: 3px solid var(--focus-ring-color, var(--accent-color, #7ed957));
+        outline: 3px solid var(--focus-ring-color);
         outline-offset: 2px;
         transition: outline-offset var(--transition-fast, 100ms) ease-in-out;
     }
@@ -115,9 +116,9 @@
 }
 
 .multipleChoiceButton:focus-visible {
-    outline: 3px solid var(--focus-ring-color, var(--accent-color, #7ed957));
+    outline: 3px solid var(--focus-ring-color);
     outline-offset: 4px;
-    box-shadow: 0 0 0 4px rgba(126, 217, 87, 0.2);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--focus-ring-color, var(--accent-color)) 20%, transparent);
 }
 
 /* ===== DYNAMIC STYLES ===== */
@@ -134,6 +135,7 @@
 
 /* ===== BASE ELEMENTS ===== */
 html {
+    background-color: var(--background-color);
     overflow-x: hidden;
     overflow-y: scroll;
     max-width: 100%;
@@ -260,13 +262,13 @@ a.content-link {
 
 .videoOverlay{
     /* make very faintly transparent */
-    background-color: rgba(255,255,255,0.5);
+    background-color: color-mix(in srgb, var(--card-background-color) 50%, transparent);
 }
 /* ===== FORM ELEMENTS ===== */
 input[type=text], input[type=password] {
     font-family: inherit;
     font-size: 1.125rem; /* 18px - slightly larger for readability */
-    border: 1px solid #ccc;
+    border: 1px solid var(--border-color);
     border-radius: var(--border-radius-sm);
     padding: 8px 12px;
 }
@@ -274,7 +276,7 @@ input[type=text], input[type=password] {
 @media (max-width: 768px) {
     input[type=text]:focus,
     input[type=password]:focus {
-        border: 1px solid #ccc !important;
+        border: 1px solid var(--border-color) !important;
         outline: none !important;
     }
 }
@@ -283,12 +285,12 @@ input[type=text], input[type=password] {
 @media (min-width: 769px) {
     input[type=text]:focus,
     input[type=password]:focus {
-        border: 1px solid var(--accent-color, #7ed957);
+        border: 1px solid var(--accent-color);
     }
 
     input[type=text]:focus-visible,
     input[type=password]:focus-visible {
-        outline: 3px solid var(--focus-ring-color, var(--accent-color, #7ed957));
+        outline: 3px solid var(--focus-ring-color);
         outline-offset: 2px;
     }
 }
@@ -577,7 +579,7 @@ input[type="file"]::file-selector-button:hover,
 
 .auth-link:hover,
 .auth-link:focus-visible {
-    color: color-mix(in srgb, var(--accent-color) 75%, black);
+    color: color-mix(in srgb, var(--accent-color) 75%, var(--text-color));
     text-decoration: underline;
 }
 
@@ -601,12 +603,12 @@ input[type="file"]::file-selector-button:hover,
 
 .auth-message-error {
     background-color: color-mix(in srgb, var(--alert-color) 12%, var(--card-background-color));
-    color: color-mix(in srgb, var(--alert-color) 70%, black);
+    color: color-mix(in srgb, var(--alert-color) 70%, var(--text-color));
 }
 
 .auth-message-success {
     background-color: color-mix(in srgb, var(--success-color) 12%, var(--card-background-color));
-    color: color-mix(in srgb, var(--success-color) 70%, black);
+    color: color-mix(in srgb, var(--success-color) 70%, var(--text-color));
 }
 
 @media (max-width: 576px) {
@@ -686,7 +688,7 @@ input[type="range"],
     width: 100%;
     height: 0.5rem;
     border-radius: var(--border-radius-sm);
-    background: #ddd;
+    background: var(--secondary-color);
     outline: none;
 }
 
@@ -709,8 +711,8 @@ input[type="range"]::-webkit-slider-thumb,
     background: var(--accent-color);
     cursor: pointer;
     margin-top: -0.375rem; /* (thumb height - track height) / 2 = (1.25 - 0.5) / 2 */
-    border: 2px solid white;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    border: 2px solid var(--card-background-color);
+    box-shadow: 0 1px 3px color-mix(in srgb, var(--text-color) 30%, transparent);
 }
 
 /******** Firefox ********/
@@ -718,19 +720,19 @@ input[type="range"]::-moz-range-track,
 .form-range::-moz-range-track {
     height: 0.5rem;
     border-radius: var(--border-radius-sm);
-    background: #ddd;
+    background: var(--secondary-color);
 }
 
 input[type="range"]::-moz-range-thumb,
 .form-range::-moz-range-thumb {
-    border: 2px solid white;
+    border: 2px solid var(--card-background-color);
     appearance: none;
     width: 1.25rem;
     height: 1.25rem;
     border-radius: var(--border-radius-circle);
     background: var(--accent-color);
     cursor: pointer;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    box-shadow: 0 1px 3px color-mix(in srgb, var(--text-color) 30%, transparent);
 }
 
 input[type="range"]::-moz-range-progress,
@@ -898,6 +900,12 @@ input[type="range"]::-moz-range-progress,
 /* Unit instructions */
 .instructions-container {
     margin-top: 1rem;
+}
+
+body:has(.instructions-container) {
+    min-height: 100vh;
+    min-height: 100dvh;
+    background-color: var(--background-color);
 }
 
 .instructions-card {
@@ -1159,7 +1167,7 @@ input[type="range"]::-moz-range-progress,
 /* Theme section grouping - visually separates theme configuration groups */
 .theme-section {
     background-color: var(--card-background-color);
-    border: 1px solid rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--border-color);
     border-radius: var(--border-radius-lg);
     padding: 1.25rem;
     margin-top: 1.25rem;
@@ -1209,7 +1217,7 @@ input[type="range"]::-moz-range-progress,
     padding: 0;
     margin-bottom: 1.25rem;
     margin-top: 1.25rem;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--surface-shadow);
     overflow: hidden; /* Ensures border radius is respected */
 }
 
@@ -1325,12 +1333,12 @@ thead th:last-child {
 
 /* Table body styling */
 tbody tr {
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    border-bottom: 1px solid var(--border-color);
     transition: background-color var(--transition-fast) ease-in-out;
 }
 
 tbody tr:hover {
-    background-color: rgba(0, 0, 0, 0.02);
+    background-color: color-mix(in srgb, var(--text-color) 2%, var(--card-background-color));
 }
 
 tbody td,
@@ -1341,26 +1349,26 @@ tbody th {
 
 /* Striped rows */
 .table-striped tbody tr:nth-of-type(odd) {
-    background-color: rgba(0, 0, 0, 0.03);
+    background-color: color-mix(in srgb, var(--text-color) 3%, var(--card-background-color));
 }
 
 .table-striped tbody tr:nth-of-type(odd):hover {
-    background-color: rgba(0, 0, 0, 0.05);
+    background-color: color-mix(in srgb, var(--text-color) 5%, var(--card-background-color));
 }
 
 /* Bordered tables */
 .table-bordered {
-    border: 1px solid rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--border-color);
 }
 
 .table-bordered th,
 .table-bordered td {
-    border: 1px solid rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--border-color);
 }
 
 /* Table footer styling */
 tfoot {
-    background-color: rgba(0, 0, 0, 0.05);
+    background-color: color-mix(in srgb, var(--text-color) 5%, var(--card-background-color));
     font-weight: 600;
     border-top: 2px solid var(--accent-color);
 }
@@ -1372,7 +1380,7 @@ tfoot th {
 
 /* Light table header variant */
 .table-light {
-    background-color: rgba(0, 0, 0, 0.05);
+    background-color: color-mix(in srgb, var(--text-color) 5%, var(--card-background-color));
 }
 
 /* ===== TABLE UTILITY CLASSES ===== */
@@ -1592,19 +1600,6 @@ tfoot th {
     color: var(--navbar-text-color);
 }
 
-/* Navbar alignment options - Override Bootstrap's default space-between */
-.navbar > .container-fluid.navbar-align-left {
-    justify-content: flex-start;
-}
-
-.navbar > .container-fluid.navbar-align-center {
-    justify-content: center;
-}
-
-.navbar > .container-fluid.navbar-align-right {
-    justify-content: flex-end;
-}
-
 /* Navbar layout stability - prevent layout shifts during theme loading */
 .navbar {
     contain: layout style;
@@ -1618,7 +1613,7 @@ tfoot th {
 .navbar-loading-placeholder {
     min-height: 56px;
     opacity: 0.3;
-    justify-content: var(--navbar-alignment, flex-start);
+    justify-content: flex-start;
 }
 
 /* Smooth alignment transitions using CSS custom property */
@@ -1723,7 +1718,7 @@ tfoot th {
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius-sm);
     background: var(--card-background-color);
-    box-shadow: 0 0.75rem 1.5rem rgba(0, 0, 0, 0.16);
+    box-shadow: var(--surface-shadow);
     z-index: 9200;
 }
 
@@ -1756,8 +1751,20 @@ tfoot th {
     background: var(--border-color);
 }
 
-.unified-navbar-return-button {
+.navbar .unified-navbar-return-button {
+    min-height: var(--button-height);
+    border-color: var(--btn-border-color);
+    background-color: var(--button-color);
+    color: var(--primary-button-text-color);
+    border-radius: var(--border-radius-sm);
     white-space: nowrap;
+}
+
+.navbar .unified-navbar-return-button:hover,
+.navbar .unified-navbar-return-button:focus-visible {
+    border-color: var(--btn-hover-border);
+    background-color: var(--btn-hover-bg);
+    color: var(--text-color);
 }
 
 .practice-sidebar {
@@ -1794,7 +1801,7 @@ tfoot th {
     font-weight: 800;
     text-transform: uppercase;
     cursor: pointer;
-    box-shadow: 0 0.3rem 0.8rem rgba(0, 0, 0, 0.14);
+    box-shadow: 0 0.3rem 0.8rem color-mix(in srgb, var(--text-color) 14%, transparent);
 }
 
 .practice-sidebar-panel {
@@ -1809,7 +1816,7 @@ tfoot th {
     border-left: 0;
     border-radius: 0 var(--border-radius-sm) var(--border-radius-sm) 0;
     background: var(--card-background-color);
-    box-shadow: 0.75rem 0 1.6rem rgba(0, 0, 0, 0.14);
+    box-shadow: 0.75rem 0 1.6rem color-mix(in srgb, var(--text-color) 14%, transparent);
     overflow: auto;
 }
 
@@ -2098,9 +2105,9 @@ tfoot th {
     padding: 0 clamp(0.5rem, 2vw, 0.75rem);
     height: 24px;
     line-height: 1;
-    border-radius: var(--border-radius-pill, 999px);
+    border-radius: var(--border-radius-pill);
     border: none;
-    background-color: var(--neutral-color, #ffffff);
+    background-color: var(--neutral-color);
     font-size: 0.8rem;
     font-weight: 600;
     color: var(--text-color);
@@ -2139,7 +2146,7 @@ tfoot th {
     display: inline-block;
     width: 1px;
     height: 16px;
-    background: rgba(15, 23, 42, 0.15);
+    background: var(--performance-divider-color);
 }
 
 .card-stats-bar-wrapper {
@@ -2185,19 +2192,19 @@ tfoot th {
 }
 
 .sr-mic-icon.sr-mic-recording {
-    color: var(--success-color, #00cc00);
+    color: var(--success-color);
 }
 
 .sr-mic-icon.sr-mic-waiting {
-    color: var(--alert-color, #ff0000);
+    color: var(--alert-color);
 }
 
 .icon-configured {
-    color: var(--success-color, #00cc00);
+    color: var(--success-color);
 }
 
 .icon-needs-config {
-    color: var(--audio-icon-disabled-color, #6c757d);
+    color: var(--audio-icon-disabled-color);
 }
 
 .no-bottom-margin {
@@ -2319,7 +2326,7 @@ tfoot th {
 }
 
 #progressBarContainer {
-    background-color: rgba(0,0,0,0.0);
+    background-color: transparent;
     border: none;
     margin: 0;
     padding: 0;
@@ -2711,61 +2718,9 @@ tfoot th {
 /* JavaScript in card.js reads this CSS variable dynamically to sync timing */
 /* Using smooth transitions (200ms) for FADING_IN/FADING_OUT states */
 
-/* ===== ROLE-BASED BUTTON COLORS ===== */
-.btn-role-main {
-    background-color: var(--main-button-color);
-    border-color: var(--main-button-color);
-    border-color: color-mix(in srgb, var(--main-button-color) calc((100 - var(--button-border-darkness, 20)) * 1%), black calc(var(--button-border-darkness, 20) * 1%));
-    color: var(--main-button-text-color);
-}
-
-.btn-role-main:hover {
-    background-color: color-mix(in srgb, var(--main-button-color) calc((100 - var(--button-hover-darkness, 15)) * 1%), black calc(var(--button-hover-darkness, 15) * 1%));
-    border-color: color-mix(in srgb, var(--main-button-color) calc((100 - var(--button-border-darkness, 20) - var(--button-hover-darkness, 15)) * 1%), black calc((var(--button-border-darkness, 20) + var(--button-hover-darkness, 15)) * 1%));
-}
-
-/* Teacher Functions buttons - Theme-configurable */
-.btn-role-teacher {
-    background-color: var(--teacher-button-color);
-    border-color: var(--teacher-button-color);
-    border-color: color-mix(in srgb, var(--teacher-button-color) calc((100 - var(--button-border-darkness, 20)) * 1%), black calc(var(--button-border-darkness, 20) * 1%));
-    color: var(--teacher-button-text-color);
-}
-
-.btn-role-teacher:hover {
-    background-color: color-mix(in srgb, var(--teacher-button-color) calc((100 - var(--button-hover-darkness, 15)) * 1%), black calc(var(--button-hover-darkness, 15) * 1%));
-    border-color: color-mix(in srgb, var(--teacher-button-color) calc((100 - var(--button-border-darkness, 20) - var(--button-hover-darkness, 15)) * 1%), black calc((var(--button-border-darkness, 20) + var(--button-hover-darkness, 15)) * 1%));
-}
-
 .spinner-border,
 .fa-spinner {
     color: var(--text-color) !important;
-}
-
-/* Shared Functions buttons - Theme-configurable (teachers & admins) */
-.btn-role-shared {
-    background-color: var(--shared-button-color);
-    border-color: var(--shared-button-color);
-    border-color: color-mix(in srgb, var(--shared-button-color) calc((100 - var(--button-border-darkness, 20)) * 1%), black calc(var(--button-border-darkness, 20) * 1%));
-    color: var(--shared-button-text-color);
-}
-
-.btn-role-shared:hover {
-    background-color: color-mix(in srgb, var(--shared-button-color) calc((100 - var(--button-hover-darkness, 15)) * 1%), black calc(var(--button-hover-darkness, 15) * 1%));
-    border-color: color-mix(in srgb, var(--shared-button-color) calc((100 - var(--button-border-darkness, 20) - var(--button-hover-darkness, 15)) * 1%), black calc((var(--button-border-darkness, 20) + var(--button-hover-darkness, 15)) * 1%));
-}
-
-/* Admin Functions buttons - Theme-configurable */
-.btn-role-admin {
-    background-color: var(--admin-button-color);
-    border-color: var(--admin-button-color);
-    border-color: color-mix(in srgb, var(--admin-button-color) calc((100 - var(--button-border-darkness, 20)) * 1%), black calc(var(--button-border-darkness, 20) * 1%));
-    color: var(--admin-button-text-color);
-}
-
-.btn-role-admin:hover {
-    background-color: color-mix(in srgb, var(--admin-button-color) calc((100 - var(--button-hover-darkness, 15)) * 1%), black calc(var(--button-hover-darkness, 15) * 1%));
-    border-color: color-mix(in srgb, var(--admin-button-color) calc((100 - var(--button-border-darkness, 20) - var(--button-hover-darkness, 15)) * 1%), black calc((var(--button-border-darkness, 20) + var(--button-hover-darkness, 15)) * 1%));
 }
 
 /* Profile page role separators - labeled horizontal dividers */
@@ -2849,6 +2804,7 @@ body:has(.svelte-card-container) {
     height: 100vh; /* Fallback for older browsers */
     height: 100dvh; /* Modern browsers use dynamic viewport height */
     overflow: hidden;
+    background-color: var(--background-color);
 }
 
 body:has(.svelte-card-container) .navbar {
@@ -2865,4 +2821,5 @@ body:has(.svelte-card-container) .navbar {
     height: 100%;
     overflow: hidden;
     position: relative;
+    background-color: var(--background-color);
 }

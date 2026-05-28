@@ -168,11 +168,6 @@ Template.theme.helpers({
         instance.contrastCache.set(cacheKey, result);
 
         return result;
-    },
-    'navbarAlignmentAttrs': function(value: any) {
-        const theme = Session.get('curTheme');
-        const currentAlignment = theme?.properties?.navbar_alignment;
-        return currentAlignment === value ? { selected: true } : {};
     }
 });
 

@@ -138,14 +138,14 @@
                             </small>
                         </div>
                         <div class="col text-end">
-                            Top Navigation Bar Background:
+                            Navigation/Header Background:
                         </div>
                         <div class="col">
                             <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.neutral_color}}" data-id="neutral_color">
                             <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.neutral_color}}" data-id="neutral_color">
                         </div>
                         <div class="col text-end">
-                            Navigation Bar Text Color:
+                            Navigation/Header Text Color:
                         </div>
                         <div class="col">
                             <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.navbar_text_color}}" data-id="navbar_text_color">
@@ -156,16 +156,6 @@
                                     <span class="badge bg-{{badgeClass}}">{{#if passes}}✓{{else}}⚠{{/if}} WCAG {{level}}</span>
                                 </small>
                             {{/with}}
-                        </div>
-                        <div class="col text-end">
-                            Navigation Bar Alignment:
-                        </div>
-                        <div class="col">
-                            <select class="currentThemeProp form-select" data-id="navbar_alignment">
-                                <option value="left" {{navbarAlignmentAttrs "left"}}>Left</option>
-                                <option value="center" {{navbarAlignmentAttrs "center"}}>Center</option>
-                                <option value="right" {{navbarAlignmentAttrs "right"}}>Right</option>
-                            </select>
                         </div>
                         <div class="col text-end">
                             Card Background Color:
@@ -201,7 +191,7 @@
                             <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.button_color}}" data-id="button_color">
                             <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.button_color}}" data-id="button_color">
                             <small class="form-text text-muted">
-                                Used for standard buttons including the practice menu
+                                Used for standard action buttons, including Start and Continue in the practice menu
                             </small>
                         </div>
                         <div class="col text-end">
@@ -218,17 +208,17 @@
                             {{/with}}
                         </div>
                         <div class="col text-end">
-                            Card Primary Button Background:
+                            Practice Button Background:
                         </div>
                         <div class="col">
                             <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.main_button_color}}" data-id="main_button_color">
                             <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.main_button_color}}" data-id="main_button_color">
                             <small class="form-text text-muted">
-                                Used for primary lesson actions such as Submit, Confirm, Continue, and selected answer states
+                                Used for trial controls and practice sidebar controls
                             </small>
                         </div>
                         <div class="col text-end">
-                            Card Primary Button Text Color:
+                            Practice Button Text Color:
                         </div>
                         <div class="col">
                             <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.main_button_text_color}}" data-id="main_button_text_color">
@@ -280,82 +270,6 @@
                                 <em>Range:</em> 0% (no hover effect) to 50% (very dark hover)<br>
                                 <em>Applies to:</em> All button types automatically match their base color hue
                             </small>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Home Page Role Buttons -->
-                <div class="theme-section">
-                    <h5 class="theme-section-header">Home Page Role-Based Button Colors</h5>
-                    <div class="row row-cols-2">
-                        <div class="col text-end">
-                            Teacher Functions Button Background:
-                        </div>
-                        <div class="col">
-                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.teacher_button_color}}" data-id="teacher_button_color">
-                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.teacher_button_color}}" data-id="teacher_button_color">
-                            <small class="form-text text-muted">
-                                Teacher Functions buttons
-                            </small>
-                        </div>
-                        <div class="col text-end">
-                            Teacher Functions Button Text:
-                        </div>
-                        <div class="col">
-                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.teacher_button_text_color}}" data-id="teacher_button_text_color">
-                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.teacher_button_text_color}}" data-id="teacher_button_text_color">
-                            {{#with (getContrastInfo "teacher_button_text_color" "teacher_button_color")}}
-                                <small class="form-text {{#unless passes}}text-warning{{/unless}}">
-                                    Contrast: <strong>{{ratio}}:1</strong>
-                                    <span class="badge bg-{{badgeClass}}">{{#if passes}}✓{{else}}⚠{{/if}} WCAG {{level}}</span>
-                                </small>
-                            {{/with}}
-                        </div>
-                        <div class="col text-end">
-                            Shared Functions Button Background:
-                        </div>
-                        <div class="col">
-                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.shared_button_color}}" data-id="shared_button_color">
-                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.shared_button_color}}" data-id="shared_button_color">
-                            <small class="form-text text-muted">
-                                Shared Functions buttons (teachers & admins)
-                            </small>
-                        </div>
-                        <div class="col text-end">
-                            Shared Functions Button Text:
-                        </div>
-                        <div class="col">
-                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.shared_button_text_color}}" data-id="shared_button_text_color">
-                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.shared_button_text_color}}" data-id="shared_button_text_color">
-                            {{#with (getContrastInfo "shared_button_text_color" "shared_button_color")}}
-                                <small class="form-text {{#unless passes}}text-warning{{/unless}}">
-                                    Contrast: <strong>{{ratio}}:1</strong>
-                                    <span class="badge bg-{{badgeClass}}">{{#if passes}}✓{{else}}⚠{{/if}} WCAG {{level}}</span>
-                                </small>
-                            {{/with}}
-                        </div>
-                        <div class="col text-end">
-                            Admin Functions Button Background:
-                        </div>
-                        <div class="col">
-                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.admin_button_color}}" data-id="admin_button_color">
-                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.admin_button_color}}" data-id="admin_button_color">
-                            <small class="form-text text-muted">
-                                Admin Functions buttons
-                            </small>
-                        </div>
-                        <div class="col text-end">
-                            Admin Functions Button Text:
-                        </div>
-                        <div class="col">
-                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.admin_button_text_color}}" data-id="admin_button_text_color">
-                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.admin_button_text_color}}" data-id="admin_button_text_color">
-                            {{#with (getContrastInfo "admin_button_text_color" "admin_button_color")}}
-                                <small class="form-text {{#unless passes}}text-warning{{/unless}}">
-                                    Contrast: <strong>{{ratio}}:1</strong>
-                                    <span class="badge bg-{{badgeClass}}">{{#if passes}}✓{{else}}⚠{{/if}} WCAG {{level}}</span>
-                                </small>
-                            {{/with}}
                         </div>
                     </div>
                 </div>

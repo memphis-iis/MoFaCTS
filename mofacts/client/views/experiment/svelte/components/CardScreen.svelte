@@ -2285,7 +2285,7 @@
     border: 1px solid var(--secondary-color);
     background: var(--card-background-color);
     color: var(--text-color);
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
+    box-shadow: 0 16px 40px color-mix(in srgb, var(--text-color) 18%, transparent);
   }
 
   .video-instruction-copy {
