@@ -90,6 +90,7 @@
     <div class="table-wrap">
       <table class="practice-table learning-dashboard-table">
         <colgroup>
+          <col class="learning-dashboard-col-action">
           <col class="practice-col-icon">
           <col class="learning-dashboard-col-lesson">
           <col class="learning-dashboard-col-stat">
@@ -98,10 +99,10 @@
           <col class="learning-dashboard-col-stat">
           <col class="learning-dashboard-col-stat">
           <col class="learning-dashboard-col-last-practice">
-          <col class="learning-dashboard-col-action">
         </colgroup>
         <thead>
           <tr>
+            <th scope="col" class="actions-heading">Actions</th>
             <th scope="col" aria-label="Lesson type"></th>
             <th scope="col">Study Set</th>
             <th scope="col" class="num">Total Trials</th>
@@ -110,22 +111,48 @@
             <th scope="col" class="num">Days w/ Sessions</th>
             <th scope="col" class="num">Time (min)</th>
             <th scope="col">Last Practice</th>
-            <th scope="col" class="actions-heading">Actions</th>
           </tr>
         </thead>
         <tbody>
           {{#each tdfs}}
             <tr class="learning-dashboard-row {{#if this.isUsed}}learning-dashboard-row--used{{else}}learning-dashboard-row--unused{{/if}}">
-              <td class="learning-dashboard-cell practice-icon-cell" data-label="Type">
-                <button type="button" class="icon-btn-set" aria-label="{{displayLabel}}">
+              <td class="learning-dashboard-cell learning-dashboard-cell--action" data-label="Action">
+                <div class="learning-dashboard-cell__value learning-dashboard-action">
                   {{#if this.conditions}}
-                    <span class="fa fa-sitemap" aria-hidden="true"></span>
+                    <div class="learning-dashboard-action-group">
+                      <button class="btn btn-sm btn-success learning-dashboard-action-button start-condition-root">Start</button>
+                      {{#if this.hasConfigurableSettings}}
+                        <button class="btn btn-sm btn-outline-secondary learning-dashboard-action-button configure-lesson" data-tdfid="{{this.TDFId}}">Settings</button>
+                      {{/if}}
+                    </div>
                   {{else if this.isUsed}}
-                    <span class="fa fa-globe" aria-hidden="true"></span>
+                    <div class="learning-dashboard-action-group">
+                      <button class="btn btn-sm btn-primary learning-dashboard-action-button continue-lesson"
+                        data-tdfid="{{this.TDFId}}"
+                        data-lessonname="{{this.displayName}}"
+                        data-currentstimulisetid="{{this.currentStimuliSetId}}"
+                        data-ismultitdf="{{this.isMultiTdf}}">Continue</button>
+                      {{#if this.hasConfigurableSettings}}
+                        <button class="btn btn-sm btn-outline-secondary learning-dashboard-action-button configure-lesson" data-tdfid="{{this.TDFId}}">Settings</button>
+                      {{/if}}
+                    </div>
                   {{else}}
-                    <span class="fa fa-book" aria-hidden="true"></span>
+                    <div class="learning-dashboard-action-group">
+                      <button class="btn btn-sm btn-success learning-dashboard-action-button start-lesson"
+                        data-tdfid="{{this.TDFId}}"
+                        data-lessonname="{{this.displayName}}"
+                        data-currentstimulisetid="{{this.currentStimuliSetId}}"
+                        data-ignoreoutofgrammarresponses="{{this.ignoreOutOfGrammarResponses}}"
+                        data-speechoutofgrammarfeedback="{{this.speechOutOfGrammarFeedback}}"
+                        data-ismultitdf="{{this.isMultiTdf}}">Start</button>
+                      {{#if this.hasConfigurableSettings}}
+                        <button class="btn btn-sm btn-outline-secondary learning-dashboard-action-button configure-lesson" data-tdfid="{{this.TDFId}}">Settings</button>
+                      {{/if}}
+                    </div>
                   {{/if}}
-                </button>
+                </div>
+              </td>
+              <td class="learning-dashboard-cell practice-icon-cell" data-label="Type">
                 <span class="practice-feature-icons" aria-label="Audio features">
                   {{#if this.enableAudioPromptAndFeedback}}
                     <span class="fa fa-headphones {{ttsIconClass}}" title="Text-to-Speech {{#if this.hasTTSAPIKey}}(API key available){{else}}(needs API key in Audio Settings){{/if}}"></span>
@@ -172,42 +199,6 @@
               <td class="learning-dashboard-cell learning-dashboard-cell--last-practice" data-label="Last Practice">
                 <span class="learning-dashboard-cell__value">{{#if this.isUsed}}{{this.lastPracticeDate}}{{else}}-{{/if}}</span>
               </td>
-              <td class="learning-dashboard-cell learning-dashboard-cell--action" data-label="Action">
-                <div class="learning-dashboard-cell__value learning-dashboard-action">
-                  {{#if this.conditions}}
-                    <div class="learning-dashboard-action-group">
-                      <button class="btn btn-sm btn-success learning-dashboard-action-button start-condition-root">Start</button>
-                      {{#if this.hasConfigurableSettings}}
-                        <button class="btn btn-sm btn-outline-secondary learning-dashboard-action-button configure-lesson" data-tdfid="{{this.TDFId}}">Settings</button>
-                      {{/if}}
-                    </div>
-                  {{else if this.isUsed}}
-                    <div class="learning-dashboard-action-group">
-                      <button class="btn btn-sm btn-primary learning-dashboard-action-button continue-lesson"
-                        data-tdfid="{{this.TDFId}}"
-                        data-lessonname="{{this.displayName}}"
-                        data-currentstimulisetid="{{this.currentStimuliSetId}}"
-                        data-ismultitdf="{{this.isMultiTdf}}">Continue</button>
-                      {{#if this.hasConfigurableSettings}}
-                        <button class="btn btn-sm btn-outline-secondary learning-dashboard-action-button configure-lesson" data-tdfid="{{this.TDFId}}">Settings</button>
-                      {{/if}}
-                    </div>
-                  {{else}}
-                    <div class="learning-dashboard-action-group">
-                      <button class="btn btn-sm btn-success learning-dashboard-action-button start-lesson"
-                        data-tdfid="{{this.TDFId}}"
-                        data-lessonname="{{this.displayName}}"
-                        data-currentstimulisetid="{{this.currentStimuliSetId}}"
-                        data-ignoreoutofgrammarresponses="{{this.ignoreOutOfGrammarResponses}}"
-                        data-speechoutofgrammarfeedback="{{this.speechOutOfGrammarFeedback}}"
-                        data-ismultitdf="{{this.isMultiTdf}}">Start</button>
-                      {{#if this.hasConfigurableSettings}}
-                        <button class="btn btn-sm btn-outline-secondary learning-dashboard-action-button configure-lesson" data-tdfid="{{this.TDFId}}">Settings</button>
-                      {{/if}}
-                    </div>
-                  {{/if}}
-                </div>
-              </td>
             </tr>
             {{#with configForTableRow}}
               <tr class="learner-config-row">
@@ -239,8 +230,8 @@
         {{/if}}
       </div>
 
-      <div class="d-flex justify-content-between align-items-center py-1 learning-dashboard-card-features-row">
-        <div class="d-flex gap-1 align-items-center">
+      <div class="d-flex align-items-center py-1 learning-dashboard-card-features-row">
+        <div class="d-flex gap-1 align-items-center learning-dashboard-card-feature-icons">
           {{#if this.enableAudioPromptAndFeedback}}
             <span class="fa fa-headphones {{ttsIconClass}}" title="Text-to-Speech {{#if this.hasTTSAPIKey}}(API key available){{else}}(needs API key in Audio Settings){{/if}}"></span>
           {{/if}}
@@ -254,7 +245,7 @@
           {{/unless}}
         </div>
 
-        <div>
+        <div class="learning-dashboard-card-status">
           {{#if this.isUsed}}
             <span class="badge {{accuracyBadgeClass}}">{{accuracyBadgeLabel}}</span>
           {{else}}
