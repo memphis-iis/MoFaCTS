@@ -4,6 +4,7 @@ import { Tracker } from 'meteor/tracker';
 import DOMPurify from 'dompurify';
 import { Cookie } from '../../lib/cookies';
 import { currentUserHasRole } from '../../lib/roleUtils';
+import { getUserDisplayName, getUserInitials } from '../../lib/userIdentity';
 import './home.html';
 import './home.css';
 
@@ -25,6 +26,33 @@ type HomeTourStep = {
   id: HomeTourStepId;
   text: string;
   getTarget: () => HTMLElement | null;
+};
+
+const SIDEBAR_ACTION_ROUTES: Record<string, string> = {
+  contentUploadButton: '/contentUpload',
+  classEditButton: '/classEdit',
+  instructorReportingButton: '/instructorReporting',
+  tdfAssignmentEditButton: '/tdfAssignmentEdit',
+  dataDownloadButton: '/dataDownload',
+  adminControlsBtn: '/adminControls',
+  userAdminButton: '/userAdmin',
+  mechTurkButton: '/turkWorkflow',
+  themeButton: '/theme',
+  adminTestsButton: '/admin/tests',
+};
+
+const SIDEBAR_ACTIVE_MATCHERS: Record<string, string[]> = {
+  home: ['/home', '/'],
+  content: ['/contentUpload', '/contentCreate', '/contentEdit', '/tdfEdit'],
+  data: ['/dataDownload'],
+  classEdit: ['/classEdit'],
+  instructorReporting: ['/instructorReporting'],
+  tdfAssignmentEdit: ['/tdfAssignmentEdit'],
+  adminControls: ['/adminControls'],
+  userAdmin: ['/userAdmin'],
+  turkWorkflow: ['/turkWorkflow'],
+  theme: ['/theme'],
+  adminTests: ['/admin/tests'],
 };
 
 const HOME_TOUR_STEPS: HomeTourStep[] = [
@@ -49,6 +77,88 @@ const HOME_TOUR_STEPS: HomeTourStep[] = [
     getTarget: () => document.getElementById('dataDownloadButton'),
   },
 ];
+
+function markSidebarToggleTransition(sidebar: HTMLElement | null): void {
+  if (!sidebar || window.matchMedia('(max-width: 1024px)').matches) {
+    return;
+  }
+
+  sidebar.classList.add('sidebar-toggle-transitioning');
+  const clearTransitionState = () => {
+    sidebar.classList.remove('sidebar-toggle-transitioning');
+    sidebar.removeEventListener('transitionend', handleTransitionEnd);
+  };
+  const handleTransitionEnd = (event: TransitionEvent) => {
+    if (event.target === sidebar && (event.propertyName === 'width' || event.propertyName === 'transform')) {
+      clearTransitionState();
+    }
+  };
+
+  sidebar.addEventListener('transitionend', handleTransitionEnd);
+  window.setTimeout(clearTransitionState, 360);
+}
+
+function toggleDesktopSidebarCollapse(): void {
+  const sidebar = document.getElementById('sidebar');
+  const main = document.getElementById('homeMain');
+  const nextCollapsed = !sidebar?.classList.contains('sidebar-collapsed');
+  markSidebarToggleTransition(sidebar);
+  sidebar?.classList.toggle('sidebar-collapsed', nextCollapsed);
+  main?.classList.toggle('main-sidebar-collapsed', nextCollapsed);
+  window.localStorage.setItem(HOME_SIDEBAR_COLLAPSED_KEY, nextCollapsed ? '1' : '0');
+}
+
+function closeMobileSidebar(): void {
+  if (!window.matchMedia('(max-width: 1024px)').matches) {
+    return;
+  }
+  const sidebar = document.getElementById('sidebar');
+  if (!sidebar?.classList.contains('sidebar-mobile-open')) {
+    return;
+  }
+
+  sidebar.classList.add('sidebar-mobile-closing');
+  sidebar.classList.remove('sidebar-mobile-open');
+  const clearClosingState = () => {
+    sidebar.classList.remove('sidebar-mobile-closing');
+    sidebar.removeEventListener('transitionend', handleTransitionEnd);
+  };
+  const handleTransitionEnd = (event: TransitionEvent) => {
+    if (event.target === sidebar && event.propertyName === 'transform') {
+      clearClosingState();
+    }
+  };
+  sidebar.addEventListener('transitionend', handleTransitionEnd);
+  window.setTimeout(clearClosingState, 320);
+}
+
+function scrollHomeToTop(): void {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  document.querySelector('.content')?.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function openSidebarForTour(): number {
+  const sidebar = document.getElementById('sidebar');
+  const main = document.getElementById('homeMain');
+  if (!sidebar) {
+    return 0;
+  }
+
+  if (window.matchMedia('(max-width: 1024px)').matches) {
+    sidebar.classList.remove('sidebar-mobile-closing');
+    sidebar.classList.add('sidebar-mobile-open');
+    return 260;
+  }
+
+  if (sidebar.classList.contains('sidebar-collapsed')) {
+    sidebar.classList.remove('sidebar-collapsed');
+    main?.classList.remove('main-sidebar-collapsed');
+    window.localStorage.setItem(HOME_SIDEBAR_COLLAPSED_KEY, '0');
+    return 320;
+  }
+
+  return 0;
+}
 
 // //////////////////////////////////////////////////////////////////////////
 // Template storage and helpers
@@ -86,29 +196,139 @@ Template.home.helpers({
     });
   },
 
+});
+
+Template.appSidebar.helpers({
+  sidebarActiveClass(action: string): string {
+    const path = document.location.pathname;
+    const matches = SIDEBAR_ACTIVE_MATCHERS[action] || [];
+    return matches.some((candidate) => path === candidate || path.startsWith(`${candidate}/`)) ? 'active' : '';
+  },
+});
+
+Template.appAccountMenu.helpers({
   userInitials(): string {
-    const user = Meteor.user();
-    const raw = String(user?.username || user?.email_canonical || user?.emails?.[0]?.address || 'M');
-    const parts = raw.split(/[^A-Za-z0-9]+/).filter(Boolean);
-    const first = parts[0] || raw;
-    const second = parts[1] || '';
-    return (parts.length > 1 ? `${first.charAt(0)}${second.charAt(0)}` : raw.slice(0, 2)).toUpperCase();
+    return getUserInitials(Meteor.user());
   },
 
   userDisplayName(): string {
-    const user = Meteor.user();
-    return String(user?.username || user?.email_canonical || user?.emails?.[0]?.address || '').trim();
+    return getUserDisplayName(Meteor.user());
   },
 
   userRoleLabel(): string {
     if (currentUserHasRole('admin')) return 'Admin';
     if (currentUserHasRole('teacher')) return 'Teacher';
     return 'Learner';
-  }
+  },
 });
 
 // //////////////////////////////////////////////////////////////////////////
 // Template Events
+
+Template.appSidebar.events({
+  'click #homePracticeButton': function(event: any) {
+    event.preventDefault();
+    event.stopPropagation();
+    closeMobileSidebar();
+    if (document.location.pathname === '/home') {
+      scrollHomeToTop();
+      return;
+    }
+    FlowRouter.go('/home');
+  },
+
+  'click #sidebarToggle': function(event: any) {
+    event.preventDefault();
+    event.stopPropagation();
+    const sidebar = document.getElementById('sidebar');
+    if (
+      window.matchMedia('(max-width: 1024px)').matches &&
+      sidebar?.classList.contains('sidebar-mobile-open')
+    ) {
+      closeMobileSidebar();
+      return;
+    }
+
+    toggleDesktopSidebarCollapse();
+  },
+});
+
+Object.keys(SIDEBAR_ACTION_ROUTES).forEach((elementId) => {
+  Template.appSidebar.events({
+    [`click #${elementId}`]: function(event: any) {
+      event.preventDefault();
+      event.stopPropagation();
+      closeMobileSidebar();
+      FlowRouter.go(SIDEBAR_ACTION_ROUTES[elementId]);
+    },
+  });
+});
+
+Template.appAccountMenu.events({
+  'click #userToggle': function(event: any) {
+    event.preventDefault();
+    event.stopPropagation();
+    const dropdown = document.getElementById('userDropdown');
+    const toggle = document.getElementById('userToggle');
+    const open = !dropdown?.classList.contains('open');
+    dropdown?.classList.toggle('open', open);
+    toggle?.setAttribute('aria-expanded', open ? 'true' : 'false');
+  },
+
+  'keydown #userToggle': function(event: any) {
+    if (event.key !== 'Enter' && event.key !== ' ') {
+      return;
+    }
+    event.preventDefault();
+    const dropdown = document.getElementById('userDropdown');
+    const toggle = document.getElementById('userToggle');
+    const open = !dropdown?.classList.contains('open');
+    dropdown?.classList.toggle('open', open);
+    toggle?.setAttribute('aria-expanded', open ? 'true' : 'false');
+  },
+
+  'click [data-home-action]': function(event: any) {
+    event.preventDefault();
+    event.stopPropagation();
+    const action = event.currentTarget.getAttribute('data-home-action');
+    document.getElementById('userDropdown')?.classList.remove('open');
+    document.getElementById('userToggle')?.setAttribute('aria-expanded', 'false');
+
+    if (action === 'tour') {
+      FlowRouter.go('/home');
+      window.setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('mofacts:startHomeTour'));
+      }, 150);
+      return;
+    }
+    if (action === 'documentation') {
+      window.open('https://github.com/memphis-iis/mofacts/wiki', '_blank');
+      return;
+    }
+    if (action === 'logout') {
+      Session.set('loginMode', 'normal');
+      Cookie.set('isExperiment', '0', 1);
+      Cookie.set('experimentTarget', '', 1);
+      Cookie.set('experimentXCond', '', 1);
+      Meteor.logout(() => {
+        Session.set('curModule', 'signinoauth');
+        Session.set('currentTemplate', 'signIn');
+        Session.set('appLoading', false);
+        FlowRouter.go('/');
+      });
+      return;
+    }
+
+    const routes: Record<string, string> = {
+      audioSettings: '/audioSettings',
+      classSelection: '/classSelection',
+      help: '/help',
+    };
+    if (routes[action]) {
+      FlowRouter.go(routes[action]);
+    }
+  },
+});
 
 Template.home.events({
   'click #mainMenuReturnTour': function(_event: any, template: any) {
@@ -117,7 +337,8 @@ Template.home.events({
 
   'click #homePracticeButton': function(event: any) {
     event.preventDefault();
-    document.getElementById('learningDashboardContainer')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    closeMobileSidebar();
+    scrollHomeToTop();
   },
 
   'click #contentUploadButton': function(event: any) {
@@ -172,12 +393,7 @@ Template.home.events({
 
   'click #sidebarToggle': function(event: any) {
     event.preventDefault();
-    const sidebar = document.getElementById('sidebar');
-    const main = document.getElementById('homeMain');
-    const nextCollapsed = !sidebar?.classList.contains('sidebar-collapsed');
-    sidebar?.classList.toggle('sidebar-collapsed', nextCollapsed);
-    main?.classList.toggle('main-sidebar-collapsed', nextCollapsed);
-    window.localStorage.setItem(HOME_SIDEBAR_COLLAPSED_KEY, nextCollapsed ? '1' : '0');
+    toggleDesktopSidebarCollapse();
   },
 
   'click #mobileSidebarToggle': function(event: any) {
@@ -380,7 +596,8 @@ function startMainMenuTour(templateInstance: any, options: { manual?: boolean } 
   templateInstance._mainMenuTourStepIndex = 0;
   templateInstance._mainMenuTourManual = Boolean(options.manual);
   Session.set('showMainMenuReturnTour', true);
-  showCurrentMainMenuTourStep(templateInstance);
+  const sidebarDelay = openSidebarForTour();
+  window.setTimeout(() => showCurrentMainMenuTourStep(templateInstance), sidebarDelay);
 }
 
 async function hydrateHomePracticeState(): Promise<void> {
@@ -404,6 +621,28 @@ function restoreHomeSidebarPreference(): void {
   sidebar.classList.toggle('sidebar-collapsed', collapsed);
   main.classList.toggle('main-sidebar-collapsed', collapsed);
 }
+
+Template.appSidebar.onRendered(function() {
+  restoreHomeSidebarPreference();
+});
+
+Template.appAccountMenu.onRendered(function(this: any) {
+  this._appAccountDocumentClickHandler = (event: Event) => {
+    const target = event.target as HTMLElement | null;
+    if (!target?.closest('#userToggle')) {
+      document.getElementById('userDropdown')?.classList.remove('open');
+      document.getElementById('userToggle')?.setAttribute('aria-expanded', 'false');
+    }
+  };
+  document.addEventListener('click', this._appAccountDocumentClickHandler);
+});
+
+Template.appAccountMenu.onDestroyed(function(this: any) {
+  if (this._appAccountDocumentClickHandler) {
+    document.removeEventListener('click', this._appAccountDocumentClickHandler);
+    this._appAccountDocumentClickHandler = null;
+  }
+});
 
 Template.home.onRendered(async function(this: any) {
   

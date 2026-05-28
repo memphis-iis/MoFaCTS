@@ -2,6 +2,7 @@ import {meteorCallAsync, clientConsole} from '../index';
 import { Meteor } from 'meteor/meteor';
 import { Cookie } from '../lib/cookies';
 import { currentUserHasRole } from '../lib/roleUtils';
+import { getUserInitials } from '../lib/userIdentity';
 import './navigation.html';
 /** @typedef {import('../../server/methods/dashboardCacheMethods.contracts').UpdateDashboardCacheResult} UpdateDashboardCacheResult */
 
@@ -200,15 +201,7 @@ Template.nav.helpers({
   },
 
   'userInitials': function() {
-    const user = Meteor.user() as any;
-    const raw = String(user?.username || user?.email_canonical || user?.emails?.[0]?.address || 'M');
-    const parts = raw.split(/[^A-Za-z0-9]+/).filter(Boolean);
-    const firstPart = parts[0] || raw;
-    const secondPart = parts[1] || '';
-    const initials = parts.length > 1
-      ? `${firstPart.charAt(0)}${secondPart.charAt(0)}`
-      : raw.slice(0, 2);
-    return initials.toUpperCase();
+    return getUserInitials(Meteor.user() as any);
   }
 });
 

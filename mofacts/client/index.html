@@ -66,35 +66,78 @@
   </div>
   {{/if}}
 
-  {{#if showAuthenticatedChrome}}
-    {{> nav}}
-    {{#if showPageNumbers}}
-      {{> curPageNumbers}}
-      <br>
-    {{/if}}
-  {{/if}}
-  {{#if uiMessage}}
-  <div class="container mt-3">
-    <div class="alert alert-{{uiMessage.variant}} d-flex align-items-center justify-content-between" role="alert">
-      <div>{{uiMessage.text}}</div>
-      <button type="button" class="btn-close" aria-label="Close" data-ui-message-clear="true"></button>
+  {{#if showAppSidebarChrome}}
+    <div class="app home-app tool-app page-loaded" id="homeContainer" style="{{appShellUnderlayStyle}}">
+      {{> appSidebar}}
+      <div class="main" id="homeMain">
+        <header class="top-header">
+          <button class="icon-btn mobile-sidebar-trigger" id="mobileSidebarToggle" type="button" aria-label="Open menu" title="Open menu">
+            <span class="fa fa-bars" aria-hidden="true"></span>
+          </button>
+          <h1 class="page-title">{{appShellTitle}}</h1>
+          <div class="header-right">
+            {{> appAccountMenu}}
+          </div>
+        </header>
+
+        <main class="content tool-content">
+          {{#if uiMessage}}
+          <div class="container mt-3">
+            <div class="alert alert-{{uiMessage.variant}} d-flex align-items-center justify-content-between" role="alert">
+              <div>{{uiMessage.text}}</div>
+              <button type="button" class="btn-close" aria-label="Close" data-ui-message-clear="true"></button>
+            </div>
+          </div>
+          {{/if}}
+          {{#if currentTemplate}}
+            {{> Template.dynamic template=currentTemplate}}
+          {{else}}
+            {{#if main}}
+              {{> Template.dynamic template=main}}
+            {{/if}}
+            {{#if content}}
+              {{> Template.dynamic template=content}}
+            {{/if}}
+            {{#if yield}}
+              {{> Template.dynamic template=yield}}
+            {{else}}
+              {{> yield}}
+            {{/if}}
+          {{/if}}
+        </main>
+      </div>
     </div>
-  </div>
-  {{/if}}
-  <!-- main page content -->
-  {{#if currentTemplate}}
-    {{> Template.dynamic template=currentTemplate}}
   {{else}}
-    {{#if main}}
-      {{> Template.dynamic template=main}}
+    {{#if showAuthenticatedChrome}}
+      {{> nav}}
+      {{#if showPageNumbers}}
+        {{> curPageNumbers}}
+        <br>
+      {{/if}}
     {{/if}}
-    {{#if content}}
-      {{> Template.dynamic template=content}}
+    {{#if uiMessage}}
+    <div class="container mt-3">
+      <div class="alert alert-{{uiMessage.variant}} d-flex align-items-center justify-content-between" role="alert">
+        <div>{{uiMessage.text}}</div>
+        <button type="button" class="btn-close" aria-label="Close" data-ui-message-clear="true"></button>
+      </div>
+    </div>
     {{/if}}
-    {{#if yield}}
-      {{> Template.dynamic template=yield}}
+    <!-- main page content -->
+    {{#if currentTemplate}}
+      {{> Template.dynamic template=currentTemplate}}
     {{else}}
-      {{> yield}}
+      {{#if main}}
+        {{> Template.dynamic template=main}}
+      {{/if}}
+      {{#if content}}
+        {{> Template.dynamic template=content}}
+      {{/if}}
+      {{#if yield}}
+        {{> Template.dynamic template=yield}}
+      {{else}}
+        {{> yield}}
+      {{/if}}
     {{/if}}
   {{/if}}
   

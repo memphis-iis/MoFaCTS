@@ -73,6 +73,44 @@ function sanitizeHTML(dirty: string | null | undefined) {
 
 export { clientConsole };
 
+const APP_SIDEBAR_TEMPLATES = new Set([
+  'contentUpload',
+  'manualContentCreator',
+  'contentEdit',
+  'tdfEdit',
+  'dataDownload',
+  'audioSettings',
+  'classSelection',
+  'help',
+  'adminControls',
+  'userAdmin',
+  'turkWorkflow',
+  'theme',
+  'testRunner',
+  'classEdit',
+  'tdfAssignmentEdit',
+  'instructorReporting',
+]);
+
+const APP_SHELL_TITLES: Record<string, string> = {
+  contentUpload: 'Create Content',
+  manualContentCreator: 'Create Content',
+  contentEdit: 'Create Content',
+  tdfEdit: 'Create Content',
+  dataDownload: 'Detailed Data',
+  audioSettings: 'Audio Settings',
+  classSelection: 'Teacher Select',
+  help: 'Help',
+  adminControls: 'Admin Control Panel',
+  userAdmin: 'User Admin',
+  turkWorkflow: 'Mechanical Turk',
+  theme: 'Theme',
+  testRunner: 'Admin Tests',
+  classEdit: 'Class Management',
+  tdfAssignmentEdit: 'Chapter Assignments',
+  instructorReporting: 'Instructor Reporting',
+};
+
 async function leavePracticeForHome(): Promise<boolean> {
   const currentPath = document.location.pathname;
   if (currentPath !== '/card' && currentPath !== '/instructions') {
@@ -566,8 +604,22 @@ Meteor.startup(function() {
   });
 });
 
-Template.DefaultLayout.onRendered(function() {
+Template.DefaultLayout.onRendered(function(this: any) {
   loadClientSettings();
+  const instance = this;
+  if (!instance._appShellDocumentClickHandler) {
+    instance._appShellDocumentClickHandler = (event: Event) => {
+      const target = event.target as HTMLElement | null;
+      if (
+        window.matchMedia('(max-width: 1024px)').matches &&
+        !target?.closest('#sidebar') &&
+        !target?.closest('#mobileSidebarToggle')
+      ) {
+        document.getElementById('sidebar')?.classList.remove('sidebar-mobile-open');
+      }
+    };
+    document.addEventListener('click', instance._appShellDocumentClickHandler);
+  }
   $('#errorReportingModal').on('hidden.bs.modal', function() {
     clientConsole(2, 'error reporting modal hidden');
   });
@@ -608,6 +660,10 @@ Template.DefaultLayout.events({
   'click [data-ui-message-clear]': function(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     Session.set('uiMessage', null);
+  },
+  'click #mobileSidebarToggle': function(event: JQuery.TriggeredEvent) {
+    event.preventDefault();
+    document.getElementById('sidebar')?.classList.toggle('sidebar-mobile-open', true);
   },
   'click #homeButton': async function(event: JQuery.TriggeredEvent) {
     event.preventDefault();
@@ -800,6 +856,31 @@ Template.registerHelper('showAuthenticatedChrome', function() {
 
   const currentTemplate = Session.get('currentTemplate');
   return !['signIn', 'signUp', 'resetPassword', 'verifyEmail', 'experimentError', 'home'].includes(currentTemplate);
+});
+Template.registerHelper('showAppSidebarChrome', function() {
+  if (Meteor.userId() === null) {
+    return false;
+  }
+  if (Session.get('suppressAuthenticatedChrome') === true) {
+    return false;
+  }
+  if (Session.get('loginMode') === 'experiment') {
+    return false;
+  }
+  return APP_SIDEBAR_TEMPLATES.has(String(Session.get('currentTemplate') || ''));
+});
+Template.registerHelper('appShellTitle', function() {
+  const currentTemplate = String(Session.get('currentTemplate') || '');
+  return APP_SHELL_TITLES[currentTemplate] || 'Practice';
+});
+Template.registerHelper('appShellUnderlayStyle', function() {
+  const theme = Session.get('curTheme') as any;
+  const url = theme?.properties?.home_hero_image_url;
+  if (typeof url !== 'string' || url.trim().length === 0) {
+    return '';
+  }
+  const escapedUrl = url.trim().replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  return `--home-underlay-image: url("${escapedUrl}");`;
 });
 Template.registerHelper('showPageNumbers', function() {
   return Session.get('showPageNumbers');
