@@ -432,7 +432,7 @@ Template.contentUpload.helpers({
             const assetsReady = assetSub ? assetSub.ready() : false;
             thisTdf.assetsReady = !!assetsReady;
             thisTdf.assets = [];
-            thisTdf.assetsCount = null;
+            thisTdf.assetsCount = typeof thisTdf.assetCount === 'number' ? thisTdf.assetCount : null;
 
             if (assetsReady && thisTdf.stimuliSetId) {
               const assetDocs = DynamicAssetsCollection.find({ 'meta.stimuliSetId': thisTdf.stimuliSetId }).fetch();
@@ -558,15 +558,6 @@ Template.contentUpload.helpers({
       clientConsole(1, '[ASSETS] Error in assets helper:', error);
       return assetsHelperCachedResult;
     }
-  },
-  'packagesUploaded': function(this: any) {
-    const packages = DynamicAssetsCollection.find({userId: Meteor.userId()}).fetch();
-    //get a link for each package
-    packages.forEach(function(thispackage: any){
-      thispackage.link = DynamicAssetsCollection.link({...thispackage});
-    });
-    
-    return packages;
   },
   listReady() {
     const template = (Template.instance() as any);
@@ -1213,18 +1204,6 @@ Template.contentUpload.events({
       $('#upload-apkg').val('');
     }
   },  
-  'click #show_assets': function(event: any){
-    event.preventDefault();
-    //get data-file field
-    const tdfId = event.currentTarget.getAttribute('data-file');
-    
-    //toggle the attribute hidden of assets-tdfid
-    if($('#assets-'+tdfId).attr('hidden')){
-      $('#assets-'+tdfId).removeAttr('hidden');
-    } else {
-      $('#assets-'+tdfId).attr('hidden', 'true');
-    }
-  },
   'click #show_stimuli': function(event: any, template: any){
     event.preventDefault();
     const tdfId = event.currentTarget.getAttribute('data-file');
@@ -1473,7 +1452,7 @@ Template.contentUpload.events({
     event.preventDefault();
     const tdfId = event.currentTarget.getAttribute('data-tdfid');
     const stimSetIdRaw = event.currentTarget.getAttribute('data-stimsetid');
-    const stimSetId = stimSetIdRaw ? parseInt(stimSetIdRaw, 10) : null;
+    const stimSetId = stimSetIdRaw && stimSetIdRaw.trim().length > 0 ? stimSetIdRaw.trim() : null;
     const panel = $(`#media-manager-${tdfId}`);
     if (panel.attr('hidden')) {
       template.ensureAssetsSubscription(tdfId, stimSetId);

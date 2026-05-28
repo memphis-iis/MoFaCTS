@@ -79,11 +79,15 @@ type ContentMethodsDeps = {
     find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]>; countAsync: () => Promise<number> };
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
     removeAsync: (selector: UnknownRecord) => Promise<unknown>;
-    writeAsync?: (data: Buffer, options: UnknownRecord) => Promise<DynamicAssetDoc>;
-    link?: (fileRef: UnknownRecord) => string | null;
-    collection?: {
+    collection: {
+      rawCollection: () => {
+        aggregate: (pipeline: UnknownRecord[]) => { toArray: () => Promise<Array<{ _id: unknown; count: number }>> };
+        updateAsync?: (selector: UnknownRecord, modifier: UnknownRecord) => Promise<unknown>;
+      };
       updateAsync?: (selector: UnknownRecord, modifier: UnknownRecord) => Promise<unknown>;
     };
+    writeAsync?: (data: Buffer, options: UnknownRecord) => Promise<DynamicAssetDoc>;
+    link?: (fileRef: UnknownRecord) => string | null;
   };
   storageBoundary: ReturnType<typeof createStorageBoundary>;
   usersCollection: {
@@ -278,6 +282,7 @@ async function getContentUploadSummariesForIds(
     }
   }
 
+  const assetCountsByStimuliSetId = await getAssetCountsByStimuliSetId(deps, tdfs as TdfLike[]);
   const summaries = [];
   for (const tdf of tdfs as TdfLike[]) {
     if (!await deps.canAccessContentUploadTdf(userId, tdf)) {
@@ -285,6 +290,8 @@ async function getContentUploadSummariesForIds(
     }
 
     const setspec = tdf.content?.tdfs?.tutor?.setspec;
+    const assetCount = getStimuliSetIdCandidatesForSummary(tdf.stimuliSetId)
+      .reduce<number>((total, candidate) => total + (assetCountsByStimuliSetId.get(String(candidate)) || 0), 0);
     const summary = {
       _id: tdf._id,
       ownerId: tdf.ownerId,
@@ -295,6 +302,7 @@ async function getContentUploadSummariesForIds(
       fileName: tdf.content?.fileName || 'unknown.xml',
       isPublic: setspec?.userselect === 'true',
       hasAPIKeys: !!(setspec?.textToSpeechAPIKey || setspec?.speechAPIKey || setspec?.openRouterApiKey),
+      assetCount,
       conditions: [] as Array<{ condition: string; tdfId: string | null; count: number | null }>,
       errors: [] as string[],
       stimFiles: [] as Array<{ filename: string; stimId: string | null; exists: boolean }>,
@@ -365,6 +373,45 @@ async function getContentUploadSummariesForIds(
   }
 
   return summaries;
+}
+
+function getStimuliSetIdCandidatesForSummary(stimuliSetId: unknown) {
+  const candidates: Array<string | number> = [];
+  if (stimuliSetId === null || stimuliSetId === undefined || String(stimuliSetId).trim() === '') {
+    return candidates;
+  }
+  if (typeof stimuliSetId === 'number' && Number.isFinite(stimuliSetId)) {
+    candidates.push(stimuliSetId);
+  }
+  const asString = String(stimuliSetId).trim();
+  if (asString.length > 0 && !candidates.includes(asString)) {
+    candidates.push(asString);
+  }
+  const asNumber = Number(asString);
+  if (Number.isFinite(asNumber) && !candidates.includes(asNumber)) {
+    candidates.push(asNumber);
+  }
+  return candidates;
+}
+
+async function getAssetCountsByStimuliSetId(deps: ContentMethodsDeps, tdfs: TdfLike[]) {
+  const lookupCandidates = [...new Set(
+    tdfs.flatMap((tdf) => getStimuliSetIdCandidatesForSummary(tdf.stimuliSetId))
+  )];
+  if (lookupCandidates.length === 0) {
+    return new Map<string, number>();
+  }
+
+  const rows = await deps.DynamicAssets.collection.rawCollection().aggregate([
+    { $match: { 'meta.stimuliSetId': { $in: lookupCandidates } } },
+    { $group: { _id: '$meta.stimuliSetId', count: { $sum: 1 } } }
+  ]).toArray();
+
+  const countByStimuliSetId = new Map<string, number>();
+  for (const row of rows) {
+    countByStimuliSetId.set(String(row._id), Number(row.count) || 0);
+  }
+  return countByStimuliSetId;
 }
 
 async function getContentUploadListIds(deps: ContentMethodsDeps, thisArg: MethodContext, options: UnknownRecord = {}) {

@@ -40,6 +40,25 @@ function normalizeIdList(ids: any) {
     return Array.from(out);
 }
 
+export const DYNAMIC_ASSET_PUBLICATION_FIELDS = {
+    _id: 1,
+    name: 1,
+    fileName: 1,
+    type: 1,
+    size: 1,
+    uploadedAt: 1,
+    userId: 1,
+    path: 1,
+    meta: 1,
+    ext: 1,
+    extension: 1,
+    extensionWithDot: 1,
+    isImage: 1,
+    isAudio: 1,
+    isVideo: 1,
+    versions: 1
+};
+
 // ===== PHASE 3: Paginated Users Publication =====
 // Server-side filtering and pagination for admin-only User Admin page
 // Eliminates O(n²) client-side iteration
@@ -409,7 +428,7 @@ Meteor.publish('files.assets.all', async function () {
         }
         : { userId: this.userId };
 
-    return DynamicAssets.collection.find(assetQuery);
+    return DynamicAssets.collection.find(assetQuery, { fields: DYNAMIC_ASSET_PUBLICATION_FIELDS });
 });
 
 Meteor.publish('assets', async function(ownerId: any, stimSetId: any) {
@@ -457,16 +476,10 @@ Meteor.publish('assets', async function(ownerId: any, stimSetId: any) {
         throw new Meteor.Error('not-authorized', 'Only owner or shared accessor can access assets from content upload');
     }
 
-    return DynamicAssets.collection.find({ "meta.stimuliSetId": { $in: uniqueStimSetCandidates } });
-});
-
-Meteor.publish('ownedFiles', function() {
-    return [Tdfs.find({'ownerId': Meteor.userId()})]
-});
-
-Meteor.publish('accessableFiles', async function() {
-    const accessableFileIds = (await (Meteor.users as any).findOneAsync({_id: this.userId})).accessedTDFs;
-    return Tdfs.find({_id: {$in: accessableFileIds}})
+    return DynamicAssets.collection.find(
+        { "meta.stimuliSetId": { $in: uniqueStimSetCandidates } },
+        { fields: DYNAMIC_ASSET_PUBLICATION_FIELDS }
+    );
 });
 
 Meteor.publish('userExperimentState', function(tdfId: any) {

@@ -265,7 +265,7 @@
                                                 {{#unless isPending}}
                                                     {{#if isOwnTdf}}
                                                     <span class="asset-public-private-row">
-                                                        <span class="public-private-switch" title="Toggle public/private status on Learning Dashboard">
+                                                        <span class="public-private-switch" title="Toggle public/private status on the home dashboard">
                                                             <span class="public-private-switch-label public-private-switch-label-left small">Private</span>
                                                             <span class="form-switch public-private-switch-control">
                                                                 <input class="form-check-input public-private-toggle" type="checkbox" data-tdfid="{{_id}}" checked={{checkedIfPublic}} aria-label="Toggle lesson public/private status">
@@ -378,7 +378,7 @@
                                             </a>
                                             <a class="manage-media-btn text-decoration-none asset-meta-item" data-tdfid="{{this._id}}" data-stimsetid="{{this.stimuliSetId}}">
                                                 <i class="fa fa-folder-open"></i> Manage Media
-                                                {{#if assetsReady}}({{assetsCount}}){{else}}(...){{/if}}
+                                                {{#if assetsCount}}({{assetsCount}}){{else}}(0){{/if}}
                                             </a>
                                         </div>
                                         <div hidden id="stimuli-{{this._id}}" class="asset-toggle-content">

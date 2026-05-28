@@ -98,10 +98,22 @@ export async function createPerformanceIndexes() {
     serverConsole('  Created: Tdfs.ownerId');
 
     await Tdfs.rawCollection().createIndex(
+      { ownerId: 1, 'content.tdfs.tutor.setspec.lessonname': 1, _id: 1 },
+      { name: 'perf_owner_lessonname_id', background: true }
+    );
+    serverConsole('  Created: Tdfs.owner_lessonname_id');
+
+    await Tdfs.rawCollection().createIndex(
       { packageAssetId: 1 },
       { name: 'perf_packageAssetId', background: true }
     );
     serverConsole('  Created: Tdfs.packageAssetId');
+
+    await Tdfs.rawCollection().createIndex(
+      { packageFile: 1 },
+      { name: 'perf_packageFile', background: true }
+    );
+    serverConsole('  Created: Tdfs.packageFile');
 
     await Tdfs.rawCollection().createIndex(
       { 'content.tdfs.tutor.setspec.lessonname': 1 },
@@ -110,10 +122,60 @@ export async function createPerformanceIndexes() {
     serverConsole('  Created: Tdfs.lessonname');
 
     await Tdfs.rawCollection().createIndex(
-      { accessors: 1 },
-      { name: 'perf_accessors', background: true }
+      { 'accessors.userId': 1 },
+      { name: 'perf_accessors_userId', background: true }
     );
-    serverConsole('  Created: Tdfs.accessors');
+    serverConsole('  Created: Tdfs.accessors.userId');
+
+    await Tdfs.rawCollection().createIndex(
+      { 'accessors.userId': 1, 'content.tdfs.tutor.setspec.lessonname': 1, _id: 1 },
+      { name: 'perf_accessors_user_lessonname_id', background: true }
+    );
+    serverConsole('  Created: Tdfs.accessors_user_lessonname_id');
+
+    serverConsole('Creating indexes for Stims collection...');
+    await Stims.rawCollection().createIndex(
+      { 'meta.fileName': 1 },
+      { name: 'perf_meta_fileName', background: true }
+    );
+    serverConsole('  Created: Stims.meta.fileName');
+
+    serverConsole('Creating indexes for DynamicAssets collection...');
+    await DynamicAssets.collection.rawCollection().createIndex(
+      { userId: 1, name: 1 },
+      { name: 'perf_userId_name', background: true }
+    );
+    serverConsole('  Created: DynamicAssets.userId_name');
+
+    await DynamicAssets.collection.rawCollection().createIndex(
+      { userId: 1, fileName: 1 },
+      { name: 'perf_userId_fileName', background: true }
+    );
+    serverConsole('  Created: DynamicAssets.userId_fileName');
+
+    await DynamicAssets.collection.rawCollection().createIndex(
+      { 'meta.stimuliSetId': 1, name: 1 },
+      { name: 'perf_stimuliSetId_name', background: true }
+    );
+    serverConsole('  Created: DynamicAssets.stimuliSetId_name');
+
+    await DynamicAssets.collection.rawCollection().createIndex(
+      { 'meta.stimuliSetId': 1, fileName: 1 },
+      { name: 'perf_stimuliSetId_fileName', background: true }
+    );
+    serverConsole('  Created: DynamicAssets.stimuliSetId_fileName');
+
+    await DynamicAssets.collection.rawCollection().createIndex(
+      { 'meta.stimuliSetId': 1, _id: 1 },
+      { name: 'perf_stimuliSetId_id', background: true }
+    );
+    serverConsole('  Created: DynamicAssets.stimuliSetId_id');
+
+    await DynamicAssets.collection.rawCollection().createIndex(
+      { 'meta.public': 1, uploadedAt: -1 },
+      { name: 'perf_public_uploadedAt', background: true }
+    );
+    serverConsole('  Created: DynamicAssets.public_uploadedAt');
 
     serverConsole('Creating indexes for Users collection...');
     await Meteor.users.rawCollection().createIndex(
@@ -160,10 +222,10 @@ export async function createPerformanceIndexes() {
     serverConsole('  Created: UserDashboardCache.usageSummary.lastActivityDate');
 
     serverConsole('========================================');
-    serverConsole('All 19 performance indexes created successfully');
+    serverConsole('All 31 performance indexes created successfully');
     serverConsole('========================================');
 
-    return { success: true, indexesCreated: 19 };
+    return { success: true, indexesCreated: 31 };
   } catch (error) {
     serverConsole('========================================');
     serverConsole('Error creating performance indexes:', error);
