@@ -81,18 +81,18 @@
 
   .status-text {
     font-size: var(--card-font-size, inherit);
-    color: var(--text-color);
+    color: var(--app-text-color);
   }
 
   .sr-status.recording .status-text {
-    color: var(--success-color, #00cc00);
+    color: var(--feedback-correct-color, #00cc00);
   }
 
   .sr-status.processing .status-text {
-    color: var(--alert-color, #ff0000);
+    color: var(--feedback-error-color, #ff0000);
   }
 
   .sr-status.error .status-text {
-    color: var(--alert-color, #ff0000);
+    color: var(--feedback-error-color, #ff0000);
   }
 </style>

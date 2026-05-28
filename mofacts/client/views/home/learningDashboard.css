@@ -12,9 +12,9 @@
     overflow: hidden;
     margin-bottom: 20px;
     padding: 14px 18px;
-    border: 1px solid var(--home-border);
-    border-radius: var(--border-radius-lg, 12px);
-    background: var(--home-card-bg);
+    border: 1px solid color-mix(in srgb, var(--app-text-color) 12%, transparent);
+    border-radius: var(--app-border-radius-lg, 12px);
+    background: var(--learning-card-surface-color);
 }
 
 .resume-bg {
@@ -26,8 +26,8 @@
     opacity: 0.14;
     pointer-events: none;
     background:
-        radial-gradient(circle at 35% 35%, color-mix(in srgb, var(--home-accent) 45%, transparent), transparent 32%),
-        linear-gradient(135deg, color-mix(in srgb, var(--home-accent) 24%, transparent), color-mix(in srgb, var(--home-accent-strong) 8%, transparent));
+        radial-gradient(circle at 35% 35%, color-mix(in srgb, var(--app-accent-color) 45%, transparent), transparent 32%),
+        linear-gradient(135deg, color-mix(in srgb, var(--app-accent-color) 24%, transparent), color-mix(in srgb, color-mix(in srgb, var(--app-accent-color) 78%, var(--app-text-color)) 8%, transparent));
 }
 
 .thumb {
@@ -38,10 +38,10 @@
     align-items: center;
     justify-content: center;
     z-index: 1;
-    border: 1px solid var(--home-border);
-    border-radius: var(--border-radius-sm, 8px);
-    background: var(--home-card-bg);
-    color: var(--home-accent-strong);
+    border: 1px solid color-mix(in srgb, var(--app-text-color) 12%, transparent);
+    border-radius: var(--app-border-radius-sm, 8px);
+    background: var(--learning-card-surface-color);
+    color: color-mix(in srgb, var(--app-accent-color) 78%, var(--app-text-color));
     font-size: 22px;
 }
 
@@ -53,7 +53,7 @@
 
 .resume-title {
     margin-bottom: 8px;
-    color: var(--home-heading);
+    color: var(--app-page-header-text-color);
     font-size: 16px;
     font-weight: 700;
     line-height: 1.2;
@@ -71,7 +71,7 @@
 }
 
 .metric-value {
-    color: var(--home-heading);
+    color: var(--app-page-header-text-color);
     font-size: 15px;
     font-weight: 700;
     line-height: 1.2;
@@ -84,7 +84,7 @@
 
 .metric-label {
     margin-top: 2px;
-    color: var(--home-muted);
+    color: color-mix(in srgb, var(--app-text-color) 62%, transparent);
     font-size: 11px;
     font-weight: 500;
     white-space: nowrap;
@@ -92,12 +92,12 @@
 
 .btn-continue {
     z-index: 1;
-    min-height: var(--button-height, 44px);
+    min-height: var(--app-button-height, 44px);
     padding: 10px 20px;
     border: 0;
-    border-radius: var(--border-radius-sm, 8px);
-    background: var(--button-color, var(--home-accent));
-    color: var(--primary-button-text-color, var(--home-card-bg));
+    border-radius: var(--app-border-radius-sm, 8px);
+    background: var(--app-primary-action-surface-color);
+    color: var(--app-primary-action-text-color);
     cursor: pointer;
     font-size: 12px;
     font-weight: 600;
@@ -108,15 +108,15 @@
 
 .btn-continue:hover,
 .btn-continue:focus-visible {
-    background: var(--btn-hover-bg, color-mix(in srgb, var(--button-color, var(--home-accent)) 85%, var(--home-text)));
+    background: var(--btn-hover-bg, color-mix(in srgb, var(--app-primary-action-surface-color) 85%, var(--app-text-color)));
     outline: none;
 }
 
 .table-card {
     overflow: hidden;
-    border: 1px solid var(--home-border);
-    border-radius: var(--border-radius-lg, 12px);
-    background: var(--home-card-bg);
+    border: 1px solid color-mix(in srgb, var(--app-text-color) 12%, transparent);
+    border-radius: var(--app-border-radius-lg, 12px);
+    background: var(--learning-card-surface-color);
 }
 
 .table-toolbar {
@@ -126,7 +126,7 @@
     gap: 12px;
     flex-wrap: wrap;
     padding: 12px 14px;
-    border-bottom: 1px solid var(--home-border);
+    border-bottom: 1px solid color-mix(in srgb, var(--app-text-color) 12%, transparent);
 }
 
 .toolbar-search {
@@ -138,12 +138,15 @@
 
 .toolbar-search input {
     width: 100%;
-    padding: 7px 12px 7px 40px;
-    border: 1px solid var(--home-border);
-    border-radius: var(--border-radius-sm, 8px);
-    background: color-mix(in srgb, var(--home-text) 4%, var(--home-card-bg));
-    color: var(--home-text);
+    height: var(--app-text-input-height);
+    min-height: var(--app-text-input-height);
+    padding: 0 12px 0 40px;
+    border: 1px solid color-mix(in srgb, var(--app-text-color) 12%, transparent);
+    border-radius: var(--app-border-radius-sm, 8px);
+    background: color-mix(in srgb, var(--app-text-color) 4%, var(--learning-card-surface-color));
+    color: var(--app-text-color);
     font-size: 13px;
+    line-height: calc(var(--app-text-input-height) - 2px);
     outline: none;
 }
 
@@ -152,9 +155,9 @@
 }
 
 .toolbar-search input:focus {
-    border-color: color-mix(in srgb, var(--home-accent) 35%, var(--home-border));
-    background: var(--home-card-bg);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--home-accent) 16%, transparent);
+    border-color: color-mix(in srgb, var(--app-accent-color) 35%, color-mix(in srgb, var(--app-text-color) 12%, transparent));
+    background: var(--learning-card-surface-color);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-accent-color) 16%, transparent);
 }
 
 .toolbar-search .fa {
@@ -163,7 +166,7 @@
     top: 50%;
     width: 16px;
     height: 16px;
-    color: var(--home-soft-muted);
+    color: color-mix(in srgb, var(--app-text-color) 42%, transparent);
     font-size: 14px;
     transform: translateY(-50%);
 }
@@ -176,11 +179,11 @@
 
 .filter {
     padding: 6px 10px;
-    min-height: var(--button-height, 44px);
-    border: 1px solid var(--home-border);
-    border-radius: var(--border-radius-sm, 8px);
-    background: var(--home-card-bg);
-    color: var(--home-text);
+    min-height: var(--app-button-height, 44px);
+    border: 1px solid color-mix(in srgb, var(--app-text-color) 12%, transparent);
+    border-radius: var(--app-border-radius-sm, 8px);
+    background: var(--learning-card-surface-color);
+    color: var(--app-text-color);
     cursor: default;
     font-size: 12px;
     font-weight: 500;
@@ -189,8 +192,8 @@
 .learning-dashboard-placeholder {
     min-height: 14rem;
     background:
-        linear-gradient(180deg, var(--home-accent-soft) 0, var(--home-accent-soft) 3rem, transparent 3rem),
-        repeating-linear-gradient(180deg, color-mix(in srgb, var(--home-card-bg) 92%, var(--home-text) 8%) 0, color-mix(in srgb, var(--home-card-bg) 92%, var(--home-text) 8%) 2.75rem, transparent 2.75rem, transparent 4.1rem);
+        linear-gradient(180deg, color-mix(in srgb, var(--app-accent-color) 12%, var(--learning-card-surface-color)) 0, color-mix(in srgb, var(--app-accent-color) 12%, var(--learning-card-surface-color)) 3rem, transparent 3rem),
+        repeating-linear-gradient(180deg, color-mix(in srgb, var(--learning-card-surface-color) 92%, var(--app-text-color) 8%) 0, color-mix(in srgb, var(--learning-card-surface-color) 92%, var(--app-text-color) 8%) 2.75rem, transparent 2.75rem, transparent 4.1rem);
     animation: skeleton-loading 1.5s ease-in-out infinite;
 }
 
@@ -210,13 +213,13 @@
 }
 
 .practice-section + .practice-section {
-    border-top: 1px solid var(--home-border);
+    border-top: 1px solid color-mix(in srgb, var(--app-text-color) 12%, transparent);
 }
 
 .practice-section-heading {
     padding: 10px 12px;
-    background: var(--home-card-bg);
-    color: var(--home-muted);
+    background: var(--learning-card-surface-color);
+    color: color-mix(in srgb, var(--app-text-color) 62%, transparent);
     font-size: 12px;
     font-weight: 700;
     letter-spacing: 0.05em;
@@ -236,7 +239,7 @@
     min-width: 920px;
     border-collapse: collapse;
     table-layout: fixed;
-    color: var(--home-text);
+    color: var(--app-text-color);
     font-size: 13px;
 }
 
@@ -262,9 +265,9 @@
 
 .practice-table thead th {
     padding: 7px 8px;
-    border-bottom: 1px solid var(--home-border);
-    background: var(--home-accent-soft);
-    color: var(--home-muted);
+    border-bottom: 1px solid color-mix(in srgb, var(--app-text-color) 12%, transparent);
+    background: color-mix(in srgb, var(--app-accent-color) 12%, var(--learning-card-surface-color));
+    color: color-mix(in srgb, var(--app-text-color) 62%, transparent);
     font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.05em;
@@ -299,16 +302,16 @@
 .practice-table tbody td,
 .practice-table tbody th {
     padding: 9px 8px;
-    border-bottom: 1px solid var(--home-border-subtle);
-    background: var(--home-card-bg);
-    color: var(--home-text);
+    border-bottom: 1px solid color-mix(in srgb, var(--app-text-color) 8%, transparent);
+    background: var(--learning-card-surface-color);
+    color: var(--app-text-color);
     font-weight: 400;
     vertical-align: middle;
 }
 
 .practice-table tbody tr:hover td,
 .practice-table tbody tr:hover th {
-    background: var(--home-hover-bg);
+    background: color-mix(in srgb, var(--app-text-color) 5%, var(--learning-card-surface-color));
 }
 
 .practice-table tbody tr:last-child td,
@@ -325,9 +328,9 @@
     align-items: center;
     justify-content: center;
     gap: 5px;
-    min-height: var(--button-height, 44px);
+    min-height: var(--app-button-height, 44px);
     margin: 0 auto;
-    color: var(--home-accent-strong);
+    color: color-mix(in srgb, var(--app-accent-color) 78%, var(--app-text-color));
     font-size: 12px;
     line-height: 1;
 }
@@ -342,7 +345,7 @@
 }
 
 .set-name {
-    color: var(--home-heading);
+    color: var(--app-page-header-text-color);
     font-weight: 600;
     line-height: 1.3;
     overflow-wrap: anywhere;
@@ -360,7 +363,7 @@
 
 .accuracy-pct {
     margin-bottom: 4px;
-    color: var(--home-heading);
+    color: var(--app-page-header-text-color);
     font-weight: 600;
 }
 
@@ -393,10 +396,10 @@
 .learning-dashboard-action-button {
     min-width: auto;
     max-width: none;
-    min-height: var(--button-height, 44px);
+    min-height: var(--app-button-height, 44px);
     padding: 5px 9px;
     border: 0;
-    border-radius: var(--border-radius-sm, 8px);
+    border-radius: var(--app-border-radius-sm, 8px);
     cursor: pointer;
     font-size: 12px;
     font-weight: 600;
@@ -406,29 +409,29 @@
 
 .learning-dashboard-action-button.btn-primary,
 .learning-dashboard-action-button.btn-success {
-    background: var(--button-color, var(--home-accent));
-    color: var(--primary-button-text-color, var(--home-card-bg));
+    background: var(--app-primary-action-surface-color);
+    color: var(--app-primary-action-text-color);
 }
 
 .learning-dashboard-action-button.btn-primary:hover,
 .learning-dashboard-action-button.btn-success:hover,
 .learning-dashboard-action-button.btn-primary:focus-visible,
 .learning-dashboard-action-button.btn-success:focus-visible {
-    background: var(--btn-hover-bg, color-mix(in srgb, var(--button-color, var(--home-accent)) 85%, var(--home-text)));
+    background: var(--btn-hover-bg, color-mix(in srgb, var(--app-primary-action-surface-color) 85%, var(--app-text-color)));
     outline: none;
 }
 
 .learning-dashboard-action-button.btn-outline-secondary {
-    width: var(--button-height, 44px);
-    height: var(--button-height, 44px);
+    width: var(--app-button-height, 44px);
+    height: var(--app-button-height, 44px);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     padding: 0;
-    border: 1px solid var(--home-border);
-    border-radius: var(--border-radius-sm, 8px);
-    background: var(--home-card-bg);
-    color: var(--home-muted);
+    border: 1px solid color-mix(in srgb, var(--app-text-color) 12%, transparent);
+    border-radius: var(--app-border-radius-sm, 8px);
+    background: var(--learning-card-surface-color);
+    color: color-mix(in srgb, var(--app-text-color) 62%, transparent);
     font-size: 0;
 }
 
@@ -440,14 +443,14 @@
 
 .learning-dashboard-action-button.btn-outline-secondary:hover,
 .learning-dashboard-action-button.btn-outline-secondary:focus-visible {
-    background: var(--home-hover-bg);
-    color: var(--home-text);
+    background: color-mix(in srgb, var(--app-text-color) 5%, var(--learning-card-surface-color));
+    color: var(--app-text-color);
     outline: none;
 }
 
 .practice-empty-state {
     padding: 1.25rem;
-    color: var(--home-text);
+    color: var(--app-text-color);
     text-align: center;
 }
 
@@ -456,11 +459,11 @@
 }
 
 .learning-dashboard-empty-value {
-    color: var(--home-muted);
+    color: color-mix(in srgb, var(--app-text-color) 62%, transparent);
 }
 
 .learner-config-row td {
-    background: color-mix(in srgb, var(--home-accent) 5%, var(--home-card-bg));
+    background: color-mix(in srgb, var(--app-accent-color) 5%, var(--learning-card-surface-color));
 }
 
 .learner-config-panel {
@@ -468,12 +471,12 @@
     grid-template-rows: 1fr;
     padding: 0;
     background: transparent;
-    animation: learner-config-panel-open var(--transition-smooth) ease-out both;
+    animation: learner-config-panel-open var(--app-transition-smooth) ease-out both;
 }
 
 .learner-config-panel.is-closing {
     pointer-events: none;
-    animation: learner-config-panel-close var(--transition-smooth) ease-in both;
+    animation: learner-config-panel-close var(--app-transition-smooth) ease-in both;
 }
 
 .learner-config-panel-clip {
@@ -486,9 +489,9 @@
     max-width: 90%;
     margin: 0.85rem auto 1rem;
     padding: 0.7rem;
-    border-radius: var(--border-radius-sm);
-    background: var(--card-background-color);
-    box-shadow: var(--home-shadow);
+    border-radius: var(--app-border-radius-sm);
+    background: var(--learning-card-surface-color);
+    box-shadow: var(--app-surface-shadow);
 }
 
 .learner-config-fields-grid {
@@ -500,8 +503,8 @@
 .learner-config-field {
     min-width: 0;
     padding: 0.48rem 0.58rem;
-    border: 1px solid color-mix(in srgb, var(--text-color) 10%, transparent);
-    border-radius: var(--border-radius-sm);
+    border: 1px solid color-mix(in srgb, var(--app-text-color) 10%, transparent);
+    border-radius: var(--app-border-radius-sm);
 }
 
 .learner-config-field-label {
@@ -517,7 +520,7 @@
 
 .learner-config-current-value {
     flex: 0 0 auto;
-    color: var(--secondary-text-color);
+    color: var(--app-secondary-text-color);
     font-variant-numeric: tabular-nums;
 }
 
@@ -539,7 +542,7 @@
 }
 
 .learner-config-field .form-check {
-    min-height: calc(var(--button-height) * 0.66);
+    min-height: calc(var(--app-button-height) * 0.66);
     margin-bottom: 0;
     padding-left: 0;
 }
@@ -552,7 +555,7 @@
 
 .learner-config-field .form-select-sm,
 .learner-config-field .form-control-sm {
-    min-height: calc(var(--button-height) * 0.66);
+    min-height: calc(var(--app-button-height) * 0.66);
     padding-top: 0.16rem;
     padding-bottom: 0.16rem;
     font-size: 0.875rem;
@@ -569,7 +572,7 @@
     justify-content: space-between;
     gap: 0.5rem;
     margin-top: 0.1rem;
-    color: var(--secondary-text-color);
+    color: var(--app-secondary-text-color);
     font-size: 0.72rem;
     line-height: 1.15;
 }
@@ -587,7 +590,7 @@
 
 .learner-config-reset-progress.btn,
 .learner-config-reset-progress-cancel.btn {
-    min-height: calc(var(--button-height) * 0.72);
+    min-height: calc(var(--app-button-height) * 0.72);
     line-height: 1.1;
 }
 
@@ -619,14 +622,15 @@
         width: 100%;
         max-width: 100%;
         box-sizing: border-box;
-        border-color: var(--home-border) !important;
+        border-color: color-mix(in srgb, var(--app-text-color) 12%, transparent) !important;
         border-radius: 8px !important;
-        background: var(--home-card-bg);
-        color: var(--home-text);
+        background: var(--learning-card-surface-color);
+        color: var(--app-text-color);
     }
 
     .learning-dashboard-card-title {
-        color: var(--home-heading);
+        margin-bottom: 0.2rem;
+        color: var(--app-page-header-text-color);
         font-weight: 600;
         line-height: 1.3;
     }
@@ -639,8 +643,57 @@
         margin-top: 0.35rem;
     }
 
+    .learning-dashboard-card-features-row {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        width: 100%;
+        box-sizing: border-box;
+        padding-right: 0 !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        min-height: 0;
+        line-height: 1;
+    }
+
+    .learning-dashboard-card .badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+        height: auto;
+        min-height: 0;
+        max-width: 4.5rem;
+        padding: 0.35em 0.55rem;
+        white-space: nowrap;
+        line-height: 1;
+        vertical-align: middle;
+    }
+
+    .learning-dashboard-card-feature-icons {
+        display: flex !important;
+        align-items: center !important;
+        flex: 0 0 auto;
+        gap: 0.25rem !important;
+        min-height: 0;
+        line-height: 1;
+    }
+
+    .learning-dashboard-card-feature-icons .badge {
+        margin-left: 0.25rem;
+        align-self: center;
+    }
+
+    .learning-dashboard-card-feature-icons .fa {
+        display: inline-block;
+        width: auto;
+        height: auto;
+        line-height: 1;
+        vertical-align: middle;
+    }
+
     .learning-dashboard-card-button {
-        min-height: var(--button-height);
+        min-height: var(--app-button-height);
         display: inline-flex !important;
         align-items: center;
         justify-content: center;
@@ -651,8 +704,12 @@
 
     .card-expand-icon {
         font-size: 0.75rem;
-        transition: transform var(--transition-smooth) ease;
+        transition: transform var(--app-transition-smooth) ease;
         vertical-align: middle;
+    }
+
+    .learning-dashboard-card-badge-text {
+        display: block;
     }
 
     button[aria-expanded="true"] .card-expand-icon {
@@ -698,7 +755,7 @@
     .learning-dashboard-card {
         padding: 0.85rem 1rem !important;
         margin-bottom: 0.55rem !important;
-        box-shadow: 0 0.12rem 0.35rem color-mix(in srgb, var(--home-text) 10%, transparent) !important;
+        box-shadow: 0 0.12rem 0.35rem color-mix(in srgb, var(--app-text-color) 10%, transparent) !important;
     }
 
     .learning-dashboard-card-title {
@@ -707,21 +764,9 @@
         line-height: 1.18;
     }
 
-    .learning-dashboard-card-features-row {
-        align-items: center !important;
-        justify-content: flex-start !important;
-        gap: 0.5rem;
-        width: 100%;
-        box-sizing: border-box;
-        padding-right: 0 !important;
-        padding-top: 0.1rem !important;
-        padding-bottom: 0.15rem !important;
-        min-height: 1.2rem;
-    }
-
     .learning-dashboard-card-actions {
         gap: 0.3rem;
-        margin-top: 0.25rem;
+        margin-top: 0.35rem;
     }
 
     .learning-dashboard-card-button {
@@ -729,29 +774,6 @@
         padding: 0.35rem 0.75rem;
         font-size: 0.95rem;
         line-height: 1.1;
-    }
-
-    .learning-dashboard-card .badge {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        flex: 0 0 auto;
-        max-width: 4.5rem;
-        white-space: nowrap;
-        line-height: 1;
-    }
-
-    .learning-dashboard-card-features-row > div:last-child {
-        display: flex;
-        justify-content: flex-start;
-        min-width: 0;
-        max-width: none;
-        overflow: visible;
-    }
-
-    .learning-dashboard-card-feature-icons,
-    .learning-dashboard-card-status {
-        flex: 0 0 auto;
     }
 
     .learning-dashboard-card .collapse .border-top {

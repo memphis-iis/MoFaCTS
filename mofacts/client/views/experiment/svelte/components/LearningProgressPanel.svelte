@@ -144,12 +144,12 @@
 
 <style>
   .learning-progress-shell {
-    --progress-tab-width: 34px;
+    --progress-tab-width: 23px;
     --progress-panel-width: var(--learning-progress-panel-width, 320px);
-    --progress-border-color: color-mix(in srgb, var(--secondary-color) 70%, var(--text-color));
-    --progress-muted-bar: color-mix(in srgb, var(--secondary-color) 82%, var(--background-color));
-    --progress-target-color: var(--success-color);
-    --progress-below-color: var(--accent-color);
+    --progress-border-color: color-mix(in srgb, var(--app-secondary-surface-color) 70%, var(--app-text-color));
+    --progress-muted-bar: color-mix(in srgb, var(--app-secondary-surface-color) 82%, var(--app-background-color));
+    --progress-target-color: var(--feedback-correct-color);
+    --progress-below-color: var(--app-accent-color);
 
     position: fixed;
     top: 0;
@@ -162,11 +162,11 @@
     height: 100vh;
     display: block;
     background: transparent;
-    color: var(--text-color);
+    color: var(--app-text-color);
     pointer-events: none;
-    transition: flex-basis var(--transition-smooth) ease,
-      width var(--transition-smooth) ease,
-      max-width var(--transition-smooth) ease;
+    transition: flex-basis var(--app-transition-smooth) ease,
+      width var(--app-transition-smooth) ease,
+      max-width var(--app-transition-smooth) ease;
     z-index: 9500;
   }
 
@@ -185,16 +185,16 @@
     transform: translateY(-50%);
     width: var(--progress-tab-width);
     min-width: var(--progress-tab-width);
-    height: 118px;
+    height: 104px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 0.32rem;
-    border: 1px solid var(--secondary-color);
+    border: 1px solid var(--app-secondary-surface-color);
     border-right: 0;
-    border-radius: var(--border-radius-lg, 10px) 0 0 var(--border-radius-lg, 10px);
-    background: var(--main-button-color);
-    color: var(--main-button-text-color);
+    border-radius: var(--app-border-radius-lg) 0 0 var(--app-border-radius-lg);
+    background: var(--navigation-surface-color);
+    color: var(--navigation-text-color);
     cursor: pointer;
     pointer-events: auto;
     writing-mode: vertical-rl;
@@ -213,13 +213,13 @@
 
   .learning-progress-toggle:hover,
   .learning-progress-toggle:focus-visible {
-    background: var(--primary-button-color);
-    color: var(--primary-button-text-color);
+    background: var(--navigation-surface-color);
+    color: var(--navigation-text-color);
     outline: none;
   }
 
   .learning-progress-toggle:focus-visible {
-    box-shadow: 0 0 0 2px var(--background-color), 0 0 0 4px var(--accent-color);
+    box-shadow: 0 0 0 2px var(--app-background-color), 0 0 0 4px var(--app-accent-color);
   }
 
   .learning-progress-toggle-icon {
@@ -229,7 +229,7 @@
     border-bottom: 4px solid transparent;
     border-right: 5px solid currentColor;
     transform: rotate(0deg);
-    transition: transform var(--transition-fast) ease;
+    transition: transform var(--app-transition-fast) ease;
   }
 
   .learning-progress-toggle-open .learning-progress-toggle-icon {
@@ -243,7 +243,7 @@
     display: flex;
     flex-direction: column;
     border-left: 1px solid var(--progress-border-color);
-    background: var(--card-background-color);
+    background: var(--learning-card-surface-color);
     box-shadow: -10px 0 18px rgba(0, 0, 0, 0.08);
     overflow: hidden;
   }
@@ -255,7 +255,7 @@
     justify-content: space-between;
     gap: 0.75rem;
     padding: 0.5rem 0.65rem 0.45rem 0.75rem;
-    border-bottom: 1px solid var(--secondary-color);
+    border-bottom: 1px solid var(--app-secondary-surface-color);
   }
 
   .learning-progress-header h2 {
@@ -263,7 +263,7 @@
     font-size: 0.95rem;
     line-height: 1.1;
     font-weight: 700;
-    color: var(--text-color);
+    color: var(--app-text-color);
   }
 
   .learning-progress-close {
@@ -273,9 +273,9 @@
     align-items: center;
     justify-content: center;
     border: 1px solid transparent;
-    border-radius: var(--border-radius-sm);
+    border-radius: var(--app-border-radius-sm);
     background: transparent;
-    color: var(--secondary-text-color);
+    color: var(--app-secondary-text-color);
     cursor: pointer;
     font-size: 1rem;
     line-height: 1;
@@ -283,8 +283,8 @@
 
   .learning-progress-close:hover,
   .learning-progress-close:focus-visible {
-    border-color: var(--secondary-color);
-    color: var(--text-color);
+    border-color: var(--app-secondary-surface-color);
+    color: var(--app-text-color);
     outline: none;
   }
 
@@ -293,7 +293,7 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.4rem;
     padding: 0.5rem 0.7rem;
-    border-bottom: 1px solid var(--secondary-color);
+    border-bottom: 1px solid var(--app-secondary-surface-color);
   }
 
   .learning-progress-stats div {
@@ -302,13 +302,13 @@
     flex-direction: column;
     gap: 0.1rem;
     padding: 0.35rem 0.4rem;
-    border: 1px solid var(--secondary-color);
-    border-radius: var(--border-radius-sm);
-    background: var(--neutral-color, var(--background-color));
+    border: 1px solid var(--app-secondary-surface-color);
+    border-radius: var(--app-border-radius-sm);
+    background: var(--navigation-surface-color);
   }
 
   .learning-progress-stat-label {
-    color: var(--secondary-text-color);
+    color: var(--app-secondary-text-color);
     font-size: 0.62rem;
     font-weight: 700;
     line-height: 1;
@@ -317,7 +317,7 @@
   }
 
   .learning-progress-stats strong {
-    color: var(--text-color);
+    color: var(--app-text-color);
     font-size: 0.82rem;
     font-variant-numeric: tabular-nums;
     line-height: 1.1;
@@ -352,7 +352,7 @@
   }
 
   .learning-progress-line-mean {
-    border-left: 1px dashed var(--text-color);
+    border-left: 1px dashed var(--app-text-color);
     opacity: 0.8;
   }
 
@@ -364,9 +364,9 @@
     writing-mode: vertical-lr;
     padding: 0.25rem 0.18rem;
     border: 1px solid currentColor;
-    border-radius: var(--border-radius-sm);
-    background: var(--card-background-color);
-    color: var(--text-color);
+    border-radius: var(--app-border-radius-sm);
+    background: var(--learning-card-surface-color);
+    color: var(--app-text-color);
     font-size: 0.62rem;
     font-weight: 700;
     line-height: 1;
@@ -384,7 +384,7 @@
     overflow-x: hidden;
     overflow-y: auto;
     scrollbar-width: thin;
-    scrollbar-color: var(--secondary-color) transparent;
+    scrollbar-color: var(--app-secondary-surface-color) transparent;
   }
 
   .learning-progress-row {
@@ -416,15 +416,15 @@
     justify-content: space-between;
     gap: 0.5rem;
     padding: 0.4rem 0.7rem 0.55rem;
-    border-top: 1px solid var(--secondary-color);
-    color: var(--secondary-text-color);
+    border-top: 1px solid var(--app-secondary-surface-color);
+    color: var(--app-secondary-text-color);
     font-size: 0.62rem;
     font-variant-numeric: tabular-nums;
   }
 
   .learning-progress-empty {
     padding: 0.8rem;
-    color: var(--secondary-text-color);
+    color: var(--app-secondary-text-color);
     font-size: 0.8rem;
     line-height: 1.35;
   }

@@ -51,7 +51,7 @@ function updateRangeSliderFill(slider: any) {
 
   // Cache the success color on first call (avoid layout thrashing on every input event)
   if (!cachedSuccessColor) {
-    cachedSuccessColor = getComputedStyle(document.documentElement).getPropertyValue('--success-color').trim() || '#28a745';
+    cachedSuccessColor = getComputedStyle(document.documentElement).getPropertyValue('--feedback-correct-color').trim() || '#28a745';
   }
   slider.style.background = `linear-gradient(to right, ${cachedSuccessColor} 0%, ${cachedSuccessColor} ${percentage}%, #ddd ${percentage}%, #ddd 100%)`;
 }

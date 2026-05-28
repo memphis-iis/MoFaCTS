@@ -691,12 +691,12 @@ Template.signIn.helpers({
     return Session.get('loginMode') !== 'experiment';
   },
 
-  signInDescription: function() {
+  auth_sign_in_description: function() {
     if (Session.get('loginMode') === 'experiment') {
       return EXPERIMENT_PORTAL_DESCRIPTION;
     }
     const theme = Session.get('curTheme') as any;
-    return theme?.properties?.signInDescription || DEFAULT_SIGNIN_DESCRIPTION;
+    return theme?.properties?.auth_sign_in_description || DEFAULT_SIGNIN_DESCRIPTION;
   },
 
   canShowSignUp: function() {

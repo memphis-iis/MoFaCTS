@@ -345,7 +345,7 @@ function getFeedbackFadeOutDurationMs(): number {
     return DEFAULT_TIMINGS.FADE_OUT_DURATION;
   }
   const cssValue = getComputedStyle(document.documentElement)
-    .getPropertyValue('--transition-smooth')
+    .getPropertyValue('--app-transition-smooth')
     .trim();
   if (!cssValue) {
     return DEFAULT_TIMINGS.FADE_OUT_DURATION;

@@ -1,14 +1,15 @@
 const TRANSITION_PROPERTIES = new Set([
-  'transition_instant',
-  'transition_fast',
-  'transition_smooth',
+  'app_transition_instant',
+  'app_transition_fast',
+  'app_transition_smooth',
 ]);
 
 const LENGTH_PROPERTIES = new Set([
-  'font_size_base',
-  'button_height',
-  'border_radius_sm',
-  'border_radius_lg',
+  'app_font_size_base',
+  'app_button_height',
+  'app_text_input_height',
+  'app_border_radius_sm',
+  'app_border_radius_lg',
 ]);
 
 const CSS_TIME_PATTERN = /^\d+(\.\d+)?(ms|s)$/i;

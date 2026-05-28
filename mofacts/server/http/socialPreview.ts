@@ -144,7 +144,7 @@ function imageHrefForSvg(imageUrl: string | null, rootUrl: string) {
 
 function resolveThemeLogoPath(imageUrl: string | null) {
   if (!imageUrl) {
-    throw new Error('Social preview requires active theme properties.logo_url.');
+    throw new Error('Social preview requires active theme properties.brand_logo_url.');
   }
   if (imageUrl.startsWith('/')) {
     const localPath = findPublicAsset(imageUrl);
@@ -166,7 +166,7 @@ async function getSocialPreviewSettings() {
   const theme = await getActiveTheme();
   const themeProperties = theme?.properties || {};
   const systemName = resolveThemeBrandLabel(theme, Meteor.settings.public?.systemName);
-  const themeLogoUrl = firstNonEmptyString(themeProperties.logo_url);
+  const themeLogoUrl = firstNonEmptyString(themeProperties.brand_logo_url);
 
   const title = firstNonEmptyString(configured.title) || `${systemName} | Mobile Fact and Concept Training System`;
   const description = firstNonEmptyString(configured.description) ||
@@ -193,12 +193,12 @@ async function getSocialPreviewSettings() {
     rootUrl: root,
     theme: {
       logoHref: imageHrefForSvg(themeLogoUrl, root),
-      backgroundColor: safeColor(themeProperties.background_color, '#F2F2F2'),
-      cardColor: safeColor(themeProperties.card_background_color, '#FFFFFF'),
-      accentColor: safeColor(themeProperties.accent_color, '#7ed957'),
-      secondaryColor: safeColor(themeProperties.accent_color, '#7ed957'),
-      textColor: safeColor(themeProperties.text_color, '#111827'),
-      fontFamily: safeFontFamily(themeProperties.font_family),
+      backgroundColor: safeColor(themeProperties.app_background_color, '#F2F2F2'),
+      cardColor: safeColor(themeProperties.learning_card_surface_color, '#FFFFFF'),
+      accentColor: safeColor(themeProperties.app_accent_color, '#7ed957'),
+      secondaryColor: safeColor(themeProperties.app_accent_color, '#7ed957'),
+      textColor: safeColor(themeProperties.app_text_color, '#111827'),
+      fontFamily: safeFontFamily(themeProperties.app_font_family),
       brandLabel: systemName,
     },
   };
@@ -369,7 +369,7 @@ async function renderSocialPreviewPng() {
   const basePath = path.join(tempDir, 'base.png');
   const logoResizedPath = path.join(tempDir, 'logo.png');
   const pngPath = path.join(tempDir, 'preview.png');
-  const rawLogoSource = firstNonEmptyString((await getActiveTheme())?.properties?.logo_url);
+  const rawLogoSource = firstNonEmptyString((await getActiveTheme())?.properties?.brand_logo_url);
   const logoSource = resolveThemeLogoPath(rawLogoSource);
   const logoPath = logoSource.startsWith('data:image/')
     ? writeDataImage(logoSource, path.join(tempDir, 'logo-source'))

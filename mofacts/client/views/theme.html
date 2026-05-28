@@ -72,16 +72,16 @@
                             Page Background Color:
                         </div>
                         <div class="col">
-                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.background_color}}" data-id="background_color">
-                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.background_color}}" data-id="background_color">
+                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.app_background_color}}" data-id="app_background_color">
+                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.app_background_color}}" data-id="app_background_color">
                         </div>
                         <div class="col text-end">
                             Body Text Color:
                         </div>
                         <div class="col">
-                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.text_color}}" data-id="text_color">
-                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.text_color}}" data-id="text_color">
-                            {{#with (getContrastInfo "text_color" "background_color")}}
+                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.app_text_color}}" data-id="app_text_color">
+                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.app_text_color}}" data-id="app_text_color">
+                            {{#with (getContrastInfo "app_text_color" "app_background_color")}}
                                 <small class="form-text {{#unless passes}}text-warning{{/unless}}">
                                     Contrast: <strong>{{ratio}}:1</strong>
                                     <span class="badge bg-{{badgeClass}}">{{#if passes}}✓{{else}}⚠{{/if}} WCAG {{level}}</span>
@@ -92,9 +92,9 @@
                             Page Header Text Color:
                         </div>
                         <div class="col">
-                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.page_header_text_color}}" data-id="page_header_text_color">
-                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.page_header_text_color}}" data-id="page_header_text_color">
-                            {{#with (getContrastInfo "page_header_text_color" "background_color")}}
+                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.app_page_header_text_color}}" data-id="app_page_header_text_color">
+                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.app_page_header_text_color}}" data-id="app_page_header_text_color">
+                            {{#with (getContrastInfo "app_page_header_text_color" "app_background_color")}}
                                 <small class="form-text {{#unless passes}}text-warning{{/unless}}">
                                     Contrast: <strong>{{ratio}}:1</strong>
                                     <span class="badge bg-{{badgeClass}}">{{#if passes}}✓{{else}}⚠{{/if}} WCAG {{level}}</span>
@@ -105,25 +105,25 @@
                             Body Font Family:
                         </div>
                         <div class="col">
-                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.font_family}}" data-id="font_family" placeholder="&quot;Atkinson Hyperlegible&quot;, &quot;Segoe UI&quot;, sans-serif">
+                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.app_font_family}}" data-id="app_font_family" placeholder="&quot;Atkinson Hyperlegible&quot;, &quot;Segoe UI&quot;, sans-serif">
                             <small class="form-text text-muted">
-                                CSS font-family stack applied to body text and app UI
+                                CSS app-font-family stack applied to body text and app UI
                             </small>
                         </div>
                         <div class="col text-end">
                             Heading & Brand Font Family:
                         </div>
                         <div class="col">
-                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.heading_font_family}}" data-id="heading_font_family" placeholder="Fraunces, Georgia, serif">
+                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.app_heading_font_family}}" data-id="app_heading_font_family" placeholder="Fraunces, Georgia, serif">
                             <small class="form-text text-muted">
-                                CSS font-family stack for h1, h2, page headers, and brand text
+                                CSS app-font-family stack for h1, h2, page headers, and brand text
                             </small>
                         </div>
                         <div class="col text-end">
                             Web Font Stylesheet URL:
                         </div>
                         <div class="col">
-                            <input type="url" class="currentThemeProp form-control" value="{{currentTheme.properties.font_stylesheet_url}}" data-id="font_stylesheet_url" placeholder="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&amp;family=Fraunces:wght@700;800&amp;display=swap">
+                            <input type="url" class="currentThemeProp form-control" value="{{currentTheme.properties.app_font_stylesheet_url}}" data-id="app_font_stylesheet_url" placeholder="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&amp;family=Fraunces:wght@700;800&amp;display=swap">
                             <small class="form-text text-muted">
                                 Optional hosted font CSS URL loaded for the theme font stacks
                             </small>
@@ -132,7 +132,7 @@
                             Base Font Size:
                         </div>
                         <div class="col">
-                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.font_size_base}}" data-id="font_size_base" placeholder="16px">
+                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.app_font_size_base}}" data-id="app_font_size_base" placeholder="16px">
                             <small class="form-text text-muted">
                                 Root font size for the card UI (e.g., 16px)
                             </small>
@@ -141,16 +141,16 @@
                             Navigation/Header Background:
                         </div>
                         <div class="col">
-                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.neutral_color}}" data-id="neutral_color">
-                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.neutral_color}}" data-id="neutral_color">
+                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.navigation_surface_color}}" data-id="navigation_surface_color">
+                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.navigation_surface_color}}" data-id="navigation_surface_color">
                         </div>
                         <div class="col text-end">
                             Navigation/Header Text Color:
                         </div>
                         <div class="col">
-                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.navbar_text_color}}" data-id="navbar_text_color">
-                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.navbar_text_color}}" data-id="navbar_text_color">
-                            {{#with (getContrastInfo "navbar_text_color" "neutral_color")}}
+                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.navigation_text_color}}" data-id="navigation_text_color">
+                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.navigation_text_color}}" data-id="navigation_text_color">
+                            {{#with (getContrastInfo "navigation_text_color" "navigation_surface_color")}}
                                 <small class="form-text {{#unless passes}}text-warning{{/unless}}">
                                     Contrast: <strong>{{ratio}}:1</strong>
                                     <span class="badge bg-{{badgeClass}}">{{#if passes}}✓{{else}}⚠{{/if}} WCAG {{level}}</span>
@@ -161,8 +161,8 @@
                             Card Background Color:
                         </div>
                         <div class="col">
-                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.card_background_color}}" data-id="card_background_color">
-                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.card_background_color}}" data-id="card_background_color">
+                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.learning_card_surface_color}}" data-id="learning_card_surface_color">
+                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.learning_card_surface_color}}" data-id="learning_card_surface_color">
                             <small class="form-text text-muted">
                                 Background color for cards, panels, and content sections
                             </small>
@@ -171,8 +171,8 @@
                             Stimulus Box Background:
                         </div>
                         <div class="col">
-                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.stimuli_box_color}}" data-id="stimuli_box_color">
-                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.stimuli_box_color}}" data-id="stimuli_box_color">
+                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.learning_card_stimulus_surface_color}}" data-id="learning_card_stimulus_surface_color">
+                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.learning_card_stimulus_surface_color}}" data-id="learning_card_stimulus_surface_color">
                             <small class="form-text text-muted">
                                 Background color for the question/stimulus display area during learning trials
                             </small>
@@ -188,8 +188,8 @@
                             Default Button Background:
                         </div>
                         <div class="col">
-                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.button_color}}" data-id="button_color">
-                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.button_color}}" data-id="button_color">
+                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.app_primary_action_surface_color}}" data-id="app_primary_action_surface_color">
+                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.app_primary_action_surface_color}}" data-id="app_primary_action_surface_color">
                             <small class="form-text text-muted">
                                 Used for standard action buttons, including Start and Continue in the practice menu
                             </small>
@@ -198,9 +198,9 @@
                             Default Button Text Color:
                         </div>
                         <div class="col">
-                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.primary_button_text_color}}" data-id="primary_button_text_color">
-                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.primary_button_text_color}}" data-id="primary_button_text_color">
-                            {{#with (getContrastInfo "primary_button_text_color" "button_color")}}
+                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.app_primary_action_text_color}}" data-id="app_primary_action_text_color">
+                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.app_primary_action_text_color}}" data-id="app_primary_action_text_color">
+                            {{#with (getContrastInfo "app_primary_action_text_color" "app_primary_action_surface_color")}}
                                 <small class="form-text {{#unless passes}}text-warning{{/unless}}">
                                     Contrast: <strong>{{ratio}}:1</strong>
                                     <span class="badge bg-{{badgeClass}}">{{#if passes}}✓{{else}}⚠{{/if}} WCAG {{level}}</span>
@@ -211,8 +211,8 @@
                             Practice Button Background:
                         </div>
                         <div class="col">
-                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.main_button_color}}" data-id="main_button_color">
-                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.main_button_color}}" data-id="main_button_color">
+                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.learning_card_primary_action_surface_color}}" data-id="learning_card_primary_action_surface_color">
+                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.learning_card_primary_action_surface_color}}" data-id="learning_card_primary_action_surface_color">
                             <small class="form-text text-muted">
                                 Used for trial controls and practice sidebar controls
                             </small>
@@ -221,9 +221,9 @@
                             Practice Button Text Color:
                         </div>
                         <div class="col">
-                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.main_button_text_color}}" data-id="main_button_text_color">
-                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.main_button_text_color}}" data-id="main_button_text_color">
-                            {{#with (getContrastInfo "main_button_text_color" "main_button_color")}}
+                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.learning_card_primary_action_text_color}}" data-id="learning_card_primary_action_text_color">
+                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.learning_card_primary_action_text_color}}" data-id="learning_card_primary_action_text_color">
+                            {{#with (getContrastInfo "learning_card_primary_action_text_color" "learning_card_primary_action_surface_color")}}
                                 <small class="form-text {{#unless passes}}text-warning{{/unless}}">
                                     Contrast: <strong>{{ratio}}:1</strong>
                                     <span class="badge bg-{{badgeClass}}">{{#if passes}}✓{{else}}⚠{{/if}} WCAG {{level}}</span>
@@ -234,8 +234,8 @@
                             Accent Color:
                         </div>
                         <div class="col">
-                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.accent_color}}" data-id="accent_color">
-                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.accent_color}}" data-id="accent_color">
+                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.app_accent_color}}" data-id="app_accent_color">
+                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.app_accent_color}}" data-id="app_accent_color">
                             <small class="form-text text-muted">
                                 Used for highlights, links, active states, emphasis, borders, table headers, toggles, and selected buttons
                             </small>
@@ -263,16 +263,25 @@
                             Button Height:
                         </div>
                         <div class="col">
-                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.button_height}}" data-id="button_height" placeholder="44px">
+                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.app_button_height}}" data-id="app_button_height" placeholder="44px">
                             <small class="form-text text-muted">
                                 <strong>Default: 44px</strong> - Shared minimum height for standard buttons
+                            </small>
+                        </div>
+                        <div class="col text-end">
+                            Text Input Height:
+                        </div>
+                        <div class="col">
+                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.app_text_input_height}}" data-id="app_text_input_height" placeholder="36px">
+                            <small class="form-text text-muted">
+                                <strong>Default: 36px</strong> - Shared minimum height for text fields such as the practice menu search box
                             </small>
                         </div>
                         <div class="col text-end">
                             Button Border Darkness (%):
                         </div>
                         <div class="col">
-                            <input type="number" class="currentThemeProp form-control" value="{{currentTheme.properties.button_border_darkness}}" data-id="button_border_darkness" min="0" max="50" step="5" placeholder="20">
+                            <input type="number" class="currentThemeProp form-control" value="{{currentTheme.properties.app_button_border_darkness}}" data-id="app_button_border_darkness" min="0" max="50" step="5" placeholder="20">
                             <small class="form-text text-muted">
                                 <strong>Default: 20%</strong> - Darkens button borders relative to button color<br>
                                 <em>Range:</em> 0% (same as button) to 50% (very dark)<br>
@@ -283,7 +292,7 @@
                             Button Hover Darkness (%):
                         </div>
                         <div class="col">
-                            <input type="number" class="currentThemeProp form-control" value="{{currentTheme.properties.button_hover_darkness}}" data-id="button_hover_darkness" min="0" max="50" step="5" placeholder="15">
+                            <input type="number" class="currentThemeProp form-control" value="{{currentTheme.properties.app_button_hover_darkness}}" data-id="app_button_hover_darkness" min="0" max="50" step="5" placeholder="15">
                             <small class="form-text text-muted">
                                 <strong>Default: 15%</strong> - Darkens button backgrounds on hover<br>
                                 <em>Range:</em> 0% (no hover effect) to 50% (very dark hover)<br>
@@ -301,16 +310,16 @@
                             Secondary Background (buttons, menus, modals, study answer box):
                         </div>
                         <div class="col">
-                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.secondary_color}}" data-id="secondary_color">
-                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.secondary_color}}" data-id="secondary_color">
+                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.app_secondary_surface_color}}" data-id="app_secondary_surface_color">
+                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.app_secondary_surface_color}}" data-id="app_secondary_surface_color">
                         </div>
                         <div class="col text-end">
                             Secondary Text:
                         </div>
                         <div class="col">
-                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.secondary_text_color}}" data-id="secondary_text_color">
-                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.secondary_text_color}}" data-id="secondary_text_color">
-                            {{#with (getContrastInfo "secondary_text_color" "secondary_color")}}
+                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.app_secondary_text_color}}" data-id="app_secondary_text_color">
+                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.app_secondary_text_color}}" data-id="app_secondary_text_color">
+                            {{#with (getContrastInfo "app_secondary_text_color" "app_secondary_surface_color")}}
                                 <small class="form-text {{#unless passes}}text-warning{{/unless}}">
                                     Contrast: <strong>{{ratio}}:1</strong>
                                     <span class="badge bg-{{badgeClass}}">{{#if passes}}✓{{else}}⚠{{/if}} WCAG {{level}}</span>
@@ -328,8 +337,8 @@
                             Success Color:
                         </div>
                         <div class="col">
-                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.success_color}}" data-id="success_color">
-                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.success_color}}" data-id="success_color">
+                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.feedback_correct_color}}" data-id="feedback_correct_color">
+                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.feedback_correct_color}}" data-id="feedback_correct_color">
                             <small class="form-text text-muted">
                                 Correct feedback, active recording, positive states
                             </small>
@@ -338,8 +347,8 @@
                             Alert Color:
                         </div>
                         <div class="col">
-                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.alert_color}}" data-id="alert_color">
-                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.alert_color}}" data-id="alert_color">
+                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.feedback_error_color}}" data-id="feedback_error_color">
+                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.feedback_error_color}}" data-id="feedback_error_color">
                             <small class="form-text text-muted">
                                 Incorrect feedback, processing/waiting, errors
                             </small>
@@ -348,8 +357,8 @@
                             Audio Icon Color (Disabled):
                         </div>
                         <div class="col">
-                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.audio_icon_disabled_color}}" data-id="audio_icon_disabled_color">
-                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.audio_icon_disabled_color}}" data-id="audio_icon_disabled_color">
+                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.learning_card_audio_icon_disabled_color}}" data-id="learning_card_audio_icon_disabled_color">
+                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.learning_card_audio_icon_disabled_color}}" data-id="learning_card_audio_icon_disabled_color">
                             <small class="form-text text-muted">
                                 Audio icons when disabled or needs configuration
                             </small>
@@ -358,8 +367,8 @@
                             Audio Control Color:
                         </div>
                         <div class="col">
-                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.audio_control_color}}" data-id="audio_control_color">
-                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.audio_control_color}}" data-id="audio_control_color">
+                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.learning_card_audio_control_color}}" data-id="learning_card_audio_control_color">
+                            <input type="color" class="currentThemePropColor" value="{{currentTheme.properties.learning_card_audio_control_color}}" data-id="learning_card_audio_control_color">
                             <small class="form-text text-muted">
                                 Replay/audio control emphasis color in the learning card
                             </small>
@@ -375,7 +384,7 @@
                             Video Overlay Surface:
                         </div>
                         <div class="col">
-                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.video_overlay_surface_color}}" data-id="video_overlay_surface_color" placeholder="rgba(255, 255, 255, 0.98)">
+                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.media_video_overlay_surface_color}}" data-id="media_video_overlay_surface_color" placeholder="rgba(255, 255, 255, 0.98)">
                             <small class="form-text text-muted">
                                 Background for checkpoint cards shown over video
                             </small>
@@ -384,7 +393,7 @@
                             Video Overlay Backdrop:
                         </div>
                         <div class="col">
-                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.video_overlay_backdrop_color}}" data-id="video_overlay_backdrop_color" placeholder="rgba(0, 0, 0, 0.6)">
+                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.media_video_overlay_backdrop_color}}" data-id="media_video_overlay_backdrop_color" placeholder="rgba(0, 0, 0, 0.6)">
                             <small class="form-text text-muted">
                                 Backdrop behind end-of-video overlays and checkpoint interruptions
                             </small>
@@ -393,7 +402,7 @@
                             Surface Shadow:
                         </div>
                         <div class="col">
-                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.surface_shadow}}" data-id="surface_shadow" placeholder="0 4px 12px rgba(0, 0, 0, 0.18)">
+                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.app_surface_shadow}}" data-id="app_surface_shadow" placeholder="0 4px 12px rgba(0, 0, 0, 0.18)">
                             <small class="form-text text-muted">
                                 Shared shadow for replay controls and card-like overlay surfaces
                             </small>
@@ -402,7 +411,7 @@
                             Performance Divider Color:
                         </div>
                         <div class="col">
-                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.performance_divider_color}}" data-id="performance_divider_color" placeholder="rgba(15, 23, 42, 0.15)">
+                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.learning_card_performance_divider_color}}" data-id="learning_card_performance_divider_color" placeholder="rgba(15, 23, 42, 0.15)">
                             <small class="form-text text-muted">
                                 Vertical divider between time and accuracy in the performance panel
                             </small>
@@ -411,7 +420,7 @@
                             Loading Overlay Color:
                         </div>
                         <div class="col">
-                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.loading_overlay_color}}" data-id="loading_overlay_color" placeholder="rgba(245, 245, 245, 0.95)">
+                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.app_loading_overlay_color}}" data-id="app_loading_overlay_color" placeholder="rgba(245, 245, 245, 0.95)">
                             <small class="form-text text-muted">
                                 Full-page loading scrim shown while the app prepares the next card
                             </small>
@@ -427,7 +436,7 @@
                             Small Border Radius:
                         </div>
                         <div class="col">
-                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.border_radius_sm}}" data-id="border_radius_sm" placeholder="8px">
+                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.app_border_radius_sm}}" data-id="app_border_radius_sm" placeholder="8px">
                             <small class="form-text text-muted">
                                 <strong>Default: 8px</strong> - Small UI elements<br>
                                 <em>Used for:</em> Buttons, inputs, dropdowns, small cards
@@ -437,7 +446,7 @@
                             Large Border Radius:
                         </div>
                         <div class="col">
-                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.border_radius_lg}}" data-id="border_radius_lg" placeholder="12px">
+                            <input type="text" class="currentThemeProp form-control" value="{{currentTheme.properties.app_border_radius_lg}}" data-id="app_border_radius_lg" placeholder="12px">
                             <small class="form-text text-muted">
                                 <strong>Default: 12px</strong> - Large containers<br>
                                 <em>Used for:</em> Modals, large cards, prominent UI sections
@@ -454,7 +463,7 @@
                             Transition Speed - Instant (ms):
                         </div>
                         <div class="col">
-                            <input type="number" class="currentThemeProp form-control" value="{{themeEditorValue 'transition_instant'}}" data-id="transition_instant" min="0" max="500" step="10" placeholder="10">
+                            <input type="number" class="currentThemeProp form-control" value="{{themeEditorValue 'app_transition_instant'}}" data-id="app_transition_instant" min="0" max="500" step="10" placeholder="10">
                             <small class="form-text text-muted">
                                 <strong>Default: 10ms</strong> - Near-instant (accessibility fallback, reduced motion mode). Plain numbers are stored as milliseconds.
                             </small>
@@ -463,7 +472,7 @@
                             Transition Speed - Fast (ms):
                         </div>
                         <div class="col">
-                            <input type="number" class="currentThemeProp form-control" value="{{themeEditorValue 'transition_fast'}}" data-id="transition_fast" min="0" max="500" step="10" placeholder="100">
+                            <input type="number" class="currentThemeProp form-control" value="{{themeEditorValue 'app_transition_fast'}}" data-id="app_transition_fast" min="0" max="500" step="10" placeholder="100">
                             <small class="form-text text-muted">
                                 <strong>Default: 100ms</strong> - Quick transitions<br>
                                 <em>Used for:</em> Buttons, hovers, input fields, progress bars, countdown timers, feedback displays. Plain numbers are stored as milliseconds.
@@ -473,7 +482,7 @@
                             Transition Speed - Smooth (ms):
                         </div>
                         <div class="col">
-                            <input type="number" class="currentThemeProp form-control" value="{{themeEditorValue 'transition_smooth'}}" data-id="transition_smooth" min="0" max="1000" step="50" placeholder="200">
+                            <input type="number" class="currentThemeProp form-control" value="{{themeEditorValue 'app_transition_smooth'}}" data-id="app_transition_smooth" min="0" max="1000" step="50" placeholder="200">
                             <small class="form-text text-muted">
                                 <strong>Default: 200ms</strong> - Main content transitions<br>
                                 <em>Used for:</em> Trial card fades, modal animations, major content changes. Plain numbers are stored as milliseconds.
@@ -490,7 +499,7 @@
                             Brand Label:
                         </div>
                         <div class="col">
-                            <input type="text" class="form-control currentThemeProp" value="{{currentTheme.properties.brand_label}}" data-id="brand_label">
+                            <input type="text" class="form-control currentThemeProp" value="{{currentTheme.properties.brand_display_label}}" data-id="brand_display_label">
                             <small class="form-text text-muted">
                                 Text shown next to the logo in the navbar and auth screens. Leave blank to use <code>public.systemName</code>.
                             </small>
@@ -500,14 +509,14 @@
                         </div>
                         <div class="col">
                             <input type="file" class="form-control mb-2" id="homeUnderlayUpload" accept="image/*">
-                            <input type="text" class="form-control currentThemeProp" value="{{currentTheme.properties.home_hero_image_url}}" data-id="home_hero_image_url" placeholder="https://example.com/underlay.jpg">
+                            <input type="text" class="form-control currentThemeProp" value="{{currentTheme.properties.practice_menu_underlay_image_url}}" data-id="practice_menu_underlay_image_url" placeholder="https://example.com/underlay.jpg">
                             <small class="form-text text-muted">
                                 Upload an image or enter a hosted image URL. The image is shown behind the home page content below the navigation bar.
                             </small>
-                            {{#if currentTheme.properties.home_hero_image_url}}
+                            {{#if currentTheme.properties.practice_menu_underlay_image_url}}
                             <div class="mt-2 d-flex flex-column align-items-start gap-2">
                                 <button type="button" id="clearHomeUnderlay" class="btn btn-secondary btn-sm">Clear Underlay Image</button>
-                                <img src="{{currentTheme.properties.home_hero_image_url}}"
+                                <img src="{{currentTheme.properties.practice_menu_underlay_image_url}}"
                                      alt="Home underlay preview"
                                      class="img-thumbnail"
                                      loading="lazy"
@@ -521,7 +530,7 @@
                             Home Welcome Back HTML:
                         </div>
                         <div class="col">
-                            <textarea class="form-control currentThemeProp" rows="5" data-id="home_welcome_html">{{currentTheme.properties.home_welcome_html}}</textarea>
+                            <textarea class="form-control currentThemeProp" rows="5" data-id="practice_menu_welcome_html">{{currentTheme.properties.practice_menu_welcome_html}}</textarea>
                             <small class="form-text text-muted">
                                 HTML shown over the home page underlay for users with practice records. Supports simple text formatting and links.
                             </small>
@@ -530,7 +539,7 @@
                             Home First Practice HTML:
                         </div>
                         <div class="col">
-                            <textarea class="form-control currentThemeProp" rows="5" data-id="home_no_practice_welcome_html">{{currentTheme.properties.home_no_practice_welcome_html}}</textarea>
+                            <textarea class="form-control currentThemeProp" rows="5" data-id="practice_menu_first_practice_welcome_html">{{currentTheme.properties.practice_menu_first_practice_welcome_html}}</textarea>
                             <small class="form-text text-muted">
                                 HTML shown over the home page underlay for users who have no practice records yet.
                             </small>
@@ -540,14 +549,15 @@
                         </div>
                         <div class="col">
                             <input type="file" class="form-control" id="logoUpload" accept="image/*">
+                            <input type="text" class="form-control currentThemeProp mt-2" value="{{currentTheme.properties.brand_logo_url}}" data-id="brand_logo_url" placeholder="/images/themes/brain-logo.png">
                             <small class="form-text text-muted">
-                                Max file size: 2MB. Recommended: PNG or SVG with transparent background.<br>
+                                Upload an image or enter a logo URL. Max file size: 2MB. Recommended: PNG or SVG with transparent background.<br>
                                 Will also auto-generate 16x16 and 32x32 favicons, a 180x180 iPhone Apple touch icon, plus Android install icons (192x192, 512x512, and maskable variants).
                             </small>
-                            {{#if currentTheme.properties.logo_url}}
+                            {{#if currentTheme.properties.brand_logo_url}}
                             <button type="button" id="clearLogo" class="btn btn-secondary btn-sm" style="margin-top: 0.5rem;">Clear Logo</button>
                             <div style="margin-top: 0.5rem;">
-                                <img src="{{currentTheme.properties.logo_url}}"
+                                <img src="{{currentTheme.properties.brand_logo_url}}"
                                      alt="Logo preview"
                                      class="img-thumbnail"
                                      loading="lazy"
@@ -561,7 +571,7 @@
                             Sign In Description:
                         </div>
                         <div class="col">
-                            <textarea class="form-control currentThemeProp" rows="3" data-id="signInDescription">{{currentTheme.properties.signInDescription}}</textarea>
+                            <textarea class="form-control currentThemeProp" rows="3" data-id="auth_sign_in_description">{{currentTheme.properties.auth_sign_in_description}}</textarea>
                             <small class="form-text text-muted">
                                 Custom text displayed on the login page
                             </small>

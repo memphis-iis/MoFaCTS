@@ -176,10 +176,10 @@ function openSidebarForTour(): number {
 Template.home.helpers({
   homeUnderlayStyle(): string {
     const theme = Session.get('curTheme');
-    const url = (theme?.properties?.home_hero_image_url as string | undefined);
+    const url = (theme?.properties?.practice_menu_underlay_image_url as string | undefined);
     if (typeof url === 'string' && url.trim().length > 0) {
       const escapedUrl = url.trim().replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-      return `--home-underlay-image: url("${escapedUrl}");`;
+      return `--practice-menu-underlay-image: url("${escapedUrl}");`;
     }
     return '';
   },
@@ -188,8 +188,8 @@ Template.home.helpers({
     const theme = Session.get('curTheme');
     const hasPracticeRecords = Session.get('homeHasPracticeRecords');
     const html = hasPracticeRecords === false
-      ? theme?.properties?.home_no_practice_welcome_html
-      : theme?.properties?.home_welcome_html;
+      ? theme?.properties?.practice_menu_first_practice_welcome_html
+      : theme?.properties?.practice_menu_welcome_html;
     if (typeof html !== 'string') {
       clientConsole(1, '[HOME] Missing required theme welcome property');
       return '';

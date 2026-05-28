@@ -1274,9 +1274,9 @@ export const cardMachine = createMachine(
     actors: createServices(),
 
     delays: {
-      FADE_IN_DURATION: () => getCssDuration('--transition-smooth'),
-      FADE_OUT_DURATION: () => getCssDuration('--transition-smooth'),
-      FADE_OUT_STALL_TIMEOUT: () => getCssDuration('--transition-smooth') + 1000,
+      FADE_IN_DURATION: () => getCssDuration('--app-transition-smooth'),
+      FADE_OUT_DURATION: () => getCssDuration('--app-transition-smooth'),
+      FADE_OUT_STALL_TIMEOUT: () => getCssDuration('--app-transition-smooth') + 1000,
       FORCE_CORRECT_TIMEOUT: ({ context }: MachineArgs) => {
         const timeout = parseInt(String(context.deliverySettings?.forcecorrecttimeout ?? ''), 10);
         return Number.isFinite(timeout) ? timeout : 2000; // Default to 2s

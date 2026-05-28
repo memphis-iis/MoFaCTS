@@ -635,7 +635,7 @@
 
   .question-number {
     font-size: 0.85rem;
-    color: var(--secondary-text-color);
+    color: var(--app-secondary-text-color);
     margin-bottom: 0.25rem;
   }
 
@@ -643,7 +643,7 @@
     font-size: var(--card-font-size, inherit);
     line-height: 1.5;
     word-wrap: break-word;
-    color: var(--text-color);
+    color: var(--app-text-color);
     width: 100%;
   }
 
@@ -655,7 +655,7 @@
   }
 
   .stimulus-text.cloze {
-    font-family: var(--font-family, inherit);
+    font-family: var(--app-font-family, inherit);
   }
 
   .stimulus-audio-box {
@@ -676,8 +676,8 @@
   }
 
   .replay-button {
-    background: var(--stimuli-box-color);
-    border: 2px solid var(--secondary-color);
+    background: var(--learning-card-stimulus-surface-color);
+    border: 2px solid var(--app-secondary-surface-color);
     border-radius: 50%;
     width: 80px;
     height: 80px;
@@ -686,18 +686,18 @@
     align-items: center;
     cursor: pointer;
     transition:
-      transform var(--transition-fast, 100ms) ease,
-      border-color var(--transition-fast, 100ms) ease,
-      box-shadow var(--transition-fast, 100ms) ease,
-      color var(--transition-fast, 100ms) ease;
-    color: var(--accent-color);
+      transform var(--app-transition-fast, 100ms) ease,
+      border-color var(--app-transition-fast, 100ms) ease,
+      box-shadow var(--app-transition-fast, 100ms) ease,
+      color var(--app-transition-fast, 100ms) ease;
+    color: var(--app-accent-color);
     font-size: 2.5rem;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   }
 
   .replay-button:hover:not(:disabled) {
     transform: scale(1.05);
-    border-color: var(--accent-color);
+    border-color: var(--app-accent-color);
     box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
   }
 
@@ -706,7 +706,7 @@
   }
 
   .replay-button:disabled {
-    color: var(--audio-icon-disabled-color);
+    color: var(--learning-card-audio-icon-disabled-color);
     opacity: 0.5;
     cursor: default;
     filter: grayscale(1);
@@ -720,9 +720,9 @@
     height: 100%;
     padding: 1em;
     overflow: auto;
-    border: 1px solid var(--secondary-color);
-    border-radius: var(--border-radius-lg);
-    background: var(--stimuli-box-color);
+    border: 1px solid var(--app-secondary-surface-color);
+    border-radius: var(--app-border-radius-lg);
+    background: var(--learning-card-stimulus-surface-color);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -765,9 +765,9 @@
     align-items: center;
     justify-content: center;
     padding: 1em;
-    border: 1px solid var(--secondary-color);
-    border-radius: var(--border-radius-lg);
-    background: var(--stimuli-box-color);
+    border: 1px solid var(--app-secondary-surface-color);
+    border-radius: var(--app-border-radius-lg);
+    background: var(--learning-card-stimulus-surface-color);
     box-sizing: border-box;
     overflow: hidden;
     width: 100%;
@@ -826,7 +826,7 @@
     display: inline-block;
     max-width: 100%;
     padding: 0 0.25rem;
-    color: var(--secondary-text-color);
+    color: var(--app-secondary-text-color);
     font-size: 0.625rem;
     line-height: 1.25;
     text-align: center;
@@ -849,7 +849,7 @@
 
   .stimulus-attribution a:hover,
   .stimulus-attribution a:focus-visible {
-    color: var(--accent-color);
+    color: var(--app-accent-color);
     text-decoration: underline;
   }
 

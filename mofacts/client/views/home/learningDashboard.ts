@@ -108,7 +108,7 @@ function getLearnerConfigCloseDurationMs() {
   if (typeof window === 'undefined') {
     return LEARNER_CONFIG_CLOSE_FALLBACK_MS;
   }
-  const transition = window.getComputedStyle(document.documentElement).getPropertyValue('--transition-smooth');
+  const transition = window.getComputedStyle(document.documentElement).getPropertyValue('--app-transition-smooth');
   return parseCssDurationMs(transition) + 20;
 }
 

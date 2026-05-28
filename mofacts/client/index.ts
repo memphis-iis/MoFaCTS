@@ -875,12 +875,12 @@ Template.registerHelper('appShellTitle', function() {
 });
 Template.registerHelper('appShellUnderlayStyle', function() {
   const theme = Session.get('curTheme') as any;
-  const url = theme?.properties?.home_hero_image_url;
+  const url = theme?.properties?.practice_menu_underlay_image_url;
   if (typeof url !== 'string' || url.trim().length === 0) {
     return '';
   }
   const escapedUrl = url.trim().replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-  return `--home-underlay-image: url("${escapedUrl}");`;
+  return `--practice-menu-underlay-image: url("${escapedUrl}");`;
 });
 Template.registerHelper('showPageNumbers', function() {
   return Session.get('showPageNumbers');

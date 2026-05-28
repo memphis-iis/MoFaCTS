@@ -91,8 +91,7 @@
 
 <style>
   .performance-area {
-    background-color: var(--background-color);
-    border-bottom: 1px solid var(--secondary-color);
+    background-color: var(--app-background-color);
     padding: 0.375rem 0.5rem;
     margin-bottom: 0.5rem;
     flex-shrink: 0;
@@ -116,7 +115,7 @@
     height: 24px;
     line-height: 1;
     border-radius: var(--border-radius-pill, 999px);
-    background-color: var(--background-color);
+    background-color: var(--app-background-color);
     margin: 0 auto;
     width: fit-content;
     min-width: 220px;
@@ -134,26 +133,26 @@
     font-size: 0.7rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--secondary-text-color);
+    color: var(--app-secondary-text-color);
   }
 
   .stat-value {
     font-size: 0.82rem;
     font-weight: 700;
-    color: var(--primary-button-text-color);
+    color: var(--app-primary-action-text-color);
   }
 
   .stat-unit {
     font-size: 0.7rem;
     font-weight: 500;
-    color: var(--secondary-text-color);
+    color: var(--app-secondary-text-color);
   }
 
   .stat-divider {
     display: inline-block;
     width: 1px;
     height: 16px;
-    background: var(--performance-divider-color);
+    background: var(--learning-card-performance-divider-color);
   }
 
   .timeout-bar-container {
@@ -167,7 +166,7 @@
   .timeout-label {
     font-size: 0.75rem;
     font-weight: 600;
-    color: var(--secondary-text-color);
+    color: var(--app-secondary-text-color);
     margin-bottom: 0.2rem;
     text-align: center;
   }
@@ -175,24 +174,24 @@
   .timeout-bar-wrapper {
     width: 100%;
     height: 8px;
-    background-color: var(--background-color);
-    border-radius: var(--border-radius-sm);
+    background-color: var(--app-background-color);
+    border-radius: var(--app-border-radius-sm);
     overflow: hidden;
   }
 
   .timeout-bar {
     height: 100%;
     width: var(--timeout-progress, 0%);
-    background-color: var(--success-color);
-    transition: width var(--transition-fast) linear, background-color var(--transition-fast) ease;
+    background-color: var(--feedback-correct-color);
+    transition: width var(--app-transition-fast) linear, background-color var(--app-transition-fast) ease;
   }
 
   .timeout-bar.warning {
-    background-color: var(--accent-color);
+    background-color: var(--app-accent-color);
   }
 
   .timeout-bar.critical {
-    background-color: var(--alert-color);
+    background-color: var(--feedback-error-color);
   }
 
   /* Mobile responsiveness */

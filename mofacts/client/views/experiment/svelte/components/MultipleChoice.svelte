@@ -295,19 +295,19 @@
     font-size: var(--choice-font-size, var(--card-font-size, 24px));
     font-weight: 500;
     line-height: 1.2;
-    color: var(--primary-button-text-color);
-    background-color: var(--card-background-color);
+    color: var(--app-primary-action-text-color);
+    background-color: var(--learning-card-surface-color);
     border: 2px solid color-mix(
       in srgb,
-      var(--button-color) calc(100% - (var(--button-border-darkness) * 1%)),
-      black calc(var(--button-border-darkness) * 1%)
+      var(--app-primary-action-surface-color) calc(100% - (var(--app-button-border-darkness) * 1%)),
+      black calc(var(--app-button-border-darkness) * 1%)
     );
-    border-radius: var(--border-radius-sm);
+    border-radius: var(--app-border-radius-sm);
     cursor: pointer;
     transition:
-      opacity var(--transition-fast, 100ms) ease,
-      background-color var(--transition-fast, 100ms) ease,
-      box-shadow var(--transition-fast, 100ms) ease;
+      opacity var(--app-transition-fast, 100ms) ease,
+      background-color var(--app-transition-fast, 100ms) ease,
+      box-shadow var(--app-transition-fast, 100ms) ease;
     min-height: var(--choice-min-height, 48px);
     display: flex;
     align-items: center;
@@ -321,18 +321,18 @@
   .choice-button:hover:not(.disabled) {
     background-color: color-mix(
       in srgb,
-      var(--button-color) calc(100% - (var(--button-hover-darkness) * 1%)),
-      black calc(var(--button-hover-darkness) * 1%)
+      var(--app-primary-action-surface-color) calc(100% - (var(--app-button-hover-darkness) * 1%)),
+      black calc(var(--app-button-hover-darkness) * 1%)
     );
-    color: var(--primary-button-text-color);
+    color: var(--app-primary-action-text-color);
     opacity: 1;
-    box-shadow: 0 2px 6px color-mix(in srgb, var(--button-color) 20%, transparent);
+    box-shadow: 0 2px 6px color-mix(in srgb, var(--app-primary-action-surface-color) 20%, transparent);
   }
 
   .choice-button.disabled {
-    background-color: var(--secondary-color);
-    border-color: var(--secondary-color);
-    color: var(--secondary-text-color);
+    background-color: var(--app-secondary-surface-color);
+    border-color: var(--app-secondary-surface-color);
+    color: var(--app-secondary-text-color);
     cursor: not-allowed;
   }
 

@@ -18,56 +18,57 @@ const FALLBACK_THEME = {
   enabled: true,
   properties: {
     themeName: 'MoFaCTS',
-    background_color: '#F2F2F2',
-    text_color: '#000000',
-    page_header_text_color: '#000000',
-    button_color: '#7ed957',
-    primary_button_text_color: '#000000',
-    accent_color: '#7ed957',
-    secondary_color: '#d9d9d9',
-    secondary_text_color: '#000000',
-    audio_icon_disabled_color: '#6c757d',
-    audio_control_color: '#7ed957',
-    success_color: '#00cc00',
-    alert_color: '#ff0000',
-    navbar_text_color: '#000000',
-    neutral_color: '#ffffff',
-    card_background_color: '#ffffff',
-    stimuli_box_color: '#ffffff',
-    video_overlay_surface_color: 'color-mix(in srgb, var(--card-background-color) 98%, transparent)',
-    video_overlay_backdrop_color: 'color-mix(in srgb, var(--text-color) 60%, transparent)',
-    surface_shadow: '0 4px 12px color-mix(in srgb, var(--text-color) 18%, transparent)',
-    performance_divider_color: 'color-mix(in srgb, var(--text-color) 15%, transparent)',
-    loading_overlay_color: 'color-mix(in srgb, var(--background-color) 95%, transparent)',
-    main_button_color: '#7FC89E',
-    main_button_text_color: '#000000',
+    app_background_color: '#F2F2F2',
+    app_text_color: '#000000',
+    app_page_header_text_color: '#000000',
+    app_primary_action_surface_color: '#7ed957',
+    app_primary_action_text_color: '#000000',
+    app_accent_color: '#7ed957',
+    app_secondary_surface_color: '#d9d9d9',
+    app_secondary_text_color: '#000000',
+    learning_card_audio_icon_disabled_color: '#6c757d',
+    learning_card_audio_control_color: '#7ed957',
+    feedback_correct_color: '#00cc00',
+    feedback_error_color: '#ff0000',
+    navigation_text_color: '#000000',
+    navigation_surface_color: '#ffffff',
+    learning_card_surface_color: '#ffffff',
+    learning_card_stimulus_surface_color: '#ffffff',
+    media_video_overlay_surface_color: 'color-mix(in srgb, var(--learning-card-surface-color) 98%, transparent)',
+    media_video_overlay_backdrop_color: 'color-mix(in srgb, var(--app-text-color) 60%, transparent)',
+    app_surface_shadow: '0 4px 12px color-mix(in srgb, var(--app-text-color) 18%, transparent)',
+    learning_card_performance_divider_color: 'color-mix(in srgb, var(--app-text-color) 15%, transparent)',
+    app_loading_overlay_color: 'color-mix(in srgb, var(--app-background-color) 95%, transparent)',
+    learning_card_primary_action_surface_color: '#7FC89E',
+    learning_card_primary_action_text_color: '#000000',
     practice_menu_accuracy_bar_fill_color: '#7ed957',
-    practice_menu_accuracy_bar_track_color: 'color-mix(in srgb, var(--text-color) 12%, transparent)',
-    home_hero_image_url: '',
-    home_welcome_html: '<h1>Welcome back!</h1><p>Access your teaching tools, resources, and system functions.</p>',
-    home_no_practice_welcome_html: '<h1>Welcome to MoFaCTS!</h1><p>Choose a lesson below to begin your first practice session.</p>',
-    brand_label: '',
-    logo_url: '/images/themes/brain-logo.png',
-    favicon_16_url: '/images/themes/brain-16.png',
-    favicon_32_url: '/images/themes/brain-32.png',
-    apple_touch_icon_url: '/images/themes/brain-apple-touch-180.png',
-    android_icon_192_url: '/images/themes/brain-android-192.png',
-    android_icon_512_url: '/images/themes/brain-android-512.png',
-    android_maskable_icon_192_url: '/images/themes/brain-maskable-192.png',
-    android_maskable_icon_512_url: '/images/themes/brain-maskable-512.png',
-    signInDescription: 'A web-based adaptive learning system that uses spaced practice and retrieval to help you learn and retain information more effectively. Sign in to access your personalized learning experience.',
-    border_radius_sm: '8px',
-    border_radius_lg: '12px',
-    transition_instant: '10ms',
-    transition_fast: '100ms',
-    transition_smooth: '200ms',
-    font_stylesheet_url: '',
-    font_family: 'system-ui, -apple-system, "Segoe UI", sans-serif',
-    heading_font_family: 'var(--font-family)',
-    font_size_base: '16px',
-    button_height: '44px',
-    button_border_darkness: 20,
-    button_hover_darkness: 15
+    practice_menu_accuracy_bar_track_color: 'color-mix(in srgb, var(--app-text-color) 12%, transparent)',
+    practice_menu_underlay_image_url: '',
+    practice_menu_welcome_html: '<h1>Welcome back!</h1><p>Access your teaching tools, resources, and system functions.</p>',
+    practice_menu_first_practice_welcome_html: '<h1>Welcome to MoFaCTS!</h1><p>Choose a lesson below to begin your first practice session.</p>',
+    brand_display_label: '',
+    brand_logo_url: '/images/themes/brain-logo.png',
+    brand_favicon_16_url: '/images/themes/brain-16.png',
+    brand_favicon_32_url: '/images/themes/brain-32.png',
+    brand_apple_touch_icon_url: '/images/themes/brain-apple-touch-180.png',
+    brand_android_icon_192_url: '/images/themes/brain-android-192.png',
+    brand_android_icon_512_url: '/images/themes/brain-android-512.png',
+    brand_android_maskable_icon_192_url: '/images/themes/brain-maskable-192.png',
+    brand_android_maskable_icon_512_url: '/images/themes/brain-maskable-512.png',
+    auth_sign_in_description: 'A web-based adaptive learning system that uses spaced practice and retrieval to help you learn and retain information more effectively. Sign in to access your personalized learning experience.',
+    app_border_radius_sm: '8px',
+    app_border_radius_lg: '12px',
+    app_transition_instant: '10ms',
+    app_transition_fast: '100ms',
+    app_transition_smooth: '200ms',
+    app_font_stylesheet_url: '',
+    app_font_family: 'system-ui, -apple-system, "Segoe UI", sans-serif',
+    app_heading_font_family: 'var(--app-font-family)',
+    app_font_size_base: '16px',
+    app_button_height: '44px',
+    app_text_input_height: '36px',
+    app_button_border_darkness: 20,
+    app_button_hover_darkness: 15
   },
   metadata: {
     name: 'MoFaCTS Default',
@@ -82,12 +83,62 @@ const FALLBACK_THEME = {
   help: null
 };
 const FALLBACK_PROPERTIES = FALLBACK_THEME.properties || {};
+const LEGACY_THEME_PROPERTY_RENAMES: Record<string, string> = {
+  background_color: 'app_background_color',
+  text_color: 'app_text_color',
+  page_header_text_color: 'app_page_header_text_color',
+  button_color: 'app_primary_action_surface_color',
+  primary_button_text_color: 'app_primary_action_text_color',
+  accent_color: 'app_accent_color',
+  secondary_color: 'app_secondary_surface_color',
+  secondary_text_color: 'app_secondary_text_color',
+  audio_icon_disabled_color: 'learning_card_audio_icon_disabled_color',
+  audio_control_color: 'learning_card_audio_control_color',
+  success_color: 'feedback_correct_color',
+  alert_color: 'feedback_error_color',
+  navbar_text_color: 'navigation_text_color',
+  neutral_color: 'navigation_surface_color',
+  card_background_color: 'learning_card_surface_color',
+  stimuli_box_color: 'learning_card_stimulus_surface_color',
+  video_overlay_surface_color: 'media_video_overlay_surface_color',
+  video_overlay_backdrop_color: 'media_video_overlay_backdrop_color',
+  surface_shadow: 'app_surface_shadow',
+  performance_divider_color: 'learning_card_performance_divider_color',
+  loading_overlay_color: 'app_loading_overlay_color',
+  main_button_color: 'learning_card_primary_action_surface_color',
+  main_button_text_color: 'learning_card_primary_action_text_color',
+  home_hero_image_url: 'practice_menu_underlay_image_url',
+  home_welcome_html: 'practice_menu_welcome_html',
+  home_no_practice_welcome_html: 'practice_menu_first_practice_welcome_html',
+  brand_label: 'brand_display_label',
+  logo_url: 'brand_logo_url',
+  favicon_16_url: 'brand_favicon_16_url',
+  favicon_32_url: 'brand_favicon_32_url',
+  apple_touch_icon_url: 'brand_apple_touch_icon_url',
+  android_icon_192_url: 'brand_android_icon_192_url',
+  android_icon_512_url: 'brand_android_icon_512_url',
+  android_maskable_icon_192_url: 'brand_android_maskable_icon_192_url',
+  android_maskable_icon_512_url: 'brand_android_maskable_icon_512_url',
+  signInDescription: 'auth_sign_in_description',
+  border_radius_sm: 'app_border_radius_sm',
+  border_radius_lg: 'app_border_radius_lg',
+  transition_instant: 'app_transition_instant',
+  transition_fast: 'app_transition_fast',
+  transition_smooth: 'app_transition_smooth',
+  font_stylesheet_url: 'app_font_stylesheet_url',
+  font_family: 'app_font_family',
+  heading_font_family: 'app_heading_font_family',
+  font_size_base: 'app_font_size_base',
+  button_height: 'app_button_height',
+  button_border_darkness: 'app_button_border_darkness',
+  button_hover_darkness: 'app_button_hover_darkness'
+};
 type DerivedThemeIconPropertyName =
-  | 'apple_touch_icon_url'
-  | 'android_icon_192_url'
-  | 'android_icon_512_url'
-  | 'android_maskable_icon_192_url'
-  | 'android_maskable_icon_512_url';
+  | 'brand_apple_touch_icon_url'
+  | 'brand_android_icon_192_url'
+  | 'brand_android_icon_512_url'
+  | 'brand_android_maskable_icon_192_url'
+  | 'brand_android_maskable_icon_512_url';
 
 const log = (..._args: any[]) => {};
 
@@ -169,11 +220,11 @@ function findDefaultThemeDirs() {
 }
 
 const DERIVED_THEME_ICON_PATHS: Record<DerivedThemeIconPropertyName, string> = {
-  apple_touch_icon_url: 'apple-touch-180',
-  android_icon_192_url: 'android-192',
-  android_icon_512_url: 'android-512',
-  android_maskable_icon_192_url: 'maskable-192',
-  android_maskable_icon_512_url: 'maskable-512'
+  brand_apple_touch_icon_url: 'apple-touch-180',
+  brand_android_icon_192_url: 'android-192',
+  brand_android_icon_512_url: 'android-512',
+  brand_android_maskable_icon_192_url: 'maskable-192',
+  brand_android_maskable_icon_512_url: 'maskable-512'
 };
 
 const BUNDLED_THEME_ASSET_ROOTS = [
@@ -226,12 +277,12 @@ function hasBundledThemeAsset(assetPath: string) {
 
 function resolveThemeAssetStem(properties: Record<string, unknown>) {
   const candidateFields = [
-    properties.logo_url,
-    properties.favicon_32_url,
-    properties.favicon_16_url,
-    properties.apple_touch_icon_url,
-    properties.android_icon_192_url,
-    properties.android_icon_512_url
+    properties.brand_logo_url,
+    properties.brand_favicon_32_url,
+    properties.brand_favicon_16_url,
+    properties.brand_apple_touch_icon_url,
+    properties.brand_android_icon_192_url,
+    properties.brand_android_icon_512_url
   ];
 
   for (const candidate of candidateFields) {
@@ -284,12 +335,36 @@ function normalizeThemeIconProperties(
   return normalizedProperties;
 }
 
+function migrateLegacyThemeProperties(properties: Record<string, unknown>) {
+  const migrated: Record<string, unknown> = {};
+
+  for (const [property, value] of Object.entries(properties)) {
+    const renamedProperty = LEGACY_THEME_PROPERTY_RENAMES[property];
+    if (!renamedProperty) {
+      migrated[property] = value;
+      continue;
+    }
+
+    if (renamedProperty in properties && properties[renamedProperty] !== value) {
+      throw new Error(`Theme contains conflicting legacy and current values for ${property} and ${renamedProperty}`);
+    }
+
+    if (!(renamedProperty in migrated)) {
+      migrated[renamedProperty] = value;
+    }
+  }
+
+  return migrated;
+}
+
 function mergeWithFallbackProps(properties: any, derivedName: string) {
-  const normalized = properties && typeof properties === 'object' ? properties : {};
+  const normalized = migrateLegacyThemeProperties(
+    properties && typeof properties === 'object' ? properties : {}
+  );
   const merged = {
     ...FALLBACK_PROPERTIES,
     ...normalized,
-    page_header_text_color: normalized.page_header_text_color || normalized.text_color || FALLBACK_PROPERTIES.page_header_text_color,
+    app_page_header_text_color: normalized.app_page_header_text_color || normalized.app_text_color || FALLBACK_PROPERTIES.app_page_header_text_color,
     themeName: normalized.themeName || derivedName
   };
   return normalizeThemeIconProperties(merged, normalized);
@@ -371,6 +446,13 @@ class ThemeRegistry {
       try {
         const raw = JSON.parse(await fsp.readFile(absolutePath, 'utf8'));
         const sanitized = sanitizeTheme(raw, origin, entry.name);
+        if (origin !== 'system') {
+          const rawComparable = JSON.stringify(raw.properties || {});
+          const sanitizedComparable = JSON.stringify(sanitized.properties || {});
+          if (rawComparable !== sanitizedComparable) {
+            await fsp.writeFile(absolutePath, JSON.stringify(sanitized, null, 2), 'utf8');
+          }
+        }
         this.registerTheme(sanitized, origin === 'system', absolutePath);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

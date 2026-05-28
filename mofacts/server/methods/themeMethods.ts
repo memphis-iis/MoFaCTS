@@ -231,7 +231,7 @@ export function createThemeMethods(deps: ThemeMethodDeps) {
 
         const serializedTheme = updateResult.serialized;
 
-        if (property === 'logo_url' && value && typeof value === 'string' && value.startsWith('data:image')) {
+        if (property === 'brand_logo_url' && value && typeof value === 'string' && value.startsWith('data:image')) {
           const capturedUserId = this.userId;
           const capturedLogoValue = value;
           Meteor.defer(async () => {
@@ -239,10 +239,10 @@ export function createThemeMethods(deps: ThemeMethodDeps) {
               const favicons = await generateFaviconsFromLogoInternal(deps.serverConsole, capturedLogoValue);
               const faviconUpdates: Record<string, string> = {};
               if (favicons.favicon_16) {
-                faviconUpdates.favicon_16_url = favicons.favicon_16;
+                faviconUpdates.brand_favicon_16_url = favicons.favicon_16;
               }
               if (favicons.favicon_32) {
-                faviconUpdates.favicon_32_url = favicons.favicon_32;
+                faviconUpdates.brand_favicon_32_url = favicons.favicon_32;
               }
               if (Object.keys(faviconUpdates).length) {
                 await deps.updateActiveThemeDocument(capturedUserId, (theme: ThemeMutable) => {

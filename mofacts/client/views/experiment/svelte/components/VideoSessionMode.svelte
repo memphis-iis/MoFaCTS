@@ -774,7 +774,7 @@
     position: relative;
     width: 100%;
     height: 100%;
-    background-color: var(--text-color);
+    background-color: var(--app-text-color);
   }
 
   .video-container {
@@ -795,14 +795,14 @@
     left: 50%;
     transform: translateX(-50%);
     width: 90%;
-    background-color: var(--video-overlay-surface-color);
-    border-radius: var(--border-radius-lg);
-    box-shadow: var(--surface-shadow);
+    background-color: var(--media-video-overlay-surface-color);
+    border-radius: var(--app-border-radius-lg);
+    box-shadow: var(--app-surface-shadow);
     padding: 1rem;
     z-index: 100;
     opacity: 0;
     pointer-events: none;
-    transition: opacity var(--transition-smooth) ease;
+    transition: opacity var(--app-transition-smooth) ease;
   }
 
   .overlay-content.overlay-content-visible {
@@ -826,7 +826,7 @@
   }
 
   :global(.plyr__video-wrapper) {
-    background: var(--text-color);
+    background: var(--app-text-color);
   }
 </style>
 

@@ -67,7 +67,9 @@ For fast UI/application hot fixes on Windows, use the native local hotfix dev se
 - Rspack dev-server host checking explicitly allows `host.docker.internal` so Playwright MCP can inspect the native dev app from its container.
 - Agents may run this hotfix dev server even though it starts Meteor in watch mode; this is the only automation exception to "Never run `meteor run`", and it is limited to local interactive UI observation.
 - Do not use the hotfix dev service as release confidence, deploy confidence, or a substitute for `npm run typecheck`.
-- For UI work, point Playwright/MCP at the hotfix dev app, make the smallest coherent source change, let Meteor/Rspack rebuild, refresh the page, and observe again.
+- For UI work, use the MoFaCTS sidecar Playwright MCP server from `mofacts-mcp-sidecar/`, not the bundled Browser or Chrome extension registry. In this Codex environment the correct tool namespace is `mcp__mofacts_playwright__`; do not diagnose MoFaCTS sidecar availability by checking bundled `iab` or Chrome-extension browser registries.
+- The hotfix sidecar endpoint is `http://localhost:8931/mcp`, and its Docker target for the native hotfix app is `http://host.docker.internal:3200`. Start or restart it from `mofacts-mcp-sidecar/` with `docker compose -f docker-compose.yml -f docker-compose.hotfix-dev.yml up --build`.
+- For UI work, point the MoFaCTS Playwright MCP sidecar at the hotfix dev app, make the smallest coherent source change, let Meteor/Rspack rebuild, refresh the page, and observe again.
 - If a dependency or Meteor package changes, run the required install/update step deliberately and restart the hotfix dev service.
 
 ## Local Hotfix Loop
@@ -101,7 +103,7 @@ Use the verification path that matches the change, and say clearly when a check 
 - TypeScript-bearing app changes: run `npm run typecheck` from `mofacts/`.
 - Lintable TypeScript, JavaScript, or Svelte changes: run `npm run lint` from `mofacts/`.
 - TDF field registry or schema changes: run `npm run generate:schemas` from `mofacts/` and inspect generated schema diffs.
-- UI/runtime behavior changes: use the native hotfix dev server plus browser smoke testing at `http://localhost:3200`.
+- UI/runtime behavior changes: use the native hotfix dev server plus browser smoke testing through the MoFaCTS Playwright sidecar (`mcp__mofacts_playwright__`) against `http://host.docker.internal:3200` / host `http://localhost:3200`.
 - Meteor integration or client contract coverage: use CI or another supported Meteor test environment. Do not run `npm run test:ci` as routine local Windows verification; the script refuses local Windows execution unless `MOFACTS_ALLOW_WINDOWS_METEOR_TESTS=1` is set for deliberate harness debugging. If Meteor coverage is needed but unavailable locally, document that explicitly instead of substituting a narrower check.
 - Docker build, push, or deploy verification: run only when explicitly requested.
 

@@ -1615,9 +1615,9 @@
                           },
                           "correctColor": {
                             "title": "Correct feedback color",
-                            "description": "CSS color value used for correct-answer feedback text. Supported values are hex colors such as \"#00ff00\" or CSS custom properties such as \"var(--success-color)\".",
+                            "description": "CSS color value used for correct-answer feedback text. Supported values are hex colors such as \"#00ff00\" or CSS custom properties such as \"var(--feedback-correct-color)\".",
                             "type": "string",
-                            "default": "var(--success-color)",
+                            "default": "var(--feedback-correct-color)",
                             "options": {
                               "grid_columns": 4
                             },
@@ -1630,9 +1630,9 @@
                           },
                           "incorrectColor": {
                             "title": "Incorrect feedback color",
-                            "description": "CSS color value used for incorrect-answer and timeout feedback text. Supported values are hex colors such as \"#ff0000\" or CSS custom properties such as \"var(--alert-color)\".",
+                            "description": "CSS color value used for incorrect-answer and timeout feedback text. Supported values are hex colors such as \"#ff0000\" or CSS custom properties such as \"var(--feedback-error-color)\".",
                             "type": "string",
-                            "default": "var(--alert-color)",
+                            "default": "var(--feedback-error-color)",
                             "options": {
                               "grid_columns": 4
                             },
@@ -2386,9 +2386,9 @@
                             },
                             "correctColor": {
                               "title": "Correct feedback color",
-                              "description": "CSS color value used for correct-answer feedback text. Supported values are hex colors such as \"#00ff00\" or CSS custom properties such as \"var(--success-color)\".",
+                              "description": "CSS color value used for correct-answer feedback text. Supported values are hex colors such as \"#00ff00\" or CSS custom properties such as \"var(--feedback-correct-color)\".",
                               "type": "string",
-                              "default": "var(--success-color)",
+                              "default": "var(--feedback-correct-color)",
                               "options": {
                                 "grid_columns": 4
                               },
@@ -2401,9 +2401,9 @@
                             },
                             "incorrectColor": {
                               "title": "Incorrect feedback color",
-                              "description": "CSS color value used for incorrect-answer and timeout feedback text. Supported values are hex colors such as \"#ff0000\" or CSS custom properties such as \"var(--alert-color)\".",
+                              "description": "CSS color value used for incorrect-answer and timeout feedback text. Supported values are hex colors such as \"#ff0000\" or CSS custom properties such as \"var(--feedback-error-color)\".",
                               "type": "string",
-                              "default": "var(--alert-color)",
+                              "default": "var(--feedback-error-color)",
                               "options": {
                                 "grid_columns": 4
                               },
@@ -3861,9 +3861,9 @@
                       },
                       "correctColor": {
                         "title": "Correct feedback color",
-                        "description": "CSS color value used for correct-answer feedback text. Supported values are hex colors such as \"#00ff00\" or CSS custom properties such as \"var(--success-color)\".",
+                        "description": "CSS color value used for correct-answer feedback text. Supported values are hex colors such as \"#00ff00\" or CSS custom properties such as \"var(--feedback-correct-color)\".",
                         "type": "string",
-                        "default": "var(--success-color)",
+                        "default": "var(--feedback-correct-color)",
                         "options": {
                           "grid_columns": 4
                         },
@@ -3876,9 +3876,9 @@
                       },
                       "incorrectColor": {
                         "title": "Incorrect feedback color",
-                        "description": "CSS color value used for incorrect-answer and timeout feedback text. Supported values are hex colors such as \"#ff0000\" or CSS custom properties such as \"var(--alert-color)\".",
+                        "description": "CSS color value used for incorrect-answer and timeout feedback text. Supported values are hex colors such as \"#ff0000\" or CSS custom properties such as \"var(--feedback-error-color)\".",
                         "type": "string",
-                        "default": "var(--alert-color)",
+                        "default": "var(--feedback-error-color)",
                         "options": {
                           "grid_columns": 4
                         },
@@ -4632,9 +4632,9 @@
                         },
                         "correctColor": {
                           "title": "Correct feedback color",
-                          "description": "CSS color value used for correct-answer feedback text. Supported values are hex colors such as \"#00ff00\" or CSS custom properties such as \"var(--success-color)\".",
+                          "description": "CSS color value used for correct-answer feedback text. Supported values are hex colors such as \"#00ff00\" or CSS custom properties such as \"var(--feedback-correct-color)\".",
                           "type": "string",
-                          "default": "var(--success-color)",
+                          "default": "var(--feedback-correct-color)",
                           "options": {
                             "grid_columns": 4
                           },
@@ -4647,9 +4647,9 @@
                         },
                         "incorrectColor": {
                           "title": "Incorrect feedback color",
-                          "description": "CSS color value used for incorrect-answer and timeout feedback text. Supported values are hex colors such as \"#ff0000\" or CSS custom properties such as \"var(--alert-color)\".",
+                          "description": "CSS color value used for incorrect-answer and timeout feedback text. Supported values are hex colors such as \"#ff0000\" or CSS custom properties such as \"var(--feedback-error-color)\".",
                           "type": "string",
-                          "default": "var(--alert-color)",
+                          "default": "var(--feedback-error-color)",
                           "options": {
                             "grid_columns": 4
                           },
@@ -5862,9 +5862,9 @@
             },
             "correctColor": {
               "title": "Correct feedback color",
-              "description": "CSS color value used for correct-answer feedback text. Supported values are hex colors such as \"#00ff00\" or CSS custom properties such as \"var(--success-color)\".",
+              "description": "CSS color value used for correct-answer feedback text. Supported values are hex colors such as \"#00ff00\" or CSS custom properties such as \"var(--feedback-correct-color)\".",
               "type": "string",
-              "default": "var(--success-color)",
+              "default": "var(--feedback-correct-color)",
               "options": {
                 "grid_columns": 4
               },
@@ -5877,9 +5877,9 @@
             },
             "incorrectColor": {
               "title": "Incorrect feedback color",
-              "description": "CSS color value used for incorrect-answer and timeout feedback text. Supported values are hex colors such as \"#ff0000\" or CSS custom properties such as \"var(--alert-color)\".",
+              "description": "CSS color value used for incorrect-answer and timeout feedback text. Supported values are hex colors such as \"#ff0000\" or CSS custom properties such as \"var(--feedback-error-color)\".",
               "type": "string",
-              "default": "var(--alert-color)",
+              "default": "var(--feedback-error-color)",
               "options": {
                 "grid_columns": 4
               },

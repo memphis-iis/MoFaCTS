@@ -80,7 +80,7 @@
     min-height: 0;
     border: 0;
     border-radius: 0;
-    background: var(--stimuli-box-color);
+    background: var(--learning-card-stimulus-surface-color);
     overflow: hidden;
     box-sizing: border-box;
     display: flex;
@@ -118,7 +118,7 @@
   }
 
   .h5p-frame-stage-transition-ready {
-    transition: opacity var(--transition-smooth, 180ms) ease;
+    transition: opacity var(--app-transition-smooth, 180ms) ease;
   }
 
   .h5p-frame-visual {
@@ -137,15 +137,15 @@
 
   .h5p-frame-stage-transition-ready .h5p-frame-visual {
     transition:
-      width var(--transition-smooth, 180ms) ease,
-      height var(--transition-smooth, 180ms) ease;
+      width var(--app-transition-smooth, 180ms) ease,
+      height var(--app-transition-smooth, 180ms) ease;
   }
 
   .h5p-frame-stage-transition-ready .h5p-frame-surface {
     transition:
-      width var(--transition-smooth, 180ms) ease,
-      height var(--transition-smooth, 180ms) ease,
-      transform var(--transition-smooth, 180ms) ease;
+      width var(--app-transition-smooth, 180ms) ease,
+      height var(--app-transition-smooth, 180ms) ease,
+      transform var(--app-transition-smooth, 180ms) ease;
   }
 
   .h5p-frame {
@@ -153,7 +153,7 @@
     border: 0;
     min-width: 0;
     min-height: 0;
-    background: var(--background-color, #fff);
+    background: var(--app-background-color);
     overflow: clip;
   }
 
@@ -164,18 +164,18 @@
     justify-content: flex-end;
     min-height: var(--h5p-action-bar-height, 3.75rem);
     padding: 0 0.75rem;
-    border-top: 1px solid var(--secondary-color);
-    background: var(--stimuli-box-color);
+    border-top: 1px solid var(--app-secondary-surface-color);
+    background: var(--learning-card-stimulus-surface-color);
     box-sizing: border-box;
   }
 
   .h5p-continue-button {
     min-width: 8rem;
     padding: 0.625rem 1rem;
-    border: 1px solid var(--main-button-color);
+    border: 1px solid var(--learning-card-primary-action-surface-color);
     border-radius: var(--border-radius-md, 6px);
-    background: var(--main-button-color);
-    color: var(--main-button-text-color);
+    background: var(--learning-card-primary-action-surface-color);
+    color: var(--learning-card-primary-action-text-color);
     font: inherit;
     font-weight: 600;
     cursor: pointer;
@@ -188,7 +188,7 @@
 
   .h5p-frame-error {
     padding: 1rem;
-    color: var(--alert-color);
+    color: var(--feedback-error-color);
     text-align: center;
     font-size: 0.95rem;
     line-height: 1.4;

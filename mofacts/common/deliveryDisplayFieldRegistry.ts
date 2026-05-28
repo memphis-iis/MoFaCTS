@@ -90,22 +90,22 @@ export const DELIVERY_DISPLAY_SETTINGS_FIELD_REGISTRY: SectionFieldRegistry = {
       validation: { kind: 'stringMaxLengthNonEmpty', max: 100 },
     },
   }),
-  correctColor: simpleField(stringField('var(--success-color)', 4), {
+  correctColor: simpleField(stringField('var(--feedback-correct-color)', 4), {
     brief: 'Correct feedback color',
-    verbose: 'CSS color value used for correct-answer feedback text. Supported values are hex colors such as "#00ff00" or CSS custom properties such as "var(--success-color)".'
+    verbose: 'CSS color value used for correct-answer feedback text. Supported values are hex colors such as "#00ff00" or CSS custom properties such as "var(--feedback-correct-color)".'
   }, {
     runtime: {
-      default: 'var(--success-color)',
+      default: 'var(--feedback-correct-color)',
       coerce: 'none',
       validation: { kind: 'color' },
     },
   }),
-  incorrectColor: simpleField(stringField('var(--alert-color)', 4), {
+  incorrectColor: simpleField(stringField('var(--feedback-error-color)', 4), {
     brief: 'Incorrect feedback color',
-    verbose: 'CSS color value used for incorrect-answer and timeout feedback text. Supported values are hex colors such as "#ff0000" or CSS custom properties such as "var(--alert-color)".'
+    verbose: 'CSS color value used for incorrect-answer and timeout feedback text. Supported values are hex colors such as "#ff0000" or CSS custom properties such as "var(--feedback-error-color)".'
   }, {
     runtime: {
-      default: 'var(--alert-color)',
+      default: 'var(--feedback-error-color)',
       coerce: 'none',
       validation: { kind: 'color' },
     },

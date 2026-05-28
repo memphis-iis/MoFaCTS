@@ -391,7 +391,7 @@
   let frozenTrialSubsetKind = 'none';
   let frozenShowSkipStudyButton = false;
   let frozenFeedbackIsCorrect = false;
-  let frozenFeedbackCorrectColor = 'var(--success-color)';
+  let frozenFeedbackCorrectColor = 'var(--feedback-correct-color)';
   let frozenFeedbackText = '';
   let frozenFeedbackCorrectAnswer = '';
   let frozenDisplayCorrectFeedback = true;
@@ -468,7 +468,7 @@
   let studyInteractionText = '';
   $: baseShowSkipStudyButton = isStudyState && toBoolean(deliverySettings.skipstudy);
   $: baseFeedbackIsCorrect = isStudyState ? true : context.isCorrect;
-  $: baseFeedbackCorrectColor = isStudyState ? 'var(--text-color)' : deliverySettings.correctColor;
+  $: baseFeedbackCorrectColor = isStudyState ? 'var(--app-text-color)' : deliverySettings.correctColor;
   $: studyAnswerText = isStudyState
     ? Answers.getDisplayAnswerText(String(context.originalAnswer || context.currentAnswer || '')) || String(context.currentAnswer || '')
     : '';
@@ -710,7 +710,7 @@
         isCorrect: incomingPreparedSubsetKind === 'study',
         isTimeout: false,
         feedbackMessage: '',
-        correctColor: incomingPreparedSubsetKind === 'study' ? 'var(--text-color)' : deliverySettings.correctColor,
+        correctColor: incomingPreparedSubsetKind === 'study' ? 'var(--app-text-color)' : deliverySettings.correctColor,
         displayCorrectFeedback: incomingPreparedSubsetKind === 'study' ? true : deliverySettings.displayCorrectFeedback,
         displayIncorrectFeedback: incomingPreparedSubsetKind === 'study' ? false : deliverySettings.displayIncorrectFeedback,
       })
@@ -2208,17 +2208,17 @@
     height: 100%;
     overflow: hidden;
     position: relative;
-    background-color: var(--background-color);
-    font-family: var(--font-family);
-    font-size: var(--font-size-base);
+    background-color: var(--app-background-color);
+    font-family: var(--app-font-family);
+    font-size: var(--app-font-size-base);
   }
 
   .card-screen.video-mode {
-    background-color: var(--text-color);
+    background-color: var(--app-text-color);
   }
 
   .card-screen.auto-tutor-mode {
-    background-color: var(--background-color);
+    background-color: var(--app-background-color);
   }
 
   .card-screen.video-mode :global(.video-session-mode) {
@@ -2245,7 +2245,7 @@
     display: flex;
     flex-direction: column;
     padding-right: 0;
-    transition: padding-right var(--transition-smooth) ease;
+    transition: padding-right var(--app-transition-smooth) ease;
   }
 
   .learning-session-layout-panel-open .learning-session-main {
@@ -2256,7 +2256,7 @@
     width: 100%;
     margin-right: 0;
     align-self: flex-start;
-    transition: width var(--transition-smooth) ease, margin-right var(--transition-smooth) ease;
+    transition: width var(--app-transition-smooth) ease, margin-right var(--app-transition-smooth) ease;
   }
 
   @media (min-width: 769px) {
@@ -2274,7 +2274,7 @@
     align-items: center;
     justify-content: center;
     padding: clamp(16px, 4vw, 48px);
-    background: color-mix(in srgb, var(--background-color) 94%, transparent);
+    background: color-mix(in srgb, var(--app-background-color) 94%, transparent);
   }
 
   .video-instruction-panel {
@@ -2282,10 +2282,10 @@
     max-height: min(78vh, 720px);
     overflow: auto;
     padding: clamp(18px, 3vw, 32px);
-    border: 1px solid var(--secondary-color);
-    background: var(--card-background-color);
-    color: var(--text-color);
-    box-shadow: 0 16px 40px color-mix(in srgb, var(--text-color) 18%, transparent);
+    border: 1px solid var(--app-secondary-surface-color);
+    background: var(--learning-card-surface-color);
+    color: var(--app-text-color);
+    box-shadow: 0 16px 40px color-mix(in srgb, var(--app-text-color) 18%, transparent);
   }
 
   .video-instruction-copy {
@@ -2295,19 +2295,19 @@
 
   .video-instruction-warning {
     margin: 16px 0 0;
-    color: var(--alert-color);
+    color: var(--feedback-error-color);
     font-weight: 600;
   }
 
   .video-instruction-continue {
     display: block;
     width: min(420px, 100%);
-    min-height: var(--button-height);
+    min-height: var(--app-button-height);
     margin: 24px auto 0;
-    border: 1px solid var(--secondary-color);
-    border-radius: var(--border-radius-sm);
-    background: var(--main-button-color);
-    color: var(--main-button-text-color);
+    border: 1px solid var(--app-secondary-surface-color);
+    border-radius: var(--app-border-radius-sm);
+    background: var(--learning-card-primary-action-surface-color);
+    color: var(--learning-card-primary-action-text-color);
     font-weight: 700;
     cursor: pointer;
   }
@@ -2328,7 +2328,7 @@
     flex-direction: column;
     width: 100%;
     opacity: 0;
-    transition: opacity var(--transition-smooth) ease;
+    transition: opacity var(--app-transition-smooth) ease;
   }
 
   .trial-content-slot {
@@ -2348,15 +2348,15 @@
 
   .trial-content-fade.trial-content-fading-out {
     opacity: 0;
-    transition-duration: var(--transition-smooth);
+    transition-duration: var(--app-transition-smooth);
     pointer-events: none;
   }
 
   .fixed-footer {
     flex-shrink: 0;
     height: 30px;
-    background: var(--card-background-color);
-    border-top: 1px solid var(--secondary-color);
+    background: var(--learning-card-surface-color);
+    border-top: 1px solid var(--app-secondary-surface-color);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2364,18 +2364,18 @@
   }
 
   .fixed-footer__message {
-    color: var(--secondary-text-color);
+    color: var(--app-secondary-text-color);
     font-size: 12px;
   }
 
   .fixed-footer__button {
     padding: 4px 16px;
-    border: 1px solid var(--secondary-color);
-    border-radius: var(--border-radius-sm);
+    border: 1px solid var(--app-secondary-surface-color);
+    border-radius: var(--app-border-radius-sm);
     font-size: 12px;
     font-weight: 600;
-    background: var(--main-button-color);
-    color: var(--main-button-text-color);
+    background: var(--learning-card-primary-action-surface-color);
+    color: var(--learning-card-primary-action-text-color);
     cursor: pointer;
   }
 
@@ -2383,10 +2383,10 @@
     position: fixed;
     top: 10px;
     right: 10px;
-    background: color-mix(in srgb, var(--text-color) 80%, transparent);
-    color: var(--accent-color);
+    background: color-mix(in srgb, var(--app-text-color) 80%, transparent);
+    color: var(--app-accent-color);
     padding: 0.5rem;
-    border-radius: var(--border-radius-sm);
+    border-radius: var(--app-border-radius-sm);
     font-family: monospace;
     font-size: 0.7rem;
     max-width: 300px;
@@ -2418,11 +2418,11 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: color-mix(in srgb, var(--text-color) 60%, transparent);
+    background: color-mix(in srgb, var(--app-text-color) 60%, transparent);
     z-index: 120;
     opacity: 0;
     pointer-events: none;
-    transition: opacity var(--transition-smooth) ease;
+    transition: opacity var(--app-transition-smooth) ease;
   }
 
   .video-end-overlay.video-end-overlay-visible {
@@ -2432,12 +2432,12 @@
 
   .video-continue-button {
     padding: 0.75rem 2rem;
-    border: 1px solid var(--secondary-color);
-    border-radius: var(--border-radius-lg);
+    border: 1px solid var(--app-secondary-surface-color);
+    border-radius: var(--app-border-radius-lg);
     font-size: 1rem;
     font-weight: 600;
-    background: var(--main-button-color);
-    color: var(--main-button-text-color);
+    background: var(--learning-card-primary-action-surface-color);
+    color: var(--learning-card-primary-action-text-color);
     cursor: pointer;
   }
 
@@ -2450,12 +2450,12 @@
 
   .skip-study-button {
     padding: 0.5rem 1.5rem;
-    border: 1px solid var(--secondary-color);
-    border-radius: var(--border-radius-lg);
+    border: 1px solid var(--app-secondary-surface-color);
+    border-radius: var(--app-border-radius-lg);
     font-size: 0.875rem;
     font-weight: 500;
-    background: var(--main-button-color);
-    color: var(--main-button-text-color);
+    background: var(--learning-card-primary-action-surface-color);
+    color: var(--learning-card-primary-action-text-color);
     cursor: pointer;
     opacity: 0.85;
     transition: opacity 0.15s ease;

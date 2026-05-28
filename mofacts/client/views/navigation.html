@@ -11,11 +11,11 @@
         <span class="navbar-brand unified-navbar-title">Practice</span>
       {{else}}
         <a class="navbar-brand home-link" href="#" aria-label="Return to practice menu" style="cursor: pointer;">
-          {{#if currentTheme.properties.logo_url}}
+          {{#if currentTheme.properties.brand_logo_url}}
             <span
               class="navbar-brand-icon"
               aria-hidden="true"
-              style="--navbar-brand-icon-image: url('{{currentTheme.properties.logo_url}}');"></span>
+              style="--navbar-brand-icon-image: url('{{currentTheme.properties.brand_logo_url}}');"></span>
           {{/if}}
           {{systemName}}
         </a>
@@ -59,8 +59,8 @@
 {{#if showPracticeSidebar}}
   <aside class="practice-sidebar {{#if practiceSidebarOpen}}is-open{{/if}}" aria-label="Practice tools">
     <button type="button" class="practice-sidebar-toggle" id="practiceSidebarToggle" aria-expanded="{{#if practiceSidebarOpen}}true{{else}}false{{/if}}">
-      <span class="fa fa-bars" aria-hidden="true"></span>
-      <span>Menu</span>
+      <span class="practice-sidebar-toggle-icon" aria-hidden="true"></span>
+      <span class="practice-sidebar-toggle-text">Menu</span>
     </button>
     <div class="practice-sidebar-panel">
       <button type="button" data-nav-action="home"><span class="fa fa-play-circle" aria-hidden="true"></span> Practice</button>

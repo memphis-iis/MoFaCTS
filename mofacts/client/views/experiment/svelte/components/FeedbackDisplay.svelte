@@ -39,10 +39,10 @@
   export let feedbackMessage = '';
 
   /** @type {string} Correct color (theme var) */
-  export let correctColor = 'var(--success-color)';
+  export let correctColor = 'var(--feedback-correct-color)';
 
   /** @type {string} Incorrect color (theme var) */
-  export let incorrectColor = 'var(--alert-color)';
+  export let incorrectColor = 'var(--feedback-error-color)';
 
   /** @type {boolean} Whether to display correct feedback */
   export let displayCorrectFeedback = true;
@@ -258,8 +258,8 @@
     max-width: 300px;
     max-height: 240px;
     margin: 0.75rem auto 0;
-    border-radius: var(--border-radius-sm);
-    border: 2px solid var(--secondary-color);
+    border-radius: var(--app-border-radius-sm);
+    border: 2px solid var(--app-secondary-surface-color);
     object-fit: contain;
   }
 

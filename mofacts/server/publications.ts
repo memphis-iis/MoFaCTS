@@ -5,6 +5,8 @@ import {
     hasSharedTdfAccess,
     isTdfOwner,
 } from './lib/contentAccessPolicy';
+import { DynamicSettings } from '../common/Collections';
+import { themeRegistry } from './lib/themeRegistry';
 
 // Use Meteor.roleAssignment — set unconditionally by alanning:roles v4 at
 // package load time. The named export RoleAssignmentCollection resolves to
@@ -183,9 +185,10 @@ Meteor.publish('userAdminDashboardUsage', async function(userIds: any[] = []) {
 // ===== PHASE 1.5 OPTIMIZATION: Theme Publication =====
 // Publish theme settings reactively instead of using method calls
 // This allows clients to get automatic updates when theme changes
-Meteor.publish('theme', function() {
+Meteor.publish('theme', async function() {
     // Theme is public data - available to all users (even unauthenticated)
     // This is safe because theme only contains visual styling, no sensitive data
+    await themeRegistry.ensureActiveTheme();
     return DynamicSettings.find({key: 'customTheme'});
 });
 

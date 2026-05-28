@@ -118,7 +118,7 @@
   }
 
   .force-correct-hint {
-    color: var(--alert-color);
+    color: var(--feedback-error-color);
     font-weight: bold;
     font-size: var(--card-font-size, 24px);
     margin: 0;

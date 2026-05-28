@@ -30,8 +30,8 @@
   export let correctLabelText = 'Correct.';
   export let incorrectLabelText = 'Incorrect.';
   export let feedbackMessage = '';
-  export let correctColor = 'var(--success-color)';
-  export let incorrectColor = 'var(--alert-color)';
+  export let correctColor = 'var(--feedback-correct-color)';
+  export let incorrectColor = 'var(--feedback-error-color)';
   export let displayCorrectFeedback = true;
   export let displayIncorrectFeedback = true;
   export let displayUserAnswerInFeedback = 'onIncorrect';
@@ -95,7 +95,7 @@
     width: 100%;
     height: 100%;
     opacity: 0;
-    transition: opacity var(--transition-smooth) ease;
+    transition: opacity var(--app-transition-smooth) ease;
   }
 
   .interaction-fade.interaction-fade-visible {

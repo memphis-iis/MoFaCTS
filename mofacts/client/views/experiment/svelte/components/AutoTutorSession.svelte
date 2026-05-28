@@ -148,35 +148,35 @@
       placeholder: { text: 'Type your answer...' },
       styles: {
         container: {
-          backgroundColor: 'var(--card-background-color)',
-          border: '1px solid var(--secondary-color)',
+          backgroundColor: 'var(--learning-card-surface-color)',
+          border: '1px solid var(--app-secondary-surface-color)',
           borderRadius: '6px',
           boxShadow: 'none',
           width: 'calc(100% - 1.5rem)',
           maxHeight: '7rem',
         },
         text: {
-          color: 'var(--text-color)',
+          color: 'var(--app-text-color)',
           minHeight: '1.5rem',
         },
       },
     };
     chatElement.inputAreaStyle = {
-      backgroundColor: 'var(--background-color)',
-      borderTop: '1px solid var(--secondary-color)',
+      backgroundColor: 'var(--app-background-color)',
+      borderTop: '1px solid var(--app-secondary-surface-color)',
     };
     chatElement.displayLoadingBubble = true;
     chatElement.submitButtonStyles = {
       submit: {
         container: {
           default: {
-            backgroundColor: 'var(--main-button-color)',
+            backgroundColor: 'var(--learning-card-primary-action-surface-color)',
             borderRadius: '6px',
           },
         },
         svg: {
           default: {
-            color: 'var(--main-button-text-color)',
+            color: 'var(--learning-card-primary-action-text-color)',
           },
         },
       },
@@ -185,16 +185,16 @@
       default: {
         user: {
           bubble: {
-            backgroundColor: 'var(--main-button-color)',
-            color: 'var(--main-button-text-color)',
+            backgroundColor: 'var(--learning-card-primary-action-surface-color)',
+            color: 'var(--learning-card-primary-action-text-color)',
             borderRadius: '8px',
           },
         },
         ai: {
           bubble: {
-            backgroundColor: 'var(--card-background-color)',
-            color: 'var(--text-color)',
-            border: '1px solid var(--secondary-color)',
+            backgroundColor: 'var(--learning-card-surface-color)',
+            color: 'var(--app-text-color)',
+            border: '1px solid var(--app-secondary-surface-color)',
             borderRadius: '8px',
           },
         },
@@ -203,9 +203,9 @@
     chatElement.chatStyle = {
       width: '100%',
       height: '100%',
-      border: '1px solid var(--secondary-color)',
+      border: '1px solid var(--app-secondary-surface-color)',
       borderRadius: '8px',
-      backgroundColor: 'var(--background-color)',
+      backgroundColor: 'var(--app-background-color)',
     };
   }
 
@@ -412,8 +412,8 @@
     width: 100%;
     padding: clamp(12px, 2vw, 24px);
     gap: 12px;
-    background: var(--background-color);
-    color: var(--text-color);
+    background: var(--app-background-color);
+    color: var(--app-text-color);
     box-sizing: border-box;
     overflow: hidden;
     position: relative;
@@ -458,7 +458,7 @@
     justify-content: space-between;
     gap: 6px;
     min-width: 0;
-    color: var(--text-color);
+    color: var(--app-text-color);
     font-size: 0.78rem;
     font-weight: 600;
   }
@@ -478,9 +478,9 @@
     position: relative;
     width: 100%;
     height: 10px;
-    border: 1px solid var(--secondary-color);
+    border: 1px solid var(--app-secondary-surface-color);
     border-radius: 6px;
-    background: var(--card-background-color);
+    background: var(--learning-card-surface-color);
     box-sizing: border-box;
   }
 
@@ -489,13 +489,13 @@
     inset: 0 auto 0 0;
     height: 100%;
     min-width: 0;
-    background: var(--main-button-color);
+    background: var(--learning-card-primary-action-surface-color);
     border-radius: 5px;
     transition: width 160ms ease;
   }
 
   .auto-tutor-progress-fill-misconceptions {
-    background: var(--warning-color, var(--accent-color));
+    background: var(--warning-color, var(--app-accent-color));
   }
 
   .auto-tutor-progress-marker {
@@ -504,13 +504,13 @@
     bottom: -3px;
     width: 2px;
     border-radius: 999px;
-    background: var(--text-color);
+    background: var(--app-text-color);
     opacity: 0.65;
     transform: translateX(-1px);
   }
 
   .auto-tutor-turns {
-    color: var(--secondary-text-color);
+    color: var(--app-secondary-text-color);
     font-size: 0.78rem;
   }
 
@@ -518,14 +518,14 @@
   .auto-tutor-complete {
     flex: 0 0 auto;
     padding: 10px 12px;
-    border: 1px solid var(--secondary-color);
+    border: 1px solid var(--app-secondary-surface-color);
     border-radius: 6px;
-    background: var(--card-background-color);
+    background: var(--learning-card-surface-color);
     font-weight: 600;
   }
 
   .auto-tutor-error {
-    color: var(--alert-color);
+    color: var(--feedback-error-color);
   }
 
   .auto-tutor-chat {
@@ -560,8 +560,8 @@
     gap: 0.75rem;
     min-height: 0;
     padding: 0.35rem 0.75rem;
-    border-top: 1px solid var(--secondary-color);
-    background: var(--stimuli-box-color);
+    border-top: 1px solid var(--app-secondary-surface-color);
+    background: var(--learning-card-stimulus-surface-color);
     box-sizing: border-box;
   }
 
@@ -569,9 +569,9 @@
     display: inline-flex;
     align-items: center;
     min-width: 0;
-    min-height: var(--button-height);
-    color: var(--navbar-text-color, var(--text-color));
-    font-family: var(--heading-font-family, var(--font-family));
+    min-height: var(--app-button-height);
+    color: var(--navigation-text-color, var(--app-text-color));
+    font-family: var(--app-heading-font-family, var(--app-font-family));
     font-size: calc(1.25rem * 0.8);
     font-weight: 700;
     line-height: 1;
@@ -583,12 +583,12 @@
 
   .auto-tutor-continue-button {
     min-width: 8rem;
-    min-height: var(--button-height);
+    min-height: var(--app-button-height);
     padding: 0 1rem;
-    border: 1px solid var(--main-button-color);
+    border: 1px solid var(--learning-card-primary-action-surface-color);
     border-radius: var(--border-radius-md, 6px);
-    background: var(--main-button-color);
-    color: var(--main-button-text-color);
+    background: var(--learning-card-primary-action-surface-color);
+    color: var(--learning-card-primary-action-text-color);
     font: inherit;
     font-weight: 600;
     cursor: pointer;
@@ -624,9 +624,9 @@
       width: min(58vw, 220px);
       gap: 4px;
       padding: 0.35rem 0.45rem;
-      border: 1px solid var(--secondary-color);
-      border-radius: var(--border-radius-sm);
-      background: color-mix(in srgb, var(--background-color) 88%, transparent);
+      border: 1px solid var(--app-secondary-surface-color);
+      border-radius: var(--app-border-radius-sm);
+      background: color-mix(in srgb, var(--app-background-color) 88%, transparent);
       box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
       backdrop-filter: blur(3px);
       pointer-events: none;
@@ -669,7 +669,7 @@
     .auto-tutor-continue-button {
       width: auto;
       min-width: 7rem;
-      min-height: var(--button-height);
+      min-height: var(--app-button-height);
     }
   }
 </style>

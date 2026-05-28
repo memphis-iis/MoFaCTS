@@ -56,12 +56,12 @@
 <template name="DefaultLayout">
   <!-- Global Loading Spinner - Persists across route transitions for elegant UX -->
   {{#if appLoading}}
-  <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style="background-color: var(--loading-overlay-color, rgba(245,245,245,0.95)); z-index: 10000; transition: opacity var(--transition-smooth, 200ms) ease-in-out;">
+  <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style="background-color: var(--app-loading-overlay-color, rgba(245,245,245,0.95)); z-index: 10000; transition: opacity var(--app-transition-smooth, 200ms) ease-in-out;">
     <div class="text-center">
-      <div class="spinner-border" role="status" style="width: 3rem; height: 3rem; color: var(--text-color, #000000);">
+      <div class="spinner-border" role="status" style="width: 3rem; height: 3rem; color: var(--app-text-color);">
         <span class="sr-only">Loading...</span>
       </div>
-      <div class="mt-3" style="color: var(--text-color, #333);">{{appLoadingMessage}}</div>
+      <div class="mt-3" style="color: var(--app-text-color);">{{appLoadingMessage}}</div>
     </div>
   </div>
   {{/if}}

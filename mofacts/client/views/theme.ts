@@ -227,15 +227,15 @@ function validateThemePropInput(inputEl: any, propId: any, rawValue: any) {
         valid = typeof value === 'string' && isValidThemeCssTime(value);
     }
 
-    if (propId === 'font_family' || propId === 'heading_font_family') {
+    if (propId === 'app_font_family' || propId === 'app_heading_font_family') {
         valid = typeof value === 'string' && value.length > 0;
     }
 
-    if (propId === 'font_stylesheet_url') {
+    if (propId === 'app_font_stylesheet_url') {
         valid = typeof value === 'string';
     }
 
-    if (propId === 'font_size_base' || isThemeLengthProperty(propId)) {
+    if (propId === 'app_font_size_base' || isThemeLengthProperty(propId)) {
         value = normalizeThemePropertyValue(propId, value);
         valid = typeof value === 'string' && isValidThemeCssLength(value);
     }
@@ -287,7 +287,7 @@ function applyThemeFontStylesheet(rawValue: unknown) {
 
 function applyThemePropertyPreview(property: string, value: unknown) {
     applyThemeCssVariable(property, value);
-    if (property === 'font_stylesheet_url') {
+    if (property === 'app_font_stylesheet_url') {
         applyThemeFontStylesheet(value);
     }
 }
@@ -314,9 +314,9 @@ function getThemeIconBackgroundColor() {
     const theme = Session.get('curTheme');
     const themeProps = theme?.properties || {};
     const backgroundCandidates = [
-        themeProps.background_color,
-        themeProps.neutral_color,
-        themeProps.card_background_color
+        themeProps.app_background_color,
+        themeProps.navigation_surface_color,
+        themeProps.learning_card_surface_color
     ];
 
     for (const candidate of backgroundCandidates) {
@@ -627,8 +627,8 @@ Template.theme.events({
         reader.onload = async function(e: any) {
             const base64Data = e.target.result;
             try {
-                updateCurrentThemeSessionProperty('home_hero_image_url', base64Data);
-                await saveThemeProperty('home_hero_image_url', base64Data);
+                updateCurrentThemeSessionProperty('practice_menu_underlay_image_url', base64Data);
+                await saveThemeProperty('practice_menu_underlay_image_url', base64Data);
                 fileInput.value = '';
             } catch (err: any) {
                 alert('Error uploading home underlay image: ' + (err?.message || err));
@@ -642,10 +642,10 @@ Template.theme.events({
     },
     'click #clearHomeUnderlay': async function() {
         try {
-            updateCurrentThemeSessionProperty('home_hero_image_url', '');
-            await saveThemeProperty('home_hero_image_url', '');
+            updateCurrentThemeSessionProperty('practice_menu_underlay_image_url', '');
+            await saveThemeProperty('practice_menu_underlay_image_url', '');
             $('#homeUnderlayUpload').val('');
-            $('.currentThemeProp[data-id=home_hero_image_url]').val('');
+            $('.currentThemeProp[data-id=practice_menu_underlay_image_url]').val('');
         } catch (err: any) {
             alert('Error clearing home underlay image: ' + (err?.message || err));
         }
@@ -675,28 +675,28 @@ Template.theme.events({
                         const backgroundColor = getThemeIconBackgroundColor();
 
                         // Upload the logo
-                        await (Meteor as any).callAsync('setCustomThemeProperty', 'logo_url', base64Data);
+                        await (Meteor as any).callAsync('setCustomThemeProperty', 'brand_logo_url', base64Data);
 
                         const generatedIcons: Record<string, string> = {
-                            favicon_32_url: createPngDataUrlFromImage(img, 32),
-                            favicon_16_url: createPngDataUrlFromImage(img, 16),
-                            apple_touch_icon_url: createPngDataUrlFromImage(img, 180, {
+                            brand_favicon_32_url: createPngDataUrlFromImage(img, 32),
+                            brand_favicon_16_url: createPngDataUrlFromImage(img, 16),
+                            brand_apple_touch_icon_url: createPngDataUrlFromImage(img, 180, {
                                 backgroundColor: backgroundColor,
                                 paddingRatio: 0.10
                             }),
-                            android_icon_192_url: createPngDataUrlFromImage(img, 192, {
+                            brand_android_icon_192_url: createPngDataUrlFromImage(img, 192, {
                                 backgroundColor: backgroundColor,
                                 paddingRatio: 0.10
                             }),
-                            android_icon_512_url: createPngDataUrlFromImage(img, 512, {
+                            brand_android_icon_512_url: createPngDataUrlFromImage(img, 512, {
                                 backgroundColor: backgroundColor,
                                 paddingRatio: 0.10
                             }),
-                            android_maskable_icon_192_url: createPngDataUrlFromImage(img, 192, {
+                            brand_android_maskable_icon_192_url: createPngDataUrlFromImage(img, 192, {
                                 backgroundColor: backgroundColor,
                                 paddingRatio: 0.18
                             }),
-                            android_maskable_icon_512_url: createPngDataUrlFromImage(img, 512, {
+                            brand_android_maskable_icon_512_url: createPngDataUrlFromImage(img, 512, {
                                 backgroundColor: backgroundColor,
                                 paddingRatio: 0.18
                             })
@@ -720,7 +720,7 @@ Template.theme.events({
     'click #clearLogo': async function() {
         if (confirm('Are you sure you want to clear the logo?')) {
             try {
-                await (Meteor as any).callAsync('setCustomThemeProperty', 'logo_url', '');
+                await (Meteor as any).callAsync('setCustomThemeProperty', 'brand_logo_url', '');
                 
                 $('#logoUpload').val('');
                 // PHASE 1.5: No need to call getCurrentTheme() - reactive subscription handles it

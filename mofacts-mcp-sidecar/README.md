@@ -52,6 +52,8 @@ docker compose -f docker-compose.yml -f docker-compose.hotfix-dev.yml up -d
 
 That points Playwright MCP at `http://host.docker.internal:3200` and connects Mongo MCP to the local Docker database `MoFACT-meteor3` on the `deploy_mofacts` network.
 
+For Codex agents working in this repo, this sidecar is the authoritative browser automation path for MoFaCTS UI checks. Use the `mcp__mofacts_playwright__` tools exposed by `http://localhost:8931/mcp`. Do not use the bundled Browser `iab` registry or the Chrome extension backend as a substitute for this sidecar.
+
 ## OpenAI Runner
 
 If you want an OpenAI-native local client instead of Gemini, use the small Agents SDK runner in `openai-runner/`.
@@ -155,6 +157,12 @@ http://host.docker.internal:3100
 ```
 
 That address works from inside Docker containers and points back to a website running on your host machine. Change `BASE_URL` in `.env` if your site moves somewhere else.
+
+For the Windows native hotfix loop, the compose override `docker-compose.hotfix-dev.yml` changes this target to:
+
+```text
+http://host.docker.internal:3200
+```
 
 ### Mongo for usage queries
 

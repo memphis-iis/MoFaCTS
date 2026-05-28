@@ -1,32 +1,17 @@
 .home-app {
-    --home-main-bg: var(--background-color);
-    --home-sidebar-bg: var(--neutral-color);
-    --home-card-bg: var(--card-background-color);
-    --home-text: var(--text-color);
-    --home-heading: var(--page-header-text-color, var(--home-text));
-    --home-muted: color-mix(in srgb, var(--home-text) 62%, transparent);
-    --home-soft-muted: color-mix(in srgb, var(--home-text) 42%, transparent);
-    --home-border: var(--border-color, color-mix(in srgb, var(--home-text) 12%, transparent));
-    --home-border-subtle: color-mix(in srgb, var(--home-text) 8%, transparent);
-    --home-accent: var(--accent-color);
-    --home-accent-strong: color-mix(in srgb, var(--home-accent) 78%, var(--home-text));
-    --home-accent-soft: color-mix(in srgb, var(--home-accent) 12%, var(--home-card-bg));
-    --home-hover-bg: color-mix(in srgb, var(--home-text) 5%, var(--home-card-bg));
-    --home-header-bg: var(--neutral-color, var(--home-card-bg));
-    --home-shadow: var(--surface-shadow);
     display: flex;
     min-height: 100vh;
     overflow-x: hidden;
-    background: var(--home-main-bg);
-    color: var(--home-text);
-    font-family: var(--font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif);
+    background: var(--app-background-color);
+    color: var(--app-text-color);
+    font-family: var(--app-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif);
     -webkit-font-smoothing: antialiased;
 }
 
 .sidebar {
-    width: 280px;
-    background: var(--home-sidebar-bg);
-    border-right: 1px solid var(--home-border);
+    width: 224px;
+    background: var(--navigation-surface-color);
+    border-right: 1px solid color-mix(in srgb, var(--app-text-color) 12%, transparent);
     display: flex;
     flex-direction: column;
     height: 100vh;
@@ -44,7 +29,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 0 20px;
-    border-bottom: 1px solid var(--home-border-subtle);
+    border-bottom: 1px solid color-mix(in srgb, var(--app-text-color) 8%, transparent);
     flex-shrink: 0;
 }
 
@@ -52,7 +37,7 @@
     display: flex;
     align-items: center;
     gap: 9px;
-    color: var(--navbar-text-color, var(--home-text));
+    color: var(--navigation-text-color);
     font-weight: 700;
     font-size: 20px;
     letter-spacing: 0;
@@ -64,7 +49,7 @@
     height: 28px;
     margin-right: 0;
     flex: 0 0 auto;
-    background-color: var(--navbar-text-color, var(--home-text));
+    background-color: var(--navigation-text-color);
 }
 
 .sidebar-collapsed-brand {
@@ -79,7 +64,7 @@
     height: 32px;
     padding: 0;
     box-sizing: border-box;
-    color: var(--navbar-text-color, var(--home-text));
+    color: var(--navigation-text-color);
     overflow: hidden;
     pointer-events: none;
 }
@@ -90,7 +75,7 @@
     height: 28px;
     margin: 0 auto;
     flex: 0 0 28px;
-    background-color: var(--navbar-text-color, var(--home-text));
+    background-color: var(--navigation-text-color);
 }
 
 .sidebar-collapsed-brand .fa {
@@ -101,15 +86,15 @@
 }
 
 .icon-btn {
-    width: var(--button-height, 44px);
-    min-width: var(--button-height, 44px);
-    min-height: var(--button-height, 44px);
+    width: var(--app-button-height, 44px);
+    min-width: var(--app-button-height, 44px);
+    min-height: var(--app-button-height, 44px);
     background: transparent;
     border: none;
     cursor: pointer;
-    color: var(--home-text);
+    color: var(--app-text-color);
     padding: 6px;
-    border-radius: var(--border-radius-sm, 8px);
+    border-radius: var(--app-border-radius-sm, 8px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -117,8 +102,8 @@
 
 .icon-btn:hover,
 .icon-btn:focus-visible {
-    background: var(--home-hover-bg);
-    color: var(--home-text);
+    background: color-mix(in srgb, var(--app-text-color) 5%, var(--learning-card-surface-color));
+    color: var(--app-text-color);
     outline: none;
 }
 
@@ -143,7 +128,7 @@
 .section-title {
     font-size: 11px;
     text-transform: uppercase;
-    color: var(--home-soft-muted);
+    color: color-mix(in srgb, var(--app-text-color) 42%, transparent);
     font-weight: 600;
     letter-spacing: 0.06em;
     padding: 8px 12px 6px;
@@ -154,12 +139,12 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    min-height: var(--button-height, 44px);
+    min-height: var(--app-button-height, 44px);
     padding: 9px 12px;
     border: 0;
-    border-radius: var(--border-radius-sm, 8px);
+    border-radius: var(--app-border-radius-sm, 8px);
     background: transparent;
-    color: var(--home-text);
+    color: var(--app-text-color);
     font-size: 14px;
     cursor: pointer;
     margin-bottom: 2px;
@@ -170,14 +155,14 @@
 
 .nav-item:hover,
 .nav-item:focus-visible {
-    background: var(--home-hover-bg);
-    color: var(--home-text);
+    background: color-mix(in srgb, var(--app-text-color) 5%, var(--learning-card-surface-color));
+    color: var(--app-text-color);
     outline: none;
 }
 
 .nav-item.active {
-    background: var(--home-accent-soft);
-    color: var(--home-text);
+    background: color-mix(in srgb, var(--app-accent-color) 12%, var(--learning-card-surface-color));
+    color: var(--app-text-color);
     font-weight: 600;
 }
 
@@ -237,10 +222,10 @@
     content: attr(data-label);
     position: absolute;
     left: 52px;
-    background: var(--home-text);
-    color: var(--home-card-bg);
+    background: var(--app-text-color);
+    color: var(--learning-card-surface-color);
     padding: 6px 10px;
-    border-radius: var(--border-radius-sm, 8px);
+    border-radius: var(--app-border-radius-sm, 8px);
     font-size: 13px;
     white-space: nowrap;
     z-index: 100;
@@ -248,8 +233,8 @@
 }
 
 .main {
-    margin-left: 280px;
-    width: calc(100% - 280px);
+    margin-left: 224px;
+    width: calc(100% - 224px);
     flex: 0 0 auto;
     min-width: 0;
     display: flex;
@@ -264,8 +249,8 @@
 
 .top-header {
     height: 64px;
-    background: var(--home-header-bg);
-    border-bottom: 1px solid var(--home-border);
+    background: var(--navigation-surface-color);
+    border-bottom: 1px solid color-mix(in srgb, var(--app-text-color) 12%, transparent);
     display: flex;
     align-items: center;
     gap: 24px;
@@ -282,7 +267,7 @@
 .page-title {
     font-size: 24px;
     font-weight: 700;
-    color: var(--home-heading);
+    color: var(--app-page-header-text-color);
     white-space: nowrap;
     margin: 0;
 }
@@ -299,15 +284,15 @@
     align-items: center;
     gap: 10px;
     cursor: pointer;
-    min-height: var(--button-height, 44px);
+    min-height: var(--app-button-height, 44px);
     padding: 4px 6px 4px 4px;
-    border-radius: var(--border-radius-sm, 8px);
+    border-radius: var(--app-border-radius-sm, 8px);
     position: relative;
 }
 
 .user-area:hover,
 .user-area:focus-visible {
-    background: var(--home-hover-bg);
+    background: color-mix(in srgb, var(--app-text-color) 5%, var(--learning-card-surface-color));
     outline: none;
 }
 
@@ -315,8 +300,8 @@
     width: 36px;
     height: 36px;
     border-radius: var(--border-radius-circle, 50%);
-    background: var(--home-accent);
-    color: var(--primary-button-text-color, var(--home-card-bg));
+    background: var(--app-accent-color);
+    color: var(--app-primary-action-text-color);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -331,18 +316,18 @@
 
 .user-email {
     font-size: 14px;
-    color: var(--home-heading);
+    color: var(--app-page-header-text-color);
     font-weight: 500;
     white-space: nowrap;
 }
 
 .user-role {
     font-size: 12px;
-    color: var(--home-muted);
+    color: color-mix(in srgb, var(--app-text-color) 62%, transparent);
 }
 
 .caret {
-    color: var(--home-soft-muted);
+    color: color-mix(in srgb, var(--app-text-color) 42%, transparent);
     transition: transform 0.2s;
     font-size: 12px;
 }
@@ -358,10 +343,10 @@
     width: 200px;
     max-height: calc(100dvh - 88px);
     overflow-y: auto;
-    background: var(--home-card-bg);
-    border-radius: var(--border-radius-lg, 12px);
-    box-shadow: var(--home-shadow);
-    border: 1px solid var(--home-border);
+    background: var(--learning-card-surface-color);
+    border-radius: var(--app-border-radius-lg, 12px);
+    box-shadow: var(--app-surface-shadow);
+    border: 1px solid color-mix(in srgb, var(--app-text-color) 12%, transparent);
     padding: 6px;
     z-index: 2000;
     display: none;
@@ -386,32 +371,32 @@
 .dropdown-item {
     width: 100%;
     display: block;
-    min-height: var(--button-height, 44px);
+    min-height: var(--app-button-height, 44px);
     padding: 9px 12px;
     border: 0;
     background: transparent;
     font-size: 14px;
-    color: var(--home-text);
-    border-radius: var(--border-radius-sm, 8px);
+    color: var(--app-text-color);
+    border-radius: var(--app-border-radius-sm, 8px);
     cursor: pointer;
     text-align: left;
 }
 
 .dropdown-item:hover,
 .dropdown-item:focus-visible {
-    background: var(--home-hover-bg);
+    background: color-mix(in srgb, var(--app-text-color) 5%, var(--learning-card-surface-color));
     outline: none;
 }
 
 .dropdown-divider {
     height: 1px;
-    background: var(--home-border-subtle);
+    background: color-mix(in srgb, var(--app-text-color) 8%, transparent);
     margin: 6px 0;
 }
 
 .content {
     padding: 24px;
-    background: var(--home-main-bg);
+    background: var(--app-background-color);
     flex: 1;
     position: relative;
     isolation: isolate;
@@ -424,7 +409,7 @@
     inset: 0 0 auto;
     z-index: 0;
     height: clamp(12rem, 27svh, 18rem);
-    background-image: var(--home-underlay-image);
+    background-image: var(--practice-menu-underlay-image);
     background-repeat: no-repeat;
     background-position: center top;
     background-size: cover;
@@ -442,7 +427,7 @@
         to bottom,
         transparent 0%,
         transparent 55%,
-        var(--home-main-bg) 100%
+        var(--app-background-color) 100%
     );
     pointer-events: none;
 }
@@ -477,14 +462,14 @@
 .welcome h3 {
     font-size: 26px;
     font-weight: 700;
-    color: var(--home-heading);
+    color: var(--app-page-header-text-color);
     margin: 0 4px 4px;
     line-height: 1.15;
 }
 
 .welcome p {
     font-size: 14px;
-    color: var(--home-muted);
+    color: color-mix(in srgb, var(--app-text-color) 62%, transparent);
     margin: 0 4px;
 }
 
@@ -493,20 +478,17 @@
 }
 
 .main-menu-return-tour {
-    --home-tour-bg: var(--button-color, var(--home-accent));
-    --home-tour-text: var(--primary-button-text-color, var(--home-text));
-    --home-tour-border: var(--home-tour-text);
     position: fixed;
     top: var(--main-menu-tour-top, 88px);
     left: var(--main-menu-tour-left, 1rem);
     z-index: 11000;
     max-width: min(270px, calc(100vw - 24px));
     padding: 0.625rem 0.75rem;
-    border: 1px solid var(--home-tour-border);
-    border-radius: var(--border-radius-sm, 8px);
-    background: var(--home-tour-bg);
-    color: var(--home-tour-text);
-    box-shadow: 0 0.65rem 1.5rem color-mix(in srgb, var(--home-text) 24%, transparent);
+    border: 1px solid var(--app-primary-action-text-color);
+    border-radius: var(--app-border-radius-sm, 8px);
+    background: var(--app-primary-action-surface-color);
+    color: var(--app-primary-action-text-color);
+    box-shadow: 0 0.65rem 1.5rem color-mix(in srgb, var(--app-text-color) 24%, transparent);
     font-size: 0.875rem;
     font-weight: 600;
     line-height: 1.25;
@@ -523,7 +505,7 @@
     top: var(--main-menu-tour-arrow-origin-y, 0);
     width: var(--main-menu-tour-arrow-length, 42px);
     height: 2px;
-    background: var(--home-tour-border);
+    background: var(--app-primary-action-text-color);
     border-radius: 999px;
     transform: rotate(var(--main-menu-tour-arrow-angle, -0.75rad));
     transform-origin: 0 50%;
@@ -539,7 +521,7 @@
     height: 0;
     border-top: 6px solid transparent;
     border-bottom: 6px solid transparent;
-    border-left: 9px solid var(--home-tour-border);
+    border-left: 9px solid var(--app-primary-action-text-color);
     transform: translateY(-50%);
 }
 
@@ -549,7 +531,7 @@
 }
 
 .main-menu-return-tour-target {
-    outline: 3px solid color-mix(in srgb, var(--home-accent) 72%, transparent);
+    outline: 3px solid color-mix(in srgb, var(--app-accent-color) 72%, transparent);
     outline-offset: 4px;
 }
 
@@ -561,8 +543,8 @@
 
     .sidebar.sidebar-mobile-open,
     .sidebar.sidebar-mobile-closing {
-        width: 280px !important;
-        box-shadow: 18px 0 38px color-mix(in srgb, var(--home-text) 18%, transparent);
+        width: 224px !important;
+        box-shadow: 18px 0 38px color-mix(in srgb, var(--app-text-color) 18%, transparent);
     }
 
     .sidebar.sidebar-mobile-open {

@@ -93,20 +93,20 @@
     min-width: 0;
     padding: 0.5rem 0.75rem;
     font-size: var(--card-font-size, 24px);
-    border: 2px solid var(--secondary-color);
-    border-radius: var(--border-radius-sm);
-    transition: border-color var(--transition-fast) ease;
-    background-color: var(--card-background-color);
-    color: var(--text-color);
+    border: 2px solid var(--app-secondary-surface-color);
+    border-radius: var(--app-border-radius-sm);
+    transition: border-color var(--app-transition-fast) ease;
+    background-color: var(--learning-card-surface-color);
+    color: var(--app-text-color);
   }
 
   .text-input:focus {
     outline: none;
-    border-color: var(--accent-color);
+    border-color: var(--app-accent-color);
   }
 
   .text-input.disabled {
-    background-color: var(--secondary-color);
+    background-color: var(--app-secondary-surface-color);
     cursor: not-allowed;
   }
 

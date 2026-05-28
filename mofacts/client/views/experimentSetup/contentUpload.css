@@ -140,7 +140,7 @@
 }
 
 .asset-error {
-    color: var(--alert-color);
+    color: var(--feedback-error-color);
 }
 
 .asset-accessors-list {
@@ -181,7 +181,7 @@
 
 .public-private-switch-label {
     min-width: 2.75rem;
-    color: var(--secondary-text-color);
+    color: var(--app-secondary-text-color);
     font-weight: 600;
     line-height: 1;
 }
@@ -251,12 +251,12 @@
 /* Compact inline elements */
 .asset-info-block a {
     cursor: pointer;
-    color: var(--accent-color);
-    transition: color var(--transition-fast, 100ms);
+    color: var(--app-accent-color);
+    transition: color var(--app-transition-fast, 100ms);
 }
 
 .asset-info-block a:hover {
-    color: color-mix(in srgb, var(--accent-color) 70%, black 30%);
+    color: color-mix(in srgb, var(--app-accent-color) 70%, black 30%);
 }
 
 .asset-info-block a i {
@@ -267,7 +267,7 @@
 .asset-toggle-content.border-top {
     background-color: rgba(0, 0, 0, 0.02);
     padding: 0.75rem;
-    border-radius: var(--border-radius-sm);
+    border-radius: var(--app-border-radius-sm);
 }
 
 @media (min-width: 1101px) {

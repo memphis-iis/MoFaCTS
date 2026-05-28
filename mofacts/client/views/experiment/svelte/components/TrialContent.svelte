@@ -116,10 +116,10 @@
   export let forceCorrectPrompt = 'Please type the correct answer to continue';
 
   /** @type {string} Correct color */
-  export let correctColor = 'var(--success-color)';
+  export let correctColor = 'var(--feedback-correct-color)';
 
   /** @type {string} Incorrect color */
-  export let incorrectColor = 'var(--alert-color)';
+  export let incorrectColor = 'var(--feedback-error-color)';
 
   /** @type {boolean} Display correct feedback */
   export let displayCorrectFeedback = true;
@@ -447,7 +447,7 @@
     flex: 0 0 min(28%, 14rem);
     min-height: 8rem;
     width: 100%;
-    border-top: 1px solid var(--secondary-color);
+    border-top: 1px solid var(--app-secondary-surface-color);
   }
 
   /* Over-under layout (vertical stack) */
@@ -486,7 +486,7 @@
   .trial-content.split .stimulus-container {
     flex: 1;
     min-width: 0;
-    border-right: 2px solid var(--secondary-color);
+    border-right: 2px solid var(--app-secondary-surface-color);
   }
 
   .trial-content.split .interaction-container {
@@ -536,7 +536,7 @@
 
     .trial-content.split .stimulus-container {
       border-right: none;
-      border-bottom: 2px solid var(--secondary-color);
+      border-bottom: 2px solid var(--app-secondary-surface-color);
     }
 
     .trial-content.split .stimulus-container,
@@ -553,7 +553,7 @@
 
     .trial-content.split .stimulus-container {
       border-right: none;
-      border-bottom: 2px solid var(--secondary-color);
+      border-bottom: 2px solid var(--app-secondary-surface-color);
       width: 100%;
     }
 

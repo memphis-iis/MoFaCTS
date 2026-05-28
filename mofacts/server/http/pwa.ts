@@ -32,12 +32,12 @@ function asNonEmptyString(value: unknown): string | null {
 function getThemeColors(theme: ThemeLike) {
   const properties = theme.properties || {};
   const backgroundColor =
-    asNonEmptyString(properties.background_color) ||
-    asNonEmptyString(properties.neutral_color) ||
+    asNonEmptyString(properties.app_background_color) ||
+    asNonEmptyString(properties.navigation_surface_color) ||
     DEFAULT_BACKGROUND_COLOR;
   const themeColor =
-    asNonEmptyString(properties.accent_color) ||
-    asNonEmptyString(properties.background_color) ||
+    asNonEmptyString(properties.app_accent_color) ||
+    asNonEmptyString(properties.app_background_color) ||
     DEFAULT_BACKGROUND_COLOR;
 
   return { backgroundColor, themeColor };
@@ -50,17 +50,17 @@ function buildThemeVersion(theme: ThemeLike) {
       activeThemeId: theme.activeThemeId || null,
       themeName: theme.themeName || null,
       updatedAt: theme.metadata?.updatedAt || null,
-      brandLabel: properties.brand_label || null,
-      logoUrl: properties.logo_url || null,
-      favicon16Url: properties.favicon_16_url || null,
-      favicon32Url: properties.favicon_32_url || null,
-      appleTouchIconUrl: properties.apple_touch_icon_url || null,
-      androidIcon192Url: properties.android_icon_192_url || null,
-      androidIcon512Url: properties.android_icon_512_url || null,
-      androidMaskableIcon192Url: properties.android_maskable_icon_192_url || null,
-      androidMaskableIcon512Url: properties.android_maskable_icon_512_url || null,
-      backgroundColor: properties.background_color || null,
-      accentColor: properties.accent_color || null
+      brandLabel: properties.brand_display_label || null,
+      logoUrl: properties.brand_logo_url || null,
+      favicon16Url: properties.brand_favicon_16_url || null,
+      favicon32Url: properties.brand_favicon_32_url || null,
+      appleTouchIconUrl: properties.brand_apple_touch_icon_url || null,
+      androidIcon192Url: properties.brand_android_icon_192_url || null,
+      androidIcon512Url: properties.brand_android_icon_512_url || null,
+      androidMaskableIcon192Url: properties.brand_android_maskable_icon_192_url || null,
+      androidMaskableIcon512Url: properties.brand_android_maskable_icon_512_url || null,
+      backgroundColor: properties.app_background_color || null,
+      accentColor: properties.app_accent_color || null
     }))
     .digest('hex')
     .slice(0, 12);
@@ -71,7 +71,7 @@ function buildManifestPayload(theme: ThemeLike) {
   const appName = resolveThemeBrandLabel(theme, Meteor.settings.public?.systemName);
   const shortName = appName.length > 24 ? appName.slice(0, 24) : appName;
   const description =
-    asNonEmptyString(properties.signInDescription) ||
+    asNonEmptyString(properties.auth_sign_in_description) ||
     'A web-based adaptive learning system that supports adaptive practice and learning.';
   const { backgroundColor, themeColor } = getThemeColors(theme);
   const version = buildThemeVersion(theme);
@@ -84,7 +84,7 @@ function buildManifestPayload(theme: ThemeLike) {
     start_url: '/',
     scope: '/',
     display: 'standalone',
-    background_color: backgroundColor,
+    app_background_color: backgroundColor,
     theme_color: themeColor,
     icons: [
       {
@@ -119,18 +119,18 @@ function resolveIconPropertyName(pathname: string) {
   switch (pathname) {
     case APPLE_TOUCH_ICON_ROUTE:
     case APPLE_TOUCH_ICON_PRECOMPOSED_ROUTE:
-      return 'apple_touch_icon_url';
+      return 'brand_apple_touch_icon_url';
   }
 
   switch (pathname) {
     case `${PWA_ICON_ROUTE_PREFIX}192.png`:
-      return 'android_icon_192_url';
+      return 'brand_android_icon_192_url';
     case `${PWA_ICON_ROUTE_PREFIX}512.png`:
-      return 'android_icon_512_url';
+      return 'brand_android_icon_512_url';
     case `${PWA_ICON_ROUTE_PREFIX}maskable-192.png`:
-      return 'android_maskable_icon_192_url';
+      return 'brand_android_maskable_icon_192_url';
     case `${PWA_ICON_ROUTE_PREFIX}maskable-512.png`:
-      return 'android_maskable_icon_512_url';
+      return 'brand_android_maskable_icon_512_url';
     default:
       return null;
   }

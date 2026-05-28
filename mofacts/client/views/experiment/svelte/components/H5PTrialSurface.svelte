@@ -35,17 +35,17 @@
     height: 100%;
     min-height: 0;
     overflow: hidden;
-    background: var(--stimuli-box-color);
+    background: var(--learning-card-stimulus-surface-color);
     box-sizing: border-box;
   }
 
   .h5p-question-number {
     flex: 0 0 auto;
     padding: 0.35rem 0.75rem;
-    color: var(--secondary-text-color);
+    color: var(--app-secondary-text-color);
     font-size: 0.85rem;
     text-align: center;
-    border-bottom: 1px solid var(--secondary-color);
+    border-bottom: 1px solid var(--app-secondary-surface-color);
   }
 
   .h5p-frame-region {

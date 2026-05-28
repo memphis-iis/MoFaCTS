@@ -15,7 +15,7 @@ export function resolveThemeBrandLabel(
   theme: ThemeBrandingLike | null | undefined,
   configuredSystemName: unknown
 ): string {
-  const themeBrandLabel = asNonEmptyString(theme?.properties?.brand_label);
+  const themeBrandLabel = asNonEmptyString(theme?.properties?.brand_display_label);
   if (themeBrandLabel) {
     return themeBrandLabel;
   }

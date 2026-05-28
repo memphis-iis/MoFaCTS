@@ -159,8 +159,73 @@ export { extractDelimFields, rangeVal, shuffle, randomChoice, search, getUserDis
 
 // Track if CSS has been applied this page session (resets on refresh, unlike Session)
 let themeCssAppliedThisSession = false;
-const THEME_CACHE_KEY = 'mofacts.theme.v1';
+const THEME_CACHE_KEY = 'mofacts.theme.v3';
+const LEGACY_THEME_CACHE_KEYS = ['mofacts.theme.v1', 'mofacts.theme.v2'];
+const LEGACY_THEME_CACHE_PROPERTY_NAMES = [
+  'background_color',
+  'button_color',
+  'primary_button_text_color',
+  'accent_color',
+  'main_button_color',
+  'main_button_text_color',
+  'home_hero_image_url',
+  'home_welcome_html',
+  'home_no_practice_welcome_html',
+  'brand_label',
+  'logo_url',
+  'signInDescription'
+];
+const REQUIRED_THEME_CACHE_PROPERTY_NAMES = [
+  'app_background_color',
+  'app_text_color',
+  'app_page_header_text_color',
+  'app_primary_action_surface_color',
+  'app_primary_action_text_color',
+  'app_accent_color',
+  'app_secondary_surface_color',
+  'app_secondary_text_color',
+  'navigation_surface_color',
+  'navigation_text_color',
+  'learning_card_surface_color',
+  'learning_card_stimulus_surface_color',
+  'learning_card_primary_action_surface_color',
+  'learning_card_primary_action_text_color',
+  'practice_menu_accuracy_bar_fill_color',
+  'practice_menu_accuracy_bar_track_color',
+  'practice_menu_underlay_image_url',
+  'brand_display_label',
+  'brand_logo_url',
+  'auth_sign_in_description',
+  'app_button_height',
+  'app_text_input_height'
+];
 const THEME_FONT_STYLESHEET_LINK_ID = 'mofacts-theme-font-stylesheet';
+
+function discardLegacyThemeCache() {
+  for (const key of LEGACY_THEME_CACHE_KEYS) {
+    localStorage.removeItem(key);
+  }
+}
+
+function hasLegacyThemeCacheProperties(themeData: ThemeData) {
+  const properties = themeData.properties;
+  if (!properties || typeof properties !== 'object') {
+    return false;
+  }
+  return LEGACY_THEME_CACHE_PROPERTY_NAMES.some((property) =>
+    Object.prototype.hasOwnProperty.call(properties, property)
+  );
+}
+
+function hasRequiredThemeCacheProperties(themeData: ThemeData) {
+  const properties = themeData.properties;
+  if (!properties || typeof properties !== 'object') {
+    return false;
+  }
+  return REQUIRED_THEME_CACHE_PROPERTY_NAMES.every((property) =>
+    Object.prototype.hasOwnProperty.call(properties, property)
+  );
+}
 
 function cacheTheme(themeData: ThemeData) {
   try {
@@ -172,6 +237,7 @@ function cacheTheme(themeData: ThemeData) {
 
 function loadCachedTheme(): ThemeData | null {
   try {
+    discardLegacyThemeCache();
     const raw = localStorage.getItem(THEME_CACHE_KEY);
     if (!raw) {
       return null;
@@ -180,7 +246,12 @@ function loadCachedTheme(): ThemeData | null {
     if (!parsed || typeof parsed !== 'object') {
       return null;
     }
-    return parsed as ThemeData;
+    const themeData = parsed as ThemeData;
+    if (hasLegacyThemeCacheProperties(themeData) || !hasRequiredThemeCacheProperties(themeData)) {
+      localStorage.removeItem(THEME_CACHE_KEY);
+      return null;
+    }
+    return themeData;
   } catch (_error) {
     return null;
   }
@@ -246,7 +317,7 @@ function applyThemeCSSProperties(themeData: ThemeData | null | undefined) {
       for (const prop in themeProps) {
         applyThemeCssVariable(prop, themeProps[prop]);
       }
-      applyThemeFontStylesheet(themeProps.font_stylesheet_url);
+      applyThemeFontStylesheet(themeProps.app_font_stylesheet_url);
     }
 
     // Set document title
@@ -255,9 +326,9 @@ function applyThemeCSSProperties(themeData: ThemeData | null | undefined) {
     document.title = titleValue;
 
     const themePropsForIcons = themeData.properties || {};
-    const favicon32 = asNonEmptyString(themePropsForIcons.favicon_32_url);
-    const favicon16 = asNonEmptyString(themePropsForIcons.favicon_16_url);
-    const logoUrl = asNonEmptyString(themePropsForIcons.logo_url);
+    const favicon32 = asNonEmptyString(themePropsForIcons.brand_favicon_32_url);
+    const favicon16 = asNonEmptyString(themePropsForIcons.brand_favicon_16_url);
+    const logoUrl = asNonEmptyString(themePropsForIcons.brand_logo_url);
     const defaultFavicon = favicon32 || favicon16 || logoUrl;
 
     if (favicon32) {
@@ -281,7 +352,7 @@ function applyThemeCSSProperties(themeData: ThemeData | null | undefined) {
     updateManifestLink(`/site.webmanifest?v=${manifestVersion}`);
     updateAppleTouchIconLink(`/apple-touch-icon.png?v=${manifestVersion}`);
 
-    const themeColor = asNonEmptyString(themePropsForIcons.background_color) || '#F2F2F2';
+    const themeColor = asNonEmptyString(themePropsForIcons.app_background_color) || '#F2F2F2';
     updateThemeColorMeta(themeColor);
 
     themeCssAppliedThisSession = true;
