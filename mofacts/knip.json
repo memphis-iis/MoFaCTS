@@ -1,19 +1,21 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "entry": [
-    "**/*.test.{js,ts}",
-    "client/**/*.{js,ts,svelte}",
-    "server/**/*.{js,ts}",
+    "client/index.ts",
+    "client/views/experiment/svelte/components/CardScreen.svelte",
+    "server/main.ts",
+    "tests/client-entry.js",
+    "tests/server-entry.js",
+    "**/*.test.{js,ts,svelte}",
     "tests/**/*.{js,ts}",
     "scripts/**/*.{js,cjs,mjs,ts}",
-    "packages/**/*.{js,ts}",
-    "lib/**/*.js"
+    "packages/**/*.{js,ts}"
   ],
   "project": [
-    "client/**/*.{js,ts}",
+    "client/**/*.{js,ts,svelte}",
     "server/**/*.{js,ts}",
     "common/**/*.{js,ts,d.ts}",
-    "tests/**/*.{js,ts}",
+    "tests/**/*.{js,ts,svelte}",
     "scripts/**/*.{js,cjs,mjs,ts}",
     "packages/**/*.{js,ts}",
     "lib/**/*.js",
@@ -21,14 +23,16 @@
   ],
   "includeEntryExports": true,
   "ignoreBinaries": [
-    "meteor"
+    "meteor",
+    "python"
   ],
   "ignoreDependencies": [
     "@babel/runtime",
     "husky",
     "@rsdoctor/rspack-plugin",
     "meteor-node-stubs",
-    "unzipper"
+    "unzipper",
+    "@playwright/test"
   ],
   "ignoreFiles": [
     "public/lib/**"

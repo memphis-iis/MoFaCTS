@@ -64,7 +64,6 @@
     "dompurify": "^3.4.0",
     "double-metaphone": "^2.0.0",
     "fast-xml-parser": "^5.7.1",
-    "h5p-standalone": "3.8.2",
     "jquery": "^3.7.1",
     "jszip": "^3.10.1",
     "marked": "^18.0.2",
@@ -99,6 +98,7 @@
     "globals": "^16.0.0",
     "husky": "^9.1.7",
     "knip": "^6.4.1",
+    "license-checker": "^25.0.1",
     "lint-staged": "^16.2.7",
     "postcss-load-config": "^5.1.0",
     "sinon": "^18.0.0",
@@ -140,7 +140,8 @@
     "secret:scan:staged": "node scripts/scan-staged-secrets.cjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "typecheck:vendor": "tsc --noEmit -p tsconfig.vendor-check.json",
-    "knip": "knip",
+    "knip": "knip --include files,dependencies,unlisted,binaries,unresolved,duplicates --no-config-hints",
+    "knip:exports": "knip --include exports,types,enumMembers,namespaceMembers --include-entry-exports --no-config-hints",
     "audit:runtime-fields": "python scripts/audit_runtime_field_refs.py"
   },
   "lint-staged": {
