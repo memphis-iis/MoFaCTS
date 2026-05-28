@@ -1,18 +1,18 @@
 # Wiki Documentation Audit Goal Prompt
 
 ```text
-/goal C:\Users\ppavl\OneDrive\Active projects\mofacts.wiki
+/goal <WIKI_REPO_PATH>
 
 Audit and update the MoFaCTS wiki so it is accurate, role-aware, and presentable for consortium users.
 
 The goal is to create a complete table of all wiki Markdown pages, classify each page by audience, record what needs to be fixed, make the needed fixes, and then update the table with a concise description of what was fixed.
 
 Primary wiki repo:
-C:\Users\ppavl\OneDrive\Active projects\mofacts.wiki
+<WIKI_REPO_PATH>
 
 Sibling repos to inspect when needed:
-C:\dev\MoFaCTS
-C:\Users\ppavl\OneDrive\Active projects\mofacts_config
+<APP_REPO_PATH>
+<CONFIG_REPO_PATH>
 
 Audience lanes must be clearly separated:
 
@@ -110,13 +110,13 @@ Initial page inventory to cover:
 Work process:
 
 1. Inspect recent and current code/config changes before auditing pages.
-   - Inspect `C:\dev\MoFaCTS`, especially:
+   - Inspect `<APP_REPO_PATH>`, especially:
      - `learning-components/`
      - `mofacts/common/`
      - `mofacts/client/views/experiment/`
      - `mofacts/client/views/experiment/svelte/services/`
      - `mofacts/server/methods/analyticsMethods.ts`
-   - Inspect `C:\Users\ppavl\OneDrive\Active projects\mofacts_config` when TDF/content/schema/config expectations may be affected.
+   - Inspect `<CONFIG_REPO_PATH>` when TDF/content/schema/config expectations may be affected.
    - Check whether wiki pages need updates for:
      - learning component manifests and capability boundaries
      - canonical history envelope and `historySchemaVersion`
@@ -144,8 +144,8 @@ Work process:
    - Add short orientation text when a page is technical or not intended for a given role.
 
 5. Check content against current code/config.
-   - For behavior, workflows, UI names, runtime behavior, and developer architecture, inspect `C:\dev\MoFaCTS`.
-   - For TDF/content/schema/config expectations, inspect `C:\Users\ppavl\OneDrive\Active projects\mofacts_config` when relevant.
+   - For behavior, workflows, UI names, runtime behavior, and developer architecture, inspect `<APP_REPO_PATH>`.
+   - For TDF/content/schema/config expectations, inspect `<CONFIG_REPO_PATH>` when relevant.
    - Remove obsolete or contradictory guidance.
    - Do not preserve old and new narratives side by side unless clearly labeled as historical.
 
