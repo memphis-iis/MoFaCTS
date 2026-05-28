@@ -2,7 +2,7 @@ import { Session } from 'meteor/session';
 import { clientConsole } from './clientLogger';
 
 type LaunchLoadingSource =
-  | 'learningDashboard'
+  | 'practiceMenu'
   | 'instructions'
   | 'card'
   | 'audio'
