@@ -2,6 +2,8 @@ export {
   AUTO_TUTOR_DEFAULT_THRESHOLDS,
   AUTO_TUTOR_DEFAULT_WEIGHTS,
   createInitialAutoTutorPlannerState,
+  getScoreableExpectationIds,
+  mergeScoreableExpectationScores,
   planAutoTutorTurn,
   preserveDurableExpectationCoverage,
   preserveRepairedMisconceptionState,

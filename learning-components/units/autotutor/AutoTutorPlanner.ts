@@ -328,6 +328,63 @@ export function preserveDurableExpectationCoverage(
   return mergedScores;
 }
 
+export function getScoreableExpectationIds(
+  script: AutoTutorPlannerScript,
+  previousScores: Record<string, AutoTutorExpectationScore>,
+  thresholds?: Partial<AutoTutorPlannerThresholds>,
+): string[] {
+  const mergedThresholds = mergeThresholds(thresholds);
+  return script.expectations
+    .filter((expectation) => {
+      const previousScore = previousScores[expectation.id];
+      return !previousScore || !isCovered(previousScore, mergedThresholds.coverageThreshold);
+    })
+    .map((expectation) => expectation.id);
+}
+
+export function mergeScoreableExpectationScores(
+  script: AutoTutorPlannerScript,
+  previousScores: Record<string, AutoTutorExpectationScore>,
+  nextScores: Record<string, AutoTutorExpectationScore>,
+  scoreableExpectationIds: string[],
+): Record<string, AutoTutorExpectationScore> {
+  const scoreableIds = new Set(scoreableExpectationIds);
+  const mergedScores: Record<string, AutoTutorExpectationScore> = {};
+
+  for (const expectation of script.expectations) {
+    const previousScore = previousScores[expectation.id];
+    const nextScore = nextScores[expectation.id];
+    if (!scoreableIds.has(expectation.id)) {
+      if (!previousScore) {
+        throw new Error(`AutoTutor frozen expectation "${expectation.id}" is missing previous score`);
+      }
+      mergedScores[expectation.id] = previousScore;
+      continue;
+    }
+    if (!nextScore) {
+      throw new Error(`AutoTutor score response omitted expectation "${expectation.id}"`);
+    }
+    if (!previousScore || nextScore.coverage >= previousScore.coverage) {
+      mergedScores[expectation.id] = nextScore;
+      continue;
+    }
+    mergedScores[expectation.id] = {
+      ...previousScore,
+      current: previousScore.current || nextScore.current,
+      ...(previousScore.evidence || nextScore.evidence
+        ? { evidence: previousScore.evidence || nextScore.evidence }
+        : {}),
+      ...(previousScore.missing || nextScore.missing
+        ? { missing: previousScore.missing || nextScore.missing }
+        : {}),
+      coherence: Math.max(previousScore.coherence, nextScore.coherence),
+      centrality: Math.max(previousScore.centrality, nextScore.centrality),
+    };
+  }
+
+  return mergedScores;
+}
+
 export function preserveRepairedMisconceptionState(
   script: AutoTutorPlannerScript,
   previousScores: Record<string, AutoTutorMisconceptionScore>,

@@ -2,6 +2,8 @@ import { expect } from 'chai';
 
 import {
   createInitialAutoTutorPlannerState,
+  getScoreableExpectationIds,
+  mergeScoreableExpectationScores,
   planAutoTutorTurn,
   preserveDurableExpectationCoverage,
   preserveRepairedMisconceptionState,
@@ -418,6 +420,70 @@ describe('AutoTutor planner', function() {
 
     expect(mergedScores.E1?.coverage).to.equal(0.85);
     expect(mergedScores.E1?.learnerRestatedAfterAssertion).to.equal(true);
+  });
+
+  it('excludes covered expectations from the scorer-owned expectation scope', function() {
+    const script = buildScript();
+    const previousScores = recomputeExpectationPriorities(script, {
+      E1: {
+        current: true,
+        coverage: 0.85,
+        evidence: 'Learner already covered repeated sampling.',
+        frontier: 0.85,
+        coherence: 0.7,
+        centrality: 0.6,
+        priority: 0,
+      },
+      E2: {
+        current: false,
+        coverage: 0.35,
+        frontier: 0.35,
+        coherence: 0.2,
+        centrality: 0.5,
+        priority: 0,
+      },
+    });
+
+    expect(getScoreableExpectationIds(script, previousScores)).to.deep.equal(['E2']);
+  });
+
+  it('carries frozen covered expectation scores forward unchanged', function() {
+    const script = buildScript();
+    const previousScores = recomputeExpectationPriorities(script, {
+      E1: {
+        current: true,
+        coverage: 0.85,
+        evidence: 'Learner already covered repeated sampling.',
+        frontier: 0.85,
+        coherence: 0.7,
+        centrality: 0.6,
+        priority: 0,
+      },
+      E2: {
+        current: false,
+        coverage: 0.35,
+        frontier: 0.35,
+        coherence: 0.2,
+        centrality: 0.5,
+        priority: 0,
+      },
+    });
+    const latestScores = {
+      E2: {
+        current: true,
+        coverage: 0.9,
+        evidence: 'Learner explained the parameter is fixed.',
+        frontier: 0.9,
+        coherence: 0.8,
+        centrality: 0.7,
+        priority: 0,
+      },
+    };
+
+    const mergedScores = mergeScoreableExpectationScores(script, previousScores, latestScores, ['E2']);
+
+    expect(mergedScores.E1).to.deep.equal(previousScores.E1);
+    expect(mergedScores.E2?.coverage).to.equal(0.9);
   });
 
   it('preserves repaired misconception state until the learner reintroduces it', function() {

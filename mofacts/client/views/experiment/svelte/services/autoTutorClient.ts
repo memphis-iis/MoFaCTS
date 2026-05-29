@@ -10,8 +10,9 @@ import {
 } from '../../../../../common/lib/autoTutorContract';
 import {
   createInitialAutoTutorPlannerState,
+  getScoreableExpectationIds,
+  mergeScoreableExpectationScores,
   planAutoTutorTurn,
-  preserveDurableExpectationCoverage,
   preserveRepairedMisconceptionState,
   recomputeExpectationPriorities,
   type AutoTutorLearnerContributionScore,
@@ -231,7 +232,10 @@ function summarizeState(state: AutoTutorState) {
   };
 }
 
-function buildScoringSystemPrompt(config: AutoTutorConfig): string {
+function buildScoringSystemPrompt(config: AutoTutorConfig, scoreableExpectationIds: string[]): string {
+  const frozenExpectationIds = config.script.expectations
+    .map((expectation) => expectation.id)
+    .filter((id) => !scoreableExpectationIds.includes(id));
   return [
     'You are the MoFaCTS AutoTutor semantic scorer for one learner.',
     'Score the latest learner answer against the authored AutoTutor script and role-preserving dialogue history.',
@@ -258,7 +262,13 @@ function buildScoringSystemPrompt(config: AutoTutorConfig): string {
     'Do not choose a dialogue target, choose a dialogue move, or write the tutor response.',
     'Return JSON only. Do not wrap it in Markdown. The JSON object must exactly follow this envelope shape:',
     JSON.stringify(AUTO_TUTOR_SCORE_ENVELOPE_SCHEMA, null, 2),
-    'Include every authored expectation ID under expectationScores and every authored misconception ID under misconceptionScores on every turn.',
+    scoreableExpectationIds.length > 0
+      ? `Include exactly these expectation IDs under expectationScores on this turn: ${JSON.stringify(scoreableExpectationIds)}.`
+      : 'Set expectationScores to an empty object on this turn.',
+    frozenExpectationIds.length > 0
+      ? `Do not include these already covered expectation IDs under expectationScores: ${JSON.stringify(frozenExpectationIds)}. The app will carry their prior scores forward unchanged.`
+      : 'No authored expectations are frozen on this turn.',
+    'Include every authored misconception ID under misconceptionScores on every turn.',
     'Do not invent expectation or misconception IDs.',
     'Set expectation coverage from 0 to 1, provide brief evidence, and include missing elements when coverage is incomplete.',
     'Set misconception confidence from 0 to 1.',
@@ -294,10 +304,13 @@ function getActiveRepairContext(config: AutoTutorConfig, state: AutoTutorState) 
   };
 }
 
-function buildScoringUserPrompt(config: AutoTutorConfig, studentAnswer: string, state: AutoTutorState): string {
+function buildScoringUserPrompt(config: AutoTutorConfig, studentAnswer: string, state: AutoTutorState, scoreableExpectationIds: string[]): string {
   return [
     'Latest student answer:',
     studentAnswer,
+    '',
+    'Expectation score scope. Score only these expectation IDs. Treat all other prior expectation scores as frozen context:',
+    JSON.stringify(scoreableExpectationIds, null, 2),
     '',
     'Active repair context. If present, score the latest answer against this repair context before carrying forward prior misconception state:',
     JSON.stringify(getActiveRepairContext(config, state), null, 2),
@@ -415,8 +428,8 @@ function buildUtteranceUserPrompt(config: AutoTutorConfig, studentAnswer: string
   ].join('\n');
 }
 
-function validateScoreEnvelopeIds(envelope: AutoTutorScoreEnvelope, state: AutoTutorState): void {
-  const expectationIds = Object.keys(state.expectations);
+function validateScoreEnvelopeIds(envelope: AutoTutorScoreEnvelope, state: AutoTutorState, scoreableExpectationIds: string[]): void {
+  const expectationIds = scoreableExpectationIds;
   const misconceptionIds = Object.keys(state.misconceptions);
   const returnedExpectationIds = Object.keys(envelope.expectationScores);
   const returnedMisconceptionIds = Object.keys(envelope.misconceptionScores);
@@ -527,10 +540,15 @@ async function callOpenRouter(
   };
 }
 
-async function callOpenRouterScoring(config: AutoTutorConfig, state: AutoTutorState, studentAnswer: string) {
+async function callOpenRouterScoring(
+  config: AutoTutorConfig,
+  state: AutoTutorState,
+  studentAnswer: string,
+  scoreableExpectationIds: string[],
+) {
   return await callOpenRouter(config, [
-    { role: 'system', content: buildScoringSystemPrompt(config) },
-    { role: 'user', content: buildScoringUserPrompt(config, studentAnswer, state) },
+    { role: 'system', content: buildScoringSystemPrompt(config, scoreableExpectationIds) },
+    { role: 'user', content: buildScoringUserPrompt(config, studentAnswer, state, scoreableExpectationIds) },
   ], AUTO_TUTOR_SCORING_TEMPERATURE);
 }
 
@@ -795,16 +813,24 @@ export async function createAutoTutorRuntime(
       }
 
       const turnStartedAt = Date.now();
-      const scoreResult = await callOpenRouterScoring(config, state, cleanedAnswer);
-      const scoreEnvelope = parseAutoTutorScoreEnvelope(scoreResult.content);
-      validateScoreEnvelopeIds(scoreEnvelope, state);
+      const scoreableExpectationIds = getScoreableExpectationIds(config.script, state.expectations);
+      const frozenExpectationIds = config.script.expectations
+        .map((expectation) => expectation.id)
+        .filter((id) => !scoreableExpectationIds.includes(id));
+      const scoreResult = await callOpenRouterScoring(config, state, cleanedAnswer, scoreableExpectationIds);
+      const scoreEnvelope = parseAutoTutorScoreEnvelope(scoreResult.content, {
+        scoreableExpectationIds,
+        frozenExpectationIds,
+      });
+      validateScoreEnvelopeIds(scoreEnvelope, state, scoreableExpectationIds);
 
       const nextState = cloneJson(state);
       nextState.costUsd += scoreResult.costUsd;
-      const durableExpectationScores = preserveDurableExpectationCoverage(
+      const durableExpectationScores = mergeScoreableExpectationScores(
         config.script,
         state.expectations,
         scoreEnvelope.expectationScores,
+        scoreableExpectationIds,
       );
       const scoredExpectations = recomputeExpectationPriorities(config.script, durableExpectationScores);
       const scoredMisconceptions = preserveRepairedMisconceptionState(

@@ -340,6 +340,60 @@ describe('AutoTutor content contract', function() {
     expect(envelope.expectationScores.E1?.priority).to.equal(0.6);
   });
 
+  it('parses only scoreable expectations and ignores frozen expectation fields', function() {
+    const envelope = parseAutoTutorScoreEnvelope(JSON.stringify({
+      expectationScores: {
+        E1: {
+          current: true,
+          coverage: 0.8,
+          coherence: 'already covered',
+          centrality: null,
+        },
+        E2: {
+          current: true,
+          coverage: 0.9,
+          coherence: 0.75,
+          centrality: 0.5,
+        },
+      },
+      misconceptionScores: {},
+      answerQuality: 'high',
+      learnerContribution: {
+        type: 'assertion',
+        confidence: 0.9,
+      },
+      learnerQuestion: {
+        current: false,
+        answerableFromAuthoredContent: false,
+      },
+    }), {
+      scoreableExpectationIds: ['E2'],
+      frozenExpectationIds: ['E1'],
+    });
+
+    expect(Object.keys(envelope.expectationScores)).to.deep.equal(['E2']);
+    expect(envelope.expectationScores.E2?.coherence).to.equal(0.75);
+  });
+
+  it('fails clearly when a score-scoped response omits a scoreable expectation', function() {
+    expect(() => parseAutoTutorScoreEnvelope(JSON.stringify({
+      expectationScores: {},
+      misconceptionScores: {},
+      answerQuality: 'partial',
+      learnerContribution: {
+        type: 'assertion',
+        confidence: 0.9,
+      },
+      learnerQuestion: {
+        current: false,
+        answerableFromAuthoredContent: false,
+      },
+    }), {
+      scoreableExpectationIds: ['E2'],
+      frozenExpectationIds: ['E1'],
+    })).to.throw('AutoTutor score response omitted expectation "E2"');
+  });
+
   it('parses the required AutoTutor utterance JSON envelope', function() {
     const envelope = parseAutoTutorUtteranceEnvelope(JSON.stringify({
       targetType: 'misconception',

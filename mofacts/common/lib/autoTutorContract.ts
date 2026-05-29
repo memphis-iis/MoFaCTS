@@ -286,6 +286,11 @@ export type AutoTutorUtteranceEnvelope = {
   tutorMessage: string;
 };
 
+export type AutoTutorScoreParseOptions = {
+  scoreableExpectationIds?: readonly string[];
+  frozenExpectationIds?: readonly string[];
+};
+
 const ANSWER_QUALITIES = new Set(['low', 'partial', 'high']);
 const LEARNER_CONTRIBUTION_TYPES = new Set([
   'assertion',
@@ -341,12 +346,24 @@ function computeExpectationPriority(frontier: number, coherence: number, central
   return Math.round(Math.max(0, Math.min(1, priority)) * 1_000_000) / 1_000_000;
 }
 
-function parseExpectationScores(value: unknown): Record<string, AutoTutorExpectationScore> {
+function parseExpectationScores(
+  value: unknown,
+  options: AutoTutorScoreParseOptions = {},
+): Record<string, AutoTutorExpectationScore> {
   if (!isRecord(value)) {
     throw new Error('AutoTutor score response expectationScores must be an object');
   }
+  const hasScoreScope = options.scoreableExpectationIds !== undefined;
+  const scoreableIds = new Set(options.scoreableExpectationIds || []);
+  const frozenIds = new Set(options.frozenExpectationIds || []);
   const parsed: Record<string, AutoTutorExpectationScore> = {};
   for (const [id, score] of Object.entries(value)) {
+    if (hasScoreScope && !scoreableIds.has(id)) {
+      if (frozenIds.has(id)) {
+        continue;
+      }
+      throw new Error(`AutoTutor score response included unscoreable expectation "${id}"`);
+    }
     if (!isRecord(score) || typeof score.current !== 'boolean') {
       throw new Error(`AutoTutor score response expectationScores.${id}.current must be boolean`);
     }
@@ -373,6 +390,13 @@ function parseExpectationScores(value: unknown): Record<string, AutoTutorExpecta
       centrality,
       priority: computeExpectationPriority(frontier, coherence, centrality),
     };
+  }
+  if (hasScoreScope) {
+    for (const id of scoreableIds) {
+      if (!Object.prototype.hasOwnProperty.call(parsed, id)) {
+        throw new Error(`AutoTutor score response omitted expectation "${id}"`);
+      }
+    }
   }
   return parsed;
 }
@@ -417,7 +441,10 @@ function parseLearnerContribution(value: unknown): AutoTutorLearnerContributionS
   };
 }
 
-export function parseAutoTutorScoreEnvelope(value: unknown): AutoTutorScoreEnvelope {
+export function parseAutoTutorScoreEnvelope(
+  value: unknown,
+  options: AutoTutorScoreParseOptions = {},
+): AutoTutorScoreEnvelope {
   const parsed = parseMaybeJsonObject(value);
   if (!isRecord(parsed)) {
     throw new Error('AutoTutor score response envelope must be a JSON object');
@@ -434,7 +461,7 @@ export function parseAutoTutorScoreEnvelope(value: unknown): AutoTutorScoreEnvel
   }
 
   return {
-    expectationScores: parseExpectationScores(parsed.expectationScores),
+    expectationScores: parseExpectationScores(parsed.expectationScores, options),
     misconceptionScores: parseMisconceptionScores(parsed.misconceptionScores),
     answerQuality: answerQuality as AutoTutorScoreEnvelope['answerQuality'],
     learnerContribution: parseLearnerContribution(parsed.learnerContribution),
