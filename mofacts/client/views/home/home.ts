@@ -17,6 +17,7 @@ declare const DynamicSettings: any;
 const MAIN_MENU_RETURN_TOUR_DURATION_MS = 5000;
 const HOME_SIDEBAR_COLLAPSED_KEY = 'mofacts.home.sidebarCollapsed';
 const PRACTICE_MENU_OPEN_KEY = 'mofacts.practice.menuOpen';
+const USER_THEME_SELECTION_KEY_PREFIX = 'mofacts.userThemeSelection.v1.';
 const HOME_WELCOME_ALLOWED_TAGS = ['h1', 'h2', 'h3', 'p', 'br', 'span', 'strong', 'em', 'b', 'i', 'u', 'a', 'ul', 'ol', 'li'];
 const HOME_WELCOME_ALLOWED_ATTR = ['href', 'title', 'target', 'rel', 'class', 'style'];
 
@@ -231,13 +232,62 @@ function serializeThemeSelection(theme: ThemeLibraryEntry): ThemeLibraryEntry {
   };
 }
 
+function getUserThemeSelectionKey(): string | null {
+  const userId = Meteor.userId();
+  if (!userId) {
+    return null;
+  }
+  return `${USER_THEME_SELECTION_KEY_PREFIX}${userId}`;
+}
+
+function saveUserThemeSelection(themeId: string): void {
+  const key = getUserThemeSelectionKey();
+  if (!key) {
+    throw new Error('[ThemeToggle] User theme selection requires a logged-in user.');
+  }
+  window.localStorage.setItem(key, themeId);
+}
+
+function clearActiveUserThemeOverride(): void {
+  Session.set('userThemeOverrideActive', false);
+}
+
 function applyUserSelectedTheme(theme: ThemeLibraryEntry): void {
   const selectedTheme = serializeThemeSelection(theme);
   Session.set('userThemeOverrideActive', true);
   applyThemeCSSProperties(selectedTheme, { cache: false });
+  saveUserThemeSelection(selectedTheme.activeThemeId as string);
+}
+
+function restoreUserSelectedTheme(): void {
+  const key = getUserThemeSelectionKey();
+  if (!key) {
+    Session.set('userThemeOverrideActive', false);
+    return;
+  }
+
+  const selectedThemeId = window.localStorage.getItem(key);
+  if (!selectedThemeId) {
+    Session.set('userThemeOverrideActive', false);
+    return;
+  }
+
+  const selectedTheme = getAvailableUserThemes().find((theme) => theme.id === selectedThemeId);
+  if (!selectedTheme) {
+    window.localStorage.removeItem(key);
+    Session.set('userThemeOverrideActive', false);
+    throw new Error(`[ThemeToggle] Saved theme "${selectedThemeId}" is no longer configured.`);
+  }
+
+  Session.set('userThemeOverrideActive', true);
+  applyThemeCSSProperties(serializeThemeSelection(selectedTheme), { cache: false });
 }
 
 function rotateUserTheme(): void {
+  if (!Meteor.userId()) {
+    throw new Error('Theme rotation requires a logged-in user.');
+  }
+
   const themes = getAvailableUserThemes();
   if (themes.length === 0) {
     throw new Error('No enabled themes are configured for user theme rotation.');
@@ -423,6 +473,7 @@ Template.appAccountMenu.events({
       return;
     }
     if (action === 'logout') {
+      clearActiveUserThemeOverride();
       Session.set('loginMode', 'normal');
       Cookie.set('isExperiment', '0', 1);
       Cookie.set('experimentTarget', '', 1);
@@ -571,6 +622,7 @@ Template.home.events({
       return;
     }
     if (action === 'logout') {
+      clearActiveUserThemeOverride();
       Session.set('loginMode', 'normal');
       Cookie.set('isExperiment', '0', 1);
       Cookie.set('experimentTarget', '', 1);
@@ -825,6 +877,20 @@ Template.appSidebar.onRendered(function() {
 
 Template.appAccountMenu.onRendered(function(this: any) {
   this.subscribe('themeLibrary');
+  this._themeLibraryAutorun = this.autorun(() => {
+    if (!Meteor.userId()) {
+      Session.set('userThemeOverrideActive', false);
+      return;
+    }
+    if (!this.subscriptionsReady()) {
+      return;
+    }
+    try {
+      restoreUserSelectedTheme();
+    } catch (error: unknown) {
+      reportThemeToggleError(error);
+    }
+  });
   this._appAccountDocumentClickHandler = (event: Event) => {
     const target = event.target as HTMLElement | null;
     if (!target?.closest('#userToggle')) {
@@ -836,6 +902,10 @@ Template.appAccountMenu.onRendered(function(this: any) {
 });
 
 Template.appAccountMenu.onDestroyed(function(this: any) {
+  if (this._themeLibraryAutorun) {
+    this._themeLibraryAutorun.stop();
+    this._themeLibraryAutorun = null;
+  }
   if (this._appAccountDocumentClickHandler) {
     document.removeEventListener('click', this._appAccountDocumentClickHandler);
     this._appAccountDocumentClickHandler = null;

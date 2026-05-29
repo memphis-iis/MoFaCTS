@@ -394,7 +394,11 @@ function getCurrentTheme() {
       return;
     }
 
-    if (Session.get('userThemeOverrideActive') === true) {
+    if (!Meteor.userId() && Session.get('userThemeOverrideActive') === true) {
+      Session.set('userThemeOverrideActive', false);
+    }
+
+    if (Meteor.userId() && Session.get('userThemeOverrideActive') === true) {
       clientConsole(2, 'getCurrentTheme - user theme override active');
       return;
     }

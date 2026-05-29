@@ -412,6 +412,7 @@ Accounts.onLogin(function() {
 Accounts.onLogout(function() {
   authSyncSeq++;
   lastAuthSyncedUserId = null;
+  Session.set('userThemeOverrideActive', false);
   const clearedRoles = { admin: false, teacher: false };
   Session.set('authRoles', clearedRoles);
   cacheAuthRoles(clearedRoles);

@@ -454,7 +454,8 @@ function validateThemePropInput(inputEl: any, propId: any, rawValue: any) {
 
 function applyThemeCssVariable(property: string, rawValue: unknown) {
     const propConverted = '--' + property.replace(/_/g, '-');
-    const normalizedText = typeof rawValue === 'string' ? rawValue.trim() : rawValue;
+    const normalizedValue = normalizeThemePropertyValue(property, rawValue);
+    const normalizedText = typeof normalizedValue === 'string' ? normalizedValue.trim() : normalizedValue;
 
     if (normalizedText == null || normalizedText === '') {
         document.documentElement.style.removeProperty(propConverted);
