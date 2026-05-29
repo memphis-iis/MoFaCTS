@@ -108,7 +108,7 @@ function syncThemeColorPicker(inputEl: HTMLInputElement, themeProperties: Record
 }
 
 function syncThemeColorPickers(root: ParentNode = document) {
-    const theme = Session.get('curTheme');
+    const theme = getServerActiveTheme();
     const themeProperties = theme?.properties;
     if (!themeProperties) {
         return;
@@ -208,8 +208,13 @@ function getThemeLibrary() {
     return library?.value || [];
 }
 
+function getServerActiveTheme() {
+    const setting = DynamicSettings.findOne({key: 'customTheme'});
+    return setting?.value || null;
+}
+
 function getActiveThemeId() {
-    const theme = Session.get('curTheme');
+    const theme = getServerActiveTheme();
     return theme?.activeThemeId;
 }
 
@@ -236,6 +241,7 @@ async function downloadThemeJson(themeId: any, filenameFallback = 'theme.json') 
 }
 
 Template.theme.onCreated(function(this: any) {
+    this.subscribe('theme');
     this.subscribe('themeLibrary');
     this.subscriptions = [];
     this.autoruns = [];
@@ -247,7 +253,7 @@ Template.theme.onCreated(function(this: any) {
 
 Template.theme.onRendered(function(this: any) {
     this.autoruns.push(this.autorun(() => {
-        const theme = Session.get('curTheme');
+        const theme = getServerActiveTheme();
         if (!theme?.properties) {
             return;
         }
@@ -277,17 +283,17 @@ Template.theme.onDestroyed(function(this: any) {
 
 Template.theme.helpers({
     'currentTheme': function() {
-        return Session.get('curTheme');
+        return getServerActiveTheme();
     },
     'themeEditorValue': function(propId: any) {
-        const theme = Session.get('curTheme');
+        const theme = getServerActiveTheme();
         if (!theme || !theme.properties || !propId) {
             return '';
         }
         return themeEditorDisplayValue(String(propId), theme.properties[propId]);
     },
     'themeColorPickerValue': function(propId: any) {
-        const theme = Session.get('curTheme');
+        const theme = getServerActiveTheme();
         return normalizeColorPickerValue(theme?.properties?.[propId]) || '#000000';
     },
     'availableThemes': function() {
@@ -320,7 +326,7 @@ Template.theme.helpers({
             : {};
     },
     'customHelpPageEnabled': function() {
-        const theme = Session.get('curTheme');
+        const theme = getServerActiveTheme();
         const help = theme?.help;
         if (!help || help.enabled === false) {
             return false;
@@ -328,7 +334,7 @@ Template.theme.helpers({
         return Boolean(help.markdown?.length || help.url?.length);
     },
     'customHelpPageUploadedAt': function() {
-        const theme = Session.get('curTheme');
+        const theme = getServerActiveTheme();
         return theme?.help?.uploadedAt || null;
     },
     'formatDate': function(date: any) {
@@ -337,7 +343,7 @@ Template.theme.helpers({
     },
     'getContrastInfo': function(fgProp: any, bgProp: any) {
         const instance = Template.instance() as any;
-        const theme = Session.get('curTheme');
+        const theme = getServerActiveTheme();
         if (!theme || !theme.properties) return null;
 
         const fg = theme.properties[fgProp];
@@ -499,17 +505,20 @@ function applyThemeState(themeData: any) {
         throw new Error('[Theme] Active theme payload is missing properties');
     }
 
-    Session.set('curTheme', themeData);
+    Session.set('serverActiveTheme', themeData);
     Session.set('themeReady', true);
-    Object.entries(themeData.properties).forEach(([property, value]) => {
-        applyThemePropertyPreview(property, value);
-    });
-    document.title = themeData.properties.themeName || 'MoFaCTS';
+    if (Session.get('userThemeOverrideActive') !== true) {
+        Session.set('curTheme', themeData);
+        Object.entries(themeData.properties).forEach(([property, value]) => {
+            applyThemePropertyPreview(property, value);
+        });
+        document.title = themeData.properties.themeName || 'MoFaCTS';
+    }
     syncThemeColorPickers();
 }
 
-function updateCurrentThemeSessionProperty(property: string, value: unknown) {
-    const theme = Session.get('curTheme');
+function updateServerActiveThemeSessionProperty(property: string, value: unknown) {
+    const theme = getServerActiveTheme();
     if (theme && theme.properties) {
         const updatedTheme = {
             ...theme,
@@ -518,7 +527,10 @@ function updateCurrentThemeSessionProperty(property: string, value: unknown) {
                 [property]: value
             }
         };
-        Session.set('curTheme', updatedTheme);
+        Session.set('serverActiveTheme', updatedTheme);
+        if (Session.get('userThemeOverrideActive') !== true) {
+            Session.set('curTheme', updatedTheme);
+        }
     }
 }
 
@@ -527,7 +539,7 @@ async function saveThemeProperty(property: string, value: unknown) {
 }
 
 function getThemeIconBackgroundColor() {
-    const theme = Session.get('curTheme');
+    const theme = getServerActiveTheme();
     const themeProps = theme?.properties || {};
     const backgroundCandidates = [
         themeProps.app_background_color,
@@ -668,7 +680,7 @@ Template.theme.events({
             alert('No active theme selected.');
             return;
         }
-        const theme = Session.get('curTheme');
+        const theme = getServerActiveTheme();
         const filename = (theme?.properties?.themeName || activeId) + '.json';
         await downloadThemeJson(activeId, filename);
     },
@@ -708,7 +720,7 @@ Template.theme.events({
         }
 
         // Update session to trigger reactive updates - create new object for reactivity
-        const theme = Session.get('curTheme');
+        const theme = getServerActiveTheme();
         if (theme && theme.properties) {
             const updatedTheme = {
                 ...theme,
@@ -717,11 +729,15 @@ Template.theme.events({
                     [data_id]: value
                 }
             };
-            Session.set('curTheme', updatedTheme);
+            Session.set('serverActiveTheme', updatedTheme);
+            if (Session.get('userThemeOverrideActive') !== true) {
+                Session.set('curTheme', updatedTheme);
+            }
         }
 
-        // Apply CSS immediately for instant preview
-        applyThemePropertyPreview(data_id, value);
+        if (Session.get('userThemeOverrideActive') !== true) {
+            applyThemePropertyPreview(data_id, value);
+        }
         syncThemeColorPickers();
 
         // Auto-save with debounce (wait 1 second after user stops typing)
@@ -738,7 +754,7 @@ Template.theme.events({
     },
     // Native mobile color pickers can open before focus has synchronized the value.
     'pointerdown .currentThemePropColor, focus .currentThemePropColor': function(event: any) {
-        const theme = Session.get('curTheme');
+        const theme = getServerActiveTheme();
         if (theme && theme.properties) {
             syncThemeColorPicker(event.currentTarget, theme.properties);
         }
@@ -759,7 +775,7 @@ Template.theme.events({
         }
 
         // Update session to trigger reactive updates - create new object for reactivity
-        const theme = Session.get('curTheme');
+        const theme = getServerActiveTheme();
         if (theme && theme.properties) {
             const updatedTheme = {
                 ...theme,
@@ -768,11 +784,15 @@ Template.theme.events({
                     [data_id]: value
                 }
             };
-            Session.set('curTheme', updatedTheme);
+            Session.set('serverActiveTheme', updatedTheme);
+            if (Session.get('userThemeOverrideActive') !== true) {
+                Session.set('curTheme', updatedTheme);
+            }
         }
 
-        // Apply CSS variable immediately for instant visual feedback
-        applyThemePropertyPreview(data_id, value);
+        if (Session.get('userThemeOverrideActive') !== true) {
+            applyThemePropertyPreview(data_id, value);
+        }
 
         // Auto-save with debounce (prevents network thrashing during color picker drag)
         clearTimeout((window as any).themeColorSaveTimeout);
@@ -795,7 +815,7 @@ Template.theme.events({
         }
 
         // Update session to trigger reactive updates - create new object for reactivity
-        const theme = Session.get('curTheme');
+        const theme = getServerActiveTheme();
         if (theme && theme.properties) {
             const updatedTheme = {
                 ...theme,
@@ -804,11 +824,15 @@ Template.theme.events({
                     [data_id]: value
                 }
             };
-            Session.set('curTheme', updatedTheme);
+            Session.set('serverActiveTheme', updatedTheme);
+            if (Session.get('userThemeOverrideActive') !== true) {
+                Session.set('curTheme', updatedTheme);
+            }
         }
 
-        // Apply CSS immediately for instant visual feedback
-        applyThemePropertyPreview(data_id, value);
+        if (Session.get('userThemeOverrideActive') !== true) {
+            applyThemePropertyPreview(data_id, value);
+        }
         syncThemeColorPickers();
 
         // Auto-save immediately for dropdowns
@@ -845,7 +869,7 @@ Template.theme.events({
         reader.onload = async function(e: any) {
             const base64Data = e.target.result;
             try {
-                updateCurrentThemeSessionProperty('practice_menu_underlay_image_url', base64Data);
+                updateServerActiveThemeSessionProperty('practice_menu_underlay_image_url', base64Data);
                 await saveThemeProperty('practice_menu_underlay_image_url', base64Data);
                 fileInput.value = '';
             } catch (err: any) {
@@ -860,7 +884,7 @@ Template.theme.events({
     },
     'click #clearHomeUnderlay': async function() {
         try {
-            updateCurrentThemeSessionProperty('practice_menu_underlay_image_url', '');
+            updateServerActiveThemeSessionProperty('practice_menu_underlay_image_url', '');
             await saveThemeProperty('practice_menu_underlay_image_url', '');
             $('#homeUnderlayUpload').val('');
             $('.currentThemeProp[data-id=practice_menu_underlay_image_url]').val('');

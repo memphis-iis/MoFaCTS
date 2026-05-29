@@ -394,23 +394,14 @@ function getCurrentTheme() {
       return;
     }
 
-    if (!Meteor.userId() && Session.get('userThemeOverrideActive') === true) {
-      Session.set('userThemeOverrideActive', false);
-    }
-
-    if (Meteor.userId() && Session.get('userThemeOverrideActive') === true) {
-      clientConsole(2, 'getCurrentTheme - user theme override active');
-      return;
-    }
-
     const themeSetting = DynamicSettings.findOne({key: 'customTheme'});
     let themeData: ThemeData | undefined;
 
     if (themeSetting && themeSetting.value && themeSetting.value.enabled !== false) {
       // Use active custom theme
       themeData = themeSetting.value as ThemeData;
+      Session.set('serverActiveTheme', themeData);
       clientConsole(2, 'getCurrentTheme - using custom theme');
-      applyThemeCSSProperties(themeData);
     } else {
       // No custom theme; use MoFaCTS default theme
       clientConsole(2, 'getCurrentTheme - no custom theme found, using MoFaCTS default');
@@ -420,8 +411,20 @@ function getCurrentTheme() {
         accentColor: '#28a745',
         logoUrl: '/images/MoFaCTS_Logo.png'
       };
-      applyThemeCSSProperties(defaultTheme);
+      Session.set('serverActiveTheme', defaultTheme);
+      themeData = defaultTheme;
     }
+
+    if (!Meteor.userId() && Session.get('userThemeOverrideActive') === true) {
+      Session.set('userThemeOverrideActive', false);
+    }
+
+    if (Meteor.userId() && Session.get('userThemeOverrideActive') === true) {
+      clientConsole(2, 'getCurrentTheme - user theme override active');
+      return;
+    }
+
+    applyThemeCSSProperties(themeData);
   });
 }
 
