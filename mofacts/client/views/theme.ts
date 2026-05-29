@@ -223,6 +223,23 @@ function isThemeActive(themeId: any) {
     return Boolean(activeId && themeId === activeId);
 }
 
+function themeExportFilename(themeName: unknown, fallbackId: unknown) {
+    const baseName = typeof themeName === 'string' && themeName.trim()
+        ? themeName.trim()
+        : String(fallbackId || 'theme');
+    const safeName = Array.from(baseName)
+        .map((character) => {
+            return character.charCodeAt(0) < 32 || '<>:"/\\|?*'.includes(character)
+                ? '-'
+                : character;
+        })
+        .join('')
+        .replace(/\s+/g, ' ')
+        .replace(/\.+$/g, '')
+        .trim();
+    return `${safeName || 'theme'}.json`;
+}
+
 async function downloadThemeJson(themeId: any, filenameFallback = 'theme.json') {
     try {
         const json = await (Meteor as any).callAsync('exportThemeFile', themeId);
@@ -538,6 +555,34 @@ async function saveThemeProperty(property: string, value: unknown) {
     await (Meteor as any).callAsync('setCustomThemeProperty', property, value);
 }
 
+function commitThemePropInput(inputEl: HTMLInputElement | HTMLTextAreaElement) {
+    const dataId = inputEl.getAttribute('data-id');
+    if (!dataId) {
+        throw new Error('[Theme] Editable theme field is missing data-id');
+    }
+
+    const { valid, value } = validateThemePropInput(inputEl, dataId, inputEl.value);
+    if (!valid) {
+        return;
+    }
+
+    updateServerActiveThemeSessionProperty(dataId, value);
+
+    if (Session.get('userThemeOverrideActive') !== true) {
+        applyThemePropertyPreview(dataId, value);
+    }
+    syncThemeColorPickers();
+
+    (async () => {
+        try {
+            await saveThemeProperty(dataId, value);
+        } catch (err: any) {
+            clientConsole(1, `[Theme] Error auto-saving ${dataId}:`, err);
+            alert(`Error saving ${dataId}: ${err}`);
+        }
+    })();
+}
+
 function getThemeIconBackgroundColor() {
     const theme = getServerActiveTheme();
     const themeProps = theme?.properties || {};
@@ -668,11 +713,11 @@ Template.theme.events({
     'click .export-theme': async function(event: any) {
         event.preventDefault();
         const themeId = event.currentTarget.getAttribute('data-id');
-        const filename = event.currentTarget.getAttribute('data-filename') || `${themeId}.json`;
+        const themeName = event.currentTarget.getAttribute('data-name');
         if (!themeId) {
             return;
         }
-        await downloadThemeJson(themeId, filename);
+        await downloadThemeJson(themeId, themeExportFilename(themeName, themeId));
     },
     'click #exportActiveTheme': async function() {
         const activeId = getActiveThemeId();
@@ -681,7 +726,7 @@ Template.theme.events({
             return;
         }
         const theme = getServerActiveTheme();
-        const filename = (theme?.properties?.themeName || activeId) + '.json';
+        const filename = themeExportFilename(theme?.metadata?.name || theme?.properties?.themeName, activeId);
         await downloadThemeJson(activeId, filename);
     },
     'click #themeImportButton': async function(event: any, template: any) {
@@ -713,44 +758,19 @@ Template.theme.events({
         }
     },
     'input .currentThemeProp': function(event: any) {
-        const data_id = event.currentTarget.getAttribute('data-id');
-        const { valid, value } = validateThemePropInput(event.currentTarget, data_id, event.currentTarget.value);
-        if (!valid) {
+        const dataId = event.currentTarget.getAttribute('data-id');
+        if (!dataId) {
+            throw new Error('[Theme] Editable theme field is missing data-id');
+        }
+        validateThemePropInput(event.currentTarget, dataId, event.currentTarget.value);
+    },
+    'keydown .currentThemeProp': function(event: KeyboardEvent) {
+        if (event.key !== 'Enter' || event.shiftKey || event.currentTarget instanceof HTMLTextAreaElement) {
             return;
         }
 
-        // Update session to trigger reactive updates - create new object for reactivity
-        const theme = getServerActiveTheme();
-        if (theme && theme.properties) {
-            const updatedTheme = {
-                ...theme,
-                properties: {
-                    ...theme.properties,
-                    [data_id]: value
-                }
-            };
-            Session.set('serverActiveTheme', updatedTheme);
-            if (Session.get('userThemeOverrideActive') !== true) {
-                Session.set('curTheme', updatedTheme);
-            }
-        }
-
-        if (Session.get('userThemeOverrideActive') !== true) {
-            applyThemePropertyPreview(data_id, value);
-        }
-        syncThemeColorPickers();
-
-        // Auto-save with debounce (wait 1 second after user stops typing)
-        clearTimeout((window as any).themeSaveTimeout);
-        (window as any).themeSaveTimeout = setTimeout(async () => {
-            try {
-                await (Meteor as any).callAsync('setCustomThemeProperty', data_id, value);
-                
-            } catch (err: any) {
-                clientConsole(1, `[Theme] Error auto-saving ${data_id}:`, err);
-                alert(`Error saving ${data_id}: ${err}`);
-            }
-        }, 1000);
+        event.preventDefault();
+        commitThemePropInput(event.currentTarget as HTMLInputElement);
     },
     // Native mobile color pickers can open before focus has synchronized the value.
     'pointerdown .currentThemePropColor, focus .currentThemePropColor': function(event: any) {
@@ -807,44 +827,7 @@ Template.theme.events({
         }, 300);
     },
     'change .currentThemeProp': function(event: any) {
-        // Handle change events for select dropdowns and other elements that don't fire input events
-        const data_id = event.currentTarget.getAttribute('data-id');
-        const { valid, value } = validateThemePropInput(event.currentTarget, data_id, event.currentTarget.value);
-        if (!valid) {
-            return;
-        }
-
-        // Update session to trigger reactive updates - create new object for reactivity
-        const theme = getServerActiveTheme();
-        if (theme && theme.properties) {
-            const updatedTheme = {
-                ...theme,
-                properties: {
-                    ...theme.properties,
-                    [data_id]: value
-                }
-            };
-            Session.set('serverActiveTheme', updatedTheme);
-            if (Session.get('userThemeOverrideActive') !== true) {
-                Session.set('curTheme', updatedTheme);
-            }
-        }
-
-        if (Session.get('userThemeOverrideActive') !== true) {
-            applyThemePropertyPreview(data_id, value);
-        }
-        syncThemeColorPickers();
-
-        // Auto-save immediately for dropdowns
-        (async () => {
-            try {
-                await (Meteor as any).callAsync('setCustomThemeProperty', data_id, value);
-                
-            } catch (err: any) {
-                clientConsole(1, `[Theme] Error auto-saving ${data_id}:`, err);
-                alert(`Error saving ${data_id}: ${err}`);
-            }
-        })();
+        commitThemePropInput(event.currentTarget);
     },
     'change #homeUnderlayUpload': function(event: any) {
         const fileInput = event.target;

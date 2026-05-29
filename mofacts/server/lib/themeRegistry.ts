@@ -11,7 +11,6 @@ const THEME_LIBRARY_KEY = 'themeLibrary';
 const ACTIVE_THEME_KEY = 'customTheme';
 const DEFAULT_THEME_ID = 'mofacts-default';
 const PUBLIC_THEME_ENV = process.env.MOFACTS_DEFAULT_THEME_DIR;
-const CUSTOM_THEME_DIR = process.env.MOFACTS_THEME_DIR || path.join(process.cwd(), 'theme-library');
 
 const FALLBACK_THEME = {
   id: DEFAULT_THEME_ID,
@@ -141,17 +140,6 @@ type DerivedThemeIconPropertyName =
   | 'brand_android_icon_512_url'
   | 'brand_android_maskable_icon_192_url'
   | 'brand_android_maskable_icon_512_url';
-
-const log = (..._args: any[]) => {};
-
-function ensureDir(dirPath: string | undefined) {
-  if (!dirPath) {
-    return;
-  }
-  if (!fs.existsSync(dirPath)) {
-    fs.mkdirSync(dirPath, { recursive: true });
-  }
-}
 
 function clone<T = any>(value: T): T {
   return JSON.parse(JSON.stringify(value));
@@ -422,7 +410,6 @@ class ThemeRegistry {
 
   constructor() {
     this.publicDirs = findDefaultThemeDirs();
-    ensureDir(CUSTOM_THEME_DIR);
   }
 
   async initialize() {
@@ -431,13 +418,22 @@ class ThemeRegistry {
   }
 
   async refreshFromDisk() {
-    this.themes.clear();
-    this.publicDirs = findDefaultThemeDirs();
-    for (const dir of this.publicDirs) {
-      await this.loadDirectory(dir, 'system');
+    const previousThemes = this.themes;
+    const previousPublicDirs = this.publicDirs;
+
+    this.themes = new Map();
+    try {
+      this.publicDirs = findDefaultThemeDirs();
+      for (const dir of this.publicDirs) {
+        await this.loadDirectory(dir, 'system');
+      }
+      await this.loadStoredCustomThemes();
+      await this.persistLibrarySetting();
+    } catch (error) {
+      this.themes = previousThemes;
+      this.publicDirs = previousPublicDirs;
+      throw error;
     }
-    await this.loadDirectory(CUSTOM_THEME_DIR, 'custom');
-    await this.persistLibrarySetting();
   }
 
   async loadDirectory(dirPath: string, origin: string) {
@@ -454,22 +450,43 @@ class ThemeRegistry {
       try {
         const raw = JSON.parse(await fsp.readFile(absolutePath, 'utf8'));
         const sanitized = sanitizeTheme(raw, origin, entry.name);
-        if (origin !== 'system') {
-          const rawComparable = JSON.stringify(raw.properties || {});
-          const sanitizedComparable = JSON.stringify(sanitized.properties || {});
-          if (rawComparable !== sanitizedComparable) {
-            await fsp.writeFile(absolutePath, JSON.stringify(sanitized, null, 2), 'utf8');
-          }
-        }
         this.registerTheme(sanitized, origin === 'system', absolutePath);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        log('Failed to load theme file', absolutePath, message);
+        throw new Error(`Failed to load theme file ${absolutePath}: ${message}`);
       }
     }
   }
 
-  registerTheme(themeData: any, readOnly: boolean, filePath: string) {
+  async loadStoredCustomThemes() {
+    const existingLibrarySetting = await DynamicSettings.findOneAsync({ key: THEME_LIBRARY_KEY });
+    const library = existingLibrarySetting?.value;
+    if (!Array.isArray(library)) {
+      return;
+    }
+
+    for (const theme of library) {
+      if (theme?.metadata?.origin !== 'custom') {
+        continue;
+      }
+
+      const sanitized = this.prepareStoredCustomTheme(theme);
+      this.registerTheme(sanitized, false, null);
+    }
+  }
+
+  prepareStoredCustomTheme(themeData: any) {
+    const theme = sanitizeTheme(themeData, 'custom', themeData?.metadata?.filename);
+    theme.metadata = {
+      ...theme.metadata,
+      filename: sanitizeFilename(theme.metadata?.filename || theme.themeName),
+      origin: 'custom',
+      updatedAt: theme.metadata?.updatedAt || nowIso()
+    };
+    return theme;
+  }
+
+  registerTheme(themeData: any, readOnly: boolean, filePath: string | null) {
     let candidateId = themeData.id || slugify(themeData.themeName);
     let counter = 1;
     while (this.themes.has(candidateId)) {
@@ -582,9 +599,8 @@ class ThemeRegistry {
   }
 
   async adoptLegacyTheme(legacyValue: any) {
-    const legacyData = sanitizeTheme(legacyValue, 'custom', legacyValue?.metadata?.filename);
-    const { theme, filePath } = await this.writeThemeToDisk(legacyData);
-    this.registerTheme(theme, false, filePath);
+    const theme = this.prepareStoredCustomTheme(legacyValue);
+    this.registerTheme(theme, false, null);
     await this.persistLibrarySetting();
     await DynamicSettings.upsertAsync(
       { key: ACTIVE_THEME_KEY },
@@ -630,24 +646,10 @@ class ThemeRegistry {
 
     sanitized.id = candidateId;
     sanitized.metadata.id = candidateId;
-    const { theme, filePath } = await this.writeThemeToDisk(sanitized);
-    this.registerTheme(theme, false, filePath);
+    const theme = this.prepareStoredCustomTheme(sanitized);
+    this.registerTheme(theme, false, null);
     await this.persistLibrarySetting();
     return this.getThemeEntry(theme.id);
-  }
-
-  async writeThemeToDisk(themeData: any) {
-    const theme = clone(themeData);
-    const filename = sanitizeFilename(theme.metadata?.filename || theme.themeName);
-    const filePath = path.join(CUSTOM_THEME_DIR, filename);
-    theme.metadata = {
-      ...theme.metadata,
-      filename,
-      origin: 'custom',
-      updatedAt: nowIso()
-    };
-    await fsp.writeFile(filePath, JSON.stringify(theme, null, 2), 'utf8');
-    return { theme, filePath };
   }
 
   async setActiveTheme(themeId: string) {
@@ -685,8 +687,8 @@ class ThemeRegistry {
     themeData.metadata.author = author || 'admin';
     themeData.metadata.createdAt = nowIso();
     themeData.metadata.updatedAt = nowIso();
-    const { theme, filePath } = await this.writeThemeToDisk(themeData);
-    this.registerTheme(theme, false, filePath);
+    const theme = this.prepareStoredCustomTheme(themeData);
+    this.registerTheme(theme, false, null);
     await this.persistLibrarySetting();
     return theme;
   }
@@ -696,8 +698,8 @@ class ThemeRegistry {
     const sanitized = sanitizeTheme(raw, 'custom', raw?.metadata?.filename);
     sanitized.id = `${slugify(sanitized.metadata.name)}-${randomBytes(2).toString('hex')}`;
     sanitized.metadata.id = sanitized.id;
-    const { theme, filePath } = await this.writeThemeToDisk(sanitized);
-    this.registerTheme(theme, false, filePath);
+    const theme = this.prepareStoredCustomTheme(sanitized);
+    this.registerTheme(theme, false, null);
     await this.persistLibrarySetting();
     return theme;
   }
@@ -711,7 +713,6 @@ class ThemeRegistry {
       throw new Meteor.Error('read-only-theme', 'System themes cannot be deleted');
     }
 
-    await fsp.rm(entry.filePath, { force: true });
     this.themes.delete(themeId);
     await this.persistLibrarySetting();
 
@@ -734,22 +735,17 @@ class ThemeRegistry {
       throw new Meteor.Error('read-only-theme', 'System themes cannot be renamed');
     }
 
-    // Update the theme name in memory
     entry.data.metadata.name = newName;
     entry.data.metadata.updatedAt = nowIso();
 
-    // Write the updated theme to file
-    await fsp.writeFile(entry.filePath, JSON.stringify(entry.data, null, 2), 'utf8');
-
-    // Update the library setting
     await this.persistLibrarySetting();
 
-    // Update active theme if this is the active theme
     const active = await DynamicSettings.findOneAsync({ key: ACTIVE_THEME_KEY });
     if (active?.value?.activeThemeId === themeId) {
+      const stored = this.serializeActiveTheme(entry);
       await DynamicSettings.upsertAsync(
         { key: ACTIVE_THEME_KEY },
-        { $set: { 'value.theme': entry.data } }
+        { $set: { value: stored } }
       );
     }
 
@@ -785,7 +781,6 @@ class ThemeRegistry {
     }
     const nextData = mutator(clone(entry.data));
     nextData.metadata.updatedAt = nowIso();
-    await fsp.writeFile(entry.filePath, JSON.stringify(nextData, null, 2), 'utf8');
     entry.data = nextData;
     await this.persistLibrarySetting();
     return entry;
