@@ -266,7 +266,7 @@
   /* Mobile responsiveness */
   @media (max-width: 768px) {
     .feedback-display {
-      padding: 1rem;
+      padding: var(--app-space-3);
     }
   }
 </style>

@@ -392,7 +392,7 @@
     <div class="auto-tutor-footer-label" aria-hidden="true">AutoTutor</div>
     <button
       type="button"
-      class="auto-tutor-continue-button"
+      class="btn btn-primary auto-tutor-continue-button"
       disabled={!completed}
       on:click={handleContinue}
     >
@@ -584,15 +584,11 @@
 
   .auto-tutor-continue-button {
     min-width: 8rem;
-    min-height: var(--app-button-height);
-    padding: 0 var(--app-space-3);
+    padding: var(--app-space-0) var(--app-space-3);
     border: 1px solid var(--learning-card-primary-action-surface-color);
-    border-radius: var(--border-radius-md, 6px);
     background: var(--learning-card-primary-action-surface-color);
     color: var(--learning-card-primary-action-text-color);
-    font: inherit;
     font-weight: 600;
-    cursor: pointer;
   }
 
   .auto-tutor-continue-button:disabled {

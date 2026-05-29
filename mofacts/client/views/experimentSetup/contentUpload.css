@@ -1,8 +1,8 @@
 /* Loading spinner for upload progress */
 .loader {
-    border: 5px solid #f3f3f3;
+    border: 5px solid var(--app-muted-surface-color);
     border-radius: 50%;
-    border-top: 5px solid #3498db;
+    border-top: 5px solid var(--app-info-color);
     width: 20px;
     height: 20px;
     -webkit-animation: spin 2s linear infinite; /* Safari */
@@ -164,7 +164,7 @@
     display: inline-flex;
     align-items: center;
     margin: 0;
-    padding: 0;
+    padding: var(--app-space-0);
     min-height: 0;
     line-height: 1;
 }
@@ -196,9 +196,9 @@
 
 .condition-selector-wrapper {
     padding: calc(0.35rem * var(--app-density-scale)) calc(0.45rem * var(--app-density-scale));
-    background: #f8f9fa;
+    background: var(--app-subtle-surface-color);
     border-radius: 4px;
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--border-color);
     min-width: min(100%, 260px);
     max-width: 320px;
 }
@@ -206,7 +206,7 @@
 .condition-selector-wrapper .form-label {
     margin-bottom: calc(0.2rem * var(--app-density-scale));
     font-weight: 500;
-    color: #495057;
+    color: var(--app-secondary-text-color);
     line-height: 1.2;
 }
 
@@ -278,7 +278,7 @@
 .action-buttons-row .btn-icon {
     width: 30px;
     height: 30px;
-    padding: 0;
+    padding: var(--app-space-0);
     margin: 0;
     display: inline-flex;
     align-items: center;
@@ -294,11 +294,11 @@
 .asset-info-block a {
     cursor: pointer;
     color: var(--app-accent-color);
-    transition: color var(--app-transition-fast, 100ms);
+    transition: color var(--app-transition-fast);
 }
 
 .asset-info-block a:hover {
-    color: color-mix(in srgb, var(--app-accent-color) 70%, black 30%);
+    color: color-mix(in srgb, var(--app-accent-color) 70%, var(--app-text-color) 30%);
 }
 
 .asset-info-block a i {
@@ -307,7 +307,7 @@
 
 /* Manage access section styling */
 .asset-toggle-content.border-top {
-    background-color: rgba(0, 0, 0, 0.02);
+    background-color: var(--app-subtle-surface-color);
     padding: calc(0.75rem * var(--app-density-scale));
     border-radius: var(--app-border-radius-sm);
 }
@@ -378,7 +378,7 @@
     }
 
     .content-upload-table tr {
-        border-top: 1px solid rgba(0, 0, 0, 0.08);
+        border-top: 1px solid var(--border-color);
     }
 
     .content-upload-table th,
@@ -406,7 +406,7 @@
         width: 100%;
         max-width: none;
         min-width: 0;
-        padding-top: 0;
+        padding-top: var(--app-space-0);
         border-top: none;
     }
 

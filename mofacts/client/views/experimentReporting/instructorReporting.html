@@ -11,6 +11,16 @@
   input[type=number] {
     -moz-appearance: textfield;
   }
+
+  .instructor-reporting-group-row {
+    font-weight: 600;
+    background-color: var(--app-muted-surface-color);
+    color: var(--app-text-color);
+  }
+
+  .instructor-reporting-exception {
+    color: var(--feedback-error-color);
+  }
   </style>
 {{#if isInRole 'admin, teacher'}}
   <div class="container admin-page">
@@ -121,7 +131,7 @@
             <tbody>
           {{#if dueDateFilter}}
           <tr>
-            <td colspan="6" style="font-weight: 600; background-color: rgba(0, 0, 0, 0.05);">
+            <td colspan="6" class="instructor-reporting-group-row">
               Completed Before Due Date
             </td>
           </tr>
@@ -151,7 +161,7 @@
           {{/if}}
           {{#if dueDateFilter}}
           <tr>
-            <td colspan="6" style="font-weight: 600; background-color: rgba(0, 0, 0, 0.05);">
+            <td colspan="6" class="instructor-reporting-group-row">
               Completed After Due Date
             </td>
           </tr>
@@ -164,7 +174,7 @@
                 <td class="text-center">{{this.totalTimeMins}}</td>
                 <td>
                   {{#if this.exception}}
-                    <span style="color: red">{{this.exception}}</span>
+                    <span class="instructor-reporting-exception">{{this.exception}}</span>
                   {{/if}}
                 </td>
                 <td>

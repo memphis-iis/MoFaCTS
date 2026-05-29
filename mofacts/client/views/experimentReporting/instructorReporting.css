@@ -1,10 +1,10 @@
 .thWideInstReport {
   width: 30%;
-  padding-right: 5px;
+  padding-right: calc(5px * var(--app-density-scale));
   text-align: center;
 }
 
 #mainContent {
-  padding-left: 20px;
-  padding-right:20px;
+  padding-left: calc(20px * var(--app-density-scale));
+  padding-right: calc(20px * var(--app-density-scale));
 }

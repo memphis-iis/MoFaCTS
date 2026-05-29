@@ -380,9 +380,10 @@
     max-width: 960px;
     margin: var(--app-space-4) auto;
     padding: var(--app-space-4);
-    background: #fff;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    background: var(--learning-card-surface-color);
+    color: var(--app-text-color);
+    border-radius: var(--app-border-radius-lg);
+    box-shadow: var(--app-surface-shadow);
   }
 
   .imscc-wizard .wizard-header {
@@ -404,7 +405,7 @@
     left: 10%;
     right: 10%;
     height: 2px;
-    background: #ddd;
+    background: var(--border-color);
     z-index: 0;
   }
 
@@ -420,30 +421,30 @@
     width: 40px;
     height: 40px;
     line-height: 40px;
-    border-radius: 50%;
-    background: #fff;
-    border: 2px solid #ddd;
-    color: #999;
+    border-radius: var(--border-radius-circle);
+    background: var(--learning-card-surface-color);
+    border: 2px solid var(--border-color);
+    color: var(--app-secondary-text-color);
     font-weight: bold;
     margin-bottom: var(--app-space-1);
   }
 
   .imscc-wizard .step.active .step-number {
-    border-color: #007bff;
-    background: #007bff;
-    color: #fff;
+    border-color: var(--app-info-color);
+    background: var(--app-info-color);
+    color: var(--app-primary-action-text-color);
   }
 
   .imscc-wizard .step.completed .step-number {
-    border-color: #28a745;
-    background: #28a745;
-    color: #fff;
+    border-color: var(--app-success-color);
+    background: var(--app-success-color);
+    color: var(--learning-card-primary-action-text-color);
   }
 
   .imscc-wizard .step-label {
     display: block;
     font-size: 12px;
-    color: #666;
+    color: var(--app-secondary-text-color);
   }
 
   .imscc-wizard .wizard-actions {
@@ -452,7 +453,7 @@
     gap: var(--app-space-2);
     margin-top: var(--app-space-3);
     padding-top: var(--app-space-3);
-    border-top: 1px solid #ddd;
+    border-top: 1px solid var(--border-color);
   }
 
   .imscc-wizard .wizard-card {
@@ -470,11 +471,12 @@
   .imscc-wizard .imscc-scroll-list {
     max-height: 150px;
     overflow-y: auto;
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--border-color);
     border-radius: 0.25rem;
     padding: var(--app-space-2);
     margin-bottom: 0;
-    background: #f8f9fa;
+    background: var(--app-subtle-surface-color);
+    color: var(--app-text-color);
   }
 
   .imscc-wizard .imscc-field-group {
@@ -534,7 +536,7 @@
 
   .imscc-wizard .imscc-mode-switch-label {
     min-width: 3.4rem;
-    color: #6c757d;
+    color: var(--app-secondary-text-color);
     font-weight: 600;
     line-height: 1;
   }

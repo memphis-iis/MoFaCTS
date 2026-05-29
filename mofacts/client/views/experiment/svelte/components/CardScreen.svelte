@@ -2075,7 +2075,7 @@
           {/if}
           <button
             type="button"
-            class="video-instruction-continue"
+            class="btn btn-primary video-instruction-continue"
             disabled={!videoPlayerReady}
             on:click={handleVideoInstructionContinue}
           >
@@ -2087,7 +2087,7 @@
 
     {#if videoEndOverlayMounted}
       <div class="video-end-overlay" class:video-end-overlay-visible={videoEndOverlayVisible}>
-        <button type="button" class="video-continue-button" on:click={handleVideoContinue}>
+        <button type="button" class="btn btn-primary video-continue-button" on:click={handleVideoContinue}>
           {deliverySettings.continueButtonText || 'Continue'}
         </button>
       </div>
@@ -2132,7 +2132,7 @@
             />
             {#if trialSubset.showSkipStudyButton}
               <div class="skip-study-container">
-                <button type="button" class="skip-study-button" on:click={handleSkipStudy}>
+                <button type="button" class="btn btn-primary skip-study-button" on:click={handleSkipStudy}>
                   {deliverySettings.skipStudyButtonText || 'Skip'}
                 </button>
               </div>
@@ -2171,7 +2171,7 @@
       <div class="fixed-footer__controls">
         <button
           type="button"
-          class="fixed-footer__button"
+          class="btn btn-primary fixed-footer__button"
           on:click={handleFooterContinue}
           disabled={continuingToNextUnit || !displayTimeoutCanContinue}
           aria-busy={continuingToNextUnit}
@@ -2244,7 +2244,7 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
-    padding-right: 0;
+    padding-right: var(--app-space-0);
     transition: padding-right var(--app-transition-smooth) ease;
   }
 
@@ -2286,16 +2286,12 @@
   }
 
   .video-instruction-continue {
-    display: block;
     width: min(420px, 100%);
-    min-height: var(--app-button-height);
     margin: var(--app-space-5-px) auto 0;
     border: 1px solid var(--app-secondary-surface-color);
-    border-radius: var(--app-border-radius-sm);
     background: var(--learning-card-primary-action-surface-color);
     color: var(--learning-card-primary-action-text-color);
     font-weight: 700;
-    cursor: pointer;
   }
 
   .video-instruction-continue:disabled {
@@ -2357,12 +2353,9 @@
   .fixed-footer__button {
     padding: var(--app-space-1-px) var(--app-space-4-px);
     border: 1px solid var(--app-secondary-surface-color);
-    border-radius: var(--app-border-radius-sm);
-    font-size: 12px;
     font-weight: 600;
     background: var(--learning-card-primary-action-surface-color);
     color: var(--learning-card-primary-action-text-color);
-    cursor: pointer;
   }
 
   .debug-state {
@@ -2394,7 +2387,7 @@
 
   @media (max-width: 768px) {
     .learning-session-layout-panel-open .learning-session-main {
-      padding-right: 0;
+      padding-right: var(--app-space-0);
     }
   }
 
@@ -2419,12 +2412,9 @@
   .video-continue-button {
     padding: calc(0.75rem * var(--app-density-scale)) calc(2rem * var(--app-density-scale));
     border: 1px solid var(--app-secondary-surface-color);
-    border-radius: var(--app-border-radius-lg);
-    font-size: 1rem;
     font-weight: 600;
     background: var(--learning-card-primary-action-surface-color);
     color: var(--learning-card-primary-action-text-color);
-    cursor: pointer;
   }
 
   .skip-study-container {
@@ -2437,12 +2427,9 @@
   .skip-study-button {
     padding: var(--app-space-2) var(--app-space-4);
     border: 1px solid var(--app-secondary-surface-color);
-    border-radius: var(--app-border-radius-lg);
-    font-size: 0.875rem;
     font-weight: 500;
     background: var(--learning-card-primary-action-surface-color);
     color: var(--learning-card-primary-action-text-color);
-    cursor: pointer;
     opacity: 0.85;
     transition: opacity 0.15s ease;
   }

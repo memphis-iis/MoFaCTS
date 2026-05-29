@@ -825,7 +825,7 @@
     flex: 0 0 auto;
     display: inline-block;
     max-width: 100%;
-    padding: 0 var(--app-space-1);
+    padding: var(--app-space-0) var(--app-space-1);
     color: var(--app-secondary-text-color);
     font-size: 0.625rem;
     line-height: 1.25;

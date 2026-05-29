@@ -294,7 +294,7 @@
     padding: var(--choice-padding-block, calc(0.75rem * var(--app-density-scale))) var(--choice-padding-inline, calc(0.75rem * var(--app-density-scale)));
     font-size: var(--choice-font-size, var(--card-font-size, 24px));
     font-weight: 500;
-    line-height: 1.2;
+    line-height: var(--choice-line-height, var(--app-button-line-height));
     color: var(--app-primary-action-text-color);
     background-color: var(--learning-card-surface-color);
     border: 2px solid color-mix(

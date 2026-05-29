@@ -1,11 +1,12 @@
 /* Content Editor Styles */
 
 .content-edit-cluster {
-    border-left: 3px solid var(--app-accent-color, #007bff);
+    border-left: 3px solid var(--app-accent-color);
 }
 
 .content-edit-cluster .card-header {
-    background-color: #f8f9fa;
+    background-color: var(--app-subtle-surface-color);
+    color: var(--app-text-color);
 }
 
 .content-edit-stim {
@@ -13,7 +14,7 @@
 }
 
 .content-edit-stim:hover {
-    background-color: #f8f9fa;
+    background-color: var(--app-hover-surface-color);
 }
 
 .content-edit-stim:last-child {

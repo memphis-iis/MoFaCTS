@@ -7,7 +7,7 @@
   opacity: 0;
 }
 .switch-toggle input + label {
-  padding: 7px;
+  padding: calc(7px * var(--app-density-scale));
   float:left;
   color: #fff;
   cursor: pointer;
@@ -37,7 +37,7 @@
 }
 
 .audio-button-containers input[type="select"]{
-  padding: 10px 0;
+  padding: calc(10px * var(--app-density-scale)) var(--app-space-0);
 }
 
 .audio-button-containers input[type="range"]{

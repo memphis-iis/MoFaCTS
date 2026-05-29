@@ -798,7 +798,7 @@
     background-color: var(--media-video-overlay-surface-color);
     border-radius: var(--app-border-radius-lg);
     box-shadow: var(--app-surface-shadow);
-    padding: 1rem;
+    padding: var(--app-space-3);
     z-index: 100;
     opacity: 0;
     pointer-events: none;
@@ -815,7 +815,7 @@
     .overlay-content {
       width: 95%;
       bottom: 60px;
-      padding: 0.75rem;
+      padding: calc(0.75rem * var(--app-density-scale));
     }
   }
 

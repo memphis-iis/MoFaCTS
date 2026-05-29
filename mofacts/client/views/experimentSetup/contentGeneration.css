@@ -14,19 +14,19 @@ textarea {
 }
 
 #cloze {
-  padding-bottom: 7px;
+  padding-bottom: calc(7px * var(--app-density-scale));
 }
 
 .cur-sentence {
-    color: #a834eb;
+    color: var(--app-accent-color);
 }
 
 .sentence-no-cloze{
-    color: #666666;
+    color: var(--app-secondary-text-color);
 }
 
 .cloze-answers {
-  color: red;
+  color: var(--feedback-error-color);
 }
 
 .source-sentence {

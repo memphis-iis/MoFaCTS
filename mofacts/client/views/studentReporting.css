@@ -7,7 +7,7 @@
 
 .thWide {
   width: 33%;
-  padding-right: 5px;
+  padding-right: calc(5px * var(--app-density-scale));
   text-align: center;
 }
 

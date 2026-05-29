@@ -5,5 +5,5 @@
 }
 
 .pad-top{
-  padding-top: 5%;
+  padding-top: var(--app-space-5);
 }

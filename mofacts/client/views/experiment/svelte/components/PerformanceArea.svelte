@@ -103,7 +103,7 @@
   }
 
   .performance-area-timeout-only {
-    padding-top: 0.25rem;
+    padding-top: var(--app-space-1);
   }
 
   .performance-stats {
@@ -111,7 +111,7 @@
     justify-content: center;
     align-items: center;
     gap: clamp(0.5rem, 1vw, 0.75rem);
-    padding: 0 clamp(var(--app-space-2), 2vw, calc(0.75rem * var(--app-density-scale)));
+    padding: var(--app-space-0) clamp(var(--app-space-2), 2vw, calc(0.75rem * var(--app-density-scale)));
     height: 24px;
     line-height: 1;
     border-radius: var(--border-radius-pill, 999px);

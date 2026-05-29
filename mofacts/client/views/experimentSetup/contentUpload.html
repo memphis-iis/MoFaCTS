@@ -5,20 +5,22 @@
     <style>
         /* Media Manager Panel */
         .media-manager-panel {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
+            background: var(--app-subtle-surface-color);
+            color: var(--app-text-color);
+            border: 1px solid var(--border-color);
             border-radius: 4px;
-            padding: 1rem;
+            padding: var(--app-space-3);
             margin-top: 0.75rem;
         }
 
         /* Drop Zone */
         .media-drop-zone {
-            border: 2px dashed #dee2e6;
+            border: 2px dashed var(--border-color);
             border-radius: 4px;
-            padding: 1rem;
+            padding: var(--app-space-3);
             text-align: center;
-            background: #fff;
+            background: var(--learning-card-surface-color);
+            color: var(--app-secondary-text-color);
             cursor: pointer;
             transition: all 0.2s ease;
             margin-bottom: 1rem;
@@ -26,8 +28,9 @@
 
         .media-drop-zone:hover,
         .media-drop-zone.drag-over {
-            border-color: #0d6efd;
-            background: #e7f1ff;
+            border-color: var(--app-info-color);
+            background: var(--app-info-surface-color);
+            color: var(--app-text-color);
         }
 
         .media-drop-zone.drag-over {
@@ -36,17 +39,17 @@
 
         .media-drop-zone .drop-icon {
             font-size: 1.5rem;
-            color: #6c757d;
+            color: var(--app-secondary-text-color);
             margin-bottom: 0.5rem;
         }
 
         .media-drop-zone:hover .drop-icon,
         .media-drop-zone.drag-over .drop-icon {
-            color: #0d6efd;
+            color: var(--app-info-color);
         }
 
         .media-drop-zone .drop-text {
-            color: #6c757d;
+            color: var(--app-secondary-text-color);
             font-size: 0.875rem;
         }
 
@@ -67,7 +70,7 @@
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            padding: 0.25rem 0;
+            padding: var(--app-space-1) var(--app-space-0);
             font-size: 0.875rem;
         }
 
@@ -84,8 +87,8 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 0.75rem;
-            padding-bottom: 0.5rem;
-            border-bottom: 1px solid #dee2e6;
+            padding-bottom: var(--app-space-2);
+            border-bottom: 1px solid var(--border-color);
         }
 
         .media-action-bar .form-check {
@@ -100,13 +103,14 @@
 
         .media-file-table th {
             font-weight: 500;
-            background: #e9ecef;
-            border-bottom: 2px solid #dee2e6;
+            background: var(--app-muted-surface-color);
+            color: var(--app-text-color);
+            border-bottom: 2px solid var(--border-color);
         }
 
         .media-file-table th,
         .media-file-table td {
-            padding: 0.5rem;
+            padding: var(--app-space-2);
             vertical-align: middle;
         }
 
@@ -134,25 +138,25 @@
             font-size: 1rem;
         }
 
-        .media-file-table .type-icon.image { color: #198754; }
-        .media-file-table .type-icon.audio { color: #0d6efd; }
-        .media-file-table .type-icon.video { color: #6f42c1; }
-        .media-file-table .type-icon.unknown { color: #6c757d; }
+        .media-file-table .type-icon.image { color: var(--app-media-image-color); }
+        .media-file-table .type-icon.audio { color: var(--app-media-audio-color); }
+        .media-file-table .type-icon.video { color: var(--app-media-video-color); }
+        .media-file-table .type-icon.unknown { color: var(--app-secondary-text-color); }
 
         .media-file-table .filename {
             word-break: break-all;
         }
 
         .media-file-table .btn-delete-media {
-            padding: 0.15rem 0.35rem;
+            padding: calc(0.15rem * var(--app-density-scale)) calc(0.35rem * var(--app-density-scale));
             font-size: 0.75rem;
         }
 
         /* Empty State */
         .media-empty-state {
             text-align: center;
-            padding: 1.5rem;
-            color: #6c757d;
+            padding: var(--app-space-4);
+            color: var(--app-secondary-text-color);
         }
 
         .media-empty-state .empty-icon {
@@ -162,14 +166,14 @@
 
         /* Optimistic UI - Pending Upload Row Styles */
         .pending-upload-row {
-            background-color: #f8f9fa;
+            background-color: var(--app-subtle-surface-color);
             opacity: 0.95;
-            border-left: 4px solid #0d6efd;
+            border-left: 4px solid var(--app-info-color);
         }
 
         .pending-upload-row.pending-error {
-            border-left-color: #dc3545;
-            background-color: #fff5f5;
+            border-left-color: var(--feedback-error-color);
+            background-color: var(--app-error-surface-color);
         }
 
         /* Pulse animation for processing state */
@@ -186,7 +190,7 @@
         .badge {
             font-size: 0.75rem;
             font-weight: 500;
-            padding: 0.25rem 0.5rem;
+            padding: var(--app-space-1) var(--app-space-2);
             vertical-align: middle;
         }
 
@@ -196,7 +200,7 @@
 
         /* Progress bar enhancements */
         .progress {
-            background-color: #e9ecef;
+            background-color: var(--app-muted-surface-color);
             border-radius: 4px;
             overflow: hidden;
         }

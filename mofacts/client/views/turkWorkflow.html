@@ -14,6 +14,10 @@
         #profileWorkModal .modal-body {
             padding: var(--app-space-3) calc(1.25rem * var(--app-density-scale));
         }
+
+        #turk-assign-results:empty {
+            display: none;
+        }
     </style>
     <div class="container admin-page">
         <h3 class="page-header-title">Mechanical Turk</h3>
@@ -239,7 +243,7 @@
                             <input type="text" class="form-control" name="turk-assignid" id="turk-assignid" value="" placeholder="Mechanical Turk AssignmentID">
                             <button id="turk-show-assign" class="btn btn-fix"><i class="fa fa-search admin-button-icon"></i>Get Assignment</button>
                         </div>
-                        <pre id="turk-assign-results" class="text-start bg-light admin-alert-compact rounded admin-preformatted-output"></pre>
+                        <pre id="turk-assign-results" class="text-start admin-alert-compact rounded admin-preformatted-output"></pre>
                     </div>
                 </div>
             </div>

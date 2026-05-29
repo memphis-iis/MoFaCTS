@@ -53,14 +53,14 @@
     {#if isSelfHosted}
       <div bind:this={continueBarElement} class="h5p-continue-bar" aria-hidden={!continueReady}>
         {#if continueReady}
-          <button type="button" class="h5p-continue-button" on:click={() => dispatch('continue')}>
+          <button type="button" class="btn btn-primary h5p-continue-button" on:click={() => dispatch('continue')}>
             Continue
           </button>
         {/if}
       </div>
     {:else if manualContinueVisible}
       <div bind:this={continueBarElement} class="h5p-continue-bar">
-        <button type="button" class="h5p-continue-button" on:click={() => dispatch('continue')}>
+        <button type="button" class="btn btn-primary h5p-continue-button" on:click={() => dispatch('continue')}>
           Continue
         </button>
       </div>
@@ -163,7 +163,7 @@
     align-items: center;
     justify-content: flex-end;
     min-height: var(--h5p-action-bar-height, 3.75rem);
-    padding: 0 calc(0.75rem * var(--app-density-scale));
+    padding: var(--app-space-0) calc(0.75rem * var(--app-density-scale));
     border-top: 1px solid var(--app-secondary-surface-color);
     background: var(--learning-card-stimulus-surface-color);
     box-sizing: border-box;
@@ -173,12 +173,9 @@
     min-width: 8rem;
     padding: calc(0.625rem * var(--app-density-scale)) var(--app-space-3);
     border: 1px solid var(--learning-card-primary-action-surface-color);
-    border-radius: var(--border-radius-md, 6px);
     background: var(--learning-card-primary-action-surface-color);
     color: var(--learning-card-primary-action-text-color);
-    font: inherit;
     font-weight: 600;
-    cursor: pointer;
   }
 
   .h5p-continue-button:hover,

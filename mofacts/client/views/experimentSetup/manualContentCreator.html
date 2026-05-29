@@ -3,21 +3,21 @@
         <style>
             .manual-content-shell { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:var(--app-space-3); align-items:start; }
             .manual-stepper { display:flex; flex-wrap:wrap; gap:var(--app-space-2); margin-bottom:var(--app-space-3); }
-            .manual-step-chip { display:inline-flex; align-items:center; gap:calc(0.45rem * var(--app-density-scale)); padding:calc(0.4rem * var(--app-density-scale)) calc(0.7rem * var(--app-density-scale)); border-radius:999px; border:1px solid #d0d7de; background:#fff; color:#5b6470; font-size:0.875rem; }
-            .manual-step-chip.is-active { border-color:var(--app-accent-color); background:color-mix(in srgb, var(--app-accent-color) 12%, white 88%); color:#1f2328; }
-            .manual-step-chip.is-complete { border-color:#198754; color:#198754; }
-            .manual-step-chip .step-number { width:1.35rem; height:1.35rem; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; background:#eef1f4; font-size:0.75rem; font-weight:600; }
-            .manual-step-chip.is-active .step-number { background:var(--app-accent-color); color:#fff; }
-            .manual-step-chip.is-complete .step-number { background:#198754; color:#fff; }
-            .manual-field-label { font-size:0.8rem; font-weight:600; text-transform:uppercase; letter-spacing:0.03em; color:#59636e; margin-bottom:calc(0.35rem * var(--app-density-scale)); }
-            .manual-helper { font-size:0.8rem; color:#6c757d; margin-top:calc(0.3rem * var(--app-density-scale)); }
+            .manual-step-chip { display:inline-flex; align-items:center; gap:calc(0.45rem * var(--app-density-scale)); padding:calc(0.4rem * var(--app-density-scale)) calc(0.7rem * var(--app-density-scale)); border-radius:var(--border-radius-pill); border:1px solid var(--border-color); background:var(--learning-card-surface-color); color:var(--app-secondary-text-color); font-size:0.875rem; }
+            .manual-step-chip.is-active { border-color:var(--app-accent-color); background:var(--app-selected-surface-color); color:var(--app-text-color); }
+            .manual-step-chip.is-complete { border-color:var(--app-success-color); color:var(--app-success-color); }
+            .manual-step-chip .step-number { width:1.35rem; height:1.35rem; border-radius:var(--border-radius-circle); display:inline-flex; align-items:center; justify-content:center; background:var(--app-muted-surface-color); font-size:0.75rem; font-weight:600; }
+            .manual-step-chip.is-active .step-number { background:var(--app-accent-color); color:var(--app-primary-action-text-color); }
+            .manual-step-chip.is-complete .step-number { background:var(--app-success-color); color:var(--learning-card-primary-action-text-color); }
+            .manual-field-label { font-size:0.8rem; font-weight:600; text-transform:uppercase; letter-spacing:0.03em; color:var(--app-secondary-text-color); margin-bottom:calc(0.35rem * var(--app-density-scale)); }
+            .manual-helper { font-size:0.8rem; color:var(--app-secondary-text-color); margin-top:calc(0.3rem * var(--app-density-scale)); }
             .manual-field-stack { display:grid; gap:var(--app-space-3); }
             .manual-inline-options { display:flex; flex-wrap:wrap; gap:calc(0.75rem * var(--app-density-scale)) var(--app-space-3); }
             .manual-summary-card { position:sticky; top:var(--app-space-3); }
             .manual-summary-grid, .manual-summary-item { display:grid; gap:calc(0.2rem * var(--app-density-scale)); }
-            .manual-summary-label { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.04em; color:#6c757d; }
-            .manual-summary-value { font-size:0.95rem; font-weight:600; color:#1f2328; word-break:break-word; }
-            .manual-actions { display:flex; justify-content:space-between; align-items:center; gap:calc(0.75rem * var(--app-density-scale)); margin-top:var(--app-space-3); padding-top:var(--app-space-3); border-top:1px solid #dee2e6; }
+            .manual-summary-label { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.04em; color:var(--app-secondary-text-color); }
+            .manual-summary-value { font-size:0.95rem; font-weight:600; color:var(--app-text-color); word-break:break-word; }
+            .manual-actions { display:flex; justify-content:space-between; align-items:center; gap:calc(0.75rem * var(--app-density-scale)); margin-top:var(--app-space-3); padding-top:var(--app-space-3); border-top:1px solid var(--border-color); }
             .manual-actions-right { display:flex; gap:var(--app-space-2); flex-wrap:wrap; justify-content:flex-end; }
             .manual-step-intro { margin-bottom:var(--app-space-3); }
             .manual-step-intro h4 { margin-bottom:var(--app-space-1); }

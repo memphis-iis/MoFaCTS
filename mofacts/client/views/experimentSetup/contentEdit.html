@@ -15,7 +15,7 @@
         /* Style array field descriptions (<p> tags) consistently with string field descriptions (<small>) */
         #stim-editor-container [data-schemapath] > p {
             font-size: 0.875em;
-            color: var(--bs-app-secondary-surface-color, #6c757d);
+            color: var(--app-secondary-text-color);
             margin-top: 0.25rem;
             margin-bottom: 0.5rem;
         }
@@ -33,7 +33,7 @@
         #stim-editor-container [class*="py-"],
         #stim-editor-container [class*="pb-"],
         #stim-editor-container [class*="pt-"] {
-            padding: 0.25rem 0;
+            padding: var(--app-space-1) var(--app-space-0);
         }
 
         /* Reset Bootstrap row gutters */
@@ -45,26 +45,28 @@
 
         /* Minimal container padding (after reset, so these win) */
         #stim-editor-container .card-body {
-            padding: 0.5rem;
+            padding: var(--app-space-2);
         }
         #stim-editor-container .card-header {
-            padding: 0.35rem 0.5rem;
+            padding: calc(0.35rem * var(--app-density-scale)) var(--app-space-2);
         }
 
         /* Remove margin from nested card.card-body elements (json-editor pattern) */
         #stim-editor-container .card.card-body {
             margin: 0;
-            padding: 0.25rem;
+            padding: var(--app-space-1);
         }
 
         /* Root Clusters container - gray background instead of blue */
         #stim-editor-container > [data-schemapath="root"] > .card {
-            background-color: #f8f9fa !important;
-            border-color: #dee2e6 !important;
+            background-color: var(--app-subtle-surface-color) !important;
+            color: var(--app-text-color);
+            border-color: var(--border-color) !important;
         }
         #stim-editor-container > [data-schemapath="root"] > .card > .card-header {
-            background-color: #e9ecef !important;
-            border-color: #dee2e6 !important;
+            background-color: var(--app-muted-surface-color) !important;
+            color: var(--app-text-color);
+            border-color: var(--border-color) !important;
         }
 
         /* Base font size */
@@ -92,7 +94,7 @@
         #stim-editor-container table th,
         #stim-editor-container table td {
             font-size: 0.875rem !important;
-            padding: 0.25rem 0.5rem !important;
+            padding: var(--app-space-1) var(--app-space-2) !important;
         }
 
         /* First column (property names) - slightly bold */
@@ -127,13 +129,13 @@
         #stim-editor-container .form-group > label {
             margin-bottom: 0 !important;
             text-align: right;
-            padding-right: 0.5rem;
+            padding-right: var(--app-space-2);
         }
 
         /* Labels for textareas should be left-aligned on top */
         #stim-editor-container .form-group.has-textarea > label {
             text-align: left;
-            padding-right: 0;
+            padding-right: var(--app-space-0);
             font-weight: normal;
         }
 
@@ -151,7 +153,7 @@
 
         #stim-editor-container .form-control,
         #stim-editor-container .form-select {
-            padding: 0.2rem 0.4rem;
+            padding: calc(0.2rem * var(--app-density-scale)) calc(0.4rem * var(--app-density-scale));
         }
 
         #stim-editor-container .btn-group {
@@ -171,7 +173,7 @@
         #stim-editor-container .btn,
         #stim-editor-container button {
             font-size: 0.8rem !important;
-            padding: 0.2rem 0.4rem !important;
+            padding: calc(0.2rem * var(--app-density-scale)) calc(0.4rem * var(--app-density-scale)) !important;
         }
 
         /* Style the Properties modal - distinguish in-use vs available */
@@ -183,32 +185,34 @@
 
         #stim-editor-container .je-modal label {
             display: block;
-            padding: 0.25rem 0.5rem;
+            padding: var(--app-space-1) var(--app-space-2);
             margin: 0.1rem 0;
             border-radius: 3px;
         }
 
         /* In-use properties (checked) - muted style, pushed to bottom */
         #stim-editor-container .je-modal label:has(input[type="checkbox"]:checked) {
-            background: #e9ecef;
-            color: #6c757d;
+            background: var(--app-muted-surface-color);
+            color: var(--app-secondary-text-color);
             order: 1;
         }
 
         /* Available properties (unchecked) - highlighted, stay at top */
         #stim-editor-container .je-modal label:has(input[type="checkbox"]:not(:checked)) {
-            background: #d4edda;
+            background: var(--app-success-surface-color);
+            color: var(--app-text-color);
             order: 0;
         }
 
-        /* Fallback classes for browsers without :has() */
+        /* Class variants mirror the checked/unchecked property states. */
         #stim-editor-container .je-modal label.property-in-use {
-            background: #e9ecef;
-            color: #6c757d;
+            background: var(--app-muted-surface-color);
+            color: var(--app-secondary-text-color);
             order: 1;
         }
         #stim-editor-container .je-modal label.property-available {
-            background: #d4edda;
+            background: var(--app-success-surface-color);
+            color: var(--app-text-color);
             order: 0;
         }
 
@@ -257,10 +261,11 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            padding: 0.25rem;
-            background: #f8f9fa;
+            padding: var(--app-space-1);
+            background: var(--app-subtle-surface-color);
+            color: var(--app-text-color);
             border-radius: 4px;
-            border: 1px solid #dee2e6;
+            border: 1px solid var(--border-color);
         }
 
         #stim-editor-container .media-preview:empty {
@@ -288,10 +293,10 @@
             display: inline-flex;
             align-items: center;
             gap: 0.25rem;
-            border: 1px dashed #dee2e6;
+            border: 1px dashed var(--border-color);
             border-radius: 3px;
-            padding: 0.15rem 0.5rem;
-            color: #6c757d;
+            padding: calc(0.15rem * var(--app-density-scale)) var(--app-space-2);
+            color: var(--app-secondary-text-color);
             font-size: 0.75rem !important;
             cursor: pointer;
             transition: all 0.2s;
@@ -300,9 +305,9 @@
 
         #stim-editor-container .media-drop-zone:hover,
         #stim-editor-container .media-drop-zone.drag-over {
-            border-color: #0d6efd;
-            background: #e7f1ff;
-            color: #0d6efd;
+            border-color: var(--app-info-color);
+            background: var(--app-info-surface-color);
+            color: var(--app-info-color);
         }
 
         #stim-editor-container .media-drop-zone input[type="file"] {
@@ -318,7 +323,7 @@
         }
 
         #stim-editor-container .media-preview .media-error {
-            color: #dc3545;
+            color: var(--feedback-error-color);
             font-size: 0.7rem !important;
             white-space: nowrap;
         }
@@ -387,7 +392,7 @@
 
         .validation-summary .validation-item {
             padding: var(--app-space-1) var(--app-space-0);
-            border-bottom: 1px solid rgba(0,0,0,0.1);
+            border-bottom: 1px solid var(--border-color);
         }
 
         .validation-summary .validation-item:last-child {
@@ -404,13 +409,13 @@
 
         /* Field-Level Error Styling */
         #stim-editor-container .validation-error-field {
-            border-color: #dc3545 !important;
-            box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25) !important;
+            border-color: var(--feedback-error-color) !important;
+            box-shadow: 0 0 0 0.2rem var(--app-error-shadow-color) !important;
         }
 
         #stim-editor-container .validation-warning-field {
-            border-color: #ffc107 !important;
-            box-shadow: 0 0 0 0.2rem rgba(255, 193, 7, 0.25) !important;
+            border-color: var(--app-warning-color) !important;
+            box-shadow: 0 0 0 0.2rem var(--app-warning-shadow-color) !important;
         }
 
         .field-validation-message {
@@ -437,7 +442,7 @@
                 background-color: transparent;
             }
             50% {
-                background-color: rgba(255, 193, 7, 0.3);
+                background-color: var(--app-warning-surface-color);
             }
         }
 
@@ -458,19 +463,19 @@
            (targeted by ID to avoid affecting other modals)
            ================================================================= */
         #generateIncorrectModal .modal-body {
-            padding: 1rem 1.5rem;
+            padding: var(--app-space-3) var(--app-space-4);
         }
         #generateIncorrectModal .modal-header {
-            padding: 1rem 1.5rem;
+            padding: var(--app-space-3) var(--app-space-4);
         }
         #generateIncorrectModal .modal-footer {
-            padding: 0.75rem 1.5rem;
+            padding: calc(0.75rem * var(--app-density-scale)) var(--app-space-4);
         }
         #generateIncorrectModal .form-control {
-            padding: 0.375rem 0.75rem;
+            padding: calc(0.375rem * var(--app-density-scale)) calc(0.75rem * var(--app-density-scale));
         }
         #generateIncorrectModal .btn {
-            padding: 0.375rem 0.75rem;
+            padding: calc(0.375rem * var(--app-density-scale)) calc(0.75rem * var(--app-density-scale));
             font-size: 1rem;
         }
 
@@ -504,7 +509,7 @@
             display: flex;
             align-items: center;
             gap: 0.35rem;
-            color: #198754;
+            color: var(--app-success-color);
             font-size: 0.875rem;
             opacity: 0;
             transition: opacity 0.15s ease;
@@ -538,13 +543,13 @@
 
             #stim-editor-container .form-group > label {
                 text-align: left;
-                padding-right: 0;
+                padding-right: var(--app-space-0);
                 font-weight: 500;
                 margin-bottom: 0.25rem !important;
             }
 
             #stim-editor-container .btn {
-                padding: 0.5rem 0.75rem !important;
+                padding: var(--app-space-2) calc(0.75rem * var(--app-density-scale)) !important;
                 min-height: var(--app-button-height);
                 font-size: 0.875rem !important;
             }
@@ -578,7 +583,7 @@
                 order: 3;
                 width: 100%;
                 justify-content: center;
-                padding: 0.5rem;
+                padding: var(--app-space-2);
             }
         }
 
@@ -654,7 +659,7 @@
                 position: absolute;
                 width: 1px;
                 height: 1px;
-                padding: 0;
+                padding: var(--app-space-0);
                 margin: -1px;
                 overflow: hidden;
                 clip: rect(0, 0, 0, 0);

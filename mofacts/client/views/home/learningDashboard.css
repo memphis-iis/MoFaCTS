@@ -11,7 +11,7 @@
     position: relative;
     overflow: hidden;
     margin-bottom: calc(20px * var(--app-density-scale));
-    padding: calc(14px * var(--app-density-scale)) calc(18px * var(--app-density-scale));
+    padding: var(--app-space-3-px) calc(18px * var(--app-density-scale));
     border: 1px solid color-mix(in srgb, var(--app-text-color) 12%, transparent);
     border-radius: var(--app-border-radius-lg, 12px);
     background: var(--learning-card-surface-color);
@@ -92,24 +92,9 @@
 
 .btn-continue {
     z-index: 1;
-    min-height: var(--app-button-height, 44px);
     padding: calc(10px * var(--app-density-scale)) var(--app-space-5-px);
-    border: 0;
-    border-radius: var(--app-border-radius-sm, 8px);
-    background: var(--app-primary-action-surface-color);
-    color: var(--app-primary-action-text-color);
-    cursor: pointer;
-    font-size: 12px;
     font-weight: 600;
-    line-height: 1.2;
     white-space: nowrap;
-    transition: background 0.15s;
-}
-
-.btn-continue:hover,
-.btn-continue:focus-visible {
-    background: var(--btn-hover-bg, color-mix(in srgb, var(--app-primary-action-surface-color) 85%, var(--app-text-color)));
-    outline: none;
 }
 
 .table-card {
@@ -125,11 +110,15 @@
     justify-content: space-between;
     gap: var(--app-space-3-px);
     flex-wrap: wrap;
-    padding: var(--app-space-3-px) calc(14px * var(--app-density-scale));
+    padding: var(--app-space-3-px);
     border-bottom: 1px solid color-mix(in srgb, var(--app-text-color) 12%, transparent);
 }
 
 .toolbar-search {
+    --toolbar-search-icon-size: 16px;
+    --toolbar-search-icon-left: max(calc(14px * var(--app-density-scale)), 0.5rem);
+    --toolbar-search-icon-gap: max(calc(8px * var(--app-density-scale)), 0.5rem);
+    --toolbar-search-padding-left: calc(var(--toolbar-search-icon-left) + var(--toolbar-search-icon-size) + var(--toolbar-search-icon-gap));
     position: relative;
     flex: 1;
     max-width: 320px;
@@ -140,7 +129,7 @@
     width: 100%;
     height: var(--app-text-input-height);
     min-height: var(--app-text-input-height);
-    padding: 0 var(--app-space-3-px) 0 calc(40px * var(--app-density-scale));
+    padding: var(--app-space-0) var(--app-space-3-px) var(--app-space-0) var(--toolbar-search-padding-left);
     border: 1px solid color-mix(in srgb, var(--app-text-color) 12%, transparent);
     border-radius: var(--app-border-radius-sm, 8px);
     background: color-mix(in srgb, var(--app-text-color) 4%, var(--learning-card-surface-color));
@@ -151,7 +140,7 @@
 }
 
 #learningDashboardSearch {
-    padding-left: calc(40px * var(--app-density-scale));
+    padding-left: var(--toolbar-search-padding-left);
 }
 
 .toolbar-search input:focus {
@@ -162,10 +151,10 @@
 
 .toolbar-search .fa {
     position: absolute;
-    left: calc(14px * var(--app-density-scale));
+    left: var(--toolbar-search-icon-left);
     top: 50%;
-    width: 16px;
-    height: 16px;
+    width: var(--toolbar-search-icon-size);
+    height: var(--toolbar-search-icon-size);
     color: color-mix(in srgb, var(--app-text-color) 42%, transparent);
     font-size: 14px;
     transform: translateY(-50%);
@@ -218,7 +207,7 @@
 }
 
 .practice-section-heading {
-    padding: 10px 12px;
+    padding: calc(10px * var(--app-density-scale)) var(--app-space-3-px);
     background: var(--learning-card-surface-color);
     color: color-mix(in srgb, var(--app-text-color) 62%, transparent);
     font-size: 12px;
@@ -265,7 +254,7 @@
 }
 
 .practice-table thead th {
-    padding: 7px 8px;
+    padding: calc(7px * var(--app-density-scale)) var(--app-space-2-px);
     border-bottom: 1px solid color-mix(in srgb, var(--app-text-color) 12%, transparent);
     background: color-mix(in srgb, var(--app-accent-color) 12%, var(--learning-card-surface-color));
     color: color-mix(in srgb, var(--app-text-color) 62%, transparent);
@@ -280,7 +269,7 @@
 
 .practice-table thead th:first-child,
 .practice-table tbody td:first-child {
-    padding-left: 8px;
+    padding-left: var(--app-space-2-px);
 }
 
 .practice-table thead th.num,
@@ -296,13 +285,13 @@
 }
 
 .actions-heading {
-    padding-right: 10px !important;
+    padding-right: calc(10px * var(--app-density-scale)) !important;
     text-align: center !important;
 }
 
 .practice-table tbody td,
 .practice-table tbody th {
-    padding: 9px 8px;
+    padding: calc(9px * var(--app-density-scale)) var(--app-space-2-px);
     border-bottom: 1px solid color-mix(in srgb, var(--app-text-color) 8%, transparent);
     background: var(--learning-card-surface-color);
     color: var(--app-text-color);
@@ -398,13 +387,11 @@
     min-width: auto;
     max-width: none;
     min-height: var(--app-button-height, 44px);
-    padding: 5px 9px;
+    padding: calc(5px * var(--app-density-scale)) calc(9px * var(--app-density-scale));
     border: 0;
     border-radius: var(--app-border-radius-sm, 8px);
     cursor: pointer;
-    font-size: 12px;
     font-weight: 600;
-    line-height: 1.2;
     transition: background 0.15s;
 }
 
@@ -428,7 +415,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 0;
+    padding: var(--app-space-0);
     border: 1px solid color-mix(in srgb, var(--app-text-color) 12%, transparent);
     border-radius: var(--app-border-radius-sm, 8px);
     background: var(--learning-card-surface-color);
@@ -493,7 +480,7 @@
     width: 90%;
     max-width: 90%;
     margin: calc(0.85rem * var(--app-density-scale)) auto var(--app-space-3);
-    padding: calc(0.7rem * var(--app-density-scale));
+    padding: var(--app-space-2);
     border-radius: var(--app-border-radius-sm);
     background: var(--learning-card-surface-color);
     box-shadow: var(--app-surface-shadow);
@@ -507,7 +494,7 @@
 
 .learner-config-field {
     min-width: 0;
-    padding: calc(0.48rem * var(--app-density-scale)) calc(0.58rem * var(--app-density-scale));
+    padding: var(--app-space-2);
     border: 1px solid color-mix(in srgb, var(--app-text-color) 10%, transparent);
     border-radius: var(--app-border-radius-sm);
 }
@@ -804,7 +791,7 @@
     .resume-card {
         flex-wrap: wrap;
         gap: 12px;
-        padding: 14px;
+        padding: var(--app-space-3-px);
     }
 
     .resume-content {
@@ -851,8 +838,6 @@
     .learning-dashboard-card-button {
         min-height: 36px;
         padding: calc(0.35rem * var(--app-density-scale)) var(--app-space-3);
-        font-size: 0.95rem;
-        line-height: 1.1;
     }
 
     .learning-dashboard-details {
@@ -890,13 +875,13 @@
 
 @media (max-width: 640px) {
     .learning-dashboard-card {
-        padding: 0.75rem 0.85rem !important;
+        padding: calc(0.75rem * var(--app-density-scale)) calc(0.85rem * var(--app-density-scale)) !important;
     }
 
     .learning-dashboard-card-button {
         flex-basis: 6.25rem !important;
         min-height: 34px;
-        padding: 0.32rem 0.68rem;
+        padding: calc(0.32rem * var(--app-density-scale)) calc(0.68rem * var(--app-density-scale));
     }
 
     .toolbar-filters {

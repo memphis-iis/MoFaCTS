@@ -28,10 +28,34 @@
     --learning-card-performance-divider-color: color-mix(in srgb, var(--app-text-color) 15%, transparent);
     --app-loading-overlay-color: color-mix(in srgb, var(--app-background-color) 95%, transparent);
     --navigation-text-color: #000000;
+    --app-subtle-surface-color: color-mix(in srgb, var(--app-text-color) 3%, var(--learning-card-surface-color));
+    --app-muted-surface-color: color-mix(in srgb, var(--app-text-color) 6%, var(--learning-card-surface-color));
+    --app-hover-surface-color: color-mix(in srgb, var(--app-text-color) 5%, var(--learning-card-surface-color));
+    --app-selected-surface-color: color-mix(in srgb, var(--app-accent-color) 12%, var(--learning-card-surface-color));
+    --app-info-color: var(--app-accent-color);
+    --app-info-surface-color: var(--app-selected-surface-color);
+    --app-success-color: var(--feedback-correct-color);
+    --app-success-surface-color: color-mix(in srgb, var(--feedback-correct-color) 12%, var(--learning-card-surface-color));
+    --app-warning-color: color-mix(in srgb, var(--app-accent-color) 65%, var(--feedback-error-color) 35%);
+    --app-warning-surface-color: color-mix(in srgb, var(--app-warning-color) 18%, var(--learning-card-surface-color));
+    --app-error-surface-color: color-mix(in srgb, var(--feedback-error-color) 10%, var(--learning-card-surface-color));
+    --app-focus-shadow-color: color-mix(in srgb, var(--focus-ring-color) 25%, transparent);
+    --app-error-shadow-color: color-mix(in srgb, var(--feedback-error-color) 25%, transparent);
+    --app-warning-shadow-color: color-mix(in srgb, var(--app-warning-color) 30%, transparent);
+    --app-media-image-color: var(--app-success-color);
+    --app-media-audio-color: var(--app-info-color);
+    --app-media-video-color: color-mix(in srgb, var(--app-accent-color) 55%, var(--app-text-color) 45%);
+    --app-media-mixed-color: color-mix(in srgb, var(--app-accent-color) 70%, var(--feedback-error-color) 30%);
+    --bs-body-color: var(--app-text-color);
+    --bs-body-bg: var(--app-background-color);
+    --bs-secondary-color: var(--app-secondary-text-color);
+    --bs-tertiary-color: var(--app-secondary-text-color);
+    --bs-border-color: var(--border-color);
     --app-font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
     --app-heading-font-family: var(--app-font-family);
     --app-font-size-base: 16px;
     --app-button-height: 44px;
+    --app-button-line-height: 1;
     --app-text-input-height: 36px;
     --app-button-border-darkness: 20;
     --app-button-hover-darkness: 15;
@@ -87,7 +111,7 @@
     position: absolute;
     width: 1px;
     height: 1px;
-    padding: 0;
+    padding: var(--app-space-0);
     margin: -1px;
     overflow: hidden;
     clip: rect(0, 0, 0, 0);
@@ -155,7 +179,7 @@ html {
     overflow-y: scroll;
     max-width: 100%;
     margin: 0 !important;
-    padding: 0 !important;
+    padding: var(--app-space-0) !important;
     border: none !important;
 }
 
@@ -166,16 +190,16 @@ body {
     font-size: var(--app-font-size-base);
     overflow-x: hidden;
     max-width: 100%;
-    padding-right: 0 !important;
+    padding-right: var(--app-space-0) !important;
     margin: 0 !important;
-    padding: 0 !important;
+    padding: var(--app-space-0) !important;
     border: none !important;
 }
 
 body.modal-open,
 body.offcanvas-open {
     overflow: visible !important;
-    padding-right: 0 !important;
+    padding-right: var(--app-space-0) !important;
 }
 
 .page-loading {
@@ -208,6 +232,33 @@ body.offcanvas-open {
 
 .theme-name-input {
     width: 250px;
+}
+
+.currentThemePropColor {
+    box-sizing: border-box;
+    width: var(--app-button-height);
+    height: var(--app-button-height);
+    min-height: var(--app-button-height);
+    padding: var(--app-space-1);
+    border: 1px solid var(--border-color);
+    border-radius: var(--app-border-radius-sm);
+    background-color: var(--learning-card-surface-color);
+    vertical-align: middle;
+    cursor: pointer;
+}
+
+.currentThemePropColor::-webkit-color-swatch-wrapper {
+    padding: var(--app-space-0);
+}
+
+.currentThemePropColor::-webkit-color-swatch {
+    border: 1px solid var(--border-color);
+    border-radius: calc(var(--app-border-radius-sm) / 2);
+}
+
+.currentThemePropColor::-moz-color-swatch {
+    border: 1px solid var(--border-color);
+    border-radius: calc(var(--app-border-radius-sm) / 2);
 }
 
 .theme-preview-stack {
@@ -292,7 +343,7 @@ body.offcanvas-open {
 .page-container {
     max-width: 1200px;
     margin: var(--app-space-3) auto;
-    padding: 0 var(--app-space-3);
+    padding: var(--app-space-0) var(--app-space-3);
     width: 100%;
 }
 
@@ -364,14 +415,14 @@ a.content-link {
     background-color: var(--app-background-color);
     border: none;
     margin: 0;
-    padding: 0;
+    padding: var(--app-space-0);
 }
 
 #cardContainer{
     background-color: var(--app-background-color);
     /* Removed contain: layout style paint - was blocking scrollIntoView() */
     margin-top: 0 !important;
-    padding-top: 0 !important;
+    padding-top: var(--app-space-0) !important;
     border-top: none !important;
 }
 
@@ -380,7 +431,18 @@ a.content-link {
     background-color: color-mix(in srgb, var(--learning-card-surface-color) 50%, transparent);
 }
 /* ===== FORM ELEMENTS ===== */
-input[type=text], input[type=password] {
+input[type=text],
+input[type=password],
+input[type=search],
+input[type=email],
+input[type=url],
+input[type=tel],
+input[type=number],
+input[type=date],
+input[type=time],
+input[type=datetime-local],
+input[type=month],
+input[type=week] {
     box-sizing: border-box;
     font-family: inherit;
     font-size: 1.125rem; /* 18px - slightly larger for readability */
@@ -388,13 +450,23 @@ input[type=text], input[type=password] {
     min-height: var(--app-text-input-height);
     border: 1px solid var(--border-color);
     border-radius: var(--app-border-radius-sm);
-    padding: 0 12px;
+    padding: var(--app-space-0) var(--app-space-3-px);
     line-height: calc(var(--app-text-input-height) - 2px);
 }
 
 @media (max-width: 768px) {
     input[type=text]:focus,
-    input[type=password]:focus {
+    input[type=password]:focus,
+    input[type=search]:focus,
+    input[type=email]:focus,
+    input[type=url]:focus,
+    input[type=tel]:focus,
+    input[type=number]:focus,
+    input[type=date]:focus,
+    input[type=time]:focus,
+    input[type=datetime-local]:focus,
+    input[type=month]:focus,
+    input[type=week]:focus {
         border: 1px solid var(--border-color) !important;
         outline: none !important;
     }
@@ -403,12 +475,32 @@ input[type=text], input[type=password] {
 /* Desktop: Focus state changes border color for visual feedback */
 @media (min-width: 769px) {
     input[type=text]:focus,
-    input[type=password]:focus {
+    input[type=password]:focus,
+    input[type=search]:focus,
+    input[type=email]:focus,
+    input[type=url]:focus,
+    input[type=tel]:focus,
+    input[type=number]:focus,
+    input[type=date]:focus,
+    input[type=time]:focus,
+    input[type=datetime-local]:focus,
+    input[type=month]:focus,
+    input[type=week]:focus {
         border: 1px solid var(--app-accent-color);
     }
 
     input[type=text]:focus-visible,
-    input[type=password]:focus-visible {
+    input[type=password]:focus-visible,
+    input[type=search]:focus-visible,
+    input[type=email]:focus-visible,
+    input[type=url]:focus-visible,
+    input[type=tel]:focus-visible,
+    input[type=number]:focus-visible,
+    input[type=date]:focus-visible,
+    input[type=time]:focus-visible,
+    input[type=datetime-local]:focus-visible,
+    input[type=month]:focus-visible,
+    input[type=week]:focus-visible {
         outline: 3px solid var(--focus-ring-color);
         outline-offset: 2px;
     }
@@ -418,8 +510,29 @@ select {
     font-family: inherit;
     border-width: 1px;
     border-radius: var(--app-border-radius-sm);
-    padding: 6px;
+    padding: calc(6px * var(--app-density-scale));
     border-color: var(--app-accent-color);
+}
+
+.form-label,
+.form-check-label {
+    color: var(--app-text-color);
+}
+
+.text-muted {
+    color: var(--app-secondary-text-color) !important;
+}
+
+.form-control,
+.form-select {
+    background-color: var(--learning-card-surface-color);
+    border-color: var(--border-color);
+    color: var(--app-text-color);
+}
+
+.form-control::placeholder {
+    color: var(--app-secondary-text-color);
+    opacity: 1;
 }
 
 /* File input styling - consistent with buttons */
@@ -430,8 +543,8 @@ input[type="file"],
     font-size: 1rem;
     height: var(--app-button-height);
     min-height: var(--app-button-height);
-    padding: 0 0.75rem 0 0;
-    line-height: calc(var(--app-button-height) - 2px);
+    padding: var(--app-space-0) calc(0.75rem * var(--app-density-scale)) var(--app-space-0) var(--app-space-0);
+    line-height: var(--app-button-line-height);
     overflow: hidden;
     border: 1px solid var(--btn-secondary-border);
     border-radius: var(--app-border-radius-sm);
@@ -444,26 +557,46 @@ input[type="file"]::file-selector-button,
 .form-control[type="file"]::file-selector-button {
     appearance: none;
     box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     font-family: inherit;
     font-size: 1rem;
     font-weight: 400;
     height: calc(var(--app-button-height) - 2px);
     min-height: calc(var(--app-button-height) - 2px);
-    padding: 0 1rem;
+    padding: var(--app-space-0) var(--app-space-3);
     margin: 0 0.75rem 0 0;
     border: none;
     border-radius: var(--app-border-radius-sm) 0 0 var(--app-border-radius-sm);
     background-color: var(--app-primary-action-surface-color);
     color: var(--app-primary-action-text-color);
     cursor: pointer;
-    line-height: calc(var(--app-button-height) - 2px);
+    line-height: var(--app-button-line-height);
     transition: background-color var(--app-transition-fast) ease;
-    vertical-align: top;
+    vertical-align: middle;
 }
 
 input[type="file"]::file-selector-button:hover,
 .form-control[type="file"]::file-selector-button:hover {
     background-color: var(--btn-hover-bg);
+}
+
+.theme-settings-container input[type=text],
+.theme-settings-container input[type=password],
+.theme-settings-container input[type=search],
+.theme-settings-container input[type=email],
+.theme-settings-container input[type=url],
+.theme-settings-container input[type=tel],
+.theme-settings-container input[type=number],
+.theme-settings-container input[type=date],
+.theme-settings-container input[type=time],
+.theme-settings-container input[type=datetime-local],
+.theme-settings-container input[type=month],
+.theme-settings-container input[type=week],
+.theme-settings-container textarea,
+.theme-settings-container select {
+    font-size: var(--app-font-size-base);
 }
 
 .sign-in-input {
@@ -473,7 +606,7 @@ input[type="file"]::file-selector-button:hover,
 .auth-page {
     max-width: 100%;
     margin: clamp(1.5rem, 5vw, 4rem) auto 0;
-    padding: 0 1rem;
+    padding: var(--app-space-0) var(--app-space-3);
 }
 
 .auth-shell {
@@ -487,10 +620,10 @@ input[type="file"]::file-selector-button:hover,
 }
 
 .auth-card-body {
-    padding: clamp(1.25rem, 3vw, 2.25rem);
+    padding: clamp(var(--app-space-3), 3vw, calc(2.25rem * var(--app-density-scale)));
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
+    gap: calc(1.25rem * var(--app-density-scale));
 }
 
 .auth-brand {
@@ -550,8 +683,8 @@ input[type="file"]::file-selector-button:hover,
 }
 
 #signInContainer .auth-card-body {
-    padding: clamp(0.9rem, 2.2vw, 1.4rem);
-    gap: 0.9rem;
+    padding: clamp(calc(0.9rem * var(--app-density-scale)), 2.2vw, calc(1.4rem * var(--app-density-scale)));
+    gap: calc(0.9rem * var(--app-density-scale));
 }
 
 #signInContainer .auth-brand {
@@ -586,7 +719,7 @@ input[type="file"]::file-selector-button:hover,
 #signInContainer .footer {
     flex: 0 0 auto;
     margin-top: 0.5rem !important;
-    padding-bottom: 0.75rem;
+    padding-bottom: calc(0.75rem * var(--app-density-scale));
 }
 
 .auth-description {
@@ -696,7 +829,7 @@ input[type="file"]::file-selector-button:hover,
 
 .auth-divider span {
     position: relative;
-    padding: 0 0.75rem;
+    padding: var(--app-space-0) calc(0.75rem * var(--app-density-scale));
     background-color: var(--learning-card-surface-color);
 }
 
@@ -718,13 +851,13 @@ input[type="file"]::file-selector-button:hover,
     gap: 0.35rem;
     flex-wrap: wrap;
     font-size: 0.95rem;
-    padding-top: 0.25rem;
+    padding-top: var(--app-space-1);
 }
 
 .auth-message {
     margin-bottom: var(--app-space-0);
     border-radius: var(--app-border-radius-sm);
-    padding: 0.875rem 1rem;
+    padding: calc(0.875rem * var(--app-density-scale)) var(--app-space-3);
     background-color: color-mix(in srgb, var(--app-secondary-surface-color) 85%, transparent);
     color: var(--app-text-color);
     text-align: left;
@@ -742,21 +875,21 @@ input[type="file"]::file-selector-button:hover,
 
 @media (max-width: 576px) {
     .auth-page {
-        padding: 0 0.75rem;
+        padding: var(--app-space-0) calc(0.75rem * var(--app-density-scale));
     }
 
     .auth-card-body {
-        padding: 1rem;
+        padding: var(--app-space-3);
     }
 
     #signInContainer.auth-page {
         min-height: 100dvh;
         margin-top: 0.5rem;
-        padding: 0 0.55rem;
+        padding: var(--app-space-0) calc(0.55rem * var(--app-density-scale));
     }
 
     #signInContainer .auth-card-body {
-        padding: 0.8rem;
+        padding: calc(0.8rem * var(--app-density-scale));
         gap: 0.75rem;
     }
 
@@ -779,7 +912,7 @@ input[type="file"]::file-selector-button:hover,
 
     #signInContainer .footer {
         margin-top: 0.35rem !important;
-        padding-bottom: 0.5rem;
+        padding-bottom: var(--app-space-2);
     }
 }
 
@@ -873,9 +1006,12 @@ input[type="range"]::-moz-range-progress,
 
 /* ===== BUTTONS ===== */
 .btn, .btn-icon{
-    --bs-btn-font-size: 14px;
-    --bs-btn-line-height: 22px;
+    --bs-btn-font-size: var(--app-font-size-base);
+    --bs-btn-line-height: var(--app-button-line-height);
     --bs-btn-padding-y: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     background-color: var(--app-primary-action-surface-color);
     border-color: var(--btn-border-color);
     color: var(--app-primary-action-text-color);
@@ -935,7 +1071,7 @@ input[type="range"]::-moz-range-progress,
     background-color: var(--app-secondary-surface-color);
     border-color: var(--btn-secondary-border);
     color: var(--app-secondary-text-color);
-    padding: 10px;
+    padding: calc(10px * var(--app-density-scale));
 }
 
 .btn-alt:hover {
@@ -944,7 +1080,7 @@ input[type="range"]::-moz-range-progress,
 
 /* Padded button with minimum width - for consistent button sizing */
 .btnPaddedAndMinWidth {
-    padding: 10px clamp(12px, 3vw, 20px);
+    padding: calc(10px * var(--app-density-scale)) clamp(var(--app-space-3-px), 3vw, calc(20px * var(--app-density-scale)));
     min-width: 120px;
 }
 
@@ -962,7 +1098,7 @@ input[type="range"]::-moz-range-progress,
 .btn-icon{
     font-family: inherit;
     border-width: 1px;
-    padding: 12px;
+    padding: var(--app-space-3-px);
     margin: 6px;
     text-align: center;
     justify-content: center;
@@ -992,7 +1128,7 @@ input[type="range"]::-moz-range-progress,
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 0.25rem 0.5rem;
+    padding: var(--app-space-1) var(--app-space-2);
     background-color: var(--app-primary-action-surface-color);
     border: 1px solid var(--btn-border-color);
     border-radius: var(--app-border-radius-sm);
@@ -1105,7 +1241,7 @@ body:has(.instructions-container) {
     width: min(100%, var(--uniform-button-width));
     max-width: var(--uniform-button-width);
     min-height: var(--choice-min-height);
-    padding: 1rem;
+    padding: var(--app-space-3);
     border: 1px solid var(--btn-border-color);
     border-radius: var(--app-border-radius-sm);
     background-color: var(--app-primary-action-surface-color);
@@ -1198,7 +1334,7 @@ body:has(.instructions-container) {
 }
 
 .modal-body{
-    padding: 0px;
+    padding: var(--app-space-0);
 }
 
 .modal-header{
@@ -1217,6 +1353,7 @@ body:has(.instructions-container) {
 /* ===== ALERTS ===== */
 .alert, .header-box{
     background-color: var(--app-secondary-surface-color);
+    color: var(--app-secondary-text-color);
     /*vertical center text*/
     display: flex;
     align-items: center;
@@ -1227,7 +1364,7 @@ body:has(.instructions-container) {
 .alert{
     margin-top: 1rem;
     margin-bottom: 1rem;
-    padding: 1.25rem;
+    padding: calc(1.25rem * var(--app-density-scale));
     border-radius: var(--border-radius-none);
 }
 
@@ -1263,10 +1400,15 @@ body:has(.instructions-container) {
 .card {
     border-radius: var(--app-border-radius-lg);
     background-color: var(--learning-card-surface-color);
+    color: var(--app-text-color);
+}
+
+.card-body{
+    padding: var(--app-space-3);
 }
 
 .card-header{
-    padding: 10px;
+    padding: calc(10px * var(--app-density-scale));
 }
 
 .card-header .displaystats{
@@ -1499,12 +1641,16 @@ body:has(.instructions-container) {
     max-height: 300px;
     overflow-y: auto;
     white-space: pre-wrap;
+    background-color: var(--app-subtle-surface-color);
+    border: 1px solid var(--border-color);
+    color: var(--app-text-color);
 }
 
 .admin-scroll-output {
     max-height: 60vh;
     overflow-y: auto;
     white-space: pre-wrap;
+    color: var(--app-text-color);
 }
 
 .admin-loading-image {
@@ -1556,6 +1702,7 @@ body:has(.instructions-container) {
 /* Theme section grouping - visually separates theme configuration groups */
 .theme-section {
     background-color: var(--learning-card-surface-color);
+    color: var(--app-text-color);
     border: 1px solid var(--border-color);
     border-radius: var(--app-border-radius-lg);
     padding: calc(1.25rem * var(--app-density-scale));
@@ -1575,6 +1722,7 @@ body:has(.instructions-container) {
 
 .theme-pill {
     background-color: var(--learning-card-surface-color);
+    color: var(--app-text-color);
     border-color: color-mix(in srgb, var(--app-text-color) 22%, transparent) !important;
     transition: border-color var(--app-transition-fast) ease, box-shadow var(--app-transition-fast) ease;
 }
@@ -1602,8 +1750,9 @@ body:has(.instructions-container) {
 /* Admin table wrapper - provides consistent card styling */
 .admin-table-wrapper {
     background-color: var(--learning-card-surface-color);
+    color: var(--app-text-color);
     border-radius: var(--app-border-radius-lg);
-    padding: 0;
+    padding: var(--app-space-0);
     margin-bottom: calc(1.25rem * var(--app-density-scale));
     margin-top: calc(1.25rem * var(--app-density-scale));
     box-shadow: var(--app-surface-shadow);
@@ -1650,7 +1799,7 @@ body:has(.instructions-container) {
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    padding: 1rem;
+    padding: var(--app-space-3);
     background: color-mix(in srgb, var(--learning-card-surface-color) 72%, transparent);
     backdrop-filter: blur(1.5px);
     color: var(--app-secondary-text-color);
@@ -1680,9 +1829,19 @@ body:has(.instructions-container) {
 
 /* Table styling */
 .table {
+    --bs-table-color: var(--app-text-color);
+    --bs-table-bg: var(--learning-card-surface-color);
+    --bs-table-border-color: var(--border-color);
+    --bs-table-striped-color: var(--app-text-color);
+    --bs-table-striped-bg: var(--app-subtle-surface-color);
+    --bs-table-active-color: var(--app-text-color);
+    --bs-table-active-bg: var(--app-selected-surface-color);
+    --bs-table-hover-color: var(--app-text-color);
+    --bs-table-hover-bg: var(--app-hover-surface-color);
     width: 100%;
     border-collapse: collapse;
     table-layout: auto; /* Allow columns to grow with content */
+    color: var(--app-text-color);
 }
 
 /* Table cell base styling - applies to all cells */
@@ -1691,6 +1850,8 @@ body:has(.instructions-container) {
     white-space: normal;
     word-wrap: break-word;
     overflow-wrap: break-word;
+    color: var(--app-text-color);
+    background-color: transparent;
 }
 
 /* Table header styling */
@@ -1702,12 +1863,13 @@ thead {
 }
 
 thead th {
-    padding: 12px clamp(12px, 2vw, 16px);
+    padding: var(--app-space-3-px) clamp(var(--app-space-3-px), 2vw, var(--app-space-4-px));
     text-align: left;
     border-bottom: 2px solid var(--app-accent-color);
     font-size: 1rem;
     font-weight: 700;
     vertical-align: middle;
+    color: var(--app-primary-action-text-color);
 }
 
 /* First header cell gets left radius */
@@ -1727,22 +1889,25 @@ tbody tr {
 }
 
 tbody tr:hover {
-    background-color: color-mix(in srgb, var(--app-text-color) 2%, var(--learning-card-surface-color));
+    background-color: var(--app-hover-surface-color);
+    color: var(--app-text-color);
 }
 
 tbody td,
 tbody th {
-    padding: 10px clamp(12px, 2vw, 16px);
+    padding: calc(10px * var(--app-density-scale)) clamp(var(--app-space-3-px), 2vw, var(--app-space-4-px));
     vertical-align: top;
 }
 
 /* Striped rows */
 .table-striped tbody tr:nth-of-type(odd) {
-    background-color: color-mix(in srgb, var(--app-text-color) 3%, var(--learning-card-surface-color));
+    background-color: var(--app-subtle-surface-color);
+    color: var(--app-text-color);
 }
 
 .table-striped tbody tr:nth-of-type(odd):hover {
-    background-color: color-mix(in srgb, var(--app-text-color) 5%, var(--learning-card-surface-color));
+    background-color: var(--app-hover-surface-color);
+    color: var(--app-text-color);
 }
 
 /* Bordered tables */
@@ -1758,18 +1923,20 @@ tbody th {
 /* Table footer styling */
 tfoot {
     background-color: color-mix(in srgb, var(--app-text-color) 5%, var(--learning-card-surface-color));
+    color: var(--app-text-color);
     font-weight: 600;
     border-top: 2px solid var(--app-accent-color);
 }
 
 tfoot td,
 tfoot th {
-    padding: 12px clamp(12px, 2vw, 16px);
+    padding: var(--app-space-3-px) clamp(var(--app-space-3-px), 2vw, var(--app-space-4-px));
 }
 
 /* Light table header variant */
 .table-light {
     background-color: color-mix(in srgb, var(--app-text-color) 5%, var(--learning-card-surface-color));
+    color: var(--app-text-color);
 }
 
 /* ===== TABLE UTILITY CLASSES ===== */
@@ -1832,7 +1999,7 @@ tfoot th {
     overflow-wrap: normal;
     word-break: normal;
     line-height: 1.12;
-    padding: 8px 8px;
+    padding: var(--app-space-2-px);
     vertical-align: middle;
 }
 
@@ -1847,7 +2014,7 @@ tfoot th {
     white-space: nowrap;
     overflow-wrap: normal;
     word-break: normal;
-    padding: 8px 8px;
+    padding: var(--app-space-2-px);
     vertical-align: middle;
 }
 
@@ -1887,7 +2054,7 @@ tfoot th {
 .data-download-table .btn-icon {
     width: 32px;
     height: 32px;
-    padding: 0;
+    padding: var(--app-space-0);
     margin: 0;
     display: inline-flex;
     align-items: center;
@@ -1916,7 +2083,7 @@ tfoot th {
 }
 
 .toggle-buttons .dropdown-item{
-    padding: 0.5rem 0.75rem;
+    padding: var(--app-space-2) calc(0.75rem * var(--app-density-scale));
     margin: 0;
 }
 
@@ -1967,12 +2134,12 @@ tfoot th {
 }
 
 .offcanvas-body {
-    padding: 1rem;
+    padding: var(--app-space-3);
 }
 
 /* ===== DROPDOWNS ===== */
 .dropdown-item {
-    padding: 0.75rem 1rem;
+    padding: calc(0.75rem * var(--app-density-scale)) var(--app-space-3);
     font-size: 1rem;
     border-radius: var(--app-border-radius-sm);
 }
@@ -1991,7 +2158,7 @@ tfoot th {
 .header-box{
     width: 100%;
     margin: 0;
-    padding: 0;
+    padding: var(--app-space-0);
     border-radius: var(--border-radius-none);
     font-size: clamp(1.25rem, 3vw, 1.75rem);
     font-weight: bold;
@@ -2007,7 +2174,7 @@ tfoot th {
     height: auto;
     min-height: 20rem;
     border-radius: var(--app-border-radius-sm);
-    padding: 10px;
+    padding: calc(10px * var(--app-density-scale));
     background: var(--app-background-color);
     border: 1px solid var(--surface-emphasis-color, var(--app-accent-color));
     box-shadow: 0 0 10px var(--surface-emphasis-color, var(--app-accent-color));
@@ -2033,7 +2200,7 @@ tfoot th {
     justify-content: flex-start;
     align-items: center;
     margin: 0;
-    padding: 0;
+    padding: var(--app-space-0);
     border: none;
 }
 
@@ -2099,7 +2266,7 @@ tfoot th {
     justify-content: center;
     gap: 0.75rem;
     margin: 0.875rem;
-    padding: 1rem;
+    padding: var(--app-space-3);
     text-align: center;
     border-radius: var(--app-border-radius-lg);
     border: none;
@@ -2121,7 +2288,7 @@ tfoot th {
     pointer-events: none;
     height: 0;
     margin: 0;
-    padding: 0;
+    padding: var(--app-space-0);
     border: 0;
     transition: opacity var(--app-transition-fast) ease-in-out, height var(--app-transition-fast) ease-in-out;
 }
@@ -2143,7 +2310,7 @@ tfoot th {
 }
 
 .card-stack--flush {
-    padding: 0;
+    padding: var(--app-space-0);
 }
 
 .card-stack--compact {
@@ -2184,7 +2351,7 @@ tfoot th {
     display: inline-flex;
     align-items: center;
     gap: clamp(0.5rem, 1vw, 0.75rem);
-    padding: 0 clamp(0.5rem, 2vw, 0.75rem);
+    padding: var(--app-space-0) clamp(var(--app-space-2), 2vw, calc(0.75rem * var(--app-density-scale)));
     height: 24px;
     line-height: 1;
     border-radius: var(--border-radius-pill);
@@ -2237,18 +2404,18 @@ tfoot th {
     margin-top: 0.375rem;
     margin-bottom: 0.625rem;
     border: none;
-    padding: 0;
+    padding: var(--app-space-0);
 }
 
 #userInteractionContainer {
-    padding: 6px 0;
+    padding: calc(6px * var(--app-density-scale)) var(--app-space-0);
     min-height: 2rem;
     border: none;
     margin: 0;
 }
 
 .video-button-bar {
-    padding: 1.25rem;
+    padding: calc(1.25rem * var(--app-density-scale));
 }
 
 .voice-icon {
@@ -2312,12 +2479,12 @@ tfoot th {
 
 .input-box {
     box-sizing: border-box;
-    padding-bottom: max(env(keyboard-inset-height, 0px), 1rem);
+    padding-bottom: max(env(keyboard-inset-height, 0px), var(--app-space-3));
     border: none;
     margin: 0;
-    padding-left: 0;
-    padding-right: 0;
-    padding-top: 0;
+    padding-left: var(--app-space-0);
+    padding-right: var(--app-space-0);
+    padding-top: var(--app-space-0);
 }
 
 .input-box.input-pending {
@@ -2325,7 +2492,7 @@ tfoot th {
     pointer-events: none;
     border: none;
     margin: 0;
-    padding: 0;
+    padding: var(--app-space-0);
 }
 
 .input-box.trial-input-hidden {
@@ -2334,7 +2501,7 @@ tfoot th {
     overflow: hidden;
     pointer-events: none;
     margin: 0;
-    padding: 0;
+    padding: var(--app-space-0);
     border: none;
 }
 
@@ -2349,7 +2516,7 @@ tfoot th {
     height: 0;
     overflow: hidden;
     margin: 0;
-    padding: 0;
+    padding: var(--app-space-0);
     border: none;
     transition: opacity var(--app-transition-fast) ease-in-out, height var(--app-transition-fast) ease-in-out;
 }
@@ -2366,7 +2533,7 @@ tfoot th {
     overflow-x: hidden;
     position: relative;
     margin: 0;
-    padding: 0;
+    padding: var(--app-space-0);
 }
 
 #trialContentWrapper.trial-hidden {
@@ -2378,7 +2545,7 @@ tfoot th {
     transition: opacity var(--app-transition-fast) ease-in-out;
     border: none;
     margin: 0;
-    padding: 0;
+    padding: var(--app-space-0);
 }
 
 .smooth-transition {
@@ -2392,7 +2559,7 @@ tfoot th {
     min-height: 1.5rem;
     border: none;
     margin: 0;
-    padding: 0;
+    padding: var(--app-space-0);
 }
 
 .feedback-slot--visible {
@@ -2404,26 +2571,26 @@ tfoot th {
     min-height: 1em;
     border: none;
     margin: 0;
-    padding: 0;
+    padding: var(--app-space-0);
 }
 
 #progressBarContainer {
     background-color: transparent;
     border: none;
     margin: 0;
-    padding: 0;
+    padding: var(--app-space-0);
 }
 
 #multipleChoiceContainer {
     border: none;
     margin: 0;
-    padding: 0;
+    padding: var(--app-space-0);
 }
 
 #userLowerInteractionContainer {
     border: none;
     margin: 0;
-    padding: 0;
+    padding: var(--app-space-0);
 }
 
 .vh-50 {
@@ -2545,7 +2712,7 @@ tfoot th {
 .alert-audio-100 {
     color: var(--feedback-error-color);
     background-color: var(--accent-background-color, var(--app-accent-color));
-    padding: 20px;
+    padding: calc(20px * var(--app-density-scale));
     margin-top: 20px;
 }
 
@@ -2609,7 +2776,7 @@ tfoot th {
         position: relative;  /* Normal document flow - appears after stimulus/SR icon */
         width: 100%;
         margin-top: 1rem;  /* Space between stimulus and input */
-        padding: 0 1rem;   /* Left/right padding for narrow screens */
+        padding: var(--app-space-0) var(--app-space-3);   /* Left/right padding for narrow screens */
     }
 
     .input-box input{
@@ -2650,9 +2817,9 @@ tfoot th {
     /* Larger touch targets for mobile - iOS recommends 44x44px minimum */
     .btn, button, input[type="file"] {
         min-height: var(--app-button-height);
-        font-size: 16px;
-        line-height: 24px;
-        padding: 3px 0.75rem;
+        font-size: var(--app-font-size-base);
+        line-height: var(--app-button-line-height);
+        padding: calc(3px * var(--app-density-scale)) calc(0.75rem * var(--app-density-scale));
     }
 
     input[type="text"], input[type="password"] {
@@ -2660,7 +2827,7 @@ tfoot th {
         min-height: var(--app-text-input-height);
         font-size: 16px;
         line-height: calc(var(--app-text-input-height) - 2px);
-        padding: 0 0.75rem;
+        padding: var(--app-space-0) calc(0.75rem * var(--app-density-scale));
     }
 
 
@@ -2688,7 +2855,7 @@ tfoot th {
 
     .content-box {
         margin: 0.5rem 0;
-        padding: 0.75rem;
+        padding: calc(0.75rem * var(--app-density-scale));
     }
 
     /* Blaze card stimulus image sizing (NOT for Svelte cards) */
@@ -2708,7 +2875,7 @@ tfoot th {
     .alert {
         margin-left: 0.5rem;
         margin-right: 0.5rem;
-        padding: 0.875rem;
+        padding: calc(0.875rem * var(--app-density-scale));
     }
 
     .lower-interaction-spacing {
@@ -2724,7 +2891,7 @@ tfoot th {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        padding: 0.5rem;
+        padding: var(--app-space-2);
     }
 
     /* Font Awesome icons inside buttons */
@@ -2738,13 +2905,13 @@ tfoot th {
     button,
     a.content-link {
         min-height: var(--app-button-height);
-        padding: 3px 0.75rem;
+        padding: calc(3px * var(--app-density-scale)) calc(0.75rem * var(--app-density-scale));
     }
 
     /* Multiple choice buttons */
     .multipleChoiceButton {
         min-height: var(--app-button-height);
-        padding: 1rem;
+        padding: var(--app-space-3);
     }
 }
 
@@ -2794,7 +2961,7 @@ tfoot th {
   visibility: hidden;
   pointer-events: none;
   margin: 0;
-  padding: 0;
+  padding: var(--app-space-0);
   border: none;
 }
 
@@ -2830,7 +2997,7 @@ tfoot th {
     left: 50%;
     transform: translate(-50%, -50%);
     background-color: var(--app-background-color);
-    padding: 0 1rem;
+    padding: var(--app-space-0) var(--app-space-3);
     color: var(--app-text-color);
     font-weight: 600;
     font-size: 0.9rem;
@@ -2842,13 +3009,13 @@ tfoot th {
 /* ===== JSON EDITOR MODALS ===== */
 /* Fix alignment and spacing for Edit Properties dropdown in TDF/Content editors */
 .je-modal {
-    padding: 0.5rem;
+    padding: var(--app-space-2);
 }
 
 /* Property checkbox rows - Bootstrap form-check structure */
 .je-modal .form-group {
     margin-bottom: 0 !important;
-    padding: 0 !important;
+    padding: var(--app-space-0) !important;
 }
 
 .je-modal .form-check {
@@ -2856,7 +3023,7 @@ tfoot th {
     align-items: center;
     gap: 0.375rem;
     min-height: auto;
-    padding-left: 0;
+    padding-left: var(--app-space-0);
     margin-bottom: 0;
 }
 
@@ -2869,19 +3036,19 @@ tfoot th {
 
 .je-modal .form-check-label {
     margin: 0;
-    padding: 0;
+    padding: var(--app-space-0);
     line-height: 1.2;
 }
 
 /* Add property input row styling */
 .je-modal input[type="text"] {
-    padding: 0.25rem 0.5rem;
+    padding: var(--app-space-1) var(--app-space-2);
     margin: 0;
     font-size: 0.875rem;
 }
 
 .je-modal .btn {
-    padding: 0.25rem 0.5rem;
+    padding: var(--app-space-1) var(--app-space-2);
     min-height: auto;
     font-size: 0.875rem;
 }

@@ -28,7 +28,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 var(--app-space-5-px);
+    padding: var(--app-space-0) var(--app-space-5-px);
     border-bottom: 1px solid color-mix(in srgb, var(--app-text-color) 8%, transparent);
     flex-shrink: 0;
 }
@@ -75,7 +75,7 @@
     bottom: 10px;
     width: auto;
     height: 32px;
-    padding: 0;
+    padding: var(--app-space-0);
     box-sizing: border-box;
     color: var(--navigation-text-color);
     overflow: hidden;
@@ -219,7 +219,7 @@
 .sidebar-collapsed .nav-item {
     justify-content: center;
     min-height: 38px;
-    padding: calc(7px * var(--app-density-scale)) 0;
+    padding: calc(7px * var(--app-density-scale)) var(--app-space-0);
     position: relative;
 }
 
@@ -227,7 +227,7 @@
     width: 38px;
     min-width: 38px;
     min-height: 38px;
-    padding: 0;
+    padding: var(--app-space-0);
 }
 
 .sidebar-collapsed .nav-item:hover::after,
@@ -267,7 +267,7 @@
     display: flex;
     align-items: center;
     gap: var(--app-space-5-px);
-    padding: 0 var(--app-space-5-px);
+    padding: var(--app-space-0) var(--app-space-5-px);
     position: sticky;
     top: 0;
     z-index: 10;
@@ -391,7 +391,7 @@
     display: flex;
     flex-direction: column;
     gap: calc(0.2rem * var(--app-density-scale));
-    padding: calc(0.55rem * var(--app-density-scale));
+    padding: var(--app-space-2);
     border: 1px solid var(--border-color);
     border-left: 0;
     border-radius: 0 var(--app-border-radius-sm, 8px) var(--app-border-radius-sm, 8px) 0;
@@ -473,8 +473,8 @@ html.learning-progress-panel-viewport-open .practice-top-header {
 }
 
 .avatar {
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
     border-radius: var(--border-radius-circle, 50%);
     background: var(--app-accent-color);
     color: var(--app-primary-action-text-color);
@@ -482,7 +482,9 @@ html.learning-progress-panel-viewport-open .practice-top-header {
     align-items: center;
     justify-content: center;
     font-weight: 600;
-    font-size: 14px;
+    font-size: 12px;
+    line-height: 1;
+    text-align: center;
     flex-shrink: 0;
 }
 
@@ -544,23 +546,25 @@ html.learning-progress-panel-viewport-open .practice-top-header {
     }
 }
 
-.dropdown-item {
+.home-user-menu .dropdown-item {
     width: 100%;
     display: block;
     min-height: var(--app-button-height, 44px);
     padding: calc(9px * var(--app-density-scale)) var(--app-space-3-px);
     border: 0;
     background: transparent;
-    font-size: 14px;
+    font-size: var(--app-font-size-base);
+    line-height: var(--app-button-line-height);
     color: var(--app-text-color);
     border-radius: var(--app-border-radius-sm, 8px);
     cursor: pointer;
     text-align: left;
 }
 
-.dropdown-item:hover,
-.dropdown-item:focus-visible {
+.home-user-menu .dropdown-item:hover,
+.home-user-menu .dropdown-item:focus-visible {
     background: color-mix(in srgb, var(--app-text-color) 5%, var(--learning-card-surface-color));
+    color: var(--app-text-color);
     outline: none;
 }
 
@@ -571,7 +575,7 @@ html.learning-progress-panel-viewport-open .practice-top-header {
 }
 
 .content {
-    padding: var(--app-space-5-px);
+    padding: var(--app-space-4);
     background: var(--app-background-color);
     flex: 1;
     position: relative;
@@ -617,7 +621,7 @@ html.learning-progress-panel-viewport-open .practice-top-header {
     min-height: 0;
     display: flex;
     flex-direction: column;
-    padding: 0;
+    padding: var(--app-space-0);
     overflow: hidden;
 }
 
@@ -679,7 +683,7 @@ html.learning-progress-panel-viewport-open .practice-top-header {
     left: var(--main-menu-tour-left, 1rem);
     z-index: 11000;
     max-width: min(270px, calc(100vw - 24px));
-    padding: calc(0.625rem * var(--app-density-scale)) calc(0.75rem * var(--app-density-scale));
+    padding: var(--app-space-2) calc(0.75rem * var(--app-density-scale));
     border: 1px solid var(--app-primary-action-text-color);
     border-radius: var(--app-border-radius-sm, 8px);
     background: var(--app-primary-action-surface-color);
@@ -752,6 +756,11 @@ html.learning-progress-panel-viewport-open .practice-top-header {
     margin: 0;
 }
 
+.class-selection-heading-icon {
+    color: var(--app-accent-color);
+    font-size: 1.25rem;
+}
+
 .class-selection-current {
     margin: 0 0 var(--app-space-2);
 }
@@ -804,7 +813,7 @@ html.learning-progress-panel-viewport-open .practice-top-header {
     .sidebar.sidebar-mobile-open .sidebar-header,
     .sidebar.sidebar-mobile-closing .sidebar-header {
         justify-content: space-between;
-        padding: 0 var(--app-space-5-px);
+        padding: var(--app-space-0) var(--app-space-5-px);
     }
 
     .sidebar.sidebar-mobile-open .nav-item,
@@ -827,7 +836,7 @@ html.learning-progress-panel-viewport-open .practice-top-header {
 @media (max-width: 860px) {
     .top-header {
         height: 50px;
-        padding: 0 var(--app-space-4-px);
+        padding: var(--app-space-0) var(--app-space-4-px);
     }
 
     .practice-top-header {
@@ -839,7 +848,7 @@ html.learning-progress-panel-viewport-open .practice-top-header {
     }
 
     .practice-content {
-        padding: 0;
+        padding: var(--app-space-0);
     }
 
     .tool-content {
@@ -861,8 +870,8 @@ html.learning-progress-panel-viewport-open .practice-top-header {
         max-width: 46vw;
         white-space: normal;
         line-height: 1.1;
-        padding-left: 0.55rem;
-        padding-right: 0.55rem;
+        padding-left: calc(0.55rem * var(--app-density-scale));
+        padding-right: calc(0.55rem * var(--app-density-scale));
     }
 
     .user-info {
