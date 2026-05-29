@@ -14,6 +14,7 @@ const secretPatterns = [
 function getStagedAdditions() {
   const output = execSync('git diff --cached --unified=0 --no-color', {
     encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 
