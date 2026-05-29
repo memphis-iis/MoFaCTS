@@ -797,6 +797,14 @@ Template.learningDashboard.helpers({
     return ((Template.instance() as any) as any).learnerConfigState.get();
   },
 
+  loadingRows: () => {
+    return [0, 1, 2];
+  },
+
+  loadingRowsShort: () => {
+    return [0, 1];
+  },
+
   displayLabel(this: any): string {
     return displayLabelForTdf(this);
   },

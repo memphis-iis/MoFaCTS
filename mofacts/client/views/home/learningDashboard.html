@@ -57,7 +57,65 @@
 
       <div class="learning-dashboard-content-shell {{#if isLoading}}is-loading{{else}}is-ready{{/if}}" aria-busy="{{#if isLoading}}true{{else}}false{{/if}}">
         {{#if isLoading}}
-          <div class="learning-dashboard-placeholder" aria-hidden="true"></div>
+          <div class="learning-dashboard-loading-preview" aria-hidden="true">
+            <div class="learning-dashboard-loading-section">
+              <div class="learning-dashboard-loading-heading">
+                <span class="learning-dashboard-skeleton learning-dashboard-skeleton--heading"></span>
+              </div>
+              <div class="learning-dashboard-loading-table">
+                <div class="learning-dashboard-loading-header">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+                {{#each loadingRows}}
+                  <div class="learning-dashboard-loading-row">
+                    <span class="learning-dashboard-skeleton learning-dashboard-skeleton--button"></span>
+                    <span class="learning-dashboard-skeleton learning-dashboard-skeleton--icon"></span>
+                    <span class="learning-dashboard-skeleton learning-dashboard-skeleton--title"></span>
+                    <span class="learning-dashboard-skeleton learning-dashboard-skeleton--short"></span>
+                    <span class="learning-dashboard-skeleton learning-dashboard-skeleton--meter"></span>
+                    <span class="learning-dashboard-skeleton learning-dashboard-skeleton--short"></span>
+                  </div>
+                  <div class="learning-dashboard-loading-card">
+                    <span class="learning-dashboard-skeleton learning-dashboard-skeleton--title"></span>
+                    <span class="learning-dashboard-skeleton learning-dashboard-skeleton--meta"></span>
+                    <div class="learning-dashboard-loading-card-actions">
+                      <span class="learning-dashboard-skeleton learning-dashboard-skeleton--button"></span>
+                      <span class="learning-dashboard-skeleton learning-dashboard-skeleton--button"></span>
+                    </div>
+                  </div>
+                {{/each}}
+              </div>
+            </div>
+            <div class="learning-dashboard-loading-section learning-dashboard-loading-section--secondary">
+              <div class="learning-dashboard-loading-heading">
+                <span class="learning-dashboard-skeleton learning-dashboard-skeleton--heading learning-dashboard-skeleton--heading-short"></span>
+              </div>
+              <div class="learning-dashboard-loading-table">
+                {{#each loadingRowsShort}}
+                  <div class="learning-dashboard-loading-row">
+                    <span class="learning-dashboard-skeleton learning-dashboard-skeleton--button"></span>
+                    <span class="learning-dashboard-skeleton learning-dashboard-skeleton--icon"></span>
+                    <span class="learning-dashboard-skeleton learning-dashboard-skeleton--title"></span>
+                    <span class="learning-dashboard-skeleton learning-dashboard-skeleton--short"></span>
+                    <span class="learning-dashboard-skeleton learning-dashboard-skeleton--meter"></span>
+                    <span class="learning-dashboard-skeleton learning-dashboard-skeleton--short"></span>
+                  </div>
+                  <div class="learning-dashboard-loading-card">
+                    <span class="learning-dashboard-skeleton learning-dashboard-skeleton--title"></span>
+                    <span class="learning-dashboard-skeleton learning-dashboard-skeleton--meta"></span>
+                    <div class="learning-dashboard-loading-card-actions">
+                      <span class="learning-dashboard-skeleton learning-dashboard-skeleton--button"></span>
+                    </div>
+                  </div>
+                {{/each}}
+              </div>
+            </div>
+          </div>
           <div class="sr-only" role="status" aria-live="polite">Loading lessons...</div>
         {{else}}
           {{#if hasTdfs}}

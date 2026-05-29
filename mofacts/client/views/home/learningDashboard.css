@@ -178,21 +178,140 @@
     font-weight: 500;
 }
 
-.learning-dashboard-placeholder {
+.learning-dashboard-loading-preview {
     min-height: 14rem;
-    background:
-        linear-gradient(180deg, color-mix(in srgb, var(--app-accent-color) 12%, var(--learning-card-surface-color)) 0, color-mix(in srgb, var(--app-accent-color) 12%, var(--learning-card-surface-color)) 3rem, transparent 3rem),
-        repeating-linear-gradient(180deg, color-mix(in srgb, var(--learning-card-surface-color) 92%, var(--app-text-color) 8%) 0, color-mix(in srgb, var(--learning-card-surface-color) 92%, var(--app-text-color) 8%) 2.75rem, transparent 2.75rem, transparent 4.1rem);
-    animation: skeleton-loading 1.5s ease-in-out infinite;
+    background: var(--learning-card-surface-color);
 }
 
-@keyframes skeleton-loading {
-    0%,
+.learning-dashboard-loading-section + .learning-dashboard-loading-section {
+    border-top: 1px solid color-mix(in srgb, var(--app-text-color) 10%, transparent);
+}
+
+.learning-dashboard-loading-section--secondary {
+    opacity: 0.92;
+}
+
+.learning-dashboard-loading-heading {
+    display: flex;
+    align-items: center;
+    min-height: calc(34px * var(--app-density-scale));
+    padding: calc(10px * var(--app-density-scale)) var(--app-space-3-px);
+    background: color-mix(in srgb, var(--app-text-color) 2%, var(--learning-card-surface-color));
+}
+
+.learning-dashboard-loading-table {
+    display: grid;
+}
+
+.learning-dashboard-loading-header,
+.learning-dashboard-loading-row {
+    display: grid;
+    grid-template-columns: 132px 48px minmax(220px, 1fr) 76px 112px 98px;
+    align-items: center;
+    column-gap: var(--app-space-2-px);
+    min-width: 920px;
+}
+
+.learning-dashboard-loading-header {
+    min-height: calc(31px * var(--app-density-scale));
+    padding: var(--app-space-0) var(--app-space-2-px);
+    border-top: 1px solid color-mix(in srgb, var(--app-text-color) 8%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--app-text-color) 12%, transparent);
+    background: color-mix(in srgb, var(--app-accent-color) 10%, var(--learning-card-surface-color));
+}
+
+.learning-dashboard-loading-header span {
+    width: 72%;
+    height: 0.55rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--app-text-color) 9%, transparent);
+}
+
+.learning-dashboard-loading-header span:first-child,
+.learning-dashboard-loading-header span:nth-child(2) {
+    justify-self: center;
+    width: 48%;
+}
+
+.learning-dashboard-loading-row {
+    min-height: calc(64px * var(--app-density-scale));
+    padding: var(--app-space-0) var(--app-space-2-px);
+    border-bottom: 1px solid color-mix(in srgb, var(--app-text-color) 8%, transparent);
+}
+
+.learning-dashboard-skeleton {
+    position: relative;
+    display: block;
+    overflow: hidden;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--app-text-color) 8%, var(--learning-card-surface-color));
+}
+
+.learning-dashboard-skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        color-mix(in srgb, var(--app-text-color) 6%, transparent) 45%,
+        transparent 90%
+    );
+    transform: translateX(-100%);
+    animation: learning-dashboard-skeleton-shimmer 1.7s ease-in-out infinite;
+}
+
+.learning-dashboard-skeleton--heading {
+    width: 9rem;
+    height: 0.7rem;
+}
+
+.learning-dashboard-skeleton--heading-short {
+    width: 6.5rem;
+}
+
+.learning-dashboard-skeleton--button {
+    justify-self: center;
+    width: calc(84px * var(--app-density-scale));
+    max-width: 100%;
+    height: calc(var(--app-button-height) * 0.78);
+    border-radius: var(--app-border-radius-sm);
+}
+
+.learning-dashboard-skeleton--icon {
+    justify-self: center;
+    width: 1.55rem;
+    height: 1.55rem;
+}
+
+.learning-dashboard-skeleton--title {
+    width: min(100%, 24rem);
+    height: 0.82rem;
+}
+
+.learning-dashboard-skeleton--short {
+    justify-self: center;
+    width: 54%;
+    height: 0.75rem;
+}
+
+.learning-dashboard-skeleton--meter {
+    width: 74%;
+    height: 0.75rem;
+}
+
+.learning-dashboard-skeleton--meta {
+    width: 42%;
+    height: 0.72rem;
+}
+
+.learning-dashboard-loading-card {
+    display: none;
+}
+
+@keyframes learning-dashboard-skeleton-shimmer {
     100% {
-        opacity: 0.72;
-    }
-    50% {
-        opacity: 1;
+        transform: translateX(100%);
     }
 }
 
@@ -644,6 +763,58 @@
 }
 
 @media (max-width: 1024px) {
+    .learning-dashboard-loading-preview {
+        padding: var(--app-space-3);
+    }
+
+    .learning-dashboard-loading-section + .learning-dashboard-loading-section {
+        margin-top: var(--app-space-3);
+        padding-top: var(--app-space-3);
+        border-top: 1px solid color-mix(in srgb, var(--app-text-color) 10%, transparent);
+    }
+
+    .learning-dashboard-loading-heading {
+        min-height: 0;
+        padding: var(--app-space-0) var(--app-space-0) var(--app-space-2);
+        background: transparent;
+    }
+
+    .learning-dashboard-loading-header,
+    .learning-dashboard-loading-row {
+        display: none;
+    }
+
+    .learning-dashboard-loading-table {
+        gap: var(--app-space-3);
+    }
+
+    .learning-dashboard-loading-card {
+        display: grid;
+        gap: calc(0.55rem * var(--app-density-scale));
+        padding: var(--app-space-3);
+        border: 1px solid color-mix(in srgb, var(--app-text-color) 12%, transparent);
+        border-radius: 8px;
+        background: color-mix(in srgb, var(--app-text-color) 2%, var(--learning-card-surface-color));
+        box-shadow: 0 0.12rem 0.35rem color-mix(in srgb, var(--app-text-color) 8%, transparent);
+    }
+
+    .learning-dashboard-loading-card-actions {
+        display: flex;
+        align-items: center;
+        gap: calc(0.35rem * var(--app-density-scale));
+        margin-top: calc(0.2rem * var(--app-density-scale));
+    }
+
+    .learning-dashboard-loading-card .learning-dashboard-skeleton--title {
+        width: 72%;
+    }
+
+    .learning-dashboard-loading-card .learning-dashboard-skeleton--button {
+        justify-self: start;
+        width: 7rem;
+        height: 34px;
+    }
+
     .learning-dashboard-table-shell {
         display: none;
     }
@@ -909,7 +1080,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .learning-dashboard-placeholder,
+    .learning-dashboard-skeleton::after,
     .learner-config-panel {
         transition: none;
         animation: none;
