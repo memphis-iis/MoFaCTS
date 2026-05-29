@@ -184,22 +184,27 @@ async function getRestartEmailRecipients(deps: RunServerStartupDeps, roleSetting
     .filter((value, index, array) => array.indexOf(value) === index);
 }
 
-function findUserByName(deps: RunServerStartupDeps, username: string) {
+async function findUserByName(deps: RunServerStartupDeps, username: string) {
   if (!username || username.length < 1) {
     return null;
   }
-  if (deps.isValidEmailAddress(username)) {
-    const canonicalEmail = username.trim().toLowerCase();
-    return Accounts.findUserByEmail(canonicalEmail) || Accounts.findUserByUsername(canonicalEmail);
-  }
-  const funcs = [Accounts.findUserByUsername, Accounts.findUserByEmail];
-  for (const fn of funcs) {
-    const user = fn(username);
-    if (user) {
-      return user;
-    }
-  }
-  return null;
+  const normalizedUsername = username.trim();
+  const lookupSelector = deps.isValidEmailAddress(normalizedUsername)
+    ? {
+        $or: [
+          { username: normalizedUsername.toLowerCase() },
+          { email_canonical: normalizedUsername.toLowerCase() },
+          { 'emails.address': normalizedUsername.toLowerCase() },
+        ],
+      }
+    : {
+        $or: [
+          { username: normalizedUsername },
+          { email_canonical: normalizedUsername },
+          { 'emails.address': normalizedUsername },
+        ],
+      };
+  return await deps.usersCollection.findOneAsync(lookupSelector);
 }
 
 function getExistingAccountMethod(user: any): 'password' | 'google' | 'microsoft' | 'memphisSaml' | 'different-method' {
@@ -484,7 +489,7 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     return true;
   });
 
-  const adminUser = findUserByName(deps, String((Meteor.settings as any)?.owner || ''));
+  const adminUser = await findUserByName(deps, String((Meteor.settings as any)?.owner || ''));
   await Roles.createRoleAsync('admin', { unlessExists: true });
   await Roles.createRoleAsync('teacher', { unlessExists: true });
 
@@ -504,7 +509,7 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     const requested = Array.isArray(roleSettings[memberName]) ? roleSettings[memberName] as unknown[] : [];
     deps.serverConsole('Role', roleName, '- found', requested.length);
     for (const username of requested) {
-      const user = findUserByName(deps, String(username || ''));
+      const user = await findUserByName(deps, String(username || ''));
       if (!user || !user._id) {
         deps.serverConsole('Warning: user', username, 'role', roleName, 'request, but user not found');
         continue;

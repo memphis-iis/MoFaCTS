@@ -159,6 +159,9 @@ async function findExistingAssetPath(relativePath: string) {
     path.resolve(process.cwd(), 'app', 'public'),
     path.resolve(process.cwd(), '..', 'public'),
     path.resolve(process.cwd(), '..', 'app'),
+    path.resolve(process.cwd(), '..', 'web.browser', 'app'),
+    path.resolve(process.cwd(), '..', 'web.browser.legacy', 'app'),
+    path.resolve(process.cwd(), '..', 'web.cordova', 'app'),
     '/opt/bundle/bundle/programs/web.browser/app',
     '/opt/bundle/bundle/programs/web.browser.legacy/app',
     '/opt/bundle/bundle/programs/web.cordova/app'
