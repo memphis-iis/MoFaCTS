@@ -1,8 +1,11 @@
 import { Meteor } from 'meteor/meteor';
 import { Template } from 'meteor/templating';
 import { Session } from 'meteor/session';
+import { Tracker } from 'meteor/tracker';
 import {
     isThemeLengthProperty,
+    isThemeDensityScaleProperty,
+    isValidThemeDensityScale,
     isThemeTransitionProperty,
     isValidThemeCssLength,
     isValidThemeCssTime,
@@ -18,6 +21,187 @@ declare const $: any;
 const THEME_FONT_STYLESHEET_LINK_ID = 'mofacts-theme-font-stylesheet';
 const THEME_IMPORT_MAX_FILE_BYTES = 10 * 1024 * 1024;
 const HOME_UNDERLAY_MAX_FILE_BYTES = 5 * 1024 * 1024;
+const MIN_ICON_CONTRAST_RATIO = 3;
+
+type RgbColor = {
+    r: number;
+    g: number;
+    b: number;
+};
+
+function getPixelChannel(data: Uint8ClampedArray, index: number) {
+    const value = data[index];
+    if (value === undefined) {
+        throw new Error(`Missing pixel channel at index ${index}`);
+    }
+    return value;
+}
+
+function srgbChannelToLinear(channel: number) {
+    const normalized = channel / 255;
+    return normalized <= 0.03928
+        ? normalized / 12.92
+        : Math.pow((normalized + 0.055) / 1.055, 2.4);
+}
+
+function getRelativeLuminance(color: RgbColor) {
+    return (
+        0.2126 * srgbChannelToLinear(color.r) +
+        0.7152 * srgbChannelToLinear(color.g) +
+        0.0722 * srgbChannelToLinear(color.b)
+    );
+}
+
+function getContrastRatio(luminanceA: number, luminanceB: number) {
+    const lighter = Math.max(luminanceA, luminanceB);
+    const darker = Math.min(luminanceA, luminanceB);
+    return (lighter + 0.05) / (darker + 0.05);
+}
+
+function toTwoDigitHex(channel: number) {
+    return Math.max(0, Math.min(255, channel)).toString(16).padStart(2, '0').toUpperCase();
+}
+
+function normalizeColorPickerValue(rawValue: unknown): string | null {
+    if (typeof rawValue !== 'string') {
+        return null;
+    }
+
+    const value = rawValue.trim();
+    const shortHex = /^#([0-9a-f]{3})$/i.exec(value);
+    if (shortHex) {
+        const channels = shortHex[1];
+        if (!channels) {
+            throw new Error(`Invalid short hex color: ${value}`);
+        }
+        return `#${channels[0]}${channels[0]}${channels[1]}${channels[1]}${channels[2]}${channels[2]}`.toUpperCase();
+    }
+
+    if (/^#[0-9a-f]{6}$/i.test(value)) {
+        return value.toUpperCase();
+    }
+
+    try {
+        const parsed = parseCssColor(value);
+        return `#${toTwoDigitHex(parsed.r)}${toTwoDigitHex(parsed.g)}${toTwoDigitHex(parsed.b)}`;
+    } catch (_err) {
+        return null;
+    }
+}
+
+function syncThemeColorPicker(inputEl: HTMLInputElement, themeProperties: Record<string, unknown>) {
+    const propId = inputEl.getAttribute('data-id');
+    if (!propId) {
+        return;
+    }
+
+    const colorValue = normalizeColorPickerValue(themeProperties[propId]);
+    if (!colorValue) {
+        inputEl.disabled = true;
+        inputEl.title = 'This value is not compatible with the native color picker. Edit the text field.';
+        return;
+    }
+
+    inputEl.disabled = false;
+    inputEl.title = '';
+    inputEl.value = colorValue;
+}
+
+function syncThemeColorPickers(root: ParentNode = document) {
+    const theme = Session.get('curTheme');
+    const themeProperties = theme?.properties;
+    if (!themeProperties) {
+        return;
+    }
+
+    root.querySelectorAll<HTMLInputElement>('.currentThemePropColor').forEach((inputEl) => {
+        syncThemeColorPicker(inputEl, themeProperties);
+    });
+}
+
+function parseCssColor(value: string): RgbColor {
+    if (typeof CSS !== 'undefined' && !CSS.supports('color', value)) {
+        throw new Error(`Invalid icon background color: ${value}`);
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 1;
+    canvas.height = 1;
+    const ctx = canvas.getContext('2d');
+
+    if (!ctx) {
+        throw new Error('Unable to create canvas context for color parsing');
+    }
+
+    ctx.fillStyle = '#000000';
+    ctx.fillStyle = value;
+    ctx.fillRect(0, 0, 1, 1);
+
+    const colorData = ctx.getImageData(0, 0, 1, 1).data;
+    return {
+        r: getPixelChannel(colorData, 0),
+        g: getPixelChannel(colorData, 1),
+        b: getPixelChannel(colorData, 2)
+    };
+}
+
+function getImageRelativeLuminance(img: HTMLImageElement) {
+    const sampleSize = 96;
+    const canvas = document.createElement('canvas');
+    canvas.width = sampleSize;
+    canvas.height = sampleSize;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+    if (!ctx) {
+        throw new Error('Unable to create canvas context for icon contrast sampling');
+    }
+
+    ctx.clearRect(0, 0, sampleSize, sampleSize);
+    const scale = Math.min(sampleSize / img.width, sampleSize / img.height);
+    const drawWidth = img.width * scale;
+    const drawHeight = img.height * scale;
+    const dx = (sampleSize - drawWidth) / 2;
+    const dy = (sampleSize - drawHeight) / 2;
+    ctx.drawImage(img, dx, dy, drawWidth, drawHeight);
+
+    const pixels = ctx.getImageData(0, 0, sampleSize, sampleSize).data;
+    let weightedLuminance = 0;
+    let alphaWeight = 0;
+
+    for (let i = 0; i < pixels.length; i += 4) {
+        const alpha = getPixelChannel(pixels, i + 3) / 255;
+        if (alpha <= 0.05) {
+            continue;
+        }
+
+        weightedLuminance += getRelativeLuminance({
+            r: getPixelChannel(pixels, i),
+            g: getPixelChannel(pixels, i + 1),
+            b: getPixelChannel(pixels, i + 2)
+        }) * alpha;
+        alphaWeight += alpha;
+    }
+
+    if (alphaWeight === 0) {
+        throw new Error('Logo image has no visible pixels for icon contrast sampling');
+    }
+
+    return weightedLuminance / alphaWeight;
+}
+
+function getContrastingIconBackgroundColor(img: HTMLImageElement, preferredBackgroundColor: string) {
+    const preferred = parseCssColor(preferredBackgroundColor);
+    const logoLuminance = getImageRelativeLuminance(img);
+    const preferredLuminance = getRelativeLuminance(preferred);
+
+    if (getContrastRatio(logoLuminance, preferredLuminance) >= MIN_ICON_CONTRAST_RATIO) {
+        return preferredBackgroundColor;
+    }
+
+    const whiteContrast = getContrastRatio(logoLuminance, 1);
+    const blackContrast = getContrastRatio(logoLuminance, 0);
+    return whiteContrast >= blackContrast ? '#FFFFFF' : '#000000';
+}
 
 function getThemeLibrary() {
     const library = DynamicSettings.findOne({key: 'themeLibrary'});
@@ -61,6 +245,16 @@ Template.theme.onCreated(function(this: any) {
     this.contrastCache = new Map();
 });
 
+Template.theme.onRendered(function(this: any) {
+    this.autoruns.push(this.autorun(() => {
+        const theme = Session.get('curTheme');
+        if (!theme?.properties) {
+            return;
+        }
+        Tracker.afterFlush(() => syncThemeColorPickers(this.firstNode?.parentNode || document));
+    }));
+});
+
 Template.theme.onDestroyed(function(this: any) {
     // Clean up autoruns
     this.autoruns.forEach((ar: any) => ar.stop());
@@ -91,6 +285,10 @@ Template.theme.helpers({
             return '';
         }
         return themeEditorDisplayValue(String(propId), theme.properties[propId]);
+    },
+    'themeColorPickerValue': function(propId: any) {
+        const theme = Session.get('curTheme');
+        return normalizeColorPickerValue(theme?.properties?.[propId]) || '#000000';
     },
     'availableThemes': function() {
         return getThemeLibrary();
@@ -235,7 +433,10 @@ function validateThemePropInput(inputEl: any, propId: any, rawValue: any) {
         valid = typeof value === 'string';
     }
 
-    if (propId === 'app_font_size_base' || isThemeLengthProperty(propId)) {
+    if (isThemeDensityScaleProperty(propId)) {
+        value = normalizeThemePropertyValue(propId, value);
+        valid = isValidThemeDensityScale(value);
+    } else if (propId === 'app_font_size_base' || isThemeLengthProperty(propId)) {
         value = normalizeThemePropertyValue(propId, value);
         valid = typeof value === 'string' && isValidThemeCssLength(value);
     }
@@ -290,6 +491,20 @@ function applyThemePropertyPreview(property: string, value: unknown) {
     if (property === 'app_font_stylesheet_url') {
         applyThemeFontStylesheet(value);
     }
+}
+
+function applyThemeState(themeData: any) {
+    if (!themeData?.properties) {
+        throw new Error('[Theme] Active theme payload is missing properties');
+    }
+
+    Session.set('curTheme', themeData);
+    Session.set('themeReady', true);
+    Object.entries(themeData.properties).forEach(([property, value]) => {
+        applyThemePropertyPreview(property, value);
+    });
+    document.title = themeData.properties.themeName || 'MoFaCTS';
+    syncThemeColorPickers();
 }
 
 function updateCurrentThemeSessionProperty(property: string, value: unknown) {
@@ -377,7 +592,8 @@ Template.theme.events({
             return;
         }
         try {
-            await (Meteor as any).callAsync('setActiveTheme', themeId);
+            const activeTheme = await (Meteor as any).callAsync('setActiveTheme', themeId);
+            applyThemeState(activeTheme);
         } catch (err: any) {
             alert('Error activating theme: ' + (err?.message || err));
         }
@@ -477,11 +693,10 @@ Template.theme.events({
     },
     'click #themeResetButton': async function() {
         try {
-            await (Meteor as any).callAsync('initializeCustomTheme', 'MoFaCTS');
-            // PHASE 1.5: No need to call getCurrentTheme() - reactive subscription handles it
-            // The Tracker.autorun in getCurrentTheme will detect the theme change automatically
+            const activeTheme = await (Meteor as any).callAsync('initializeCustomTheme', 'MoFaCTS');
+            applyThemeState(activeTheme);
         } catch (err: any) {
-            // Theme initialization fallback keeps existing default theme.
+            alert('Error resetting theme: ' + (err?.message || err));
         }
     },
     'input .currentThemeProp': function(event: any) {
@@ -506,6 +721,7 @@ Template.theme.events({
 
         // Apply CSS immediately for instant preview
         applyThemePropertyPreview(data_id, value);
+        syncThemeColorPickers();
 
         // Auto-save with debounce (wait 1 second after user stops typing)
         clearTimeout((window as any).themeSaveTimeout);
@@ -519,20 +735,20 @@ Template.theme.events({
             }
         }, 1000);
     },
-    // Initialize color picker value when opened (more efficient than reactive autorun)
-    'focus .currentThemePropColor': function(event: any) {
+    // Native mobile color pickers can open before focus has synchronized the value.
+    'pointerdown .currentThemePropColor, focus .currentThemePropColor': function(event: any) {
         const theme = Session.get('curTheme');
         if (theme && theme.properties) {
-            const propId = event.currentTarget.getAttribute('data-id');
-            const value = theme.properties[propId];
-            if (value && value.startsWith('#')) {
-                event.currentTarget.value = value;
-            }
+            syncThemeColorPicker(event.currentTarget, theme.properties);
         }
     },
     'input .currentThemePropColor': function(event: any, instance: any) {
         const data_id = event.currentTarget.getAttribute('data-id');
-        const value = event.currentTarget.value;
+        const value = normalizeColorPickerValue(event.currentTarget.value);
+        if (!value) {
+            clientConsole(1, `[Theme] Native color picker produced an invalid value for ${data_id}`);
+            return;
+        }
         //change the corresponding currentThemeProp value. we need to find a input with the same data-id and change its value
         $(`.currentThemeProp[data-id=${data_id}]`).val(value);
 
@@ -592,6 +808,7 @@ Template.theme.events({
 
         // Apply CSS immediately for instant visual feedback
         applyThemePropertyPreview(data_id, value);
+        syncThemeColorPickers();
 
         // Auto-save immediately for dropdowns
         (async () => {
@@ -672,7 +889,10 @@ Template.theme.events({
                 const img = new Image();
                 img.onload = async function() {
                     try {
-                        const backgroundColor = getThemeIconBackgroundColor();
+                        const backgroundColor = getContrastingIconBackgroundColor(
+                            img,
+                            getThemeIconBackgroundColor()
+                        );
 
                         // Upload the logo
                         await (Meteor as any).callAsync('setCustomThemeProperty', 'brand_logo_url', base64Data);

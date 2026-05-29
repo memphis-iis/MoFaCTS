@@ -276,7 +276,7 @@
 <style>
   .multiple-choice {
     width: 100%;
-    padding: var(--choice-container-padding, 0.5rem) 0;
+    padding: var(--choice-container-padding, var(--app-space-2)) 0;
   }
 
   .button-grid {
@@ -291,7 +291,7 @@
   .choice-button {
     width: min(100%, var(--uniform-button-width, 100%));
     max-width: 100%;
-    padding: var(--choice-padding-block, 0.75rem) var(--choice-padding-inline, 0.75rem);
+    padding: var(--choice-padding-block, calc(0.75rem * var(--app-density-scale))) var(--choice-padding-inline, calc(0.75rem * var(--app-density-scale)));
     font-size: var(--choice-font-size, var(--card-font-size, 24px));
     font-weight: 500;
     line-height: 1.2;

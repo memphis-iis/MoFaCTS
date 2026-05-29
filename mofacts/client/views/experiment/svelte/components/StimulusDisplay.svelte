@@ -605,7 +605,7 @@
 
 <style>
   .stimulus-display {
-    padding: 0.5rem 0.75rem;
+    padding: var(--app-space-2) var(--app-space-3);
     width: 100%;
     height: 100%; /* Fill parent completely for proper % sizing in children */
     max-height: 100%; /* Prevent overflow while filling space */
@@ -614,7 +614,7 @@
     align-items: center; /* Center text boxes horizontally */
     box-sizing: border-box;
     overflow: hidden; /* Prevent content from exceeding bounds */
-    gap: 0.5rem;
+    gap: var(--app-space-2);
     /* Prevent repaints when sibling content changes */
     contain: layout style;
   }
@@ -636,7 +636,7 @@
   .question-number {
     font-size: 0.85rem;
     color: var(--app-secondary-text-color);
-    margin-bottom: 0.25rem;
+    margin-bottom: var(--app-space-1);
   }
 
   .stimulus-text {
@@ -648,8 +648,8 @@
   }
 
   .stimulus-display.h5p-display {
-    padding: 0;
-    gap: 0;
+    padding: var(--app-space-0);
+    gap: var(--app-space-0);
     align-items: stretch;
     justify-content: stretch;
   }
@@ -662,17 +662,17 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 0.25rem;
+    padding: var(--app-space-1);
   }
 
   .stimulus-audio-box.audio-only {
     flex: 1;
-    padding: 2rem;
+    padding: calc(2rem * var(--app-density-scale));
   }
 
   .stimulus-display.flow-row .stimulus-audio-box:not(.audio-only) {
     flex: 0 0 auto;
-    padding: 50px;
+    padding: calc(50px * var(--app-density-scale));
   }
 
   .replay-button {
@@ -718,7 +718,7 @@
     min-height: 0;
     width: 100%;
     height: 100%;
-    padding: 1em;
+    padding: var(--app-space-3);
     overflow: auto;
     border: 1px solid var(--app-secondary-surface-color);
     border-radius: var(--app-border-radius-lg);
@@ -729,7 +729,7 @@
     justify-content: center;
     text-align: center;
     box-sizing: border-box;
-    gap: 0.375rem;
+    gap: calc(0.375rem * var(--app-density-scale));
   }
 
   .stimulus-display.flow-row .stimulus-text-box {
@@ -741,7 +741,7 @@
   }
 
   .stimulus-text :global(p) {
-    margin: 0.5rem 0;
+    margin: var(--app-space-2) 0;
   }
 
   .stimulus-text-content {
@@ -764,7 +764,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 1em;
+    padding: var(--app-space-3);
     border: 1px solid var(--app-secondary-surface-color);
     border-radius: var(--app-border-radius-lg);
     background: var(--learning-card-stimulus-surface-color);
@@ -786,7 +786,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.375rem;
+    gap: calc(0.375rem * var(--app-density-scale));
     width: 100%;
     height: 100%;
     min-height: 0;
@@ -825,7 +825,7 @@
     flex: 0 0 auto;
     display: inline-block;
     max-width: 100%;
-    padding: 0 0.25rem;
+    padding: 0 var(--app-space-1);
     color: var(--app-secondary-text-color);
     font-size: 0.625rem;
     line-height: 1.25;
@@ -866,7 +866,7 @@
     max-width: 100%;
     height: auto;
     display: block;
-    margin: 0 auto;
+    margin: var(--app-space-0) auto;
   }
 
   .stimulus-h5p {

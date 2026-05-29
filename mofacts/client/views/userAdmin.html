@@ -2,29 +2,29 @@
 
 <template name="userAdmin">
 {{#if isInRole 'admin'}}
-    <div class="container" style="margin-top: 1rem;">
+    <div class="container admin-page">
         <h3 class="page-header-title">User Admin</h3>
 
         <!-- User List Section -->
         <div class="admin-section">
-            <div class="card mb-4">
+            <div class="card admin-card">
                 <div class="card-body">
-                    <div class="d-flex align-items-center mb-3">
-                        <i class="fa fa-users me-2" style="font-size: 1.25rem; color: var(--app-accent-color);"></i>
-                        <h5 class="m-0">User List</h5>
+                    <div class="admin-section-heading">
+                        <i class="fa fa-users admin-section-icon"></i>
+                        <h5>User List</h5>
                     </div>
-                    <div class="mb-3">
+                    <div class="admin-form-row">
                         <label for="filter" class="form-label">Filter users</label>
                         <input type="text" name="filter" id="filter" class="form-control" value="{{currentFilter}}" placeholder="Filter by email">
                     </div>
 
                     {{#if isLoading}}
-                    <div class="text-center py-4">
+                    <div class="text-center admin-empty-state">
                         <i class="fa fa-spinner fa-spin fa-2x"></i>
-                        <p class="mt-2 text-muted">Loading users...</p>
+                        <p class="admin-form-row-top text-muted">Loading users...</p>
                     </div>
                     {{else}}
-                    <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="d-flex justify-content-between align-items-center admin-form-row">
                         <div>
                             <small class="text-muted d-block">Showing {{showingRange}} users</small>
                             <small class="text-muted d-block">{{usageAggregateSummary}}</small>
@@ -48,12 +48,12 @@
                         </div>
                     </div>
                     {{#if usageRefreshMessage}}
-                    <div class="alert {{usageRefreshAlertClass}} py-2" role="alert">
+                    <div class="alert {{usageRefreshAlertClass}} admin-alert-compact" role="alert">
                         {{usageRefreshMessage}}
                     </div>
                     {{/if}}
                     {{#if newsEmailMessage}}
-                    <div class="alert {{newsEmailAlertClass}} py-2" role="alert">
+                    <div class="alert {{newsEmailAlertClass}} admin-alert-compact" role="alert">
                         {{newsEmailMessage}}
                     </div>
                     {{/if}}
@@ -138,17 +138,17 @@
 
         <!-- Import User File Section -->
         <div class="admin-section">
-            <div class="card mb-4">
+            <div class="card admin-card">
                 <div class="card-body">
-                    <div class="d-flex align-items-center mb-3">
-                        <i class="fa fa-upload me-2" style="font-size: 1.25rem; color: var(--app-accent-color);"></i>
-                        <h5 class="m-0">Import User File</h5>
+                    <div class="admin-section-heading">
+                        <i class="fa fa-upload admin-section-icon"></i>
+                        <h5>Import User File</h5>
                     </div>
-                    <p class="text-muted small mb-3">CSV format: header row, then email in column 1 and password in column 2. Passwords must be at least 8 characters.</p>
+                    <p class="text-muted small admin-form-row">CSV format: header row, then email in column 1 and password in column 2. Passwords must be at least 8 characters.</p>
                     <div class="row g-3">
                         <div class="col-12">
                             <input type="file" class="form-control" name="upload-users" id="upload-users" value="" placeholder="Users File">
-                            <span class='label label-info file-info mt-2 d-block text-muted small' id="users-file-info"></span>
+                            <span class='label label-info file-info admin-form-row-top d-block text-muted small' id="users-file-info"></span>
                         </div>
                         <div class="col-md-6 text-center">
                             <button type='button' id='doUploadUsers' class='btn btn-primary'>
@@ -161,9 +161,9 @@
         </div>
     </div>
 {{else}}
-    <div class="container" style="margin-top: 1rem;">
+    <div class="container admin-page">
         <h3 class="page-header-title">User Admin</h3>
-        <div class="alert alert-warning mt-4" role="alert">
+        <div class="alert alert-warning admin-denied-alert" role="alert">
             <i class="fa fa-exclamation-triangle"></i>
             <strong>Access Denied:</strong> You do not have permission to access this function.
         </div>

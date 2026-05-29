@@ -5,8 +5,8 @@
     #draft-content-editor-container .je-object__controls,
     #draft-content-editor-container .je-array__controls {
       display: inline-flex !important;
-      gap: 0.25rem;
-      margin-bottom: 0;
+      gap: var(--app-space-1);
+      margin-bottom: var(--app-space-0);
       vertical-align: middle;
     }
 
@@ -20,8 +20,46 @@
 
     #draft-tdf-editor-container .form-label,
     #draft-content-editor-container .form-label {
-      margin-bottom: 0.15rem;
+      margin-bottom: calc(0.15rem * var(--app-density-scale));
       font-weight: 500;
+    }
+
+    .draft-workspace-title {
+      margin-bottom: var(--app-space-1);
+    }
+
+    .draft-workspace-label {
+      margin-bottom: var(--app-space-1);
+    }
+
+    .draft-workspace-tabs {
+      margin-bottom: var(--app-space-3);
+    }
+
+    .draft-workspace-actions-row {
+      margin-top: var(--app-space-3);
+    }
+
+    .draft-content-toolbar,
+    .draft-content-toolbar-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--app-space-2);
+    }
+
+    .draft-content-toolbar {
+      justify-content: space-between;
+      margin-bottom: var(--app-space-3);
+    }
+
+    .draft-content-window-label {
+      margin-bottom: var(--app-space-0);
+    }
+
+    .draft-content-info {
+      padding: var(--app-space-2) var(--app-space-3);
+      margin-bottom: var(--app-space-3);
     }
 
     #draft-tdf-editor-container .je-switcher,
@@ -41,7 +79,7 @@
   <div class="draft-editor-workspace">
     <div class="draft-workspace-header">
       <div>
-        <h4 class="mb-1">{{workspaceHeading}}</h4>
+        <h4 class="draft-workspace-title">{{workspaceHeading}}</h4>
         {{#if currentLesson}}
         <div class="text-muted small">
           <strong>{{currentLesson.title}}</strong>
@@ -54,7 +92,7 @@
       </div>
       {{#if hasMultipleLessons}}
       <div class="draft-lesson-select">
-        <label class="small mb-1">Lesson</label>
+        <label class="small draft-workspace-label">Lesson</label>
         <select class="form-control form-control-sm" id="draft-lesson-select">
           {{#each lessonOptions}}
           <option value="{{index}}" selected={{isSelected}}>{{label}}</option>
@@ -70,7 +108,7 @@
     </div>
     {{/if}}
 
-    <div class="draft-workspace-tabs btn-group mb-3" role="group">
+    <div class="draft-workspace-tabs btn-group" role="group">
       <button class="btn btn-outline-primary draft-tab {{#if isActiveTab 'tdf'}}active{{/if}}" data-tab="tdf">TDF</button>
       <button class="btn btn-outline-primary draft-tab {{#if isActiveTab 'content'}}active{{/if}}" data-tab="content">Content</button>
     </div>
@@ -83,7 +121,7 @@
       <div id="draft-content-editor-container"></div>
     </div>
 
-    <div class="wizard-actions mt-3">
+    <div class="wizard-actions draft-workspace-actions-row">
       <button class="btn btn-secondary" id="draft-workspace-back">← Back</button>
       <div class="draft-workspace-actions">
         <button class="btn btn-outline-secondary" id="draft-reset-defaults">Reset to Generated Defaults</button>

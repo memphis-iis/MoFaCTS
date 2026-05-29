@@ -196,21 +196,21 @@ export async function createContentDraftEditor(
 
   container.innerHTML = `
     <div class="draft-content-editor">
-      <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-        <div class="d-flex flex-wrap align-items-center gap-2">
+      <div class="draft-content-toolbar">
+        <div class="draft-content-toolbar-group">
           <button type="button" class="btn btn-outline-secondary btn-sm draft-content-prev">Previous</button>
           <div class="small text-muted draft-content-status"></div>
           <button type="button" class="btn btn-outline-secondary btn-sm draft-content-next">Next</button>
         </div>
-        <div class="d-flex align-items-center gap-2">
-          <label class="small mb-0" for="draft-content-window-size">Show</label>
+        <div class="draft-content-toolbar-group">
+          <label class="small draft-content-window-label" for="draft-content-window-size">Show</label>
           <select class="form-control form-control-sm" id="draft-content-window-size" style="width:auto;">
             ${WINDOW_SIZE_OPTIONS.map((size) => `<option value="${size}">${size}</option>`).join('')}
           </select>
           <span class="small text-muted">cluster(s) at a time</span>
         </div>
       </div>
-      <div class="alert alert-info py-2 px-3 small mb-3">
+      <div class="alert alert-info small draft-content-info">
         Editing is windowed for performance. The full lesson stays intact, but only the visible cluster range is rendered at one time.
       </div>
       <div class="draft-content-editor-host"></div>

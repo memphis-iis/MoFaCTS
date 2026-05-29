@@ -41,7 +41,7 @@
 
   .h5p-question-number {
     flex: 0 0 auto;
-    padding: 0.35rem 0.75rem;
+    padding: calc(0.35rem * var(--app-density-scale)) calc(0.75rem * var(--app-density-scale));
     color: var(--app-secondary-text-color);
     font-size: 0.85rem;
     text-align: center;

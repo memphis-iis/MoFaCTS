@@ -4,7 +4,7 @@
   input::-webkit-outer-spin-button,
   input::-webkit-inner-spin-button {
     -webkit-appearance: none;
-    margin: 0;
+    margin: var(--app-space-0);
   }
 
   /* Firefox */
@@ -13,17 +13,17 @@
   }
   </style>
 {{#if isInRole 'admin, teacher'}}
-  <div class="container" style="margin-top: 1rem;">
+  <div class="container admin-page">
     <h3 class="page-header-title">Instructor Reporting</h3>
 
     <div id="mainContent">
       <!-- Class Selection Section -->
       <div class="admin-section">
-        <div class="card mb-4">
+        <div class="card admin-card">
           <div class="card-body">
-            <div class="d-flex align-items-center mb-3">
-              <i class="fa fa-users me-2" style="font-size: 1.25rem; color: var(--app-accent-color);"></i>
-              <h5 class="m-0">Class Selection</h5>
+            <div class="admin-section-heading">
+              <i class="fa fa-users admin-section-icon"></i>
+              <h5>Class Selection</h5>
             </div>
             <select id="class-select" class="form-select">
               <option selected="selected" value="{{INVALID}}" disabled="true">Select a class</option>
@@ -37,11 +37,11 @@
 
       <!-- Select Chapter Section -->
       <div class="admin-section">
-        <div class="card mb-4">
+        <div class="card admin-card">
           <div class="card-body">
-            <div class="d-flex align-items-center mb-3">
-              <i class="fa fa-book me-2" style="font-size: 1.25rem; color: var(--app-accent-color);"></i>
-              <h5 class="m-0">Select Chapter</h5>
+            <div class="admin-section-heading">
+              <i class="fa fa-book admin-section-icon"></i>
+              <h5>Select Chapter</h5>
             </div>
             <select id="tdf-select" disabled="true" class="form-select">
               <option selected="selected" value="{{INVALID}}" disabled="true">Select a lesson</option>
@@ -50,7 +50,7 @@
               {{/each}}
             </select>
             {{#if performanceLoading}}
-              <p class="text-muted text-center mt-3 mb-0">Loading reports...</p>
+              <p class="text-muted text-center admin-loading-text">Loading reports...</p>
             {{/if}}
           </div>
         </div>
@@ -59,11 +59,11 @@
       {{#if selectedTdfDueDate}}
       <!-- Practice Deadline Section -->
       <div class="admin-section">
-        <div class="card mb-4">
+        <div class="card admin-card">
           <div class="card-body">
-            <div class="d-flex align-items-center mb-3">
-              <i class="fa fa-calendar me-2" style="font-size: 1.25rem; color: var(--app-accent-color);"></i>
-              <h5 class="m-0">Practice Deadline</h5>
+            <div class="admin-section-heading">
+              <i class="fa fa-calendar admin-section-icon"></i>
+              <h5>Practice Deadline</h5>
             </div>
             <input type="date" id="practice-deadline-date" name="practice-deadline-date-select" disabled="true" class="form-control">
           </div>
@@ -72,11 +72,11 @@
 
       <!-- Filter By Due Date Section -->
       <div class="admin-section">
-        <div class="card mb-4">
+        <div class="card admin-card">
           <div class="card-body">
-            <div class="d-flex align-items-center mb-3">
-              <i class="fa fa-filter me-2" style="font-size: 1.25rem; color: var(--app-accent-color);"></i>
-              <h5 class="m-0">Filter By Due Date ({{selectedTdfDueDate}})</h5>
+            <div class="admin-section-heading">
+              <i class="fa fa-filter admin-section-icon"></i>
+              <h5>Filter By Due Date ({{selectedTdfDueDate}})</h5>
             </div>
             <div class="row g-3">
               <div class="col-12">
@@ -99,11 +99,11 @@
 
       <!-- Class Data Section -->
       <div class="admin-section">
-        <div class="card mb-4">
+        <div class="card admin-card">
           <div class="card-body">
-            <div class="d-flex align-items-center mb-3">
-              <i class="fa fa-table me-2" style="font-size: 1.25rem; color: var(--app-accent-color);"></i>
-              <h5 class="m-0">Class Data</h5>
+            <div class="admin-section-heading">
+              <i class="fa fa-table admin-section-icon"></i>
+              <h5>Class Data</h5>
             </div>
             <div class="admin-table-wrapper">
               <div class="table-responsive">

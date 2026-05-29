@@ -61,28 +61,46 @@
       <div class="spinner-border" role="status" style="width: 3rem; height: 3rem; color: var(--app-text-color);">
         <span class="sr-only">Loading...</span>
       </div>
-      <div class="mt-3" style="color: var(--app-text-color);">{{appLoadingMessage}}</div>
+      <div class="app-loading-message" style="color: var(--app-text-color);">{{appLoadingMessage}}</div>
     </div>
   </div>
   {{/if}}
 
-  {{#if showAppSidebarChrome}}
-    <div class="app home-app tool-app page-loaded" id="homeContainer" style="{{appShellUnderlayStyle}}">
-      {{> appSidebar}}
-      <div class="main" id="homeMain">
-        <header class="top-header">
-          <button class="icon-btn mobile-sidebar-trigger" id="mobileSidebarToggle" type="button" aria-label="Open menu" title="Open menu">
-            <span class="fa fa-bars" aria-hidden="true"></span>
-          </button>
+  {{#if showAuthenticatedAppChrome}}
+    <div class="app home-app {{appChromeClass}} page-loaded" id="homeContainer" style="{{appShellUnderlayStyle}}">
+      {{#if showAppSidebar}}
+        {{> appSidebar}}
+      {{/if}}
+      <div class="main {{appMainClass}}" id="homeMain">
+        <header class="top-header {{appHeaderClass}}">
+          {{#if showAppSidebar}}
+            <button class="icon-btn mobile-sidebar-trigger" id="mobileSidebarToggle" type="button" aria-label="Open menu" title="Open menu">
+              <span class="fa fa-bars" aria-hidden="true"></span>
+            </button>
+          {{/if}}
           <h1 class="page-title">{{appShellTitle}}</h1>
           <div class="header-right">
-            {{> appAccountMenu}}
+            {{#if isPracticeChrome}}
+              <button type="button" class="btn btn-primary practice-return-button" id="saveReturnPracticeMenuButton">
+                Save and return to practice menu
+              </button>
+            {{else}}
+              {{> appAccountMenu}}
+            {{/if}}
           </div>
         </header>
 
-        <main class="content tool-content">
+        {{#if showPracticeMenu}}
+          {{> appPracticeMenu}}
+        {{/if}}
+
+        {{#if showPageNumbers}}
+          {{> curPageNumbers}}
+        {{/if}}
+
+        <main class="content {{appContentClass}}">
           {{#if uiMessage}}
-          <div class="container mt-3">
+          <div class="container app-ui-message-container">
             <div class="alert alert-{{uiMessage.variant}} d-flex align-items-center justify-content-between" role="alert">
               <div>{{uiMessage.text}}</div>
               <button type="button" class="btn-close" aria-label="Close" data-ui-message-clear="true"></button>
@@ -108,15 +126,8 @@
       </div>
     </div>
   {{else}}
-    {{#if showAuthenticatedChrome}}
-      {{> nav}}
-      {{#if showPageNumbers}}
-        {{> curPageNumbers}}
-        <br>
-      {{/if}}
-    {{/if}}
     {{#if uiMessage}}
-    <div class="container mt-3">
+    <div class="container app-ui-message-container">
       <div class="alert alert-{{uiMessage.variant}} d-flex align-items-center justify-content-between" role="alert">
         <div>{{uiMessage.text}}</div>
         <button type="button" class="btn-close" aria-label="Close" data-ui-message-clear="true"></button>
@@ -155,7 +166,7 @@
         <div class="modal-body">
           <div class="container">
             <div class="row">
-              <div class="col-10 mx-auto">
+              <div class="col-10 app-disabled-error-field">
                 <textarea id="errorDescription" placeholder="Describe the error here." rows="5"></textarea>
               </div>
             </div>

@@ -84,7 +84,7 @@ function buildManifestPayload(theme: ThemeLike) {
     start_url: '/',
     scope: '/',
     display: 'standalone',
-    app_background_color: backgroundColor,
+    background_color: backgroundColor,
     theme_color: themeColor,
     icons: [
       {

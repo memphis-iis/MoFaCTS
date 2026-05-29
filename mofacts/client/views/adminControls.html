@@ -1,11 +1,11 @@
 <!-- User Administration Template -->
 
 <template name="adminControls">
-    <div class="container" style="margin-top: 1rem;">
+    <div class="container admin-page">
         <h3 class="page-header-title">Admin Control Panel</h3>
 
         {{#if adminMessage}}
-        <div class="alert {{adminMessage.className}} mb-3" role="status" aria-live="polite">
+        <div class="alert {{adminMessage.className}} admin-message" role="status" aria-live="polite">
             {{adminMessage.text}}
         </div>
         {{/if}}
@@ -13,11 +13,11 @@
         {{#if isInRole 'admin'}}
         <!-- Server Status Section -->
         <div class="admin-section">
-            <div class="card mb-4">
+            <div class="card admin-card">
                 <div class="card-body">
-                    <div class="d-flex align-items-center mb-3">
-                        <i class="fa fa-server me-2" style="font-size: 1.25rem; color: var(--app-accent-color);"></i>
-                        <h5 class="m-0">Server Status</h5>
+                    <div class="admin-section-heading">
+                        <i class="fa fa-server admin-section-icon"></i>
+                        <h5>Server Status</h5>
                     </div>
                     <div class="row g-3">
                         <div class="col-md-6">
@@ -37,11 +37,11 @@
 
         <!-- Stimulus display cache refresh section -->
         <div class="admin-section">
-            <div class="card mb-4">
+            <div class="card admin-card">
                 <div class="card-body">
-                    <div class="d-flex align-items-center mb-3">
-                        <i class="fa fa-refresh me-2" style="font-size: 1.25rem; color: var(--app-accent-color);"></i>
-                        <h5 class="m-0">Stimulus Display Cache</h5>
+                    <div class="admin-section-heading">
+                        <i class="fa fa-refresh admin-section-icon"></i>
+                        <h5>Stimulus Display Cache</h5>
                     </div>
                     <div class="text-center">
                         <button type="button" id="updateStimDisplayTypeMap" class="btn btn-primary">
@@ -54,11 +54,11 @@
 
         <!-- Server Verbosity Level Section -->
         <div class="admin-section">
-            <div class="card mb-4">
+            <div class="card admin-card">
                 <div class="card-body">
-                    <div class="d-flex align-items-center mb-3">
-                        <i class="fa fa-cog me-2" style="font-size: 1.25rem; color: var(--app-accent-color);"></i>
-                        <h5 class="m-0">Server Verbosity Level</h5>
+                    <div class="admin-section-heading">
+                        <i class="fa fa-cog admin-section-icon"></i>
+                        <h5>Server Verbosity Level</h5>
                     </div>
                     <div class="row g-3">
                         <div class="col-12">
@@ -93,11 +93,11 @@
 
         <!-- Client Verbosity Level Section -->
         <div class="admin-section">
-            <div class="card mb-4">
+            <div class="card admin-card">
                 <div class="card-body">
-                    <div class="d-flex align-items-center mb-3">
-                        <i class="fa fa-desktop me-2" style="font-size: 1.25rem; color: var(--app-accent-color);"></i>
-                        <h5 class="m-0">Client Verbosity Level</h5>
+                    <div class="admin-section-heading">
+                        <i class="fa fa-desktop admin-section-icon"></i>
+                        <h5>Client Verbosity Level</h5>
                     </div>
                     <div class="row g-3">
                         <div class="col-12">

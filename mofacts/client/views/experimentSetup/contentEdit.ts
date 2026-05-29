@@ -1002,8 +1002,8 @@ async function handleMediaUpload(file: any, mediaType: any, input: any, preview:
     // Show upload progress
     preview.style.display = 'flex';
     preview.innerHTML = `
-        <div style="width: 100%;">
-            <div class="d-flex align-items-center gap-2 mb-1">
+        <div class="media-upload-status">
+            <div class="media-upload-status-row">
                 <i class="fa fa-spinner fa-spin"></i>
                 <span>Uploading ${file.name}...</span>
             </div>
@@ -1047,11 +1047,11 @@ async function handleMediaUpload(file: any, mediaType: any, input: any, preview:
                 // Update preview
                 preview.innerHTML = '';
                 if (mediaType === 'image') {
-                    preview.innerHTML = `<img src="${filePath}" alt="Preview"><span class="text-success ms-2"><i class="fa fa-check"></i> Uploaded</span>`;
+                    preview.innerHTML = `<img src="${filePath}" alt="Preview"><span class="text-success media-upload-success"><i class="fa fa-check"></i> Uploaded</span>`;
                 } else if (mediaType === 'audio') {
-                    preview.innerHTML = `<audio controls src="${filePath}"></audio><span class="text-success ms-2"><i class="fa fa-check"></i> Uploaded</span>`;
+                    preview.innerHTML = `<audio controls src="${filePath}"></audio><span class="text-success media-upload-success"><i class="fa fa-check"></i> Uploaded</span>`;
                 } else if (mediaType === 'video') {
-                    preview.innerHTML = `<video controls src="${filePath}"></video><span class="text-success ms-2"><i class="fa fa-check"></i> Uploaded</span>`;
+                    preview.innerHTML = `<video controls src="${filePath}"></video><span class="text-success media-upload-success"><i class="fa fa-check"></i> Uploaded</span>`;
                 }
             }
         });

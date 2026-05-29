@@ -189,7 +189,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.32rem;
+    gap: calc(0.32rem * var(--app-density-scale));
     border: 1px solid var(--app-secondary-surface-color);
     border-right: 0;
     border-radius: var(--app-border-radius-lg) 0 0 var(--app-border-radius-lg);
@@ -253,13 +253,13 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.75rem;
-    padding: 0.5rem 0.65rem 0.45rem 0.75rem;
+    gap: var(--app-space-3);
+    padding: var(--app-space-2) calc(0.65rem * var(--app-density-scale)) calc(0.45rem * var(--app-density-scale)) var(--app-space-3);
     border-bottom: 1px solid var(--app-secondary-surface-color);
   }
 
   .learning-progress-header h2 {
-    margin: 0;
+    margin: var(--app-space-0);
     font-size: 0.95rem;
     line-height: 1.1;
     font-weight: 700;
@@ -291,8 +291,8 @@
   .learning-progress-stats {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.4rem;
-    padding: 0.5rem 0.7rem;
+    gap: calc(0.4rem * var(--app-density-scale));
+    padding: var(--app-space-2) calc(0.7rem * var(--app-density-scale));
     border-bottom: 1px solid var(--app-secondary-surface-color);
   }
 
@@ -300,8 +300,8 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.1rem;
-    padding: 0.35rem 0.4rem;
+    gap: calc(0.1rem * var(--app-density-scale));
+    padding: calc(0.35rem * var(--app-density-scale)) calc(0.4rem * var(--app-density-scale));
     border: 1px solid var(--app-secondary-surface-color);
     border-radius: var(--app-border-radius-sm);
     background: var(--navigation-surface-color);
@@ -327,7 +327,7 @@
     position: relative;
     flex: 1 1 auto;
     min-height: 0;
-    margin: 0.55rem 0.7rem 0;
+    margin: calc(0.55rem * var(--app-density-scale)) calc(0.7rem * var(--app-density-scale)) var(--app-space-0);
     overflow: hidden;
   }
 
@@ -362,7 +362,7 @@
     left: 50%;
     transform: translate(-50%, -50%);
     writing-mode: vertical-lr;
-    padding: 0.25rem 0.18rem;
+    padding: var(--app-space-1) calc(0.18rem * var(--app-density-scale));
     border: 1px solid currentColor;
     border-radius: var(--app-border-radius-sm);
     background: var(--learning-card-surface-color);
@@ -391,7 +391,7 @@
     display: block;
     width: 100%;
     height: 3px;
-    margin-bottom: 2px;
+    margin-bottom: calc(2px * var(--app-density-scale));
   }
 
   .learning-progress-bar {
@@ -414,8 +414,8 @@
   .learning-progress-axis {
     display: flex;
     justify-content: space-between;
-    gap: 0.5rem;
-    padding: 0.4rem 0.7rem 0.55rem;
+    gap: var(--app-space-2);
+    padding: calc(0.4rem * var(--app-density-scale)) calc(0.7rem * var(--app-density-scale)) calc(0.55rem * var(--app-density-scale));
     border-top: 1px solid var(--app-secondary-surface-color);
     color: var(--app-secondary-text-color);
     font-size: 0.62rem;
@@ -423,7 +423,7 @@
   }
 
   .learning-progress-empty {
-    padding: 0.8rem;
+    padding: calc(0.8rem * var(--app-density-scale));
     color: var(--app-secondary-text-color);
     font-size: 0.8rem;
     line-height: 1.35;

@@ -1,21 +1,21 @@
 <template name="audioSettings">
-  <div class="container" style="margin-top: 1rem;">
+  <div class="container admin-page">
     <h3 class="page-header-title">Audio Settings</h3>
 
     <!-- Text-to-Speech Section -->
     <div class="admin-section">
-      <div class="card mb-4">
+      <div class="card admin-card">
         <div class="card-body">
-          <div class="d-flex align-items-center mb-3">
-            <i class="fa fa-headphones me-2" style="font-size: 1.25rem; color: var(--app-accent-color);"></i>
-            <h5 class="m-0">Text-to-Speech</h5>
+          <div class="admin-section-heading">
+            <i class="fa fa-headphones admin-section-icon"></i>
+            <h5>Text-to-Speech</h5>
           </div>
 
           <div class="card border">
             <div class="card-body">
-              <div class="form-check form-switch mb-3">
+              <div class="form-check form-switch admin-form-row">
                 <input class="form-check-input" type="checkbox" role="switch" id="audioPromptQuestionOn">
-                <label class="form-check-label ms-2" for="audioPromptQuestionOn">
+                <label class="form-check-label admin-inline-action" for="audioPromptQuestionOn">
                   <strong>Read questions</strong>
                   <br><small class="text-muted">Hear each question read aloud</small>
                 </label>
@@ -23,7 +23,7 @@
 
               <div class="form-check form-switch">
                 <input class="form-check-input" type="checkbox" role="switch" id="audioPromptFeedbackOn">
-                <label class="form-check-label ms-2" for="audioPromptFeedbackOn">
+                <label class="form-check-label admin-inline-action" for="audioPromptFeedbackOn">
                   <strong>Read feedback</strong>
                   <br><small class="text-muted">Hear feedback after your answer</small>
                 </label>
@@ -33,12 +33,12 @@
 
           <!-- Voice Controls (shown when TTS is enabled) -->
           <div class="audioPromptSharedGroup" style="display: none;">
-            <div class="card border bg-light mt-3">
+            <div class="card border bg-light admin-form-row-top">
               <div class="card-body">
                 <div class="row g-3">
                   <div class="col-md-4">
                     <label for="audioPromptVolume" class="form-label fw-semibold">
-                      <i class="fa fa-volume-up me-1"></i>Volume
+                      <i class="fa fa-volume-up admin-section-icon"></i>Volume
                     </label>
                     <input type="range" class="form-range" id="audioPromptVolume" min="-6" max="6" step=".5" value="0">
                     <div class="d-flex justify-content-between">
@@ -49,7 +49,7 @@
 
                   <div class="col-md-4">
                     <label for="audioPromptSpeakingRate" class="form-label fw-semibold">
-                      <i class="fa fa-gauge me-1"></i>Speed
+                      <i class="fa fa-gauge admin-section-icon"></i>Speed
                     </label>
                     <select class="form-select" id="audioPromptSpeakingRate">
                       <option value=".25">0.25x</option>
@@ -65,7 +65,7 @@
 
                   <div class="col-md-4">
                     <label for="audioPromptVoice" class="form-label fw-semibold">
-                      <i class="fa fa-user me-1"></i>Voice
+                      <i class="fa fa-user admin-section-icon"></i>Voice
                     </label>
                     <div class="input-group">
                       <select class="form-select" id="audioPromptVoice">
@@ -95,20 +95,20 @@
 
     <!-- Speech Recognition Section -->
     <div class="admin-section">
-      <div class="card mb-4">
+      <div class="card admin-card">
         <div class="card-body">
-          <div class="d-flex align-items-center mb-3">
-            <i class="fa fa-microphone me-2" style="font-size: 1.25rem; color: var(--app-accent-color);"></i>
-            <h5 class="m-0">Speech Recognition</h5>
+          <div class="admin-section-heading">
+            <i class="fa fa-microphone admin-section-icon"></i>
+            <h5>Speech Recognition</h5>
           </div>
 
           <div class="card border">
             <div class="card-body">
-              <div class="row align-items-start mb-3">
+              <div class="row align-items-start admin-form-row">
                 <div class="col-12 col-md-6">
                   <div class="form-check form-switch">
                     <input class="form-check-input" type="checkbox" role="switch" id="audioInputOn">
-                    <label class="form-check-label ms-2" for="audioInputOn">
+                    <label class="form-check-label admin-inline-action" for="audioInputOn">
                       <strong>Enable voice input</strong>
                       <br><small class="text-muted">Answer questions by speaking</small>
                     </label>
@@ -116,9 +116,9 @@
                 </div>
 
                 <div class="col-12 col-md-6 audioInputGroup" style="display: none;">
-                  <div class="d-flex justify-content-between align-items-center mb-1">
-                    <label for="audioInputSensitivity" class="form-label fw-semibold mb-0">
-                      <i class="fa fa-sliders me-1"></i>Speech Detection Threshold
+                  <div class="d-flex justify-content-between align-items-center admin-form-row-sm">
+                    <label for="audioInputSensitivity" class="form-label fw-semibold admin-empty-text">
+                      <i class="fa fa-sliders admin-section-icon"></i>Speech Detection Threshold
                     </label>
                     <span class="badge text-bg-light border">
                       <span id="audioInputSensitivityLabel">60</span> dB
@@ -129,11 +129,11 @@
                     <small class="text-muted">20 dB<br>Very easy to trigger</small>
                     <small class="text-muted text-end">80 dB<br>Needs loud speech</small>
                   </div>
-                  <p class="small text-muted mt-2 mb-2">
+                  <p class="small text-muted admin-form-row-sm">
                     The app starts recording when your voice rises above this threshold and stops after a short silence below it.
                   </p>
                   <div class="table-responsive">
-                    <table class="table table-sm table-bordered align-middle mb-0">
+                    <table class="table table-sm table-bordered align-middle admin-empty-text">
                       <thead class="table-light">
                         <tr>
                           <th scope="col">Common sound</th>
@@ -180,22 +180,22 @@
 
               <div class="audioInputGroup" style="display: none;">
                 {{#if showSpeechAPISetup}}
-                  <div class="border-top pt-3">
-                    <h6 class="mb-3">
-                      <i class="fa fa-key me-2"></i>Google Speech API Key
+                  <div class="border-top admin-section-top-border">
+                    <h6 class="admin-section-heading">
+                      <i class="fa fa-key admin-section-icon"></i>Google Speech API Key
                     </h6>
-                    <p class="text-muted small mb-2">
+                    <p class="text-muted small admin-form-row-sm">
                       To use speech recognition, you need a Google Speech API key.
                       <a href="https://support.google.com/cloud/answer/6158862?hl=en" target="_blank">Learn how to get one <i class="fa fa-external-link-alt fa-xs"></i></a>
                     </p>
 
                     {{#if speechAPIKeyIsSetup}}
-                      <div class="alert alert-success border-success mb-2" role="alert">
+                      <div class="alert alert-success border-success admin-form-row-sm" role="alert">
                         <i class="fa fa-check-circle"></i> Speech API key is configured
                       </div>
                     {{/if}}
 
-                    <div class="input-group mb-2">
+                    <div class="input-group admin-form-row-sm">
                       <input type="text" class="form-control" id="speechAPIKey" placeholder="Enter your API key">
                       <button id="speechAPISubmit" type="button" class="btn btn-primary">
                         <i class="fa fa-save"></i> Save

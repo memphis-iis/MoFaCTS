@@ -45,16 +45,16 @@ export function createValidationSummary(errors: ValidationResult[], warnings: Va
   if (errors.length > 0) {
     const hasBreaking = errors.some(e => e.breaking);
     html += `
-      <div class="validation-errors alert alert-danger mb-2">
-        <div class="d-flex align-items-center">
+      <div class="validation-errors alert alert-danger validation-alert">
+        <div class="validation-summary-row">
           ${ERROR_ICON}
-          <strong class="ms-2">${errors.length} Error${errors.length !== 1 ? 's' : ''}</strong>
-          ${hasBreaking ? '<span class="badge bg-warning text-dark ms-2">Breaking Changes</span>' : ''}
-          <button type="button" class="btn btn-sm btn-link ms-auto toggle-validation-details p-0" data-target="error">
+          <strong class="validation-summary-label">${errors.length} Error${errors.length !== 1 ? 's' : ''}</strong>
+          ${hasBreaking ? '<span class="badge bg-warning text-dark validation-breaking-badge">Breaking Changes</span>' : ''}
+          <button type="button" class="btn btn-sm btn-link toggle-validation-details validation-toggle-button" data-target="error">
             <i class="fa fa-chevron-down"></i>
           </button>
         </div>
-        <ul class="validation-list error-list mb-0 mt-2" style="display: none;">
+        <ul class="validation-list error-list validation-list-collapsed" style="display: none;">
           ${errors.map(e => createValidationItem(e)).join('')}
         </ul>
       </div>
@@ -64,15 +64,15 @@ export function createValidationSummary(errors: ValidationResult[], warnings: Va
   // Warnings section
   if (warnings.length > 0) {
     html += `
-      <div class="validation-warnings alert alert-warning mb-2">
-        <div class="d-flex align-items-center">
+      <div class="validation-warnings alert alert-warning validation-alert">
+        <div class="validation-summary-row">
           ${WARNING_ICON}
-          <strong class="ms-2">${warnings.length} Warning${warnings.length !== 1 ? 's' : ''}</strong>
-          <button type="button" class="btn btn-sm btn-link ms-auto toggle-validation-details p-0" data-target="warning">
+          <strong class="validation-summary-label">${warnings.length} Warning${warnings.length !== 1 ? 's' : ''}</strong>
+          <button type="button" class="btn btn-sm btn-link toggle-validation-details validation-toggle-button" data-target="warning">
             <i class="fa fa-chevron-down"></i>
           </button>
         </div>
-        <ul class="validation-list warning-list mb-0 mt-2" style="display: none;">
+        <ul class="validation-list warning-list validation-list-collapsed" style="display: none;">
           ${warnings.map(e => createValidationItem(e)).join('')}
         </ul>
       </div>
@@ -96,7 +96,7 @@ function createValidationItem(error: ValidationResult): string {
   return `
     <li class="validation-item" data-path="${path}">
       <a href="#" class="jump-to-field text-decoration-none">${displayPath}</a>: ${message}
-      ${error.breaking ? '<span class="badge bg-warning text-dark ms-1" title="Changing this will reset student progress">Breaking</span>' : ''}
+      ${error.breaking ? '<span class="badge bg-warning text-dark validation-breaking-badge-sm" title="Changing this will reset student progress">Breaking</span>' : ''}
     </li>
   `;
 }
@@ -166,8 +166,8 @@ export function applyFieldErrors(container: HTMLElement, results: ValidationResu
         const existingMsg = fieldEl.querySelector('.field-validation-message');
         if (!existingMsg) {
           const msg = document.createElement('small');
-          msg.className = `field-validation-message d-block mt-1 text-${result.severity === 'error' ? 'danger' : 'warning'}`;
-          msg.innerHTML = `${result.severity === 'error' ? ERROR_ICON : WARNING_ICON} <span class="ms-1">${DOMPurify.sanitize(result.message)}</span>`;
+          msg.className = `field-validation-message d-block text-${result.severity === 'error' ? 'danger' : 'warning'}`;
+          msg.innerHTML = `${result.severity === 'error' ? ERROR_ICON : WARNING_ICON} <span class="field-validation-message-text">${DOMPurify.sanitize(result.message)}</span>`;
 
           // Insert after input (or after existing small text)
           const insertAfter = input.nextElementSibling?.tagName === 'SMALL'

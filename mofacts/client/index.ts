@@ -43,10 +43,6 @@ import './views/login/signUp';
 import './views/login/resetPassword';
 import './views/login/verifyEmail';
 
-// -- Top-level views --
-// Keep navigation eagerly loaded because DefaultLayout references it globally.
-import './views/navigation';
-
 // -- Experiment --
 import './views/experiment/multiTdfSelect';
 // Lazily loaded route modules are loaded from client/lib/router.js:
@@ -73,7 +69,7 @@ function sanitizeHTML(dirty: string | null | undefined) {
 
 export { clientConsole };
 
-const APP_SIDEBAR_TEMPLATES = new Set([
+const APP_SHELL_TEMPLATES = new Set([
   'contentUpload',
   'manualContentCreator',
   'contentEdit',
@@ -90,6 +86,11 @@ const APP_SIDEBAR_TEMPLATES = new Set([
   'classEdit',
   'tdfAssignmentEdit',
   'instructorReporting',
+]);
+
+const PRACTICE_SHELL_TEMPLATES = new Set([
+  'card',
+  'instructions',
 ]);
 
 const APP_SHELL_TITLES: Record<string, string> = {
@@ -111,6 +112,8 @@ const APP_SHELL_TITLES: Record<string, string> = {
   instructorReporting: 'Instructor Reporting',
 };
 
+type AuthenticatedChromeMode = 'none' | 'app' | 'practice';
+
 async function leavePracticeForHome(): Promise<boolean> {
   const currentPath = document.location.pathname;
   if (currentPath !== '/card' && currentPath !== '/instructions') {
@@ -120,6 +123,33 @@ async function leavePracticeForHome(): Promise<boolean> {
   const { leavePage } = await import('./views/experiment/svelte/services/navigationCleanup');
   await leavePage('/home');
   return true;
+}
+
+function getPracticeLessonTitle(): string {
+  const tdfFile = Session.get('currentTdfFile') as any;
+  const title = tdfFile?.tdfs?.tutor?.setspec?.lessonname || Session.get('currentLessonName');
+  return typeof title === 'string' && title.trim() ? title.trim() : 'Practice';
+}
+
+function getAuthenticatedChromeMode(): AuthenticatedChromeMode {
+  if (Meteor.userId() === null) {
+    return 'none';
+  }
+  if (Session.get('suppressAuthenticatedChrome') === true) {
+    return 'none';
+  }
+  if (Session.get('loginMode') === 'experiment') {
+    return 'none';
+  }
+
+  const currentTemplate = String(Session.get('currentTemplate') || '');
+  if (PRACTICE_SHELL_TEMPLATES.has(currentTemplate)) {
+    return 'practice';
+  }
+  if (APP_SHELL_TEMPLATES.has(currentTemplate)) {
+    return 'app';
+  }
+  return 'none';
 }
 
 function getSystemName() {
@@ -665,36 +695,10 @@ Template.DefaultLayout.events({
     event.preventDefault();
     document.getElementById('sidebar')?.classList.toggle('sidebar-mobile-open', true);
   },
-  'click #homeButton': async function(event: JQuery.TriggeredEvent) {
+  'click #saveReturnPracticeMenuButton': async function(event: JQuery.TriggeredEvent) {
     event.preventDefault();
-
-    if (await leavePracticeForHome()) {
-      return;
-    }
-
-    audioManager.pauseCurrentAudio();
-
-    // Update dashboard cache when leaving from card/practice page
-    const currentPath = document.location.pathname;
-    if (currentPath === '/card' || currentPath === '/instructions') {
-      const currentTdfId = Session.get('currentTdfId');
-      if (currentTdfId) {
-        clientConsole(2, '[Cache] Navbar: Updating dashboard cache for TDF:', currentTdfId);
-        try {
-          /** @type {UpdateDashboardCacheResult} */
-          const result = await meteorCallAsync('updateDashboardCacheForTdf', currentTdfId);
-          clientConsole(2, '[Cache] Navbar: Cache updated:', result);
-        } catch (err) {
-          const errorMessage = err instanceof Error ? err.message : String(err);
-          clientConsole(1, '[Cache] Navbar: Failed to update cache:', errorMessage);
-        }
-      }
-    }
-
-    FlowRouter.go('/home');
+    await leavePracticeForHome();
   },
-
-
   'click #helpButton': function(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     setCardState('pausedLocks', getCardState('pausedLocks')+1);
@@ -746,82 +750,6 @@ Template.DefaultLayout.events({
     $('#errorDescription').val('');
   },
 
-  'click #logoutButton': function(event: JQuery.TriggeredEvent) {
-    MeteorAny.callAsync('clearLoginData');
-    MeteorAny.callAsync('recordSessionRevocation', 'manual-logout');
-    Session.set('curUnitInstructionsSeen', undefined);
-    Session.set('curSectionId', undefined);
-    Session.set('loginMode', 'normal');
-    Cookie.set('isExperiment', '0', 1); // 1 day
-    Cookie.set('experimentTarget', '', 1);
-    Cookie.set('experimentXCond', '', 1);
-    event.preventDefault();
-    audioManager.pauseCurrentAudio();
-    Meteor.logout( function(error) {
-      if (typeof error !== 'undefined') {
-        // something happened during logout
-        clientConsole(1, 'Logout error - User:', Meteor.user(), 'Error:', error);
-      } else {
-        Session.set('curTeacher', undefined);
-        Session.set('curClass', undefined);
-        sessionCleanUp();
-        Session.set('curModule', 'signinoauth');
-        Session.set('currentTemplate', 'signIn');
-        Session.set('appLoading', false);
-        routeAfterLogout('/');
-      }
-    });
-  },
-  'click #wikiButton': function(event: JQuery.TriggeredEvent) {
-    event.preventDefault();
-    audioManager.pauseCurrentAudio();
-    // Instantly hide offcanvas to prevent layout shift during page transition
-    const offcanvas = bootstrap.Offcanvas.getInstance(document.getElementById('navOffcanvas'));
-    if (offcanvas) {
-      offcanvas.hide();
-    }
-    FlowRouter.go('/help');
-  },
-  'click #mechTurkButton': function(event: JQuery.TriggeredEvent) {
-    event.preventDefault();
-    FlowRouter.go('/turkWorkflow');
-  },
-
-  'click #contentUploadButton': function(event: JQuery.TriggeredEvent) {
-    event.preventDefault();
-    FlowRouter.go('/contentUpload');
-  },
-
-  'click #dataDownloadButton': function(event: JQuery.TriggeredEvent) {
-    event.preventDefault();
-    FlowRouter.go('/dataDownload');
-  },
-
-  'click #userAdminButton': function(event: JQuery.TriggeredEvent) {
-    event.preventDefault();
-    FlowRouter.go('/userAdmin');
-  },
-
-  'click #classEditButton': function(event: JQuery.TriggeredEvent) {
-    event.preventDefault();
-    FlowRouter.go('/classEdit');
-  },
-
-  'click #adminControlsBtn': function(event: JQuery.TriggeredEvent) {
-    event.preventDefault();
-    FlowRouter.go('/adminControls');
-  },
-
-  'click #tdfAssignmentEditButton': function(event: JQuery.TriggeredEvent) {
-    event.preventDefault();
-    FlowRouter.go('/tdfAssignmentEdit');
-  },
-
-  'click #instructorReportingButton': function(event: JQuery.TriggeredEvent) {
-    event.preventDefault();
-    FlowRouter.go('/instructorReporting');
-  },
-
 });
 
 // Global template helpers
@@ -845,31 +773,37 @@ Template.registerHelper('modalTemplate', function() {
 Template.registerHelper('isLoggedIn', function() {
   return Meteor.userId() !== null;
 });
-Template.registerHelper('showAuthenticatedChrome', function() {
-  if (Meteor.userId() === null) {
-    return false;
-  }
-
-  if (Session.get('suppressAuthenticatedChrome') === true) {
-    return false;
-  }
-
-  const currentTemplate = Session.get('currentTemplate');
-  return !['signIn', 'signUp', 'resetPassword', 'verifyEmail', 'experimentError', 'home'].includes(currentTemplate);
+Template.registerHelper('showAuthenticatedAppChrome', function() {
+  return getAuthenticatedChromeMode() !== 'none';
 });
-Template.registerHelper('showAppSidebarChrome', function() {
-  if (Meteor.userId() === null) {
-    return false;
-  }
-  if (Session.get('suppressAuthenticatedChrome') === true) {
-    return false;
-  }
-  if (Session.get('loginMode') === 'experiment') {
-    return false;
-  }
-  return APP_SIDEBAR_TEMPLATES.has(String(Session.get('currentTemplate') || ''));
+Template.registerHelper('showAppSidebar', function() {
+  return getAuthenticatedChromeMode() === 'app';
+});
+Template.registerHelper('isPracticeChrome', function() {
+  return getAuthenticatedChromeMode() === 'practice';
+});
+Template.registerHelper('showPracticeMenu', function() {
+  return getAuthenticatedChromeMode() === 'practice';
+});
+Template.registerHelper('appChromeClass', function() {
+  const mode = getAuthenticatedChromeMode();
+  if (mode === 'practice') return 'practice-app';
+  if (mode === 'app') return 'tool-app';
+  return '';
+});
+Template.registerHelper('appMainClass', function() {
+  return getAuthenticatedChromeMode() === 'practice' ? 'practice-main' : '';
+});
+Template.registerHelper('appHeaderClass', function() {
+  return getAuthenticatedChromeMode() === 'practice' ? 'practice-top-header' : '';
+});
+Template.registerHelper('appContentClass', function() {
+  return getAuthenticatedChromeMode() === 'practice' ? 'practice-content' : 'tool-content';
 });
 Template.registerHelper('appShellTitle', function() {
+  if (getAuthenticatedChromeMode() === 'practice') {
+    return getPracticeLessonTitle();
+  }
   const currentTemplate = String(Session.get('currentTemplate') || '');
   return APP_SHELL_TITLES[currentTemplate] || 'Practice';
 });
@@ -938,25 +872,6 @@ Template.registerHelper('and',(a: unknown, b: unknown)=>{
 Template.registerHelper('or',(a: unknown, b: unknown)=>{
   return a || b;
 });
-
-function routeAfterLogout(target = '/') {
-  let handle: Tracker.Computation | null = null;
-  handle = Tracker.autorun(() => {
-    if (!Meteor.userId()) {
-      // Check if handle exists before stopping (prevents race condition)
-      if (handle) {
-        handle.stop();
-      }
-      FlowRouter.go(target);
-    }
-  });
-  Meteor.setTimeout(() => {
-    if (handle) {
-      handle.stop();
-      FlowRouter.go(target);
-    }
-  }, 3000);
-}
 
 // Global app loading state for elegant transitions (dashboard → first trial)
 Template.registerHelper('appLoading', function() {

@@ -1,6 +1,10 @@
 import { Meteor } from 'meteor/meteor';
 import { check, Match } from 'meteor/check';
-import { normalizeThemePropertyValue } from '../../common/themePropertyNormalization';
+import {
+  isThemeDensityScaleProperty,
+  isValidThemeDensityScale,
+  normalizeThemePropertyValue
+} from '../../common/themePropertyNormalization';
 import { themeRegistry } from '../lib/themeRegistry';
 import {
   requireUserWithRoles,
@@ -215,6 +219,9 @@ export function createThemeMethods(deps: ThemeMethodDeps) {
       }
 
       try {
+        if (isThemeDensityScaleProperty(property) && !isValidThemeDensityScale(value)) {
+          throw new Meteor.Error('invalid-theme-density', 'Theme density scale must be a number greater than 0 and no greater than 2');
+        }
         const normalizedValue = normalizeThemePropertyValue(property, value);
         const updateResult = await deps.updateActiveThemeDocument(this.userId, (theme: ThemeMutable) => {
           theme.properties = theme.properties || {};

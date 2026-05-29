@@ -1,15 +1,15 @@
 <template name="dataDownload">
-    <div class="container" style="margin-top: 1rem;">
+    <div class="container admin-page">
         <h3 class="page-header-title">Download Data</h3>
 
     <div class="admin-section">
-        <div class="card mb-4">
+        <div class="card admin-card">
             <div class="card-body">
-                <div class="d-flex align-items-center mb-3">
-                    <i class="fa fa-download me-2" style="font-size: 1.25rem; color: var(--app-accent-color);"></i>
-                    <h5 class="m-0">Data Downloads</h5>
+                <div class="admin-section-heading">
+                    <i class="fa fa-download admin-section-icon"></i>
+                    <h5>Data Downloads</h5>
                 </div>
-                <div class="mb-3 text-center">
+                <div class="admin-form-row text-center">
                     <a class="btn btn-primary" id="userDataDownloadLink" target="_blank" href>
                         <i class="fa fa-download"></i> Download all data for TDFs you own
                     </a>
@@ -27,7 +27,7 @@
                             <tbody>
                                 {{#if isLoading}}
                                 <tr>
-                                    <td colspan="3" class="text-center py-4">
+                                    <td colspan="3" class="text-center admin-table-status-cell">
                                         <i class="fa fa-spinner fa-spin"></i> Loading...
                                     </td>
                                 </tr>
@@ -63,7 +63,7 @@
                                 </tr>
                                 {{else}}
                                 <tr>
-                                    <td colspan="3" class="text-center text-muted py-3">No data files available</td>
+                                    <td colspan="3" class="text-center text-muted admin-table-status-cell">No data files available</td>
                                 </tr>
                                 {{/each}}
                                 {{/if}}

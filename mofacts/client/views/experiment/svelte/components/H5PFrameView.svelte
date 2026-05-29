@@ -163,7 +163,7 @@
     align-items: center;
     justify-content: flex-end;
     min-height: var(--h5p-action-bar-height, 3.75rem);
-    padding: 0 0.75rem;
+    padding: 0 calc(0.75rem * var(--app-density-scale));
     border-top: 1px solid var(--app-secondary-surface-color);
     background: var(--learning-card-stimulus-surface-color);
     box-sizing: border-box;
@@ -171,7 +171,7 @@
 
   .h5p-continue-button {
     min-width: 8rem;
-    padding: 0.625rem 1rem;
+    padding: calc(0.625rem * var(--app-density-scale)) var(--app-space-3);
     border: 1px solid var(--learning-card-primary-action-surface-color);
     border-radius: var(--border-radius-md, 6px);
     background: var(--learning-card-primary-action-surface-color);
@@ -187,7 +187,7 @@
   }
 
   .h5p-frame-error {
-    padding: 1rem;
+    padding: var(--app-space-3);
     color: var(--feedback-error-color);
     text-align: center;
     font-size: 0.95rem;

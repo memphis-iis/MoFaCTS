@@ -92,7 +92,7 @@
 <style>
   .performance-area {
     background-color: var(--app-background-color);
-    padding: 0.375rem 0.5rem;
+    padding: calc(0.375rem * var(--app-density-scale)) var(--app-space-2);
     margin-bottom: 0.5rem;
     flex-shrink: 0;
     text-align: center;
@@ -111,7 +111,7 @@
     justify-content: center;
     align-items: center;
     gap: clamp(0.5rem, 1vw, 0.75rem);
-    padding: 0 clamp(0.5rem, 2vw, 0.75rem);
+    padding: 0 clamp(var(--app-space-2), 2vw, calc(0.75rem * var(--app-density-scale)));
     height: 24px;
     line-height: 1;
     border-radius: var(--border-radius-pill, 999px);

@@ -91,7 +91,7 @@
   .text-input {
     flex: 1;
     min-width: 0;
-    padding: 0.5rem 0.75rem;
+    padding: var(--app-space-2) calc(0.75rem * var(--app-density-scale));
     font-size: var(--card-font-size, 24px);
     border: 2px solid var(--app-secondary-surface-color);
     border-radius: var(--app-border-radius-sm);

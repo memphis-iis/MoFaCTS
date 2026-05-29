@@ -7,11 +7,11 @@
     min-height: 90px;
     display: flex;
     align-items: center;
-    gap: 18px;
+    gap: calc(18px * var(--app-density-scale));
     position: relative;
     overflow: hidden;
-    margin-bottom: 20px;
-    padding: 14px 18px;
+    margin-bottom: calc(20px * var(--app-density-scale));
+    padding: calc(14px * var(--app-density-scale)) calc(18px * var(--app-density-scale));
     border: 1px solid color-mix(in srgb, var(--app-text-color) 12%, transparent);
     border-radius: var(--app-border-radius-lg, 12px);
     background: var(--learning-card-surface-color);
@@ -52,7 +52,7 @@
 }
 
 .resume-title {
-    margin-bottom: 8px;
+    margin-bottom: var(--app-space-2-px);
     color: var(--app-page-header-text-color);
     font-size: 16px;
     font-weight: 700;
@@ -63,7 +63,7 @@
 .resume-metrics {
     display: flex;
     flex-wrap: wrap;
-    gap: 28px;
+    gap: calc(28px * var(--app-density-scale));
 }
 
 .metric {
@@ -79,11 +79,11 @@
 
 .resume-accuracy-bar {
     width: 72px;
-    margin-top: 5px;
+    margin-top: calc(5px * var(--app-density-scale));
 }
 
 .metric-label {
-    margin-top: 2px;
+    margin-top: calc(2px * var(--app-density-scale));
     color: color-mix(in srgb, var(--app-text-color) 62%, transparent);
     font-size: 11px;
     font-weight: 500;
@@ -93,7 +93,7 @@
 .btn-continue {
     z-index: 1;
     min-height: var(--app-button-height, 44px);
-    padding: 10px 20px;
+    padding: calc(10px * var(--app-density-scale)) var(--app-space-5-px);
     border: 0;
     border-radius: var(--app-border-radius-sm, 8px);
     background: var(--app-primary-action-surface-color);
@@ -123,9 +123,9 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: var(--app-space-3-px);
     flex-wrap: wrap;
-    padding: 12px 14px;
+    padding: var(--app-space-3-px) calc(14px * var(--app-density-scale));
     border-bottom: 1px solid color-mix(in srgb, var(--app-text-color) 12%, transparent);
 }
 
@@ -140,7 +140,7 @@
     width: 100%;
     height: var(--app-text-input-height);
     min-height: var(--app-text-input-height);
-    padding: 0 12px 0 40px;
+    padding: 0 var(--app-space-3-px) 0 calc(40px * var(--app-density-scale));
     border: 1px solid color-mix(in srgb, var(--app-text-color) 12%, transparent);
     border-radius: var(--app-border-radius-sm, 8px);
     background: color-mix(in srgb, var(--app-text-color) 4%, var(--learning-card-surface-color));
@@ -151,7 +151,7 @@
 }
 
 #learningDashboardSearch {
-    padding-left: 40px;
+    padding-left: calc(40px * var(--app-density-scale));
 }
 
 .toolbar-search input:focus {
@@ -162,7 +162,7 @@
 
 .toolbar-search .fa {
     position: absolute;
-    left: 14px;
+    left: calc(14px * var(--app-density-scale));
     top: 50%;
     width: 16px;
     height: 16px;
@@ -174,11 +174,11 @@
 .toolbar-filters {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: var(--app-space-2-px);
 }
 
 .filter {
-    padding: 6px 10px;
+    padding: calc(6px * var(--app-density-scale)) calc(10px * var(--app-density-scale));
     min-height: var(--app-button-height, 44px);
     border: 1px solid color-mix(in srgb, var(--app-text-color) 12%, transparent);
     border-radius: var(--app-border-radius-sm, 8px);
@@ -210,6 +210,7 @@
 .learning-dashboard-sections {
     display: grid;
     gap: 0;
+    min-width: 0;
 }
 
 .practice-section + .practice-section {
@@ -449,9 +450,13 @@
 }
 
 .practice-empty-state {
-    padding: 1.25rem;
+    padding: var(--app-space-4);
     color: var(--app-text-color);
     text-align: center;
+}
+
+.learning-dashboard-flush {
+    margin-bottom: var(--app-space-0);
 }
 
 .learning-dashboard-card {
@@ -469,7 +474,7 @@
 .learner-config-panel {
     display: grid;
     grid-template-rows: 1fr;
-    padding: 0;
+    padding: var(--app-space-0);
     background: transparent;
     animation: learner-config-panel-open var(--app-transition-smooth) ease-out both;
 }
@@ -487,8 +492,8 @@
 .learner-config-panel-card {
     width: 90%;
     max-width: 90%;
-    margin: 0.85rem auto 1rem;
-    padding: 0.7rem;
+    margin: calc(0.85rem * var(--app-density-scale)) auto var(--app-space-3);
+    padding: calc(0.7rem * var(--app-density-scale));
     border-radius: var(--app-border-radius-sm);
     background: var(--learning-card-surface-color);
     box-shadow: var(--app-surface-shadow);
@@ -497,12 +502,12 @@
 .learner-config-fields-grid {
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 0.5rem;
+    gap: var(--app-space-2);
 }
 
 .learner-config-field {
     min-width: 0;
-    padding: 0.48rem 0.58rem;
+    padding: calc(0.48rem * var(--app-density-scale)) calc(0.58rem * var(--app-density-scale));
     border: 1px solid color-mix(in srgb, var(--app-text-color) 10%, transparent);
     border-radius: var(--app-border-radius-sm);
 }
@@ -511,8 +516,8 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.5rem;
-    margin-bottom: 0.25rem;
+    gap: var(--app-space-2);
+    margin-bottom: var(--app-space-1);
     font-size: 0.875rem;
     font-weight: 400;
     line-height: 1.25;
@@ -527,7 +532,7 @@
 .learner-config-reset-field.btn {
     min-height: 0;
     height: auto;
-    padding: 0;
+    padding: var(--app-space-0);
     border: 0;
     background: transparent;
     font-size: 0.75rem;
@@ -543,35 +548,35 @@
 
 .learner-config-field .form-check {
     min-height: calc(var(--app-button-height) * 0.66);
-    margin-bottom: 0;
-    padding-left: 0;
+    margin-bottom: var(--app-space-0);
+    padding-left: var(--app-space-0);
 }
 
 .learner-config-field .form-switch .form-check-input {
     width: 2.55em;
     height: 1.25em;
-    margin-left: 0;
+    margin-left: var(--app-space-0);
 }
 
 .learner-config-field .form-select-sm,
 .learner-config-field .form-control-sm {
     min-height: calc(var(--app-button-height) * 0.66);
-    padding-top: 0.16rem;
-    padding-bottom: 0.16rem;
+    padding-top: calc(0.16rem * var(--app-density-scale));
+    padding-bottom: calc(0.16rem * var(--app-density-scale));
     font-size: 0.875rem;
     line-height: 1.2;
 }
 
 .learner-config-field .form-range {
-    margin: 0.25rem 0 0;
+    margin: var(--app-space-1) var(--app-space-0) var(--app-space-0);
 }
 
 .learner-config-slider-labels {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.5rem;
-    margin-top: 0.1rem;
+    gap: var(--app-space-2);
+    margin-top: calc(0.1rem * var(--app-density-scale));
     color: var(--app-secondary-text-color);
     font-size: 0.72rem;
     line-height: 1.15;
@@ -584,7 +589,7 @@
 .learner-config-admin-reset {
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: calc(0.4rem * var(--app-density-scale));
     margin-right: auto;
 }
 
@@ -592,6 +597,39 @@
 .learner-config-reset-progress-cancel.btn {
     min-height: calc(var(--app-button-height) * 0.72);
     line-height: 1.1;
+}
+
+.condition-tdf-selector {
+    margin-top: var(--app-space-1);
+}
+
+.learning-dashboard-details {
+    margin-top: var(--app-space-1);
+    padding-top: var(--app-space-1);
+}
+
+.learning-dashboard-detail-row {
+    display: flex;
+    justify-content: space-between;
+    padding-top: var(--app-space-1);
+    padding-bottom: var(--app-space-1);
+}
+
+.learner-config-alert {
+    padding-top: var(--app-space-2);
+    padding-bottom: var(--app-space-2);
+    margin-bottom: var(--app-space-2);
+}
+
+.learner-config-label {
+    margin-bottom: var(--app-space-2);
+}
+
+.learner-config-footer {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: var(--app-space-2);
 }
 
 @keyframes learner-config-panel-open {
@@ -621,7 +659,11 @@
         display: block;
         width: 100%;
         max-width: 100%;
+        min-width: 0;
         box-sizing: border-box;
+        overflow: hidden;
+        padding: var(--app-space-3);
+        margin-bottom: var(--app-space-3);
         border-color: color-mix(in srgb, var(--app-text-color) 12%, transparent) !important;
         border-radius: 8px !important;
         background: var(--learning-card-surface-color);
@@ -629,18 +671,19 @@
     }
 
     .learning-dashboard-card-title {
-        margin-bottom: 0.2rem;
+        margin-bottom: calc(0.2rem * var(--app-density-scale));
         color: var(--app-page-header-text-color);
         font-weight: 600;
         line-height: 1.3;
+        overflow-wrap: anywhere;
     }
 
     .learning-dashboard-card-actions {
         display: flex;
         align-items: center;
         flex-wrap: wrap;
-        gap: 0.35rem;
-        margin-top: 0.35rem;
+        gap: calc(0.35rem * var(--app-density-scale));
+        margin-top: calc(0.35rem * var(--app-density-scale));
     }
 
     .learning-dashboard-card-features-row {
@@ -649,9 +692,9 @@
         justify-content: flex-start !important;
         width: 100%;
         box-sizing: border-box;
-        padding-right: 0 !important;
-        padding-top: 0 !important;
-        padding-bottom: 0 !important;
+        padding-right: var(--app-space-0) !important;
+        padding-top: var(--app-space-0) !important;
+        padding-bottom: var(--app-space-0) !important;
         min-height: 0;
         line-height: 1;
     }
@@ -664,7 +707,7 @@
         height: auto;
         min-height: 0;
         max-width: 4.5rem;
-        padding: 0.35em 0.55rem;
+        padding: calc(0.35em * var(--app-density-scale)) calc(0.55rem * var(--app-density-scale));
         white-space: nowrap;
         line-height: 1;
         vertical-align: middle;
@@ -674,13 +717,13 @@
         display: flex !important;
         align-items: center !important;
         flex: 0 0 auto;
-        gap: 0.25rem !important;
+        gap: var(--app-space-1) !important;
         min-height: 0;
         line-height: 1;
     }
 
-    .learning-dashboard-card-feature-icons .badge {
-        margin-left: 0.25rem;
+.learning-dashboard-card-feature-icons .badge {
+        margin-left: var(--app-space-1);
         align-self: center;
     }
 
@@ -697,19 +740,55 @@
         display: inline-flex !important;
         align-items: center;
         justify-content: center;
-        flex: 0 0 auto !important;
+        flex: 1 1 7rem !important;
+        min-width: 0;
         max-width: 9.5rem;
-        white-space: nowrap;
+        white-space: normal;
+        text-align: center;
     }
 
     .card-expand-icon {
+        margin-left: var(--app-space-1);
         font-size: 0.75rem;
         transition: transform var(--app-transition-smooth) ease;
         vertical-align: middle;
     }
 
-    .learning-dashboard-card-badge-text {
+.learning-dashboard-card-badge-text {
         display: block;
+    }
+
+    .condition-tdf-selector {
+        margin-top: var(--app-space-1);
+    }
+
+    .learning-dashboard-details {
+        margin-top: var(--app-space-1);
+        padding-top: var(--app-space-1);
+    }
+
+    .learning-dashboard-detail-row {
+        display: flex;
+        justify-content: space-between;
+        padding-top: var(--app-space-1);
+        padding-bottom: var(--app-space-1);
+    }
+
+    .learner-config-alert {
+        padding-top: var(--app-space-2);
+        padding-bottom: var(--app-space-2);
+        margin-bottom: var(--app-space-2);
+    }
+
+    .learner-config-label {
+        margin-bottom: var(--app-space-2);
+    }
+
+    .learner-config-footer {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: var(--app-space-2);
     }
 
     button[aria-expanded="true"] .card-expand-icon {
@@ -753,32 +832,32 @@
     }
 
     .learning-dashboard-card {
-        padding: 0.85rem 1rem !important;
-        margin-bottom: 0.55rem !important;
+        padding: calc(0.85rem * var(--app-density-scale)) var(--app-space-3) !important;
+        margin-bottom: calc(0.55rem * var(--app-density-scale)) !important;
         box-shadow: 0 0.12rem 0.35rem color-mix(in srgb, var(--app-text-color) 10%, transparent) !important;
     }
 
     .learning-dashboard-card-title {
-        margin-bottom: 0.2rem;
+        margin-bottom: calc(0.2rem * var(--app-density-scale));
         font-size: 1rem;
         line-height: 1.18;
     }
 
     .learning-dashboard-card-actions {
-        gap: 0.3rem;
-        margin-top: 0.35rem;
+        gap: calc(0.3rem * var(--app-density-scale));
+        margin-top: calc(0.35rem * var(--app-density-scale));
     }
 
     .learning-dashboard-card-button {
         min-height: 36px;
-        padding: 0.35rem 0.75rem;
+        padding: calc(0.35rem * var(--app-density-scale)) var(--app-space-3);
         font-size: 0.95rem;
         line-height: 1.1;
     }
 
-    .learning-dashboard-card .collapse .border-top {
-        margin-top: 0.35rem !important;
-        padding-top: 0.35rem !important;
+    .learning-dashboard-details {
+        margin-top: calc(0.35rem * var(--app-density-scale)) !important;
+        padding-top: calc(0.35rem * var(--app-density-scale)) !important;
         font-size: 0.9rem;
     }
 
@@ -815,6 +894,7 @@
     }
 
     .learning-dashboard-card-button {
+        flex-basis: 6.25rem !important;
         min-height: 34px;
         padding: 0.32rem 0.68rem;
     }

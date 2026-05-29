@@ -10,7 +10,7 @@
     </div>
     {{/if}}
     <div class="container instructions-container">
-        <div class="card mb-4 instructions-card">
+        <div class="card instructions-card">
             <div class="card-body">
                 <div class="row">
                     {{#if backgroundImage}}
@@ -29,19 +29,19 @@
                     </div>
                 {{/if}}
                 {{#if allowcontinue}}
-                    <div class="text-center mt-4"><span id="lockoutTimeRemaining"></span></div>
+                    <div class="text-center instructions-lockout-time"><span id="lockoutTimeRemaining"></span></div>
                     <div id="continueBar" class="full-width text-center" >
                         <span id="displayTimeoutMsg"></span>
                         {{#if islockout}}
                             <div class="row">
                                 <div class="col-6 offset-3">
-                                    <button type="button" id="continueButton" class="btn width-80-percent mx-auto" disabled>
+                                    <button type="button" id="continueButton" class="btn width-80-percent instructions-action-button" disabled>
                                     {{continueButtonText}}
                                     </button>
                                 </div>
                             {{#if allowGoBack}}
                                 <div class="col-1 offset-1">
-                                    <button type="button" id="stepBackButton" class="btn width-80-percent mx-auto" disabled aria-label="Go back to previous question">
+                                    <button type="button" id="stepBackButton" class="btn width-80-percent instructions-action-button" disabled aria-label="Go back to previous question">
                                     <!-- back icon -->
                                     <i class="fa fa-arrow-left" aria-hidden="true"></i>
                                     </button>
@@ -51,13 +51,13 @@
                         {{else}}
                             <div class="row">
                                 <div class="col-6 offset-3">
-                                    <button type="button" id="continueButton" class="btn width-80-percent mx-auto" disabled>
+                                    <button type="button" id="continueButton" class="btn width-80-percent instructions-action-button" disabled>
                                     {{continueButtonText}}
                                     </button>
                                 </div>
                             {{#if allowGoBack}}
                                 <div class="col-1 offset-1">
-                                    <button type="button" id="stepBackButton" class="btn width-80-percent mx-auto" aria-label="Go back to previous question">
+                                    <button type="button" id="stepBackButton" class="btn width-80-percent instructions-action-button" aria-label="Go back to previous question">
                                     <!-- back icon -->
                                     <i class="fa fa-arrow-left" aria-hidden="true"></i>
                                     </button>

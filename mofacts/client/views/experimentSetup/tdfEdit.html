@@ -233,22 +233,44 @@
 
         /* Validation Summary Panel */
         .validation-summary {
-            margin-bottom: 1rem;
+            margin-bottom: var(--app-space-3);
         }
 
         .validation-summary .alert {
-            padding: 0.75rem 1rem;
+            padding: var(--app-space-3);
+        }
+
+        .validation-summary-row {
+            display: flex;
+            align-items: center;
+        }
+
+        .validation-summary-label,
+        .validation-breaking-badge {
+            margin-left: var(--app-space-2);
+        }
+
+        .validation-breaking-badge-sm {
+            margin-left: var(--app-space-1);
+        }
+
+        .validation-alert {
+            margin-bottom: var(--app-space-2);
         }
 
         .validation-summary .validation-list {
             list-style: none;
-            padding-left: 0;
-            margin-bottom: 0;
+            padding-left: var(--app-space-0);
+            margin-bottom: var(--app-space-0);
             font-size: 0.875rem;
         }
 
+        .validation-list-collapsed {
+            margin-top: var(--app-space-2);
+        }
+
         .validation-summary .validation-item {
-            padding: 0.25rem 0;
+            padding: var(--app-space-1) var(--app-space-0);
             border-bottom: 1px solid rgba(0,0,0,0.1);
         }
 
@@ -276,8 +298,13 @@
         }
 
         .field-validation-message {
+            margin-top: var(--app-space-1);
             font-size: 0.75rem !important;
             line-height: 1.2;
+        }
+
+        .field-validation-message-text {
+            margin-left: var(--app-space-1);
         }
 
         .field-validation-message i {
@@ -300,6 +327,8 @@
 
         /* Toggle Button Styling */
         .toggle-validation-details {
+            margin-left: auto;
+            padding: var(--app-space-0);
             color: inherit !important;
             text-decoration: none !important;
         }
@@ -313,6 +342,10 @@
             font-size: 0.75rem !important;
             padding: 0.15rem 0.4rem !important;
             vertical-align: middle;
+        }
+
+        .mc-toggle-action {
+            margin-left: var(--app-space-2);
         }
 
         .mc-toggle-btn.btn-success {
@@ -456,13 +489,13 @@
         }
     </style>
 
-    <div class="container" style="margin-top: 1rem;">
+    <div class="container admin-page">
         <!-- Header -->
-        <div class="d-flex align-items-center mb-3">
-            <a href="/contentUpload" class="btn btn-outline-secondary me-3">
+        <div class="editor-page-header">
+            <a href="/contentUpload" class="btn btn-outline-secondary editor-back-button">
                 <i class="fa fa-arrow-left"></i> Back
             </a>
-            <h3 class="page-header-text m-0">
+            <h3 class="page-header-text editor-page-title">
                 Edit TDF: {{lessonName}}
                 {{#if conditionInfo}}
                     <small class="text-muted">
@@ -473,9 +506,9 @@
         </div>
 
         {{#if loading}}
-        <div class="text-center py-5">
+        <div class="text-center editor-loading-state">
             <i class="fa fa-spinner fa-spin fa-2x"></i>
-            <p class="mt-2">Loading TDF...</p>
+            <p class="admin-form-row-top">Loading TDF...</p>
         </div>
         {{else}}
         {{#if noData}}
@@ -486,7 +519,7 @@
         {{else}}
 
         <!-- Tooltip toggle + unsaved state (mobile-friendly) -->
-        <div class="editor-topbar mb-3">
+        <div class="editor-topbar admin-form-row">
             <div class="editor-status">
                 {{#if hasChanges}}
                 <span class="badge bg-warning text-dark unsaved-badge">Unsaved changes</span>
@@ -494,15 +527,15 @@
             </div>
             <div class="editor-verbosity">
                 <span class="text-muted small">Descriptions:</span>
-                <div class="form-check form-check-inline mb-0">
+                <div class="form-check form-check-inline editor-inline-check">
                     <input class="form-check-input" type="radio" name="tooltipMode" id="tooltipNone" value="none" checked="{{noneChecked}}">
                     <label class="form-check-label small" for="tooltipNone">None</label>
                 </div>
-                <div class="form-check form-check-inline mb-0">
+                <div class="form-check form-check-inline editor-inline-check">
                     <input class="form-check-input" type="radio" name="tooltipMode" id="tooltipBrief" value="brief" checked="{{briefChecked}}">
                     <label class="form-check-label small" for="tooltipBrief">Brief</label>
                 </div>
-                <div class="form-check form-check-inline mb-0">
+                <div class="form-check form-check-inline editor-inline-check">
                     <input class="form-check-input" type="radio" name="tooltipMode" id="tooltipVerbose" value="verbose" checked="{{verboseChecked}}">
                     <label class="form-check-label small" for="tooltipVerbose">Verbose</label>
                 </div>
@@ -513,14 +546,14 @@
         <div id="tdf-validation-summary"></div>
 
         <!-- JSON Editor container -->
-        <div class="card mb-4">
-            <div class="card-body p-2">
+        <div class="card admin-card">
+            <div class="card-body admin-alert-compact">
                 <div id="tdf-editor-container"></div>
             </div>
         </div>
 
         <!-- Action buttons -->
-        <div class="d-flex align-items-center justify-content-end gap-2 mt-4 mb-4 content-edit-actions">
+        <div class="content-edit-actions">
             <div class="save-feedback {{#if saveFeedbackText}}is-visible{{/if}}" role="status" aria-live="polite" aria-atomic="true">
                 {{#if saveFeedbackText}}
                 <i class="fa fa-check-circle" aria-hidden="true"></i>

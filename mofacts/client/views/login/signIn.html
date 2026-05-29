@@ -4,7 +4,7 @@
             <div class="auth-card card">
                 <div class="card-body auth-card-body">
                     <div class="auth-brand">
-                        <h2 class="auth-system-name mt-0">
+                        <h2 class="auth-system-name">
                             {{#if currentTheme.properties.brand_logo_url}}
                                 <span class="navbar-brand-icon"
                                       aria-hidden="true"
@@ -21,7 +21,7 @@
                     </div>
 
                     {{#if serverErrorMessage}}
-                    <p id="serverErrors" class="auth-message auth-message-error mb-0" role="alert" aria-live="polite">{{serverErrorMessage}}</p>
+                    <p id="serverErrors" class="auth-message auth-message-error" role="alert" aria-live="polite">{{serverErrorMessage}}</p>
                     {{#if showVerificationHelp}}
                     <div class="auth-helper-text">
                         <a href="/auth/verify-email" class="auth-link">Go to email verification</a>
@@ -81,16 +81,16 @@
 
                     <div class="auth-secondary-actions">
                         <button type="button" id="signInButtonOAuth" class="btn btn-secondary auth-provider-btn w-100">
-                            <img width="20" height="20" class="me-2" alt="" aria-hidden="true" loading="eager" decoding="async" fetchpriority="low" src="/images/google-logo.svg" />
+                            <img width="20" height="20" class="auth-provider-icon" alt="" aria-hidden="true" loading="eager" decoding="async" fetchpriority="low" src="/images/google-logo.svg" />
                             <span>Sign in with Google</span>
                         </button>
                         <button type="button" id="signInWithMicrosoftSSO" class="btn btn-secondary auth-provider-btn w-100">
-                            <img width="20" height="20" class="me-2" alt="" aria-hidden="true" loading="eager" decoding="async" fetchpriority="low" src="/images/microsoft-logo.svg" />
+                            <img width="20" height="20" class="auth-provider-icon" alt="" aria-hidden="true" loading="eager" decoding="async" fetchpriority="low" src="/images/microsoft-logo.svg" />
                             <span>Sign in with Microsoft</span>
                         </button>
                         {{#if canShowMemphisSaml}}
                         <button type="button" id="signInWithMemphisSaml" class="btn btn-secondary auth-provider-btn w-100">
-                            <img width="20" height="20" class="me-2" alt="" aria-hidden="true" loading="eager" decoding="async" fetchpriority="low" src="/images/microsoft-logo.svg" />
+                            <img width="20" height="20" class="auth-provider-icon" alt="" aria-hidden="true" loading="eager" decoding="async" fetchpriority="low" src="/images/microsoft-logo.svg" />
                             <span>{{memphisSamlButtonLabel}}</span>
                         </button>
                         {{/if}}

@@ -961,7 +961,7 @@ function injectMCButtons(instance: any) {
 
         // Create or update toggle button
         const btn = existing || document.createElement('button');
-        btn.className = `btn btn-sm mc-toggle-btn ms-2 ${isEnabled ? 'btn-success' : 'btn-outline-secondary'}`;
+        btn.className = `btn btn-sm mc-toggle-btn mc-toggle-action ${isEnabled ? 'btn-success' : 'btn-outline-secondary'}`;
         btn.type = 'button';
         btn.innerHTML = isEnabled
             ? '<i class="fa fa-check-square"></i> MC Mode'

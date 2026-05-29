@@ -131,6 +131,7 @@
     <span class="fa fa-chevron-down caret" aria-hidden="true"></span>
     <div class="home-user-menu" id="userDropdown">
       <button type="button" class="dropdown-item" data-home-action="audioSettings">Audio settings</button>
+      <button type="button" class="dropdown-item" data-home-action="toggleTheme">Toggle theme</button>
       <button type="button" class="dropdown-item" data-home-action="classSelection">Teacher select</button>
       <div class="dropdown-divider"></div>
       <button type="button" class="dropdown-item" data-home-action="help">Help</button>
@@ -140,4 +141,30 @@
       <button type="button" class="dropdown-item" data-home-action="logout">Log out</button>
     </div>
   </div>
+</template>
+
+<template name="appPracticeMenu">
+  <aside class="app-practice-menu {{#if practiceMenuOpen}}is-open{{/if}}" aria-label="Practice tools">
+    <button type="button" class="app-practice-menu-toggle" id="practiceMenuToggle" aria-expanded="{{#if practiceMenuOpen}}true{{else}}false{{/if}}">
+      <span class="app-practice-menu-toggle-icon" aria-hidden="true"></span>
+      <span class="app-practice-menu-toggle-text">Menu</span>
+    </button>
+    <div class="app-practice-menu-panel">
+      <button type="button" data-practice-menu-action="home"><span class="fa fa-play-circle" aria-hidden="true"></span> Practice</button>
+      <button type="button" data-practice-menu-action="contentUpload"><span class="fa fa-folder-open" aria-hidden="true"></span> Create Content</button>
+      <button type="button" data-practice-menu-action="dataDownload"><span class="fa fa-download" aria-hidden="true"></span> Detailed Data</button>
+      {{#if isInRole 'teacher'}}
+        <button type="button" data-practice-menu-action="classEdit"><span class="fa fa-users" aria-hidden="true"></span> Class Management</button>
+        <button type="button" data-practice-menu-action="instructorReporting"><span class="fa fa-bar-chart" aria-hidden="true"></span> Instructor Reporting</button>
+        <button type="button" data-practice-menu-action="tdfAssignmentEdit"><span class="fa fa-tasks" aria-hidden="true"></span> Chapter Assignments</button>
+      {{/if}}
+      {{#if isInRole 'admin'}}
+        <button type="button" data-practice-menu-action="adminControls"><span class="fa fa-cogs" aria-hidden="true"></span> Admin Control Panel</button>
+        <button type="button" data-practice-menu-action="userAdmin"><span class="fa fa-user" aria-hidden="true"></span> User Admin</button>
+        <button type="button" data-practice-menu-action="turkWorkflow"><span class="fa fa-wrench" aria-hidden="true"></span> Mechanical Turk</button>
+        <button type="button" data-practice-menu-action="theme"><span class="fa fa-paint-brush" aria-hidden="true"></span> Theme</button>
+        <button type="button" data-practice-menu-action="adminTests"><span class="fa fa-flask" aria-hidden="true"></span> Admin Tests</button>
+      {{/if}}
+    </div>
+  </aside>
 </template>

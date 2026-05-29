@@ -4,7 +4,7 @@
             <div class="auth-card card">
                 <div class="card-body auth-card-body">
                     <div class="auth-brand">
-                        <h2 class="auth-system-name mt-0">
+                        <h2 class="auth-system-name">
                             {{#if currentTheme.properties.brand_logo_url}}
                                 <span class="navbar-brand-icon"
                                       aria-hidden="true"
@@ -13,11 +13,11 @@
                             <span>{{systemName}}</span>
                         </h2>
                         <h1 class="auth-title">Create account</h1>
-                        <p class="auth-description mb-2">Create your account to access your practice menu and saved progress.</p>
-                        <p class="auth-description auth-description-secondary mb-0">{{signUpInstructionCopy}}</p>
+                        <p class="auth-description auth-description-primary">Create your account to access your practice menu and saved progress.</p>
+                        <p class="auth-description auth-description-secondary">{{signUpInstructionCopy}}</p>
                     </div>
 
-                    <p id="serverErrors" class="auth-message mb-0" role="alert" aria-live="polite" hidden></p>
+                    <p id="serverErrors" class="auth-message" role="alert" aria-live="polite" hidden></p>
 
                     <form class="auth-form" novalidate>
                         <div class="auth-field">

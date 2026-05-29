@@ -150,7 +150,7 @@ type StudentPerformanceAccumulator = {
 
 type DeliverySettings = Record<string, unknown>;
 
-export { extractDelimFields, rangeVal, shuffle, randomChoice, search, getUserDisplayIdentifier, haveMeteorUser, updateCurStudentPerformance, updateCurStudedentPracticeTime, setStudentPerformance, getStimCount, getStimCluster, getStimKCBaseForCurrentStimuliSet, createStimClusterMapping, getAllCurrentStimAnswers, getStimAnswerDisplayCase, getTestType, getCurrentDeliverySettings, refreshCurrentDeliverySettingsStore, getCurrentTheme };
+export { extractDelimFields, rangeVal, shuffle, randomChoice, search, getUserDisplayIdentifier, haveMeteorUser, updateCurStudentPerformance, updateCurStudedentPracticeTime, setStudentPerformance, getStimCount, getStimCluster, getStimKCBaseForCurrentStimuliSet, createStimClusterMapping, getAllCurrentStimAnswers, getStimAnswerDisplayCase, getTestType, getCurrentDeliverySettings, refreshCurrentDeliverySettingsStore, getCurrentTheme, applyThemeCSSProperties };
 
 
 // ===== PHASE 1.5 OPTIMIZATION: Theme Subscription =====
@@ -196,6 +196,7 @@ const REQUIRED_THEME_CACHE_PROPERTY_NAMES = [
   'brand_display_label',
   'brand_logo_url',
   'auth_sign_in_description',
+  'app_density_scale',
   'app_button_height',
   'app_text_input_height'
 ];
@@ -293,7 +294,7 @@ function applyThemeFontStylesheet(rawValue: unknown) {
 }
 
 // Helper function to apply theme CSS properties
-function applyThemeCSSProperties(themeData: ThemeData | null | undefined) {
+function applyThemeCSSProperties(themeData: ThemeData | null | undefined, options: { cache?: boolean } = {}) {
   if (!themeData) {
     clientConsole(2, 'applyThemeCSSProperties - no theme data');
     return;
@@ -361,7 +362,9 @@ function applyThemeCSSProperties(themeData: ThemeData | null | undefined) {
   if (themeChanged) {
     clientConsole(2, 'Theme changed, updating Session');
     Session.set('curTheme', themeData);
-    cacheTheme(themeData);
+    if (options.cache !== false) {
+      cacheTheme(themeData);
+    }
   }
 
   // Mark theme as ready (enables navbar rendering without layout shift)
@@ -388,6 +391,11 @@ function getCurrentTheme() {
     // This prevents flash of default theme before actual theme loads
     if (!themeSubscription.ready()) {
       clientConsole(2, 'getCurrentTheme - subscription not ready, waiting...');
+      return;
+    }
+
+    if (Session.get('userThemeOverrideActive') === true) {
+      clientConsole(2, 'getCurrentTheme - user theme override active');
       return;
     }
 

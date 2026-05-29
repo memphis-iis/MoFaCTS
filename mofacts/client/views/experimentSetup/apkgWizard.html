@@ -49,7 +49,7 @@
         {{#if analyzing}}
         <div class="alert alert-info">
           <i class="fa fa-spinner fa-spin"></i> Analyzing deck structure...
-          <div class="mt-2">
+          <div class="wizard-status-detail">
             <small>• Parsing SQLite database</small><br>
             <small>• Extracting fields and card templates</small><br>
             <small>• Analyzing media files</small>
@@ -84,7 +84,7 @@
         <h4>Step 2: Configure Lesson Sources</h4>
 
         {{#if deckMetadata}}
-        <div class="deck-info card mb-3">
+        <div class="deck-info card wizard-card">
           <div class="card-body">
             <h5>{{deckMetadata.deckName}}</h5>
             <div class="row">
@@ -103,7 +103,7 @@
             </div>
             {{#if (eq importableNoteCount deckMetadata.noteCount)}}
             {{else}}
-            <div class="mt-2 small text-muted">
+            <div class="wizard-status-detail small text-muted">
               Importable notes from the primary model: {{importableNoteCount}}
             </div>
             {{/if}}
@@ -113,7 +113,7 @@
         <h5>Available Fields:</h5>
         <div class="fields-list">
           {{#each deckMetadata.fields}}
-          <div class="field-card card mb-2">
+          <div class="field-card card wizard-card-sm">
             <div class="card-body">
               <div class="row align-items-center">
                 <div class="col-md-3">
@@ -122,7 +122,7 @@
                 </div>
                 <div class="col-md-9">
                   {{#if sampleImage}}
-                  <div class="field-preview mb-2">
+                  <div class="field-preview wizard-card-sm">
                     <img src="{{sampleImage}}" alt="Preview" class="img-thumbnail" style="max-height: 80px; max-width: 120px;">
                   </div>
                   {{/if}}
@@ -149,7 +149,7 @@
         <!-- TDF Configurations -->
         <div class="tdf-configs">
           {{#each tdfConfigs}}
-          <div class="tdf-config-card card mb-3">
+          <div class="tdf-config-card card wizard-card">
             <div class="card-header">
               <strong>TDF {{plusOne @index}}: {{#if name}}{{name}}{{else}}(unnamed){{/if}}</strong>
               {{#if isMultipleMode}}
@@ -206,7 +206,7 @@
                 </small>
               </div>
 
-              <div class="text-muted small mb-2">
+              <div class="text-muted small wizard-card-sm">
                 Uses <strong>{{selectedNoteCount this}}</strong> of {{importableNoteCount}} importable notes{{#if usingSubset this}} for this TDF{{/if}}.
               </div>
 
@@ -229,11 +229,11 @@
 
         <!-- Add Another TDF Button -->
         {{#unless hideAddButton}}
-        <div class="text-center mb-3">
+        <div class="text-center wizard-card">
           <button class="btn btn-outline-primary" id="add-tdf-config">
             <i class="fa fa-plus"></i> Add Another TDF Configuration
           </button>
-          <p class="text-muted small mt-2">
+          <p class="text-muted small wizard-status-detail">
             Want to create multiple learning modules from this deck?
           </p>
         </div>
@@ -253,7 +253,7 @@
           </div>
         </div>
 
-        <div class="wizard-actions mt-3">
+        <div class="wizard-actions wizard-actions-extra">
           <button class="btn btn-secondary" id="back-to-upload">← Back</button>
           {{#if allConfigsValid}}
           <button class="btn btn-primary" id="open-draft-editor">
@@ -294,13 +294,13 @@
         {{#if generating}}
         <div class="alert alert-info">
           <i class="fa fa-spinner fa-spin"></i> Generating TDF{{#if isMultipleMode}}s{{/if}}...
-          <div class="progress mt-2">
+          <div class="progress wizard-status-detail">
             <div class="progress-bar progress-bar-striped progress-bar-animated"
                  style="width: {{generationProgress}}%">
               {{generationProgress}}%
             </div>
           </div>
-          <div class="mt-2">
+          <div class="wizard-status-detail">
             {{#if currentGenerationStep}}
             <small>{{currentGenerationStep}}</small>
             {{/if}}
@@ -311,7 +311,7 @@
         {{#if generateError}}
         <div class="alert alert-danger">
           <strong>Error:</strong> {{generateError}}
-          <button class="btn btn-sm btn-secondary mt-2" id="back-to-config-error">
+          <button class="btn btn-sm btn-secondary wizard-status-detail" id="back-to-config-error">
             ← Back to Configuration
           </button>
         </div>
@@ -329,7 +329,7 @@
         </div>
         {{/if}}
 
-        <div class="card mb-3">
+        <div class="card wizard-card">
           <div class="card-header">
             <h5>Generated Files:</h5>
           </div>
@@ -343,7 +343,7 @@
               </li>
               {{/each}}
             </ul>
-            <div class="mt-2">
+            <div class="wizard-status-detail">
               <strong>Total:</strong> {{generationResult.totalCards}} cards,
               {{generationResult.totalMedia}} media files
               {{#if generationResult.totalSkipped}}, {{generationResult.totalSkipped}} skipped{{/if}}
@@ -352,16 +352,16 @@
         </div>
 
         {{#if uploadStatus}}
-        <div class="alert alert-info mt-3">
+        <div class="alert alert-info wizard-card">
           <i class="fa fa-spinner fa-spin"></i> {{uploadStatus.message}}
-          <div class="progress mt-2">
+          <div class="progress wizard-status-detail">
             <div class="progress-bar progress-bar-striped progress-bar-animated"
                  style="width: {{uploadStatus.progress}}%">
               {{uploadStatus.progress}}%
             </div>
           </div>
           {{#if uploadStatus.hint}}
-          <small class="text-muted mt-2 d-block">
+          <small class="text-muted wizard-status-detail d-block">
             {{uploadStatus.hint}}
           </small>
           {{/if}}
@@ -369,7 +369,7 @@
         {{/if}}
 
         {{#if uploadError}}
-        <div class="alert alert-danger mt-3">
+        <div class="alert alert-danger wizard-card">
           <i class="fa fa-exclamation-triangle"></i> {{uploadError}}
         </div>
         {{/if}}
@@ -393,9 +393,9 @@
         </div>
 
         {{#if uploadComplete}}
-        <div class="alert alert-success mt-3">
+        <div class="alert alert-success wizard-card">
           <i class="fa fa-check"></i> Successfully uploaded to MoFaCTS!
-          <button class="btn btn-sm btn-primary mt-2" id="close-wizard">
+          <button class="btn btn-sm btn-primary wizard-status-detail" id="close-wizard">
             Close Wizard
           </button>
         </div>
@@ -411,26 +411,26 @@
   <style>
   .apkg-wizard {
     max-width: 900px;
-    margin: 20px auto;
-    padding: 20px;
+    margin: var(--app-space-4) auto;
+    padding: var(--app-space-4);
     background: #fff;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   }
 
-  .wizard-header {
+  .apkg-wizard .wizard-header {
     text-align: center;
-    margin-bottom: 30px;
+    margin-bottom: var(--app-space-5);
   }
 
-  .wizard-steps {
+  .apkg-wizard .wizard-steps {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 30px;
+    margin-bottom: var(--app-space-5);
     position: relative;
   }
 
-  .wizard-steps::before {
+  .apkg-wizard .wizard-steps::before {
     content: '';
     position: absolute;
     top: 20px;
@@ -441,14 +441,14 @@
     z-index: 0;
   }
 
-  .wizard-steps .step {
+  .apkg-wizard .wizard-steps .step {
     flex: 1;
     text-align: center;
     position: relative;
     z-index: 1;
   }
 
-  .wizard-steps .step-number {
+  .apkg-wizard .wizard-steps .step-number {
     display: inline-block;
     width: 40px;
     height: 40px;
@@ -458,59 +458,76 @@
     border: 2px solid #ddd;
     color: #999;
     font-weight: bold;
-    margin-bottom: 5px;
+    margin-bottom: var(--app-space-1);
   }
 
-  .wizard-steps .step.active .step-number {
+  .apkg-wizard .wizard-steps .step.active .step-number {
     border-color: #007bff;
     background: #007bff;
     color: #fff;
   }
 
-  .wizard-steps .step.completed .step-number {
+  .apkg-wizard .wizard-steps .step.completed .step-number {
     border-color: #28a745;
     background: #28a745;
     color: #fff;
   }
 
-  .wizard-steps .step-label {
+  .apkg-wizard .wizard-steps .step-label {
     display: block;
     font-size: 12px;
     color: #666;
   }
 
-  .wizard-content {
+  .apkg-wizard .wizard-content {
     min-height: 400px;
   }
 
-  .wizard-actions {
+  .apkg-wizard .wizard-actions {
     display: flex;
     justify-content: space-between;
-    margin-top: 20px;
-    padding-top: 20px;
+    gap: var(--app-space-2);
+    margin-top: var(--app-space-4);
+    padding-top: var(--app-space-4);
     border-top: 1px solid #ddd;
   }
 
-  .field-card {
+  .apkg-wizard .field-card {
     border-left: 3px solid #007bff;
   }
 
-  .tdf-config-card {
+  .apkg-wizard .tdf-config-card {
     border-left: 4px solid #007bff;
   }
 
-  .tdf-config-card.editing {
+  .apkg-wizard .tdf-config-card.editing {
     border-left-color: #ffc107;
   }
 
-  .badge-text { background: #6c757d; }
-  .badge-image { background: #17a2b8; }
-  .badge-mixed { background: #fd7e14; }
-  .badge-audio { background: #6f42c1; }
+  .apkg-wizard .badge-text { background: #6c757d; }
+  .apkg-wizard .badge-image { background: #17a2b8; }
+  .apkg-wizard .badge-mixed { background: #fd7e14; }
+  .apkg-wizard .badge-audio { background: #6f42c1; }
 
-  .fields-list {
+  .apkg-wizard .fields-list {
     max-height: 400px;
     overflow-y: auto;
+  }
+
+  .apkg-wizard .wizard-card {
+    margin-bottom: var(--app-space-3);
+  }
+
+  .apkg-wizard .wizard-status-detail {
+    margin-top: var(--app-space-2);
+  }
+
+  .apkg-wizard .wizard-card-sm {
+    margin-bottom: var(--app-space-2);
+  }
+
+  .apkg-wizard .wizard-actions-extra {
+    margin-top: var(--app-space-3);
   }
   </style>
 </template>

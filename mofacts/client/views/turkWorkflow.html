@@ -12,24 +12,24 @@
 
         #turkModal .modal-body,
         #profileWorkModal .modal-body {
-            padding: 1rem 1.25rem;
+            padding: var(--app-space-3) calc(1.25rem * var(--app-density-scale));
         }
     </style>
-    <div class="container" style="margin-top: 1rem;">
+    <div class="container admin-page">
         <h3 class="page-header-title">Mechanical Turk</h3>
 
     <!-- AWS Login Data -->
     <div class="admin-section">
-        <div class="card mb-4">
+        <div class="card admin-card">
             <div class="card-body">
-                <div class="d-flex align-items-center mb-3">
-                    <i class="fa fa-key me-2" style="font-size: 1.25rem; color: var(--app-accent-color);"></i>
-                    <h5 class="m-0">AWS Login Data</h5>
+                <div class="admin-section-heading">
+                    <i class="fa fa-key admin-section-icon"></i>
+                    <h5>AWS Login Data</h5>
                 </div>
 
     <div class="row" id="profileContainer">
         <div class="col-lg-6 col-md-8 offset-lg-3 offset-md-2">
-                <div class="form-group mb-3">
+                <div class="form-group admin-form-row">
                     <input type="text"
                         id="profileAWSID" name="profileAWSID"
                         class="form-control clearOnSave"
@@ -37,7 +37,7 @@
                         placeholder="{{#if have_aws_id}}Overwrite{{else}}Enter{{/if}} your AWS ID"
                     >
                 </div>
-                <div class="form-group mb-3">
+                <div class="form-group admin-form-row">
                     <input type="password"
                         id="profileAWSSecret" name="profileAWSSecret"
                         class="form-control clearOnSave"
@@ -45,7 +45,7 @@
                         placeholder="{{#if have_aws_secret}}Overwrite{{else}}Enter{{/if}} your AWS Secret Key"
                     >
                 </div>
-                <div class="form-group text-center mb-3">
+                <div class="form-group text-center admin-form-row">
                     <div class="form-check d-inline-block">
                         <input type="checkbox" class="form-check-input" id="profileUseSandbox" name="profileUseSandbox" checked={{use_sandbox}}>
                         <label class="form-check-label" for="profileUseSandbox">Use Sandbox <span class="text-muted small">(Your AWS credentials are never shown)</span></label>
@@ -53,19 +53,19 @@
                 </div>
                 <div class="form-group text-center">
                     <button type='button' id='saveProfile' class='btn btn-fix'>
-                        <i class="fa fa-save me-1"></i>Save Profile Data
+                        <i class="fa fa-save admin-button-icon"></i>Save Profile Data
                     </button>
-                    <button type='button' id='testConfirmProfile' class='btn btn-fix btn-primary ms-2'>
-                        <i class="fa fa-check-circle me-1"></i>Test and Confirm
+                    <button type='button' id='testConfirmProfile' class='btn btn-fix btn-primary admin-inline-action'>
+                        <i class="fa fa-check-circle admin-button-icon"></i>Test and Confirm
                     </button>
                 </div>
-                <div class="form-group mt-3">
+                <div class="form-group admin-form-row-top">
                     <div class="small text-muted">
                         <strong>Saved profile state:</strong> {{savedAwsProfileSummary}}
                     </div>
                     {{#if profileInlineStatus}}
-                    <div class="alert {{profileInlineStatusClass}} mt-2 mb-0" role="alert">
-                        <pre class="mb-0" style="white-space: pre-wrap;">{{profileInlineStatus}}</pre>
+                    <div class="alert {{profileInlineStatusClass}} admin-form-row-top admin-alert-flush" role="alert">
+                        <pre class="admin-scroll-output admin-empty-text">{{profileInlineStatus}}</pre>
                     </div>
                     {{/if}}
                 </div>
@@ -78,17 +78,17 @@
 
     <!-- Experiment Logs -->
     <div class="admin-section">
-        <div class="card mb-4">
+        <div class="card admin-card">
             <div class="card-body">
-                <div class="d-flex align-items-center mb-3">
-                    <i class="fa fa-list-alt me-2" style="font-size: 1.25rem; color: var(--app-accent-color);"></i>
-                    <h5 class="m-0">Experiment Logs</h5>
+                <div class="admin-section-heading">
+                    <i class="fa fa-list-alt admin-section-icon"></i>
+                    <h5>Experiment Logs</h5>
                 </div>
 
     <div id="turkLogEntireWorkflow">
         <div class="row">
             <div class="col-md-6 text-center offset-md-3" id="turkLogSelectContainer">
-                <p class="text-muted mb-2">Select a TDF to see the Turk Log</p>
+                <p class="text-muted admin-form-row-sm">Select a TDF to see the Turk Log</p>
                 
                 <select id="tdf-select" class="form-select">
                     <option value="">Select a lesson</option>
@@ -99,14 +99,14 @@
             </div>
         </div>
         {{#if turkExperimentLogToShow}}
-        <div id="turkLogAll" class="mt-3">
+        <div id="turkLogAll" class="admin-form-row-top">
             <div class="row">
                 <div class="col-md-12">
-                    <h5 class="text-center mb-2">
+                    <h5 class="text-center admin-form-row-sm">
                         Turk Experiment Log <span id="turkExpTitle" class="text-muted"></span>
                     </h5>
 
-                    <div class="form-group mb-3">
+                    <div class="form-group admin-form-row">
                         <input type="text" class="form-control" name="turklog-filt" id="turklog-filt" value="" placeholder="Only show users with this many trials">
                     </div>
 
@@ -134,8 +134,8 @@
                         <tbody>
                         {{#if turkExperimentLogEmpty}}
                             <tr>
-                                <td colspan="12" class="text-center text-muted py-4">
-                                    <i class="fa fa-info-circle me-1"></i>No experiment-mode users found for this TDF.
+                                <td colspan="12" class="text-center text-muted admin-empty-state">
+                                    <i class="fa fa-info-circle admin-button-icon"></i>No experiment-mode users found for this TDF.
                                 </td>
                             </tr>
                         {{/if}}
@@ -227,19 +227,19 @@
 
     <!-- Assignment Details -->
     <div class="admin-section">
-        <div class="card mb-4">
+        <div class="card admin-card">
             <div class="card-body">
-                <div class="d-flex align-items-center mb-3">
-                    <i class="fa fa-clipboard me-2" style="font-size: 1.25rem; color: var(--app-accent-color);"></i>
-                    <h5 class="m-0">Assignment Details</h5>
+                <div class="admin-section-heading">
+                    <i class="fa fa-clipboard admin-section-icon"></i>
+                    <h5>Assignment Details</h5>
                 </div>
                 <div class="row">
                     <div class="col-md-6 offset-md-3 text-center" id="turk-assignment-details">
-                        <div class="input-group mb-2">
+                        <div class="input-group admin-form-row-sm">
                             <input type="text" class="form-control" name="turk-assignid" id="turk-assignid" value="" placeholder="Mechanical Turk AssignmentID">
-                            <button id="turk-show-assign" class="btn btn-fix"><i class="fa fa-search me-1"></i>Get Assignment</button>
+                            <button id="turk-show-assign" class="btn btn-fix"><i class="fa fa-search admin-button-icon"></i>Get Assignment</button>
                         </div>
-                        <pre id="turk-assign-results" class="text-start bg-light p-2 rounded" style="width:100%; max-height: 300px; overflow-y: auto;"></pre>
+                        <pre id="turk-assign-results" class="text-start bg-light admin-alert-compact rounded admin-preformatted-output"></pre>
                     </div>
                 </div>
             </div>
@@ -248,23 +248,23 @@
 
     <!-- Send Turk Message -->
     <div class="admin-section">
-        <div class="card mb-4">
+        <div class="card admin-card">
             <div class="card-body">
-                <div class="d-flex align-items-center mb-3">
-                    <i class="fa fa-envelope me-2" style="font-size: 1.25rem; color: var(--app-accent-color);"></i>
-                    <h5 class="m-0">Send Turk Message</h5>
+                <div class="admin-section-heading">
+                    <i class="fa fa-envelope admin-section-icon"></i>
+                    <h5>Send Turk Message</h5>
                 </div>
                 <div class="row">
                     <div class="col-md-6 offset-md-3" id="turk-send-message">
-                        <div class="form-group mb-3">
+                        <div class="form-group admin-form-row">
                             <input type="text" class="form-control" name="turk-workerid" id="turk-workerid" value="" placeholder="Mechanical Turk WorkerID">
                         </div>
-                        <div class="form-group mb-3">
+                        <div class="form-group admin-form-row">
                             <textarea name="turk-msg" id="turk-msg" class="form-control" rows="8" placeholder="Message text goes here"></textarea>
                         </div>
                         <div class="text-center">
                             <button id="turk-send-msg" class="btn btn-fix btn-primary">
-                                <i class="fa fa-paper-plane me-1"></i>Send Message
+                                <i class="fa fa-paper-plane admin-button-icon"></i>Send Message
                             </button>
                         </div>
                     </div>
@@ -275,16 +275,16 @@
 
     <!-- Remove Turk User -->
     <div class="admin-section">
-        <div class="card mb-4">
+        <div class="card admin-card">
             <div class="card-body">
-                <div class="d-flex align-items-center mb-3">
-                    <i class="fa fa-user-times me-2" style="font-size: 1.25rem; color: var(--app-accent-color);"></i>
-                    <h5 class="m-0">Remove Turk User</h5>
+                <div class="admin-section-heading">
+                    <i class="fa fa-user-times admin-section-icon"></i>
+                    <h5>Remove Turk User</h5>
                 </div>
                 <div class="row text-center">
                     <div class="col-md-6 offset-md-3" id="turk-assignment-removal-container">
-                        <p class="text-muted mb-2">Select an Experiment and User to remove from Mechanical Turk</p>
-                        <div class="form-group mb-2">
+                        <p class="text-muted admin-form-row-sm">Select an Experiment and User to remove from Mechanical Turk</p>
+                        <div class="form-group admin-form-row-sm">
                             <select id="experiment-select" class="form-select">
                                 <option selected="selected" value="{{INVALID}}" disabled="true">Select an Experiment</option>
                                 {{#each experiments}}
@@ -292,7 +292,7 @@
                                 {{/each}}
                             </select>
                         </div>
-                        <div class="form-group mb-2">
+                        <div class="form-group admin-form-row-sm">
                             <select id="user-select" disabled="true" class="form-select">
                                 <option selected="selected" value="{{INVALID}}" disabled="true">Select a User</option>
                                 {{#each turkIds}}
@@ -301,7 +301,7 @@
                             </select>
                         </div>
                         <button id="turk-assignment-removal" class="btn btn-fix btn-danger">
-                            <i class="fa fa-trash me-1"></i>Remove Turk User
+                            <i class="fa fa-trash admin-button-icon"></i>Remove Turk User
                         </button>
                     </div>
                 </div>
@@ -314,18 +314,17 @@
         <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="turkModalLabel"><i class="fa fa-spinner fa-spin me-2"></i>Please Wait</h5>
+                    <h5 class="modal-title" id="turkModalLabel"><i class="fa fa-spinner fa-spin admin-inline-icon"></i>Please Wait</h5>
                 </div>
                 <div class="modal-body">
-                    <div class="d-flex align-items-center gap-3">
+                    <div class="admin-modal-body-row">
                         <img src="/styles/mofacts_waiting.gif"
                              alt="Loading, please wait"
-                             class="img-fluid"
-                             style="max-width: 80px;"
+                             class="img-fluid admin-loading-image"
                              loading="lazy"
                              decoding="async"
                              fetchpriority="low"/>
-                        <p class="m-0" id="turkModalMessage">Please wait&hellip;</p>
+                        <p class="admin-empty-text" id="turkModalMessage">Please wait&hellip;</p>
                     </div>
                 </div>
             </div>
@@ -335,18 +334,17 @@
         <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="profileWorkModalLabel"><i class="fa fa-spinner fa-spin me-2"></i>Please Wait</h5>
+                    <h5 class="modal-title" id="profileWorkModalLabel"><i class="fa fa-spinner fa-spin admin-inline-icon"></i>Please Wait</h5>
                 </div>
                 <div class="modal-body">
-                    <div class="d-flex align-items-center gap-3">
+                    <div class="admin-modal-body-row">
                         <img src="/styles/mofacts_waiting.gif"
                              alt="Loading, please wait"
-                             class="img-fluid"
-                             style="max-width: 80px;"
+                             class="img-fluid admin-loading-image"
                              loading="lazy"
                              decoding="async"
                              fetchpriority="low"/>
-                        <p class="m-0" id="profileWorkModalMessage">{{profileWorkModalMessage}}</p>
+                        <p class="admin-empty-text" id="profileWorkModalMessage">{{profileWorkModalMessage}}</p>
                     </div>
                 </div>
                 {{#if saveComplete}}
@@ -361,11 +359,11 @@
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="detailsModalLabel"><i class="fa fa-info-circle me-2"></i>Turk Experiment Log Details</h5>
+                    <h5 class="modal-title" id="detailsModalLabel"><i class="fa fa-info-circle admin-inline-icon"></i>Turk Experiment Log Details</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <div id="detailsModalListing" style="white-space: pre-wrap; max-height: 60vh; overflow-y: auto;"></div>
+                    <div id="detailsModalListing" class="admin-scroll-output"></div>
                 </div>
             </div>
         </div>

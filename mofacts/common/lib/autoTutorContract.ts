@@ -25,6 +25,10 @@ function nonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+function containsInternalRubricId(value: string): boolean {
+  return /\b[EM]\d+\b/.test(value);
+}
+
 function asRecordArray(value: unknown): Array<Record<string, unknown>> {
   return Array.isArray(value) ? value.filter(isRecord) : [];
 }
@@ -480,6 +484,9 @@ export function parseAutoTutorUtteranceEnvelope(value: unknown): AutoTutorUttera
   }
   if (!nonEmptyString(parsed.tutorMessage)) {
     throw new Error('AutoTutor utterance response requires non-empty tutorMessage');
+  }
+  if (containsInternalRubricId(parsed.tutorMessage)) {
+    throw new Error('AutoTutor utterance response tutorMessage must not expose internal expectation or misconception IDs');
   }
   if (typeof parsed.targetType !== 'string' || !TARGET_TYPES.has(parsed.targetType)) {
     throw new Error('AutoTutor utterance response targetType is invalid');

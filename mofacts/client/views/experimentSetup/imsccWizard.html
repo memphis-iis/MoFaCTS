@@ -41,7 +41,7 @@
         </div>
 
         {{#if selectedFileName}}
-        <div class="alert alert-secondary mt-3">
+        <div class="alert alert-secondary wizard-card">
           <strong>Selected:</strong> {{selectedFileName}}
         </div>
         {{/if}}
@@ -49,7 +49,7 @@
         {{#if analyzing}}
         <div class="alert alert-info">
           <i class="fa fa-spinner fa-spin"></i> Analyzing IMSCC package...
-          <div class="progress mt-2">
+          <div class="progress wizard-status-detail">
             <div class="progress-bar progress-bar-striped progress-bar-animated"
                  style="width: {{analyzeProgress}}%">
               {{analyzeProgress}}%
@@ -77,7 +77,7 @@
       <div class="wizard-step">
         <h4>Step 2: Select and Configure Quizzes</h4>
 
-        <div class="form-group mb-3 imscc-mode-setting">
+        <div class="form-group imscc-mode-setting wizard-card">
           <div class="imscc-mode-setting-top">
             <strong>Output mode</strong>
             <div class="imscc-mode-switch" title="Toggle between separate systems and a single joined system">
@@ -104,7 +104,7 @@
         </div>
 
         {{#if metadata}}
-        <div class="card mb-3">
+        <div class="card wizard-card">
           <div class="card-body">
             <div class="row">
               <div class="col-md-4"><strong>File:</strong> {{metadata.fileName}}</div>
@@ -154,7 +154,7 @@
         </div>
         {{/if}}
 
-        <div class="card bg-light mb-3">
+        <div class="card bg-light wizard-card">
           <div class="card-body">
             <strong>Selected quizzes:</strong> {{selectedConfigCount}}<br>
             <strong>Supported questions to convert:</strong> {{selectedSupportedCount}}
@@ -162,10 +162,10 @@
         </div>
 
         {{#if joinMode}}
-        <div class="card mb-3">
+        <div class="card wizard-card">
           <div class="card-header">
             <strong>Combined Practice System</strong>
-            <span class="badge badge-info ml-2">{{selectedConfigCount}} quizzes &bull; {{joinedTotalSupported}} supported questions</span>
+            <span class="badge badge-info imscc-inline-badge">{{selectedConfigCount}} quizzes &bull; {{joinedTotalSupported}} supported questions</span>
           </div>
           <div class="card-body">
             <div class="row">
@@ -175,7 +175,7 @@
               </div>
               <div class="col-md-6">
                 <label>Included Quizzes</label>
-                <ul class="list-unstyled mb-0" style="max-height:150px;overflow-y:auto;border:1px solid #dee2e6;border-radius:.25rem;padding:8px;background:#f8f9fa">
+                <ul class="list-unstyled imscc-scroll-list">
                   {{#each configs}}
                     {{#if selected}}
                     <li class="small">{{title}} <span class="text-muted">({{supportedCount}} supported)</span></li>
@@ -184,12 +184,12 @@
                 </ul>
               </div>
             </div>
-            <div class="mt-3">
+            <div class="imscc-field-group">
               <label>Instructions (optional)</label>
               <textarea class="form-control" id="imscc-joined-instructions" rows="3">{{joinedConfig.instructions}}</textarea>
             </div>
             {{#if joinedConfig.validationError}}
-            <div class="alert alert-warning mt-3 mb-0">
+            <div class="alert alert-warning imscc-alert-flush">
               {{joinedConfig.validationError}}
             </div>
             {{/if}}
@@ -198,7 +198,7 @@
         {{else}}
         {{#each configs}}
           {{#if selected}}
-          <div class="card mb-3">
+          <div class="card wizard-card">
             <div class="card-header">
               <strong>{{title}}</strong>
             </div>
@@ -218,14 +218,14 @@
                   </div>
                 </div>
               </div>
-              <div class="mt-3">
+              <div class="imscc-field-group">
                 <label>Instructions (optional)</label>
                 <textarea class="form-control imscc-instructions"
                           rows="3"
                           data-ident="{{ident}}">{{instructions}}</textarea>
               </div>
               {{#if validationError}}
-              <div class="alert alert-warning mt-3 mb-0">
+              <div class="alert alert-warning imscc-alert-flush">
                 {{validationError}}
               </div>
               {{/if}}
@@ -244,7 +244,7 @@
         {{#if generating}}
         <div class="alert alert-info">
           <i class="fa fa-spinner fa-spin"></i> Preparing editable draft...
-          <div class="progress mt-2">
+          <div class="progress wizard-status-detail">
             <div class="progress-bar progress-bar-striped progress-bar-animated"
                  style="width: {{generateProgress}}%">
               {{generateProgress}}%
@@ -290,7 +290,7 @@
         {{#if generating}}
         <div class="alert alert-info">
           <i class="fa fa-spinner fa-spin"></i> Generating package...
-          <div class="progress mt-2">
+          <div class="progress wizard-status-detail">
             <div class="progress-bar progress-bar-striped progress-bar-animated"
                  style="width: {{generateProgress}}%">
               {{generateProgress}}%
@@ -310,15 +310,15 @@
           Package generated successfully.
         </div>
 
-        <div class="card mb-3">
+        <div class="card wizard-card">
           <div class="card-header">
-            <h5 class="m-0">Generation Summary</h5>
+            <h5 class="imscc-heading-flush">Generation Summary</h5>
           </div>
           <div class="card-body">
             <div><strong>Total cards:</strong> {{generationResult.totalCards}}</div>
             <div><strong>Total skipped:</strong> {{generationResult.totalSkipped}}</div>
             <hr>
-            <ul class="mb-0">
+            <ul class="imscc-summary-list">
               {{#each generationResult.manifest}}
               <li>
                 <strong>{{tdfName}}</strong> - {{cardCount}} cards
@@ -334,7 +334,7 @@
         {{#if uploadStatus}}
         <div class="alert alert-info">
           <i class="fa fa-spinner fa-spin"></i> {{uploadStatus.message}}
-          <div class="progress mt-2">
+          <div class="progress wizard-status-detail">
             <div class="progress-bar progress-bar-striped progress-bar-animated"
                  style="width: {{uploadStatus.progress}}%">
               {{uploadStatus.progress}}%
@@ -378,8 +378,8 @@
   <style>
   .imscc-wizard {
     max-width: 960px;
-    margin: 20px auto;
-    padding: 20px;
+    margin: var(--app-space-4) auto;
+    padding: var(--app-space-4);
     background: #fff;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -387,13 +387,13 @@
 
   .imscc-wizard .wizard-header {
     text-align: center;
-    margin-bottom: 20px;
+    margin-bottom: var(--app-space-4);
   }
 
   .imscc-wizard .wizard-steps {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 20px;
+    margin-bottom: var(--app-space-4);
     position: relative;
   }
 
@@ -425,7 +425,7 @@
     border: 2px solid #ddd;
     color: #999;
     font-weight: bold;
-    margin-bottom: 5px;
+    margin-bottom: var(--app-space-1);
   }
 
   .imscc-wizard .step.active .step-number {
@@ -449,30 +449,66 @@
   .imscc-wizard .wizard-actions {
     display: flex;
     justify-content: space-between;
-    gap: 10px;
-    margin-top: 16px;
-    padding-top: 16px;
+    gap: var(--app-space-2);
+    margin-top: var(--app-space-3);
+    padding-top: var(--app-space-3);
     border-top: 1px solid #ddd;
+  }
+
+  .imscc-wizard .wizard-card {
+    margin-bottom: var(--app-space-3);
+  }
+
+  .imscc-wizard .wizard-status-detail {
+    margin-top: var(--app-space-2);
+  }
+
+  .imscc-wizard .imscc-inline-badge {
+    margin-left: var(--app-space-2);
+  }
+
+  .imscc-wizard .imscc-scroll-list {
+    max-height: 150px;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+    padding: var(--app-space-2);
+    margin-bottom: 0;
+    background: #f8f9fa;
+  }
+
+  .imscc-wizard .imscc-field-group {
+    margin-top: var(--app-space-3);
+  }
+
+  .imscc-wizard .imscc-alert-flush {
+    margin-top: var(--app-space-3);
+    margin-bottom: 0;
+  }
+
+  .imscc-wizard .imscc-heading-flush,
+  .imscc-wizard .imscc-summary-list {
+    margin: var(--app-space-0);
   }
 
   .imscc-wizard .imscc-mode-setting {
     display: flex;
     flex-direction: column;
-    gap: 0.35rem;
+    gap: calc(0.35rem * var(--app-density-scale));
   }
 
   .imscc-wizard .imscc-mode-setting-top {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.75rem;
+    gap: var(--app-space-2);
     flex-wrap: wrap;
   }
 
   .imscc-wizard .imscc-mode-switch {
     display: inline-flex;
     align-items: center;
-    gap: 0.45rem;
+    gap: calc(0.45rem * var(--app-density-scale));
     flex-wrap: nowrap;
     white-space: nowrap;
   }
@@ -480,8 +516,8 @@
   .imscc-wizard .imscc-mode-switch-control {
     display: inline-flex;
     align-items: center;
-    margin: 0;
-    padding: 0;
+    margin: var(--app-space-0);
+    padding: var(--app-space-0);
     min-height: 0;
     line-height: 1;
   }
@@ -520,7 +556,7 @@
     .imscc-wizard .imscc-mode-setting-top {
       align-items: flex-start;
       flex-direction: column;
-      gap: 0.4rem;
+      gap: calc(0.4rem * var(--app-density-scale));
     }
   }
   </style>

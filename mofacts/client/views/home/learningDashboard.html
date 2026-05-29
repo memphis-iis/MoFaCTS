@@ -79,7 +79,7 @@
             </div>
           {{else}}
             <div class="practice-empty-state">
-              <p class="mb-0">No lessons found. Please contact your administrator.</p>
+              <p class="learning-dashboard-flush">No lessons found. Please contact your administrator.</p>
             </div>
           {{/if}}
         {{/if}}
@@ -219,11 +219,11 @@
 
 <template name="learningDashboardLessonCards">
   {{#each tdfs}}
-    <div class="learning-dashboard-card border rounded p-3 mb-3 shadow-sm {{#unless this.isUsed}}lesson-card-unused{{/unless}}">
+    <div class="learning-dashboard-card border rounded shadow-sm {{#unless this.isUsed}}lesson-card-unused{{/unless}}">
       <div class="learning-dashboard-card-title">
         {{displayLabel}}
         {{#if this.conditions}}
-          <select class="form-select form-select-sm mt-1 condition-tdf-selector"
+          <select class="form-select form-select-sm condition-tdf-selector"
             data-roottdfid="{{this.TDFId}}">
             <option value="{{this.TDFId}}">{{this.displayName}} (auto-assign)</option>
             {{#each this.conditions}}
@@ -279,7 +279,7 @@
             aria-expanded="false"
             aria-controls="details-{{this.TDFId}}">
             Details
-            <span class="fa fa-chevron-down card-expand-icon ms-1"></span>
+            <span class="fa fa-chevron-down card-expand-icon"></span>
           </button>
           {{#if this.hasConfigurableSettings}}
             <button class="btn btn-sm btn-outline-secondary configure-lesson learning-dashboard-card-button" data-tdfid="{{this.TDFId}}">
@@ -312,24 +312,24 @@
 
       {{#if this.isUsed}}
         <div id="details-{{this.TDFId}}" class="collapse">
-          <div class="border-top pt-1 mt-1">
-            <div class="d-flex justify-content-between py-1 border-bottom">
+          <div class="learning-dashboard-details border-top">
+            <div class="learning-dashboard-detail-row border-bottom">
               <span>Total Trials:</span>
               <span class="fw-bold">{{this.totalTrials}}</span>
             </div>
-            <div class="d-flex justify-content-between py-1 border-bottom">
+            <div class="learning-dashboard-detail-row border-bottom">
               <span>Time Spent:</span>
               <span class="fw-bold">{{this.totalTimeMinutes}} min</span>
             </div>
-            <div class="d-flex justify-content-between py-1 border-bottom">
+            <div class="learning-dashboard-detail-row border-bottom">
               <span>Items Practiced:</span>
               <span class="fw-bold">{{itemsPracticedDisplay}}</span>
             </div>
-            <div class="d-flex justify-content-between py-1 border-bottom">
+            <div class="learning-dashboard-detail-row border-bottom">
               <span>Days with Sessions:</span>
               <span class="fw-bold">{{this.totalSessions}}</span>
             </div>
-            <div class="d-flex justify-content-between py-1">
+            <div class="learning-dashboard-detail-row">
               <span>Last Practice:</span>
               <span class="fw-bold">{{this.lastPracticeDate}}</span>
             </div>
@@ -348,12 +348,12 @@
           <div class="text-muted">Loading settings...</div>
         {{else}}
           {{#if this.error}}
-            <div class="alert alert-warning py-2 mb-2">{{this.error}}</div>
+            <div class="alert alert-warning learner-config-alert">{{this.error}}</div>
           {{/if}}
 
           {{#if isConfigStep "settings"}}
             <form class="learner-config-form">
-              <div class="small text-muted mb-2">{{selectedConfigLabel}}</div>
+              <div class="small text-muted learner-config-label">{{selectedConfigLabel}}</div>
               {{#if hasSettingFields}}
                 <div class="learner-config-fields-grid">
                 {{#each settingFields}}
@@ -407,7 +407,7 @@
                 {{/each}}
                 </div>
               {{/if}}
-              <div class="d-flex gap-2 justify-content-end align-items-center learner-config-footer">
+              <div class="learner-config-footer">
                 {{#if currentUserIsAdmin}}
                   <div class="learner-config-admin-reset">
                     {{#if this.resetConfirming}}

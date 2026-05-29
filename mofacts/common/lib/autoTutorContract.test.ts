@@ -421,6 +421,15 @@ describe('AutoTutor content contract', function() {
     expect(envelope.selectedMove).to.equal('final_answer_prompt');
   });
 
+  it('rejects tutor messages that expose internal rubric IDs', function() {
+    expect(() => parseAutoTutorUtteranceEnvelope(JSON.stringify({
+      targetType: 'expectation',
+      targetId: 'E4',
+      selectedMove: 'prompt',
+      tutorMessage: 'You are doing the key E4 move. Can you restate it?',
+    }))).to.throw('AutoTutor utterance response tutorMessage must not expose internal expectation or misconception IDs');
+  });
+
   it('fails clearly when the model returns malformed JSON', function() {
     expect(() => parseAutoTutorScoreEnvelope('{ not json')).to.throw(
       'AutoTutor response envelope is not valid JSON'

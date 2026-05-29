@@ -2252,20 +2252,6 @@
     padding-right: min(var(--learning-progress-panel-width), 40vw);
   }
 
-  :global(body:has(.svelte-card-container) .navbar) {
-    width: 100%;
-    margin-right: 0;
-    align-self: flex-start;
-    transition: width var(--app-transition-smooth) ease, margin-right var(--app-transition-smooth) ease;
-  }
-
-  @media (min-width: 769px) {
-    :global(html.learning-progress-panel-viewport-open .navbar) {
-      width: calc(100% - min(320px, 40vw));
-      margin-right: min(320px, 40vw);
-    }
-  }
-
   .video-instruction-overlay {
     position: absolute;
     inset: 0;
@@ -2273,7 +2259,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: clamp(16px, 4vw, 48px);
+    padding: clamp(var(--app-space-4-px), 4vw, var(--app-space-5));
     background: color-mix(in srgb, var(--app-background-color) 94%, transparent);
   }
 
@@ -2281,7 +2267,7 @@
     width: min(760px, 100%);
     max-height: min(78vh, 720px);
     overflow: auto;
-    padding: clamp(18px, 3vw, 32px);
+    padding: clamp(calc(18px * var(--app-density-scale)), 3vw, calc(32px * var(--app-density-scale)));
     border: 1px solid var(--app-secondary-surface-color);
     background: var(--learning-card-surface-color);
     color: var(--app-text-color);
@@ -2294,7 +2280,7 @@
   }
 
   .video-instruction-warning {
-    margin: 16px 0 0;
+    margin: var(--app-space-4-px) 0 0;
     color: var(--feedback-error-color);
     font-weight: 600;
   }
@@ -2303,7 +2289,7 @@
     display: block;
     width: min(420px, 100%);
     min-height: var(--app-button-height);
-    margin: 24px auto 0;
+    margin: var(--app-space-5-px) auto 0;
     border: 1px solid var(--app-secondary-surface-color);
     border-radius: var(--app-border-radius-sm);
     background: var(--learning-card-primary-action-surface-color);
@@ -2360,7 +2346,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 12px;
+    gap: var(--app-space-3-px);
   }
 
   .fixed-footer__message {
@@ -2369,7 +2355,7 @@
   }
 
   .fixed-footer__button {
-    padding: 4px 16px;
+    padding: var(--app-space-1-px) var(--app-space-4-px);
     border: 1px solid var(--app-secondary-surface-color);
     border-radius: var(--app-border-radius-sm);
     font-size: 12px;
@@ -2385,7 +2371,7 @@
     right: 10px;
     background: color-mix(in srgb, var(--app-text-color) 80%, transparent);
     color: var(--app-accent-color);
-    padding: 0.5rem;
+    padding: var(--app-space-2);
     border-radius: var(--app-border-radius-sm);
     font-family: monospace;
     font-size: 0.7rem;
@@ -2401,7 +2387,7 @@
   }
 
   .debug-state pre {
-    margin: 0.5rem 0 0 0;
+    margin: var(--app-space-2) 0 0 0;
     white-space: pre-wrap;
     word-wrap: break-word;
   }
@@ -2431,7 +2417,7 @@
   }
 
   .video-continue-button {
-    padding: 0.75rem 2rem;
+    padding: calc(0.75rem * var(--app-density-scale)) calc(2rem * var(--app-density-scale));
     border: 1px solid var(--app-secondary-surface-color);
     border-radius: var(--app-border-radius-lg);
     font-size: 1rem;
@@ -2449,7 +2435,7 @@
   }
 
   .skip-study-button {
-    padding: 0.5rem 1.5rem;
+    padding: var(--app-space-2) var(--app-space-4);
     border: 1px solid var(--app-secondary-surface-color);
     border-radius: var(--app-border-radius-lg);
     font-size: 0.875rem;

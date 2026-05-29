@@ -328,28 +328,65 @@
             min-width: 100px;
         }
 
+        #stim-editor-container .media-upload-status {
+            width: 100%;
+        }
+
+        #stim-editor-container .media-upload-status-row {
+            display: flex;
+            align-items: center;
+            gap: var(--app-space-2);
+            margin-bottom: var(--app-space-1);
+        }
+
+        #stim-editor-container .media-upload-success {
+            margin-left: var(--app-space-2);
+        }
+
         /* =================================================================
            VALIDATION UI STYLES
            ================================================================= */
 
         /* Validation Summary Panel */
         .validation-summary {
-            margin-bottom: 1rem;
+            margin-bottom: var(--app-space-3);
         }
 
         .validation-summary .alert {
-            padding: 0.75rem 1rem;
+            padding: var(--app-space-3);
+        }
+
+        .validation-summary-row {
+            display: flex;
+            align-items: center;
+        }
+
+        .validation-summary-label,
+        .validation-breaking-badge {
+            margin-left: var(--app-space-2);
+        }
+
+        .validation-breaking-badge-sm {
+            margin-left: var(--app-space-1);
+        }
+
+        .validation-alert {
+            margin-bottom: var(--app-space-2);
         }
 
         .validation-summary .validation-list {
             list-style: none;
-            padding-left: 0;
-            margin-bottom: 0;
+            padding-left: var(--app-space-0);
+            margin-bottom: var(--app-space-0);
             font-size: 0.875rem;
         }
 
+        .validation-list-collapsed {
+            margin-top: var(--app-space-2);
+        }
+
         .validation-summary .validation-item {
-            padding: 0.25rem 0;
+            padding: var(--app-space-1) var(--app-space-0);
             border-bottom: 1px solid rgba(0,0,0,0.1);
         }
 
@@ -377,8 +414,13 @@
         }
 
         .field-validation-message {
+            margin-top: var(--app-space-1);
             font-size: 0.75rem !important;
             line-height: 1.2;
+        }
+
+        .field-validation-message-text {
+            margin-left: var(--app-space-1);
         }
 
         .field-validation-message i {
@@ -401,6 +443,8 @@
 
         /* Toggle Button Styling */
         .toggle-validation-details {
+            margin-left: auto;
+            padding: var(--app-space-0);
             color: inherit !important;
             text-decoration: none !important;
         }
@@ -628,13 +672,13 @@
         }
     </style>
 
-    <div class="container" style="margin-top: 1rem;">
+    <div class="container admin-page">
         <!-- Header -->
-        <div class="d-flex align-items-center mb-3">
-            <a href="/contentUpload" class="btn btn-outline-secondary me-3">
+        <div class="editor-page-header">
+            <a href="/contentUpload" class="btn btn-outline-secondary editor-back-button">
                 <i class="fa fa-arrow-left"></i> Back
             </a>
-            <h3 class="page-header-text m-0">
+            <h3 class="page-header-text editor-page-title">
                 Edit Stimuli: {{lessonName}}
                 {{#if conditionInfo}}
                     <small class="text-muted">
@@ -650,9 +694,9 @@
         </div>
 
         {{#if loading}}
-        <div class="text-center py-5">
+        <div class="text-center editor-loading-state">
             <i class="fa fa-spinner fa-spin fa-2x"></i>
-            <p class="mt-2">Loading content...</p>
+            <p class="admin-form-row-top">Loading content...</p>
         </div>
         {{else}}
         {{#if noData}}
@@ -664,15 +708,15 @@
 
         {{#unless editorReady}}
         <!-- Show initializing message while editor loads -->
-        <div class="text-center py-4">
+        <div class="text-center admin-empty-state">
             <i class="fa fa-spinner fa-spin fa-2x text-primary"></i>
-            <p class="mt-2 text-muted">Initializing editor...</p>
+            <p class="admin-form-row-top text-muted">Initializing editor...</p>
         </div>
         {{/unless}}
 
         {{#if editorReady}}
         <!-- Tooltip toggle + unsaved state (mobile-friendly) -->
-        <div class="editor-topbar mb-3">
+        <div class="editor-topbar admin-form-row">
             <div class="editor-status">
                 {{#if hasChanges}}
                 <span class="badge bg-warning text-dark unsaved-badge">Unsaved changes</span>
@@ -680,15 +724,15 @@
             </div>
             <div class="editor-verbosity">
                 <span class="text-muted small">Descriptions:</span>
-                <div class="form-check form-check-inline mb-0">
+                <div class="form-check form-check-inline editor-inline-check">
                     <input class="form-check-input" type="radio" name="tooltipMode" id="tooltipNone" value="none" checked="{{noneChecked}}">
                     <label class="form-check-label small" for="tooltipNone">None</label>
                 </div>
-                <div class="form-check form-check-inline mb-0">
+                <div class="form-check form-check-inline editor-inline-check">
                     <input class="form-check-input" type="radio" name="tooltipMode" id="tooltipBrief" value="brief" checked="{{briefChecked}}">
                     <label class="form-check-label small" for="tooltipBrief">Brief</label>
                 </div>
-                <div class="form-check form-check-inline mb-0">
+                <div class="form-check form-check-inline editor-inline-check">
                     <input class="form-check-input" type="radio" name="tooltipMode" id="tooltipVerbose" value="verbose" checked="{{verboseChecked}}">
                     <label class="form-check-label small" for="tooltipVerbose">Verbose</label>
                 </div>
@@ -696,7 +740,7 @@
         </div>
 
         <!-- MC Conversion Toolbar -->
-        <div class="mc-toolbar mb-3">
+        <div class="mc-toolbar admin-form-row">
             <button id="generateIncorrectBtn" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#generateIncorrectModal">
                 <i class="fa fa-random"></i> Generate Incorrect Responses
             </button>
@@ -715,11 +759,11 @@
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
-                        <div class="mb-3">
+                        <div class="admin-form-row">
                             <label for="distractorCount" class="form-label">Number of distractors per question:</label>
                             <input type="number" class="form-control" id="distractorCount" value="3" min="1" max="20">
                         </div>
-                        <div class="alert alert-info small mb-0">
+                        <div class="alert alert-info small content-upload-empty-text">
                             <i class="fa fa-info-circle"></i>
                             Distractors will be randomly selected from all other correct answers across all stims.
                             Existing incorrect responses will be replaced.
@@ -733,7 +777,7 @@
             </div>
         </div>
 
-        <div class="cluster-navigation mb-2">
+        <div class="cluster-navigation admin-form-row-sm">
             <div class="cluster-nav-controls">
                 <button class="btn btn-outline-secondary btn-sm cluster-nav" data-dir="prev" aria-label="Previous cluster">
                     <i class="fa fa-chevron-left"></i><span class="nav-label"> Prev</span>
@@ -744,7 +788,7 @@
                 <span class="text-muted small cluster-counter">Cluster {{currentClusterNumber}} of {{clustersCount}}</span>
             </div>
             <div class="cluster-window-controls">
-                <label for="cluster-window-size" class="small text-muted mb-0">Show</label>
+                <label for="cluster-window-size" class="small text-muted content-upload-empty-text">Show</label>
                 <select id="cluster-window-size" class="form-select form-select-sm">
                     <option value="1" selected="{{windowSizeSelected 1}}">1</option>
                     <option value="5" selected="{{windowSizeSelected 5}}">5</option>
@@ -761,15 +805,15 @@
         <div id="stim-validation-summary"></div>
 
         <!-- JSON Editor container -->
-        <div class="card mb-4">
-            <div class="card-body p-2">
+        <div class="card admin-card">
+            <div class="card-body admin-alert-compact">
                 <div id="stim-editor-container"></div>
             </div>
         </div>
 
         {{#if editorReady}}
         <!-- Action buttons -->
-        <div class="d-flex align-items-center justify-content-end gap-2 mt-3 mb-4 content-edit-actions">
+        <div class="content-edit-actions">
             <div class="save-feedback {{#if saveFeedbackText}}is-visible{{/if}}" role="status" aria-live="polite" aria-atomic="true">
                 {{#if saveFeedbackText}}
                 <i class="fa fa-check-circle" aria-hidden="true"></i>

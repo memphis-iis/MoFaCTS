@@ -5,17 +5,32 @@ import DOMPurify from 'dompurify';
 import { Cookie } from '../../lib/cookies';
 import { currentUserHasRole } from '../../lib/roleUtils';
 import { getUserDisplayName, getUserInitials } from '../../lib/userIdentity';
+import { applyThemeCSSProperties } from '../../lib/currentTestingHelpers';
 import './home.html';
 import './home.css';
 
 declare const Template: any;
 declare const Session: any;
 declare const Meteor: any;
+declare const DynamicSettings: any;
 
 const MAIN_MENU_RETURN_TOUR_DURATION_MS = 5000;
 const HOME_SIDEBAR_COLLAPSED_KEY = 'mofacts.home.sidebarCollapsed';
+const PRACTICE_MENU_OPEN_KEY = 'mofacts.practice.menuOpen';
 const HOME_WELCOME_ALLOWED_TAGS = ['h1', 'h2', 'h3', 'p', 'br', 'span', 'strong', 'em', 'b', 'i', 'u', 'a', 'ul', 'ol', 'li'];
 const HOME_WELCOME_ALLOWED_ATTR = ['href', 'title', 'target', 'rel', 'class', 'style'];
+
+type ThemeLibraryEntry = {
+  id?: string;
+  activeThemeId?: string;
+  enabled?: boolean;
+  themeName?: string;
+  properties?: Record<string, unknown>;
+  metadata?: {
+    name?: string;
+    updatedAt?: string;
+  };
+};
 
 type HomeTourStepId =
   | 'main-menu-return'
@@ -41,6 +56,20 @@ const SIDEBAR_ACTION_ROUTES: Record<string, string> = {
   mechTurkButton: '/turkWorkflow',
   themeButton: '/theme',
   adminTestsButton: '/admin/tests',
+};
+
+const PRACTICE_MENU_ACTION_ROUTES: Record<string, string> = {
+  home: '/home',
+  contentUpload: '/contentUpload',
+  dataDownload: '/dataDownload',
+  classEdit: '/classEdit',
+  instructorReporting: '/instructorReporting',
+  tdfAssignmentEdit: '/tdfAssignmentEdit',
+  adminControls: '/adminControls',
+  userAdmin: '/userAdmin',
+  turkWorkflow: '/turkWorkflow',
+  theme: '/theme',
+  adminTests: '/admin/tests',
 };
 
 const SIDEBAR_ACTIVE_MATCHERS: Record<string, string[]> = {
@@ -147,6 +176,15 @@ function scrollHomeToTop(): void {
   document.querySelector('.content')?.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+async function leavePracticeFor(route: string): Promise<void> {
+  if (document.location.pathname === '/card' || document.location.pathname === '/instructions') {
+    const { leavePage } = await import('../experiment/svelte/services/navigationCleanup');
+    await leavePage(route);
+    return;
+  }
+  FlowRouter.go(route);
+}
+
 function openSidebarForTour(): number {
   const sidebar = document.getElementById('sidebar');
   const main = document.getElementById('homeMain');
@@ -168,6 +206,61 @@ function openSidebarForTour(): number {
   }
 
   return 0;
+}
+
+function getThemeLibrary(): ThemeLibraryEntry[] {
+  const librarySetting = DynamicSettings.findOne({ key: 'themeLibrary' });
+  const library = librarySetting?.value;
+  return Array.isArray(library) ? library : [];
+}
+
+function getAvailableUserThemes(): ThemeLibraryEntry[] {
+  return getThemeLibrary().filter((theme) => {
+    return typeof theme?.id === 'string' && theme.id.trim().length > 0 && theme.enabled !== false && theme.properties;
+  });
+}
+
+function serializeThemeSelection(theme: ThemeLibraryEntry): ThemeLibraryEntry {
+  if (!theme.id || !theme.properties) {
+    throw new Error('[ThemeToggle] Selected theme is missing id or properties.');
+  }
+  return {
+    ...theme,
+    activeThemeId: theme.id,
+    themeName: theme.themeName || theme.properties.themeName as string || theme.metadata?.name || theme.id,
+  };
+}
+
+function applyUserSelectedTheme(theme: ThemeLibraryEntry): void {
+  const selectedTheme = serializeThemeSelection(theme);
+  Session.set('userThemeOverrideActive', true);
+  applyThemeCSSProperties(selectedTheme, { cache: false });
+}
+
+function rotateUserTheme(): void {
+  const themes = getAvailableUserThemes();
+  if (themes.length === 0) {
+    throw new Error('No enabled themes are configured for user theme rotation.');
+  }
+
+  const currentTheme = Session.get('curTheme');
+  const currentThemeId = currentTheme?.activeThemeId;
+  const currentIndex = themes.findIndex((theme) => theme.id === currentThemeId);
+  const nextTheme = themes[(currentIndex + 1) % themes.length];
+  if (!nextTheme) {
+    throw new Error('Theme rotation could not resolve the next configured theme.');
+  }
+
+  applyUserSelectedTheme(nextTheme);
+}
+
+function reportThemeToggleError(error: unknown): void {
+  const message = error instanceof Error ? error.message : String(error);
+  clientConsole(1, '[ThemeToggle] Failed to rotate theme:', message);
+  Session.set('uiMessage', {
+    variant: 'danger',
+    text: message,
+  });
 }
 
 // //////////////////////////////////////////////////////////////////////////
@@ -229,6 +322,12 @@ Template.appAccountMenu.helpers({
     if (currentUserHasRole('admin')) return 'Admin';
     if (currentUserHasRole('teacher')) return 'Teacher';
     return 'Learner';
+  },
+});
+
+Template.appPracticeMenu.helpers({
+  practiceMenuOpen(): boolean {
+    return Session.get(PRACTICE_MENU_OPEN_KEY) === true;
   },
 });
 
@@ -315,6 +414,14 @@ Template.appAccountMenu.events({
       window.open('https://github.com/memphis-iis/mofacts/wiki', '_blank');
       return;
     }
+    if (action === 'toggleTheme') {
+      try {
+        rotateUserTheme();
+      } catch (error: unknown) {
+        reportThemeToggleError(error);
+      }
+      return;
+    }
     if (action === 'logout') {
       Session.set('loginMode', 'normal');
       Cookie.set('isExperiment', '0', 1);
@@ -337,6 +444,25 @@ Template.appAccountMenu.events({
     if (routes[action]) {
       FlowRouter.go(routes[action]);
     }
+  },
+});
+
+Template.appPracticeMenu.events({
+  'click #practiceMenuToggle': function(event: any) {
+    event.preventDefault();
+    Session.set(PRACTICE_MENU_OPEN_KEY, Session.get(PRACTICE_MENU_OPEN_KEY) !== true);
+  },
+
+  async 'click [data-practice-menu-action]'(event: any) {
+    event.preventDefault();
+    const action = event.currentTarget.getAttribute('data-practice-menu-action');
+    const route = PRACTICE_MENU_ACTION_ROUTES[action];
+    if (!route) {
+      clientConsole(1, '[PracticeMenu] Unknown action:', action);
+      return;
+    }
+    Session.set(PRACTICE_MENU_OPEN_KEY, false);
+    await leavePracticeFor(route);
   },
 });
 
@@ -434,6 +560,14 @@ Template.home.events({
     }
     if (action === 'documentation') {
       window.open('https://github.com/memphis-iis/mofacts/wiki', '_blank');
+      return;
+    }
+    if (action === 'toggleTheme') {
+      try {
+        rotateUserTheme();
+      } catch (error: unknown) {
+        reportThemeToggleError(error);
+      }
       return;
     }
     if (action === 'logout') {
@@ -690,6 +824,7 @@ Template.appSidebar.onRendered(function() {
 });
 
 Template.appAccountMenu.onRendered(function(this: any) {
+  this.subscribe('themeLibrary');
   this._appAccountDocumentClickHandler = (event: Event) => {
     const target = event.target as HTMLElement | null;
     if (!target?.closest('#userToggle')) {

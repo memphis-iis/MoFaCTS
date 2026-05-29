@@ -3,6 +3,7 @@ import path from 'path';
 import { randomBytes } from 'crypto';
 import { Meteor } from 'meteor/meteor';
 import { DynamicSettings } from '../../common/Collections';
+import { isValidThemeDensityScale, normalizeThemePropertyValue } from '../../common/themePropertyNormalization';
 
 const { promises: fsp } = fs;
 
@@ -65,6 +66,7 @@ const FALLBACK_THEME = {
     app_font_family: 'system-ui, -apple-system, "Segoe UI", sans-serif',
     app_heading_font_family: 'var(--app-font-family)',
     app_font_size_base: '16px',
+    app_density_scale: '1',
     app_button_height: '44px',
     app_text_input_height: '36px',
     app_button_border_darkness: 20,
@@ -361,6 +363,12 @@ function mergeWithFallbackProps(properties: any, derivedName: string) {
   const normalized = migrateLegacyThemeProperties(
     properties && typeof properties === 'object' ? properties : {}
   );
+  if ('app_density_scale' in normalized && !isValidThemeDensityScale(normalized.app_density_scale)) {
+    throw new Error('Theme property app_density_scale must be a number greater than 0 and no greater than 2');
+  }
+  if ('app_density_scale' in normalized) {
+    normalized.app_density_scale = normalizeThemePropertyValue('app_density_scale', normalized.app_density_scale);
+  }
   const merged = {
     ...FALLBACK_PROPERTIES,
     ...normalized,

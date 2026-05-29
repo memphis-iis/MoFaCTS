@@ -12,6 +12,10 @@ const LENGTH_PROPERTIES = new Set([
   'app_border_radius_lg',
 ]);
 
+const DENSITY_SCALE_PROPERTIES = new Set([
+  'app_density_scale',
+]);
+
 const CSS_TIME_PATTERN = /^\d+(\.\d+)?(ms|s)$/i;
 const CSS_LENGTH_PATTERN = /^\d+(\.\d+)?(px|rem|em|%)$/i;
 
@@ -38,6 +42,10 @@ export function isThemeLengthProperty(property: string): boolean {
   return LENGTH_PROPERTIES.has(property);
 }
 
+export function isThemeDensityScaleProperty(property: string): boolean {
+  return DENSITY_SCALE_PROPERTIES.has(property);
+}
+
 export function isValidThemeCssTime(value: string): boolean {
   return CSS_TIME_PATTERN.test(value.trim());
 }
@@ -46,8 +54,24 @@ export function isValidThemeCssLength(value: string): boolean {
   return CSS_LENGTH_PATTERN.test(value.trim());
 }
 
+export function isValidThemeDensityScale(value: unknown): boolean {
+  const normalizedString = normalizeNumberishString(value);
+  if (normalizedString == null) {
+    return false;
+  }
+  const numericValue = Number(normalizedString);
+  return Number.isFinite(numericValue) && numericValue > 0 && numericValue <= 2;
+}
+
 export function normalizeThemePropertyValue(property: string, rawValue: unknown): unknown {
   const normalizedString = normalizeNumberishString(rawValue);
+
+  if (isThemeDensityScaleProperty(property)) {
+    if (!isValidThemeDensityScale(rawValue)) {
+      return rawValue;
+    }
+    return String(Number(normalizedString));
+  }
 
   if (isThemeTransitionProperty(property)) {
     if (normalizedString == null) {

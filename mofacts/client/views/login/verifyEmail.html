@@ -4,14 +4,14 @@
             <div class="auth-card card">
                 <div class="card-body auth-card-body">
                     <div class="auth-brand">
-                        <h2 class="auth-system-name mt-0">{{systemName}}</h2>
+                        <h2 class="auth-system-name">{{systemName}}</h2>
                         <h1 class="auth-title">Verify email</h1>
                         <p class="auth-description">Verify your email address to finish activating your account.</p>
-                        <p class="auth-description auth-description-secondary mb-0">If the verification message does not arrive soon, check your spam folder.</p>
+                        <p class="auth-description auth-description-secondary">If the verification message does not arrive soon, check your spam folder.</p>
                     </div>
-                    <p class="auth-message {{verificationStatusClass}} mb-0">{{verificationStatusMessage}}</p>
+                    <p class="auth-message {{verificationStatusClass}}">{{verificationStatusMessage}}</p>
                     {{#if verificationErrorMessage}}
-                    <p class="auth-message auth-message-error mb-0">{{verificationErrorMessage}}</p>
+                    <p class="auth-message auth-message-error">{{verificationErrorMessage}}</p>
                     {{/if}}
                     {{#if showVerificationResend}}
                     <div class="auth-form">

@@ -384,7 +384,7 @@
     </div>
     <deep-chat
       bind:this={chatElement}
-      style="display: block; width: 100%; height: 100%; min-width: 0; min-height: 0; box-sizing: border-box;"
+      class="auto-tutor-chat-host"
     ></deep-chat>
   </div>
 
@@ -410,8 +410,8 @@
     max-height: 100%;
     min-height: 0;
     width: 100%;
-    padding: clamp(12px, 2vw, 24px);
-    gap: 12px;
+    padding: clamp(var(--app-space-3), 2vw, var(--app-space-5));
+    gap: var(--app-space-3);
     background: var(--app-background-color);
     color: var(--app-text-color);
     box-sizing: border-box;
@@ -422,7 +422,7 @@
   .auto-tutor-header {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(220px, 320px);
-    gap: 16px;
+    gap: var(--app-space-3);
     align-items: center;
     flex: 0 0 auto;
   }
@@ -432,7 +432,7 @@
   }
 
   .auto-tutor-question h1 {
-    margin: 0;
+    margin: var(--app-space-0);
     font-size: 1.25rem;
     line-height: 1.35;
     font-weight: 700;
@@ -442,13 +442,13 @@
   .auto-tutor-progress {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: calc(0.375rem * var(--app-density-scale));
   }
 
   .auto-tutor-meter-row {
     display: grid;
     grid-template-columns: minmax(6.5rem, 8.5rem) minmax(0, 1fr);
-    gap: 8px;
+    gap: var(--app-space-2);
     align-items: center;
   }
 
@@ -456,7 +456,7 @@
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    gap: 6px;
+    gap: calc(0.375rem * var(--app-density-scale));
     min-width: 0;
     color: var(--app-text-color);
     font-size: 0.78rem;
@@ -517,7 +517,7 @@
   .auto-tutor-error,
   .auto-tutor-complete {
     flex: 0 0 auto;
-    padding: 10px 12px;
+    padding: calc(0.625rem * var(--app-density-scale)) var(--app-space-3);
     border: 1px solid var(--app-secondary-surface-color);
     border-radius: 6px;
     background: var(--learning-card-surface-color);
@@ -539,6 +539,7 @@
     opacity: 0.72;
   }
 
+  .auto-tutor-chat-host,
   .auto-tutor-chat :global(deep-chat) {
     display: block;
     width: 100% !important;
@@ -557,9 +558,9 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.75rem;
+    gap: var(--app-space-3);
     min-height: 0;
-    padding: 0.35rem 0.75rem;
+    padding: calc(0.35rem * var(--app-density-scale)) var(--app-space-3);
     border-top: 1px solid var(--app-secondary-surface-color);
     background: var(--learning-card-stimulus-surface-color);
     box-sizing: border-box;
@@ -584,7 +585,7 @@
   .auto-tutor-continue-button {
     min-width: 8rem;
     min-height: var(--app-button-height);
-    padding: 0 1rem;
+    padding: 0 var(--app-space-3);
     border: 1px solid var(--learning-card-primary-action-surface-color);
     border-radius: var(--border-radius-md, 6px);
     background: var(--learning-card-primary-action-surface-color);
@@ -606,8 +607,8 @@
 
   @media (max-width: 768px) {
     .auto-tutor-session {
-      padding: 10px;
-      gap: 8px;
+      padding: calc(0.625rem * var(--app-density-scale));
+      gap: var(--app-space-2);
     }
 
     .auto-tutor-header {
@@ -616,14 +617,14 @@
 
     .auto-tutor-mobile-progress {
       position: absolute;
-      top: 8px;
-      right: 8px;
+      top: var(--app-space-2);
+      right: var(--app-space-2);
       z-index: 2;
       display: flex;
       flex-direction: column;
       width: min(58vw, 220px);
-      gap: 4px;
-      padding: 0.35rem 0.45rem;
+      gap: var(--app-space-1);
+      padding: calc(0.35rem * var(--app-density-scale)) calc(0.45rem * var(--app-density-scale));
       border: 1px solid var(--app-secondary-surface-color);
       border-radius: var(--app-border-radius-sm);
       background: color-mix(in srgb, var(--app-background-color) 88%, transparent);
@@ -634,7 +635,7 @@
 
     .auto-tutor-mobile-progress .auto-tutor-meter-row {
       grid-template-columns: minmax(0, 1fr);
-      gap: 2px;
+      gap: calc(0.125rem * var(--app-density-scale));
     }
 
     .auto-tutor-mobile-progress .auto-tutor-meter-copy {
@@ -658,12 +659,12 @@
 
     .auto-tutor-error,
     .auto-tutor-complete {
-      padding: 8px 10px;
+      padding: var(--app-space-2) calc(0.625rem * var(--app-density-scale));
       font-size: 0.9rem;
     }
 
     .auto-tutor-continue-bar {
-      padding: 0.3rem 0.4rem;
+      padding: calc(0.3rem * var(--app-density-scale)) calc(0.4rem * var(--app-density-scale));
     }
 
     .auto-tutor-continue-button {
