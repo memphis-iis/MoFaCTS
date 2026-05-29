@@ -242,7 +242,7 @@
 }
 
 .learning-dashboard-col-stat {
-    width: 86px;
+    width: 76px;
 }
 
 .learning-dashboard-col-last-practice {
@@ -275,6 +275,12 @@
 .practice-table thead th.num,
 .practice-table tbody td.num {
     text-align: center;
+}
+
+.practice-table thead th.num,
+.practice-table tbody td.learning-dashboard-cell--stat {
+    padding-right: var(--app-space-1-px);
+    padding-left: var(--app-space-1-px);
 }
 
 .practice-table thead th:first-child,
@@ -637,7 +643,7 @@
     }
 }
 
-@media (max-width: 1199px) {
+@media (max-width: 1024px) {
     .learning-dashboard-table-shell {
         display: none;
     }
