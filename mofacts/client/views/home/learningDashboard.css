@@ -509,6 +509,8 @@
 }
 
 .learning-dashboard-action-button {
+    --bs-btn-font-size: inherit;
+    --bs-btn-line-height: inherit;
     min-width: auto;
     max-width: none;
     min-height: var(--app-button-height, 44px);
@@ -516,7 +518,9 @@
     border: 0;
     border-radius: var(--app-border-radius-sm, 8px);
     cursor: pointer;
+    font-size: inherit;
     font-weight: 600;
+    line-height: inherit;
     transition: background 0.15s;
 }
 

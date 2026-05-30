@@ -259,6 +259,30 @@ function applyUserSelectedTheme(theme: ThemeLibraryEntry): void {
   saveUserThemeSelection(selectedTheme.activeThemeId as string);
 }
 
+function findAvailableUserTheme(themeId: string | null): ThemeLibraryEntry | undefined {
+  if (!themeId) {
+    return undefined;
+  }
+  return getAvailableUserThemes().find((theme) => theme.id === themeId);
+}
+
+function getThemeDisplayName(theme: ThemeLibraryEntry): string {
+  const propertyThemeName = theme.properties?.themeName;
+  if (typeof theme.metadata?.name === 'string' && theme.metadata.name.trim()) {
+    return theme.metadata.name.trim();
+  }
+  if (typeof theme.themeName === 'string' && theme.themeName.trim()) {
+    return theme.themeName.trim();
+  }
+  if (typeof propertyThemeName === 'string' && propertyThemeName.trim()) {
+    return propertyThemeName.trim();
+  }
+  if (theme.id) {
+    return theme.id;
+  }
+  throw new Error('[ThemeToggle] Theme menu entry is missing a display name and id.');
+}
+
 function restoreUserSelectedTheme(): void {
   const key = getUserThemeSelectionKey();
   if (!key) {
@@ -283,30 +307,9 @@ function restoreUserSelectedTheme(): void {
   applyThemeCSSProperties(serializeThemeSelection(selectedTheme), { cache: false });
 }
 
-function rotateUserTheme(): void {
-  if (!Meteor.userId()) {
-    throw new Error('Theme rotation requires a logged-in user.');
-  }
-
-  const themes = getAvailableUserThemes();
-  if (themes.length === 0) {
-    throw new Error('No enabled themes are configured for user theme rotation.');
-  }
-
-  const currentTheme = Session.get('curTheme');
-  const currentThemeId = currentTheme?.activeThemeId;
-  const currentIndex = themes.findIndex((theme) => theme.id === currentThemeId);
-  const nextTheme = themes[(currentIndex + 1) % themes.length];
-  if (!nextTheme) {
-    throw new Error('Theme rotation could not resolve the next configured theme.');
-  }
-
-  applyUserSelectedTheme(nextTheme);
-}
-
 function reportThemeToggleError(error: unknown): void {
   const message = error instanceof Error ? error.message : String(error);
-  clientConsole(1, '[ThemeToggle] Failed to rotate theme:', message);
+  clientConsole(1, '[ThemeToggle] Failed to select theme:', message);
   Session.set('uiMessage', {
     variant: 'danger',
     text: message,
@@ -373,6 +376,36 @@ Template.appAccountMenu.helpers({
     if (currentUserHasRole('teacher')) return 'Teacher';
     return 'Learner';
   },
+
+  themeMenuOpen(): boolean {
+    return Session.get('themeMenuOpen') === true;
+  },
+
+  availableUserThemes(): ThemeLibraryEntry[] {
+    return getAvailableUserThemes().map((theme) => ({
+      ...theme,
+      metadata: {
+        ...theme.metadata,
+        name: getThemeDisplayName(theme),
+      },
+    }));
+  },
+
+  hasAvailableThemes(): boolean {
+    return getAvailableUserThemes().length > 0;
+  },
+
+  themeSelectionName(theme: ThemeLibraryEntry): string {
+    return getThemeDisplayName(theme);
+  },
+
+  isSelectedTheme(themeId: string): boolean {
+    return Session.get('curTheme')?.activeThemeId === themeId;
+  },
+
+  themeSelectionActiveClass(themeId: string): string {
+    return Session.get('curTheme')?.activeThemeId === themeId ? 'theme-selection-item-active' : '';
+  },
 });
 
 Template.appPracticeMenu.helpers({
@@ -432,6 +465,9 @@ Template.appAccountMenu.events({
     const open = !dropdown?.classList.contains('open');
     dropdown?.classList.toggle('open', open);
     toggle?.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (!open) {
+      Session.set('themeMenuOpen', false);
+    }
   },
 
   'keydown #userToggle': function(event: any) {
@@ -444,14 +480,22 @@ Template.appAccountMenu.events({
     const open = !dropdown?.classList.contains('open');
     dropdown?.classList.toggle('open', open);
     toggle?.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (!open) {
+      Session.set('themeMenuOpen', false);
+    }
   },
 
   'click [data-home-action]': function(event: any) {
     event.preventDefault();
     event.stopPropagation();
     const action = event.currentTarget.getAttribute('data-home-action');
+    if (action === 'toggleTheme') {
+      Session.set('themeMenuOpen', Session.get('themeMenuOpen') !== true);
+      return;
+    }
     document.getElementById('userDropdown')?.classList.remove('open');
     document.getElementById('userToggle')?.setAttribute('aria-expanded', 'false');
+    Session.set('themeMenuOpen', false);
 
     if (action === 'tour') {
       FlowRouter.go('/home');
@@ -462,14 +506,6 @@ Template.appAccountMenu.events({
     }
     if (action === 'documentation') {
       window.open('https://github.com/memphis-iis/mofacts/wiki', '_blank');
-      return;
-    }
-    if (action === 'toggleTheme') {
-      try {
-        rotateUserTheme();
-      } catch (error: unknown) {
-        reportThemeToggleError(error);
-      }
       return;
     }
     if (action === 'logout') {
@@ -494,6 +530,24 @@ Template.appAccountMenu.events({
     };
     if (routes[action]) {
       FlowRouter.go(routes[action]);
+    }
+  },
+
+  'click .theme-selection-item': function(event: any) {
+    event.preventDefault();
+    event.stopPropagation();
+    const themeId = event.currentTarget.getAttribute('data-theme-id');
+    try {
+      const selectedTheme = findAvailableUserTheme(themeId);
+      if (!selectedTheme) {
+        throw new Error(`Theme "${themeId || ''}" is not configured for selection.`);
+      }
+      applyUserSelectedTheme(selectedTheme);
+      Session.set('themeMenuOpen', false);
+      document.getElementById('userDropdown')?.classList.remove('open');
+      document.getElementById('userToggle')?.setAttribute('aria-expanded', 'false');
+    } catch (error: unknown) {
+      reportThemeToggleError(error);
     }
   },
 });
@@ -596,14 +650,22 @@ Template.home.events({
     const open = !dropdown?.classList.contains('open');
     dropdown?.classList.toggle('open', open);
     toggle?.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (!open) {
+      Session.set('themeMenuOpen', false);
+    }
   },
 
   'click [data-home-action]': function(event: any, template: any) {
     event.preventDefault();
     event.stopPropagation();
     const action = event.currentTarget.getAttribute('data-home-action');
+    if (action === 'toggleTheme') {
+      Session.set('themeMenuOpen', Session.get('themeMenuOpen') !== true);
+      return;
+    }
     document.getElementById('userDropdown')?.classList.remove('open');
     document.getElementById('userToggle')?.setAttribute('aria-expanded', 'false');
+    Session.set('themeMenuOpen', false);
 
     if (action === 'tour') {
       startMainMenuTour(template, { manual: true });
@@ -611,14 +673,6 @@ Template.home.events({
     }
     if (action === 'documentation') {
       window.open('https://github.com/memphis-iis/mofacts/wiki', '_blank');
-      return;
-    }
-    if (action === 'toggleTheme') {
-      try {
-        rotateUserTheme();
-      } catch (error: unknown) {
-        reportThemeToggleError(error);
-      }
       return;
     }
     if (action === 'logout') {
@@ -896,6 +950,7 @@ Template.appAccountMenu.onRendered(function(this: any) {
     if (!target?.closest('#userToggle')) {
       document.getElementById('userDropdown')?.classList.remove('open');
       document.getElementById('userToggle')?.setAttribute('aria-expanded', 'false');
+      Session.set('themeMenuOpen', false);
     }
   };
   document.addEventListener('click', this._appAccountDocumentClickHandler);
@@ -936,6 +991,7 @@ Template.home.onRendered(async function(this: any) {
     if (!target?.closest('#userToggle')) {
       document.getElementById('userDropdown')?.classList.remove('open');
       document.getElementById('userToggle')?.setAttribute('aria-expanded', 'false');
+      Session.set('themeMenuOpen', false);
     }
     if (
       window.matchMedia('(max-width: 1024px)').matches &&

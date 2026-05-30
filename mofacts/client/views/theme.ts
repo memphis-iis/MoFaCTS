@@ -13,6 +13,7 @@ import {
     themeEditorDisplayValue,
 } from '../../common/themePropertyNormalization';
 import { clientConsole } from '../lib/clientLogger';
+import './themeGenerationWizard';
 import './theme.html';
 
 declare const DynamicSettings: any;

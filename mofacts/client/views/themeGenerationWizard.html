@@ -1,0 +1,180 @@
+<template name="themeGenerationWizard">
+    <div class="theme-wizard-panel border-top">
+        <div class="theme-library-header">
+            <div>
+                <h5>Generate Theme</h5>
+                <div class="text-muted small">Create one custom theme from a source palette, density, and contrast schema.</div>
+            </div>
+            <button type="button" class="btn btn-secondary toggle-theme-wizard">{{wizardToggleLabel}}</button>
+        </div>
+
+        {{#if wizardOpen}}
+            <div class="theme-wizard-grid">
+                <div class="theme-wizard-control-group">
+                    <label class="form-label">Theme Name</label>
+                    <input type="text" class="form-control theme-wizard-name" value="{{wizardName}}">
+                </div>
+
+                <div class="theme-wizard-control-group">
+                    <label class="form-label">Base Theme</label>
+                    <select class="form-control theme-wizard-base-theme">
+                        {{#each baseThemes}}
+                            <option value="{{id}}" {{attrs}}>{{name}}</option>
+                        {{/each}}
+                    </select>
+                </div>
+
+                <div class="theme-wizard-control-group">
+                    <label class="form-label">Source Palette</label>
+                    <div class="theme-wizard-palette">
+                        {{#each paletteSlots}}
+                            <div class="theme-wizard-palette-slot" data-index="{{index}}">
+                                <input type="color" class="theme-wizard-slot-color" value="{{value}}">
+                                <input type="text" class="form-control theme-wizard-slot-hex" value="{{value}}" placeholder="#7ED957">
+                                <input type="text" class="form-control theme-wizard-slot-label" value="{{label}}" placeholder="Label">
+                                <button type="button" class="btn btn-secondary btn-sm theme-wizard-remove-color" data-index="{{index}}" {{removeAttrs}}>Remove</button>
+                            </div>
+                        {{/each}}
+                    </div>
+                    <div class="theme-action-row admin-form-row-top">
+                        <button type="button" class="btn btn-secondary btn-sm theme-wizard-add-color">Add Color</button>
+                        <button type="button" class="btn btn-secondary btn-sm theme-wizard-from-active">Extract from Active Theme</button>
+                        <button type="button" class="btn btn-secondary btn-sm theme-wizard-from-default">Start from MoFaCTS Default</button>
+                    </div>
+                </div>
+
+                <div class="theme-wizard-control-group">
+                    <label class="form-label">Paste Colors</label>
+                    <textarea class="form-control theme-wizard-paste" rows="3" placeholder="#7ed957&#10;rgb(0, 0, 0)"></textarea>
+                    <button type="button" class="btn btn-secondary btn-sm admin-form-row-top theme-wizard-apply-paste">Fill Palette</button>
+                </div>
+
+                <div class="theme-wizard-control-group">
+                    <label class="form-label">Upload Palette JSON</label>
+                    <input type="file" class="form-control theme-wizard-json-upload" accept=".json,application/json">
+                </div>
+
+                <div class="theme-wizard-control-group">
+                    <label class="form-label">Polarity</label>
+                    <select class="form-control theme-wizard-polarity">
+                        <option value="light" {{polarityAttrs 'light'}}>Light</option>
+                        <option value="dark" {{polarityAttrs 'dark'}}>Dark</option>
+                    </select>
+                </div>
+
+                <div class="theme-wizard-control-group">
+                    <label class="form-label">Contrast Priority: {{contrastPriorityPercent}}%</label>
+                    <input type="range" class="form-range theme-wizard-contrast" min="0" max="100" step="5" value="{{contrastPriorityPercent}}">
+                </div>
+
+                <div class="theme-wizard-control-group">
+                    <label class="form-label">Density: {{densityPercent}}%</label>
+                    <input type="range" class="form-range theme-wizard-density" min="25" max="200" step="5" value="{{densityPercent}}">
+                </div>
+
+                <div class="theme-wizard-control-group">
+                    <label class="form-label">Palette Expansion</label>
+                    <label class="theme-wizard-check"><input type="checkbox" class="theme-wizard-expansion" data-key="allowTints" {{expansionAttrs 'allowTints'}}> Allow tints</label>
+                    <label class="theme-wizard-check"><input type="checkbox" class="theme-wizard-expansion" data-key="allowShades" {{expansionAttrs 'allowShades'}}> Allow shades</label>
+                    <label class="theme-wizard-check"><input type="checkbox" class="theme-wizard-expansion" data-key="allowMutedVariants" {{expansionAttrs 'allowMutedVariants'}}> Allow muted variants</label>
+                    <label class="theme-wizard-check"><input type="checkbox" class="theme-wizard-expansion" data-key="allowGeneratedCompanions" {{expansionAttrs 'allowGeneratedCompanions'}}> Allow generated companions</label>
+                </div>
+            </div>
+
+            {{#if paletteStats}}
+                <div class="theme-wizard-stats">
+                    <span>Colors: {{paletteStats.colorCount}}</span>
+                    <span>Darkest: {{paletteStats.darkestColor}}</span>
+                    <span>Lightest: {{paletteStats.lightestColor}}</span>
+                    <span>Median luminance: {{paletteStats.medianLuminance}}</span>
+                    <span>Chromatic: {{paletteStats.chromaticColorCount}}</span>
+                    <span>Neutral: {{paletteStats.neutralColorCount}}</span>
+                </div>
+            {{/if}}
+
+            {{#if wizardError}}
+                <div class="alert alert-danger admin-form-row">{{wizardError}}</div>
+            {{/if}}
+
+            {{#if generatedPreview}}
+                <div class="theme-wizard-preview" style="{{generatedPreview.previewStyle}}">
+                    <div class="theme-wizard-preview-nav" style="{{generatedPreview.navStyle}}">Navigation</div>
+                    <div class="theme-wizard-preview-card" style="{{generatedPreview.cardStyle}}">
+                        <div class="theme-wizard-preview-stimulus" style="{{generatedPreview.stimulusStyle}}">Stimulus</div>
+                        <button type="button" class="btn theme-wizard-preview-button" style="{{generatedPreview.buttonStyle}}">Primary</button>
+                        <div class="theme-wizard-feedback-row">
+                            <span style="{{generatedPreview.correctStyle}}">Correct</span>
+                            <span style="{{generatedPreview.errorStyle}}">Error</span>
+                        </div>
+                        <div class="theme-wizard-accuracy" style="{{generatedPreview.trackStyle}}">
+                            <div class="theme-wizard-accuracy-fill" style="{{generatedPreview.fillStyle}}"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="theme-wizard-stats">
+                    <span>Readability: {{generatedPreview.readability}}</span>
+                    <span>Surface separation: {{generatedPreview.surfaceSeparation}}</span>
+                    <span>Feedback: {{generatedPreview.feedbackDistinctiveness}}</span>
+                    <span>Palette fidelity: {{generatedPreview.paletteFidelity}}</span>
+                    <span>AA/AAA: {{generatedPreview.aaCount}}/{{generatedPreview.aaaCount}}</span>
+                </div>
+                <details class="theme-wizard-explain">
+                    <summary>Explain</summary>
+                    <ul>
+                        {{#each generatedPreview.explanation}}
+                            <li>{{this}}</li>
+                        {{/each}}
+                    </ul>
+                </details>
+
+                <details class="theme-wizard-explain">
+                    <summary>Advanced Diagnostics</summary>
+                    <div class="theme-wizard-diagnostics-grid">
+                        <div>
+                            <h6>WCAG Matrix</h6>
+                            {{#each generatedPreview.contrastRows}}
+                                <div class="theme-wizard-diagnostic-row">
+                                    <span>{{relationship}}</span>
+                                    <span>{{ratio}}:1 / min {{minimum}}</span>
+                                </div>
+                            {{/each}}
+                        </div>
+                        <div>
+                            <h6>Delta E Matrix</h6>
+                            {{#each generatedPreview.distinctnessRows}}
+                                <div class="theme-wizard-diagnostic-row">
+                                    <span>{{relationship}}</span>
+                                    <span>{{deltaE}} / min {{minimumDeltaE}}</span>
+                                </div>
+                            {{/each}}
+                        </div>
+                        <div>
+                            <h6>Luminance Profile</h6>
+                            {{#each generatedPreview.luminanceRows}}
+                                <div class="theme-wizard-diagnostic-row">
+                                    <span>{{role}}</span>
+                                    <span>{{luminance}}</span>
+                                </div>
+                            {{/each}}
+                        </div>
+                        <div>
+                            <h6>Color Roles</h6>
+                            {{#each generatedPreview.colorRows}}
+                                <div class="theme-wizard-diagnostic-row">
+                                    <span>{{role}}</span>
+                                    <span>{{value}}</span>
+                                </div>
+                            {{/each}}
+                        </div>
+                    </div>
+                </details>
+            {{/if}}
+
+            <div class="theme-action-row admin-form-row-top">
+                <button type="button" class="btn theme-wizard-preview-generate">Preview Generated Theme</button>
+                <button type="button" class="btn theme-wizard-create-activate">Generate Theme</button>
+                <span class="text-muted small">{{wizardStatus}}</span>
+            </div>
+        {{/if}}
+    </div>
+</template>

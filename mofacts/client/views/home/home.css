@@ -561,6 +561,56 @@ html.learning-progress-panel-viewport-open .practice-top-header {
     text-align: left;
 }
 
+.home-user-menu .dropdown-item-with-caret,
+.home-user-menu .theme-selection-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--app-space-2);
+}
+
+.theme-menu-caret {
+    font-size: 11px;
+    color: color-mix(in srgb, var(--app-text-color) 46%, transparent);
+    transition: transform var(--app-transition-fast, 100ms) ease;
+}
+
+.dropdown-item[aria-expanded="true"] .theme-menu-caret {
+    transform: rotate(90deg);
+}
+
+.theme-selection-menu {
+    display: none;
+    margin: calc(2px * var(--app-density-scale)) 0 calc(6px * var(--app-density-scale));
+    padding-left: var(--app-space-2-px);
+    border-left: 2px solid color-mix(in srgb, var(--app-accent-color) 40%, transparent);
+}
+
+.theme-selection-menu.open {
+    display: block;
+}
+
+.home-user-menu .theme-selection-item {
+    min-height: calc(var(--app-button-height, 44px) - 6px);
+    padding-left: var(--app-space-3-px);
+    font-size: calc(var(--app-font-size-base) * 0.94);
+}
+
+.theme-selection-item-active {
+    background: color-mix(in srgb, var(--app-accent-color) 14%, var(--learning-card-surface-color)) !important;
+}
+
+.theme-selection-check {
+    color: var(--app-accent-color);
+    font-size: 12px;
+}
+
+.theme-selection-empty {
+    padding: calc(8px * var(--app-density-scale)) var(--app-space-3-px);
+    color: color-mix(in srgb, var(--app-text-color) 62%, transparent);
+    font-size: calc(var(--app-font-size-base) * 0.9);
+}
+
 .home-user-menu .dropdown-item:hover,
 .home-user-menu .dropdown-item:focus-visible {
     background: color-mix(in srgb, var(--app-text-color) 5%, var(--learning-card-surface-color));

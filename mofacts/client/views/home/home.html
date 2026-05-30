@@ -131,7 +131,24 @@
     <span class="fa fa-chevron-down caret" aria-hidden="true"></span>
     <div class="home-user-menu" id="userDropdown">
       <button type="button" class="dropdown-item" data-home-action="audioSettings">Audio settings</button>
-      <button type="button" class="dropdown-item" data-home-action="toggleTheme">Toggle theme</button>
+      <button type="button" class="dropdown-item dropdown-item-with-caret" data-home-action="toggleTheme" aria-expanded="{{#if themeMenuOpen}}true{{else}}false{{/if}}" aria-controls="themeSelectionMenu">
+        <span>Toggle theme</span>
+        <span class="fa fa-chevron-right theme-menu-caret" aria-hidden="true"></span>
+      </button>
+      <div class="theme-selection-menu {{#if themeMenuOpen}}open{{/if}}" id="themeSelectionMenu">
+        {{#if hasAvailableThemes}}
+          {{#each availableUserThemes}}
+            <button type="button" class="dropdown-item theme-selection-item {{themeSelectionActiveClass id}}" data-theme-id="{{id}}">
+              <span>{{themeSelectionName this}}</span>
+              {{#if isSelectedTheme id}}
+                <span class="fa fa-check theme-selection-check" aria-hidden="true"></span>
+              {{/if}}
+            </button>
+          {{/each}}
+        {{else}}
+          <div class="theme-selection-empty">No themes configured</div>
+        {{/if}}
+      </div>
       <button type="button" class="dropdown-item" data-home-action="classSelection">Teacher select</button>
       <div class="dropdown-divider"></div>
       <button type="button" class="dropdown-item" data-home-action="help">Help</button>

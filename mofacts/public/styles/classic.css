@@ -445,7 +445,7 @@ input[type=month],
 input[type=week] {
     box-sizing: border-box;
     font-family: inherit;
-    font-size: 1.125rem; /* 18px - slightly larger for readability */
+    font-size: var(--app-font-size-base);
     height: var(--app-text-input-height);
     min-height: var(--app-text-input-height);
     border: 1px solid var(--border-color);
@@ -528,10 +528,14 @@ select {
     background-color: var(--learning-card-surface-color);
     border-color: var(--border-color);
     color: var(--app-text-color);
+    font-family: var(--app-font-family);
+    font-size: var(--app-font-size-base);
 }
 
 .form-control::placeholder {
     color: var(--app-secondary-text-color);
+    font-family: inherit;
+    font-size: inherit;
     opacity: 1;
 }
 
@@ -540,11 +544,11 @@ input[type="file"],
 .form-control[type="file"] {
     box-sizing: border-box;
     font-family: inherit;
-    font-size: 1rem;
+    font-size: var(--app-font-size-base);
     height: var(--app-button-height);
     min-height: var(--app-button-height);
     padding: var(--app-space-0) calc(0.75rem * var(--app-density-scale)) var(--app-space-0) var(--app-space-0);
-    line-height: var(--app-button-line-height);
+    line-height: calc(var(--app-button-height) - 2px);
     overflow: hidden;
     border: 1px solid var(--btn-secondary-border);
     border-radius: var(--app-border-radius-sm);
@@ -561,7 +565,7 @@ input[type="file"]::file-selector-button,
     align-items: center;
     justify-content: center;
     font-family: inherit;
-    font-size: 1rem;
+    font-size: inherit;
     font-weight: 400;
     height: calc(var(--app-button-height) - 2px);
     min-height: calc(var(--app-button-height) - 2px);
@@ -572,7 +576,7 @@ input[type="file"]::file-selector-button,
     background-color: var(--app-primary-action-surface-color);
     color: var(--app-primary-action-text-color);
     cursor: pointer;
-    line-height: var(--app-button-line-height);
+    line-height: calc(var(--app-button-height) - 2px);
     transition: background-color var(--app-transition-fast) ease;
     vertical-align: middle;
 }
@@ -1006,8 +1010,9 @@ input[type="range"]::-moz-range-progress,
 
 /* ===== BUTTONS ===== */
 .btn, .btn-icon{
-    --bs-btn-font-size: var(--app-font-size-base);
-    --bs-btn-line-height: var(--app-button-line-height);
+    --bs-btn-font-family: var(--app-font-family);
+    --bs-btn-font-size: inherit;
+    --bs-btn-line-height: inherit;
     --bs-btn-padding-y: 0;
     display: inline-flex;
     align-items: center;
@@ -1015,6 +1020,9 @@ input[type="range"]::-moz-range-progress,
     background-color: var(--app-primary-action-surface-color);
     border-color: var(--btn-border-color);
     color: var(--app-primary-action-text-color);
+    font-family: var(--app-font-family);
+    font-size: inherit;
+    line-height: inherit;
     border-radius: var(--app-border-radius-sm);
     min-height: var(--app-button-height);
 }
@@ -1745,6 +1753,137 @@ body:has(.instructions-container) {
 .theme-pill .btn-group .btn[aria-disabled='true'] {
     opacity: 1;
     cursor: default;
+}
+
+.theme-wizard-panel {
+    margin-top: 1rem;
+    padding-top: 1rem;
+}
+
+.theme-wizard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.theme-wizard-control-group {
+    min-width: 0;
+}
+
+.theme-wizard-palette {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.theme-wizard-palette-slot {
+    display: grid;
+    grid-template-columns: 44px minmax(96px, 1fr) minmax(84px, 1fr) auto;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.theme-wizard-palette-slot input[type=color] {
+    width: 44px;
+    height: 36px;
+    padding: 2px;
+}
+
+.theme-wizard-check {
+    display: block;
+    margin-bottom: 0.35rem;
+}
+
+.theme-wizard-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    margin-top: 1rem;
+    font-size: 0.9rem;
+}
+
+.theme-wizard-preview {
+    margin-top: 1rem;
+    border: 1px solid color-mix(in srgb, var(--app-text-color) 18%, transparent);
+    border-radius: var(--app-border-radius-sm);
+    overflow: hidden;
+}
+
+.theme-wizard-preview-nav {
+    padding: 0.6rem 0.8rem;
+    font-weight: 700;
+}
+
+.theme-wizard-preview-card {
+    margin: 1rem;
+    padding: 1rem;
+    border-radius: var(--app-border-radius-sm);
+    box-shadow: var(--app-surface-shadow);
+}
+
+.theme-wizard-preview-stimulus {
+    padding: 1rem;
+    border-radius: var(--app-border-radius-sm);
+    margin-bottom: 0.75rem;
+}
+
+.theme-wizard-preview-button {
+    border: 0;
+    min-width: 120px;
+}
+
+.theme-wizard-feedback-row {
+    display: flex;
+    gap: 1rem;
+    margin-top: 0.75rem;
+    font-weight: 700;
+}
+
+.theme-wizard-accuracy {
+    height: 12px;
+    margin-top: 0.75rem;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.theme-wizard-accuracy-fill {
+    height: 100%;
+}
+
+.theme-wizard-explain {
+    margin-top: 0.75rem;
+}
+
+.theme-wizard-diagnostics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1rem;
+    margin-top: 0.75rem;
+}
+
+.theme-wizard-diagnostic-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.75rem;
+    padding: 0.25rem 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--app-text-color) 10%, transparent);
+    font-size: 0.82rem;
+}
+
+.theme-wizard-diagnostic-row span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+    .theme-wizard-palette-slot {
+        grid-template-columns: 44px minmax(0, 1fr);
+    }
+
+    .theme-wizard-palette-slot .theme-wizard-slot-label,
+    .theme-wizard-palette-slot .theme-wizard-remove-color {
+        grid-column: 1 / -1;
+    }
 }
 
 /* Admin table wrapper - provides consistent card styling */
