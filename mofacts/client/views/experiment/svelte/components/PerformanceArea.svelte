@@ -130,20 +130,20 @@
   }
 
   .stat-label {
-    font-size: 0.7rem;
+    font-size: calc(var(--app-font-size-base) * 0.7);
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--app-secondary-text-color);
   }
 
   .stat-value {
-    font-size: 0.82rem;
+    font-size: calc(var(--app-font-size-base) * 0.82);
     font-weight: 700;
     color: var(--app-primary-action-text-color);
   }
 
   .stat-unit {
-    font-size: 0.7rem;
+    font-size: calc(var(--app-font-size-base) * 0.7);
     font-weight: 500;
     color: var(--app-secondary-text-color);
   }
@@ -164,7 +164,7 @@
   }
 
   .timeout-label {
-    font-size: 0.75rem;
+    font-size: calc(var(--app-font-size-base) * 0.75);
     font-weight: 600;
     color: var(--app-secondary-text-color);
     margin-bottom: 0.2rem;
@@ -202,15 +202,15 @@
     }
 
     .stat-label {
-      font-size: 0.65rem;
+      font-size: calc(var(--app-font-size-base) * 0.65);
     }
 
     .stat-value {
-      font-size: 0.75rem;
+      font-size: calc(var(--app-font-size-base) * 0.75);
     }
 
     .timeout-label {
-      font-size: 0.7rem;
+      font-size: calc(var(--app-font-size-base) * 0.7);
     }
 
     .timeout-bar-wrapper {

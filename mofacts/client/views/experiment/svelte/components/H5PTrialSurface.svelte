@@ -43,7 +43,7 @@
     flex: 0 0 auto;
     padding: calc(0.35rem * var(--app-density-scale)) calc(0.75rem * var(--app-density-scale));
     color: var(--app-secondary-text-color);
-    font-size: 0.85rem;
+    font-size: calc(var(--app-font-size-base) * 0.85);
     text-align: center;
     border-bottom: 1px solid var(--app-secondary-surface-color);
   }

@@ -433,7 +433,7 @@
 
   .auto-tutor-question h1 {
     margin: var(--app-space-0);
-    font-size: 1.25rem;
+    font-size: calc(var(--app-font-size-base) * 1.25);
     line-height: 1.35;
     font-weight: 700;
     letter-spacing: 0;
@@ -459,7 +459,7 @@
     gap: calc(0.375rem * var(--app-density-scale));
     min-width: 0;
     color: var(--app-text-color);
-    font-size: 0.78rem;
+    font-size: calc(var(--app-font-size-base) * 0.78);
     font-weight: 600;
   }
 
@@ -471,7 +471,7 @@
 
   .auto-tutor-meter-copy strong {
     flex: 0 0 auto;
-    font-size: 0.82rem;
+    font-size: calc(var(--app-font-size-base) * 0.82);
   }
 
   .auto-tutor-progress-track {
@@ -511,7 +511,7 @@
 
   .auto-tutor-turns {
     color: var(--app-secondary-text-color);
-    font-size: 0.78rem;
+    font-size: calc(var(--app-font-size-base) * 0.78);
   }
 
   .auto-tutor-error,
@@ -573,7 +573,7 @@
     min-height: var(--app-button-height);
     color: var(--navigation-text-color, var(--app-text-color));
     font-family: var(--app-heading-font-family, var(--app-font-family));
-    font-size: calc(1.25rem * 0.8);
+    font-size: var(--app-font-size-base);
     font-weight: 700;
     line-height: 1;
     letter-spacing: 0;
@@ -635,16 +635,16 @@
     }
 
     .auto-tutor-mobile-progress .auto-tutor-meter-copy {
-      font-size: 0.68rem;
+      font-size: calc(var(--app-font-size-base) * 0.68);
       line-height: 1;
     }
 
     .auto-tutor-mobile-progress .auto-tutor-meter-copy strong {
-      font-size: 0.72rem;
+      font-size: calc(var(--app-font-size-base) * 0.72);
     }
 
     .auto-tutor-turns {
-      font-size: 0.75rem;
+      font-size: calc(var(--app-font-size-base) * 0.75);
       line-height: 1.1;
       text-align: center;
     }
@@ -656,7 +656,7 @@
     .auto-tutor-error,
     .auto-tutor-complete {
       padding: var(--app-space-2) calc(0.625rem * var(--app-density-scale));
-      font-size: 0.9rem;
+      font-size: calc(var(--app-font-size-base) * 0.9);
     }
 
     .auto-tutor-continue-bar {

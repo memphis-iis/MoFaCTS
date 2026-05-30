@@ -199,7 +199,7 @@
     pointer-events: auto;
     writing-mode: vertical-rl;
     text-orientation: mixed;
-    font-size: 0.68rem;
+    font-size: calc(var(--app-font-size-base) * 0.68);
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
@@ -260,7 +260,7 @@
 
   .learning-progress-header h2 {
     margin: var(--app-space-0);
-    font-size: 0.95rem;
+    font-size: calc(var(--app-font-size-base) * 0.95);
     line-height: 1.1;
     font-weight: 700;
     color: var(--app-text-color);
@@ -277,7 +277,7 @@
     background: transparent;
     color: var(--app-secondary-text-color);
     cursor: pointer;
-    font-size: 1rem;
+    font-size: var(--app-font-size-base);
     line-height: 1;
   }
 
@@ -309,7 +309,7 @@
 
   .learning-progress-stat-label {
     color: var(--app-secondary-text-color);
-    font-size: 0.62rem;
+    font-size: calc(var(--app-font-size-base) * 0.62);
     font-weight: 700;
     line-height: 1;
     text-transform: uppercase;
@@ -318,7 +318,7 @@
 
   .learning-progress-stats strong {
     color: var(--app-text-color);
-    font-size: 0.82rem;
+    font-size: calc(var(--app-font-size-base) * 0.82);
     font-variant-numeric: tabular-nums;
     line-height: 1.1;
   }
@@ -367,7 +367,7 @@
     border-radius: var(--app-border-radius-sm);
     background: var(--learning-card-surface-color);
     color: var(--app-text-color);
-    font-size: 0.62rem;
+    font-size: calc(var(--app-font-size-base) * 0.62);
     font-weight: 700;
     line-height: 1;
     white-space: nowrap;
@@ -418,14 +418,14 @@
     padding: calc(0.4rem * var(--app-density-scale)) calc(0.7rem * var(--app-density-scale)) calc(0.55rem * var(--app-density-scale));
     border-top: 1px solid var(--app-secondary-surface-color);
     color: var(--app-secondary-text-color);
-    font-size: 0.62rem;
+    font-size: calc(var(--app-font-size-base) * 0.62);
     font-variant-numeric: tabular-nums;
   }
 
   .learning-progress-empty {
     padding: calc(0.8rem * var(--app-density-scale));
     color: var(--app-secondary-text-color);
-    font-size: 0.8rem;
+    font-size: calc(var(--app-font-size-base) * 0.8);
     line-height: 1.35;
   }
 

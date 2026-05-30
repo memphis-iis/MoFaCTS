@@ -9,7 +9,7 @@
 
 @media (max-width: 576px) {
   .class-edit-heading {
-    font-size: 1.5rem;
+    font-size: calc(var(--app-font-size-base) * 1.5);
   }
 }
 

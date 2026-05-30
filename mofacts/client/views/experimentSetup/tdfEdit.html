@@ -60,7 +60,7 @@
         /* Base font size */
         #tdf-editor-container,
         #tdf-editor-container * {
-            font-size: 0.875rem !important;
+            font-size: calc(var(--app-font-size-base) * 0.875) !important;
         }
 
         /* Headings - slightly larger but still compact */
@@ -73,7 +73,7 @@
         #tdf-editor-container .card-header,
         #tdf-editor-container .je-object__title,
         #tdf-editor-container .h3.card-title {
-            font-size: 0.9rem !important;
+            font-size: calc(var(--app-font-size-base) * 0.9) !important;
             font-weight: 600;
             margin-bottom: 0;
         }
@@ -81,7 +81,7 @@
         /* Property labels in table layout */
         #tdf-editor-container table th,
         #tdf-editor-container table td {
-            font-size: 0.875rem !important;
+            font-size: calc(var(--app-font-size-base) * 0.875) !important;
             padding: var(--app-space-1) var(--app-space-2) !important;
         }
 
@@ -160,7 +160,7 @@
         /* Buttons */
         #tdf-editor-container .btn,
         #tdf-editor-container button {
-            font-size: 0.8rem !important;
+            font-size: calc(var(--app-font-size-base) * 0.8) !important;
             padding: calc(0.2rem * var(--app-density-scale)) calc(0.4rem * var(--app-density-scale)) !important;
         }
 
@@ -264,7 +264,7 @@
             list-style: none;
             padding-left: var(--app-space-0);
             margin-bottom: var(--app-space-0);
-            font-size: 0.875rem;
+            font-size: calc(var(--app-font-size-base) * 0.875);
         }
 
         .validation-list-collapsed {
@@ -301,7 +301,7 @@
 
         .field-validation-message {
             margin-top: var(--app-space-1);
-            font-size: 0.75rem !important;
+            font-size: calc(var(--app-font-size-base) * 0.75) !important;
             line-height: 1.2;
         }
 
@@ -310,7 +310,7 @@
         }
 
         .field-validation-message i {
-            font-size: 0.7rem;
+            font-size: calc(var(--app-font-size-base) * 0.7);
         }
 
         /* Highlight Animation */
@@ -341,7 +341,7 @@
 
         /* MC Mode Toggle Button */
         .mc-toggle-btn {
-            font-size: 0.75rem !important;
+            font-size: calc(var(--app-font-size-base) * 0.75) !important;
             padding: calc(0.15rem * var(--app-density-scale)) calc(0.4rem * var(--app-density-scale)) !important;
             vertical-align: middle;
         }
@@ -397,7 +397,7 @@
             align-items: center;
             gap: 0.35rem;
             color: var(--app-success-color);
-            font-size: 0.875rem;
+            font-size: calc(var(--app-font-size-base) * 0.875);
             opacity: 0;
             transition: opacity 0.15s ease;
             pointer-events: none;
@@ -438,14 +438,14 @@
             #tdf-editor-container .btn {
                 padding: var(--app-space-2) calc(0.75rem * var(--app-density-scale)) !important;
                 min-height: var(--app-button-height);
-                font-size: 0.875rem !important;
+                font-size: calc(var(--app-font-size-base) * 0.875) !important;
             }
 
             #tdf-editor-container .form-control,
             #tdf-editor-container .form-select,
             #tdf-editor-container input,
             #tdf-editor-container textarea {
-                font-size: 16px !important;
+                font-size: var(--app-font-size-base) !important;
             }
 
             #tdf-editor-container .media-field-wrapper {

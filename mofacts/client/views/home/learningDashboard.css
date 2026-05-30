@@ -42,7 +42,7 @@
     border-radius: var(--app-border-radius-sm, 8px);
     background: var(--learning-card-surface-color);
     color: color-mix(in srgb, var(--app-accent-color) 78%, var(--app-text-color));
-    font-size: 22px;
+    font-size: calc(var(--app-font-size-base) * 1.375);
 }
 
 .resume-content {
@@ -54,7 +54,7 @@
 .resume-title {
     margin-bottom: var(--app-space-2-px);
     color: var(--app-page-header-text-color);
-    font-size: 16px;
+    font-size: var(--app-font-size-base);
     font-weight: 700;
     line-height: 1.2;
     overflow-wrap: anywhere;
@@ -72,7 +72,7 @@
 
 .metric-value {
     color: var(--app-page-header-text-color);
-    font-size: 15px;
+    font-size: calc(var(--app-font-size-base) * 0.9375);
     font-weight: 700;
     line-height: 1.2;
 }
@@ -85,7 +85,7 @@
 .metric-label {
     margin-top: calc(2px * var(--app-density-scale));
     color: color-mix(in srgb, var(--app-text-color) 62%, transparent);
-    font-size: 11px;
+    font-size: calc(var(--app-font-size-base) * 0.6875);
     font-weight: 500;
     white-space: nowrap;
 }
@@ -134,7 +134,7 @@
     border-radius: var(--app-border-radius-sm, 8px);
     background: color-mix(in srgb, var(--app-text-color) 4%, var(--learning-card-surface-color));
     color: var(--app-text-color);
-    font-size: 13px;
+    font-size: calc(var(--app-font-size-base) * 0.8125);
     line-height: calc(var(--app-text-input-height) - 2px);
     outline: none;
 }
@@ -156,7 +156,7 @@
     width: var(--toolbar-search-icon-size);
     height: var(--toolbar-search-icon-size);
     color: color-mix(in srgb, var(--app-text-color) 42%, transparent);
-    font-size: 14px;
+    font-size: calc(var(--app-font-size-base) * 0.875);
     transform: translateY(-50%);
 }
 
@@ -174,7 +174,7 @@
     background: var(--learning-card-surface-color);
     color: var(--app-text-color);
     cursor: default;
-    font-size: 12px;
+    font-size: calc(var(--app-font-size-base) * 0.75);
     font-weight: 500;
 }
 
@@ -329,7 +329,7 @@
     padding: calc(10px * var(--app-density-scale)) var(--app-space-3-px);
     background: var(--learning-card-surface-color);
     color: color-mix(in srgb, var(--app-text-color) 62%, transparent);
-    font-size: 12px;
+    font-size: calc(var(--app-font-size-base) * 0.75);
     font-weight: 700;
     letter-spacing: 0.05em;
     text-transform: uppercase;
@@ -349,7 +349,7 @@
     border-collapse: collapse;
     table-layout: fixed;
     color: var(--app-text-color);
-    font-size: 13px;
+    font-size: calc(var(--app-font-size-base) * 0.8125);
 }
 
 .practice-col-icon {
@@ -377,7 +377,7 @@
     border-bottom: 1px solid color-mix(in srgb, var(--app-text-color) 12%, transparent);
     background: color-mix(in srgb, var(--app-accent-color) 12%, var(--learning-card-surface-color));
     color: color-mix(in srgb, var(--app-text-color) 62%, transparent);
-    font-size: 10px;
+    font-size: calc(var(--app-font-size-base) * 0.625);
     font-weight: 700;
     letter-spacing: 0.05em;
     text-align: left;
@@ -446,7 +446,7 @@
     min-height: var(--app-button-height, 44px);
     margin: 0 auto;
     color: color-mix(in srgb, var(--app-accent-color) 78%, var(--app-text-color));
-    font-size: 12px;
+    font-size: calc(var(--app-font-size-base) * 0.75);
     line-height: 1;
 }
 
@@ -555,7 +555,7 @@
 .learning-dashboard-action-button.btn-outline-secondary::before {
     content: "\f013";
     font-family: FontAwesome;
-    font-size: 14px;
+    font-size: calc(var(--app-font-size-base) * 0.875);
 }
 
 .learning-dashboard-action-button.btn-outline-secondary:hover,
@@ -634,7 +634,7 @@
     justify-content: space-between;
     gap: var(--app-space-2);
     margin-bottom: var(--app-space-1);
-    font-size: 0.875rem;
+    font-size: calc(var(--app-font-size-base) * 0.875);
     font-weight: 400;
     line-height: 1.25;
 }
@@ -651,7 +651,7 @@
     padding: var(--app-space-0);
     border: 0;
     background: transparent;
-    font-size: 0.75rem;
+    font-size: calc(var(--app-font-size-base) * 0.75);
     line-height: 1.15;
     text-decoration: none;
 }
@@ -679,7 +679,7 @@
     min-height: calc(var(--app-button-height) * 0.66);
     padding-top: calc(0.16rem * var(--app-density-scale));
     padding-bottom: calc(0.16rem * var(--app-density-scale));
-    font-size: 0.875rem;
+    font-size: calc(var(--app-font-size-base) * 0.875);
     line-height: 1.2;
 }
 
@@ -694,7 +694,7 @@
     gap: var(--app-space-2);
     margin-top: calc(0.1rem * var(--app-density-scale));
     color: var(--app-secondary-text-color);
-    font-size: 0.72rem;
+    font-size: calc(var(--app-font-size-base) * 0.72);
     line-height: 1.15;
 }
 
@@ -917,7 +917,7 @@
 
     .card-expand-icon {
         margin-left: var(--app-space-1);
-        font-size: 0.75rem;
+        font-size: calc(var(--app-font-size-base) * 0.75);
         transition: transform var(--app-transition-smooth) ease;
         vertical-align: middle;
     }
@@ -1007,7 +1007,7 @@
 
     .learning-dashboard-card-title {
         margin-bottom: calc(0.2rem * var(--app-density-scale));
-        font-size: 1rem;
+        font-size: var(--app-font-size-base);
         line-height: 1.18;
     }
 
@@ -1024,7 +1024,7 @@
     .learning-dashboard-details {
         margin-top: calc(0.35rem * var(--app-density-scale)) !important;
         padding-top: calc(0.35rem * var(--app-density-scale)) !important;
-        font-size: 0.9rem;
+        font-size: calc(var(--app-font-size-base) * 0.9);
     }
 
     .table-toolbar {

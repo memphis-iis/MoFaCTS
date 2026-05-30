@@ -324,8 +324,8 @@
     Session.set('instructionClientStart', videoInstructionsShownAt);
   }
   $: layoutMode = deliverySettings.stimuliPosition;
-  $: fontSizePx = parsePositiveNumber(deliverySettings?.fontsize) ?? 24;
-  $: cardFontSizeStyle = `--card-font-size: ${fontSizePx}px;`;
+  $: fontSizeScale = (parsePositiveNumber(deliverySettings?.fontsize) ?? 24) / 16;
+  $: cardFontSizeStyle = `--card-font-size: calc(var(--app-font-size-base) * ${fontSizeScale});`;
 
   // Timeout bar visibility - controlled by displayTimeoutBar boolean
   $: showTimeoutBar = deliverySettings.displayTimeoutBar;
@@ -2275,7 +2275,7 @@
   }
 
   .video-instruction-copy {
-    font-size: clamp(1rem, 1.6vw, 1.2rem);
+    font-size: clamp(var(--app-font-size-base), 1.6vw, calc(var(--app-font-size-base) * 1.2));
     line-height: 1.5;
   }
 
@@ -2347,7 +2347,7 @@
 
   .fixed-footer__message {
     color: var(--app-secondary-text-color);
-    font-size: 12px;
+    font-size: calc(var(--app-font-size-base) * 0.75);
   }
 
   .fixed-footer__button {
@@ -2367,7 +2367,7 @@
     padding: var(--app-space-2);
     border-radius: var(--app-border-radius-sm);
     font-family: monospace;
-    font-size: 0.7rem;
+    font-size: calc(var(--app-font-size-base) * 0.7);
     max-width: 300px;
     max-height: 200px;
     overflow: auto;

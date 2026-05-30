@@ -80,7 +80,7 @@
   }
 
   .status-text {
-    font-size: var(--card-font-size, inherit);
+    font-size: var(--card-font-size);
     color: var(--app-text-color);
   }
 

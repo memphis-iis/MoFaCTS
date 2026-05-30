@@ -634,13 +634,13 @@
   }
 
   .question-number {
-    font-size: 0.85rem;
+    font-size: calc(var(--app-font-size-base) * 0.85);
     color: var(--app-secondary-text-color);
     margin-bottom: var(--app-space-1);
   }
 
   .stimulus-text {
-    font-size: var(--card-font-size, inherit);
+    font-size: var(--card-font-size);
     line-height: 1.5;
     word-wrap: break-word;
     color: var(--app-text-color);
@@ -691,7 +691,7 @@
       box-shadow var(--app-transition-fast, 100ms) ease,
       color var(--app-transition-fast, 100ms) ease;
     color: var(--app-accent-color);
-    font-size: 2.5rem;
+    font-size: calc(var(--app-font-size-base) * 2.5);
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   }
 
@@ -827,7 +827,7 @@
     max-width: 100%;
     padding: var(--app-space-0) var(--app-space-1);
     color: var(--app-secondary-text-color);
-    font-size: 0.625rem;
+    font-size: calc(var(--app-font-size-base) * 0.625);
     line-height: 1.25;
     text-align: center;
     text-decoration: none;

@@ -110,7 +110,7 @@
     align-items: center;
     gap: calc(0.55rem * var(--app-density-scale)) calc(0.85rem * var(--app-density-scale));
     flex-wrap: wrap;
-    font-size: 0.9rem;
+    font-size: calc(var(--app-font-size-base) * 0.9);
 }
 
 .asset-meta-item {
@@ -212,7 +212,7 @@
 
 .condition-tdf-selector,
 .stim-file-selector {
-    font-size: 0.85rem;
+    font-size: calc(var(--app-font-size-base) * 0.85);
     width: 100%;
 }
 
@@ -287,7 +287,7 @@
 
 .action-buttons-row .btn-icon .fa {
     margin: 0;
-    font-size: 0.85rem;
+    font-size: calc(var(--app-font-size-base) * 0.85);
 }
 
 /* Compact inline elements */

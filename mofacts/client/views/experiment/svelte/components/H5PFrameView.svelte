@@ -187,7 +187,7 @@
     padding: var(--app-space-3);
     color: var(--feedback-error-color);
     text-align: center;
-    font-size: 0.95rem;
+    font-size: calc(var(--app-font-size-base) * 0.95);
     line-height: 1.4;
   }
 </style>

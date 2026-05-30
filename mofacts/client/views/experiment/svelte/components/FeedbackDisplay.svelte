@@ -236,7 +236,7 @@
 
   .feedback-display {
     text-align: center;
-    font-size: var(--card-font-size, inherit);
+    font-size: var(--card-font-size);
     line-height: 1.4;
     width: 100%;
     max-width: 600px;

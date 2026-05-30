@@ -280,6 +280,7 @@
   }
 
   .button-grid {
+    --choice-font-size: var(--card-font-size);
     display: grid;
     grid-template-columns: repeat(var(--columns, 2), 1fr);
     gap: var(--choice-grid-gap, 0.75rem);
@@ -292,7 +293,7 @@
     width: min(100%, var(--uniform-button-width, 100%));
     max-width: 100%;
     padding: var(--choice-padding-block, calc(0.75rem * var(--app-density-scale))) var(--choice-padding-inline, calc(0.75rem * var(--app-density-scale)));
-    font-size: var(--choice-font-size, var(--card-font-size, 24px));
+    font-size: var(--choice-font-size);
     font-weight: 500;
     line-height: var(--choice-line-height, var(--app-button-line-height));
     color: var(--app-primary-action-text-color);

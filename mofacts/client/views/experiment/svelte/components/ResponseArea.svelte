@@ -120,7 +120,7 @@
   .force-correct-hint {
     color: var(--feedback-error-color);
     font-weight: bold;
-    font-size: var(--card-font-size, 24px);
+    font-size: var(--card-font-size);
     margin: 0;
   }
 

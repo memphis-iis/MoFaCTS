@@ -53,7 +53,7 @@ line.ct-bar:nth-child(2n+1) {
    text-align: center;
    left: 0;
    bottom: -10px;
-   font-size: 1.45rem;
+   font-size: calc(var(--app-font-size-base) * 1.45);
    color: #000;
    font-weight: bolder;
 }
@@ -63,7 +63,7 @@ line.ct-bar:nth-child(2n+1) {
    position: absolute;
    top: 40%;
    left: -6.25rem;
-   font-size: 1.45rem;
+   font-size: calc(var(--app-font-size-base) * 1.45);
    color: #000;
    text-align: center;
    transform: rotate(-90deg)translateY(50%);
