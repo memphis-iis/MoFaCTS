@@ -85,14 +85,14 @@
   }
 
   .sr-status.recording .status-text {
-    color: var(--feedback-correct-color, #00cc00);
+    color: var(--app-state-success-color);
   }
 
   .sr-status.processing .status-text {
-    color: var(--feedback-error-color, #ff0000);
+    color: var(--app-state-error-color);
   }
 
   .sr-status.error .status-text {
-    color: var(--feedback-error-color, #ff0000);
+    color: var(--app-state-error-color);
   }
 </style>

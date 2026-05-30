@@ -145,7 +145,8 @@
 <style>
   .learning-progress-shell {
     --progress-tab-width: 23px;
-    --progress-panel-width: var(--learning-progress-panel-width, 320px);
+    --progress-panel-width: var(--learning-progress-panel-width, 224px);
+    --progress-tab-anchor-y: 66.6667%;
     --progress-border-color: color-mix(in srgb, var(--app-secondary-surface-color) 70%, var(--app-text-color));
     --progress-muted-bar: color-mix(in srgb, var(--app-secondary-surface-color) 82%, var(--app-background-color));
     --progress-target-color: var(--feedback-correct-color);
@@ -180,7 +181,7 @@
 
   .learning-progress-toggle {
     position: absolute;
-    top: 50%;
+    top: var(--progress-tab-anchor-y);
     right: 0;
     transform: translateY(-50%);
     width: var(--progress-tab-width);
@@ -200,10 +201,10 @@
     writing-mode: vertical-rl;
     text-orientation: mixed;
     font-size: calc(var(--app-font-size-base) * 0.68);
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.14);
+    font-weight: var(--app-font-weight-bold);
+    letter-spacing: var(--app-label-letter-spacing);
+    text-transform: var(--app-label-text-transform);
+    box-shadow: var(--app-shadow-soft);
   }
 
   .learning-progress-shell-open .learning-progress-toggle {
@@ -244,7 +245,7 @@
     flex-direction: column;
     border-left: 1px solid var(--progress-border-color);
     background: var(--learning-card-surface-color);
-    box-shadow: -10px 0 18px rgba(0, 0, 0, 0.08);
+    box-shadow: var(--app-shadow-panel-edge);
     overflow: hidden;
   }
 

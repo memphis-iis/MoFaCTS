@@ -131,20 +131,20 @@
 
   .stat-label {
     font-size: calc(var(--app-font-size-base) * 0.7);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    letter-spacing: var(--app-label-letter-spacing);
+    text-transform: var(--app-label-text-transform);
     color: var(--app-secondary-text-color);
   }
 
   .stat-value {
     font-size: calc(var(--app-font-size-base) * 0.82);
-    font-weight: 700;
+    font-weight: var(--app-font-weight-bold);
     color: var(--app-primary-action-text-color);
   }
 
   .stat-unit {
     font-size: calc(var(--app-font-size-base) * 0.7);
-    font-weight: 500;
+    font-weight: var(--app-font-weight-medium);
     color: var(--app-secondary-text-color);
   }
 
@@ -165,7 +165,7 @@
 
   .timeout-label {
     font-size: calc(var(--app-font-size-base) * 0.75);
-    font-weight: 600;
+    font-weight: var(--app-font-weight-semibold);
     color: var(--app-secondary-text-color);
     margin-bottom: 0.2rem;
     text-align: center;

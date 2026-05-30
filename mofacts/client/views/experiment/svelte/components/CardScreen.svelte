@@ -2227,7 +2227,7 @@
   }
 
   .learning-session-layout {
-    --learning-progress-panel-width: 320px;
+    --learning-progress-panel-width: 224px;
 
     position: relative;
     flex: 1 1 auto;
@@ -2271,18 +2271,18 @@
     border: 1px solid var(--app-secondary-surface-color);
     background: var(--learning-card-surface-color);
     color: var(--app-text-color);
-    box-shadow: 0 16px 40px color-mix(in srgb, var(--app-text-color) 18%, transparent);
+    box-shadow: var(--app-shadow-modal);
   }
 
   .video-instruction-copy {
     font-size: clamp(var(--app-font-size-base), 1.6vw, calc(var(--app-font-size-base) * 1.2));
-    line-height: 1.5;
+    line-height: var(--app-line-height-relaxed);
   }
 
   .video-instruction-warning {
     margin: var(--app-space-4-px) 0 0;
-    color: var(--feedback-error-color);
-    font-weight: 600;
+    color: var(--app-state-error-color);
+    font-weight: var(--app-font-weight-semibold);
   }
 
   .video-instruction-continue {
@@ -2291,7 +2291,7 @@
     border: 1px solid var(--app-secondary-surface-color);
     background: var(--learning-card-primary-action-surface-color);
     color: var(--learning-card-primary-action-text-color);
-    font-weight: 700;
+    font-weight: var(--app-font-weight-bold);
   }
 
   .video-instruction-continue:disabled {
@@ -2353,7 +2353,7 @@
   .fixed-footer__button {
     padding: var(--app-space-1-px) var(--app-space-4-px);
     border: 1px solid var(--app-secondary-surface-color);
-    font-weight: 600;
+    font-weight: var(--app-font-weight-semibold);
     background: var(--learning-card-primary-action-surface-color);
     color: var(--learning-card-primary-action-text-color);
   }
@@ -2412,7 +2412,7 @@
   .video-continue-button {
     padding: calc(0.75rem * var(--app-density-scale)) calc(2rem * var(--app-density-scale));
     border: 1px solid var(--app-secondary-surface-color);
-    font-weight: 600;
+    font-weight: var(--app-font-weight-semibold);
     background: var(--learning-card-primary-action-surface-color);
     color: var(--learning-card-primary-action-text-color);
   }
@@ -2427,7 +2427,7 @@
   .skip-study-button {
     padding: var(--app-space-2) var(--app-space-4);
     border: 1px solid var(--app-secondary-surface-color);
-    font-weight: 500;
+    font-weight: var(--app-font-weight-medium);
     background: var(--learning-card-primary-action-surface-color);
     color: var(--learning-card-primary-action-text-color);
     opacity: 0.85;

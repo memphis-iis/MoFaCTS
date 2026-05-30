@@ -572,7 +572,7 @@
     min-width: 0;
     min-height: var(--app-button-height);
     color: var(--navigation-text-color, var(--app-text-color));
-    font-family: var(--app-heading-font-family, var(--app-font-family));
+    font-family: var(--app-heading-font-family);
     font-size: var(--app-font-size-base);
     font-weight: 700;
     line-height: 1;
@@ -624,7 +624,7 @@
       border: 1px solid var(--app-secondary-surface-color);
       border-radius: var(--app-border-radius-sm);
       background: color-mix(in srgb, var(--app-background-color) 88%, transparent);
-      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+      box-shadow: var(--app-shadow-floating-panel);
       backdrop-filter: blur(3px);
       pointer-events: none;
     }

@@ -2,7 +2,7 @@ import {Roles} from 'meteor/alanning:roles';
 // import * as ElaboratedFeedback from './lib/CachedElaboratedFeedback';
 // import * as DefinitionalFeedback from '../server/lib/DefinitionalFeedback.js';
 // import * as ClozeAPI from '../server/lib/ClozeAPI.js';
-import {createExperimentExport, createExperimentExportByTdfIds} from './experiment_times';
+import {createExperimentExport, createExperimentExportByTdfIds, createExperimentExportFromHistories} from './experiment_times';
 import {getNewItemFormat} from './conversions/convert';
 import { legacyTrim } from '../common/underscoreCompat';
 import _ from 'underscore';
@@ -417,6 +417,7 @@ const analyticsMethods = createAnalyticsMethods({
   syncUsernameCaches,
   createExperimentExport,
   createExperimentExportByTdfIds,
+  createExperimentExportFromHistories,
   getTdfNamesByOwnerId,
   assertUserOwnsTdfs,
   canDownloadOwnedTdfData,

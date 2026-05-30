@@ -38,10 +38,30 @@
     --app-success-surface-color: color-mix(in srgb, var(--feedback-correct-color) 12%, var(--learning-card-surface-color));
     --app-warning-color: color-mix(in srgb, var(--app-accent-color) 65%, var(--feedback-error-color) 35%);
     --app-warning-surface-color: color-mix(in srgb, var(--app-warning-color) 18%, var(--learning-card-surface-color));
+    --app-error-color: var(--feedback-error-color);
     --app-error-surface-color: color-mix(in srgb, var(--feedback-error-color) 10%, var(--learning-card-surface-color));
+    --app-state-hover-surface-color: var(--app-hover-surface-color);
+    --app-state-selected-surface-color: var(--app-selected-surface-color);
+    --app-state-disabled-surface-color: var(--app-muted-surface-color);
+    --app-state-disabled-text-color: var(--app-secondary-text-color);
+    --app-state-success-color: var(--app-success-color);
+    --app-state-success-surface-color: var(--app-success-surface-color);
+    --app-state-error-color: var(--app-error-color);
+    --app-state-error-surface-color: var(--app-error-surface-color);
+    --app-state-warning-color: var(--app-warning-color);
+    --app-state-warning-surface-color: var(--app-warning-surface-color);
+    --app-state-info-color: var(--app-info-color);
+    --app-state-info-surface-color: var(--app-info-surface-color);
+    --app-state-focus-ring-color: var(--focus-ring-color);
     --app-focus-shadow-color: color-mix(in srgb, var(--focus-ring-color) 25%, transparent);
     --app-error-shadow-color: color-mix(in srgb, var(--feedback-error-color) 25%, transparent);
     --app-warning-shadow-color: color-mix(in srgb, var(--app-warning-color) 30%, transparent);
+    --app-shadow-soft: 0 4px 10px color-mix(in srgb, var(--app-text-color) 14%, transparent);
+    --app-shadow-control: 0 4px 6px color-mix(in srgb, var(--app-text-color) 10%, transparent);
+    --app-shadow-control-hover: 0 6px 12px color-mix(in srgb, var(--app-text-color) 15%, transparent);
+    --app-shadow-panel-edge: -10px 0 18px color-mix(in srgb, var(--app-text-color) 8%, transparent);
+    --app-shadow-floating-panel: 0 4px 14px color-mix(in srgb, var(--app-text-color) 12%, transparent);
+    --app-shadow-modal: 0 16px 40px color-mix(in srgb, var(--app-text-color) 18%, transparent);
     --app-media-image-color: var(--app-success-color);
     --app-media-audio-color: var(--app-info-color);
     --app-media-video-color: color-mix(in srgb, var(--app-accent-color) 55%, var(--app-text-color) 45%);
@@ -54,6 +74,16 @@
     --app-font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
     --app-heading-font-family: var(--app-font-family);
     --app-font-size-base: 16px;
+    --app-font-weight-normal: 400;
+    --app-font-weight-medium: 500;
+    --app-font-weight-semibold: 600;
+    --app-font-weight-bold: 700;
+    --app-font-weight-heavy: 800;
+    --app-line-height-tight: 1.1;
+    --app-line-height-normal: 1.4;
+    --app-line-height-relaxed: 1.5;
+    --app-label-letter-spacing: 0.08em;
+    --app-label-text-transform: uppercase;
     --app-button-height: 44px;
     --app-button-line-height: 1;
     --app-text-input-height: 36px;
@@ -2492,12 +2522,12 @@ tfoot th {
     gap: clamp(0.5rem, 1vw, 0.75rem);
     padding: var(--app-space-0) clamp(var(--app-space-2), 2vw, calc(0.75rem * var(--app-density-scale)));
     height: 24px;
-    line-height: 1;
+    line-height: var(--app-button-line-height);
     border-radius: var(--border-radius-pill);
     border: none;
     background-color: var(--navigation-surface-color);
     font-size: calc(var(--app-font-size-base) * 0.8);
-    font-weight: 600;
+    font-weight: var(--app-font-weight-semibold);
     color: var(--app-text-color);
     margin: 0 auto 0.75rem;
     width: fit-content;
@@ -2514,18 +2544,18 @@ tfoot th {
 
 .card-stats-bar__label {
     font-size: calc(var(--app-font-size-base) * 0.7);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    letter-spacing: var(--app-label-letter-spacing);
+    text-transform: var(--app-label-text-transform);
     color: var(--app-secondary-text-color);
 }
 
 .card-stats-bar__value {
     font-size: calc(var(--app-font-size-base) * 0.82);
-    font-weight: 700;
+    font-weight: var(--app-font-weight-bold);
 }
 
 .card-stats-bar__unit {
-    font-weight: 500;
+    font-weight: var(--app-font-weight-medium);
     font-size: calc(var(--app-font-size-base) * 0.7);
     color: var(--app-secondary-text-color);
 }

@@ -35,7 +35,7 @@ import _ from 'underscore';
 
 import { legacyTrim } from '../common/underscoreCompat';
 
-export {createExperimentExport, createExperimentExportByTdfIds};
+export {createExperimentExport, createExperimentExportByTdfIds, createExperimentExportFromHistories};
 
 let FIELDSDS = JSON.parse(JSON.stringify(outputFields));
 
@@ -131,8 +131,6 @@ async function delimitedRecord(rec: any, listOfDynamicStimTags: any[], isHeader 
 // for expName in datashop format. We do NOT terminate our records.
 // We return the number of records written
 async function createExperimentExport(expName: any, _requestingUserId: any) {
-  let record = '';
-  const header: Record<string, string> = {};
   let expNames = [];  
   const allHistories = [];
 
@@ -141,25 +139,6 @@ async function createExperimentExport(expName: any, _requestingUserId: any) {
   } else {
     expNames = expName;
   }
-
-  const listOfDynamicStimTags: any[] = [];
-
-  FIELDSDS.forEach(function(f: string) {
-    const prefix = f.substr(0, 14);
-
-    let t;
-    if (prefix === 'Condition Name') {
-      t = 'Condition Name';
-    } else if (prefix === 'Condition Type') {
-      t = 'Condition Type';
-    } else {
-      t = f;
-    }
-
-    header[f] = t;
-  });
-
-  record += await delimitedRecord(header, listOfDynamicStimTags, true);
 
   for (expName of expNames) {
     const tdf = await getTdfByFileName(expName) || await getTdfById(expName);
@@ -172,24 +151,28 @@ async function createExperimentExport(expName: any, _requestingUserId: any) {
     allHistories.push(...histories);
   }
 
-  for (let history of sortHistoriesByStudentThenTime(allHistories)) {
-    try {
-      history = getHistory(history);
-      // Authorization is already handled by TDF selection in routes
-      record += await delimitedRecord(history, listOfDynamicStimTags, false);
-    } catch (e: any) {
-      serverConsole('There was an error populating the record - it will be skipped', e, e.stack);
-    }
-  }
-  return record;
+  return await createExperimentExportFromHistories(allHistories);
 }
 
-// Export experiment data by TDF IDs (fallback when fileName is missing)
+// Export experiment data by TDF IDs when fileName is unavailable.
 async function createExperimentExportByTdfIds(tdfIds: any[], _requestingUserId: any) {
-  let record = '';
-  const header: Record<string, string> = {};
   const allHistories = [];
 
+  for (const tdfId of tdfIds) {
+    const tdf = await getTdfById(tdfId);
+    if (!tdf) {
+      continue;
+    }
+    const histories = await getHistoryByTDFID(tdf._id);
+    allHistories.push(...histories);
+  }
+
+  return await createExperimentExportFromHistories(allHistories);
+}
+
+async function createExperimentExportFromHistories(histories: any[]) {
+  let record = '';
+  const header: Record<string, string> = {};
   const listOfDynamicStimTags: any[] = [];
 
   FIELDSDS.forEach(function(f: string) {
@@ -209,16 +192,7 @@ async function createExperimentExportByTdfIds(tdfIds: any[], _requestingUserId: 
 
   record += await delimitedRecord(header, listOfDynamicStimTags, true);
 
-  for (const tdfId of tdfIds) {
-    const tdf = await getTdfById(tdfId);
-    if (!tdf) {
-      continue;
-    }
-    const histories = await getHistoryByTDFID(tdf._id);
-    allHistories.push(...histories);
-  }
-
-  for (let history of sortHistoriesByStudentThenTime(allHistories)) {
+  for (let history of sortHistoriesByStudentThenTime(histories)) {
       try {
         history = getHistory(history);
         record += await delimitedRecord(history, listOfDynamicStimTags, false);

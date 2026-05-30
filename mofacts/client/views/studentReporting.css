@@ -54,8 +54,8 @@ line.ct-bar:nth-child(2n+1) {
    left: 0;
    bottom: -10px;
    font-size: calc(var(--app-font-size-base) * 1.45);
-   color: #000;
-   font-weight: bolder;
+   color: var(--app-text-color);
+   font-weight: var(--app-font-weight-heavy);
 }
 
 .show-axis-labels[data-y-axis-label]::after {
@@ -64,8 +64,8 @@ line.ct-bar:nth-child(2n+1) {
    top: 40%;
    left: -6.25rem;
    font-size: calc(var(--app-font-size-base) * 1.45);
-   color: #000;
+   color: var(--app-text-color);
    text-align: center;
    transform: rotate(-90deg)translateY(50%);
-   font-weight: bolder;
+   font-weight: var(--app-font-weight-heavy);
 }

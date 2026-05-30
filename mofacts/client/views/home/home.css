@@ -4,7 +4,7 @@
     overflow-x: hidden;
     background: var(--app-background-color);
     color: var(--app-text-color);
-    font-family: var(--app-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif);
+    font-family: var(--app-font-family);
     -webkit-font-smoothing: antialiased;
 }
 
@@ -99,15 +99,15 @@
 }
 
 .icon-btn {
-    width: var(--app-button-height, 44px);
-    min-width: var(--app-button-height, 44px);
-    min-height: var(--app-button-height, 44px);
+    width: var(--app-button-height);
+    min-width: var(--app-button-height);
+    min-height: var(--app-button-height);
     background: transparent;
     border: none;
     cursor: pointer;
     color: var(--app-text-color);
     padding: var(--app-space-2-px);
-    border-radius: var(--app-border-radius-sm, 8px);
+    border-radius: var(--app-border-radius-sm);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -118,6 +118,17 @@
     background: color-mix(in srgb, var(--app-text-color) 5%, var(--learning-card-surface-color));
     color: var(--app-text-color);
     outline: none;
+}
+
+#sidebarToggle {
+    align-self: center;
+    margin-right: calc(-1 * var(--app-space-2-px));
+    line-height: 1;
+}
+
+#sidebarToggle .fa {
+    display: block;
+    line-height: 1;
 }
 
 .sidebar-toggle-transitioning #sidebarToggle {
@@ -140,10 +151,10 @@
 
 .section-title {
     font-size: calc(var(--app-font-size-base) * 0.75625);
-    text-transform: uppercase;
+    text-transform: var(--app-label-text-transform);
     color: color-mix(in srgb, var(--app-text-color) 42%, transparent);
-    font-weight: 600;
-    letter-spacing: 0.06em;
+    font-weight: var(--app-font-weight-semibold);
+    letter-spacing: var(--app-label-letter-spacing);
     padding: var(--app-space-2-px) var(--app-space-3-px) calc(6px * var(--app-density-scale));
 }
 
@@ -152,31 +163,31 @@
     display: flex;
     align-items: center;
     gap: var(--app-space-3-px);
-    min-height: var(--app-button-height, 44px);
+    min-height: var(--app-button-height);
     padding: calc(9px * var(--app-density-scale)) var(--app-space-3-px);
     border: 0;
-    border-radius: var(--app-border-radius-sm, 8px);
+    border-radius: var(--app-border-radius-sm);
     background: transparent;
     color: var(--app-text-color);
     font-size: calc(var(--app-font-size-base) * 0.9625);
     cursor: pointer;
     margin-bottom: calc(2px * var(--app-density-scale));
-    font-weight: 500;
+    font-weight: var(--app-font-weight-medium);
     text-align: left;
     transition: all 0.15s;
 }
 
 .nav-item:hover,
 .nav-item:focus-visible {
-    background: color-mix(in srgb, var(--app-text-color) 5%, var(--learning-card-surface-color));
+    background: var(--app-state-hover-surface-color);
     color: var(--app-text-color);
     outline: none;
 }
 
 .nav-item.active {
-    background: color-mix(in srgb, var(--app-accent-color) 12%, var(--learning-card-surface-color));
+    background: var(--app-state-selected-surface-color);
     color: var(--app-text-color);
-    font-weight: 600;
+    font-weight: var(--app-font-weight-semibold);
 }
 
 .nav-item .fa {
@@ -238,7 +249,7 @@
     background: var(--app-text-color);
     color: var(--learning-card-surface-color);
     padding: calc(6px * var(--app-density-scale)) calc(10px * var(--app-density-scale));
-    border-radius: var(--app-border-radius-sm, 8px);
+    border-radius: var(--app-border-radius-sm);
     font-size: calc(var(--app-font-size-base) * 0.89375);
     white-space: nowrap;
     z-index: 100;
@@ -304,11 +315,11 @@
 }
 
 .practice-return-button {
-    min-height: var(--app-button-height, 44px);
+    min-height: var(--app-button-height);
     border-color: var(--btn-border-color);
     background-color: var(--app-primary-action-surface-color);
     color: var(--app-primary-action-text-color);
-    border-radius: var(--app-border-radius-sm, 8px);
+    border-radius: var(--app-border-radius-sm);
     white-space: nowrap;
 }
 
@@ -321,8 +332,9 @@
 
 .app-practice-menu {
     --practice-menu-width: 280px;
+    --practice-menu-anchor-y: 66.6667%;
     position: fixed;
-    top: 50%;
+    top: var(--practice-menu-anchor-y);
     left: 0;
     z-index: 15;
     transform: translate(calc(-1 * var(--practice-menu-width)), -50%);
@@ -346,18 +358,18 @@
     gap: calc(0.32rem * var(--app-density-scale));
     border: 1px solid var(--app-secondary-surface-color);
     border-left: 0;
-    border-radius: 0 var(--app-border-radius-lg, 12px) var(--app-border-radius-lg, 12px) 0;
+    border-radius: 0 var(--app-border-radius-lg) var(--app-border-radius-lg) 0;
     background: var(--navigation-surface-color);
     color: var(--navigation-text-color);
     font-size: calc(var(--app-font-size-base) * 0.68);
-    font-weight: 700;
-    letter-spacing: 0.06em;
+    font-weight: var(--app-font-weight-bold);
+    letter-spacing: var(--app-label-letter-spacing);
     line-height: 1;
-    text-transform: uppercase;
+    text-transform: var(--app-label-text-transform);
     writing-mode: vertical-rl;
     text-orientation: mixed;
     cursor: pointer;
-    box-shadow: 0 0.3rem 0.8rem color-mix(in srgb, var(--app-text-color) 14%, transparent);
+    box-shadow: var(--app-shadow-soft);
 }
 
 .app-practice-menu-toggle-icon {
@@ -394,7 +406,7 @@
     padding: var(--app-space-2);
     border: 1px solid var(--border-color);
     border-left: 0;
-    border-radius: 0 var(--app-border-radius-sm, 8px) var(--app-border-radius-sm, 8px) 0;
+    border-radius: 0 var(--app-border-radius-sm) var(--app-border-radius-sm) 0;
     background: var(--learning-card-surface-color);
     box-shadow: 0.75rem 0 1.6rem color-mix(in srgb, var(--app-text-color) 14%, transparent);
     overflow: auto;
@@ -406,7 +418,7 @@
     align-items: center;
     gap: calc(0.6rem * var(--app-density-scale));
     border: 0;
-    border-radius: var(--app-border-radius-sm, 8px);
+    border-radius: var(--app-border-radius-sm);
     background: transparent;
     color: var(--app-text-color);
     text-align: left;
@@ -427,8 +439,8 @@
 }
 
 html.learning-progress-panel-viewport-open .practice-top-header {
-    width: calc(100% - min(320px, 40vw));
-    margin-right: min(320px, 40vw);
+    width: calc(100% - min(224px, 40vw));
+    margin-right: min(224px, 40vw);
 }
 
 .mobile-sidebar-trigger {
@@ -460,9 +472,9 @@ html.learning-progress-panel-viewport-open .practice-top-header {
     align-items: center;
     gap: calc(10px * var(--app-density-scale));
     cursor: pointer;
-    min-height: var(--app-button-height, 44px);
+    min-height: var(--app-button-height);
     padding: var(--app-space-1-px) calc(6px * var(--app-density-scale)) var(--app-space-1-px) var(--app-space-1-px);
-    border-radius: var(--app-border-radius-sm, 8px);
+    border-radius: var(--app-border-radius-sm);
     position: relative;
 }
 
@@ -522,7 +534,7 @@ html.learning-progress-panel-viewport-open .practice-top-header {
     max-height: calc(100dvh - 88px);
     overflow-y: auto;
     background: var(--learning-card-surface-color);
-    border-radius: var(--app-border-radius-lg, 12px);
+    border-radius: var(--app-border-radius-lg);
     box-shadow: var(--app-surface-shadow);
     border: 1px solid color-mix(in srgb, var(--app-text-color) 12%, transparent);
     padding: calc(6px * var(--app-density-scale));
@@ -549,14 +561,14 @@ html.learning-progress-panel-viewport-open .practice-top-header {
 .home-user-menu .dropdown-item {
     width: 100%;
     display: block;
-    min-height: var(--app-button-height, 44px);
+    min-height: var(--app-button-height);
     padding: calc(9px * var(--app-density-scale)) var(--app-space-3-px);
     border: 0;
     background: transparent;
     font-size: var(--app-font-size-base);
     line-height: var(--app-button-line-height);
     color: var(--app-text-color);
-    border-radius: var(--app-border-radius-sm, 8px);
+    border-radius: var(--app-border-radius-sm);
     cursor: pointer;
     text-align: left;
 }
@@ -572,7 +584,7 @@ html.learning-progress-panel-viewport-open .practice-top-header {
 .theme-menu-caret {
     font-size: calc(var(--app-font-size-base) * 0.6875);
     color: color-mix(in srgb, var(--app-text-color) 46%, transparent);
-    transition: transform var(--app-transition-fast, 100ms) ease;
+    transition: transform var(--app-transition-fast) ease;
 }
 
 .dropdown-item[aria-expanded="true"] .theme-menu-caret {
@@ -591,7 +603,7 @@ html.learning-progress-panel-viewport-open .practice-top-header {
 }
 
 .home-user-menu .theme-selection-item {
-    min-height: calc(var(--app-button-height, 44px) - 6px);
+    min-height: calc(var(--app-button-height) - 6px);
     padding-left: var(--app-space-3-px);
     font-size: calc(var(--app-font-size-base) * 0.94);
 }
@@ -735,7 +747,7 @@ html.learning-progress-panel-viewport-open .practice-top-header {
     max-width: min(270px, calc(100vw - 24px));
     padding: var(--app-space-2) calc(0.75rem * var(--app-density-scale));
     border: 1px solid var(--app-primary-action-text-color);
-    border-radius: var(--app-border-radius-sm, 8px);
+    border-radius: var(--app-border-radius-sm);
     background: var(--app-primary-action-surface-color);
     color: var(--app-primary-action-text-color);
     box-shadow: 0 0.65rem 1.5rem color-mix(in srgb, var(--app-text-color) 24%, transparent);

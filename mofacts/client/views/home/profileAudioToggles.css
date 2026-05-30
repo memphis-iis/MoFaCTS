@@ -1,6 +1,6 @@
 .switch-toggle {
    float: left;
-   background: #67d10f;
+   background: var(--app-state-success-color);
 }
 .switch-toggle input {
   position: absolute;
@@ -9,14 +9,14 @@
 .switch-toggle input + label {
   padding: calc(7px * var(--app-density-scale));
   float:left;
-  color: #fff;
+  color: var(--learning-card-primary-action-text-color);
   cursor: pointer;
   margin-bottom: 0px;
-  border-color: #C1E1A6;
+  border-color: var(--app-state-success-surface-color);
   border-style: solid;
 }
 .switch-toggle input:checked + label {
-  background: green;
+  background: color-mix(in srgb, var(--app-state-success-color) 72%, var(--app-text-color));
 }
 
 #switch-input {

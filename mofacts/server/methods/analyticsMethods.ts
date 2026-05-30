@@ -57,6 +57,7 @@ type AnalyticsMethodsDeps = {
   syncUsernameCaches: (userId: string, nextUsername: string, previousUsername?: string) => void;
   createExperimentExport: (keys: unknown[], userId: string) => Promise<string>;
   createExperimentExportByTdfIds: (tdfIds: string[], userId: string) => Promise<string>;
+  createExperimentExportFromHistories: (histories: any[]) => Promise<string>;
   getTdfNamesByOwnerId: (ownerId: string) => Promise<string[] | null>;
   assertUserOwnsTdfs: (userId: string, keys: unknown[]) => Promise<unknown>;
   canDownloadOwnedTdfData: (userId: string, tdf: any) => boolean;
@@ -98,10 +99,10 @@ function buildLearningHistoryScopeMatch(
   };
 }
 
-function sanitizeFileNameSegment(value: unknown, fallback: string) {
+function sanitizeFileNameSegment(value: unknown, defaultValue: string) {
   const rawValue = typeof value === 'string' && value.trim().length > 0
     ? value.trim()
-    : fallback;
+    : defaultValue;
   return rawValue.replace(/[/\\?%*:|"<>\s]/g, '_');
 }
 
@@ -1411,6 +1412,25 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       const fileName = `mofacts_${userName}_all_tdf_data.tsv`;
 
       const tsvContent = await deps.createExperimentExport(uniqueTdfs, targetUserId);
+      return { fileName, contentType: 'text/tab-separated-values', content: tsvContent };
+    },
+
+    downloadOwnHistoryAcrossTdfs: async function(this: MethodContext) {
+      const actingUserId = requireAuthenticatedUser(this.userId, 'Must be logged in', 401);
+
+      const histories = await deps.Histories.find({ userId: actingUserId }).fetchAsync();
+      if (histories.length === 0) {
+        throw new Meteor.Error(404, 'No history found for current user');
+      }
+
+      const user = await deps.usersCollection.findOneAsync({ _id: actingUserId }, { fields: { username: 1, emails: 1 } });
+      if (!user) {
+        throw new Meteor.Error(404, 'User not found');
+      }
+
+      const userName = sanitizeFileNameSegment(user.username || user.emails?.[0]?.address || actingUserId, actingUserId);
+      const fileName = `mofacts_${userName}_own_history_all_tdfs.tsv`;
+      const tsvContent = await deps.createExperimentExportFromHistories(histories);
       return { fileName, contentType: 'text/tab-separated-values', content: tsvContent };
     },
 

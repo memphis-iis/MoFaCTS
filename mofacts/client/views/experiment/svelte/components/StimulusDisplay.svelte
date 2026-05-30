@@ -655,7 +655,7 @@
   }
 
   .stimulus-text.cloze {
-    font-family: var(--app-font-family, inherit);
+    font-family: var(--app-font-family);
   }
 
   .stimulus-audio-box {
@@ -686,19 +686,19 @@
     align-items: center;
     cursor: pointer;
     transition:
-      transform var(--app-transition-fast, 100ms) ease,
-      border-color var(--app-transition-fast, 100ms) ease,
-      box-shadow var(--app-transition-fast, 100ms) ease,
-      color var(--app-transition-fast, 100ms) ease;
+      transform var(--app-transition-fast) ease,
+      border-color var(--app-transition-fast) ease,
+      box-shadow var(--app-transition-fast) ease,
+      color var(--app-transition-fast) ease;
     color: var(--app-accent-color);
     font-size: calc(var(--app-font-size-base) * 2.5);
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--app-shadow-control);
   }
 
   .replay-button:hover:not(:disabled) {
     transform: scale(1.05);
     border-color: var(--app-accent-color);
-    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--app-shadow-control-hover);
   }
 
   .replay-button:active:not(:disabled) {

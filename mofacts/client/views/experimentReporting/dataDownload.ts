@@ -95,6 +95,10 @@ Template.dataDownload.events({
     event.preventDefault();
     makeDataDownloadMethodCall('downloadDataByTeacher', Meteor.userId());
   },
+  'click #ownHistoryDownloadButton': function(event: any) {
+    event.preventDefault();
+    makeDataDownloadMethodCall('downloadOwnHistoryAcrossTdfs');
+  },
 });
 
 async function makeDataDownloadMethodCall(methodName: string, ...args: any[]): Promise<void> {
