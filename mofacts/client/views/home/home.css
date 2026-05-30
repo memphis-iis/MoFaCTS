@@ -39,7 +39,7 @@
     gap: var(--app-space-2-px);
     color: var(--navigation-text-color);
     font-weight: 700;
-    font-size: calc(var(--app-font-size-base) * 1.5);
+    font-size: calc(var(--app-font-size-base) * 1.375);
     line-height: 1;
     letter-spacing: 0;
     min-width: 0;
@@ -139,7 +139,7 @@
 }
 
 .section-title {
-    font-size: calc(var(--app-font-size-base) * 0.825);
+    font-size: calc(var(--app-font-size-base) * 0.75625);
     text-transform: uppercase;
     color: color-mix(in srgb, var(--app-text-color) 42%, transparent);
     font-weight: 600;
@@ -158,7 +158,7 @@
     border-radius: var(--app-border-radius-sm, 8px);
     background: transparent;
     color: var(--app-text-color);
-    font-size: calc(var(--app-font-size-base) * 1.05);
+    font-size: calc(var(--app-font-size-base) * 0.9625);
     cursor: pointer;
     margin-bottom: calc(2px * var(--app-density-scale));
     font-weight: 500;
@@ -239,7 +239,7 @@
     color: var(--learning-card-surface-color);
     padding: calc(6px * var(--app-density-scale)) calc(10px * var(--app-density-scale));
     border-radius: var(--app-border-radius-sm, 8px);
-    font-size: calc(var(--app-font-size-base) * 0.975);
+    font-size: calc(var(--app-font-size-base) * 0.89375);
     white-space: nowrap;
     z-index: 100;
     pointer-events: none;
