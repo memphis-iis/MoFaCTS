@@ -903,14 +903,17 @@
         vertical-align: middle;
     }
 
-    .learning-dashboard-card-button {
-        min-height: var(--app-button-height);
+    .learning-dashboard-card .learning-dashboard-card-button.btn {
+        min-height: max(28px, calc(var(--app-button-height) * 0.62));
+        padding: calc(0.2rem * var(--app-density-scale)) calc(0.55rem * var(--app-density-scale));
         display: inline-flex !important;
         align-items: center;
         justify-content: center;
-        flex: 1 1 7rem !important;
+        flex: 0 1 auto !important;
         min-width: 0;
-        max-width: 9.5rem;
+        max-width: none;
+        font-size: calc(var(--app-font-size-base) * 0.8125);
+        line-height: 1.1;
         white-space: normal;
         text-align: center;
     }
@@ -1016,11 +1019,6 @@
         margin-top: calc(0.35rem * var(--app-density-scale));
     }
 
-    .learning-dashboard-card-button {
-        min-height: 36px;
-        padding: calc(0.35rem * var(--app-density-scale)) var(--app-space-3);
-    }
-
     .learning-dashboard-details {
         margin-top: calc(0.35rem * var(--app-density-scale)) !important;
         padding-top: calc(0.35rem * var(--app-density-scale)) !important;
@@ -1057,12 +1055,6 @@
 @media (max-width: 640px) {
     .learning-dashboard-card {
         padding: calc(0.75rem * var(--app-density-scale)) calc(0.85rem * var(--app-density-scale)) !important;
-    }
-
-    .learning-dashboard-card-button {
-        flex-basis: 6.25rem !important;
-        min-height: 34px;
-        padding: calc(0.32rem * var(--app-density-scale)) calc(0.68rem * var(--app-density-scale));
     }
 
     .toolbar-filters {

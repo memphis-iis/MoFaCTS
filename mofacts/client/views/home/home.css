@@ -560,9 +560,10 @@ html.learning-progress-panel-viewport-open .practice-top-header {
     align-items: center;
     justify-content: center;
     font-weight: 600;
-    font-size: calc(var(--app-font-size-base) * 0.9375 * var(--app-density-scale));
+    font-size: calc(var(--app-font-size-base) * var(--home-sidebar-density-scale));
     line-height: 1;
     text-align: center;
+    transform: translateY(0.04em);
     flex-shrink: 0;
 }
 
@@ -676,6 +677,7 @@ html.learning-progress-panel-viewport-open .practice-top-header {
 
 .theme-selection-item-active {
     background: color-mix(in srgb, var(--app-accent-color) 14%, var(--learning-card-surface-color)) !important;
+    color: var(--app-text-color);
 }
 
 .theme-selection-check {
@@ -948,6 +950,14 @@ html.learning-progress-panel-viewport-open .practice-top-header {
     .sidebar.sidebar-mobile-closing .nav-item {
         justify-content: flex-start;
         padding: calc(9px * var(--app-density-scale)) var(--app-space-3-px);
+    }
+
+    .sidebar.sidebar-mobile-open .nav-item:hover::after,
+    .sidebar.sidebar-mobile-open .nav-item:focus-visible::after,
+    .sidebar.sidebar-mobile-closing .nav-item:hover::after,
+    .sidebar.sidebar-mobile-closing .nav-item:focus-visible::after {
+        content: none;
+        display: none;
     }
 
     .main,
