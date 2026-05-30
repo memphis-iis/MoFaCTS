@@ -2,7 +2,7 @@
     --home-sidebar-density-scale: calc((var(--app-density-scale) + 1) / 2);
     --home-sidebar-width: calc(224px * var(--home-sidebar-density-scale));
     --home-sidebar-collapsed-width: calc(48px * var(--home-sidebar-density-scale));
-    --home-header-height: calc(var(--app-font-size-base) * 2.5);
+    --home-header-height: max(var(--app-button-height), calc(50px * var(--app-density-scale)));
     --home-header-control-size: min(var(--app-button-height), var(--home-header-height));
     --home-user-menu-top: calc(var(--home-header-height) + calc(var(--app-font-size-base) * 1.625));
     --home-user-menu-bottom-reserve: calc(var(--home-header-height) + calc(var(--app-font-size-base) * 2.375));
