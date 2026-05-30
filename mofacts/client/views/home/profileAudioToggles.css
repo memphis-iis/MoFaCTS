@@ -20,11 +20,11 @@
 }
 
 #switch-input {
-  margin-left: 26px;
+  margin-left: calc(26px * var(--app-density-scale));
 }
 
 #switch-feedback {
-  margin-left: 26px;
+  margin-left: calc(26px * var(--app-density-scale));
 }
 
 .audio-button-containers {
@@ -32,7 +32,7 @@
 }
 
 .audio-button-containers input[type="radio"] {
-    margin-top: -4px;
+    margin-top: calc(-4px * var(--app-density-scale));
     vertical-align: middle;
 }
 
@@ -41,7 +41,7 @@
 }
 
 .audio-button-containers input[type="range"]{
-  margin-top: -4px;
+  margin-top: calc(-4px * var(--app-density-scale));
   vertical-align: middle;
   display: inline; 
   width: 50%;

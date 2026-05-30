@@ -58,7 +58,7 @@
   {{#if appLoading}}
   <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style="background-color: var(--app-loading-overlay-color, rgba(245,245,245,0.95)); z-index: 10000; transition: opacity var(--app-transition-smooth, 200ms) ease-in-out;">
     <div class="text-center">
-      <div class="spinner-border" role="status" style="width: 3rem; height: 3rem; color: var(--app-text-color);">
+      <div class="spinner-border" role="status" style="width: calc(3rem * var(--app-density-scale)); height: calc(3rem * var(--app-density-scale)); color: var(--app-text-color);">
         <span class="sr-only">Loading...</span>
       </div>
       <div class="app-loading-message" style="color: var(--app-text-color);">{{appLoadingMessage}}</div>
@@ -75,7 +75,7 @@
         <header class="top-header {{appHeaderClass}}">
           {{#if showAppSidebar}}
             <button class="icon-btn mobile-sidebar-trigger" id="mobileSidebarToggle" type="button" aria-label="Open menu" title="Open menu">
-              <span class="fa fa-bars" aria-hidden="true"></span>
+              <span class="header-action-icon header-action-icon-sidebar" aria-hidden="true"></span>
             </button>
           {{/if}}
           <h1 class="page-title">{{appShellTitle}}</h1>

@@ -144,7 +144,7 @@
 
 <style>
   .learning-progress-shell {
-    --progress-tab-width: 23px;
+    --progress-tab-width: calc(23px * var(--app-density-scale));
     --progress-panel-width: var(--learning-progress-panel-width, 224px);
     --progress-tab-anchor-y: 66.6667%;
     --progress-border-color: color-mix(in srgb, var(--app-secondary-surface-color) 70%, var(--app-text-color));
@@ -186,7 +186,7 @@
     transform: translateY(-50%);
     width: var(--progress-tab-width);
     min-width: var(--progress-tab-width);
-    height: 104px;
+    height: calc(104px * var(--app-density-scale));
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -250,7 +250,7 @@
   }
 
   .learning-progress-header {
-    min-height: 42px;
+    min-height: calc(42px * var(--app-density-scale));
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -268,8 +268,8 @@
   }
 
   .learning-progress-close {
-    width: 26px;
-    height: 26px;
+    width: calc(26px * var(--app-density-scale));
+    height: calc(26px * var(--app-density-scale));
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -391,16 +391,16 @@
   .learning-progress-row {
     display: block;
     width: 100%;
-    height: 3px;
+    height: calc(3px * var(--app-density-scale));
     margin-bottom: calc(2px * var(--app-density-scale));
   }
 
   .learning-progress-bar {
     display: block;
     width: var(--bar-width);
-    min-width: 2px;
-    height: 3px;
-    border-radius: 2px;
+    min-width: calc(2px * var(--app-density-scale));
+    height: calc(3px * var(--app-density-scale));
+    border-radius: calc(2px * var(--app-density-scale));
     background: var(--progress-below-color);
   }
 

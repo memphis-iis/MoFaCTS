@@ -110,9 +110,9 @@
     display: inline-flex;
     justify-content: center;
     align-items: center;
-    gap: clamp(0.5rem, 1vw, 0.75rem);
+    gap: clamp(var(--app-space-2), 1vw, calc(0.75rem * var(--app-density-scale)));
     padding: var(--app-space-0) clamp(var(--app-space-2), 2vw, calc(0.75rem * var(--app-density-scale)));
-    height: 24px;
+    height: var(--app-space-5-px);
     line-height: 1;
     border-radius: var(--border-radius-pill, 999px);
     background-color: var(--app-background-color);
@@ -124,7 +124,7 @@
   .stat-item {
     display: inline-flex;
     align-items: center;
-    gap: 0.25rem;
+    gap: var(--app-space-1);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
@@ -151,12 +151,12 @@
   .stat-divider {
     display: inline-block;
     width: 1px;
-    height: 16px;
+    height: var(--app-space-4-px);
     background: var(--learning-card-performance-divider-color);
   }
 
   .timeout-bar-container {
-    margin-top: 0.375rem;
+    margin-top: calc(0.375rem * var(--app-density-scale));
   }
 
   .timeout-bar-container-placeholder {
@@ -167,13 +167,13 @@
     font-size: calc(var(--app-font-size-base) * 0.75);
     font-weight: var(--app-font-weight-semibold);
     color: var(--app-secondary-text-color);
-    margin-bottom: 0.2rem;
+    margin-bottom: calc(0.2rem * var(--app-density-scale));
     text-align: center;
   }
 
   .timeout-bar-wrapper {
     width: 100%;
-    height: 8px;
+    height: var(--app-space-2-px);
     background-color: var(--app-background-color);
     border-radius: var(--app-border-radius-sm);
     overflow: hidden;
@@ -197,7 +197,7 @@
   /* Mobile responsiveness */
   @media (max-width: 768px) {
     .performance-stats {
-      gap: 0.5rem;
+      gap: var(--app-space-2);
       min-width: 180px;
     }
 
@@ -214,7 +214,7 @@
     }
 
     .timeout-bar-wrapper {
-      height: 6px;
+      height: calc(6px * var(--app-density-scale));
     }
   }
 </style>

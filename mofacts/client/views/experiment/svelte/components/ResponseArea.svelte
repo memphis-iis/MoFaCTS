@@ -114,12 +114,12 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--app-space-2);
   }
 
   .force-correct-hint {
     color: var(--feedback-error-color);
-    font-weight: bold;
+    font-weight: var(--app-font-weight-bold);
     font-size: var(--card-font-size);
     margin: 0;
   }

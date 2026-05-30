@@ -477,9 +477,9 @@
   .auto-tutor-progress-track {
     position: relative;
     width: 100%;
-    height: 10px;
+    height: calc(10px * var(--app-density-scale));
     border: 1px solid var(--app-secondary-surface-color);
-    border-radius: 6px;
+    border-radius: var(--app-border-radius-sm);
     background: var(--learning-card-surface-color);
     box-sizing: border-box;
   }
@@ -490,7 +490,7 @@
     height: 100%;
     min-width: 0;
     background: var(--learning-card-primary-action-surface-color);
-    border-radius: 5px;
+    border-radius: var(--app-border-radius-sm);
     transition: width 160ms ease;
   }
 
@@ -500,13 +500,13 @@
 
   .auto-tutor-progress-marker {
     position: absolute;
-    top: -3px;
-    bottom: -3px;
-    width: 2px;
+    top: calc(-3px * var(--app-density-scale));
+    bottom: calc(-3px * var(--app-density-scale));
+    width: calc(2px * var(--app-density-scale));
     border-radius: 999px;
     background: var(--app-text-color);
     opacity: 0.65;
-    transform: translateX(-1px);
+    transform: translateX(calc(-1px * var(--app-density-scale)));
   }
 
   .auto-tutor-turns {
@@ -519,7 +519,7 @@
     flex: 0 0 auto;
     padding: calc(0.625rem * var(--app-density-scale)) var(--app-space-3);
     border: 1px solid var(--app-secondary-surface-color);
-    border-radius: 6px;
+    border-radius: var(--app-border-radius-sm);
     background: var(--learning-card-surface-color);
     font-weight: 600;
   }

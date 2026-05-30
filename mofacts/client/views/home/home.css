@@ -1,4 +1,14 @@
 .home-app {
+    --home-sidebar-density-scale: calc((var(--app-density-scale) + 1) / 2);
+    --home-sidebar-width: calc(224px * var(--home-sidebar-density-scale));
+    --home-sidebar-collapsed-width: calc(48px * var(--home-sidebar-density-scale));
+    --home-header-height: calc(var(--app-font-size-base) * 2.5);
+    --home-header-control-size: min(var(--app-button-height), var(--home-header-height));
+    --home-user-menu-top: calc(var(--home-header-height) + calc(var(--app-font-size-base) * 1.625));
+    --home-user-menu-bottom-reserve: calc(var(--home-header-height) + calc(var(--app-font-size-base) * 2.375));
+}
+
+.home-app {
     display: flex;
     min-height: 100vh;
     overflow-x: hidden;
@@ -9,7 +19,7 @@
 }
 
 .sidebar {
-    width: 224px;
+    width: var(--home-sidebar-width);
     background: var(--navigation-surface-color);
     border-right: 1px solid color-mix(in srgb, var(--app-text-color) 12%, transparent);
     display: flex;
@@ -24,7 +34,7 @@
 }
 
 .sidebar-header {
-    height: 50px;
+    height: var(--home-header-height);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -50,8 +60,8 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
+    width: calc(var(--app-font-size-base) * 1.75);
+    height: calc(var(--app-font-size-base) * 1.75);
     margin-right: 0;
     flex: 0 0 auto;
     background-color: var(--navigation-text-color);
@@ -62,7 +72,7 @@
     display: inline-flex;
     align-items: center;
     line-height: 1;
-    transform: translateY(0.08em);
+    transform: none;
 }
 
 .sidebar-collapsed-brand {
@@ -72,9 +82,9 @@
     position: absolute;
     left: 0;
     right: 0;
-    bottom: 10px;
+    bottom: calc(10px * var(--app-density-scale));
     width: auto;
-    height: 32px;
+    height: calc(32px * var(--app-density-scale));
     padding: var(--app-space-0);
     box-sizing: border-box;
     color: var(--navigation-text-color);
@@ -84,15 +94,15 @@
 
 .sidebar-collapsed-brand .navbar-brand-icon {
     display: block;
-    width: 28px;
-    height: 28px;
+    width: calc(var(--app-font-size-base) * 1.75);
+    height: calc(var(--app-font-size-base) * 1.75);
     margin: 0 auto;
-    flex: 0 0 28px;
+    flex: 0 0 calc(var(--app-font-size-base) * 1.75);
     background-color: var(--navigation-text-color);
 }
 
 .sidebar-collapsed-brand .fa {
-    width: 28px;
+    width: calc(var(--app-font-size-base) * 1.75);
     font-size: calc(var(--app-font-size-base) * 1.5);
     line-height: 1;
     text-align: center;
@@ -118,6 +128,62 @@
     background: color-mix(in srgb, var(--app-text-color) 5%, var(--learning-card-surface-color));
     color: var(--app-text-color);
     outline: none;
+}
+
+.top-header .icon-btn,
+.sidebar-header .icon-btn {
+    width: var(--home-header-control-size);
+    min-width: var(--home-header-control-size);
+    height: var(--home-header-control-size);
+    min-height: var(--home-header-control-size);
+    padding: var(--app-space-1-px);
+    font-size: var(--app-font-size-base);
+}
+
+.top-header .icon-btn .fa,
+.sidebar-header .icon-btn .fa {
+    display: block;
+    line-height: 1;
+    transform: none;
+}
+
+.header-action-icon {
+    position: relative;
+    display: block;
+    color: currentColor;
+    flex: 0 0 auto;
+}
+
+.header-action-icon-menu {
+    width: 1.125em;
+    height: 0.875em;
+    display: grid;
+    grid-template-rows: repeat(3, 0.125em);
+    align-content: space-between;
+}
+
+.header-action-icon-menu > span {
+    width: 100%;
+    height: 0.125em;
+    border-radius: var(--border-radius-pill, 9999px);
+    background: currentColor;
+}
+
+.header-action-icon-sidebar {
+    width: 1.125em;
+    height: 1em;
+    border: 0.125em solid currentColor;
+    border-radius: 0.125em;
+}
+
+.header-action-icon-sidebar::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0.375em;
+    width: 0.125em;
+    background: currentColor;
 }
 
 #sidebarToggle {
@@ -191,9 +257,9 @@
 }
 
 .nav-item .fa {
-    width: 20px;
-    height: 20px;
-    flex: 0 0 20px;
+    width: calc(20px * var(--app-density-scale));
+    height: calc(20px * var(--app-density-scale));
+    flex: 0 0 calc(20px * var(--app-density-scale));
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -201,7 +267,7 @@
 }
 
 .sidebar-collapsed {
-    width: 48px !important;
+    width: var(--home-sidebar-collapsed-width) !important;
 }
 
 .sidebar-collapsed .logo span:not(.navbar-brand-icon):not(.fa),
@@ -229,15 +295,15 @@
 
 .sidebar-collapsed .nav-item {
     justify-content: center;
-    min-height: 38px;
+    min-height: calc(38px * var(--app-density-scale));
     padding: calc(7px * var(--app-density-scale)) var(--app-space-0);
     position: relative;
 }
 
 .sidebar-collapsed .icon-btn {
-    width: 38px;
-    min-width: 38px;
-    min-height: 38px;
+    width: calc(38px * var(--app-density-scale));
+    min-width: calc(38px * var(--app-density-scale));
+    min-height: calc(38px * var(--app-density-scale));
     padding: var(--app-space-0);
 }
 
@@ -245,7 +311,7 @@
 .sidebar-collapsed .nav-item:focus-visible::after {
     content: attr(data-label);
     position: absolute;
-    left: 52px;
+    left: calc(var(--home-sidebar-collapsed-width) + var(--app-space-1-px));
     background: var(--app-text-color);
     color: var(--learning-card-surface-color);
     padding: calc(6px * var(--app-density-scale)) calc(10px * var(--app-density-scale));
@@ -257,8 +323,8 @@
 }
 
 .main {
-    margin-left: 224px;
-    width: calc(100% - 224px);
+    margin-left: var(--home-sidebar-width);
+    width: calc(100% - var(--home-sidebar-width));
     flex: 0 0 auto;
     min-width: 0;
     display: flex;
@@ -267,12 +333,12 @@
 }
 
 .main-sidebar-collapsed {
-    margin-left: 48px;
-    width: calc(100% - 48px);
+    margin-left: var(--home-sidebar-collapsed-width);
+    width: calc(100% - var(--home-sidebar-collapsed-width));
 }
 
 .top-header {
-    height: 50px;
+    height: var(--home-header-height);
     background: var(--navigation-surface-color);
     border-bottom: 1px solid color-mix(in srgb, var(--app-text-color) 12%, transparent);
     display: flex;
@@ -331,7 +397,7 @@
 }
 
 .app-practice-menu {
-    --practice-menu-width: 280px;
+    --practice-menu-width: calc(280px * var(--app-density-scale));
     --practice-menu-anchor-y: 66.6667%;
     position: fixed;
     top: var(--practice-menu-anchor-y);
@@ -349,9 +415,9 @@
 
 .app-practice-menu-toggle {
     order: 2;
-    width: 23px;
-    min-width: 23px;
-    height: 104px;
+    width: calc(23px * var(--app-density-scale));
+    min-width: calc(23px * var(--app-density-scale));
+    height: calc(104px * var(--app-density-scale));
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -413,7 +479,7 @@
 }
 
 .app-practice-menu-panel button {
-    min-height: 2.3rem;
+    min-height: calc(2.3rem * var(--app-density-scale));
     display: flex;
     align-items: center;
     gap: calc(0.6rem * var(--app-density-scale));
@@ -427,7 +493,7 @@
 }
 
 .app-practice-menu-panel button .fa {
-    width: 1.15rem;
+    width: calc(1.15rem * var(--app-density-scale));
     color: var(--app-accent-color);
     text-align: center;
 }
@@ -457,13 +523,13 @@ html.learning-progress-panel-viewport-open .practice-top-header {
     color: var(--app-page-header-text-color);
     white-space: nowrap;
     margin: 0;
-    transform: translateY(0.08em);
+    transform: none;
 }
 
 .header-right {
     display: flex;
     align-items: center;
-    gap: 20px;
+    gap: calc(20px * var(--app-density-scale));
     margin-left: auto;
 }
 
@@ -485,8 +551,8 @@ html.learning-progress-panel-viewport-open .practice-top-header {
 }
 
 .avatar {
-    width: 32px;
-    height: 32px;
+    width: calc(32px * var(--app-density-scale));
+    height: calc(32px * var(--app-density-scale));
     border-radius: var(--border-radius-circle, 50%);
     background: var(--app-accent-color);
     color: var(--app-primary-action-text-color);
@@ -494,7 +560,7 @@ html.learning-progress-panel-viewport-open .practice-top-header {
     align-items: center;
     justify-content: center;
     font-weight: 600;
-    font-size: calc(var(--app-font-size-base) * 0.75);
+    font-size: calc(var(--app-font-size-base) * 0.9375 * var(--app-density-scale));
     line-height: 1;
     text-align: center;
     flex-shrink: 0;
@@ -528,10 +594,10 @@ html.learning-progress-panel-viewport-open .practice-top-header {
 
 .home-user-menu {
     position: fixed;
-    top: 76px;
-    right: 18px;
+    top: var(--home-user-menu-top);
+    right: calc(18px * var(--app-density-scale));
     width: 200px;
-    max-height: calc(100dvh - 88px);
+    max-height: calc(100dvh - var(--home-user-menu-bottom-reserve));
     overflow-y: auto;
     background: var(--learning-card-surface-color);
     border-radius: var(--app-border-radius-lg);
@@ -550,7 +616,7 @@ html.learning-progress-panel-viewport-open .practice-top-header {
 @keyframes fadeIn {
     from {
         opacity: 0;
-        transform: translateY(-4px);
+        transform: translateY(calc(-4px * var(--app-density-scale)));
     }
     to {
         opacity: 1;
@@ -756,7 +822,7 @@ html.learning-progress-panel-viewport-open .practice-top-header {
     line-height: 1.25;
     text-align: center;
     opacity: 0;
-    transform: translateY(-4px);
+    transform: translateY(calc(-4px * var(--app-density-scale)));
     transition: opacity 150ms ease-out, transform 150ms ease-out;
     cursor: pointer;
 }
@@ -841,7 +907,7 @@ html.learning-progress-panel-viewport-open .practice-top-header {
 
     .sidebar.sidebar-mobile-open,
     .sidebar.sidebar-mobile-closing {
-        width: 224px !important;
+        width: var(--home-sidebar-width) !important;
         box-shadow: 18px 0 38px color-mix(in srgb, var(--app-text-color) 18%, transparent);
     }
 
@@ -897,7 +963,7 @@ html.learning-progress-panel-viewport-open .practice-top-header {
 
 @media (max-width: 860px) {
     .top-header {
-        height: 50px;
+        height: var(--home-header-height);
         padding: var(--app-space-0) var(--app-space-4-px);
     }
 

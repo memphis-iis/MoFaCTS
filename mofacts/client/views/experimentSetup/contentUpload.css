@@ -1,10 +1,10 @@
 /* Loading spinner for upload progress */
 .loader {
-    border: 5px solid var(--app-muted-surface-color);
+    border: calc(5px * var(--app-density-scale)) solid var(--app-muted-surface-color);
     border-radius: 50%;
-    border-top: 5px solid var(--app-info-color);
-    width: 20px;
-    height: 20px;
+    border-top: calc(5px * var(--app-density-scale)) solid var(--app-info-color);
+    width: calc(20px * var(--app-density-scale));
+    height: calc(20px * var(--app-density-scale));
     -webkit-animation: spin 2s linear infinite; /* Safari */
     animation: spin 2s linear infinite;
 }
@@ -80,7 +80,7 @@
     display: grid;
     grid-template-columns: max-content max-content;
     align-items: center;
-    column-gap: 40px;
+    column-gap: calc(40px * var(--app-density-scale));
     row-gap: calc(0.3rem * var(--app-density-scale));
     justify-content: start;
 }
@@ -170,8 +170,8 @@
 }
 
 .public-private-switch-control .form-check-input {
-    width: 2rem;
-    height: 1rem;
+    width: calc(2rem * var(--app-density-scale));
+    height: calc(1rem * var(--app-density-scale));
     margin: 0 !important;
     margin-left: 0 !important;
     margin-top: 0 !important;
@@ -180,7 +180,7 @@
 }
 
 .public-private-switch-label {
-    min-width: 2.75rem;
+    min-width: calc(2.75rem * var(--app-density-scale));
     color: var(--app-secondary-text-color);
     font-weight: 600;
     line-height: 1;
@@ -197,7 +197,7 @@
 .condition-selector-wrapper {
     padding: calc(0.35rem * var(--app-density-scale)) calc(0.45rem * var(--app-density-scale));
     background: var(--app-subtle-surface-color);
-    border-radius: 4px;
+    border-radius: var(--app-border-radius-sm);
     border: 1px solid var(--border-color);
     min-width: min(100%, 260px);
     max-width: 320px;
@@ -276,8 +276,8 @@
 }
 
 .action-buttons-row .btn-icon {
-    width: 30px;
-    height: 30px;
+    width: calc(30px * var(--app-density-scale));
+    height: calc(30px * var(--app-density-scale));
     padding: var(--app-space-0);
     margin: 0;
     display: inline-flex;

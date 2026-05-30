@@ -44,8 +44,8 @@ textarea {
 
 #select-delete {
   float: left;
-  margin-top: 10px;
-  margin-right: 10px;
+  margin-top: calc(10px * var(--app-density-scale));
+  margin-right: calc(10px * var(--app-density-scale));
 }
 
 .btn-default {
@@ -61,7 +61,7 @@ textarea {
 }
 
 #fileTemplateLabel{
-  margin-top: 0px;
+  margin-top: 0;
 }
 
 #templateTDFSelect {

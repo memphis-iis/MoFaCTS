@@ -4,7 +4,7 @@
 }
 
 .resume-card {
-    min-height: 90px;
+    min-height: calc(90px * var(--app-density-scale));
     display: flex;
     align-items: center;
     gap: calc(18px * var(--app-density-scale));
@@ -31,8 +31,8 @@
 }
 
 .thumb {
-    width: 80px;
-    height: 55px;
+    width: calc(80px * var(--app-density-scale));
+    height: calc(55px * var(--app-density-scale));
     flex: 0 0 auto;
     display: flex;
     align-items: center;
@@ -78,7 +78,7 @@
 }
 
 .resume-accuracy-bar {
-    width: 72px;
+    width: calc(72px * var(--app-density-scale));
     margin-top: calc(5px * var(--app-density-scale));
 }
 
@@ -115,7 +115,7 @@
 }
 
 .toolbar-search {
-    --toolbar-search-icon-size: 16px;
+    --toolbar-search-icon-size: calc(16px * var(--app-density-scale));
     --toolbar-search-icon-left: max(calc(14px * var(--app-density-scale)), 0.5rem);
     --toolbar-search-icon-gap: max(calc(8px * var(--app-density-scale)), 0.5rem);
     --toolbar-search-padding-left: calc(var(--toolbar-search-icon-left) + var(--toolbar-search-icon-size) + var(--toolbar-search-icon-gap));

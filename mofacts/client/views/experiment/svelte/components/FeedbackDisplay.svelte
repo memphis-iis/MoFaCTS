@@ -257,7 +257,7 @@
     display: block;
     max-width: 300px;
     max-height: 240px;
-    margin: 0.75rem auto 0;
+    margin: calc(0.75rem * var(--app-density-scale)) auto 0;
     border-radius: var(--app-border-radius-sm);
     border: 2px solid var(--app-secondary-surface-color);
     object-fit: contain;

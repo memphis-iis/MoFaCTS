@@ -82,7 +82,7 @@
 <style>
   .text-input-container {
     display: flex;
-    gap: 0.5rem;
+    gap: var(--app-space-2);
     width: min(100%, 80vw);
     max-width: 48rem;
     align-items: center;

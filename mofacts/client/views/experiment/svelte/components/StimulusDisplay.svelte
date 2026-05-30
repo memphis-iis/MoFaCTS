@@ -679,8 +679,8 @@
     background: var(--learning-card-stimulus-surface-color);
     border: 2px solid var(--app-secondary-surface-color);
     border-radius: 50%;
-    width: 80px;
-    height: 80px;
+    width: calc(80px * var(--app-density-scale));
+    height: calc(80px * var(--app-density-scale));
     display: flex;
     justify-content: center;
     align-items: center;

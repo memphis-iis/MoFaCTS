@@ -275,15 +275,22 @@
 
 <style>
   .multiple-choice {
+    --choice-container-padding: var(--app-space-2);
+    --choice-grid-gap: calc(0.75rem * var(--app-density-scale));
+    --choice-padding-block: calc(0.75rem * var(--app-density-scale));
+    --choice-padding-inline: calc(0.75rem * var(--app-density-scale));
+    --choice-line-height: var(--app-button-line-height);
+    --choice-min-height: calc(48px * var(--app-density-scale));
+
     width: 100%;
-    padding: var(--choice-container-padding, var(--app-space-2)) 0;
+    padding: var(--choice-container-padding) 0;
   }
 
   .button-grid {
     --choice-font-size: var(--card-font-size);
     display: grid;
     grid-template-columns: repeat(var(--columns, 2), 1fr);
-    gap: var(--choice-grid-gap, 0.75rem);
+    gap: var(--choice-grid-gap);
     width: 100%;
     justify-items: center;
     min-width: 0;
@@ -292,10 +299,10 @@
   .choice-button {
     width: min(100%, var(--uniform-button-width, 100%));
     max-width: 100%;
-    padding: var(--choice-padding-block, calc(0.75rem * var(--app-density-scale))) var(--choice-padding-inline, calc(0.75rem * var(--app-density-scale)));
+    padding: var(--choice-padding-block) var(--choice-padding-inline);
     font-size: var(--choice-font-size);
     font-weight: 500;
-    line-height: var(--choice-line-height, var(--app-button-line-height));
+    line-height: var(--choice-line-height);
     color: var(--app-primary-action-text-color);
     background-color: var(--learning-card-surface-color);
     border: 2px solid color-mix(
@@ -309,7 +316,7 @@
       opacity var(--app-transition-fast, 100ms) ease,
       background-color var(--app-transition-fast, 100ms) ease,
       box-shadow var(--app-transition-fast, 100ms) ease;
-    min-height: var(--choice-min-height, 48px);
+    min-height: var(--choice-min-height);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -348,7 +355,7 @@
   @media (max-width: 768px) {
     .button-grid {
       grid-template-columns: 1fr;
-      gap: 0.75rem;
+      gap: calc(0.75rem * var(--app-density-scale));
     }
   }
 

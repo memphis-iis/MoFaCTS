@@ -67,7 +67,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.5rem;
+    gap: var(--app-space-2);
     width: 100%;
   }
 
