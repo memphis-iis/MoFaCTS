@@ -185,6 +185,41 @@ function setDynamicViewportHeight() {
 }
 
 let resizeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+let mobilePracticeReturnInProgress = false;
+
+function isMobilePracticeDisplay(): boolean {
+  return window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+}
+
+function isPracticeRoutePath(path: string): boolean {
+  return path === '/card' || path === '/instructions';
+}
+
+async function returnMobilePracticeDisplayToMenu(reason: string): Promise<void> {
+  if (mobilePracticeReturnInProgress || !isMobilePracticeDisplay()) {
+    return;
+  }
+
+  const currentPath = document.location.pathname;
+  if (!isPracticeRoutePath(currentPath)) {
+    return;
+  }
+
+  mobilePracticeReturnInProgress = true;
+  clientConsole(1, '[PRACTICE] Mobile practice display lost focus; returning to practice menu:', reason);
+  try {
+    const leftPractice = await leavePracticeForHome();
+    if (!leftPractice) {
+      clientConsole(1, '[PRACTICE] Practice return invariant failed; active route was not a practice route:', document.location.pathname);
+    }
+  } catch (error: unknown) {
+    clientConsole(1, '[PRACTICE] Failed to return mobile practice display to menu:', getErrorMessage(error));
+  } finally {
+    setTimeout(() => {
+      mobilePracticeReturnInProgress = false;
+    }, 1000);
+  }
+}
 
 function isResizeSensitivePhase() {
   // SR/trial-active phases are sensitive to repeated resize work and can race SR callbacks.
@@ -220,6 +255,16 @@ window.addEventListener('resize', function() {
 window.addEventListener('orientationchange', () => {
   // Small delay to let browser finish orientation change
   setTimeout(() => scheduleResizeWork('orientationchange'), 100);
+});
+
+window.addEventListener('blur', () => {
+  void returnMobilePracticeDisplayToMenu('window-blur');
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    void returnMobilePracticeDisplayToMenu('document-hidden');
+  }
 });
 
 // Register the isInRole helper for templates (Meteor 3.0 compatibility)

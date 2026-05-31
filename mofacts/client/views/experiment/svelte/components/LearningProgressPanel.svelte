@@ -145,22 +145,25 @@
 <style>
   .learning-progress-shell {
     --progress-tab-width: calc(23px * var(--app-density-scale));
-    --progress-panel-width: var(--learning-progress-panel-width, 224px);
+    --progress-panel-width: var(--learning-progress-panel-width, 136px);
     --progress-tab-anchor-y: 66.6667%;
     --progress-border-color: color-mix(in srgb, var(--app-secondary-surface-color) 70%, var(--app-text-color));
     --progress-muted-bar: color-mix(in srgb, var(--app-secondary-surface-color) 82%, var(--app-background-color));
     --progress-target-color: var(--feedback-correct-color);
     --progress-below-color: var(--app-accent-color);
+    --progress-bar-density-scale: max(0.5, min(var(--app-density-scale), 2));
+    --progress-bar-height: calc(3px * var(--progress-bar-density-scale));
+    --progress-bar-gap: calc(2px * var(--progress-bar-density-scale));
+    --progress-panel-padding-x: calc(0.45rem * var(--app-density-scale));
+    --progress-panel-padding-y: calc(0.35rem * var(--app-density-scale));
+    --progress-panel-gap: calc(0.25rem * var(--app-density-scale));
 
-    position: fixed;
-    top: 0;
-    right: 0;
-    bottom: 0;
+    position: relative;
     flex: 0 0 0;
     width: 0;
     min-width: 0;
     max-width: 0;
-    height: 100vh;
+    height: 100%;
     display: block;
     background: transparent;
     color: var(--app-text-color);
@@ -168,21 +171,20 @@
     transition: flex-basis var(--app-transition-smooth) ease,
       width var(--app-transition-smooth) ease,
       max-width var(--app-transition-smooth) ease;
-    z-index: 9500;
+    z-index: 30;
   }
 
   .learning-progress-shell-open {
-    flex-basis: min(var(--progress-panel-width), 40vw);
-    width: min(var(--progress-panel-width), 40vw);
-    min-width: min(var(--progress-panel-width), 40vw);
-    max-width: min(var(--progress-panel-width), 40vw);
+    flex-basis: var(--progress-panel-width);
+    width: var(--progress-panel-width);
+    max-width: var(--progress-panel-width);
     pointer-events: auto;
   }
 
   .learning-progress-toggle {
     position: absolute;
     top: var(--progress-tab-anchor-y);
-    right: 0;
+    left: calc(-1 * var(--progress-tab-width) + 1px);
     transform: translateY(-50%);
     width: var(--progress-tab-width);
     min-width: var(--progress-tab-width);
@@ -208,7 +210,6 @@
   }
 
   .learning-progress-shell-open .learning-progress-toggle {
-    right: auto;
     left: calc(-1 * var(--progress-tab-width) + 1px);
   }
 
@@ -238,24 +239,26 @@
   }
 
   .learning-progress-panel {
-    width: 100%;
+    width: var(--progress-panel-width);
     min-width: 0;
     height: 100%;
     display: flex;
     flex-direction: column;
     border-left: 1px solid var(--progress-border-color);
+    border-right: 0;
+    border-radius: 0;
     background: var(--learning-card-surface-color);
     box-shadow: var(--app-shadow-panel-edge);
     overflow: hidden;
   }
 
   .learning-progress-header {
-    min-height: calc(42px * var(--app-density-scale));
+    min-height: calc(34px * var(--app-density-scale));
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--app-space-3);
-    padding: var(--app-space-2) calc(0.65rem * var(--app-density-scale)) calc(0.45rem * var(--app-density-scale)) var(--app-space-3);
+    gap: var(--progress-panel-gap);
+    padding: var(--progress-panel-padding-y) var(--progress-panel-padding-x);
     border-bottom: 1px solid var(--app-secondary-surface-color);
   }
 
@@ -292,8 +295,8 @@
   .learning-progress-stats {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: calc(0.4rem * var(--app-density-scale));
-    padding: var(--app-space-2) calc(0.7rem * var(--app-density-scale));
+    gap: var(--progress-panel-gap);
+    padding: var(--progress-panel-padding-y) var(--progress-panel-padding-x);
     border-bottom: 1px solid var(--app-secondary-surface-color);
   }
 
@@ -301,16 +304,17 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: calc(0.1rem * var(--app-density-scale));
-    padding: calc(0.35rem * var(--app-density-scale)) calc(0.4rem * var(--app-density-scale));
-    border: 1px solid var(--app-secondary-surface-color);
-    border-radius: var(--app-border-radius-sm);
-    background: var(--navigation-surface-color);
+    align-items: center;
+    gap: calc(0.06rem * var(--app-density-scale));
+    padding: calc(0.18rem * var(--app-density-scale)) calc(0.12rem * var(--app-density-scale));
+    border: 0;
+    border-radius: 0;
+    background: transparent;
   }
 
   .learning-progress-stat-label {
     color: var(--app-secondary-text-color);
-    font-size: calc(var(--app-font-size-base) * 0.62);
+    font-size: calc(var(--app-font-size-base) * 0.52);
     font-weight: 700;
     line-height: 1;
     text-transform: uppercase;
@@ -319,7 +323,7 @@
 
   .learning-progress-stats strong {
     color: var(--app-text-color);
-    font-size: calc(var(--app-font-size-base) * 0.82);
+    font-size: calc(var(--app-font-size-base) * 0.74);
     font-variant-numeric: tabular-nums;
     line-height: 1.1;
   }
@@ -328,7 +332,7 @@
     position: relative;
     flex: 1 1 auto;
     min-height: 0;
-    margin: calc(0.55rem * var(--app-density-scale)) calc(0.7rem * var(--app-density-scale)) var(--app-space-0);
+    margin: var(--progress-panel-padding-y) var(--progress-panel-padding-x) var(--app-space-0);
     overflow: hidden;
   }
 
@@ -391,15 +395,15 @@
   .learning-progress-row {
     display: block;
     width: 100%;
-    height: calc(3px * var(--app-density-scale));
-    margin-bottom: calc(2px * var(--app-density-scale));
+    height: var(--progress-bar-height);
+    margin-bottom: var(--progress-bar-gap);
   }
 
   .learning-progress-bar {
     display: block;
     width: var(--bar-width);
     min-width: calc(2px * var(--app-density-scale));
-    height: calc(3px * var(--app-density-scale));
+    height: var(--progress-bar-height);
     border-radius: calc(2px * var(--app-density-scale));
     background: var(--progress-below-color);
   }
@@ -415,8 +419,8 @@
   .learning-progress-axis {
     display: flex;
     justify-content: space-between;
-    gap: var(--app-space-2);
-    padding: calc(0.4rem * var(--app-density-scale)) calc(0.7rem * var(--app-density-scale)) calc(0.55rem * var(--app-density-scale));
+    gap: var(--progress-panel-gap);
+    padding: var(--progress-panel-padding-y) var(--progress-panel-padding-x);
     border-top: 1px solid var(--app-secondary-surface-color);
     color: var(--app-secondary-text-color);
     font-size: calc(var(--app-font-size-base) * 0.62);
@@ -431,24 +435,10 @@
   }
 
   @media (max-width: 768px) {
-    .learning-progress-shell {
-      height: auto;
-    }
-
     .learning-progress-shell-open {
-      left: 0;
-      width: 100%;
-      max-width: none;
-      min-width: 0;
-      flex-basis: 100%;
-    }
-
-    .learning-progress-shell-open .learning-progress-toggle {
-      display: none;
-    }
-
-    .learning-progress-panel {
-      max-width: none;
+      flex-basis: var(--progress-panel-width);
+      width: var(--progress-panel-width);
+      max-width: var(--progress-panel-width);
     }
   }
 </style>

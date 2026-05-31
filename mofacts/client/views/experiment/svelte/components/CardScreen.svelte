@@ -197,6 +197,17 @@
     document.documentElement.classList.toggle('learning-progress-panel-viewport-open', open);
   }
 
+  async function notifyLearningProgressLayoutChange() {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    await tick();
+    window.dispatchEvent(new Event('resize'));
+    window.setTimeout(() => {
+      window.dispatchEvent(new Event('resize'));
+    }, 260);
+  }
+
   function buildTrialSlotProps(trialLike, slotState = {}) {
     const trial = trialLike || {};
     const subset = buildTrialSubset({
@@ -810,17 +821,31 @@
   let performanceData = buildPerformanceData();
   let learningProgressPanelOpen = false;
   let learningProgressSnapshot = buildLearningProgressPanelSnapshot(null, DEFAULT_DELIVERY_SETTINGS);
+  let lastLearningProgressFeedbackEnd = 0;
   $: learningProgressRefreshKey = [
-    currentState,
-    performanceData.currentTrial,
     context.engine,
+    context.timestamps?.feedbackEnd || 0,
     context.h5pResult?.batchId || '',
   ].join(':');
   $: {
     learningProgressRefreshKey;
-    learningProgressSnapshot = buildLearningProgressPanelSnapshot(context.engine, deliverySettings, {
+    const nextLearningProgressSnapshot = buildLearningProgressPanelSnapshot(context.engine, deliverySettings, {
       hiddenItems: CardStore.getHiddenItems(),
     });
+    const feedbackEnd = Number(context.timestamps?.feedbackEnd || 0);
+    const shouldSeedInitialProgress =
+      !learningProgressSnapshot.available && nextLearningProgressSnapshot.available;
+    const shouldCommitCompletedTrialProgress =
+      feedbackEnd > 0 && feedbackEnd !== lastLearningProgressFeedbackEnd;
+    if (shouldSeedInitialProgress || shouldCommitCompletedTrialProgress) {
+      learningProgressSnapshot = nextLearningProgressSnapshot;
+      if (feedbackEnd > 0) {
+        lastLearningProgressFeedbackEnd = feedbackEnd;
+      }
+    } else if (!nextLearningProgressSnapshot.available && learningProgressSnapshot.available) {
+      learningProgressSnapshot = nextLearningProgressSnapshot;
+      lastLearningProgressFeedbackEnd = 0;
+    }
   }
   $: sessionSurfaceShell = resolveSessionSurfaceShell({
     surfaceState: sessionSurfaceState,
@@ -1988,6 +2013,7 @@
 
   function handleLearningProgressPanelToggle(event) {
     learningProgressPanelOpen = Boolean(event?.detail?.open);
+    void notifyLearningProgressLayoutChange();
   }
 
   async function handleFooterContinue(event) {
@@ -2227,7 +2253,7 @@
   }
 
   .learning-session-layout {
-    --learning-progress-panel-width: 224px;
+    --learning-progress-panel-width: 136px;
 
     position: relative;
     flex: 1 1 auto;
@@ -2249,7 +2275,7 @@
   }
 
   .learning-session-layout-panel-open .learning-session-main {
-    padding-right: min(var(--learning-progress-panel-width), 40vw);
+    padding-right: var(--app-space-0);
   }
 
   .video-instruction-overlay {
@@ -2383,12 +2409,6 @@
     margin: var(--app-space-2) 0 0 0;
     white-space: pre-wrap;
     word-wrap: break-word;
-  }
-
-  @media (max-width: 768px) {
-    .learning-session-layout-panel-open .learning-session-main {
-      padding-right: var(--app-space-0);
-    }
   }
 
   .video-end-overlay {

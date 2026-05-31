@@ -163,6 +163,15 @@ function evaluateRouteAccess(policy: RouteAccessPolicy): RouteAccessDecision {
   return 'allow';
 }
 
+function routeDeniedUserToEntryPoint(): void {
+  if (Meteor.userId()) {
+    FlowRouter.go('/home');
+    return;
+  }
+
+  routeToSignin();
+}
+
 // Load infrequently-used route modules on demand to keep the initial client bundle smaller.
 const lazyTemplateLoaders: Record<string, any> = {
   card: () => import('../views/experiment/card'),
@@ -487,7 +496,7 @@ function waitForAuthenticatedRoute(
   }
 
   if (currentDecision === 'forbidden') {
-    FlowRouter.go('/accessDenied');
+    routeDeniedUserToEntryPoint();
     return;
   }
 
@@ -518,7 +527,7 @@ function waitForAuthenticatedRoute(
     if (deferredDecision === 'forbidden') {
       pendingAuthRouteHandles[routeName]?.stop();
       delete pendingAuthRouteHandles[routeName];
-      FlowRouter.go('/accessDenied');
+      routeDeniedUserToEntryPoint();
       return;
     }
 
@@ -733,8 +742,14 @@ FlowRouter.route('/dataDownload', {
 FlowRouter.route('/accessDenied', {
   name: 'client.accessDenied',
   action: async function(this: any) {
-    Session.set('curModule', 'accessDenied');
-    await renderRouteTemplate(this, 'accessDenied');
+    if (shouldWaitForAuthHydration()) {
+      waitForPublicAuthHydration(this, 'client.accessDenied', () => {
+        routeDeniedUserToEntryPoint();
+      });
+      return;
+    }
+
+    routeDeniedUserToEntryPoint();
   }
 })
 
@@ -1100,6 +1115,15 @@ Session.set('instructionClientStart', 0);
 FlowRouter.route('/instructions', {
   name: 'client.instructions',
   action: function() {
+    const userId = Meteor.userId();
+    const user = Meteor.user();
+    if (!userId || !user) {
+      waitForAuthenticatedRoute(this, 'client.instructions', () => {
+        FlowRouter.go('/instructions');
+      });
+      return;
+    }
+
     assertIdInvariants('router.instructions.entry', { requireCurrentTdfId: true, requireStimuliSetId: false });
     ensureStimuliSetIdSessionInvariant();
     Meteor.subscribe('files.assets.all');

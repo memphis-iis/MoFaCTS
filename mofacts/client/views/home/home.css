@@ -505,8 +505,8 @@
 }
 
 html.learning-progress-panel-viewport-open .practice-top-header {
-    width: calc(100% - min(224px, 40vw));
-    margin-right: min(224px, 40vw);
+    width: 100%;
+    margin-right: 0;
 }
 
 .mobile-sidebar-trigger {
