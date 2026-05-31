@@ -101,10 +101,59 @@ describe('manualDraftBuilder', function() {
     expect(tutor.setspec.speechRecognitionLanguage).to.equal('es-ES');
     expect(tutor.setspec.speechIgnoreOutOfGrammarResponses).to.equal('false');
     expect(assessmentUnit.unitname).to.equal('Assessment');
-    expect((assessmentUnit.assessmentsession as Record<string, unknown>).clusterlist).to.equal('0-0');
+    expect(assessmentUnit.buttontrial).to.equal('true');
     expect(assessmentUnit.buttonorder).to.equal('fixed');
+    expect(assessmentUnit.assessmentsession).to.deep.equal({
+      conditiontemplatesbygroup: {
+        groupnames: 'A',
+        clustersrepeated: '1',
+        templatesrepeated: '1',
+        group: '0,b,t,0',
+      },
+      initialpositions: 'A_1',
+      randomizegroups: 'false',
+      clusterlist: '0-0',
+      assignrandomclusters: 'false',
+      permutefinalresult: '0-0',
+    });
     expect((firstStim?.display || {}).audioSrc).to.equal('prompt-audio.mp3');
     expect(response.correctResponse).to.equal('rojo');
     expect(response.incorrectResponses).to.deep.equal(['azul', 'verde', 'amarillo']);
+  });
+
+  it('builds assessment sessions with the Prequiz-style explicit template schedule', function() {
+    const draft = buildManualDraftLesson(buildState({
+      structure: 'instructions-assessment',
+      instructionText: 'Answer each question once.',
+      responseType: 'multiple-choice',
+      rows: Array.from({ length: 10 }, (_unused, index) => ({
+        id: `row-${index + 1}`,
+        promptText: `Question ${index + 1}`,
+        mediaRef: '',
+        answer: `Answer ${index + 1}`,
+        choice2: `Choice ${index + 1}b`,
+        choice3: `Choice ${index + 1}c`,
+        choice4: `Choice ${index + 1}d`,
+      })),
+    }));
+
+    const tutor = draft.workingCopy.tutor as {
+      unit: Array<Record<string, unknown>>;
+    };
+    const assessmentUnit = tutor.unit[0] as Record<string, unknown>;
+    const assessmentSession = assessmentUnit.assessmentsession as Record<string, unknown>;
+
+    expect(tutor.unit).to.have.length(1);
+    expect(assessmentUnit.unitinstructions).to.contain('Answer each question once.');
+    expect(assessmentUnit.buttontrial).to.equal('true');
+    expect(assessmentSession.initialpositions).to.equal('A_1 A_2 A_3 A_4 A_5 A_6 A_7 A_8 A_9 A_10');
+    expect(assessmentSession.clusterlist).to.equal('0-9');
+    expect(assessmentSession.permutefinalresult).to.equal('0-0');
+    expect(assessmentSession.conditiontemplatesbygroup).to.deep.equal({
+      groupnames: 'A',
+      clustersrepeated: '1',
+      templatesrepeated: '10',
+      group: '0,b,t,0 0,b,t,0 0,b,t,0 0,b,t,0 0,b,t,0 0,b,t,0 0,b,t,0 0,b,t,0 0,b,t,0 0,b,t,0',
+    });
   });
 });

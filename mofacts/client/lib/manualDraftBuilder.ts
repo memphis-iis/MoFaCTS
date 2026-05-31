@@ -100,6 +100,35 @@ function buildClusterRange(itemCount: number) {
   return itemCount > 0 ? `0-${itemCount - 1}` : '0-0';
 }
 
+function buildAssessmentInitialPositions(itemCount: number) {
+  return Array.from({ length: itemCount }, (_unused, index) => `A_${index + 1}`).join(' ');
+}
+
+function buildAssessmentTemplateGroup(itemCount: number, responseType: ResponseType) {
+  const inputMethod = responseType === 'multiple-choice' ? 'b' : 't';
+  return Array.from({ length: itemCount }, () => `0,${inputMethod},t,0`).join(' ');
+}
+
+function buildAssessmentSession(state: ManualCreatorState, clusterRange: string, itemCount: number) {
+  if (itemCount < 1) {
+    throw new Error('Assessment sessions require at least one item.');
+  }
+
+  return {
+    conditiontemplatesbygroup: {
+      groupnames: 'A',
+      clustersrepeated: '1',
+      templatesrepeated: String(itemCount),
+      group: buildAssessmentTemplateGroup(itemCount, state.responseType)
+    },
+    initialpositions: buildAssessmentInitialPositions(itemCount),
+    randomizegroups: 'false',
+    clusterlist: clusterRange,
+    assignrandomclusters: 'false',
+    permutefinalresult: '0-0'
+  };
+}
+
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, '&amp;')
@@ -214,30 +243,33 @@ function buildLearningUnit(state: ManualCreatorState, clusterRange: string) {
   };
 }
 
-function buildAssessmentUnit(state: ManualCreatorState, clusterRange: string) {
+function buildAssessmentUnit(
+  state: ManualCreatorState,
+  clusterRange: string,
+  itemCount: number,
+  instructionsHtml?: string
+) {
   const parameters = cloneImportParameterDefaults();
   const { lfparameter: _lfparameter, ...deliverySettings } = parameters;
 
   return {
     unitname: 'Assessment',
-    assessmentsession: {
-      clusterlist: clusterRange,
-      randomizegroups: 'false',
-      assignrandomclusters: 'false'
-    },
+    ...(instructionsHtml ? { unitinstructions: instructionsHtml } : {}),
+    assessmentsession: buildAssessmentSession(state, clusterRange, itemCount),
     deliverySettings,
     ...(state.responseType === 'multiple-choice'
       ? {
+          buttontrial: 'true',
           buttonorder: state.buttonOrder
         }
       : {})
   };
 }
 
-function buildUnits(state: ManualCreatorState, clusterRange: string, instructionsHtml: string) {
+function buildUnits(state: ManualCreatorState, clusterRange: string, itemCount: number, instructionsHtml: string) {
   const units: Array<Record<string, unknown>> = [];
 
-  if (state.structure === 'instructions-learning' || state.structure === 'instructions-assessment') {
+  if (state.structure === 'instructions-learning') {
     units.push({
       unitname: 'Instructions',
       unitinstructions: instructionsHtml
@@ -249,7 +281,12 @@ function buildUnits(state: ManualCreatorState, clusterRange: string, instruction
   }
 
   if (state.structure === 'assessment-only' || state.structure === 'instructions-assessment') {
-    units.push(buildAssessmentUnit(state, clusterRange));
+    units.push(buildAssessmentUnit(
+      state,
+      clusterRange,
+      itemCount,
+      state.structure === 'instructions-assessment' ? instructionsHtml : undefined
+    ));
   }
 
   return units;
@@ -308,7 +345,7 @@ export function buildManualDraftLesson(state: ManualCreatorState): ImportDraftLe
   tutor.setspec.speechRecognitionLanguage = String(state.speechLanguage || '').trim() || 'en-US';
   tutor.setspec.speechIgnoreOutOfGrammarResponses = state.speechRecognitionEnabled && state.ignoreOutOfGrammar ? 'true' : 'false';
   tutor.deliverySettings = buildDeliverySettings(state);
-  tutor.unit = buildUnits(state, clusterRange, instructionsHtml);
+  tutor.unit = buildUnits(state, clusterRange, items.length, instructionsHtml);
 
   draft.generatedBaseline.tutor = tutor as Record<string, unknown>;
   draft.workingCopy.tutor = clone(tutor) as Record<string, unknown>;
