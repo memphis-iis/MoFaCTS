@@ -279,7 +279,7 @@ describe('learner TDF config', function() {
     });
   });
 
-  it('skips stale unit overrides but still applies valid set-spec overrides', function() {
+  it('keeps valid unit overrides after harmless TDF edits', function() {
     const baseTdf = makeTdf();
     const config = buildLearnerTdfConfig(baseTdf, 'tdf-a', {
       setspec: {
@@ -299,10 +299,39 @@ describe('learner TDF config', function() {
     const validation = validateLearnerTdfConfig(changedTdf, config);
     const result = applyLearnerTdfConfig(changedTdf, config);
 
-    expect(validation.staleUnitOverrides).to.equal(true);
-    expect(result.warnings).to.deep.equal(['Unit-specific learner settings are stale for this TDF and were not applied']);
+    expect(validation.staleUnitOverrides).to.equal(false);
+    expect(result.warnings).to.deep.equal([]);
     expect(result.tdf.tdfs.tutor.setspec.audioPromptMode).to.equal('question');
-    expect(result.tdf.tdfs.tutor.unit[0]!.deliverySettings.drill).to.equal(30000);
+    expect(result.tdf.tdfs.tutor.unit[0]!.deliverySettings.drill).to.equal(60000);
+  });
+
+  it('drops unit overrides that no longer apply to the current unit type', function() {
+    const baseTdf = makeTdf();
+    const config = buildLearnerTdfConfig(baseTdf, 'tdf-a', {
+      setspec: {
+        audioPromptMode: 'question'
+      },
+      unit: {
+        '0': {
+          deliverySettings: {
+            displayPerformance: true,
+            studyFirst: 1
+          }
+        }
+      }
+    });
+    const changedTdf = makeTdf();
+    delete (changedTdf.tdfs.tutor.unit[0] as any).learningsession;
+    (changedTdf.tdfs.tutor.unit[0] as any).autotutorsession = {};
+
+    const validation = validateLearnerTdfConfig(changedTdf, config);
+    const result = applyLearnerTdfConfig(changedTdf, config);
+
+    expect(validation.valid).to.equal(true);
+    expect(result.warnings).to.deep.equal([]);
+    expect(result.tdf.tdfs.tutor.setspec.audioPromptMode).to.equal('question');
+    expect(result.tdf.tdfs.tutor.unit[0]!.deliverySettings.displayPerformance).to.equal(false);
+    expect(result.tdf.tdfs.tutor.unit[0]!.deliverySettings.studyFirst).to.equal(0);
   });
 
   it('uses unit delivery defaults in the source signature', function() {

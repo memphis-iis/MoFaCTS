@@ -422,17 +422,35 @@ function unitSignatureEntry(unit: JsonRecord): string {
   });
 }
 
-function sourceMatches(current: LearnerTdfSourceMetadata, saved: LearnerTdfSourceMetadata | undefined): boolean {
-  if (!saved) {
-    return true;
+function pruneUnitOverridesToCurrentTdf(
+  tdf: unknown,
+  unitOverrides: LearnerTdfOverrides['unit'] | undefined
+): LearnerTdfOverrides['unit'] | undefined {
+  if (!unitOverrides) return undefined;
+
+  const units = getUnitArray(tdf);
+  const applicable: NonNullable<LearnerTdfOverrides['unit']> = {};
+  for (const [unitIndex, unitConfig] of Object.entries(unitOverrides)) {
+    const index = Number(unitIndex);
+    const unit = units[index];
+    if (!Number.isInteger(index) || index < 0 || index >= units.length || !unit) {
+      continue;
+    }
+
+    const deliverySettings = asRecord(unitConfig.deliverySettings);
+    const applicableDeliverySettings: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(deliverySettings)) {
+      if (learnerConfigurableKeyAppliesToUnit('deliverySettings', key, unit)) {
+        applicableDeliverySettings[key] = value;
+      }
+    }
+
+    if (Object.keys(applicableDeliverySettings).length) {
+      applicable[unitIndex] = { deliverySettings: applicableDeliverySettings };
+    }
   }
-  if (saved.tdfUpdatedAt && current.tdfUpdatedAt && saved.tdfUpdatedAt !== current.tdfUpdatedAt) {
-    return false;
-  }
-  if (saved.unitCount !== current.unitCount) {
-    return false;
-  }
-  return stableStringify(saved.unitSignature) === stableStringify(current.unitSignature);
+
+  return Object.keys(applicable).length ? applicable : undefined;
 }
 
 function normalizeDeliveryDisplaySettingValue(path: string, value: unknown, errors: string[]): unknown {
@@ -776,17 +794,16 @@ export function buildLearnerTdfConfig(tdf: unknown, tdfId: string, overrides: un
 
 export function validateLearnerTdfConfig(tdf: unknown, config: LearnerTdfConfig | undefined): LearnerTdfValidationResult {
   const errors: string[] = [];
-  const overrides = config?.overrides ?? {};
+  const overrides = {
+    ...(config?.overrides ?? {}),
+    unit: pruneUnitOverridesToCurrentTdf(tdf, config?.overrides?.unit)
+  };
   normalizeLearnerTdfOverridesWithErrors(tdf, overrides, errors);
-  const staleUnitOverrides = Boolean(overrides.unit && !sourceMatches(buildLearnerTdfSourceMetadata(tdf, config?.source?.tdfId), config?.source));
-  if (staleUnitOverrides) {
-    errors.push('Unit-specific learner settings are stale for this TDF and need review');
-  }
 
   return {
     valid: errors.length === 0,
     errors,
-    staleUnitOverrides
+    staleUnitOverrides: false
   };
 }
 
@@ -797,17 +814,17 @@ export function applyLearnerTdfConfig<T>(tdf: T, config: LearnerTdfConfig | unde
   }
 
   const errors: string[] = [];
-  const normalized = normalizeLearnerTdfOverridesWithErrors(tdf, overrides, errors);
+  const applicableOverrides = {
+    ...overrides,
+    unit: pruneUnitOverridesToCurrentTdf(tdf, overrides.unit)
+  };
+  const normalized = normalizeLearnerTdfOverridesWithErrors(tdf, applicableOverrides, errors);
   if (errors.length) {
     throw new Error(errors.join('; '));
   }
 
-  const currentSource = buildLearnerTdfSourceMetadata(tdf, config?.source?.tdfId);
-  const staleUnitOverrides = Boolean(normalized.unit && !sourceMatches(currentSource, config?.source));
-  const applicableUnitOverrides = staleUnitOverrides ? undefined : normalized.unit;
-  const warnings = staleUnitOverrides
-    ? ['Unit-specific learner settings are stale for this TDF and were not applied']
-    : [];
+  const applicableUnitOverrides = normalized.unit;
+  const warnings: string[] = [];
 
   if (!normalized.setspec && !normalized.deliverySettings && !applicableUnitOverrides) {
     return { tdf, applied: false, warnings };
