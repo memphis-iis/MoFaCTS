@@ -57,6 +57,8 @@ export function calculateSingleProbability(params: CalculateSingleProbabilityPar
   p.questionSecsSinceLastShown = elapsed(card.lastSeen);
   p.questionSecsSinceFirstShown = elapsed(card.firstSeen);
   p.questionSecsPracticingOthers = secs(card.otherPracticeTime);
+  p.questionTimeHistory = JSON.parse(JSON.stringify(card.timeHistory || []));
+  p.questionSpacingLagged = pFunc.spacingLagged(p.questionTimeHistory);
 
   // Stimulus/cluster-version metrics
   p.stimSecsSinceLastShown = elapsed(stim.lastSeen);
@@ -66,7 +68,10 @@ export function calculateSingleProbability(params: CalculateSingleProbabilityPar
 
   p.stimSuccessCount = stim.priorCorrect;
   p.stimFailureCount = stim.priorIncorrect;
+  p.stimTotalTests = p.stimSuccessCount + p.stimFailureCount;
   p.stimStudyTrialCount = stim.priorStudy;
+  p.stimTimeHistory = JSON.parse(JSON.stringify(stim.timeHistory || []));
+  p.stimSpacingLagged = pFunc.spacingLagged(p.stimTimeHistory);
   const stimAnswer = params.stimCluster.stims[params.stimIndex].correctResponse;
   let answerText = params.getDisplayAnswerText(stimAnswer).toLowerCase();
   p.stimResponseText = params.normalizeResponseText(answerText);
@@ -79,6 +84,9 @@ export function calculateSingleProbability(params: CalculateSingleProbabilityPar
   p.responseOutcomeHistory = JSON.parse(JSON.stringify(p.resp.outcomeStack));
   p.responseSecsSinceLastShown = elapsed(p.resp.lastSeen);
   p.responseStudyTrialCount = p.resp.priorStudy;
+  p.responseTotalTests = p.responseSuccessCount + p.responseFailureCount;
+  p.responseTimeHistory = JSON.parse(JSON.stringify(p.resp.timeHistory || []));
+  p.responseSpacingLagged = pFunc.spacingLagged(p.responseTimeHistory);
 
   p.stimParameters = params.stimCluster.stims[params.stimIndex].params.split(',').map((x: any) => params.legacyFloat(x));
   if (params.deliverySettings.optimalThreshold) {

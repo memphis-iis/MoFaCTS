@@ -14,6 +14,80 @@ export function defaultProbFunction(p: any, pFunc: any): any {
   return p;
 }
 
+function requireFiniteNumber(value: any, name: string): number {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) {
+    throw new Error(`PPES requires finite ${name}`);
+  }
+  return numericValue;
+}
+
+function requireFiniteNumberArray(values: any, name: string): number[] {
+  if (!Array.isArray(values)) {
+    throw new Error(`PPES requires ${name} as an array`);
+  }
+  return values.map((value, index) => requireFiniteNumber(value, `${name}[${index}]`));
+}
+
+function componentSpacing(times: number[]): number[] {
+  if (times.length === 0) {
+    return [0];
+  }
+
+  return times.map((time, index) => {
+    if (index === 0) {
+      return 0;
+    }
+    const previousTime = times[index - 1];
+    if (previousTime === undefined) {
+      throw new Error('PPES failed to align component spacing times');
+    }
+    return time - previousTime;
+  });
+}
+
+function laggedSpacing(times: number[]): number[] {
+  const spacing = componentSpacing(times);
+  return spacing.map((_, index) => {
+    if (index === 0) {
+      return 0;
+    }
+    const previousSpacing = spacing[index - 1];
+    if (previousSpacing === undefined) {
+      throw new Error('PPES failed to align lagged spacing values');
+    }
+    return previousSpacing;
+  });
+}
+
+function weightedPpeTime(times: number[], decay: number): number {
+  const currentTime = times[times.length - 1];
+  if (currentTime === undefined) {
+    return 1;
+  }
+
+  const elapsedTimes = times.slice(0, -1).map((time) => currentTime - time);
+  if (elapsedTimes.length === 0) {
+    return 1;
+  }
+
+  const weights = elapsedTimes.map((elapsedTime) => Math.pow(elapsedTime, -decay));
+  const weightTotal = weights.reduce((total, weight) => total + weight, 0);
+  const weightedTime = elapsedTimes.reduce((total, elapsedTime, index) => {
+    const weight = weights[index];
+    if (weight === undefined) {
+      throw new Error('PPES failed to align elapsed time weights');
+    }
+    return total + elapsedTime * weight / weightTotal;
+  }, 0);
+
+  return Number.isNaN(weightedTime) ? 1 : weightedTime;
+}
+
+function slidingWeightedPpeTimes(times: number[], decay: number): number[] {
+  return times.map((_, index) => weightedPpeTime(times.slice(0, index + 1), decay));
+}
+
 export function createProbabilityFunctionHelpers(log: (...args: unknown[]) => void): any {
   const pFunc: any = {};
   pFunc.testFunction = function() {
@@ -81,6 +155,107 @@ export function createProbabilityFunctionHelpers(log: (...args: unknown[]) => vo
 
   pFunc.errlist = function(seq: any) {
     return seq.map(function(value: any) { return Math.abs(value - 1); });
+  };
+
+  pFunc.componentSpacing = function(times: any) {
+    return componentSpacing(requireFiniteNumberArray(times, 'times'));
+  };
+
+  pFunc.spacingLagged = function(times: any) {
+    return laggedSpacing(requireFiniteNumberArray(times, 'times'));
+  };
+
+  pFunc.ppew = function(times: any, wpar: any) {
+    const timeValues = requireFiniteNumberArray(times, 'times');
+    const weightDecay = requireFiniteNumber(wpar, 'wpar');
+    const weights = timeValues.map((timeValue) => Math.pow(timeValue, -weightDecay));
+    const weightTotal = weights.reduce((total, weight) => total + weight, 0);
+    return weights.map((weight) => weight / weightTotal);
+  };
+
+  pFunc.ppet = function(times: any) {
+    const timeValues = requireFiniteNumberArray(times, 'times');
+    const currentTime = timeValues[timeValues.length - 1];
+    if (currentTime === undefined) {
+      return [];
+    }
+    return timeValues.map((timeValue) => currentTime - timeValue);
+  };
+
+  pFunc.ppetw = function(times: any, d: any) {
+    return weightedPpeTime(
+      requireFiniteNumberArray(times, 'times'),
+      requireFiniteNumber(d, 'd'),
+    );
+  };
+
+  pFunc.slideppetw = function(times: any, d: any) {
+    return slidingWeightedPpeTimes(
+      requireFiniteNumberArray(times, 'times'),
+      requireFiniteNumber(d, 'd'),
+    );
+  };
+
+  pFunc.ppes = function(
+    correctCount: any,
+    totalCount: any,
+    times: any,
+    spacingLagged: any,
+    par1: any,
+    par2: any,
+    par3: any,
+    par4: any,
+  ) {
+    const correct = requireFiniteNumber(correctCount, 'correctCount');
+    const total = requireFiniteNumber(totalCount, 'totalCount');
+    const timeValues = requireFiniteNumberArray(times, 'times');
+    const spacingValues = requireFiniteNumberArray(spacingLagged, 'spacingLagged');
+    if (timeValues.length === 0) {
+      return 0;
+    }
+    const p1 = requireFiniteNumber(par1, 'par1');
+    const p2 = requireFiniteNumber(par2, 'par2');
+    const p3 = requireFiniteNumber(par3, 'par3');
+    const p4 = requireFiniteNumber(par4, 'par4');
+    if (timeValues.length !== spacingValues.length) {
+      throw new Error('PPES requires times and spacingLagged arrays with the same length');
+    }
+
+    const firstTime = Math.min(...timeValues);
+    const relativeTimes = timeValues.map((timeValue) => timeValue - firstTime);
+    const spacingSum = spacingValues.reduce((totalSpacing, spacingValue) => {
+      return totalSpacing + (spacingValue === 0 ? 0 : 1 / Math.log(spacingValue + Math.E));
+    }, 0);
+    const spacing = total <= 1 ? 0 : spacingSum / (total - 1);
+    const weightedTimes = slidingWeightedPpeTimes(relativeTimes, p4);
+    const tw = weightedTimes[weightedTimes.length - 1];
+    if (tw === undefined) {
+      throw new Error('PPES failed to compute weighted time');
+    }
+
+    return Math.pow(correct, p1) * Math.pow(tw, -(p2 + p3 * spacing));
+  };
+
+  pFunc.ppesFromTimes = function(
+    correctCount: any,
+    totalCount: any,
+    times: any,
+    par1: any,
+    par2: any,
+    par3: any,
+    par4: any,
+  ) {
+    const timeValues = requireFiniteNumberArray(times, 'times');
+    return pFunc.ppes(
+      correctCount,
+      totalCount,
+      timeValues,
+      laggedSpacing(timeValues),
+      par1,
+      par2,
+      par3,
+      par4,
+    );
   };
 
   return pFunc;

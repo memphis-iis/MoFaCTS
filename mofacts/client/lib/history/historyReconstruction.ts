@@ -22,6 +22,7 @@ type AggregateEntry = {
   allTimeIncorrect: number;
   priorStudy: number;
   outcomeStack: number[];
+  timeHistory: number[];
   totalPracticeDuration: number;
   allTimeTotalPracticeDuration: number;
 };
@@ -95,6 +96,7 @@ function createAggregateEntry(): AggregateEntry {
     allTimeIncorrect: 0,
     priorStudy: 0,
     outcomeStack: [],
+    timeHistory: [],
     totalPracticeDuration: 0,
     allTimeTotalPracticeDuration: 0,
   };
@@ -139,6 +141,7 @@ function applyAggregateTrial(
   if (entry.firstSeen < 1) {
     entry.firstSeen = time;
   }
+  entry.timeHistory.push(time);
 
   entry.totalPracticeDuration += practiceTimeMs;
   entry.allTimeTotalPracticeDuration += practiceTimeMs;
