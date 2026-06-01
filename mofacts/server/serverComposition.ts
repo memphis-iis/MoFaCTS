@@ -398,6 +398,7 @@ const {
 const analyticsMethods = createAnalyticsMethods({
   serverConsole,
   Histories,
+  StimulusCrowdStats,
   GlobalExperimentStates,
   Tdfs,
   Courses,
@@ -900,6 +901,7 @@ Meteor.startup(async function() {
     AuthThrottleState: AuthThrottleStateAny,
     Tdfs,
     Histories,
+    StimulusCrowdStats,
     AssetsAny,
     updateActiveThemeDocument,
     upsertStimFile,

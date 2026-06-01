@@ -9,6 +9,9 @@ export interface DashboardHistoryRecord {
   CFEndLatency?: number | null;
   CFFeedbackLatency?: number | null;
   itemId?: string | number | null;
+  stimuliSetId?: string | number | null;
+  stimulusKC?: string | number | null;
+  clusterKC?: string | number | null;
   CFStimFileIndex?: string | number | null;
   problemName?: string | number | null;
   recordedServerTime?: string | Date | null;

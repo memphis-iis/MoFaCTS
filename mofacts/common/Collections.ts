@@ -18,6 +18,7 @@ const Assignments = new Mongo.Collection(collectionMongoName('Assignments'));
 const Courses = new Mongo.Collection(collectionMongoName('Courses'));
 const GlobalExperimentStates = new Mongo.Collection(collectionMongoName('GlobalExperimentStates'));
 const Histories = new Mongo.Collection(collectionMongoName('Histories'));
+const StimulusCrowdStats = new Mongo.Collection(collectionMongoName('StimulusCrowdStats'));
 const Items = new Mongo.Collection(collectionMongoName('Items'));
 const Stims = new Mongo.Collection(collectionMongoName('Stims'));
 const itemSourceSentences = new Mongo.Collection(collectionMongoName('itemSourceSentences'));
@@ -116,6 +117,7 @@ Object.assign(globalThis, {
   Courses,
   GlobalExperimentStates,
   Histories,
+  StimulusCrowdStats,
   Items,
   Stims,
   itemSourceSentences,
@@ -138,7 +140,7 @@ Object.assign(globalThis, {
   DynamicAssets,
 });
 
-export { Tdfs, GlobalExperimentStates, DynamicSettings, UserDashboardCache, H5PContents };
+export { Tdfs, GlobalExperimentStates, DynamicSettings, UserDashboardCache, H5PContents, StimulusCrowdStats };
 
 GlobalExperimentStates.allow({
   update: function(userId: string, doc: unknown, _fieldNames: string[], _modifier: any) {

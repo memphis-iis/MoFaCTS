@@ -19,6 +19,7 @@ declare var Assignments: any;
 declare var Courses: any;
 declare var GlobalExperimentStates: any;
 declare var Histories: any;
+declare var StimulusCrowdStats: any;
 declare var Items: any;
 declare var Stims: any;
 declare var itemSourceSentences: any;

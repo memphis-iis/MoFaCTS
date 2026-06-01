@@ -13,6 +13,7 @@ import {
   type LearnerTdfConfig,
   type LearnerTdfOverrides
 } from '../../common/lib/learnerTdfConfig';
+import { createStimulusKey, isBlankIdentityValue } from '../../common/historyEnvelope';
 
 type DashboardCacheDeps = {
   Meteor: any;
@@ -32,7 +33,7 @@ type DashboardCacheDeps = {
 };
 
 const DASHBOARD_LEVEL_UNIT_TYPES = ['model', 'schedule', 'autotutor'];
-const DASHBOARD_CACHE_VERSION = 3;
+const DASHBOARD_CACHE_VERSION = 4;
 
 function roundOneDecimal(value: number): number {
   return Number(value.toFixed(1));
@@ -76,6 +77,19 @@ function shouldCountDashboardHistoryRecord(record: DashboardHistoryRecord): bool
     return false;
   }
   return true;
+}
+
+function resolveDashboardModelStimulusKey(record: DashboardHistoryRecord): string | null {
+  if (record.levelUnitType !== 'model' || isH5PPartRecord(record)) {
+    return null;
+  }
+  if (isBlankIdentityValue(record.stimuliSetId) || isBlankIdentityValue(record.stimulusKC)) {
+    return null;
+  }
+  return createStimulusKey({
+    stimuliSetId: record.stimuliSetId as string | number,
+    stimulusKC: record.stimulusKC as string | number,
+  });
 }
 
 function getHistoryPracticeTimeMs(
@@ -128,10 +142,10 @@ export function computeCacheStats(
 
     stats.totalTimeMs += getHistoryPracticeTimeMs(record, computePracticeTimeMs);
 
-    const itemId = record.itemId || record.CFStimFileIndex || record.problemName;
-    if (record.levelUnitType === 'model' && !isH5PPartRecord(record) && itemId !== undefined && itemId !== null) {
+    const stimulusKey = resolveDashboardModelStimulusKey(record);
+    if (stimulusKey !== null) {
       stats.itemsPracticedApplies = true;
-      uniqueItems.add(String(itemId));
+      uniqueItems.add(stimulusKey);
     }
 
     const timestamp = historyRecordTimestamp(record);
@@ -745,16 +759,6 @@ export function createDashboardCacheMethods({
             };
           }
 
-          if (cache.version !== DASHBOARD_CACHE_VERSION) {
-            const result = await methods.initializeDashboardCache.call(this);
-            return {
-              success: true,
-              action: 'refreshed',
-              reason: 'version',
-              tdfCount: result.tdfCount
-            };
-          }
-
           const latestHistory = await Histories.findOneAsync(
             {
               userId,
@@ -774,6 +778,16 @@ export function createDashboardCacheMethods({
               success: true,
               action: 'refreshed',
               reason: 'history-newer',
+              tdfCount: result.tdfCount
+            };
+          }
+
+          if (cache.version !== DASHBOARD_CACHE_VERSION) {
+            const result = await methods.initializeDashboardCache.call(this);
+            return {
+              success: true,
+              action: 'refreshed',
+              reason: 'version',
               tdfCount: result.tdfCount
             };
           }

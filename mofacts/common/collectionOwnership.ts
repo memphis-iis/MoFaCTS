@@ -37,6 +37,12 @@ export const COLLECTION_OWNERSHIP = {
     owner: 'experiment-runtime',
     purpose: 'Trial history and learner response records.',
   },
+  StimulusCrowdStats: {
+    mongoName: 'stimulus_crowd_stats',
+    globalName: 'StimulusCrowdStats',
+    owner: 'analytics',
+    purpose: 'Derived stimulus-level correct/incorrect counts across accepted model-practice history.',
+  },
   Items: {
     mongoName: 'stimuli',
     globalName: 'Items',

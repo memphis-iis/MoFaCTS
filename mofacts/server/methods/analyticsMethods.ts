@@ -7,6 +7,11 @@ import {
 } from '../lib/methodAuthorization';
 import { decompressHistoryRecord } from '../../common/historyCompression';
 import { assertCanonicalHistoryEnvelope, validateHistoryWirePayload } from '../../common/historyEnvelope';
+import {
+  buildStimulusCrowdStatKeys,
+  recordStimulusCrowdOutcome,
+  type StimulusCrowdStatsCollection,
+} from '../lib/stimulusCrowdStats';
 
 type UnknownRecord = Record<string, unknown>;
 type Logger = (...args: unknown[]) => void;
@@ -24,6 +29,7 @@ type AnalyticsMethodsDeps = {
     insertAsync: (document: UnknownRecord) => Promise<unknown>;
     rawCollection: () => { aggregate: (pipeline: unknown[]) => { toArray: () => Promise<any[]> } };
   };
+  StimulusCrowdStats: StimulusCrowdStatsCollection;
   GlobalExperimentStates: {
     find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]> };
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
@@ -449,6 +455,9 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     const insertStartTime = Date.now();
     await deps.Histories.insertAsync(sanitizedHistoryRecord);
     const insertMs = elapsedMsSince(insertStartTime);
+    const crowdStatsStartTime = Date.now();
+    await recordStimulusCrowdOutcome(deps.StimulusCrowdStats, sanitizedHistoryRecord);
+    const crowdStatsMs = elapsedMsSince(crowdStatsStartTime);
 
     if (INSERT_HISTORY_TIMING_ENABLED) {
       deps.serverConsole('[insertHistory timing]', {
@@ -461,6 +470,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
         authorizationMs,
         recordBuildMs,
         insertMs,
+        crowdStatsMs,
         totalMs: elapsedMsSince(methodStartTime),
       });
     }
@@ -479,6 +489,117 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
 
   async function getHistoryByTDFID(TDFId: string) {
     return await deps.Histories.find({ TDFId }).fetchAsync();
+  }
+
+  async function getStimulusCrowdStatsForDeck(this: MethodContext, TDFId: string, stimulusKCs: unknown[]) {
+    const actorUserId = requireAuthenticatedUser(this.userId, 'Must be logged in', 401);
+    const normalizedTdfId = deps.normalizeCanonicalId(TDFId);
+    if (!normalizedTdfId) {
+      throw new Meteor.Error(400, 'Invalid TDFId');
+    }
+    if (!Array.isArray(stimulusKCs)) {
+      throw new Meteor.Error(400, 'stimulusKCs must be an array');
+    }
+
+    const normalizedStimulusKCs = Array.from(new Set(
+      stimulusKCs.map((value) => {
+        if (typeof value === 'number' && Number.isFinite(value)) {
+          return value;
+        }
+        if (typeof value === 'string' && value.trim().length > 0) {
+          return value.trim();
+        }
+        throw new Meteor.Error(400, 'stimulusKCs must contain only non-blank string or number values');
+      })
+    ));
+    if (normalizedStimulusKCs.length === 0) {
+      return [];
+    }
+
+    const tdf = await assertCrowdStatsReadAccess(actorUserId, normalizedTdfId);
+    const stimuliSetId = tdf?.stimuliSetId;
+    if (stimuliSetId === undefined || stimuliSetId === null || (typeof stimuliSetId === 'string' && stimuliSetId.trim().length === 0)) {
+      throw new Meteor.Error(400, 'TDF is missing stimuliSetId for stimulus crowd stats');
+    }
+
+    const stimulusKeys = buildStimulusCrowdStatKeys(stimuliSetId, normalizedStimulusKCs);
+    const stats = await deps.StimulusCrowdStats.find(
+      { stimulusKey: { $in: stimulusKeys } },
+      {
+        fields: {
+          _id: 0,
+          stimulusKey: 1,
+          stimuliSetId: 1,
+          stimulusKC: 1,
+          KCId: 1,
+          correctCount: 1,
+          incorrectCount: 1,
+          totalCount: 1,
+        },
+      }
+    ).fetchAsync();
+
+    return stats.map((stat) => ({
+      stimulusKey: stat.stimulusKey,
+      stimuliSetId: stat.stimuliSetId,
+      stimulusKC: stat.stimulusKC,
+      KCId: stat.KCId,
+      correctCount: Number(stat.correctCount) || 0,
+      incorrectCount: Number(stat.incorrectCount) || 0,
+      totalCount: Number(stat.totalCount) || 0,
+    }));
+  }
+
+  async function assertCrowdStatsReadAccess(actorUserId: string, tdfId: string) {
+    const tdf = await deps.Tdfs.findOneAsync(
+      { _id: tdfId },
+      { fields: { _id: 1, ownerId: 1, accessors: 1, stimuliSetId: 1, 'content.tdfs.tutor.setspec': 1 } }
+    );
+    if (!tdf) {
+      throw new Meteor.Error(404, 'TDF not found');
+    }
+    if (await deps.canViewDashboardTdf(actorUserId, tdf)) {
+      return tdf;
+    }
+
+    const assignedTdfIds = await deps.resolveAssignedRootTdfIdsForUser(actorUserId);
+    if (assignedTdfIds.includes(tdfId)) {
+      return tdf;
+    }
+
+    const setspec = (tdf as any)?.content?.tdfs?.tutor?.setspec || {};
+    const rootUserSelect = deps.normalizeOptionalString(setspec.userselect);
+    const rootExperimentTarget = deps.normalizeOptionalString(setspec.experimentTarget);
+    const userDoc = await deps.usersCollection.findOneAsync(
+      { _id: actorUserId },
+      { fields: { profile: 1, loginParams: 1 } }
+    );
+    const userExperimentTarget = deps.normalizeOptionalString((userDoc as any)?.profile?.experimentTarget);
+    const userLoginMode = deps.normalizeOptionalString((userDoc as any)?.loginParams?.loginMode);
+    if (
+      rootUserSelect === 'true'
+      || (!!rootExperimentTarget && rootExperimentTarget === userExperimentTarget)
+      || (userLoginMode === 'experiment' && !!rootExperimentTarget && rootExperimentTarget === userExperimentTarget)
+    ) {
+      return tdf;
+    }
+
+    const existingStateForTdf = await deps.GlobalExperimentStates.findOneAsync(
+      {
+        userId: actorUserId,
+        $or: [
+          { TDFId: tdfId },
+          { 'experimentState.currentTdfId': tdfId },
+          { 'experimentState.conditionTdfId': tdfId },
+        ],
+      },
+      { fields: { _id: 1 } }
+    );
+    if (existingStateForTdf) {
+      return tdf;
+    }
+
+    throw new Meteor.Error(403, 'Not authorized to access stimulus crowd stats for this TDF');
   }
 
   async function validateHistoryWriteAccess(
@@ -647,7 +768,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       },
       {
         $group: {
-          _id: '$KCId',
+          _id: '$stimulusKC',
           numCorrect: { $sum: '$correct' },
           numIncorrect: { $sum: '$incorrect' },
           practiceDuration: { $sum: '$practiceDuration' },
@@ -719,7 +840,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       },
       {
         $group: {
-          _id: '$KCId',
+          _id: '$stimulusKC',
           numCorrect: { $sum: '$correct' },
           numIncorrect: { $sum: '$incorrect' },
           totalPracticeDuration: { $sum: '$practiceDuration' },
@@ -826,6 +947,9 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       fields: {
         time: 1,
         outcome: 1,
+        stimuliSetId: 1,
+        stimulusKC: 1,
+        clusterKC: 1,
         KCCluster: 1,
         KCId: 1,
         CFCorrectAnswer: 1,
@@ -874,7 +998,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       CFItemRemoved: true,
     }, {
       fields: {
-        KCId: 1,
+        stimulusKC: 1,
         time: 1,
       },
       sort: { time: 1 },
@@ -883,16 +1007,16 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     const hiddenStimulusKCs: Array<string | number> = [];
     const seen = new Set<string>();
     for (const row of rows) {
-      const kcId = row?.KCId;
-      if (kcId === null || kcId === undefined || kcId === '') {
+      const stimulusKC = row?.stimulusKC;
+      if (stimulusKC === null || stimulusKC === undefined || stimulusKC === '') {
         continue;
       }
-      const key = String(kcId);
+      const key = String(stimulusKC);
       if (seen.has(key)) {
         continue;
       }
       seen.add(key);
-      hiddenStimulusKCs.push(kcId);
+      hiddenStimulusKCs.push(stimulusKC);
     }
 
     return hiddenStimulusKCs;
@@ -1189,7 +1313,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       return await deps.Histories.find(
         { userId: requestedUserId, TDFId: normalizedTdfId },
         {
-          fields: { _id: 0, KCId: 1, outcome: 1, recordedServerTime: 1, time: 1 },
+          fields: { _id: 0, stimulusKC: 1, outcome: 1, recordedServerTime: 1, time: 1 },
           sort: { recordedServerTime: 1, time: 1 },
         }
       ).fetchAsync();
@@ -1242,6 +1366,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     },
     insertHistory,
     getHistoryByTDFID,
+    getStimulusCrowdStatsForDeck,
     getUserRecentTDFs: async function(this: MethodContext, userId: string | null = null) {
       const scopedUserId = requireSelfScopedUserId(this, userId, 'Can only read recent TDFs for the current user');
       return await getUserRecentTDFs(scopedUserId);
@@ -1367,14 +1492,14 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       const history = await deps.Histories.find(
         { userId: requestedUserId, TDFId: normalizedTdfId },
         {
-          fields: { _id: 0, KCId: 1, outcome: 1, recordedServerTime: 1, time: 1 },
+          fields: { _id: 0, stimulusKC: 1, outcome: 1, recordedServerTime: 1, time: 1 },
           sort: { recordedServerTime: 1, time: 1 },
         }
       ).fetchAsync();
       const outcomes: Record<string, boolean> = {};
-      for (const historyRow of history as Array<{ KCId?: number; outcome?: string }>) {
-        if (historyRow.KCId) {
-          outcomes[historyRow.KCId % 1000] = historyRow.outcome === 'correct';
+      for (const historyRow of history as Array<{ stimulusKC?: number; outcome?: string }>) {
+        if (historyRow.stimulusKC) {
+          outcomes[historyRow.stimulusKC % 1000] = historyRow.outcome === 'correct';
         }
       }
 

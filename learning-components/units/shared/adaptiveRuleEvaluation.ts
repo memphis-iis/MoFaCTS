@@ -1,12 +1,13 @@
 export type AdaptiveOutcomes = Record<string, boolean>;
 
 export type AdaptiveOutcomeRow = {
-  KCId?: number | string;
+  stimulusKC?: number | string;
   outcome?: string;
 };
 
 export type AdaptiveStimulusClusterRef = {
   clusterKC?: unknown;
+  stimulusKC?: unknown;
 };
 
 export type AdaptiveRuleScheduleItem = {
@@ -66,8 +67,8 @@ function translateConditionToken(token: string, adaptiveOutcomes: AdaptiveOutcom
     return 'false';
   }
   if (token.startsWith('C')) {
-    const { clusterIndex } = parseClusterStimToken(token, 'token');
-    return String(adaptiveOutcomes[String(clusterIndex)] ?? false);
+    const { clusterIndex, stimIndex } = parseClusterStimToken(token, 'token');
+    return String(adaptiveOutcomes[`${clusterIndex}:${stimIndex}`] ?? false);
   }
   if (Number.isInteger(parseInt(token))) {
     return token;
@@ -178,23 +179,33 @@ export function buildAdaptiveOutcomes(options: {
   kcMultiple: number;
 }): AdaptiveOutcomes {
   const outcomes: AdaptiveOutcomes = {};
-  for (const historyRow of options.rows) {
-    const kcId = Number(historyRow?.KCId);
-    if (Number.isFinite(kcId)) {
-      outcomes[String(kcId % options.kcMultiple)] = historyRow.outcome === 'correct';
-    }
-  }
+  const adaptiveKeyByStimulusKC = new Map<string, string>();
+  const seenStimCountByClusterIndex = new Map<string, number>();
 
   if (Array.isArray(options.currentStimuliSet)) {
     for (const stim of options.currentStimuliSet) {
       const clusterKC = Number(stim?.clusterKC);
-      if (!Number.isFinite(clusterKC)) {
+      const stimulusKC = stim?.stimulusKC;
+      if (!Number.isFinite(clusterKC) || stimulusKC === undefined || stimulusKC === null || stimulusKC === '') {
         continue;
       }
       const clusterKey = String(clusterKC % options.kcMultiple);
-      if (!Object.prototype.hasOwnProperty.call(outcomes, clusterKey)) {
-        outcomes[clusterKey] = false;
-      }
+      const stimIndex = seenStimCountByClusterIndex.get(clusterKey) || 0;
+      const adaptiveKey = `${clusterKey}:${stimIndex}`;
+      seenStimCountByClusterIndex.set(clusterKey, stimIndex + 1);
+      adaptiveKeyByStimulusKC.set(String(stimulusKC), adaptiveKey);
+      outcomes[adaptiveKey] = false;
+    }
+  }
+
+  for (const historyRow of options.rows) {
+    const stimulusKC = historyRow?.stimulusKC;
+    if (stimulusKC === undefined || stimulusKC === null || stimulusKC === '') {
+      continue;
+    }
+    const adaptiveKey = adaptiveKeyByStimulusKC.get(String(stimulusKC));
+    if (adaptiveKey) {
+      outcomes[adaptiveKey] = historyRow.outcome === 'correct';
     }
   }
 

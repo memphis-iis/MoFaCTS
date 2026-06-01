@@ -17,7 +17,9 @@ describe('dashboardCacheMethods', function() {
         levelUnitType: 'model',
         CFEndLatency: 2000,
         CFFeedbackLatency: 500,
-        itemId: 'item-a',
+        stimuliSetId: 'set-a',
+        stimulusKC: 'stim-a',
+        clusterKC: 'cluster-a',
         recordedServerTime: new Date('2026-02-10T10:00:00.000Z')
       },
       {
@@ -26,7 +28,9 @@ describe('dashboardCacheMethods', function() {
         levelUnitType: 'model',
         CFEndLatency: 3000,
         CFFeedbackLatency: 800,
-        itemId: 'item-b',
+        stimuliSetId: 'set-a',
+        stimulusKC: 'stim-b',
+        clusterKC: 'cluster-a',
         recordedServerTime: new Date('2026-02-11T10:00:00.000Z')
       }
     ];
@@ -42,6 +46,23 @@ describe('dashboardCacheMethods', function() {
     expect(stats.itemsPracticedApplies).to.equal(true);
     expect(stats.overallAccuracy).to.equal(50);
     expect(stats.lastPracticeTimestamp).to.equal(new Date('2026-02-11T10:00:00.000Z').getTime());
+  });
+
+  it('does not count legacy model itemId as canonical practiced stimulus identity', function() {
+    const stats = computeCacheStats([
+      {
+        _id: 'legacy-item-id',
+        outcome: 'correct',
+        levelUnitType: 'model',
+        CFEndLatency: 2000,
+        CFFeedbackLatency: 500,
+        itemId: 'legacy-cruft',
+        recordedServerTime: new Date('2026-02-10T10:00:00.000Z')
+      }
+    ], 'Legacy Demo', (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0));
+
+    expect(stats.itemsPracticedCount).to.equal(0);
+    expect(stats.itemsPracticedApplies).to.equal(false);
   });
 
   it('computeCacheStats includes assessment rows in trial and accuracy metrics', function() {
@@ -334,7 +355,9 @@ describe('dashboardCacheMethods', function() {
               outcome: 'correct',
               CFEndLatency: 1000,
               CFFeedbackLatency: 500,
-              itemId: 'item-1',
+              stimuliSetId: 'set-a',
+              stimulusKC: 'stim-a',
+              clusterKC: 'cluster-a',
               recordedServerTime: new Date('2026-05-01T00:00:00.000Z'),
               levelUnitType: 'model'
             }
@@ -405,7 +428,9 @@ describe('dashboardCacheMethods', function() {
         outcome: 'correct',
         CFEndLatency: 1000,
         CFFeedbackLatency: 500,
-        itemId: 'item-1',
+        stimuliSetId: 'set-a',
+        stimulusKC: 'stim-a',
+        clusterKC: 'cluster-a',
         recordedServerTime: new Date('2026-05-01T00:01:00.000Z'),
         levelUnitType: 'model'
       }

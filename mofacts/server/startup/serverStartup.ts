@@ -54,6 +54,9 @@ type RunServerStartupDeps = {
   Histories: {
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
   };
+  StimulusCrowdStats: {
+    rawCollection: () => { createIndex: (keys: UnknownRecord, options?: UnknownRecord) => Promise<unknown> };
+  };
   AssetsAny: { getTextAsync: (path: string) => Promise<string> };
   updateActiveThemeDocument: (userId: string | null | undefined, mutator: (theme: any) => any) => Promise<unknown>;
   upsertStimFile: (filename: string, json: unknown, ownerId: string) => Promise<string | number | null | undefined>;
@@ -643,6 +646,9 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
   await deps.AuthThrottleState.rawCollection().createIndex({ key: 1 }, { unique: true });
   await deps.AuthThrottleState.rawCollection().createIndex({ updatedAt: 1 });
   await deps.ManualContentDrafts.rawCollection().createIndex({ ownerId: 1, updatedAt: -1 });
+  await deps.StimulusCrowdStats.rawCollection().createIndex({ stimulusKey: 1 }, { unique: true });
+  await deps.StimulusCrowdStats.rawCollection().createIndex({ stimuliSetId: 1, KCId: 1 });
+  await deps.StimulusCrowdStats.rawCollection().createIndex({ stimuliSetId: 1 });
 
   await startConfiguredMofactsCronJobs({
     Meteor,

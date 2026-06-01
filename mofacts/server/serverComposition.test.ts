@@ -15,6 +15,7 @@ const CoursesAny = (globalThis as any).Courses as any;
 const DynamicSettingsAny = (globalThis as any).DynamicSettings as any;
 const GlobalExperimentStatesAny = (globalThis as any).GlobalExperimentStates as any;
 const HistoriesAny = (globalThis as any).Histories as any;
+const StimulusCrowdStatsAny = (globalThis as any).StimulusCrowdStats as any;
 const SectionsAny = (globalThis as any).Sections as any;
 const SectionUserMapAny = (globalThis as any).SectionUserMap as any;
 const TdfsAny = (globalThis as any).Tdfs as any;
@@ -33,6 +34,12 @@ function createServerHistoryRecord(overrides: Record<string, unknown> = {}) {
     historySchemaVersion: 1,
     userId: 'current-user',
     TDFId: 'history-root',
+    stimuliSetId: 'set-1',
+    stimulusKC: 'kc-1',
+    clusterKC: 'cluster-1',
+    KCId: 'kc-1',
+    KCDefault: 'kc-1',
+    KCCluster: 'cluster-1',
     anonStudentId: 'student-1',
     sessionID: 'session-1',
     levelUnit: 0,
@@ -58,6 +65,7 @@ StubCollections.stub(CoursesAny);
 StubCollections.stub(DynamicSettingsAny);
 StubCollections.stub(GlobalExperimentStatesAny);
 StubCollections.stub(HistoriesAny);
+StubCollections.stub(StimulusCrowdStatsAny);
 StubCollections.stub(PasswordResetTokensAny);
 StubCollections.stub(SectionsAny);
 StubCollections.stub(SectionUserMapAny);
@@ -76,6 +84,7 @@ describe('server auth and session methods', function() {
     DynamicSettingsAny.remove({});
     GlobalExperimentStatesAny.remove({});
     HistoriesAny.remove({});
+    StimulusCrowdStatsAny.remove({});
     MeteorUsersAny.remove({});
     PasswordResetTokensAny.remove({});
     SectionsAny.remove({});
@@ -263,6 +272,7 @@ describe('public TDF and stimulus method authorization', function() {
     DynamicSettingsAny.remove({});
     GlobalExperimentStatesAny.remove({});
     HistoriesAny.remove({});
+    StimulusCrowdStatsAny.remove({});
     MeteorUsersAny.remove({});
     PasswordResetTokensAny.remove({});
     SectionUserMapAny.remove({});
@@ -599,6 +609,7 @@ describe('learner analytics method authorization', function() {
     DynamicSettingsAny.remove({});
     GlobalExperimentStatesAny.remove({});
     HistoriesAny.remove({});
+    StimulusCrowdStatsAny.remove({});
     MeteorUsersAny.remove({});
     PasswordResetTokensAny.remove({});
     SectionUserMapAny.remove({});
@@ -622,6 +633,42 @@ describe('learner analytics method authorization', function() {
     } catch (error: any) {
       expect(error.error).to.equal(403);
     }
+  });
+
+  it('returns explicit identity fields for learning history reconstruction', async function() {
+    await HistoriesAny.insertAsync({
+      _id: 'learning-history-explicit-identity',
+      userId: 'current-user',
+      TDFId: 'tdf-identity',
+      levelUnit: 0,
+      levelUnitType: 'model',
+      time: 1000,
+      outcome: 'correct',
+      stimuliSetId: 'set-a',
+      stimulusKC: 'stim-a',
+      clusterKC: 'cluster-a',
+      KCCluster: 'cluster-a',
+      KCId: 'stim-a',
+      CFCorrectAnswer: 'Alpha',
+      CFEndLatency: 100,
+      CFFeedbackLatency: 100,
+    });
+
+    const rows = await (asyncMethods.getLearningHistoryForUnit as any).call(
+      { userId: 'current-user' },
+      'current-user',
+      'tdf-identity',
+      0
+    );
+
+    expect(rows).to.have.length(1);
+    expect(rows[0]).to.deep.include({
+      stimuliSetId: 'set-a',
+      stimulusKC: 'stim-a',
+      clusterKC: 'cluster-a',
+      KCCluster: 'cluster-a',
+      KCId: 'stim-a',
+    });
   });
 
   it('counts one completed assessment trial per H5P summary row on resume', async function() {
@@ -713,6 +760,7 @@ describe('system method authorization', function() {
     DynamicSettingsAny.remove({});
     GlobalExperimentStatesAny.remove({});
     HistoriesAny.remove({});
+    StimulusCrowdStatsAny.remove({});
     MeteorUsersAny.remove({});
     PasswordResetTokensAny.remove({});
     SectionUserMapAny.remove({});
@@ -792,6 +840,7 @@ describe('condition count method authorization', function() {
     DynamicSettingsAny.remove({});
     GlobalExperimentStatesAny.remove({});
     HistoriesAny.remove({});
+    StimulusCrowdStatsAny.remove({});
     MeteorUsersAny.remove({});
     PasswordResetTokensAny.remove({});
     SectionUserMapAny.remove({});
@@ -950,6 +999,7 @@ describe('condition count method authorization', function() {
     await TdfsAny.insertAsync({
       _id: 'history-regular',
       ownerId: 'owner-user',
+      stimuliSetId: 'set-1',
       content: {
         fileName: 'history-regular.json',
         tdfs: { tutor: { setspec: { lessonname: 'History Regular', userselect: 'true' } } },
@@ -981,6 +1031,154 @@ describe('condition count method authorization', function() {
     }) as any;
     expect(insertedHistory).to.exist;
     expect(insertedHistory.historySchemaVersion).to.equal(1);
+  });
+
+  it('updates stimulus crowd stats only after an accepted history insert', async function() {
+    await TdfsAny.insertAsync({
+      _id: 'history-crowd-stats',
+      ownerId: 'owner-user',
+      stimuliSetId: 'set-1',
+      content: {
+        fileName: 'history-crowd-stats.json',
+        tdfs: { tutor: { setspec: { lessonname: 'Crowd Stats', userselect: 'true' } } },
+      },
+    });
+    await MeteorUsersAny.insertAsync({
+      _id: 'current-user',
+      profile: {},
+      loginParams: {},
+    });
+
+    await (asyncMethods.insertHistory as any).call(
+      { userId: 'current-user' },
+      createServerHistoryRecord({ TDFId: 'history-crowd-stats', outcome: 'correct' })
+    );
+    await (asyncMethods.insertHistory as any).call(
+      { userId: 'current-user' },
+      createServerHistoryRecord({ TDFId: 'history-crowd-stats', outcome: 'incorrect' })
+    );
+
+    const stat = await StimulusCrowdStatsAny.findOneAsync({ stimulusKey: 'set-1:kc-1' }) as any;
+    expect(stat).to.exist;
+    expect(stat.correctCount).to.equal(1);
+    expect(stat.incorrectCount).to.equal(1);
+    expect(stat.totalCount).to.equal(2);
+    expect(stat.KCId).to.equal('kc-1');
+  });
+
+  it('does not double-count duplicate H5P idempotency submissions', async function() {
+    await TdfsAny.insertAsync({
+      _id: 'history-h5p-crowd-stats',
+      ownerId: 'owner-user',
+      stimuliSetId: 'set-1',
+      content: {
+        fileName: 'history-h5p-crowd-stats.json',
+        tdfs: { tutor: { setspec: { lessonname: 'Crowd Stats H5P', userselect: 'true' } } },
+      },
+    });
+    await MeteorUsersAny.insertAsync({
+      _id: 'current-user',
+      profile: {},
+      loginParams: {},
+    });
+
+    const h5p = { idempotencyKey: 'h5p-key-1', eventType: 'summary' };
+    await (asyncMethods.insertHistory as any).call(
+      { userId: 'current-user' },
+      createServerHistoryRecord({ TDFId: 'history-h5p-crowd-stats', h5p })
+    );
+    const duplicateResult = await (asyncMethods.insertHistory as any).call(
+      { userId: 'current-user' },
+      createServerHistoryRecord({ TDFId: 'history-h5p-crowd-stats', h5p })
+    );
+
+    const stat = await StimulusCrowdStatsAny.findOneAsync({ stimulusKey: 'set-1:kc-1' }) as any;
+    expect(duplicateResult).to.deep.equal({ duplicate: true });
+    expect(stat.totalCount).to.equal(1);
+    expect(stat.correctCount).to.equal(1);
+  });
+
+  it('returns scoped batched stimulus crowd stats for the current deck', async function() {
+    await TdfsAny.insertAsync({
+      _id: 'history-crowd-read',
+      ownerId: 'owner-user',
+      stimuliSetId: 'set-1',
+      content: {
+        fileName: 'history-crowd-read.json',
+        tdfs: { tutor: { setspec: { lessonname: 'Crowd Stats Read', userselect: 'true' } } },
+      },
+    });
+    await MeteorUsersAny.insertAsync({
+      _id: 'current-user',
+      profile: {},
+      loginParams: {},
+    });
+    await StimulusCrowdStatsAny.insertAsync({
+      stimulusKey: 'set-1:kc-1',
+      stimuliSetId: 'set-1',
+      stimulusKC: 'kc-1',
+      KCId: 'kc-1',
+      correctCount: 3,
+      incorrectCount: 2,
+      totalCount: 5,
+      lastOutcomeAt: 1000,
+      updatedAt: new Date(),
+    });
+    await StimulusCrowdStatsAny.insertAsync({
+      stimulusKey: 'other-set:kc-1',
+      stimuliSetId: 'other-set',
+      stimulusKC: 'kc-1',
+      KCId: 'kc-1',
+      correctCount: 99,
+      incorrectCount: 99,
+      totalCount: 198,
+      lastOutcomeAt: 1000,
+      updatedAt: new Date(),
+    });
+
+    const stats = await (asyncMethods.getStimulusCrowdStatsForDeck as any).call(
+      { userId: 'current-user' },
+      'history-crowd-read',
+      ['kc-1', 'missing-kc']
+    );
+
+    expect(stats).to.deep.equal([{
+      stimulusKey: 'set-1:kc-1',
+      stimuliSetId: 'set-1',
+      stimulusKC: 'kc-1',
+      KCId: 'kc-1',
+      correctCount: 3,
+      incorrectCount: 2,
+      totalCount: 5,
+    }]);
+  });
+
+  it('denies stimulus crowd stats reads for inaccessible TDFs', async function() {
+    await TdfsAny.insertAsync({
+      _id: 'private-crowd-read',
+      ownerId: 'owner-user',
+      stimuliSetId: 'set-1',
+      content: {
+        fileName: 'private-crowd-read.json',
+        tdfs: { tutor: { setspec: { lessonname: 'Private Crowd Stats', userselect: 'false' } } },
+      },
+    });
+    await MeteorUsersAny.insertAsync({
+      _id: 'current-user',
+      profile: {},
+      loginParams: {},
+    });
+
+    try {
+      await (asyncMethods.getStimulusCrowdStatsForDeck as any).call(
+        { userId: 'current-user' },
+        'private-crowd-read',
+        ['kc-1']
+      );
+      expect.fail('Expected inaccessible crowd stats read to be denied');
+    } catch (error: any) {
+      expect(error.error).to.equal(403);
+    }
   });
 
   it('allows history insertion for a condition assigned in root experiment state', async function() {
@@ -1142,6 +1340,7 @@ describe('course method authorization', function() {
     DynamicSettingsAny.remove({});
     GlobalExperimentStatesAny.remove({});
     HistoriesAny.remove({});
+    StimulusCrowdStatsAny.remove({});
     MeteorUsersAny.remove({});
     PasswordResetTokensAny.remove({});
     SectionUserMapAny.remove({});
@@ -1224,6 +1423,7 @@ describe('content helper authorization', function() {
     DynamicSettingsAny.remove({});
     GlobalExperimentStatesAny.remove({});
     HistoriesAny.remove({});
+    StimulusCrowdStatsAny.remove({});
     MeteorUsersAny.remove({});
     PasswordResetTokensAny.remove({});
     SectionUserMapAny.remove({});
@@ -1286,6 +1486,7 @@ describe('MTurk workflow authorization', function() {
     DynamicSettingsAny.remove({});
     GlobalExperimentStatesAny.remove({});
     HistoriesAny.remove({});
+    StimulusCrowdStatsAny.remove({});
     MeteorUsersAny.remove({});
     PasswordResetTokensAny.remove({});
     SectionUserMapAny.remove({});
