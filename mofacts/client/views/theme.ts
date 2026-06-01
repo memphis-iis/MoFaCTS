@@ -763,7 +763,10 @@ Template.theme.events({
         if (!dataId) {
             throw new Error('[Theme] Editable theme field is missing data-id');
         }
-        validateThemePropInput(event.currentTarget, dataId, event.currentTarget.value);
+        const { valid, value } = validateThemePropInput(event.currentTarget, dataId, event.currentTarget.value);
+        if (valid && isThemeDensityScaleProperty(dataId) && Session.get('userThemeOverrideActive') !== true) {
+            applyThemePropertyPreview(dataId, value);
+        }
     },
     'keydown .currentThemeProp': function(event: KeyboardEvent) {
         if (event.key !== 'Enter' || event.shiftKey || event.currentTarget instanceof HTMLTextAreaElement) {
