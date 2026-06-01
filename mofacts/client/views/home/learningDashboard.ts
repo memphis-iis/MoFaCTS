@@ -599,6 +599,20 @@ function displayLabelForTdf(tdf: any) {
   return tdf.displayName;
 }
 
+function resolveDashboardTdfFileName(tdf: any, tdfObject: any) {
+  const contentFileName = typeof tdfObject?.fileName === 'string' ? tdfObject.fileName.trim() : '';
+  if (contentFileName) {
+    return contentFileName;
+  }
+
+  const packageTdfFileName = typeof tdf?.tdfFileName === 'string' ? tdf.tdfFileName.trim() : '';
+  if (packageTdfFileName) {
+    return packageTdfFileName;
+  }
+
+  return undefined;
+}
+
 function expandClusterToken(token: string, tdfLabel: string): number[] {
   const value = token.trim();
   if (!value) {
@@ -1234,6 +1248,7 @@ Template.learningDashboard.rendered = async function(this: any) {
     ownerId: 1,
     accessors: 1,
     conditionCounts: 1,
+    tdfFileName: 1,
     'content.fileName': 1,
     'content.isMultiTdf': 1,
     'content.tdfs.tutor.setspec.lessonname': 1,
@@ -1369,8 +1384,9 @@ Template.learningDashboard.rendered = async function(this: any) {
     if (tdf?._id) {
       tdfsById.set(String(tdf._id), tdf);
     }
-    if (tdf?.content?.fileName) {
-      tdfsByFileName.set(String(tdf.content.fileName), tdf);
+    const resolvedFileName = resolveDashboardTdfFileName(tdf, tdf?.content);
+    if (resolvedFileName) {
+      tdfsByFileName.set(resolvedFileName, tdf);
     }
     const sp = tdf?.content?.tdfs?.tutor?.setspec;
     const conditionFileNames: unknown[] = Array.isArray(sp?.condition) ? sp.condition : [];
@@ -1398,12 +1414,13 @@ Template.learningDashboard.rendered = async function(this: any) {
     }
 
     // Skip condition children — they are accessible only via their parent root's selector
-    if (conditionChildIds.has(String(TDFId)) || conditionChildFileNames.has(String(tdfObject.fileName))) {
+    const fileName = resolveDashboardTdfFileName(tdf, tdfObject);
+
+    if (conditionChildIds.has(String(TDFId)) || conditionChildFileNames.has(String(fileName))) {
       continue;
     }
 
     const name = setspec.lessonname;
-    const fileName = tdfObject.fileName;
     const totalPracticeItems = countTotalPracticeItems(tdfObject, fileName || name || TDFId);
     const itemsPracticedApplies = typeof totalPracticeItems === 'number' && totalPracticeItems > 0;
     const hasConfigurableRuntime = tdfFamilyHasConfigurableRuntime(tdfObject, tdfsById, tdfsByFileName);
