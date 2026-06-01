@@ -661,8 +661,14 @@ html.learning-progress-panel-viewport-open .practice-top-header {
 .theme-selection-menu {
     display: none;
     margin: calc(2px * var(--app-density-scale)) 0 calc(6px * var(--app-density-scale));
-    padding-left: var(--app-space-2-px);
-    border-left: 2px solid color-mix(in srgb, var(--app-accent-color) 40%, transparent);
+    padding: calc(6px * var(--app-density-scale));
+    --theme-selection-menu-surface: color-mix(in srgb, var(--app-secondary-surface-color) 86%, var(--app-text-color));
+    --theme-selection-menu-text: var(--app-secondary-text-color);
+    background: var(--theme-selection-menu-surface);
+    border: 1px solid color-mix(in srgb, var(--app-accent-color) 28%, transparent);
+    border-left: 3px solid color-mix(in srgb, var(--app-accent-color) 62%, transparent);
+    border-radius: var(--app-border-radius-sm);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-text-color) 5%, transparent);
 }
 
 .theme-selection-menu.open {
@@ -673,10 +679,11 @@ html.learning-progress-panel-viewport-open .practice-top-header {
     min-height: calc(var(--app-button-height) - 6px);
     padding-left: var(--app-space-3-px);
     font-size: calc(var(--app-font-size-base) * 0.94);
+    color: var(--theme-selection-menu-text);
 }
 
-.theme-selection-item-active {
-    background: color-mix(in srgb, var(--app-accent-color) 14%, var(--learning-card-surface-color)) !important;
+.home-user-menu .theme-selection-item-active {
+    background: color-mix(in srgb, var(--app-accent-color) 20%, var(--theme-selection-menu-surface)) !important;
     color: var(--app-text-color);
 }
 
@@ -687,8 +694,14 @@ html.learning-progress-panel-viewport-open .practice-top-header {
 
 .theme-selection-empty {
     padding: calc(8px * var(--app-density-scale)) var(--app-space-3-px);
-    color: color-mix(in srgb, var(--app-text-color) 62%, transparent);
+    color: color-mix(in srgb, var(--theme-selection-menu-text) 72%, transparent);
     font-size: calc(var(--app-font-size-base) * 0.9);
+}
+
+.home-user-menu .theme-selection-menu .dropdown-item:hover,
+.home-user-menu .theme-selection-menu .dropdown-item:focus-visible {
+    background: color-mix(in srgb, var(--app-text-color) 8%, var(--theme-selection-menu-surface));
+    color: var(--app-text-color);
 }
 
 .home-user-menu .dropdown-item:hover,

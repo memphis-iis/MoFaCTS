@@ -207,9 +207,33 @@ function Remove-StaleLocalBuild {
     Remove-Item -LiteralPath $resolvedLocalBuildDir -Recurse -Force
 }
 
+function Ensure-RspackDevBootstrap {
+    $mainDevDir = Join-Path $appDir "_build\main-dev"
+    if (-not (Test-Path $mainDevDir)) {
+        New-Item -ItemType Directory -Path $mainDevDir | Out-Null
+    }
+
+    $bootstrapFiles = @{
+        "client-entry.js" = "if (module.hot) {`n  module.hot.accept();`n}`nimport '../../client/index.ts';`n"
+        "server-entry.js" = "import '../../server/main.ts';`n"
+        "client-meteor.js" = "/* Rspack dev-server serves the client bundle during hotfix dev. */`n"
+        "server-meteor.js" = "import './server-rspack.js';`n"
+        "client-rspack.js" = "/* Placeholder until Rspack writes the client bundle. */`n"
+        "server-rspack.js" = "/* Placeholder until Rspack writes the server bundle. */`n"
+    }
+
+    foreach ($entry in $bootstrapFiles.GetEnumerator()) {
+        $path = Join-Path $mainDevDir $entry.Key
+        if (-not (Test-Path $path)) {
+            Set-Content -Path $path -Value $entry.Value -NoNewline
+        }
+    }
+}
+
 function Start-HotfixDev {
     Assert-RequiredFiles
     Remove-StaleLocalBuild
+    Ensure-RspackDevBootstrap
 
     $existing = Get-HotfixDevProcess
     if ($null -ne $existing) {
