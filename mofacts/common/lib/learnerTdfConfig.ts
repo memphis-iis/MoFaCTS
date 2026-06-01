@@ -369,6 +369,21 @@ function learnerConfigurableKeyAppliesToUnit(
   return unitTypeApplies(applicability, unitType);
 }
 
+function learnerUnitOverrideKeyAppliesToUnit(
+  family: LearnerTdfFamily,
+  key: string,
+  unit: unknown
+): boolean {
+  const tdfPath = family === 'deliverySettings'
+    ? `unit[].deliverySettings.${key}`
+    : '';
+  const definition = LEARNER_TDF_FIELD_DEFINITIONS.find((field) => field.tdfPath === tdfPath);
+  if (!definition) {
+    return learnerConfigurableKeyAppliesToUnit(family, key, unit);
+  }
+  return learnerTdfFieldAppliesToUnit(definition, unit);
+}
+
 function getTdfUpdatedAt(tdf: unknown): string | undefined {
   const record = asRecord(tdf);
   const candidates = [
@@ -440,7 +455,7 @@ function pruneUnitOverridesToCurrentTdf(
     const deliverySettings = asRecord(unitConfig.deliverySettings);
     const applicableDeliverySettings: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(deliverySettings)) {
-      if (learnerConfigurableKeyAppliesToUnit('deliverySettings', key, unit)) {
+      if (learnerUnitOverrideKeyAppliesToUnit('deliverySettings', key, unit)) {
         applicableDeliverySettings[key] = value;
       }
     }
