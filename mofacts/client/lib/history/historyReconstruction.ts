@@ -1,10 +1,14 @@
 import { computePracticeTimeMs } from '../../../lib/practiceTime';
+import { isBlankIdentityValue } from '../../../common/historyEnvelope';
 
 export type LearningOutcome = 'study' | 'correct' | 'incorrect';
 
 export type LearningHistoryRecord = {
   time?: number | string | null;
   outcome?: LearningOutcome | string | null;
+  stimuliSetId?: string | number | null;
+  stimulusKC?: string | number | null;
+  clusterKC?: string | number | null;
   KCCluster?: string | number | null;
   KCId?: string | number | null;
   CFCorrectAnswer?: string | number | null;
@@ -73,10 +77,25 @@ function toFiniteTime(value: unknown, fieldName: string): number {
 }
 
 function requireKey(value: unknown, fieldName: string): string {
-  if (value === undefined || value === null || value === '') {
+  if (isBlankIdentityValue(value)) {
     throw new Error(`[History Reconstruction] Missing required field ${fieldName}`);
   }
   return String(value);
+}
+
+function requireLearningHistoryIdentityKey(
+  row: LearningHistoryRecord,
+  explicitFieldName: 'clusterKC' | 'stimulusKC',
+  aliasFieldName: 'KCCluster' | 'KCId',
+): string {
+  const explicitKey = requireKey(row[explicitFieldName], explicitFieldName);
+  const aliasValue = row[aliasFieldName];
+  if (!isBlankIdentityValue(aliasValue) && String(aliasValue) !== explicitKey) {
+    throw new Error(
+      `[History Reconstruction] Identity mismatch: ${aliasFieldName} must equal ${explicitFieldName}`,
+    );
+  }
+  return explicitKey;
 }
 
 function requireOutcome(value: unknown): LearningOutcome {
@@ -207,8 +226,8 @@ export function reconstructLearningStateFromHistory(
     }
     const outcome = row.outcome as LearningOutcome;
     const time = row.time as number;
-    const clusterKey = requireKey(row.KCCluster, 'KCCluster');
-    const stimulusKey = requireKey(row.KCId, 'KCId');
+    const clusterKey = requireLearningHistoryIdentityKey(row, 'clusterKC', 'KCCluster');
+    const stimulusKey = requireLearningHistoryIdentityKey(row, 'stimulusKC', 'KCId');
     const responseKey = requireKey(row.CFCorrectAnswer, 'CFCorrectAnswer');
     const practiceTimeMs = computePracticeTimeMs(row.CFEndLatency, row.CFFeedbackLatency);
 

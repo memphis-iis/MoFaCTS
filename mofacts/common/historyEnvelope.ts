@@ -8,6 +8,12 @@ export {
   validateHistoryWirePayload,
   withCanonicalHistorySchemaVersion,
 } from '../../learning-components/runtime/historyEnvelope';
+export {
+  assertModelPracticeHistoryIdentity,
+  createStimulusKey,
+  isBlankIdentityValue,
+  isModelPracticeHistoryRecord,
+} from '../../learning-components/runtime/historyStimulusIdentity';
 
 export type {
   CanonicalHistoryRecord,
@@ -15,3 +21,12 @@ export type {
   HistoryEnvelopeValidationResult,
   HistoryEventType,
 } from '../../learning-components/runtime/historyEnvelope';
+export type {
+  ModelPracticeHistoryIdentity,
+  ResponseIdentity,
+  StimulusClusterIdentity,
+  StimulusIdentityValue,
+  StimulusItemIdentity,
+  StimulusRecordIdentity,
+  StimulusSetIdentity,
+} from '../../learning-components/runtime/historyStimulusIdentity';

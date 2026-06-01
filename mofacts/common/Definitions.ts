@@ -150,5 +150,10 @@ export const HISTORY_KEY_MAP: Record<string, string> = {
   '70': 'CFVideoPreviousVolume',
   '71': 'CFVideoIsPlaying',
   '72': 'CFVideoAction',
-  '73': 'historySchemaVersion'
+  '73': 'historySchemaVersion',
+  '74': 'stimuliSetId',
+  '75': 'stimulusKC',
+  '76': 'clusterKC',
+  '77': 'responseKC',
+  '78': 'responseKey'
 };

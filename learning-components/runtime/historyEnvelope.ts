@@ -1,3 +1,5 @@
+import { assertModelPracticeHistoryIdentity } from './historyStimulusIdentity';
+
 export type CanonicalHistoryRecord = Record<string, unknown>;
 
 export const CANONICAL_HISTORY_SCHEMA_VERSION = 1;
@@ -144,6 +146,7 @@ export function assertCanonicalHistoryEnvelope(
 
   assertNoRuntimeSnapshotFields(record);
   assertStableEventType(record);
+  assertModelPracticeHistoryIdentity(record);
   assertBoundedComponentExtensionFields(record, options);
 }
 

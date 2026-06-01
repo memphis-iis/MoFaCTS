@@ -85,9 +85,10 @@ type HistoryEngineLike = UnitEngineLike & {
   unitType?: unknown;
 };
 type HistoryStimLike = {
-  _id?: string;
-  clusterKC?: string;
-  stimulusKC?: string;
+  stimuliSetId?: string | number;
+  clusterKC?: string | number;
+  stimulusKC?: string | number;
+  responseKC?: string | number;
 };
 function getTrialSelection(wasButtonTrial: boolean): string {
   return wasButtonTrial ? 'multiple choice' : 'answer';
@@ -525,7 +526,7 @@ export function createHistoryRecord({
     ? truncateToFiveDecimals(cardInfo.probabilityEstimate)
     : cardInfo.probabilityEstimate;
   const cluster = getStimCluster(clusterIndex) as HistoryClusterLike;
-  const { _id, clusterKC, stimulusKC } = cluster.stims[whichStim] || {};
+  const { stimuliSetId, clusterKC, stimulusKC, responseKC } = cluster.stims[whichStim] || {};
 
   // Get TDF info
   const curTdf = Session.get('currentTdfFile');
@@ -560,6 +561,11 @@ export function createHistoryRecord({
   const fullAnswer = (typeof(originalAnswer) == 'undefined' || originalAnswer == '') ? currentAnswer : originalAnswer;
   const temp = legacyTrim((fullAnswer || '')).split('~');
   const correctAnswer = temp[0];
+  const responseIdentityFields: Record<string, unknown> = {};
+  if (responseKC !== undefined && responseKC !== null && String(responseKC).trim().length > 0) {
+    responseIdentityFields.responseKC = responseKC;
+    responseIdentityFields.responseKey = correctAnswer;
+  }
 
   // Clone and fill in display object
   if (!currentDisplay) {
@@ -586,7 +592,10 @@ export function createHistoryRecord({
   // Build complete record
   const answerLogRecord = {
     // Core IDs
-    'itemId': _id,
+    'stimuliSetId': stimuliSetId,
+    'stimulusKC': stimulusKC,
+    'clusterKC': clusterKC,
+    ...responseIdentityFields,
     'KCId': stimulusKC,
     'userId': Meteor.userId(),
     'TDFId': Session.get('currentTdfId'),

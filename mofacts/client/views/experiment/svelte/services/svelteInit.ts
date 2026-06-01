@@ -275,6 +275,46 @@ function isStimuliSetScopedToExpectedId(stimuliSet: unknown[], expectedStimuliSe
   return observedIds.every((stimuliSetId) => stimuliSetId === expected);
 }
 
+function isBlankIdentityValue(value: unknown): boolean {
+  return value === undefined || value === null || (typeof value === 'string' && value.trim().length === 0);
+}
+
+export function stampAndValidateStandardStimuliIdentity(
+  stimuliSet: unknown[],
+  expectedStimuliSetId: unknown,
+): Array<Record<string, unknown>> {
+  const normalizedExpectedStimuliSetId = normalizeStimuliScopeId(expectedStimuliSetId);
+  if (!normalizedExpectedStimuliSetId) {
+    throw new Error('[Svelte Init] Standard init requires a canonical stimuliSetId before preparing stimuli');
+  }
+
+  return stimuliSet.map((stim, index) => {
+    if (!stim || typeof stim !== 'object' || Array.isArray(stim)) {
+      throw new Error(`[Svelte Init] Standard stimulus ${index} must be an object`);
+    }
+    const stimulus = stim as Record<string, unknown>;
+    const observedStimuliSetId = normalizeStimuliScopeId(stimulus.stimuliSetId);
+    if (observedStimuliSetId && observedStimuliSetId !== normalizedExpectedStimuliSetId) {
+      throw new Error(
+        `[Svelte Init] Standard stimulus ${index} has stimuliSetId ${observedStimuliSetId}; expected ${normalizedExpectedStimuliSetId}`,
+      );
+    }
+    if (isBlankIdentityValue(stimulus.stimulusKC)) {
+      throw new Error(`[Svelte Init] Standard stimulus ${index} is missing stimulusKC`);
+    }
+    if (isBlankIdentityValue(stimulus.clusterKC)) {
+      throw new Error(`[Svelte Init] Standard stimulus ${index} is missing clusterKC`);
+    }
+    if (observedStimuliSetId) {
+      return stimulus;
+    }
+    return {
+      ...stimulus,
+      stimuliSetId: expectedStimuliSetId,
+    };
+  });
+}
+
 async function ensureCanonicalStimuliSetLoadedForStandardInit(tdfFile: TdfFileLike): Promise<void> {
   const currentScopeId = normalizeStimuliScopeId(Session.get('currentStimuliSetId'));
   const tdfScopeId = normalizeStimuliScopeId(tdfFile.stimuliSetId);
@@ -306,8 +346,12 @@ async function ensureCanonicalStimuliSetLoadedForStandardInit(tdfFile: TdfFileLi
       });
       Session.set('currentStimuliSet', undefined);
     } else {
-      if (repairedSessionStimuliSet !== sessionStimuliSet) {
-        Session.set('currentStimuliSet', repairedSessionStimuliSet);
+      const identityCheckedSessionStimuliSet = stampAndValidateStandardStimuliIdentity(
+        repairedSessionStimuliSet as unknown[],
+        expectedScopeId,
+      );
+      if (identityCheckedSessionStimuliSet !== sessionStimuliSet) {
+        Session.set('currentStimuliSet', identityCheckedSessionStimuliSet);
       }
       if (!Session.get('currentStimuliSetId') && tdfFile.stimuliSetId) {
         setActiveTdfContext({
@@ -323,12 +367,13 @@ async function ensureCanonicalStimuliSetLoadedForStandardInit(tdfFile: TdfFileLi
 
   const inlineStimuliSet = tdfFile.stimuli || tdfFile.content?.stimuli || null;
   if (Array.isArray(inlineStimuliSet) && inlineStimuliSet.length > 0) {
+    const repairedInlineStimuliSet = repairFormattedStimuliResponsesFromRaw(
+      inlineStimuliSet as Record<string, unknown>[],
+      tdfFile.rawStimuliFile
+    );
     Session.set(
       'currentStimuliSet',
-      repairFormattedStimuliResponsesFromRaw(
-        inlineStimuliSet as Record<string, unknown>[],
-        tdfFile.rawStimuliFile
-      )
+      stampAndValidateStandardStimuliIdentity(repairedInlineStimuliSet as unknown[], expectedScopeId)
     );
   } else {
     const stimuliSetId = Session.get('currentStimuliSetId') || tdfFile.stimuliSetId;
@@ -339,7 +384,10 @@ async function ensureCanonicalStimuliSetLoadedForStandardInit(tdfFile: TdfFileLi
     if (!Array.isArray(fetchedSet) || fetchedSet.length === 0) {
       throw new Error(`[Svelte Init] Stimuli set ${String(stimuliSetId)} could not be loaded for standard initialization`);
     }
-    Session.set('currentStimuliSet', fetchedSet);
+    Session.set(
+      'currentStimuliSet',
+      stampAndValidateStandardStimuliIdentity(fetchedSet, expectedScopeId)
+    );
   }
 
   if (!Session.get('currentStimuliSetId') && tdfFile.stimuliSetId) {

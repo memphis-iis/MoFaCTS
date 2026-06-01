@@ -7,6 +7,9 @@ describe('history reconstruction', function() {
       {
         time: 3000,
         outcome: 'incorrect',
+        stimuliSetId: 'set-a',
+        clusterKC: 2000,
+        stimulusKC: 'KC-2',
         KCCluster: 2000,
         KCId: 'KC-2',
         CFCorrectAnswer: 'Beta',
@@ -16,6 +19,9 @@ describe('history reconstruction', function() {
       {
         time: 1000,
         outcome: 'study',
+        stimuliSetId: 'set-a',
+        clusterKC: 1000,
+        stimulusKC: 'KC-1',
         KCCluster: 1000,
         KCId: 'KC-1',
         CFCorrectAnswer: 'Alpha',
@@ -25,6 +31,9 @@ describe('history reconstruction', function() {
       {
         time: 2000,
         outcome: 'correct',
+        stimuliSetId: 'set-a',
+        clusterKC: 1000,
+        stimulusKC: 'KC-1',
         KCCluster: 1000,
         KCId: 'KC-1',
         CFCorrectAnswer: 'Alpha',
@@ -123,6 +132,9 @@ describe('history reconstruction', function() {
       {
         time: 1000,
         outcome: 'correct',
+        stimuliSetId: 'set-a',
+        clusterKC: 'cluster-a',
+        stimulusKC: 'stim-a',
         KCCluster: 'cluster-a',
         KCId: 'stim-a',
         CFCorrectAnswer: 'Alpha',
@@ -132,6 +144,9 @@ describe('history reconstruction', function() {
       {
         time: 2000,
         outcome: 'incorrect',
+        stimuliSetId: 'set-a',
+        clusterKC: 'cluster-a',
+        stimulusKC: 'stim-a',
         KCCluster: 'cluster-a',
         KCId: 'stim-a',
         CFCorrectAnswer: 'Alpha',
@@ -141,6 +156,9 @@ describe('history reconstruction', function() {
       {
         time: 3000,
         outcome: 'correct',
+        stimuliSetId: 'set-a',
+        clusterKC: 'cluster-b',
+        stimulusKC: 'stim-b',
         KCCluster: 'cluster-b',
         KCId: 'stim-b',
         CFCorrectAnswer: 'Beta',
@@ -155,13 +173,63 @@ describe('history reconstruction', function() {
     expect(result.stimulusState['stim-b']?.otherPracticeTime).to.equal(0);
   });
 
+  it('uses explicit stimulus identity for replay state keys', function() {
+    const result = reconstructLearningStateFromHistory([
+      {
+        time: 1000,
+        outcome: 'correct',
+        stimuliSetId: 'set-a',
+        stimulusKC: 'stim-a',
+        clusterKC: 'cluster-a',
+        CFCorrectAnswer: 'Alpha',
+        CFEndLatency: 100,
+        CFFeedbackLatency: 100,
+      },
+    ]);
+
+    expect(result.clusterState['cluster-a']).to.not.equal(undefined);
+    expect(result.stimulusState['stim-a']).to.not.equal(undefined);
+  });
+
+  it('rejects mismatched explicit identity aliases', function() {
+    expect(() => reconstructLearningStateFromHistory([
+      {
+        time: 1000,
+        outcome: 'correct',
+        stimuliSetId: 'set-a',
+        stimulusKC: 'stim-a',
+        clusterKC: 'cluster-a',
+        KCCluster: 'cluster-a',
+        KCId: 'cluster-a',
+        CFCorrectAnswer: 'Alpha',
+        CFEndLatency: 100,
+        CFFeedbackLatency: 100,
+      },
+    ])).to.throw('KCId must equal stimulusKC');
+  });
+
+  it('rejects alias-only identity rows instead of reconstructing with hidden compatibility', function() {
+    expect(() => reconstructLearningStateFromHistory([
+      {
+        time: 1000,
+        outcome: 'correct',
+        KCCluster: 'cluster-a',
+        KCId: 'stim-a',
+        CFCorrectAnswer: 'Alpha',
+        CFEndLatency: 100,
+        CFFeedbackLatency: 100,
+      },
+    ])).to.throw('Missing required field clusterKC');
+  });
+
   it('fails closed when required replay fields are missing', function() {
     expect(() => reconstructLearningStateFromHistory([
       {
         time: 1000,
         outcome: 'correct',
-        KCCluster: 1000,
-        KCId: 'KC-1',
+        stimuliSetId: 'set-a',
+        clusterKC: 1000,
+        stimulusKC: 'KC-1',
       },
     ])).to.throw('CFCorrectAnswer');
   });
@@ -171,6 +239,9 @@ describe('history reconstruction', function() {
       {
         time: 1000,
         outcome: 'correct',
+        stimuliSetId: 'set-a',
+        clusterKC: 1000,
+        stimulusKC: 'KC-1',
         KCCluster: 1000,
         KCId: 'KC-1',
         CFCorrectAnswer: 'Alpha',

@@ -36,6 +36,7 @@ export interface StimLike extends Record<string, unknown> {
   stimuliSetId?: unknown;
   stimulusKC?: unknown;
   clusterKC?: unknown;
+  responseKC?: unknown;
   speechHintExclusionList?: string;
 }
 
@@ -441,9 +442,10 @@ export function buildCardDataFromResolvedTrial(params: {
       whichStim,
       probabilityEstimate,
     },
-    itemId: stim._id,
+    stimuliSetId: stim.stimuliSetId,
     stimulusKC: stim.stimulusKC,
-    clusterKC: stim.clusterKC || cluster.clusterKC,
+    clusterKC: stim.clusterKC,
+    responseKC: stim.responseKC,
     speechHintExclusionList: stim.speechHintExclusionList || '',
   };
 }

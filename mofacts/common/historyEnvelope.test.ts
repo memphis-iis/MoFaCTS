@@ -19,7 +19,9 @@ import { HISTORY_KEY_MAP, outputFields } from './Definitions';
 function createHistoryRecord(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     historySchemaVersion: 1,
-    itemId: 'item-1',
+    stimuliSetId: 'set-1',
+    stimulusKC: 'kc-1',
+    clusterKC: 'cluster-1',
     KCId: 'kc-1',
     userId: 'user-1',
     TDFId: 'tdf-1',
@@ -125,6 +127,9 @@ describe('canonical history envelope', function() {
     expect(compressed['34']).to.equal('answer');
     expect(compressed['63']).to.equal('h5p');
     expect(compressed['73']).to.equal(1);
+    expect(compressed['74']).to.equal('set-1');
+    expect(compressed['75']).to.equal('kc-1');
+    expect(compressed['76']).to.equal('cluster-1');
   });
 
   it('accepts only documented event types for the current schema', function() {
@@ -162,6 +167,23 @@ describe('canonical history envelope', function() {
 
     expect(() => assertCanonicalHistoryEnvelope(record))
       .to.throw('History record historySchemaVersion must be 1');
+  });
+
+  it('requires explicit stimulus identity for model-practice rows', function() {
+    const record = createHistoryRecord();
+    delete record.stimuliSetId;
+
+    expect(() => assertCanonicalHistoryEnvelope(record))
+      .to.throw('Model practice history record missing stimuliSetId');
+  });
+
+  it('rejects model-practice identity alias mismatches', function() {
+    const record = createHistoryRecord({
+      KCId: 'cluster-1',
+    });
+
+    expect(() => assertCanonicalHistoryEnvelope(record))
+      .to.throw('Model practice history identity mismatch: KCId must equal stimulusKC');
   });
 
   it('accepts bounded component-specific extension fields', function() {
