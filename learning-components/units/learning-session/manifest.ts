@@ -23,6 +23,7 @@ export const learningSessionUnitComponentManifest: LearningComponentManifest<Cre
   requiredServerMethods: [
     'getLearningHistoryForUnit',
     'getResponseKCMapForTdf',
+    'getStimulusCrowdStatsForDeck',
   ],
   register(context) {
     context.registerUnitEngineWithDeps(LEARNING_SESSION_UNIT_TYPE, (currentDeps) => {

@@ -3,10 +3,6 @@
   <title>mofacts_app</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, interactive-widget=resizes-content">
     <meta name="theme-color" content="#F2F2F2">
-    <script>
-      window.module = window.module || { exports: {} };
-      window.exports = window.exports || window.module.exports;
-    </script>
     <link rel="manifest" href="/site.webmanifest">
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 
@@ -40,6 +36,10 @@
   <!-- JSON Editor for TDF editing (schema-driven form generation) -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@json-editor/json-editor@2.15.2/dist/css/jsoneditor.min.css" />
   <script src="https://cdn.jsdelivr.net/npm/@json-editor/json-editor@2.15.2/dist/jsoneditor.min.js"></script>
+  <script>
+    window.module = window.module || { exports: {} };
+    window.exports = window.exports || window.module.exports;
+  </script>
 
   <!-- Local CSS loaded last to override Bootstrap defaults -->
   <link href="/styles/classic.css" rel="stylesheet">

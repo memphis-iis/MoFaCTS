@@ -2,7 +2,6 @@ services:
   mofacts:
     environment:
       PORT: 3000
-      MONGO_URL: mongodb://mongodb:27017/MoFACT-meteor3
       EXPECTED_MONGO_DB_NAME: MoFACT-meteor3
       METEOR_SETTINGS_WORKAROUND: /run/mofacts/settings.json
       MOFACTS_SELF_HOSTED: 'false'

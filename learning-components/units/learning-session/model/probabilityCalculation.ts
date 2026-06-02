@@ -69,6 +69,9 @@ export function calculateSingleProbability(params: CalculateSingleProbabilityPar
   p.stimSuccessCount = stim.priorCorrect;
   p.stimFailureCount = stim.priorIncorrect;
   p.stimTotalTests = p.stimSuccessCount + p.stimFailureCount;
+  p.crowdStimSuccessCount = stim.crowdStimSuccessCount || 0;
+  p.crowdStimFailureCount = stim.crowdStimFailureCount || 0;
+  p.crowdStimTotalTests = stim.crowdStimTotalTests || 0;
   p.stimStudyTrialCount = stim.priorStudy;
   p.stimTimeHistory = JSON.parse(JSON.stringify(stim.timeHistory || []));
   p.stimSpacingLagged = pFunc.spacingLagged(p.stimTimeHistory);

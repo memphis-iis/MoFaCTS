@@ -1,4 +1,9 @@
 import { createInitialModelState } from './model/modelStateFactory';
+import {
+  applyStimulusCrowdStatsToCards,
+  collectStimulusKCsForCrowdStats,
+  type StimulusCrowdStat,
+} from './model/stimulusCrowdStatsModel';
 import { resolveLearningSessionRuntimeConfig } from './learningSessionRuntimeConfig';
 
 export interface InitializeLearningModelStateParams {
@@ -9,6 +14,7 @@ export interface InitializeLearningModelStateParams {
   readonly currentUnitNumber: any;
   readonly stimClusters: any[];
   readonly getResponseKCMapForTdf: (tdfId: any) => Promise<Record<string, unknown>>;
+  readonly getStimulusCrowdStatsForDeck: (tdfId: any, stimulusKCs: Array<string | number>) => Promise<StimulusCrowdStat[]>;
   readonly setResponseKCMap: (responseKCMap: Record<string, unknown>) => void;
   readonly getStimParameterArrayFromCluster: (cluster: any, whichStim: number) => unknown[];
   readonly normalizeResponseText: (rawResponse: unknown) => string;
@@ -22,9 +28,17 @@ export async function initializeLearningModelState(
   params: InitializeLearningModelStateParams,
 ): Promise<void> {
   params.log(1, 'initializeLogisticModelState', params.numQuestions, params.curKCBase);
-  const responseKCMap = await params.getResponseKCMapForTdf(params.currentTdfId);
+  const stimulusKCs = collectStimulusKCsForCrowdStats(params.stimClusters);
+  const [responseKCMap, crowdStats] = await Promise.all([
+    params.getResponseKCMapForTdf(params.currentTdfId),
+    params.getStimulusCrowdStatsForDeck(params.currentTdfId, stimulusKCs),
+  ]);
   params.setResponseKCMap(responseKCMap);
   params.log(2, 'initializeLogisticModelState,responseKCMap', responseKCMap);
+  params.log(2, 'initializeLogisticModelState,stimulusCrowdStats', {
+    requested: stimulusKCs.length,
+    returned: crowdStats.length,
+  });
 
   const initialModelState = createInitialModelState({
     stimClusters: params.stimClusters,
@@ -37,6 +51,10 @@ export async function initializeLearningModelState(
   const initProbs = initialModelState.probabilities;
 
   params.setUpClusterList(initCards);
+  applyStimulusCrowdStatsToCards({
+    cards: initCards,
+    crowdStats,
+  });
 
   params.initCardProbs({
     cards: initCards,

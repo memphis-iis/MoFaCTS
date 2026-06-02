@@ -33,6 +33,7 @@ describe('Learning component catalog', function() {
         getAutoTutorHistoryForUnit: async () => [],
         getLearningHistoryForUnit: async () => [],
         getResponseKCMapForTdf: async () => ({}),
+        getStimulusCrowdStatsForDeck: async () => [],
       },
       currentUserHasRole: () => false,
       log() {},
@@ -59,6 +60,7 @@ describe('Learning component catalog', function() {
       'getAutoTutorHistoryForUnit',
       'getLearningHistoryForUnit',
       'getResponseKCMapForTdf',
+      'getStimulusCrowdStatsForDeck',
     ]);
     expect([...getCreateUnitEngineServerMethodSet(adapterWithoutServerMethods)].sort()).to.deep.equal([]);
 
@@ -132,7 +134,7 @@ describe('Learning component catalog', function() {
       .to.deep.include({
         id: 'mofacts.learning-session-unit',
         kind: 'unit',
-        requiredServerMethods: ['getLearningHistoryForUnit', 'getResponseKCMapForTdf'],
+        requiredServerMethods: ['getLearningHistoryForUnit', 'getResponseKCMapForTdf', 'getStimulusCrowdStatsForDeck'],
       });
     expect(summary.units.find((manifest) => manifest.id === 'mofacts.assessment-session-unit'))
       .to.deep.include({

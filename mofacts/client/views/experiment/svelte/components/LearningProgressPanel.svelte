@@ -154,6 +154,7 @@
     --progress-bar-density-scale: max(0.5, min(var(--app-density-scale), 2));
     --progress-bar-height: calc(3px * var(--progress-bar-density-scale));
     --progress-bar-gap: calc(2px * var(--progress-bar-density-scale));
+    --progress-scrollbar-gutter: calc(10px * var(--app-density-scale));
     --progress-panel-padding-x: calc(0.45rem * var(--app-density-scale));
     --progress-panel-padding-y: calc(0.35rem * var(--app-density-scale));
     --progress-panel-gap: calc(0.25rem * var(--app-density-scale));
@@ -336,9 +337,19 @@
     overflow: hidden;
   }
 
+  .learning-progress-chart::before {
+    content: "";
+    position: absolute;
+    inset: 0 var(--progress-scrollbar-gutter) 0 0;
+    box-sizing: border-box;
+    border: 1px solid var(--app-text-color);
+    pointer-events: none;
+    z-index: 3;
+  }
+
   .learning-progress-lines {
     position: absolute;
-    inset: 0;
+    inset: 0 var(--progress-scrollbar-gutter) 0 0;
     z-index: 2;
     pointer-events: none;
   }
@@ -388,6 +399,7 @@
     z-index: 1;
     overflow-x: hidden;
     overflow-y: auto;
+    scrollbar-gutter: stable;
     scrollbar-width: thin;
     scrollbar-color: var(--app-secondary-surface-color) transparent;
   }
@@ -420,7 +432,10 @@
     display: flex;
     justify-content: space-between;
     gap: var(--progress-panel-gap);
-    padding: var(--progress-panel-padding-y) var(--progress-panel-padding-x);
+    padding: var(--progress-panel-padding-y)
+      calc(var(--progress-panel-padding-x) + var(--progress-scrollbar-gutter))
+      var(--progress-panel-padding-y)
+      var(--progress-panel-padding-x);
     border-top: 1px solid var(--app-secondary-surface-color);
     color: var(--app-secondary-text-color);
     font-size: calc(var(--app-font-size-base) * 0.62);

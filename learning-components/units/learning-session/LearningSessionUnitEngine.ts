@@ -55,6 +55,15 @@ type StimClusterLike = {
 
 export type LearningSessionServerMethods = {
   readonly getResponseKCMapForTdf: (tdfId: any) => Promise<Record<string, unknown>>;
+  readonly getStimulusCrowdStatsForDeck: (
+    tdfId: any,
+    stimulusKCs: Array<string | number>,
+  ) => Promise<Array<{
+    stimulusKC: string | number;
+    correctCount: number;
+    incorrectCount: number;
+    totalCount: number;
+  }>>;
   readonly getLearningHistoryForUnit: (
     userId: any,
     tdfId: any,
@@ -184,6 +193,7 @@ export async function createLearningSessionUnitEngine(deps: CreateLearningSessio
         currentUnitNumber: deps.getSessionValue('currentUnitNumber'),
         stimClusters,
         getResponseKCMapForTdf: deps.serverMethods.getResponseKCMapForTdf,
+        getStimulusCrowdStatsForDeck: deps.serverMethods.getStimulusCrowdStatsForDeck,
         setResponseKCMap: (responseKCMap) => deps.setSessionValue('responseKCMap', responseKCMap),
         getStimParameterArrayFromCluster,
         normalizeResponseText: (rawResponse) => stripSpacesAndLowerCase(deps.getDisplayAnswerText(rawResponse as string)),
@@ -356,8 +366,13 @@ export async function createLearningSessionUnitEngine(deps: CreateLearningSessio
     selectNextCard: async function(indices: any, curExperimentState: any) {
       const selection = await this._buildNextCardSelection(indices, {});
       if (!selection) {
-        deps.unitIsFinished('No more cards to show');
-        return;
+        if (await this.unitFinished()) {
+          deps.unitIsFinished('Learning session completion rule satisfied');
+          return;
+        }
+        throw new Error(
+          'Learning session selection produced no card before a completion rule was satisfied; refusing to advance unit.'
+        );
       }
       await this._applyNextCardSelection(selection, curExperimentState);
       return selection;

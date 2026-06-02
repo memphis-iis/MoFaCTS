@@ -11,6 +11,15 @@ export type UnitEngineServerMethods = {
     resetStudentPerformance: boolean,
   ) => Promise<any[]>;
   readonly getResponseKCMapForTdf: (tdfId: any) => Promise<Record<string, unknown>>;
+  readonly getStimulusCrowdStatsForDeck: (
+    tdfId: any,
+    stimulusKCs: Array<string | number>,
+  ) => Promise<Array<{
+    stimulusKC: string | number;
+    correctCount: number;
+    incorrectCount: number;
+    totalCount: number;
+  }>>;
 };
 
 export function getUnitEngineServerMethodNames(): Set<keyof UnitEngineServerMethods> {
@@ -18,5 +27,6 @@ export function getUnitEngineServerMethodNames(): Set<keyof UnitEngineServerMeth
     'getAutoTutorHistoryForUnit',
     'getLearningHistoryForUnit',
     'getResponseKCMapForTdf',
+    'getStimulusCrowdStatsForDeck',
   ]);
 }

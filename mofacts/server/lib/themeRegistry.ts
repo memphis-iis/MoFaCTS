@@ -486,20 +486,28 @@ class ThemeRegistry {
     return theme;
   }
 
-  registerTheme(themeData: any, readOnly: boolean, filePath: string | null) {
-    let candidateId = themeData.id || slugify(themeData.themeName);
+  allocateThemeId(baseId: string) {
+    const normalizedBaseId = slugify(baseId);
+    let candidateId = normalizedBaseId;
     let counter = 1;
     while (this.themes.has(candidateId)) {
-      candidateId = `${themeData.id}-${counter++}`;
+      candidateId = `${normalizedBaseId}-${counter++}`;
+    }
+    return candidateId;
+  }
+
+  registerTheme(themeData: any, readOnly: boolean, filePath: string | null) {
+    const candidateId = themeData.id || slugify(themeData.themeName);
+    if (this.themes.has(candidateId)) {
+      const existing = this.themes.get(candidateId);
+      const existingName = existing?.data?.metadata?.name || existing?.data?.themeName || 'unknown';
+      const incomingName = themeData?.metadata?.name || themeData?.themeName || 'unknown';
+      throw new Error(`Theme id collision for "${candidateId}" between "${existingName}" and "${incomingName}"`);
     }
 
-    if (candidateId !== themeData.id) {
-      themeData.id = candidateId;
-      themeData.metadata.id = candidateId;
-      if (readOnly) {
-        themeData.metadata.filename = sanitizeFilename(candidateId);
-      }
-    }
+    themeData.id = candidateId;
+    themeData.metadata = themeData.metadata || {};
+    themeData.metadata.id = candidateId;
 
     this.themes.set(candidateId, {
       id: candidateId,
@@ -669,11 +677,14 @@ class ThemeRegistry {
 
     const baseEntry = baseThemeId ? this.getThemeEntry(baseThemeId) : this.getThemeEntry(DEFAULT_THEME_ID);
     const baseData = baseEntry ? baseEntry.data : FALLBACK_THEME;
+    const themeId = this.allocateThemeId(name);
     const themeData = sanitizeTheme(
       {
         ...baseData,
+        id: themeId,
         metadata: {
           ...baseData.metadata,
+          id: themeId,
           name
         },
         properties: {
@@ -696,7 +707,7 @@ class ThemeRegistry {
   async importTheme(themePayload: string | Record<string, any>) {
     const raw = typeof themePayload === 'string' ? JSON.parse(themePayload) : themePayload;
     const sanitized = sanitizeTheme(raw, 'custom', raw?.metadata?.filename);
-    sanitized.id = `${slugify(sanitized.metadata.name)}-${randomBytes(2).toString('hex')}`;
+    sanitized.id = this.allocateThemeId(`${slugify(sanitized.metadata.name)}-${randomBytes(2).toString('hex')}`);
     sanitized.metadata.id = sanitized.id;
     const theme = this.prepareStoredCustomTheme(sanitized);
     this.registerTheme(theme, false, null);

@@ -54,13 +54,16 @@ export function applyAnswerUpdate(params: ApplyAnswerUpdateParams): void {
     stim.priorCorrect += 1;
     stim.curSessionPriorCorrect += 1;
     stim.allTimeCorrect += 1;
+    stim.crowdStimSuccessCount = Number(stim.crowdStimSuccessCount || 0) + 1;
   } else {
     card.priorIncorrect += 1;
     card.allTimeIncorrect += 1;
     stim.priorIncorrect += 1;
     stim.curSessionPriorIncorrect += 1;
     stim.allTimeIncorrect += 1;
+    stim.crowdStimFailureCount = Number(stim.crowdStimFailureCount || 0) + 1;
   }
+  stim.crowdStimTotalTests = Number(stim.crowdStimTotalTests || 0) + 1;
 
   card.outcomeStack.push(params.wasCorrect ? 1 : 0);
   stim.outcomeStack.push(params.wasCorrect ? 1 : 0);

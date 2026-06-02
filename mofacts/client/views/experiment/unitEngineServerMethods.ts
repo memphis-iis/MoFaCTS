@@ -30,5 +30,15 @@ export function createUnitEngineServerMethods(
       'getResponseKCMapForTdf',
       tdfId,
     ) as Record<string, unknown>,
+    getStimulusCrowdStatsForDeck: async (tdfId, stimulusKCs) => await deps.meteorCallAsync(
+      'getStimulusCrowdStatsForDeck',
+      tdfId,
+      stimulusKCs,
+    ) as Array<{
+      stimulusKC: string | number;
+      correctCount: number;
+      incorrectCount: number;
+      totalCount: number;
+    }>,
   };
 }
