@@ -81,6 +81,31 @@ The readiness command must call the admin-only deployment readiness path for tha
 
 Use this loop when the goal is fast local UI/application iteration with browser/MCP observation.
 
+### First-Time Windows Setup
+
+Before starting the loop on a new Windows machine, confirm the local runtime prerequisites:
+
+```powershell
+node --version
+npm --version
+docker version
+docker compose version
+```
+
+The supported baseline is Node.js `22.x`, npm `10.x`, Docker Desktop with the Linux engine running, and the Meteor release declared in `../mofacts/.meteor/release`. If `hotfix-dev.ps1` reports that the matching Meteor tool is missing under `$env:LOCALAPPDATA\.meteor\packages\meteor-tool`, install the project release once:
+
+```powershell
+npm install -g meteor@3.4.1 --foreground-script
+```
+
+Then verify the project tool is available:
+
+```powershell
+Test-Path "$env:LOCALAPPDATA\.meteor\packages\meteor-tool\3.4.1\mt-os.windows.x86_64\meteor.bat"
+```
+
+That check should return `True`. If `docker version` prints a client version but cannot connect to `dockerDesktopLinuxEngine`, start or restart Docker Desktop before running the hotfix loop.
+
 Start the persistent native Meteor dev server:
 
 ```powershell
@@ -94,11 +119,21 @@ The dev app is exposed at:
 http://localhost:3200
 ```
 
+The launcher also ensures a local admin account for the owner configured in `settings.local.json`. On a new local database, the default hotfix-dev login is `admin@localhost.test` with password `local-admin-2026`. Credentials are written to ignored local state and preserved there:
+
+```powershell
+Get-Content .\local-dev\agent-secrets.env
+```
+
+Use `MOFACTS_AGENT_ADMIN_EMAIL` and `MOFACTS_AGENT_ADMIN_PASSWORD` from that file to sign in locally. If the local database already contains that admin account with a different password, the launcher fails clearly instead of resetting it silently; reset the local database or account deliberately before changing the saved password.
+
 Follow Meteor startup and incremental rebuild output:
 
 ```powershell
 .\hotfix-dev.ps1 logs
 ```
+
+On first startup after installing Meteor or refreshing local caches, the log may sit at `Started proxy` for a few minutes while Meteor/Rspack finishes the initial build. Wait for `Started your app` and verify `http://localhost:3200` before treating startup as complete.
 
 Check or control the service:
 
@@ -114,6 +149,7 @@ The dev server:
 - uses Docker only for the local MongoDB service,
 - publishes MongoDB on `127.0.0.1:27017` through `docker-compose.hotfix-native.yml`,
 - uses the local MongoDB database `MoFACT-meteor3`,
+- creates or verifies the local admin account through the running app and stores credentials in ignored `deploy/local-dev/agent-secrets.env`,
 - sets `HOME` to `deploy/local-data` so dynamic assets and H5P content resolve to the same local data folders as the container workflows,
 - writes logs and a PID file to ignored local state under `deploy/local-dev/`,
 - maintains an ignored `.meteor/local/build/package.json` marker so Meteor's generated CommonJS dev bundle is not treated as ESM by the app root package,

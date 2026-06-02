@@ -20,11 +20,14 @@ $watcherStderrPath = Join-Path $localDevDir "commonjs-watcher.stderr.log"
 $settingsPath = Join-Path $deployDir "settings.local.json"
 $localDataHome = Join-Path $deployDir "local-data"
 $commonJsWatcherScript = Join-Path $deployDir "hotfix-dev\ensure-commonjs-build.ps1"
+$localAdminScript = Join-Path $deployDir "hotfix-dev\ensure-local-admin.cjs"
+$localAgentSecretsPath = Join-Path $localDevDir "agent-secrets.env"
 $meteorReleasePath = Join-Path $appDir ".meteor\release"
 
 $expectedMongoDbName = "MoFACT-meteor3"
 $rootUrl = "http://localhost:3200"
 $port = "3200"
+$defaultLocalAdminPassword = "local-admin-2026"
 
 $composeArgs = @(
     "compose",
@@ -137,6 +140,45 @@ function Read-LocalEnvValue {
     return ""
 }
 
+function Read-JsonFile {
+    param([string]$Path)
+
+    if (-not (Test-Path $Path)) {
+        throw "Missing JSON file at $Path"
+    }
+
+    return Get-Content $Path -Raw | ConvertFrom-Json
+}
+
+function Read-AgentSecretValue {
+    param([string]$Name)
+
+    if (-not (Test-Path $localAgentSecretsPath)) {
+        return ""
+    }
+
+    foreach ($line in Get-Content $localAgentSecretsPath) {
+        $trimmed = $line.Trim()
+        if (-not $trimmed -or $trimmed.StartsWith("#")) {
+            continue
+        }
+
+        $separatorIndex = $trimmed.IndexOf("=")
+        if ($separatorIndex -lt 1) {
+            continue
+        }
+
+        $key = $trimmed.Substring(0, $separatorIndex).Trim()
+        if ($key -ne $Name) {
+            continue
+        }
+
+        return $trimmed.Substring($separatorIndex + 1).Trim().Trim('"').Trim("'")
+    }
+
+    return ""
+}
+
 function Get-NativeMongoUrl {
     $composeMongoUrl = Read-LocalEnvValue -Name "MONGO_URL"
     if (-not $composeMongoUrl) {
@@ -146,12 +188,155 @@ function Get-NativeMongoUrl {
     return $composeMongoUrl -replace "@mongodb:", "@127.0.0.1:" -replace "//mongodb:", "//127.0.0.1:"
 }
 
+function Get-LocalAdminEmail {
+    $settings = Read-JsonFile -Path $settingsPath
+    $owner = ""
+    if ($null -ne $settings.owner) {
+        $owner = [string]$settings.owner
+    }
+    if (-not $owner.Trim()) {
+        throw "settings.local.json must define owner for local admin bootstrap"
+    }
+
+    return $owner.Trim().ToLowerInvariant()
+}
+
+function New-LocalAdminPassword {
+    return $defaultLocalAdminPassword
+}
+
+function Ensure-LocalAgentSecrets {
+    if (-not (Test-Path $localDevDir)) {
+        New-Item -ItemType Directory -Path $localDevDir | Out-Null
+    }
+
+    $email = Read-AgentSecretValue -Name "MOFACTS_AGENT_ADMIN_EMAIL"
+    $password = Read-AgentSecretValue -Name "MOFACTS_AGENT_ADMIN_PASSWORD"
+    $expectedEmail = Get-LocalAdminEmail
+
+    if (-not $email -or $email -ne $expectedEmail) {
+        $email = $expectedEmail
+    }
+
+    if (-not $password) {
+        $password = New-LocalAdminPassword
+    }
+
+    $content = @(
+        "MOFACTS_AGENT_ADMIN_EMAIL=$email",
+        "MOFACTS_AGENT_ADMIN_PASSWORD=$password"
+    )
+    Set-Content -Path $localAgentSecretsPath -Value $content
+
+    return @{
+        Email = $email
+        Password = $password
+        Path = $localAgentSecretsPath
+    }
+}
+
+function Ensure-CommonJsBuildMarker {
+    $buildDir = Join-Path $appDir ".meteor\local\build"
+    if (-not (Test-Path $buildDir)) {
+        New-Item -ItemType Directory -Path $buildDir | Out-Null
+    }
+
+    Set-Content -Path (Join-Path $buildDir "package.json") -Value "{`"type`":`"commonjs`"}" -NoNewline
+}
+
+function Wait-HotfixDevReady {
+    param([int]$TimeoutSeconds = 360)
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    do {
+        $existing = Get-HotfixDevProcess
+        if ($null -eq $existing) {
+            throw "Hotfix dev server exited before it became ready"
+        }
+
+        if (Test-Path $stdoutPath) {
+            $stdout = Get-Content -Path $stdoutPath -Raw -ErrorAction SilentlyContinue
+            if ($stdout -match "=> App running at") {
+                return
+            }
+
+            if ($stdout -match "=> Your application is crashing") {
+                throw "Hotfix dev server is crashing. Run .\hotfix-dev.ps1 logs for details."
+            }
+        }
+
+        if (Test-Path $stderrPath) {
+            $stderr = Get-Content -Path $stderrPath -Raw -ErrorAction SilentlyContinue
+            if ($stderr -match "ReferenceError|SyntaxError|TypeError|Error:") {
+                $latestError = ($stderr -split "`r?`n" | Where-Object { $_.Trim() } | Select-Object -First 1)
+                throw "Hotfix dev server startup error: $latestError"
+            }
+        }
+
+        Start-Sleep -Seconds 5
+    } while ((Get-Date) -lt $deadline)
+
+    throw "Timed out waiting for hotfix dev server at $rootUrl"
+}
+
+function Ensure-LocalAdminAccount {
+    $secrets = Ensure-LocalAgentSecrets
+    $nodeExe = Resolve-ExternalCommandName -CommandName "node"
+
+    $previousEmail = $env:MOFACTS_AGENT_ADMIN_EMAIL
+    $previousPassword = $env:MOFACTS_AGENT_ADMIN_PASSWORD
+    $previousDdpUrl = $env:MOFACTS_AGENT_DDP_URL
+
+    try {
+        $env:MOFACTS_AGENT_ADMIN_EMAIL = $secrets.Email
+        $env:MOFACTS_AGENT_ADMIN_PASSWORD = $secrets.Password
+        $env:MOFACTS_AGENT_DDP_URL = "ws://localhost:$port/websocket"
+        Write-Host "Running: $nodeExe $localAdminScript"
+        Push-Location $deployDir
+        try {
+            $output = & $nodeExe $localAdminScript 2>&1
+            $exitCode = $LASTEXITCODE
+        } finally {
+            Pop-Location
+        }
+
+        if ($output) {
+            $output | ForEach-Object { Write-Host $_ }
+        }
+        if ($exitCode -ne 0) {
+            throw "Local admin bootstrap failed with exit code $exitCode"
+        }
+
+        $result = $null
+        foreach ($line in $output) {
+            $trimmed = [string]$line
+            $trimmed = $trimmed.Trim()
+            if ($trimmed.StartsWith("{") -and $trimmed.EndsWith("}")) {
+                $result = $trimmed | ConvertFrom-Json
+            }
+        }
+
+        Write-Host "Local admin ready: $($secrets.Email)"
+        Write-Host "Local admin credentials: $($secrets.Path)"
+        return ($null -ne $result -and $result.created -eq $true)
+    } finally {
+        $env:MOFACTS_AGENT_ADMIN_EMAIL = $previousEmail
+        $env:MOFACTS_AGENT_ADMIN_PASSWORD = $previousPassword
+        $env:MOFACTS_AGENT_DDP_URL = $previousDdpUrl
+    }
+}
+
 function Get-HotfixDevProcess {
     if (-not (Test-Path $pidPath)) {
         return $null
     }
 
-    $rawPid = (Get-Content $pidPath -Raw).Trim()
+    $pidContent = Get-Content $pidPath -Raw -ErrorAction SilentlyContinue
+    if ($null -eq $pidContent) {
+        return $null
+    }
+
+    $rawPid = $pidContent.Trim()
     if (-not $rawPid) {
         return $null
     }
@@ -189,6 +374,10 @@ function Assert-RequiredFiles {
 
     if (-not (Test-Path $commonJsWatcherScript)) {
         throw "Missing CommonJS build guard script at $commonJsWatcherScript"
+    }
+
+    if (-not (Test-Path $localAdminScript)) {
+        throw "Missing local admin bootstrap script at $localAdminScript"
     }
 }
 
@@ -234,6 +423,7 @@ function Start-HotfixDev {
     Assert-RequiredFiles
     Remove-StaleLocalBuild
     Ensure-RspackDevBootstrap
+    Ensure-CommonJsBuildMarker
 
     $existing = Get-HotfixDevProcess
     if ($null -ne $existing) {
@@ -251,6 +441,7 @@ function Start-HotfixDev {
 
     Invoke-ExternalChecked -CommandLine (@($dockerExe) + $composeArgs + @("config")) -WorkingDirectory $deployDir
     Invoke-ExternalChecked -CommandLine (@($dockerExe) + $composeArgs + @("up", "-d", "mongodb")) -WorkingDirectory $deployDir
+    Ensure-LocalAgentSecrets | Out-Null
 
     Set-Content -Path $stdoutPath -Value ""
     Set-Content -Path $stderrPath -Value ""
@@ -310,6 +501,14 @@ function Start-HotfixDev {
         $env:HOME = $previousHome
         $env:PATH = $previousPath
         $env:METEOR_INSTALLATION = $previousMeteorInstallation
+    }
+
+    Wait-HotfixDevReady
+    $createdLocalAdmin = Ensure-LocalAdminAccount
+    if ($createdLocalAdmin) {
+        Write-Host "Local admin was created for the first time; restarting once so startup sees the owner/admin account."
+        Stop-HotfixDev
+        Start-HotfixDev
     }
 }
 

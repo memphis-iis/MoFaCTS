@@ -7,6 +7,7 @@ This guide covers the public contributor baseline for MoFaCTS.
 - Node.js `22.x`
 - npm `10.x`
 - Meteor `3.4`
+- Docker Desktop for local Compose-backed workflows
 - Git
 
 ## Setup
@@ -19,6 +20,14 @@ npm ci
 ```
 
 Adjust `settings.json` for your local environment. Do not commit local settings or secrets.
+
+For the Windows native hotfix dev loop, use the deployment notes in `deploy/README.md`. On a new machine, install/cache the exact Meteor release from `mofacts/.meteor/release` before running `deploy/hotfix-dev.ps1`; for the current app release that is:
+
+```powershell
+npm install -g meteor@3.4.1 --foreground-script
+```
+
+Docker Desktop must be running because the hotfix loop runs Meteor natively but uses Docker Compose for MongoDB.
 
 ## Common Checks
 

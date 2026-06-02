@@ -14,3 +14,7 @@ Does not belong here:
 - Generated logs, PID files, or local database content.
 
 The hotfix dev loop is intended for fast observe/edit/reload UI and application work at `http://localhost:3200`.
+
+On a first-time Windows machine, see `../README.md` for the Meteor tool cache and Docker Desktop checks required before `hotfix-dev.ps1 start` can succeed.
+
+`ensure-commonjs-build.ps1` keeps Meteor's generated build marked as CommonJS. `ensure-local-admin.cjs` signs in through DDP after startup so the local owner/admin account exists and has the `admin` role; credentials live in ignored `../local-dev/agent-secrets.env`.
