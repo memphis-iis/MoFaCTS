@@ -96,6 +96,19 @@ export function registerDdpRateLimits(deps: DdpRateLimitDeps) {
     userId(userId: string | null | undefined) { return !!userId; }
   }, 30, 3600000);
 
+  DDPRateLimiter.addRule({
+    type: 'method',
+    name(name: string) {
+      return [
+        'updateOwnProfile',
+        'updateOwnOpenRouterSettings',
+        'deleteOwnOpenRouterKey',
+        'testOwnOpenRouterSettings'
+      ].includes(name);
+    },
+    userId(userId: string | null | undefined) { return !!userId; }
+  }, 30, 3600000);
+
   DDPRateLimiterWithErrorMessage.setErrorMessage(function(rateLimitResult: RateLimitResult) {
     const { timeToReset, numInvocationsLeft } = rateLimitResult;
     const seconds = Math.ceil(timeToReset / 1000);

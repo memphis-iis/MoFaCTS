@@ -6,6 +6,7 @@ import { Cookie } from '../../lib/cookies';
 import { currentUserHasRole } from '../../lib/roleUtils';
 import { getUserDisplayName, getUserInitials } from '../../lib/userIdentity';
 import { applyThemeCSSProperties } from '../../lib/currentTestingHelpers';
+import { findProfileAvatarIcon, normalizeProfileAvatarType } from '../../../common/profileAvatar';
 import './home.html';
 import './home.css';
 
@@ -367,6 +368,31 @@ Template.appAccountMenu.helpers({
     return getUserInitials(Meteor.user());
   },
 
+  userAvatarClass(): string {
+    const avatarType = normalizeProfileAvatarType(Meteor.user()?.profile?.avatarType);
+    return `avatar-${avatarType}`;
+  },
+
+  userAvatarIsImage(): boolean {
+    const user = Meteor.user();
+    return normalizeProfileAvatarType(user?.profile?.avatarType) === 'image' &&
+      typeof user?.profile?.avatarImageData === 'string' &&
+      user.profile.avatarImageData.length > 0;
+  },
+
+  userAvatarImageData(): string {
+    return String(Meteor.user()?.profile?.avatarImageData || '');
+  },
+
+  userAvatarIsIcon(): boolean {
+    return normalizeProfileAvatarType(Meteor.user()?.profile?.avatarType) === 'icon' &&
+      !!findProfileAvatarIcon(Meteor.user()?.profile?.avatarIconId);
+  },
+
+  userAvatarIconClass(): string {
+    return findProfileAvatarIcon(Meteor.user()?.profile?.avatarIconId)?.className || 'fa-user';
+  },
+
   userDisplayName(): string {
     return getUserDisplayName(Meteor.user());
   },
@@ -524,6 +550,7 @@ Template.appAccountMenu.events({
     }
 
     const routes: Record<string, string> = {
+      profile: '/profile',
       audioSettings: '/audioSettings',
       classSelection: '/classSelection',
       help: '/help',
@@ -691,6 +718,7 @@ Template.home.events({
     }
 
     const routes: Record<string, string> = {
+      profile: '/profile',
       audioSettings: '/audioSettings',
       classSelection: '/classSelection',
       help: '/help',

@@ -843,7 +843,15 @@ Meteor.publish('contentUploadOwners', async function(ownerIds: any[] = []) {
 
     return Meteor.users.find(
         { _id: { $in: uniqueOwnerIds } },
-        { fields: { username: 1, profile: 1 } }
+        {
+            fields: {
+                username: 1,
+                'profile.displayName': 1,
+                'profile.avatarType': 1,
+                'profile.avatarIconId': 1,
+                'profile.avatarImageData': 1
+            }
+        }
     );
 });
 

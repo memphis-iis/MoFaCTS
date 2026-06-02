@@ -13,6 +13,7 @@ export const routeAccessPolicies: Readonly<Record<string, RouteAccessPolicy>> = 
   'client.manualContentCreator': { requiresAuth: true },
   'client.contentEdit': { requiresAuth: true },
   'client.tdfEdit': { requiresAuth: true },
+  'client.profile': { requiresAuth: true },
   'client.dataDownload': { requiresAuth: true },
   'client.adminControls': { requiresAuth: true, allowedRoles: 'admin' },
   'client.adminTests': { requiresAuth: true, allowedRoles: 'admin' },

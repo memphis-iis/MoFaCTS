@@ -47,6 +47,7 @@ import { createDashboardCacheMethods } from './methods/dashboardCacheMethods';
 import { createDeploymentReadinessMethods } from './methods/deploymentReadinessMethods';
 import { createExperimentMethods } from './methods/experimentMethods';
 import { createPackageMethods } from './methods/packageMethods';
+import { createProfileMethods } from './methods/profileMethods';
 import { createSpeechMethods } from './methods/speechMethods';
 import { createSystemMethods } from './methods/systemMethods';
 import { createTurkWorkflowMethods } from './methods/turkWorkflowMethods';
@@ -655,6 +656,12 @@ export const methods: any = {
     requireAdminUser,
     getMethodAuthorizationDeps,
     updateActiveThemeDocument,
+  }),
+
+  ...createProfileMethods({
+    usersCollection: MeteorAny.users,
+    encryptData,
+    decryptData,
   }),
 }
 

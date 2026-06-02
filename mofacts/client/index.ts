@@ -75,6 +75,7 @@ const APP_SHELL_TEMPLATES = new Set([
   'contentEdit',
   'tdfEdit',
   'dataDownload',
+  'profile',
   'audioSettings',
   'classSelection',
   'help',
@@ -99,6 +100,7 @@ const APP_SHELL_TITLES: Record<string, string> = {
   contentEdit: 'Create Content',
   tdfEdit: 'Create Content',
   dataDownload: 'Detailed Data',
+  profile: 'Profile',
   audioSettings: 'Audio Settings',
   classSelection: 'Teacher Select',
   help: 'Help',
@@ -480,7 +482,6 @@ const PUBLIC_LOGOUT_PATHS = new Set([
   '/signup',
   '/resetPassword',
   '/help',
-  '/setTheme',
   '/signIn',
   '/signin',
 ]);

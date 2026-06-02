@@ -123,13 +123,24 @@
 
 <template name="appAccountMenu">
   <div class="user-area" id="userToggle" role="button" tabindex="0" aria-haspopup="true" aria-expanded="false">
-    <div class="avatar">{{userInitials}}</div>
+    <div class="avatar {{userAvatarClass}}">
+      {{#if userAvatarIsImage}}
+        <img src="{{userAvatarImageData}}" alt="" aria-hidden="true">
+      {{else}}
+        {{#if userAvatarIsIcon}}
+          <span class="fa {{userAvatarIconClass}}" aria-hidden="true"></span>
+        {{else}}
+          {{userInitials}}
+        {{/if}}
+      {{/if}}
+    </div>
     <div class="user-info">
       <div class="user-email">{{userDisplayName}}</div>
       <div class="user-role">{{userRoleLabel}}</div>
     </div>
     <span class="fa fa-chevron-down caret" aria-hidden="true"></span>
     <div class="home-user-menu" id="userDropdown">
+      <button type="button" class="dropdown-item" data-home-action="profile">Profile</button>
       <button type="button" class="dropdown-item" data-home-action="audioSettings">Audio settings</button>
       <button type="button" class="dropdown-item dropdown-item-with-caret" data-home-action="toggleTheme" aria-expanded="{{#if themeMenuOpen}}true{{else}}false{{/if}}" aria-controls="themeSelectionMenu">
         <span>Toggle theme</span>

@@ -1,0 +1,128 @@
+<template name="profile">
+  <div class="profile-page">
+    <div class="profile-layout">
+      <section class="profile-section">
+        <div class="profile-section-heading">
+          <span class="fa fa-lock profile-section-icon" aria-hidden="true"></span>
+          <h2>Private Account Information</h2>
+        </div>
+
+        <div class="profile-field">
+          <label for="profileEmail">Email</label>
+          <input id="profileEmail" type="email" value="{{email}}" readonly>
+          <p>Used for login. Not shown to other users.</p>
+        </div>
+
+        <div class="profile-field">
+          <label for="profileName">Name</label>
+          <input id="profileName" type="text" maxlength="100" value="{{name}}">
+          <p>Used for personal communications. Not shown to other users.</p>
+        </div>
+      </section>
+
+      <section class="profile-section">
+        <div class="profile-section-heading">
+          <span class="fa fa-user-circle profile-section-icon" aria-hidden="true"></span>
+          <h2>Public Profile</h2>
+        </div>
+
+        <div class="profile-avatar-row">
+          <div class="profile-avatar-preview" aria-label="Avatar preview">
+            {{#if previewIsImage}}
+              <img src="{{previewImageData}}" alt="" aria-hidden="true">
+            {{else}}
+              {{#if previewIsIcon}}
+                <span class="fa {{previewIconClass}}" aria-hidden="true"></span>
+              {{else}}
+                {{previewInitials}}
+              {{/if}}
+            {{/if}}
+          </div>
+
+          <div class="profile-avatar-controls">
+            <div class="profile-field">
+              <label for="profileDisplayName">Display Name</label>
+              <input id="profileDisplayName" type="text" maxlength="60" value="{{displayName}}">
+              <p>Shown to other users and in your Account menu.</p>
+            </div>
+
+            <div class="profile-segmented-control" role="group" aria-label="Avatar type">
+              <button type="button" class="{{#if avatarTypeIs 'initials'}}active{{/if}}" data-avatar-type="initials">Initials</button>
+              <button type="button" class="{{#if avatarTypeIs 'icon'}}active{{/if}}" data-avatar-type="icon">Icon</button>
+              <button type="button" class="{{#if avatarTypeIs 'image'}}active{{/if}}" data-avatar-type="image">Picture</button>
+            </div>
+
+            <div class="profile-icon-grid" aria-label="Avatar icons">
+              {{#each avatarOptions}}
+                <button type="button" class="{{#if avatarIconSelected id}}active{{/if}}" data-avatar-icon="{{id}}" title="{{label}}" aria-label="{{label}}">
+                  <span class="fa {{avatarIconClass id}}" aria-hidden="true"></span>
+                </button>
+              {{/each}}
+            </div>
+
+            <div class="profile-avatar-image-actions">
+              <input id="profileAvatarUpload" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+              <button id="profileAvatarUploadButton" type="button">
+                <span class="fa fa-upload" aria-hidden="true"></span>
+                Upload Picture
+              </button>
+              {{#if previewIsImage}}
+                <button id="profileAvatarRemoveImage" type="button">
+                  <span class="fa fa-trash" aria-hidden="true"></span>
+                  Remove Picture
+                </button>
+              {{/if}}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="profile-section">
+        <div class="profile-section-heading">
+          <span class="fa fa-plug profile-section-icon" aria-hidden="true"></span>
+          <h2>AI Provider</h2>
+        </div>
+
+        {{#if hasOpenRouterKey}}
+          <div class="profile-key-status" role="status">
+            <span class="fa fa-check-circle" aria-hidden="true"></span>
+            Key saved
+          </div>
+        {{/if}}
+
+        <div class="profile-field">
+          <label for="openRouterApiKey">OpenRouter API Key</label>
+          <input id="openRouterApiKey" type="password" autocomplete="new-password" placeholder="OpenRouter API key">
+          <p>Used only for your own AI content generation requests. Your key is never shown after saving.</p>
+        </div>
+
+        <div class="profile-field">
+          <label for="openRouterDefaultModel">Default OpenRouter Model</label>
+          <input id="openRouterDefaultModel" type="text" maxlength="160" value="{{openRouterDefaultModel}}" placeholder="openai/gpt-4o-mini">
+          <p>Used as your default model for AI-assisted content creation.</p>
+        </div>
+
+        {{#if openRouterStatusMessage}}
+          <div class="profile-alert {{openRouterStatusClass}}" role="status">{{openRouterStatusMessage}}</div>
+        {{/if}}
+      </section>
+
+      <div class="profile-actions">
+        <button id="profileSave" type="button" class="profile-primary-action" {{savingAttrs}}>
+          <span class="fa fa-save" aria-hidden="true"></span>
+          {{#if saving}}Saving{{else}}Save Profile{{/if}}
+        </button>
+        <button id="openRouterTest" type="button" {{testingAttrs}}>
+          <span class="fa fa-flask" aria-hidden="true"></span>
+          {{#if testing}}Testing{{else}}Test Configuration{{/if}}
+        </button>
+        {{#if hasOpenRouterKey}}
+          <button id="openRouterDeleteKey" type="button" class="profile-danger-action" {{savingAttrs}}>
+            <span class="fa fa-trash" aria-hidden="true"></span>
+            Delete Key
+          </button>
+        {{/if}}
+      </div>
+    </div>
+  </div>
+</template>

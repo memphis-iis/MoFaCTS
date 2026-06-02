@@ -178,12 +178,11 @@ const lazyTemplateLoaders: Record<string, any> = {
   classSelection: () => import('../views/home/classSelection'),
   adminControls: () => import('../views/adminControls'),
   audioSettings: () => import('../views/audioSettings'),
+  profile: () => import('../views/profile'),
   help: () => import('../views/help'),
-  accessDenied: () => import('../views/accessDenied'),
   experimentError: () => import('../views/experimentError'),
   testRunner: () => import('../views/testRunner'),
   theme: () => import('../views/theme'),
-  setTheme: () => import('../views/theme'),
   turkWorkflow: () => import('../views/turkWorkflow'),
   userAdmin: () => import('../views/userAdmin'),
   classEdit: () => import('../views/experimentSetup/classEdit'),
@@ -454,26 +453,12 @@ FlowRouter.route('/experiment/:target?/:xcond?', {
   },
 });
 
-const defaultBehaviorRoutes = [
-  'setTheme',
-];
-
 const restrictedRoutes = [
   'multiTdfSelect',
-  'profileEdit',
   'userAdmin',
   'tdfAssignmentEdit',
   'instructorReporting',
-  'feedback',
-  'classControlPanel',
-  'contentControlPanel',
 ];
-
-const getDefaultRouteAction = function(routeName: any) {
-  return async function(this: any) {
-    await renderRouteTemplate(this, routeName);
-  };
-};
 
 function waitForAuthenticatedRoute(
   controller: any,
@@ -583,13 +568,6 @@ for (const route of restrictedRoutes) {
   FlowRouter.route('/' + route, {
     name: 'client.' + route,
     action: getRestrictedRouteAction(route),
-  });
-}
-
-for (const route of defaultBehaviorRoutes) {
-  FlowRouter.route('/' + route, {
-    name: 'client.' + route,
-    action: getDefaultRouteAction(route),
   });
 }
 
@@ -719,16 +697,6 @@ FlowRouter.route('/turkWorkflow', {
   action: getRestrictedRouteAction('turkWorkflow'),
 })
 
-FlowRouter.route('/studentReporting', {
-  name: 'client.studentReporting',
-  action: function() {
-    const routeName = 'studentReporting';
-    Session.set('curModule', routeName.toLowerCase());
-    renderLayout(this, routeName);
-  }
-})
-
-
 FlowRouter.route('/dataDownload', {
   name: 'client.dataDownload',
   action: async function(this: any) {
@@ -742,14 +710,14 @@ FlowRouter.route('/dataDownload', {
 FlowRouter.route('/accessDenied', {
   name: 'client.accessDenied',
   action: async function(this: any) {
-    if (shouldWaitForAuthHydration()) {
-      waitForPublicAuthHydration(this, 'client.accessDenied', () => {
-        routeDeniedUserToEntryPoint();
-      });
-      return;
-    }
-
     routeDeniedUserToEntryPoint();
+  }
+})
+
+FlowRouter.route('/setTheme', {
+  name: 'client.setTheme',
+  action: function() {
+    FlowRouter.go('/theme');
   }
 })
 
@@ -968,11 +936,20 @@ FlowRouter.route('/home', {
   },
 });
 
-// Legacy redirect: /profile -> /home
 FlowRouter.route('/profile', {
   name: 'client.profile',
+  action: async function() {
+    waitForAuthenticatedRoute(this, 'client.profile', async () => {
+      Session.set('curModule', 'profile');
+      await renderRouteTemplate(this, 'profile');
+    }, getRouteAccessPolicy('client.profile'));
+  }
+});
+
+FlowRouter.route('/profileEdit', {
+  name: 'client.profileEdit',
   action: function() {
-    FlowRouter.go('/home');
+    FlowRouter.go('/profile');
   }
 });
 

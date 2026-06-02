@@ -69,11 +69,6 @@ export function getUserDisplayName(user: UserLike | null | undefined): string {
 }
 
 export function getUserInitials(user: UserLike | null | undefined, fallback = 'M'): string {
-  const explicitFirstLast = firstString(user?.profile?.firstName) || firstString(user?.profile?.givenName);
-  const explicitLast = firstString(user?.profile?.lastName) || firstString(user?.profile?.familyName);
-  if (explicitFirstLast && explicitLast) {
-    return `${explicitFirstLast.charAt(0)}${explicitLast.charAt(0)}`.toUpperCase();
-  }
-
-  return initialsFromName(getUserDisplayName(user)) || fallback;
+  const visibleName = firstString(user?.profile?.displayName) || getUserDisplayName(user);
+  return initialsFromName(visibleName) || fallback;
 }
