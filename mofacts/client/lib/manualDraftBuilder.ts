@@ -184,7 +184,7 @@ function buildPromptFromRow(row: StarterRow, promptType: PromptType): Normalized
   const promptText = String(row.promptText || '').trim();
   const mediaRef = String(row.mediaRef || '').trim();
 
-  if (promptType === 'text' || promptType === 'text-image') {
+  if (promptText && (promptType === 'text' || promptType === 'text-image')) {
     prompt.text = promptText;
   }
   if (promptType === 'image' || promptType === 'text-image') {

@@ -13,6 +13,8 @@ export function buildItemAuthoringPrompt(sourceText: string, selectedModules: Cr
     'Prefer multiple choice when the correct response is long, ambiguous to type, conceptual, or has plausible misconceptions.',
     'For multiple choice, make incorrect responses plausible student errors or common misconceptions, not jokes or arbitrary wrong answers.',
     'Avoid paragraph free-response answers.',
+    'The learner-visible cue must not give away the answer. Do not put the correctResponse, the target name, or the answer label inside prompt.text, image captions, hints, definitions, examples, descriptions, or other visible learner text.',
+    'When prompt.text is a definition, clue, description, or identification cue, write it so the learner must infer the correctResponse. Do not reuse the answer words in the cue. For example, if the correctResponse is "Yellow Warbler", prompt.text must not say "yellow warbler" or otherwise name that answer.',
     'Treat the source content as the user request plus any pasted material. If the user names a coherent educational topic without details, build from ordinary domain knowledge for that topic rather than treating the missing details as empty source.',
     'When pasted source material is specific, prefer that material and do not add unsupported claims that conflict with it.',
     'Do not duplicate items or create near-duplicate prompts that practice the same atomic knowledge component in the same way.',
@@ -37,7 +39,7 @@ export function buildItemAuthoringPrompt(sourceText: string, selectedModules: Cr
       tags: ['optional', 'tags'],
       items: [{
         prompt: {
-          text: 'question or stimulus',
+          text: 'learner-visible question, definition, description, or content clue that does not name or give away the correctResponse',
           imgSrc: 'optional direct HTTPS image URL for visual identification items',
           attribution: {
             creatorName: '',

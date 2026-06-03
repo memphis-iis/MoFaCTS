@@ -56,6 +56,32 @@ For Codex agents working in this repo, this sidecar is the authoritative browser
 
 If the current Codex turn does not list `mcp__mofacts_playwright__` as a callable namespace, or `tool_search` finds no such tools, do not treat that as proof the sidecar is down or unavailable. First verify the hotfix app, start or restart this sidecar, and check `http://localhost:8931/mcp`. A missing callable namespace after that is a Codex tool-exposure/session issue, not a MoFaCTS sidecar diagnosis.
 
+Codex can also expose a partial tool list even when the sidecar is healthy. In one observed session the first callable list included only tools such as `browser_navigate`, `browser_evaluate`, `browser_hover`, `browser_tabs`, and `browser_run_code_unsafe`, while the Playwright MCP server itself was still advertising the normal browser tools:
+
+- `browser_snapshot`
+- `browser_click`
+- `browser_fill_form`
+- `browser_type`
+- `browser_take_screenshot`
+- `browser_wait_for`
+- `browser_network_requests`
+- `browser_network_request`
+
+When that happens, do not replace the sidecar with ad hoc Playwright and do not hand-write MCP JSON-RPC calls for the UI task. Verify what the MCP server advertises, then use `tool_search` with the missing tool names so Codex loads those deferred tools into the turn.
+
+From `mofacts-mcp-sidecar\services\mongo-mcp`, this probe lists the tools advertised by the running Playwright MCP endpoint:
+
+```powershell
+node --input-type=module -e "import { Client } from '@modelcontextprotocol/sdk/client/index.js'; import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'; const client = new Client({ name: 'probe', version: '1.0.0' }); const transport = new StreamableHTTPClientTransport(new URL('http://localhost:8931/mcp')); await client.connect(transport); const result = await client.listTools(); console.log(JSON.stringify(result.tools.map(t => ({ name: t.name, description: t.description })), null, 2)); await client.close();"
+```
+
+If that probe lists `browser_snapshot`, `browser_click`, or `browser_fill_form`, the tools did not disappear from the sidecar. Search for those exact names with Codex `tool_search`, then continue using the `mcp__mofacts_playwright__` namespace. If the probe does not list them, inspect the running image and upstream Playwright MCP package before diagnosing Codex exposure:
+
+```powershell
+docker exec mofacts-mcp-sidecar-playwright-mcp-1 node -e "const fs=require('fs'); console.log(fs.readFileSync('/app/package.json','utf8'))"
+docker logs mofacts-mcp-sidecar-playwright-mcp-1 --tail 80
+```
+
 For a repeatable local check, run from the main repo:
 
 ```powershell

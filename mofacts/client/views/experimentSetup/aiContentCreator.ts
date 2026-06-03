@@ -290,48 +290,20 @@ async function generateAutoTutorFromAi(sourceText: string, model: string): Promi
   };
 }
 
-function requestedItemCount(sourceText: string): number | null {
-  const text = sourceText.toLowerCase();
-  const match = text.match(/\b(\d{1,3})\s+(?:common\s+)?(?:items|cards|questions|prompts|facts|terms|birds|animals|plants|species|examples)\b/) ||
-    text.match(/\b(?:create|make|build|generate|system\s+with)\s+(\d{1,3})\b/);
-  const count = match ? Number(match[1]) : 0;
-  return Number.isInteger(count) && count > 0 && count <= 100 ? count : null;
-}
-
-async function generateValidatedItemsFromAi(sourceText: string, selectedModules: CreationModuleId[], model: string): Promise<ItemGenerationResult> {
-  const targetCount = requestedItemCount(sourceText);
-  let promptSourceText = sourceText;
-  let lastResult: ItemGenerationResult | null = null;
-
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    const rawAiResponse = await callOpenRouterForItems(promptSourceText, selectedModules, model);
-    const parsedJson = extractJsonObject(rawAiResponse);
-    const validation = validateAiOutput(parsedJson);
-    const enriched = await enrichAiContentMedia(validation.output, sourceText);
-    lastResult = {
-      rawAiResponse,
-      parsedJson,
-      result: {
-        ...enriched,
-        warnings: validation.warnings.concat(enriched.warnings),
-        rejectedItems: validation.rejectedItems,
-      },
-    };
-    const usableCount = lastResult.result.output.items.length;
-    if (!targetCount || usableCount >= targetCount) {
-      return lastResult;
-    }
-    promptSourceText = [
-      sourceText,
-      '',
-      `Important correction: the user requested ${targetCount} usable items. Return exactly ${targetCount} non-duplicate usable items unless the source is genuinely impossible.`,
-    ].join('\n');
-  }
-
-  if (targetCount && lastResult && lastResult.result.output.items.length < targetCount) {
-    throw new Error(`AI returned ${lastResult.result.output.items.length} usable items, but the request asked for ${targetCount}.`);
-  }
-  return lastResult as ItemGenerationResult;
+async function generateItemsFromAi(sourceText: string, selectedModules: CreationModuleId[], model: string): Promise<ItemGenerationResult> {
+  const rawAiResponse = await callOpenRouterForItems(sourceText, selectedModules, model);
+  const parsedJson = extractJsonObject(rawAiResponse);
+  const validation = validateAiOutput(parsedJson);
+  const enriched = await enrichAiContentMedia(validation.output, sourceText);
+  return {
+    rawAiResponse,
+    parsedJson,
+    result: {
+      ...enriched,
+      warnings: validation.warnings.concat(enriched.warnings),
+      rejectedItems: validation.rejectedItems,
+    },
+  };
 }
 
 function promptForReplacementName(conflict: GeneratedNameConflict): string | null {
@@ -380,7 +352,7 @@ async function runCreation(instance: AiCreatorInstance): Promise<void> {
     const sourceTextHash = await hashSourceText(sourceText);
     const itemModules = selectedModules.filter((moduleId) => moduleId === 'learningSession' || moduleId === 'assessmentSession');
     const itemGenerationPromise = itemModules.length > 0
-      ? generateValidatedItemsFromAi(sourceText, itemModules, model)
+      ? generateItemsFromAi(sourceText, itemModules, model)
       : null;
     const autoTutorGenerationPromise = selectedModules.includes('autoTutor')
       ? generateAutoTutorFromAi(sourceText, model)
