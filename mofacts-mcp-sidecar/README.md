@@ -54,6 +54,16 @@ That points Playwright MCP at `http://host.docker.internal:3200` and connects Mo
 
 For Codex agents working in this repo, this sidecar is the authoritative browser automation path for MoFaCTS UI checks. Use the `mcp__mofacts_playwright__` tools exposed by `http://localhost:8931/mcp`. Do not use the bundled Browser `iab` registry or the Chrome extension backend as a substitute for this sidecar.
 
+If the current Codex turn does not list `mcp__mofacts_playwright__` as a callable namespace, or `tool_search` finds no such tools, do not treat that as proof the sidecar is down or unavailable. First verify the hotfix app, start or restart this sidecar, and check `http://localhost:8931/mcp`. A missing callable namespace after that is a Codex tool-exposure/session issue, not a MoFaCTS sidecar diagnosis.
+
+For a repeatable local check, run from the main repo:
+
+```powershell
+mofacts-mcp-sidecar\scripts\check-hotfix-sidecar.ps1
+```
+
+Use `-Start` or `-Restart` to start the hotfix sidecar before checking. The script reports the hotfix app endpoint, sidecar compose services, Playwright MCP endpoint, and the expected Codex namespace.
+
 ## OpenAI Runner
 
 If you want an OpenAI-native local client instead of Gemini, use the small Agents SDK runner in `openai-runner/`.
