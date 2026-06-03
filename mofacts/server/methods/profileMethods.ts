@@ -21,24 +21,12 @@ type ProfileMethodsDeps = {
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
     updateAsync: (selector: UnknownRecord, modifier: UnknownRecord, options?: UnknownRecord) => Promise<unknown>;
   };
-  encryptData: (value: string) => string;
-  decryptData: (value: string) => string;
 };
-
-type OpenRouterTestStatus =
-  | 'Connection successful'
-  | 'Invalid OpenRouter key'
-  | 'Model not found'
-  | 'Billing or quota problem'
-  | 'Rate limited'
-  | 'OpenRouter unavailable'
-  | 'Unknown error';
 
 const PROFILE_NAME_MAX_LENGTH = 100;
 const DISPLAY_NAME_MAX_LENGTH = 60;
 const OPENROUTER_MODEL_MAX_LENGTH = 160;
 const OPENROUTER_KEY_MAX_LENGTH = 4096;
-const OPENROUTER_CHAT_COMPLETIONS_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const DATA_URL_PATTERN = /^data:([^;,]+);base64,([A-Za-z0-9+/=]+)$/;
 
 function hasControlCharacters(value: string): boolean {
@@ -136,59 +124,6 @@ function validateAvatarImageData(value: unknown): string {
   return `data:${mimeType};base64,${base64}`;
 }
 
-function openRouterStatusForResponse(status: number, bodyText: string): OpenRouterTestStatus {
-  const lowerBody = bodyText.toLowerCase();
-  if (status === 401 || status === 403) return 'Invalid OpenRouter key';
-  if (status === 404 || lowerBody.includes('model') && lowerBody.includes('not found')) return 'Model not found';
-  if (status === 402 || lowerBody.includes('billing') || lowerBody.includes('quota') || lowerBody.includes('credits')) return 'Billing or quota problem';
-  if (status === 429) return 'Rate limited';
-  if (status >= 500) return 'OpenRouter unavailable';
-  return 'Unknown error';
-}
-
-async function testOpenRouterKey(apiKey: string, model: string): Promise<{ success: boolean; status: OpenRouterTestStatus }> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
-  try {
-    const response = await fetch(OPENROUTER_CHAT_COMPLETIONS_URL, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'X-Title': 'MoFaCTS Profile OpenRouter Test',
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'user', content: 'Reply with exactly: OK' }],
-        max_tokens: 3,
-        temperature: 0,
-      }),
-      signal: controller.signal,
-    });
-    const responseText = await response.text();
-    if (!response.ok) {
-      return { success: false, status: openRouterStatusForResponse(response.status, responseText) };
-    }
-    return { success: true, status: 'Connection successful' };
-  } catch (_error: unknown) {
-    return { success: false, status: 'OpenRouter unavailable' };
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-async function getSavedOpenRouterKey(deps: ProfileMethodsDeps, userId: string): Promise<string> {
-  const user = await deps.usersCollection.findOneAsync(
-    { _id: userId },
-    { fields: { 'services.openRouter.keyEncrypted': 1 } }
-  );
-  const encryptedKey = user?.services?.openRouter?.keyEncrypted;
-  if (typeof encryptedKey !== 'string' || !encryptedKey) {
-    return '';
-  }
-  return deps.decryptData(encryptedKey);
-}
-
 export function createProfileMethods(deps: ProfileMethodsDeps) {
   return {
     updateOwnProfile: async function(this: MethodContext, params: unknown) {
@@ -251,19 +186,24 @@ export function createProfileMethods(deps: ProfileMethodsDeps) {
       const data = params as { apiKey?: string; model?: string };
       const apiKey = normalizeOpenRouterKey(data.apiKey);
       const model = normalizeOpenRouterModel(data.model);
+      if (apiKey) {
+        throw new Meteor.Error('client-only-openrouter-key', 'OpenRouter keys must be saved in browser storage and used only by the client.');
+      }
       const now = new Date();
       const setFields: UnknownRecord = {
         'profile.openRouterDefaultModel': model,
         'profile.openRouterUpdatedAt': now,
+        'profile.openRouterHasKey': false,
       };
-      if (apiKey) {
-        setFields['services.openRouter.keyEncrypted'] = deps.encryptData(apiKey);
-        setFields['services.openRouter.keyUpdatedAt'] = now;
-        setFields['profile.openRouterHasKey'] = true;
-        setFields['profile.openRouterKeyUpdatedAt'] = now;
-      }
-      await deps.usersCollection.updateAsync({ _id: userId }, { $set: setFields });
-      return { success: true, hasOpenRouterKey: apiKey ? true : undefined };
+      await deps.usersCollection.updateAsync({ _id: userId }, {
+        $set: setFields,
+        $unset: {
+          'profile.openRouterKeyUpdatedAt': '',
+          'services.openRouter.keyEncrypted': '',
+          'services.openRouter.keyUpdatedAt': '',
+        },
+      });
+      return { success: true, hasOpenRouterKey: false };
     },
 
     deleteOwnOpenRouterKey: async function(this: MethodContext) {
@@ -288,25 +228,22 @@ export function createProfileMethods(deps: ProfileMethodsDeps) {
         model: Match.Maybe(String),
       });
       const userId = requireAuthenticatedUser(this.userId, 'Must be logged in to test OpenRouter settings', 401);
+      void userId;
       const data = params as { apiKey?: string; model?: string };
-      const apiKey = normalizeOpenRouterKey(data.apiKey) || await getSavedOpenRouterKey(deps, userId);
-      const model = normalizeOpenRouterModel(data.model);
-      if (!apiKey) {
-        return { success: false, status: 'missing-key', message: 'OpenRouter API key is required' };
-      }
-      if (!model) {
-        return { success: false, status: 'missing-model', message: 'Default OpenRouter model is required' };
-      }
-
-      const result = await testOpenRouterKey(apiKey, model);
+      normalizeOpenRouterKey(data.apiKey);
+      normalizeOpenRouterModel(data.model);
+      const result = {
+        success: false,
+        status: 'client-only-openrouter-key',
+        message: 'OpenRouter configuration tests must run in the browser.',
+      };
       await deps.usersCollection.updateAsync({ _id: userId }, {
         $set: {
-          'profile.openRouterDefaultModel': model,
           'profile.openRouterLastTestedAt': new Date(),
-          'profile.openRouterLastTestStatus': result.status,
+          'profile.openRouterLastTestStatus': result.message,
         },
       });
-      return { success: result.success, status: result.status, message: result.status };
+      return result;
     },
   };
 }

@@ -660,8 +660,6 @@ export const methods: any = {
 
   ...createProfileMethods({
     usersCollection: MeteorAny.users,
-    encryptData,
-    decryptData,
   }),
 }
 
