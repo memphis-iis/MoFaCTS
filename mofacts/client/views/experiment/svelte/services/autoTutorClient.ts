@@ -55,8 +55,6 @@ import {
   validateAutoTutorSavedState,
   type AutoTutorSavedStateShape,
 } from '../../../../../../learning-components/units/autotutor/AutoTutorSavedState';
-import { getSavedOpenRouterApiKey } from '../../../../lib/openRouterClientProfile';
-
 const OPEN_ROUTER_CHAT_COMPLETIONS_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const AUTO_TUTOR_COST_CAP_USD = 0.20;
 type AutoTutorState = {
@@ -170,7 +168,12 @@ function createMeteorAutoTutorRuntimeCapabilities(): AutoTutorRuntimeCapabilitie
     },
     aiProvider: {
       getOpenRouterApiKey() {
-        return getSavedOpenRouterApiKey();
+        const currentTdfFile = Session.get('currentTdfFile');
+        const tdfRoot = isRecord(currentTdfFile) ? currentTdfFile.tdfs : null;
+        const tutor = isRecord(tdfRoot) ? tdfRoot.tutor : null;
+        const setspec = isRecord(tutor) ? tutor.setspec : null;
+        const openRouterApiKey = isRecord(setspec) ? setspec.openRouterApiKey : '';
+        return typeof openRouterApiKey === 'string' ? openRouterApiKey.trim() : '';
       },
     },
     logger: {

@@ -51,6 +51,7 @@ type TdfLike = {
           conditionTdfIds?: Array<string | null>;
           stimulusfile?: string;
           experimentTarget?: string;
+          aiVisibilityLockReason?: string;
         };
         unit?: Array<{ learningsession?: { stimulusfile?: string } }>;
       };
@@ -218,6 +219,7 @@ async function getContentUploadSummariesForIds(
         'content.tdfs.tutor.setspec.condition': 1,
         'content.tdfs.tutor.setspec.conditionTdfIds': 1,
         'content.tdfs.tutor.setspec.stimulusfile': 1,
+        'content.tdfs.tutor.setspec.aiVisibilityLockReason': 1,
         'content.tdfs.tutor.unit.learningsession.stimulusfile': 1,
       },
     }
@@ -292,7 +294,7 @@ async function getContentUploadSummariesForIds(
     const setspec = tdf.content?.tdfs?.tutor?.setspec;
     const assetCount = getStimuliSetIdCandidatesForSummary(tdf.stimuliSetId)
       .reduce<number>((total, candidate) => total + (assetCountsByStimuliSetId.get(getStimuliSetIdCountKey(candidate)) || 0), 0);
-    const summary = {
+      const summary = {
       _id: tdf._id,
       ownerId: tdf.ownerId,
       packageFile: tdf.packageFile || null,
@@ -301,6 +303,8 @@ async function getContentUploadSummariesForIds(
       lessonName: setspec?.lessonname || 'Unknown Lesson',
       fileName: tdf.content?.fileName || 'unknown.xml',
       isPublic: setspec?.userselect === 'true',
+      publicVisibilityLocked: Boolean(setspec?.aiVisibilityLockReason),
+      publicVisibilityLockReason: typeof setspec?.aiVisibilityLockReason === 'string' ? setspec.aiVisibilityLockReason : '',
       hasAPIKeys: !!(setspec?.textToSpeechAPIKey || setspec?.speechAPIKey || setspec?.openRouterApiKey),
       assetCount,
       conditions: [] as Array<{ condition: string; tdfId: string | null; count: number | null }>,
@@ -1192,6 +1196,10 @@ export function createContentMethods(deps: ContentMethodsDeps) {
       });
 
       const newUserSelect = isPublic ? 'true' : 'false';
+      const visibilityLockReason = String(tdf.content?.tdfs?.tutor?.setspec?.aiVisibilityLockReason || '').trim();
+      if (isPublic && visibilityLockReason) {
+        throw new Meteor.Error('tdf-public-locked', visibilityLockReason);
+      }
 
       await deps.Tdfs.updateAsync(
         { _id: tdfId },

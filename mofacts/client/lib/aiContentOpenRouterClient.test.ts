@@ -1,26 +1,30 @@
 import { expect } from 'chai';
+import { Meteor } from 'meteor/meteor';
 import sinon from 'sinon';
 import { callOpenRouterForAutoTutor, callOpenRouterForItems } from './aiContentOpenRouterClient';
 import {
-  deleteSavedOpenRouterApiKey,
   OPENROUTER_CHAT_COMPLETIONS_URL,
-  saveOpenRouterApiKey,
 } from './openRouterClientProfile';
 
 describe('aiContentOpenRouterClient', function() {
   let fetchStub: sinon.SinonStub;
+  let callAsyncStub: sinon.SinonStub;
 
   beforeEach(function() {
-    saveOpenRouterApiKey('test-openrouter-key');
+    callAsyncStub = sinon.stub(Meteor as any, 'callAsync').resolves({
+      apiKey: 'test-openrouter-key',
+      model: 'openai/test-model',
+      hasOpenRouterKey: true,
+    });
     fetchStub = sinon.stub(globalThis, 'fetch' as any);
   });
 
   afterEach(function() {
     fetchStub.restore();
-    deleteSavedOpenRouterApiKey();
+    callAsyncStub.restore();
   });
 
-  it('posts item-generation prompts with saved client-side key and selected modules', async function() {
+  it('posts item-generation prompts with saved server-backed key and selected modules', async function() {
     fetchStub.resolves(new Response(JSON.stringify({
       choices: [{ message: { content: '{"lessonName":"Generated","items":[]}' } }],
     }), { status: 200 }));
@@ -28,6 +32,7 @@ describe('aiContentOpenRouterClient', function() {
     const content = await callOpenRouterForItems('source text', ['learningSession', 'assessmentSession'], 'openai/test-model');
 
     expect(content).to.equal('{"lessonName":"Generated","items":[]}');
+    expect(callAsyncStub.calledWith('getOwnOpenRouterSettings')).to.equal(true);
     expect(fetchStub.calledOnce).to.equal(true);
     const [url, request] = fetchStub.firstCall.args as [string, RequestInit];
     expect(url).to.equal(OPENROUTER_CHAT_COMPLETIONS_URL);

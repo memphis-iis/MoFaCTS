@@ -12,11 +12,9 @@ import {
 import { getErrorMessage } from '../../lib/errorUtils';
 import { getUserDisplayName, getUserInitials } from '../../lib/userIdentity';
 import {
-  deleteSavedOpenRouterApiKey,
-  getSavedOpenRouterApiKey,
-  hasSavedOpenRouterApiKey,
-  saveOpenRouterApiKey,
+  getOwnOpenRouterSettings,
   testOpenRouterClientConfig,
+  userHasServerOpenRouterKey,
 } from '../../lib/openRouterClientProfile';
 
 const MeteorAny = Meteor as typeof Meteor & { callAsync: (name: string, ...args: any[]) => Promise<any> };
@@ -29,7 +27,7 @@ type ProfileTemplateInstance = Blaze.TemplateInstance & {
   avatarType: ReactiveVar<ProfileAvatarType>;
   avatarIconId: ReactiveVar<string>;
   avatarImageData: ReactiveVar<string>;
-  openRouterHasClientKey: ReactiveVar<boolean>;
+  openRouterHasServerKey: ReactiveVar<boolean>;
 };
 
 const AVATAR_IMAGE_SIZE = 256;
@@ -136,11 +134,8 @@ async function saveProfile(template: ProfileTemplateInstance): Promise<void> {
       avatarIconId: template.avatarIconId.get(),
       avatarImageData: template.avatarImageData.get() || null,
     });
-    if (apiKey.trim()) {
-      saveOpenRouterApiKey(apiKey);
-      template.openRouterHasClientKey.set(true);
-    }
-    await MeteorAny.callAsync('updateOwnOpenRouterSettings', { apiKey: '', model });
+    const result = await MeteorAny.callAsync('updateOwnOpenRouterSettings', { apiKey, model });
+    template.openRouterHasServerKey.set(Boolean(result?.hasOpenRouterKey || apiKey.trim()));
     const apiKeyInput = document.getElementById('openRouterApiKey') as HTMLInputElement | null;
     if (apiKeyInput) {
       apiKeyInput.value = '';
@@ -161,10 +156,11 @@ Template.profile.onCreated(function(this: ProfileTemplateInstance) {
   this.avatarType = new ReactiveVar('initials');
   this.avatarIconId = new ReactiveVar(PROFILE_AVATAR_DEFAULT_ICON_ID);
   this.avatarImageData = new ReactiveVar('');
-  this.openRouterHasClientKey = new ReactiveVar(hasSavedOpenRouterApiKey());
+  this.openRouterHasServerKey = new ReactiveVar(userHasServerOpenRouterKey(Meteor.user()));
   this.autorun(() => {
     if (Meteor.user()) {
       syncAvatarFromCurrentUser(this);
+      this.openRouterHasServerKey.set(userHasServerOpenRouterKey(Meteor.user()));
     }
   });
 });
@@ -220,7 +216,7 @@ Template.profile.helpers({
   },
 
   hasOpenRouterKey(): boolean {
-    return (Template.instance() as ProfileTemplateInstance).openRouterHasClientKey.get();
+    return (Template.instance() as ProfileTemplateInstance).openRouterHasServerKey.get();
   },
 
   openRouterDefaultModel(): string {
@@ -323,8 +319,10 @@ Template.profile.events({
     template.testing.set(true);
     template.statusMessage.set('');
     try {
+      const inputKey = inputValue('openRouterApiKey');
+      const storedSettings = inputKey.trim() ? null : await getOwnOpenRouterSettings();
       const result = await testOpenRouterClientConfig(
-        inputValue('openRouterApiKey') || getSavedOpenRouterApiKey(),
+        inputKey || storedSettings?.apiKey || '',
         inputValue('openRouterDefaultModel'),
       );
       setStatus(template, result?.success ? 'success' : 'error', result?.message || 'Unknown error');
@@ -338,9 +336,8 @@ Template.profile.events({
   'click #openRouterDeleteKey': async function(_event: Event, template: ProfileTemplateInstance) {
     template.saving.set(true);
     try {
-      deleteSavedOpenRouterApiKey();
-      template.openRouterHasClientKey.set(false);
       await MeteorAny.callAsync('deleteOwnOpenRouterKey');
+      template.openRouterHasServerKey.set(false);
       const apiKeyInput = document.getElementById('openRouterApiKey') as HTMLInputElement | null;
       if (apiKeyInput) {
         apiKeyInput.value = '';

@@ -32,6 +32,7 @@ export type AiLessonOutput = {
   textToSpeechMode?: ManualCreatorState['textToSpeechMode'];
   topBarMode?: ManualCreatorState['topBarMode'];
   visibility?: ManualCreatorState['visibility'];
+  visibilityLockReason?: string;
   tags?: string[];
   items?: AiItem[];
   creationSummary?: string;

@@ -18,6 +18,9 @@ export function buildItemAuthoringPrompt(sourceText: string, selectedModules: Cr
     'Do not duplicate items or create near-duplicate prompts that practice the same atomic knowledge component in the same way.',
     'Do not refuse sparse but coherent educational requests; expand from ordinary domain knowledge when the request is a general topic such as the Krebs cycle, multiplication tables, or common vocabulary.',
     'If the source is abusive, sexual, incoherent, or not an educational topic, return an empty items array and explain the issue in creationSummary.',
+    'When the requested learning topic is naturally visual, such as birds, animals, plants, landmarks, artwork, tools, body parts, or diagrams, set promptType to "text-image" or "image" and include prompt.imgSrc for each item when a public, educational image URL is available.',
+    'For visual identification images, prefer Wikimedia Commons or Wikipedia lead-image URLs. Use direct HTTPS image URLs that can render in a browser, and include evidence-backed attribution with sourceUrl, licenseName, and licenseUrl.',
+    'If you cannot provide an image URL with attribution evidence for a visual identification item, still create the item when educationally useful, but omit imgSrc for that item.',
     'Set visibility to "public" only for general knowledge, original generated wording, public-domain/openly licensed material, or user-provided material that is clearly shareable. Set visibility to "private" when copied source wording, images, audio, or other media may be copyrighted or the license is unclear.',
     'When attribution is warranted for copied or closely adapted licensed/public-domain source material, put attribution on prompt.attribution using creatorName, sourceName, sourceUrl, licenseName, and licenseUrl. Do not add attribution for ordinary general knowledge, arithmetic facts, or dictionary-like facts.',
     'Return JSON only with this shape:',
@@ -35,6 +38,7 @@ export function buildItemAuthoringPrompt(sourceText: string, selectedModules: Cr
       items: [{
         prompt: {
           text: 'question or stimulus',
+          imgSrc: 'optional direct HTTPS image URL for visual identification items',
           attribution: {
             creatorName: '',
             sourceName: '',

@@ -61,7 +61,9 @@ export function registerDdpRateLimits(deps: DdpRateLimitDeps) {
 
   DDPRateLimiter.addRule({
     type: 'method',
-    name: 'processPackageUpload',
+    name(name: string) {
+      return ['processPackageUpload', 'saveAiGeneratedPackageContent'].includes(name);
+    },
     userId(userId: string | null | undefined) { return !!userId; }
   }, 20, 3600000);
 
@@ -102,6 +104,7 @@ export function registerDdpRateLimits(deps: DdpRateLimitDeps) {
       return [
         'updateOwnProfile',
         'updateOwnOpenRouterSettings',
+        'getOwnOpenRouterSettings',
         'deleteOwnOpenRouterKey',
         'testOwnOpenRouterSettings'
       ].includes(name);

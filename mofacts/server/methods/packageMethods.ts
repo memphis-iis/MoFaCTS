@@ -41,6 +41,7 @@ type TdfSetspecLike = {
   conditionTdfIds?: Array<string | null>;
   shuffleclusters?: unknown;
   openRouterModel?: string;
+  aiVisibilityLockReason?: string;
 };
 
 type TdfPayload = {
@@ -804,6 +805,37 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     return 'Learning session';
   }
 
+  function hasAttributionEvidence(value: unknown): boolean {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return false;
+    }
+    const attribution = value as Record<string, unknown>;
+    return Boolean(
+      String(attribution.sourceUrl || '').trim() &&
+      String(attribution.licenseName || '').trim() &&
+      String(attribution.licenseUrl || '').trim()
+    );
+  }
+
+  function getGeneratedMediaVisibilityLockReason(stimuli: UnknownRecord): string {
+    const clusters = Array.isArray((stimuli.setspec as any)?.clusters)
+      ? (stimuli.setspec as any).clusters
+      : [];
+    for (const cluster of clusters) {
+      const stims = Array.isArray(cluster?.stims) ? cluster.stims : [];
+      for (const stim of stims) {
+        const display = stim?.display && typeof stim.display === 'object' && !Array.isArray(stim.display)
+          ? stim.display as Record<string, unknown>
+          : {};
+        const hasMedia = ['imgSrc', 'audioSrc', 'videoSrc'].some((field) => String(display[field] || '').trim());
+        if (hasMedia && !hasAttributionEvidence(display.attribution)) {
+          return 'Generated media content requires source and license attribution evidence before public sharing.';
+        }
+      }
+    }
+    return '';
+  }
+
   async function saveAiGeneratedPackageContent(this: MethodContext, payload: AiGeneratedPackageSavePayload) {
     check(payload, Object);
     const actingUserId = deps.normalizeCanonicalId(this.userId);
@@ -885,6 +917,12 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       }
       if (!isTeacherOrAdmin) {
         tutor.setspec.userselect = 'false';
+      }
+      const mediaVisibilityLockReason = getGeneratedMediaVisibilityLockReason(stimuli);
+      const existingLockReason = String(tutor.setspec.aiVisibilityLockReason || '').trim();
+      if (mediaVisibilityLockReason || existingLockReason) {
+        tutor.setspec.userselect = 'false';
+        tutor.setspec.aiVisibilityLockReason = existingLockReason || mediaVisibilityLockReason;
       }
       const tdfs = { tutor };
       const autoTutorValidation = validateAutoTutorContent({ tdf: { tutor }, stimuli });

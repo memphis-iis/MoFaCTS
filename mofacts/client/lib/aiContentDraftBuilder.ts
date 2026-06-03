@@ -57,10 +57,23 @@ function buildStateFromAi(output: ReturnType<typeof validateAiOutput>['output'],
   };
 }
 
+function applyVisibilityLock(draft: ImportDraftLesson, output: ReturnType<typeof validateAiOutput>['output']): ImportDraftLesson {
+  const reason = String(output.visibilityLockReason || '').trim();
+  if (!reason) {
+    return draft;
+  }
+  for (const tutor of [draft.generatedBaseline.tutor, draft.workingCopy.tutor] as Array<{ setspec?: Record<string, unknown> }>) {
+    tutor.setspec = tutor.setspec || {};
+    tutor.setspec.userselect = 'false';
+    tutor.setspec.aiVisibilityLockReason = reason;
+  }
+  return draft;
+}
+
 export function buildDrafts(output: ReturnType<typeof validateAiOutput>['output'], selectedModules: CreationModuleId[]): ImportDraftLesson[] {
   return selectedModules
     .filter((moduleId) => moduleId === 'learningSession' || moduleId === 'assessmentSession')
-    .map((moduleId) => buildManualDraftLesson(buildStateFromAi(output, moduleId)));
+    .map((moduleId) => applyVisibilityLock(buildManualDraftLesson(buildStateFromAi(output, moduleId)), output));
 }
 
 export function buildAutoTutorDraft(output: ReturnType<typeof validateAutoTutorOutput>['output'], model: string): ImportDraftLesson {

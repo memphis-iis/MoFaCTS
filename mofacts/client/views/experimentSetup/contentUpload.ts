@@ -3,6 +3,7 @@ import { Template } from 'meteor/templating';
 import { Session } from 'meteor/session';
 import './contentUpload.html';
 import './contentUpload.css';
+import './aiContentCreator';
 import { meteorCallAsync, clientConsole } from '../..';
 import { ReactiveVar } from 'meteor/reactive-var';
 import { ReactiveDict } from 'meteor/reactive-dict';
@@ -10,7 +11,6 @@ import { currentUserHasRole } from '../../lib/roleUtils';
 import { buildStimuliFromNormalizedItems, buildTutorFromNormalizedItems, getImportFileNames } from '../../lib/importCompositionBuilder';
 import type { NormalizedImportItem } from '../../lib/normalizedImportTypes';
 import { getUploadIntegrity } from '../../lib/uploadIntegrity';
-import { hasSavedOpenRouterApiKey } from '../../lib/openRouterClientProfile';
 import './apkgWizard';
 import './imsccWizard';
 export {doFileUpload};
@@ -38,10 +38,6 @@ const CONTENT_UPLOAD_LIST_LIMIT = 50;
 const DEBUG_SKIP_PACKAGE_PROCESSING = false;
 const SUMMARY_FETCH_THROTTLE = 1500;
 
-function currentOpenRouterModel(): string {
-  return String((Meteor.user() as any)?.profile?.openRouterDefaultModel || '').trim();
-}
-
 // Reactive trigger for forcing UI refresh after deletions
 const assetsRefreshTrigger = new ReactiveVar(0);
 const assetRowRefreshTrigger = new ReactiveVar(0);
@@ -49,6 +45,10 @@ const pendingPackageDeletes = new ReactiveDict();
 const ACCESS_MESSAGE_TIMEOUT_MS = 6000;
 const CDN_ASSET_REF_REGEX = /^\/?cdn\/storage\/Assets\/([^/]+)\/original\/([^/?#]+)$/i;
 const DYNAMIC_ASSET_REF_REGEX = /^\/?dynamic-assets\/([A-Za-z0-9_-]+)(?:\/|$)/i;
+
+function contentUploadRefreshToken(): string {
+  return `${assetsRefreshTrigger.get()}-${Session.get('assetsRefreshTrigger') || 0}`;
+}
 
 function parseMediaAssetReference(reference: unknown) {
   const raw = typeof reference === 'string' ? reference.trim() : '';
@@ -196,12 +196,6 @@ Template.contentUpload.helpers({
   quotaStatus() {
     return (Template.instance() as any).quotaStatus.get();
   },
-  hasAiContentConfig() {
-    return hasSavedOpenRouterApiKey() && Boolean(currentOpenRouterModel());
-  },
-  aiContentCreateAttrs() {
-    return hasSavedOpenRouterApiKey() && currentOpenRouterModel() ? {} : { disabled: true };
-  },
   assets: function(this: any) {
     try {
       const template = (Template.instance() as any);
@@ -304,6 +298,11 @@ Template.contentUpload.helpers({
             thisTdf.isPublic = summary?.isPublic ?? false;
             thisTdf.checkedIfPublic = thisTdf.isPublic ? 'checked' : null;
             thisTdf.publicPrivateLabel = thisTdf.isPublic ? 'Public' : 'Private';
+            thisTdf.publicVisibilityLocked = Boolean(summary?.publicVisibilityLocked);
+            thisTdf.publicVisibilityLockReason = String(summary?.publicVisibilityLockReason || '');
+            thisTdf.publicPrivateToggleAttrs = thisTdf.publicVisibilityLocked
+              ? { disabled: true, title: thisTdf.publicVisibilityLockReason || 'This content is locked private.' }
+              : {};
             thisTdf.summaryLoading = !summary;
             thisTdf.accessMessageText = accessMessages?.[tdfId]?.text || null;
             thisTdf.accessMessageClass = accessMessages?.[tdfId]?.className || 'alert-info';
@@ -627,7 +626,7 @@ Template.contentUpload.helpers({
 
   this.autoruns.push(this.autorun(() => {
     const limit = this.listLimit.get();
-    const refreshToken = assetsRefreshTrigger.get();
+    const refreshToken = contentUploadRefreshToken();
     const key = `${limit}-${refreshToken}`;
     const now = Date.now();
     if (this.lastListFetchKey === key && (now - this.lastListFetch) < SUMMARY_FETCH_THROTTLE) {
@@ -666,7 +665,7 @@ Template.contentUpload.helpers({
 
   this.autoruns.push(this.autorun(() => {
     const ids = this.listIds.get();
-    const refreshToken = assetsRefreshTrigger.get();
+    const refreshToken = contentUploadRefreshToken();
     if (!Array.isArray(ids) || ids.length === 0) {
       this.summaryLoading.set(false);
       this.summaryMap.set({});
@@ -805,14 +804,6 @@ Template.contentUpload.onDestroyed(function(this: any) {
 // Template events
 
 Template.contentUpload.events({
-  'click #open-ai-content-creator': function(event: any, _template: any) {
-    event.preventDefault();
-    if (!hasSavedOpenRouterApiKey() || !currentOpenRouterModel()) {
-      return;
-    }
-    FlowRouter.go('/aiContentCreate');
-  },
-
   // Toggle TDF public/private setting
   'change .public-private-toggle': async function(event: any, _template: any) {
     const tdfId = event.currentTarget.getAttribute('data-tdfid');

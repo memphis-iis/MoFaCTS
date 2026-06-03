@@ -385,6 +385,7 @@ const packageMethods = createPackageMethods({
 const {
   getResponseKCMapForTdf,
   processPackageUpload,
+  saveAiGeneratedPackageContent,
   saveContentFile,
   tdfUpdateConfirmed,
   saveTdfStimuli,
@@ -660,6 +661,8 @@ export const methods: any = {
 
   ...createProfileMethods({
     usersCollection: MeteorAny.users,
+    encryptData,
+    decryptData,
   }),
 }
 
@@ -854,6 +857,7 @@ export const asyncMethods: Record<string, unknown> = {
   updateStimDisplayTypeMap: updateStimDisplayTypeMapPublic,
 
   saveContentFile,
+  saveAiGeneratedPackageContent,
 
   getResponseKCMapForTdf: getResponseKCMapForTdfPublic,
   processPackageUpload,

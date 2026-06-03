@@ -1,6 +1,6 @@
 import type { CreationModuleId } from './aiContentTypes';
 import {
-  getSavedOpenRouterApiKey,
+  getOwnOpenRouterSettings,
   OPENROUTER_CHAT_COMPLETIONS_URL,
 } from './openRouterClientProfile';
 import {
@@ -13,10 +13,15 @@ export async function callOpenRouterForItems(
   selectedModules: CreationModuleId[],
   model: string,
 ) {
+  const settings = await getOwnOpenRouterSettings();
+  const apiKey = settings.apiKey;
+  if (!apiKey) {
+    throw new Error('OpenRouter API key is not saved for this account.');
+  }
   const response = await fetch(OPENROUTER_CHAT_COMPLETIONS_URL, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${getSavedOpenRouterApiKey()}`,
+      Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
       'HTTP-Referer': window.location.origin,
       'X-OpenRouter-Title': 'MoFaCTS AI Content Creator',
@@ -44,10 +49,15 @@ export async function callOpenRouterForItems(
 }
 
 export async function callOpenRouterForAutoTutor(sourceText: string, model: string) {
+  const settings = await getOwnOpenRouterSettings();
+  const apiKey = settings.apiKey;
+  if (!apiKey) {
+    throw new Error('OpenRouter API key is not saved for this account.');
+  }
   const response = await fetch(OPENROUTER_CHAT_COMPLETIONS_URL, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${getSavedOpenRouterApiKey()}`,
+      Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
       'HTTP-Referer': window.location.origin,
       'X-OpenRouter-Title': 'MoFaCTS AI AutoTutor Creator',

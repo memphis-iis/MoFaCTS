@@ -21,6 +21,8 @@ type ProfileMethodsDeps = {
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
     updateAsync: (selector: UnknownRecord, modifier: UnknownRecord, options?: UnknownRecord) => Promise<unknown>;
   };
+  encryptData: (value: string) => string;
+  decryptData: (value: string) => string;
 };
 
 const PROFILE_NAME_MAX_LENGTH = 100;
@@ -186,24 +188,52 @@ export function createProfileMethods(deps: ProfileMethodsDeps) {
       const data = params as { apiKey?: string; model?: string };
       const apiKey = normalizeOpenRouterKey(data.apiKey);
       const model = normalizeOpenRouterModel(data.model);
-      if (apiKey) {
-        throw new Meteor.Error('client-only-openrouter-key', 'OpenRouter keys must be saved in browser storage and used only by the client.');
-      }
       const now = new Date();
       const setFields: UnknownRecord = {
         'profile.openRouterDefaultModel': model,
         'profile.openRouterUpdatedAt': now,
-        'profile.openRouterHasKey': false,
       };
-      await deps.usersCollection.updateAsync({ _id: userId }, {
-        $set: setFields,
-        $unset: {
-          'profile.openRouterKeyUpdatedAt': '',
-          'services.openRouter.keyEncrypted': '',
-          'services.openRouter.keyUpdatedAt': '',
+      const unsetFields: UnknownRecord = {};
+      if (apiKey) {
+        setFields['profile.openRouterHasKey'] = true;
+        setFields['profile.openRouterKeyUpdatedAt'] = now;
+        setFields['services.openRouter.keyEncrypted'] = deps.encryptData(apiKey);
+        setFields['services.openRouter.keyUpdatedAt'] = now;
+      } else {
+        const existingUser = await deps.usersCollection.findOneAsync({ _id: userId }, {
+          fields: {
+            'profile.openRouterHasKey': 1,
+            'services.openRouter.keyEncrypted': 1,
+          },
+        });
+        setFields['profile.openRouterHasKey'] = Boolean(existingUser?.services?.openRouter?.keyEncrypted || existingUser?.profile?.openRouterHasKey);
+      }
+      const modifier: UnknownRecord = { $set: setFields };
+      if (Object.keys(unsetFields).length > 0) {
+        modifier.$unset = unsetFields;
+      }
+      await deps.usersCollection.updateAsync({ _id: userId }, modifier);
+      return { success: true, hasOpenRouterKey: Boolean(setFields['profile.openRouterHasKey']) };
+    },
+
+    getOwnOpenRouterSettings: async function(this: MethodContext) {
+      const userId = requireAuthenticatedUser(this.userId, 'Must be logged in to read OpenRouter settings', 401);
+      const user = await deps.usersCollection.findOneAsync({ _id: userId }, {
+        fields: {
+          'profile.openRouterDefaultModel': 1,
+          'profile.openRouterHasKey': 1,
+          'services.openRouter.keyEncrypted': 1,
         },
       });
-      return { success: true, hasOpenRouterKey: false };
+      const encryptedKey = typeof user?.services?.openRouter?.keyEncrypted === 'string'
+        ? user.services.openRouter.keyEncrypted
+        : '';
+      const apiKey = encryptedKey ? deps.decryptData(encryptedKey) : '';
+      return {
+        apiKey,
+        model: String(user?.profile?.openRouterDefaultModel || '').trim(),
+        hasOpenRouterKey: Boolean(apiKey || user?.profile?.openRouterHasKey),
+      };
     },
 
     deleteOwnOpenRouterKey: async function(this: MethodContext) {
@@ -230,12 +260,22 @@ export function createProfileMethods(deps: ProfileMethodsDeps) {
       const userId = requireAuthenticatedUser(this.userId, 'Must be logged in to test OpenRouter settings', 401);
       void userId;
       const data = params as { apiKey?: string; model?: string };
-      normalizeOpenRouterKey(data.apiKey);
+      const apiKey = normalizeOpenRouterKey(data.apiKey);
       normalizeOpenRouterModel(data.model);
+      if (apiKey) {
+        await deps.usersCollection.updateAsync({ _id: userId }, {
+          $set: {
+            'profile.openRouterHasKey': true,
+            'profile.openRouterKeyUpdatedAt': new Date(),
+            'services.openRouter.keyEncrypted': deps.encryptData(apiKey),
+            'services.openRouter.keyUpdatedAt': new Date(),
+          },
+        });
+      }
       const result = {
         success: false,
-        status: 'client-only-openrouter-key',
-        message: 'OpenRouter configuration tests must run in the browser.',
+        status: 'server-stored-openrouter-key',
+        message: 'OpenRouter key is saved on the server. Test the provider from the browser.',
       };
       await deps.usersCollection.updateAsync({ _id: userId }, {
         $set: {

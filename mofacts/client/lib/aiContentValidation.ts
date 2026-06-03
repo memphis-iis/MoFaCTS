@@ -219,6 +219,7 @@ export function validateAiOutput(value: unknown) {
       textToSpeechMode: normalizeTtsMode(output.textToSpeechMode, warnings),
       topBarMode: normalizeTopBarMode(output.topBarMode, warnings),
       visibility: normalizeVisibility(output.visibility),
+      visibilityLockReason: String(output.visibilityLockReason || '').trim(),
       tags: Array.isArray(output.tags) ? output.tags.map((tag) => String(tag).trim()).filter(Boolean) : ['ai-created'],
       items,
       creationSummary: String(output.creationSummary || '').trim(),

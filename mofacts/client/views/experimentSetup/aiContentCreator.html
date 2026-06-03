@@ -1,5 +1,5 @@
 <template name="aiContentCreator">
-  <div class="ai-create-page">
+  <div class="ai-create-page {{embeddedClass}}">
     <style>
       .ai-create-page {
         min-height: calc(100vh - var(--app-top-nav-height, 0px));
@@ -23,6 +23,20 @@
         border: 1px solid var(--border-color);
         border-radius: calc(var(--border-radius, 4px) * 4);
         box-shadow: var(--app-elevation-3, 0 12px 40px rgba(0, 0, 0, 0.12));
+      }
+
+      .ai-create-page.is-embedded {
+        min-height: 0;
+        display: block;
+        padding: 0;
+        background: transparent;
+      }
+
+      .ai-create-page.is-embedded .ai-create-card {
+        width: 100%;
+        max-width: none;
+        border-radius: var(--border-radius, 4px);
+        box-shadow: none;
       }
 
       .ai-create-header {
@@ -309,6 +323,10 @@
         .ai-create-page {
           align-items: flex-start;
           padding: var(--app-space-3);
+        }
+
+        .ai-create-page.is-embedded {
+          padding: 0;
         }
 
         .ai-create-card {

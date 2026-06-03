@@ -1,32 +1,14 @@
 import { expect } from 'chai';
+import { Meteor } from 'meteor/meteor';
 import sinon from 'sinon';
 import {
-  deleteSavedOpenRouterApiKey,
-  getSavedOpenRouterApiKey,
-  hasSavedOpenRouterApiKey,
-  saveOpenRouterApiKey,
+  getOwnOpenRouterSettings,
   testOpenRouterClientConfig,
 } from './openRouterClientProfile';
 
 describe('openRouterClientProfile', function() {
   afterEach(function() {
-    deleteSavedOpenRouterApiKey();
     sinon.restore();
-  });
-
-  it('stores OpenRouter keys only in browser local storage and trims whitespace', function() {
-    saveOpenRouterApiKey('  test-key  ');
-
-    expect(getSavedOpenRouterApiKey()).to.equal('test-key');
-    expect(hasSavedOpenRouterApiKey()).to.equal(true);
-
-    deleteSavedOpenRouterApiKey();
-    expect(getSavedOpenRouterApiKey()).to.equal('');
-    expect(hasSavedOpenRouterApiKey()).to.equal(false);
-  });
-
-  it('rejects keys with whitespace', function() {
-    expect(() => saveOpenRouterApiKey('bad key')).to.throw('OpenRouter API key cannot contain whitespace.');
   });
 
   it('classifies profile test failures from OpenRouter status and body', async function() {
@@ -50,5 +32,22 @@ describe('openRouterClientProfile', function() {
       message: 'Default OpenRouter model is required',
     });
     expect(fetchStub.called).to.equal(false);
+  });
+
+  it('reads saved OpenRouter settings from the server', async function() {
+    const callAsyncStub = sinon.stub(Meteor as any, 'callAsync').resolves({
+      apiKey: ' server-key ',
+      model: ' openai/test-model ',
+      hasOpenRouterKey: true,
+    });
+
+    const settings = await getOwnOpenRouterSettings();
+
+    expect(callAsyncStub.calledWith('getOwnOpenRouterSettings')).to.equal(true);
+    expect(settings).to.deep.equal({
+      apiKey: 'server-key',
+      model: 'openai/test-model',
+      hasOpenRouterKey: true,
+    });
   });
 });

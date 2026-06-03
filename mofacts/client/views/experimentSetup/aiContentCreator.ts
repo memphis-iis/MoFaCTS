@@ -7,12 +7,13 @@ import './aiContentCreator.html';
 import { clientConsole } from '../..';
 import { getUploadIntegrity } from '../../lib/uploadIntegrity';
 import { getErrorMessage } from '../../lib/errorUtils';
-import { hasSavedOpenRouterApiKey } from '../../lib/openRouterClientProfile';
+import { userHasServerOpenRouterKey } from '../../lib/openRouterClientProfile';
 import { sanitizeImportName } from '../../lib/importCompositionBuilder';
 import type { ImportDraftLesson } from '../../lib/normalizedImportTypes';
 import type { CreatedOutput, CreationModuleId } from '../../lib/aiContentTypes';
 import { buildAutoTutorDraft, buildDrafts } from '../../lib/aiContentDraftBuilder';
 import { callOpenRouterForAutoTutor, callOpenRouterForItems } from '../../lib/aiContentOpenRouterClient';
+import { enrichAiContentMedia } from '../../lib/aiContentMediaEnrichment';
 import { extractJsonObject, validateAiOutput, validateAutoTutorOutput } from '../../lib/aiContentValidation';
 import {
   buildUploadWithNameConflictRetry,
@@ -49,7 +50,9 @@ type DebugRecord = {
 type ItemGenerationResult = {
   rawAiResponse: string;
   parsedJson: unknown;
-  result: ReturnType<typeof validateAiOutput>;
+  result: Awaited<ReturnType<typeof enrichAiContentMedia>> & {
+    rejectedItems: ReturnType<typeof validateAiOutput>['rejectedItems'];
+  };
 };
 
 type AutoTutorGenerationResult = {
@@ -82,6 +85,9 @@ type CreationRecord = {
 };
 
 type AiCreatorInstance = Blaze.TemplateInstance & {
+  data?: {
+    embedded?: boolean;
+  };
   creating: ReactiveVar<boolean>;
   sourceText: ReactiveVar<string>;
   selectedModules: ReactiveVar<CreationModuleId[]>;
@@ -246,6 +252,10 @@ function statusClass(kind: StatusKind): string {
   return 'alert-info';
 }
 
+function isEmbedded(instance: AiCreatorInstance): boolean {
+  return instance.data?.embedded === true;
+}
+
 function findStarter(starterId: string) {
   return PROMPT_STARTERS.find((starter) => starter.id === starterId) || null;
 }
@@ -270,20 +280,6 @@ function modeHelperText(moduleIds: CreationModuleId[]): string {
   return `Creates a combo: ${labels}`;
 }
 
-async function generateItemsFromAi(
-  sourceText: string,
-  selectedModules: CreationModuleId[],
-  model: string,
-): Promise<ItemGenerationResult> {
-  const rawAiResponse = await callOpenRouterForItems(sourceText, selectedModules, model);
-  const parsedJson = extractJsonObject(rawAiResponse);
-  return {
-    rawAiResponse,
-    parsedJson,
-    result: validateAiOutput(parsedJson),
-  };
-}
-
 async function generateAutoTutorFromAi(sourceText: string, model: string): Promise<AutoTutorGenerationResult> {
   const rawAiResponse = await callOpenRouterForAutoTutor(sourceText, model);
   const parsedJson = extractJsonObject(rawAiResponse);
@@ -292,6 +288,50 @@ async function generateAutoTutorFromAi(sourceText: string, model: string): Promi
     parsedJson,
     result: validateAutoTutorOutput(parsedJson),
   };
+}
+
+function requestedItemCount(sourceText: string): number | null {
+  const text = sourceText.toLowerCase();
+  const match = text.match(/\b(\d{1,3})\s+(?:common\s+)?(?:items|cards|questions|prompts|facts|terms|birds|animals|plants|species|examples)\b/) ||
+    text.match(/\b(?:create|make|build|generate|system\s+with)\s+(\d{1,3})\b/);
+  const count = match ? Number(match[1]) : 0;
+  return Number.isInteger(count) && count > 0 && count <= 100 ? count : null;
+}
+
+async function generateValidatedItemsFromAi(sourceText: string, selectedModules: CreationModuleId[], model: string): Promise<ItemGenerationResult> {
+  const targetCount = requestedItemCount(sourceText);
+  let promptSourceText = sourceText;
+  let lastResult: ItemGenerationResult | null = null;
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const rawAiResponse = await callOpenRouterForItems(promptSourceText, selectedModules, model);
+    const parsedJson = extractJsonObject(rawAiResponse);
+    const validation = validateAiOutput(parsedJson);
+    const enriched = await enrichAiContentMedia(validation.output, sourceText);
+    lastResult = {
+      rawAiResponse,
+      parsedJson,
+      result: {
+        ...enriched,
+        warnings: validation.warnings.concat(enriched.warnings),
+        rejectedItems: validation.rejectedItems,
+      },
+    };
+    const usableCount = lastResult.result.output.items.length;
+    if (!targetCount || usableCount >= targetCount) {
+      return lastResult;
+    }
+    promptSourceText = [
+      sourceText,
+      '',
+      `Important correction: the user requested ${targetCount} usable items. Return exactly ${targetCount} non-duplicate usable items unless the source is genuinely impossible.`,
+    ].join('\n');
+  }
+
+  if (targetCount && lastResult && lastResult.result.output.items.length < targetCount) {
+    throw new Error(`AI returned ${lastResult.result.output.items.length} usable items, but the request asked for ${targetCount}.`);
+  }
+  return lastResult as ItemGenerationResult;
 }
 
 function promptForReplacementName(conflict: GeneratedNameConflict): string | null {
@@ -328,7 +368,7 @@ async function runCreation(instance: AiCreatorInstance): Promise<void> {
     setStatus(instance, 'warning', 'Choose at least one creation target.');
     return;
   }
-  if (!hasSavedOpenRouterApiKey() || !model) {
+  if (!userHasServerOpenRouterKey(Meteor.user()) || !model) {
     setStatus(instance, 'warning', 'AI content creation requires an OpenRouter key and default model. Add them in your Profile.');
     return;
   }
@@ -340,7 +380,7 @@ async function runCreation(instance: AiCreatorInstance): Promise<void> {
     const sourceTextHash = await hashSourceText(sourceText);
     const itemModules = selectedModules.filter((moduleId) => moduleId === 'learningSession' || moduleId === 'assessmentSession');
     const itemGenerationPromise = itemModules.length > 0
-      ? generateItemsFromAi(sourceText, itemModules, model)
+      ? generateValidatedItemsFromAi(sourceText, itemModules, model)
       : null;
     const autoTutorGenerationPromise = selectedModules.includes('autoTutor')
       ? generateAutoTutorFromAi(sourceText, model)
@@ -432,6 +472,15 @@ async function runCreation(instance: AiCreatorInstance): Promise<void> {
       ...(warnings.length || rejectedItems.length ? { debugRecordId } : {}),
     }, warnings.length || rejectedItems.length ? debugRecord : undefined);
     Session.set('assetsRefreshTrigger', Date.now());
+    if (isEmbedded(instance)) {
+      instance.sourceText.set('');
+      instance.statusMessage.set('');
+      const textarea = instance.find('#ai-source-text') as HTMLTextAreaElement | null;
+      if (textarea) {
+        textarea.value = '';
+      }
+      return;
+    }
     FlowRouter.go('/contentUpload');
   } catch (error: unknown) {
     clientConsole(1, '[AI CONTENT CREATOR] Creation failed:', error);
@@ -491,8 +540,11 @@ Template.aiContentCreator.onRendered(function(this: AiCreatorInstance) {
 });
 
 Template.aiContentCreator.helpers({
+  embeddedClass() {
+    return isEmbedded(Template.instance() as AiCreatorInstance) ? 'is-embedded' : '';
+  },
   hasOpenRouterConfig() {
-    return hasSavedOpenRouterApiKey() && Boolean(currentModel());
+    return userHasServerOpenRouterKey(Meteor.user()) && Boolean(currentModel());
   },
   sourceText() {
     return (Template.instance() as AiCreatorInstance).sourceText.get();
@@ -527,7 +579,7 @@ Template.aiContentCreator.helpers({
     const disabled = instance.creating.get() ||
       !instance.sourceText.get().trim() ||
       instance.selectedModules.get().length === 0 ||
-      !hasSavedOpenRouterApiKey() ||
+      !userHasServerOpenRouterKey(Meteor.user()) ||
       !currentModel();
     return disabled ? { disabled: true } : {};
   },

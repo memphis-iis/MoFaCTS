@@ -229,32 +229,7 @@
         {{/unless}}
 
         <div class="admin-section">
-            <div class="card admin-card">
-                <div class="card-body">
-                    <div class="admin-section-heading">
-                        <i class="fa fa-magic admin-section-icon"></i>
-                        <h5>AI Content Creator</h5>
-                    </div>
-                    <div class="row g-3 align-items-center">
-                        <div class="col-lg-8 col-12">
-                            <p class="text-muted admin-form-row mb-0">
-                                Paste notes or learning goals, choose a learning, assessment, AutoTutor, or combined route, and let MoFaCTS generate a private package.
-                            </p>
-                            {{#unless hasAiContentConfig}}
-                            <div class="alert alert-warning admin-form-row-top mb-0" role="status">
-                                AI content creation requires an OpenRouter key and default model in your Profile.
-                                <a href="/profile" class="btn btn-outline-primary btn-sm admin-inline-action">Go to Profile</a>
-                            </div>
-                            {{/unless}}
-                        </div>
-                        <div class="col-lg-4 col-12 text-lg-end text-center">
-                            <button type="button" class="btn btn-primary btn-lg" id="open-ai-content-creator" {{aiContentCreateAttrs}}>
-                                <i class="fa fa-magic"></i> Create with AI
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            {{> aiContentCreator embedded=true}}
         </div>
 
         <div class="admin-section">
@@ -301,7 +276,7 @@
                                                         <span class="public-private-switch" title="Toggle public/private status on the home dashboard">
                                                             <span class="public-private-switch-label public-private-switch-label-left small">Private</span>
                                                             <span class="form-switch public-private-switch-control">
-                                                                <input class="form-check-input public-private-toggle" type="checkbox" data-tdfid="{{_id}}" checked={{checkedIfPublic}} aria-label="Toggle lesson public/private status">
+                                                                <input class="form-check-input public-private-toggle" type="checkbox" data-tdfid="{{_id}}" checked={{checkedIfPublic}} {{publicPrivateToggleAttrs}} aria-label="Toggle lesson public/private status">
                                                             </span>
                                                             <span class="public-private-switch-label public-private-switch-label-right small">Public</span>
                                                         </span>
