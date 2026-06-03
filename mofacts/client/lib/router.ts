@@ -187,6 +187,7 @@ const lazyTemplateLoaders: Record<string, any> = {
   userAdmin: () => import('../views/userAdmin'),
   classEdit: () => import('../views/experimentSetup/classEdit'),
   contentUpload: () => import('../views/experimentSetup/contentUpload'),
+  aiContentCreator: () => import('../views/experimentSetup/aiContentCreator'),
   manualContentCreator: () => import('../views/experimentSetup/manualContentCreator'),
   contentEdit: () => import('../views/experimentSetup/contentEdit'),
   tdfEdit: () => import('../views/experimentSetup/tdfEdit'),
@@ -828,6 +829,15 @@ FlowRouter.route('/contentCreate', {
     waitForAuthenticatedRoute(this, 'client.manualContentCreator', async () => {
       await renderRouteTemplate(this, 'manualContentCreator');
     }, getRouteAccessPolicy('client.manualContentCreator'));
+  }
+})
+
+FlowRouter.route('/aiContentCreate', {
+  name: 'client.aiContentCreator',
+  action: async function(this: any) {
+    waitForAuthenticatedRoute(this, 'client.aiContentCreator', async () => {
+      await renderRouteTemplate(this, 'aiContentCreator');
+    }, getRouteAccessPolicy('client.aiContentCreator'));
   }
 })
 

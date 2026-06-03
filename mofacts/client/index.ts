@@ -71,6 +71,7 @@ export { clientConsole };
 
 const APP_SHELL_TEMPLATES = new Set([
   'contentUpload',
+  'aiContentCreator',
   'manualContentCreator',
   'contentEdit',
   'tdfEdit',
@@ -96,6 +97,7 @@ const PRACTICE_SHELL_TEMPLATES = new Set([
 
 const APP_SHELL_TITLES: Record<string, string> = {
   contentUpload: 'Create Content',
+  aiContentCreator: 'Create Content',
   manualContentCreator: 'Create Content',
   contentEdit: 'Create Content',
   tdfEdit: 'Create Content',

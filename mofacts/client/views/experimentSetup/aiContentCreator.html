@@ -1,0 +1,416 @@
+<template name="aiContentCreator">
+  <div class="ai-create-page">
+    <style>
+      .ai-create-page {
+        min-height: calc(100vh - var(--app-top-nav-height, 0px));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: clamp(var(--app-space-3), 4vw, var(--app-space-5));
+        background:
+          linear-gradient(180deg,
+            color-mix(in srgb, var(--app-subtle-surface-color) 86%, var(--app-accent-color)),
+            var(--app-subtle-surface-color));
+        color: var(--app-text-color);
+      }
+
+      .ai-create-card {
+        width: min(100%, 720px);
+        display: grid;
+        gap: var(--app-space-3);
+        padding: clamp(var(--app-space-3), 4vw, var(--app-space-4));
+        background: var(--learning-card-surface-color);
+        border: 1px solid var(--border-color);
+        border-radius: calc(var(--border-radius, 4px) * 4);
+        box-shadow: var(--app-elevation-3, 0 12px 40px rgba(0, 0, 0, 0.12));
+      }
+
+      .ai-create-header {
+        display: flex;
+        gap: var(--app-space-3);
+        align-items: flex-start;
+      }
+
+      .ai-create-icon,
+      .ai-mode-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        background: var(--app-info-surface-color);
+        color: var(--app-info-color);
+        border: 1px solid color-mix(in srgb, var(--app-info-color) 24%, var(--border-color));
+      }
+
+      .ai-create-icon {
+        width: calc(44px * var(--app-density-scale));
+        height: calc(44px * var(--app-density-scale));
+        border-radius: calc(var(--border-radius, 4px) * 3);
+        font-size: calc(var(--app-font-size-base) * 1.25);
+      }
+
+      .ai-create-title {
+        margin: 0;
+        font-size: calc(var(--app-font-size-base) * 1.375);
+        font-weight: 700;
+        line-height: 1.2;
+        letter-spacing: 0;
+      }
+
+      .ai-create-subtitle,
+      .ai-create-help,
+      .ai-create-tip,
+      .ai-mode-helper {
+        color: var(--app-secondary-text-color);
+      }
+
+      .ai-create-subtitle {
+        margin: var(--app-space-1) 0 0;
+        font-size: calc(var(--app-font-size-base) * 0.875);
+      }
+
+      .ai-route-label {
+        display: flex;
+        align-items: center;
+        gap: var(--app-space-1);
+        margin: var(--app-space-1) var(--app-space-1) 0;
+        color: var(--app-text-color);
+        font-size: calc(var(--app-font-size-base) * 0.875);
+        font-weight: 600;
+      }
+
+      .ai-route-label .fa {
+        color: var(--app-secondary-text-color);
+        transition: transform 0.15s ease;
+      }
+
+      .ai-route-label:hover .fa {
+        transform: translateX(2px);
+      }
+
+      .ai-prompt-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--app-space-2);
+      }
+
+      .ai-prompt-chip {
+        min-height: calc(36px * var(--app-density-scale));
+        display: inline-flex;
+        align-items: center;
+        gap: var(--app-space-1);
+        padding: var(--app-space-1) calc(0.875rem * var(--app-density-scale));
+        background: var(--app-muted-surface-color);
+        color: var(--app-text-color);
+        border: 1px solid var(--border-color);
+        border-radius: var(--border-radius-pill);
+        font-size: calc(var(--app-font-size-base) * 0.875);
+        font-weight: 600;
+        line-height: 1.2;
+        transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
+      }
+
+      .ai-prompt-chip:hover {
+        background: color-mix(in srgb, var(--app-muted-surface-color) 78%, var(--app-accent-color));
+        border-color: color-mix(in srgb, var(--app-accent-color) 44%, var(--border-color));
+        transform: translateY(-1px);
+      }
+
+      @keyframes ai-chip-pulse {
+        0%, 100% { transform: translateY(0); box-shadow: 0 0 0 0 color-mix(in srgb, var(--app-accent-color) 0%, transparent); }
+        35% { transform: translateY(-1px); box-shadow: 0 0 0 4px color-mix(in srgb, var(--app-accent-color) 22%, transparent); }
+      }
+
+      .ai-prompt-chip.ai-pulse-once {
+        animation: ai-chip-pulse 1.5s ease-in-out 2;
+      }
+
+      .ai-create-help {
+        margin: calc(-1 * var(--app-space-1)) var(--app-space-1) 0;
+        font-size: calc(var(--app-font-size-base) * 0.78);
+      }
+
+      .ai-input-wrap {
+        position: relative;
+      }
+
+      .ai-source-box {
+        width: 100%;
+        min-height: calc(188px * var(--app-density-scale));
+        padding: calc(1.125rem * var(--app-density-scale)) calc(1.125rem * var(--app-density-scale)) calc(3.25rem * var(--app-density-scale));
+        border-radius: calc(var(--border-radius, 4px) * 5);
+        border: 1.5px solid var(--border-color);
+        background: color-mix(in srgb, var(--learning-card-surface-color) 94%, var(--app-muted-surface-color));
+        color: var(--app-text-color);
+        resize: vertical;
+        font: inherit;
+        font-size: max(16px, var(--app-font-size-base));
+        line-height: 1.55;
+        transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+      }
+
+      .ai-source-box:focus {
+        outline: none;
+        border-color: var(--app-info-color);
+        background: var(--learning-card-surface-color);
+        box-shadow: 0 0 0 4px color-mix(in srgb, var(--app-info-color) 18%, transparent);
+      }
+
+      .ai-source-box::placeholder {
+        color: var(--app-tertiary-text-color, var(--app-secondary-text-color));
+      }
+
+      .ai-source-meta {
+        position: absolute;
+        left: calc(1.125rem * var(--app-density-scale));
+        right: calc(1.125rem * var(--app-density-scale));
+        bottom: calc(0.875rem * var(--app-density-scale));
+        display: flex;
+        justify-content: flex-end;
+        pointer-events: none;
+      }
+
+      .ai-char-count {
+        padding: 2px var(--app-space-1);
+        border-radius: var(--border-radius, 4px);
+        background: color-mix(in srgb, var(--learning-card-surface-color) 84%, transparent);
+        color: var(--app-secondary-text-color);
+        font-size: calc(var(--app-font-size-base) * 0.75);
+      }
+
+      .ai-create-tip {
+        margin: calc(-1 * var(--app-space-1)) var(--app-space-1) 0;
+        font-size: calc(var(--app-font-size-base) * 0.8125);
+      }
+
+      .ai-mode-label {
+        margin: var(--app-space-1) 0 0 var(--app-space-1);
+        color: var(--app-secondary-text-color);
+        font-size: calc(var(--app-font-size-base) * 0.8125);
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .ai-mode-selector {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: var(--app-space-2);
+      }
+
+      .ai-mode-card {
+        min-height: calc(72px * var(--app-density-scale));
+        display: flex;
+        align-items: center;
+        gap: var(--app-space-2);
+        padding: calc(0.875rem * var(--app-density-scale));
+        background: var(--learning-card-surface-color);
+        border: 1.5px solid var(--border-color);
+        border-radius: calc(var(--border-radius, 4px) * 4);
+        color: var(--app-text-color);
+        text-align: left;
+        transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+      }
+
+      .ai-mode-card:hover {
+        background: color-mix(in srgb, var(--learning-card-surface-color) 92%, var(--app-muted-surface-color));
+        border-color: color-mix(in srgb, var(--app-accent-color) 36%, var(--border-color));
+        transform: translateY(-1px);
+      }
+
+      .ai-mode-card.is-selected {
+        background: var(--app-info-surface-color);
+        border-color: var(--app-info-color);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-info-color) 16%, transparent);
+      }
+
+      .ai-mode-icon {
+        width: calc(40px * var(--app-density-scale));
+        height: calc(40px * var(--app-density-scale));
+        border-radius: calc(var(--border-radius, 4px) * 3);
+        background: var(--app-muted-surface-color);
+        color: var(--app-secondary-text-color);
+      }
+
+      .ai-mode-card.is-selected .ai-mode-icon {
+        background: color-mix(in srgb, var(--app-info-surface-color) 72%, var(--learning-card-surface-color));
+        color: var(--app-info-color);
+      }
+
+      .ai-mode-text strong,
+      .ai-mode-text span {
+        display: block;
+      }
+
+      .ai-mode-text strong {
+        font-size: calc(var(--app-font-size-base) * 0.9375);
+        line-height: 1.1;
+      }
+
+      .ai-mode-text span {
+        margin-top: 3px;
+        color: var(--app-secondary-text-color);
+        font-size: calc(var(--app-font-size-base) * 0.75);
+      }
+
+      .ai-mode-helper {
+        min-height: calc(18px * var(--app-density-scale));
+        margin: calc(-1 * var(--app-space-1)) var(--app-space-1) 0;
+        font-size: calc(var(--app-font-size-base) * 0.8125);
+      }
+
+      .ai-create-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--app-space-3);
+        padding-top: var(--app-space-3);
+        border-top: 1px solid var(--border-color);
+      }
+
+      .ai-manual-link {
+        min-height: calc(32px * var(--app-density-scale));
+        display: inline-flex;
+        align-items: center;
+        gap: var(--app-space-1);
+        padding: 0 var(--app-space-1);
+        color: var(--app-accent-color);
+        background: transparent;
+        border: none;
+        border-radius: var(--border-radius, 4px);
+        font: inherit;
+        font-size: calc(var(--app-font-size-base) * 0.875);
+        font-weight: 650;
+      }
+
+      .ai-manual-link:hover {
+        color: var(--app-accent-color);
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+
+      .ai-create-submit {
+        min-width: calc(132px * var(--app-density-scale));
+        min-height: calc(50px * var(--app-density-scale));
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--app-space-2);
+        padding: 0 calc(1.5rem * var(--app-density-scale));
+        border-radius: calc(var(--border-radius, 4px) * 3);
+        font-weight: 700;
+      }
+
+      .ai-create-status {
+        margin: 0;
+      }
+
+      @media (max-width: 680px) {
+        .ai-create-page {
+          align-items: flex-start;
+          padding: var(--app-space-3);
+        }
+
+        .ai-create-card {
+          border-radius: calc(var(--border-radius, 4px) * 3);
+        }
+
+        .ai-mode-selector {
+          grid-template-columns: 1fr;
+        }
+
+        .ai-mode-card {
+          min-height: calc(64px * var(--app-density-scale));
+        }
+
+        .ai-create-footer {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .ai-create-submit {
+          width: 100%;
+        }
+      }
+    </style>
+
+    <section class="ai-create-card" role="region" aria-label="Create New Content">
+      <header class="ai-create-header">
+        <div class="ai-create-icon" aria-hidden="true">
+          <i class="fa fa-magic"></i>
+        </div>
+        <div>
+          <h1 class="ai-create-title">Create New Content</h1>
+          <p class="ai-create-subtitle">Drop your notes and we'll turn them into something learnable</p>
+        </div>
+      </header>
+
+      {{#unless hasOpenRouterConfig}}
+      <div class="alert alert-warning ai-create-status">
+        AI content creation requires an OpenRouter key and default model. Add them in your Profile.
+        <a href="/profile" class="btn btn-outline-primary btn-sm admin-inline-action">Go to Profile</a>
+      </div>
+      {{/unless}}
+
+      {{#if statusMessage}}
+      <div class="alert {{statusClass}} ai-create-status" role="status">
+        {{#if creating}}<i class="fa fa-refresh fa-spin"></i>{{/if}}
+        {{statusMessage}}
+      </div>
+      {{/if}}
+
+      <div class="ai-route-label">Choose your route - tap a starter to begin <i class="fa fa-arrow-right" aria-hidden="true"></i></div>
+
+      <div class="ai-prompt-chips" aria-label="Prompt starters">
+        {{#each promptStarters}}
+        <button type="button" class="ai-prompt-chip {{pulseClass}}" data-starter-id="{{id}}" title="{{title}}">
+          <i class="fa {{icon}}" aria-hidden="true"></i>
+          {{label}}
+        </button>
+        {{/each}}
+      </div>
+      <p class="ai-create-help">Each starter picks the best mode for you. You can change it below.</p>
+
+      <div class="ai-input-wrap">
+        <textarea id="ai-source-text" class="ai-source-box" placeholder="Paste notes, learning objectives, quiz items, or a short description." aria-label="Content input">{{sourceText}}</textarea>
+        <div class="ai-source-meta">
+          <span class="ai-char-count">{{sourceLength}}</span>
+        </div>
+      </div>
+
+      <p class="ai-create-tip">Tip: the more context you add, the better your session will be</p>
+
+      <p class="ai-mode-label">Choose how you want to start</p>
+      <div class="ai-mode-selector" role="group" aria-label="Session type">
+        {{#each modules}}
+        <button type="button" class="ai-mode-card {{selectedClass}}" aria-pressed="{{pressed}}" data-module-id="{{id}}">
+          <div class="ai-mode-icon" aria-hidden="true">
+            <i class="fa {{icon}}"></i>
+          </div>
+          <div class="ai-mode-text">
+            <strong>{{shortLabel}}</strong>
+            <span>{{description}}</span>
+          </div>
+        </button>
+        {{/each}}
+      </div>
+      <p class="ai-mode-helper" aria-live="polite">{{modeHelper}}</p>
+
+      <footer class="ai-create-footer">
+        <button type="button" class="ai-manual-link" id="ai-open-manual-creator">
+          <i class="fa fa-plus" aria-hidden="true"></i>
+          Advanced: build manually <i class="fa fa-arrow-right" aria-hidden="true"></i>
+        </button>
+        <button type="button" class="btn btn-primary ai-create-submit" id="ai-create-submit" {{createAttrs}}>
+          {{#if creating}}
+            <i class="fa fa-refresh fa-spin" aria-hidden="true"></i>
+            Creating...
+          {{else}}
+            <i class="fa fa-magic" aria-hidden="true"></i>
+            Create
+          {{/if}}
+        </button>
+      </footer>
+    </section>
+  </div>
+</template>

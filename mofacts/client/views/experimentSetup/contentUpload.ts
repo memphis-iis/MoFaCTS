@@ -10,6 +10,7 @@ import { currentUserHasRole } from '../../lib/roleUtils';
 import { buildStimuliFromNormalizedItems, buildTutorFromNormalizedItems, getImportFileNames } from '../../lib/importCompositionBuilder';
 import type { NormalizedImportItem } from '../../lib/normalizedImportTypes';
 import { getUploadIntegrity } from '../../lib/uploadIntegrity';
+import { hasSavedOpenRouterApiKey } from '../../lib/openRouterClientProfile';
 import './apkgWizard';
 import './imsccWizard';
 export {doFileUpload};
@@ -37,41 +38,8 @@ const CONTENT_UPLOAD_LIST_LIMIT = 50;
 const DEBUG_SKIP_PACKAGE_PROCESSING = false;
 const SUMMARY_FETCH_THROTTLE = 1500;
 
-type ManualDraftSummary = {
-  _id: string;
-  lessonName: string;
-  currentStep: number;
-  stepLabel: string;
-  status: string;
-  promptType?: string | null;
-  responseType?: string | null;
-  updatedAt?: Date | string | null;
-};
-
-function formatManualDraftTimestamp(value: unknown) {
-  if (!value) return '';
-  const dateValue = value instanceof Date ? value : new Date(String(value));
-  if (Number.isNaN(dateValue.getTime())) {
-    return '';
-  }
-  return dateValue.toLocaleString();
-}
-
-function fetchManualContentDrafts(template: any) {
-  template.manualDraftsLoading.set(true);
-  template.manualDraftsError.set(null);
-
-  MeteorAny.callAsync('listManualContentDrafts')
-    .then((drafts: ManualDraftSummary[]) => {
-      template.manualDrafts.set(Array.isArray(drafts) ? drafts : []);
-      template.manualDraftsLoading.set(false);
-    })
-    .catch((error: unknown) => {
-      clientConsole(1, '[MANUAL DRAFTS] Failed to load drafts:', error);
-      template.manualDrafts.set([]);
-      template.manualDraftsError.set(error instanceof Error ? error.message : String(error));
-      template.manualDraftsLoading.set(false);
-    });
+function currentOpenRouterModel(): string {
+  return String((Meteor.user() as any)?.profile?.openRouterDefaultModel || '').trim();
 }
 
 // Reactive trigger for forcing UI refresh after deletions
@@ -228,41 +196,11 @@ Template.contentUpload.helpers({
   quotaStatus() {
     return (Template.instance() as any).quotaStatus.get();
   },
-  manualDrafts() {
-    const template = Template.instance() as any;
-    const drafts = template.manualDrafts ? template.manualDrafts.get() : [];
-    return (Array.isArray(drafts) ? drafts : []).map((draft: ManualDraftSummary) => ({
-      ...draft,
-      updatedAtLabel: formatManualDraftTimestamp(draft.updatedAt)
-    }));
+  hasAiContentConfig() {
+    return hasSavedOpenRouterApiKey() && Boolean(currentOpenRouterModel());
   },
-  manualDraftsLoading() {
-    const template = Template.instance() as any;
-    return template.manualDraftsLoading ? template.manualDraftsLoading.get() : false;
-  },
-  manualDraftsError() {
-    const template = Template.instance() as any;
-    return template.manualDraftsError ? template.manualDraftsError.get() : null;
-  },
-  hasManualDrafts() {
-    const template = Template.instance() as any;
-    const drafts = template.manualDrafts ? template.manualDrafts.get() : [];
-    return Array.isArray(drafts) && drafts.length > 0;
-  },
-  manualDraftToggleAttrs() {
-    const template = Template.instance() as any;
-    const drafts = template.manualDrafts ? template.manualDrafts.get() : [];
-    const hasDrafts = Array.isArray(drafts) && drafts.length > 0;
-    return hasDrafts ? {} : { disabled: true };
-  },
-  manualDraftCount() {
-    const template = Template.instance() as any;
-    const drafts = template.manualDrafts ? template.manualDrafts.get() : [];
-    return Array.isArray(drafts) ? drafts.length : 0;
-  },
-  showManualDrafts() {
-    const template = Template.instance() as any;
-    return template.showManualDrafts ? template.showManualDrafts.get() : false;
+  aiContentCreateAttrs() {
+    return hasSavedOpenRouterApiKey() && currentOpenRouterModel() ? {} : { disabled: true };
   },
   assets: function(this: any) {
     try {
@@ -635,10 +573,6 @@ Template.contentUpload.helpers({
     this.listLimit = new ReactiveVar(CONTENT_UPLOAD_LIST_LIMIT);
     this.lastDdpStatus = null;
     this.accessMessages = new ReactiveVar({});
-  this.manualDrafts = new ReactiveVar([]);
-  this.manualDraftsLoading = new ReactiveVar(false);
-  this.manualDraftsError = new ReactiveVar(null);
-  this.showManualDrafts = new ReactiveVar(false);
   this.initialPaintDone = new ReactiveVar(false);
   this.listDisplayReady = new ReactiveVar(false);
   this.overlayVisible = new ReactiveVar(false);
@@ -827,8 +761,6 @@ Template.contentUpload.helpers({
     clientConsole(1, '[QUOTA] Error loading quota status:', err);
   });
 
-  fetchManualContentDrafts(this);
-
 });
 
 Template.contentUpload.onRendered(function(this: any) {
@@ -873,47 +805,12 @@ Template.contentUpload.onDestroyed(function(this: any) {
 // Template events
 
 Template.contentUpload.events({
-  'click #open-manual-content-creator': function(event: any, _template: any) {
+  'click #open-ai-content-creator': function(event: any, _template: any) {
     event.preventDefault();
-    FlowRouter.go('/contentCreate');
-  },
-
-  'click #toggle-manual-drafts': function(event: any, template: any) {
-    event.preventDefault();
-    const nextVisible = !(template.showManualDrafts?.get?.() || false);
-    template.showManualDrafts.set(nextVisible);
-    if (nextVisible) {
-      fetchManualContentDrafts(template);
-    }
-  },
-
-  'click .open-saved-manual-draft': function(event: any, _template: any) {
-    event.preventDefault();
-    const draftId = String(event.currentTarget.dataset.draftId || '');
-    if (!draftId) {
+    if (!hasSavedOpenRouterApiKey() || !currentOpenRouterModel()) {
       return;
     }
-    FlowRouter.go('/contentCreate', {}, { draftId });
-  },
-
-  'click .delete-saved-manual-draft': async function(event: any, template: any) {
-    event.preventDefault();
-    const draftId = String(event.currentTarget.dataset.draftId || '');
-    const lessonName = String(event.currentTarget.dataset.lessonName || 'this draft');
-    if (!draftId) {
-      return;
-    }
-    if (!confirm(`Delete saved draft "${lessonName}"?`)) {
-      return;
-    }
-
-    try {
-      await MeteorAny.callAsync('deleteManualContentDraft', draftId);
-      fetchManualContentDrafts(template);
-    } catch (error: unknown) {
-      clientConsole(1, '[MANUAL DRAFTS] Failed to delete draft:', error);
-      alert(`Error deleting draft: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    FlowRouter.go('/aiContentCreate');
   },
 
   // Toggle TDF public/private setting

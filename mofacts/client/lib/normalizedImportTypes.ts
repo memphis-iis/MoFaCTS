@@ -1,11 +1,20 @@
 export type SourceKind = 'apkg' | 'imscc' | 'manual';
 
+export type PromptAttribution = {
+  creatorName?: string;
+  sourceName?: string;
+  sourceUrl?: string;
+  licenseName?: string;
+  licenseUrl?: string;
+};
+
 export type NormalizedImportItem = {
   prompt: {
     text?: string;
     imgSrc?: string;
     audioSrc?: string;
     videoSrc?: string;
+    attribution?: PromptAttribution;
   };
   response: {
     correctResponse: string;

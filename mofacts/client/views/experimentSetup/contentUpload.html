@@ -232,6 +232,35 @@
             <div class="card admin-card">
                 <div class="card-body">
                     <div class="admin-section-heading">
+                        <i class="fa fa-magic admin-section-icon"></i>
+                        <h5>AI Content Creator</h5>
+                    </div>
+                    <div class="row g-3 align-items-center">
+                        <div class="col-lg-8 col-12">
+                            <p class="text-muted admin-form-row mb-0">
+                                Paste notes or learning goals, choose a learning, assessment, AutoTutor, or combined route, and let MoFaCTS generate a private package.
+                            </p>
+                            {{#unless hasAiContentConfig}}
+                            <div class="alert alert-warning admin-form-row-top mb-0" role="status">
+                                AI content creation requires an OpenRouter key and default model in your Profile.
+                                <a href="/profile" class="btn btn-outline-primary btn-sm admin-inline-action">Go to Profile</a>
+                            </div>
+                            {{/unless}}
+                        </div>
+                        <div class="col-lg-4 col-12 text-lg-end text-center">
+                            <button type="button" class="btn btn-primary btn-lg" id="open-ai-content-creator" {{aiContentCreateAttrs}}>
+                                <i class="fa fa-magic"></i> Create with AI
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="admin-section">
+            <div class="card admin-card">
+                <div class="card-body">
+                    <div class="admin-section-heading">
                         <i class="fa fa-folder-open admin-section-icon"></i>
                         <h5>Uploaded Content</h5>
                     </div>
@@ -643,88 +672,6 @@
                 </button>
                 {{/if}}
             </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Create New Content Section -->
-        <div class="admin-section">
-            <div class="card admin-card">
-                <div class="card-body">
-                    <div class="admin-section-heading">
-                        <i class="fa fa-plus-square-o admin-section-icon"></i>
-                        <h5>Create New Content</h5>
-                    </div>
-                    <div class="row g-3 align-items-center">
-                        <div class="col-lg-8 col-12">
-                            <div class="text-muted small">
-                                <div>Start from prompts.</div>
-                                <div>Build draft lesson.</div>
-                                <div>Edit. Validate. Finalize.</div>
-                            </div>
-                            <div class="text-muted small admin-form-row-top">
-                                Basics &rarr; Format &rarr; Content &rarr; Finalize
-                            </div>
-                        </div>
-                        <div class="col-lg-4 col-12 text-lg-end text-center">
-                            <div class="d-flex flex-column flex-sm-row justify-content-lg-end justify-content-center gap-2">
-                                <button type="button" class="btn btn-primary btn-lg" id="open-manual-content-creator">
-                                    <i class="fa fa-plus-square-o"></i> Start Content Creator
-                                </button>
-                                {{#if manualDraftsLoading}}
-                                <button type="button" class="btn btn-outline-secondary btn-lg" id="toggle-manual-drafts" disabled>
-                                    <i class="fa fa-refresh fa-spin"></i> Resume Draft
-                                </button>
-                                {{else}}
-                                <button type="button" class="btn btn-outline-secondary btn-lg" id="toggle-manual-drafts" {{manualDraftToggleAttrs}}>
-                                    <i class="fa fa-folder-open-o"></i> Resume Draft{{#if hasManualDrafts}} ({{manualDraftCount}}){{/if}}
-                                </button>
-                                {{/if}}
-                            </div>
-                        </div>
-                    </div>
-                    {{#if manualDraftsError}}
-                    <div class="alert alert-warning admin-form-row-top admin-empty-text">
-                        {{manualDraftsError}}
-                    </div>
-                    {{/if}}
-                    {{#if showManualDrafts}}
-                    <div class="content-upload-drafts border-top">
-                        <div class="d-flex align-items-center justify-content-between admin-form-row-sm">
-                            <div class="fw-semibold">Saved Drafts</div>
-                            {{#if manualDraftsLoading}}
-                            <div class="small text-muted"><i class="fa fa-refresh fa-spin"></i> Loading drafts...</div>
-                            {{/if}}
-                        </div>
-                        {{#if hasManualDrafts}}
-                        <div class="list-group">
-                            {{#each manualDrafts}}
-                            <div class="list-group-item">
-                                <div class="content-upload-draft-row">
-                                    <div>
-                                        <div class="fw-semibold">{{lessonName}}</div>
-                                        <div class="small text-muted">{{stepLabel}} · {{status}}</div>
-                                        {{#if updatedAtLabel}}
-                                        <div class="small text-muted">Updated {{updatedAtLabel}}</div>
-                                        {{/if}}
-                                    </div>
-                                    <div class="content-upload-draft-actions">
-                                        <button type="button" class="btn btn-primary open-saved-manual-draft" data-draft-id="{{_id}}">
-                                            Continue
-                                        </button>
-                                        <button type="button" class="btn btn-outline-danger delete-saved-manual-draft" data-draft-id="{{_id}}" data-lesson-name="{{lessonName}}">
-                                            Delete
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            {{/each}}
-                        </div>
-                        {{else}}
-                        <div class="small text-muted">No saved drafts yet.</div>
-                        {{/if}}
-                    </div>
-                    {{/if}}
                 </div>
             </div>
         </div>

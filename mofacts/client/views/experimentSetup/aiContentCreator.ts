@@ -1,0 +1,592 @@
+import { Meteor } from 'meteor/meteor';
+import { ReactiveVar } from 'meteor/reactive-var';
+import { Random } from 'meteor/random';
+import { Session } from 'meteor/session';
+import { Template } from 'meteor/templating';
+import './aiContentCreator.html';
+import { clientConsole } from '../..';
+import { getUploadIntegrity } from '../../lib/uploadIntegrity';
+import { getErrorMessage } from '../../lib/errorUtils';
+import { hasSavedOpenRouterApiKey } from '../../lib/openRouterClientProfile';
+import { sanitizeImportName } from '../../lib/importCompositionBuilder';
+import type { ImportDraftLesson } from '../../lib/normalizedImportTypes';
+import type { CreatedOutput, CreationModuleId } from '../../lib/aiContentTypes';
+import { buildAutoTutorDraft, buildDrafts } from '../../lib/aiContentDraftBuilder';
+import { callOpenRouterForAutoTutor, callOpenRouterForItems } from '../../lib/aiContentOpenRouterClient';
+import { extractJsonObject, validateAiOutput, validateAutoTutorOutput } from '../../lib/aiContentValidation';
+import {
+  buildUploadWithNameConflictRetry,
+  suggestedReplacementName,
+  type GeneratedNameConflict,
+} from '../../lib/aiContentPackageSave';
+
+const MeteorAny = Meteor as typeof Meteor & { callAsync: (name: string, ...args: any[]) => Promise<any> };
+const FlowRouter = (globalThis as any).FlowRouter;
+declare const DynamicAssets: any;
+
+type StatusKind = 'info' | 'success' | 'warning' | 'error';
+
+type DebugRecord = {
+  id?: string;
+  creationRecordId?: string;
+  sourceTextPreview: string;
+  selectedModules: CreationModuleId[];
+  model: string;
+  status: 'succeeded' | 'failed';
+  failureStage?: string;
+  warnings: string[];
+  rawAiResponse?: string;
+  parsedJson?: unknown;
+  llmCalls?: {
+    itemGeneration?: { rawAiResponse: string; parsedJson: unknown };
+    autoTutorGeneration?: { rawAiResponse: string; parsedJson: unknown };
+  };
+  rejectedItems?: Array<{ item: unknown; reason: string }>;
+  outputs?: CreatedOutput[];
+  error?: string;
+};
+
+type ItemGenerationResult = {
+  rawAiResponse: string;
+  parsedJson: unknown;
+  result: ReturnType<typeof validateAiOutput>;
+};
+
+type AutoTutorGenerationResult = {
+  rawAiResponse: string;
+  parsedJson: unknown;
+  result: ReturnType<typeof validateAutoTutorOutput>;
+};
+
+type CreationRecord = {
+  id: string;
+  createdAt: string;
+  createdBy: string;
+  sourceTextHash: string;
+  sourceTextPreview?: string;
+  selectedModules: CreationModuleId[];
+  modelProvider: 'openrouter';
+  model: string;
+  promptTemplateVersion: string;
+  compactSchemaVersion: string;
+  status: 'succeeded' | 'failed' | 'partial';
+  failureStage?: string;
+  warnings?: string[];
+  outputArtifactIds?: string[];
+  itemCounts?: {
+    generated?: number;
+    accepted?: number;
+    rejected?: number;
+  };
+  debugRecordId?: string;
+};
+
+type AiCreatorInstance = Blaze.TemplateInstance & {
+  creating: ReactiveVar<boolean>;
+  sourceText: ReactiveVar<string>;
+  selectedModules: ReactiveVar<CreationModuleId[]>;
+  statusMessage: ReactiveVar<string>;
+  statusKind: ReactiveVar<StatusKind>;
+  debugRecord: ReactiveVar<DebugRecord | null>;
+  autoStartFromHandoff?: boolean;
+};
+
+const CREATION_MODULES: Array<{
+  id: CreationModuleId;
+  label: string;
+  shortLabel: string;
+  description: string;
+  icon: string;
+  disabled?: boolean;
+}> = [
+  { id: 'learningSession', label: 'Learning session', shortLabel: 'Learn it', description: 'Learning session', icon: 'fa-book' },
+  { id: 'assessmentSession', label: 'Assessment session', shortLabel: 'Test me', description: 'Assessment session', icon: 'fa-check-square-o' },
+  { id: 'autoTutor', label: 'AutoTutor', shortLabel: 'Chat tutor', description: 'AutoTutor', icon: 'fa-star-o' },
+];
+
+const PROMPT_STARTERS: Array<{
+  id: string;
+  label: string;
+  icon: string;
+  text: string;
+  modules: CreationModuleId[];
+  title?: string;
+  pulse?: boolean;
+}> = [
+  {
+    id: 'lecture-notes',
+    label: 'Lecture notes',
+    icon: 'fa-book',
+    text: "Paste your lecture notes or slides here. I'll pull out key terms and examples.",
+    modules: ['learningSession'],
+  },
+  {
+    id: 'brain-dump',
+    label: 'Brain dump',
+    icon: 'fa-lightbulb-o',
+    text: "Here's what I remember - messy is fine:\n\nWe'll organize it with a tutor, then build a quick quiz to check what stuck.",
+    modules: ['autoTutor', 'assessmentSession'],
+    pulse: true,
+  },
+  {
+    id: 'study-guide',
+    label: 'Study guide',
+    icon: 'fa-pencil-square-o',
+    text: "Topic:\nWhat I need to know:\nConfusing parts:\n\nWe'll create a study guide and a short quiz.",
+    modules: ['learningSession', 'assessmentSession'],
+  },
+  {
+    id: 'make-quiz',
+    label: 'Make a quiz',
+    icon: 'fa-question-circle',
+    text: 'Turn this into a quiz. Focus on:\n',
+    modules: ['assessmentSession'],
+  },
+  {
+    id: 'make-simple',
+    label: 'Make it simple',
+    icon: 'fa-magic',
+    text: "Explain this simply, like I'm 12:\n",
+    modules: ['autoTutor'],
+    title: 'AI will explain at about a 5th-grade level',
+  },
+];
+const CREATION_RECORDS_STORAGE_KEY = 'mofacts.aiContentCreation.records';
+const DEBUG_RECORDS_STORAGE_KEY = 'mofacts.aiContentCreation.debugRecords';
+const AI_CREATION_HANDOFF_STORAGE_KEY = 'mofacts.aiContentCreation.pendingRequest';
+const PROMPT_TEMPLATE_VERSION = 'ai-content-creator-v1';
+const COMPACT_SCHEMA_VERSION = 'ai-normalized-v1';
+const MAX_STORED_RECORDS = 50;
+const MAX_DEBUG_PAYLOAD_LENGTH = 20000;
+
+function currentModel(): string {
+  return String((Meteor.user() as any)?.profile?.openRouterDefaultModel || '').trim();
+}
+
+function readPendingCreationHandoff(): { sourceText: string; selectedModules: CreationModuleId[]; autoStart: boolean } | null {
+  try {
+    const raw = window.sessionStorage.getItem(AI_CREATION_HANDOFF_STORAGE_KEY);
+    window.sessionStorage.removeItem(AI_CREATION_HANDOFF_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw);
+    const sourceText = String(parsed?.sourceText || '').trim();
+    const selectedModules = Array.isArray(parsed?.selectedModules)
+      ? parsed.selectedModules.filter((moduleId: unknown) => CREATION_MODULES.some((module) => module.id === moduleId))
+      : [];
+    if (!sourceText || selectedModules.length === 0) {
+      return null;
+    }
+    return {
+      sourceText,
+      selectedModules,
+      autoStart: parsed?.autoStart === true,
+    };
+  } catch {
+    window.sessionStorage.removeItem(AI_CREATION_HANDOFF_STORAGE_KEY);
+    return null;
+  }
+}
+
+function setStatus(instance: AiCreatorInstance, kind: StatusKind, message: string): void {
+  instance.statusKind.set(kind);
+  instance.statusMessage.set(message);
+}
+
+async function hashSourceText(sourceText: string): Promise<string> {
+  const data = new TextEncoder().encode(sourceText);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function readStoredArray<T>(key: string): T[] {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(key) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function truncateDebugValue(value: unknown): unknown {
+  const text = typeof value === 'string' ? value : JSON.stringify(value);
+  if (typeof text !== 'string' || text.length <= MAX_DEBUG_PAYLOAD_LENGTH) {
+    return value;
+  }
+  return `${text.slice(0, MAX_DEBUG_PAYLOAD_LENGTH)}\n...[truncated]`;
+}
+
+function saveCreationRecord(record: CreationRecord, debugRecord?: DebugRecord): void {
+  const records = readStoredArray<CreationRecord>(CREATION_RECORDS_STORAGE_KEY);
+  window.localStorage.setItem(
+    CREATION_RECORDS_STORAGE_KEY,
+    JSON.stringify([record, ...records].slice(0, MAX_STORED_RECORDS)),
+  );
+
+  if (debugRecord) {
+    const debugRecords = readStoredArray<DebugRecord>(DEBUG_RECORDS_STORAGE_KEY);
+    const storedDebug = {
+      ...debugRecord,
+      rawAiResponse: debugRecord.rawAiResponse ? String(truncateDebugValue(debugRecord.rawAiResponse)) : undefined,
+      parsedJson: debugRecord.parsedJson ? truncateDebugValue(debugRecord.parsedJson) : undefined,
+      llmCalls: debugRecord.llmCalls ? truncateDebugValue(debugRecord.llmCalls) : undefined,
+    };
+    window.localStorage.setItem(
+      DEBUG_RECORDS_STORAGE_KEY,
+      JSON.stringify([storedDebug, ...debugRecords].slice(0, MAX_STORED_RECORDS)),
+    );
+  }
+}
+
+function statusClass(kind: StatusKind): string {
+  if (kind === 'success') return 'alert-success';
+  if (kind === 'warning') return 'alert-warning';
+  if (kind === 'error') return 'alert-danger';
+  return 'alert-info';
+}
+
+function findStarter(starterId: string) {
+  return PROMPT_STARTERS.find((starter) => starter.id === starterId) || null;
+}
+
+function orderedModules(moduleIds: CreationModuleId[]): CreationModuleId[] {
+  const selected = new Set(moduleIds);
+  return CREATION_MODULES.map((module) => module.id).filter((moduleId) => selected.has(moduleId));
+}
+
+function modeHelperText(moduleIds: CreationModuleId[]): string {
+  const ordered = orderedModules(moduleIds);
+  if (ordered.length === 0) {
+    return 'Select at least one mode to continue';
+  }
+  if (ordered.length === 1) {
+    return CREATION_MODULES.find((module) => module.id === ordered[0])?.description || '';
+  }
+  const labels = ordered
+    .map((moduleId) => CREATION_MODULES.find((module) => module.id === moduleId)?.shortLabel)
+    .filter(Boolean)
+    .join(' + ');
+  return `Creates a combo: ${labels}`;
+}
+
+async function generateItemsFromAi(
+  sourceText: string,
+  selectedModules: CreationModuleId[],
+  model: string,
+): Promise<ItemGenerationResult> {
+  const rawAiResponse = await callOpenRouterForItems(sourceText, selectedModules, model);
+  const parsedJson = extractJsonObject(rawAiResponse);
+  return {
+    rawAiResponse,
+    parsedJson,
+    result: validateAiOutput(parsedJson),
+  };
+}
+
+async function generateAutoTutorFromAi(sourceText: string, model: string): Promise<AutoTutorGenerationResult> {
+  const rawAiResponse = await callOpenRouterForAutoTutor(sourceText, model);
+  const parsedJson = extractJsonObject(rawAiResponse);
+  return {
+    rawAiResponse,
+    parsedJson,
+    result: validateAutoTutorOutput(parsedJson),
+  };
+}
+
+function promptForReplacementName(conflict: GeneratedNameConflict): string | null {
+  const suggested = suggestedReplacementName(conflict);
+  const response = window.prompt(
+    `Content already exists under the name "${conflict.title}". Enter a different name for the generated system.`,
+    suggested,
+  );
+  const normalized = sanitizeImportName(response || '', '');
+  return normalized || null;
+}
+
+async function runCreation(instance: AiCreatorInstance): Promise<void> {
+  const sourceText = instance.sourceText.get().trim();
+  const selectedModules = instance.selectedModules.get();
+  const model = currentModel();
+  const creationRecordId = Random.id();
+  const debugRecordId = Random.id();
+  const debugBase: DebugRecord = {
+    id: debugRecordId,
+    creationRecordId,
+    sourceTextPreview: sourceText.slice(0, 500),
+    selectedModules,
+    model,
+    status: 'failed',
+    warnings: [],
+  };
+
+  if (!sourceText) {
+    setStatus(instance, 'warning', 'Add source content before creating.');
+    return;
+  }
+  if (selectedModules.length === 0) {
+    setStatus(instance, 'warning', 'Choose at least one creation target.');
+    return;
+  }
+  if (!hasSavedOpenRouterApiKey() || !model) {
+    setStatus(instance, 'warning', 'AI content creation requires an OpenRouter key and default model. Add them in your Profile.');
+    return;
+  }
+
+  instance.creating.set(true);
+  instance.debugRecord.set(debugBase);
+  setStatus(instance, 'info', 'Creating content...');
+  try {
+    const sourceTextHash = await hashSourceText(sourceText);
+    const itemModules = selectedModules.filter((moduleId) => moduleId === 'learningSession' || moduleId === 'assessmentSession');
+    const itemGenerationPromise = itemModules.length > 0
+      ? generateItemsFromAi(sourceText, itemModules, model)
+      : null;
+    const autoTutorGenerationPromise = selectedModules.includes('autoTutor')
+      ? generateAutoTutorFromAi(sourceText, model)
+      : null;
+    const [itemGeneration, autoTutorGeneration] = await Promise.all([
+      itemGenerationPromise || Promise.resolve(null),
+      autoTutorGenerationPromise || Promise.resolve(null),
+    ]);
+    const drafts: ImportDraftLesson[] = [];
+    let creationSummary = '';
+    let rawAiResponse = '';
+    let parsedJson: unknown = null;
+    const llmCalls: DebugRecord['llmCalls'] = {};
+    let warnings: string[] = [];
+    let rejectedItems: Array<{ item: unknown; reason: string }> = [];
+
+    if (itemGeneration) {
+      rawAiResponse = itemGeneration.rawAiResponse;
+      parsedJson = itemGeneration.parsedJson;
+      llmCalls.itemGeneration = {
+        rawAiResponse: itemGeneration.rawAiResponse,
+        parsedJson: itemGeneration.parsedJson,
+      };
+      drafts.push(...buildDrafts(itemGeneration.result.output, itemModules));
+      warnings = warnings.concat(itemGeneration.result.warnings);
+      rejectedItems = rejectedItems.concat(itemGeneration.result.rejectedItems);
+      creationSummary = itemGeneration.result.output.creationSummary;
+    }
+
+    if (autoTutorGeneration) {
+      llmCalls.autoTutorGeneration = {
+        rawAiResponse: autoTutorGeneration.rawAiResponse,
+        parsedJson: autoTutorGeneration.parsedJson,
+      };
+      drafts.push(buildAutoTutorDraft(autoTutorGeneration.result.output, model));
+      warnings = warnings.concat(autoTutorGeneration.result.warnings);
+      creationSummary = [
+        creationSummary,
+        autoTutorGeneration.result.output.creationSummary,
+      ].filter(Boolean).join(' ');
+      if (!rawAiResponse) {
+        rawAiResponse = autoTutorGeneration.rawAiResponse;
+        parsedJson = autoTutorGeneration.parsedJson;
+      }
+    }
+
+    const { builtPackage, outputs } = await buildUploadWithNameConflictRetry(drafts, creationSummary, {
+      dynamicAssets: DynamicAssets,
+      callAsync: MeteorAny.callAsync.bind(MeteorAny),
+      getUploadIntegrity,
+      promptForReplacementName,
+      refreshAssets: () => Session.set('assetsRefreshTrigger', Date.now()),
+      logCleanupError: (cleanupError) => {
+        clientConsole(1, '[AI CONTENT CREATOR] Failed to clean up unsaved package asset:', cleanupError);
+      },
+    });
+    const debugRecord: DebugRecord = {
+      ...debugBase,
+      status: 'succeeded',
+      warnings,
+      rejectedItems,
+      outputs,
+    };
+    if (warnings.length || rejectedItems.length) {
+      debugRecord.rawAiResponse = rawAiResponse;
+      debugRecord.parsedJson = parsedJson;
+      debugRecord.llmCalls = llmCalls;
+    }
+    instance.debugRecord.set(debugRecord);
+    saveCreationRecord({
+      id: creationRecordId,
+      createdAt: new Date().toISOString(),
+      createdBy: Meteor.userId() || '',
+      sourceTextHash,
+      sourceTextPreview: sourceText.slice(0, 500),
+      selectedModules,
+      modelProvider: 'openrouter',
+      model,
+      promptTemplateVersion: PROMPT_TEMPLATE_VERSION,
+      compactSchemaVersion: COMPACT_SCHEMA_VERSION,
+      status: 'succeeded',
+      ...(warnings.length ? { warnings } : {}),
+      outputArtifactIds: outputs.map((output) => output.tdfId || output.title).filter(Boolean),
+      itemCounts: {
+        generated: builtPackage.totalCards,
+        accepted: builtPackage.totalCards,
+        rejected: rejectedItems.length,
+      },
+      ...(warnings.length || rejectedItems.length ? { debugRecordId } : {}),
+    }, warnings.length || rejectedItems.length ? debugRecord : undefined);
+    Session.set('assetsRefreshTrigger', Date.now());
+    FlowRouter.go('/contentUpload');
+  } catch (error: unknown) {
+    clientConsole(1, '[AI CONTENT CREATOR] Creation failed:', error);
+    const sourceTextHash = await hashSourceText(sourceText);
+    const debugRecord: DebugRecord = {
+      ...debugBase,
+      status: 'failed',
+      failureStage: 'create',
+      error: getErrorMessage(error),
+    };
+    instance.debugRecord.set(debugRecord);
+    saveCreationRecord({
+      id: creationRecordId,
+      createdAt: new Date().toISOString(),
+      createdBy: Meteor.userId() || '',
+      sourceTextHash,
+      sourceTextPreview: sourceText.slice(0, 500),
+      selectedModules,
+      modelProvider: 'openrouter',
+      model,
+      promptTemplateVersion: PROMPT_TEMPLATE_VERSION,
+      compactSchemaVersion: COMPACT_SCHEMA_VERSION,
+      status: 'failed',
+      failureStage: 'create',
+      warnings: [],
+      debugRecordId,
+    }, debugRecord);
+    setStatus(instance, 'error', getErrorMessage(error));
+  } finally {
+    instance.creating.set(false);
+  }
+}
+
+Template.aiContentCreator.onCreated(function(this: AiCreatorInstance) {
+  const pendingHandoff = readPendingCreationHandoff();
+  this.creating = new ReactiveVar(false);
+  this.sourceText = new ReactiveVar(pendingHandoff?.sourceText || '');
+  this.selectedModules = new ReactiveVar(pendingHandoff?.selectedModules || ['learningSession']);
+  this.statusMessage = new ReactiveVar('');
+  this.statusKind = new ReactiveVar('info');
+  this.debugRecord = new ReactiveVar(null);
+  this.autoStartFromHandoff = pendingHandoff?.autoStart === true;
+});
+
+Template.aiContentCreator.onRendered(function(this: AiCreatorInstance) {
+  Meteor.setTimeout(() => {
+    this.findAll('.ai-pulse-once').forEach((element) => element.classList.remove('ai-pulse-once'));
+  }, 3200);
+
+  if (!this.autoStartFromHandoff) {
+    return;
+  }
+  this.autoStartFromHandoff = false;
+  Meteor.setTimeout(() => {
+    void runCreation(this);
+  }, 0);
+});
+
+Template.aiContentCreator.helpers({
+  hasOpenRouterConfig() {
+    return hasSavedOpenRouterApiKey() && Boolean(currentModel());
+  },
+  sourceText() {
+    return (Template.instance() as AiCreatorInstance).sourceText.get();
+  },
+  sourceLength() {
+    const length = (Template.instance() as AiCreatorInstance).sourceText.get().length;
+    return `${length} character${length === 1 ? '' : 's'}`;
+  },
+  promptStarters() {
+    return PROMPT_STARTERS.map((starter) => ({
+      ...starter,
+      pulseClass: starter.pulse ? 'ai-pulse-once' : '',
+    }));
+  },
+  modules() {
+    const selected = new Set((Template.instance() as AiCreatorInstance).selectedModules.get());
+    return CREATION_MODULES.map((module) => ({
+      ...module,
+      selectedClass: selected.has(module.id) ? 'is-selected' : '',
+      pressed: selected.has(module.id) ? 'true' : 'false',
+      disabled: module.disabled ? true : null,
+    }));
+  },
+  modeHelper() {
+    return modeHelperText((Template.instance() as AiCreatorInstance).selectedModules.get());
+  },
+  creating() {
+    return (Template.instance() as AiCreatorInstance).creating.get();
+  },
+  createAttrs() {
+    const instance = Template.instance() as AiCreatorInstance;
+    const disabled = instance.creating.get() ||
+      !instance.sourceText.get().trim() ||
+      instance.selectedModules.get().length === 0 ||
+      !hasSavedOpenRouterApiKey() ||
+      !currentModel();
+    return disabled ? { disabled: true } : {};
+  },
+  statusMessage() {
+    return (Template.instance() as AiCreatorInstance).statusMessage.get();
+  },
+  statusClass() {
+    return statusClass((Template.instance() as AiCreatorInstance).statusKind.get());
+  },
+});
+
+Template.aiContentCreator.events({
+  'input #ai-source-text'(event: Event, instance: AiCreatorInstance) {
+    instance.sourceText.set((event.currentTarget as HTMLTextAreaElement).value);
+  },
+  'click .ai-prompt-chip'(event: Event, instance: AiCreatorInstance) {
+    event.preventDefault();
+    const button = event.currentTarget as HTMLButtonElement;
+    const starter = findStarter(String(button.dataset.starterId || ''));
+    if (!starter) {
+      return;
+    }
+    if (!instance.sourceText.get().trim()) {
+      instance.sourceText.set(starter.text);
+      const textarea = instance.find('#ai-source-text') as HTMLTextAreaElement | null;
+      if (textarea) {
+        textarea.value = starter.text;
+        textarea.focus();
+        textarea.setSelectionRange(starter.text.length, starter.text.length);
+      }
+    } else {
+      (instance.find('#ai-source-text') as HTMLTextAreaElement | null)?.focus();
+    }
+    instance.selectedModules.set(orderedModules(starter.modules));
+  },
+  'click .ai-mode-card'(event: Event, instance: AiCreatorInstance) {
+    event.preventDefault();
+    const button = event.currentTarget as HTMLButtonElement;
+    const moduleId = button.dataset.moduleId as CreationModuleId;
+    if (!CREATION_MODULES.some((module) => module.id === moduleId)) {
+      return;
+    }
+    const selected = new Set(instance.selectedModules.get());
+    if (selected.has(moduleId)) {
+      selected.delete(moduleId);
+    } else {
+      selected.add(moduleId);
+    }
+    if (selected.size === 0) {
+      selected.add(moduleId);
+    }
+    instance.selectedModules.set(orderedModules(Array.from(selected)));
+  },
+  'click #ai-create-submit'(event: Event, instance: AiCreatorInstance) {
+    event.preventDefault();
+    void runCreation(instance);
+  },
+  'click #ai-open-manual-creator'(event: Event) {
+    event.preventDefault();
+    FlowRouter.go('/contentCreate');
+  },
+});

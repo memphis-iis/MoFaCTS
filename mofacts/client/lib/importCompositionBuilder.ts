@@ -50,6 +50,9 @@ export function buildStimuliFromNormalizedItems(items: NormalizedImportItem[]) {
         if (item.prompt.videoSrc) {
           display.videoSrc = item.prompt.videoSrc;
         }
+        if (item.prompt.attribution) {
+          display.attribution = item.prompt.attribution;
+        }
 
         const response: Record<string, unknown> = {
           correctResponse: item.response.correctResponse

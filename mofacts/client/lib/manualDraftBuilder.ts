@@ -1,6 +1,6 @@
 import { buildImportLessonDraft } from './importCompositionBuilder';
 import { CALCULATE_PROBABILITY_FORMULA, cloneImportParameterDefaults } from './importParameterDefaults';
-import type { ImportDraftLesson, NormalizedImportItem } from './normalizedImportTypes';
+import type { ImportDraftLesson, NormalizedImportItem, PromptAttribution } from './normalizedImportTypes';
 
 export type LessonStructure =
   | 'learning-only'
@@ -24,6 +24,7 @@ export type StarterRow = {
   choice2: string;
   choice3: string;
   choice4: string;
+  attribution?: PromptAttribution;
 };
 
 export type ManualCreatorState = {
@@ -194,6 +195,9 @@ function buildPromptFromRow(row: StarterRow, promptType: PromptType): Normalized
   }
   if (promptType === 'video') {
     prompt.videoSrc = mediaRef;
+  }
+  if (row.attribution) {
+    prompt.attribution = row.attribution;
   }
 
   return prompt;
