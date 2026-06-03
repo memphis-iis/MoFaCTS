@@ -127,10 +127,15 @@ export interface AutoTutorHistoryRuntime extends HistoryRuntime<AutoTutorHistory
   writeCanonicalHistory(record: AutoTutorCanonicalHistoryRecord): Promise<void>;
 }
 
+export interface AutoTutorAiProviderRuntime {
+  getOpenRouterApiKey(): string;
+}
+
 export type AutoTutorRuntimeCapabilities = {
   readonly session: AutoTutorSessionRuntime;
   readonly stimuli: AutoTutorStimuliRuntime;
   readonly serverMethods: AutoTutorServerMethodsRuntime;
   readonly history: AutoTutorHistoryRuntime;
+  readonly aiProvider: AutoTutorAiProviderRuntime;
   readonly logger: ComponentLogger;
 };

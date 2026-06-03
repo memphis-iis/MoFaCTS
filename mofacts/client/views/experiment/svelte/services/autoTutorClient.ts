@@ -55,6 +55,7 @@ import {
   validateAutoTutorSavedState,
   type AutoTutorSavedStateShape,
 } from '../../../../../../learning-components/units/autotutor/AutoTutorSavedState';
+import { getSavedOpenRouterApiKey } from '../../../../lib/openRouterClientProfile';
 
 const OPEN_ROUTER_CHAT_COMPLETIONS_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const AUTO_TUTOR_COST_CAP_USD = 0.20;
@@ -165,6 +166,11 @@ function createMeteorAutoTutorRuntimeCapabilities(): AutoTutorRuntimeCapabilitie
       },
       async writeCanonicalHistory(record: AutoTutorCanonicalHistoryRecord) {
         await insertCompressedHistory(record);
+      },
+    },
+    aiProvider: {
+      getOpenRouterApiKey() {
+        return getSavedOpenRouterApiKey();
       },
     },
     logger: {

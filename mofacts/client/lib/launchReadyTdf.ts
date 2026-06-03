@@ -52,12 +52,23 @@ function hasAutoTutorUnit(content: any): boolean {
   );
 }
 
-function hasAutoTutorLaunchConfig(content: any): boolean {
+function hasAutoTutorLaunchModel(content: any): boolean {
   if (!hasAutoTutorUnit(content)) {
     return true;
   }
   const setspec = content?.tdfs?.tutor?.setspec;
-  return typeof setspec?.openRouterApiKey === 'string' && setspec.openRouterApiKey.trim().length > 0;
+  const units = content?.tdfs?.tutor?.unit;
+  return Array.isArray(units) && units.some((unit: any) => {
+    if (!unit || typeof unit !== 'object' || !unit.autotutorsession) {
+      return false;
+    }
+    const sessionModel = unit.autotutorsession.openRouterModel;
+    return (
+      typeof sessionModel === 'string' && sessionModel.trim().length > 0
+    ) || (
+      typeof setspec?.openRouterModel === 'string' && setspec.openRouterModel.trim().length > 0
+    );
+  });
 }
 
 function describeLaunchReadyFailure(tdfId: unknown, content: any): string {
@@ -94,7 +105,7 @@ export async function loadLaunchReadyTdf(
   let content = tdfDoc?.content;
   normalizeTutorUnits(content);
 
-  if (!isLaunchReadyContent(content, allowConditionRoot) || !hasAutoTutorLaunchConfig(content)) {
+  if (!isLaunchReadyContent(content, allowConditionRoot) || !hasAutoTutorLaunchModel(content)) {
     clientConsole(1, `[${source}] TDF content is not launch-ready after subscription; fetching full TDF by id`, {
       currentTdfId,
     });
@@ -108,8 +119,8 @@ export async function loadLaunchReadyTdf(
     throw new Error(`[${source}] ${describeLaunchReadyFailure(currentTdfId, content)}`);
   }
 
-  if (!hasAutoTutorLaunchConfig(content)) {
-    throw new Error(`[${source}] AutoTutor TDF ${currentTdfId} is missing tutor.setspec.openRouterApiKey after full TDF load`);
+  if (!hasAutoTutorLaunchModel(content)) {
+    throw new Error(`[${source}] AutoTutor TDF ${currentTdfId} is missing an effective OpenRouter model after full TDF load`);
   }
 
   if (isConditionRoot && !allowConditionRoot) {

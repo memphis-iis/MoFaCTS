@@ -110,8 +110,8 @@ export const SETSPEC_FIELD_REGISTRY: SectionFieldRegistry = {
     verbose: 'Google TTS API key used for lesson audio output.'
   }),
   openRouterApiKey: simpleField(stringField('', 12), {
-    brief: 'OpenRouter API key.',
-    verbose: 'OpenRouter API key used by AutoTutor units. The key is authored runtime configuration and is stripped from committed config content by the config sync script.'
+    brief: 'Legacy OpenRouter API key.',
+    verbose: 'Legacy field retained for older content. Current AutoTutor runtime reads the OpenRouter key from client-owned browser profile storage, not from saved TDF content.'
   }),
   openRouterModel: simpleField(stringField('openai/gpt-4.1-mini', 12), {
     brief: 'Default OpenRouter model.',

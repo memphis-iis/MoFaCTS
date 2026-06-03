@@ -2,7 +2,7 @@
 
 ## Goal
 
-Add an AutoTutor unit type where each unit represents one AI-guided tutoring session around one question. The first implementation supports a single question per unit. The TDF wires the unit and provider settings; the stimulus file owns the structured AutoTutor curriculum script content.
+Add an AutoTutor unit type where each unit represents one AI-guided tutoring session around one question. The first implementation supports a single question per unit. The TDF wires the unit and model settings, the client Profile owns the provider key, and the stimulus file owns the structured AutoTutor curriculum script content.
 
 The design follows the paper's expectation- and misconception-tailored dialogue pattern: a curriculum script has a main question, ideal answer, expectations, hints, prompts, assertions, misconceptions, corrections, and a summary. The tutor guides the learner until enough expectations are current and misconceptions are not current.
 
@@ -12,7 +12,6 @@ The first target package lives in the private configuration/content repository u
 
 The intended authoring shape is:
 
-- `tutor.setspec.openRouterApiKey`: required for AutoTutor units, encrypted on upload like existing speech keys.
 - `tutor.setspec.openRouterModel`: default model identifier, such as `openai/gpt-4.1-mini`.
 - `unit[].autotutorsession`: marks the unit as an AutoTutor unit.
 - `unit[].autotutorsession.cluster`: the stimulus cluster index used as the AutoTutor content record.
@@ -24,16 +23,16 @@ The intended authoring shape is:
 - stimulus `display.text`: the main question prompt shown at session start.
 - stimulus `autoTutor`: structured tutoring metadata, including topic, learning goal, ideal answer, expectations, misconceptions, dialogue policy, and summary.
 
-No silent fallback behavior is allowed. Missing API key, missing effective model, invalid cluster, missing prompt, or malformed `autoTutor` script data should fail clearly.
+No silent fallback behavior is allowed. Missing client Profile API key, missing effective model, invalid cluster, missing prompt, or malformed `autoTutor` script data should fail clearly.
 
 ## Invariants
 
 - An AutoTutor unit owns exactly one question for phase 1.
-- Structured curriculum content lives in the stimulus file. TDF content is limited to unit wiring, provider configuration, and existing blob-style content patterns such as instructions or media session fields.
+- Structured curriculum content lives in the stimulus file. TDF content is limited to unit wiring, model configuration, and existing blob-style content patterns such as instructions or media session fields.
 - The prompt and tutor script come from the first stim in the referenced stimulus cluster, not from duplicated content in the TDF unit.
 - AutoTutor content does not use normal `response.correctResponse`; it is a distinct unit/content path.
 - AutoTutor script text is plain text for phase 1.
-- The API key lives in the TDF permanently, is stripped/restored by the config repository scripts, and is available to the browser at runtime for direct OpenRouter calls.
+- The API key lives in client-owned Profile browser storage and is available to the browser at runtime for direct OpenRouter calls. It is not saved in TDF content.
 - The client owns the AutoTutor turn loop, prompt construction, OpenRouter call, response parsing, state update, progress calculation, and completion logic.
 - The server is not part of the AutoTutor reasoning loop. It remains storage and ordinary content access infrastructure.
 - The tutoring controller state is explicit and persisted with session history.
@@ -68,7 +67,7 @@ Completion is based on the authored TDF graduation rule. Phase 1 uses `graduatio
 
 1. Add the schema contract.
    - Extend `fieldRegistrySections.ts` with `autotutorsession`.
-   - Add `openRouterApiKey` and default `openRouterModel` to setspec.
+   - Add default `openRouterModel` to setspec.
    - Add optional `openRouterModel` to `autotutorsession` for per-unit overrides.
    - Add authored `graduation` settings and `maxTurns` to `autotutorsession`.
    - Add stimulus `autoTutor` schema to the first-stim content path.
@@ -76,14 +75,12 @@ Completion is based on the authored TDF graduation rule. Phase 1 uses `graduatio
    - Update unit-type detection and field applicability to include `autotutor`.
 
 2. Extend package upload and persistence.
-   - Preserve `openRouterApiKey` as authored TDF runtime configuration so the browser can call OpenRouter directly.
-   - Follow the same config strip/restore pattern used for existing Google TTS and speech-recognition keys.
-   - Reject AutoTutor TDFs with missing key, missing effective model, invalid cluster, missing stimulus prompt, or malformed stimulus `autoTutor` script.
+   - Reject AutoTutor TDFs with missing effective model, invalid cluster, missing stimulus prompt, or malformed stimulus `autoTutor` script.
    - Preserve the raw authored script in stimulus content for inspection and export.
 
 3. Add client-side AutoTutor service.
    - Add client/shared code for OpenRouter request construction, response parsing, cost tracking, and clear error handling.
-   - Call OpenRouter directly from the browser with the TDF-provided key.
+   - Call OpenRouter directly from the browser with the client Profile key.
    - Enforce the authored or default learner-turn limit per session.
    - Stop the session once tracked phase-1 session cost exceeds 20 cents for non-admin users.
    - Fail clearly on first tutor call if the OpenRouter key is invalid or insufficient.

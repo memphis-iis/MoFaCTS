@@ -198,8 +198,8 @@
               }
             },
             "openRouterApiKey": {
-              "title": "OpenRouter API key.",
-              "description": "OpenRouter API key used by AutoTutor units. The key is authored runtime configuration and is stripped from committed config content by the config sync script.",
+              "title": "Legacy OpenRouter API key.",
+              "description": "Legacy field retained for older content. Current AutoTutor runtime reads the OpenRouter key from client-owned browser profile storage, not from saved TDF content.",
               "type": "string",
               "default": "",
               "options": {

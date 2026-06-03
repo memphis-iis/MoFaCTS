@@ -215,9 +215,6 @@ export function validateAutoTutorContent(context: AutoTutorValidationContext): A
   }
 
   const setspec = isRecord(tutor.setspec) ? tutor.setspec : {};
-  if (!nonEmptyString(setspec.openRouterApiKey)) {
-    errors.push('tutor.setspec.openRouterApiKey is required for AutoTutor units');
-  }
 
   for (const { unit, index } of autoTutorUnits) {
     const session = unit.autotutorsession as Record<string, unknown>;

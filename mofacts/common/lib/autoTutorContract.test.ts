@@ -6,7 +6,6 @@ function buildValidTdf() {
   return {
     tutor: {
       setspec: {
-        openRouterApiKey: 'test-key',
         openRouterModel: 'openai/gpt-4.1-mini',
       },
       unit: [
@@ -90,9 +89,8 @@ describe('AutoTutor content contract', function() {
     expect(result).to.deep.equal({ valid: true, errors: [] });
   });
 
-  it('requires a browser-available OpenRouter key and effective model for AutoTutor units', function() {
+  it('requires an effective model for AutoTutor units without requiring stored provider keys', function() {
     const tdf = buildValidTdf();
-    delete (tdf.tutor.setspec as Record<string, unknown>).openRouterApiKey;
     delete (tdf.tutor.setspec as Record<string, unknown>).openRouterModel;
 
     const result = validateAutoTutorContent({
@@ -101,7 +99,6 @@ describe('AutoTutor content contract', function() {
     });
 
     expect(result.valid).to.equal(false);
-    expect(result.errors).to.include('tutor.setspec.openRouterApiKey is required for AutoTutor units');
     expect(result.errors).to.include('tutor.unit[0].autotutorsession requires openRouterModel or tutor.setspec.openRouterModel');
   });
 
