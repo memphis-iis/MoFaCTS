@@ -1,8 +1,9 @@
 import type { CreationModuleId } from './aiContentTypes';
 import {
-  getOwnOpenRouterSettings,
-  OPENROUTER_CHAT_COMPLETIONS_URL,
-} from './openRouterClientProfile';
+  callOpenRouterJson as callSharedOpenRouterJson,
+  type OpenRouterJsonSchema,
+  type OpenRouterMessage,
+} from './openRouterClient';
 import {
   buildAutoTutorAuthoringPrompt,
   buildItemCueRepairPrompt,
@@ -10,60 +11,61 @@ import {
 } from './aiContentPrompts';
 import type { CueLeak } from './aiContentCueValidation';
 
-type OpenRouterMessage = {
-  role: 'system' | 'user' | 'assistant';
-  content: string;
+const AI_CONTENT_OBJECT_SCHEMA: OpenRouterJsonSchema = {
+  type: 'object',
+  additionalProperties: true,
 };
 
 async function callOpenRouterJson(
   messages: OpenRouterMessage[],
+  apiKey: string,
   model: string,
   title: string,
   errorPrefix: string,
   missingContentMessage: string,
   temperature: number,
+  operation: string,
 ) {
-  const settings = await getOwnOpenRouterSettings();
-  const apiKey = settings.apiKey;
-  if (!apiKey) {
-    throw new Error('OpenRouter API key is not saved for this account.');
-  }
-  const response = await fetch(OPENROUTER_CHAT_COMPLETIONS_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': window.location.origin,
-      'X-OpenRouter-Title': title,
-    },
-    body: JSON.stringify({
+  try {
+    const result = await callSharedOpenRouterJson({
+      apiKey,
       model,
       messages,
       temperature,
-      stream: false,
-    }),
-  });
-  const bodyText = await response.text();
-  if (!response.ok) {
-    throw new Error(`${errorPrefix} failed with HTTP ${response.status}: ${bodyText.slice(0, 500)}`);
+      telemetry: {
+        surface: 'ai-content-creator',
+        operation,
+      },
+      intent: {
+        title,
+        schemaName: title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'mofacts_ai_content',
+        schema: AI_CONTENT_OBJECT_SCHEMA,
+        missingContentMessage,
+        parse(value) {
+          return value;
+        },
+      },
+    });
+    return result.rawContent;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.startsWith('OpenRouter API key') || message === missingContentMessage) {
+      throw error;
+    }
+    throw new Error(`${errorPrefix} failed: ${message}`);
   }
-  const body = JSON.parse(bodyText);
-  const content = body?.choices?.[0]?.message?.content;
-  if (typeof content !== 'string' || !content.trim()) {
-    throw new Error(missingContentMessage);
-  }
-  return content;
 }
 
 export async function callOpenRouterForItems(
   sourceText: string,
   selectedModules: CreationModuleId[],
+  apiKey: string,
   model: string,
 ) {
   return callOpenRouterJson([
     { role: 'system', content: 'You create compact import-ready MoFaCTS authoring JSON. Return JSON only.' },
     { role: 'user', content: buildItemAuthoringPrompt(sourceText, selectedModules) },
-  ], model, 'MoFaCTS AI Content Creator', 'OpenRouter request', 'OpenRouter response did not include message content.', 0.3);
+  ], apiKey, model, 'MoFaCTS AI Content Creator', 'OpenRouter request', 'OpenRouter response did not include message content.', 0.3, 'item-generation');
 }
 
 export async function callOpenRouterForItemCueRepair(
@@ -71,6 +73,7 @@ export async function callOpenRouterForItemCueRepair(
   selectedModules: CreationModuleId[],
   originalAiResponse: string,
   leaks: CueLeak[],
+  apiKey: string,
   model: string,
 ) {
   return callOpenRouterJson([
@@ -78,12 +81,12 @@ export async function callOpenRouterForItemCueRepair(
     { role: 'user', content: buildItemAuthoringPrompt(sourceText, selectedModules) },
     { role: 'assistant', content: originalAiResponse },
     { role: 'user', content: buildItemCueRepairPrompt(leaks) },
-  ], model, 'MoFaCTS AI Content Repair', 'OpenRouter item repair request', 'OpenRouter item repair response did not include message content.', 0.1);
+  ], apiKey, model, 'MoFaCTS AI Content Repair', 'OpenRouter item repair request', 'OpenRouter item repair response did not include message content.', 0.1, 'item-cue-repair');
 }
 
-export async function callOpenRouterForAutoTutor(sourceText: string, model: string) {
+export async function callOpenRouterForAutoTutor(sourceText: string, apiKey: string, model: string) {
   return callOpenRouterJson([
     { role: 'system', content: 'You create compact import-ready MoFaCTS AutoTutor JSON. Return JSON only.' },
     { role: 'user', content: buildAutoTutorAuthoringPrompt(sourceText) },
-  ], model, 'MoFaCTS AI AutoTutor Creator', 'OpenRouter AutoTutor request', 'OpenRouter AutoTutor response did not include message content.', 0.35);
+  ], apiKey, model, 'MoFaCTS AI AutoTutor Creator', 'OpenRouter AutoTutor request', 'OpenRouter AutoTutor response did not include message content.', 0.35, 'autotutor-authoring');
 }

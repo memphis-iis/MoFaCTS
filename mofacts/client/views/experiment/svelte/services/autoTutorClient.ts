@@ -24,6 +24,10 @@ import { getStimCluster } from '../../../../lib/currentTestingHelpers';
 import { clientConsole } from '../../../../lib/clientLogger';
 import { insertCompressedHistory } from '../../../../lib/historyWire';
 import { meteorCallAsync } from '../../../../lib/meteorAsync';
+import {
+  callOpenRouterJson as callSharedOpenRouterJson,
+  type OpenRouterJsonSchema,
+} from '../../../../lib/openRouterClient';
 import { legacyTrim } from '../../../../../common/underscoreCompat';
 import type {
   AutoTutorCanonicalHistoryRecord,
@@ -55,8 +59,6 @@ import {
   validateAutoTutorSavedState,
   type AutoTutorSavedStateShape,
 } from '../../../../../../learning-components/units/autotutor/AutoTutorSavedState';
-const OPEN_ROUTER_CHAT_COMPLETIONS_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const AUTO_TUTOR_COST_CAP_USD = 0.20;
 type AutoTutorState = {
   expectations: AutoTutorPlannerState['expectationScores'];
   misconceptions: AutoTutorPlannerState['misconceptionScores'];
@@ -99,6 +101,83 @@ export type AutoTutorRuntime = {
 };
 
 type AutoTutorSavedHistoryNote = AutoTutorHistoryNote<ReturnType<typeof summarizeState>>;
+
+const AUTO_TUTOR_SCORE_JSON_SCHEMA: OpenRouterJsonSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    expectationScores: {
+      type: 'object',
+      additionalProperties: {
+        type: 'object',
+        additionalProperties: true,
+        properties: {
+          current: { type: 'boolean' },
+          coverage: { type: 'number' },
+          evidence: { type: 'string' },
+          missing: { type: 'array', items: { type: 'string' } },
+          tutoredByAssertion: { type: 'boolean' },
+          learnerRestatedAfterAssertion: { type: 'boolean' },
+          coherence: { type: 'number' },
+          centrality: { type: 'number' },
+        },
+        required: ['current', 'coverage', 'coherence', 'centrality'],
+      },
+    },
+    misconceptionScores: {
+      type: 'object',
+      additionalProperties: {
+        type: 'object',
+        additionalProperties: true,
+        properties: {
+          current: { type: 'boolean' },
+          confidence: { type: 'number' },
+          evidence: { type: 'string' },
+          repaired: { type: 'boolean' },
+          repairEvidence: { type: 'string' },
+        },
+        required: ['current', 'confidence'],
+      },
+    },
+    answerQuality: { type: 'string', enum: ['low', 'partial', 'high'] },
+    learnerContribution: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        type: { type: 'string', enum: ['assertion', 'idk', 'help_request', 'uncertainty', 'affect', 'meta', 'question', 'off_task'] },
+        confidence: { type: 'number' },
+        evidence: { type: 'string' },
+      },
+      required: ['type', 'confidence'],
+    },
+    learnerQuestion: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        current: { type: 'boolean' },
+        answerableFromAuthoredContent: { type: 'boolean' },
+        evidence: { type: 'string' },
+      },
+      required: ['current', 'answerableFromAuthoredContent'],
+    },
+  },
+  required: ['expectationScores', 'misconceptionScores', 'answerQuality', 'learnerContribution', 'learnerQuestion'],
+};
+
+const AUTO_TUTOR_UTTERANCE_JSON_SCHEMA: OpenRouterJsonSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    targetType: { type: 'string', enum: ['expectation', 'misconception', 'learner_question', 'completion'] },
+    targetId: { type: ['string', 'null'] },
+    selectedMove: {
+      type: 'string',
+      enum: ['feedback', 'pump', 'hint', 'prompt', 'assertion', 'correction', 'answer_question', 'question_prompt', 'final_answer_prompt', 'summary'],
+    },
+    tutorMessage: { type: 'string' },
+  },
+  required: ['targetType', 'selectedMove', 'tutorMessage'],
+};
 
 function createMeteorAutoTutorRuntimeCapabilities(): AutoTutorRuntimeCapabilities {
   const capabilities: AutoTutorRuntimeCapabilities = {
@@ -167,13 +246,8 @@ function createMeteorAutoTutorRuntimeCapabilities(): AutoTutorRuntimeCapabilitie
       },
     },
     aiProvider: {
-      getOpenRouterApiKey() {
-        const currentTdfFile = Session.get('currentTdfFile');
-        const tdfRoot = isRecord(currentTdfFile) ? currentTdfFile.tdfs : null;
-        const tutor = isRecord(tdfRoot) ? tdfRoot.tutor : null;
-        const setspec = isRecord(tutor) ? tutor.setspec : null;
-        const openRouterApiKey = isRecord(setspec) ? setspec.openRouterApiKey : '';
-        return typeof openRouterApiKey === 'string' ? openRouterApiKey.trim() : '';
+      async callOpenRouterJson(options) {
+        return callSharedOpenRouterJson(options);
       },
     },
     logger: {
@@ -185,10 +259,6 @@ function createMeteorAutoTutorRuntimeCapabilities(): AutoTutorRuntimeCapabilitie
   return capabilities;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
 function requiredString(value: unknown, field: string): string {
   if (typeof value !== 'string' || value.trim().length === 0) {
     throw new Error(`AutoTutor runtime requires ${field}`);
@@ -198,10 +268,6 @@ function requiredString(value: unknown, field: string): string {
 
 function cloneJson<T>(value: T): T {
   return JSON.parse(JSON.stringify(value));
-}
-
-function redactSecrets(message: string): string {
-  return message.replace(/sk-or-v1-[A-Za-z0-9_-]+/g, '[redacted OpenRouter key]');
 }
 
 function createInitialState(script: AutoTutorScript): AutoTutorState {
@@ -481,95 +547,86 @@ function validateUtteranceEnvelope(envelope: AutoTutorUtteranceEnvelope, plan: A
   }
 }
 
-function readOpenRouterCost(response: unknown): number {
-  if (!isRecord(response) || !isRecord(response.usage) || typeof response.usage.cost !== 'number') {
-    throw new Error('OpenRouter response did not include usage.cost; AutoTutor cannot enforce the 20 cent cap');
-  }
-  return response.usage.cost;
-}
-
-function readOpenRouterMessageContent(response: unknown): string {
-  if (!isRecord(response) || !Array.isArray(response.choices)) {
-    throw new Error('OpenRouter response missing choices array');
-  }
-  const firstChoice = response.choices[0];
-  if (!isRecord(firstChoice) || !isRecord(firstChoice.message) || typeof firstChoice.message.content !== 'string') {
-    throw new Error('OpenRouter response missing choices[0].message.content');
-  }
-  return firstChoice.message.content;
-}
-
-async function readOpenRouterResponseBody(response: Response): Promise<unknown> {
-  const text = await response.text();
-  if (!text.trim()) {
-    if (!response.ok) {
-      return {};
-    }
-    throw new Error('OpenRouter response was empty');
-  }
-  try {
-    return JSON.parse(text);
-  } catch {
-    const status = response.ok ? '' : ` for HTTP ${response.status}`;
-    throw new Error(`OpenRouter returned non-JSON response${status}`);
-  }
-}
-
-async function callOpenRouter(
+async function callAutoTutorOpenRouter<T>(
+  capabilities: AutoTutorRuntimeCapabilities,
   config: AutoTutorConfig,
   messages: Array<{ role: 'system' | 'user'; content: string }>,
   temperature: number,
+  intent: {
+    schemaName: string;
+    schema: OpenRouterJsonSchema;
+    parse: (value: unknown) => T;
+    missingContentMessage: string;
+  },
 ) {
-  const response = await fetch(OPEN_ROUTER_CHAT_COMPLETIONS_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${config.apiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': window.location.origin,
-      'X-OpenRouter-Title': 'MoFaCTS AutoTutor',
+  const result = await capabilities.aiProvider.callOpenRouterJson({
+    apiKey: config.apiKey,
+    model: config.model,
+    messages,
+    temperature,
+    telemetry: {
+      surface: 'autotutor-runtime',
+      operation: intent.schemaName,
+      componentId: 'mofacts.autotutor-unit',
+      unitType: 'autotutor',
     },
-    body: JSON.stringify({
-      model: config.model,
-      messages,
-      temperature,
-      stream: false,
-    }),
+    intent: {
+      title: 'MoFaCTS AutoTutor',
+      schemaName: intent.schemaName,
+      schema: intent.schema,
+      missingContentMessage: intent.missingContentMessage,
+      parse: intent.parse,
+    },
   });
-
-  const responseBody = await readOpenRouterResponseBody(response);
-  if (!response.ok) {
-    const responseError = isRecord(responseBody) && isRecord(responseBody.error)
-      ? responseBody.error
-      : {};
-    const errorMessage = typeof responseError.message === 'string'
-      ? responseError.message
-      : `OpenRouter request failed with HTTP ${response.status}`;
-    throw new Error(redactSecrets(errorMessage));
-  }
-
-  return {
-    content: readOpenRouterMessageContent(responseBody),
-    costUsd: readOpenRouterCost(responseBody),
-  };
+  return result;
 }
 
 async function callOpenRouterScoring(
+  capabilities: AutoTutorRuntimeCapabilities,
   config: AutoTutorConfig,
   state: AutoTutorState,
   studentAnswer: string,
   scoreableExpectationIds: string[],
 ) {
-  return await callOpenRouter(config, [
+  const frozenExpectationIds = config.script.expectations
+    .map((expectation) => expectation.id)
+    .filter((id) => !scoreableExpectationIds.includes(id));
+  return await callAutoTutorOpenRouter(capabilities, config, [
     { role: 'system', content: buildScoringSystemPrompt(config, scoreableExpectationIds) },
     { role: 'user', content: buildScoringUserPrompt(config, studentAnswer, state, scoreableExpectationIds) },
-  ], AUTO_TUTOR_SCORING_TEMPERATURE);
+  ], AUTO_TUTOR_SCORING_TEMPERATURE, {
+    schemaName: 'mofacts_autotutor_score',
+    schema: AUTO_TUTOR_SCORE_JSON_SCHEMA,
+    missingContentMessage: 'OpenRouter AutoTutor scoring response did not include message content.',
+    parse(value) {
+      return parseAutoTutorScoreEnvelope(value, {
+        scoreableExpectationIds,
+        frozenExpectationIds,
+      });
+    },
+  });
 }
 
-async function callOpenRouterUtterance(config: AutoTutorConfig, state: AutoTutorState, studentAnswer: string, plan: AutoTutorPlan) {
-  return await callOpenRouter(config, [
+async function callOpenRouterUtterance(
+  capabilities: AutoTutorRuntimeCapabilities,
+  config: AutoTutorConfig,
+  state: AutoTutorState,
+  studentAnswer: string,
+  plan: AutoTutorPlan,
+) {
+  return await callAutoTutorOpenRouter(capabilities, config, [
     { role: 'system', content: buildUtteranceSystemPrompt(config) },
     { role: 'user', content: buildUtteranceUserPrompt(config, studentAnswer, state, plan) },
-  ], config.utteranceTemperature);
+  ], config.utteranceTemperature, {
+    schemaName: 'mofacts_autotutor_utterance',
+    schema: AUTO_TUTOR_UTTERANCE_JSON_SCHEMA,
+    missingContentMessage: 'OpenRouter AutoTutor utterance response did not include message content.',
+    parse(value) {
+      const envelope = parseAutoTutorUtteranceEnvelope(value);
+      validateUtteranceEnvelope(envelope, plan);
+      return envelope;
+    },
+  });
 }
 
 function computeProgress(state: AutoTutorState): number {
@@ -813,32 +870,15 @@ export async function createAutoTutorRuntime(
       if (state.completed) {
         throw new Error('AutoTutor session is already complete');
       }
-      if (state.costUsd > AUTO_TUTOR_COST_CAP_USD) {
-        applyAutoTutorEndReason(state, 'cost_cap');
-        publishState(capabilities, state, config);
-        return {
-          message: 'We need to stop here because this AutoTutor session reached the configured cost cap.',
-          completed: true,
-          mastered: false,
-          endReason: 'cost_cap',
-          stoppedByCost: true,
-        };
-      }
 
       const turnStartedAt = Date.now();
       const scoreableExpectationIds = getScoreableExpectationIds(config.script, state.expectations);
-      const frozenExpectationIds = config.script.expectations
-        .map((expectation) => expectation.id)
-        .filter((id) => !scoreableExpectationIds.includes(id));
-      const scoreResult = await callOpenRouterScoring(config, state, cleanedAnswer, scoreableExpectationIds);
-      const scoreEnvelope = parseAutoTutorScoreEnvelope(scoreResult.content, {
-        scoreableExpectationIds,
-        frozenExpectationIds,
-      });
+      const scoreResult = await callOpenRouterScoring(capabilities, config, state, cleanedAnswer, scoreableExpectationIds);
+      const scoreEnvelope = scoreResult.value;
       validateScoreEnvelopeIds(scoreEnvelope, state, scoreableExpectationIds);
 
       const nextState = cloneJson(state);
-      nextState.costUsd += scoreResult.costUsd;
+      nextState.costUsd += scoreResult.costUsd || 0;
       const durableExpectationScores = mergeScoreableExpectationScores(
         config.script,
         state.expectations,
@@ -872,30 +912,17 @@ export async function createAutoTutorRuntime(
       nextState.turnCount += 1;
       nextState.dialogue.push({ role: 'student', text: cleanedAnswer });
 
-      if (nextState.costUsd > AUTO_TUTOR_COST_CAP_USD) {
-        applyAutoTutorEndReason(nextState, 'cost_cap');
+      const graduationMet = computeGraduationMet(nextState, config);
+      if (graduationMet && (plan.target.type !== 'completion' || plan.selectedMove === 'summary')) {
+        applyAutoTutorEndReason(nextState, 'mastery');
+      } else if (nextState.turnCount >= config.turnLimit.maxTurns) {
+        applyAutoTutorEndReason(nextState, 'max_turns');
       } else {
-        const graduationMet = computeGraduationMet(nextState, config);
-        if (graduationMet && (plan.target.type !== 'completion' || plan.selectedMove === 'summary')) {
-          applyAutoTutorEndReason(nextState, 'mastery');
-        } else if (nextState.turnCount >= config.turnLimit.maxTurns) {
-          applyAutoTutorEndReason(nextState, 'max_turns');
-        } else {
-          applyAutoTutorEndReason(nextState, 'in_progress');
-        }
+        applyAutoTutorEndReason(nextState, 'in_progress');
       }
-      let tutorMessage = 'We need to stop here because this AutoTutor session reached the configured cost cap.';
-      if (!nextState.stoppedByCost) {
-        const utteranceResult = await callOpenRouterUtterance(config, stateForUtterancePlan, cleanedAnswer, plan);
-        nextState.costUsd += utteranceResult.costUsd;
-        const utteranceEnvelope = parseAutoTutorUtteranceEnvelope(utteranceResult.content);
-        validateUtteranceEnvelope(utteranceEnvelope, plan);
-        tutorMessage = utteranceEnvelope.tutorMessage;
-        if (nextState.costUsd > AUTO_TUTOR_COST_CAP_USD) {
-          applyAutoTutorEndReason(nextState, 'cost_cap');
-          tutorMessage = 'We need to stop here because this AutoTutor session reached the configured cost cap.';
-        }
-      }
+      const utteranceResult = await callOpenRouterUtterance(capabilities, config, stateForUtterancePlan, cleanedAnswer, plan);
+      nextState.costUsd += utteranceResult.costUsd || 0;
+      const tutorMessage = utteranceResult.value.tutorMessage;
       nextState.dialogue.push({ role: 'tutor', text: tutorMessage });
       const turnEndedAt = Date.now();
       await capabilities.history.writeAutoTutorTurn({

@@ -162,7 +162,7 @@ export function readAutoTutorConfig(capabilities: AutoTutorRuntimeCapabilities):
   const display = isRecord(stim.display) ? stim.display : {};
 
   return {
-    apiKey: requiredString(capabilities.aiProvider.getOpenRouterApiKey(), 'client OpenRouter API key'),
+    apiKey: requiredString(setspec.openRouterApiKey, 'openRouterApiKey'),
     model: requiredString(session.openRouterModel || setspec.openRouterModel, 'openRouterModel'),
     utteranceTemperature: parseAutoTutorTemperature(
       session.utteranceTemperature,

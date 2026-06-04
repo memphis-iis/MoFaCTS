@@ -13,11 +13,16 @@ describe('openRouterClientProfile', function() {
 
   it('classifies profile test failures from OpenRouter status and body', async function() {
     const fetchStub = sinon.stub(globalThis, 'fetch');
-    fetchStub.resolves(new Response('model was not found', { status: 404 }));
+    fetchStub.resolves(new Response(JSON.stringify({
+      error: { message: 'model was not found' },
+    }), { status: 404 }));
 
     const result = await testOpenRouterClientConfig('test-key', 'missing/model');
 
     expect(result).to.deep.equal({ success: false, message: 'Model not found' });
+    const [, request] = fetchStub.firstCall.args as [string, RequestInit];
+    const body = JSON.parse(String(request.body));
+    expect(body.response_format.json_schema.name).to.equal('mofacts_profile_openrouter_test');
   });
 
   it('requires both profile test key and model before calling OpenRouter', async function() {

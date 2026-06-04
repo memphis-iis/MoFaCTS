@@ -3,6 +3,7 @@ import type { CanonicalHistoryRecord } from '../../runtime/historyEnvelope';
 import type {
   ComponentLogger,
   HistoryRuntime,
+  AiProviderRuntime,
   ServerMethodRuntime,
   SessionRuntime,
 } from '../../runtime/LearningComponentContext';
@@ -13,6 +14,7 @@ export const AUTO_TUTOR_UNIT_REQUIRED_CAPABILITIES = [
   'server-methods',
   'history',
   'logging',
+  'ai-provider',
 ] as const satisfies readonly LearningComponentCapability[];
 
 export type AutoTutorSessionSnapshot = {
@@ -127,15 +129,11 @@ export interface AutoTutorHistoryRuntime extends HistoryRuntime<AutoTutorHistory
   writeCanonicalHistory(record: AutoTutorCanonicalHistoryRecord): Promise<void>;
 }
 
-export interface AutoTutorAiProviderRuntime {
-  getOpenRouterApiKey(): string;
-}
-
 export type AutoTutorRuntimeCapabilities = {
   readonly session: AutoTutorSessionRuntime;
   readonly stimuli: AutoTutorStimuliRuntime;
   readonly serverMethods: AutoTutorServerMethodsRuntime;
   readonly history: AutoTutorHistoryRuntime;
-  readonly aiProvider: AutoTutorAiProviderRuntime;
+  readonly aiProvider: AiProviderRuntime;
   readonly logger: ComponentLogger;
 };

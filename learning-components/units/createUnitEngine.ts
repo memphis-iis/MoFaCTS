@@ -10,6 +10,7 @@ import { registerLearningComponents } from '../runtime/registerLearningComponent
 import { registerTrialDisplayAdapter } from '../runtime/TrialDisplayAdapterRegistry';
 import { defaultUnitComponentManifestsFromCatalog } from '../defaultLearningComponentCatalog';
 import type { LearningComponentCapability } from '../runtime/ComponentManifest';
+import type { AiProviderRuntime } from '../runtime/LearningComponentContext';
 import {
   getUnitEngineServerMethodNames,
   type UnitEngineServerMethods,
@@ -56,6 +57,7 @@ export interface CreateUnitEngineDeps {
   readonly setAlternateDisplayIndex: (value: number | undefined) => void;
   readonly setOriginalQuestion: (value: unknown) => void;
   readonly alertUser: (message: string) => void;
+  readonly aiProvider: AiProviderRuntime;
   readonly log: (level: number, ...args: unknown[]) => void;
 }
 
@@ -135,6 +137,9 @@ export function getCreateUnitEngineCapabilitySet(
   }
   if (hasFunctions(deps, 'alertUser')) {
     capabilities.add('ui-alerts');
+  }
+  if (deps.aiProvider && typeof deps.aiProvider.callOpenRouterJson === 'function') {
+    capabilities.add('ai-provider');
   }
   return capabilities;
 }

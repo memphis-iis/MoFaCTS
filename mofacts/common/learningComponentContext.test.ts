@@ -41,10 +41,20 @@ describe('Learning component runtime capabilities', function() {
       userAlerts: {
         alertUser() {},
       },
+      aiProvider: {
+        async callOpenRouterJson(options) {
+          return {
+            value: options.intent.parse({}),
+            rawContent: '{}',
+            responseBody: {},
+          };
+        },
+      },
     });
 
     expect([...capabilities].sort()).to.deep.equal([
       'adaptive-model',
+      'ai-provider',
       'assessment-state',
       'authz',
       'delivery-settings',
@@ -95,6 +105,10 @@ describe('Learning component runtime capabilities', function() {
         getLearningHistoryForUnit: [] as any,
       },
     })).to.throw('Runtime capability "serverMethods" has non-function entries: getLearningHistoryForUnit');
+
+    expect(() => getLearningComponentCapabilitySet({
+      aiProvider: {} as any,
+    })).to.throw('Runtime capability "aiProvider" is missing required functions: callOpenRouterJson');
   });
 
   it('projects named server methods into the manifest runtime context', function() {

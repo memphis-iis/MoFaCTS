@@ -53,12 +53,13 @@ describe('aiContentDraftBuilder', function() {
       visibility: 'private',
     });
 
-    const draft = buildAutoTutorDraft(validation.output, 'openai/test-model');
+    const draft = buildAutoTutorDraft(validation.output, 'test-openrouter-key', 'openai/test-model');
     const tutor = draft.workingCopy.tutor as { setspec: Record<string, unknown>; unit: Array<Record<string, any>> };
     const firstStim = (draft.workingCopy.stimuli.setspec.clusters[0] as any).stims[0];
 
     expect(draft.title).to.equal('Krebs_Tutor');
     expect(tutor.setspec.userselect).to.equal('false');
+    expect(tutor.setspec.openRouterApiKey).to.equal('test-openrouter-key');
     expect(tutor.setspec.openRouterModel).to.equal('openai/test-model');
     expect(tutor.unit[0]!.autotutorsession.maxTurns).to.equal(12);
     expect(tutor.unit[0]!.autotutorsession.graduation.requiredExpectationCount).to.equal(1);

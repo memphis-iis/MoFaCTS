@@ -22,6 +22,7 @@ import { AdaptiveQuestionLogic } from './adaptiveQuestionLogic';
 import { reconstructLearningStateFromHistory } from '../../lib/history/historyReconstruction';
 import { hasScheduleArtifactForUnit } from './svelte/services/assessmentResume';
 import { createUnitEngineServerMethods } from './unitEngineServerMethods';
+import { callOpenRouterJson } from '../../lib/openRouterClient';
 import {
   createEmptyUnit as createEmptyUnitWithDeps,
   createAutoTutorUnit as createAutoTutorUnitWithDeps,
@@ -81,6 +82,9 @@ function createUnitEngineDeps(): CreateUnitEngineDeps {
     setAlternateDisplayIndex: (value) => CardStore.setAlternateDisplayIndex(value),
     setOriginalQuestion: (value) => CardStore.setOriginalQuestion(value),
     alertUser: (message) => alert(message),
+    aiProvider: {
+      callOpenRouterJson,
+    },
     log: (level, ...args) => clientConsole(level, ...args),
   };
 }

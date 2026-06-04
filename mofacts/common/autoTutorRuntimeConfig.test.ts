@@ -43,6 +43,7 @@ function createCapabilities(overrides: {
       tdfs: {
         tutor: {
           setspec: {
+            openRouterApiKey: 'test-openrouter-key',
             openRouterModel: 'openai/test-model',
           },
         },
@@ -86,7 +87,11 @@ function createCapabilities(overrides: {
       writeCanonicalHistory: async () => undefined,
     },
     aiProvider: {
-      getOpenRouterApiKey: () => 'sk-or-v1-test',
+      callOpenRouterJson: async (options) => ({
+        value: options.intent.parse({}),
+        rawContent: '{}',
+        responseBody: {},
+      }),
     },
     logger: {
       log() {},
@@ -98,8 +103,8 @@ describe('AutoTutor runtime config', function() {
   it('reads authored AutoTutor session config through explicit capabilities', function() {
     const config = readAutoTutorConfig(createCapabilities());
 
+    expect(config.apiKey).to.equal('test-openrouter-key');
     expect(config.model).to.equal('openai/test-model');
-    expect(config.apiKey).to.equal('sk-or-v1-test');
     expect(config.prompt).to.equal('What does a confidence interval estimate?');
     expect(config.clusterIndex).to.equal(0);
     expect(config.turnLimit.maxTurns).to.equal(5);

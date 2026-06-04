@@ -1,5 +1,4 @@
 import { expect } from 'chai';
-import { Meteor } from 'meteor/meteor';
 import sinon from 'sinon';
 import { callOpenRouterForAutoTutor, callOpenRouterForItemCueRepair, callOpenRouterForItems } from './aiContentOpenRouterClient';
 import {
@@ -8,37 +7,30 @@ import {
 
 describe('aiContentOpenRouterClient', function() {
   let fetchStub: sinon.SinonStub;
-  let callAsyncStub: sinon.SinonStub;
 
   beforeEach(function() {
-    callAsyncStub = sinon.stub(Meteor as any, 'callAsync').resolves({
-      apiKey: 'test-openrouter-key',
-      model: 'openai/test-model',
-      hasOpenRouterKey: true,
-    });
     fetchStub = sinon.stub(globalThis, 'fetch' as any);
   });
 
   afterEach(function() {
     fetchStub.restore();
-    callAsyncStub.restore();
   });
 
-  it('posts item-generation prompts with saved server-backed key and selected modules', async function() {
+  it('posts item-generation prompts with the provided key and selected modules', async function() {
     fetchStub.resolves(new Response(JSON.stringify({
       choices: [{ message: { content: '{"lessonName":"Generated","items":[]}' } }],
     }), { status: 200 }));
 
-    const content = await callOpenRouterForItems('source text', ['learningSession', 'assessmentSession'], 'openai/test-model');
+    const content = await callOpenRouterForItems('source text', ['learningSession', 'assessmentSession'], 'test-openrouter-key', 'openai/test-model');
 
     expect(content).to.equal('{"lessonName":"Generated","items":[]}');
-    expect(callAsyncStub.calledWith('getOwnOpenRouterSettings')).to.equal(true);
     expect(fetchStub.calledOnce).to.equal(true);
     const [url, request] = fetchStub.firstCall.args as [string, RequestInit];
     expect(url).to.equal(OPENROUTER_CHAT_COMPLETIONS_URL);
     expect((request.headers as Record<string, string>).Authorization).to.equal('Bearer test-openrouter-key');
     const body = JSON.parse(String(request.body));
     expect(body.model).to.equal('openai/test-model');
+    expect(body.response_format.json_schema.name).to.equal('mofacts_ai_content_creator');
     expect(body.messages[0].content).to.equal('You create compact import-ready MoFaCTS authoring JSON. Return JSON only.');
     expect(body.messages[1].content).to.contain('Selected modules: learningSession, assessmentSession');
   });
@@ -47,10 +39,10 @@ describe('aiContentOpenRouterClient', function() {
     fetchStub.resolves(new Response('bad model', { status: 404 }));
 
     try {
-      await callOpenRouterForAutoTutor('source text', 'missing/model');
+      await callOpenRouterForAutoTutor('source text', 'test-openrouter-key', 'missing/model');
       throw new Error('Expected request failure');
     } catch (error) {
-      expect((error as Error).message).to.equal('OpenRouter AutoTutor request failed with HTTP 404: bad model');
+      expect((error as Error).message).to.equal('OpenRouter AutoTutor request failed: OpenRouter returned non-JSON response for HTTP 404: bad model');
     }
   });
 
@@ -69,6 +61,7 @@ describe('aiContentOpenRouterClient', function() {
         correctResponse: 'Blue Jay',
         forbiddenTerms: ['blue', 'jay'],
       }],
+      'test-openrouter-key',
       'openai/test-model',
     );
 
@@ -90,7 +83,7 @@ describe('aiContentOpenRouterClient', function() {
     fetchStub.resolves(new Response(JSON.stringify({ choices: [{ message: {} }] }), { status: 200 }));
 
     try {
-      await callOpenRouterForItems('source text', ['learningSession'], 'openai/test-model');
+      await callOpenRouterForItems('source text', ['learningSession'], 'test-openrouter-key', 'openai/test-model');
       throw new Error('Expected missing content failure');
     } catch (error) {
       expect((error as Error).message).to.equal('OpenRouter response did not include message content.');

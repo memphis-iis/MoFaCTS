@@ -7,7 +7,7 @@ import './aiContentCreator.html';
 import { clientConsole } from '../..';
 import { getUploadIntegrity } from '../../lib/uploadIntegrity';
 import { getErrorMessage } from '../../lib/errorUtils';
-import { userHasServerOpenRouterKey } from '../../lib/openRouterClientProfile';
+import { getOwnOpenRouterSettings, userHasServerOpenRouterKey } from '../../lib/openRouterClientProfile';
 import { sanitizeImportName } from '../../lib/importCompositionBuilder';
 import type { ImportDraftLesson } from '../../lib/normalizedImportTypes';
 import type { CreatedOutput, CreationModuleId } from '../../lib/aiContentTypes';
@@ -284,8 +284,8 @@ function modeHelperText(moduleIds: CreationModuleId[]): string {
   return `Creates a combo: ${labels}`;
 }
 
-async function generateAutoTutorFromAi(sourceText: string, model: string): Promise<AutoTutorGenerationResult> {
-  const rawAiResponse = await callOpenRouterForAutoTutor(sourceText, model);
+async function generateAutoTutorFromAi(sourceText: string, apiKey: string, model: string): Promise<AutoTutorGenerationResult> {
+  const rawAiResponse = await callOpenRouterForAutoTutor(sourceText, apiKey, model);
   const parsedJson = extractJsonObject(rawAiResponse);
   return {
     rawAiResponse,
@@ -331,8 +331,8 @@ function applyCueRepairResponse(parsedRepair: unknown, validation: ReturnType<ty
   return repairedItemIndexes;
 }
 
-async function generateItemsFromAi(sourceText: string, selectedModules: CreationModuleId[], model: string): Promise<ItemGenerationResult> {
-  const rawAiResponse = await callOpenRouterForItems(sourceText, selectedModules, model);
+async function generateItemsFromAi(sourceText: string, selectedModules: CreationModuleId[], apiKey: string, model: string): Promise<ItemGenerationResult> {
+  const rawAiResponse = await callOpenRouterForItems(sourceText, selectedModules, apiKey, model);
   const parsedJson = extractJsonObject(rawAiResponse);
   const repairs: ItemGenerationResult['repairs'] = [];
   let validation = validateAiOutput(parsedJson);
@@ -341,7 +341,7 @@ async function generateItemsFromAi(sourceText: string, selectedModules: Creation
     if (leaks.length === 0) {
       break;
     }
-    const rawRepairResponse = await callOpenRouterForItemCueRepair(sourceText, selectedModules, rawAiResponse, leaks, model);
+    const rawRepairResponse = await callOpenRouterForItemCueRepair(sourceText, selectedModules, rawAiResponse, leaks, apiKey, model);
     const parsedRepairJson = extractJsonObject(rawRepairResponse);
     const repairedItemIndexes = applyCueRepairResponse(parsedRepairJson, validation);
     repairs.push({
@@ -414,12 +414,17 @@ async function runCreation(instance: AiCreatorInstance): Promise<void> {
   setStatus(instance, 'info', 'Creating content...');
   try {
     const sourceTextHash = await hashSourceText(sourceText);
+    const openRouterSettings = await getOwnOpenRouterSettings();
+    const apiKey = openRouterSettings.apiKey;
+    if (!apiKey) {
+      throw new Error('AI content creation requires an OpenRouter key. Add one in your Profile.');
+    }
     const itemModules = selectedModules.filter((moduleId) => moduleId === 'learningSession' || moduleId === 'assessmentSession');
     const itemGenerationPromise = itemModules.length > 0
-      ? generateItemsFromAi(sourceText, itemModules, model)
+      ? generateItemsFromAi(sourceText, itemModules, apiKey, model)
       : null;
     const autoTutorGenerationPromise = selectedModules.includes('autoTutor')
-      ? generateAutoTutorFromAi(sourceText, model)
+      ? generateAutoTutorFromAi(sourceText, apiKey, model)
       : null;
     const [itemGeneration, autoTutorGeneration] = await Promise.all([
       itemGenerationPromise || Promise.resolve(null),
@@ -454,7 +459,7 @@ async function runCreation(instance: AiCreatorInstance): Promise<void> {
         rawAiResponse: autoTutorGeneration.rawAiResponse,
         parsedJson: autoTutorGeneration.parsedJson,
       };
-      drafts.push(buildAutoTutorDraft(autoTutorGeneration.result.output, model));
+      drafts.push(buildAutoTutorDraft(autoTutorGeneration.result.output, apiKey, model));
       warnings = warnings.concat(autoTutorGeneration.result.warnings);
       creationSummary = [
         creationSummary,

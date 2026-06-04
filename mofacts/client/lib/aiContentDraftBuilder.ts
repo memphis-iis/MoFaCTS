@@ -76,7 +76,7 @@ export function buildDrafts(output: ReturnType<typeof validateAiOutput>['output'
     .map((moduleId) => applyVisibilityLock(buildManualDraftLesson(buildStateFromAi(output, moduleId)), output));
 }
 
-export function buildAutoTutorDraft(output: ReturnType<typeof validateAutoTutorOutput>['output'], model: string): ImportDraftLesson {
+export function buildAutoTutorDraft(output: ReturnType<typeof validateAutoTutorOutput>['output'], apiKey: string, model: string): ImportDraftLesson {
   const safeLessonName = sanitizeImportName(output.lessonName, 'AI_AutoTutor');
   const { stimFileName } = getImportFileNames(safeLessonName);
   const scriptId = sanitizeImportName(`${safeLessonName}_script`, 'AI_AutoTutor_script');
@@ -116,6 +116,7 @@ export function buildAutoTutorDraft(output: ReturnType<typeof validateAutoTutorO
         lessonname: safeLessonName,
         stimulusfile: stimFileName,
         userselect: output.visibility === 'public' ? 'true' : 'false',
+        openRouterApiKey: apiKey,
         openRouterModel: model,
       },
     unit: [

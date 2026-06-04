@@ -38,10 +38,20 @@ describe('Learning component catalog', function() {
       currentUserHasRole: () => false,
       log() {},
       alertUser() {},
+      aiProvider: {
+        async callOpenRouterJson(options) {
+          return {
+            value: options.intent.parse({}),
+            rawContent: '{}',
+            responseBody: {},
+          };
+        },
+      },
     };
 
     expect([...getCreateUnitEngineCapabilitySet(adapter)].sort()).to.deep.equal([
       'adaptive-model',
+      'ai-provider',
       'assessment-state',
       'authz',
       'delivery-settings',
@@ -127,7 +137,7 @@ describe('Learning component catalog', function() {
       .to.deep.include({
         id: 'mofacts.autotutor-unit',
         kind: 'unit',
-        requiredCapabilities: ['history', 'logging', 'server-methods', 'session', 'stimuli'],
+        requiredCapabilities: ['ai-provider', 'history', 'logging', 'server-methods', 'session', 'stimuli'],
         requiredServerMethods: ['getAutoTutorHistoryForUnit'],
       });
     expect(summary.units.find((manifest) => manifest.id === 'mofacts.learning-session-unit'))

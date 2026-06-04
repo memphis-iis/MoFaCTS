@@ -44,6 +44,48 @@ export interface UserAlertRuntime {
   alertUser(message: string): void;
 }
 
+export type AiProviderMessage = {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+};
+
+export type AiProviderJsonSchema = Record<string, unknown>;
+
+export type AiProviderCallOptions<T> = {
+  intent: {
+    title: string;
+    schemaName?: string;
+    schema?: AiProviderJsonSchema;
+    strictSchema?: boolean;
+    parse: (value: unknown) => T;
+    missingContentMessage?: string;
+  };
+  messages: AiProviderMessage[];
+  apiKey: string;
+  model: string;
+  temperature?: number;
+  maxTokens?: number;
+  requireUsageCost?: boolean;
+  telemetry?: {
+    surface?: string;
+    operation?: string;
+    componentId?: string;
+    unitType?: string;
+    requestId?: string;
+  };
+};
+
+export type AiProviderResult<T> = {
+  value: T;
+  rawContent: string;
+  responseBody: unknown;
+  costUsd?: number;
+};
+
+export interface AiProviderRuntime {
+  callOpenRouterJson<T>(options: AiProviderCallOptions<T>): Promise<AiProviderResult<T>>;
+}
+
 export interface LearningComponentCapabilities {
   session?: SessionRuntime;
   deliverySettings?: DeliverySettingsRuntime;
@@ -56,6 +98,7 @@ export interface LearningComponentCapabilities {
   authorization?: AuthorizationRuntime;
   logger?: ComponentLogger;
   userAlerts?: UserAlertRuntime;
+  aiProvider?: AiProviderRuntime;
 }
 
 const runtimeCapabilityEntries: readonly [
@@ -73,6 +116,7 @@ const runtimeCapabilityEntries: readonly [
   ['authorization', 'authz'],
   ['logger', 'logging'],
   ['userAlerts', 'ui-alerts'],
+  ['aiProvider', 'ai-provider'],
 ];
 
 const runtimeCapabilityFunctionRequirements: Partial<Record<
@@ -86,6 +130,7 @@ const runtimeCapabilityFunctionRequirements: Partial<Record<
   authorization: ['currentUserHasRole'],
   logger: ['log'],
   userAlerts: ['alertUser'],
+  aiProvider: ['callOpenRouterJson'],
 };
 
 function assertRuntimeCapabilityShape(
