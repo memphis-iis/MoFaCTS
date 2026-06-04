@@ -1,4 +1,5 @@
 import type { CreationModuleId } from './aiContentTypes';
+import type { CueLeak } from './aiContentCueValidation';
 
 export function buildItemAuthoringPrompt(sourceText: string, selectedModules: CreationModuleId[]) {
   return [
@@ -57,6 +58,35 @@ export function buildItemAuthoringPrompt(sourceText: string, selectedModules: Cr
     '',
     'Source content:',
     sourceText,
+  ].join('\n');
+}
+
+export function buildItemCueRepairPrompt(leaks: CueLeak[]) {
+  return [
+    'Some generated items have learner-visible cue text that gives away the correct response.',
+    'Rewrite only prompt.text for the listed items.',
+    'Preserve every correctResponse, incorrectResponses, imgSrc, attribution, sourceType, lesson setting, item count, and item order exactly.',
+    'Do not rewrite items that are not listed.',
+    'For each listed item, the replacement prompt.text must be a useful clue or definition, but must not use any forbidden term listed for that item.',
+    'Forbidden terms are absolute: if forbiddenTerms contains "woodpecker", the replacement prompt.text must not contain the word "woodpecker"; if it contains "blue" or "jay", the replacement must not contain "blue" or "jay".',
+    'Before returning JSON, self-check each replacement by comparing it with that item\'s forbiddenTerms. If any forbidden term appears, rewrite that replacement again before returning it.',
+    'Return JSON only with this shape:',
+    JSON.stringify({
+      repairs: [{
+        itemIndex: 0,
+        prompt: {
+          text: 'replacement learner-visible cue text',
+        },
+      }],
+    }, null, 2),
+    '',
+    'Items needing repair, using zero-based itemIndex:',
+    JSON.stringify(leaks.map((leak) => ({
+      itemIndex: leak.itemIndex,
+      correctResponse: leak.correctResponse,
+      currentPromptText: leak.promptText,
+      forbiddenTerms: leak.forbiddenTerms,
+    })), null, 2),
   ].join('\n');
 }
 

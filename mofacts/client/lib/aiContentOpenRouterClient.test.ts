@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import { Meteor } from 'meteor/meteor';
 import sinon from 'sinon';
-import { callOpenRouterForAutoTutor, callOpenRouterForItems } from './aiContentOpenRouterClient';
+import { callOpenRouterForAutoTutor, callOpenRouterForItemCueRepair, callOpenRouterForItems } from './aiContentOpenRouterClient';
 import {
   OPENROUTER_CHAT_COMPLETIONS_URL,
 } from './openRouterClientProfile';
@@ -52,6 +52,38 @@ describe('aiContentOpenRouterClient', function() {
     } catch (error) {
       expect((error as Error).message).to.equal('OpenRouter AutoTutor request failed with HTTP 404: bad model');
     }
+  });
+
+  it('posts item cue repair as a continuation of the original item chat', async function() {
+    fetchStub.resolves(new Response(JSON.stringify({
+      choices: [{ message: { content: '{"repairs":[{"itemIndex":0,"prompt":{"text":"replacement"}}]}' } }],
+    }), { status: 200 }));
+
+    const content = await callOpenRouterForItemCueRepair(
+      'source text',
+      ['learningSession'],
+      '{"lessonName":"Generated","items":[]}',
+      [{
+        itemIndex: 0,
+        promptText: 'A bright blue jay.',
+        correctResponse: 'Blue Jay',
+        forbiddenTerms: ['blue', 'jay'],
+      }],
+      'openai/test-model',
+    );
+
+    expect(content).to.contain('"repairs"');
+    const [, request] = fetchStub.firstCall.args as [string, RequestInit];
+    const body = JSON.parse(String(request.body));
+    expect(body.messages).to.have.length(4);
+    expect(body.messages[1].content).to.contain('Selected modules: learningSession');
+    expect(body.messages[2]).to.deep.equal({
+      role: 'assistant',
+      content: '{"lessonName":"Generated","items":[]}',
+    });
+    expect(body.messages[3].content).to.contain('forbiddenTerms');
+    expect(body.messages[3].content).to.contain('blue');
+    expect(body.temperature).to.equal(0.1);
   });
 
   it('rejects successful responses that omit message content', async function() {

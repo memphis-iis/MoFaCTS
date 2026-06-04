@@ -12,7 +12,8 @@ import { sanitizeImportName } from '../../lib/importCompositionBuilder';
 import type { ImportDraftLesson } from '../../lib/normalizedImportTypes';
 import type { CreatedOutput, CreationModuleId } from '../../lib/aiContentTypes';
 import { buildAutoTutorDraft, buildDrafts } from '../../lib/aiContentDraftBuilder';
-import { callOpenRouterForAutoTutor, callOpenRouterForItems } from '../../lib/aiContentOpenRouterClient';
+import { findCueLeaks, type CueLeak } from '../../lib/aiContentCueValidation';
+import { callOpenRouterForAutoTutor, callOpenRouterForItemCueRepair, callOpenRouterForItems } from '../../lib/aiContentOpenRouterClient';
 import { enrichAiContentMedia } from '../../lib/aiContentMediaEnrichment';
 import { extractJsonObject, validateAiOutput, validateAutoTutorOutput } from '../../lib/aiContentValidation';
 import {
@@ -40,6 +41,7 @@ type DebugRecord = {
   parsedJson?: unknown;
   llmCalls?: {
     itemGeneration?: { rawAiResponse: string; parsedJson: unknown };
+    itemCueRepairs?: Array<{ rawAiResponse: string; parsedJson: unknown; repairedItemIndexes: number[] }>;
     autoTutorGeneration?: { rawAiResponse: string; parsedJson: unknown };
   };
   rejectedItems?: Array<{ item: unknown; reason: string }>;
@@ -50,6 +52,7 @@ type DebugRecord = {
 type ItemGenerationResult = {
   rawAiResponse: string;
   parsedJson: unknown;
+  repairs: Array<{ rawAiResponse: string; parsedJson: unknown; repairedItemIndexes: number[] }>;
   result: Awaited<ReturnType<typeof enrichAiContentMedia>> & {
     rejectedItems: ReturnType<typeof validateAiOutput>['rejectedItems'];
   };
@@ -164,6 +167,7 @@ const PROMPT_TEMPLATE_VERSION = 'ai-content-creator-v1';
 const COMPACT_SCHEMA_VERSION = 'ai-normalized-v1';
 const MAX_STORED_RECORDS = 50;
 const MAX_DEBUG_PAYLOAD_LENGTH = 20000;
+const MAX_ITEM_CUE_REPAIR_PASSES = 2;
 
 function currentModel(): string {
   return String((Meteor.user() as any)?.profile?.openRouterDefaultModel || '').trim();
@@ -290,17 +294,77 @@ async function generateAutoTutorFromAi(sourceText: string, model: string): Promi
   };
 }
 
+function summarizeCueLeaks(leaks: CueLeak[]): string {
+  return leaks
+    .map((leak) => `item ${leak.itemIndex + 1} (${leak.correctResponse}): ${leak.forbiddenTerms.join(', ')}`)
+    .join('; ');
+}
+
+function applyCueRepairResponse(parsedRepair: unknown, validation: ReturnType<typeof validateAiOutput>): number[] {
+  if (!parsedRepair || typeof parsedRepair !== 'object' || Array.isArray(parsedRepair)) {
+    throw new Error('AI cue repair response was not a JSON object.');
+  }
+  const repairs = (parsedRepair as { repairs?: unknown }).repairs;
+  if (!Array.isArray(repairs)) {
+    throw new Error('AI cue repair response did not include a repairs array.');
+  }
+  const repairedItemIndexes: number[] = [];
+  for (const repair of repairs) {
+    if (!repair || typeof repair !== 'object' || Array.isArray(repair)) {
+      continue;
+    }
+    const itemIndex = Number((repair as { itemIndex?: unknown }).itemIndex);
+    const text = String((repair as { prompt?: { text?: unknown } }).prompt?.text || '').trim();
+    const item = validation.output.items[itemIndex];
+    if (!Number.isInteger(itemIndex) || itemIndex < 0 || itemIndex >= validation.output.items.length || !item || !text) {
+      continue;
+    }
+    item.prompt = {
+      ...(item.prompt || {}),
+      text,
+    };
+    repairedItemIndexes.push(itemIndex);
+  }
+  if (repairedItemIndexes.length === 0) {
+    throw new Error('AI cue repair response did not include any usable prompt.text repairs.');
+  }
+  return repairedItemIndexes;
+}
+
 async function generateItemsFromAi(sourceText: string, selectedModules: CreationModuleId[], model: string): Promise<ItemGenerationResult> {
   const rawAiResponse = await callOpenRouterForItems(sourceText, selectedModules, model);
   const parsedJson = extractJsonObject(rawAiResponse);
-  const validation = validateAiOutput(parsedJson);
+  const repairs: ItemGenerationResult['repairs'] = [];
+  let validation = validateAiOutput(parsedJson);
+  for (let pass = 0; pass < MAX_ITEM_CUE_REPAIR_PASSES; pass += 1) {
+    const leaks = findCueLeaks(validation.output);
+    if (leaks.length === 0) {
+      break;
+    }
+    const rawRepairResponse = await callOpenRouterForItemCueRepair(sourceText, selectedModules, rawAiResponse, leaks, model);
+    const parsedRepairJson = extractJsonObject(rawRepairResponse);
+    const repairedItemIndexes = applyCueRepairResponse(parsedRepairJson, validation);
+    repairs.push({
+      rawAiResponse: rawRepairResponse,
+      parsedJson: parsedRepairJson,
+      repairedItemIndexes,
+    });
+    validation = validateAiOutput(validation.output);
+  }
+  const remainingLeaks = findCueLeaks(validation.output);
+  if (remainingLeaks.length > 0) {
+    throw new Error(`Generated cue text still includes answer terms after targeted repair: ${summarizeCueLeaks(remainingLeaks)}`);
+  }
   const enriched = await enrichAiContentMedia(validation.output, sourceText);
   return {
     rawAiResponse,
     parsedJson,
+    repairs,
     result: {
       ...enriched,
-      warnings: validation.warnings.concat(enriched.warnings),
+      warnings: validation.warnings
+        .concat(repairs.length ? [`Repaired answer-revealing cue text in ${repairs.reduce((count, repair) => count + repair.repairedItemIndexes.length, 0)} generated item${repairs.reduce((count, repair) => count + repair.repairedItemIndexes.length, 0) === 1 ? '' : 's'}.`] : [])
+        .concat(enriched.warnings),
       rejectedItems: validation.rejectedItems,
     },
   };
@@ -376,6 +440,9 @@ async function runCreation(instance: AiCreatorInstance): Promise<void> {
         rawAiResponse: itemGeneration.rawAiResponse,
         parsedJson: itemGeneration.parsedJson,
       };
+      if (itemGeneration.repairs.length > 0) {
+        llmCalls.itemCueRepairs = itemGeneration.repairs;
+      }
       drafts.push(...buildDrafts(itemGeneration.result.output, itemModules));
       warnings = warnings.concat(itemGeneration.result.warnings);
       rejectedItems = rejectedItems.concat(itemGeneration.result.rejectedItems);
