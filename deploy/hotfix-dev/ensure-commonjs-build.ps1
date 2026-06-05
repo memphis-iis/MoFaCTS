@@ -8,30 +8,58 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$buildDir = Join-Path $AppDir ".meteor\local\build"
+$localMeteorDir = Join-Path $AppDir ".meteor\local"
+$localPackageJsonPath = Join-Path $localMeteorDir "package.json"
+$buildDir = Join-Path $localMeteorDir "build"
 $packageJsonPath = Join-Path $buildDir "package.json"
 $packageJson = "{`"type`":`"commonjs`"}"
+$serverEntryPath = Join-Path $AppDir "server\main.ts"
+$startedAt = Get-Date
 
-function Ensure-CommonJsMarker {
-    if (-not (Test-Path $buildDir)) {
-        return
+function Set-CommonJsMarkerIfNeeded {
+    param([string]$Path)
+
+    $parentDir = Split-Path -Parent $Path
+    if (-not (Test-Path $parentDir)) {
+        return $false
     }
 
     $current = ""
-    if (Test-Path $packageJsonPath) {
-        $raw = Get-Content $packageJsonPath -Raw -ErrorAction SilentlyContinue
+    if (Test-Path $Path) {
+        $raw = Get-Content $Path -Raw -ErrorAction SilentlyContinue
         if ($null -ne $raw) {
             $current = $raw.Trim()
         }
     }
 
     if ($current -ne $packageJson) {
-        Set-Content -Path $packageJsonPath -Value $packageJson -NoNewline
+        Set-Content -Path $Path -Value $packageJson -NoNewline
+        return $true
     }
+
+    return $false
+}
+
+function Ensure-CommonJsMarker {
+    $changed = $false
+
+    if (Set-CommonJsMarkerIfNeeded -Path $localPackageJsonPath) {
+        $changed = $true
+    }
+
+    if (Set-CommonJsMarkerIfNeeded -Path $packageJsonPath) {
+        $changed = $true
+    }
+
+    return $changed
 }
 
 while ($true) {
-    Ensure-CommonJsMarker
+    $commonJsMarkerChanged = Ensure-CommonJsMarker
+    if ($commonJsMarkerChanged -and (Test-Path $serverEntryPath)) {
+        Write-Host "Meteor build CommonJS marker changed; touching server/main.ts to trigger rebuild."
+        (Get-Item -LiteralPath $serverEntryPath).LastWriteTime = Get-Date
+    }
 
     if (-not (Test-Path $PidPath)) {
         break
@@ -55,5 +83,6 @@ while ($true) {
         continue
     }
 
-    Start-Sleep -Milliseconds 50
+    $sleepMs = if (((Get-Date) - $startedAt).TotalSeconds -lt 120) { 5 } else { 50 }
+    Start-Sleep -Milliseconds $sleepMs
 }

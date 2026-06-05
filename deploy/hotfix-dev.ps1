@@ -236,12 +236,21 @@ function Ensure-LocalAgentSecrets {
 }
 
 function Ensure-CommonJsBuildMarker {
+    $localMeteorDir = Join-Path $appDir ".meteor\local"
     $buildDir = Join-Path $appDir ".meteor\local\build"
+    $packageJson = "{`"type`":`"commonjs`"}"
+
+    if (-not (Test-Path $localMeteorDir)) {
+        New-Item -ItemType Directory -Path $localMeteorDir | Out-Null
+    }
+
+    Set-Content -Path (Join-Path $localMeteorDir "package.json") -Value $packageJson -NoNewline
+
     if (-not (Test-Path $buildDir)) {
         New-Item -ItemType Directory -Path $buildDir | Out-Null
     }
 
-    Set-Content -Path (Join-Path $buildDir "package.json") -Value "{`"type`":`"commonjs`"}" -NoNewline
+    Set-Content -Path (Join-Path $buildDir "package.json") -Value $packageJson -NoNewline
 }
 
 function Wait-HotfixDevReady {
