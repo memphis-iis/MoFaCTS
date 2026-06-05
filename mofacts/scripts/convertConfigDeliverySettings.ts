@@ -39,7 +39,7 @@ export type ConfigDeliverySettingsConversionReport = {
   files: ConfigDeliverySettingsFileReport[];
 };
 
-const DEFAULT_CONFIG_DIR = 'C:\\Users\\ppavl\\OneDrive\\Active projects\\mofacts_config';
+const DEFAULT_CONFIG_DIR = 'C:\\dev\\mofacts_config';
 const SKIP_DIRS = new Set(['.git', 'node_modules']);
 const ARCHIVE_DIRS = new Set(['internal_archive', 'mofacts_config']);
 

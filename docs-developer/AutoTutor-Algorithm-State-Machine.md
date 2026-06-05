@@ -1,6 +1,6 @@
 # MoFaCTS AutoTutor Algorithm State Machine
 
-This document describes the AutoTutor algorithm as implemented in the local MoFaCTS checkout, not generic AutoTutor behavior. The canonical wiki path named in `AGENTS.md`, `C:\Users\ppavl\OneDrive\Active projects\mofacts.wiki`, was not present in this session, so this write-up is kept in the app repository rather than placed in or substituted for a wiki repo.
+This document describes the AutoTutor algorithm as implemented in the local MoFaCTS checkout, not generic AutoTutor behavior. The canonical wiki path named in `AGENTS.md` is `C:\dev\MoFaCTS.wiki`.
 
 ## Concise Lifecycle
 

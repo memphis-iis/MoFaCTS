@@ -1,6 +1,6 @@
 # AutoTutor Concern Matrix From Art's Email
 
-Source reviewed: Art's email, Phil's draft reply, the two authored systems in `C:\Users\ppavl\OneDrive\Active projects\mofacts_config`, the current AutoTutor runtime/planner in `mofacts/client/views/experiment/svelte/services/autoTutorClient.ts` and `mofacts/common/lib/autoTutorPlanner.ts`, and read-only production history from `MoFACT-meteor3.history`.
+Source reviewed: Art's email, Phil's draft reply, the two authored systems in `C:\dev\mofacts_config`, the current AutoTutor runtime/planner in `mofacts/client/views/experiment/svelte/services/autoTutorClient.ts` and `mofacts/common/lib/autoTutorPlanner.ts`, and read-only production history from `MoFACT-meteor3.history`.
 
 Production snapshot from the remote server: 25 AutoTutor history rows were found. The confidence-interval system had 10 turns from one user, no completion, and progress stayed at 0. The NVC system had 15 turns from one user, no completion, and final progress was about 0.41. The traces are small, so they should guide diagnosis rather than settle it.
 

@@ -9,7 +9,7 @@ The application source tree lives under `mofacts/`.
 ## Repo Selection
 
 - For runtime behavior, UI rendering, themes, transitions, Svelte components, state machines, or application logic, work in this repository and prefer `mofacts/`.
-- For TDF/config content or sync scripts, use the canonical project configuration/content repository at `C:\Users\ppavl\OneDrive\Active projects\mofacts_config` and inspect this repository only for compatibility checks.
+- For TDF/config content or sync scripts, use the canonical project configuration/content repository at `C:\dev\mofacts_config` and inspect this repository only for compatibility checks.
 - For product and developer documentation that is too long for the public repo docs, use the canonical project wiki at `C:\dev\MoFaCTS.wiki`.
 - `MOFACTS_CONFIG_REPO`, when present, must resolve to the canonical configuration/content path above. If it is missing or points elsewhere, do not use a fallback path; report the mismatch clearly before proceeding.
 - `MOFACTS_WIKI_REPO`, when present, must resolve to `C:\dev\MoFaCTS.wiki`. If it is missing, use `C:\dev\MoFaCTS.wiki` after verifying that path exists; if it points elsewhere, report the mismatch clearly before proceeding.
@@ -26,7 +26,7 @@ The application source tree lives under `mofacts/`.
 ## Cross-Repo Coordination
 
 - If user-facing behavior changes in `mofacts/`, check whether wiki documentation in `C:\dev\MoFaCTS.wiki` needs an update.
-- If code changes alter required TDF fields, config names, structures, or expectations, verify compatibility with the configuration/content repository at `C:\Users\ppavl\OneDrive\Active projects\mofacts_config`.
+- If code changes alter required TDF fields, config names, structures, or expectations, verify compatibility with the configuration/content repository at `C:\dev\mofacts_config`.
 - If schemas, payloads, interfaces, or field names change, inspect dependent repositories for compatibility.
 
 ## Operational Rules
