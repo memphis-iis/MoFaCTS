@@ -15,6 +15,7 @@ import {
 } from '../../learning-components/units/UnitEngineRegistry';
 import {
   AUTO_TUTOR_SESSION_UNIT_TYPE,
+  type AutoTutorUnitEngine,
 } from '../../learning-components/units/autotutor/AutoTutorUnitEngine';
 import { autoTutorUnitComponentManifest } from '../../learning-components/units/autotutor/manifest';
 import { sampleEchoUnitFixtureDeps } from '../../learning-components/samples/echo-unit/fixtures';
@@ -274,9 +275,11 @@ describe('Learning component manifests', function() {
 
     expect(getRegisteredUnitEngineTypes()).to.deep.equal([AUTO_TUTOR_SESSION_UNIT_TYPE]);
 
-    const engine = await createRegisteredUnitEngine(AUTO_TUTOR_SESSION_UNIT_TYPE);
+    const engine = await createRegisteredUnitEngine(AUTO_TUTOR_SESSION_UNIT_TYPE) as AutoTutorUnitEngine;
     expect(engine.unitType).to.equal(AUTO_TUTOR_SESSION_UNIT_TYPE);
-    expect(engine.unitFinished?.()).to.equal(false);
+    expect(engine.createInitialState).to.be.a('function');
+    expect(engine.scoreAndPlanTurn).to.be.a('function');
+    expect(engine.validateLearnerInput).to.be.a('function');
   });
 
   it('fails AutoTutor registration when app-owned runtime capabilities are missing', function() {

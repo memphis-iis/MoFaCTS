@@ -1,15 +1,39 @@
 import type { UnitEngine } from '../UnitEngine';
+import {
+  createInitialAutoTutorState,
+  scoreAndPlanAutoTutorTurn,
+  validateAutoTutorLearnerInput,
+} from './AutoTutorStateMachine';
 
 export const AUTO_TUTOR_SESSION_UNIT_TYPE = 'autotutor';
 
-export function createAutoTutorUnitEngine(): Partial<UnitEngine> {
+export type AutoTutorUnitEngine = Partial<UnitEngine> & {
+  createInitialState: typeof createInitialAutoTutorState;
+  scoreAndPlanTurn: typeof scoreAndPlanAutoTutorTurn;
+  validateLearnerInput: typeof validateAutoTutorLearnerInput;
+};
+
+function unsupportedGenericCardEngineMethod(methodName: string): never {
+  throw new Error(`AutoTutor unit engine does not support generic card-engine method ${methodName}`);
+}
+
+export function createAutoTutorUnitEngine(): AutoTutorUnitEngine {
   return {
     unitType: AUTO_TUTOR_SESSION_UNIT_TYPE,
-    async cardAnswered() {},
-    selectNextCard() {},
-    findCurrentCardInfo() {},
+    createInitialState: createInitialAutoTutorState,
+    scoreAndPlanTurn: scoreAndPlanAutoTutorTurn,
+    validateLearnerInput: validateAutoTutorLearnerInput,
+    async cardAnswered() {
+      unsupportedGenericCardEngineMethod('cardAnswered');
+    },
+    selectNextCard() {
+      unsupportedGenericCardEngineMethod('selectNextCard');
+    },
+    findCurrentCardInfo() {
+      unsupportedGenericCardEngineMethod('findCurrentCardInfo');
+    },
     unitFinished() {
-      return false;
+      unsupportedGenericCardEngineMethod('unitFinished');
     },
   };
 }

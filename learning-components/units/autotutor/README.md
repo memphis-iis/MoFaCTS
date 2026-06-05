@@ -8,15 +8,16 @@ Component-owned:
 - The unit-engine extension registered for `autotutor`.
 - Typed runtime capability contracts in `AutoTutorRuntimeCapabilities.ts`.
 - Explicit completion/end-state semantics in `AutoTutorEndState.ts`.
+- Explicit operational and pedagogical state-machine orchestration in `AutoTutorStateMachine.ts`.
 - Generation configuration constants and temperature validation in `AutoTutorGenerationConfig.ts`.
 - Authored runtime configuration interpretation in `AutoTutorRuntimeConfig.ts`.
 - Saved-history row/note parsing and completion flag validation in `AutoTutorSavedHistory.ts`.
 - Saved-state validation in `AutoTutorSavedState.ts`.
-- AutoTutor planning, scoring, and response contract helpers in shared common code.
+- AutoTutor deterministic planning helpers in `AutoTutorPlanner.ts`.
 
 App-owned for the current milestone:
 
-- Svelte chat shell and browser OpenRouter calls.
+- Svelte chat shell, browser OpenRouter calls, and prompt text.
 - Meteor session wiring, route flow, and card lifecycle integration.
 - Canonical history envelope validation, compression, persistence, and server methods.
 - Authoring, upload, encryption, and configuration repository sync.
