@@ -2,6 +2,7 @@ import { expect } from 'chai';
 import type { AutoTutorRuntimeCapabilities } from '../../learning-components/units/autotutor/AutoTutorRuntimeCapabilities';
 import {
   readAutoTutorConfig,
+  readAutoTutorConfigWithOptions,
   validateGraduationAgainstScript,
 } from '../../learning-components/units/autotutor/AutoTutorRuntimeConfig';
 
@@ -109,6 +110,41 @@ describe('AutoTutor runtime config', function() {
     expect(config.clusterIndex).to.equal(0);
     expect(config.turnLimit.maxTurns).to.equal(5);
     expect(config.graduation.requiredExpectationCount).to.equal(1);
+  });
+
+  it('prefers the saved profile OpenRouter key over the TDF key', function() {
+    const config = readAutoTutorConfigWithOptions(createCapabilities(), {
+      preferredOpenRouterApiKey: 'profile-openrouter-key',
+    });
+
+    expect(config.apiKey).to.equal('profile-openrouter-key');
+  });
+
+  it('uses the TDF OpenRouter key when no profile key is available', function() {
+    const config = readAutoTutorConfigWithOptions(createCapabilities(), {
+      preferredOpenRouterApiKey: '   ',
+    });
+
+    expect(config.apiKey).to.equal('test-openrouter-key');
+  });
+
+  it('fails clearly when neither profile nor TDF OpenRouter key is available', function() {
+    const capabilities = createCapabilities({
+      session: {
+        currentTdfFile: {
+          tdfs: {
+            tutor: {
+              setspec: {
+                openRouterModel: 'openai/test-model',
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expect(() => readAutoTutorConfigWithOptions(capabilities))
+      .to.throw('AutoTutor runtime requires OpenRouter API key from profile settings or tutor.setspec.openRouterApiKey');
   });
 
   it('clones the authored script before returning component runtime config', function() {

@@ -14,6 +14,10 @@ import type { CreatedOutput, CreationModuleId } from '../../lib/aiContentTypes';
 import { buildAutoTutorDraft, buildDrafts } from '../../lib/aiContentDraftBuilder';
 import { findCueLeaks, type CueLeak } from '../../lib/aiContentCueValidation';
 import { callOpenRouterForAutoTutor, callOpenRouterForItemCueRepair, callOpenRouterForItems } from '../../lib/aiContentOpenRouterClient';
+import {
+  generateAutoTutorExpectationRelationships,
+  selectAutoTutorRelationshipGenerationKey,
+} from '../../lib/autoTutorRelationshipEngine';
 import { enrichAiContentMedia } from '../../lib/aiContentMediaEnrichment';
 import { extractJsonObject, validateAiOutput, validateAutoTutorOutput } from '../../lib/aiContentValidation';
 import {
@@ -43,6 +47,13 @@ type DebugRecord = {
     itemGeneration?: { rawAiResponse: string; parsedJson: unknown };
     itemCueRepairs?: Array<{ rawAiResponse: string; parsedJson: unknown; repairedItemIndexes: number[] }>;
     autoTutorGeneration?: { rawAiResponse: string; parsedJson: unknown };
+    autoTutorRelationshipGeneration?: {
+      model: string;
+      attemptedModels: string[];
+      sourceKeyType: 'tdf' | 'user';
+      cacheKey: string;
+      costUsd?: number;
+    };
   };
   rejectedItems?: Array<{ item: unknown; reason: string }>;
   outputs?: CreatedOutput[];
@@ -287,10 +298,22 @@ function modeHelperText(moduleIds: CreationModuleId[]): string {
 async function generateAutoTutorFromAi(sourceText: string, apiKey: string, model: string): Promise<AutoTutorGenerationResult> {
   const rawAiResponse = await callOpenRouterForAutoTutor(sourceText, apiKey, model);
   const parsedJson = extractJsonObject(rawAiResponse);
+  const result = validateAutoTutorOutput(parsedJson);
+  if (result.output.expectations.length > 1) {
+    const relationshipKey = selectAutoTutorRelationshipGenerationKey({
+      userOpenRouterApiKey: apiKey,
+    });
+    const relationshipResult = await generateAutoTutorExpectationRelationships(result.output, {
+      apiKey: relationshipKey.apiKey,
+      sourceKeyType: relationshipKey.sourceKeyType,
+    });
+    result.output.expectationRelationships = relationshipResult.expectationRelationships;
+    result.output.expectationRelationshipProvenance = relationshipResult.expectationRelationshipProvenance;
+  }
   return {
     rawAiResponse,
     parsedJson,
-    result: validateAutoTutorOutput(parsedJson),
+    result,
   };
 }
 
@@ -411,7 +434,13 @@ async function runCreation(instance: AiCreatorInstance): Promise<void> {
 
   instance.creating.set(true);
   instance.debugRecord.set(debugBase);
-  setStatus(instance, 'info', 'Creating content...');
+  setStatus(
+    instance,
+    'info',
+    selectedModules.includes('autoTutor')
+      ? 'Creating content and generating a shared AutoTutor expectation graph for the authored lesson...'
+      : 'Creating content...',
+  );
   try {
     const sourceTextHash = await hashSourceText(sourceText);
     const openRouterSettings = await getOwnOpenRouterSettings();
@@ -459,6 +488,15 @@ async function runCreation(instance: AiCreatorInstance): Promise<void> {
         rawAiResponse: autoTutorGeneration.rawAiResponse,
         parsedJson: autoTutorGeneration.parsedJson,
       };
+      if (autoTutorGeneration.result.output.expectationRelationshipProvenance) {
+        const provenance = autoTutorGeneration.result.output.expectationRelationshipProvenance;
+        llmCalls.autoTutorRelationshipGeneration = {
+          model: provenance.model,
+          attemptedModels: provenance.attemptedModels,
+          sourceKeyType: provenance.sourceKeyType,
+          cacheKey: provenance.cacheKey,
+        };
+      }
       drafts.push(buildAutoTutorDraft(autoTutorGeneration.result.output, apiKey, model));
       warnings = warnings.concat(autoTutorGeneration.result.warnings);
       creationSummary = [

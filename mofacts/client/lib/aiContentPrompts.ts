@@ -98,6 +98,7 @@ export function buildAutoTutorAuthoringPrompt(sourceText: string) {
     'When pasted source material is specific, prefer that material and do not add unsupported claims that conflict with it.',
     'If the user asks for a specific number of expectations, use that number when the source can support it. If no count is specified, aim for about 5 expectations.',
     'Expectations should be atomic teachable propositions: each one should represent one discrete knowledge component the learner should articulate.',
+    'Do not create expectation relationship scores. MoFaCTS computes expectationRelationships separately from embeddings after this JSON is validated.',
     'Misconceptions should be common student misconceptions or likely confusions for this topic, not arbitrary wrong statements.',
     'Keep IDs simple, stable, and unique, such as E1, E2, M1, M2.',
     'Do not duplicate expectations or create near-duplicate misconceptions.',

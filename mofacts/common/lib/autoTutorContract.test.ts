@@ -50,6 +50,9 @@ function buildValidStimuli() {
                     assertion: 'The 95% describes the long-run procedure.',
                   },
                 ],
+                expectationRelationships: {
+                  E1: {},
+                },
                 misconceptions: [
                   {
                     id: 'M1',
@@ -171,6 +174,75 @@ describe('AutoTutor content contract', function() {
     );
   });
 
+  it('rejects malformed AutoTutor expectation relationships', function() {
+    const stimuli = buildValidStimuli();
+    const script = stimuli.setspec.clusters[0]?.stims[0]?.autoTutor as Record<string, unknown> | undefined;
+    expect(script).to.not.equal(undefined);
+    if (!script) {
+      throw new Error('Test fixture missing AutoTutor script');
+    }
+    script.expectationRelationships = {
+      E1: {
+        E2: 0.7,
+        E1: 1.2,
+      },
+      E3: {
+        E1: 0.5,
+      },
+    };
+
+    const result = validateAutoTutorContent({
+      tdf: buildValidTdf(),
+      stimuli,
+    });
+
+    expect(result.valid).to.equal(false);
+    expect(result.errors).to.include(
+      'setspec.clusters[0].stims[0].autoTutor.expectationRelationships.E1.E2 references unknown expectation "E2"'
+    );
+    expect(result.errors).to.include(
+      'setspec.clusters[0].stims[0].autoTutor.expectationRelationships.E1.E1 must be a number from 0 to 1'
+    );
+    expect(result.errors).to.include(
+      'setspec.clusters[0].stims[0].autoTutor.expectationRelationships.E3 must reference a known expectation and contain target weights'
+    );
+  });
+
+  it('rejects malformed AutoTutor expectation relationship provenance', function() {
+    const stimuli = buildValidStimuli();
+    const script = stimuli.setspec.clusters[0]?.stims[0]?.autoTutor as Record<string, unknown> | undefined;
+    expect(script).to.not.equal(undefined);
+    if (!script) {
+      throw new Error('Test fixture missing AutoTutor script');
+    }
+    script.expectationRelationshipProvenance = {
+      graphVersion: '',
+      generatedAt: '2026-06-05T00:00:00.000Z',
+      model: 'google/gemini-embedding-001',
+      attemptedModels: [],
+      metric: 'cosine_similarity_normalized_vectors',
+      scoreTransform: 'clamp_negative_to_zero',
+      sourceKeyType: 'profile',
+      cacheKey: 'cache',
+    };
+
+    const result = validateAutoTutorContent({
+      tdf: buildValidTdf(),
+      stimuli,
+    });
+
+    expect(result.valid).to.equal(false);
+    expect(result.errors).to.include(
+      'setspec.clusters[0].stims[0].autoTutor.expectationRelationshipProvenance.graphVersion must be a non-empty string'
+    );
+    expect(result.errors).to.include(
+      'setspec.clusters[0].stims[0].autoTutor.expectationRelationshipProvenance.attemptedModels must be a non-empty string array'
+    );
+    expect(result.errors).to.include(
+      'setspec.clusters[0].stims[0].autoTutor.expectationRelationshipProvenance.sourceKeyType must be "tdf" or "user"'
+    );
+  });
+
   it('rejects malformed misconception repair criteria fields', function() {
     const stimuli = buildValidStimuli();
     const firstMisconception = stimuli.setspec.clusters[0]?.stims[0]?.autoTutor.misconceptions[0];
@@ -206,8 +278,6 @@ describe('AutoTutor content contract', function() {
           coverage: 0.4,
           evidence: 'mentioned intervals',
           missing: ['repeated samples'],
-          coherence: 0.7,
-          centrality: 0.8,
         },
       },
       misconceptionScores: {
@@ -234,8 +304,8 @@ describe('AutoTutor content contract', function() {
     }
 
     expect(expectation.coverage).to.equal(0.4);
-    expect(expectation.frontier).to.equal(0.4);
-    expect(expectation.priority).to.equal(0.57);
+    expect(expectation.frontier).to.equal(0);
+    expect(expectation.priority).to.equal(0);
     expect(misconception.confidence).to.equal(0.9);
     expect(misconception.repaired).to.equal(false);
     expect(envelope.learnerContribution.type).to.equal('assertion');
@@ -249,8 +319,6 @@ describe('AutoTutor content contract', function() {
           current: false,
           coverage: 0.2,
           evidence: 'named the population mean but not repeated sampling',
-          coherence: 0.6,
-          centrality: 0.7,
         },
       },
       misconceptionScores: {
@@ -287,9 +355,7 @@ describe('AutoTutor content contract', function() {
     "E1": {
       "current": true,
       "coverage": 0.85,
-      "evidence": "mentioned repeated sampling",
-      "coherence": 0.7,
-      "centrality": 0.6
+      "evidence": "mentioned repeated sampling"
     }
   },
   "misconceptionScores": {},
@@ -306,19 +372,17 @@ describe('AutoTutor content contract', function() {
 \`\`\``);
 
     expect(envelope.expectationScores.E1?.current).to.equal(true);
-    expect(envelope.expectationScores.E1?.frontier).to.equal(0.85);
-    expect(envelope.expectationScores.E1?.priority).to.equal(0.755);
+    expect(envelope.expectationScores.E1?.frontier).to.equal(0);
+    expect(envelope.expectationScores.E1?.priority).to.equal(0);
     expect(envelope.answerQuality).to.equal('high');
   });
 
-  it('derives frontier and priority instead of requiring model-owned values', function() {
+  it('leaves planner-owned graph metrics unset when parsing scorer output', function() {
     const envelope = parseAutoTutorScoreEnvelope(JSON.stringify({
       expectationScores: {
         E1: {
           current: true,
           coverage: 0.8,
-          coherence: 0.5,
-          centrality: 0.25,
         },
       },
       misconceptionScores: {},
@@ -333,8 +397,10 @@ describe('AutoTutor content contract', function() {
       },
     }));
 
-    expect(envelope.expectationScores.E1?.frontier).to.equal(0.8);
-    expect(envelope.expectationScores.E1?.priority).to.equal(0.6);
+    expect(envelope.expectationScores.E1?.frontier).to.equal(0);
+    expect(envelope.expectationScores.E1?.coherence).to.equal(0);
+    expect(envelope.expectationScores.E1?.centrality).to.equal(0);
+    expect(envelope.expectationScores.E1?.priority).to.equal(0);
   });
 
   it('parses only scoreable expectations and ignores frozen expectation fields', function() {
@@ -349,8 +415,6 @@ describe('AutoTutor content contract', function() {
         E2: {
           current: true,
           coverage: 0.9,
-          coherence: 0.75,
-          centrality: 0.5,
         },
       },
       misconceptionScores: {},
@@ -369,7 +433,7 @@ describe('AutoTutor content contract', function() {
     });
 
     expect(Object.keys(envelope.expectationScores)).to.deep.equal(['E2']);
-    expect(envelope.expectationScores.E2?.coherence).to.equal(0.75);
+    expect(envelope.expectationScores.E2?.coverage).to.equal(0.9);
   });
 
   it('fails clearly when a score-scoped response omits a scoreable expectation', function() {
@@ -440,8 +504,6 @@ describe('AutoTutor content contract', function() {
           current: false,
           coverage: 0.4,
           missing: ['repeated samples', 42],
-          coherence: 0.7,
-          centrality: 0.8,
         },
       },
       misconceptionScores: {},

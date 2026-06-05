@@ -39,7 +39,21 @@ describe('aiContentDraftBuilder', function() {
       idealAnswer: 'The Krebs cycle oxidizes acetyl-CoA and produces electron carriers.',
       expectations: [
         { id: 'E1', proposition: 'Acetyl-CoA enters the cycle.', assertion: 'Acetyl-CoA enters the cycle.' },
+        { id: 'E2', proposition: 'The cycle makes electron carriers.', assertion: 'The cycle makes electron carriers.' },
       ],
+      expectationRelationships: {
+        E1: { E2: 0.8 },
+      },
+      expectationRelationshipProvenance: {
+        graphVersion: 'autotutor-expectation-relationships-v1',
+        generatedAt: '2026-06-05T00:00:00.000Z',
+        model: 'google/gemini-embedding-001',
+        attemptedModels: ['google/gemini-embedding-001'],
+        metric: 'cosine_similarity_normalized_vectors',
+        scoreTransform: 'clamp_negative_to_zero',
+        sourceKeyType: 'user',
+        cacheKey: 'cache-key',
+      },
       misconceptions: [
         {
           id: 'M1',
@@ -65,6 +79,8 @@ describe('aiContentDraftBuilder', function() {
     expect(tutor.unit[0]!.autotutorsession.graduation.requiredExpectationCount).to.equal(1);
     expect(firstStim.display.text).to.equal('Explain the Krebs cycle.');
     expect(firstStim.autoTutor.expectations[0].id).to.equal('E1');
-    expect(firstStim.autoTutor.dialogPolicy.requiredExpectations).to.deep.equal(['E1']);
+    expect(firstStim.autoTutor.expectationRelationships).to.deep.equal({ E1: { E2: 0.8 } });
+    expect(firstStim.autoTutor.expectationRelationshipProvenance.cacheKey).to.equal('cache-key');
+    expect(firstStim.autoTutor.dialogPolicy.requiredExpectations).to.deep.equal(['E1', 'E2']);
   });
 });

@@ -3,6 +3,7 @@ import type { PromptAttribution } from './normalizedImportTypes';
 import type {
   AiAutoTutorExpectation,
   AiAutoTutorOutput,
+  AiAutoTutorRelationshipProvenance,
   AiItem,
   AiLessonOutput,
 } from './aiContentTypes';
@@ -175,6 +176,40 @@ function asStringArray(value: unknown): string[] {
     : [];
 }
 
+function normalizeRelationshipScore(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1) {
+    return null;
+  }
+  return Math.round(value * 1_000_000) / 1_000_000;
+}
+
+function normalizeRelationshipProvenance(value: unknown): AiAutoTutorRelationshipProvenance | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+  const provenance = value as Partial<AiAutoTutorRelationshipProvenance>;
+  const graphVersion = String(provenance.graphVersion || '').trim();
+  const generatedAt = String(provenance.generatedAt || '').trim();
+  const model = String(provenance.model || '').trim();
+  const cacheKey = String(provenance.cacheKey || '').trim();
+  const attemptedModels = Array.isArray(provenance.attemptedModels)
+    ? provenance.attemptedModels.map((entry) => String(entry || '').trim()).filter(Boolean)
+    : [];
+  if (!graphVersion || !generatedAt || !model || !cacheKey || attemptedModels.length === 0) {
+    return undefined;
+  }
+  return {
+    graphVersion,
+    generatedAt,
+    model,
+    attemptedModels,
+    metric: 'cosine_similarity_normalized_vectors',
+    scoreTransform: 'clamp_negative_to_zero',
+    sourceKeyType: provenance.sourceKeyType === 'tdf' ? 'tdf' : 'user',
+    cacheKey,
+  };
+}
+
 export function validateAutoTutorOutput(value: unknown) {
   const warnings: string[] = [];
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -214,6 +249,30 @@ export function validateAutoTutorOutput(value: unknown) {
   }
 
   const expectationIds = new Set(expectations.map((entry) => entry.id));
+  const expectationRelationships: Record<string, Record<string, number>> = {};
+  if (
+    output.expectationRelationships &&
+    typeof output.expectationRelationships === 'object' &&
+    !Array.isArray(output.expectationRelationships)
+  ) {
+    for (const [sourceId, rawRelationships] of Object.entries(output.expectationRelationships)) {
+      if (!expectationIds.has(sourceId) || !rawRelationships || typeof rawRelationships !== 'object' || Array.isArray(rawRelationships)) {
+        continue;
+      }
+      for (const [targetId, rawScore] of Object.entries(rawRelationships)) {
+        if (!expectationIds.has(targetId) || targetId === sourceId) {
+          continue;
+        }
+        const score = normalizeRelationshipScore(rawScore);
+        if (score === null) {
+          continue;
+        }
+        expectationRelationships[sourceId] = expectationRelationships[sourceId] || {};
+        expectationRelationships[sourceId]![targetId] = score;
+      }
+    }
+  }
+  const expectationRelationshipProvenance = normalizeRelationshipProvenance(output.expectationRelationshipProvenance);
   const rawMisconceptions = Array.isArray(output.misconceptions) ? output.misconceptions : [];
   const seenMisconceptionIds = new Set<string>();
   const misconceptions = rawMisconceptions.map((entry, index) => {
@@ -263,6 +322,8 @@ export function validateAutoTutorOutput(value: unknown) {
       learningGoal: String(output.learningGoal || output.prompt || '').trim(),
       idealAnswer: String(output.idealAnswer || expectations.map((entry) => entry.proposition).join(' ')).trim(),
       expectations,
+      expectationRelationships,
+      ...(expectationRelationshipProvenance ? { expectationRelationshipProvenance } : {}),
       misconceptions,
       maxTurns: Math.max(1, Number.isInteger(output.maxTurns) ? Number(output.maxTurns) : 20),
       requiredExpectationCount,

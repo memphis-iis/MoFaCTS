@@ -34,6 +34,17 @@ export type AutoTutorScript = {
   idealAnswer: string;
   expectations: AutoTutorExpectation[];
   misconceptions?: AutoTutorMisconception[];
+  expectationRelationships?: Record<string, Record<string, number>>;
+  expectationRelationshipProvenance?: {
+    graphVersion: string;
+    generatedAt: string;
+    model: string;
+    attemptedModels: string[];
+    metric: string;
+    scoreTransform: string;
+    sourceKeyType: 'tdf' | 'user';
+    cacheKey: string;
+  };
   dialogPolicy: Record<string, unknown>;
   summary: string;
 };
@@ -60,6 +71,10 @@ export type AutoTutorConfig = {
   clusterIndex: number;
 };
 
+export type AutoTutorConfigOptions = {
+  preferredOpenRouterApiKey?: unknown;
+};
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
@@ -69,6 +84,10 @@ function requiredString(value: unknown, field: string): string {
     throw new Error(`AutoTutor runtime requires ${field}`);
   }
   return value.trim();
+}
+
+function optionalString(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
 }
 
 function requiredNumber(value: unknown, field: string): number {
@@ -141,6 +160,13 @@ function readTurnLimit(session: Record<string, unknown>): AutoTutorTurnLimit {
 }
 
 export function readAutoTutorConfig(capabilities: AutoTutorRuntimeCapabilities): AutoTutorConfig {
+  return readAutoTutorConfigWithOptions(capabilities);
+}
+
+export function readAutoTutorConfigWithOptions(
+  capabilities: AutoTutorRuntimeCapabilities,
+  options: AutoTutorConfigOptions = {},
+): AutoTutorConfig {
   const tutor = getTutorFromSession(capabilities);
   const setspec = isRecord(tutor.setspec) ? tutor.setspec : {};
   const unit = getCurrentUnit(capabilities);
@@ -162,7 +188,10 @@ export function readAutoTutorConfig(capabilities: AutoTutorRuntimeCapabilities):
   const display = isRecord(stim.display) ? stim.display : {};
 
   return {
-    apiKey: requiredString(setspec.openRouterApiKey, 'openRouterApiKey'),
+    apiKey: requiredString(
+      optionalString(options.preferredOpenRouterApiKey) || setspec.openRouterApiKey,
+      'OpenRouter API key from profile settings or tutor.setspec.openRouterApiKey',
+    ),
     model: requiredString(session.openRouterModel || setspec.openRouterModel, 'openRouterModel'),
     utteranceTemperature: parseAutoTutorTemperature(
       session.utteranceTemperature,

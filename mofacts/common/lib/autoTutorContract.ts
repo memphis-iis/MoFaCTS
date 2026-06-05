@@ -101,6 +101,60 @@ function validateAutoTutorScript(script: unknown, prefix: string, errors: string
     }
   });
 
+  if (script.expectationRelationships !== undefined) {
+    if (!isRecord(script.expectationRelationships)) {
+      errors.push(`${prefix}.autoTutor.expectationRelationships must be an object keyed by expectation ID`);
+    } else {
+      for (const [sourceId, relationships] of Object.entries(script.expectationRelationships)) {
+        if (!expectationIds.has(sourceId) || !isRecord(relationships)) {
+          errors.push(`${prefix}.autoTutor.expectationRelationships.${sourceId} must reference a known expectation and contain target weights`);
+          continue;
+        }
+        for (const [targetId, relationship] of Object.entries(relationships)) {
+          if (!expectationIds.has(targetId)) {
+            errors.push(`${prefix}.autoTutor.expectationRelationships.${sourceId}.${targetId} references unknown expectation "${targetId}"`);
+            continue;
+          }
+          if (
+            typeof relationship !== 'number' ||
+            !Number.isFinite(relationship) ||
+            relationship < 0 ||
+            relationship > 1
+          ) {
+            errors.push(`${prefix}.autoTutor.expectationRelationships.${sourceId}.${targetId} must be a number from 0 to 1`);
+          }
+        }
+      }
+    }
+  }
+
+  if (script.expectationRelationshipProvenance !== undefined) {
+    const provenance = script.expectationRelationshipProvenance;
+    if (!isRecord(provenance)) {
+      errors.push(`${prefix}.autoTutor.expectationRelationshipProvenance must be an object`);
+    } else {
+      for (const field of ['graphVersion', 'generatedAt', 'model', 'metric', 'scoreTransform', 'sourceKeyType', 'cacheKey']) {
+        if (!nonEmptyString(provenance[field])) {
+          errors.push(`${prefix}.autoTutor.expectationRelationshipProvenance.${field} must be a non-empty string`);
+        }
+      }
+      if (
+        !Array.isArray(provenance.attemptedModels) ||
+        provenance.attemptedModels.length === 0 ||
+        provenance.attemptedModels.some((model) => !nonEmptyString(model))
+      ) {
+        errors.push(`${prefix}.autoTutor.expectationRelationshipProvenance.attemptedModels must be a non-empty string array`);
+      }
+      if (
+        provenance.sourceKeyType !== undefined &&
+        provenance.sourceKeyType !== 'tdf' &&
+        provenance.sourceKeyType !== 'user'
+      ) {
+        errors.push(`${prefix}.autoTutor.expectationRelationshipProvenance.sourceKeyType must be "tdf" or "user"`);
+      }
+    }
+  }
+
   const misconceptions = asRecordArray(script.misconceptions);
   const misconceptionIds = new Set<string>();
   misconceptions.forEach((misconception, misconceptionIndex) => {
@@ -342,11 +396,6 @@ function requireScore(value: unknown, fieldName: string): number {
   return value;
 }
 
-function computeExpectationPriority(frontier: number, coherence: number, centrality: number): number {
-  const priority = (0.5 * frontier) + (0.3 * coherence) + (0.2 * centrality);
-  return Math.round(Math.max(0, Math.min(1, priority)) * 1_000_000) / 1_000_000;
-}
-
 function parseExpectationScores(
   value: unknown,
   options: AutoTutorScoreParseOptions = {},
@@ -376,9 +425,6 @@ function parseExpectationScores(
       missing = score.missing;
     }
     const coverage = requireScore(score.coverage, `expectationScores.${id}.coverage`);
-    const coherence = requireScore(score.coherence, `expectationScores.${id}.coherence`);
-    const centrality = requireScore(score.centrality, `expectationScores.${id}.centrality`);
-    const frontier = coverage;
     parsed[id] = {
       current: score.current,
       coverage,
@@ -386,10 +432,10 @@ function parseExpectationScores(
       ...(missing ? { missing } : {}),
       ...(typeof score.tutoredByAssertion === 'boolean' ? { tutoredByAssertion: score.tutoredByAssertion } : {}),
       ...(typeof score.learnerRestatedAfterAssertion === 'boolean' ? { learnerRestatedAfterAssertion: score.learnerRestatedAfterAssertion } : {}),
-      frontier,
-      coherence,
-      centrality,
-      priority: computeExpectationPriority(frontier, coherence, centrality),
+      frontier: 0,
+      coherence: 0,
+      centrality: 0,
+      priority: 0,
     };
   }
   if (hasScoreScope) {
@@ -511,8 +557,6 @@ export const AUTO_TUTOR_SCORE_ENVELOPE_SCHEMA = Object.freeze({
       missing: 'string[] optional',
       tutoredByAssertion: 'boolean optional',
       learnerRestatedAfterAssertion: 'boolean optional',
-      coherence: 'number 0..1',
-      centrality: 'number 0..1',
     },
   },
   misconceptionScores: {

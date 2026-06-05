@@ -59,6 +59,17 @@ export type AiAutoTutorMisconception = {
   acceptableRepairAnswers?: string[];
 };
 
+export type AiAutoTutorRelationshipProvenance = {
+  graphVersion: string;
+  generatedAt: string;
+  model: string;
+  attemptedModels: string[];
+  metric: 'cosine_similarity_normalized_vectors';
+  scoreTransform: 'clamp_negative_to_zero';
+  sourceKeyType: 'tdf' | 'user';
+  cacheKey: string;
+};
+
 export type AiAutoTutorOutput = {
   lessonName?: string;
   prompt?: string;
@@ -66,6 +77,8 @@ export type AiAutoTutorOutput = {
   learningGoal?: string;
   idealAnswer?: string;
   expectations?: AiAutoTutorExpectation[];
+  expectationRelationships?: Record<string, Record<string, number>>;
+  expectationRelationshipProvenance?: AiAutoTutorRelationshipProvenance;
   misconceptions?: AiAutoTutorMisconception[];
   maxTurns?: number;
   requiredExpectationCount?: number;

@@ -36,7 +36,7 @@ import type {
 } from '../../../../../../learning-components/units/autotutor/AutoTutorRuntimeCapabilities';
 import {
   getRequiredExpectationIds,
-  readAutoTutorConfig,
+  readAutoTutorConfigWithOptions,
   validateGraduationAgainstScript,
   type AutoTutorConfig,
   type AutoTutorScript,
@@ -118,10 +118,8 @@ const AUTO_TUTOR_SCORE_JSON_SCHEMA: OpenRouterJsonSchema = {
           missing: { type: 'array', items: { type: 'string' } },
           tutoredByAssertion: { type: 'boolean' },
           learnerRestatedAfterAssertion: { type: 'boolean' },
-          coherence: { type: 'number' },
-          centrality: { type: 'number' },
         },
-        required: ['current', 'coverage', 'coherence', 'centrality'],
+        required: ['current', 'coverage'],
       },
     },
     misconceptionScores: {
@@ -218,6 +216,11 @@ function createMeteorAutoTutorRuntimeCapabilities(): AutoTutorRuntimeCapabilitie
     serverMethods: {
       async getAutoTutorHistoryForUnit(userId: string, tdfId: string, unitNumber: number) {
         return await meteorCallAsync('getAutoTutorHistoryForUnit', userId, tdfId, unitNumber) as unknown[];
+      },
+      async getPreferredOpenRouterApiKey() {
+        const settings = await meteorCallAsync('getOwnOpenRouterSettings') as { apiKey?: unknown } | null;
+        const apiKey = typeof settings?.apiKey === 'string' ? settings.apiKey.trim() : '';
+        return apiKey || null;
       },
     },
     stimuli: {
@@ -347,7 +350,7 @@ function buildScoringSystemPrompt(config: AutoTutorConfig, scoreableExpectationI
     'Do not invent expectation or misconception IDs.',
     'Set expectation coverage from 0 to 1, provide brief evidence, and include missing elements when coverage is incomplete.',
     'Set misconception confidence from 0 to 1.',
-    'Set coherence and centrality from 0 to 1. Do not return frontier or priority; the app derives those values deterministically from coverage, coherence, and centrality.',
+    'Do not return frontier, coherence, centrality, or priority. The app derives those planner values deterministically from learner coverage and the authored expectation relationship graph.',
     '',
     'Question prompt:',
     config.prompt,
@@ -853,7 +856,10 @@ async function insertAutoTutorHistoryTurn(config: AutoTutorConfig, state: AutoTu
 export async function createAutoTutorRuntime(
   capabilities: AutoTutorRuntimeCapabilities = createMeteorAutoTutorRuntimeCapabilities(),
 ): Promise<AutoTutorRuntime> {
-  const config = readAutoTutorConfig(capabilities);
+  const preferredOpenRouterApiKey = capabilities.serverMethods.getPreferredOpenRouterApiKey
+    ? await capabilities.serverMethods.getPreferredOpenRouterApiKey()
+    : null;
+  const config = readAutoTutorConfigWithOptions(capabilities, { preferredOpenRouterApiKey });
   validateGraduationAgainstScript(config);
   const state = createInitialState(config.script);
   applySavedHistory(config, state, await loadSavedAutoTutorHistory(capabilities));
@@ -885,7 +891,13 @@ export async function createAutoTutorRuntime(
         scoreEnvelope.expectationScores,
         scoreableExpectationIds,
       );
-      const scoredExpectations = recomputeExpectationPriorities(config.script, durableExpectationScores);
+      const relationshipAnchorId = state.planner.focusedExpectationId || state.planner.lastCoveredExpectationId;
+      const scoredExpectations = recomputeExpectationPriorities(
+        config.script,
+        durableExpectationScores,
+        undefined,
+        relationshipAnchorId,
+      );
       const scoredMisconceptions = preserveRepairedMisconceptionState(
         config.script,
         state.misconceptions,

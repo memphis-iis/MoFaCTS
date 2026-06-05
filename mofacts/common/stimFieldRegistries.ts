@@ -261,6 +261,44 @@ export const STIM_FIELD_REGISTRY: SectionFieldRegistry = {
           },
         },
       },
+      expectationRelationships: {
+        type: 'object',
+        title: 'Expectation Relationships',
+        additionalProperties: {
+          type: 'object',
+          title: 'Expectation Relationship Row',
+          additionalProperties: {
+            type: 'number',
+            minimum: 0,
+            maximum: 1,
+          },
+        },
+      },
+      expectationRelationshipProvenance: {
+        type: 'object',
+        title: 'Expectation Relationship Provenance',
+        additionalProperties: false,
+        required: ['graphVersion', 'generatedAt', 'model', 'attemptedModels', 'metric', 'scoreTransform', 'sourceKeyType', 'cacheKey'],
+        properties: {
+          graphVersion: stringField('', 6),
+          generatedAt: stringField('', 6),
+          model: stringField('', 6),
+          attemptedModels: stringArrayField('Attempted Models', 'Model'),
+          metric: {
+            type: 'string',
+            enum: ['cosine_similarity_normalized_vectors'],
+          },
+          scoreTransform: {
+            type: 'string',
+            enum: ['clamp_negative_to_zero'],
+          },
+          sourceKeyType: {
+            type: 'string',
+            enum: ['tdf', 'user'],
+          },
+          cacheKey: stringField('', 6),
+        },
+      },
       misconceptions: {
         type: 'array',
         title: 'Misconceptions',

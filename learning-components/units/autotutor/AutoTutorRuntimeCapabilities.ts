@@ -122,6 +122,7 @@ export interface AutoTutorStimuliRuntime {
 
 export interface AutoTutorServerMethodsRuntime extends ServerMethodRuntime {
   getAutoTutorHistoryForUnit(userId: string, tdfId: string, unitNumber: number): Promise<unknown[]>;
+  getPreferredOpenRouterApiKey?(): Promise<string | null>;
 }
 
 export interface AutoTutorHistoryRuntime extends HistoryRuntime<AutoTutorHistoryTurn> {

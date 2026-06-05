@@ -198,8 +198,8 @@
               }
             },
             "openRouterApiKey": {
-              "title": "Legacy OpenRouter API key.",
-              "description": "Legacy field retained for older content. Current AutoTutor runtime reads the OpenRouter key from client-owned browser profile storage, not from saved TDF content.",
+              "title": "Alternate OpenRouter API key.",
+              "description": "Provider-supplied OpenRouter key available to AutoTutor lessons when the current user has no saved profile OpenRouter key. User profile keys take precedence over this TDF key.",
               "type": "string",
               "default": "",
               "options": {

@@ -101,7 +101,13 @@ describe('AutoTutor planner', function() {
   });
 
   it('selects the highest-priority uncovered required expectation', function() {
-    const script = buildScript();
+    const script = {
+      ...buildScript(),
+      expectationRelationships: {
+        E1: { E2: 0.2 },
+        E2: { E1: 0.9 },
+      },
+    };
     const plannerState = createInitialAutoTutorPlannerState(script);
     plannerState.expectationScores = recomputeExpectationPriorities(script, {
       ...plannerState.expectationScores,
@@ -117,6 +123,30 @@ describe('AutoTutor planner', function() {
     });
 
     expect(target).to.deep.equal({ type: 'expectation', id: 'E2' });
+  });
+
+  it('derives frontier, coherence, and centrality from the authored expectation graph', function() {
+    const script = {
+      ...buildScript(),
+      expectationRelationships: {
+        E1: { E2: 0.75 },
+        E2: { E1: 0.25 },
+      },
+    };
+    const plannerState = createInitialAutoTutorPlannerState(script);
+
+    const scores = recomputeExpectationPriorities(script, {
+      ...plannerState.expectationScores,
+      E1: { ...plannerState.expectationScores.E1!, coverage: 0.4 },
+      E2: { ...plannerState.expectationScores.E2!, coverage: 0.2 },
+    }, undefined, 'E1');
+
+    expect(scores.E1?.coherence).to.equal(1);
+    expect(scores.E1?.frontier).to.equal(0.6);
+    expect(scores.E1?.centrality).to.equal(0.75);
+    expect(scores.E2?.coherence).to.equal(0.75);
+    expect(scores.E2?.frontier).to.be.closeTo(0.6, 0.000001);
+    expect(scores.E2?.centrality).to.equal(0.25);
   });
 
   it('answers learner questions before correcting active misconceptions', function() {

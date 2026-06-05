@@ -87,6 +87,20 @@ describe('aiContentValidation', function() {
         { id: 'E1', label: 'Acetyl-CoA', proposition: 'Acetyl-CoA enters the Krebs cycle.', assertion: 'Acetyl-CoA enters the Krebs cycle.' },
         { id: 'E2', proposition: 'The cycle produces electron carriers.' },
       ],
+      expectationRelationships: {
+        E1: { E2: 0.7 },
+        E2: { E1: 0.6 },
+      },
+      expectationRelationshipProvenance: {
+        graphVersion: 'autotutor-expectation-relationships-v1',
+        generatedAt: '2026-06-05T00:00:00.000Z',
+        model: 'google/gemini-embedding-001',
+        attemptedModels: ['google/gemini-embedding-001'],
+        metric: 'cosine_similarity_normalized_vectors',
+        scoreTransform: 'clamp_negative_to_zero',
+        sourceKeyType: 'user',
+        cacheKey: 'abc123',
+      },
       misconceptions: [
         {
           id: 'M1',
@@ -106,6 +120,11 @@ describe('aiContentValidation', function() {
     expect(result.output.requiredExpectationCount).to.equal(2);
     expect(result.output.maxActiveMisconceptions).to.equal(1);
     expect(result.output.misconceptions).to.have.length(1);
+    expect(result.output.expectationRelationships).to.deep.equal({
+      E1: { E2: 0.7 },
+      E2: { E1: 0.6 },
+    });
+    expect(result.output.expectationRelationshipProvenance?.cacheKey).to.equal('abc123');
     expect(result.output.visibility).to.equal('public');
     expect(result.warnings).to.deep.equal(['1 AutoTutor misconception rejected during validation.']);
   });

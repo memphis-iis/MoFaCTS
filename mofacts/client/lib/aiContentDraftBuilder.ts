@@ -96,6 +96,10 @@ export function buildAutoTutorDraft(output: ReturnType<typeof validateAutoTutorO
                 learningGoal: output.learningGoal || output.prompt,
                 idealAnswer: output.idealAnswer,
                 expectations: output.expectations,
+                expectationRelationships: output.expectationRelationships,
+                ...(output.expectationRelationshipProvenance
+                  ? { expectationRelationshipProvenance: output.expectationRelationshipProvenance }
+                  : {}),
                 misconceptions: output.misconceptions,
                 dialogPolicy: {
                   allowAnyOrder: true,

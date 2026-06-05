@@ -83,9 +83,12 @@ export type AutoTutorPlannerWeights = {
   centralityWeight: number;
 };
 
+export type AutoTutorExpectationRelationshipMatrix = Record<string, Record<string, number>>;
+
 export type AutoTutorPlannerScript = {
   expectations: Array<{ id: string; proposition: string; hints?: string[]; prompts?: Array<{ stem?: string; target?: string }>; assertion: string }>;
   misconceptions?: Array<{ id: string; correction: string; repairQuestion: string }>;
+  expectationRelationships?: AutoTutorExpectationRelationshipMatrix;
   dialogPolicy: Record<string, unknown>;
   summary: string;
 };
@@ -166,6 +169,42 @@ function mergeWeights(weights?: Partial<AutoTutorPlannerWeights>): AutoTutorPlan
     ...AUTO_TUTOR_DEFAULT_WEIGHTS,
     ...(weights || {}),
   };
+}
+
+function clampScore(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+function relationshipFor(
+  matrix: AutoTutorExpectationRelationshipMatrix | undefined,
+  sourceId: string,
+  targetId: string,
+): number {
+  if (sourceId === targetId) {
+    return 1;
+  }
+  const sourceValue = matrix?.[sourceId]?.[targetId];
+  if (typeof sourceValue === 'number' && Number.isFinite(sourceValue)) {
+    return clampScore(sourceValue);
+  }
+  const targetValue = matrix?.[targetId]?.[sourceId];
+  if (typeof targetValue === 'number' && Number.isFinite(targetValue)) {
+    return clampScore(targetValue);
+  }
+  return 0;
+}
+
+function computeExpectationCentrality(script: AutoTutorPlannerScript, expectationId: string): number {
+  const otherExpectationIds = script.expectations
+    .map((expectation) => expectation.id)
+    .filter((id) => id !== expectationId);
+  if (otherExpectationIds.length === 0) {
+    return 0;
+  }
+  const total = otherExpectationIds.reduce((sum, otherId) => (
+    sum + relationshipFor(script.expectationRelationships, expectationId, otherId)
+  ), 0);
+  return total / otherExpectationIds.length;
 }
 
 export function createInitialAutoTutorPlannerState(script: AutoTutorPlannerScript): AutoTutorPlannerState {
@@ -274,6 +313,7 @@ export function recomputeExpectationPriorities(
   script: AutoTutorPlannerScript,
   scores: Record<string, AutoTutorExpectationScore>,
   weights?: Partial<AutoTutorPlannerWeights>,
+  anchorExpectationId?: string,
 ): Record<string, AutoTutorExpectationScore> {
   const mergedWeights = mergeWeights(weights);
   const nextScores: Record<string, AutoTutorExpectationScore> = {};
@@ -282,15 +322,21 @@ export function recomputeExpectationPriorities(
     if (!score) {
       throw new Error(`AutoTutor score response omitted expectation "${expectation.id}"`);
     }
-    const frontier = score.coverage;
+    const coherence = anchorExpectationId
+      ? relationshipFor(script.expectationRelationships, anchorExpectationId, expectation.id)
+      : 0;
+    const frontier = anchorExpectationId ? (1 - score.coverage) * coherence : 0;
+    const centrality = computeExpectationCentrality(script, expectation.id);
     const priority =
       mergedWeights.frontierWeight * frontier +
-      mergedWeights.coherenceWeight * score.coherence +
-      mergedWeights.centralityWeight * score.centrality;
+      mergedWeights.coherenceWeight * coherence +
+      mergedWeights.centralityWeight * centrality;
     nextScores[expectation.id] = {
       ...score,
       frontier,
-      priority: Math.max(0, Math.min(1, priority)),
+      coherence,
+      centrality,
+      priority: clampScore(priority),
     };
   }
   return nextScores;
@@ -321,8 +367,6 @@ export function preserveDurableExpectationCoverage(
       ...(previousScore.missing || nextScore.missing
         ? { missing: previousScore.missing || nextScore.missing }
         : {}),
-      coherence: Math.max(previousScore.coherence, nextScore.coherence),
-      centrality: Math.max(previousScore.centrality, nextScore.centrality),
     };
   }
   return mergedScores;
@@ -377,8 +421,6 @@ export function mergeScoreableExpectationScores(
       ...(previousScore.missing || nextScore.missing
         ? { missing: previousScore.missing || nextScore.missing }
         : {}),
-      coherence: Math.max(previousScore.coherence, nextScore.coherence),
-      centrality: Math.max(previousScore.centrality, nextScore.centrality),
     };
   }
 

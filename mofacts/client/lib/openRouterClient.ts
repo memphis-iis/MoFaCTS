@@ -6,6 +6,7 @@ import {
 import { extractJsonObject } from './jsonExtraction';
 
 export const OPENROUTER_CHAT_COMPLETIONS_URL = 'https://openrouter.ai/api/v1/chat/completions';
+export const OPENROUTER_EMBEDDINGS_URL = 'https://openrouter.ai/api/v1/embeddings';
 
 export type OpenRouterMessage = {
   role: 'system' | 'user' | 'assistant';
@@ -39,6 +40,19 @@ export type OpenRouterResult<T> = {
   rawContent: string;
   responseBody: unknown;
   costUsd?: number;
+};
+
+export type OpenRouterEmbeddingResult = {
+  embeddings: number[][];
+  responseBody: unknown;
+  costUsd?: number;
+};
+
+export type OpenRouterEmbeddingOptions = {
+  apiKey: string;
+  model: string;
+  input: string[];
+  telemetry?: AiFlowTelemetry;
 };
 
 export type OpenRouterConnectionTestResult = {
@@ -92,6 +106,12 @@ function readOpenRouterCost(responseBody: unknown): number {
     throw new Error('OpenRouter response did not include usage.cost; this request cannot enforce its cost policy');
   }
   return responseBody.usage.cost;
+}
+
+function optionalOpenRouterCost(responseBody: unknown): number | undefined {
+  return isRecord(responseBody) && isRecord(responseBody.usage) && typeof responseBody.usage.cost === 'number'
+    ? responseBody.usage.cost
+    : undefined;
 }
 
 function openRouterErrorMessage(responseBody: unknown, status: number): string {
@@ -216,6 +236,104 @@ export async function callOpenRouterJson<T>(options: OpenRouterCallOptions<T>): 
       model: trimmedModel,
       ...(options.intent.schemaName ? { schemaName: options.intent.schemaName } : {}),
       messageCount: options.messages.length,
+      durationMs: Date.now() - startedAt,
+      ...(httpStatus !== undefined ? { httpStatus } : {}),
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
+}
+
+export async function callOpenRouterEmbeddings(options: OpenRouterEmbeddingOptions): Promise<OpenRouterEmbeddingResult> {
+  const requestId = options.telemetry?.requestId || createAiFlowRequestId('openrouter-embedding');
+  const startedAt = Date.now();
+  const trimmedModel = String(options.model || '').trim();
+  if (!trimmedModel) {
+    throw new Error('OpenRouter embedding model is required');
+  }
+  const apiKey = String(options.apiKey || '').trim();
+  if (!apiKey) {
+    throw new Error('OpenRouter API key is required');
+  }
+  const input = options.input.map((entry) => String(entry || '').trim());
+  if (input.length === 0 || input.some((entry) => !entry)) {
+    throw new Error('OpenRouter embeddings require non-empty input strings');
+  }
+
+  recordAiFlowEvent({
+    ...options.telemetry,
+    id: requestId,
+    provider: 'openrouter',
+    status: 'started',
+    title: 'MoFaCTS AutoTutor Relationship Embeddings',
+    model: trimmedModel,
+    messageCount: input.length,
+  });
+
+  let httpStatus: number | undefined;
+  try {
+    const response = await fetch(OPENROUTER_EMBEDDINGS_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : 'http://localhost',
+        'X-OpenRouter-Title': 'MoFaCTS AutoTutor Relationship Embeddings',
+      },
+      body: JSON.stringify({
+        model: trimmedModel,
+        input,
+      }),
+    });
+
+    httpStatus = response.status;
+    const responseBody = await readOpenRouterResponseBody(response);
+    if (!response.ok) {
+      throw new Error(redactOpenRouterSecrets(openRouterErrorMessage(responseBody, response.status)));
+    }
+    if (!isRecord(responseBody) || !Array.isArray(responseBody.data)) {
+      throw new Error('OpenRouter embedding response did not include data');
+    }
+    const embeddings = responseBody.data.map((entry, index) => {
+      if (!isRecord(entry) || !Array.isArray(entry.embedding)) {
+        throw new Error(`OpenRouter embedding response omitted embedding ${index}`);
+      }
+      const embedding = entry.embedding.map((value) => Number(value));
+      if (embedding.length === 0 || embedding.some((value) => !Number.isFinite(value))) {
+        throw new Error(`OpenRouter embedding ${index} must be a finite number vector`);
+      }
+      return embedding;
+    });
+    if (embeddings.length !== input.length) {
+      throw new Error('OpenRouter embedding response count did not match input count');
+    }
+    const costUsd = optionalOpenRouterCost(responseBody);
+    recordAiFlowEvent({
+      ...options.telemetry,
+      id: requestId,
+      provider: 'openrouter',
+      status: 'succeeded',
+      title: 'MoFaCTS AutoTutor Relationship Embeddings',
+      model: trimmedModel,
+      messageCount: input.length,
+      durationMs: Date.now() - startedAt,
+      httpStatus,
+      ...(costUsd !== undefined ? { costUsd } : {}),
+    });
+    return {
+      embeddings,
+      responseBody,
+      ...(costUsd !== undefined ? { costUsd } : {}),
+    };
+  } catch (error) {
+    recordAiFlowEvent({
+      ...options.telemetry,
+      id: requestId,
+      provider: 'openrouter',
+      status: 'failed',
+      title: 'MoFaCTS AutoTutor Relationship Embeddings',
+      model: trimmedModel,
+      messageCount: input.length,
       durationMs: Date.now() - startedAt,
       ...(httpStatus !== undefined ? { httpStatus } : {}),
       error: error instanceof Error ? error.message : String(error),

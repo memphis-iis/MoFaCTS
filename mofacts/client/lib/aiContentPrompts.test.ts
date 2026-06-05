@@ -19,6 +19,7 @@ describe('aiContentPrompts', function() {
 
     expect(prompt).to.contain('aim for about 5 expectations');
     expect(prompt).to.contain('Expectations should be atomic teachable propositions');
+    expect(prompt).to.contain('MoFaCTS computes expectationRelationships separately from embeddings');
     expect(prompt).to.contain('Misconceptions should be common student misconceptions');
     expect(prompt).to.contain('Return JSON only with this shape');
     expect(prompt).to.contain('Source content:\nmultiplication tables');
