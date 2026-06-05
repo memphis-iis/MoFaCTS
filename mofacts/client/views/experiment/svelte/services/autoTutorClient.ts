@@ -5,20 +5,10 @@ import {
   AUTO_TUTOR_UTTERANCE_ENVELOPE_SCHEMA,
   parseAutoTutorScoreEnvelope,
   parseAutoTutorUtteranceEnvelope,
-  type AutoTutorScoreEnvelope,
   type AutoTutorUtteranceEnvelope,
 } from '../../../../../common/lib/autoTutorContract';
 import {
-  createInitialAutoTutorPlannerState,
-  getScoreableExpectationIds,
-  mergeScoreableExpectationScores,
-  planAutoTutorTurn,
-  preserveRepairedMisconceptionState,
-  recomputeExpectationPriorities,
-  type AutoTutorLearnerContributionScore,
-  type AutoTutorMove,
   type AutoTutorPlan,
-  type AutoTutorPlannerState,
 } from '../../../../../common/lib/autoTutorPlanner';
 import { getStimCluster } from '../../../../lib/currentTestingHelpers';
 import { clientConsole } from '../../../../lib/clientLogger';
@@ -28,6 +18,10 @@ import {
   callOpenRouterJson as callSharedOpenRouterJson,
   type OpenRouterJsonSchema,
 } from '../../../../lib/openRouterClient';
+import {
+  computeAutoTutorRelationshipCacheKey,
+  generateAutoTutorExpectationRelationships,
+} from '../../../../lib/autoTutorRelationshipEngine';
 import { legacyTrim } from '../../../../../common/underscoreCompat';
 import type {
   AutoTutorCanonicalHistoryRecord,
@@ -35,14 +29,11 @@ import type {
   AutoTutorRuntimeCapabilities,
 } from '../../../../../../learning-components/units/autotutor/AutoTutorRuntimeCapabilities';
 import {
-  getRequiredExpectationIds,
   readAutoTutorConfigWithOptions,
   validateGraduationAgainstScript,
   type AutoTutorConfig,
-  type AutoTutorScript,
 } from '../../../../../../learning-components/units/autotutor/AutoTutorRuntimeConfig';
 import {
-  applyAutoTutorEndReason,
   getAutoTutorHistoryAction,
   type AutoTutorEndReason,
 } from '../../../../../../learning-components/units/autotutor/AutoTutorEndState';
@@ -50,40 +41,30 @@ import {
   AUTO_TUTOR_SCORING_TEMPERATURE,
 } from '../../../../../../learning-components/units/autotutor/AutoTutorGenerationConfig';
 import {
-  readAutoTutorHistoryNote,
-  validateAutoTutorSavedEndState,
-  type AutoTutorHistoryNote,
   type AutoTutorHistoryRow,
 } from '../../../../../../learning-components/units/autotutor/AutoTutorSavedHistory';
 import {
-  validateAutoTutorSavedState,
-  type AutoTutorSavedStateShape,
-} from '../../../../../../learning-components/units/autotutor/AutoTutorSavedState';
-type AutoTutorState = {
-  expectations: AutoTutorPlannerState['expectationScores'];
-  misconceptions: AutoTutorPlannerState['misconceptionScores'];
-  planner: AutoTutorPlannerState;
-  answerQuality: 'low' | 'partial' | 'high' | 'none';
-  learnerContribution: AutoTutorLearnerContributionScore | null;
-  studentAskedQuestion: boolean;
-  selectedMove: AutoTutorMove | '';
-  turnCount: number;
-  costUsd: number;
-  completed: boolean;
-  mastered: boolean;
-  endReason: AutoTutorEndReason;
-  stoppedByCost: boolean;
-  dialogue: Array<{ role: 'student' | 'tutor'; text: string }>;
-};
-
-export type AutoTutorProgressCounts = {
-  coveredExpectations: number;
-  requiredExpectations: number;
-  neededExpectations: number;
-  activeMisconceptions: number;
-  totalMisconceptions: number;
-  maxActiveMisconceptions: number;
-};
+  AUTO_TUTOR_COST_CAP_MESSAGE,
+  addAutoTutorUtteranceToTurn,
+  applyAutoTutorCostCap,
+  applySavedAutoTutorHistory,
+  buildAutoTutorHistoryNote,
+  buildAutoTutorPublishState,
+  computeAutoTutorProgress,
+  computeAutoTutorProgressCounts,
+  createInitialAutoTutorState,
+  getAutoTutorScoreableExpectationIds,
+  isAutoTutorCostCapReached,
+  markAutoTutorErrored,
+  markAutoTutorHistoryWritten,
+  markAutoTutorStatePublished,
+  scoreAndPlanAutoTutorTurn,
+  summarizeAutoTutorState,
+  transitionAutoTutorOperationalPhase,
+  validateAutoTutorLearnerInput,
+  type AutoTutorProgressCounts,
+  type AutoTutorState,
+} from '../../../../../../learning-components/units/autotutor/AutoTutorStateMachine';
 
 export type AutoTutorRuntime = {
   config: AutoTutorConfig;
@@ -99,8 +80,6 @@ export type AutoTutorRuntime = {
     stoppedByCost: boolean;
   }>;
 };
-
-type AutoTutorSavedHistoryNote = AutoTutorHistoryNote<ReturnType<typeof summarizeState>>;
 
 const AUTO_TUTOR_SCORE_JSON_SCHEMA: OpenRouterJsonSchema = {
   type: 'object',
@@ -273,41 +252,61 @@ function cloneJson<T>(value: T): T {
   return JSON.parse(JSON.stringify(value));
 }
 
-function createInitialState(script: AutoTutorScript): AutoTutorState {
-  const planner = createInitialAutoTutorPlannerState(script);
-  return {
-    expectations: planner.expectationScores,
-    misconceptions: planner.misconceptionScores,
-    planner,
-    answerQuality: 'none',
-    learnerContribution: null,
-    studentAskedQuestion: false,
-    selectedMove: '',
-    turnCount: 0,
-    costUsd: 0,
-    completed: false,
-    mastered: false,
-    endReason: 'in_progress',
-    stoppedByCost: false,
-    dialogue: [],
-  };
+function isCompleteAutoTutorRelationshipGraph(config: AutoTutorConfig): boolean {
+  const expectations = config.script.expectations;
+  if (expectations.length < 2) {
+    return true;
+  }
+  const graph = config.script.expectationRelationships;
+  if (!graph || typeof graph !== 'object') {
+    return false;
+  }
+  for (const source of expectations) {
+    const relationships = graph[source.id];
+    if (!relationships || typeof relationships !== 'object') {
+      return false;
+    }
+    for (const target of expectations) {
+      if (target.id === source.id) {
+        continue;
+      }
+      const score = relationships[target.id];
+      if (typeof score !== 'number' || !Number.isFinite(score) || score < 0 || score > 1) {
+        return false;
+      }
+    }
+  }
+  const provenance = config.script.expectationRelationshipProvenance;
+  if (!provenance?.model || !provenance.cacheKey) {
+    return false;
+  }
+  return provenance.cacheKey === computeAutoTutorRelationshipCacheKey(expectations, provenance.model);
 }
 
-function summarizeState(state: AutoTutorState) {
-  return {
-    expectations: state.expectations,
-    misconceptions: state.misconceptions,
-    planner: state.planner,
-    answerQuality: state.answerQuality,
-    learnerContribution: state.learnerContribution,
-    studentAskedQuestion: state.studentAskedQuestion,
-    selectedMove: state.selectedMove,
-    turnCount: state.turnCount,
-    costUsd: state.costUsd,
-    completed: state.completed,
-    mastered: state.mastered,
-    endReason: state.endReason,
-  };
+async function ensureAutoTutorRelationshipGraph(
+  capabilities: AutoTutorRuntimeCapabilities,
+  config: AutoTutorConfig,
+  preferredOpenRouterApiKey: string | null,
+): Promise<void> {
+  if (isCompleteAutoTutorRelationshipGraph(config)) {
+    return;
+  }
+  const result = await generateAutoTutorExpectationRelationships(config.script, {
+    apiKey: config.apiKey,
+    sourceKeyType: preferredOpenRouterApiKey ? 'user' : 'tdf',
+  });
+  config.script.expectationRelationships = result.expectationRelationships;
+  config.script.expectationRelationshipProvenance = result.expectationRelationshipProvenance;
+
+  const snapshot = capabilities.session.getAutoTutorSessionSnapshot();
+  await meteorCallAsync(
+    'persistAutoTutorExpectationRelationships',
+    snapshot.currentTdfId,
+    config.clusterIndex,
+    config.script.id,
+    result.expectationRelationships,
+    result.expectationRelationshipProvenance,
+  );
 }
 
 function buildScoringSystemPrompt(config: AutoTutorConfig, scoreableExpectationIds: string[]): string {
@@ -322,7 +321,7 @@ function buildScoringSystemPrompt(config: AutoTutorConfig, scoreableExpectationI
     'Classify whether the learner asked a substantive question and whether it is answerable from the provided authored lesson content or dialogue context.',
     'Classify the latest learner contribution as exactly one learnerContribution.type: assertion, idk, help_request, uncertainty, affect, meta, question, or off_task. Use assertion for substantive content claims or restatements. Use idk for "I do not know" or equivalent. Use help_request for requests for help, hints, or the answer. Use uncertainty for tentative or low-confidence content attempts. Use affect for frustration, confidence, boredom, or emotional comments. Use meta for comments about the task, interface, rules, progress, or procedure. Use question for substantive content questions. Use off_task for playful, abusive, irrelevant, or non-instructional turns.',
     'Set learnerContribution.confidence from 0 to 1 and provide brief evidence.',
-    'When learnerContribution.type is question, set learnerQuestion.current true. For meta comments about procedure rather than lesson content, use learnerContribution.type meta and leave learnerQuestion.current false unless the learner also asks a substantive content question.',
+    'Always include learnerQuestion.current and learnerQuestion.answerableFromAuthoredContent as booleans. When learnerContribution.type is question, set learnerQuestion.current true and decide answerableFromAuthoredContent from the authored content and dialogue context. For non-question turns, set learnerQuestion.current false and learnerQuestion.answerableFromAuthoredContent false. For meta comments about procedure rather than lesson content, use learnerContribution.type meta and leave learnerQuestion.current false unless the learner also asks a substantive content question.',
     'Misconception repair is a first-class scoring decision. If the prior tutor state last selected a misconception target and the latest tutor turn asked its repair question or otherwise requested repair, score the latest learner answer first as a repair attempt for that misconception.',
     'A concise answer can repair a misconception when it directly answers the repair question or rejects the mistaken contrast, even if it does not cover a full expectation. For example, if the tutor asks whether an interval estimates individual scores or the population mean, "the population mean" repairs the individual-scores misconception.',
     'When scoring a repair answer, interpret pronouns and short phrases in the context of the tutor question and active repair context. Do not require the learner to restate every contrast perfectly if their answer substantially accepts the repair target.',
@@ -348,7 +347,7 @@ function buildScoringSystemPrompt(config: AutoTutorConfig, scoreableExpectationI
       : 'No authored expectations are frozen on this turn.',
     'Include every authored misconception ID under misconceptionScores on every turn.',
     'Do not invent expectation or misconception IDs.',
-    'Set expectation coverage from 0 to 1, provide brief evidence, and include missing elements when coverage is incomplete.',
+    'For every returned expectation score, always include current as a boolean and coverage as a number from 0 to 1. Set expectation coverage from 0 to 1, provide brief evidence, and include missing elements when coverage is incomplete.',
     'Set misconception confidence from 0 to 1.',
     'Do not return frontier, coherence, centrality, or priority. The app derives those planner values deterministically from learner coverage and the authored expectation relationship graph.',
     '',
@@ -394,7 +393,7 @@ function buildScoringUserPrompt(config: AutoTutorConfig, studentAnswer: string, 
     JSON.stringify(getActiveRepairContext(config, state), null, 2),
     '',
     'Prior tutor state:',
-    JSON.stringify(summarizeState(state), null, 2),
+    JSON.stringify(summarizeAutoTutorState(state), null, 2),
     '',
     'Full dialogue history:',
     JSON.stringify(state.dialogue, null, 2),
@@ -491,6 +490,9 @@ function buildUtteranceUserPrompt(config: AutoTutorConfig, studentAnswer: string
       correctionStage: plan.correctionStage || null,
     }, null, 2),
     '',
+    'App-selected pedagogical state. For learner questions, questionScope and answerableFromAuthoredContent are already decided by the application before this utterance is generated:',
+    JSON.stringify(state.pedagogicalState, null, 2),
+    '',
     'Correction-stage guidance:',
     buildCorrectionStageGuidance(plan),
     '',
@@ -508,34 +510,6 @@ function buildUtteranceUserPrompt(config: AutoTutorConfig, studentAnswer: string
     'Full dialogue history:',
     JSON.stringify(state.dialogue, null, 2),
   ].join('\n');
-}
-
-function validateScoreEnvelopeIds(envelope: AutoTutorScoreEnvelope, state: AutoTutorState, scoreableExpectationIds: string[]): void {
-  const expectationIds = scoreableExpectationIds;
-  const misconceptionIds = Object.keys(state.misconceptions);
-  const returnedExpectationIds = Object.keys(envelope.expectationScores);
-  const returnedMisconceptionIds = Object.keys(envelope.misconceptionScores);
-
-  for (const id of expectationIds) {
-    if (!returnedExpectationIds.includes(id)) {
-      throw new Error(`AutoTutor response omitted expectation "${id}"`);
-    }
-  }
-  for (const id of returnedExpectationIds) {
-    if (!expectationIds.includes(id)) {
-      throw new Error(`AutoTutor response included unknown expectation "${id}"`);
-    }
-  }
-  for (const id of misconceptionIds) {
-    if (!returnedMisconceptionIds.includes(id)) {
-      throw new Error(`AutoTutor response omitted misconception "${id}"`);
-    }
-  }
-  for (const id of returnedMisconceptionIds) {
-    if (!misconceptionIds.includes(id)) {
-      throw new Error(`AutoTutor response included unknown misconception "${id}"`);
-    }
-  }
 }
 
 function validateUtteranceEnvelope(envelope: AutoTutorUtteranceEnvelope, plan: AutoTutorPlan): void {
@@ -567,6 +541,7 @@ async function callAutoTutorOpenRouter<T>(
     model: config.model,
     messages,
     temperature,
+    requireUsageCost: true,
     telemetry: {
       surface: 'autotutor-runtime',
       operation: intent.schemaName,
@@ -632,108 +607,8 @@ async function callOpenRouterUtterance(
   });
 }
 
-function computeProgress(state: AutoTutorState): number {
-  const expectationCount = Object.keys(state.expectations).length;
-  if (expectationCount === 0) {
-    throw new Error('AutoTutor state has no expectations');
-  }
-  const coverageSum = Object.values(state.expectations).reduce((sum, entry) => sum + entry.coverage, 0);
-  const activeMisconceptionPenalty = Object.values(state.misconceptions)
-    .filter((entry) => !entry.repaired && entry.current && entry.confidence >= 0.65)
-    .length;
-  return Math.max(0, coverageSum - activeMisconceptionPenalty) / expectationCount;
-}
-
-function countCoveredRequiredExpectations(state: AutoTutorState, config: AutoTutorConfig): number {
-  return getRequiredExpectationIds(config.script).filter((id) => {
-    const score = state.expectations[id];
-    return Boolean(score && score.coverage >= 0.8);
-  }).length;
-}
-
-function countActiveMisconceptions(state: AutoTutorState): number {
-  return Object.values(state.misconceptions)
-    .filter((entry) => !entry.repaired && entry.current && entry.confidence >= 0.65)
-    .length;
-}
-
-function computeProgressCounts(state: AutoTutorState, config: AutoTutorConfig): AutoTutorProgressCounts {
-  return {
-    coveredExpectations: countCoveredRequiredExpectations(state, config),
-    requiredExpectations: getRequiredExpectationIds(config.script).length,
-    neededExpectations: config.graduation.requiredExpectationCount,
-    activeMisconceptions: countActiveMisconceptions(state),
-    totalMisconceptions: Object.keys(state.misconceptions).length,
-    maxActiveMisconceptions: config.graduation.maxActiveMisconceptions,
-  };
-}
-
-function computeGraduationMet(state: AutoTutorState, config: AutoTutorConfig): boolean {
-  const progressCounts = computeProgressCounts(state, config);
-  return progressCounts.coveredExpectations >= config.graduation.requiredExpectationCount &&
-    progressCounts.activeMisconceptions <= config.graduation.maxActiveMisconceptions;
-}
-
 function publishState(capabilities: AutoTutorRuntimeCapabilities, state: AutoTutorState, config: AutoTutorConfig): void {
-  capabilities.session.publishAutoTutorState({
-    ...summarizeState(state),
-    completed: state.completed,
-    mastered: state.mastered,
-    endReason: state.endReason,
-    stoppedByCost: state.stoppedByCost,
-    progress: computeProgress(state),
-    progressCounts: computeProgressCounts(state, config),
-  });
-}
-
-function applySavedHistory(config: AutoTutorConfig, state: AutoTutorState, rows: AutoTutorHistoryRow[]): void {
-  if (rows.length === 0) {
-    return;
-  }
-  const dialogue: AutoTutorState['dialogue'] = [];
-  for (const row of rows) {
-    const studentText = typeof row.input === 'string' && row.input.trim()
-      ? row.input.trim()
-      : (typeof row.responseValue === 'string' ? row.responseValue.trim() : '');
-    const tutorText = typeof row.feedbackText === 'string' ? row.feedbackText.trim() : '';
-    if (!studentText || !tutorText) {
-      throw new Error('AutoTutor history row is missing student or tutor text');
-    }
-    dialogue.push({ role: 'student', text: studentText });
-    dialogue.push({ role: 'tutor', text: tutorText });
-  }
-
-  const latestRow = rows[rows.length - 1];
-  if (!latestRow) {
-    throw new Error('AutoTutor history resume expected at least one row');
-  }
-  const latest = readAutoTutorHistoryNote<ReturnType<typeof summarizeState>>(latestRow);
-  if (latest.scriptId !== config.script.id) {
-    throw new Error(`AutoTutor saved history scriptId "${latest.scriptId}" does not match current script "${config.script.id}"`);
-  }
-  validateAutoTutorSavedEndState(latest);
-  const savedState = validateAutoTutorSavedState(latest.state as AutoTutorSavedStateShape, state);
-  if (
-    latest.completed !== savedState.completed ||
-    latest.mastered !== savedState.mastered ||
-    latest.endReason !== savedState.endReason
-  ) {
-    throw new Error('AutoTutor saved history top-level end state does not match state payload');
-  }
-  state.expectations = savedState.expectations;
-  state.misconceptions = savedState.misconceptions;
-  state.planner = savedState.planner;
-  state.answerQuality = savedState.answerQuality;
-  state.learnerContribution = savedState.learnerContribution;
-  state.studentAskedQuestion = savedState.studentAskedQuestion;
-  state.selectedMove = savedState.selectedMove;
-  state.turnCount = savedState.turnCount;
-  state.costUsd = savedState.costUsd;
-  state.completed = savedState.completed;
-  state.mastered = savedState.mastered;
-  state.endReason = savedState.endReason;
-  state.stoppedByCost = latest.stoppedByCost;
-  state.dialogue = dialogue;
+  capabilities.session.publishAutoTutorState(buildAutoTutorPublishState(state, config));
 }
 
 async function loadSavedAutoTutorHistory(capabilities: AutoTutorRuntimeCapabilities): Promise<AutoTutorHistoryRow[]> {
@@ -746,21 +621,6 @@ async function loadSavedAutoTutorHistory(capabilities: AutoTutorRuntimeCapabilit
     snapshot.currentTdfId,
     snapshot.currentUnitNumber,
   ) as AutoTutorHistoryRow[];
-}
-
-function buildHistoryNote(config: AutoTutorConfig, state: AutoTutorState, tutorMessage: string): AutoTutorSavedHistoryNote {
-  return {
-    kind: 'autotutor',
-    model: config.model,
-    scriptId: config.script.id,
-    state: summarizeState(state),
-    progress: computeProgress(state),
-    completed: state.completed,
-    mastered: state.mastered,
-    endReason: state.endReason,
-    stoppedByCost: state.stoppedByCost,
-    tutorMessage,
-  };
 }
 
 async function insertAutoTutorHistoryTurn(config: AutoTutorConfig, state: AutoTutorState, args: {
@@ -781,7 +641,7 @@ async function insertAutoTutorHistoryTurn(config: AutoTutorConfig, state: AutoTu
   const cluster = args.capabilities.stimuli.getStimCluster(config.clusterIndex);
   const stim = (cluster?.stims?.[0] || {}) as { _id?: unknown; stimulusKC?: unknown };
   const sessionID = (new Date(args.turnStartedAt)).toUTCString().substr(0, 16) + ' ' + snapshot.currentTdfName;
-  const note = buildHistoryNote(config, state, args.tutorMessage);
+  const note = buildAutoTutorHistoryNote(config, state, args.tutorMessage);
 
   const historyRecord: AutoTutorCanonicalHistoryRecord = {
     itemId: stim?._id || config.script.id,
@@ -860,101 +720,100 @@ export async function createAutoTutorRuntime(
     ? await capabilities.serverMethods.getPreferredOpenRouterApiKey()
     : null;
   const config = readAutoTutorConfigWithOptions(capabilities, { preferredOpenRouterApiKey });
+  await ensureAutoTutorRelationshipGraph(capabilities, config, preferredOpenRouterApiKey);
   validateGraduationAgainstScript(config);
-  const state = createInitialState(config.script);
-  applySavedHistory(config, state, await loadSavedAutoTutorHistory(capabilities));
+  const state = createInitialAutoTutorState(config.script);
+  applySavedAutoTutorHistory(config, state, await loadSavedAutoTutorHistory(capabilities));
   publishState(capabilities, state, config);
 
   return {
     config,
     getState: () => cloneJson(state),
-    getProgress: () => computeProgress(state),
-    getProgressCounts: () => computeProgressCounts(state, config),
+    getProgress: () => computeAutoTutorProgress(state),
+    getProgressCounts: () => computeAutoTutorProgressCounts(state, config),
     getDialogue: () => cloneJson(state.dialogue),
     async submitStudentAnswer(studentAnswer: string) {
-      const cleanedAnswer = requiredString(studentAnswer, 'student answer');
-      if (state.completed) {
-        throw new Error('AutoTutor session is already complete');
-      }
-
+      const cleanedAnswer = validateAutoTutorLearnerInput(state, studentAnswer);
       const turnStartedAt = Date.now();
-      const scoreableExpectationIds = getScoreableExpectationIds(config.script, state.expectations);
-      const scoreResult = await callOpenRouterScoring(capabilities, config, state, cleanedAnswer, scoreableExpectationIds);
-      const scoreEnvelope = scoreResult.value;
-      validateScoreEnvelopeIds(scoreEnvelope, state, scoreableExpectationIds);
+      try {
+        Object.assign(state, transitionAutoTutorOperationalPhase(state, 'scoring_learner', 'learner answer submitted', turnStartedAt));
+        const scoreableExpectationIds = getAutoTutorScoreableExpectationIds(config, state);
+        const scoreResult = await callOpenRouterScoring(capabilities, config, state, cleanedAnswer, scoreableExpectationIds);
+        const scoreEnvelope = scoreResult.value;
+        const plannedTurn = scoreAndPlanAutoTutorTurn({
+          config,
+          state,
+          studentAnswer: cleanedAnswer,
+        }, scoreEnvelope, scoreResult.costUsd || 0);
+        let nextState = plannedTurn.nextState;
+        if (isAutoTutorCostCapReached(nextState)) {
+          nextState = addAutoTutorUtteranceToTurn(nextState, AUTO_TUTOR_COST_CAP_MESSAGE, 0);
+          nextState = applyAutoTutorCostCap(nextState);
+          const turnEndedAt = Date.now();
+          await capabilities.history.writeAutoTutorTurn({
+            config,
+            state: nextState,
+            studentAnswer: cleanedAnswer,
+            tutorMessage: AUTO_TUTOR_COST_CAP_MESSAGE,
+            startedAt: turnStartedAt,
+            endedAt: turnEndedAt,
+          });
+          nextState = markAutoTutorHistoryWritten(nextState);
+          nextState = markAutoTutorStatePublished(nextState);
+          Object.assign(state, nextState);
+          publishState(capabilities, state, config);
 
-      const nextState = cloneJson(state);
-      nextState.costUsd += scoreResult.costUsd || 0;
-      const durableExpectationScores = mergeScoreableExpectationScores(
-        config.script,
-        state.expectations,
-        scoreEnvelope.expectationScores,
-        scoreableExpectationIds,
-      );
-      const relationshipAnchorId = state.planner.focusedExpectationId || state.planner.lastCoveredExpectationId;
-      const scoredExpectations = recomputeExpectationPriorities(
-        config.script,
-        durableExpectationScores,
-        undefined,
-        relationshipAnchorId,
-      );
-      const scoredMisconceptions = preserveRepairedMisconceptionState(
-        config.script,
-        state.misconceptions,
-        scoreEnvelope.misconceptionScores,
-      );
-      nextState.expectations = scoredExpectations;
-      nextState.misconceptions = scoredMisconceptions;
-      nextState.planner.expectationScores = scoredExpectations;
-      nextState.planner.misconceptionScores = scoredMisconceptions;
-      nextState.answerQuality = scoreEnvelope.answerQuality;
-      nextState.learnerContribution = scoreEnvelope.learnerContribution;
-      nextState.studentAskedQuestion = scoreEnvelope.learnerQuestion.current;
-      const stateForUtterancePlan = cloneJson(nextState);
-      const plan = planAutoTutorTurn({
-        script: config.script,
-        plannerState: nextState.planner,
-        learnerQuestion: scoreEnvelope.learnerQuestion,
-        learnerContribution: scoreEnvelope.learnerContribution,
-        answerQuality: scoreEnvelope.answerQuality,
-        requireFinalAnswerPrompt: config.requireFinalAnswerPrompt,
-      });
-      nextState.planner = plan.nextPlannerState;
-      nextState.selectedMove = plan.selectedMove;
-      nextState.turnCount += 1;
-      nextState.dialogue.push({ role: 'student', text: cleanedAnswer });
+          return {
+            message: AUTO_TUTOR_COST_CAP_MESSAGE,
+            completed: state.completed,
+            mastered: state.mastered,
+            endReason: state.endReason,
+            stoppedByCost: state.stoppedByCost,
+          };
+        }
 
-      const graduationMet = computeGraduationMet(nextState, config);
-      if (graduationMet && (plan.target.type !== 'completion' || plan.selectedMove === 'summary')) {
-        applyAutoTutorEndReason(nextState, 'mastery');
-      } else if (nextState.turnCount >= config.turnLimit.maxTurns) {
-        applyAutoTutorEndReason(nextState, 'max_turns');
-      } else {
-        applyAutoTutorEndReason(nextState, 'in_progress');
+        const utteranceResult = await callOpenRouterUtterance(
+          capabilities,
+          config,
+          plannedTurn.stateForUtterancePlan,
+          cleanedAnswer,
+          plannedTurn.plan,
+        );
+        nextState = addAutoTutorUtteranceToTurn(
+          nextState,
+          utteranceResult.value.tutorMessage,
+          utteranceResult.costUsd || 0,
+        );
+        const tutorMessage = utteranceResult.value.tutorMessage;
+        if (isAutoTutorCostCapReached(nextState)) {
+          nextState = applyAutoTutorCostCap(nextState);
+        }
+        const turnEndedAt = Date.now();
+        await capabilities.history.writeAutoTutorTurn({
+          config,
+          state: nextState,
+          studentAnswer: cleanedAnswer,
+          tutorMessage,
+          startedAt: turnStartedAt,
+          endedAt: turnEndedAt,
+        });
+        nextState = markAutoTutorHistoryWritten(nextState);
+        nextState = markAutoTutorStatePublished(nextState);
+        Object.assign(state, nextState);
+        publishState(capabilities, state, config);
+
+        return {
+          message: tutorMessage,
+          completed: state.completed,
+          mastered: state.mastered,
+          endReason: state.endReason,
+          stoppedByCost: state.stoppedByCost,
+        };
+      } catch (error) {
+        Object.assign(state, markAutoTutorErrored(state));
+        publishState(capabilities, state, config);
+        throw error;
       }
-      const utteranceResult = await callOpenRouterUtterance(capabilities, config, stateForUtterancePlan, cleanedAnswer, plan);
-      nextState.costUsd += utteranceResult.costUsd || 0;
-      const tutorMessage = utteranceResult.value.tutorMessage;
-      nextState.dialogue.push({ role: 'tutor', text: tutorMessage });
-      const turnEndedAt = Date.now();
-      await capabilities.history.writeAutoTutorTurn({
-        config,
-        state: nextState,
-        studentAnswer: cleanedAnswer,
-        tutorMessage,
-        startedAt: turnStartedAt,
-        endedAt: turnEndedAt,
-      });
-      Object.assign(state, nextState);
-      publishState(capabilities, state, config);
-
-      return {
-        message: tutorMessage,
-        completed: state.completed,
-        mastered: state.mastered,
-        endReason: state.endReason,
-        stoppedByCost: state.stoppedByCost,
-      };
     },
   };
 }

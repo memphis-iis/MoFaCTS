@@ -6,6 +6,7 @@ import {
   AUTO_TUTOR_RELATIONSHIP_GRAPH_VERSION,
   AUTO_TUTOR_SECONDARY_EMBEDDING_MODEL,
   computeAutoTutorExpectationRelationshipsFromEmbeddings,
+  computeAutoTutorRelationshipCacheKey,
   generateAutoTutorExpectationRelationships,
   selectAutoTutorRelationshipGenerationKey,
 } from './autoTutorRelationshipEngine';
@@ -48,6 +49,20 @@ describe('autoTutorRelationshipEngine', function() {
       apiKey: 'user-key',
       sourceKeyType: 'user',
     });
+  });
+
+  it('changes the relationship cache key when authored expectation content changes', function() {
+    const original = [
+      { id: 'E1', label: 'connection', proposition: 'NVC supports connection.', assertion: 'NVC supports connection.' },
+      { id: 'E2', label: 'request', proposition: 'A request leaves room for no.', assertion: 'A request leaves room for no.' },
+    ];
+    const changed = [
+      original[0]!,
+      { id: 'E2', label: 'request', proposition: 'A request is concrete and negotiable.', assertion: 'A request leaves room for no.' },
+    ];
+
+    expect(computeAutoTutorRelationshipCacheKey(original, AUTO_TUTOR_PRIMARY_EMBEDDING_MODEL))
+      .to.not.equal(computeAutoTutorRelationshipCacheKey(changed, AUTO_TUTOR_PRIMARY_EMBEDDING_MODEL));
   });
 
   it('falls back from the primary embedding model and records provenance without secrets', async function() {

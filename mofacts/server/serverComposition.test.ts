@@ -448,6 +448,112 @@ describe('public TDF and stimulus method authorization', function() {
     expect(stimuli[0].stimulusKC).to.equal(3);
   });
 
+  it('persists AutoTutor expectation relationships into raw and flat stimuli for any authorized accessor', async function() {
+    const autoTutor = {
+      id: 'script-1',
+      topic: 'Communication',
+      learningGoal: 'Explain communication concepts.',
+      idealAnswer: 'Communication supports connection with clear observations and requests.',
+      expectations: [
+        { id: 'E1', label: 'connection', proposition: 'NVC supports connection.', assertion: 'NVC supports connection.' },
+        { id: 'E2', label: 'request', proposition: 'NVC requests leave room for no.', assertion: 'NVC requests leave room for no.' },
+      ],
+      misconceptions: [],
+      dialogPolicy: {
+        requiredExpectations: ['E1', 'E2'],
+      },
+      summary: 'NVC supports connection with clear requests.',
+    };
+    await TdfsAny.insertAsync({
+      _id: 'autotutor-derived-tdf',
+      ownerId: 'owner-user',
+      accessors: [{ userId: 'student-user' }],
+      stimuliSetId: 108,
+      stimulusFileName: 'autotutor-stims.json',
+      rawStimuliFile: {
+        setspec: {
+          clusters: [
+            {
+              clusterKC: 108000,
+              stims: [
+                {
+                  stimulusKC: 108001,
+                  display: { text: 'What is NVC for?' },
+                  autoTutor,
+                },
+              ],
+            },
+          ],
+        },
+      },
+      stimuli: [
+        {
+          stimulusKC: 108001,
+          clusterKC: 108000,
+          correctResponse: '__AUTOTUTOR_SESSION__',
+          display: { text: 'What is NVC for?' },
+          autoTutor,
+        },
+      ],
+      content: {
+        fileName: 'autotutor-tdf.json',
+        tdfs: {
+          tutor: {
+            setspec: {
+              lessonname: 'AutoTutor Derived',
+              stimulusfile: 'autotutor-stims.json',
+              userselect: 'false',
+            },
+            unit: [
+              {
+                autotutorsession: {
+                  cluster: 0,
+                  maxTurns: 10,
+                  graduation: {
+                    requiredExpectationCount: 1,
+                    maxActiveMisconceptions: 0,
+                  },
+                },
+              },
+            ],
+          },
+        },
+      },
+    });
+    const expectationRelationships = {
+      E1: { E2: 0.75 },
+      E2: { E1: 0.75 },
+    };
+    const provenance = {
+      graphVersion: 'autotutor-expectation-relationships-v1',
+      generatedAt: '2026-06-05T00:00:00.000Z',
+      model: 'google/gemini-embedding-001',
+      attemptedModels: ['google/gemini-embedding-001'],
+      metric: 'cosine_similarity_normalized_vectors',
+      scoreTransform: 'clamp_negative_to_zero',
+      sourceKeyType: 'user',
+      cacheKey: 'test-cache-key',
+    };
+
+    const result = await (asyncMethods.persistAutoTutorExpectationRelationships as any).call(
+      { userId: 'student-user' },
+      'autotutor-derived-tdf',
+      0,
+      'script-1',
+      expectationRelationships,
+      provenance,
+    );
+
+    expect(result.success).to.equal(true);
+    const updated = await TdfsAny.findOneAsync({ _id: 'autotutor-derived-tdf' });
+    const rawAutoTutor = updated.rawStimuliFile.setspec.clusters[0].stims[0].autoTutor;
+    const flatAutoTutor = updated.stimuli[0].autoTutor;
+    expect(rawAutoTutor.expectationRelationships).to.deep.equal(expectationRelationships);
+    expect(rawAutoTutor.expectationRelationshipProvenance).to.deep.equal(provenance);
+    expect(flatAutoTutor.expectationRelationships).to.deep.equal(expectationRelationships);
+    expect(flatAutoTutor.expectationRelationshipProvenance).to.deep.equal(provenance);
+  });
+
   it('allows experiment participants to access stimuli for their assigned condition TDF', async function() {
     await TdfsAny.insertAsync({
       _id: 'condition-root-tdf',

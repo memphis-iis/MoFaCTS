@@ -34,6 +34,7 @@ import { createStorageBoundary } from './lib/storageBoundary';
 import { createRedisBoundary } from './lib/redisBoundary';
 import { registerServerRuntime } from './runtime/serverRuntime';
 import { getResponseKCAnswerKey } from '../common/lib/responseKCAnswerKey';
+import { validateAutoTutorContent } from '../common/lib/autoTutorContract';
 import { computePracticeTimeMs } from '../lib/practiceTime';
 import { createServerUtilityHelpers } from './lib/serverUtilities';
 import { createStimulusLookupHelpers } from './lib/stimulusLookup';
@@ -689,6 +690,97 @@ async function getTdfByIdPublic(this: MethodContext, TDFId: string) {
   return await getTdfById.call({ userId }, TDFId);
 }
 
+function requireRelationshipGraph(value: unknown): Record<string, Record<string, number>> {
+  if (!isPlainRecord(value)) {
+    throw new Meteor.Error(400, 'AutoTutor expectation relationships must be an object');
+  }
+  const graph: Record<string, Record<string, number>> = {};
+  for (const [sourceId, rawTargets] of Object.entries(value)) {
+    if (!isPlainRecord(rawTargets)) {
+      throw new Meteor.Error(400, `AutoTutor expectation relationships.${sourceId} must be an object`);
+    }
+    graph[sourceId] = {};
+    for (const [targetId, rawScore] of Object.entries(rawTargets)) {
+      if (typeof rawScore !== 'number' || !Number.isFinite(rawScore) || rawScore < 0 || rawScore > 1) {
+        throw new Meteor.Error(400, `AutoTutor expectation relationship ${sourceId}.${targetId} must be a number from 0 to 1`);
+      }
+      graph[sourceId]![targetId] = rawScore;
+    }
+  }
+  return graph;
+}
+
+async function persistAutoTutorExpectationRelationships(
+  this: MethodContext,
+  tdfId: string,
+  clusterIndex: number,
+  scriptId: string,
+  expectationRelationships: unknown,
+  expectationRelationshipProvenance: unknown,
+) {
+  const userId = requireAuthenticatedUser(this.userId, 'Must be logged in to update AutoTutor derived data', 401);
+  const normalizedTdfId = normalizeCanonicalId(tdfId);
+  if (!normalizedTdfId) {
+    throw new Meteor.Error(400, 'TDF id is required');
+  }
+  if (!Number.isInteger(clusterIndex) || clusterIndex < 0) {
+    throw new Meteor.Error(400, 'AutoTutor cluster index must be a non-negative integer');
+  }
+  if (typeof scriptId !== 'string' || !scriptId.trim()) {
+    throw new Meteor.Error(400, 'AutoTutor script id is required');
+  }
+  const accessibleTdf = await getTdfById.call({ userId }, normalizedTdfId);
+  if (!accessibleTdf) {
+    throw new Meteor.Error(403, 'You do not have access to this AutoTutor content');
+  }
+  const rawStimuliFile = cloneJsonLike(accessibleTdf.rawStimuliFile);
+  const clusters = isPlainRecord(rawStimuliFile?.setspec) && Array.isArray(rawStimuliFile.setspec.clusters)
+    ? rawStimuliFile.setspec.clusters
+    : null;
+  const cluster = clusters?.[clusterIndex];
+  const firstStim = isPlainRecord(cluster) && Array.isArray(cluster.stims) ? cluster.stims[0] : null;
+  const autoTutor = isPlainRecord(firstStim) && isPlainRecord(firstStim.autoTutor) ? firstStim.autoTutor : null;
+  if (!autoTutor || autoTutor.id !== scriptId) {
+    throw new Meteor.Error(400, 'AutoTutor script id does not match the requested TDF cluster');
+  }
+
+  autoTutor.expectationRelationships = requireRelationshipGraph(expectationRelationships);
+  if (!isPlainRecord(expectationRelationshipProvenance)) {
+    throw new Meteor.Error(400, 'AutoTutor expectation relationship provenance must be an object');
+  }
+  autoTutor.expectationRelationshipProvenance = expectationRelationshipProvenance;
+
+  const validation = validateAutoTutorContent({
+    tdf: accessibleTdf.content?.tdfs,
+    stimuli: rawStimuliFile,
+  });
+  if (!validation.valid) {
+    throw new Meteor.Error('invalid-autotutor-content', validation.errors.join('; '));
+  }
+
+  const stimulusFileName = accessibleTdf.stimulusFileName ||
+    accessibleTdf.content?.tdfs?.tutor?.setspec?.stimulusfile ||
+    'unknown';
+  const responseKCMap = await getResponseKCMapForTdf(normalizedTdfId);
+  const stimuli = getNewItemFormat({
+    fileName: stimulusFileName,
+    stimuli: rawStimuliFile,
+    owner: accessibleTdf.ownerId || userId,
+    source: 'autotutor-derived-data',
+  }, stimulusFileName, accessibleTdf.stimuliSetId, responseKCMap);
+
+  await Tdfs.updateAsync({ _id: normalizedTdfId }, {
+    $set: {
+      rawStimuliFile,
+      stimuli,
+    },
+  });
+  if (accessibleTdf.stimuliSetId !== undefined && accessibleTdf.stimuliSetId !== null) {
+    await updateStimDisplayTypeMap([accessibleTdf.stimuliSetId]);
+  }
+  return { success: true, stimuliCount: stimuli.length };
+}
+
 async function getTdfByFileNamePublic(this: MethodContext, filename: string) {
   const userId = requireAuthenticatedUser(this.userId, 'Must be logged in to access TDF content', 401);
   const tdf = await getTdfAccessByFileName(filename);
@@ -863,6 +955,7 @@ export const asyncMethods: Record<string, unknown> = {
   processPackageUpload,
 
   tdfUpdateConfirmed, saveTdfStimuli, saveTdfContent,
+  persistAutoTutorExpectationRelationships,
   copyTdf,
 
   getTdfById: getTdfByIdPublic,
