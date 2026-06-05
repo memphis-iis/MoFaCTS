@@ -149,6 +149,43 @@ describe('AutoTutor planner', function() {
     expect(scores.E2?.centrality).to.equal(0.25);
   });
 
+  it('keeps priority as an unclamped ordering score', function() {
+    const script = {
+      ...buildScript(),
+      expectationRelationships: {
+        E1: { E2: 0.75 },
+        E2: { E1: 0.25 },
+      },
+    };
+    const plannerState = createInitialAutoTutorPlannerState(script);
+
+    const highScores = recomputeExpectationPriorities(script, {
+      ...plannerState.expectationScores,
+      E1: { ...plannerState.expectationScores.E1!, coverage: 0 },
+      E2: { ...plannerState.expectationScores.E2!, coverage: 0 },
+    }, {
+      frontierWeight: 2,
+      coherenceWeight: 2,
+      centralityWeight: 2,
+    }, 'E1');
+
+    expect(highScores.E1?.priority).to.equal(5.5);
+    expect(highScores.E2?.priority).to.equal(3);
+
+    const negativeScores = recomputeExpectationPriorities(script, {
+      ...plannerState.expectationScores,
+      E1: { ...plannerState.expectationScores.E1!, coverage: 0 },
+      E2: { ...plannerState.expectationScores.E2!, coverage: 0 },
+    }, {
+      frontierWeight: -2,
+      coherenceWeight: -2,
+      centralityWeight: -2,
+    }, 'E1');
+
+    expect(negativeScores.E1?.priority).to.equal(-5.5);
+    expect(negativeScores.E2?.priority).to.equal(-3);
+  });
+
   it('answers learner questions before correcting active misconceptions', function() {
     const script = buildScript();
     const plannerState = createInitialAutoTutorPlannerState(script);
@@ -552,6 +589,26 @@ describe('AutoTutor planner', function() {
       current: true,
       confidence: 0.9,
       repaired: false,
+    });
+  });
+
+  it('marks below-threshold active misconceptions as repaired in durable state', function() {
+    const script = buildScript();
+    const previousScores = createInitialAutoTutorPlannerState(script).misconceptionScores;
+
+    const repaired = preserveRepairedMisconceptionState(script, previousScores, {
+      M1: {
+        current: true,
+        confidence: 0.55,
+        evidence: 'Learner gave the repair answer, but the scorer left residual uncertainty.',
+      },
+    });
+
+    expect(repaired.M1).to.include({
+      current: false,
+      confidence: 0,
+      repaired: true,
+      repairEvidence: 'Learner gave the repair answer, but the scorer left residual uncertainty.',
     });
   });
 });

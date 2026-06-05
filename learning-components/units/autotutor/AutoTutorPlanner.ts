@@ -260,7 +260,9 @@ export function validatePlannerState(script: AutoTutorPlannerScript, plannerStat
     assertScore(score.frontier, `expectationScores.${id}.frontier`);
     assertScore(score.coherence, `expectationScores.${id}.coherence`);
     assertScore(score.centrality, `expectationScores.${id}.centrality`);
-    assertScore(score.priority, `expectationScores.${id}.priority`);
+    if (typeof score.priority !== 'number' || !Number.isFinite(score.priority)) {
+      throw new Error(`AutoTutor planner requires expectationScores.${id}.priority to be finite`);
+    }
   }
   for (const id of misconceptionIds) {
     if (!stateMisconceptionIds.includes(id)) {
@@ -336,7 +338,7 @@ export function recomputeExpectationPriorities(
       frontier,
       coherence,
       centrality,
-      priority: clampScore(priority),
+      priority,
     };
   }
   return nextScores;
@@ -431,7 +433,9 @@ export function preserveRepairedMisconceptionState(
   script: AutoTutorPlannerScript,
   previousScores: Record<string, AutoTutorMisconceptionScore>,
   nextScores: Record<string, AutoTutorMisconceptionScore>,
+  thresholds: Partial<AutoTutorPlannerThresholds> = {},
 ): Record<string, AutoTutorMisconceptionScore> {
+  const mergedThresholds = mergeThresholds(thresholds);
   const mergedScores: Record<string, AutoTutorMisconceptionScore> = {};
   for (const misconception of script.misconceptions || []) {
     const previousScore = previousScores[misconception.id];
@@ -441,6 +445,19 @@ export function preserveRepairedMisconceptionState(
     }
 
     if (nextScore.repaired) {
+      mergedScores[misconception.id] = {
+        ...nextScore,
+        current: false,
+        confidence: 0,
+        repaired: true,
+        ...(nextScore.repairEvidence || nextScore.evidence
+          ? { repairEvidence: nextScore.repairEvidence || nextScore.evidence }
+          : {}),
+      };
+      continue;
+    }
+
+    if (nextScore.current && nextScore.confidence < mergedThresholds.misconceptionThreshold) {
       mergedScores[misconception.id] = {
         ...nextScore,
         current: false,
@@ -486,7 +503,7 @@ function selectHighestPriorityExpectation(
   excludedId?: string,
 ): string {
   let selectedId = '';
-  let selectedPriority = -1;
+  let selectedPriority = -Infinity;
   for (const id of requiredIds) {
     if (id === excludedId) {
       continue;

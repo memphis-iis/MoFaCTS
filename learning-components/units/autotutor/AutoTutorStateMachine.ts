@@ -478,7 +478,12 @@ export function computeAutoTutorProgress(state: AutoTutorState): number {
   if (expectationCount === 0) {
     throw new Error('AutoTutor state has no expectations');
   }
-  const coverageSum = Object.values(state.expectations).reduce((sum, entry) => sum + entry.coverage, 0);
+  const coverageSum = Object.values(state.expectations).reduce((sum, entry) => {
+    const contribution = entry.coverage >= AUTO_TUTOR_DEFAULT_THRESHOLDS.coverageThreshold
+      ? 1
+      : entry.coverage;
+    return sum + contribution;
+  }, 0);
   const activeMisconceptionPenalty = Object.values(state.misconceptions)
     .filter((entry) =>
       !entry.repaired &&

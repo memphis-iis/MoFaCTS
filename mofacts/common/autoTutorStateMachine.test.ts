@@ -5,6 +5,7 @@ import {
   applyAutoTutorCostCap,
   applySavedAutoTutorHistory,
   buildAutoTutorHistoryNote,
+  computeAutoTutorProgress,
   createInitialAutoTutorState,
   markAutoTutorHistoryWritten,
   markAutoTutorStatePublished,
@@ -359,6 +360,20 @@ describe('AutoTutor state machine', function() {
     const costCapped = applyAutoTutorCostCap(createInitialAutoTutorState(buildConfig().script));
     expect(costCapped.endReason).to.equal('cost_cap');
     expect(costCapped.operationalPhase).to.equal('completed_cost_cap');
+  });
+
+  it('counts covered expectations as one and uncovered expectations fractionally for progress', function() {
+    const state = createInitialAutoTutorState(buildConfig().script);
+    state.expectations.E1 = {
+      ...state.expectations.E1!,
+      coverage: 0.8,
+    };
+    state.expectations.E2 = {
+      ...state.expectations.E2!,
+      coverage: 0.5,
+    };
+
+    expect(computeAutoTutorProgress(state)).to.equal(0.75);
   });
 
   it('saves only stable post-turn operational phases in history notes', function() {
