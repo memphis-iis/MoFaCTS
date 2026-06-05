@@ -22,7 +22,11 @@ describe('openRouterClientProfile', function() {
     expect(result).to.deep.equal({ success: false, message: 'Model not found' });
     const [, request] = fetchStub.firstCall.args as [string, RequestInit];
     const body = JSON.parse(String(request.body));
-    expect(body.response_format.json_schema.name).to.equal('mofacts_profile_openrouter_test');
+    expect(body.response_format).to.equal(undefined);
+    expect(body.messages).to.deep.equal([
+      { role: 'system', content: 'Return JSON only.' },
+      { role: 'user', content: 'Reply with exactly this JSON object: {"ok":true}' },
+    ]);
   });
 
   it('requires both profile test key and model before calling OpenRouter', async function() {

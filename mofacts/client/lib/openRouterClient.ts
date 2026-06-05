@@ -121,6 +121,14 @@ function openRouterErrorMessage(responseBody: unknown, status: number): string {
   return `OpenRouter request failed with HTTP ${status}`;
 }
 
+function openRouterMalformedSuccessMessage(responseBody: unknown): string {
+  if (isRecord(responseBody) && isRecord(responseBody.error) && typeof responseBody.error.message === 'string') {
+    return responseBody.error.message;
+  }
+  const keys = isRecord(responseBody) ? Object.keys(responseBody).join(', ') : typeof responseBody;
+  return `OpenRouter embedding response did not include data; top-level response keys: ${keys}`;
+}
+
 function buildResponseFormat(intent: OpenRouterIntent<unknown>): Record<string, unknown> | undefined {
   if (!intent.schema) {
     return undefined;
@@ -271,28 +279,40 @@ export async function callOpenRouterEmbeddings(options: OpenRouterEmbeddingOptio
   });
 
   let httpStatus: number | undefined;
+  let lastResponseBody: unknown;
   try {
-    const response = await fetch(OPENROUTER_EMBEDDINGS_URL, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : 'http://localhost',
-        'X-OpenRouter-Title': 'MoFaCTS AutoTutor Relationship Embeddings',
-      },
-      body: JSON.stringify({
-        model: trimmedModel,
-        input,
-      }),
-    });
+    let responseBody: unknown;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const response = await fetch(OPENROUTER_EMBEDDINGS_URL, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : 'http://localhost',
+          'X-OpenRouter-Title': 'MoFaCTS AutoTutor Relationship Embeddings',
+        },
+        body: JSON.stringify({
+          model: trimmedModel,
+          input,
+          encoding_format: 'float',
+        }),
+      });
 
-    httpStatus = response.status;
-    const responseBody = await readOpenRouterResponseBody(response);
-    if (!response.ok) {
-      throw new Error(redactOpenRouterSecrets(openRouterErrorMessage(responseBody, response.status)));
+      httpStatus = response.status;
+      responseBody = await readOpenRouterResponseBody(response);
+      lastResponseBody = responseBody;
+      if (!response.ok) {
+        throw new Error(redactOpenRouterSecrets(openRouterErrorMessage(responseBody, response.status)));
+      }
+      if (isRecord(responseBody) && Array.isArray(responseBody.data)) {
+        break;
+      }
+      if (attempt === 1) {
+        throw new Error(openRouterMalformedSuccessMessage(responseBody));
+      }
     }
     if (!isRecord(responseBody) || !Array.isArray(responseBody.data)) {
-      throw new Error('OpenRouter embedding response did not include data');
+      throw new Error(openRouterMalformedSuccessMessage(responseBody));
     }
     const embeddings = responseBody.data.map((entry, index) => {
       if (!isRecord(entry) || !Array.isArray(entry.embedding)) {
@@ -317,7 +337,7 @@ export async function callOpenRouterEmbeddings(options: OpenRouterEmbeddingOptio
       model: trimmedModel,
       messageCount: input.length,
       durationMs: Date.now() - startedAt,
-      httpStatus,
+      ...(httpStatus !== undefined ? { httpStatus } : {}),
       ...(costUsd !== undefined ? { costUsd } : {}),
     });
     return {
@@ -364,20 +384,12 @@ export async function testOpenRouterConnection(apiKey: string, model: string): P
       },
       intent: {
         title: 'MoFaCTS Profile OpenRouter Test',
+        missingContentMessage: 'OpenRouter profile test response did not include message content.',
         parse(value) {
           if (!isRecord(value) || value.ok !== true) {
             throw new Error('OpenRouter test response was not valid');
           }
           return value;
-        },
-        schemaName: 'mofacts_profile_openrouter_test',
-        schema: {
-          type: 'object',
-          additionalProperties: false,
-          properties: {
-            ok: { type: 'boolean' },
-          },
-          required: ['ok'],
         },
       },
       messages: [

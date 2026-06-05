@@ -1,8 +1,10 @@
 import { expect } from 'chai';
 import sinon from 'sinon';
 import {
+  callOpenRouterEmbeddings,
   callOpenRouterJson,
   OPENROUTER_CHAT_COMPLETIONS_URL,
+  OPENROUTER_EMBEDDINGS_URL,
 } from './openRouterClient';
 import {
   clearAiFlowEvents,
@@ -135,5 +137,52 @@ describe('openRouterClient', function() {
     } catch (error) {
       expect((error as Error).message).to.equal('schema validation failed');
     }
+  });
+
+  it('uses float encoding for embeddings', async function() {
+    const fetchStub = sinon.stub(globalThis, 'fetch');
+    fetchStub.resolves(new Response(JSON.stringify({
+      data: [
+        { embedding: [1, 0] },
+        { embedding: [0, 1] },
+      ],
+      usage: { cost: 0.0003 },
+    }), { status: 200 }));
+
+    const result = await callOpenRouterEmbeddings({
+      apiKey: 'sk-or-v1-test',
+      model: 'google/gemini-embedding-001',
+      input: ['first idea', 'second idea'],
+    });
+
+    expect(result.embeddings).to.deep.equal([[1, 0], [0, 1]]);
+    expect(result.costUsd).to.be.closeTo(0.0003, 0.0000000001);
+    expect(fetchStub.callCount).to.equal(1);
+    const [url, request] = fetchStub.firstCall.args as [string, RequestInit];
+    expect(url).to.equal(OPENROUTER_EMBEDDINGS_URL);
+    expect(JSON.parse(String(request.body))).to.deep.equal({
+      model: 'google/gemini-embedding-001',
+      input: ['first idea', 'second idea'],
+      encoding_format: 'float',
+    });
+  });
+
+  it('retries malformed successful embedding responses once', async function() {
+    const fetchStub = sinon.stub(globalThis, 'fetch');
+    fetchStub.onFirstCall().resolves(new Response(JSON.stringify({
+      error: { message: 'No successful provider responses' },
+    }), { status: 200 }));
+    fetchStub.onSecondCall().resolves(new Response(JSON.stringify({
+      data: [{ embedding: [1, 0] }],
+    }), { status: 200 }));
+
+    const result = await callOpenRouterEmbeddings({
+      apiKey: 'sk-or-v1-test',
+      model: 'google/gemini-embedding-001',
+      input: ['first idea'],
+    });
+
+    expect(result.embeddings).to.deep.equal([[1, 0]]);
+    expect(fetchStub.callCount).to.equal(2);
   });
 });

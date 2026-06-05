@@ -312,6 +312,47 @@ describe('AutoTutor content contract', function() {
     expect(envelope.answerQuality).to.equal('partial');
   });
 
+  it('defaults missing question answerability to false when the learner did not ask a question', function() {
+    const envelope = parseAutoTutorScoreEnvelope(JSON.stringify({
+      expectationScores: {
+        E1: {
+          current: true,
+          coverage: 0.8,
+          evidence: 'described a concrete request',
+        },
+      },
+      misconceptionScores: {},
+      answerQuality: 'high',
+      learnerContribution: {
+        type: 'assertion',
+        confidence: 0.9,
+      },
+      learnerQuestion: {
+        current: false,
+      },
+    }));
+
+    expect(envelope.learnerQuestion).to.deep.equal({
+      current: false,
+      answerableFromAuthoredContent: false,
+    });
+  });
+
+  it('still requires question answerability when the learner asked a question', function() {
+    expect(() => parseAutoTutorScoreEnvelope(JSON.stringify({
+      expectationScores: {},
+      misconceptionScores: {},
+      answerQuality: 'partial',
+      learnerContribution: {
+        type: 'question',
+        confidence: 0.9,
+      },
+      learnerQuestion: {
+        current: true,
+      },
+    }))).to.throw('AutoTutor score response learnerQuestion.answerableFromAuthoredContent must be boolean');
+  });
+
   it('parses repaired misconception state with repair evidence', function() {
     const envelope = parseAutoTutorScoreEnvelope(JSON.stringify({
       expectationScores: {
@@ -401,6 +442,33 @@ describe('AutoTutor content contract', function() {
     expect(envelope.expectationScores.E1?.coherence).to.equal(0);
     expect(envelope.expectationScores.E1?.centrality).to.equal(0);
     expect(envelope.expectationScores.E1?.priority).to.equal(0);
+  });
+
+  it('derives missing expectation current from valid coverage', function() {
+    const envelope = parseAutoTutorScoreEnvelope(JSON.stringify({
+      expectationScores: {
+        E1: {
+          coverage: 0.7,
+          evidence: 'described feelings tied to needs',
+        },
+        E2: {
+          coverage: 0,
+        },
+      },
+      misconceptionScores: {},
+      answerQuality: 'partial',
+      learnerContribution: {
+        type: 'assertion',
+        confidence: 0.9,
+      },
+      learnerQuestion: {
+        current: false,
+        answerableFromAuthoredContent: false,
+      },
+    }));
+
+    expect(envelope.expectationScores.E1?.current).to.equal(true);
+    expect(envelope.expectationScores.E2?.current).to.equal(false);
   });
 
   it('parses only scoreable expectations and ignores frozen expectation fields', function() {

@@ -414,9 +414,13 @@ function parseExpectationScores(
       }
       throw new Error(`AutoTutor score response included unscoreable expectation "${id}"`);
     }
-    if (!isRecord(score) || typeof score.current !== 'boolean') {
+    if (!isRecord(score)) {
       throw new Error(`AutoTutor score response expectationScores.${id}.current must be boolean`);
     }
+    const coverage = requireScore(score.coverage, `expectationScores.${id}.coverage`);
+    const current = typeof score.current === 'boolean'
+      ? score.current
+      : coverage > 0;
     let missing: string[] | undefined;
     if (score.missing !== undefined) {
       if (!Array.isArray(score.missing) || score.missing.some((entry) => typeof entry !== 'string')) {
@@ -424,9 +428,8 @@ function parseExpectationScores(
       }
       missing = score.missing;
     }
-    const coverage = requireScore(score.coverage, `expectationScores.${id}.coverage`);
     parsed[id] = {
-      current: score.current,
+      current,
       coverage,
       ...(typeof score.evidence === 'string' ? { evidence: score.evidence } : {}),
       ...(missing ? { missing } : {}),
@@ -503,7 +506,13 @@ export function parseAutoTutorScoreEnvelope(
   if (!isRecord(parsed.learnerQuestion) || typeof parsed.learnerQuestion.current !== 'boolean') {
     throw new Error('AutoTutor score response learnerQuestion.current must be boolean');
   }
-  if (typeof parsed.learnerQuestion.answerableFromAuthoredContent !== 'boolean') {
+  const answerableFromAuthoredContent = typeof parsed.learnerQuestion.answerableFromAuthoredContent === 'boolean'
+    ? parsed.learnerQuestion.answerableFromAuthoredContent
+    : false;
+  if (
+    parsed.learnerQuestion.current &&
+    typeof parsed.learnerQuestion.answerableFromAuthoredContent !== 'boolean'
+  ) {
     throw new Error('AutoTutor score response learnerQuestion.answerableFromAuthoredContent must be boolean');
   }
 
@@ -514,7 +523,7 @@ export function parseAutoTutorScoreEnvelope(
     learnerContribution: parseLearnerContribution(parsed.learnerContribution),
     learnerQuestion: {
       current: parsed.learnerQuestion.current,
-      answerableFromAuthoredContent: parsed.learnerQuestion.answerableFromAuthoredContent,
+      answerableFromAuthoredContent,
       ...(typeof parsed.learnerQuestion.evidence === 'string' ? { evidence: parsed.learnerQuestion.evidence } : {}),
     },
   };
