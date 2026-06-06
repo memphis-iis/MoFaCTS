@@ -2261,15 +2261,82 @@ tfoot th {
 }
 
 .footer{
-    color: var(--navigation-text-color);
+    color: var(--app-secondary-text-color);
 }
 
 .app-footer {
     display: flex;
     justify-content: center;
     margin-top: var(--app-space-5);
+    padding-top: var(--app-space-3);
+    padding-bottom: var(--app-space-3);
     padding-left: var(--app-space-3);
     padding-right: var(--app-space-3);
+    font-size: calc(var(--app-font-size-base) * 0.875);
+    line-height: 1.5;
+}
+
+.app-footer span {
+    display: inline-flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--app-space-2);
+}
+
+.app-footer a {
+    color: var(--app-text-color);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.app-footer a:hover,
+.app-footer a:focus-visible {
+    color: var(--app-accent-color);
+}
+
+.home-app .app-footer,
+.tool-app .app-footer {
+    flex: 0 0 auto;
+    margin-top: 0;
+    background: var(--app-background-color);
+}
+
+.public-document-page {
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    background: var(--app-background-color);
+    color: var(--app-text-color);
+}
+
+.public-document-shell {
+    width: min(100%, 860px);
+    margin: 0 auto;
+    padding: clamp(var(--app-space-4), 6vw, var(--app-space-6)) var(--app-space-4) var(--app-space-3);
+}
+
+.public-document-shell h1 {
+    margin: 0 0 var(--app-space-1);
+    font-size: calc(var(--app-font-size-base) * 2);
+    line-height: 1.15;
+}
+
+.public-document-shell h2 {
+    margin: var(--app-space-4) 0 var(--app-space-2);
+    font-size: calc(var(--app-font-size-base) * 1.25);
+    line-height: 1.25;
+}
+
+.public-document-shell p {
+    margin: 0 0 var(--app-space-2);
+    line-height: 1.65;
+}
+
+.public-document-updated {
+    color: var(--app-secondary-text-color);
+    font-size: calc(var(--app-font-size-base) * 0.875);
 }
 
 .navbar-brand-icon {

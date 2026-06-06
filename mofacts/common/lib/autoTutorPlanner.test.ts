@@ -195,6 +195,7 @@ describe('AutoTutor planner', function() {
       script,
       plannerState,
       learnerQuestion: { current: true, answerableFromAuthoredContent: true, evidence: 'asked what repeated sampling means' },
+      learnerContribution: { type: 'question', confidence: 0.95 },
       answerQuality: 'partial',
     });
 
@@ -255,7 +256,7 @@ describe('AutoTutor planner', function() {
     expect(moves).to.deep.equal(['hint', 'prompt', 'assertion']);
   });
 
-  it('answers substantive questions but resumes instruction for meta comments', function() {
+  it('answers only when the current turn has both question signals', function() {
     const script = buildScript();
     const plannerState = createInitialAutoTutorPlannerState(script);
     plannerState.expectationScores = recomputeExpectationPriorities(script, {
@@ -267,12 +268,30 @@ describe('AutoTutor planner', function() {
     const questionPlan = planAutoTutorTurn({
       script,
       plannerState,
-      learnerQuestion: { current: false, answerableFromAuthoredContent: true },
+      learnerQuestion: { current: true, answerableFromAuthoredContent: true },
       learnerContribution: { type: 'question', confidence: 0.9 },
       answerQuality: 'partial',
     });
     expect(questionPlan.target).to.deep.equal({ type: 'learner_question' });
     expect(questionPlan.selectedMove).to.equal('answer_question');
+
+    const rhetoricalPlan = planAutoTutorTurn({
+      script,
+      plannerState,
+      learnerQuestion: { current: false, answerableFromAuthoredContent: false },
+      learnerContribution: { type: 'question', confidence: 0.9 },
+      answerQuality: 'partial',
+    });
+    expect(rhetoricalPlan.target.type).to.equal('expectation');
+
+    const staleQuestionPlan = planAutoTutorTurn({
+      script,
+      plannerState,
+      learnerQuestion: { current: true, answerableFromAuthoredContent: true },
+      learnerContribution: { type: 'meta', confidence: 0.9 },
+      answerQuality: 'low',
+    });
+    expect(staleQuestionPlan.target.type).to.equal('expectation');
 
     const metaPlan = planAutoTutorTurn({
       script,

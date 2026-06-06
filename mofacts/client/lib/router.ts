@@ -750,6 +750,14 @@ FlowRouter.route('/help', {
   }
 })
 
+FlowRouter.route('/terms-of-service', {
+  name: 'client.termsOfService',
+  action: function() {
+    Session.set('curModule', 'termsOfService');
+    renderLayout(this, 'termsOfService');
+  }
+})
+
 FlowRouter.route('/audioSettings', {
   name: 'client.audioSettings',
   action: async function() {

@@ -537,7 +537,7 @@ export function selectAutoTutorTarget(input: AutoTutorPlannerInput): AutoTutorTa
 
   const contributionType = input.learnerContribution?.type;
 
-  if (contributionType === 'question' || input.learnerQuestion.current) {
+  if (contributionType === 'question' && input.learnerQuestion.current) {
     return { type: 'learner_question' };
   }
 

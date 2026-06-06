@@ -1,0 +1,1 @@
+import './termsOfService.html';

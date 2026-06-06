@@ -42,6 +42,8 @@ import './views/login/signIn';
 import './views/login/signUp';
 import './views/login/resetPassword';
 import './views/login/verifyEmail';
+import './views/footer.html';
+import './views/termsOfService';
 
 // -- Experiment --
 import './views/experiment/multiTdfSelect';
