@@ -21,6 +21,8 @@ cp settings.self-hosted.example.json settings.self-hosted.json
 
 Edit both files. Replace every placeholder, especially passwords, `ROOT_URL`, `MAIL_URL`, `owner`, `emailFrom`, `initRoles.admins`, and `encryptionKey`. `METEOR_SETTINGS_HOST_PATH` must point to the private settings file. The app fails startup when required settings are missing, examples are still present, MongoDB is unauthenticated in the self-hosted path, or Redis is required but unavailable.
 
+The admin backup control plane writes local archives to `/backups` inside the app container. Compose mounts `MOFACTS_BACKUP_HOST_PATH` there, defaulting to `/backups/mofacts` on the host. Create and protect that host directory before production use, then copy completed archives off-server. A backup stored only on the same server does not protect against server loss, disk loss, hosting-account loss, or accidental deletion of the backup directory.
+
 For email verification deliverability, set `emailFrom` to an address on a domain authenticated with your SMTP provider, for example `MoFaCTS <no-reply@your-domain.example>`, and use `emailReplyTo` for the admin contact address. Do not send production verification mail from a personal Gmail address through a separate SMTP provider.
 
 `storage.backend` defaults to `local`. To use S3-compatible object storage, set `storage.backend` to `s3` and configure `storage.s3.endpoint`, `bucket`, `region`, `accessKeyId`, and `secretAccessKey`. Optional `storage.s3.prefix` scopes object keys for one MoFaCTS instance, and `storage.s3.forcePathStyle` defaults to `true` for MinIO-style endpoints. Readiness writes and deletes a temporary object, so the configured credentials need object write, read, head, list-prefix, and delete permissions.
@@ -45,6 +47,7 @@ Back up all of these together:
 - H5P content mounted at `/h5p-content`.
 - H5P libraries mounted at `/h5p-libraries`.
 - SAML/OAuth certificate or key material when configured.
+- Backup archives stored in `MOFACTS_BACKUP_HOST_PATH`; copy these off-server.
 
 When `storage.backend` is `s3`, object storage replaces the local dynamic asset, H5P content, and H5P library state for new uploads. Back up the bucket or bucket prefix with MongoDB and configuration. Do not switch an existing local-storage install to S3 until existing DynamicAssets and H5P content records have S3 metadata or have been re-imported.
 

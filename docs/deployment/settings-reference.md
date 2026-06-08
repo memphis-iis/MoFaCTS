@@ -15,6 +15,8 @@ Required settings:
 - `emailFrom`: required when `enableEmail` or `prod` is true. Use a sender identity authenticated by the SMTP provider, for example `MoFaCTS <no-reply@example.org>`.
 - `emailReplyTo`: optional reply-to address for system mail.
 - `openCore.requireRedis`: `true` for the completed self-hosted runtime.
+- `openCore.backups.enabled`: enables the admin backup control plane.
+- `openCore.backups.localBackupPath`: container path for local backup archives. In self-hosted Compose this is `/backups`.
 - `public.sourceUrl`: exact public source tag or archive URL exposed by the app footer License / Source link.
 
 Required environment:
@@ -26,6 +28,8 @@ Required environment:
 - `REDIS_URL`: Redis connection string when Redis is required.
 - `MONGO_INITDB_ROOT_USERNAME` and `MONGO_INITDB_ROOT_PASSWORD`: Mongo root bootstrap credentials.
 - `MOFACTS_MONGO_APP_USERNAME` and `MOFACTS_MONGO_APP_PASSWORD`: app database user credentials.
+- `MOFACTS_BACKUP_HOST_PATH`: host directory mounted into the app container as `/backups`. Defaults to `/backups/mofacts`.
+- `MOFACTS_ENV_FILE_HOST_PATH`: host path to the private `.env.self-hosted` file mounted read-only for backup inclusion. Defaults to `./.env.self-hosted` from the deploy directory.
 
 Optional integrations:
 
@@ -50,6 +54,17 @@ S3-compatible storage settings:
 - `storage.s3.forcePathStyle`: optional boolean. Defaults to `true`, which is normally required for MinIO and many S3-compatible services.
 
 When `storage.backend` is `s3`, deployment readiness writes, heads, reads, and deletes a temporary `readiness/...txt` object. Missing bucket, invalid endpoint, invalid credentials, and insufficient object permissions fail readiness and do not switch to local storage. Dynamic assets, package export zips, H5P content, and H5P libraries are read from S3 metadata in S3 mode. Existing local-only asset records need migration metadata before switching an existing install to S3.
+
+Backup settings:
+
+- `openCore.backups.backend`: `local` for Open Core backup archives. The schema keeps a backend field so S3-compatible archive destinations can be added without changing the admin UI or registry model.
+- `openCore.backups.includeSettings`: include `/run/mofacts/settings.json`.
+- `openCore.backups.includeEnvironmentFile`: include `/run/mofacts/env.self-hosted`.
+- `openCore.backups.includeKeyMaterial`: include mounted key/certificate material from `/mofactsAssets_override`.
+- `openCore.backups.maxRetainedBackups`: retained-backup policy limit for future cleanup automation.
+- `openCore.backups.requirePreRestoreBackup`: restore safety policy. App-level restore must create a pre-restore backup before destructive restore unless an explicit future admin option disables it.
+
+Local backups are written inside the app container at `/backups`, backed by the host directory `MOFACTS_BACKUP_HOST_PATH` or `/backups/mofacts`. Same-server backups do not protect against server or disk loss; copy completed archives off-server and test restore on a separate instance.
 
 For production deliverability, `emailFrom` should use a domain that has SPF, DKIM, and DMARC configured for the `MAIL_URL` provider. Do not use a personal Gmail address as the sender for SMTP mail sent through another provider.
 
