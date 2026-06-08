@@ -1,0 +1,46 @@
+{
+  "id": "96616",
+  "scope": "embedded",
+  "type": "Activity",
+  "tags": [],
+  "title": "Body Image and Academic Performance of College Students",
+  "content": {
+    "authoring": {
+      "parts": [
+        {
+          "hints": [],
+          "id": "661208384",
+          "responses": [],
+          "scoringStrategy": "average"
+        }
+      ],
+      "previewText": ""
+    },
+    "base": "ctat2",
+    "modelXml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?> <!DOCTYPE ctat PUBLIC \"-//Carnegie Mellon University//DTD CTAT 1.1//EN\" \"http://oli.cmu.edu/dtd/cmu-ctat-tutor_1.1.dtd\"> <ctat id=\"ctat2_m2_stattutor\" width=\"900\" height=\"750\" max_attempts=\"9\"> <title>Body Image and Academic Performance of College Students</title> <interface>18/18256a2027359b4af76ce1205baeb803/body_image2.brd</interface> <dataset package=\"instructions.xml\">28/2812566537f76fb5eafbca1c678a1bdd/Instructions.xml</dataset> <dataset package=\"problem_description.xml\">e6/e6d4929cc3d627814721cade0394d1bf/body_image.xml</dataset> <dataset package=\"Minitab\">86/86351d220a9e40a8b64d07342aa73868/body_image.mtw</dataset> <dataset package=\"Excel\">a6/a685810d9d2b89d85727c1598b7c0285/body_image.xls</dataset> <dataset package=\"StatCrunch\">a6/a685810d9d2b89d85727c1598b7c0285/body_image.xls</dataset> <dataset package=\"R\">b7/b788f9a183f4370bf3ec1c6633bab4d1/body_image.RData</dataset> <dataset package=\"TI Calculator\">0f/0f2fecd27440563c94cad153f857d767/body_image.8xg</dataset> <dataset package=\"json\">d5/d520b598ed349f6e3bcbef30b5a5c974/body_image2.json</dataset> <asset>bundles/cannon_5-0/ctat_stattutor/webcontent/StatTutor.html</asset> </ctat> ",
+    "resourceBase": "3009376094",
+    "resourceURLs": [],
+    "src": "tutor.html",
+    "stem": {
+      "content": [
+        {
+          "children": [
+            {
+              "text": ""
+            }
+          ],
+          "id": "3978390119",
+          "type": "p"
+        }
+      ],
+      "id": "1780234505"
+    },
+    "title": "Body Image and Academic Performance of College Students"
+  },
+  "objectives": {
+    "661208384": []
+  },
+  "originalFile": "",
+  "unresolvedReferences": [],
+  "subType": "oli_embedded"
+}

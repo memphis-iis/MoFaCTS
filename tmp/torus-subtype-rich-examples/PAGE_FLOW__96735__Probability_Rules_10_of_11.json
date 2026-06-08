@@ -1,0 +1,917 @@
+{
+  "id": "96735",
+  "type": "Page",
+  "tags": [],
+  "title": "Probability Rules (10 of 11)",
+  "content": {
+    "bibrefs": [],
+    "model": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "text": "In our delivery example from a prior example, there are two categorical variables of interest in the background: "
+              }
+            ],
+            "id": "c5ba07594ed04bbf99c61ea70bb9e44c",
+            "type": "p"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "text": "On-time delivery by service A (yes/no)"
+                      }
+                    ],
+                    "id": "e7068af67d9e4624a8c7bd5641b312fc",
+                    "type": "p"
+                  }
+                ],
+                "id": "so6r0f8jv0grbha",
+                "type": "li"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "text": "On-time delivery by service B (yes/no)"
+                      }
+                    ],
+                    "id": "b53b876ce10e4c9198661dcf3b660865",
+                    "type": "p"
+                  }
+                ],
+                "id": "7h6cduhpx05kuvq",
+                "type": "li"
+              }
+            ],
+            "id": "c31cb2ca45964998b5d1d50d1909b13f",
+            "type": "ul"
+          },
+          {
+            "children": [
+              {
+                "text": "Since each of the two has two possible values (yes/no), there are four possible combinations altogether, which correspond to the four possible outcomes of using the two services."
+              }
+            ],
+            "id": "f411d8dfec664db5aef0bc274d9ae0e9",
+            "type": "p"
+          },
+          {
+            "children": [
+              {
+                "text": "While the Venn diagrams were great to visualize the General Addition Rule, in cases like these it is much easier to display the information in and work with a two-way table of probabilities, much as we examined the relationship between two categorical variables in the Exploratory Data Analysis section."
+              }
+            ],
+            "id": "d04b59da82d84de090a7074a9b1ea8f1",
+            "type": "p"
+          },
+          {
+            "children": [
+              {
+                "text": "How do we build a two-way table of probabilities? Let's use our delivery example to illustrate this simple process:"
+              }
+            ],
+            "id": "d3f8db1495e04739b38363c67598bf01",
+            "type": "p"
+          },
+          {
+            "caption": [
+              {
+                "___selfClosing___": true,
+                "children": [
+                  {
+                    "text": " ",
+                    "type": "text"
+                  }
+                ],
+                "type": "p"
+              }
+            ],
+            "children": [
+              {
+                "id": "y32lfvwbfp0udwu",
+                "text": " ",
+                "type": "text"
+              }
+            ],
+            "controls": "true",
+            "id": "d95ab0fb015e4347812d98f7f6a3e7a3",
+            "src": "aN0eulm19MM",
+            "type": "youtube"
+          },
+          {
+            "children": [
+              {
+                "text": "Now that we’ve completed the table, it is important to understand what each of the table’s entries mean in context. "
+              }
+            ],
+            "id": "ef2c268b036f466da3e4acf63bd79438",
+            "type": "p"
+          },
+          {
+            "alt": "The table has columns \"B,\" \"not B,\" and \"Total.\" The rows are \"A,\" \"not A,\" and \"Total.\" Here are is some information about the table, organized by cell:         At the cell A,B, the value there (0.75) is P(A and B) = P(on-time delivery by both services).         At the cell A,not B, the value there (0.15) is P(A and Not B) = P(on-time delivery ONLY by service A).         At cell Not A and B, the value (0.05) is P(not A and B) = P(on-time delivery ONLY by service B).         At cell Not A and Not B, the value (0.05) is P(not A and not B) = P(Neither service A nor B delivered on time).",
+            "caption": [
+              {
+                "___selfClosing___": true,
+                "children": [
+                  {
+                    "text": " ",
+                    "type": "text"
+                  }
+                ],
+                "type": "p"
+              }
+            ],
+            "children": [
+              {
+                "id": "8c5qb3vh99apapo",
+                "text": " ",
+                "type": "text"
+              }
+            ],
+            "id": "bbc2a4d57dc94aa2954b28e66b90dce6",
+            "src": "https://d2xvti2irp4c7t.cloudfront.net/media/57/5752ad9e9eba50cfe6123499966cd7f2/prob_table_explained.png",
+            "style": "inline",
+            "type": "img",
+            "vertical-align": "middle"
+          },
+          {
+            "children": [
+              {
+                "id": "wp6vu4h2c585ebx",
+                "text": "Comment"
+              }
+            ],
+            "id": "ykeh717cjn3dwpc",
+            "type": "h1"
+          },
+          {
+            "children": [
+              {
+                "text": "A common mistake is to confuse between: P(A) = P(event A occurs) and P(A and Not B) = P(ONLY event A occurs)[and similarly, between P(B) = P(event B occurs) and P(Not A and B) = P(only event B occurs)]. "
+              }
+            ],
+            "id": "b19271b2f28843d7ad672622f1bf9c17",
+            "type": "p"
+          },
+          {
+            "children": [
+              {
+                "text": "Looking at the probability table is a great way to clear-up this confusion:"
+              }
+            ],
+            "id": "e44dd7dd6af541119e973a998470b4cd",
+            "type": "p"
+          },
+          {
+            "alt": "The table's first row has been highlighted. Here is the highlighted data in \"Row, Column\" format:         A, B:  P(A and B) = 0.75;         A, not B: P(A and not B) = 0.15;         A, Total: P(A) = 0.90 = P(A and B) + P(A and not B)",
+            "caption": [
+              {
+                "___selfClosing___": true,
+                "children": [
+                  {
+                    "text": " ",
+                    "type": "text"
+                  }
+                ],
+                "type": "p"
+              }
+            ],
+            "children": [
+              {
+                "id": "hg47jzhltggvacl",
+                "text": " ",
+                "type": "text"
+              }
+            ],
+            "id": "b02b38354d084e5183c1d09d1cba540a",
+            "src": "https://d2xvti2irp4c7t.cloudfront.net/media/58/58b37bd98e1ae202d3983208d0162088/prob_table.png",
+            "style": "inline",
+            "type": "img",
+            "vertical-align": "middle"
+          },
+          {
+            "children": [
+              {
+                "text": "P(A) = 0.90 means that in 90% of the cases when service A is used, it delivers the document on time. "
+              }
+            ],
+            "id": "e557fb244499406fa180f280d5100232",
+            "type": "p"
+          },
+          {
+            "children": [
+              {
+                "text": "These cases of on-time delivery by service A can be decomposed into two sub-cases:"
+              }
+            ],
+            "id": "d9d656fe04de4bb5862e14dcdc22a72a",
+            "type": "p"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "text": "P(A and B) = 0.75 → 75% of the time the document is delivered on time also by service B (i.e., the document is delivered on time by both services)"
+                      }
+                    ],
+                    "id": "b75a0e08db914e188bdf2eeb0310bde2",
+                    "type": "p"
+                  }
+                ],
+                "id": "ibgj33wsw7fxhxw",
+                "type": "li"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "text": "P(A and Not B) = 0.15 → 15% of the time the document is not delivered on time by service B (i.e., delivered on time only by service A). "
+                      }
+                    ],
+                    "id": "e04a9c3a44fb4560a6e2e8666b326ce1",
+                    "type": "p"
+                  }
+                ],
+                "id": "vi6776o0ad2cigz",
+                "type": "li"
+              }
+            ],
+            "id": "fe52853959e44939997522c0ed829d01",
+            "type": "ul"
+          },
+          {
+            "children": [
+              {
+                "text": "Similarly,"
+              }
+            ],
+            "id": "f5ec9e9a1d634c55af28932b92f0bcfc",
+            "type": "p"
+          },
+          {
+            "alt": "The table's first column has been highlighted. Here is the highlighted data in \"Row, Column\" format:         A,B:  P(A and B) = 0.75;         not A, B: P(not A and B) = 0.05;         B,Total: P(B) = 0.80 = P(A and B) + P(not A and B)",
+            "caption": [
+              {
+                "___selfClosing___": true,
+                "children": [
+                  {
+                    "text": " ",
+                    "type": "text"
+                  }
+                ],
+                "type": "p"
+              }
+            ],
+            "children": [
+              {
+                "id": "96lfbl13ubhcug6",
+                "text": " ",
+                "type": "text"
+              }
+            ],
+            "id": "d69d295fb6cf4f94a4874ea71e4fd1fe",
+            "src": "https://d2xvti2irp4c7t.cloudfront.net/media/78/7832166c6edd7c79bb16d7033729aac4/prob_table2.png",
+            "style": "inline",
+            "type": "img",
+            "vertical-align": "middle"
+          },
+          {
+            "children": [
+              {
+                "text": "P(B) = 0.80 means that in 80% of the cases when service B is used, it delivers the document on time. "
+              }
+            ],
+            "id": "a858fc3d215f4144a0c1cfaac914d48f",
+            "type": "p"
+          },
+          {
+            "children": [
+              {
+                "text": "These cases of on-time delivery by service B can be decomposed into two sub-cases: "
+              }
+            ],
+            "id": "f254b39de40e42a59787ca2fbc8e7880",
+            "type": "p"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "text": "P(A and B) = 0.75 → 75% of the time the document is delivered on time also by service A (i.e., the document is delivered on time by both services)"
+                      }
+                    ],
+                    "id": "d6b96ddd63ec4ab0a6706b83190747dd",
+                    "type": "p"
+                  }
+                ],
+                "id": "7tt285j1n1bwdln",
+                "type": "li"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "text": "P(Not A and B) = 0.05 → 5% of the time the document is not delivered on time by service A (i.e., delivered on time "
+                      },
+                      {
+                        "strong": true,
+                        "text": "only by service B"
+                      },
+                      {
+                        "text": ")."
+                      }
+                    ],
+                    "id": "df64055541704636b82b3c7e94cfe518",
+                    "type": "p"
+                  }
+                ],
+                "id": "22pi6z8bkh2e7dy",
+                "type": "li"
+              }
+            ],
+            "id": "d6b78a7866ff4bb3a6a884b87c91da52",
+            "type": "ul"
+          },
+          {
+            "children": [
+              {
+                "text": ""
+              }
+            ],
+            "id": "80124976",
+            "type": "p"
+          }
+        ],
+        "id": "4080149768",
+        "selection": {
+          "anchor": {
+            "offset": 0,
+            "path": [
+              0,
+              0
+            ]
+          },
+          "focus": {
+            "offset": 0,
+            "path": [
+              1,
+              0
+            ]
+          }
+        },
+        "type": "content"
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "text": "Title"
+                  }
+                ],
+                "id": "ji7nvixdyyfo6jh",
+                "type": "p"
+              },
+              {
+                "children": [
+                  {
+                    "text": "Recall the smoke detector example from the last activity. Here is a quick recap:"
+                  }
+                ],
+                "id": "daa241cc08a24d8f8f26f2a9ad35719f",
+                "type": "p"
+              },
+              {
+                "children": [
+                  {
+                    "text": "D—the dining room alarm is set off by smoke in the kitchen"
+                  }
+                ],
+                "id": "ca584754f6eb44699865569260e862ab",
+                "type": "p"
+              },
+              {
+                "children": [
+                  {
+                    "text": "B—the bedroom alarm is set off by smoke in the kitchen "
+                  }
+                ],
+                "id": "ecd254a282e84094b95b923c05e92b2a",
+                "type": "p"
+              },
+              {
+                "children": [
+                  {
+                    "text": "P(D) = 0.95 "
+                  }
+                ],
+                "id": "f33352038bda47e18760683925420211",
+                "type": "p"
+              },
+              {
+                "children": [
+                  {
+                    "text": "P(B) = 0.40"
+                  }
+                ],
+                "id": "ed958dde1e6e484cbc22f4be23f18821",
+                "type": "p"
+              },
+              {
+                "children": [
+                  {
+                    "text": "D and B are independent → P(D and B) = 0.38"
+                  }
+                ],
+                "id": "c729447e2f2040b5af21059955795729",
+                "type": "p"
+              },
+              {
+                "children": [
+                  {
+                    "text": "Complete the table below. Start with the information that is given and go from there."
+                  }
+                ],
+                "id": "e770c866878140448148ce1cfb47e5f7",
+                "type": "p"
+              }
+            ],
+            "id": "910250581",
+            "selection": {
+              "anchor": {
+                "offset": 0,
+                "path": [
+                  0,
+                  0
+                ]
+              },
+              "focus": {
+                "offset": 0,
+                "path": [
+                  1,
+                  0
+                ]
+              }
+            },
+            "type": "content"
+          }
+        ],
+        "id": "bc0d817c6aa14f8081b3adc26c773307",
+        "layout": "vertical",
+        "purpose": "example",
+        "type": "group"
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "id": "t6qpkhvsma1sp7w",
+                    "text": " ",
+                    "type": "text"
+                  }
+                ],
+                "id": "bdzjs5iol3a2q11",
+                "type": "h1"
+              }
+            ],
+            "id": "1892805482",
+            "selection": {
+              "anchor": {
+                "offset": 0,
+                "path": [
+                  0,
+                  0
+                ]
+              },
+              "focus": {
+                "offset": 0,
+                "path": [
+                  1,
+                  0
+                ]
+              }
+            },
+            "type": "content"
+          },
+          {
+            "children": [
+              {
+                "activity_id": 96020,
+                "id": "4059627491",
+                "type": "activity-reference"
+              }
+            ],
+            "id": "2931859812",
+            "layout": "vertical",
+            "purpose": "none",
+            "type": "group"
+          },
+          {
+            "children": [
+              {
+                "activity_id": 96318,
+                "id": "3194064833",
+                "type": "activity-reference"
+              }
+            ],
+            "id": "2732071780",
+            "layout": "vertical",
+            "purpose": "none",
+            "type": "group"
+          },
+          {
+            "children": [
+              {
+                "activity_id": 96500,
+                "id": "550661752",
+                "type": "activity-reference"
+              }
+            ],
+            "id": "3341120649",
+            "layout": "vertical",
+            "purpose": "none",
+            "type": "group"
+          }
+        ],
+        "id": "a5f66eb44b72481c90aa1ea6a5df0af5",
+        "layout": "vertical",
+        "purpose": "learnbydoing",
+        "type": "group"
+      },
+      {
+        "children": [
+          {
+            "activity_id": 95863,
+            "id": "895597988",
+            "type": "activity-reference"
+          }
+        ],
+        "id": "620843950",
+        "layout": "vertical",
+        "purpose": "didigetthis",
+        "type": "group"
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "id": "w4eur7etzd910xm",
+                "text": "Comment"
+              }
+            ],
+            "id": "hzf5u7mr2svp5fd",
+            "type": "h1"
+          },
+          {
+            "children": [
+              {
+                "text": "In both the delivery problem and the smoke detector problem, we knew P(A), P(B) and P(A and B). (In the smoke detector problem, we actually needed to work a bit to get P(A and B), but it wasn't too bad.) Visually, we had the probability for the three shaded cells below, which was enough information to complete the table."
+              }
+            ],
+            "id": "d5fc34653c77472f82c8b12dc3b57cfd",
+            "type": "p"
+          },
+          {
+            "alt": "The table has columns \"B,\" \"not B,\" and \"Total.\" The rows are \"A,\" \"not A,\" and \"Total.\" We will be naming cells by \"{Row, Column}\" notation.         Cells {A,B}, {A, Total}, and {Total, B} have been shaded.",
+            "caption": [
+              {
+                "___selfClosing___": true,
+                "children": [
+                  {
+                    "text": " ",
+                    "type": "text"
+                  }
+                ],
+                "type": "p"
+              }
+            ],
+            "children": [
+              {
+                "id": "mb5ggyy6tgjl08k",
+                "text": " ",
+                "type": "text"
+              }
+            ],
+            "id": "e98f51693d9848658a1b9a383a3d931d",
+            "src": "https://d2xvti2irp4c7t.cloudfront.net/media/f7/f741efa34e7f58931f3fc457dbec3cf0/image031.gif",
+            "style": "block",
+            "type": "img",
+            "vertical-align": "middle"
+          },
+          {
+            "children": [
+              {
+                "text": "This, however, is not the only combination of three cells that would provide sufficient information to complete the table. Essentially, as long as we are given (or can calculate) one cell in each of the margins (the total row and column), and one of the four cells in the body of the table, we'll be able to complete the entire table. Visually, we need:"
+              }
+            ],
+            "id": "b4b159a4a9854052b0a77a550b8361ee",
+            "type": "p"
+          },
+          {
+            "alt": "The same table. We need information about one of the cells in the body of the table. These cells are {A,B}, {A, not B}, {not A, B}, and {not A, not B}. In addition, we need information from one of the cells on the right margin. These cells are {A, Total} and {not A, Total}. The last group of cells we need information from is the bottom margin. These cells are {Total, B} and {Total, not B}. With one cell from each of these three groups we can fill in the entire table.",
+            "caption": [
+              {
+                "___selfClosing___": true,
+                "children": [
+                  {
+                    "text": " ",
+                    "type": "text"
+                  }
+                ],
+                "type": "p"
+              }
+            ],
+            "children": [
+              {
+                "id": "3s1gqmiqijlyrjx",
+                "text": " ",
+                "type": "text"
+              }
+            ],
+            "id": "af2585f0dbd84212b07521cd1ee0645f",
+            "src": "https://d2xvti2irp4c7t.cloudfront.net/media/4b/4b22114b92bda49cee8a3a06db0b0c7e/image032.gif",
+            "style": "block",
+            "type": "img",
+            "vertical-align": "middle"
+          }
+        ],
+        "id": "1357401132",
+        "selection": {
+          "anchor": {
+            "offset": 0,
+            "path": [
+              0,
+              0
+            ]
+          },
+          "focus": {
+            "offset": 0,
+            "path": [
+              1,
+              0
+            ]
+          }
+        },
+        "type": "content"
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "text": "Researchers studied thousands of court cases. For each case, they recorded the jury’s decision. In addition, they asked the judge in each case how he or she would have decided the same case if there were no jury. In 67% of the cases the jury voted to convict, in 83% of the cases the judge would have convicted, and in 19% of the cases only the judge would have convicted."
+                  }
+                ],
+                "id": "c61930ac8269448b97bc483c5e058f7f",
+                "type": "p"
+              },
+              {
+                "children": [
+                  {
+                    "text": "Let A be the event “jury convicts”."
+                  }
+                ],
+                "id": "cc08040771c54117a2234e0378b28239",
+                "type": "p"
+              },
+              {
+                "children": [
+                  {
+                    "text": "Let B be the event “judge convicts”."
+                  }
+                ],
+                "id": "be99b27dc2a74487a0761a248ac1acd7",
+                "type": "p"
+              },
+              {
+                "children": [
+                  {
+                    "text": "Complete the following table:"
+                  }
+                ],
+                "id": "a8ee2d1c18b645a5afd96b618aca91c6",
+                "type": "p"
+              }
+            ],
+            "id": "3445261785",
+            "selection": {
+              "anchor": {
+                "offset": 0,
+                "path": [
+                  0,
+                  0
+                ]
+              },
+              "focus": {
+                "offset": 0,
+                "path": [
+                  1,
+                  0
+                ]
+              }
+            },
+            "type": "content"
+          },
+          {
+            "children": [
+              {
+                "activity_id": 96350,
+                "id": "4176902096",
+                "type": "activity-reference"
+              }
+            ],
+            "id": "2627623042",
+            "layout": "vertical",
+            "purpose": "none",
+            "type": "group"
+          }
+        ],
+        "id": "a954d9cf21314401b5f8cc20d0c6e4fc",
+        "layout": "vertical",
+        "purpose": "learnbydoing",
+        "type": "group"
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "id": "nukza8d0k39j8n1",
+                    "text": "Did I Get This?"
+                  }
+                ],
+                "id": "qikaa8t75kyq677",
+                "type": "h1"
+              },
+              {
+                "children": [
+                  {
+                    "text": "According to www.jointogether.com, in 2000, 87% of all suicides were committed by males, 56% of all suicides were committed using a gun, and 10% of all suicides were committed by women not using a gun."
+                  }
+                ],
+                "id": "b2811ab1154e4fa890e428a962253146",
+                "type": "p"
+              },
+              {
+                "children": [
+                  {
+                    "text": "(We'll use M for suicide committed by a male, F [= not M] for suicide committed by female, and G for a suicide committed using a gun.)"
+                  }
+                ],
+                "id": "cc4e186c1b04425a8907448a24a16716",
+                "type": "p"
+              }
+            ],
+            "id": "2748068988",
+            "selection": {
+              "anchor": {
+                "offset": 0,
+                "path": [
+                  0,
+                  0
+                ]
+              },
+              "focus": {
+                "offset": 0,
+                "path": [
+                  1,
+                  0
+                ]
+              }
+            },
+            "type": "content"
+          },
+          {
+            "children": [
+              {
+                "activity_id": 96634,
+                "id": "3141666237",
+                "type": "activity-reference"
+              }
+            ],
+            "id": "4010523536",
+            "layout": "vertical",
+            "purpose": "none",
+            "type": "group"
+          },
+          {
+            "children": [
+              {
+                "activity_id": 95594,
+                "id": "585188077",
+                "type": "activity-reference"
+              }
+            ],
+            "id": "3670012973",
+            "layout": "vertical",
+            "purpose": "none",
+            "type": "group"
+          }
+        ],
+        "id": "afbaa84ed0884e08bae04ff2c11927ae",
+        "layout": "vertical",
+        "purpose": "didigetthis",
+        "type": "group"
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "id": "vv15y665rs5mlxl",
+                "text": "Comment"
+              }
+            ],
+            "id": "95yvfrjgh84ylot",
+            "type": "h1"
+          },
+          {
+            "children": [
+              {
+                "text": "When we used two-way tables in the categorical variables unit, it was to record values of two categorical variables for a concrete "
+              },
+              {
+                "strong": true,
+                "text": "sample"
+              },
+              {
+                "text": " of individuals. In contrast, the information in a probability two-way table is for an entire "
+              },
+              {
+                "strong": true,
+                "text": "population"
+              },
+              {
+                "text": ", and the values are rather abstract. If we had treated something like the delivery example as a sample, we would have recorded the actual numbers of on-time (and not-on-time) deliveries for samples of documents mailed with service A or B. In this section, the long-term probabilities are presented as being known. Presumably, those probabilities were based on relative frequencies recorded over many repetitions. "
+              }
+            ],
+            "id": "d2306ac0e4f54bbc83590fadf59bd8af",
+            "type": "p"
+          }
+        ],
+        "id": "5730525",
+        "selection": {
+          "anchor": {
+            "offset": 0,
+            "path": [
+              0,
+              0
+            ]
+          },
+          "focus": {
+            "offset": 0,
+            "path": [
+              1,
+              0
+            ]
+          }
+        },
+        "type": "content"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  "purpose": "foundation",
+  "objectives": [
+    "95387",
+    "95331"
+  ],
+  "originalFile": "",
+  "unresolvedReferences": [],
+  "collabSpace": {
+    "status": "disabled",
+    "threaded": true,
+    "auto_accept": true,
+    "show_full_history": true,
+    "participation_min_replies": 0,
+    "participation_min_posts": 0,
+    "anonymous_posting": true
+  },
+  "isGraded": false,
+  "relatesTo": []
+}

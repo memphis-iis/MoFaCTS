@@ -1,0 +1,2284 @@
+{
+  "id": "95561",
+  "scope": "embedded",
+  "type": "Activity",
+  "tags": [],
+  "title": "PostcourseSurvey-1828087862",
+  "content": {
+    "authoring": {
+      "parts": [
+        {
+          "explanation": null,
+          "gradingApproach": "automatic",
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "osgb8hz770a3hy4",
+                  "type": "p"
+                }
+              ],
+              "id": "3634507024"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "dnd10br8s702z97",
+                  "type": "p"
+                }
+              ],
+              "id": "3395109467"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "errxu64ed1i4e3z",
+                  "type": "p"
+                }
+              ],
+              "id": "97058350"
+            }
+          ],
+          "id": "mindset_1",
+          "objectives": [],
+          "outOf": null,
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct."
+                      }
+                    ],
+                    "id": "nws77tkqcve3w9p",
+                    "type": "p"
+                  }
+                ],
+                "id": "1225340573"
+              },
+              "id": "34532251",
+              "rule": "input like {1}",
+              "score": 1
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect."
+                      }
+                    ],
+                    "id": "gksi0es24jd3hx4",
+                    "type": "p"
+                  }
+                ],
+                "id": "1732004257"
+              },
+              "id": "4279528295",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average",
+          "targeted": []
+        },
+        {
+          "explanation": null,
+          "gradingApproach": "automatic",
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "ze2un49ipkurwyt",
+                  "type": "p"
+                }
+              ],
+              "id": "3736980108"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "swq59in2soq65l8",
+                  "type": "p"
+                }
+              ],
+              "id": "1852537775"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "91h34jmx2tk9le2",
+                  "type": "p"
+                }
+              ],
+              "id": "4287107741"
+            }
+          ],
+          "id": "mindset_2",
+          "objectives": [],
+          "outOf": null,
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct."
+                      }
+                    ],
+                    "id": "og418ql91456nvw",
+                    "type": "p"
+                  }
+                ],
+                "id": "3107467902"
+              },
+              "id": "2036696016",
+              "rule": "input like {1}",
+              "score": 1
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect."
+                      }
+                    ],
+                    "id": "qeenpsa5z3j99nv",
+                    "type": "p"
+                  }
+                ],
+                "id": "378135240"
+              },
+              "id": "3421683222",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average",
+          "targeted": []
+        },
+        {
+          "explanation": null,
+          "gradingApproach": "automatic",
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "s9ahtcqkrtuqj7k",
+                  "type": "p"
+                }
+              ],
+              "id": "421539720"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "kq4p05yfl1ysd44",
+                  "type": "p"
+                }
+              ],
+              "id": "3784761819"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "lcu26xvo4trgpo2",
+                  "type": "p"
+                }
+              ],
+              "id": "1355388240"
+            }
+          ],
+          "id": "mindset_3",
+          "objectives": [],
+          "outOf": null,
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct."
+                      }
+                    ],
+                    "id": "4gqyso1hab4maku",
+                    "type": "p"
+                  }
+                ],
+                "id": "2630961030"
+              },
+              "id": "263888765",
+              "rule": "input like {1}",
+              "score": 1
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect."
+                      }
+                    ],
+                    "id": "3bob9zjaw4lddvf",
+                    "type": "p"
+                  }
+                ],
+                "id": "579960452"
+              },
+              "id": "4232049373",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average",
+          "targeted": []
+        },
+        {
+          "explanation": null,
+          "gradingApproach": "automatic",
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "o232ih0uymc5m7k",
+                  "type": "p"
+                }
+              ],
+              "id": "364860822"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "05l8adg9380o9ix",
+                  "type": "p"
+                }
+              ],
+              "id": "3087529757"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "jkn43h7hlxeg40g",
+                  "type": "p"
+                }
+              ],
+              "id": "647013654"
+            }
+          ],
+          "id": "mindset_4",
+          "objectives": [],
+          "outOf": null,
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct."
+                      }
+                    ],
+                    "id": "wddah36htaxm5dl",
+                    "type": "p"
+                  }
+                ],
+                "id": "2033704465"
+              },
+              "id": "1451445647",
+              "rule": "input like {1}",
+              "score": 1
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect."
+                      }
+                    ],
+                    "id": "36zjzj13w6xixnp",
+                    "type": "p"
+                  }
+                ],
+                "id": "2694299041"
+              },
+              "id": "158756941",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average",
+          "targeted": []
+        },
+        {
+          "explanation": null,
+          "gradingApproach": "automatic",
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "o4c2hiyhdj23m0h",
+                  "type": "p"
+                }
+              ],
+              "id": "2584525927"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "9gzx6sebutdrk9c",
+                  "type": "p"
+                }
+              ],
+              "id": "1119973104"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "x0iyta6eg79j1o6",
+                  "type": "p"
+                }
+              ],
+              "id": "3759946864"
+            }
+          ],
+          "id": "ca13006b95574170b2c14a09489c54c8",
+          "objectives": [],
+          "outOf": null,
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct."
+                      }
+                    ],
+                    "id": "yexfzcywhwm97es",
+                    "type": "p"
+                  }
+                ],
+                "id": "2037276935"
+              },
+              "id": "446267760",
+              "rule": "input like {1}",
+              "score": 1
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect."
+                      }
+                    ],
+                    "id": "2vkjbn5rm7sfvht",
+                    "type": "p"
+                  }
+                ],
+                "id": "3413486414"
+              },
+              "id": "361716460",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average",
+          "targeted": []
+        },
+        {
+          "explanation": null,
+          "gradingApproach": "automatic",
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "z6enrl4uqu1thvv",
+                  "type": "p"
+                }
+              ],
+              "id": "1117715768"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "voesg8vjm1qr0ir",
+                  "type": "p"
+                }
+              ],
+              "id": "3361467522"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "kelwbcg8tgfu3ry",
+                  "type": "p"
+                }
+              ],
+              "id": "3076066938"
+            }
+          ],
+          "id": "mindset_5",
+          "objectives": [],
+          "outOf": null,
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct."
+                      }
+                    ],
+                    "id": "uirz3qikgryy3ul",
+                    "type": "p"
+                  }
+                ],
+                "id": "2680248716"
+              },
+              "id": "3996405025",
+              "rule": "input like {1}",
+              "score": 1
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect."
+                      }
+                    ],
+                    "id": "tog7yob2bso8n3o",
+                    "type": "p"
+                  }
+                ],
+                "id": "1511048848"
+              },
+              "id": "2377170423",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average",
+          "targeted": []
+        },
+        {
+          "explanation": null,
+          "gradingApproach": "automatic",
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "e665pkwv5ct95v3",
+                  "type": "p"
+                }
+              ],
+              "id": "189077945"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "ojflx00to567179",
+                  "type": "p"
+                }
+              ],
+              "id": "1522669078"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "7sgwuq4gq0wibj9",
+                  "type": "p"
+                }
+              ],
+              "id": "2627872510"
+            }
+          ],
+          "id": "mindset_7",
+          "objectives": [],
+          "outOf": null,
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct."
+                      }
+                    ],
+                    "id": "ycve0361cv1z55l",
+                    "type": "p"
+                  }
+                ],
+                "id": "480548221"
+              },
+              "id": "1053801156",
+              "rule": "input like {1}",
+              "score": 1
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect."
+                      }
+                    ],
+                    "id": "5yj472q8wfd0rh9",
+                    "type": "p"
+                  }
+                ],
+                "id": "2969651177"
+              },
+              "id": "1486076149",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average",
+          "targeted": []
+        },
+        {
+          "explanation": null,
+          "gradingApproach": "automatic",
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "9zyb5ervj6viq9r",
+                  "type": "p"
+                }
+              ],
+              "id": "837342128"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "z2pm3wkociavr10",
+                  "type": "p"
+                }
+              ],
+              "id": "4177680114"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "00vpliefsbv1dd1",
+                  "type": "p"
+                }
+              ],
+              "id": "1819489096"
+            }
+          ],
+          "id": "mindset_8",
+          "objectives": [],
+          "outOf": null,
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct."
+                      }
+                    ],
+                    "id": "ybcn9k5niedowdf",
+                    "type": "p"
+                  }
+                ],
+                "id": "2837166874"
+              },
+              "id": "1222008763",
+              "rule": "input like {1}",
+              "score": 1
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect."
+                      }
+                    ],
+                    "id": "f06y54om2rsys3o",
+                    "type": "p"
+                  }
+                ],
+                "id": "1301898528"
+              },
+              "id": "1946570027",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average",
+          "targeted": []
+        },
+        {
+          "explanation": null,
+          "gradingApproach": "automatic",
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "58ndqjbe3ttvvbd",
+                  "type": "p"
+                }
+              ],
+              "id": "2926758191"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "knfa0u4homxok2s",
+                  "type": "p"
+                }
+              ],
+              "id": "2961633446"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "7fsxdjmu2yy9vf9",
+                  "type": "p"
+                }
+              ],
+              "id": "3683356554"
+            }
+          ],
+          "id": "mindset_9",
+          "objectives": [],
+          "outOf": null,
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct."
+                      }
+                    ],
+                    "id": "rnrfoz6vqqnlgxm",
+                    "type": "p"
+                  }
+                ],
+                "id": "827636053"
+              },
+              "id": "1075595349",
+              "rule": "input like {1}",
+              "score": 1
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect."
+                      }
+                    ],
+                    "id": "2tf5z1ohzdj7syi",
+                    "type": "p"
+                  }
+                ],
+                "id": "4293657730"
+              },
+              "id": "2399503868",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average",
+          "targeted": []
+        },
+        {
+          "explanation": null,
+          "gradingApproach": "automatic",
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "ha7spntdhfbcb4h",
+                  "type": "p"
+                }
+              ],
+              "id": "2169020386"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "bb7ihfs2zlsy1yx",
+                  "type": "p"
+                }
+              ],
+              "id": "902886038"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "falybrs2vfmcibe",
+                  "type": "p"
+                }
+              ],
+              "id": "3063288835"
+            }
+          ],
+          "id": "mindset_10",
+          "objectives": [],
+          "outOf": null,
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct."
+                      }
+                    ],
+                    "id": "1w9yemxupe9spxm",
+                    "type": "p"
+                  }
+                ],
+                "id": "96182600"
+              },
+              "id": "392075048",
+              "rule": "input like {1}",
+              "score": 1
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect."
+                      }
+                    ],
+                    "id": "41uq7fa1kem6f4i",
+                    "type": "p"
+                  }
+                ],
+                "id": "2185075815"
+              },
+              "id": "3014069569",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average",
+          "targeted": []
+        },
+        {
+          "explanation": null,
+          "gradingApproach": "automatic",
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "2knhpp9v1e91jy0",
+                  "type": "p"
+                }
+              ],
+              "id": "2109084311"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "3xy5q31zivdti0t",
+                  "type": "p"
+                }
+              ],
+              "id": "493095365"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "9akpcnidaremo70",
+                  "type": "p"
+                }
+              ],
+              "id": "3290678601"
+            }
+          ],
+          "id": "mindset_11",
+          "objectives": [],
+          "outOf": null,
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct."
+                      }
+                    ],
+                    "id": "8wdnxht9poandw1",
+                    "type": "p"
+                  }
+                ],
+                "id": "4199512660"
+              },
+              "id": "344836507",
+              "rule": "input like {1}",
+              "score": 1
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect."
+                      }
+                    ],
+                    "id": "7h4p1j6jd2n3pg6",
+                    "type": "p"
+                  }
+                ],
+                "id": "3873278213"
+              },
+              "id": "2680715489",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average",
+          "targeted": []
+        },
+        {
+          "explanation": null,
+          "gradingApproach": "automatic",
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "zuvt4dsg4lx1q0w",
+                  "type": "p"
+                }
+              ],
+              "id": "803417261"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "q33kc2pftbcmzq4",
+                  "type": "p"
+                }
+              ],
+              "id": "865530869"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "ckvpb756kt6dvea",
+                  "type": "p"
+                }
+              ],
+              "id": "3660269451"
+            }
+          ],
+          "id": "mindset_12",
+          "objectives": [],
+          "outOf": null,
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct."
+                      }
+                    ],
+                    "id": "nudskbrbtvqngl6",
+                    "type": "p"
+                  }
+                ],
+                "id": "2085432502"
+              },
+              "id": "4244727848",
+              "rule": "input like {1}",
+              "score": 1
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect."
+                      }
+                    ],
+                    "id": "xa7wevu2jx4s7rx",
+                    "type": "p"
+                  }
+                ],
+                "id": "3948180532"
+              },
+              "id": "2372112407",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average",
+          "targeted": []
+        },
+        {
+          "explanation": null,
+          "gradingApproach": "automatic",
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "ny3w5uj4k7rqfl5",
+                  "type": "p"
+                }
+              ],
+              "id": "427523838"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "rvgggv3022bm1xk",
+                  "type": "p"
+                }
+              ],
+              "id": "1875571515"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "bx62sep1bw2ohdb",
+                  "type": "p"
+                }
+              ],
+              "id": "1088659564"
+            }
+          ],
+          "id": "mindset_13",
+          "objectives": [],
+          "outOf": null,
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct."
+                      }
+                    ],
+                    "id": "7tyu7gnxtenuaw9",
+                    "type": "p"
+                  }
+                ],
+                "id": "3455176557"
+              },
+              "id": "1004769833",
+              "rule": "input like {1}",
+              "score": 1
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect."
+                      }
+                    ],
+                    "id": "a18dgvnm2a8awn4",
+                    "type": "p"
+                  }
+                ],
+                "id": "3567486870"
+              },
+              "id": "3536459336",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average",
+          "targeted": []
+        },
+        {
+          "explanation": null,
+          "gradingApproach": "automatic",
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "23gjrzh7eiyd914",
+                  "type": "p"
+                }
+              ],
+              "id": "1783264471"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "xlef022q1dw6bia",
+                  "type": "p"
+                }
+              ],
+              "id": "1258708459"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "vqvloe78o5dq7h0",
+                  "type": "p"
+                }
+              ],
+              "id": "840516646"
+            }
+          ],
+          "id": "mindset_14",
+          "objectives": [],
+          "outOf": null,
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct."
+                      }
+                    ],
+                    "id": "qmewf6dm2tilqv5",
+                    "type": "p"
+                  }
+                ],
+                "id": "612999398"
+              },
+              "id": "1710838329",
+              "rule": "input like {1}",
+              "score": 1
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect."
+                      }
+                    ],
+                    "id": "3a6ln333uzemgd7",
+                    "type": "p"
+                  }
+                ],
+                "id": "2604092540"
+              },
+              "id": "2166003584",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average",
+          "targeted": []
+        },
+        {
+          "explanation": null,
+          "gradingApproach": "automatic",
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "6h71q8jq6qr9sss",
+                  "type": "p"
+                }
+              ],
+              "id": "41164848"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "ajwzp3gtfh6e96s",
+                  "type": "p"
+                }
+              ],
+              "id": "4113711319"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "38hpvfpfpqr0dqo",
+                  "type": "p"
+                }
+              ],
+              "id": "3880654879"
+            }
+          ],
+          "id": "mindset_15",
+          "objectives": [],
+          "outOf": null,
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct."
+                      }
+                    ],
+                    "id": "tp5xt2q1op9wc1g",
+                    "type": "p"
+                  }
+                ],
+                "id": "1833018219"
+              },
+              "id": "1069829723",
+              "rule": "input like {1}",
+              "score": 1
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect."
+                      }
+                    ],
+                    "id": "2342cvx66bevv45",
+                    "type": "p"
+                  }
+                ],
+                "id": "3931578115"
+              },
+              "id": "84765871",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average",
+          "targeted": []
+        },
+        {
+          "explanation": null,
+          "gradingApproach": "automatic",
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "g78ozpb5ibvpefk",
+                  "type": "p"
+                }
+              ],
+              "id": "2274125009"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "46kmhw04i8gsesi",
+                  "type": "p"
+                }
+              ],
+              "id": "2461271038"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "immu3nsjp99h0ay",
+                  "type": "p"
+                }
+              ],
+              "id": "421357080"
+            }
+          ],
+          "id": "mindset_16",
+          "objectives": [],
+          "outOf": null,
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct."
+                      }
+                    ],
+                    "id": "wycvrvr5lala11j",
+                    "type": "p"
+                  }
+                ],
+                "id": "549277925"
+              },
+              "id": "2702105249",
+              "rule": "input like {1}",
+              "score": 1
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect."
+                      }
+                    ],
+                    "id": "rww0607vihwmhsq",
+                    "type": "p"
+                  }
+                ],
+                "id": "1836354965"
+              },
+              "id": "2267444236",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average",
+          "targeted": []
+        },
+        {
+          "explanation": null,
+          "gradingApproach": "automatic",
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "kykbqsa4ouzgv7p",
+                  "type": "p"
+                }
+              ],
+              "id": "1056109481"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "uyonkh9vtw3oabs",
+                  "type": "p"
+                }
+              ],
+              "id": "1497935893"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "3k2ia17be2p4wt4",
+                  "type": "p"
+                }
+              ],
+              "id": "3636568958"
+            }
+          ],
+          "id": "mindset_17",
+          "objectives": [],
+          "outOf": null,
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct."
+                      }
+                    ],
+                    "id": "xewjc2d9i6c89wj",
+                    "type": "p"
+                  }
+                ],
+                "id": "2279556314"
+              },
+              "id": "848098661",
+              "rule": "input like {1}",
+              "score": 1
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect."
+                      }
+                    ],
+                    "id": "v589d669315i1yr",
+                    "type": "p"
+                  }
+                ],
+                "id": "423209380"
+              },
+              "id": "1288130546",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average",
+          "targeted": []
+        },
+        {
+          "explanation": null,
+          "gradingApproach": "automatic",
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "eb5t43f5cwdezht",
+                  "type": "p"
+                }
+              ],
+              "id": "3127046622"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "tb02n8giucqef6w",
+                  "type": "p"
+                }
+              ],
+              "id": "2138362807"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "okefllkavn7zua7",
+                  "type": "p"
+                }
+              ],
+              "id": "1823457619"
+            }
+          ],
+          "id": "mindset_18",
+          "objectives": [],
+          "outOf": null,
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct."
+                      }
+                    ],
+                    "id": "8n7ngjutieg0rsg",
+                    "type": "p"
+                  }
+                ],
+                "id": "964894008"
+              },
+              "id": "3373842356",
+              "rule": "input like {1}",
+              "score": 1
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect."
+                      }
+                    ],
+                    "id": "etbvdnsud04e45m",
+                    "type": "p"
+                  }
+                ],
+                "id": "2129043456"
+              },
+              "id": "1205706606",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average",
+          "targeted": []
+        },
+        {
+          "explanation": null,
+          "gradingApproach": "automatic",
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "t1liybq4cgtn7vd",
+                  "type": "p"
+                }
+              ],
+              "id": "296883281"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "iw5g0e1jnbj4jkw",
+                  "type": "p"
+                }
+              ],
+              "id": "1987712049"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "lm29qqe5els1fr0",
+                  "type": "p"
+                }
+              ],
+              "id": "2296559581"
+            }
+          ],
+          "id": "mindset_19",
+          "objectives": [],
+          "outOf": null,
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct."
+                      }
+                    ],
+                    "id": "kahg69th7gj5dup",
+                    "type": "p"
+                  }
+                ],
+                "id": "37209486"
+              },
+              "id": "1305229670",
+              "rule": "input like {1}",
+              "score": 1
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect."
+                      }
+                    ],
+                    "id": "5s2ckx6s134lasn",
+                    "type": "p"
+                  }
+                ],
+                "id": "3239502228"
+              },
+              "id": "159853196",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average",
+          "targeted": []
+        },
+        {
+          "explanation": null,
+          "gradingApproach": "automatic",
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "u4cp2dhrur7wpo5",
+                  "type": "p"
+                }
+              ],
+              "id": "803312078"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "98gc3h28ugkeax2",
+                  "type": "p"
+                }
+              ],
+              "id": "3962292740"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "bb78fhnxwosfh5k",
+                  "type": "p"
+                }
+              ],
+              "id": "2209159"
+            }
+          ],
+          "id": "mindset_20",
+          "objectives": [],
+          "outOf": null,
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct."
+                      }
+                    ],
+                    "id": "yp0rvjfr5n7dly8",
+                    "type": "p"
+                  }
+                ],
+                "id": "2586706111"
+              },
+              "id": "3321404499",
+              "rule": "input like {1}",
+              "score": 1
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect."
+                      }
+                    ],
+                    "id": "yofgt9znhiaji21",
+                    "type": "p"
+                  }
+                ],
+                "id": "234770098"
+              },
+              "id": "3467715874",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average",
+          "targeted": []
+        }
+      ],
+      "previewText": "",
+      "targeted": [],
+      "transformations": []
+    },
+    "choices": [
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "Strongly Agree"
+              }
+            ],
+            "id": "fn9jgrnnwkj4l53",
+            "type": "p"
+          }
+        ],
+        "id": "1"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "Agree"
+              }
+            ],
+            "id": "vb0h3n9y3g6bvdt",
+            "type": "p"
+          }
+        ],
+        "id": "2"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "Somewhat Agree"
+              }
+            ],
+            "id": "ki9jg2q8kx728nc",
+            "type": "p"
+          }
+        ],
+        "id": "3"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "Somewhat Disagree"
+              }
+            ],
+            "id": "65xr7vbp4q1loqj",
+            "type": "p"
+          }
+        ],
+        "id": "4"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "Disagree"
+              }
+            ],
+            "id": "xsz246ueqa94uxa",
+            "type": "p"
+          }
+        ],
+        "id": "5"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "Strongly Disagree"
+              }
+            ],
+            "id": "13v90ex118l5q6p",
+            "type": "p"
+          }
+        ],
+        "id": "6"
+      }
+    ],
+    "items": [
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "Your intelligence is something very basic about you that you can’t change very much."
+              }
+            ],
+            "type": "p"
+          }
+        ],
+        "id": "mindset_1",
+        "required": "true"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "No matter what your intelligence level is, you can always increase it."
+              }
+            ],
+            "type": "p"
+          }
+        ],
+        "id": "mindset_2",
+        "required": "true"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "You can always substantially change how intelligent you are."
+              }
+            ],
+            "type": "p"
+          }
+        ],
+        "id": "mindset_3",
+        "required": "true"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "You are a certain kind of person, and you cannot really change that."
+              }
+            ],
+            "type": "p"
+          }
+        ],
+        "id": "mindset_4",
+        "required": "true"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "You can always change basic qualities that define the kind of person you are."
+              }
+            ],
+            "type": "p"
+          }
+        ],
+        "id": "ca13006b95574170b2c14a09489c54c8",
+        "required": "false"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "Music talent can be learned by anyone."
+              }
+            ],
+            "type": "p"
+          }
+        ],
+        "id": "mindset_5",
+        "required": "true"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "Only a few people are truly good at sports – you have to be born with athletic skills."
+              }
+            ],
+            "type": "p"
+          }
+        ],
+        "id": "mindset_7",
+        "required": "true"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "Math is much easier to learn if you are male or if you come from a culture that values math."
+              }
+            ],
+            "type": "p"
+          }
+        ],
+        "id": "mindset_8",
+        "required": "true"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "The harder you work at any skill, the better you will be at it."
+              }
+            ],
+            "type": "p"
+          }
+        ],
+        "id": "mindset_9",
+        "required": "true"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "No matter what kind of person you are, you can always change substantially."
+              }
+            ],
+            "type": "p"
+          }
+        ],
+        "id": "mindset_10",
+        "required": "true"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "Trying new things is stressful for me, and I avoid it."
+              }
+            ],
+            "type": "p"
+          }
+        ],
+        "id": "mindset_11",
+        "required": "true"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "Some people are good and kind, and some are not – it’s not often that people change. "
+              }
+            ],
+            "type": "p"
+          }
+        ],
+        "id": "mindset_12",
+        "required": "true"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "I appreciate when parents, coaches, teachers give me feedback about my performance. "
+              }
+            ],
+            "type": "p"
+          }
+        ],
+        "id": "mindset_13",
+        "required": "true"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "I often get angry when I get feedback about my performance. "
+              }
+            ],
+            "type": "p"
+          }
+        ],
+        "id": "mindset_14",
+        "required": "true"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "All human beings without a brain injury or birth defect are capable of the same amount of learning."
+              }
+            ],
+            "type": "p"
+          }
+        ],
+        "id": "mindset_15",
+        "required": "true"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "You can learn new things, but you can’t really change how intelligent you are."
+              }
+            ],
+            "type": "p"
+          }
+        ],
+        "id": "mindset_16",
+        "required": "true"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "You can do things differently, but the important parts of who you are can’t really be changed."
+              }
+            ],
+            "type": "p"
+          }
+        ],
+        "id": "mindset_17",
+        "required": "true"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "Human beings are basically good, but sometimes make terrible decisions."
+              }
+            ],
+            "type": "p"
+          }
+        ],
+        "id": "mindset_18",
+        "required": "true"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "An important reason why I do my school work is that I like to learn new things. "
+              }
+            ],
+            "type": "p"
+          }
+        ],
+        "id": "mindset_19",
+        "required": "true"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "Truly smart people do not need to try hard."
+              }
+            ],
+            "type": "p"
+          }
+        ],
+        "id": "mindset_20",
+        "required": "true"
+      }
+    ],
+    "orderDescending": false,
+    "stem": {
+      "content": [
+        {
+          "children": [
+            {
+              "text": " ",
+              "type": "text"
+            }
+          ],
+          "id": "aa9eb188be63f4316a29206ba01fbdb2c",
+          "type": "p"
+        }
+      ]
+    }
+  },
+  "objectives": {
+    "ca13006b95574170b2c14a09489c54c8": [],
+    "mindset_1": [],
+    "mindset_10": [],
+    "mindset_11": [],
+    "mindset_12": [],
+    "mindset_13": [],
+    "mindset_14": [],
+    "mindset_15": [],
+    "mindset_16": [],
+    "mindset_17": [],
+    "mindset_18": [],
+    "mindset_19": [],
+    "mindset_2": [],
+    "mindset_20": [],
+    "mindset_3": [],
+    "mindset_4": [],
+    "mindset_5": [],
+    "mindset_7": [],
+    "mindset_8": [],
+    "mindset_9": []
+  },
+  "originalFile": "",
+  "unresolvedReferences": [],
+  "subType": "oli_likert"
+}

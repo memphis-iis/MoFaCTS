@@ -1,0 +1,46 @@
+{
+  "id": "96430",
+  "scope": "embedded",
+  "type": "Activity",
+  "tags": [],
+  "title": "Drinking Habits and Integrity of College Students",
+  "content": {
+    "authoring": {
+      "parts": [
+        {
+          "hints": [],
+          "id": "357647775",
+          "responses": [],
+          "scoringStrategy": "average"
+        }
+      ],
+      "previewText": ""
+    },
+    "base": "ctat2",
+    "modelXml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?> <!DOCTYPE ctat PUBLIC \"-//Carnegie Mellon University//DTD CTAT 1.1//EN\" \"http://oli.cmu.edu/dtd/cmu-ctat-tutor_1.1.dtd\"> <ctat id=\"ctat2_m1_stattutor\" width=\"900\" height=\"750\" max_attempts=\"9\"> <title>Drinking Habits and Integrity of College Students</title> <interface>c0/c00ea359d23637aa6cd82ed508b7d931/survey2.brd</interface> <dataset package=\"problem_description.xml\">4c/4cddeb1168cd2633d96158371721cb18/survey.xml</dataset> <dataset package=\"Minitab\">27/27fb64fec07c9f4a2378efed0049227b/drinking.mtw</dataset> <dataset package=\"Excel\">45/4550cdd7a1e24c1aca8be4be348dee8c/drinking.xls</dataset> <dataset package=\"StatCrunch\">45/4550cdd7a1e24c1aca8be4be348dee8c/drinking.xls</dataset> <dataset package=\"R\">c2/c22e13b9a47c759e77a3cdf31d32bd24/drinking.RData</dataset> <dataset package=\"TI Calculator\">51/512a9a40d21ffab0264ee04250c52d66/drinking.8xg</dataset> <dataset package=\"json\">dc/dc027b4d695277555abe474ba2080e74/Survey2.json</dataset> <asset>bundles/cannon_5-0/ctat_stattutor/webcontent/StatTutor.html</asset> </ctat> ",
+    "resourceBase": "3781932878",
+    "resourceURLs": [],
+    "src": "tutor.html",
+    "stem": {
+      "content": [
+        {
+          "children": [
+            {
+              "text": ""
+            }
+          ],
+          "id": "3759420534",
+          "type": "p"
+        }
+      ],
+      "id": "987075153"
+    },
+    "title": "Drinking Habits and Integrity of College Students"
+  },
+  "objectives": {
+    "357647775": []
+  },
+  "originalFile": "",
+  "unresolvedReferences": [],
+  "subType": "oli_embedded"
+}

@@ -1,0 +1,873 @@
+{
+  "id": "96576",
+  "scope": "embedded",
+  "type": "Activity",
+  "tags": [],
+  "title": "Multiple Choice",
+  "content": {
+    "authoring": {
+      "flowchart": {
+        "paths": [
+          {
+            "completed": true,
+            "destinationScreenId": 96022,
+            "id": "always-go-to",
+            "label": "Always",
+            "priority": 12,
+            "ruleId": null,
+            "type": "always-go-to"
+          }
+        ],
+        "screenType": "multiple_choice",
+        "templateApplied": true
+      },
+      "parts": [
+        {
+          "gradingApproach": "automatic",
+          "id": "janus_mcq-15070280842066802176",
+          "inherited": false,
+          "outOf": 1,
+          "owner": "adaptive_activity_b4d8i_4217319221",
+          "type": "janus-mcq"
+        }
+      ],
+      "rules": [
+        {
+          "additionalScore": 0,
+          "conditions": {
+            "all": [
+              {
+                "fact": "stage.janus_mcq-15070280842066802176.selectedChoices",
+                "id": "830701160",
+                "operator": "is",
+                "type": 3,
+                "value": "[1]"
+              }
+            ]
+          },
+          "correct": true,
+          "default": true,
+          "disabled": false,
+          "event": {
+            "params": {
+              "actions": [
+                {
+                  "params": {
+                    "target": "adaptive_activity_da9hr_820822628"
+                  },
+                  "type": "navigation"
+                },
+                {
+                  "id": "752227086",
+                  "params": {
+                    "feedback": {
+                      "custom": {
+                        "applyBtnFlag": false,
+                        "applyBtnLabel": "Show Solution",
+                        "facts": [],
+                        "height": 100,
+                        "lockCanvasSize": true,
+                        "mainBtnLabel": "Next",
+                        "palette": {
+                          "fillAlpha": 0,
+                          "fillColor": 16777215,
+                          "lineAlpha": 0,
+                          "lineColor": 16777215,
+                          "lineStyle": 0,
+                          "lineThickness": 0.1
+                        },
+                        "panelHeaderColor": 10027008,
+                        "panelTitleColor": 16777215,
+                        "rules": [],
+                        "width": 350
+                      },
+                      "partsLayout": [
+                        {
+                          "custom": {
+                            "customCssClass": "",
+                            "height": 91,
+                            "maxScore": 1,
+                            "nodes": [
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [],
+                                        "style": {},
+                                        "tag": "text",
+                                        "text": "That's correct!"
+                                      }
+                                    ],
+                                    "style": {},
+                                    "tag": "span"
+                                  }
+                                ],
+                                "style": {
+                                  "textAlign": "center"
+                                },
+                                "tag": "p"
+                              }
+                            ],
+                            "overrideHeight": false,
+                            "overrideWidth": true,
+                            "palette": {
+                              "backgroundColor": "rgba(255,255,255,0)",
+                              "borderColor": "rgba(255,255,255,0)",
+                              "borderRadius": 0,
+                              "borderStyle": "solid",
+                              "borderWidth": "0.1px",
+                              "useHtmlProps": true
+                            },
+                            "requiresManualGrading": false,
+                            "visible": true,
+                            "width": 340,
+                            "x": 4,
+                            "y": 5,
+                            "z": 0
+                          },
+                          "id": "",
+                          "type": "janus-text-flow"
+                        }
+                      ]
+                    },
+                    "id": ""
+                  },
+                  "type": "feedback"
+                },
+                {
+                  "params": {
+                    "operator": "=",
+                    "target": "stage.janus_mcq-15070280842066802176.enabled",
+                    "targetType": 4,
+                    "value": "false"
+                  },
+                  "type": "mutateState"
+                }
+              ]
+            },
+            "type": "r:121404494.correct"
+          },
+          "forceProgress": false,
+          "id": "r:3924715071.correct",
+          "name": "correct",
+          "priority": 10
+        },
+        {
+          "additionalScore": 0,
+          "conditions": {
+            "all": [
+              {
+                "fact": "stage.janus_mcq-15070280842066802176.selectedChoices",
+                "id": "2738472191",
+                "operator": "is",
+                "type": 3,
+                "value": "[]"
+              }
+            ]
+          },
+          "correct": false,
+          "default": false,
+          "disabled": false,
+          "event": {
+            "params": {
+              "actions": [
+                {
+                  "id": "53412750",
+                  "params": {
+                    "feedback": {
+                      "custom": {
+                        "applyBtnFlag": false,
+                        "applyBtnLabel": "Show Solution",
+                        "facts": [],
+                        "height": 100,
+                        "lockCanvasSize": true,
+                        "mainBtnLabel": "Next",
+                        "palette": {
+                          "fillAlpha": 0,
+                          "fillColor": 16777215,
+                          "lineAlpha": 0,
+                          "lineColor": 16777215,
+                          "lineStyle": 0,
+                          "lineThickness": 0.1
+                        },
+                        "panelHeaderColor": 10027008,
+                        "panelTitleColor": 16777215,
+                        "rules": [],
+                        "width": 350
+                      },
+                      "partsLayout": [
+                        {
+                          "custom": {
+                            "customCssClass": "",
+                            "height": 91,
+                            "maxScore": 1,
+                            "nodes": [
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [],
+                                        "style": {},
+                                        "tag": "text",
+                                        "text": "Please answer the question."
+                                      }
+                                    ],
+                                    "style": {},
+                                    "tag": "span"
+                                  }
+                                ],
+                                "style": {
+                                  "textAlign": "center"
+                                },
+                                "tag": "p"
+                              }
+                            ],
+                            "overrideHeight": false,
+                            "overrideWidth": true,
+                            "palette": {
+                              "backgroundColor": "rgba(255,255,255,0)",
+                              "borderColor": "rgba(255,255,255,0)",
+                              "borderRadius": 0,
+                              "borderStyle": "solid",
+                              "borderWidth": "0.1px",
+                              "useHtmlProps": true
+                            },
+                            "requiresManualGrading": false,
+                            "visible": true,
+                            "width": 340,
+                            "x": 4,
+                            "y": 5,
+                            "z": 0
+                          },
+                          "id": "",
+                          "type": "janus-text-flow"
+                        }
+                      ]
+                    },
+                    "id": ""
+                  },
+                  "type": "feedback"
+                },
+                {
+                  "params": {
+                    "operator": "setting to",
+                    "target": "session.attemptNumber",
+                    "targetType": 1,
+                    "value": "1"
+                  },
+                  "type": "mutateState"
+                }
+              ]
+            },
+            "type": "r:3376929961.blank"
+          },
+          "forceProgress": false,
+          "id": "r:2456852441.blank",
+          "name": "blank",
+          "priority": 20
+        },
+        {
+          "additionalScore": 0,
+          "conditions": {
+            "all": [
+              {
+                "fact": "session.attemptNumber",
+                "id": "2625369085",
+                "operator": "greaterThan",
+                "type": 1,
+                "value": "2"
+              },
+              {
+                "fact": "stage.janus_mcq-15070280842066802176.selectedChoices",
+                "id": "1914395014",
+                "operator": "notIs",
+                "type": 3,
+                "value": "[1]"
+              }
+            ]
+          },
+          "correct": false,
+          "default": false,
+          "disabled": false,
+          "event": {
+            "params": {
+              "actions": [
+                {
+                  "params": {
+                    "target": "adaptive_activity_da9hr_820822628"
+                  },
+                  "type": "navigation"
+                },
+                {
+                  "id": "2233447772",
+                  "params": {
+                    "feedback": {
+                      "custom": {
+                        "applyBtnFlag": false,
+                        "applyBtnLabel": "Show Solution",
+                        "facts": [],
+                        "height": 100,
+                        "lockCanvasSize": true,
+                        "mainBtnLabel": "Next",
+                        "palette": {
+                          "fillAlpha": 0,
+                          "fillColor": 16777215,
+                          "lineAlpha": 0,
+                          "lineColor": 16777215,
+                          "lineStyle": 0,
+                          "lineThickness": 0.1
+                        },
+                        "panelHeaderColor": 10027008,
+                        "panelTitleColor": 16777215,
+                        "rules": [],
+                        "width": 350
+                      },
+                      "partsLayout": [
+                        {
+                          "custom": {
+                            "customCssClass": "",
+                            "height": 91,
+                            "maxScore": 1,
+                            "nodes": [
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [],
+                                        "style": {},
+                                        "tag": "text",
+                                        "text": "You seem to be having trouble. We have filled in the correct answer for you. Click next to continue."
+                                      }
+                                    ],
+                                    "style": {},
+                                    "tag": "span"
+                                  }
+                                ],
+                                "style": {
+                                  "textAlign": "center"
+                                },
+                                "tag": "p"
+                              }
+                            ],
+                            "overrideHeight": false,
+                            "overrideWidth": true,
+                            "palette": {
+                              "backgroundColor": "rgba(255,255,255,0)",
+                              "borderColor": "rgba(255,255,255,0)",
+                              "borderRadius": 0,
+                              "borderStyle": "solid",
+                              "borderWidth": "0.1px",
+                              "useHtmlProps": true
+                            },
+                            "requiresManualGrading": false,
+                            "visible": true,
+                            "width": 340,
+                            "x": 4,
+                            "y": 5,
+                            "z": 0
+                          },
+                          "id": "",
+                          "type": "janus-text-flow"
+                        }
+                      ]
+                    },
+                    "id": ""
+                  },
+                  "type": "feedback"
+                },
+                {
+                  "params": {
+                    "operator": "=",
+                    "target": "stage.janus_mcq-15070280842066802176.selectedChoices",
+                    "targetType": 3,
+                    "value": "[1]"
+                  },
+                  "type": "mutateState"
+                },
+                {
+                  "params": {
+                    "operator": "=",
+                    "target": "stage.janus_mcq-15070280842066802176.enabled",
+                    "targetType": 4,
+                    "value": "false"
+                  },
+                  "type": "mutateState"
+                }
+              ]
+            },
+            "type": "r:2763755066.incorrect-3-times"
+          },
+          "forceProgress": false,
+          "id": "r:3875692890.incorrect-3-times",
+          "name": "incorrect-3-times",
+          "priority": 40
+        },
+        {
+          "additionalScore": 0,
+          "conditions": {
+            "all": []
+          },
+          "correct": false,
+          "default": true,
+          "disabled": false,
+          "event": {
+            "params": {
+              "actions": [
+                {
+                  "id": "499469898",
+                  "params": {
+                    "feedback": {
+                      "custom": {
+                        "applyBtnFlag": false,
+                        "applyBtnLabel": "Show Solution",
+                        "facts": [],
+                        "height": 100,
+                        "lockCanvasSize": true,
+                        "mainBtnLabel": "Next",
+                        "palette": {
+                          "fillAlpha": 0,
+                          "fillColor": 16777215,
+                          "lineAlpha": 0,
+                          "lineColor": 16777215,
+                          "lineStyle": 0,
+                          "lineThickness": 0.1
+                        },
+                        "panelHeaderColor": 10027008,
+                        "panelTitleColor": 16777215,
+                        "rules": [],
+                        "width": 350
+                      },
+                      "partsLayout": [
+                        {
+                          "custom": {
+                            "customCssClass": "",
+                            "height": 91,
+                            "maxScore": 1,
+                            "nodes": [
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [],
+                                        "style": {},
+                                        "tag": "text",
+                                        "text": "That's incorrect. Please try again."
+                                      }
+                                    ],
+                                    "style": {},
+                                    "tag": "span"
+                                  }
+                                ],
+                                "style": {
+                                  "textAlign": "center"
+                                },
+                                "tag": "p"
+                              }
+                            ],
+                            "overrideHeight": false,
+                            "overrideWidth": true,
+                            "palette": {
+                              "backgroundColor": "rgba(255,255,255,0)",
+                              "borderColor": "rgba(255,255,255,0)",
+                              "borderRadius": 0,
+                              "borderStyle": "solid",
+                              "borderWidth": "0.1px",
+                              "useHtmlProps": true
+                            },
+                            "requiresManualGrading": false,
+                            "visible": true,
+                            "width": 340,
+                            "x": 4,
+                            "y": 5,
+                            "z": 0
+                          },
+                          "id": "",
+                          "type": "janus-text-flow"
+                        }
+                      ]
+                    },
+                    "id": ""
+                  },
+                  "type": "feedback"
+                }
+              ]
+            },
+            "type": "r:2708818733.default-incorrect"
+          },
+          "forceProgress": false,
+          "id": "r:3162859658.default-incorrect",
+          "name": "default-incorrect",
+          "priority": 70
+        }
+      ],
+      "variablesRequiredForEvaluation": [
+        "stage.janus_mcq-15070280842066802176.selectedChoices",
+        "session.attemptNumber"
+      ]
+    },
+    "bibrefs": [],
+    "custom": {
+      "applyBtnFlag": false,
+      "applyBtnLabel": "",
+      "checkButtonLabel": "Next",
+      "combineFeedback": false,
+      "customCssClass": "",
+      "facts": [],
+      "height": 540,
+      "lockCanvasSize": false,
+      "mainBtnLabel": "",
+      "maxAttempt": 2,
+      "maxScore": 0,
+      "negativeScoreAllowed": false,
+      "objectives": [
+        95199
+      ],
+      "palette": {
+        "backgroundColor": "rgba(255,255,255,0)",
+        "borderColor": "rgba(255, 255, 255,100)",
+        "borderRadius": "10px",
+        "borderStyle": "solid",
+        "borderWidth": "1px",
+        "useHtmlProps": true
+      },
+      "panelHeaderColor": 0,
+      "panelTitleColor": 0,
+      "showCheckBtn": true,
+      "trapStateScoreScheme": false,
+      "width": 1000,
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "partsLayout": [
+      {
+        "custom": {
+          "customCssClass": "",
+          "height": 96,
+          "maxScore": 1,
+          "nodes": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "style": {},
+                      "tag": "text",
+                      "text": "Lorem ipsum sit dolor amet. Non feugiat tincidunt ante urna sed consectetur."
+                    }
+                  ],
+                  "style": {},
+                  "tag": "span"
+                }
+              ],
+              "style": {},
+              "tag": "h2"
+            }
+          ],
+          "overrideHeight": false,
+          "overrideWidth": true,
+          "palette": {
+            "backgroundColor": "rgba(255,255,255,0)",
+            "borderColor": "rgba(255,255,255,0)",
+            "borderRadius": 0,
+            "borderStyle": "solid",
+            "borderWidth": "0.1px",
+            "useHtmlProps": true
+          },
+          "requiresManualGrading": false,
+          "visible": true,
+          "width": 960,
+          "x": 20,
+          "y": 60,
+          "z": 0
+        },
+        "id": "text_2111367691904960740",
+        "type": "janus-text-flow"
+      },
+      {
+        "custom": {
+          "anyCorrectAnswer": false,
+          "commonErrorFeedback": [],
+          "correctAnswer": [
+            true
+          ],
+          "correctFeedback": "",
+          "customCssClass": "",
+          "enabled": true,
+          "fontSize": 12,
+          "height": 160,
+          "incorrectFeedback": "",
+          "layoutType": "verticalLayout",
+          "maxManualGrade": 0,
+          "maxScore": 1,
+          "mcqItems": [
+            {
+              "nodes": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "tag": "text",
+                          "text": "Option 1"
+                        }
+                      ],
+                      "style": {},
+                      "tag": "span"
+                    }
+                  ],
+                  "tag": "p"
+                }
+              ],
+              "scoreValue": 0
+            },
+            {
+              "nodes": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "tag": "text",
+                          "text": "Option 2"
+                        }
+                      ],
+                      "style": {},
+                      "tag": "span"
+                    }
+                  ],
+                  "tag": "p"
+                }
+              ],
+              "scoreValue": 1
+            },
+            {
+              "nodes": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "tag": "text",
+                          "text": "Option 3"
+                        }
+                      ],
+                      "style": {},
+                      "tag": "span"
+                    }
+                  ],
+                  "tag": "p"
+                }
+              ],
+              "scoreValue": 2
+            }
+          ],
+          "multipleSelection": true,
+          "overrideHeight": false,
+          "randomize": false,
+          "requireManualGrading": false,
+          "requiresManualGrading": false,
+          "showLabel": true,
+          "showNumbering": false,
+          "showOnAnswersReport": false,
+          "verticalGap": 16,
+          "width": 470,
+          "x": 510,
+          "y": 360,
+          "z": 0
+        },
+        "id": "janus_mcq-15070280842066802176",
+        "type": "janus-mcq"
+      },
+      {
+        "custom": {
+          "customCssClass": "",
+          "height": 20,
+          "maxScore": 1,
+          "nodes": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "style": {},
+                      "tag": "text",
+                      "text": "Lorem ipsum"
+                    }
+                  ],
+                  "style": {},
+                  "tag": "span"
+                }
+              ],
+              "style": {},
+              "tag": "p"
+            }
+          ],
+          "overrideHeight": false,
+          "overrideWidth": true,
+          "palette": {
+            "backgroundColor": "transparent",
+            "borderColor": "transparent",
+            "borderRadius": 0,
+            "borderStyle": "none",
+            "borderWidth": 0,
+            "useHtmlProps": true
+          },
+          "requiresManualGrading": false,
+          "visible": true,
+          "width": 960,
+          "x": 22,
+          "y": 19,
+          "z": 0
+        },
+        "id": "janus_text_flow-3779703728980615913",
+        "type": "janus-text-flow"
+      },
+      {
+        "custom": {
+          "customCssClass": "",
+          "height": 360,
+          "maxScore": 1,
+          "nodes": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "style": {},
+                      "tag": "text",
+                      "text": "Lorem ipsum dolor sit amet consectetur. Non feugiat tincidunt ante arcu urna sed consectetur. Nulla id quam mattis blandit lobortis adipiscing. Etiam sem ornare velit odio adipiscing gravida viverra amet."
+                    }
+                  ],
+                  "style": {},
+                  "tag": "span"
+                }
+              ],
+              "style": {},
+              "tag": "p"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "style": {},
+                      "tag": "text",
+                      "text": "Etiam sem ornare velit odio adipiscing gravida viverra amet. Orci sed nullam bibendum nibh massa magna urna fermentum. Non feugiat tincidunt ante arcu urna sed consectetur. Nulla id quam mattis sed blandit lobortis. Etiam sem ornare velit adipiscing gravida. Nulla id quam mattis sed blandit lobortis."
+                    }
+                  ],
+                  "style": {},
+                  "tag": "span"
+                }
+              ],
+              "style": {},
+              "tag": "p"
+            }
+          ],
+          "overrideHeight": false,
+          "overrideWidth": true,
+          "palette": {
+            "backgroundColor": "transparent",
+            "borderColor": "transparent",
+            "borderRadius": 0,
+            "borderStyle": "none",
+            "borderWidth": 0,
+            "useHtmlProps": true
+          },
+          "requiresManualGrading": false,
+          "visible": true,
+          "width": 470,
+          "x": 20,
+          "y": 160,
+          "z": 0
+        },
+        "id": "janus_text_flow-33878160532606294993",
+        "type": "janus-text-flow"
+      },
+      {
+        "custom": {
+          "customCssClass": "",
+          "height": 97,
+          "maxScore": 1,
+          "nodes": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "style": {},
+                      "tag": "text",
+                      "text": "Lorem ipsum dolor sit amet consectetur. Non feugiat tincidunt ante arcu urna sed consectetur. Nulla id quam mattis blandit lobortis adipiscing. Etiam sem ornare velit odio adipiscing gravida viverra amet."
+                    }
+                  ],
+                  "style": {},
+                  "tag": "span"
+                }
+              ],
+              "style": {},
+              "tag": "p"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "style": {},
+                      "tag": "text",
+                      "text": "Lorem ipsum dolor sit amet?"
+                    }
+                  ],
+                  "style": {
+                    "fontWeight": "bold"
+                  },
+                  "tag": "span"
+                }
+              ],
+              "style": {},
+              "tag": "p"
+            }
+          ],
+          "overrideHeight": true,
+          "overrideWidth": true,
+          "palette": {
+            "backgroundColor": "transparent",
+            "borderColor": "transparent",
+            "borderRadius": 0,
+            "borderStyle": "none",
+            "borderWidth": 0,
+            "useHtmlProps": true
+          },
+          "requiresManualGrading": false,
+          "visible": true,
+          "width": 420,
+          "x": 510,
+          "y": 160,
+          "z": 0
+        },
+        "id": "janus-text-flow-28549187421091873192",
+        "type": "janus-text-flow"
+      }
+    ]
+  },
+  "objectives": {
+    "janus_mcq-15070280842066802176": [
+      "95199"
+    ]
+  },
+  "originalFile": "",
+  "unresolvedReferences": [],
+  "subType": "oli_adaptive"
+}

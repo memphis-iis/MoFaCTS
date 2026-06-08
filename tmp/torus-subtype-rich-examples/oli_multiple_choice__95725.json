@@ -1,0 +1,499 @@
+{
+  "id": "95725",
+  "scope": "embedded",
+  "type": "Activity",
+  "tags": [],
+  "title": "u1_m1_boxplot2_tutor1-q2",
+  "content": {
+    "authoring": {
+      "parts": [
+        {
+          "explanation": null,
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": "Are there any observations that are larger than this one? If so, what can you say about those observations?"
+                    }
+                  ],
+                  "id": "syk5x4hdnavlcsg",
+                  "type": "p"
+                }
+              ],
+              "id": "3225186"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "qd4m1mq2ixy0cvt",
+                  "type": "p"
+                }
+              ],
+              "id": "2287175529"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "kxwwuqd263j7ad6",
+                  "type": "p"
+                }
+              ],
+              "id": "420283682"
+            }
+          ],
+          "id": "q2_p1",
+          "objectives": [
+            "labelboxplot"
+          ],
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. A hint might be useful at this point."
+                      }
+                    ],
+                    "id": "z9audutqxhgfiw8",
+                    "type": "p"
+                  }
+                ],
+                "id": "1958303175"
+              },
+              "id": "70178737",
+              "legacyMatch": "Res1",
+              "rule": "input like {Res1}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. A hint might be useful at this point."
+                      }
+                    ],
+                    "id": "nj6nn30pxq6luk5",
+                    "type": "p"
+                  }
+                ],
+                "id": "1732934597"
+              },
+              "id": "4042922751",
+              "legacyMatch": "Res2",
+              "rule": "input like {Res2}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. A hint might be useful at this point."
+                      }
+                    ],
+                    "id": "0134xf73g8z6pnt",
+                    "type": "p"
+                  }
+                ],
+                "id": "3338790382"
+              },
+              "id": "1473049472",
+              "legacyMatch": "Res3",
+              "rule": "input like {Res3}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. A hint might be useful at this point."
+                      }
+                    ],
+                    "id": "aqx3j3zqx01kfg0",
+                    "type": "p"
+                  }
+                ],
+                "id": "1950207387"
+              },
+              "id": "2099413467",
+              "legacyMatch": "Res4",
+              "rule": "input like {Res4}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. It is true that this is one of the largest observations in our dataset; however, you need to look at the boxplot carefully. Note that there is an observation that is even larger than this one, which is represented by an asterisk (*)."
+                      }
+                    ],
+                    "id": "bql4pc8iprcwbv0",
+                    "type": "p"
+                  }
+                ],
+                "id": "2938311893"
+              },
+              "id": "2985193329",
+              "legacyMatch": "Res5",
+              "rule": "input like {Res5}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. A hint might be useful at this point."
+                      }
+                    ],
+                    "id": "8fql2t1y8gr09on",
+                    "type": "p"
+                  }
+                ],
+                "id": "915754104"
+              },
+              "id": "2777046901",
+              "legacyMatch": "Res6",
+              "rule": "input like {Res6}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. A hint might be useful at this point."
+                      }
+                    ],
+                    "id": "3pcdl1mol8e574q",
+                    "type": "p"
+                  }
+                ],
+                "id": "1883950894"
+              },
+              "id": "3518625924",
+              "legacyMatch": "Res7",
+              "rule": "input like {Res7}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct. This is the largest observation that is not an outlier."
+                      }
+                    ],
+                    "id": "e21iuer7f4y5wu3",
+                    "type": "p"
+                  }
+                ],
+                "id": "1030817410"
+              },
+              "id": "203704155",
+              "legacyMatch": "Res8",
+              "rule": "input like {Res8}",
+              "score": 10
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect."
+                      }
+                    ],
+                    "id": "zbgt1ewo9w5bu8i",
+                    "type": "p"
+                  }
+                ],
+                "id": "2828106591"
+              },
+              "id": "25611041",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average",
+          "targeted": [
+            [
+              [
+                "Res1"
+              ],
+              "70178737"
+            ],
+            [
+              [
+                "Res2"
+              ],
+              "4042922751"
+            ],
+            [
+              [
+                "Res3"
+              ],
+              "1473049472"
+            ],
+            [
+              [
+                "Res4"
+              ],
+              "2099413467"
+            ],
+            [
+              [
+                "Res5"
+              ],
+              "2985193329"
+            ],
+            [
+              [
+                "Res6"
+              ],
+              "2777046901"
+            ],
+            [
+              [
+                "Res7"
+              ],
+              "3518625924"
+            ],
+            [
+              [
+                "Res8"
+              ],
+              "203704155"
+            ]
+          ]
+        }
+      ],
+      "previewText": "",
+      "targeted": [
+        [
+          [
+            "Res1"
+          ],
+          "70178737"
+        ],
+        [
+          [
+            "Res2"
+          ],
+          "4042922751"
+        ],
+        [
+          [
+            "Res3"
+          ],
+          "1473049472"
+        ],
+        [
+          [
+            "Res4"
+          ],
+          "2099413467"
+        ],
+        [
+          [
+            "Res5"
+          ],
+          "2985193329"
+        ],
+        [
+          [
+            "Res6"
+          ],
+          "2777046901"
+        ],
+        [
+          [
+            "Res7"
+          ],
+          "3518625924"
+        ],
+        [
+          [
+            "Res8"
+          ],
+          "203704155"
+        ]
+      ],
+      "transformations": [],
+      "version": 2
+    },
+    "choices": [
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "Q1"
+              }
+            ],
+            "id": "b7xp87pftvp5sr9",
+            "type": "p"
+          }
+        ],
+        "id": "Res1"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "Q3"
+              }
+            ],
+            "id": "1fx28zas8vcjwha",
+            "type": "p"
+          }
+        ],
+        "id": "Res2"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "M"
+              }
+            ],
+            "id": "md76xfu00carvhl",
+            "type": "p"
+          }
+        ],
+        "id": "Res3"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "Min"
+              }
+            ],
+            "id": "hv8tw1uxq0q4t64",
+            "type": "p"
+          }
+        ],
+        "id": "Res4"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "Max"
+              }
+            ],
+            "id": "lv2m3hgvedapw6p",
+            "type": "p"
+          }
+        ],
+        "id": "Res5"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "IQR"
+              }
+            ],
+            "id": "ufxu15nam9996jm",
+            "type": "p"
+          }
+        ],
+        "id": "Res6"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "Range"
+              }
+            ],
+            "id": "rydgq7yqjmgjdc3",
+            "type": "p"
+          }
+        ],
+        "id": "Res7"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "None of the above"
+              }
+            ],
+            "id": "yv9lvbwpl6n80ig",
+            "type": "p"
+          }
+        ],
+        "id": "Res8"
+      }
+    ],
+    "stem": {
+      "content": [
+        {
+          "children": [
+            {
+              "text": "Choose the correct label for the point on the boxplot represented by the question mark:"
+            }
+          ],
+          "id": "akfomh5chby5oib",
+          "type": "p"
+        },
+        {
+          "alt": "boxplot graph with question mark next to the top line",
+          "children": [
+            {
+              "id": "x6gxkefxhcvayrl",
+              "text": " ",
+              "type": "text"
+            }
+          ],
+          "height": "450",
+          "id": "dbjkbosd72gfj5s",
+          "src": "https://d2xvti2irp4c7t.cloudfront.net/media/18/18e7823bfcf333e81441d3b9237a05bb/boxplot2q1_none.gif",
+          "type": "img",
+          "width": "450"
+        }
+      ]
+    }
+  },
+  "objectives": {
+    "q2_p1": [
+      "95271"
+    ]
+  },
+  "originalFile": "",
+  "unresolvedReferences": [],
+  "subType": "oli_multiple_choice"
+}

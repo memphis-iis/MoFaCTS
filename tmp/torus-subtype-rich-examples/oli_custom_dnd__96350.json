@@ -1,0 +1,3719 @@
+{
+  "id": "96350",
+  "scope": "embedded",
+  "type": "Activity",
+  "tags": [],
+  "title": "u3_m1_rules10_dd-q1",
+  "content": {
+    "authoring": {
+      "parts": [
+        {
+          "explanation": null,
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": "The jury convicts in 67% of the cases. This is a row total P(A). The judge would convict in 83% of the cases. This is a column total P(B)."
+                    }
+                  ],
+                  "id": "ip38pak3k38hh8u",
+                  "type": "p"
+                }
+              ],
+              "id": "3362654781"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": "If only the judge convicts, this is the event (\"not A\" and B)."
+                    }
+                  ],
+                  "id": "d9xwkv33gzbsbs2",
+                  "type": "p"
+                }
+              ],
+              "id": "3296527287"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "u2nkk9sihzd7nbj",
+                  "type": "p"
+                }
+              ],
+              "id": "3865889236"
+            }
+          ],
+          "id": "dropAreaA",
+          "objectives": [
+            "probtools"
+          ],
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(B) is 0.83. P(\"not A\" and B) is 0.19. So P(A and B) = P(B) − P(\"not A\" and B)."
+                      }
+                    ],
+                    "id": "78vv90qf344vp9f",
+                    "type": "p"
+                  }
+                ],
+                "id": "3453992053"
+              },
+              "id": "1437514928",
+              "legacyMatch": "v003",
+              "rule": "input like {dropAreaA_v003}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(B) is 0.83. P(\"not A\" and B) is 0.19. So P(A and B) = P(B) − P(\"not A\" and B)."
+                      }
+                    ],
+                    "id": "x1or8qlx82ujvkr",
+                    "type": "p"
+                  }
+                ],
+                "id": "4015494616"
+              },
+              "id": "3464368299",
+              "legacyMatch": "v014",
+              "rule": "input like {dropAreaA_v014}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(B) is 0.83. P(\"not A\" and B) is 0.19. So P(A and B) = P(B) − P(\"not A\" and B)."
+                      }
+                    ],
+                    "id": "lylqjjxp18fbibo",
+                    "type": "p"
+                  }
+                ],
+                "id": "1534521969"
+              },
+              "id": "2365273435",
+              "legacyMatch": "v017",
+              "rule": "input like {dropAreaA_v017}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(B) is 0.83. P(\"not A\" and B) is 0.19. So P(A and B) = P(B) − P(\"not A\" and B)."
+                      }
+                    ],
+                    "id": "b8obgy6gcdcjzib",
+                    "type": "p"
+                  }
+                ],
+                "id": "1318649393"
+              },
+              "id": "221417397",
+              "legacyMatch": "v019",
+              "rule": "input like {dropAreaA_v019}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(B) is 0.83. P(\"not A\" and B) is 0.19. So P(A and B) = P(B) − P(\"not A\" and B)."
+                      }
+                    ],
+                    "id": "dt3dnlzyg873fdw",
+                    "type": "p"
+                  }
+                ],
+                "id": "1259271168"
+              },
+              "id": "84694157",
+              "legacyMatch": "v033",
+              "rule": "input like {dropAreaA_v033}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct. P(B) is 0.83. P(\"not A\" and B) is 0.19. So P(A and B) = 0.83 − 0.19 = 0.64."
+                      }
+                    ],
+                    "id": "rca011bigplabis",
+                    "type": "p"
+                  }
+                ],
+                "id": "2344609348"
+              },
+              "id": "3793486167",
+              "legacyMatch": "v064",
+              "rule": "input like {dropAreaA_v064}",
+              "score": 10
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(B) is 0.83. P(\"not A\" and B) is 0.19. So P(A and B) = P(B) − P(\"not A\" and B)."
+                      }
+                    ],
+                    "id": "bjmtwzxa1bqewss",
+                    "type": "p"
+                  }
+                ],
+                "id": "4086998518"
+              },
+              "id": "2211943892",
+              "legacyMatch": "v067",
+              "rule": "input like {dropAreaA_v067}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. There are many ways to find P(A and \"not B\") depending on the order in which you completed the table. This will most likely be one of the last cells you complete."
+                      }
+                    ],
+                    "id": "5h9pv22guvifhg7",
+                    "type": "p"
+                  }
+                ],
+                "id": "4213232740"
+              },
+              "id": "981419668",
+              "legacyMatch": "v083",
+              "rule": "input like {dropAreaA_v083}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(B) is 0.83. P(\"not A\" and B) is 0.19. So P(A and B) = P(B) − P(\"not A\" and B)."
+                      }
+                    ],
+                    "id": "l7j8zzlfzkaqjwj",
+                    "type": "p"
+                  }
+                ],
+                "id": "3495697495"
+              },
+              "id": "119631244",
+              "legacyMatch": "v10",
+              "rule": "input like {dropAreaA_v10}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect."
+                      }
+                    ],
+                    "id": "ut8x98fex1dmfll",
+                    "type": "p"
+                  }
+                ],
+                "id": "2911046253"
+              },
+              "id": "2094320317",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average"
+        },
+        {
+          "explanation": null,
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": "The jury convicts in 67% of the cases. This is a row total P(A). The judge would convict in 83% of the cases. This is a column total P(B)."
+                    }
+                  ],
+                  "id": "n4cm9vgr01q4jp7",
+                  "type": "p"
+                }
+              ],
+              "id": "4007657151"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": "If only the judge convicts, this is the event (\"not A\" and B)."
+                    }
+                  ],
+                  "id": "g0q9op608ecv1g4",
+                  "type": "p"
+                }
+              ],
+              "id": "2340482377"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "8d8m0vnnf4728xh",
+                  "type": "p"
+                }
+              ],
+              "id": "3909320983"
+            }
+          ],
+          "id": "dropAreaB",
+          "objectives": [
+            "probtools"
+          ],
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct. There are many ways to find P(A and \"not B\") depending on the order in which you completed the table."
+                      }
+                    ],
+                    "id": "zi9l1e379uwf1q2",
+                    "type": "p"
+                  }
+                ],
+                "id": "2703691731"
+              },
+              "id": "3847932007",
+              "legacyMatch": "v003",
+              "rule": "input like {dropAreaB_v003}",
+              "score": 10
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. There are many ways to find P(A and \"not B\") depending on the order in which you completed the table. This will most likely be one of the last cells you complete."
+                      }
+                    ],
+                    "id": "f61ko49qtzg8kck",
+                    "type": "p"
+                  }
+                ],
+                "id": "1199992830"
+              },
+              "id": "434087611",
+              "legacyMatch": "v014",
+              "rule": "input like {dropAreaB_v014}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. There are many ways to find P(A and \"not B\") depending on the order in which you completed the table. This will most likely be one of the last cells you complete."
+                      }
+                    ],
+                    "id": "az9nbe0qh7z2zt0",
+                    "type": "p"
+                  }
+                ],
+                "id": "2957827844"
+              },
+              "id": "1974070359",
+              "legacyMatch": "v017",
+              "rule": "input like {dropAreaB_v017}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. There are many ways to find P(A and \"not B\") depending on the order in which you completed the table. This will most likely be one of the last cells you complete."
+                      }
+                    ],
+                    "id": "f3td7a207805zp9",
+                    "type": "p"
+                  }
+                ],
+                "id": "3644170202"
+              },
+              "id": "2228332161",
+              "legacyMatch": "v019",
+              "rule": "input like {dropAreaB_v019}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. There are many ways to find P(A and \"not B\") depending on the order in which you completed the table. This will most likely be one of the last cells you complete."
+                      }
+                    ],
+                    "id": "omaqdsrwxerbhpw",
+                    "type": "p"
+                  }
+                ],
+                "id": "799561042"
+              },
+              "id": "1610500099",
+              "legacyMatch": "v033",
+              "rule": "input like {dropAreaB_v033}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. There are many ways to find P(A and \"not B\") depending on the order in which you completed the table. This will most likely be one of the last cells you complete."
+                      }
+                    ],
+                    "id": "m781ds27e0i8ph9",
+                    "type": "p"
+                  }
+                ],
+                "id": "362436780"
+              },
+              "id": "1818455095",
+              "legacyMatch": "v064",
+              "rule": "input like {dropAreaB_v064}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. There are many ways to find P(A and \"not B\") depending on the order in which you completed the table. This will most likely be one of the last cells you complete."
+                      }
+                    ],
+                    "id": "1jqbxbwdrczkru1",
+                    "type": "p"
+                  }
+                ],
+                "id": "2679742626"
+              },
+              "id": "3683455300",
+              "legacyMatch": "v067",
+              "rule": "input like {dropAreaB_v067}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. There are many ways to find P(A and \"not B\") depending on the order in which you completed the table. This will most likely be one of the last cells you complete."
+                      }
+                    ],
+                    "id": "1bp4e3usllls1sn",
+                    "type": "p"
+                  }
+                ],
+                "id": "2187076262"
+              },
+              "id": "1317914133",
+              "legacyMatch": "v083",
+              "rule": "input like {dropAreaB_v083}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. There are many ways to find P(A and \"not B\") depending on the order in which you completed the table. This will most likely be one of the last cells you complete."
+                      }
+                    ],
+                    "id": "qxvlocczmq3qbnx",
+                    "type": "p"
+                  }
+                ],
+                "id": "3226020888"
+              },
+              "id": "1321976067",
+              "legacyMatch": "v10",
+              "rule": "input like {dropAreaB_v10}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect."
+                      }
+                    ],
+                    "id": "ovn7ll4gy5b7a4f",
+                    "type": "p"
+                  }
+                ],
+                "id": "1339842592"
+              },
+              "id": "3062443943",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average"
+        },
+        {
+          "explanation": null,
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": "The jury convicts in 67% of the cases. This is a row total P(A). The judge would convict in 83% of the cases. This is a column total P(B)."
+                    }
+                  ],
+                  "id": "0z8i9j9d7jg7au6",
+                  "type": "p"
+                }
+              ],
+              "id": "3292994489"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": "If only the judge convicts, this is the event (\"not A\" and B)."
+                    }
+                  ],
+                  "id": "ao9jyyg6swtv7kl",
+                  "type": "p"
+                }
+              ],
+              "id": "283106719"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "scsn2pdusdy5z7a",
+                  "type": "p"
+                }
+              ],
+              "id": "2512628354"
+            }
+          ],
+          "id": "dropAreaC",
+          "objectives": [
+            "probtools"
+          ],
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(A) is the probability that the jury convicts."
+                      }
+                    ],
+                    "id": "zj37q533cdnzbfs",
+                    "type": "p"
+                  }
+                ],
+                "id": "4247235629"
+              },
+              "id": "2777047225",
+              "legacyMatch": "v003",
+              "rule": "input like {dropAreaC_v003}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(A) is the probability that the jury convicts."
+                      }
+                    ],
+                    "id": "sunw7hp97xmzpkg",
+                    "type": "p"
+                  }
+                ],
+                "id": "1329752745"
+              },
+              "id": "3879805310",
+              "legacyMatch": "v014",
+              "rule": "input like {dropAreaC_v014}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(A) is the probability that the jury convicts."
+                      }
+                    ],
+                    "id": "mcpifd9gbdyv6kd",
+                    "type": "p"
+                  }
+                ],
+                "id": "2731371673"
+              },
+              "id": "2697627664",
+              "legacyMatch": "v017",
+              "rule": "input like {dropAreaC_v017}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(A) is the probability that the jury convicts."
+                      }
+                    ],
+                    "id": "ypm3oryzywq3uo1",
+                    "type": "p"
+                  }
+                ],
+                "id": "2223803510"
+              },
+              "id": "488607294",
+              "legacyMatch": "v019",
+              "rule": "input like {dropAreaC_v019}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(A) is the probability that the jury convicts."
+                      }
+                    ],
+                    "id": "7h1st8mtzpscz0d",
+                    "type": "p"
+                  }
+                ],
+                "id": "2858455775"
+              },
+              "id": "1591733646",
+              "legacyMatch": "v033",
+              "rule": "input like {dropAreaC_v033}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(A) is the probability that the jury convicts."
+                      }
+                    ],
+                    "id": "qoyeznms69ujupu",
+                    "type": "p"
+                  }
+                ],
+                "id": "4234633714"
+              },
+              "id": "2946526389",
+              "legacyMatch": "v064",
+              "rule": "input like {dropAreaC_v064}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct. P(A) is the probability that the jury convicts, which is given as 0.67"
+                      }
+                    ],
+                    "id": "4f75459bti9xxjy",
+                    "type": "p"
+                  }
+                ],
+                "id": "3468698839"
+              },
+              "id": "1592531481",
+              "legacyMatch": "v067",
+              "rule": "input like {dropAreaC_v067}",
+              "score": 10
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(A) is the probability that the jury convicts."
+                      }
+                    ],
+                    "id": "4bgyr6rxg0t1yop",
+                    "type": "p"
+                  }
+                ],
+                "id": "724770378"
+              },
+              "id": "929397582",
+              "legacyMatch": "v083",
+              "rule": "input like {dropAreaC_v083}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(A) is the probability that the jury convicts."
+                      }
+                    ],
+                    "id": "n5954xgc8kw2rly",
+                    "type": "p"
+                  }
+                ],
+                "id": "453166183"
+              },
+              "id": "60840099",
+              "legacyMatch": "v10",
+              "rule": "input like {dropAreaC_v10}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect."
+                      }
+                    ],
+                    "id": "kr49xkrja6p66ry",
+                    "type": "p"
+                  }
+                ],
+                "id": "1374855904"
+              },
+              "id": "3024176738",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average"
+        },
+        {
+          "explanation": null,
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": "The jury convicts in 67% of the cases. This is a row total P(A). The judge would convict in 83% of the cases. This is a column total P(B)."
+                    }
+                  ],
+                  "id": "gp94fmb0vxbidp5",
+                  "type": "p"
+                }
+              ],
+              "id": "1464418959"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": "If only the judge convicts, this is the event (\"not A\" and B)."
+                    }
+                  ],
+                  "id": "y3k3a845105f6rv",
+                  "type": "p"
+                }
+              ],
+              "id": "532123095"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "x99onpw8lqk0nq0",
+                  "type": "p"
+                }
+              ],
+              "id": "2102189162"
+            }
+          ],
+          "id": "dropAreaD",
+          "objectives": [
+            "probtools"
+          ],
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(\"not A\" and B) is the probability that only a judge would convict."
+                      }
+                    ],
+                    "id": "6hoycet7vo7034u",
+                    "type": "p"
+                  }
+                ],
+                "id": "4069945949"
+              },
+              "id": "2375679183",
+              "legacyMatch": "v003",
+              "rule": "input like {dropAreaD_v003}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(\"not A\" and B) is the probability that only a judge would convict."
+                      }
+                    ],
+                    "id": "2u0wqtdkj21759y",
+                    "type": "p"
+                  }
+                ],
+                "id": "826248532"
+              },
+              "id": "1775737389",
+              "legacyMatch": "v014",
+              "rule": "input like {dropAreaD_v014}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(\"not A\" and B) is the probability that only a judge would convict."
+                      }
+                    ],
+                    "id": "bx8ijv1w2g10ynr",
+                    "type": "p"
+                  }
+                ],
+                "id": "2511944849"
+              },
+              "id": "3965520232",
+              "legacyMatch": "v017",
+              "rule": "input like {dropAreaD_v017}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct. The probability that only a judge would convict is P(\"not A\" and B) = 0.19."
+                      }
+                    ],
+                    "id": "6pdv80oysrwhz87",
+                    "type": "p"
+                  }
+                ],
+                "id": "2011542056"
+              },
+              "id": "4141678877",
+              "legacyMatch": "v019",
+              "rule": "input like {dropAreaD_v019}",
+              "score": 10
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(\"not A\" and B) is the probability that only a judge would convict."
+                      }
+                    ],
+                    "id": "mdkzfi2ejb7uuc6",
+                    "type": "p"
+                  }
+                ],
+                "id": "1219046699"
+              },
+              "id": "2863799894",
+              "legacyMatch": "v033",
+              "rule": "input like {dropAreaD_v033}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(\"not A\" and B) is the probability that only a judge would convict."
+                      }
+                    ],
+                    "id": "tvpxdb499hq1hvh",
+                    "type": "p"
+                  }
+                ],
+                "id": "3895296429"
+              },
+              "id": "2010889515",
+              "legacyMatch": "v064",
+              "rule": "input like {dropAreaD_v064}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(\"not A\" and B) is the probability that only a judge would convict."
+                      }
+                    ],
+                    "id": "qi0zzppqobyufaq",
+                    "type": "p"
+                  }
+                ],
+                "id": "328084472"
+              },
+              "id": "133686063",
+              "legacyMatch": "v067",
+              "rule": "input like {dropAreaD_v067}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(\"not A\" and B) is the probability that only a judge would convict."
+                      }
+                    ],
+                    "id": "ws1z3vs4e697xsh",
+                    "type": "p"
+                  }
+                ],
+                "id": "2901239308"
+              },
+              "id": "3118749018",
+              "legacyMatch": "v083",
+              "rule": "input like {dropAreaD_v083}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(\"not A\" and B) is the probability that only a judge would convict."
+                      }
+                    ],
+                    "id": "4ozjzwysewhrgb1",
+                    "type": "p"
+                  }
+                ],
+                "id": "2767581560"
+              },
+              "id": "3026399554",
+              "legacyMatch": "v10",
+              "rule": "input like {dropAreaD_v10}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect."
+                      }
+                    ],
+                    "id": "08vi5hbsexua3hi",
+                    "type": "p"
+                  }
+                ],
+                "id": "1041639387"
+              },
+              "id": "2934718359",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average"
+        },
+        {
+          "explanation": null,
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": "The jury convicts in 67% of the cases. This is a row total P(A). The judge would convict in 83% of the cases. This is a column total P(B)."
+                    }
+                  ],
+                  "id": "ckfmizsw98xfchv",
+                  "type": "p"
+                }
+              ],
+              "id": "2924522828"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": "If only the judge convicts, this is the event (\"not A\" and B)."
+                    }
+                  ],
+                  "id": "tgtvy91z1d16okr",
+                  "type": "p"
+                }
+              ],
+              "id": "3875326094"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "z9eb4ydjw4dwapq",
+                  "type": "p"
+                }
+              ],
+              "id": "4018819405"
+            }
+          ],
+          "id": "dropAreaE",
+          "objectives": [
+            "probtools"
+          ],
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. There are many ways to find P(\"not A\" and \"not B\") depending on the order in which you completed the table. This will most likely be one of the last cells you complete."
+                      }
+                    ],
+                    "id": "qji9bllc9h4bi47",
+                    "type": "p"
+                  }
+                ],
+                "id": "3900118181"
+              },
+              "id": "2235984426",
+              "legacyMatch": "v003",
+              "rule": "input like {dropAreaE_v003}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct. There are many ways to find P(\"not A\" and \"not B\") depending on the order in which you completed the table."
+                      }
+                    ],
+                    "id": "usp3liq76vj5vgq",
+                    "type": "p"
+                  }
+                ],
+                "id": "2797812185"
+              },
+              "id": "2746081180",
+              "legacyMatch": "v014",
+              "rule": "input like {dropAreaE_v014}",
+              "score": 10
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. There are many ways to find P(\"not A\" and \"not B\") depending on the order in which you completed the table. This will most likely be one of the last cells you complete."
+                      }
+                    ],
+                    "id": "0v0iyfhpbp6wwly",
+                    "type": "p"
+                  }
+                ],
+                "id": "2013259949"
+              },
+              "id": "2249897222",
+              "legacyMatch": "v017",
+              "rule": "input like {dropAreaE_v017}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. There are many ways to find P(\"not A\" and \"not B\") depending on the order in which you completed the table. This will most likely be one of the last cells you complete."
+                      }
+                    ],
+                    "id": "frywy770sabmm45",
+                    "type": "p"
+                  }
+                ],
+                "id": "617924869"
+              },
+              "id": "3518557247",
+              "legacyMatch": "v019",
+              "rule": "input like {dropAreaE_v019}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. There are many ways to find P(\"not A\" and \"not B\") depending on the order in which you completed the table. This will most likely be one of the last cells you complete."
+                      }
+                    ],
+                    "id": "95hgipcchyisf9r",
+                    "type": "p"
+                  }
+                ],
+                "id": "3935489525"
+              },
+              "id": "889368448",
+              "legacyMatch": "v033",
+              "rule": "input like {dropAreaE_v033}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. There are many ways to find P(\"not A\" and \"not B\") depending on the order in which you completed the table. This will most likely be one of the last cells you complete."
+                      }
+                    ],
+                    "id": "t9iid8q9sud8551",
+                    "type": "p"
+                  }
+                ],
+                "id": "1203011085"
+              },
+              "id": "2885084904",
+              "legacyMatch": "v064",
+              "rule": "input like {dropAreaE_v064}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. There are many ways to find P(\"not A\" and \"not B\") depending on the order in which you completed the table. This will most likely be one of the last cells you complete."
+                      }
+                    ],
+                    "id": "sbtbbt2yzw9m245",
+                    "type": "p"
+                  }
+                ],
+                "id": "902108594"
+              },
+              "id": "2870594190",
+              "legacyMatch": "v067",
+              "rule": "input like {dropAreaE_v067}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. There are many ways to find P(\"not A\" and \"not B\") depending on the order in which you completed the table. This will most likely be one of the last cells you complete."
+                      }
+                    ],
+                    "id": "ckfuqikbbsckz67",
+                    "type": "p"
+                  }
+                ],
+                "id": "4287117952"
+              },
+              "id": "2329925159",
+              "legacyMatch": "v083",
+              "rule": "input like {dropAreaE_v083}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. There are many ways to find P(\"not A\" and \"not B\") depending on the order in which you completed the table. This will most likely be one of the last cells you complete."
+                      }
+                    ],
+                    "id": "y5l3fesnejcnmu6",
+                    "type": "p"
+                  }
+                ],
+                "id": "265608686"
+              },
+              "id": "119750372",
+              "legacyMatch": "v10",
+              "rule": "input like {dropAreaE_v10}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect."
+                      }
+                    ],
+                    "id": "1b46d4510jhue79",
+                    "type": "p"
+                  }
+                ],
+                "id": "96458381"
+              },
+              "id": "2901835594",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average"
+        },
+        {
+          "explanation": null,
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": "The jury convicts in 67% of the cases. This is a row total P(A). The judge would convict in 83% of the cases. This is a column total P(B)."
+                    }
+                  ],
+                  "id": "jw5wxz6intjvz2b",
+                  "type": "p"
+                }
+              ],
+              "id": "3891647602"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": "If only the judge convicts, this is the event (\"not A\" and B)."
+                    }
+                  ],
+                  "id": "tod9nsz4nqzmbka",
+                  "type": "p"
+                }
+              ],
+              "id": "10079968"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "44ok25xx0681v2y",
+                  "type": "p"
+                }
+              ],
+              "id": "1835782419"
+            }
+          ],
+          "id": "dropAreaF",
+          "objectives": [
+            "probtools"
+          ],
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(A) is 0.67. Use the complement rule to find P(not A)."
+                      }
+                    ],
+                    "id": "5zf9y3nogcwl5jj",
+                    "type": "p"
+                  }
+                ],
+                "id": "3463152803"
+              },
+              "id": "2576114784",
+              "legacyMatch": "v003",
+              "rule": "input like {dropAreaF_v003}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(A) is 0.67. Use the complement rule to find P(not A)."
+                      }
+                    ],
+                    "id": "iy95y0y5qabc02z",
+                    "type": "p"
+                  }
+                ],
+                "id": "1719073866"
+              },
+              "id": "2370050996",
+              "legacyMatch": "v014",
+              "rule": "input like {dropAreaF_v014}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(A) is 0.67. Use the complement rule to find P(not A)."
+                      }
+                    ],
+                    "id": "0wgthish9jck7v8",
+                    "type": "p"
+                  }
+                ],
+                "id": "3864604855"
+              },
+              "id": "3688464480",
+              "legacyMatch": "v017",
+              "rule": "input like {dropAreaF_v017}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(A) is 0.67. Use the complement rule to find P(not A)."
+                      }
+                    ],
+                    "id": "temkxrkp78t3pr2",
+                    "type": "p"
+                  }
+                ],
+                "id": "4081624564"
+              },
+              "id": "4024730531",
+              "legacyMatch": "v019",
+              "rule": "input like {dropAreaF_v019}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct. P(A) is 0.67. So by the complement rule, P(not A) = 1 − 0.67 = 0.33"
+                      }
+                    ],
+                    "id": "fm91n1d4jdkn4o2",
+                    "type": "p"
+                  }
+                ],
+                "id": "2846994295"
+              },
+              "id": "3873836531",
+              "legacyMatch": "v033",
+              "rule": "input like {dropAreaF_v033}",
+              "score": 10
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(A) is 0.67. Use the complement rule to find P(not A)."
+                      }
+                    ],
+                    "id": "erhd03hiul4mz64",
+                    "type": "p"
+                  }
+                ],
+                "id": "1971881952"
+              },
+              "id": "2266735897",
+              "legacyMatch": "v064",
+              "rule": "input like {dropAreaF_v064}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(A) is 0.67. Use the complement rule to find P(not A)."
+                      }
+                    ],
+                    "id": "zxz6i13np5ex2rg",
+                    "type": "p"
+                  }
+                ],
+                "id": "3413309755"
+              },
+              "id": "552596900",
+              "legacyMatch": "v067",
+              "rule": "input like {dropAreaF_v067}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(A) is 0.67. Use the complement rule to find P(not A)."
+                      }
+                    ],
+                    "id": "cmfdta60dnb5xxz",
+                    "type": "p"
+                  }
+                ],
+                "id": "1618226215"
+              },
+              "id": "3100209317",
+              "legacyMatch": "v083",
+              "rule": "input like {dropAreaF_v083}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(A) is 0.67. Use the complement rule to find P(not A)."
+                      }
+                    ],
+                    "id": "nap7x6ggqx6y3ju",
+                    "type": "p"
+                  }
+                ],
+                "id": "2534394236"
+              },
+              "id": "1227067682",
+              "legacyMatch": "v10",
+              "rule": "input like {dropAreaF_v10}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect."
+                      }
+                    ],
+                    "id": "1bnfxrcbd5y8zm8",
+                    "type": "p"
+                  }
+                ],
+                "id": "562683725"
+              },
+              "id": "3926639887",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average"
+        },
+        {
+          "explanation": null,
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": "The jury convicts in 67% of the cases. This is a row total P(A). The judge would convict in 83% of the cases. This is a column total P(B)."
+                    }
+                  ],
+                  "id": "9vgznlc2ane2r1a",
+                  "type": "p"
+                }
+              ],
+              "id": "2515362499"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": "If only the judge convicts, this is the event (\"not A\" and B)."
+                    }
+                  ],
+                  "id": "zkj80aj3uiwde3v",
+                  "type": "p"
+                }
+              ],
+              "id": "1341207531"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "x51m7rpnq0p1ywi",
+                  "type": "p"
+                }
+              ],
+              "id": "4227801666"
+            }
+          ],
+          "id": "dropAreaG",
+          "objectives": [
+            "probtools"
+          ],
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(B) is the probability that a judge would convict."
+                      }
+                    ],
+                    "id": "myt108xpue8xcma",
+                    "type": "p"
+                  }
+                ],
+                "id": "2282843835"
+              },
+              "id": "4155982455",
+              "legacyMatch": "v003",
+              "rule": "input like {dropAreaG_v003}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(B) is the probability that a judge would convict."
+                      }
+                    ],
+                    "id": "arqsq1uw1ire2z0",
+                    "type": "p"
+                  }
+                ],
+                "id": "4162448106"
+              },
+              "id": "98375412",
+              "legacyMatch": "v014",
+              "rule": "input like {dropAreaG_v014}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(B) is the probability that a judge would convict."
+                      }
+                    ],
+                    "id": "mlv6ibcoticab8f",
+                    "type": "p"
+                  }
+                ],
+                "id": "3274713935"
+              },
+              "id": "2474008284",
+              "legacyMatch": "v017",
+              "rule": "input like {dropAreaG_v017}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(B) is the probability that a judge would convict."
+                      }
+                    ],
+                    "id": "h0vgkt2p32410qn",
+                    "type": "p"
+                  }
+                ],
+                "id": "276124823"
+              },
+              "id": "2564622736",
+              "legacyMatch": "v019",
+              "rule": "input like {dropAreaG_v019}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(B) is the probability that a judge would convict."
+                      }
+                    ],
+                    "id": "p5ghbm1vln6biuw",
+                    "type": "p"
+                  }
+                ],
+                "id": "3663433548"
+              },
+              "id": "1823435207",
+              "legacyMatch": "v033",
+              "rule": "input like {dropAreaG_v033}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(B) is the probability that a judge would convict."
+                      }
+                    ],
+                    "id": "j7wwy0vhiehbu6l",
+                    "type": "p"
+                  }
+                ],
+                "id": "3202031887"
+              },
+              "id": "3816719018",
+              "legacyMatch": "v064",
+              "rule": "input like {dropAreaG_v064}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(B) is the probability that a judge would convict."
+                      }
+                    ],
+                    "id": "32kvkygt97akaqo",
+                    "type": "p"
+                  }
+                ],
+                "id": "2250148597"
+              },
+              "id": "1110437950",
+              "legacyMatch": "v067",
+              "rule": "input like {dropAreaG_v067}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct. P(B) is the probability that a judge would convict, which is given as 0.83"
+                      }
+                    ],
+                    "id": "du18nljsuow81fx",
+                    "type": "p"
+                  }
+                ],
+                "id": "148920067"
+              },
+              "id": "257076630",
+              "legacyMatch": "v083",
+              "rule": "input like {dropAreaG_v083}",
+              "score": 10
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(B) is the probability that a judge would convict."
+                      }
+                    ],
+                    "id": "yajtlzhwvve20p8",
+                    "type": "p"
+                  }
+                ],
+                "id": "804078073"
+              },
+              "id": "3687686584",
+              "legacyMatch": "v10",
+              "rule": "input like {dropAreaG_v10}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect."
+                      }
+                    ],
+                    "id": "vnqmwu4zc99hayp",
+                    "type": "p"
+                  }
+                ],
+                "id": "3417412395"
+              },
+              "id": "2791921700",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average"
+        },
+        {
+          "explanation": null,
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": "The jury convicts in 67% of the cases. This is a row total P(A). The judge would convict in 83% of the cases. This is a column total P(B)."
+                    }
+                  ],
+                  "id": "ukd3zwyjj6lgeab",
+                  "type": "p"
+                }
+              ],
+              "id": "3000956336"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": "If only the judge convicts, this is the event (\"not A\" and B)."
+                    }
+                  ],
+                  "id": "41n8mqlrfm0ci45",
+                  "type": "p"
+                }
+              ],
+              "id": "3883858693"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "14tokj96av2k80u",
+                  "type": "p"
+                }
+              ],
+              "id": "2886507506"
+            }
+          ],
+          "id": "dropAreaH",
+          "objectives": [
+            "probtools"
+          ],
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(B) is 0.83. Use the complement rule to find P(not B)."
+                      }
+                    ],
+                    "id": "cw4nmiepmq52j0z",
+                    "type": "p"
+                  }
+                ],
+                "id": "380264265"
+              },
+              "id": "2014506539",
+              "legacyMatch": "v003",
+              "rule": "input like {dropAreaH_v003}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(B) is 0.83. Use the complement rule to find P(not B)."
+                      }
+                    ],
+                    "id": "te8ank9jap0xt8f",
+                    "type": "p"
+                  }
+                ],
+                "id": "2729030143"
+              },
+              "id": "3022597044",
+              "legacyMatch": "v014",
+              "rule": "input like {dropAreaH_v014}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct. P(B) is 0.83. So by the complement rule, P(not B) = 1 − 0.83 = 0.17"
+                      }
+                    ],
+                    "id": "wy4vuciingvqyuj",
+                    "type": "p"
+                  }
+                ],
+                "id": "1282618390"
+              },
+              "id": "3854150117",
+              "legacyMatch": "v017",
+              "rule": "input like {dropAreaH_v017}",
+              "score": 10
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(B) is 0.83. Use the complement rule to find P(not B)."
+                      }
+                    ],
+                    "id": "z2dsadbr1rlo1n1",
+                    "type": "p"
+                  }
+                ],
+                "id": "1802859600"
+              },
+              "id": "259955021",
+              "legacyMatch": "v019",
+              "rule": "input like {dropAreaH_v019}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(B) is 0.83. Use the complement rule to find P(not B)."
+                      }
+                    ],
+                    "id": "f8ys6fd5egx4dm2",
+                    "type": "p"
+                  }
+                ],
+                "id": "2819632808"
+              },
+              "id": "2547096039",
+              "legacyMatch": "v033",
+              "rule": "input like {dropAreaH_v033}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(B) is 0.83. Use the complement rule to find P(not B)."
+                      }
+                    ],
+                    "id": "vu2jtvz03e9r29c",
+                    "type": "p"
+                  }
+                ],
+                "id": "4146605854"
+              },
+              "id": "3500242909",
+              "legacyMatch": "v064",
+              "rule": "input like {dropAreaH_v064}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(B) is 0.83. Use the complement rule to find P(not B)."
+                      }
+                    ],
+                    "id": "ws0a49t2mythv2m",
+                    "type": "p"
+                  }
+                ],
+                "id": "4081699300"
+              },
+              "id": "4140160417",
+              "legacyMatch": "v067",
+              "rule": "input like {dropAreaH_v067}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(B) is 0.83. Use the complement rule to find P(not B)."
+                      }
+                    ],
+                    "id": "0x0244oc88ui6n3",
+                    "type": "p"
+                  }
+                ],
+                "id": "3825446381"
+              },
+              "id": "3758450122",
+              "legacyMatch": "v083",
+              "rule": "input like {dropAreaH_v083}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. P(B) is 0.83. Use the complement rule to find P(not B)."
+                      }
+                    ],
+                    "id": "oc2rpdj48rmtfro",
+                    "type": "p"
+                  }
+                ],
+                "id": "3603693852"
+              },
+              "id": "3162442608",
+              "legacyMatch": "v10",
+              "rule": "input like {dropAreaH_v10}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect."
+                      }
+                    ],
+                    "id": "la45rg2q3ebtf9y",
+                    "type": "p"
+                  }
+                ],
+                "id": "1659180760"
+              },
+              "id": "2727677395",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average"
+        },
+        {
+          "explanation": null,
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": "The jury convicts in 67% of the cases. This is a row total P(A). The judge would convict in 83% of the cases. This is a column total P(B)."
+                    }
+                  ],
+                  "id": "gn389aoqwfqm3s8",
+                  "type": "p"
+                }
+              ],
+              "id": "1384818334"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": "If only the judge convicts, this is the event (\"not A\" and B)."
+                    }
+                  ],
+                  "id": "hh41k8um7plcuic",
+                  "type": "p"
+                }
+              ],
+              "id": "3858633904"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "fhl1etcy4yqg445",
+                  "type": "p"
+                }
+              ],
+              "id": "3499464398"
+            }
+          ],
+          "id": "dropAreaI",
+          "objectives": [
+            "probtools"
+          ],
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. What is the sum of complements?"
+                      }
+                    ],
+                    "id": "1wzt8p6ezxnv5z2",
+                    "type": "p"
+                  }
+                ],
+                "id": "4227526789"
+              },
+              "id": "3665370163",
+              "legacyMatch": "v003",
+              "rule": "input like {dropAreaI_v003}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. What is the sum of complements?"
+                      }
+                    ],
+                    "id": "vcr8w7vxc8kq1h0",
+                    "type": "p"
+                  }
+                ],
+                "id": "1997554556"
+              },
+              "id": "846901287",
+              "legacyMatch": "v014",
+              "rule": "input like {dropAreaI_v014}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. What is the sum of complements?"
+                      }
+                    ],
+                    "id": "g447raoip3o0qjc",
+                    "type": "p"
+                  }
+                ],
+                "id": "356737109"
+              },
+              "id": "2031046264",
+              "legacyMatch": "v017",
+              "rule": "input like {dropAreaI_v017}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. What is the sum of complements?"
+                      }
+                    ],
+                    "id": "icklxe3h6i9ph9q",
+                    "type": "p"
+                  }
+                ],
+                "id": "1462553927"
+              },
+              "id": "3863803849",
+              "legacyMatch": "v019",
+              "rule": "input like {dropAreaI_v019}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. What is the sum of complements?"
+                      }
+                    ],
+                    "id": "0wobbpig2yw8z2q",
+                    "type": "p"
+                  }
+                ],
+                "id": "1316045253"
+              },
+              "id": "4222976660",
+              "legacyMatch": "v033",
+              "rule": "input like {dropAreaI_v033}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. What is the sum of complements?"
+                      }
+                    ],
+                    "id": "tnt6h77b154yvz6",
+                    "type": "p"
+                  }
+                ],
+                "id": "1490962540"
+              },
+              "id": "539386155",
+              "legacyMatch": "v064",
+              "rule": "input like {dropAreaI_v064}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. What is the sum of complements?"
+                      }
+                    ],
+                    "id": "gzbxb0dzuk72hgm",
+                    "type": "p"
+                  }
+                ],
+                "id": "27053682"
+              },
+              "id": "1616949296",
+              "legacyMatch": "v067",
+              "rule": "input like {dropAreaI_v067}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. What is the sum of complements?"
+                      }
+                    ],
+                    "id": "79bha0wfvwab2vf",
+                    "type": "p"
+                  }
+                ],
+                "id": "1059921908"
+              },
+              "id": "3297228618",
+              "legacyMatch": "v083",
+              "rule": "input like {dropAreaI_v083}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct. The sum of complements is 1. P(A) + P(not A) = 1. Similarly, P(B) + P(not B) = 1."
+                      }
+                    ],
+                    "id": "889t3l2x3yvzg7s",
+                    "type": "p"
+                  }
+                ],
+                "id": "4022189125"
+              },
+              "id": "4066923026",
+              "legacyMatch": "v10",
+              "rule": "input like {dropAreaI_v10}",
+              "score": 10
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect."
+                      }
+                    ],
+                    "id": "ktbrctn8ta5bmsx",
+                    "type": "p"
+                  }
+                ],
+                "id": "2104417150"
+              },
+              "id": "310360654",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average"
+        }
+      ],
+      "previewText": "",
+      "targeted": [
+        [
+          [
+            "dropAreaA_v003"
+          ],
+          "1437514928"
+        ],
+        [
+          [
+            "dropAreaA_v014"
+          ],
+          "3464368299"
+        ],
+        [
+          [
+            "dropAreaA_v017"
+          ],
+          "2365273435"
+        ],
+        [
+          [
+            "dropAreaA_v019"
+          ],
+          "221417397"
+        ],
+        [
+          [
+            "dropAreaA_v033"
+          ],
+          "84694157"
+        ],
+        [
+          [
+            "dropAreaA_v064"
+          ],
+          "3793486167"
+        ],
+        [
+          [
+            "dropAreaA_v067"
+          ],
+          "2211943892"
+        ],
+        [
+          [
+            "dropAreaA_v083"
+          ],
+          "981419668"
+        ],
+        [
+          [
+            "dropAreaA_v10"
+          ],
+          "119631244"
+        ],
+        [
+          [
+            "dropAreaB_v003"
+          ],
+          "3847932007"
+        ],
+        [
+          [
+            "dropAreaB_v014"
+          ],
+          "434087611"
+        ],
+        [
+          [
+            "dropAreaB_v017"
+          ],
+          "1974070359"
+        ],
+        [
+          [
+            "dropAreaB_v019"
+          ],
+          "2228332161"
+        ],
+        [
+          [
+            "dropAreaB_v033"
+          ],
+          "1610500099"
+        ],
+        [
+          [
+            "dropAreaB_v064"
+          ],
+          "1818455095"
+        ],
+        [
+          [
+            "dropAreaB_v067"
+          ],
+          "3683455300"
+        ],
+        [
+          [
+            "dropAreaB_v083"
+          ],
+          "1317914133"
+        ],
+        [
+          [
+            "dropAreaB_v10"
+          ],
+          "1321976067"
+        ],
+        [
+          [
+            "dropAreaC_v003"
+          ],
+          "2777047225"
+        ],
+        [
+          [
+            "dropAreaC_v014"
+          ],
+          "3879805310"
+        ],
+        [
+          [
+            "dropAreaC_v017"
+          ],
+          "2697627664"
+        ],
+        [
+          [
+            "dropAreaC_v019"
+          ],
+          "488607294"
+        ],
+        [
+          [
+            "dropAreaC_v033"
+          ],
+          "1591733646"
+        ],
+        [
+          [
+            "dropAreaC_v064"
+          ],
+          "2946526389"
+        ],
+        [
+          [
+            "dropAreaC_v067"
+          ],
+          "1592531481"
+        ],
+        [
+          [
+            "dropAreaC_v083"
+          ],
+          "929397582"
+        ],
+        [
+          [
+            "dropAreaC_v10"
+          ],
+          "60840099"
+        ],
+        [
+          [
+            "dropAreaD_v003"
+          ],
+          "2375679183"
+        ],
+        [
+          [
+            "dropAreaD_v014"
+          ],
+          "1775737389"
+        ],
+        [
+          [
+            "dropAreaD_v017"
+          ],
+          "3965520232"
+        ],
+        [
+          [
+            "dropAreaD_v019"
+          ],
+          "4141678877"
+        ],
+        [
+          [
+            "dropAreaD_v033"
+          ],
+          "2863799894"
+        ],
+        [
+          [
+            "dropAreaD_v064"
+          ],
+          "2010889515"
+        ],
+        [
+          [
+            "dropAreaD_v067"
+          ],
+          "133686063"
+        ],
+        [
+          [
+            "dropAreaD_v083"
+          ],
+          "3118749018"
+        ],
+        [
+          [
+            "dropAreaD_v10"
+          ],
+          "3026399554"
+        ],
+        [
+          [
+            "dropAreaE_v003"
+          ],
+          "2235984426"
+        ],
+        [
+          [
+            "dropAreaE_v014"
+          ],
+          "2746081180"
+        ],
+        [
+          [
+            "dropAreaE_v017"
+          ],
+          "2249897222"
+        ],
+        [
+          [
+            "dropAreaE_v019"
+          ],
+          "3518557247"
+        ],
+        [
+          [
+            "dropAreaE_v033"
+          ],
+          "889368448"
+        ],
+        [
+          [
+            "dropAreaE_v064"
+          ],
+          "2885084904"
+        ],
+        [
+          [
+            "dropAreaE_v067"
+          ],
+          "2870594190"
+        ],
+        [
+          [
+            "dropAreaE_v083"
+          ],
+          "2329925159"
+        ],
+        [
+          [
+            "dropAreaE_v10"
+          ],
+          "119750372"
+        ],
+        [
+          [
+            "dropAreaF_v003"
+          ],
+          "2576114784"
+        ],
+        [
+          [
+            "dropAreaF_v014"
+          ],
+          "2370050996"
+        ],
+        [
+          [
+            "dropAreaF_v017"
+          ],
+          "3688464480"
+        ],
+        [
+          [
+            "dropAreaF_v019"
+          ],
+          "4024730531"
+        ],
+        [
+          [
+            "dropAreaF_v033"
+          ],
+          "3873836531"
+        ],
+        [
+          [
+            "dropAreaF_v064"
+          ],
+          "2266735897"
+        ],
+        [
+          [
+            "dropAreaF_v067"
+          ],
+          "552596900"
+        ],
+        [
+          [
+            "dropAreaF_v083"
+          ],
+          "3100209317"
+        ],
+        [
+          [
+            "dropAreaF_v10"
+          ],
+          "1227067682"
+        ],
+        [
+          [
+            "dropAreaG_v003"
+          ],
+          "4155982455"
+        ],
+        [
+          [
+            "dropAreaG_v014"
+          ],
+          "98375412"
+        ],
+        [
+          [
+            "dropAreaG_v017"
+          ],
+          "2474008284"
+        ],
+        [
+          [
+            "dropAreaG_v019"
+          ],
+          "2564622736"
+        ],
+        [
+          [
+            "dropAreaG_v033"
+          ],
+          "1823435207"
+        ],
+        [
+          [
+            "dropAreaG_v064"
+          ],
+          "3816719018"
+        ],
+        [
+          [
+            "dropAreaG_v067"
+          ],
+          "1110437950"
+        ],
+        [
+          [
+            "dropAreaG_v083"
+          ],
+          "257076630"
+        ],
+        [
+          [
+            "dropAreaG_v10"
+          ],
+          "3687686584"
+        ],
+        [
+          [
+            "dropAreaH_v003"
+          ],
+          "2014506539"
+        ],
+        [
+          [
+            "dropAreaH_v014"
+          ],
+          "3022597044"
+        ],
+        [
+          [
+            "dropAreaH_v017"
+          ],
+          "3854150117"
+        ],
+        [
+          [
+            "dropAreaH_v019"
+          ],
+          "259955021"
+        ],
+        [
+          [
+            "dropAreaH_v033"
+          ],
+          "2547096039"
+        ],
+        [
+          [
+            "dropAreaH_v064"
+          ],
+          "3500242909"
+        ],
+        [
+          [
+            "dropAreaH_v067"
+          ],
+          "4140160417"
+        ],
+        [
+          [
+            "dropAreaH_v083"
+          ],
+          "3758450122"
+        ],
+        [
+          [
+            "dropAreaH_v10"
+          ],
+          "3162442608"
+        ],
+        [
+          [
+            "dropAreaI_v003"
+          ],
+          "3665370163"
+        ],
+        [
+          [
+            "dropAreaI_v014"
+          ],
+          "846901287"
+        ],
+        [
+          [
+            "dropAreaI_v017"
+          ],
+          "2031046264"
+        ],
+        [
+          [
+            "dropAreaI_v019"
+          ],
+          "3863803849"
+        ],
+        [
+          [
+            "dropAreaI_v033"
+          ],
+          "4222976660"
+        ],
+        [
+          [
+            "dropAreaI_v064"
+          ],
+          "539386155"
+        ],
+        [
+          [
+            "dropAreaI_v067"
+          ],
+          "1616949296"
+        ],
+        [
+          [
+            "dropAreaI_v083"
+          ],
+          "3297228618"
+        ],
+        [
+          [
+            "dropAreaI_v10"
+          ],
+          "4066923026"
+        ]
+      ],
+      "transformations": []
+    },
+    "choices": [
+      {
+        "content": [
+          {
+            "id": "u1oerqyhn15l11m",
+            "text": "003"
+          }
+        ],
+        "id": "dropAreaA_v003"
+      },
+      {
+        "content": [
+          {
+            "id": "mijexeh2dw3chmo",
+            "text": "014"
+          }
+        ],
+        "id": "dropAreaA_v014"
+      },
+      {
+        "content": [
+          {
+            "id": "kvbjkrb3rkkudda",
+            "text": "017"
+          }
+        ],
+        "id": "dropAreaA_v017"
+      },
+      {
+        "content": [
+          {
+            "id": "v5u2a8aboiqre6r",
+            "text": "019"
+          }
+        ],
+        "id": "dropAreaA_v019"
+      },
+      {
+        "content": [
+          {
+            "id": "7w9gmzchat81tg6",
+            "text": "033"
+          }
+        ],
+        "id": "dropAreaA_v033"
+      },
+      {
+        "content": [
+          {
+            "id": "si9ktimczdzava3",
+            "text": "064"
+          }
+        ],
+        "id": "dropAreaA_v064"
+      },
+      {
+        "content": [
+          {
+            "id": "0dkowovnsstvm42",
+            "text": "067"
+          }
+        ],
+        "id": "dropAreaA_v067"
+      },
+      {
+        "content": [
+          {
+            "id": "gb0p86njghkrtok",
+            "text": "083"
+          }
+        ],
+        "id": "dropAreaA_v083"
+      },
+      {
+        "content": [
+          {
+            "id": "kf153aq9o1sgx4o",
+            "text": "10"
+          }
+        ],
+        "id": "dropAreaA_v10"
+      },
+      {
+        "content": [
+          {
+            "id": "o0uualungsorvsp",
+            "text": "003"
+          }
+        ],
+        "id": "dropAreaB_v003"
+      },
+      {
+        "content": [
+          {
+            "id": "ou0gleey8x5vnsu",
+            "text": "014"
+          }
+        ],
+        "id": "dropAreaB_v014"
+      },
+      {
+        "content": [
+          {
+            "id": "ud5om0o5icyt54g",
+            "text": "017"
+          }
+        ],
+        "id": "dropAreaB_v017"
+      },
+      {
+        "content": [
+          {
+            "id": "tfb6n3ob60iiqlp",
+            "text": "019"
+          }
+        ],
+        "id": "dropAreaB_v019"
+      },
+      {
+        "content": [
+          {
+            "id": "phvd7bw752au1qs",
+            "text": "033"
+          }
+        ],
+        "id": "dropAreaB_v033"
+      },
+      {
+        "content": [
+          {
+            "id": "vjhkpdqxf7vbuu0",
+            "text": "064"
+          }
+        ],
+        "id": "dropAreaB_v064"
+      },
+      {
+        "content": [
+          {
+            "id": "fwdhbk0jmbak9dm",
+            "text": "067"
+          }
+        ],
+        "id": "dropAreaB_v067"
+      },
+      {
+        "content": [
+          {
+            "id": "jr484dshb5440ya",
+            "text": "083"
+          }
+        ],
+        "id": "dropAreaB_v083"
+      },
+      {
+        "content": [
+          {
+            "id": "xwxvtqo1045paao",
+            "text": "10"
+          }
+        ],
+        "id": "dropAreaB_v10"
+      },
+      {
+        "content": [
+          {
+            "id": "6ibhn9gcglhrj55",
+            "text": "003"
+          }
+        ],
+        "id": "dropAreaC_v003"
+      },
+      {
+        "content": [
+          {
+            "id": "cl4llvp62jpfdc0",
+            "text": "014"
+          }
+        ],
+        "id": "dropAreaC_v014"
+      },
+      {
+        "content": [
+          {
+            "id": "imgb39nl2ax6x58",
+            "text": "017"
+          }
+        ],
+        "id": "dropAreaC_v017"
+      },
+      {
+        "content": [
+          {
+            "id": "pxgiiei0x4is8zy",
+            "text": "019"
+          }
+        ],
+        "id": "dropAreaC_v019"
+      },
+      {
+        "content": [
+          {
+            "id": "3svau0w5q8ynt0f",
+            "text": "033"
+          }
+        ],
+        "id": "dropAreaC_v033"
+      },
+      {
+        "content": [
+          {
+            "id": "obmy5oj14c79fgp",
+            "text": "064"
+          }
+        ],
+        "id": "dropAreaC_v064"
+      },
+      {
+        "content": [
+          {
+            "id": "2rv6gipxnolvjbd",
+            "text": "067"
+          }
+        ],
+        "id": "dropAreaC_v067"
+      },
+      {
+        "content": [
+          {
+            "id": "79jiv18pdra5e4z",
+            "text": "083"
+          }
+        ],
+        "id": "dropAreaC_v083"
+      },
+      {
+        "content": [
+          {
+            "id": "oauo64t7ilb8lj8",
+            "text": "10"
+          }
+        ],
+        "id": "dropAreaC_v10"
+      },
+      {
+        "content": [
+          {
+            "id": "wqnglnz64v4ypik",
+            "text": "003"
+          }
+        ],
+        "id": "dropAreaD_v003"
+      },
+      {
+        "content": [
+          {
+            "id": "h5pi7gw2injt014",
+            "text": "014"
+          }
+        ],
+        "id": "dropAreaD_v014"
+      },
+      {
+        "content": [
+          {
+            "id": "wlm9ph0b2qdhamq",
+            "text": "017"
+          }
+        ],
+        "id": "dropAreaD_v017"
+      },
+      {
+        "content": [
+          {
+            "id": "00j8foxo971krsf",
+            "text": "019"
+          }
+        ],
+        "id": "dropAreaD_v019"
+      },
+      {
+        "content": [
+          {
+            "id": "qeuoa2a1sauy3te",
+            "text": "033"
+          }
+        ],
+        "id": "dropAreaD_v033"
+      },
+      {
+        "content": [
+          {
+            "id": "tivyt6iycjycnfa",
+            "text": "064"
+          }
+        ],
+        "id": "dropAreaD_v064"
+      },
+      {
+        "content": [
+          {
+            "id": "0t0eyhpta7bxvao",
+            "text": "067"
+          }
+        ],
+        "id": "dropAreaD_v067"
+      },
+      {
+        "content": [
+          {
+            "id": "plaeahmkw4258gs",
+            "text": "083"
+          }
+        ],
+        "id": "dropAreaD_v083"
+      },
+      {
+        "content": [
+          {
+            "id": "p68btd36a1bstj3",
+            "text": "10"
+          }
+        ],
+        "id": "dropAreaD_v10"
+      },
+      {
+        "content": [
+          {
+            "id": "p5w3hbfzygrxbt6",
+            "text": "003"
+          }
+        ],
+        "id": "dropAreaE_v003"
+      },
+      {
+        "content": [
+          {
+            "id": "spbb2ggmrsty7fu",
+            "text": "014"
+          }
+        ],
+        "id": "dropAreaE_v014"
+      },
+      {
+        "content": [
+          {
+            "id": "lr71bwl3e19fj1x",
+            "text": "017"
+          }
+        ],
+        "id": "dropAreaE_v017"
+      },
+      {
+        "content": [
+          {
+            "id": "7hc6e2g6svaeonb",
+            "text": "019"
+          }
+        ],
+        "id": "dropAreaE_v019"
+      },
+      {
+        "content": [
+          {
+            "id": "vgnjifptw4iufyb",
+            "text": "033"
+          }
+        ],
+        "id": "dropAreaE_v033"
+      },
+      {
+        "content": [
+          {
+            "id": "fgon9k321gch8mg",
+            "text": "064"
+          }
+        ],
+        "id": "dropAreaE_v064"
+      },
+      {
+        "content": [
+          {
+            "id": "2qjyqzz1aclj0gi",
+            "text": "067"
+          }
+        ],
+        "id": "dropAreaE_v067"
+      },
+      {
+        "content": [
+          {
+            "id": "sgisfqqfdmcj3fx",
+            "text": "083"
+          }
+        ],
+        "id": "dropAreaE_v083"
+      },
+      {
+        "content": [
+          {
+            "id": "tql9le8bho1v3fu",
+            "text": "10"
+          }
+        ],
+        "id": "dropAreaE_v10"
+      },
+      {
+        "content": [
+          {
+            "id": "5nc2k2l94a2no1l",
+            "text": "003"
+          }
+        ],
+        "id": "dropAreaF_v003"
+      },
+      {
+        "content": [
+          {
+            "id": "tcom36s8bf3k9vu",
+            "text": "014"
+          }
+        ],
+        "id": "dropAreaF_v014"
+      },
+      {
+        "content": [
+          {
+            "id": "srkvxovplv4ruej",
+            "text": "017"
+          }
+        ],
+        "id": "dropAreaF_v017"
+      },
+      {
+        "content": [
+          {
+            "id": "yibomdocqva6dhj",
+            "text": "019"
+          }
+        ],
+        "id": "dropAreaF_v019"
+      },
+      {
+        "content": [
+          {
+            "id": "bg4ixbfdv9nqt5b",
+            "text": "033"
+          }
+        ],
+        "id": "dropAreaF_v033"
+      },
+      {
+        "content": [
+          {
+            "id": "b57sjdsmmbmxf33",
+            "text": "064"
+          }
+        ],
+        "id": "dropAreaF_v064"
+      },
+      {
+        "content": [
+          {
+            "id": "0zc27pmrkstzw8u",
+            "text": "067"
+          }
+        ],
+        "id": "dropAreaF_v067"
+      },
+      {
+        "content": [
+          {
+            "id": "cl6t7gj8hmiy39k",
+            "text": "083"
+          }
+        ],
+        "id": "dropAreaF_v083"
+      },
+      {
+        "content": [
+          {
+            "id": "b30a1o1wpuivozi",
+            "text": "10"
+          }
+        ],
+        "id": "dropAreaF_v10"
+      },
+      {
+        "content": [
+          {
+            "id": "nabewlbba830kyr",
+            "text": "003"
+          }
+        ],
+        "id": "dropAreaG_v003"
+      },
+      {
+        "content": [
+          {
+            "id": "97n691mzf6t5jun",
+            "text": "014"
+          }
+        ],
+        "id": "dropAreaG_v014"
+      },
+      {
+        "content": [
+          {
+            "id": "at1wjrxy4i5krz7",
+            "text": "017"
+          }
+        ],
+        "id": "dropAreaG_v017"
+      },
+      {
+        "content": [
+          {
+            "id": "azztp1pepwlqdm1",
+            "text": "019"
+          }
+        ],
+        "id": "dropAreaG_v019"
+      },
+      {
+        "content": [
+          {
+            "id": "95g6f1420b3trh5",
+            "text": "033"
+          }
+        ],
+        "id": "dropAreaG_v033"
+      },
+      {
+        "content": [
+          {
+            "id": "c8zm108mdxkle9h",
+            "text": "064"
+          }
+        ],
+        "id": "dropAreaG_v064"
+      },
+      {
+        "content": [
+          {
+            "id": "o9u9mirqlahrqqt",
+            "text": "067"
+          }
+        ],
+        "id": "dropAreaG_v067"
+      },
+      {
+        "content": [
+          {
+            "id": "sv2ms37qqrumo52",
+            "text": "083"
+          }
+        ],
+        "id": "dropAreaG_v083"
+      },
+      {
+        "content": [
+          {
+            "id": "ol15wdhgb3pys37",
+            "text": "10"
+          }
+        ],
+        "id": "dropAreaG_v10"
+      },
+      {
+        "content": [
+          {
+            "id": "hl679v3g6xk4r4e",
+            "text": "003"
+          }
+        ],
+        "id": "dropAreaH_v003"
+      },
+      {
+        "content": [
+          {
+            "id": "68o0r26iia9me9r",
+            "text": "014"
+          }
+        ],
+        "id": "dropAreaH_v014"
+      },
+      {
+        "content": [
+          {
+            "id": "hfiq5j0ebaopr3d",
+            "text": "017"
+          }
+        ],
+        "id": "dropAreaH_v017"
+      },
+      {
+        "content": [
+          {
+            "id": "n2hju5c9bibcisp",
+            "text": "019"
+          }
+        ],
+        "id": "dropAreaH_v019"
+      },
+      {
+        "content": [
+          {
+            "id": "al3kotn69k391y5",
+            "text": "033"
+          }
+        ],
+        "id": "dropAreaH_v033"
+      },
+      {
+        "content": [
+          {
+            "id": "iv4slfwa2ki7vfv",
+            "text": "064"
+          }
+        ],
+        "id": "dropAreaH_v064"
+      },
+      {
+        "content": [
+          {
+            "id": "y8da6wr6j8mfk38",
+            "text": "067"
+          }
+        ],
+        "id": "dropAreaH_v067"
+      },
+      {
+        "content": [
+          {
+            "id": "jpnm1ust2rjylvq",
+            "text": "083"
+          }
+        ],
+        "id": "dropAreaH_v083"
+      },
+      {
+        "content": [
+          {
+            "id": "p3kfcyrmqxhpigt",
+            "text": "10"
+          }
+        ],
+        "id": "dropAreaH_v10"
+      },
+      {
+        "content": [
+          {
+            "id": "7ibh7wnaum3m1w5",
+            "text": "003"
+          }
+        ],
+        "id": "dropAreaI_v003"
+      },
+      {
+        "content": [
+          {
+            "id": "bx9old5omx6hudv",
+            "text": "014"
+          }
+        ],
+        "id": "dropAreaI_v014"
+      },
+      {
+        "content": [
+          {
+            "id": "fpm1jiau5tkmjj7",
+            "text": "017"
+          }
+        ],
+        "id": "dropAreaI_v017"
+      },
+      {
+        "content": [
+          {
+            "id": "lqg9ufcxds2vvix",
+            "text": "019"
+          }
+        ],
+        "id": "dropAreaI_v019"
+      },
+      {
+        "content": [
+          {
+            "id": "7j6a7v3qhwl1010",
+            "text": "033"
+          }
+        ],
+        "id": "dropAreaI_v033"
+      },
+      {
+        "content": [
+          {
+            "id": "oylptibxft0hhle",
+            "text": "064"
+          }
+        ],
+        "id": "dropAreaI_v064"
+      },
+      {
+        "content": [
+          {
+            "id": "v0ojlnwub9bpwgl",
+            "text": "067"
+          }
+        ],
+        "id": "dropAreaI_v067"
+      },
+      {
+        "content": [
+          {
+            "id": "c6d92efiqlmp21l",
+            "text": "083"
+          }
+        ],
+        "id": "dropAreaI_v083"
+      },
+      {
+        "content": [
+          {
+            "id": "utj96ffu5vo7hqp",
+            "text": "10"
+          }
+        ],
+        "id": "dropAreaI_v10"
+      }
+    ],
+    "height": "500",
+    "initiators": "<html><head></head><body><div input_val=\"v003\" class=\"initiator\">0.03</div>\n\t\t\t<div input_val=\"v014\" class=\"initiator\">0.14</div>\n\t\t\t<div input_val=\"v017\" class=\"initiator\">0.17</div>\n\t\t\t<div input_val=\"v019\" class=\"initiator\">0.19</div>\n\t\t\t<div input_val=\"v033\" class=\"initiator\">0.33</div>\n\t\t\t<div input_val=\"v064\" class=\"initiator\">0.64</div>\n\t\t\t<div input_val=\"v067\" class=\"initiator\">0.67</div>\n\t\t\t<div input_val=\"v083\" class=\"initiator\">0.83</div>\n\t\t\t<div input_val=\"v10\" class=\"initiator\">1.0</div>\n\t\t\t\n\t\t\t\n\t\t\n    </body></html>",
+    "inputs": [
+      {
+        "choiceIds": [
+          "dropAreaA_v003",
+          "dropAreaA_v014",
+          "dropAreaA_v017",
+          "dropAreaA_v019",
+          "dropAreaA_v033",
+          "dropAreaA_v064",
+          "dropAreaA_v067",
+          "dropAreaA_v083",
+          "dropAreaA_v10"
+        ],
+        "id": "dropAreaA",
+        "inputType": "dropdown",
+        "partId": "dropAreaA",
+        "shuffle": "false"
+      },
+      {
+        "choiceIds": [
+          "dropAreaB_v003",
+          "dropAreaB_v014",
+          "dropAreaB_v017",
+          "dropAreaB_v019",
+          "dropAreaB_v033",
+          "dropAreaB_v064",
+          "dropAreaB_v067",
+          "dropAreaB_v083",
+          "dropAreaB_v10"
+        ],
+        "id": "dropAreaB",
+        "inputType": "dropdown",
+        "partId": "dropAreaB",
+        "shuffle": "false"
+      },
+      {
+        "choiceIds": [
+          "dropAreaC_v003",
+          "dropAreaC_v014",
+          "dropAreaC_v017",
+          "dropAreaC_v019",
+          "dropAreaC_v033",
+          "dropAreaC_v064",
+          "dropAreaC_v067",
+          "dropAreaC_v083",
+          "dropAreaC_v10"
+        ],
+        "id": "dropAreaC",
+        "inputType": "dropdown",
+        "partId": "dropAreaC",
+        "shuffle": "false"
+      },
+      {
+        "choiceIds": [
+          "dropAreaD_v003",
+          "dropAreaD_v014",
+          "dropAreaD_v017",
+          "dropAreaD_v019",
+          "dropAreaD_v033",
+          "dropAreaD_v064",
+          "dropAreaD_v067",
+          "dropAreaD_v083",
+          "dropAreaD_v10"
+        ],
+        "id": "dropAreaD",
+        "inputType": "dropdown",
+        "partId": "dropAreaD",
+        "shuffle": "false"
+      },
+      {
+        "choiceIds": [
+          "dropAreaE_v003",
+          "dropAreaE_v014",
+          "dropAreaE_v017",
+          "dropAreaE_v019",
+          "dropAreaE_v033",
+          "dropAreaE_v064",
+          "dropAreaE_v067",
+          "dropAreaE_v083",
+          "dropAreaE_v10"
+        ],
+        "id": "dropAreaE",
+        "inputType": "dropdown",
+        "partId": "dropAreaE",
+        "shuffle": "false"
+      },
+      {
+        "choiceIds": [
+          "dropAreaF_v003",
+          "dropAreaF_v014",
+          "dropAreaF_v017",
+          "dropAreaF_v019",
+          "dropAreaF_v033",
+          "dropAreaF_v064",
+          "dropAreaF_v067",
+          "dropAreaF_v083",
+          "dropAreaF_v10"
+        ],
+        "id": "dropAreaF",
+        "inputType": "dropdown",
+        "partId": "dropAreaF",
+        "shuffle": "false"
+      },
+      {
+        "choiceIds": [
+          "dropAreaG_v003",
+          "dropAreaG_v014",
+          "dropAreaG_v017",
+          "dropAreaG_v019",
+          "dropAreaG_v033",
+          "dropAreaG_v064",
+          "dropAreaG_v067",
+          "dropAreaG_v083",
+          "dropAreaG_v10"
+        ],
+        "id": "dropAreaG",
+        "inputType": "dropdown",
+        "partId": "dropAreaG",
+        "shuffle": "false"
+      },
+      {
+        "choiceIds": [
+          "dropAreaH_v003",
+          "dropAreaH_v014",
+          "dropAreaH_v017",
+          "dropAreaH_v019",
+          "dropAreaH_v033",
+          "dropAreaH_v064",
+          "dropAreaH_v067",
+          "dropAreaH_v083",
+          "dropAreaH_v10"
+        ],
+        "id": "dropAreaH",
+        "inputType": "dropdown",
+        "partId": "dropAreaH",
+        "shuffle": "false"
+      },
+      {
+        "choiceIds": [
+          "dropAreaI_v003",
+          "dropAreaI_v014",
+          "dropAreaI_v017",
+          "dropAreaI_v019",
+          "dropAreaI_v033",
+          "dropAreaI_v064",
+          "dropAreaI_v067",
+          "dropAreaI_v083",
+          "dropAreaI_v10"
+        ],
+        "id": "dropAreaI",
+        "inputType": "dropdown",
+        "partId": "dropAreaI",
+        "shuffle": "false"
+      }
+    ],
+    "layoutStyles": "\r\n        \r\n\t\t\t\t\r\n#q1_target_container0 {  \r\n    margin: auto;\r\n    position:relative; <!-- This is important-->\r\n    width: 680px;  \r\n    height: 200px;\r\n   \r\n}\t\r\n\t.tbody .th {\r\n    text-align: center;\r\n}\t\t\r\n\t\t\t.target \r\n\t\t\t{  \r\n\t\t\t  border: 2px;\r\n\t\t\t  border-style: dashed;\r\n\t\t\t  border-color: #999999; \r\n\t\t\t  display: inline-block; \r\n\t\t\t  position: absolute; \r\n\t\t\t  min-width: 40px;  \r\n\t\t\t  width: 40px;  \r\n\t\t\t  min-height: 40px; \r\n\t\t\t  height: 40px;\r\n\t\t\t  \r\n\t\t\t}\r\n\t\t\t\r\n\t\t\t\r\n\t\t\t.initiator\r\n\t\t\t{\r\n\t\t\t\tdisplay: inline-block;\r\n\t\t\t\tmin-height: 35px;\r\n\t\t\t\tmax-height: 35px;\r\n\t\t\t\theight: 35px;\r\n\t\t\t\tmin-width: 40px;\r\n\t\t\t\tmax-width: 40px;\r\n\t\t\t\tbackground: #ffc;\r\n\t\t\t\ttext-align: center;\r\n\t\t\t\tpadding: 3px;\r\n\t\t\t\tcursor: move;\r\n\t\t\t\tborder-style: solid;\r\n    \t\t\tborder-width: 1px;\r\n    \t\t\tborder-color: black;\r\n\t\t\t}\r\n\t\t\t\r\n\t\t\t.dragdropspacer\r\n\t\t\t{\r\n\t\t\t\theight: 35px;\r\n\t\t\t}\r\n\t\t\t\r\n\t\t\r\n\t\t\r\n    ",
+    "stem": {
+      "content": [
+        {
+          "___selfClosing___": true,
+          "children": [
+            {
+              "text": " ",
+              "type": "text"
+            }
+          ],
+          "id": "spff9boz485asso",
+          "type": "p"
+        }
+      ]
+    },
+    "submitPerPart": true,
+    "targetArea": "<html><head></head><body><div id=\"q1_target_container0\">\n\t\t\n<!--Top row -->\t\t\n<div id=\"toplabel0\" style=\"position:absolute;top:20px; left:30px; width:40px; line-height:15px\"><b>B</b></div>\n<div id=\"toplabel1\" style=\"position:absolute;top:20px;  left:80px;width:90px; line-height:15px\"><b>Not B</b></div>\n<div id=\"toplabel0b\" style=\"position:absolute;top:20px; left:160px; width:40px; line-height:14px\"><b>Total</b></div>\n<div id=\"toplabel1b\" style=\"position:absolute;top:0px;  left:160px;width:40px; line-height:14px\"></div>\n\n<!--Left headers -->\n<div id=\"leftlabel1\" style=\"position:absolute;top:50px; left:220px\"><b>A</b></div>\n<div id=\"leftlabel2\" style=\"position:absolute;top:100px; left:220px\"><b>Not A</b></div>\n<div id=\"leftlabel2b\" style=\"position:absolute;top:150px; left:220px\"><b>Total</b></div>\n\n<!--target areas top -->\n<div input_ref=\"dropAreaA\" class=\"target\" style=\"left:0px; top:40px; width:60px; height:40px;\"> </div>\n<div input_ref=\"dropAreaB\" class=\"target\" style=\"left:70px; top:40px; width:60px; height:40px;\"> </div>\n<div input_ref=\"dropAreaC\" class=\"target\" style=\"left:140px; top:40px; width:60px; height:20px;\"> </div>\n\n<div input_ref=\"dropAreaD\" class=\"target\" style=\"left:0px; top:90px; width:60px; height:40px;\"> </div>\n<div input_ref=\"dropAreaE\" class=\"target\" style=\"left:70px; top:90px; width:60px; height:40px;\"> </div>\n<div input_ref=\"dropAreaF\" class=\"target\" style=\"left:140px; top:90px; width:60px; height:40px;\"> </div>\n\n<div input_ref=\"dropAreaG\" class=\"target\" style=\"left:0px; top:140px; width:60px; height:40px;\"> </div>\n<div input_ref=\"dropAreaH\" class=\"target\" style=\"left:70px; top:140px; width:60px; height:40px;\"> </div>\n<div input_ref=\"dropAreaI\" class=\"target\" style=\"left:140px; top:140px; width:60px; height:40px;\"> </div>\n\n\n\t\t    </div>\n\t\t\t\n\t\t\n    </body></html>",
+    "width": "200"
+  },
+  "objectives": {
+    "dropAreaA": [
+      "95315"
+    ],
+    "dropAreaB": [
+      "95315"
+    ],
+    "dropAreaC": [
+      "95315"
+    ],
+    "dropAreaD": [
+      "95315"
+    ],
+    "dropAreaE": [
+      "95315"
+    ],
+    "dropAreaF": [
+      "95315"
+    ],
+    "dropAreaG": [
+      "95315"
+    ],
+    "dropAreaH": [
+      "95315"
+    ],
+    "dropAreaI": [
+      "95315"
+    ]
+  },
+  "originalFile": "",
+  "unresolvedReferences": [],
+  "subType": "oli_custom_dnd"
+}

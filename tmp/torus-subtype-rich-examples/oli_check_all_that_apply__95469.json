@@ -1,0 +1,1263 @@
+{
+  "id": "95469",
+  "scope": "banked",
+  "type": "Activity",
+  "tags": [
+    "95124"
+  ],
+  "title": "explain_vs_response_var_pool-q1_explain_vs_response_var",
+  "content": {
+    "authoring": {
+      "correct": [
+        [
+          "A"
+        ],
+        "3363911377"
+      ],
+      "incorrect": [],
+      "parts": [
+        {
+          "explanation": null,
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "rlw9u1rhhaptit2",
+                  "type": "p"
+                }
+              ],
+              "id": "1249433831"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "6hzilrp4zszoomq",
+                  "type": "p"
+                }
+              ],
+              "id": "3051726425"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "2ldqx6y7wr1a47t",
+                  "type": "p"
+                }
+              ],
+              "id": "3358059118"
+            }
+          ],
+          "id": "q1_explain_vs_response_var_p1",
+          "objectives": [
+            "expvsresp"
+          ],
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. An explanatory variable claims to explain, predict, or affect the response. The study is looking at the effect of medication and diet on changes in blood pressure. The blood pressure before the study is part of calculating the "
+                      },
+                      {
+                        "em": true,
+                        "text": "response"
+                      },
+                      {
+                        "text": " variable."
+                      }
+                    ],
+                    "id": "vazw1v644z67lab",
+                    "type": "p"
+                  }
+                ],
+                "id": "1509883481"
+              },
+              "id": "3363911377",
+              "legacyMatch": "A",
+              "rule": "(!(input like {E})) && ((!(input like {D})) && ((!(input like {C})) && ((!(input like {B})) && (input like {A}))))",
+              "score": 4
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. An explanatory variable claims to explain, predict, or affect the response. The study is looking at the effect of medication and diet on changes in blood pressure. The blood pressure after the study is part of calculating the "
+                      },
+                      {
+                        "em": true,
+                        "text": "response"
+                      },
+                      {
+                        "text": " variable."
+                      }
+                    ],
+                    "id": "843yd4efpanzk7z",
+                    "type": "p"
+                  }
+                ],
+                "id": "3876777038"
+              },
+              "id": "2569412624",
+              "legacyMatch": "B",
+              "rule": "(!(input like {E})) && ((!(input like {D})) && ((!(input like {C})) && ((!(input like {A})) && (input like {B}))))",
+              "score": 4
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. An explanatory variable claims to explain, predict, or affect the response. The study is looking at the effect of medication and diet on changes in blood pressure. The difference in the two measurements of blood pressure is the "
+                      },
+                      {
+                        "em": true,
+                        "text": "response"
+                      },
+                      {
+                        "text": " variable."
+                      }
+                    ],
+                    "id": "kot04a5wr6d2mro",
+                    "type": "p"
+                  }
+                ],
+                "id": "3135967209"
+              },
+              "id": "2833990573",
+              "legacyMatch": "C",
+              "rule": "(!(input like {E})) && ((!(input like {D})) && ((!(input like {B})) && ((!(input like {A})) && (input like {C}))))",
+              "score": 4
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. You are correct that type of drug given is one factor, or explanatory variable, in the study looking at the effect of medication and diet on changes in blood pressure. However, there is at least one other correct answer."
+                      }
+                    ],
+                    "id": "819vcbcjvdrm5e4",
+                    "type": "p"
+                  }
+                ],
+                "id": "4121696608"
+              },
+              "id": "4287285722",
+              "legacyMatch": "D",
+              "rule": "(!(input like {E})) && ((!(input like {C})) && ((!(input like {B})) && ((!(input like {A})) && (input like {D}))))",
+              "score": 8
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. You are correct that type of diet is one factor, or explanatory variable, in the study looking at the effect of medication and diet on changes in blood pressure. However, there is at least one other correct answer."
+                      }
+                    ],
+                    "id": "n5vbr8mx9gapg5l",
+                    "type": "p"
+                  }
+                ],
+                "id": "518991155"
+              },
+              "id": "1900741366",
+              "legacyMatch": "E",
+              "rule": "(!(input like {D})) && ((!(input like {C})) && ((!(input like {B})) && ((!(input like {A})) && (input like {E}))))",
+              "score": 8
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. An explanatory variable claims to explain, predict, or affect the response. The study is looking at the effect of medication and diet on changes in blood pressure. The blood pressure before and after the study are parts of calculating the "
+                      },
+                      {
+                        "em": true,
+                        "text": "response"
+                      },
+                      {
+                        "text": " variable. Also, there is at least one correct answer."
+                      }
+                    ],
+                    "id": "mff2df75j8ptd92",
+                    "type": "p"
+                  }
+                ],
+                "id": "4192011472"
+              },
+              "id": "2411109311",
+              "legacyMatch": "A,B",
+              "rule": "(!(input like {E})) && ((!(input like {D})) && ((!(input like {C})) && (input like {B} && (input like {A}))))",
+              "score": 2
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. An explanatory variable claims to explain, predict, or affect the response. The study is looking at the effect of medication and diet on changes in blood pressure. The blood pressure before the study is part of calculating the "
+                      },
+                      {
+                        "em": true,
+                        "text": "response"
+                      },
+                      {
+                        "text": " variable. The difference in the two measurements of blood pressure is the response variable. Also, there is at least one correct answer."
+                      }
+                    ],
+                    "id": "uxdefyegh7se36d",
+                    "type": "p"
+                  }
+                ],
+                "id": "1434656491"
+              },
+              "id": "3652434782",
+              "legacyMatch": "A,C",
+              "rule": "(!(input like {E})) && ((!(input like {D})) && ((!(input like {B})) && (input like {C} && (input like {A}))))",
+              "score": 2
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. You are correct that type of drug given is one factor, or explanatory variable, in the study looking at the effect of medication and diet on changes in blood pressure. However, the blood pressure before the study is part of calculating the "
+                      },
+                      {
+                        "em": true,
+                        "text": "response"
+                      },
+                      {
+                        "text": " variable. Also, there is at least one other correct answer."
+                      }
+                    ],
+                    "id": "j0doan92n9xlmxv",
+                    "type": "p"
+                  }
+                ],
+                "id": "2024943233"
+              },
+              "id": "2177400859",
+              "legacyMatch": "A,D",
+              "rule": "(!(input like {E})) && ((!(input like {C})) && ((!(input like {B})) && (input like {D} && (input like {A}))))",
+              "score": 6
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. You are correct that type of diet is one factor, or explanatory variable, in the study looking at the effect of medication and diet on changes in blood pressure. However, the blood pressure before the study is part of calculating the "
+                      },
+                      {
+                        "em": true,
+                        "text": "response"
+                      },
+                      {
+                        "text": " variable. Also, there is at least one other correct answer."
+                      }
+                    ],
+                    "id": "z032t946nyf8w6j",
+                    "type": "p"
+                  }
+                ],
+                "id": "4038592806"
+              },
+              "id": "460566043",
+              "legacyMatch": "A,E",
+              "rule": "(!(input like {D})) && ((!(input like {C})) && ((!(input like {B})) && (input like {E} && (input like {A}))))",
+              "score": 6
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. An explanatory variable claims to explain, predict, or affect the response. The study is looking at the effect of medication and diet on changes in blood pressure. The blood pressure after the study is part of calculating the "
+                      },
+                      {
+                        "em": true,
+                        "text": "response"
+                      },
+                      {
+                        "text": " variable. The difference in the two measurements of blood pressure is the response variable."
+                      }
+                    ],
+                    "id": "927rhqbqjao9anv",
+                    "type": "p"
+                  }
+                ],
+                "id": "567399288"
+              },
+              "id": "1829249293",
+              "legacyMatch": "B,C",
+              "rule": "(!(input like {E})) && ((!(input like {D})) && ((!(input like {A})) && (input like {C} && (input like {B}))))",
+              "score": 2
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. You are correct that type of drug given is one factor, or explanatory variable, in the study looking at the effect of medication and diet on changes in blood pressure. However, the blood pressure after the study is part of calculating the "
+                      },
+                      {
+                        "em": true,
+                        "text": "response"
+                      },
+                      {
+                        "text": " variable. Also, there is at least one other correct answer."
+                      }
+                    ],
+                    "id": "sdpl7npvp8dcwqe",
+                    "type": "p"
+                  }
+                ],
+                "id": "2821912058"
+              },
+              "id": "1954212976",
+              "legacyMatch": "B,D",
+              "rule": "(!(input like {E})) && ((!(input like {C})) && ((!(input like {A})) && (input like {D} && (input like {B}))))",
+              "score": 6
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. You are correct that type of diet is one factor, or explanatory variable, in the study looking at the effect of medication and diet on changes in blood pressure. However, the blood pressure after the study is part of calculating the "
+                      },
+                      {
+                        "em": true,
+                        "text": "response"
+                      },
+                      {
+                        "text": " variable. Also, there is at least one other correct answer."
+                      }
+                    ],
+                    "id": "8p19ehw852isi72",
+                    "type": "p"
+                  }
+                ],
+                "id": "3418697485"
+              },
+              "id": "3839676528",
+              "legacyMatch": "B,E",
+              "rule": "(!(input like {D})) && ((!(input like {C})) && ((!(input like {A})) && (input like {E} && (input like {B}))))",
+              "score": 6
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. You are correct that type of drug given is one factor, or explanatory variable, in the study looking at the effect of medication and diet on changes in blood pressure. However, the blood pressure before the study is part of calculating the "
+                      },
+                      {
+                        "em": true,
+                        "text": "response"
+                      },
+                      {
+                        "text": " variable. Also, there is at least one other correct answer."
+                      }
+                    ],
+                    "id": "0zb41g5mopbwte0",
+                    "type": "p"
+                  }
+                ],
+                "id": "421580218"
+              },
+              "id": "261027393",
+              "legacyMatch": "C,D",
+              "rule": "(!(input like {E})) && ((!(input like {B})) && ((!(input like {A})) && (input like {D} && (input like {C}))))",
+              "score": 6
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. You are correct that type of diet is one factor, or explanatory variable, in the study looking at the effect of medication and diet on changes in blood pressure. However, the blood pressure before the study is part of calculating the "
+                      },
+                      {
+                        "em": true,
+                        "text": "response"
+                      },
+                      {
+                        "text": " variable. Also, there is at least one other correct answer."
+                      }
+                    ],
+                    "id": "z5hoarlb4xgwgkp",
+                    "type": "p"
+                  }
+                ],
+                "id": "323742173"
+              },
+              "id": "3835931619",
+              "legacyMatch": "C,E",
+              "rule": "(!(input like {D})) && ((!(input like {B})) && ((!(input like {A})) && (input like {E} && (input like {C}))))",
+              "score": 6
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct. Type of drug given and type of diet are the two factors, or explanatory variables, in the study looking at the effect of medication and diet on changes in blood pressure. The difference in blood pressure is the "
+                      },
+                      {
+                        "em": true,
+                        "text": "response"
+                      },
+                      {
+                        "text": " variable. "
+                      }
+                    ],
+                    "id": "g1ljsx6cab9nncx",
+                    "type": "p"
+                  }
+                ],
+                "id": "4211597480"
+              },
+              "id": "3165625493",
+              "legacyMatch": "D,E",
+              "rule": "(!(input like {C})) && ((!(input like {B})) && ((!(input like {A})) && (input like {E} && (input like {D}))))",
+              "score": 10
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. An explanatory variable claims to explain, predict, or affect the response. The study is looking at the effect of medication and diet on changes in blood pressure. The blood pressure before and after the study are parts of calculating the "
+                      },
+                      {
+                        "em": true,
+                        "text": "response"
+                      },
+                      {
+                        "text": " variable. The difference in the two measurements of blood pressure is the response variable. Also, there is at least one correct answer."
+                      }
+                    ],
+                    "id": "icy850lbdzis4av",
+                    "type": "p"
+                  }
+                ],
+                "id": "144529569"
+              },
+              "id": "2737369544",
+              "legacyMatch": "A,B,C",
+              "rule": "(!(input like {E})) && ((!(input like {D})) && (input like {C} && (input like {B} && (input like {A}))))",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. You are correct that type of drug given is one factor, or explanatory variable, in the study looking at the effect of medication and diet on changes in blood pressure. However, the blood pressure before and after the study are parts of calculating the "
+                      },
+                      {
+                        "em": true,
+                        "text": "response"
+                      },
+                      {
+                        "text": " variable. Also, there is at least one other correct answer."
+                      }
+                    ],
+                    "id": "3agqs06xzhg2btp",
+                    "type": "p"
+                  }
+                ],
+                "id": "3751511183"
+              },
+              "id": "2672193641",
+              "legacyMatch": "A,B,D",
+              "rule": "(!(input like {E})) && ((!(input like {C})) && (input like {D} && (input like {B} && (input like {A}))))",
+              "score": 4
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. You are correct that type of diet is one factor, or explanatory variable, in the study looking at the effect of medication and diet on changes in blood pressure. However, the blood pressure before and after the study are parts of calculating the "
+                      },
+                      {
+                        "em": true,
+                        "text": "response"
+                      },
+                      {
+                        "text": " variable. Also, there is at least one other correct answer."
+                      }
+                    ],
+                    "id": "b0qqbpkfa1gqaq7",
+                    "type": "p"
+                  }
+                ],
+                "id": "1754438284"
+              },
+              "id": "4046514018",
+              "legacyMatch": "A,B,E",
+              "rule": "(!(input like {D})) && ((!(input like {C})) && (input like {E} && (input like {B} && (input like {A}))))",
+              "score": 4
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. You are correct that type of drug given is one factor, or explanatory variable, in the study looking at the effect of medication and diet on changes in blood pressure. However, the blood pressure before the study is part of calculating the "
+                      },
+                      {
+                        "em": true,
+                        "text": "response"
+                      },
+                      {
+                        "text": " variable. The difference in the two measurements of blood pressure is the response variable. Also, there is at least one other correct answer."
+                      }
+                    ],
+                    "id": "k2irbpbnioqqgl9",
+                    "type": "p"
+                  }
+                ],
+                "id": "3150119440"
+              },
+              "id": "3676911236",
+              "legacyMatch": "A,C,D",
+              "rule": "(!(input like {E})) && ((!(input like {B})) && (input like {D} && (input like {C} && (input like {A}))))",
+              "score": 4
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. You are correct that type of diet is one factor, or explanatory variable, in the study looking at the effect of medication and diet on changes in blood pressure. However, the blood pressure before the study is part of calculating the "
+                      },
+                      {
+                        "em": true,
+                        "text": "response"
+                      },
+                      {
+                        "text": " variable. The difference in the two measurements of blood pressure is the response variable. Also, there is at least one other correct answer."
+                      }
+                    ],
+                    "id": "2wyw1undfrwi5fd",
+                    "type": "p"
+                  }
+                ],
+                "id": "1259866745"
+              },
+              "id": "3453282137",
+              "legacyMatch": "A,C,E",
+              "rule": "(!(input like {D})) && ((!(input like {B})) && (input like {E} && (input like {C} && (input like {A}))))",
+              "score": 4
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. You are correct that the type of drug given and type of diet are the two factors, or explanatory variables, in the study looking at the effect of medication and diet on changes in blood pressure. However, the blood pressure before the study is part of calculating the "
+                      },
+                      {
+                        "em": true,
+                        "text": "response"
+                      },
+                      {
+                        "text": " variable."
+                      }
+                    ],
+                    "id": "mj4dnyqvq3e8j6g",
+                    "type": "p"
+                  }
+                ],
+                "id": "2008684239"
+              },
+              "id": "1531743674",
+              "legacyMatch": "A,D,E",
+              "rule": "(!(input like {C})) && ((!(input like {B})) && (input like {E} && (input like {D} && (input like {A}))))",
+              "score": 8
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. You are correct that type of drug given is one factor, or explanatory variable, in the study looking at the effect of medication and diet on changes in blood pressure. However, an explanatory variable claims to explain, predict, or affect the response. The study is looking at the effect of medication and diet on changes in blood pressure. The blood pressure after the study is part of calculating the "
+                      },
+                      {
+                        "em": true,
+                        "text": "response"
+                      },
+                      {
+                        "text": " variable. The difference in the two measurements of blood pressure is the response variable."
+                      }
+                    ],
+                    "id": "wpisuiobq9ao3jw",
+                    "type": "p"
+                  }
+                ],
+                "id": "3974578915"
+              },
+              "id": "3914101130",
+              "legacyMatch": "B,C,D",
+              "rule": "(!(input like {E})) && ((!(input like {A})) && (input like {D} && (input like {C} && (input like {B}))))",
+              "score": 4
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. You are correct that type of diet is one factor, or explanatory variable, in the study looking at the effect of medication and diet on changes in blood pressure. However, an explanatory variable claims to explain, predict, or affect the response. The study is looking at the effect of medication and diet on changes in blood pressure. The blood pressure after the study is part of calculating the "
+                      },
+                      {
+                        "em": true,
+                        "text": "response"
+                      },
+                      {
+                        "text": " variable. The difference in the two measurements of blood pressure is the response variable."
+                      }
+                    ],
+                    "id": "dz4fo3mfhpsjout",
+                    "type": "p"
+                  }
+                ],
+                "id": "4291485172"
+              },
+              "id": "3920850903",
+              "legacyMatch": "B,C,E",
+              "rule": "(!(input like {D})) && ((!(input like {A})) && (input like {E} && (input like {C} && (input like {B}))))",
+              "score": 4
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. You are correct that the type of drug given and type of diet are the two factors, or explanatory variables, in the study looking at the effect of medication and diet on changes in blood pressure. However, the blood pressure after the study is part of calculating the "
+                      },
+                      {
+                        "em": true,
+                        "text": "response"
+                      },
+                      {
+                        "text": " variable."
+                      }
+                    ],
+                    "id": "xwhczjzec7kaymq",
+                    "type": "p"
+                  }
+                ],
+                "id": "253236437"
+              },
+              "id": "2585642264",
+              "legacyMatch": "B,D,E",
+              "rule": "(!(input like {C})) && ((!(input like {A})) && (input like {E} && (input like {D} && (input like {B}))))",
+              "score": 8
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. You are correct that the type of drug given and type of diet are the two factors, or explanatory variables, in the study looking at the effect of medication and diet on changes in blood pressure. However, the difference in the two measurements of blood pressure is the "
+                      },
+                      {
+                        "em": true,
+                        "text": "response"
+                      },
+                      {
+                        "text": " variable."
+                      }
+                    ],
+                    "id": "60yccwol3cnw7pf",
+                    "type": "p"
+                  }
+                ],
+                "id": "1521011075"
+              },
+              "id": "2485078017",
+              "legacyMatch": "C,D,E",
+              "rule": "(!(input like {B})) && ((!(input like {A})) && (input like {E} && (input like {D} && (input like {C}))))",
+              "score": 8
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. You are correct that type of drug given is one factor, or explanatory variable, in the study looking at the effect of medication and diet on changes in blood pressure. However, an explanatory variable claims to explain, predict, or affect the response. The study is looking at the effect of medication and diet on changes in blood pressure. The blood pressure before and after the study are parts of calculating the "
+                      },
+                      {
+                        "em": true,
+                        "text": "response"
+                      },
+                      {
+                        "text": " variable. The difference in the two measurements of blood pressure is the response variable. "
+                      }
+                    ],
+                    "id": "nat35lqzzw5vonf",
+                    "type": "p"
+                  }
+                ],
+                "id": "2476446018"
+              },
+              "id": "1761216332",
+              "legacyMatch": "A,B,C,D",
+              "rule": "(!(input like {E})) && (input like {D} && (input like {C} && (input like {B} && (input like {A}))))",
+              "score": 2
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. You are correct that the type of drug given and type of diet are the two factors, or explanatory variables, in the study looking at the effect of medication and diet on changes in blood pressure. However, an explanatory variable claims to explain, predict, or affect the response. The study is looking at the effect of medication and diet on changes in blood pressure. The blood pressure before and after the study are parts of calculating the "
+                      },
+                      {
+                        "em": true,
+                        "text": "response"
+                      },
+                      {
+                        "text": " variable. The difference in the two measurements of blood pressure is the response variable. "
+                      }
+                    ],
+                    "id": "sin7ij7cjwgey6p",
+                    "type": "p"
+                  }
+                ],
+                "id": "757185729"
+              },
+              "id": "3729561673",
+              "legacyMatch": "A,B,C,E",
+              "rule": "(!(input like {D})) && (input like {E} && (input like {C} && (input like {B} && (input like {A}))))",
+              "score": 2
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. You are correct that the type of drug given and type of diet are the two factors, or explanatory variables, in the study looking at the effect of medication and diet on changes in blood pressure. However, an explanatory variable claims to explain, predict or affect the response. The study is looking at the effect of medication and diet on changes in blood pressure. The blood pressure before and after the study are parts of calculating the response variable. "
+                      }
+                    ],
+                    "id": "dptfmcjh3560z9n",
+                    "type": "p"
+                  }
+                ],
+                "id": "738455579"
+              },
+              "id": "214763519",
+              "legacyMatch": "A,B,D,E",
+              "rule": "(!(input like {C})) && (input like {E} && (input like {D} && (input like {B} && (input like {A}))))",
+              "score": 6
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. You are correct that the type of drug given and type of diet are the two factors, or explanatory variables, in the study looking at the effect of medication and diet on changes in blood pressure. However, an explanatory variable claims to explain, predict, or affect the response. The study is looking at the effect of medication and diet on changes in blood pressure. The blood pressure before the study is part of calculating the "
+                      },
+                      {
+                        "em": true,
+                        "text": "response"
+                      },
+                      {
+                        "text": " variable. The difference in the two measurements of blood pressure is the response variable. "
+                      }
+                    ],
+                    "id": "egcw0gyptqup9g8",
+                    "type": "p"
+                  }
+                ],
+                "id": "106811580"
+              },
+              "id": "1948318377",
+              "legacyMatch": "A,C,D,E",
+              "rule": "(!(input like {B})) && (input like {E} && (input like {D} && (input like {C} && (input like {A}))))",
+              "score": 6
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. You are correct that the type of drug given and type of diet are the two factors, or explanatory variables, in the study looking at the effect of medication and diet on changes in blood pressure. However, an explanatory variable claims to explain, predict, or affect the response. The study is looking at the effect of medication and diet on changes in blood pressure. The blood pressure after the study is part of calculating the "
+                      },
+                      {
+                        "em": true,
+                        "text": "response"
+                      },
+                      {
+                        "text": " variable. The difference in the two measurements of blood pressure is the response variable."
+                      }
+                    ],
+                    "id": "xuq8h21u8ol43vc",
+                    "type": "p"
+                  }
+                ],
+                "id": "4098184592"
+              },
+              "id": "987826320",
+              "legacyMatch": "B,C,D,E",
+              "rule": "(!(input like {A})) && (input like {E} && (input like {D} && (input like {C} && (input like {B}))))",
+              "score": 6
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. You are correct that the type of drug given and type of diet are the two factors, or explanatory variables, in the study looking at the effect of medication and diet on changes in blood pressure. However, an explanatory variable claims to explain, predict, or affect the response. The study is looking at the effect of medication and diet on changes in blood pressure. The blood pressure before and after the study are parts of calculating the "
+                      },
+                      {
+                        "em": true,
+                        "text": "response"
+                      },
+                      {
+                        "text": " variable. The difference in the two measurements of blood pressure is the response variable. "
+                      }
+                    ],
+                    "id": "a513xgaxkconra8",
+                    "type": "p"
+                  }
+                ],
+                "id": "3269087882"
+              },
+              "id": "1933804411",
+              "legacyMatch": "A,B,C,D,E",
+              "rule": "input like {E} && (input like {D} && (input like {C} && (input like {B} && (input like {A}))))",
+              "score": 4
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. There is at least one correct answer."
+                      }
+                    ],
+                    "id": "n6z4j1a87wo03r1",
+                    "type": "p"
+                  }
+                ],
+                "id": "3548154869"
+              },
+              "id": "3937828533",
+              "legacyMatch": ".*",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average",
+          "targeted": []
+        }
+      ],
+      "previewText": "",
+      "targeted": [
+        [
+          [
+            "B"
+          ],
+          "2569412624"
+        ],
+        [
+          [
+            "C"
+          ],
+          "2833990573"
+        ],
+        [
+          [
+            "D"
+          ],
+          "4287285722"
+        ],
+        [
+          [
+            "E"
+          ],
+          "1900741366"
+        ],
+        [
+          [
+            "A",
+            "B"
+          ],
+          "2411109311"
+        ],
+        [
+          [
+            "A",
+            "C"
+          ],
+          "3652434782"
+        ],
+        [
+          [
+            "A",
+            "D"
+          ],
+          "2177400859"
+        ],
+        [
+          [
+            "A",
+            "E"
+          ],
+          "460566043"
+        ],
+        [
+          [
+            "B",
+            "C"
+          ],
+          "1829249293"
+        ],
+        [
+          [
+            "B",
+            "D"
+          ],
+          "1954212976"
+        ],
+        [
+          [
+            "B",
+            "E"
+          ],
+          "3839676528"
+        ],
+        [
+          [
+            "C",
+            "D"
+          ],
+          "261027393"
+        ],
+        [
+          [
+            "C",
+            "E"
+          ],
+          "3835931619"
+        ],
+        [
+          [
+            "D",
+            "E"
+          ],
+          "3165625493"
+        ],
+        [
+          [
+            "A",
+            "B",
+            "C"
+          ],
+          "2737369544"
+        ],
+        [
+          [
+            "A",
+            "B",
+            "D"
+          ],
+          "2672193641"
+        ],
+        [
+          [
+            "A",
+            "B",
+            "E"
+          ],
+          "4046514018"
+        ],
+        [
+          [
+            "A",
+            "C",
+            "D"
+          ],
+          "3676911236"
+        ],
+        [
+          [
+            "A",
+            "C",
+            "E"
+          ],
+          "3453282137"
+        ],
+        [
+          [
+            "A",
+            "D",
+            "E"
+          ],
+          "1531743674"
+        ],
+        [
+          [
+            "B",
+            "C",
+            "D"
+          ],
+          "3914101130"
+        ],
+        [
+          [
+            "B",
+            "C",
+            "E"
+          ],
+          "3920850903"
+        ],
+        [
+          [
+            "B",
+            "D",
+            "E"
+          ],
+          "2585642264"
+        ],
+        [
+          [
+            "C",
+            "D",
+            "E"
+          ],
+          "2485078017"
+        ],
+        [
+          [
+            "A",
+            "B",
+            "C",
+            "D"
+          ],
+          "1761216332"
+        ],
+        [
+          [
+            "A",
+            "B",
+            "C",
+            "E"
+          ],
+          "3729561673"
+        ],
+        [
+          [
+            "A",
+            "B",
+            "D",
+            "E"
+          ],
+          "214763519"
+        ],
+        [
+          [
+            "A",
+            "C",
+            "D",
+            "E"
+          ],
+          "1948318377"
+        ],
+        [
+          [
+            "B",
+            "C",
+            "D",
+            "E"
+          ],
+          "987826320"
+        ],
+        [
+          [
+            "A",
+            "B",
+            "C",
+            "D",
+            "E"
+          ],
+          "1933804411"
+        ]
+      ],
+      "transformations": [],
+      "version": 2
+    },
+    "choices": [
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "Blood pressure before the study "
+              }
+            ],
+            "id": "gw1kultr1cts3zm",
+            "type": "p"
+          }
+        ],
+        "id": "A"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "Blood pressure after the study"
+              }
+            ],
+            "id": "sdht9pz6avy2784",
+            "type": "p"
+          }
+        ],
+        "id": "B"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "Difference in the two measurements of blood pressure"
+              }
+            ],
+            "id": "t31jcsbwjjorz9b",
+            "type": "p"
+          }
+        ],
+        "id": "C"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "Type of drug given"
+              }
+            ],
+            "id": "vbq8qrb3f4hbh7i",
+            "type": "p"
+          }
+        ],
+        "id": "D"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "Type of diet"
+              }
+            ],
+            "id": "ksbubyqm1agwkdd",
+            "type": "p"
+          }
+        ],
+        "id": "E"
+      }
+    ],
+    "stem": {
+      "content": [
+        {
+          "children": [
+            {
+              "strong": true,
+              "text": "Research Question: "
+            },
+            {
+              "text": "What is the combined effect of medication and diet on blood pressure in adult males?"
+            }
+          ],
+          "id": "pu0e3gkt9iaja2t",
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "A randomized, controlled experiment investigated this question using a random sample of 540 adult males as subjects. At the beginning of the study, researchers measured the blood pressure of all the subjects. Each subject was given a month's supply of either Drug A, Drug B, or a placebo, then was assigned to be on either a low-fat diet or a low-salt diet for that month-long period. At the end of the month, the researchers measured the blood pressure of each subject again, and compared the two blood pressure readings. "
+            }
+          ],
+          "id": "lvmc6f0i814fau7",
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "Which of the following is an explanatory variable in this study? Check all that apply."
+            }
+          ],
+          "id": "dt1kkxvbkhkib4h",
+          "type": "p"
+        }
+      ]
+    },
+    "type": "TargetedCATA"
+  },
+  "objectives": {
+    "q1_explain_vs_response_var_p1": [
+      "95321"
+    ]
+  },
+  "originalFile": "",
+  "unresolvedReferences": [],
+  "subType": "oli_check_all_that_apply"
+}

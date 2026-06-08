@@ -1,0 +1,696 @@
+{
+  "id": "96585",
+  "scope": "embedded",
+  "type": "Activity",
+  "tags": [],
+  "title": "u3_m3_normal8_lbd_tutor1-q1",
+  "content": {
+    "authoring": {
+      "parts": [
+        {
+          "explanation": null,
+          "gradingApproach": "automatic",
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "wjk2y0lftzi7a2a",
+                  "type": "p"
+                }
+              ],
+              "id": "3201534687"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "w684tre7flc05ok",
+                  "type": "p"
+                }
+              ],
+              "id": "2451493206"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "b2yi2hjv9mm8tc9",
+                  "type": "p"
+                }
+              ],
+              "id": "3731988964"
+            }
+          ],
+          "id": "859961661",
+          "objectives": [],
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "id": "pq9cklgqdi89v6j",
+                                "text": "R"
+                              }
+                            ],
+                            "id": "qs4kp08or4n9ohv",
+                            "type": "title"
+                          },
+                          {
+                            "children": [
+                              {
+                                "text": "(a) R provides:"
+                              }
+                            ],
+                            "id": "pvxenio7ku254ol",
+                            "type": "p"
+                          },
+                          {
+                            "children": [
+                              {
+                                "id": "lqj4q9pygh1ma9e",
+                                "text": " ",
+                                "type": "text"
+                              }
+                            ],
+                            "id": "dd5c6ybl85euzmt",
+                            "src": "https://d2xvti2irp4c7t.cloudfront.net/media/2d/2d1407279c0062da81781882241cece3/_u4_m3_lbdtutor10a_image1_r.gif",
+                            "type": "img"
+                          },
+                          {
+                            "children": [
+                              {
+                                "text": "So roughly 7.66% of males are less than 65 inches tall."
+                              }
+                            ],
+                            "id": "ndgbtmf31r5f8qm",
+                            "type": "p"
+                          },
+                          {
+                            "children": [
+                              {
+                                "text": "(b) R provides:"
+                              }
+                            ],
+                            "id": "cgbpfhmqxwrirev",
+                            "type": "p"
+                          },
+                          {
+                            "children": [
+                              {
+                                "id": "6lxv7isp4p8vzvb",
+                                "text": " ",
+                                "type": "text"
+                              }
+                            ],
+                            "id": "dehy46sc6s0dzfc",
+                            "src": "https://d2xvti2irp4c7t.cloudfront.net/media/77/770b3a4cf09e22f76926cb0417e18cd1/_u4_m3_lbdtutor10a_image2_r.gif",
+                            "type": "img"
+                          },
+                          {
+                            "children": [
+                              {
+                                "text": "So roughly 1.6% of males are more than 75 inches tall."
+                              }
+                            ],
+                            "id": "o60k2t91vfp9gt4",
+                            "type": "p"
+                          },
+                          {
+                            "children": [
+                              {
+                                "text": "(c) R provides:"
+                              }
+                            ],
+                            "id": "b1alzeh2visju8u",
+                            "type": "p"
+                          },
+                          {
+                            "children": [
+                              {
+                                "id": "y4zsibe81mcwtlv",
+                                "text": " ",
+                                "type": "text"
+                              }
+                            ],
+                            "id": "w2me5mrlf3jpx9r",
+                            "src": "https://d2xvti2irp4c7t.cloudfront.net/media/bf/bf2958ff6851c362bb1ddc86592b3e34/_u4_m3_lbdtutor10a_image3_r.gif",
+                            "type": "img"
+                          },
+                          {
+                            "children": [
+                              {
+                                "text": "So roughly 71.6% of males are between 66 and 72 inches tall."
+                              }
+                            ],
+                            "id": "v5wnwf6c663jgex",
+                            "type": "p"
+                          }
+                        ],
+                        "id": "r",
+                        "type": "alternative",
+                        "value": "r"
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "id": "mevphgbfzow7a4q",
+                                "text": "StatCrunch"
+                              }
+                            ],
+                            "id": "6g1qlm1tz9253w3",
+                            "type": "title"
+                          },
+                          {
+                            "children": [
+                              {
+                                "text": "(a) StatCrunch provides:"
+                              }
+                            ],
+                            "id": "7kzds5dufx37fl5",
+                            "type": "p"
+                          },
+                          {
+                            "children": [
+                              {
+                                "id": "rzwrwsclgt21vdc",
+                                "text": " ",
+                                "type": "text"
+                              }
+                            ],
+                            "id": "iu884yz9vr2101j",
+                            "src": "https://d2xvti2irp4c7t.cloudfront.net/media/97/97341752e0963c49d850be35b2b70def/_u4_m3_lbdtutor10a_image1_statcrunch.jpg",
+                            "type": "img"
+                          },
+                          {
+                            "children": [
+                              {
+                                "text": "So roughly 7.66% of males are less than 65 inches tall."
+                              }
+                            ],
+                            "id": "k65yx94biqtaffo",
+                            "type": "p"
+                          },
+                          {
+                            "children": [
+                              {
+                                "text": "(b) StatCrunch provides:"
+                              }
+                            ],
+                            "id": "64rrbzic18u88g4",
+                            "type": "p"
+                          },
+                          {
+                            "children": [
+                              {
+                                "id": "dtpgd62ghap6wut",
+                                "text": " ",
+                                "type": "text"
+                              }
+                            ],
+                            "id": "bdvokq9t9f1ip5t",
+                            "src": "https://d2xvti2irp4c7t.cloudfront.net/media/45/451b4579c427060fd3bb7e13c8810615/_u4_m3_lbdtutor10a_image2_statcrunch.jpg",
+                            "type": "img"
+                          },
+                          {
+                            "children": [
+                              {
+                                "text": "So roughly 1.6% of males are more than 75 inches tall."
+                              }
+                            ],
+                            "id": "ynp13u6ez715qmi",
+                            "type": "p"
+                          },
+                          {
+                            "children": [
+                              {
+                                "text": "(c) StatCrunch provides:"
+                              }
+                            ],
+                            "id": "isgyjtkfafs6p0j",
+                            "type": "p"
+                          },
+                          {
+                            "children": [
+                              {
+                                "id": "df5cdm5pempfvr8",
+                                "text": " ",
+                                "type": "text"
+                              }
+                            ],
+                            "id": "copjltzeasprjx8",
+                            "src": "https://d2xvti2irp4c7t.cloudfront.net/media/89/89d444d99df9df7704a287cff11ce599/_u4_m3_lbdtutor10a_image3_statcrunch.jpg",
+                            "type": "img"
+                          },
+                          {
+                            "children": [
+                              {
+                                "text": "and therefore P(66 < X < 72) = 0.8580116 − 0.14198838 = 0.71602322."
+                              }
+                            ],
+                            "id": "luw6fppw0eo23t6",
+                            "type": "p"
+                          },
+                          {
+                            "children": [
+                              {
+                                "text": "So roughly 71.6% of males are between 66 and 72 inches tall."
+                              }
+                            ],
+                            "id": "7vlxpz4rmsc1e42",
+                            "type": "p"
+                          }
+                        ],
+                        "id": "StatCrunch",
+                        "type": "alternative",
+                        "value": "StatCrunch"
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "id": "lztld86i99dm8vs",
+                                "text": "Minitab"
+                              }
+                            ],
+                            "id": "otopn9oca0tb79p",
+                            "type": "title"
+                          },
+                          {
+                            "children": [
+                              {
+                                "text": "(a) Minitab provides:"
+                              }
+                            ],
+                            "id": "dclmb40dh8ir4iv",
+                            "type": "p"
+                          },
+                          {
+                            "children": [
+                              {
+                                "id": "fwwy7uayyow7a80",
+                                "text": " ",
+                                "type": "text"
+                              }
+                            ],
+                            "id": "dx0c4aw2pc9035z",
+                            "src": "https://d2xvti2irp4c7t.cloudfront.net/media/de/deec4c19491e0bc97c6dd9863bf29d7b/_u4_m3_lbdtutor10a_image1_minitab.gif",
+                            "type": "img"
+                          },
+                          {
+                            "children": [
+                              {
+                                "text": "So roughly 7.66% of males are less than 65 inches tall."
+                              }
+                            ],
+                            "id": "9n9wc0thxksudx9",
+                            "type": "p"
+                          },
+                          {
+                            "children": [
+                              {
+                                "text": "(b) Minitab provides:"
+                              }
+                            ],
+                            "id": "jxpsubxm0hxq375",
+                            "type": "p"
+                          },
+                          {
+                            "children": [
+                              {
+                                "id": "krrqjtljj8u9dcr",
+                                "text": " ",
+                                "type": "text"
+                              }
+                            ],
+                            "id": "o0aq9m4o4dhy2ms",
+                            "src": "https://d2xvti2irp4c7t.cloudfront.net/media/ea/ea6cdb14b6aa7cb6281de191a8509c87/_u4_m3_lbdtutor10a_image2_minitab.gif",
+                            "type": "img"
+                          },
+                          {
+                            "children": [
+                              {
+                                "text": "P(X > 75) = 1 − 0.983938 = 0.016062, so roughly 1.6% of males are more than 75 inches tall."
+                              }
+                            ],
+                            "id": "r4izbq1vvqsszgw",
+                            "type": "p"
+                          },
+                          {
+                            "children": [
+                              {
+                                "text": "(c) Minitab provides:"
+                              }
+                            ],
+                            "id": "bbfqk6i5p02v49r",
+                            "type": "p"
+                          },
+                          {
+                            "children": [
+                              {
+                                "id": "jh9cimzyvnoxd1g",
+                                "text": " ",
+                                "type": "text"
+                              }
+                            ],
+                            "id": "9za9jyop92rougq",
+                            "src": "https://d2xvti2irp4c7t.cloudfront.net/media/62/62e965c0175d3cab1234d91e25c344aa/_u4_m3_lbdtutor10a_image3_minitab.gif",
+                            "type": "img"
+                          },
+                          {
+                            "children": [
+                              {
+                                "text": "and therefore P(66 < X < 72) = 0.858012 − 0.141988 = 0.716024."
+                              }
+                            ],
+                            "id": "7qnete988i7pj4x",
+                            "type": "p"
+                          },
+                          {
+                            "children": [
+                              {
+                                "text": "Roughly 71.6% of males are between 66 and 72 inches tall."
+                              }
+                            ],
+                            "id": "mmrhqsazgqd0eix",
+                            "type": "p"
+                          }
+                        ],
+                        "id": "minitab",
+                        "type": "alternative",
+                        "value": "minitab"
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "id": "swcjx48xlhn1k8a",
+                                "text": "Excel 2007"
+                              }
+                            ],
+                            "id": "rbtytajhahp4bwx",
+                            "type": "title"
+                          },
+                          {
+                            "children": [
+                              {
+                                "text": "(a) Excel provides:"
+                              }
+                            ],
+                            "id": "ykw83b0tjqk0ynr",
+                            "type": "p"
+                          },
+                          {
+                            "children": [
+                              {
+                                "id": "g5gb3cle5afxdoc",
+                                "text": " ",
+                                "type": "text"
+                              }
+                            ],
+                            "id": "2o32qgldg04mowc",
+                            "src": "https://d2xvti2irp4c7t.cloudfront.net/media/52/523359af6d53af1ca22228a614fcfb6c/_u4_m3_lbdtutor10a_image1_excel.gif",
+                            "type": "img"
+                          },
+                          {
+                            "children": [
+                              {
+                                "text": "So roughly 7.66% of males are less than 65 inches tall."
+                              }
+                            ],
+                            "id": "kbulud5mr5nszlr",
+                            "type": "p"
+                          },
+                          {
+                            "children": [
+                              {
+                                "text": "(b) Excel provides:"
+                              }
+                            ],
+                            "id": "w9sakgvrv4eatr0",
+                            "type": "p"
+                          },
+                          {
+                            "children": [
+                              {
+                                "id": "9xxyhr2iawm9cqy",
+                                "text": " ",
+                                "type": "text"
+                              }
+                            ],
+                            "id": "1mxkn01ikozlzdt",
+                            "src": "https://d2xvti2irp4c7t.cloudfront.net/media/6c/6cdef73ea8320a9c189790c720ead2d5/_u4_m3_lbdtutor10a_image2_excel.gif",
+                            "type": "img"
+                          },
+                          {
+                            "children": [
+                              {
+                                "text": "P(X > 75) = 1 − 0.983938 = 0.016062, so roughly 1.6% of males are more than 75 inches tall."
+                              }
+                            ],
+                            "id": "qcs8fkm2gmvujbp",
+                            "type": "p"
+                          },
+                          {
+                            "children": [
+                              {
+                                "text": "(c) Excel provides:"
+                              }
+                            ],
+                            "id": "c9nfg6446sunzbk",
+                            "type": "p"
+                          },
+                          {
+                            "children": [
+                              {
+                                "id": "78kuogiw1dv2ro4",
+                                "text": " ",
+                                "type": "text"
+                              }
+                            ],
+                            "id": "vaohqf42lgpttnb",
+                            "src": "https://d2xvti2irp4c7t.cloudfront.net/media/0d/0d0b3adf724b0562c9ca7a84c56ce814/_u4_m3_lbdtutor10a_image3_excel.gif",
+                            "type": "img"
+                          },
+                          {
+                            "children": [
+                              {
+                                "text": "and therefore P(66 < X < 72) = 0.858012 − 0.141988 = 0.716024."
+                              }
+                            ],
+                            "id": "8dgzeaivz7iw3ax",
+                            "type": "p"
+                          },
+                          {
+                            "children": [
+                              {
+                                "text": "Roughly 71.6% of males are between 66 and 72 inches tall."
+                              }
+                            ],
+                            "id": "kyw463cq11y28ks",
+                            "type": "p"
+                          }
+                        ],
+                        "id": "excel",
+                        "type": "alternative",
+                        "value": "excel"
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "id": "0pjipx7v039mbck",
+                                "text": "TI Calculator"
+                              }
+                            ],
+                            "id": "z6vm1g0sqn78l01",
+                            "type": "title"
+                          },
+                          {
+                            "children": [
+                              {
+                                "text": "(a) The TI Calculator provides:"
+                              }
+                            ],
+                            "id": "w3936bezqcx2ec3",
+                            "type": "p"
+                          },
+                          {
+                            "children": [
+                              {
+                                "id": "xgxd2r73pc8miem",
+                                "text": " ",
+                                "type": "text"
+                              }
+                            ],
+                            "id": "adqaoyv32r7qfxe",
+                            "src": "https://d2xvti2irp4c7t.cloudfront.net/media/03/03d19dc7e17015c7399fe046c5999c0d/_u4_m3_lbdtutor10a_image1_ti.jpg",
+                            "type": "img"
+                          },
+                          {
+                            "children": [
+                              {
+                                "text": "So roughly 7.66% of males are less than 65 inches tall."
+                              }
+                            ],
+                            "id": "mie8v2lkrw0cmfz",
+                            "type": "p"
+                          },
+                          {
+                            "children": [
+                              {
+                                "text": "(b) The TI Calculator provides:"
+                              }
+                            ],
+                            "id": "cqcsp9o27pazhp9",
+                            "type": "p"
+                          },
+                          {
+                            "children": [
+                              {
+                                "id": "1cnnu7c1eqpwz1b",
+                                "text": " ",
+                                "type": "text"
+                              }
+                            ],
+                            "id": "9hr45lofxnbf7vu",
+                            "src": "https://d2xvti2irp4c7t.cloudfront.net/media/00/00ea489838b3f257b2afaf827b6ca713/_u4_m3_lbdtutor10a_image2_ti.jpg",
+                            "type": "img"
+                          },
+                          {
+                            "children": [
+                              {
+                                "text": "So roughly 1.6% of males are more than 75 inches tall."
+                              }
+                            ],
+                            "id": "2dx70w5b2fhhl72",
+                            "type": "p"
+                          },
+                          {
+                            "children": [
+                              {
+                                "text": "(c) The TI Calculator provides:"
+                              }
+                            ],
+                            "id": "2lrxrofckyz969n",
+                            "type": "p"
+                          },
+                          {
+                            "children": [
+                              {
+                                "id": "ji48dnimqqgu0bb",
+                                "text": " ",
+                                "type": "text"
+                              }
+                            ],
+                            "id": "gqk26ul84vr49i4",
+                            "src": "https://d2xvti2irp4c7t.cloudfront.net/media/c5/c57b98d6d1df1e80bcd29004b93fb0b7/_u4_m3_lbdtutor10a_image3_ti.jpg",
+                            "type": "img"
+                          },
+                          {
+                            "children": [
+                              {
+                                "text": "So roughly 71.6% of males are between 66 and 72 inches tall."
+                              }
+                            ],
+                            "id": "38oj75wc0c44xe7",
+                            "type": "p"
+                          }
+                        ],
+                        "id": "ti",
+                        "type": "alternative",
+                        "value": "ti"
+                      }
+                    ],
+                    "group": "statistics.package",
+                    "id": "607bknyrmo1x3bg",
+                    "strategy": "user_section_preference",
+                    "type": "alternatives"
+                  }
+                ],
+                "id": "2275048443"
+              },
+              "id": "1226137997",
+              "rule": "input like {.*}",
+              "score": 1
+            }
+          ],
+          "scoringStrategy": "average"
+        }
+      ],
+      "previewText": "",
+      "transformations": []
+    },
+    "inputType": "textarea",
+    "stem": {
+      "content": [
+        {
+          "children": [
+            {
+              "text": "Adult male height (X) follows (approximately) a normal distribution with a mean of 69 inches and a standard deviation of 2.8 inches."
+            }
+          ],
+          "id": "gdlwiahd0styg7q",
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "(a) What proportion of males are less than 65 inches tall? In other words, what is P(X < 65)?"
+            }
+          ],
+          "id": "tuzrhbx15phx43w",
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "(b) What proportion of males are more than 75 inches tall? In other words, what is P(X > 75)?"
+            }
+          ],
+          "id": "zjw5wv67ktu54vd",
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "(c) What proportion of males are between 66 and 72 inches tall? In other words, what is P(66 < X < 72)?"
+            }
+          ],
+          "id": "s0zycbx0xw7j1bg",
+          "type": "p"
+        }
+      ]
+    },
+    "submitAndCompare": true
+  },
+  "objectives": {
+    "859961661": []
+  },
+  "originalFile": "",
+  "unresolvedReferences": [],
+  "subType": "oli_short_answer"
+}

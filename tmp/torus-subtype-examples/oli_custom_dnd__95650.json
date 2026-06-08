@@ -1,0 +1,1155 @@
+{
+  "id": "95650",
+  "scope": "embedded",
+  "type": "Activity",
+  "tags": [],
+  "title": "type_dd_tutor2-q1",
+  "content": {
+    "authoring": {
+      "parts": [
+        {
+          "explanation": null,
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "w4k3bxp3b0x1cjc",
+                  "type": "p"
+                }
+              ],
+              "id": "324650887"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "2zgkiplweztosq9",
+                  "type": "p"
+                }
+              ],
+              "id": "355502586"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "iw7j5vsqu5drhay",
+                  "type": "p"
+                }
+              ],
+              "id": "409670715"
+            }
+          ],
+          "id": "dropAreaA",
+          "objectives": [],
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct. A type I error occurs when the H"
+                      },
+                      {
+                        "sub": true,
+                        "text": "0"
+                      },
+                      {
+                        "text": " is true, but, we reject it (H"
+                      },
+                      {
+                        "sub": true,
+                        "text": "0"
+                      },
+                      {
+                        "text": ") and, thus, accept the H"
+                      },
+                      {
+                        "sub": true,
+                        "text": "a"
+                      },
+                      {
+                        "text": "."
+                      }
+                    ],
+                    "id": "vmoi88tve4xi6yh",
+                    "type": "p"
+                  }
+                ],
+                "id": "2434915409"
+              },
+              "id": "1457312652",
+              "legacyMatch": "typeIError",
+              "rule": "input like {dropAreaA_typeIError}",
+              "score": 10
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. A type I error occurs when the H"
+                      },
+                      {
+                        "sub": true,
+                        "text": "0"
+                      },
+                      {
+                        "text": " is true, but we reject it (H"
+                      },
+                      {
+                        "sub": true,
+                        "text": "0"
+                      },
+                      {
+                        "text": ") and, thus, accept the H"
+                      },
+                      {
+                        "sub": true,
+                        "text": "a"
+                      },
+                      {
+                        "text": ". Please try again."
+                      }
+                    ],
+                    "id": "modt45lgax9xjmt",
+                    "type": "p"
+                  }
+                ],
+                "id": "1966834726"
+              },
+              "id": "4150468192",
+              "legacyMatch": "typeIIError",
+              "rule": "input like {dropAreaA_typeIIError}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. A type I error occurs when the H"
+                      },
+                      {
+                        "sub": true,
+                        "text": "0"
+                      },
+                      {
+                        "text": " is true, but we reject it (H"
+                      },
+                      {
+                        "sub": true,
+                        "text": "0"
+                      },
+                      {
+                        "text": ") and , thus, accept the H"
+                      },
+                      {
+                        "sub": true,
+                        "text": "a"
+                      },
+                      {
+                        "text": ". Please try again."
+                      }
+                    ],
+                    "id": "56et3ubh9i9i55x",
+                    "type": "p"
+                  }
+                ],
+                "id": "1538922619"
+              },
+              "id": "277066021",
+              "legacyMatch": "correctDecision1",
+              "rule": "input like {dropAreaA_correctDecision1}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. A Type I error occurs when the H"
+                      },
+                      {
+                        "sub": true,
+                        "text": "0"
+                      },
+                      {
+                        "text": " is true, but we reject it (H"
+                      },
+                      {
+                        "sub": true,
+                        "text": "0"
+                      },
+                      {
+                        "text": ") and, thus, accept the H"
+                      },
+                      {
+                        "sub": true,
+                        "text": "a"
+                      },
+                      {
+                        "text": ". Please try again."
+                      }
+                    ],
+                    "id": "l6onw8lhqjufp6h",
+                    "type": "p"
+                  }
+                ],
+                "id": "4214416664"
+              },
+              "id": "745017038",
+              "legacyMatch": "correctDecision2",
+              "rule": "input like {dropAreaA_correctDecision2}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect."
+                      }
+                    ],
+                    "id": "d82iqx6keuw8qmx",
+                    "type": "p"
+                  }
+                ],
+                "id": "2985113566"
+              },
+              "id": "1175413910",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average"
+        },
+        {
+          "explanation": null,
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "yptzneqmotoaioz",
+                  "type": "p"
+                }
+              ],
+              "id": "2382662724"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "re69zfitggryu17",
+                  "type": "p"
+                }
+              ],
+              "id": "849926545"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "pbtmovit39a1xel",
+                  "type": "p"
+                }
+              ],
+              "id": "2795161139"
+            }
+          ],
+          "id": "dropAreaB",
+          "objectives": [],
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "That is incorrect. A type II error occurs when we fail to reject the H"
+                      },
+                      {
+                        "sub": true,
+                        "text": "0"
+                      },
+                      {
+                        "text": ", when it (H"
+                      },
+                      {
+                        "sub": true,
+                        "text": "0"
+                      },
+                      {
+                        "text": ") is false. Please try again."
+                      }
+                    ],
+                    "id": "p0r5onn4rtcfkxp",
+                    "type": "p"
+                  }
+                ],
+                "id": "2377397088"
+              },
+              "id": "2350071031",
+              "legacyMatch": "typeIError",
+              "rule": "input like {dropAreaB_typeIError}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. A type II error occurs when we fail to reject the H"
+                      },
+                      {
+                        "sub": true,
+                        "text": "0"
+                      },
+                      {
+                        "text": ", when it is false. Please try again."
+                      }
+                    ],
+                    "id": "etpig27zqnd8tmu",
+                    "type": "p"
+                  }
+                ],
+                "id": "2307103760"
+              },
+              "id": "206905883",
+              "legacyMatch": "typeIIError",
+              "rule": "input like {dropAreaB_typeIIError}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct. A Type II error occurs when we fail to reject the H"
+                      },
+                      {
+                        "sub": true,
+                        "text": "0"
+                      },
+                      {
+                        "text": ", when it (H"
+                      },
+                      {
+                        "sub": true,
+                        "text": "0"
+                      },
+                      {
+                        "text": ") is false."
+                      }
+                    ],
+                    "id": "uhcnr0vxyypuojv",
+                    "type": "p"
+                  }
+                ],
+                "id": "637415288"
+              },
+              "id": "269852459",
+              "legacyMatch": "correctDecision1",
+              "rule": "input like {dropAreaB_correctDecision1}",
+              "score": 10
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct. A Type II error occurs when we fail to reject the H"
+                      },
+                      {
+                        "sub": true,
+                        "text": "0"
+                      },
+                      {
+                        "text": ", when it (H"
+                      },
+                      {
+                        "sub": true,
+                        "text": "0"
+                      },
+                      {
+                        "text": ") is false."
+                      }
+                    ],
+                    "id": "lih8jqr6wvw3is3",
+                    "type": "p"
+                  }
+                ],
+                "id": "1949313298"
+              },
+              "id": "3632777178",
+              "legacyMatch": "correctDecision2",
+              "rule": "input like {dropAreaB_correctDecision2}",
+              "score": 10
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect."
+                      }
+                    ],
+                    "id": "z0cjqjgz31vbjma",
+                    "type": "p"
+                  }
+                ],
+                "id": "1468307626"
+              },
+              "id": "2759468127",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average"
+        },
+        {
+          "explanation": null,
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "osfrnewtibv19tx",
+                  "type": "p"
+                }
+              ],
+              "id": "1670362894"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "v8j1jayv5xm6fm9",
+                  "type": "p"
+                }
+              ],
+              "id": "2316237009"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "n07urp03vu4j7nz",
+                  "type": "p"
+                }
+              ],
+              "id": "1606821740"
+            }
+          ],
+          "id": "dropAreaC",
+          "objectives": [],
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "That is incorrect. When the H"
+                      },
+                      {
+                        "sub": true,
+                        "text": "0"
+                      },
+                      {
+                        "text": " is true, to be a correct decision, we need to fail to reject the H"
+                      },
+                      {
+                        "sub": true,
+                        "text": "0"
+                      },
+                      {
+                        "text": ". Please try again."
+                      }
+                    ],
+                    "id": "3xltgd0gls8shxj",
+                    "type": "p"
+                  }
+                ],
+                "id": "893356403"
+              },
+              "id": "3678540880",
+              "legacyMatch": "typeIError",
+              "rule": "input like {dropAreaC_typeIError}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "That is incorrect. When the H"
+                      },
+                      {
+                        "sub": true,
+                        "text": "0"
+                      },
+                      {
+                        "text": " is true, to be a correct decision, we need to fail to reject the H"
+                      },
+                      {
+                        "sub": true,
+                        "text": "0"
+                      },
+                      {
+                        "text": ". Please try again."
+                      }
+                    ],
+                    "id": "1pvcnvynsl9iic2",
+                    "type": "p"
+                  }
+                ],
+                "id": "1942943373"
+              },
+              "id": "30002655",
+              "legacyMatch": "typeIIError",
+              "rule": "input like {dropAreaC_typeIIError}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct. This would be a correct decision, as the H"
+                      },
+                      {
+                        "sub": true,
+                        "text": "0"
+                      },
+                      {
+                        "text": " is rejected, when it is false."
+                      }
+                    ],
+                    "id": "2axp75ur19mmp2d",
+                    "type": "p"
+                  }
+                ],
+                "id": "2917611466"
+              },
+              "id": "995278994",
+              "legacyMatch": "correctDecision1",
+              "rule": "input like {dropAreaC_correctDecision1}",
+              "score": 10
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct. This would be a correct decision, as the H"
+                      },
+                      {
+                        "sub": true,
+                        "text": "0"
+                      },
+                      {
+                        "text": " is rejected, when it is false."
+                      }
+                    ],
+                    "id": "oy0odh4wxt4zo4d",
+                    "type": "p"
+                  }
+                ],
+                "id": "2158254739"
+              },
+              "id": "1690154979",
+              "legacyMatch": "correctDecision2",
+              "rule": "input like {dropAreaC_correctDecision2}",
+              "score": 10
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect."
+                      }
+                    ],
+                    "id": "n1x0d47uuqgdrgv",
+                    "type": "p"
+                  }
+                ],
+                "id": "2334320744"
+              },
+              "id": "3765181034",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average"
+        },
+        {
+          "explanation": null,
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "vkstrl5ynb5n6wt",
+                  "type": "p"
+                }
+              ],
+              "id": "1489516169"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "p2xzb8d5s8ya64e",
+                  "type": "p"
+                }
+              ],
+              "id": "1010455178"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "ubbtfsteymci0ww",
+                  "type": "p"
+                }
+              ],
+              "id": "2858817948"
+            }
+          ],
+          "id": "dropAreaD",
+          "objectives": [],
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "That is incorrect. When the H"
+                      },
+                      {
+                        "sub": true,
+                        "text": "0"
+                      },
+                      {
+                        "text": " is true, to be a correct decision, we need to fail to reject the H"
+                      },
+                      {
+                        "sub": true,
+                        "text": "0"
+                      },
+                      {
+                        "text": ". Please try again."
+                      }
+                    ],
+                    "id": "4e3grgj9xovo16v",
+                    "type": "p"
+                  }
+                ],
+                "id": "18634001"
+              },
+              "id": "44916435",
+              "legacyMatch": "typeIError",
+              "rule": "input like {dropAreaD_typeIError}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct. We do not reject H"
+                      },
+                      {
+                        "sub": true,
+                        "text": "0"
+                      },
+                      {
+                        "text": " when it is true."
+                      }
+                    ],
+                    "id": "4h039akk8c36q2m",
+                    "type": "p"
+                  }
+                ],
+                "id": "2516436774"
+              },
+              "id": "129333256",
+              "legacyMatch": "typeIIError",
+              "rule": "input like {dropAreaD_typeIIError}",
+              "score": 10
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "That is incorrect. When the H"
+                      },
+                      {
+                        "sub": true,
+                        "text": "0"
+                      },
+                      {
+                        "text": " is false, to be a correct decision, we would need reject the H"
+                      },
+                      {
+                        "sub": true,
+                        "text": "0"
+                      },
+                      {
+                        "text": ". Please try again."
+                      }
+                    ],
+                    "id": "vzk3gjqjzker43k",
+                    "type": "p"
+                  }
+                ],
+                "id": "3963745164"
+              },
+              "id": "3207700058",
+              "legacyMatch": "correctDecision1",
+              "rule": "input like {dropAreaD_correctDecision1}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "That is incorrect. When the H"
+                      },
+                      {
+                        "sub": true,
+                        "text": "0"
+                      },
+                      {
+                        "text": " is false, to be a correct decision, we would need reject the H"
+                      },
+                      {
+                        "sub": true,
+                        "text": "0"
+                      },
+                      {
+                        "text": ". Please try again."
+                      }
+                    ],
+                    "id": "grvdttevygye4ii",
+                    "type": "p"
+                  }
+                ],
+                "id": "563431907"
+              },
+              "id": "1011742942",
+              "legacyMatch": "correctDecision2",
+              "rule": "input like {dropAreaD_correctDecision2}",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect."
+                      }
+                    ],
+                    "id": "kd9ua4mgh3a9acm",
+                    "type": "p"
+                  }
+                ],
+                "id": "346601372"
+              },
+              "id": "830544207",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average"
+        }
+      ],
+      "previewText": "",
+      "targeted": [
+        [
+          [
+            "dropAreaA_typeIError"
+          ],
+          "1457312652"
+        ],
+        [
+          [
+            "dropAreaA_typeIIError"
+          ],
+          "4150468192"
+        ],
+        [
+          [
+            "dropAreaA_correctDecision1"
+          ],
+          "277066021"
+        ],
+        [
+          [
+            "dropAreaA_correctDecision2"
+          ],
+          "745017038"
+        ],
+        [
+          [
+            "dropAreaB_typeIError"
+          ],
+          "2350071031"
+        ],
+        [
+          [
+            "dropAreaB_typeIIError"
+          ],
+          "206905883"
+        ],
+        [
+          [
+            "dropAreaB_correctDecision1"
+          ],
+          "269852459"
+        ],
+        [
+          [
+            "dropAreaB_correctDecision2"
+          ],
+          "3632777178"
+        ],
+        [
+          [
+            "dropAreaC_typeIError"
+          ],
+          "3678540880"
+        ],
+        [
+          [
+            "dropAreaC_typeIIError"
+          ],
+          "30002655"
+        ],
+        [
+          [
+            "dropAreaC_correctDecision1"
+          ],
+          "995278994"
+        ],
+        [
+          [
+            "dropAreaC_correctDecision2"
+          ],
+          "1690154979"
+        ],
+        [
+          [
+            "dropAreaD_typeIError"
+          ],
+          "44916435"
+        ],
+        [
+          [
+            "dropAreaD_typeIIError"
+          ],
+          "129333256"
+        ],
+        [
+          [
+            "dropAreaD_correctDecision1"
+          ],
+          "3207700058"
+        ],
+        [
+          [
+            "dropAreaD_correctDecision2"
+          ],
+          "1011742942"
+        ]
+      ],
+      "transformations": []
+    },
+    "choices": [
+      {
+        "content": [
+          {
+            "id": "vx91vwlq3rkbqb9",
+            "text": "typeIError"
+          }
+        ],
+        "id": "dropAreaA_typeIError"
+      },
+      {
+        "content": [
+          {
+            "id": "pvm4jqal6xve2gc",
+            "text": "typeIIError"
+          }
+        ],
+        "id": "dropAreaA_typeIIError"
+      },
+      {
+        "content": [
+          {
+            "id": "3c82d9jdaajvoae",
+            "text": "correctDecision1"
+          }
+        ],
+        "id": "dropAreaA_correctDecision1"
+      },
+      {
+        "content": [
+          {
+            "id": "jb1qopzsyy3v1xa",
+            "text": "correctDecision2"
+          }
+        ],
+        "id": "dropAreaA_correctDecision2"
+      },
+      {
+        "content": [
+          {
+            "id": "bwcw6nqu3vj2uk9",
+            "text": "typeIError"
+          }
+        ],
+        "id": "dropAreaB_typeIError"
+      },
+      {
+        "content": [
+          {
+            "id": "6kl0uqrhx2f9utv",
+            "text": "typeIIError"
+          }
+        ],
+        "id": "dropAreaB_typeIIError"
+      },
+      {
+        "content": [
+          {
+            "id": "p6psrrldlkpmckr",
+            "text": "correctDecision1"
+          }
+        ],
+        "id": "dropAreaB_correctDecision1"
+      },
+      {
+        "content": [
+          {
+            "id": "q6qy6btqoeugbrp",
+            "text": "correctDecision2"
+          }
+        ],
+        "id": "dropAreaB_correctDecision2"
+      },
+      {
+        "content": [
+          {
+            "id": "poa1762f6tbwhqe",
+            "text": "typeIError"
+          }
+        ],
+        "id": "dropAreaC_typeIError"
+      },
+      {
+        "content": [
+          {
+            "id": "zrp8nrumx4mnoap",
+            "text": "typeIIError"
+          }
+        ],
+        "id": "dropAreaC_typeIIError"
+      },
+      {
+        "content": [
+          {
+            "id": "n0ldbjz26lawo3r",
+            "text": "correctDecision1"
+          }
+        ],
+        "id": "dropAreaC_correctDecision1"
+      },
+      {
+        "content": [
+          {
+            "id": "1d3r7me9b2esn4t",
+            "text": "correctDecision2"
+          }
+        ],
+        "id": "dropAreaC_correctDecision2"
+      },
+      {
+        "content": [
+          {
+            "id": "o4nurbr0dd2qkm3",
+            "text": "typeIError"
+          }
+        ],
+        "id": "dropAreaD_typeIError"
+      },
+      {
+        "content": [
+          {
+            "id": "iz8i3g2jo48qqyt",
+            "text": "typeIIError"
+          }
+        ],
+        "id": "dropAreaD_typeIIError"
+      },
+      {
+        "content": [
+          {
+            "id": "l93hqdp0f9s55m1",
+            "text": "correctDecision1"
+          }
+        ],
+        "id": "dropAreaD_correctDecision1"
+      },
+      {
+        "content": [
+          {
+            "id": "vfunggjyeayc61s",
+            "text": "correctDecision2"
+          }
+        ],
+        "id": "dropAreaD_correctDecision2"
+      }
+    ],
+    "height": "500",
+    "initiators": "<html><head></head><body><div input_val=\"typeIError\" class=\"initiator\">Type I error</div>\n\t\t\t<div input_val=\"typeIIError\" class=\"initiator\">Type II error</div>\n\t\t\t<div input_val=\"correctDecision1\" class=\"initiator\">Correct Decision</div>\n\t\t\t<div input_val=\"correctDecision2\" class=\"initiator\">Correct Decision</div>\n\t\t\t\n\t\t\n    </body></html>",
+    "inputs": [
+      {
+        "choiceIds": [
+          "dropAreaA_typeIError",
+          "dropAreaA_typeIIError",
+          "dropAreaA_correctDecision1",
+          "dropAreaA_correctDecision2"
+        ],
+        "id": "dropAreaA",
+        "inputType": "dropdown",
+        "partId": "dropAreaA",
+        "shuffle": "false"
+      },
+      {
+        "choiceIds": [
+          "dropAreaB_typeIError",
+          "dropAreaB_typeIIError",
+          "dropAreaB_correctDecision1",
+          "dropAreaB_correctDecision2"
+        ],
+        "id": "dropAreaB",
+        "inputType": "dropdown",
+        "partId": "dropAreaB",
+        "shuffle": "false"
+      },
+      {
+        "choiceIds": [
+          "dropAreaC_typeIError",
+          "dropAreaC_typeIIError",
+          "dropAreaC_correctDecision1",
+          "dropAreaC_correctDecision2"
+        ],
+        "id": "dropAreaC",
+        "inputType": "dropdown",
+        "partId": "dropAreaC",
+        "shuffle": "false"
+      },
+      {
+        "choiceIds": [
+          "dropAreaD_typeIError",
+          "dropAreaD_typeIIError",
+          "dropAreaD_correctDecision1",
+          "dropAreaD_correctDecision2"
+        ],
+        "id": "dropAreaD",
+        "inputType": "dropdown",
+        "partId": "dropAreaD",
+        "shuffle": "false"
+      }
+    ],
+    "layoutStyles": "\r\n        \r\n\t\t\t\t\r\n#q1_target_container0 {  \r\n    margin: auto;\r\n    position:relative; <!-- This is important-->\r\n    width: 680px;  \r\n    height: 200px;\r\n   \r\n}\t\r\n\t.tbody .th {\r\n    text-align: center;\r\n}\t\t\r\n\t\t\t.target \r\n\t\t\t{  \r\n\t\t\t  border: 2px;\r\n\t\t\t  border-style: dashed;\r\n\t\t\t  border-color: #999999; \r\n\t\t\t  display: inline-block; \r\n\t\t\t  position: absolute; \r\n\t\t\t  min-width: 170px;  \r\n\t\t\t  width: 170px;  \r\n\t\t\t  min-height: 40px; \r\n\t\t\t  height: 40px;\r\n\t\t\t  \r\n\t\t\t}\r\n\t\t\t\r\n\t\t\t\r\n\t\t\t.initiator\r\n\t\t\t{\r\n\t\t\t\tdisplay: inline-block;\r\n\t\t\t\tmin-height: 35px;\r\n\t\t\t\tmax-height: 35px;\r\n\t\t\t\theight: 35px;\r\n\t\t\t\tmin-width: 170px;\r\n\t\t\t\tmax-width: 170px;\r\n\t\t\t\tbackground: #ffc;\r\n\t\t\t\ttext-align: center;\r\n\t\t\t\tpadding: 3px;\r\n\t\t\t\tcursor: move;\r\n\t\t\t\tborder-style: solid;\r\n    \t\t\tborder-width: 1px;\r\n    \t\t\tborder-color: black;\r\n\t\t\t}\r\n\t\t\t\r\n\t\t\t.dragdropspacer\r\n\t\t\t{\r\n\t\t\t\theight: 35px;\r\n\t\t\t}\r\n\t\t\t\r\n\t\t\r\n\t\t\r\n    ",
+    "stem": {
+      "content": []
+    },
+    "submitPerPart": true,
+    "targetArea": "<html><head></head><body><div id=\"q1_target_container0\">\n\t\t\n\t\t\n<div id=\"toplabel0\" style=\"position:absolute;top:0px; left:150px; width:175px; line-height:15px\"><b>We Reject the <i>H</i><sub>0</sub> </b></div>\n<div id=\"toplabel1\" style=\"position:absolute;top:0px;  left:325px;width:190px; line-height:15px\"><b>We Fail to Reject the <i>H</i><sub>0</sub></b></div>\n\n<div id=\"toplabel0b\" style=\"position:absolute;top:20px; left:150px; width:175px; line-height:14px\">(accept <i>H</i><sub>a</sub>)</div>\n<div id=\"toplabel1b\" style=\"position:absolute;top:20px;  left:325px;width:190px; line-height:14px\">(not enough evidence to accept <i>H</i><sub>a</sub>)</div>\n\n\n<div id=\"leftlabel1\" style=\"position:absolute;top:64px; left:0px\"><b><i>H<sub>0</sub> is true</i></b></div>\n<div id=\"leftlabel2\" style=\"position:absolute;top:106px; left:0px\"><b><i>H</i><sub>0</sub> is false</b></div>\n\n<div id=\"leftlabel2b\" style=\"position:absolute;top:126px; left:0px\">(<i>H</i><sub>a</sub> is true)</div>\n\n\n<div input_ref=\"dropAreaA\" class=\"target\" style=\"left:150px; top:64px; width:175px; height:40px;\"> </div>\n<div input_ref=\"dropAreaB\" class=\"target\" style=\"left:325px; top:64px; width:175px; height:40px;\"> </div>\n\n<div input_ref=\"dropAreaC\" class=\"target\" style=\"left:150px; top:106px; width:175px; height:40px;\"> </div>\n<div input_ref=\"dropAreaD\" class=\"target\" style=\"left:325px; top:106px; width:175px; height:40px;\"> </div>\n\t\t    </div>\n\t\t\t\n\t\t\n    </body></html>",
+    "width": "200"
+  },
+  "objectives": {
+    "dropAreaA": [],
+    "dropAreaB": [],
+    "dropAreaC": [],
+    "dropAreaD": []
+  },
+  "originalFile": "",
+  "unresolvedReferences": [],
+  "subType": "oli_custom_dnd"
+}

@@ -1,0 +1,347 @@
+{
+  "id": "96348",
+  "scope": "embedded",
+  "type": "Activity",
+  "tags": [],
+  "title": "eda_intro_new_digt_3-q1",
+  "content": {
+    "authoring": {
+      "correct": [
+        [
+          "iia",
+          "iic"
+        ],
+        "3669220619"
+      ],
+      "incorrect": [],
+      "parts": [
+        {
+          "explanation": null,
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "emwte28ak0p6p69",
+                  "type": "p"
+                }
+              ],
+              "id": "2192370827"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "rbsxz8r03hk2p5k",
+                  "type": "p"
+                }
+              ],
+              "id": "2857079280"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "90snl0l9z0xiw9t",
+                  "type": "p"
+                }
+              ],
+              "id": "4153619901"
+            }
+          ],
+          "id": "q1_p1",
+          "objectives": [
+            "catvsquant"
+          ],
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. You are correct that Treat is a categorical variable because the treatment received by the patients is in the form of categories (Lithium, Imipramine, or Placebo). However, there is at least one other variable that is also categorical."
+                      }
+                    ],
+                    "id": "erqz9dvypq3idl9",
+                    "type": "p"
+                  }
+                ],
+                "id": "2552785598"
+              },
+              "id": "1729357693",
+              "legacyMatch": "iia",
+              "rule": "(!(input like {iic})) && ((!(input like {iib})) && (input like {iia}))",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. AcuteT is not a categorical variable; rather, it is a quantitative variable because it can take on multiple numerical values to represent a characteristic of the patient."
+                      }
+                    ],
+                    "id": "qrpxhyreakyp59d",
+                    "type": "p"
+                  }
+                ],
+                "id": "1597835805"
+              },
+              "id": "3385677933",
+              "legacyMatch": "iib",
+              "rule": "(!(input like {iic})) && ((!(input like {iia})) && (input like {iib}))",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. You are correct that Outcome is a categorical variable, since recurrence is in the form of two categories (Recurrence or No Recurrence). However, there is at least one other variable that is also categorical."
+                      }
+                    ],
+                    "id": "jvim2gsmzyk5ch4",
+                    "type": "p"
+                  }
+                ],
+                "id": "4224441286"
+              },
+              "id": "1195476387",
+              "legacyMatch": "iic",
+              "rule": "(!(input like {iib})) && ((!(input like {iia})) && (input like {iic}))",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. Treat is a categorical variable because the treatment received by the patients is in the form of categories (Lithium, Imipramine, or Placebo). However, AcuteT is not a categorical variable; rather, it is a quantitative variable because it can take on multiple numerical values to represent a characteristic of the patient."
+                      }
+                    ],
+                    "id": "kzuq6d2rtnw7pcq",
+                    "type": "p"
+                  }
+                ],
+                "id": "3670550344"
+              },
+              "id": "2240133233",
+              "legacyMatch": "iia,iib",
+              "rule": "(!(input like {iic})) && (input like {iib} && (input like {iia}))",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct. Treat is a categorical variable because the treatment received by the patients is in the form of categories (Lithium, Imipramine, or Placebo). Outcome is also a categorical variable, since recurrence is in the form of two categories (Recurrence or No Recurrence)."
+                      }
+                    ],
+                    "id": "3xeoqly05kiohwi",
+                    "type": "p"
+                  }
+                ],
+                "id": "3983574489"
+              },
+              "id": "3669220619",
+              "legacyMatch": "iia,iic",
+              "rule": "(!(input like {iib})) && (input like {iic} && (input like {iia}))",
+              "score": 10
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. You are correct that Outcome is a categorical variable, since recurrence is in the form of two categories (Recurrence or No Recurrence). However, there is at least one other variable that is also categorical. However, AcuteT is not a categorical variable; rather, it is a quantitative variable because it can take on multiple numerical values to represent a characteristic of the patient."
+                      }
+                    ],
+                    "id": "v06g5ddse8hziw7",
+                    "type": "p"
+                  }
+                ],
+                "id": "3016773011"
+              },
+              "id": "2491466565",
+              "legacyMatch": "iib,iic",
+              "rule": "(!(input like {iia})) && (input like {iic} && (input like {iib}))",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. You are correct that that both Treat and Outcome are categorical variables. Treat is a categorical variable because the treatment received by the patients is in the form of categories (Lithium, Imipramine, or Placebo). Outcome is also a categorical variable, since recurrence is in the form of two categories (Recurrence or No Recurrence). However, AcuteT is not a categorical variable; rather, it is a quantitative variable because it can take on multiple numerical values to represent a characteristic of the patient."
+                      }
+                    ],
+                    "id": "vz8dm9vmmudcsf1",
+                    "type": "p"
+                  }
+                ],
+                "id": "4281447987"
+              },
+              "id": "1455339235",
+              "legacyMatch": "iia,iib,iic",
+              "rule": "input like {iic} && (input like {iib} && (input like {iia}))",
+              "score": 0
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. There is at least one variable that is categorical. "
+                      }
+                    ],
+                    "id": "ncizts5a8bv08zb",
+                    "type": "p"
+                  }
+                ],
+                "id": "3499897967"
+              },
+              "id": "402177404",
+              "legacyMatch": ".*",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average",
+          "targeted": []
+        }
+      ],
+      "previewText": "",
+      "targeted": [
+        [
+          [
+            "iia"
+          ],
+          "1729357693"
+        ],
+        [
+          [
+            "iib"
+          ],
+          "3385677933"
+        ],
+        [
+          [
+            "iic"
+          ],
+          "1195476387"
+        ],
+        [
+          [
+            "iia",
+            "iib"
+          ],
+          "2240133233"
+        ],
+        [
+          [
+            "iib",
+            "iic"
+          ],
+          "2491466565"
+        ],
+        [
+          [
+            "iia",
+            "iib",
+            "iic"
+          ],
+          "1455339235"
+        ]
+      ],
+      "transformations": [],
+      "version": 2
+    },
+    "choices": [
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "Treat"
+              }
+            ],
+            "id": "3i4yh3mk9w1z3ee",
+            "type": "p"
+          }
+        ],
+        "id": "iia"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "AcuteT"
+              }
+            ],
+            "id": "eb7frjx02d59v9g",
+            "type": "p"
+          }
+        ],
+        "id": "iib"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "Outcome"
+              }
+            ],
+            "id": "y7pixf2t9iwes0r",
+            "type": "p"
+          }
+        ],
+        "id": "iic"
+      }
+    ],
+    "stem": {
+      "content": [
+        {
+          "children": [
+            {
+              "text": "Which of the following variables is categorical? Check all that apply."
+            }
+          ],
+          "id": "mnrnvnjebdy10a3",
+          "type": "p"
+        }
+      ]
+    },
+    "type": "TargetedCATA"
+  },
+  "objectives": {
+    "q1_p1": [
+      "95254"
+    ]
+  },
+  "originalFile": "",
+  "unresolvedReferences": [],
+  "subType": "oli_check_all_that_apply"
+}

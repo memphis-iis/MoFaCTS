@@ -1,0 +1,163 @@
+{
+  "id": "95471",
+  "scope": "embedded",
+  "type": "Activity",
+  "tags": [],
+  "title": "u3_m3_discreteprobdist4_tutor1-q2",
+  "content": {
+    "authoring": {
+      "parts": [
+        {
+          "explanation": null,
+          "hints": [
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "8ept52duospih4k",
+                  "type": "p"
+                }
+              ],
+              "id": "317546890"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "9n0m7sy4tjtmldd",
+                  "type": "p"
+                }
+              ],
+              "id": "1653333476"
+            },
+            {
+              "content": [
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "id": "85h6wclcwa175d0",
+                  "type": "p"
+                }
+              ],
+              "id": "277520065"
+            }
+          ],
+          "id": "q2_p1",
+          "objectives": [
+            "probdistvalues"
+          ],
+          "responses": [
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Correct. At most 4 means X is 4 or fewer, so X = 2 would be included."
+                      }
+                    ],
+                    "id": "1tvsylaf15vg776",
+                    "type": "p"
+                  }
+                ],
+                "id": "413687574"
+              },
+              "id": "1424158175",
+              "legacyMatch": "res1",
+              "rule": "input like {res1}",
+              "score": 1
+            },
+            {
+              "feedback": {
+                "content": [
+                  {
+                    "children": [
+                      {
+                        "text": "Incorrect. At most 4 means X is 4 or fewer, so X = 2 would be included."
+                      }
+                    ],
+                    "id": "qvolumeswongddf",
+                    "type": "p"
+                  }
+                ],
+                "id": "2187278751"
+              },
+              "id": "1429556786",
+              "legacyMatch": "res2",
+              "rule": "input like {.*}",
+              "score": 0
+            }
+          ],
+          "scoringStrategy": "average",
+          "targeted": []
+        }
+      ],
+      "previewText": "",
+      "targeted": [],
+      "transformations": [],
+      "version": 2
+    },
+    "choices": [
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "yes"
+              }
+            ],
+            "id": "k7x9k5j7vh0fjst",
+            "type": "p"
+          }
+        ],
+        "id": "res1"
+      },
+      {
+        "content": [
+          {
+            "children": [
+              {
+                "text": "no"
+              }
+            ],
+            "id": "op29oyyopk7inbg",
+            "type": "p"
+          }
+        ],
+        "id": "res2"
+      }
+    ],
+    "stem": {
+      "content": [
+        {
+          "children": [
+            {
+              "text": "X = 2 "
+            }
+          ],
+          "id": "20eo3dftj2uydth",
+          "type": "p"
+        }
+      ]
+    }
+  },
+  "objectives": {
+    "q2_p1": [
+      "95212"
+    ]
+  },
+  "originalFile": "",
+  "unresolvedReferences": [],
+  "subType": "oli_multiple_choice"
+}
