@@ -38,4 +38,6 @@ export function clientConsole(...args: unknown[]): void {
   console.log(...disp);
 }
 
-window.clientConsole = clientConsole;
+if (typeof window !== 'undefined') {
+  window.clientConsole = clientConsole;
+}

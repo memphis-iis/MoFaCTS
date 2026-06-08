@@ -1,5 +1,3 @@
-import { clientConsole } from './clientLogger';
-
 export type AiFlowStatus = 'started' | 'succeeded' | 'failed';
 
 export type AiFlowTelemetry = {
@@ -65,6 +63,15 @@ function summarizeEvent(event: AiFlowEvent): Record<string, unknown> {
   };
 }
 
+function logAiFlowEvent(level: number, ...args: unknown[]): void {
+  const browserConsole = typeof window !== 'undefined' && typeof window.clientConsole === 'function'
+    ? window.clientConsole
+    : null;
+  if (browserConsole) {
+    browserConsole(level, ...args);
+  }
+}
+
 export function createAiFlowRequestId(prefix = 'ai'): string {
   const randomPart = Math.random().toString(36).slice(2, 10);
   return `${prefix}-${Date.now().toString(36)}-${randomPart}`;
@@ -83,7 +90,7 @@ export function recordAiFlowEvent(event: Omit<AiFlowEvent, 'createdAt' | 'error'
   }
 
   const level = sanitizedEvent.status === 'failed' ? 1 : 2;
-  clientConsole(level, '[AI FLOW]', summarizeEvent(sanitizedEvent));
+  logAiFlowEvent(level, '[AI FLOW]', summarizeEvent(sanitizedEvent));
   return sanitizedEvent;
 }
 
