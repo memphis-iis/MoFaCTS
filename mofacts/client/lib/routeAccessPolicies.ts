@@ -17,6 +17,7 @@ export const routeAccessPolicies: Readonly<Record<string, RouteAccessPolicy>> = 
   'client.profile': { requiresAuth: true },
   'client.dataDownload': { requiresAuth: true },
   'client.adminControls': { requiresAuth: true, allowedRoles: 'admin' },
+  'client.adminBackups': { requiresAuth: true, allowedRoles: 'admin' },
   'client.adminTests': { requiresAuth: true, allowedRoles: 'admin' },
   'client.theme': { requiresAuth: true, allowedRoles: 'admin' },
 };

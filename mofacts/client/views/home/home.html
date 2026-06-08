@@ -106,6 +106,10 @@
               <span class="fa fa-flask" aria-hidden="true"></span>
               <span>Admin Tests</span>
             </button>
+            <button type="button" class="nav-item {{sidebarActiveClass 'adminBackups'}}" data-label="Backups" id="adminBackupsButton">
+              <span class="fa fa-archive" aria-hidden="true"></span>
+              <span>Backups</span>
+            </button>
           </div>
         {{/if}}
       </nav>
@@ -193,6 +197,7 @@
         <button type="button" data-practice-menu-action="turkWorkflow"><span class="fa fa-wrench" aria-hidden="true"></span> Mechanical Turk</button>
         <button type="button" data-practice-menu-action="theme"><span class="fa fa-paint-brush" aria-hidden="true"></span> Theme</button>
         <button type="button" data-practice-menu-action="adminTests"><span class="fa fa-flask" aria-hidden="true"></span> Admin Tests</button>
+        <button type="button" data-practice-menu-action="adminBackups"><span class="fa fa-archive" aria-hidden="true"></span> Backups</button>
       {{/if}}
     </div>
   </aside>

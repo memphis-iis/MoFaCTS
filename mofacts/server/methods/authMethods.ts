@@ -2,7 +2,7 @@ import { Meteor } from 'meteor/meteor';
 import { Accounts } from 'meteor/accounts-base';
 import { check, Match } from 'meteor/check';
 import { createHash, randomBytes } from 'crypto';
-import type { ApiKeyResolutionDeps } from '../lib/apiKeyResolution';
+import { resolvePreferredApiKey, type ApiKeyResolutionDeps } from '../lib/apiKeyResolution';
 import {
   requireUserMatchesOrHasRole,
   type MethodAuthorizationDeps,
@@ -441,8 +441,14 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
         return { hasSR: false, hasTTS: false };
       }
       return {
-        hasSR: !!user.speechAPIKey,
-        hasTTS: !!user.ttsAPIKey,
+        hasSR: Boolean(user.speechAPIKey) || Boolean((await resolvePreferredApiKey(deps.getApiKeyResolutionDeps(), {
+          userId,
+          kind: 'speech',
+        })).apiKey),
+        hasTTS: Boolean(user.ttsAPIKey) || Boolean((await resolvePreferredApiKey(deps.getApiKeyResolutionDeps(), {
+          userId,
+          kind: 'tts',
+        })).apiKey),
       };
     },
 

@@ -205,7 +205,9 @@ function normalizeRelationshipProvenance(value: unknown): AiAutoTutorRelationshi
     attemptedModels,
     metric: 'cosine_similarity_normalized_vectors',
     scoreTransform: 'clamp_negative_to_zero',
-    sourceKeyType: provenance.sourceKeyType === 'tdf' ? 'tdf' : 'user',
+    sourceKeyType: provenance.sourceKeyType === 'tdf' || provenance.sourceKeyType === 'admin'
+      ? provenance.sourceKeyType
+      : 'user',
     cacheKey,
   };
 }

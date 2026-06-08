@@ -1,6 +1,7 @@
 import { Meteor } from 'meteor/meteor';
 import { formatSettingsValidationIssues, validateOpenCoreSettings } from '../lib/openCoreSettingsValidation';
 import { validateStorageBoundary } from '../lib/storageBoundary';
+import { validateBackupConfig } from '../lib/backup/backupConfig';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -116,6 +117,9 @@ export function createDeploymentReadinessMethods(deps: ReadinessDeps) {
 
       const storageChecks = await validateStorageBoundary(Meteor.settings || {}, process.env);
       checks.push(...storageChecks);
+
+      const backupChecks = await validateBackupConfig(Meteor.settings || {}, process.env);
+      checks.push(...backupChecks);
 
       if (deps.redisBoundary.enabled) {
         checks.push(await check('redis.connection', async () => {

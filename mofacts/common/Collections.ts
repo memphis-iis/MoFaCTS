@@ -38,6 +38,7 @@ const UserDashboardCache = new Mongo.Collection(collectionMongoName('UserDashboa
 const UserUploadQuota = new Mongo.Collection(collectionMongoName('UserUploadQuota'));
 const ManualContentDrafts = new Mongo.Collection(collectionMongoName('ManualContentDrafts'));
 const H5PContents = new Mongo.Collection(collectionMongoName('H5PContents'));
+const BackupJobs = new Mongo.Collection(collectionMongoName('BackupJobs'));
 
 // DynamicAssets upload policy. Later split target: common/fileUploadPolicy.ts.
 const DynamicAssets = new FilesCollection({
@@ -137,10 +138,11 @@ Object.assign(globalThis, {
   UserUploadQuota,
   ManualContentDrafts,
   H5PContents,
+  BackupJobs,
   DynamicAssets,
 });
 
-export { Tdfs, GlobalExperimentStates, DynamicSettings, UserDashboardCache, H5PContents, StimulusCrowdStats };
+export { Tdfs, GlobalExperimentStates, DynamicSettings, UserDashboardCache, H5PContents, StimulusCrowdStats, BackupJobs };
 
 GlobalExperimentStates.allow({
   update: function(userId: string, doc: unknown, _fieldNames: string[], _modifier: any) {

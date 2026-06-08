@@ -30,6 +30,11 @@ const NEWS_EMAIL_BODY = [
 ].join('\n');
 
 type SortDirection = 'asc' | 'desc';
+type AdminApiKeyMetadata = {
+  openRouter?: { configured?: boolean; keyUpdatedAt?: unknown; modelUpdatedAt?: unknown; updatedBy?: unknown; model?: string };
+  googleTts?: { configured?: boolean; keyUpdatedAt?: unknown; updatedBy?: unknown };
+  googleSpeech?: { configured?: boolean; keyUpdatedAt?: unknown; updatedBy?: unknown };
+};
 
 function getPagedUserIds(): string[] {
   return FilteredUserPageIds.find({}, { sort: { userId: 1 } })
@@ -94,6 +99,26 @@ function formatDate(value: unknown): string {
     return 'Invalid date';
   }
   return date.toLocaleDateString();
+}
+
+function formatStatusDate(value: unknown): string {
+  if (!value) {
+    return 'never';
+  }
+  return formatDate(value);
+}
+
+function apiKeyMetadata(instance: any): AdminApiKeyMetadata {
+  return instance.apiKeyMetadata.get() || {};
+}
+
+async function refreshAdminApiKeyMetadata(instance: any): Promise<void> {
+  try {
+    instance.apiKeyMetadata.set(await MeteorCompat.callAsync('getAdminApiKeyAlternativeMetadata'));
+  } catch (error: unknown) {
+    instance.apiKeyMessageType.set('danger');
+    instance.apiKeyMessage.set('Failed to load API key alternatives: ' + getErrorMessage(error));
+  }
 }
 
 function getTimeValue(value: unknown): number {
@@ -185,6 +210,10 @@ Template.userAdmin.onCreated(function(this: any) {
   this.isPreparingNewsEmail = new ReactiveVar(false);
   this.newsEmailMessage = new ReactiveVar('');
   this.newsEmailMessageType = new ReactiveVar('info');
+  this.apiKeyMetadata = new ReactiveVar(null);
+  this.apiKeyBusy = new ReactiveVar(false);
+  this.apiKeyMessage = new ReactiveVar('');
+  this.apiKeyMessageType = new ReactiveVar('info');
   this.sortField = new ReactiveVar('identifier');
   this.sortDirection = new ReactiveVar('asc' as SortDirection);
   this.autoruns = [];
@@ -195,6 +224,7 @@ Template.userAdmin.onCreated(function(this: any) {
 
 Template.userAdmin.onRendered(function(this: any) {
   const instance = this;
+  void refreshAdminApiKeyMetadata(instance);
 
   // Autorun to reactively subscribe when filter or page changes
   const autorun = this.autorun(() => {
@@ -362,6 +392,58 @@ Template.userAdmin.helpers({
   newsEmailAttrs: function() {
     const isPreparing = (Template.instance() as any).isPreparingNewsEmail.get();
     return isPreparing ? { disabled: true } : {};
+  },
+
+  apiKeyMessage: function() {
+    return (Template.instance() as any).apiKeyMessage.get();
+  },
+
+  apiKeyAlertClass: function() {
+    const messageType = (Template.instance() as any).apiKeyMessageType.get();
+    if (messageType === 'success') return 'alert-success';
+    if (messageType === 'warning') return 'alert-warning';
+    if (messageType === 'danger') return 'alert-danger';
+    return 'alert-info';
+  },
+
+  apiKeyActionAttrs: function() {
+    return (Template.instance() as any).apiKeyBusy.get() ? { disabled: true } : {};
+  },
+
+  adminOpenRouterModel: function() {
+    return String(apiKeyMetadata(Template.instance()).openRouter?.model || '');
+  },
+
+  openRouterKeyPlaceholder: function() {
+    return apiKeyMetadata(Template.instance()).openRouter?.configured ? 'Configured; enter to replace' : 'Enter OpenRouter key';
+  },
+
+  openRouterKeyStatus: function() {
+    const data = apiKeyMetadata(Template.instance()).openRouter;
+    return data?.configured ? `Configured; key updated ${formatStatusDate(data.keyUpdatedAt)}` : 'No admin-provided OpenRouter key configured';
+  },
+
+  openRouterModelStatus: function() {
+    const data = apiKeyMetadata(Template.instance()).openRouter;
+    return data?.model ? `Model updated ${formatStatusDate(data.modelUpdatedAt)}` : 'No admin OpenRouter model configured';
+  },
+
+  googleTtsKeyPlaceholder: function() {
+    return apiKeyMetadata(Template.instance()).googleTts?.configured ? 'Configured; enter to replace' : 'Enter Google TTS key';
+  },
+
+  googleTtsKeyStatus: function() {
+    const data = apiKeyMetadata(Template.instance()).googleTts;
+    return data?.configured ? `Configured; key updated ${formatStatusDate(data.keyUpdatedAt)}` : 'No admin-provided Google TTS key configured';
+  },
+
+  googleSpeechKeyPlaceholder: function() {
+    return apiKeyMetadata(Template.instance()).googleSpeech?.configured ? 'Configured; enter to replace' : 'Enter Google Speech Recognition key';
+  },
+
+  googleSpeechKeyStatus: function() {
+    const data = apiKeyMetadata(Template.instance()).googleSpeech;
+    return data?.configured ? `Configured; key updated ${formatStatusDate(data.keyUpdatedAt)}` : 'No admin-provided Google SR key configured';
   },
 
   sortIndicator: function(field: string) {
@@ -548,6 +630,77 @@ Template.userAdmin.events({
       instance.usageRefreshMessage.set('Failed to refresh usage caches: ' + getErrorMessage(error));
     } finally {
       instance.isRefreshingUsage.set(false);
+    }
+  },
+
+  'click #saveAdminOpenRouterAlternative': async function(event: any, instance: any) {
+    event.preventDefault();
+    instance.apiKeyBusy.set(true);
+    instance.apiKeyMessageType.set('info');
+    instance.apiKeyMessage.set('Saving OpenRouter alternative...');
+    try {
+      const apiKeyInput = document.getElementById('adminOpenRouterKey') as HTMLInputElement | null;
+      const modelInput = document.getElementById('adminOpenRouterModel') as HTMLInputElement | null;
+      const result = await MeteorCompat.callAsync('saveAdminApiKeyAlternative', 'openrouter', {
+        apiKey: apiKeyInput?.value || '',
+        model: modelInput?.value || '',
+      });
+      instance.apiKeyMetadata.set(result);
+      if (apiKeyInput) apiKeyInput.value = '';
+      instance.apiKeyMessageType.set('success');
+      instance.apiKeyMessage.set('Saved OpenRouter API key alternative metadata.');
+    } catch (error: unknown) {
+      instance.apiKeyMessageType.set('danger');
+      instance.apiKeyMessage.set('Failed to save OpenRouter alternative: ' + getErrorMessage(error));
+    } finally {
+      instance.apiKeyBusy.set(false);
+    }
+  },
+
+  'click .btn-admin-api-key-save': async function(event: any, instance: any) {
+    event.preventDefault();
+    const provider = legacyTrim($(event.currentTarget).data('provider'));
+    const inputSelector = legacyTrim($(event.currentTarget).data('input'));
+    const input = inputSelector ? document.querySelector(inputSelector) as HTMLInputElement | null : null;
+    instance.apiKeyBusy.set(true);
+    instance.apiKeyMessageType.set('info');
+    instance.apiKeyMessage.set('Saving API key alternative...');
+    try {
+      const result = await MeteorCompat.callAsync('saveAdminApiKeyAlternative', provider, {
+        apiKey: input?.value || '',
+      });
+      instance.apiKeyMetadata.set(result);
+      if (input) input.value = '';
+      instance.apiKeyMessageType.set('success');
+      instance.apiKeyMessage.set('Saved API key alternative metadata.');
+    } catch (error: unknown) {
+      instance.apiKeyMessageType.set('danger');
+      instance.apiKeyMessage.set('Failed to save API key alternative: ' + getErrorMessage(error));
+    } finally {
+      instance.apiKeyBusy.set(false);
+    }
+  },
+
+  'click .btn-admin-api-key-delete': async function(event: any, instance: any) {
+    event.preventDefault();
+    const provider = legacyTrim($(event.currentTarget).data('provider'));
+    instance.apiKeyBusy.set(true);
+    instance.apiKeyMessageType.set('info');
+    instance.apiKeyMessage.set('Deleting API key alternative...');
+    try {
+      const result = await MeteorCompat.callAsync('deleteAdminApiKeyAlternative', provider);
+      instance.apiKeyMetadata.set(result);
+      ['adminOpenRouterKey', 'adminGoogleTtsKey', 'adminGoogleSpeechKey'].forEach((id) => {
+        const input = document.getElementById(id) as HTMLInputElement | null;
+        if (input) input.value = '';
+      });
+      instance.apiKeyMessageType.set('success');
+      instance.apiKeyMessage.set('Deleted API key alternative.');
+    } catch (error: unknown) {
+      instance.apiKeyMessageType.set('danger');
+      instance.apiKeyMessage.set('Failed to delete API key alternative: ' + getErrorMessage(error));
+    } finally {
+      instance.apiKeyBusy.set(false);
     }
   },
 

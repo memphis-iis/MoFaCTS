@@ -1,10 +1,20 @@
 import { Meteor } from 'meteor/meteor';
 
-type ApiKeyKind = 'speech' | 'tts';
+export type ApiKeyKind = 'openrouter' | 'speech' | 'tts';
+export type ApiKeySource = 'provided' | 'tdf' | 'user' | 'admin' | null;
 
 type UserApiKeyDoc = {
   speechAPIKey?: unknown;
   ttsAPIKey?: unknown;
+  profile?: {
+    openRouterDefaultModel?: unknown;
+    openRouterHasKey?: unknown;
+  };
+  services?: {
+    openRouter?: {
+      keyEncrypted?: unknown;
+    };
+  };
 } | null | undefined;
 
 type TdfApiKeyDoc = {
@@ -14,6 +24,8 @@ type TdfApiKeyDoc = {
       tutor?: {
         setspec?: {
           userselect?: unknown;
+          openRouterApiKey?: unknown;
+          openRouterModel?: unknown;
           speechAPIKey?: unknown;
           textToSpeechAPIKey?: unknown;
         };
@@ -25,30 +37,61 @@ type TdfApiKeyDoc = {
 export type ApiKeyResolutionDeps = {
   getUserById: (userId: string) => Promise<UserApiKeyDoc>;
   getTdfById: (tdfId: string) => Promise<TdfApiKeyDoc>;
+  getAdminApiKeySettings?: () => Promise<AdminApiKeySettingsDoc>;
   hasHistoryWithTdf: (userId: string, tdfId: string) => Promise<unknown>;
   userIsInRoleAsync: (userId: string, roles: string[]) => Promise<boolean>;
   decryptData: (value: string) => string;
 };
 
-type ApiKeyResolutionResult = {
+export type ApiKeyResolutionResult = {
   apiKey: string | null;
-  source: 'provided' | 'tdf' | 'user' | null;
+  source: ApiKeySource;
   errors: {
     tdf?: unknown;
     user?: unknown;
+    admin?: unknown;
   };
 };
 
+export type AdminApiKeyProvider = 'openrouter' | 'googleTts' | 'googleSpeech';
+
+export type AdminApiKeyProviderSettings = {
+  keyEncrypted?: unknown;
+  model?: unknown;
+  keyUpdatedAt?: unknown;
+  modelUpdatedAt?: unknown;
+  updatedBy?: unknown;
+};
+
+export type AdminApiKeySettingsValue = {
+  openRouter?: AdminApiKeyProviderSettings;
+  googleTts?: AdminApiKeyProviderSettings;
+  googleSpeech?: AdminApiKeyProviderSettings;
+};
+
+export type AdminApiKeySettingsDoc = {
+  value?: AdminApiKeySettingsValue;
+} | null | undefined;
+
 const API_KEY_FIELDS = {
+  openrouter: {
+    tdfField: 'openRouterApiKey',
+    userField: 'services.openRouter.keyEncrypted',
+    adminProvider: 'openRouter',
+  },
   speech: {
     tdfField: 'speechAPIKey',
     userField: 'speechAPIKey',
+    adminProvider: 'googleSpeech',
   },
   tts: {
     tdfField: 'textToSpeechAPIKey',
     userField: 'ttsAPIKey',
+    adminProvider: 'googleTts',
   },
-} as const satisfies Record<ApiKeyKind, { tdfField: string; userField: string }>;
+} as const satisfies Record<ApiKeyKind, { tdfField: string; userField: string; adminProvider: keyof AdminApiKeySettingsValue }>;
+
+export const ADMIN_API_KEY_SETTINGS_KEY = 'apiKeyAlternatives';
 
 function normalizeString(value: unknown) {
   if (typeof value !== 'string') {
@@ -59,14 +102,34 @@ function normalizeString(value: unknown) {
 
 function getEncryptedTdfApiKey(tdf: TdfApiKeyDoc, kind: ApiKeyKind) {
   const keyField = API_KEY_FIELDS[kind].tdfField;
-  const value = tdf?.content?.tdfs?.tutor?.setspec?.[keyField as 'speechAPIKey' | 'textToSpeechAPIKey'];
+  const value = tdf?.content?.tdfs?.tutor?.setspec?.[keyField as 'openRouterApiKey' | 'speechAPIKey' | 'textToSpeechAPIKey'];
   return normalizeString(value) || null;
 }
 
 function getEncryptedUserApiKey(user: UserApiKeyDoc, kind: ApiKeyKind) {
+  if (kind === 'openrouter') {
+    return normalizeString(user?.services?.openRouter?.keyEncrypted) || null;
+  }
   const keyField = API_KEY_FIELDS[kind].userField;
   const value = user?.[keyField as 'speechAPIKey' | 'ttsAPIKey'];
   return normalizeString(value) || null;
+}
+
+function getEncryptedAdminApiKey(settings: AdminApiKeySettingsDoc, kind: ApiKeyKind) {
+  const provider = API_KEY_FIELDS[kind].adminProvider;
+  return normalizeString(settings?.value?.[provider]?.keyEncrypted) || null;
+}
+
+export function getAdminOpenRouterModel(settings: AdminApiKeySettingsDoc) {
+  return normalizeString(settings?.value?.openRouter?.model);
+}
+
+export function getTdfOpenRouterModel(tdf: TdfApiKeyDoc) {
+  return normalizeString(tdf?.content?.tdfs?.tutor?.setspec?.openRouterModel);
+}
+
+export function getUserOpenRouterModel(user: UserApiKeyDoc) {
+  return normalizeString(user?.profile?.openRouterDefaultModel);
 }
 
 export async function getUserPersonalApiKey(
@@ -123,15 +186,6 @@ export async function resolvePreferredApiKey(
     initialKey?: string | null;
   }
 ): Promise<ApiKeyResolutionResult> {
-  const directKey = normalizeString(params.initialKey);
-  if (directKey) {
-    return {
-      apiKey: directKey,
-      source: 'provided',
-      errors: {},
-    };
-  }
-
   if (!params.userId) {
     return {
       apiKey: null,
@@ -141,6 +195,7 @@ export async function resolvePreferredApiKey(
   }
 
   const errors: ApiKeyResolutionResult['errors'] = {};
+  const directKey = normalizeString(params.initialKey);
 
   if (params.tdfId) {
     try {
@@ -157,8 +212,19 @@ export async function resolvePreferredApiKey(
         };
       }
     } catch (error) {
+      if (error instanceof Meteor.Error && (error.error === 401 || error.error === 403)) {
+        throw error;
+      }
       errors.tdf = error;
     }
+  }
+
+  if (directKey) {
+    return {
+      apiKey: directKey,
+      source: 'provided',
+      errors,
+    };
   }
 
   try {
@@ -172,6 +238,22 @@ export async function resolvePreferredApiKey(
     }
   } catch (error) {
     errors.user = error;
+  }
+
+  if (deps.getAdminApiKeySettings) {
+    try {
+      const settings = await deps.getAdminApiKeySettings();
+      const encryptedKey = getEncryptedAdminApiKey(settings, params.kind);
+      if (encryptedKey) {
+        return {
+          apiKey: deps.decryptData(encryptedKey),
+          source: 'admin',
+          errors,
+        };
+      }
+    } catch (error) {
+      errors.admin = error;
+    }
   }
 
   return {

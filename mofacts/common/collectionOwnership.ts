@@ -158,6 +158,12 @@ export const COLLECTION_OWNERSHIP = {
     owner: 'h5p-content',
     purpose: 'Imported H5P content metadata and package references.',
   },
+  BackupJobs: {
+    mongoName: 'backup_jobs',
+    globalName: 'BackupJobs',
+    owner: 'open-core-backups',
+    purpose: 'Admin-only backup, verification, restore, and deletion job registry.',
+  },
   DynamicAssets: {
     mongoName: 'Assets',
     globalName: 'DynamicAssets',

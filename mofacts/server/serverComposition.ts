@@ -29,6 +29,7 @@ if (typeof underscoreAny.display !== 'function') {
   };
 }
 import { applyMeteorSettingsWorkaround } from './startup/meteorSettingsWorkaround';
+import { BackupJobs } from '../common/Collections';
 import { runServerStartup } from './startup/serverStartup';
 import { createStorageBoundary } from './lib/storageBoundary';
 import { createRedisBoundary } from './lib/redisBoundary';
@@ -46,8 +47,10 @@ import { createContentMethods } from './methods/contentMethods';
 import { createCourseMethods } from './methods/courseMethods';
 import { createDashboardCacheMethods } from './methods/dashboardCacheMethods';
 import { createDeploymentReadinessMethods } from './methods/deploymentReadinessMethods';
+import { createBackupMethods, createBackupRegistry } from './methods/backupMethods';
 import { createExperimentMethods } from './methods/experimentMethods';
 import { createPackageMethods } from './methods/packageMethods';
+import { createOpenRouterMethods } from './methods/openRouterMethods';
 import { createProfileMethods } from './methods/profileMethods';
 import { createSpeechMethods } from './methods/speechMethods';
 import { createSystemMethods } from './methods/systemMethods';
@@ -73,6 +76,7 @@ import {
   isTdfOwner,
 } from './lib/contentAccessPolicy';
 import {
+  ADMIN_API_KEY_SETTINGS_KEY,
   getAccessibleTdfApiKey,
   getUserPersonalApiKey,
   type ApiKeyResolutionDeps,
@@ -129,6 +133,7 @@ function getApiKeyResolutionDeps(): ApiKeyResolutionDeps {
   return {
     getUserById: async (userId: string) => await MeteorAny.users.findOneAsync({ _id: userId }),
     getTdfById: async (tdfId: string) => await Tdfs.findOneAsync({ _id: tdfId }),
+    getAdminApiKeySettings: async () => await DynamicSettings.findOneAsync({ key: ADMIN_API_KEY_SETTINGS_KEY }),
     hasHistoryWithTdf: async (userId: string, tdfId: string) =>
       await Histories.findOneAsync({ userId, TDFId: tdfId }),
     userIsInRoleAsync: async (userId: string, roles: string[]) =>
@@ -157,6 +162,17 @@ function cloneJsonLike<T>(value: T): T {
     return value;
   }
   return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function removeRuntimeTdfSecrets<T>(tdf: T): T {
+  const copy = cloneJsonLike(tdf) as any;
+  const setspec = copy?.content?.tdfs?.tutor?.setspec;
+  if (setspec && typeof setspec === 'object') {
+    delete setspec.speechAPIKey;
+    delete setspec.textToSpeechAPIKey;
+    delete setspec.openRouterApiKey;
+  }
+  return copy;
 }
 
 const authSupport = createAuthSupport({
@@ -582,6 +598,7 @@ export const methods: any = {
     syncUsernameCaches,
     deleteTdfRuntimeData,
     clearStimDisplayTypeMap,
+    encryptData,
   }),
   ...createAuthMethods({
     serverConsole,
@@ -687,7 +704,8 @@ function getStimuliSetIdCandidatesForMethod(stimuliSetId: string | number) {
 
 async function getTdfByIdPublic(this: MethodContext, TDFId: string) {
   const userId = requireAuthenticatedUser(this.userId, 'Must be logged in to access TDF content', 401);
-  return await getTdfById.call({ userId }, TDFId);
+  const tdf = await getTdfById.call({ userId }, TDFId);
+  return tdf ? removeRuntimeTdfSecrets(tdf) : tdf;
 }
 
 function requireRelationshipGraph(value: unknown): Record<string, Record<string, number>> {
@@ -962,6 +980,11 @@ export const asyncMethods: Record<string, unknown> = {
 
   ...speechMethods,
 
+  ...createOpenRouterMethods({
+    serverConsole,
+    getApiKeyResolutionDeps,
+  }),
+
   ...createDashboardCacheMethods({
     Meteor,
     Roles,
@@ -981,6 +1004,15 @@ export const asyncMethods: Record<string, unknown> = {
     Tdfs,
     usersCollection: MeteorAny.users,
     redisBoundary
+  }),
+
+  ...createBackupMethods({
+    settings: Meteor.settings || {},
+    backupJobs: createBackupRegistry(BackupJobs),
+    rawDatabase: () => Tdfs.rawDatabase(),
+    usersCollection: MeteorAny.users,
+    auditLog: AuditLog,
+    requireAdminUser: authSupport.requireAdminUser,
   }),
 }
 

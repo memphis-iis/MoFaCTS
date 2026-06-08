@@ -148,9 +148,10 @@ function validateAutoTutorScript(script: unknown, prefix: string, errors: string
       if (
         provenance.sourceKeyType !== undefined &&
         provenance.sourceKeyType !== 'tdf' &&
-        provenance.sourceKeyType !== 'user'
+        provenance.sourceKeyType !== 'user' &&
+        provenance.sourceKeyType !== 'admin'
       ) {
-        errors.push(`${prefix}.autoTutor.expectationRelationshipProvenance.sourceKeyType must be "tdf" or "user"`);
+        errors.push(`${prefix}.autoTutor.expectationRelationshipProvenance.sourceKeyType must be "tdf", "user", or "admin"`);
       }
     }
   }

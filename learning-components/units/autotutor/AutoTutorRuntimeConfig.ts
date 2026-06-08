@@ -42,7 +42,7 @@ export type AutoTutorScript = {
     attemptedModels: string[];
     metric: string;
     scoreTransform: string;
-    sourceKeyType: 'tdf' | 'user';
+    sourceKeyType: 'tdf' | 'user' | 'admin';
     cacheKey: string;
   };
   dialogPolicy: Record<string, unknown>;
@@ -73,6 +73,7 @@ export type AutoTutorConfig = {
 
 export type AutoTutorConfigOptions = {
   preferredOpenRouterApiKey?: unknown;
+  allowServerResolvedOpenRouterApiKey?: boolean;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -189,7 +190,9 @@ export function readAutoTutorConfigWithOptions(
 
   return {
     apiKey: requiredString(
-      optionalString(options.preferredOpenRouterApiKey) || setspec.openRouterApiKey,
+      optionalString(options.preferredOpenRouterApiKey) ||
+        setspec.openRouterApiKey ||
+        (options.allowServerResolvedOpenRouterApiKey ? '__server_resolved_openrouter__' : ''),
       'OpenRouter API key from profile settings or tutor.setspec.openRouterApiKey',
     ),
     model: requiredString(session.openRouterModel || setspec.openRouterModel, 'openRouterModel'),

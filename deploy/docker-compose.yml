@@ -30,6 +30,15 @@ services:
         bind:
           create_host_path: true
       - type: bind
+        source: ${MOFACTS_BACKUP_HOST_PATH:-/backups/mofacts}
+        target: /backups
+        bind:
+          create_host_path: true
+      - type: bind
+        source: ${MOFACTS_ENV_FILE_HOST_PATH:-./.env.self-hosted}
+        target: /run/mofacts/env.self-hosted
+        read_only: true
+      - type: bind
         source: ${METEOR_SETTINGS_HOST_PATH:?METEOR_SETTINGS_HOST_PATH must point to the private settings file}
         target: /run/mofacts/settings.json
         read_only: true
@@ -53,6 +62,8 @@ services:
       PORT: ${PORT:-3000}
       WAIT_HOSTS: mongodb:27017,redis:6379
       METEOR_SETTINGS_WORKAROUND: /run/mofacts/settings.json
+      MOFACTS_ENV_FILE_PATH: /run/mofacts/env.self-hosted
+      MOFACTS_BACKUP_LOCAL_PATH: /backups
       MOFACTS_SELF_HOSTED: 'true'
       MOFACTS_REQUIRE_REDIS: 'true'
       REDIS_URL: ${REDIS_URL:?REDIS_URL is required}

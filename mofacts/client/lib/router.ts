@@ -177,6 +177,7 @@ const lazyTemplateLoaders: Record<string, any> = {
   card: () => import('../views/experiment/card'),
   classSelection: () => import('../views/home/classSelection'),
   adminControls: () => import('../views/adminControls'),
+  adminBackups: () => import('../views/adminBackups'),
   audioSettings: () => import('../views/audioSettings'),
   profile: () => import('../views/profile'),
   help: () => import('../views/help'),
@@ -884,6 +885,15 @@ FlowRouter.route('/admin/tests', {
     waitForAuthenticatedRoute(this, 'client.adminTests', async () => {
       await renderRouteTemplate(this, 'testRunner');
     }, getRouteAccessPolicy('client.adminTests'));
+  }
+})
+
+FlowRouter.route('/admin/backups', {
+  name: 'client.adminBackups',
+  action: async function() {
+    waitForAuthenticatedRoute(this, 'client.adminBackups', async () => {
+      await renderRouteTemplate(this, 'adminBackups');
+    }, getRouteAccessPolicy('client.adminBackups'));
   }
 })
 

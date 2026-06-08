@@ -14,6 +14,12 @@ export type OpenRouterSettings = {
   hasOpenRouterKey: boolean;
 };
 
+export type OpenRouterCapability = {
+  configured: boolean;
+  source: 'tdf' | 'user' | 'admin' | null;
+  model: string;
+};
+
 export function userHasServerOpenRouterKey(user: unknown): boolean {
   return Boolean((user as any)?.profile?.openRouterHasKey);
 }
@@ -24,6 +30,17 @@ export async function getOwnOpenRouterSettings(): Promise<OpenRouterSettings> {
     apiKey: String(settings?.apiKey || '').trim(),
     model: String(settings?.model || '').trim(),
     hasOpenRouterKey: Boolean(settings?.hasOpenRouterKey || settings?.apiKey),
+  };
+}
+
+export async function getOpenRouterCapability(tdfId?: string | null): Promise<OpenRouterCapability> {
+  const result = await MeteorAny.callAsync('getOpenRouterCapability', tdfId || null);
+  return {
+    configured: Boolean(result?.configured),
+    source: ['tdf', 'user', 'admin'].includes(String(result?.source || ''))
+      ? result.source
+      : null,
+    model: String(result?.model || '').trim(),
   };
 }
 

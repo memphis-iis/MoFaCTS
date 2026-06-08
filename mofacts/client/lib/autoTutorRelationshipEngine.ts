@@ -14,13 +14,14 @@ export const AUTO_TUTOR_SECONDARY_EMBEDDING_MODEL = 'openai/text-embedding-3-lar
 
 type NormalizedExpectation = Required<Pick<AiAutoTutorExpectation, 'id' | 'label' | 'proposition' | 'assertion'>>;
 
-export type AutoTutorRelationshipKeySource = 'tdf' | 'user';
+export type AutoTutorRelationshipKeySource = 'tdf' | 'user' | 'admin';
 
 export type AutoTutorRelationshipGenerationOptions = {
   apiKey: string;
   sourceKeyType: AutoTutorRelationshipKeySource;
   generatedAt?: string;
   embeddingModels?: string[];
+  callEmbeddings?: (model: string, input: string[]) => Promise<OpenRouterEmbeddingResult>;
 };
 
 export type AutoTutorRelationshipKeySelection = {
@@ -162,7 +163,11 @@ async function callEmbeddingModel(
   apiKey: string,
   model: string,
   input: string[],
+  callEmbeddings?: (model: string, input: string[]) => Promise<OpenRouterEmbeddingResult>,
 ): Promise<OpenRouterEmbeddingResult> {
+  if (callEmbeddings) {
+    return callEmbeddings(model, input);
+  }
   return callOpenRouterEmbeddings({
     apiKey,
     model,
@@ -200,7 +205,7 @@ export async function generateAutoTutorExpectationRelationships(
   for (const model of models) {
     attemptedModels.push(model);
     try {
-      const embeddingResult = await callEmbeddingModel(options.apiKey, model, input);
+      const embeddingResult = await callEmbeddingModel(options.apiKey, model, input, options.callEmbeddings);
       const expectationRelationships = computeAutoTutorExpectationRelationshipsFromEmbeddings(
         normalizedExpectations,
         embeddingResult.embeddings,

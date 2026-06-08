@@ -2,6 +2,11 @@ import { Meteor } from 'meteor/meteor';
 import { Accounts } from 'meteor/accounts-base';
 import { check } from 'meteor/check';
 import { Roles } from 'meteor/alanning:roles';
+import {
+  ADMIN_API_KEY_SETTINGS_KEY,
+  type AdminApiKeyProvider,
+  type AdminApiKeySettingsDoc,
+} from '../lib/apiKeyResolution';
 
 type UnknownRecord = Record<string, unknown>;
 type Logger = (...args: unknown[]) => void;
@@ -42,6 +47,8 @@ type AdminMethodsDeps = {
   };
   DynamicSettings: {
     findOneAsync: (selector: UnknownRecord) => Promise<any>;
+    updateAsync?: (selector: UnknownRecord, modifier: UnknownRecord, options?: UnknownRecord) => Promise<unknown>;
+    upsertAsync?: (selector: UnknownRecord, modifier: UnknownRecord) => Promise<unknown>;
   };
   Histories: { removeAsync: (selector: UnknownRecord) => Promise<unknown> };
   GlobalExperimentStates: { removeAsync: (selector: UnknownRecord) => Promise<unknown> };
@@ -84,10 +91,92 @@ type AdminMethodsDeps = {
   syncUsernameCaches: (userId: string, nextUsername: string, previousUsername?: string) => void;
   deleteTdfRuntimeData: (tdfId: string) => Promise<void>;
   clearStimDisplayTypeMap: () => void;
+  encryptData?: (value: string) => string;
 };
+
+const OPENROUTER_MODEL_MAX_LENGTH = 160;
+const API_KEY_MAX_LENGTH = 4096;
+
+const ADMIN_API_KEY_PROVIDER_FIELDS = {
+  openrouter: 'openRouter',
+  googleTts: 'googleTts',
+  googleSpeech: 'googleSpeech',
+} as const satisfies Record<AdminApiKeyProvider, string>;
 
 function trimString(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function hasControlCharacters(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code <= 31 || code === 127) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function normalizeAdminApiKey(value: unknown, label: string): string {
+  const trimmed = trimString(value);
+  if (!trimmed) {
+    return '';
+  }
+  if (trimmed.length > API_KEY_MAX_LENGTH) {
+    throw new Meteor.Error('invalid-api-key', `${label} key is too long`);
+  }
+  if (hasControlCharacters(trimmed) || /\s/.test(trimmed)) {
+    throw new Meteor.Error('invalid-api-key', `${label} key contains unsupported whitespace or control characters`);
+  }
+  return trimmed;
+}
+
+function normalizeAdminOpenRouterModel(value: unknown): string {
+  const trimmed = trimString(value);
+  if (!trimmed) {
+    return '';
+  }
+  if (trimmed.length > OPENROUTER_MODEL_MAX_LENGTH) {
+    throw new Meteor.Error('invalid-openrouter-model', `Admin OpenRouter model must be ${OPENROUTER_MODEL_MAX_LENGTH} characters or fewer`);
+  }
+  if (hasControlCharacters(trimmed) || /[<>\s]/.test(trimmed)) {
+    throw new Meteor.Error('invalid-openrouter-model', 'Admin OpenRouter model contains unsupported characters');
+  }
+  return trimmed;
+}
+
+function summarizeAdminApiKeySettings(doc: AdminApiKeySettingsDoc) {
+  const value = doc?.value || {};
+  const summarizeProvider = (provider: keyof typeof value) => {
+    const entry = value[provider] || {};
+    return {
+      configured: typeof entry.keyEncrypted === 'string' && entry.keyEncrypted.trim().length > 0,
+      keyUpdatedAt: entry.keyUpdatedAt || null,
+      modelUpdatedAt: provider === 'openRouter' ? entry.modelUpdatedAt || null : null,
+      updatedBy: entry.updatedBy || null,
+      ...(provider === 'openRouter' ? { model: trimString(entry.model) } : {}),
+    };
+  };
+  return {
+    openRouter: summarizeProvider('openRouter'),
+    googleTts: summarizeProvider('googleTts'),
+    googleSpeech: summarizeProvider('googleSpeech'),
+  };
+}
+
+async function writeAdminApiKeySettings(
+  deps: AdminMethodsDeps,
+  modifier: UnknownRecord,
+) {
+  if (typeof deps.DynamicSettings.upsertAsync === 'function') {
+    await deps.DynamicSettings.upsertAsync({ key: ADMIN_API_KEY_SETTINGS_KEY }, modifier);
+    return;
+  }
+  if (typeof deps.DynamicSettings.updateAsync === 'function') {
+    await deps.DynamicSettings.updateAsync({ key: ADMIN_API_KEY_SETTINGS_KEY }, modifier, { upsert: true });
+    return;
+  }
+  throw new Meteor.Error('admin-api-key-settings-unavailable', 'Dynamic settings cannot save API key alternatives');
 }
 
 function addEmailCandidate(emailSet: Map<string, string>, candidate: unknown) {
@@ -218,6 +307,80 @@ async function upsertManagedUser(
 
 export function createAdminMethods(deps: AdminMethodsDeps) {
   return {
+    getAdminApiKeyAlternativeMetadata: async function(this: MethodContext) {
+      await deps.requireAdminUser(this.userId, 'Only admins can read API key alternative settings');
+      const doc = await deps.DynamicSettings.findOneAsync({ key: ADMIN_API_KEY_SETTINGS_KEY });
+      return summarizeAdminApiKeySettings(doc);
+    },
+
+    saveAdminApiKeyAlternative: async function(
+      this: MethodContext,
+      provider: AdminApiKeyProvider,
+      params: { apiKey?: unknown; model?: unknown } = {},
+    ) {
+      check(provider, String);
+      await deps.requireAdminUser(this.userId, 'Only admins can save API key alternatives');
+      if (!deps.encryptData) {
+        throw new Meteor.Error('encryption-unavailable', 'API key encryption is unavailable');
+      }
+      const providerField = ADMIN_API_KEY_PROVIDER_FIELDS[provider];
+      if (!providerField) {
+        throw new Meteor.Error('invalid-provider', 'Unknown API key alternative provider');
+      }
+
+      const now = new Date();
+      const setFields: UnknownRecord = {
+        updatedAt: now,
+        [`value.${providerField}.updatedBy`]: this.userId || null,
+      };
+      const apiKey = normalizeAdminApiKey(params?.apiKey, provider);
+      if (apiKey) {
+        setFields[`value.${providerField}.keyEncrypted`] = deps.encryptData(apiKey);
+        setFields[`value.${providerField}.keyUpdatedAt`] = now;
+      }
+      if (provider === 'openrouter') {
+        const model = normalizeAdminOpenRouterModel(params?.model);
+        setFields['value.openRouter.model'] = model;
+        setFields['value.openRouter.modelUpdatedAt'] = now;
+      }
+      if (!apiKey && provider !== 'openrouter') {
+        throw new Meteor.Error('missing-api-key', 'API key is required');
+      }
+
+      await writeAdminApiKeySettings(deps, { $set: setFields, $setOnInsert: { key: ADMIN_API_KEY_SETTINGS_KEY } });
+      await deps.writeAuditLog('admin.apiKeyAlternativeSaved', this.userId || null, null, {
+        provider,
+        keyUpdated: Boolean(apiKey),
+        modelUpdated: provider === 'openrouter',
+      });
+      const doc = await deps.DynamicSettings.findOneAsync({ key: ADMIN_API_KEY_SETTINGS_KEY });
+      return summarizeAdminApiKeySettings(doc);
+    },
+
+    deleteAdminApiKeyAlternative: async function(this: MethodContext, provider: AdminApiKeyProvider) {
+      check(provider, String);
+      await deps.requireAdminUser(this.userId, 'Only admins can delete API key alternatives');
+      const providerField = ADMIN_API_KEY_PROVIDER_FIELDS[provider];
+      if (!providerField) {
+        throw new Meteor.Error('invalid-provider', 'Unknown API key alternative provider');
+      }
+      const now = new Date();
+      await writeAdminApiKeySettings(deps, {
+        $set: {
+          updatedAt: now,
+          [`value.${providerField}.updatedBy`]: this.userId || null,
+        },
+        $unset: {
+          [`value.${providerField}.keyEncrypted`]: '',
+          [`value.${providerField}.keyUpdatedAt`]: '',
+        },
+        $setOnInsert: { key: ADMIN_API_KEY_SETTINGS_KEY },
+      });
+      await deps.writeAuditLog('admin.apiKeyAlternativeDeleted', this.userId || null, null, { provider });
+      const doc = await deps.DynamicSettings.findOneAsync({ key: ADMIN_API_KEY_SETTINGS_KEY });
+      return summarizeAdminApiKeySettings(doc);
+    },
+
     userAdminNewsEmailRecipients: async function(this: MethodContext) {
       await deps.requireAdminUser(this.userId, 'Only admins can compose news emails');
 

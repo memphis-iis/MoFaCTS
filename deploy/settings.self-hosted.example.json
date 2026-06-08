@@ -21,7 +21,17 @@
     "argon2Enabled": true
   },
   "openCore": {
-    "requireRedis": true
+    "requireRedis": true,
+    "backups": {
+      "enabled": true,
+      "backend": "local",
+      "localBackupPath": "/backups",
+      "includeSettings": true,
+      "includeEnvironmentFile": true,
+      "includeKeyMaterial": true,
+      "maxRetainedBackups": 10,
+      "requirePreRestoreBackup": true
+    }
   },
   "storage": {
     "backend": "local",

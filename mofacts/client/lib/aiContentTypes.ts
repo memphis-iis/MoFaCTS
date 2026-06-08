@@ -66,7 +66,7 @@ export type AiAutoTutorRelationshipProvenance = {
   attemptedModels: string[];
   metric: 'cosine_similarity_normalized_vectors';
   scoreTransform: 'clamp_negative_to_zero';
-  sourceKeyType: 'tdf' | 'user';
+  sourceKeyType: 'tdf' | 'user' | 'admin';
   cacheKey: string;
 };
 

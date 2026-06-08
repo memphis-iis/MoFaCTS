@@ -105,8 +105,23 @@ export function registerDdpRateLimits(deps: DdpRateLimitDeps) {
         'updateOwnProfile',
         'updateOwnOpenRouterSettings',
         'getOwnOpenRouterSettings',
+        'getOpenRouterCapability',
+        'callResolvedOpenRouterJson',
+        'callResolvedOpenRouterEmbeddings',
         'deleteOwnOpenRouterKey',
         'testOwnOpenRouterSettings'
+      ].includes(name);
+    },
+    userId(userId: string | null | undefined) { return !!userId; }
+  }, 30, 3600000);
+
+  DDPRateLimiter.addRule({
+    type: 'method',
+    name(name: string) {
+      return [
+        'getAdminApiKeyAlternativeMetadata',
+        'saveAdminApiKeyAlternative',
+        'deleteAdminApiKeyAlternative'
       ].includes(name);
     },
     userId(userId: string | null | undefined) { return !!userId; }

@@ -5,6 +5,74 @@
     <div class="container admin-page">
         <h3 class="page-header-title">User Admin</h3>
 
+        <div class="admin-section">
+            <div class="card admin-card">
+                <div class="card-body">
+                    <div class="admin-section-heading">
+                        <i class="fa fa-key admin-section-icon"></i>
+                        <h5>API Key Alternatives</h5>
+                    </div>
+                    {{#if apiKeyMessage}}
+                    <div class="alert {{apiKeyAlertClass}} admin-alert-compact" role="alert">
+                        {{apiKeyMessage}}
+                    </div>
+                    {{/if}}
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label for="adminOpenRouterKey" class="form-label">OpenRouter API Key</label>
+                            <input id="adminOpenRouterKey" type="password" class="form-control" autocomplete="new-password" placeholder="{{openRouterKeyPlaceholder}}">
+                            <small class="text-muted d-block admin-form-row-top">{{openRouterKeyStatus}}</small>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="adminOpenRouterModel" class="form-label">OpenRouter Model</label>
+                            <input id="adminOpenRouterModel" type="text" class="form-control" maxlength="160" value="{{adminOpenRouterModel}}" placeholder="openai/gpt-4.1-mini">
+                            <small class="text-muted d-block admin-form-row-top">{{openRouterModelStatus}}</small>
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <div class="btn-group" role="group">
+                                <button type="button" id="saveAdminOpenRouterAlternative" class="btn btn-sm btn-primary" {{apiKeyActionAttrs}}>
+                                    <i class="fa fa-save"></i> Save OpenRouter
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-danger btn-admin-api-key-delete" data-provider="openrouter" {{apiKeyActionAttrs}}>
+                                    <i class="fa fa-trash"></i> Delete Key
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="adminGoogleTtsKey" class="form-label">Google TTS Key</label>
+                            <input id="adminGoogleTtsKey" type="password" class="form-control" autocomplete="new-password" placeholder="{{googleTtsKeyPlaceholder}}">
+                            <small class="text-muted d-block admin-form-row-top">{{googleTtsKeyStatus}}</small>
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button type="button" class="btn btn-sm btn-primary btn-admin-api-key-save" data-provider="googleTts" data-input="#adminGoogleTtsKey" {{apiKeyActionAttrs}}>
+                                <i class="fa fa-save"></i> Save TTS
+                            </button>
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button type="button" class="btn btn-sm btn-outline-danger btn-admin-api-key-delete" data-provider="googleTts" {{apiKeyActionAttrs}}>
+                                <i class="fa fa-trash"></i> Delete TTS
+                            </button>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="adminGoogleSpeechKey" class="form-label">Google SR Key</label>
+                            <input id="adminGoogleSpeechKey" type="password" class="form-control" autocomplete="new-password" placeholder="{{googleSpeechKeyPlaceholder}}">
+                            <small class="text-muted d-block admin-form-row-top">{{googleSpeechKeyStatus}}</small>
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button type="button" class="btn btn-sm btn-primary btn-admin-api-key-save" data-provider="googleSpeech" data-input="#adminGoogleSpeechKey" {{apiKeyActionAttrs}}>
+                                <i class="fa fa-save"></i> Save SR
+                            </button>
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button type="button" class="btn btn-sm btn-outline-danger btn-admin-api-key-delete" data-provider="googleSpeech" {{apiKeyActionAttrs}}>
+                                <i class="fa fa-trash"></i> Delete SR
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- User List Section -->
         <div class="admin-section">
             <div class="card admin-card">

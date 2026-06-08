@@ -58,6 +58,7 @@ const SIDEBAR_ACTION_ROUTES: Record<string, string> = {
   mechTurkButton: '/turkWorkflow',
   themeButton: '/theme',
   adminTestsButton: '/admin/tests',
+  adminBackupsButton: '/admin/backups',
 };
 
 const PRACTICE_MENU_ACTION_ROUTES: Record<string, string> = {
@@ -72,6 +73,7 @@ const PRACTICE_MENU_ACTION_ROUTES: Record<string, string> = {
   turkWorkflow: '/turkWorkflow',
   theme: '/theme',
   adminTests: '/admin/tests',
+  adminBackups: '/admin/backups',
 };
 
 const SIDEBAR_ACTIVE_MATCHERS: Record<string, string[]> = {
@@ -86,6 +88,7 @@ const SIDEBAR_ACTIVE_MATCHERS: Record<string, string[]> = {
   turkWorkflow: ['/turkWorkflow'],
   theme: ['/theme'],
   adminTests: ['/admin/tests'],
+  adminBackups: ['/admin/backups'],
 };
 
 const HOME_TOUR_STEPS: HomeTourStep[] = [
@@ -657,6 +660,11 @@ Template.home.events({
   'click #adminTestsButton': function(event: any) {
     event.preventDefault();
     FlowRouter.go('/admin/tests');
+  },
+
+  'click #adminBackupsButton': function(event: any) {
+    event.preventDefault();
+    FlowRouter.go('/admin/backups');
   },
 
   'click #sidebarToggle': function(event: any) {

@@ -15,9 +15,10 @@ import { clientConsole } from '../../../../lib/clientLogger';
 import { insertCompressedHistory } from '../../../../lib/historyWire';
 import { meteorCallAsync } from '../../../../lib/meteorAsync';
 import {
-  callOpenRouterJson as callSharedOpenRouterJson,
+  type OpenRouterEmbeddingResult,
   type OpenRouterJsonSchema,
 } from '../../../../lib/openRouterClient';
+import { extractJsonObject } from '../../../../lib/jsonExtraction';
 import {
   computeAutoTutorRelationshipCacheKey,
   generateAutoTutorExpectationRelationships,
@@ -197,9 +198,9 @@ function createMeteorAutoTutorRuntimeCapabilities(): AutoTutorRuntimeCapabilitie
         return await meteorCallAsync('getAutoTutorHistoryForUnit', userId, tdfId, unitNumber) as unknown[];
       },
       async getPreferredOpenRouterApiKey() {
-        const settings = await meteorCallAsync('getOwnOpenRouterSettings') as { apiKey?: unknown } | null;
-        const apiKey = typeof settings?.apiKey === 'string' ? settings.apiKey.trim() : '';
-        return apiKey || null;
+        const snapshot = capabilities.session.getAutoTutorSessionSnapshot();
+        const capability = await meteorCallAsync('getOpenRouterCapability', snapshot.currentTdfId) as { configured?: unknown } | null;
+        return capability?.configured ? '__server_resolved_openrouter__' : null;
       },
     },
     stimuli: {
@@ -229,7 +230,30 @@ function createMeteorAutoTutorRuntimeCapabilities(): AutoTutorRuntimeCapabilitie
     },
     aiProvider: {
       async callOpenRouterJson(options) {
-        return callSharedOpenRouterJson(options);
+        const snapshot = capabilities.session.getAutoTutorSessionSnapshot();
+        const serverResult = await meteorCallAsync('callResolvedOpenRouterJson', {
+          tdfId: snapshot.currentTdfId,
+          model: options.model,
+          messages: options.messages,
+          temperature: options.temperature,
+          maxTokens: options.maxTokens,
+          requireUsageCost: options.requireUsageCost,
+          telemetry: options.telemetry,
+          intent: {
+            title: options.intent.title,
+            schemaName: options.intent.schemaName,
+            schema: options.intent.schema,
+            strictSchema: options.intent.strictSchema,
+            missingContentMessage: options.intent.missingContentMessage,
+          },
+        }) as { rawContent: string; responseBody: unknown; costUsd?: number };
+        const value = options.intent.parse(extractJsonObject(serverResult.rawContent));
+        return {
+          value,
+          rawContent: serverResult.rawContent,
+          responseBody: serverResult.responseBody,
+          ...(serverResult.costUsd !== undefined ? { costUsd: serverResult.costUsd } : {}),
+        };
       },
     },
     logger: {
@@ -291,14 +315,28 @@ async function ensureAutoTutorRelationshipGraph(
   if (isCompleteAutoTutorRelationshipGraph(config)) {
     return;
   }
+  const snapshot = capabilities.session.getAutoTutorSessionSnapshot();
+  const capability = await meteorCallAsync('getOpenRouterCapability', snapshot.currentTdfId) as { source?: 'tdf' | 'user' | 'admin' } | null;
   const result = await generateAutoTutorExpectationRelationships(config.script, {
     apiKey: config.apiKey,
-    sourceKeyType: preferredOpenRouterApiKey ? 'user' : 'tdf',
+    sourceKeyType: capability?.source || (preferredOpenRouterApiKey ? 'user' : 'tdf'),
+    callEmbeddings: async (model, input) => {
+      return await meteorCallAsync('callResolvedOpenRouterEmbeddings', {
+        tdfId: snapshot.currentTdfId,
+        model,
+        input,
+        telemetry: {
+          surface: 'autotutor-runtime',
+          operation: 'autotutor-relationship-embedding',
+          componentId: 'mofacts.autotutor-unit',
+          unitType: 'autotutor',
+        },
+      }) as OpenRouterEmbeddingResult;
+    },
   });
   config.script.expectationRelationships = result.expectationRelationships;
   config.script.expectationRelationshipProvenance = result.expectationRelationshipProvenance;
 
-  const snapshot = capabilities.session.getAutoTutorSessionSnapshot();
   await meteorCallAsync(
     'persistAutoTutorExpectationRelationships',
     snapshot.currentTdfId,
@@ -719,7 +757,10 @@ export async function createAutoTutorRuntime(
   const preferredOpenRouterApiKey = capabilities.serverMethods.getPreferredOpenRouterApiKey
     ? await capabilities.serverMethods.getPreferredOpenRouterApiKey()
     : null;
-  const config = readAutoTutorConfigWithOptions(capabilities, { preferredOpenRouterApiKey });
+  const config = readAutoTutorConfigWithOptions(capabilities, {
+    preferredOpenRouterApiKey,
+    allowServerResolvedOpenRouterApiKey: preferredOpenRouterApiKey === '__server_resolved_openrouter__',
+  });
   await ensureAutoTutorRelationshipGraph(capabilities, config, preferredOpenRouterApiKey);
   validateGraduationAgainstScript(config);
   const state = createInitialAutoTutorState(config.script);

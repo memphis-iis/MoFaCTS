@@ -7,7 +7,7 @@ import './aiContentCreator.html';
 import { clientConsole } from '../..';
 import { getUploadIntegrity } from '../../lib/uploadIntegrity';
 import { getErrorMessage } from '../../lib/errorUtils';
-import { getOwnOpenRouterSettings, userHasServerOpenRouterKey } from '../../lib/openRouterClientProfile';
+import { getOpenRouterCapability, userHasServerOpenRouterKey, type OpenRouterCapability } from '../../lib/openRouterClientProfile';
 import { sanitizeImportName } from '../../lib/importCompositionBuilder';
 import type { ImportDraftLesson } from '../../lib/normalizedImportTypes';
 import type { CreatedOutput, CreationModuleId } from '../../lib/aiContentTypes';
@@ -16,7 +16,6 @@ import { findCueLeaks, type CueLeak } from '../../lib/aiContentCueValidation';
 import { callOpenRouterForAutoTutor, callOpenRouterForItemCueRepair, callOpenRouterForItems } from '../../lib/aiContentOpenRouterClient';
 import {
   generateAutoTutorExpectationRelationships,
-  selectAutoTutorRelationshipGenerationKey,
 } from '../../lib/autoTutorRelationshipEngine';
 import { enrichAiContentMedia } from '../../lib/aiContentMediaEnrichment';
 import { extractJsonObject, validateAiOutput, validateAutoTutorOutput } from '../../lib/aiContentValidation';
@@ -50,7 +49,7 @@ type DebugRecord = {
     autoTutorRelationshipGeneration?: {
       model: string;
       attemptedModels: string[];
-      sourceKeyType: 'tdf' | 'user';
+      sourceKeyType: 'tdf' | 'user' | 'admin';
       cacheKey: string;
       costUsd?: number;
     };
@@ -108,6 +107,7 @@ type AiCreatorInstance = Blaze.TemplateInstance & {
   statusMessage: ReactiveVar<string>;
   statusKind: ReactiveVar<StatusKind>;
   debugRecord: ReactiveVar<DebugRecord | null>;
+  openRouterCapability: ReactiveVar<OpenRouterCapability | null>;
   autoStartFromHandoff?: boolean;
 };
 
@@ -182,6 +182,23 @@ const MAX_ITEM_CUE_REPAIR_PASSES = 2;
 
 function currentModel(): string {
   return String((Meteor.user() as any)?.profile?.openRouterDefaultModel || '').trim();
+}
+
+async function refreshOpenRouterCapability(instance: AiCreatorInstance): Promise<void> {
+  try {
+    instance.openRouterCapability.set(await getOpenRouterCapability());
+  } catch {
+    instance.openRouterCapability.set(null);
+  }
+}
+
+function hasOpenRouterCapability(instance: AiCreatorInstance): boolean {
+  const capability = instance.openRouterCapability.get();
+  return Boolean(capability?.configured || (userHasServerOpenRouterKey(Meteor.user()) && currentModel()));
+}
+
+function effectiveOpenRouterModel(instance: AiCreatorInstance): string {
+  return currentModel() || String(instance.openRouterCapability.get()?.model || '').trim();
 }
 
 function readPendingCreationHandoff(): { sourceText: string; selectedModules: CreationModuleId[]; autoStart: boolean } | null {
@@ -295,17 +312,29 @@ function modeHelperText(moduleIds: CreationModuleId[]): string {
   return `Creates a combo: ${labels}`;
 }
 
-async function generateAutoTutorFromAi(sourceText: string, apiKey: string, model: string): Promise<AutoTutorGenerationResult> {
+async function generateAutoTutorFromAi(
+  sourceText: string,
+  apiKey: string,
+  model: string,
+  sourceKeyType: 'tdf' | 'user' | 'admin' = 'user',
+): Promise<AutoTutorGenerationResult> {
   const rawAiResponse = await callOpenRouterForAutoTutor(sourceText, apiKey, model);
   const parsedJson = extractJsonObject(rawAiResponse);
   const result = validateAutoTutorOutput(parsedJson);
   if (result.output.expectations.length > 1) {
-    const relationshipKey = selectAutoTutorRelationshipGenerationKey({
-      userOpenRouterApiKey: apiKey,
-    });
     const relationshipResult = await generateAutoTutorExpectationRelationships(result.output, {
-      apiKey: relationshipKey.apiKey,
-      sourceKeyType: relationshipKey.sourceKeyType,
+      apiKey,
+      sourceKeyType,
+      callEmbeddings: async (embeddingModel, input) => {
+        return await MeteorAny.callAsync('callResolvedOpenRouterEmbeddings', {
+          model: embeddingModel,
+          input,
+          telemetry: {
+            surface: 'ai-content-creator',
+            operation: 'autotutor-relationship-embedding',
+          },
+        });
+      },
     });
     result.output.expectationRelationships = relationshipResult.expectationRelationships;
     result.output.expectationRelationshipProvenance = relationshipResult.expectationRelationshipProvenance;
@@ -406,7 +435,8 @@ function promptForReplacementName(conflict: GeneratedNameConflict): string | nul
 async function runCreation(instance: AiCreatorInstance): Promise<void> {
   const sourceText = instance.sourceText.get().trim();
   const selectedModules = instance.selectedModules.get();
-  const model = currentModel();
+  await refreshOpenRouterCapability(instance);
+  const model = effectiveOpenRouterModel(instance);
   const creationRecordId = Random.id();
   const debugRecordId = Random.id();
   const debugBase: DebugRecord = {
@@ -427,8 +457,8 @@ async function runCreation(instance: AiCreatorInstance): Promise<void> {
     setStatus(instance, 'warning', 'Choose at least one creation target.');
     return;
   }
-  if (!userHasServerOpenRouterKey(Meteor.user()) || !model) {
-    setStatus(instance, 'warning', 'AI content creation requires an OpenRouter key and default model. Add them in your Profile.');
+  if (!hasOpenRouterCapability(instance) || !model) {
+    setStatus(instance, 'warning', 'AI content creation requires a configured OpenRouter key and model.');
     return;
   }
 
@@ -443,17 +473,13 @@ async function runCreation(instance: AiCreatorInstance): Promise<void> {
   );
   try {
     const sourceTextHash = await hashSourceText(sourceText);
-    const openRouterSettings = await getOwnOpenRouterSettings();
-    const apiKey = openRouterSettings.apiKey;
-    if (!apiKey) {
-      throw new Error('AI content creation requires an OpenRouter key. Add one in your Profile.');
-    }
+    const apiKey = '__server_resolved_openrouter__';
     const itemModules = selectedModules.filter((moduleId) => moduleId === 'learningSession' || moduleId === 'assessmentSession');
     const itemGenerationPromise = itemModules.length > 0
       ? generateItemsFromAi(sourceText, itemModules, apiKey, model)
       : null;
     const autoTutorGenerationPromise = selectedModules.includes('autoTutor')
-      ? generateAutoTutorFromAi(sourceText, apiKey, model)
+      ? generateAutoTutorFromAi(sourceText, apiKey, model, instance.openRouterCapability.get()?.source || 'user')
       : null;
     const [itemGeneration, autoTutorGeneration] = await Promise.all([
       itemGenerationPromise || Promise.resolve(null),
@@ -497,7 +523,7 @@ async function runCreation(instance: AiCreatorInstance): Promise<void> {
           cacheKey: provenance.cacheKey,
         };
       }
-      drafts.push(buildAutoTutorDraft(autoTutorGeneration.result.output, apiKey, model));
+      drafts.push(buildAutoTutorDraft(autoTutorGeneration.result.output, '', model));
       warnings = warnings.concat(autoTutorGeneration.result.warnings);
       creationSummary = [
         creationSummary,
@@ -604,10 +630,12 @@ Template.aiContentCreator.onCreated(function(this: AiCreatorInstance) {
   this.statusMessage = new ReactiveVar('');
   this.statusKind = new ReactiveVar('info');
   this.debugRecord = new ReactiveVar(null);
+  this.openRouterCapability = new ReactiveVar(null);
   this.autoStartFromHandoff = pendingHandoff?.autoStart === true;
 });
 
 Template.aiContentCreator.onRendered(function(this: AiCreatorInstance) {
+  void refreshOpenRouterCapability(this);
   Meteor.setTimeout(() => {
     this.findAll('.ai-pulse-once').forEach((element) => element.classList.remove('ai-pulse-once'));
   }, 3200);
@@ -626,7 +654,7 @@ Template.aiContentCreator.helpers({
     return isEmbedded(Template.instance() as AiCreatorInstance) ? 'is-embedded' : '';
   },
   hasOpenRouterConfig() {
-    return userHasServerOpenRouterKey(Meteor.user()) && Boolean(currentModel());
+    return hasOpenRouterCapability(Template.instance() as AiCreatorInstance);
   },
   sourceText() {
     return (Template.instance() as AiCreatorInstance).sourceText.get();
@@ -661,8 +689,8 @@ Template.aiContentCreator.helpers({
     const disabled = instance.creating.get() ||
       !instance.sourceText.get().trim() ||
       instance.selectedModules.get().length === 0 ||
-      !userHasServerOpenRouterKey(Meteor.user()) ||
-      !currentModel();
+      !hasOpenRouterCapability(instance) ||
+      !effectiveOpenRouterModel(instance);
     return disabled ? { disabled: true } : {};
   },
   statusMessage() {

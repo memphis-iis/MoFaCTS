@@ -68,6 +68,14 @@ function redactOpenRouterSecrets(message: string): string {
   return message.replace(/sk-or-v1-[A-Za-z0-9_-]+/g, '[redacted OpenRouter key]');
 }
 
+export function redactOpenRouterSecretText(message: string): string {
+  return redactOpenRouterSecrets(message);
+}
+
+function getOpenRouterReferer(): string {
+  return typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
+}
+
 async function readOpenRouterResponseBody(response: Response): Promise<unknown> {
   const text = await response.text();
   if (!text.trim()) {
@@ -186,7 +194,7 @@ export async function callOpenRouterJson<T>(options: OpenRouterCallOptions<T>): 
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': window.location.origin,
+        'HTTP-Referer': getOpenRouterReferer(),
         'X-OpenRouter-Title': options.intent.title,
       },
       body: JSON.stringify({
@@ -288,7 +296,7 @@ export async function callOpenRouterEmbeddings(options: OpenRouterEmbeddingOptio
         headers: {
           Authorization: `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
-          'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : 'http://localhost',
+          'HTTP-Referer': getOpenRouterReferer(),
           'X-OpenRouter-Title': 'MoFaCTS AutoTutor Relationship Embeddings',
         },
         body: JSON.stringify({

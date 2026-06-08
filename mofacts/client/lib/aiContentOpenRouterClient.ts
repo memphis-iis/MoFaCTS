@@ -1,6 +1,6 @@
+import { Meteor } from 'meteor/meteor';
 import type { CreationModuleId } from './aiContentTypes';
 import {
-  callOpenRouterJson as callSharedOpenRouterJson,
   type OpenRouterJsonSchema,
   type OpenRouterMessage,
 } from './openRouterClient';
@@ -16,6 +16,8 @@ const AI_CONTENT_OBJECT_SCHEMA: OpenRouterJsonSchema = {
   additionalProperties: true,
 };
 
+const MeteorAny = Meteor as typeof Meteor & { callAsync: (name: string, ...args: any[]) => Promise<any> };
+
 async function callOpenRouterJson(
   messages: OpenRouterMessage[],
   apiKey: string,
@@ -27,8 +29,7 @@ async function callOpenRouterJson(
   operation: string,
 ) {
   try {
-    const result = await callSharedOpenRouterJson({
-      apiKey,
+    const result = await MeteorAny.callAsync('callResolvedOpenRouterJson', {
       model,
       messages,
       temperature,
@@ -41,10 +42,8 @@ async function callOpenRouterJson(
         schemaName: title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'mofacts_ai_content',
         schema: AI_CONTENT_OBJECT_SCHEMA,
         missingContentMessage,
-        parse(value) {
-          return value;
-        },
       },
+      ...(apiKey ? { initialUserKeyPresent: true } : {}),
     });
     return result.rawContent;
   } catch (error) {

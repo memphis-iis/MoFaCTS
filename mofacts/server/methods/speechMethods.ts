@@ -16,6 +16,17 @@ type SpeechMethodsDeps = {
   getApiKeyResolutionErrorMessage: (error: unknown) => string;
 };
 
+function redactGoogleApiKeys(message: string): string {
+  return message
+    .replace(/([?&]key=)[^&\s]+/gi, '$1[redacted Google API key]')
+    .replace(/AIza[0-9A-Za-z_-]{20,}/g, '[redacted Google API key]');
+}
+
+function getSafeErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return redactGoogleApiKeys(message);
+}
+
 async function makeHTTPSrequest(options: unknown, request: string | Buffer, timeoutMs: number = 30000){
   return new Promise<Buffer>((resolve, reject) => {
     let chunks: Buffer[] = [];
@@ -83,6 +94,8 @@ export function createSpeechMethods(deps: SpeechMethodsDeps) {
           deps.serverConsole('Using TDF API key for TTS');
         } else if (keyResolution.source === 'user') {
           deps.serverConsole('Using user personal API key for TTS');
+        } else if (keyResolution.source === 'admin') {
+          deps.serverConsole('Using admin-provided API key alternative for TTS');
         }
 
         if (!ttsAPIKey) {
@@ -114,8 +127,8 @@ export function createSpeechMethods(deps: SpeechMethodsDeps) {
         const response = JSON.parse(Buffer.isBuffer(data) ? data.toString('utf-8') : String(data));
         return response.audioContent;
       } catch (error: unknown) {
-        deps.serverConsole('[TTS] ERROR in makeGoogleTTSApiCall:', error);
-        throw error;
+        deps.serverConsole('[TTS] ERROR in makeGoogleTTSApiCall:', getSafeErrorMessage(error));
+        throw error instanceof Meteor.Error ? error : new Meteor.Error('google-tts-api-error', getSafeErrorMessage(error));
       }
     },
 
@@ -168,6 +181,8 @@ export function createSpeechMethods(deps: SpeechMethodsDeps) {
         deps.serverConsole('Using TDF API key for speech recognition');
       } else if (keyResolution.source === 'user') {
         deps.serverConsole('Using user personal API key for speech recognition');
+      } else if (keyResolution.source === 'admin') {
+        deps.serverConsole('Using admin-provided API key alternative for speech recognition');
       }
 
       if (!speechAPIKey) {
@@ -192,8 +207,8 @@ export function createSpeechMethods(deps: SpeechMethodsDeps) {
         });
         return [answerGrammar, parsed];
       } catch (error: unknown) {
-        deps.serverConsole('Google Speech API error:', error);
-        const message = error instanceof Error ? error.message : String(error);
+        const message = getSafeErrorMessage(error);
+        deps.serverConsole('Google Speech API error:', message);
         throw new Meteor.Error('google-speech-api-error', 'Error with Google SR API call: ' + message);
       }
     },

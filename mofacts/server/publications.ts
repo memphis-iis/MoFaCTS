@@ -61,6 +61,12 @@ export const DYNAMIC_ASSET_PUBLICATION_FIELDS = {
     versions: 1
 };
 
+const TDF_RUNTIME_SECRET_EXCLUSION_FIELDS = {
+    'content.tdfs.tutor.setspec.speechAPIKey': 0,
+    'content.tdfs.tutor.setspec.textToSpeechAPIKey': 0,
+    'content.tdfs.tutor.setspec.openRouterApiKey': 0
+};
+
 // ===== PHASE 3: Paginated Users Publication =====
 // Server-side filtering and pagination for admin-only User Admin page
 // Eliminates O(n²) client-side iteration
@@ -539,7 +545,7 @@ Meteor.publish('currentTdf', async function(tdfId: any) {
         if (!allowedIds.length) {
             return this.ready();
         }
-        return Tdfs.find({ _id: { $in: allowedIds } });
+        return Tdfs.find({ _id: { $in: allowedIds } }, { fields: TDF_RUNTIME_SECRET_EXCLUSION_FIELDS });
     }
 
     const normalizedTdfId = normalizeOptionalStringId(tdfId);
@@ -549,7 +555,7 @@ Meteor.publish('currentTdf', async function(tdfId: any) {
     if (!await canAccessRequestedTdf(normalizedTdfId)) {
         return this.ready();
     }
-    return Tdfs.find({ _id: normalizedTdfId });
+    return Tdfs.find({ _id: normalizedTdfId }, { fields: TDF_RUNTIME_SECRET_EXCLUSION_FIELDS });
 });
 
 // Publication for content/TDF editor - returns TDF with full content for editing
@@ -865,7 +871,7 @@ Meteor.publish('allTdfs', async function() {
 
     // Admins can see all TDFs
     if (await Roles.userIsInRoleAsync(this.userId, ['admin'])) {
-        return Tdfs.find();
+        return Tdfs.find({}, { fields: TDF_RUNTIME_SECRET_EXCLUSION_FIELDS });
     }
 
     // Teachers can see their own TDFs, TDFs they have access to, public TDFs, and all TDFs with experimentTarget
@@ -877,7 +883,7 @@ Meteor.publish('allTdfs', async function() {
                 { 'content.tdfs.tutor.setspec.userselect': 'true' },
                 { 'content.tdfs.tutor.setspec.experimentTarget': { $exists: true, $ne: null } }
             ]
-        });
+        }, { fields: TDF_RUNTIME_SECRET_EXCLUSION_FIELDS });
     }
 
     const user = await (Meteor.users as any).findOneAsync(
@@ -893,7 +899,7 @@ Meteor.publish('allTdfs', async function() {
             { 'content.tdfs.tutor.setspec.userselect': 'true' },
             { _id: { $in: accessedTdfIds } }
         ]
-    });
+    }, { fields: TDF_RUNTIME_SECRET_EXCLUSION_FIELDS });
 });
 
 Meteor.publish('ownedTdfs', async function(ownerId: any) {
@@ -935,7 +941,7 @@ Meteor.publish('tdfByExperimentTarget', async function(experimentTarget: any, ex
 
     // Security: Filter results based on user role and permissions
     if (await Roles.userIsInRoleAsync(this.userId, ['admin'])) {
-        return Tdfs.find(query);
+        return Tdfs.find(query, { fields: TDF_RUNTIME_SECRET_EXCLUSION_FIELDS });
     }
 
     if (await Roles.userIsInRoleAsync(this.userId, ['teacher'])) {
@@ -951,7 +957,7 @@ Meteor.publish('tdfByExperimentTarget', async function(experimentTarget: any, ex
                     ]
                 }
             ]
-        });
+        }, { fields: TDF_RUNTIME_SECRET_EXCLUSION_FIELDS });
     }
 
     // Students: resolve canonical root+condition ids and verify participant access to target.
@@ -1001,7 +1007,7 @@ Meteor.publish('tdfByExperimentTarget', async function(experimentTarget: any, ex
             query,
             { _id: { $in: allowedIds } }
         ]
-    });
+    }, { fields: TDF_RUNTIME_SECRET_EXCLUSION_FIELDS });
 });
 
 Meteor.publish('Assignments', async function(courseId: any) {

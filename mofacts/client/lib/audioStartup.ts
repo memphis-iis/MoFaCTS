@@ -155,9 +155,7 @@ async function warmupSrIfNeeded(
   currentTdfFile: AudioStartupTdf | null | undefined,
   user: AudioStartupUser | null | undefined,
 ): Promise<void> {
-  if (!supportsSr(currentTdfFile, user) ||
-      !currentTdfFile?.tdfs?.tutor?.setspec?.speechAPIKey ||
-      getSrWarmedUp()) {
+  if (!supportsSr(currentTdfFile, user) || getSrWarmedUp()) {
     return;
   }
 
@@ -204,7 +202,6 @@ async function preInitializeAudioRecorderIfNeeded(
   user: AudioStartupUser | null | undefined,
 ): Promise<void> {
   if (!supportsSr(currentTdfFile, user) ||
-      !currentTdfFile?.tdfs?.tutor?.setspec?.speechAPIKey ||
       getAudioRecorderInitialized() ||
       audioManager.getPreInitializedStream()) {
     return;
@@ -230,7 +227,7 @@ export function getAudioLaunchPreparationPlan(
   currentTdfFile: AudioStartupTdf | null | undefined,
   user: AudioStartupUser | null | undefined,
 ): AudioLaunchPreparationPlan {
-  const hasSrWarmupTarget = !!currentTdfFile?.tdfs?.tutor?.setspec?.speechAPIKey;
+  const hasSrWarmupTarget = supportsSr(currentTdfFile, user);
   const srSupported = supportsSr(currentTdfFile, user);
 
   const ttsWarmup = supportsTts(currentTdfFile, user) && !getTtsWarmedUp();
