@@ -225,14 +225,9 @@ export function createProfileMethods(deps: ProfileMethodsDeps) {
           'services.openRouter.keyEncrypted': 1,
         },
       });
-      const encryptedKey = typeof user?.services?.openRouter?.keyEncrypted === 'string'
-        ? user.services.openRouter.keyEncrypted
-        : '';
-      const apiKey = encryptedKey ? deps.decryptData(encryptedKey) : '';
       return {
-        apiKey,
         model: String(user?.profile?.openRouterDefaultModel || '').trim(),
-        hasOpenRouterKey: Boolean(apiKey || user?.profile?.openRouterHasKey),
+        hasOpenRouterKey: Boolean(user?.services?.openRouter?.keyEncrypted || user?.profile?.openRouterHasKey),
       };
     },
 
@@ -272,10 +267,19 @@ export function createProfileMethods(deps: ProfileMethodsDeps) {
           },
         });
       }
+      const currentUser = await deps.usersCollection.findOneAsync({ _id: userId }, {
+        fields: {
+          'profile.openRouterHasKey': 1,
+          'services.openRouter.keyEncrypted': 1,
+        },
+      });
+      const hasStoredKey = Boolean(currentUser?.services?.openRouter?.keyEncrypted || currentUser?.profile?.openRouterHasKey);
       const result = {
-        success: false,
+        success: hasStoredKey,
         status: 'server-stored-openrouter-key',
-        message: 'OpenRouter key is saved on the server. Test the provider from the browser.',
+        message: hasStoredKey
+          ? 'OpenRouter key is saved on the server.'
+          : 'OpenRouter API key is required',
       };
       await deps.usersCollection.updateAsync({ _id: userId }, {
         $set: {

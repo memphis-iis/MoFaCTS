@@ -12,8 +12,6 @@ import {
 import { getErrorMessage } from '../../lib/errorUtils';
 import { getUserDisplayName, getUserInitials } from '../../lib/userIdentity';
 import {
-  getOwnOpenRouterSettings,
-  testOpenRouterClientConfig,
   userHasServerOpenRouterKey,
 } from '../../lib/openRouterClientProfile';
 
@@ -320,11 +318,17 @@ Template.profile.events({
     template.statusMessage.set('');
     try {
       const inputKey = inputValue('openRouterApiKey');
-      const storedSettings = inputKey.trim() ? null : await getOwnOpenRouterSettings();
-      const result = await testOpenRouterClientConfig(
-        inputKey || storedSettings?.apiKey || '',
-        inputValue('openRouterDefaultModel'),
-      );
+      const result = await MeteorAny.callAsync('testOwnOpenRouterSettings', {
+        apiKey: inputKey,
+        model: inputValue('openRouterDefaultModel'),
+      });
+      if (inputKey.trim()) {
+        template.openRouterHasServerKey.set(true);
+        const apiKeyInput = document.getElementById('openRouterApiKey') as HTMLInputElement | null;
+        if (apiKeyInput) {
+          apiKeyInput.value = '';
+        }
+      }
       setStatus(template, result?.success ? 'success' : 'error', result?.message || 'Unknown error');
     } catch (error: unknown) {
       setStatus(template, 'error', getErrorMessage(error));

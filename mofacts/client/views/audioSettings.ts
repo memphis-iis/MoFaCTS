@@ -226,6 +226,7 @@ Template.audioSettings.onRendered(async function(this: any) {
     user: Meteor.user() as any,
     tdfFile: Session.get('currentTdfFile'),
     sessionSpeechApiKey: Session.get('speechAPIKey'),
+    serverSpeechConfigured: Session.get('speechAPIKeyConfigured'),
   });
   clientConsole(2, '[Audio Settings] SR availability evaluated', srAvailability);
 
@@ -243,16 +244,9 @@ Template.audioSettings.onRendered(async function(this: any) {
 
   checkAndSetSpeechAPIKeyIsSetup();
 
-  // Load API key if it exists
+  // Stored keys are replacement-only; do not load secrets back into the browser.
   if (Session.get('showSpeechAPISetup')) {
-    try {
-      const key = await (Meteor as any).callAsync('getUserSpeechAPIKey');
-      if (key) {
-        $('#speechAPIKey').val(key);
-      }
-    } catch (_error) {
-      // Missing key is expected for users who have not configured speech API.
-    }
+    $('#speechAPIKey').val('');
   }
 
   // Note: TTS warmup on hot code reload is now handled in index.js Meteor.startup

@@ -873,6 +873,7 @@ export async function initializeSvelteCard(): Promise<SvelteCardInitResult> {
     user: getMeteorUser() ?? null,
     tdfFile: (tdfFile as Parameters<typeof evaluateSrAvailability>[0]['tdfFile']) ?? null,
     sessionSpeechApiKey: Session.get('speechAPIKey'),
+    serverSpeechConfigured: Session.get('speechAPIKeyConfigured'),
   });
   let audioInputEnabled = srAvailability.status === 'available';
   CardStore.setAudioInputModeEnabled(audioInputEnabled);

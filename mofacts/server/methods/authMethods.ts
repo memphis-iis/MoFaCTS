@@ -419,7 +419,8 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
     },
 
     getUserSpeechAPIKey: async function(this: MethodContext) {
-      return await deps.getUserPersonalApiKey(deps.getApiKeyResolutionDeps(), this.userId, 'speech');
+      requireCurrentUserId(this.userId, 'Must be logged in to read speech API key status');
+      return '';
     },
 
     isUserSpeechAPIKeySetup: async function(this: MethodContext) {
@@ -431,7 +432,7 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
       return !!speechAPIKey;
     },
 
-    hasUserPersonalKeys: async function(this: MethodContext) {
+    hasUserPersonalKeys: async function(this: MethodContext, tdfId?: string | null) {
       const userId = typeof this.userId === 'string' ? this.userId.trim() : '';
       if (!userId) {
         return { hasSR: false, hasTTS: false };
@@ -440,15 +441,22 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
       if (!user) {
         return { hasSR: false, hasTTS: false };
       }
+      const currentTdfId = typeof tdfId === 'string' && tdfId.trim() ? tdfId.trim() : null;
+      const speechResolution = await resolvePreferredApiKey(deps.getApiKeyResolutionDeps(), {
+        userId,
+        tdfId: currentTdfId,
+        kind: 'speech',
+      });
+      const ttsResolution = await resolvePreferredApiKey(deps.getApiKeyResolutionDeps(), {
+        userId,
+        tdfId: currentTdfId,
+        kind: 'tts',
+      });
       return {
-        hasSR: Boolean(user.speechAPIKey) || Boolean((await resolvePreferredApiKey(deps.getApiKeyResolutionDeps(), {
-          userId,
-          kind: 'speech',
-        })).apiKey),
-        hasTTS: Boolean(user.ttsAPIKey) || Boolean((await resolvePreferredApiKey(deps.getApiKeyResolutionDeps(), {
-          userId,
-          kind: 'tts',
-        })).apiKey),
+        hasSR: Boolean(speechResolution.apiKey),
+        hasTTS: Boolean(ttsResolution.apiKey),
+        speechSource: speechResolution.source,
+        ttsSource: ttsResolution.source,
       };
     },
 
@@ -458,19 +466,21 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
     },
 
     getTdfTTSAPIKey: async function(this: MethodContext, tdfId: string) {
-      return await deps.getAccessibleTdfApiKey(deps.getApiKeyResolutionDeps(), {
+      const key = await deps.getAccessibleTdfApiKey(deps.getApiKeyResolutionDeps(), {
         userId: this.userId,
         tdfId,
         kind: 'tts',
       });
+      return { configured: Boolean(key) };
     },
 
     getTdfSpeechAPIKey: async function(this: MethodContext, tdfId: string) {
-      return await deps.getAccessibleTdfApiKey(deps.getApiKeyResolutionDeps(), {
+      const key = await deps.getAccessibleTdfApiKey(deps.getApiKeyResolutionDeps(), {
         userId: this.userId,
         tdfId,
         kind: 'speech',
       });
+      return { configured: Boolean(key) };
     },
 
     setUserSessionId: async function(this: MethodContext, sessionId: string, sessionIdTimestamp: number) {

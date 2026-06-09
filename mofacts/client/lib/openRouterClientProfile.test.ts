@@ -45,7 +45,6 @@ describe('openRouterClientProfile', function() {
 
   it('reads saved OpenRouter settings from the server', async function() {
     const callAsyncStub = sinon.stub(Meteor as any, 'callAsync').resolves({
-      apiKey: ' server-key ',
       model: ' openai/test-model ',
       hasOpenRouterKey: true,
     });
@@ -54,7 +53,6 @@ describe('openRouterClientProfile', function() {
 
     expect(callAsyncStub.calledWith('getOwnOpenRouterSettings')).to.equal(true);
     expect(settings).to.deep.equal({
-      apiKey: 'server-key',
       model: 'openai/test-model',
       hasOpenRouterKey: true,
     });

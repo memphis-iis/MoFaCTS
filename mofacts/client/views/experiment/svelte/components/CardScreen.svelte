@@ -349,6 +349,7 @@
     user,
     tdfFile: Session.get('currentTdfFile'),
     sessionSpeechApiKey: Session.get('speechAPIKey'),
+    serverSpeechConfigured: Session.get('speechAPIKeyConfigured'),
     requireTextTrial: true,
     isTextTrial: !context.buttonTrial,
   });

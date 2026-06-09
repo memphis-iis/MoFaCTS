@@ -942,6 +942,9 @@ async function updateStimDisplayTypeMapPublic(this: MethodContext, stimuliSetIds
     forbiddenMessage: 'Admin access required to update stimulus display map',
     forbiddenCode: 403,
   });
+  if (!Array.isArray(stimuliSetIds) || stimuliSetIds.length === 0) {
+    return await rebuildStimDisplayTypeMapSnapshot(getStimDisplayTypeMapDeps());
+  }
   return await updateStimDisplayTypeMap(stimuliSetIds);
 }
 

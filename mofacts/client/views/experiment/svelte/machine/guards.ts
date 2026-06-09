@@ -212,6 +212,7 @@ export function srEnabled(args: CardMachineActorArgs): boolean {
     user: Meteor.user() as MeteorUserLike | null,
     tdfFile: Session.get('currentTdfFile'),
     sessionSpeechApiKey: Session.get('speechAPIKey'),
+    serverSpeechConfigured: Session.get('speechAPIKeyConfigured'),
     requireTextTrial: true,
     isTextTrial: isTextTrial(args),
   });

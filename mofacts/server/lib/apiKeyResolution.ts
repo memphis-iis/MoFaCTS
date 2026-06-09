@@ -6,6 +6,7 @@ export type ApiKeySource = 'provided' | 'tdf' | 'user' | 'admin' | null;
 type UserApiKeyDoc = {
   speechAPIKey?: unknown;
   ttsAPIKey?: unknown;
+  textToSpeechAPIKey?: unknown;
   profile?: {
     openRouterDefaultModel?: unknown;
     openRouterHasKey?: unknown;
@@ -109,6 +110,9 @@ function getEncryptedTdfApiKey(tdf: TdfApiKeyDoc, kind: ApiKeyKind) {
 function getEncryptedUserApiKey(user: UserApiKeyDoc, kind: ApiKeyKind) {
   if (kind === 'openrouter') {
     return normalizeString(user?.services?.openRouter?.keyEncrypted) || null;
+  }
+  if (kind === 'tts') {
+    return normalizeString(user?.ttsAPIKey) || normalizeString(user?.textToSpeechAPIKey) || null;
   }
   const keyField = API_KEY_FIELDS[kind].userField;
   const value = user?.[keyField as 'speechAPIKey' | 'ttsAPIKey'];

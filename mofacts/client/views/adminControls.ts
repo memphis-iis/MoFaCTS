@@ -151,9 +151,9 @@ Template.adminControls.events({
     'click #updateStimDisplayTypeMap': async function() {
         try {
             await meteorCallAsync('updateStimDisplayTypeMap');
-            setAdminMessage('Stimulus display cache refreshed.', 'success');
+            setAdminMessage('Stimulus display cache rebuilt.', 'success');
         } catch (err) {
-            setAdminMessage(`Failed to refresh stimulus display cache: ${formatError(err)}`, 'error');
+            setAdminMessage(`Failed to rebuild stimulus display cache: ${formatError(err)}`, 'error');
         }
     }
 });

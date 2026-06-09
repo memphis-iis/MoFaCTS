@@ -430,6 +430,7 @@ function isSrEnabled(): boolean {
     user: getMeteorUser(),
     tdfFile: Session.get('currentTdfFile'),
     sessionSpeechApiKey: Session.get('speechAPIKey'),
+    serverSpeechConfigured: Session.get('speechAPIKeyConfigured'),
   });
   return availability.status === 'available';
 }
@@ -470,6 +471,7 @@ export async function initializeAudioRecorder(): Promise<SpeechRecognitionInitRe
     user: getMeteorUser(),
     tdfFile: Session.get('currentTdfFile'),
     sessionSpeechApiKey: Session.get('speechAPIKey'),
+    serverSpeechConfigured: Session.get('speechAPIKeyConfigured'),
   });
   if (srAvailability.status !== 'available') {
     setAudioRecorderInitialized(false);
@@ -620,6 +622,7 @@ export async function initializeAudioRecorder(): Promise<SpeechRecognitionInitRe
         user: getMeteorUser(),
         tdfFile: Session.get('currentTdfFile'),
         sessionSpeechApiKey: Session.get('speechAPIKey'),
+        serverSpeechConfigured: Session.get('speechAPIKeyConfigured'),
       }),
       browserSupportsMediaDevices: supportsMediaDevicesApi(),
     });
@@ -660,6 +663,7 @@ async function initializeAudioRecorderWithRetry(
           user: getMeteorUser(),
           tdfFile: Session.get('currentTdfFile'),
           sessionSpeechApiKey: Session.get('speechAPIKey'),
+          serverSpeechConfigured: Session.get('speechAPIKeyConfigured'),
         }),
         browserSupportsMediaDevices: supportsMediaDevicesApi(),
       });

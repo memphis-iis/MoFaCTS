@@ -37,16 +37,23 @@
 
         <!-- Stimulus display cache refresh section -->
         <div class="admin-section">
-            <div class="card admin-card">
+            <div class="card admin-card admin-maintenance-card">
                 <div class="card-body">
-                    <div class="admin-section-heading">
-                        <i class="fa fa-refresh admin-section-icon"></i>
-                        <h5>Stimulus Display Cache</h5>
-                    </div>
-                    <div class="text-center">
-                        <button type="button" id="updateStimDisplayTypeMap" class="btn btn-primary">
-                            <i class="fa fa-refresh"></i> Refresh Cache
-                        </button>
+                    <div class="admin-maintenance-row">
+                        <div class="admin-maintenance-copy">
+                            <div class="admin-section-heading admin-section-heading-compact">
+                                <i class="fa fa-refresh admin-section-icon"></i>
+                                <h5>Stimulus Display Cache</h5>
+                            </div>
+                            <p class="admin-maintenance-description">
+                                Rebuilds the server snapshot that tells lesson screens whether each stimulus set contains text, cloze, audio, image, or video content. Use after direct content repairs or imports if lesson display choices do not match the current content.
+                            </p>
+                        </div>
+                        <div class="admin-maintenance-action">
+                            <button type="button" id="updateStimDisplayTypeMap" class="btn btn-primary">
+                                <i class="fa fa-refresh"></i> Rebuild Display Cache
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -54,37 +61,45 @@
 
         <!-- Server Verbosity Level Section -->
         <div class="admin-section">
-            <div class="card admin-card">
+            <div class="card admin-card admin-verbosity-card">
                 <div class="card-body">
-                    <div class="admin-section-heading">
-                        <i class="fa fa-cog admin-section-icon"></i>
-                        <h5>Server Verbosity Level</h5>
+                    <div class="admin-section-heading admin-verbosity-heading">
+                        <div>
+                            <div class="admin-section-heading">
+                                <i class="fa fa-cog admin-section-icon"></i>
+                                <h5>Server Logging</h5>
+                            </div>
+                            <p class="admin-verbosity-intro">Controls server-side diagnostic output from MoFaCTS methods and startup/runtime services.</p>
+                        </div>
                     </div>
-                    <div class="row g-3">
-                        <div class="col-12">
-                            <div class="form-check">
+                    <div class="admin-verbosity-options">
+                        <label class="admin-verbosity-option" for="verbosityRadio0">
+                            <span class="admin-verbosity-option-control">
                                 <input class="form-check-input serverVerbosityRadio" type="radio" name="serverVerbosityRadio" id="verbosityRadio0">
-                                <label class="form-check-label" for="verbosityRadio0">
-                                    Server Logs Only
-                                </label>
-                            </div>
-                        </div>
-                        <div class="col-12">
-                            <div class="form-check">
+                            </span>
+                            <span class="admin-verbosity-option-copy">
+                                <span class="admin-verbosity-option-title">Routine Server Logs</span>
+                                <span class="admin-verbosity-option-description">Shows normal serverConsole messages. Use for general operational debugging.</span>
+                            </span>
+                        </label>
+                        <label class="admin-verbosity-option" for="verbosityRadio1">
+                            <span class="admin-verbosity-option-control">
                                 <input class="form-check-input serverVerbosityRadio" type="radio" name="serverVerbosityRadio" id="verbosityRadio1">
-                                <label class="form-check-label" for="verbosityRadio1">
-                                    Function Times Only
-                                </label>
-                            </div>
-                        </div>
-                        <div class="col-12">
-                            <div class="form-check">
+                            </span>
+                            <span class="admin-verbosity-option-copy">
+                                <span class="admin-verbosity-option-title">Timing Instrumentation</span>
+                                <span class="admin-verbosity-option-description">Suppresses routine server logs and leaves timing-focused diagnostics for performance checks.</span>
+                            </span>
+                        </label>
+                        <label class="admin-verbosity-option" for="verbosityRadio2">
+                            <span class="admin-verbosity-option-control">
                                 <input class="form-check-input serverVerbosityRadio" type="radio" name="serverVerbosityRadio" id="verbosityRadio2">
-                                <label class="form-check-label" for="verbosityRadio2">
-                                    Server Logs and Function Times
-                                </label>
-                            </div>
-                        </div>
+                            </span>
+                            <span class="admin-verbosity-option-copy">
+                                <span class="admin-verbosity-option-title">Server Logs and Timing</span>
+                                <span class="admin-verbosity-option-description">Most detailed server mode: combines routine diagnostics with timing instrumentation.</span>
+                            </span>
+                        </label>
                     </div>
                 </div>
             </div>
@@ -93,37 +108,45 @@
 
         <!-- Client Verbosity Level Section -->
         <div class="admin-section">
-            <div class="card admin-card">
+            <div class="card admin-card admin-verbosity-card">
                 <div class="card-body">
-                    <div class="admin-section-heading">
-                        <i class="fa fa-desktop admin-section-icon"></i>
-                        <h5>Client Verbosity Level</h5>
+                    <div class="admin-section-heading admin-verbosity-heading">
+                        <div>
+                            <div class="admin-section-heading">
+                                <i class="fa fa-desktop admin-section-icon"></i>
+                                <h5>Browser Console Logging</h5>
+                            </div>
+                            <p class="admin-verbosity-intro">Controls MoFaCTS clientConsole output in learner/admin browsers after the setting is loaded.</p>
+                        </div>
                     </div>
-                    <div class="row g-3">
-                        <div class="col-12">
-                            <div class="form-check">
+                    <div class="admin-verbosity-options">
+                        <label class="admin-verbosity-option" for="clientVerbosityRadio0">
+                            <span class="admin-verbosity-option-control">
                                 <input class="form-check-input clientVerbosityRadio" type="radio" name="clientVerbosityRadio" id="clientVerbosityRadio0">
-                                <label class="form-check-label" for="clientVerbosityRadio0">
-                                    No Logging (fastest)
-                                </label>
-                            </div>
-                        </div>
-                        <div class="col-12">
-                            <div class="form-check">
+                            </span>
+                            <span class="admin-verbosity-option-copy">
+                                <span class="admin-verbosity-option-title">Off</span>
+                                <span class="admin-verbosity-option-description">No clientConsole output. Best default for normal use and learner sessions.</span>
+                            </span>
+                        </label>
+                        <label class="admin-verbosity-option" for="clientVerbosityRadio1">
+                            <span class="admin-verbosity-option-control">
                                 <input class="form-check-input clientVerbosityRadio" type="radio" name="clientVerbosityRadio" id="clientVerbosityRadio1">
-                                <label class="form-check-label" for="clientVerbosityRadio1">
-                                    Function Calls Only (slower)
-                                </label>
-                            </div>
-                        </div>
-                        <div class="col-12">
-                            <div class="form-check">
+                            </span>
+                            <span class="admin-verbosity-option-copy">
+                                <span class="admin-verbosity-option-title">Important Diagnostics</span>
+                                <span class="admin-verbosity-option-description">Shows level-1 client messages such as errors, blocked states, and major runtime decisions.</span>
+                            </span>
+                        </label>
+                        <label class="admin-verbosity-option" for="clientVerbosityRadio2">
+                            <span class="admin-verbosity-option-control">
                                 <input class="form-check-input clientVerbosityRadio" type="radio" name="clientVerbosityRadio" id="clientVerbosityRadio2">
-                                <label class="form-check-label" for="clientVerbosityRadio2">
-                                    Full Logging (slowest)
-                                </label>
-                            </div>
-                        </div>
+                            </span>
+                            <span class="admin-verbosity-option-copy">
+                                <span class="admin-verbosity-option-title">Detailed Trace</span>
+                                <span class="admin-verbosity-option-description">Includes level-1 messages plus level-2 flow traces for deeper debugging.</span>
+                            </span>
+                        </label>
                     </div>
                 </div>
             </div>

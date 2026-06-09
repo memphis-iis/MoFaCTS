@@ -37,6 +37,7 @@ type SrAvailabilityInput = {
   user?: UserLike | null;
   tdfFile?: TdfLike | null;
   sessionSpeechApiKey?: unknown;
+  serverSpeechConfigured?: unknown;
   requireTextTrial?: boolean;
   isTextTrial?: boolean;
 };
@@ -78,11 +79,12 @@ function isTdfAudioInputEnabled(tdfFile?: TdfLike | null): boolean {
   return parseBooleanLike(tdfFile?.tdfs?.tutor?.setspec?.audioInputEnabled);
 }
 
-export function resolveSpeechApiKeyAvailability(input: Pick<SrAvailabilityInput, 'user' | 'tdfFile' | 'sessionSpeechApiKey'>): boolean {
+export function resolveSpeechApiKeyAvailability(input: Pick<SrAvailabilityInput, 'user' | 'tdfFile' | 'sessionSpeechApiKey' | 'serverSpeechConfigured'>): boolean {
   const tdfHasSpeechKey = hasNonEmptyString(input.tdfFile?.tdfs?.tutor?.setspec?.speechAPIKey);
   const userHasSpeechKey = hasNonEmptyString(input.user?.speechAPIKey);
   const sessionHasSpeechKey = hasNonEmptyString(input.sessionSpeechApiKey);
-  return tdfHasSpeechKey || userHasSpeechKey || sessionHasSpeechKey;
+  const serverHasSpeechKey = input.serverSpeechConfigured === true;
+  return tdfHasSpeechKey || userHasSpeechKey || sessionHasSpeechKey || serverHasSpeechKey;
 }
 
 export function evaluateSrAvailability(input: SrAvailabilityInput): SrAvailabilityResult {

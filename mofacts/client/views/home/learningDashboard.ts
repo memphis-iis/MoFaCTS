@@ -1572,7 +1572,7 @@ async function checkAndWarmupAudioIfNeeded() {
   let userPersonalKeys = { hasSR: false, hasTTS: false };
   try {
     markLaunchLoadingTiming('hasUserPersonalKeys:start');
-    userPersonalKeys = await (Meteor as any).callAsync('hasUserPersonalKeys');
+    userPersonalKeys = await (Meteor as any).callAsync('hasUserPersonalKeys', Session.get('currentTdfId'));
     markLaunchLoadingTiming('hasUserPersonalKeys:complete', userPersonalKeys);
   } catch (error) {
     clientConsole(1, '[LearningDashboard] Could not determine personal audio key availability during launch prep:', error);
@@ -1583,6 +1583,8 @@ async function checkAndWarmupAudioIfNeeded() {
     speechAPIKey: userPersonalKeys.hasSR ? '__configured__' : user?.speechAPIKey,
     ttsAPIKey: userPersonalKeys.hasTTS ? '__configured__' : user?.ttsAPIKey,
   };
+  Session.set('speechAPIKeyConfigured', userPersonalKeys.hasSR === true);
+  Session.set('ttsAPIKeyConfigured', userPersonalKeys.hasTTS === true);
 
   const audioPreparationPlan = getAudioLaunchPreparationPlan(currentTdfFile, audioStartupUser);
   if (!audioPreparationPlan.requiresPreparation) {
@@ -1742,16 +1744,6 @@ async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId
   setAudioEnabled(audioEnabled);
 
   let continueToCard = true;
-
-  if (audioEnabled) {
-    // Fetch speech API key if available (from user settings or TDF)
-    try {
-      const key = await (Meteor as any).callAsync('getUserSpeechAPIKey');
-      Session.set('speechAPIKey', key);
-    } catch (error) {
-      // Missing user key is acceptable; continue with runtime behavior.
-    }
-  }
 
   // Go directly to the card session - which will decide whether or
   // not to show instruction

@@ -366,7 +366,8 @@ async function speakText(
       
 
       const currentTdf = Session.get('currentTdfFile');
-      const hasTtsKey = !!currentTdf?.tdfs?.tutor?.setspec?.textToSpeechAPIKey;
+      const hasTtsKey = !!currentTdf?.tdfs?.tutor?.setspec?.textToSpeechAPIKey ||
+        Session.get('ttsAPIKeyConfigured') === true;
       const ttsLanguage = resolveTtsLanguageCode(currentTdf?.tdfs?.tutor?.setspec, String(voice || ''));
 
       const speakWithSpeechSynthesis = () => new Promise<void>((speechResolve, speechReject) => {

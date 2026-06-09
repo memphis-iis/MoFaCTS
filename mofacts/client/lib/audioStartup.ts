@@ -70,6 +70,7 @@ function supportsSr(currentTdfFile: AudioStartupTdf | null | undefined, user: Au
     user: user as any,
     tdfFile: currentTdfFile as any,
     sessionSpeechApiKey: Session.get('speechAPIKey'),
+    serverSpeechConfigured: Session.get('speechAPIKeyConfigured'),
   });
   return availability.status === 'available';
 }
@@ -83,7 +84,7 @@ function supportsTts(currentTdfFile: AudioStartupTdf | null | undefined, user: A
   ) || (
     typeof user?.ttsAPIKey === 'string' &&
     user.ttsAPIKey.trim().length > 0
-  );
+  ) || Session.get('ttsAPIKeyConfigured') === true;
 
   return tdfTtsEnabled &&
     hasEnabledAudioPromptMode(userAudioPromptMode) &&

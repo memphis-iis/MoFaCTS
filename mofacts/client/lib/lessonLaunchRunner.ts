@@ -181,13 +181,12 @@ export async function selectTdf(
   const audioEnabled = !Session.get('experimentTarget') ? (tdfAudioEnabled && userAudioToggled) : tdfAudioEnabled;
   setAudioEnabled(audioEnabled);
 
-  if (audioEnabled) {
-    try {
-      const key = await (Meteor as any).callAsync('getUserSpeechAPIKey');
-      Session.set('speechAPIKey', key);
-    } catch (error) {
-      clientConsole(1, 'Error getting user speech API key:', error);
-    }
+  try {
+    const keyStatus = await (Meteor as any).callAsync('hasUserPersonalKeys', Session.get('currentTdfId'));
+    Session.set('speechAPIKeyConfigured', keyStatus?.hasSR === true);
+    Session.set('ttsAPIKeyConfigured', keyStatus?.hasTTS === true);
+  } catch (error) {
+    clientConsole(1, '[LessonLaunch] Could not determine resolved audio key availability:', error);
   }
 
   if (!isRefresh) {

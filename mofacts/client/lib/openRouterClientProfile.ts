@@ -9,7 +9,6 @@ export { OPENROUTER_CHAT_COMPLETIONS_URL };
 const MeteorAny = Meteor as typeof Meteor & { callAsync: (name: string, ...args: any[]) => Promise<any> };
 
 export type OpenRouterSettings = {
-  apiKey: string;
   model: string;
   hasOpenRouterKey: boolean;
 };
@@ -27,9 +26,8 @@ export function userHasServerOpenRouterKey(user: unknown): boolean {
 export async function getOwnOpenRouterSettings(): Promise<OpenRouterSettings> {
   const settings = await MeteorAny.callAsync('getOwnOpenRouterSettings');
   return {
-    apiKey: String(settings?.apiKey || '').trim(),
     model: String(settings?.model || '').trim(),
-    hasOpenRouterKey: Boolean(settings?.hasOpenRouterKey || settings?.apiKey),
+    hasOpenRouterKey: Boolean(settings?.hasOpenRouterKey),
   };
 }
 

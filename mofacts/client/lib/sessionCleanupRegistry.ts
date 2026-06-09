@@ -38,6 +38,8 @@ export const CARD_RUNTIME_SESSION_DEFAULTS: readonly SessionCleanupEntry[] = [
   { key: 'resumeInProgress', value: false, domain: 'resume', reason: 'Clear active resume marker after cleanup.' },
   { key: 'recording', value: false, domain: 'speech', reason: 'Stop any active recording marker.' },
   { key: 'sampleRate', value: undefined, domain: 'speech', reason: 'Speech service re-detects sample rate.' },
+  { key: 'speechAPIKeyConfigured', value: false, domain: 'speech', reason: 'Resolved speech key availability is launch scoped.' },
+  { key: 'ttsAPIKeyConfigured', value: false, domain: 'audio', reason: 'Resolved TTS key availability is launch scoped.' },
   { key: 'speechOutOfGrammarFeedback', value: undefined, domain: 'speech', reason: 'Feedback text is delivery-settings scoped.' },
   { key: 'subTdfIndex', value: undefined, domain: 'multi-tdf', reason: 'Sub-TDF selection is launch scoped.' },
   { key: 'testType', value: undefined, domain: 'card-display', reason: 'Trial type belongs to the selected card.' },

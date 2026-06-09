@@ -92,8 +92,8 @@
 
         <div class="profile-field">
           <label for="openRouterApiKey">OpenRouter API Key</label>
-          <input id="openRouterApiKey" type="password" autocomplete="new-password" placeholder="OpenRouter API key">
-          <p>Saved encrypted for your account and used for your own AI requests.</p>
+          <input id="openRouterApiKey" type="password" autocomplete="new-password" placeholder="{{#if hasOpenRouterKey}}Enter a new key to replace saved key{{else}}OpenRouter API key{{/if}}">
+          <p>Saved encrypted for your account. Stored keys are not shown again; enter a new key to replace one.</p>
         </div>
 
         <div class="profile-field">
@@ -114,7 +114,7 @@
         </button>
         <button id="openRouterTest" type="button" {{testingAttrs}}>
           <span class="fa fa-flask" aria-hidden="true"></span>
-          {{#if testing}}Testing{{else}}Test Configuration{{/if}}
+          {{#if testing}}Checking{{else}}Check Configuration{{/if}}
         </button>
         {{#if hasOpenRouterKey}}
           <button id="openRouterDeleteKey" type="button" class="profile-danger-action" {{savingAttrs}}>

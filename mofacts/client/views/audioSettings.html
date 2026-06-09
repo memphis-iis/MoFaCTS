@@ -185,7 +185,7 @@
                       <i class="fa fa-key admin-section-icon"></i>Google Speech API Key
                     </h6>
                     <p class="text-muted small admin-form-row-sm">
-                      To use speech recognition, you need a Google Speech API key.
+                      To use speech recognition, you need a Google Speech API key. Stored keys are not shown again; enter a new key to replace one.
                       <a href="https://support.google.com/cloud/answer/6158862?hl=en" target="_blank">Learn how to get one <i class="fa fa-external-link-alt fa-xs"></i></a>
                     </p>
 
@@ -196,7 +196,7 @@
                     {{/if}}
 
                     <div class="input-group admin-form-row-sm">
-                      <input type="text" class="form-control" id="speechAPIKey" placeholder="Enter your API key">
+                      <input type="password" class="form-control" id="speechAPIKey" autocomplete="new-password" placeholder="{{#if speechAPIKeyIsSetup}}Enter a new key to replace saved key{{else}}Enter your API key{{/if}}">
                       <button id="speechAPISubmit" type="button" class="btn btn-primary">
                         <i class="fa fa-save"></i> Save
                       </button>
