@@ -813,7 +813,7 @@ Template.registerHelper('systemName', function() {
   return getSystemName();
 });
 Template.registerHelper('licenseSourceUrl', function() {
-  return Meteor.settings.public?.sourceUrl || 'https://github.com/memphis-iis/mofacts/tree/v0.1.0-alpha.1';
+  return Meteor.settings.public?.sourceUrl || 'https://github.com/memphis-iis/MoFaCTS/tree/v0.1.0-alpha.1';
 });
 Template.registerHelper('currentTemplate', function() {
   return Session.get('currentTemplate');
