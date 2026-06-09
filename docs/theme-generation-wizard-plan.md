@@ -1,6 +1,6 @@
 # Theme Generation Wizard Plan
 
-This plan updates `C:\Users\ppavl\Downloads\theme_generation_wizard_plan_UPDATED_with_density.md` for compatibility with the current MoFaCTS codebase.
+This plan updates the theme generation wizard planning notes for compatibility with the current MoFaCTS codebase.
 
 ## Compatibility Summary
 
