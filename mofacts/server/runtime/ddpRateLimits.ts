@@ -70,7 +70,7 @@ export function registerDdpRateLimits(deps: DdpRateLimitDeps) {
   DDPRateLimiter.addRule({
     type: 'method',
     name(name: string) {
-      return ['deleteAllFiles', 'deletePackageFile', 'removeAssetById', 'removeMultipleAssets', 'deleteManualContentDraft'].includes(name);
+      return ['deleteAllFiles', 'deletePackageFile', 'removeAssetById', 'removeMultipleAssets', 'deleteManualContentDraft', 'cleanupOrphanDynamicAssets'].includes(name);
     },
     userId(userId: string | null | undefined) { return !!userId; }
   }, 10, 3600000);

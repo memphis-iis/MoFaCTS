@@ -184,4 +184,121 @@ describe('contentMethods content upload summaries', function() {
       versions: 1
     });
   });
+
+  it('dry-runs orphan DynamicAssets cleanup against active TDF references', async function() {
+    const tdfs = [
+      { _id: 'tdf-active', stimuliSetId: 1, packageAssetId: 'package-live', packageFile: 'package-live.zip' },
+    ];
+    const assets = [
+      { _id: 'media-active', name: 'active.jpg', ext: 'jpg', size: 10, meta: { stimuliSetId: 1 } },
+      { _id: 'media-orphan', name: 'orphan.jpg', ext: 'jpg', size: 20, meta: { stimuliSetId: 2 } },
+      { _id: 'package-orphan', name: 'old.zip', ext: 'zip', size: 30, meta: {} },
+      { _id: 'package-live', name: 'package-live.zip', ext: 'zip', size: 40, meta: {} },
+      { _id: 'unscoped-media', name: 'scratch.png', ext: 'png', size: 50, meta: {} },
+    ];
+    const removed: string[] = [];
+    const deps = createContentDeps({
+      Tdfs: {
+        find: () => ({ fetchAsync: async () => tdfs, countAsync: async () => tdfs.length }),
+        findOneAsync: async () => null,
+        updateAsync: async () => undefined,
+        removeAsync: async () => undefined
+      },
+      DynamicAssets: {
+        find: () => ({ fetchAsync: async () => assets, countAsync: async () => assets.length }),
+        findOneAsync: async () => null,
+        removeAsync: async (selector: any) => { removed.push(selector._id); },
+        collection: {
+          rawCollection: () => ({ aggregate: () => ({ toArray: async () => [] }) }),
+          updateAsync: async () => undefined
+        }
+      },
+      getStimuliSetIdCandidates: (value: unknown) => {
+        const text = String(value);
+        const numberValue = Number(text);
+        return Number.isFinite(numberValue) ? [text, numberValue] : [text];
+      },
+      getMethodAuthorizationDeps: () => ({ userIsInRoleAsync: async () => true })
+    });
+    const methods = createContentMethods(deps);
+
+    const result = await methods.cleanupOrphanDynamicAssets.call({ userId: 'admin-user' }, { dryRun: true });
+
+    expect(result.dryRun).to.equal(true);
+    expect(result.orphanCount).to.equal(2);
+    expect(result.sizeBytes).to.equal(50);
+    expect(result.assets.map((asset: any) => asset.assetId)).to.deep.equal(['media-orphan', 'package-orphan']);
+    expect(removed).to.deep.equal([]);
+  });
+
+  it('removes scoped DynamicAssets when deleting the last TDF for a package stimuli set', async function() {
+    const tdfs = [
+      { _id: 'tdf-delete', ownerId: 'owner', stimuliSetId: 88, packageAssetId: 'package-delete', stimuli: [] },
+    ];
+    const assets = [
+      { _id: 'package-delete', name: 'package-delete.zip', ext: 'zip', userId: 'owner', meta: {} },
+      { _id: 'media-delete', name: 'lesson.jpg', ext: 'jpg', meta: { stimuliSetId: 88 } },
+      { _id: 'media-keep', name: 'other.jpg', ext: 'jpg', meta: { stimuliSetId: 99 } },
+    ];
+    const removed: string[] = [];
+    const deps = createContentDeps({
+      Tdfs: {
+        find: (selector: any) => ({
+          fetchAsync: async () => {
+            if (selector?.$or) {
+              return tdfs.filter((tdf) => tdf.packageAssetId === 'package-delete');
+            }
+            if (selector?.stimuliSetId?.$in) {
+              return tdfs.filter((tdf) => selector.stimuliSetId.$in.includes(tdf.stimuliSetId));
+            }
+            return tdfs;
+          },
+          countAsync: async () => tdfs.length
+        }),
+        findOneAsync: async () => null,
+        updateAsync: async () => undefined,
+        removeAsync: async (selector: any) => {
+          const index = tdfs.findIndex((tdf) => tdf._id === selector._id);
+          if (index >= 0) {
+            tdfs.splice(index, 1);
+          }
+        }
+      },
+      DynamicAssets: {
+        find: (selector: any) => ({
+          fetchAsync: async () => {
+            if (selector?.['meta.stimuliSetId']?.$in) {
+              return assets.filter((asset) => selector['meta.stimuliSetId'].$in.includes(asset.meta?.stimuliSetId));
+            }
+            return assets;
+          },
+          countAsync: async () => assets.length
+        }),
+        findOneAsync: async (selector: any) => assets.find((asset) => asset._id === selector._id) || null,
+        removeAsync: async (selector: any) => {
+          removed.push(selector._id);
+          const index = assets.findIndex((asset) => asset._id === selector._id);
+          if (index >= 0) {
+            assets.splice(index, 1);
+          }
+        },
+        collection: {
+          rawCollection: () => ({ aggregate: () => ({ toArray: async () => [] }) }),
+          updateAsync: async () => undefined
+        }
+      },
+      getStimuliSetIdCandidates: (value: unknown) => {
+        const text = String(value);
+        const numberValue = Number(text);
+        return Number.isFinite(numberValue) ? [text, numberValue] : [text];
+      },
+      getMethodAuthorizationDeps: () => ({ userIsInRoleAsync: async () => true })
+    });
+    const methods = createContentMethods(deps);
+
+    await methods.deletePackageFile.call({ userId: 'admin-user' }, 'package-delete');
+
+    expect(removed).to.deep.equal(['package-delete', 'media-delete']);
+    expect(assets.map((asset) => asset._id)).to.deep.equal(['media-keep']);
+  });
 });
