@@ -239,7 +239,7 @@ describe('AutoTutor content contract', function() {
       'setspec.clusters[0].stims[0].autoTutor.expectationRelationshipProvenance.attemptedModels must be a non-empty string array'
     );
     expect(result.errors).to.include(
-      'setspec.clusters[0].stims[0].autoTutor.expectationRelationshipProvenance.sourceKeyType must be "tdf" or "user"'
+      'setspec.clusters[0].stims[0].autoTutor.expectationRelationshipProvenance.sourceKeyType must be "tdf", "user", or "admin"'
     );
   });
 

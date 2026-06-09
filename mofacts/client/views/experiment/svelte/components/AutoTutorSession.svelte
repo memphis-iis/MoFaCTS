@@ -118,6 +118,13 @@
     return Math.max(0, Math.min(100, (value / total) * 100));
   }
 
+  function formatProgressCount(value) {
+    if (!Number.isFinite(value)) {
+      return '0';
+    }
+    return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+  }
+
   function applyDeepChatHostLayout() {
     if (!chatElement) {
       return;
@@ -281,7 +288,7 @@
       <div class="auto-tutor-meter-row">
         <div class="auto-tutor-meter-copy">
           <span>Expectations</span>
-          <strong>{progressCounts.coveredExpectations}/{progressCounts.requiredExpectations}</strong>
+          <strong>{formatProgressCount(progressCounts.coveredExpectations)}/{progressCounts.requiredExpectations}</strong>
         </div>
         <div
           class="auto-tutor-progress-track auto-tutor-progress-track-ideas"
@@ -357,7 +364,7 @@
       <div class="auto-tutor-meter-row">
         <div class="auto-tutor-meter-copy">
           <span>Expectations</span>
-          <strong>{progressCounts.coveredExpectations}/{progressCounts.requiredExpectations}</strong>
+          <strong>{formatProgressCount(progressCounts.coveredExpectations)}/{progressCounts.requiredExpectations}</strong>
         </div>
         <div class="auto-tutor-progress-track auto-tutor-progress-track-ideas">
           <div

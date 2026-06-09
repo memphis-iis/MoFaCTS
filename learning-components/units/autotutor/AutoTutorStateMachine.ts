@@ -478,12 +478,10 @@ export function computeAutoTutorProgress(state: AutoTutorState): number {
   if (expectationCount === 0) {
     throw new Error('AutoTutor state has no expectations');
   }
-  const coverageSum = Object.values(state.expectations).reduce((sum, entry) => {
-    const contribution = entry.coverage >= AUTO_TUTOR_DEFAULT_THRESHOLDS.coverageThreshold
-      ? 1
-      : entry.coverage;
-    return sum + contribution;
-  }, 0);
+  const coverageSum = Object.values(state.expectations).reduce(
+    (sum, entry) => sum + getAutoTutorExpectationCredit(entry.coverage),
+    0,
+  );
   const activeMisconceptionPenalty = Object.values(state.misconceptions)
     .filter((entry) =>
       !entry.repaired &&
@@ -501,6 +499,17 @@ export function countAutoTutorCoveredRequiredExpectations(state: AutoTutorState,
   }).length;
 }
 
+function getAutoTutorExpectationCredit(coverage: number): number {
+  return coverage >= AUTO_TUTOR_DEFAULT_THRESHOLDS.coverageThreshold ? 1 : coverage;
+}
+
+export function sumAutoTutorRequiredExpectationCredit(state: AutoTutorState, config: AutoTutorConfig): number {
+  return getRequiredExpectationIds(config.script).reduce((sum, id) => {
+    const score = state.expectations[id];
+    return score ? sum + getAutoTutorExpectationCredit(score.coverage) : sum;
+  }, 0);
+}
+
 export function countAutoTutorActiveMisconceptions(state: AutoTutorState): number {
   return Object.values(state.misconceptions)
     .filter((entry) =>
@@ -516,7 +525,7 @@ export function computeAutoTutorProgressCounts(
   config: AutoTutorConfig,
 ): AutoTutorProgressCounts {
   return {
-    coveredExpectations: countAutoTutorCoveredRequiredExpectations(state, config),
+    coveredExpectations: sumAutoTutorRequiredExpectationCredit(state, config),
     requiredExpectations: getRequiredExpectationIds(config.script).length,
     neededExpectations: config.graduation.requiredExpectationCount,
     activeMisconceptions: countAutoTutorActiveMisconceptions(state),

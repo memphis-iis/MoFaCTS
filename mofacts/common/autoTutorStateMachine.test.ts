@@ -5,7 +5,9 @@ import {
   applyAutoTutorCostCap,
   applySavedAutoTutorHistory,
   buildAutoTutorHistoryNote,
+  computeAutoTutorGraduationMet,
   computeAutoTutorProgress,
+  computeAutoTutorProgressCounts,
   createInitialAutoTutorState,
   markAutoTutorHistoryWritten,
   markAutoTutorStatePublished,
@@ -374,6 +376,49 @@ describe('AutoTutor state machine', function() {
     };
 
     expect(computeAutoTutorProgress(state)).to.equal(0.75);
+  });
+
+  it('reports required expectation progress with fractional below-threshold credit', function() {
+    const config = buildConfig();
+    const state = createInitialAutoTutorState(config.script);
+    state.expectations.E1 = {
+      ...state.expectations.E1!,
+      coverage: 0.8,
+    };
+    state.expectations.E2 = {
+      ...state.expectations.E2!,
+      coverage: 0.5,
+    };
+
+    const counts = computeAutoTutorProgressCounts(state, config);
+
+    expect(counts.coveredExpectations).to.equal(1.5);
+  });
+
+  it('uses fractional required expectation credit for graduation', function() {
+    const config = buildConfig({
+      graduation: {
+        requiredExpectationCount: 1,
+        maxActiveMisconceptions: 0,
+      },
+    });
+    const state = createInitialAutoTutorState(config.script);
+    state.expectations.E1 = {
+      ...state.expectations.E1!,
+      coverage: 0.5,
+    };
+    state.expectations.E2 = {
+      ...state.expectations.E2!,
+      coverage: 0.5,
+    };
+
+    expect(computeAutoTutorGraduationMet(state, {
+      ...config,
+      graduation: {
+        ...config.graduation,
+        requiredExpectationCount: 1,
+      },
+    })).to.equal(true);
   });
 
   it('saves only stable post-turn operational phases in history notes', function() {

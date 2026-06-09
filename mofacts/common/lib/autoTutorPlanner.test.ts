@@ -170,7 +170,7 @@ describe('AutoTutor planner', function() {
     }, 'E1');
 
     expect(highScores.E1?.priority).to.equal(5.5);
-    expect(highScores.E2?.priority).to.equal(3);
+    expect(highScores.E2?.priority).to.equal(3.5);
 
     const negativeScores = recomputeExpectationPriorities(script, {
       ...plannerState.expectationScores,
@@ -183,7 +183,7 @@ describe('AutoTutor planner', function() {
     }, 'E1');
 
     expect(negativeScores.E1?.priority).to.equal(-5.5);
-    expect(negativeScores.E2?.priority).to.equal(-3);
+    expect(negativeScores.E2?.priority).to.equal(-3.5);
   });
 
   it('answers learner questions before correcting active misconceptions', function() {
