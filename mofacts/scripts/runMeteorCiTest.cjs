@@ -1,4 +1,5 @@
 const { spawnSync } = require('node:child_process');
+const path = require('node:path');
 
 const allowWindowsMeteorTests = process.env.MOFACTS_ALLOW_WINDOWS_METEOR_TESTS === '1';
 const isLocalWindows = process.platform === 'win32' && !process.env.CI;
@@ -13,6 +14,39 @@ if (isLocalWindows && !allowWindowsMeteorTests) {
   );
   process.exit(1);
 }
+
+const hotfixDevScript = path.resolve(__dirname, '..', '..', 'deploy', 'hotfix-dev.ps1');
+const hotfixDevCwd = path.dirname(hotfixDevScript);
+
+function runHotfixDev(command, stdio = 'pipe') {
+  return spawnSync(
+    'powershell.exe',
+    [
+      '-NoProfile',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-File',
+      hotfixDevScript,
+      command,
+    ],
+    {
+      cwd: hotfixDevCwd,
+      encoding: 'utf8',
+      stdio,
+    },
+  );
+}
+
+function isHotfixDevRunning() {
+  if (!isLocalWindows || !allowWindowsMeteorTests) {
+    return false;
+  }
+  const status = runHotfixDev('status');
+  const output = `${status.stdout || ''}${status.stderr || ''}`;
+  return status.status === 0 && output.includes('Hotfix dev server is running');
+}
+
+const shouldRestartHotfixDev = isHotfixDevRunning();
 
 const result = spawnSync(
   'meteor',
@@ -31,9 +65,27 @@ const result = spawnSync(
   },
 );
 
+let exitStatus = result.status ?? 1;
+
 if (result.error) {
   console.error(result.error.message);
-  process.exit(1);
+  exitStatus = 1;
 }
 
-process.exit(result.status ?? 1);
+if (result.signal) {
+  console.error(`Meteor test process exited via signal ${result.signal}`);
+  exitStatus = 1;
+}
+
+if (shouldRestartHotfixDev) {
+  console.log('Restarting local hotfix dev server because the Meteor test harness can disturb the watched dev build state.');
+  const restart = runHotfixDev('restart', 'inherit');
+  if (restart.status !== 0 && exitStatus === 0) {
+    exitStatus = restart.status ?? 1;
+  }
+  if (restart.status === 0) {
+    runHotfixDev('status', 'inherit');
+  }
+}
+
+process.exit(exitStatus);

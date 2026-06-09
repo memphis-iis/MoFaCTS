@@ -26,7 +26,8 @@ describe('backup archive verification', function() {
     expect(result.ok).to.equal(true);
     expect(result.checks.map((check) => check.name)).to.include.members([
       'archive.read',
-      'manifest.present',
+      'manifest.exists',
+      'manifest.parse',
       'checksum.mongo/database.json',
       'mongo.dump',
     ]);
@@ -53,10 +54,8 @@ describe('backup archive verification', function() {
     const result = await verifyBackupArchive(archive);
 
     expect(result.ok).to.equal(false);
-    expect(result.checks).to.deep.include({
-      name: 'checksum.mongo/database.json',
-      status: 'fail',
-      message: 'checksum mismatch',
-    });
+    const checksumCheck = result.checks.find((check) => check.name === 'checksum.mongo/database.json');
+    expect(checksumCheck).to.include({ status: 'fail' });
+    expect(checksumCheck?.message).to.match(/^expected [a-f0-9]{64}, got [a-f0-9]{64}$/);
   });
 });
