@@ -14,6 +14,7 @@ describe('backup config', function() {
           includeSettings: false,
           includeEnvironmentFile: false,
           includeKeyMaterial: false,
+          includeLocalAssetFiles: true,
           maxRetainedBackups: 4,
           requirePreRestoreBackup: true,
         },
@@ -25,7 +26,20 @@ describe('backup config', function() {
       path: path.resolve('/tmp/mofacts-backups'),
     });
     expect(config.includeSettings).to.equal(false);
+    expect(config.includeLocalAssetFiles).to.equal(true);
     expect(config.maxRetainedBackups).to.equal(4);
+  });
+
+  it('excludes local asset files from in-app backups by default', function() {
+    const config = readBackupConfig({
+      openCore: {
+        backups: {
+          backend: 'local',
+        },
+      },
+    }, {});
+
+    expect(config.includeLocalAssetFiles).to.equal(false);
   });
 
   it('validates the writable local backup destination', async function() {

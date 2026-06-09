@@ -47,6 +47,7 @@ export function readBackupConfig(settings: unknown, env: NodeJS.ProcessEnv = pro
     includeSettings: readBoolean(backups.includeSettings, true),
     includeEnvironmentFile: readBoolean(backups.includeEnvironmentFile, true),
     includeKeyMaterial: readBoolean(backups.includeKeyMaterial, true),
+    includeLocalAssetFiles: readBoolean(backups.includeLocalAssetFiles, false),
     maxRetainedBackups: readInteger(backups.maxRetainedBackups, 10),
     requirePreRestoreBackup: readBoolean(backups.requirePreRestoreBackup, true),
   };
@@ -59,9 +60,12 @@ export function publicBackupConfigStatus(config: BackupConfig) {
     includeSettings: config.includeSettings,
     includeEnvironmentFile: config.includeEnvironmentFile,
     includeKeyMaterial: config.includeKeyMaterial,
+    includeLocalAssetFiles: config.includeLocalAssetFiles,
     maxRetainedBackups: config.maxRetainedBackups,
     requirePreRestoreBackup: config.requirePreRestoreBackup,
-    warning: 'Backups stored on this server do not protect against server or disk loss. Copy completed archives off-server.',
+    warning: config.includeLocalAssetFiles
+      ? 'Local asset-file backup is enabled and can heavily degrade the live app on large installs. Prefer host-level snapshots or off-server asset sync.'
+      : 'In-app backups exclude local content asset files. Use host-level snapshots or off-server asset sync for /dynamic-assets and H5P storage.',
   };
 }
 

@@ -79,6 +79,7 @@ export type BackupConfig = {
   includeSettings: boolean;
   includeEnvironmentFile: boolean;
   includeKeyMaterial: boolean;
+  includeLocalAssetFiles: boolean;
   maxRetainedBackups: number;
   requirePreRestoreBackup: boolean;
 };

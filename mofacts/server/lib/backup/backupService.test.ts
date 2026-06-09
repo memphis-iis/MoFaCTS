@@ -4,7 +4,7 @@ import path from 'path';
 import { expect } from 'chai';
 import { createBackupManifest } from './backupManifest';
 import { createTarGzArchive } from './tarArchive';
-import { deleteBackupJob, restoreBackupJob } from './backupService';
+import { deleteBackupJob, reconcileInterruptedBackupJobs, restoreBackupJob } from './backupService';
 import type { BackupJobDocument } from './backupTypes';
 
 describe('backup restore service', function() {
@@ -188,5 +188,62 @@ describe('backup restore service', function() {
     expect(result.status).to.equal('deleted');
     expect(await fs.stat(path.join(basePath, archiveFileName)).then(() => true).catch(() => false)).to.equal(false);
     expect(jobs.get('delete-job')?.status).to.equal('complete');
+  });
+
+  it('marks queued and running backup jobs failed during startup reconciliation', async function() {
+    const jobs = new Map<string, BackupJobDocument>([
+      ['queued-job', {
+        _id: 'queued-job',
+        jobType: 'backup',
+        status: 'queued',
+        createdAt: new Date('2026-06-09T14:20:00.000Z'),
+        createdByUserId: 'admin-user',
+        destination: { backend: 'local', path: '/backups' },
+      }],
+      ['running-job', {
+        _id: 'running-job',
+        jobType: 'restore',
+        status: 'running',
+        createdAt: new Date('2026-06-09T14:21:00.000Z'),
+        startedAt: new Date('2026-06-09T14:21:05.000Z'),
+        createdByUserId: 'admin-user',
+        destination: { backend: 'local', path: '/backups' },
+      }],
+      ['complete-job', {
+        _id: 'complete-job',
+        jobType: 'backup',
+        status: 'complete',
+        createdAt: new Date('2026-06-09T14:22:00.000Z'),
+        createdByUserId: 'admin-user',
+        destination: { backend: 'local', path: '/backups' },
+      }],
+    ]);
+
+    const reconciled = await reconcileInterruptedBackupJobs({
+      backupJobs: {
+        insert: async () => '',
+        update: async (jobId: string, modifier: Record<string, any>) => {
+          const current = jobs.get(jobId);
+          if (current && modifier.$set) {
+            jobs.set(jobId, { ...current, ...modifier.$set });
+          }
+        },
+        find: (selector: Record<string, any> = {}) => ({
+          fetchAsync: async () => Array.from(jobs.values()).filter((job) =>
+            Array.isArray(selector.status?.$in)
+              ? selector.status.$in.includes(job.status)
+              : true
+          ),
+        }),
+        findOne: async (selector: Record<string, unknown>) => jobs.get(String(selector._id)) || null,
+      },
+    });
+
+    expect(reconciled).to.equal(2);
+    expect(jobs.get('queued-job')?.status).to.equal('failed');
+    expect(jobs.get('queued-job')?.error?.phase).to.equal('startup-reconcile');
+    expect(jobs.get('running-job')?.status).to.equal('failed');
+    expect(jobs.get('running-job')?.error?.message).to.contain('did not finish before the server process stopped');
+    expect(jobs.get('complete-job')?.status).to.equal('complete');
   });
 });

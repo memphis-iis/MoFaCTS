@@ -48,6 +48,7 @@ import { createCourseMethods } from './methods/courseMethods';
 import { createDashboardCacheMethods } from './methods/dashboardCacheMethods';
 import { createDeploymentReadinessMethods } from './methods/deploymentReadinessMethods';
 import { createBackupMethods, createBackupRegistry } from './methods/backupMethods';
+import { reconcileInterruptedBackupJobs } from './lib/backup/backupService';
 import { createExperimentMethods } from './methods/experimentMethods';
 import { createPackageMethods } from './methods/packageMethods';
 import { createOpenRouterMethods } from './methods/openRouterMethods';
@@ -1029,6 +1030,12 @@ registerServerRuntime({
 });
 
 Meteor.startup(async function() {
+  const interruptedBackupCount = await reconcileInterruptedBackupJobs({
+    backupJobs: createBackupRegistry(BackupJobs),
+  });
+  if (interruptedBackupCount > 0) {
+    serverConsole(0, `[Backups] Marked ${interruptedBackupCount} interrupted backup job(s) as failed after server startup.`);
+  }
   await runServerStartup({
     serverConsole,
     DynamicSettings,
