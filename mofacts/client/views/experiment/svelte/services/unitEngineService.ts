@@ -530,9 +530,14 @@ export async function prepareIncomingTrialService(
     }
   }
 
+  const unitFinished = await isUnitFinished(engine);
+  const fallbackAdvanceMode = route.kind === 'schedule-prepare' && !unitFinished
+    ? 'none'
+    : route.preparedAdvanceMode;
+
   return {
-    unitFinished: await isUnitFinished(engine),
-    preparedAdvanceMode: route.preparedAdvanceMode,
+    unitFinished,
+    preparedAdvanceMode: fallbackAdvanceMode,
     engine,
     questionIndex: nextQuestionIndex,
   };

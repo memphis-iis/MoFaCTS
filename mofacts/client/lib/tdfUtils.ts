@@ -85,6 +85,7 @@ export function hasLaunchReadyTutorUnits(tdfContent: any): boolean {
     return Boolean(
       unit.assessmentsession ||
       unit.learningsession ||
+      unit.sparcsession ||
       unit.videosession ||
       unit.autotutorsession ||
       unit.unitinstructions ||

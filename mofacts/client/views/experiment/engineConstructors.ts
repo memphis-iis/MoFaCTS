@@ -1,4 +1,4 @@
-import { AUTO_TUTOR_UNIT, MODEL_UNIT, SCHEDULE_UNIT, VIDEO_UNIT } from '../../../common/Definitions';
+import { AUTO_TUTOR_UNIT, MODEL_UNIT, SPARC_UNIT, SCHEDULE_UNIT, VIDEO_UNIT } from '../../../common/Definitions';
 import type { UnitEngineLike, UnitType } from '../../../common/types';
 import { createUnitEngineByType, getCreatableUnitEngineTypes } from './unitEngine';
 
@@ -8,6 +8,7 @@ interface EngineUnitLike {
   unitname?: unknown;
   assessmentsession?: unknown;
   learningsession?: unknown;
+  sparcsession?: unknown;
   videosession?: unknown;
   autotutorsession?: unknown;
   unitinstructions?: unknown;
@@ -29,6 +30,7 @@ function getAvailableUnitShapes(unit: EngineUnitLike | null | undefined): string
   const shapes: string[] = [];
   if (unit.assessmentsession) shapes.push('assessmentsession');
   if (unit.learningsession) shapes.push('learningsession');
+  if (unit.sparcsession) shapes.push('sparcsession');
   if (unit.videosession) shapes.push('videosession');
   if (unit.autotutorsession) shapes.push('autotutorsession');
   if (unit.unitinstructions) shapes.push('unitinstructions');
@@ -48,6 +50,7 @@ export function resolveUnitEngineTypeForUnit(unit: EngineUnitLike | null | undef
 
   if (unit.assessmentsession) return SCHEDULE_UNIT;
   if (unit.videosession) return VIDEO_UNIT;
+  if (unit.sparcsession) return SPARC_UNIT;
   if (unit.learningsession) return MODEL_UNIT;
   if (unit.autotutorsession) return AUTO_TUTOR_UNIT;
   if (hasInstructionContent(unit)) return 'instruction-only';
@@ -56,7 +59,7 @@ export function resolveUnitEngineTypeForUnit(unit: EngineUnitLike | null | undef
   const shapes = getAvailableUnitShapes(unit);
   throw new Error(
     `${source}: Cannot determine unit type for unit "${unitName}". ` +
-    `Expected assessmentsession, learningsession, videosession, autotutorsession, or instruction-only content. ` +
+    `Expected assessmentsession, learningsession, sparcsession, videosession, autotutorsession, or instruction-only content. ` +
     `Unit has: ${shapes.length ? shapes.join(', ') : 'no runnable unit shape'}`
   );
 }

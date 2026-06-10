@@ -4,7 +4,40 @@ This document defines **SPARC** (Semantic Pages with Adaptive Rules and Cognitio
 
 SPARC content is authored in **TutorScript**, the canonical JSON schema for SPARC documents.
 
-- [TutorScript schema (JSON)](/c:/dev/MoFaCTS/docs-developer/tutorscript.schema.json)
+- Windows/environment note:
+  - Authoring and canonical paths in this document are written for a Windows checkout.
+  - Use canonical Windows paths from `C:\dev` such as `C:\dev\mofacts_config\...`.
+  - Any remaining `/` characters are not filesystem separators here; they appear in schema/version or phrasing tokens (for example, `tutorscript-sparc/1.0`) by design.
+
+- TutorScript schema (JSON): `C:\dev\MoFaCTS\docs-developer\tutorscript.schema.json`
+- SPARC Runtime Usage Checklist (current example contract): `C:\dev\mofacts_config\SPARC_Runtime_Usage_Checklist.md` (canonical config repo path sibling to `MoFaCTS`)
+- SPARC Phase 1 Execution Checklist (implementation handoff): `C:\dev\MoFaCTS\docs-developer\sparc-phase-1-execution-checklist.md`
+
+## SPARC Example-First Implementation Status (Active)
+
+This phase is being executed as an example-first implementation pass, not as a generic spec-first exercise.
+
+- **Goal preserved:** build a unit-engine-ready document format where nodes and node groups support two-level hierarchy and adaptive, model-driven behavior.
+- **Concrete artifacts created in the config repo:**
+  - `C:\dev\mofacts_config\SPARC Fractions Addition\SPARC_Fractions_Addition_stims.json`
+  - `C:\dev\mofacts_config\SPARC Fractions Addition\SPARC Fractions Addition_TDF.json`
+  - `C:\dev\mofacts_config\SPARC Stoichiometry\SPARC_Stoichiometry_stims.json`
+  - `C:\dev\mofacts_config\SPARC Stoichiometry\SPARC Stoichiometry_TDF.json`
+- Both examples currently use:
+  - `display.type = "sparc"`
+  - `display.schema = "tutorscript-sparc/1.0"`
+  - explicit `group` and `atomic` node levels
+  - explicit `layout.zones` plus per-group `placement`
+  - explicit read-only `givens` with `readOnly: true`
+  - node-level `response.intentByNode` where scoring is intended
+- For both examples, `response` and `intentByNode` are currently defined on each stimulus’ `display` object (`clusters[...].stims[...].display.response`).
+- The Runtime Usage Checklist now serves as the acceptance target for the first SPARC runtime usage path and should be used to drive the first implementation tests.
+- Execution tasks are now the actionable phase-1 implementation sequence: `C:\dev\MoFaCTS\docs-developer\sparc-phase-1-execution-checklist.md`.
+
+### Open/limited deviations from earlier plan language
+
+- The plan’s earlier broad vision remains intact, but initial implementation favors **filled-in examples** over a pristine, fully abstract first draft.
+- Schema and runtime details below are being validated against these two examples before generalization.
 
 When authoring content for SPARC, use TutorScript for:
 
@@ -289,36 +322,38 @@ Examples:
 
 ### 8.1 Frontend Application
 
-Use **React + TypeScript**.
+Use the existing MoFaCTS frontend stack for this phase (no framework migration).
+
+Implementation note:
+
+* Phase 1 SPARC runtime work reuses the existing Svelte experiment runtime surface in the application codebase, including files and services whose historical names contain `card` (for example `CardScreen`, `cardMachine`, and related payload builders).
+* Those names are inherited implementation-surface labels in the current MoFaCTS runtime. They are **not** the SPARC conceptual model and should not be read as saying that SPARC sessions are flash cards.
+* In SPARC-specific code, docs, contracts, and discussions, prefer SPARC domain vocabulary such as `sparcsession`, `page`, `interaction`, `node`, `surface`, and `interaction step`.
+* Do not introduce new SPARC-specific abstractions that call SPARC payloads `cards` unless a shared pre-existing runtime boundary leaves no narrower alternative.
 
 Purpose:
 
-* authoring interface
-* runtime renderer
+* runtime renderer in existing MoFaCTS app surface
 * semantic instructional components
-* preview/debug tools
-* state/rule visualization
-* simulation UI integration
+* compact preview/debug tooling needed for this phase
+* state/rule visibility for example validation
+* simulation UI integration where examples require it
 
 Rationale:
 
-* strong ecosystem
-* faster development than Web Components
-* good integration with Tiptap, XState, and modern tooling
-* component portability can be considered later
+* prevents unrelated migration risk in Phase 1
+* aligns with already-stable app conventions
+* keeps this effort focused on rule/state/contract quality
 
 ### 8.2 Structured Authoring Editor
 
-Use **Tiptap / ProseMirror**.
+No editor migration in this phase.
 
 Purpose:
 
-* author structured instructional documents
-* preserve semantic nodes rather than raw HTML
-* insert and configure instructional components
-* protect KC tags, rule bindings, telemetry hooks, and activity metadata
-* store lessons as JSON
-* render HTML from the document model
+* preserve existing configuration-driven SPARC example contract flow
+* keep authoring boundaries explicit in config source of truth
+* defer tooling changes until two example contracts are stable
 
 ### 8.3 Runtime State Control
 
@@ -351,7 +386,7 @@ Initial implementation can start with simpler timers and timestamped events.
 
 ### 8.5 Rule Layer
 
-Use either **json-rules-engine** or a custom lightweight rule evaluator.
+Use **json-rules-engine** as the rule engine for this first SPARC runtime pass.
 
 Purpose:
 
@@ -369,14 +404,9 @@ Rules should operate over the interpreted hybrid state, not raw DOM events.
 
 Keep the student model separate from the UI but connected to the event stream.
 
-Initial options:
-
-* simple KC-level logistic model
-* AFM/LKT-style learner model
-* BKT-style mastery model
-* later: forgetting, spacing, transfer, latency, and hint-dependence models
-
-The student model should expose estimates back to the rule layer.
+For Phase 1, KT is fixed to the existing flash-card integration path.
+KT updates are emitted as evidence against `stimulusid` and then consumed as state inputs for rule evaluation.
+No new KT family is introduced in this phase.
 
 ## 9. Instructional Component Model
 
@@ -454,6 +484,8 @@ Author workflow:
 7. Student runtime compares future semantic actions against the behavior graph/rules.
 
 This gives the system an easier authoring path than hand-writing all rules.
+
+For Phase 1, this workflow is deferred (no example tracing build in this iteration). We are shipping the two concrete SPARC examples with explicit JSON rule payloads and event/history-based grading feedback.
 
 Possible trace types:
 
@@ -564,7 +596,7 @@ Replay should support:
 
 Initial human authoring workflow:
 
-1. Create structured document in Tiptap.
+1. Author structure in current SPARC config assets (no editor migration in this phase).
 2. Insert instructional components.
 3. Tag components with activity ids, KCs, and semantic roles.
 4. Define correctness checks or scoring logic.
@@ -592,7 +624,7 @@ Future AI-assisted workflow:
 At runtime:
 
 1. Document loads from structured JSON.
-2. React renderer creates the instructional page.
+2. Runtime creates the instructional page from existing config-driven contracts.
 3. Components register with the runtime.
 4. Learner/system events are timestamped.
 5. Raw events are appended to the log.
@@ -605,6 +637,169 @@ At runtime:
 12. Components receive adaptive actions.
 13. UI changes reactively.
 14. All state, action, rule, and model events remain replayable.
+
+## 14.1 Phase 1 implementation playbook (coherent execution path)
+
+- Execute directly from SPARC Phase 1 Execution Checklist (`C:\dev\MoFaCTS\docs-developer\sparc-phase-1-execution-checklist.md`); each section corresponds to this playbook stage.
+
+### A) Parse-time contract module
+
+- Build one `loadSparcStimulus()` entrypoint that takes `{setspec, clusterid, stimulusid}` and returns:
+  - `layoutRuntime`: normalized zones + region map + strict placement map
+  - `nodeIndex`: `id -> node metadata`
+  - `responseSpec`: parsed `gradingMode`, `evaluation`, `scoredNodes`, `intentByNode`
+  - `runtimeOptions`: feature flags needed by the rule bridge
+- Reject immediately on required-missing values (no fallback):
+  - missing `display.type`, `display.schema`, `display.layout.zones`, required `activityId` bindings, group/atomic IDs, response fields
+  - unmapped required `placement.region`
+  - duplicate ids, unknown required node types in used paths
+- Emit normalized diagnostics for parser/layout failures and warnings using one shape:
+  - `{ severity, code, path, message, stimulusid? }`
+- Keep unknown optional metadata in `runtimeOptions` for diagnostics only; do not auto-correct structure.
+
+### B) Interpreter module
+
+- Add `toSemanticAction(rawEvent, context)`:
+  - `rawEvent`: component interaction payload
+  - `context`: node descriptor, activity bindings, node response expectations
+  - return shape: `{ actionType, componentId, activityId, timestamp, stepId, value, result, kcIds, expectedValue, latencyMs }`
+- Ensure interpreter output always includes:
+  - `actionType`
+  - `componentId`
+  - `activityId`
+  - `timestamp`
+- Keep interpretation deterministic:
+  - same raw event + state snapshot must produce same semantic action every time
+
+### C) Runtime state layer
+
+- Keep runtime state split by domain:
+  - `flowState` (XState-managed): page mode, navigation, completion flags
+  - `domainState` (explicit): discrete/semantic/quantitative/simulation buckets
+- State update policy:
+  - rules return `runtimeAction[]` only
+  - interpreter and UI never mutate domainState directly
+  - all domain state changes flow through one reducer-style updater
+- Per-event execution order is fixed:
+  1. capture raw event
+  2. derive semantic action
+  3. apply learner-event state update through the reducer
+  4. build rule facts from updated `domainState` + current semantic action
+  5. evaluate rules and emit `runtimeAction[]`
+  6. apply runtime actions through the same reducer path
+  7. persist ordered history entries
+- Rule evaluation must not read partially applied runtime-action effects from the same cycle.
+
+### D) Rule bridge module
+
+- Add a `buildRuleFacts(domainState, context, semanticAction)` object for json-rules-engine:
+  - `state.currentStep`, `state.correctness`, `state.stepAttempts`
+  - `quant.elapsedMs`, `quant.stepElapsedMs`, `quant.hintCount`, `quant.errorCount`, `quant.kcMastery.<kcId>`
+  - `interface.lastAction`, `activityId`, `componentId`, `stimulusid`
+- Rule output contract is always `runtimeAction` and should include:
+  - `type` (required)
+  - `target`/`componentId` (optional depending on action)
+  - `payload` (normalized)
+  - `meta` with `{ ruleId, firedAt, sequence }`
+- Rule side effect policy:
+  - Rule condition checks only state/input.
+  - Rule effects are action contracts only.
+
+### E) Scoring and grading module
+
+- Build `evaluateIntent(scoredNodeId, nodeValue, responseSpec, context)`:
+  - enforce grading mode and evaluation policy
+  - evaluate only listed `response.scoredNodes`
+  - compare against `response.intentByNode` by strict node map
+- Generate one deterministic semantic action per graded node and mark:
+  - `result: correct | incorrect | partiallyCorrect | irrelevant`
+  - optional `bugCode` when mis-match patterns become known
+- Preserve existing behavior:
+  - unscored open nodes are ignored by correctness gating
+
+### F) KT hook module
+
+- Keep KT event input as:
+  - semantic action outcome
+  - node-level correctness
+  - `stimulusid` evidence tag
+- Do not add new KT strategy in phase 1.
+- Output from KT is mapped into domain state numeric fields used only by rule facts.
+
+### G) History persistence module
+
+- On every student/action event and every interface-triggered action:
+  - append raw event
+  - append interpreted action
+  - append rule firing summary
+  - append state snapshot/delta and KT delta
+- Maintain explicit event ordering fields:
+  - `eventId`, `sequence`, `timestamp`, `triggerSource`
+- Hard fail only if event append writes are structurally invalid; preserve existing recorder boundary where possible.
+
+### H) Integration harness and verification order
+
+1. Parse + schema gate (`display.schema`, layout map, node map)
+2. Render contract verification (zone/placement + static required groups)
+3. One node interaction path (open response grading)
+4. One rule condition path (time/step condition -> interface action)
+5. KT evidence tagging + state update
+6. History append ordering assertions
+7. End-to-end stimulus run for both example packages
+
+### I) Concrete acceptance output for this phase
+
+- A single runtime adapter that passes both:
+  - `SPARC Fractions Addition`
+  - `SPARC Stoichiometry`
+- A deterministic log format for debug and replay.
+- A no-fallback failure report with:
+  - schema/parsing error list
+  - missing references
+  - unknown region/type errors
+- Existing behavior preserved (including exact scored-node behavior and fixed-field semantics).
+
+## 14.2 Canonical runtime interface (for implementation handoff)
+
+Use these four object shapes across parser → interpreter → rules → history:
+
+1) `SparcParsedStimulus`
+- `layoutRuntime: { zones: ..., panelMap: ..., placements: ... }`
+- `nodeIndex: Record<string, NodeRuntimeDef>`
+- `responseSpec: ResponseContract`
+- `runtimeOptions: Record<string, unknown>`
+
+2) `SparcSemanticAction`
+- `actionType: string`
+- `componentId: string`
+- `activityId: string`
+- `timestamp: string`
+- `stepId?: string`
+- `value?: unknown`
+- `expectedValue?: unknown`
+- `result?: 'correct'|'incorrect'|'buggy'|'irrelevant'|'partiallyCorrect'`
+- `kcIds?: string[]`
+- `latencyMs?: number`
+
+3) `RuleInput`
+- `state: RuntimeDomainState`
+- `lastAction: SparcSemanticAction`
+- `env: { nowMs, stimulusid, stepElapsedMs, lastMeaningfulActionMs }`
+
+4) `RuntimeAction`
+- `type: string`
+- `target?: string`
+- `componentId?: string`
+- `payload?: Record<string, unknown>`
+- `meta: { ruleId: string, firedAt: string, sequence: number }`
+
+### Required consistency checks
+
+- `nodeIndex` must contain all IDs in `response.scoredNodes`.
+- Every scored node in `response.scoredNodes` must resolve to `intentByNode`.
+- Every `placement.region` in use must exist in `layout.zones`.
+- Every interactive or scored node in used paths must resolve to an explicit `activityId` before interpretation.
+- Unknown required node kind must fail before UI render.
 
 ## 15. Debugging and Inspection Tools
 
@@ -626,7 +821,6 @@ Include:
 
 Example warnings:
 
-* component has no activity id
 * rule references nonexistent component
 * KC tag missing from scored component
 * raw event has no semantic mapping
@@ -677,27 +871,52 @@ Avoid:
 * treating AI chat as the tutor instead of authoring support
 * building complex KT before event semantics are stable
 
-## 18. Key Open Design Questions
+## 18. Phase 1 Decisions and Scope Boundaries
 
-Questions to resolve before expansion:
+### Phase 1 locked (final for this iteration)
 
-1. What is the canonical document JSON schema?
-2. What is the canonical raw event schema?
-3. What is the canonical semantic action schema?
-4. What is the minimum behavior graph representation?
-5. How much state belongs in XState versus ordinary runtime state?
-6. Should rules modify state directly or dispatch actions only?
-7. How should correctness checks be authored?
-8. How are KCs represented and linked to semantic actions?
-9. What is the first KT model?
-10. How should buggy rules be represented?
-11. How much of the rule language should be visual versus JSON?
-12. What component types are essential for the MVP?
-13. How should simulations expose state to the runtime?
-14. What should be replayable: events only, state snapshots, or both?
-15. How should AI-assisted authoring be constrained and validated?
-16. What is the boundary between content authoring and instructional programming?
-17. How much CTAT-like example tracing should be included in the first version?
+1. Target examples are fixed to:
+  - `C:\dev\mofacts_config\SPARC Fractions Addition\SPARC_Fractions_Addition_stims.json`
+  - `C:\dev\mofacts_config\SPARC Stoichiometry\SPARC_Stoichiometry_stims.json`
+2. Rule engine is fixed to **json-rules-engine**.
+3. `display.schema` contract is fixed at **`tutorscript-sparc/1.0`** for phase 1.
+4. Parser hard-fail policy is active for missing/invalid required structure:
+  - required IDs, required layout fields, required `activityId` bindings, and required rule/response contracts must exist
+   - unknown `placement.region` or unknown group/atomic type is a blocking diagnostic
+5. `response.scoredNodes` + `response.intentByNode` remain the single grading truth for this phase.
+6. History writes remain required for each student/action event.
+7. No example-tracing workflow in phase 1.
+8. XState is for flow control only; non-flow explicit state remains in runtime state ownership.
+9. `activityId` is a required authored contract for phase 1 semantic actions; the runtime must not synthesize it implicitly.
+
+### Deferred (explicitly out of scope in phase 1)
+
+- React/Tiptap migration
+- New canonical schema migration tooling beyond these examples
+- Cross-example behavior-graph authoring workflows
+- Full visual rule editor
+- Non-trivial replay/time-snapshot UX expansion
+
+### Still uncertain (documented for phase 2)
+
+- Whether `schemaVersion` becomes the canonical version gate once more example families are onboarded.
+- Fine-grained `runtimeAction` serialization fields for future rule tooling compatibility.
+
+### Canonical implementation targets this phase
+
+Current implementation target remains explicit:
+
+- No visual rule-authoring builder (the first pass uses authored JSON rule payloads).
+- No full rule-language normalization pass beyond what is needed for these two example packages.
+- No generalized event/state serializer rewrite in `history` beyond current recorder boundaries.
+- No cross-component behavior graph builder for dynamic adaptation outside explicit SPARC examples.
+
+### Phase 2 backlog questions
+
+1. Canonical raw event schema for SPARC actions at the MoFaCTS history boundary.
+2. Canonical semantic action schema to feed `json-rules-engine` consistently.
+3. Representation of buggy-rule outcomes for both feedback and scoring traces.
+4. Minimum event/state replay depth for wider QA/debug in phase 2.
 
 ## 19. Working Positioning
 

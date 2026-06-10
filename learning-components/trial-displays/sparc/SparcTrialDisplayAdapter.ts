@@ -1,0 +1,106 @@
+import type { LearningComponentManifest } from '../../runtime/ComponentManifest';
+import type { TrialDisplayAdapter } from '../../runtime/TrialDisplayAdapterRegistry';
+
+export const SPARC_TRIAL_DISPLAY_TYPE = 'sparc';
+
+export interface SparcIntentExpectation {
+  node: string;
+  expected: unknown;
+  type?: string;
+}
+
+export interface SparcTrialDisplay {
+  type: 'sparc';
+  schema?: string;
+  nodes: unknown[];
+  response?: {
+    gradingMode?: string;
+    scoredNodes?: string[];
+    intentByNode?: SparcIntentExpectation[];
+    evaluation?: Record<string, unknown>;
+  };
+  [key: string]: unknown;
+}
+
+export interface SparcTrialResult {
+  submittedNodes: Record<string, unknown>;
+  triggeredBy?: string;
+  timestamp: number;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function normalizeSubmittedNodes(value: unknown): Record<string, unknown> {
+  if (!isPlainObject(value)) {
+    throw new Error('SPARC trial result requires submittedNodes');
+  }
+  return value;
+}
+
+export const sparcTrialDisplayAdapter: TrialDisplayAdapter<SparcTrialDisplay, SparcTrialResult> = {
+  id: 'mofacts.sparc-trial-display',
+  displayType: SPARC_TRIAL_DISPLAY_TYPE,
+  requiredCapabilities: ['media', 'history'],
+  ownsInteraction(display) {
+    return isPlainObject(display) && display.type === SPARC_TRIAL_DISPLAY_TYPE;
+  },
+  normalizeDisplay(display) {
+    if (!isPlainObject(display)) {
+      throw new Error('SPARC trial display must be an object');
+    }
+    if (display.type !== SPARC_TRIAL_DISPLAY_TYPE) {
+      throw new Error('SPARC trial display requires type "sparc"');
+    }
+    if (!Array.isArray(display.nodes)) {
+      throw new Error('SPARC trial display requires a nodes array');
+    }
+    const normalizedResponse = isPlainObject(display.response)
+      ? {
+          ...display.response,
+          scoredNodes: Array.isArray(display.response.scoredNodes)
+            ? display.response.scoredNodes.map((node) => String(node))
+            : [],
+          intentByNode: Array.isArray(display.response.intentByNode)
+            ? display.response.intentByNode
+                .filter(isPlainObject)
+                .map((entry) => ({
+                  node: String(entry.node || ''),
+                  expected: entry.expected,
+                  ...(typeof entry.type === 'string' ? { type: entry.type } : {}),
+                }))
+            : [],
+        }
+      : null;
+    return {
+      ...display,
+      type: SPARC_TRIAL_DISPLAY_TYPE,
+      nodes: display.nodes.slice(),
+      ...(normalizedResponse ? { response: normalizedResponse } : {}),
+    };
+  },
+  normalizeResult(result) {
+    if (!isPlainObject(result)) {
+      throw new Error('SPARC trial result must be an object');
+    }
+    return {
+      submittedNodes: normalizeSubmittedNodes(result.submittedNodes),
+      ...(typeof result.triggeredBy === 'string' ? { triggeredBy: result.triggeredBy } : {}),
+      timestamp: Number.isFinite(result.timestamp) ? Number(result.timestamp) : Date.now(),
+    };
+  },
+};
+
+export const sparcTrialDisplayComponentManifest: LearningComponentManifest = {
+  id: sparcTrialDisplayAdapter.id,
+  kind: 'trial-display',
+  displayTypes: [SPARC_TRIAL_DISPLAY_TYPE],
+  requiredCapabilities: ['media', 'history'],
+  register(context) {
+    if (typeof context.registerTrialDisplayAdapter !== 'function') {
+      throw new Error('SPARC trial display component requires registerTrialDisplayAdapter');
+    }
+    context.registerTrialDisplayAdapter(sparcTrialDisplayAdapter);
+  },
+};

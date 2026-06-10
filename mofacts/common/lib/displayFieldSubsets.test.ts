@@ -33,6 +33,18 @@ describe('display field subsets', function() {
     });
   });
 
+  it('does not strip structured SPARC displays through legacy subset settings', function() {
+    const sparcDisplay = {
+      type: 'sparc',
+      schema: 'tutorscript-sparc/1.0',
+      layout: { zones: [{ id: 'main' }] },
+      nodes: [{ id: 'node-1', nodeType: 'atomic', atomType: 'text', value: 'Prompt' }],
+      response: { gradingMode: 'node-intent', scoredNodes: [], intentByNode: [] },
+    };
+
+    expect(applyDisplayFieldSubset(sparcDisplay, { drillFields: 'text,audioSrc' }, 'd')).to.deep.equal(sparcDisplay);
+  });
+
   it('uses drillFields for drill, test, and review-backed prompt trials', function() {
     const params = { drillFields: 'text, audioSrc' };
     expect(applyDisplayFieldSubset(display, params, 'd')).to.deep.equal({

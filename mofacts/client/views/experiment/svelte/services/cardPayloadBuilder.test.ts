@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import {
   firstNonEmptyString,
+  getPreparedCardDataFromSelection,
   getStimIncorrectResponses,
   normalizeButtonOptions,
   normalizeDisplayAttribution,
@@ -85,5 +86,57 @@ describe('card payload builder helpers', function() {
       currentUnit: { assessmentsession: {} },
       schedule: { isButtonTrial: false },
     })).to.equal(false);
+  });
+
+  it('preserves structured SPARC displays instead of flattening them to legacy prompt fields', function() {
+    const originalGet = {
+      currentTdfFile: Session.get('currentTdfFile'),
+      currentStimuliSetId: Session.get('currentStimuliSetId'),
+      testType: Session.get('testType'),
+    };
+
+    Session.set('currentTdfFile', { tdfs: { tutor: { setspec: {} } } });
+    Session.set('currentStimuliSetId', 'set-1');
+    Session.set('testType', 'd');
+
+    const engine = {
+      findCurrentCardInfo() {
+        return { whichStim: 0, clusterIndex: 0 };
+      },
+    } as any;
+
+    const sparcDisplay = {
+      type: 'sparc',
+      schema: 'tutorscript-sparc/1.0',
+      nodes: [{ id: 'node-1', nodeType: 'atomic', atomType: 'text-input', value: '' }],
+      response: { gradingMode: 'node-intent', scoredNodes: ['node-1'], intentByNode: [{ node: 'node-1', expected: '2' }] },
+    };
+
+    const selection = {
+      clusterIndex: 0,
+      stimIndex: 0,
+      preparedState: {
+        currentDisplay: sparcDisplay,
+        currentAnswer: '',
+        newExperimentState: {},
+      },
+    };
+
+    const cluster = {
+      stims: [{ display: sparcDisplay, correctResponse: '' }],
+    };
+
+    const originalGetStimCluster = (globalThis as any).getStimCluster;
+    (globalThis as any).getStimCluster = () => cluster;
+
+    try {
+      const result = getPreparedCardDataFromSelection(engine, selection, 1) as Record<string, unknown>;
+      expect(result.currentDisplay).to.deep.equal(sparcDisplay);
+    } finally {
+      (globalThis as any).getStimCluster = originalGetStimCluster;
+      Session.set('currentTdfFile', originalGet.currentTdfFile);
+      Session.set('currentStimuliSetId', originalGet.currentStimuliSetId);
+      Session.set('testType', originalGet.testType);
+    }
   });
 });

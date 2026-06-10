@@ -108,7 +108,7 @@ function resolveLearningSessionFlag(unitType: unknown, isLearningSession: unknow
   if (typeof isLearningSession === 'boolean') {
     return isLearningSession;
   }
-  return unitType === MODEL_UNIT;
+  return unitType === MODEL_UNIT || unitType === 'sparc';
 }
 
 export function resolveCurrentDeliverySettings(params: {

@@ -7,8 +7,10 @@
   import { createEventDispatcher, tick } from 'svelte';
   import StimulusDisplay from './StimulusDisplay.svelte';
   import H5PTrialSurface from './H5PTrialSurface.svelte';
+  import SparcTrialSurface from './SparcTrialSurface.svelte';
   import TrialInteractionPane from './TrialInteractionPane.svelte';
   import { resolveSelfHostedH5PTrialDisplay } from '../services/h5pTrialDisplay';
+  import { resolveSparcTrialDisplay } from '../services/sparcTrialDisplay';
   import { clientConsole } from '../../../../lib/clientLogger';
   import { waitForBrowserPaint } from '../utils/paintTiming';
 
@@ -20,6 +22,10 @@
 
   function handleH5PResult(event) {
     dispatch('h5presult', event.detail);
+  }
+
+  function handleSparcSubmit(event) {
+    dispatch('sparcsubmit', event.detail);
   }
 
   /** @type {'top' | 'left'} Layout mode (top = over-under, left = split) */
@@ -144,8 +150,11 @@
   $: isOverUnder = !isSplitLayout;
   $: isImageStimulus = Boolean(display?.imgSrc || display?.videoSrc);
   $: isH5PStimulus = Boolean(display?.h5p);
+  $: sparcTrialDisplay = resolveSparcTrialDisplay(display, '[TrialContent]');
   $: selfHostedH5PTrialDisplay = resolveSelfHostedH5PTrialDisplay(display, '[TrialContent]');
+  $: sparcOwnsInteraction = Boolean(sparcTrialDisplay);
   $: h5pOwnsInteraction = Boolean(selfHostedH5PTrialDisplay);
+  $: useSparcOwnedSurface = sparcOwnsInteraction && displayVisible;
   $: useH5POwnedSurface = h5pOwnsInteraction && displayVisible;
   $: requestedInteractionKind = feedbackVisible ? 'feedback' : (responseVisible ? 'response' : 'none');
 
@@ -306,7 +315,46 @@
   class:non-image-stimulus={!isImageStimulus}
   data-subset-kind={subsetKind}
 >
-  {#if useH5POwnedSurface}
+  {#if useSparcOwnedSurface}
+    <div class="h5p-owned-main">
+      <div class="h5p-owned-surface">
+        <SparcTrialSurface
+          {display}
+          {showQuestionNumber}
+          {questionNumber}
+          on:sparcsubmit={handleSparcSubmit}
+        />
+      </div>
+
+      {#if requestedInteractionKind === 'feedback'}
+        <div class="interaction-container h5p-feedback-container">
+          <TrialInteractionPane
+            bind:fadeElement={interactionFadeElement}
+            {interactionVisible}
+            {mountedFeedbackVisible}
+            mountedResponseVisible={false}
+            {isCorrect}
+            {isTimeout}
+            {feedbackUserAnswer}
+            {correctAnswer}
+            {correctAnswerImageSrc}
+            {correctLabelText}
+            {incorrectLabelText}
+            {feedbackMessage}
+            {correctColor}
+            {incorrectColor}
+            {displayCorrectFeedback}
+            {displayIncorrectFeedback}
+            {displayUserAnswerInFeedback}
+            {feedbackLayout}
+            {displayCorrectAnswerInIncorrectFeedback}
+            on:feedbackcontent={handleFeedbackContent}
+            on:blockingassetstate
+          />
+        </div>
+      {/if}
+    </div>
+  {:else if useH5POwnedSurface}
     <div class="h5p-owned-main">
       <div class="h5p-owned-surface">
         <H5PTrialSurface

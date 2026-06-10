@@ -6,6 +6,7 @@ describe('unit engine creation contracts', function() {
     expect(resolveUnitEngineTypeForUnit({ assessmentsession: {} }, 'unit-engine-contract-test')).to.equal('schedule');
     expect(resolveUnitEngineTypeForUnit({ videosession: {} }, 'unit-engine-contract-test')).to.equal('video');
     expect(resolveUnitEngineTypeForUnit({ learningsession: {} }, 'unit-engine-contract-test')).to.equal('model');
+    expect(resolveUnitEngineTypeForUnit({ sparcsession: {} }, 'unit-engine-contract-test')).to.equal('sparc');
     expect(resolveUnitEngineTypeForUnit({ autotutorsession: {} }, 'unit-engine-contract-test')).to.equal('autotutor');
     expect(resolveUnitEngineTypeForUnit({ unitinstructions: 'Read this first' }, 'unit-engine-contract-test')).to.equal('instruction-only');
   });
@@ -37,7 +38,7 @@ describe('unit engine creation contracts', function() {
       const message = (error as Error).message;
       expect(message).to.include('Cannot determine unit type for unit "Loose Notes"');
       expect(message).to.include(
-        'Expected assessmentsession, learningsession, videosession, autotutorsession, or instruction-only content',
+        'Expected assessmentsession, learningsession, sparcsession, videosession, autotutorsession, or instruction-only content',
       );
       expect(message).to.include('Unit has: no runnable unit shape');
     }
@@ -62,6 +63,7 @@ describe('unit engine creation contracts', function() {
       expect(message).to.include("Registered unit engine types:");
       expect(message).to.include("'schedule'");
       expect(message).to.include("'model'");
+      expect(message).to.include("'sparc'");
       expect(message).to.include("'video'");
       expect(message).to.include("'autotutor'");
       expect(message).to.include("'instruction-only'");

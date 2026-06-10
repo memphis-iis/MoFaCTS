@@ -1,9 +1,10 @@
-import { MODEL_UNIT, SCHEDULE_UNIT, VIDEO_UNIT } from '../../common/Definitions';
+import { MODEL_UNIT, SPARC_UNIT, SCHEDULE_UNIT, VIDEO_UNIT } from '../../common/Definitions';
 import { resolveUnitEngineTypeForUnit } from '../views/experiment/engineConstructors';
 
 type LaunchUnitLike = {
   assessmentsession?: unknown;
   learningsession?: unknown;
+  sparcsession?: unknown;
   videosession?: unknown;
   autotutorsession?: unknown;
   unitinstructions?: unknown;
@@ -34,7 +35,7 @@ export function shouldLockMultiTdfLaunchToCurrentUnit(unit: LaunchUnitLike | nul
     return true;
   }
 
-  if (unitType === MODEL_UNIT || unitType === VIDEO_UNIT) {
+  if (unitType === MODEL_UNIT || unitType === SPARC_UNIT || unitType === VIDEO_UNIT) {
     return hasDisplayTimingLock(unit);
   }
 

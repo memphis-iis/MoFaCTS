@@ -4,6 +4,7 @@ export const ENTER_KEY = 13;
 export const KC_MULTIPLE = 10000;
 export const STIM_PARAMETER = '0,.7';
 export const MODEL_UNIT = 'model';
+export const SPARC_UNIT = 'sparc';
 export const SCHEDULE_UNIT = 'schedule';
 export const VIDEO_UNIT = 'video';
 export const AUTO_TUTOR_UNIT = 'autotutor';

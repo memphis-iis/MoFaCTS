@@ -81,6 +81,46 @@ describe('stimuli response Unicode handling', function() {
     });
   });
 
+  it('accepts SPARC structured displays that own their response contract', function() {
+    const formatted = getNewItemFormat({
+      stimuli: {
+        setspec: {
+          clusters: [
+            {
+              stims: [
+                {
+                  display: {
+                    type: 'sparc',
+                    schema: 'tutorscript-sparc/1.0',
+                    nodes: [],
+                    response: {
+                      gradingMode: 'node-intent',
+                      scoredNodes: ['node-1'],
+                      intentByNode: [{ node: 'node-1', expected: '2' }],
+                    },
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      },
+    }, 'sparc.json', 91, {});
+
+    expect(formatted).to.have.length(1);
+    expect(formatted[0].correctResponse).to.equal('__SPARC_COMPLETED__');
+    expect(formatted[0].display).to.deep.equal({
+      type: 'sparc',
+      schema: 'tutorscript-sparc/1.0',
+      nodes: [],
+      response: {
+        gradingMode: 'node-intent',
+        scoredNodes: ['node-1'],
+        intentByNode: [{ node: 'node-1', expected: '2' }],
+      },
+    });
+  });
+
   it('repairs flattened stored stimuli from the raw stimuli file', function() {
     const repaired = repairFormattedStimuliResponsesFromRaw(
       [

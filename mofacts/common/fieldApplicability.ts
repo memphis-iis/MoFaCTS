@@ -1,10 +1,11 @@
-export type TdfUnitType = 'learning' | 'assessment' | 'video' | 'instructions' | 'autotutor';
+export type TdfUnitType = 'learning' | 'assessment' | 'video' | 'instructions' | 'autotutor' | 'sparc';
 
 export const INTERACTIVE_TDF_UNIT_TYPES: readonly TdfUnitType[] = Object.freeze([
   'learning',
   'assessment',
   'video',
   'autotutor',
+  'sparc',
 ]);
 
 export function detectTdfUnitType(unit: unknown): TdfUnitType | null {
@@ -23,6 +24,9 @@ export function detectTdfUnitType(unit: unknown): TdfUnitType | null {
   }
   if (record.learningsession && typeof record.learningsession === 'object') {
     return 'learning';
+  }
+  if (record.sparcsession && typeof record.sparcsession === 'object') {
+    return 'sparc';
   }
   if (record.unitinstructions || record.unitinstructionsquestion) {
     return 'instructions';

@@ -58,8 +58,9 @@ export function applyClusterListAvailability(
 ): void {
   for (let i = 0; i < clusterList.length; ++i) {
     const nums = rangeVal(clusterList[i]);
-    for (let j = 0; j < nums.length; ++j) {
-      cards[legacyInt(nums[j])].canUse = true;
+    const resolvedIndices = nums.length > 0 ? nums : [legacyInt(clusterList[i])];
+    for (let j = 0; j < resolvedIndices.length; ++j) {
+      cards[legacyInt(resolvedIndices[j])].canUse = true;
     }
   }
 }

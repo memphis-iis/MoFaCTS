@@ -60,6 +60,10 @@
     resolveH5PTrialDisplayResult,
     selfHostedH5PTrialDisplayOwnsInteraction,
   } from '../services/h5pTrialDisplay';
+  import {
+    resolveSparcTrialDisplayResult,
+    sparcTrialDisplayOwnsInteraction,
+  } from '../services/sparcTrialDisplay';
   import { buildLearningProgressPanelSnapshot } from '../services/learningProgressPanel';
   import {
     resolveSessionContentSurface,
@@ -291,6 +295,7 @@
   let videoInstructionsShownAt = 0;
   let videoPlayerReady = false;
   let submittedH5PResultKey = '';
+  let submittedSparcResultKey = '';
   let sessionUnitModeVersion = 0;
   const send = (event) => {
     if (testMode) {
@@ -473,9 +478,11 @@
   $: baseDisplayVisible = baseTrialSubsetKind !== 'none';
   $: baseFeedbackVisible = baseTrialSubsetKind === 'feedback' || baseTrialSubsetKind === 'study';
   $: h5pOwnsResponse = selfHostedH5PTrialDisplayOwnsInteraction(context.currentDisplay) && baseTrialSubsetKind === 'question';
-  $: baseResponseVisible = !h5pOwnsResponse && (baseTrialSubsetKind === 'question' || baseTrialSubsetKind === 'forceCorrect');
+  $: sparcOwnsResponse = sparcTrialDisplayOwnsInteraction(context.currentDisplay) && baseTrialSubsetKind === 'question';
+  $: baseResponseVisible = !h5pOwnsResponse && !sparcOwnsResponse && (baseTrialSubsetKind === 'question' || baseTrialSubsetKind === 'forceCorrect');
   $: if (baseTrialSubsetKind !== 'question') {
     submittedH5PResultKey = '';
+    submittedSparcResultKey = '';
   }
   let studyInteractionText = '';
   $: baseShowSkipStudyButton = isStudyState && toBoolean(deliverySettings.skipstudy);
@@ -1067,6 +1074,29 @@
       timestamp: Date.now(),
       source: 'h5p',
       h5pResult
+    });
+  }
+
+  function handleSparcSubmit(event) {
+    const detail = event.detail || {};
+    if (!sparcOwnsResponse) {
+      return;
+    }
+    const sparcResult = resolveSparcTrialDisplayResult(context.currentDisplay, detail, '[CardScreen]');
+    if (!sparcResult) {
+      throw new Error('[CardScreen] SPARC result received for non-SPARC display');
+    }
+    const resultKey = `${sparcResult.timestamp}:${sparcResult.triggeredBy || ''}`;
+    if (submittedSparcResultKey === resultKey) {
+      return;
+    }
+    submittedSparcResultKey = resultKey;
+    send({
+      type: 'SUBMIT',
+      userAnswer: '__SPARC_COMPLETED__',
+      timestamp: sparcResult.timestamp,
+      source: 'sparc',
+      sparcResult,
     });
   }
 
@@ -2084,6 +2114,7 @@
           on:blockingassetstate={handleBlockingAssetState}
           on:reviewrevealstarted={handleReviewRevealStarted}
           on:h5presult={handleH5PResult}
+          on:sparcsubmit={handleSparcSubmit}
         />
       </div>
 
@@ -2156,6 +2187,7 @@
               on:blockingassetstate={handleBlockingAssetState}
               on:reviewrevealstarted={handleReviewRevealStarted}
               on:h5presult={handleH5PResult}
+              on:sparcsubmit={handleSparcSubmit}
             />
             {#if trialSubset.showSkipStudyButton}
               <div class="skip-study-container">

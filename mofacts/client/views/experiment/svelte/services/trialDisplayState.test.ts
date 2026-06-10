@@ -73,6 +73,31 @@ describe('trial display state', function() {
     expect(cloned.h5p).to.not.equal(original.h5p);
   });
 
+  it('preserves structured SPARC display payloads during cloning', function() {
+    const original = {
+      type: 'sparc',
+      schema: 'tutorscript-sparc/1.0',
+      layout: { zones: [{ id: 'main' }] },
+      nodes: [{ id: 'node-1', nodeType: 'atomic', atomType: 'text-input', value: '' }],
+      response: { gradingMode: 'node-intent', scoredNodes: ['node-1'], intentByNode: [{ node: 'node-1', expected: '2' }] },
+    };
+
+    const cloned = cloneDisplay(original);
+
+    expect(cloned).to.deep.include({
+      type: 'sparc',
+      schema: 'tutorscript-sparc/1.0',
+      text: '',
+      clozeText: '',
+      imgSrc: '',
+      videoSrc: '',
+      audioSrc: '',
+    });
+    expect(cloned.nodes).to.deep.equal(original.nodes);
+    expect(cloned.nodes).to.not.equal(original.nodes);
+    expect(cloned.response).to.deep.equal(original.response);
+  });
+
   it('builds trial subset visibility flags', function() {
     expect(buildTrialSubset({
       kind: 'study',

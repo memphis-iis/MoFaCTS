@@ -159,6 +159,10 @@ function createLearningSessionSchema(): Record<string, unknown> {
   return createClosedObjectSchema('Learning Session', LEARNING_SESSION_FIELD_REGISTRY);
 }
 
+function createSparcSessionSchema(): Record<string, unknown> {
+  return createClosedObjectSchema('SPARC Session', LEARNING_SESSION_FIELD_REGISTRY);
+}
+
 function createVideoSessionSchema(): Record<string, unknown> {
   return createClosedObjectSchema('Video Session', VIDEO_SESSION_FIELD_REGISTRY);
 }
@@ -171,6 +175,7 @@ function createUnitSchema(title = 'Unit'): Record<string, unknown> {
   const schema = createClosedObjectSchema(title, UNIT_FIELD_REGISTRY);
   (schema.properties as Record<string, unknown>).deliverySettings = createUnitDeliverySettingsSchema();
   (schema.properties as Record<string, unknown>).learningsession = createLearningSessionSchema();
+  (schema.properties as Record<string, unknown>).sparcsession = createSparcSessionSchema();
   (schema.properties as Record<string, unknown>).assessmentsession = createAssessmentSessionSchema();
   (schema.properties as Record<string, unknown>).videosession = createVideoSessionSchema();
   (schema.properties as Record<string, unknown>).autotutorsession = createAutoTutorSessionSchema();

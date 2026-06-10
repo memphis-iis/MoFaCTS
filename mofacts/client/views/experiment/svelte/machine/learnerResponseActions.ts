@@ -1,4 +1,5 @@
 import type { H5PTrialResult } from '../../../../../common/types';
+import type { SparcTrialResult } from '../../../../../../learning-components/trial-displays/sparc/SparcTrialDisplayAdapter';
 import { getStimAnswerDisplayCase } from '../../../../lib/currentTestingHelpers';
 import { assign, type ActionArgs, type ActionEvent } from './cardMachineActionTypes';
 
@@ -12,6 +13,16 @@ function getH5PSubmitResult(event?: ActionEvent): H5PTrialResult | null {
   return event.h5pResult;
 }
 
+function getSparcSubmitResult(event?: ActionEvent): SparcTrialResult | null {
+  if (event?.source !== 'sparc') {
+    return null;
+  }
+  if (!event.sparcResult) {
+    throw new Error('[CardMachine] SPARC submit event missing sparcResult');
+  }
+  return event.sparcResult;
+}
+
 export const clearUserAnswer = assign({
   userAnswer: () => '',
 });
@@ -20,6 +31,7 @@ export const captureAnswer = assign({
   userAnswer: ({ event }: ActionArgs) => event?.userAnswer,
   source: ({ event, context }: ActionArgs) => event?.source || context.source || 'keyboard',
   h5pResult: ({ event }: ActionArgs) => getH5PSubmitResult(event),
+  sparcResult: ({ event }: ActionArgs) => getSparcSubmitResult(event),
   timestamps: ({ context, event }: ActionArgs) => ({
     ...context.timestamps,
     trialEnd: event?.timestamp || Date.now(),

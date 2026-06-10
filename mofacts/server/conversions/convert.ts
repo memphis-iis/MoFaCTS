@@ -95,11 +95,14 @@ function getNewItemFormat(stimFile: any, stimulusFileName: string, stimuliSetId:
       }
       const h5pOwnsResponse = stim.display?.h5p?.sourceType === 'self-hosted';
       const autoTutorOwnsResponse = Boolean(stim.autoTutor);
+      const sparcOwnsResponse = stim.display?.type === 'sparc' && stim.display?.response && typeof stim.display.response === 'object';
       if (!stim.response || typeof stim.response !== 'object') {
         if (h5pOwnsResponse) {
           stim.response = { correctResponse: '__H5P_COMPLETED__' };
         } else if (autoTutorOwnsResponse) {
           stim.response = { correctResponse: '__AUTOTUTOR_SESSION__' };
+        } else if (sparcOwnsResponse) {
+          stim.response = { correctResponse: '__SPARC_COMPLETED__' };
         } else {
         throw new Error(`Stim ${stimIdx} in cluster ${clusterIdx} of "${stimulusFileName}" missing 'response' property.`);
         }
@@ -109,6 +112,8 @@ function getNewItemFormat(stimFile: any, stimulusFileName: string, stimuliSetId:
           stim.response.correctResponse = '__H5P_COMPLETED__';
         } else if (autoTutorOwnsResponse) {
           stim.response.correctResponse = '__AUTOTUTOR_SESSION__';
+        } else if (sparcOwnsResponse) {
+          stim.response.correctResponse = '__SPARC_COMPLETED__';
         } else {
           throw new Error(`Stim ${stimIdx} in cluster ${clusterIdx} of "${stimulusFileName}" missing 'correctResponse' property in 'response'.`);
         }

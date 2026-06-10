@@ -1,7 +1,7 @@
 import {
-  applyPreparedCardQuestionAndAnswerGlobals,
-  buildPreparedCardQuestionAndAnswerGlobals,
-} from './shared/cardPreparation';
+  applyPreparedInteractionStepState,
+  buildPreparedInteractionStepState,
+} from './shared/interactionStepAssembly';
 
 export interface CreateBaseUnitEngineParams {
   readonly experimentState: any;
@@ -51,7 +51,7 @@ export function createBaseUnitEngine(params: CreateBaseUnitEngineParams): any {
     },
 
     buildPreparedCardQuestionAndAnswerGlobals: async function(cardIndex: any, whichStim: any, probFunctionParameters: any, options: any = {}) {
-      return buildPreparedCardQuestionAndAnswerGlobals(
+      return buildPreparedInteractionStepState(
         cardIndex,
         whichStim,
         probFunctionParameters,
@@ -67,7 +67,7 @@ export function createBaseUnitEngine(params: CreateBaseUnitEngineParams): any {
     },
 
     applyPreparedCardQuestionAndAnswerGlobals: function(preparedState: any) {
-      return applyPreparedCardQuestionAndAnswerGlobals(preparedState, {
+      return applyPreparedInteractionStepState(preparedState, {
         setSessionValue: params.setSessionValue,
         setCardValue: params.setCardValue,
         setAlternateDisplayIndex: params.setAlternateDisplayIndex,

@@ -26,6 +26,14 @@ export function shouldExcludeCurrentCard(
   return excludedRef.clusterIndex === clusterIndex && excludedRef.stimIndex === stimIndex;
 }
 
+function resolveConfiguredOptimalThreshold(currentDeliverySettings: Record<string, any>): number | null {
+  const threshold = Number(currentDeliverySettings?.optimalThreshold);
+  if (!Number.isFinite(threshold) || threshold <= 0 || threshold >= 1) {
+    return null;
+  }
+  return threshold;
+}
+
 export function selectCardClosestToOptimalProbability(
   cards: any[],
   hiddenItems: unknown[],
@@ -50,7 +58,10 @@ export function selectCardClosestToOptimalProbability(
       if (shouldExcludeCurrentCard(i, j, selectionOptions)) continue;
       if (hiddenItemKeys.has(String(stim.stimulusKC)) || !stim.canUse) continue;
       const parameters = stim.parameter;
-      optimalProb = Math.log(Number(currentDeliverySettings.optimalThreshold) / (1 - Number(currentDeliverySettings.optimalThreshold))) || false;
+      const configuredThreshold = resolveConfiguredOptimalThreshold(currentDeliverySettings);
+      optimalProb = configuredThreshold !== null
+        ? Math.log(configuredThreshold / (1 - configuredThreshold)) || false
+        : false;
       if (!optimalProb) optimalProb = Math.log(parameters[1] / (1 - parameters[1])) || false;
       if (!optimalProb) {
         throw new Error("NO OPTIMAL PROBABILITY SPECIFIED IN STIM, THROWING ERROR");
@@ -91,9 +102,12 @@ export function selectCardBelowOptimalProbability(
       if (hiddenItemKeys.has(String(stim.stimulusKC)) || !stim.canUse) continue;
       const parameters = stim.parameter;
       let thresholdCeiling = parameters[1];
+      const configuredThreshold = resolveConfiguredOptimalThreshold(currentDeliverySettings);
+      if (configuredThreshold !== null) {
+        thresholdCeiling = configuredThreshold;
+      }
       if (!thresholdCeiling) {
-        thresholdCeiling = currentDeliverySettings.optimalThreshold;
-        if (thresholdCeiling === undefined || thresholdCeiling === null || thresholdCeiling === "") {
+        if (configuredThreshold === null) {
           throw new Error("Missing deliverySettings.optimalThreshold while selecting a card below optimal probability.");
         }
       }

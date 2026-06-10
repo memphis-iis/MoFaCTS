@@ -1,5 +1,6 @@
 import { DEFAULT_DELIVERY_SETTINGS, SR_CONFIG } from './constants';
 import type { H5PTrialResult } from '../../../../../common/types';
+import type { SparcTrialResult } from '../../../../../../learning-components/trial-displays/sparc/SparcTrialDisplayAdapter';
 
 export type DeliverySettings = typeof DEFAULT_DELIVERY_SETTINGS & Record<string, unknown>;
 export type PreparedAdvanceMode = 'none' | 'seamless' | 'direct';
@@ -68,6 +69,7 @@ export interface CardMachineContext {
   feedbackRevealStarted: boolean;
   feedbackSuppressed: boolean;
   h5pResult: H5PTrialResult | null;
+  sparcResult: SparcTrialResult | null;
   isCorrect: boolean;
   isTimeout: boolean;
   feedbackTimeoutMs: number | undefined;
@@ -116,6 +118,7 @@ export interface CardMachineEvent extends Record<string, unknown> {
   feedbackHtml?: string;
   feedbackSuppressed?: boolean;
   h5pResult?: H5PTrialResult | null;
+  sparcResult?: SparcTrialResult | null;
 }
 
 export interface CardSelectionResult extends Record<string, unknown> {
@@ -169,6 +172,7 @@ export const initialContext: CardMachineContext = {
   feedbackRevealStarted: false,
   feedbackSuppressed: false,
   h5pResult: null,
+  sparcResult: null,
   isCorrect: false,
   isTimeout: false,
   feedbackTimeoutMs: undefined,

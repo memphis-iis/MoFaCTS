@@ -19,6 +19,7 @@ import { CardStore } from '../../modules/cardStore';
 import { fromCallback, fromPromise, type AnyEventObject } from 'xstate';
 import { resolveH5PModelOutcomes } from '../../../../../common/lib/h5pTrialResult';
 import type { H5PTrialResult } from '../../../../../common/types';
+import type { SparcTrialResult } from '../../../../../../learning-components/trial-displays/sparc/SparcTrialDisplayAdapter';
 
 type TimeoutContextLike = Parameters<typeof getMainTimeoutMs>[0] & {
   feedbackTimeoutMs?: number;
@@ -43,11 +44,93 @@ interface AnswerEvaluationContext extends ServiceRecord {
   currentAnswer?: string;
   originalAnswer?: string;
   h5pResult?: H5PTrialResult | null;
+  sparcResult?: SparcTrialResult | null;
+  currentDisplay?: {
+    response?: {
+      gradingMode?: string;
+      scoredNodes?: string[];
+      intentByNode?: Array<{ node?: string; expected?: unknown; type?: string }>;
+      evaluation?: {
+        trimWhitespace?: boolean;
+        caseNormalize?: boolean;
+        mathNormalize?: boolean;
+        allowScientificNotation?: boolean;
+      };
+    };
+  };
   deliverySettings?: {
     caseSensitive?: boolean;
   };
   setspec?: unknown;
   buttonTrial?: boolean;
+}
+
+function normalizeSparcComparableValue(
+  value: unknown,
+  options: {
+    trimWhitespace?: boolean;
+    caseNormalize?: boolean;
+    mathNormalize?: boolean;
+    allowScientificNotation?: boolean;
+  },
+  typeHint?: string,
+): unknown {
+  if (typeHint === 'boolean' || typeof value === 'boolean') {
+    return value === true || value === 'true';
+  }
+
+  let normalized = typeof value === 'string' ? value : String(value ?? '');
+  if (options.trimWhitespace) {
+    normalized = normalized.trim();
+  }
+  if (options.caseNormalize) {
+    normalized = normalized.toLowerCase();
+  }
+  if (options.mathNormalize || options.allowScientificNotation || typeHint === 'scientific') {
+    const numeric = Number(normalized);
+    if (Number.isFinite(numeric)) {
+      return numeric;
+    }
+  }
+  return normalized;
+}
+
+function evaluateSparcNodeIntent(context: AnswerEvaluationContext) {
+  const response = context.currentDisplay?.response;
+  const sparcResult = context.sparcResult;
+  if (!response || !sparcResult) {
+    return null;
+  }
+  if (response.gradingMode !== 'node-intent') {
+    throw new Error(`[SPARC] Unsupported grading mode: ${String(response.gradingMode || '')}`);
+  }
+
+  const evaluationOptions = {
+    trimWhitespace: response.evaluation?.trimWhitespace !== false,
+    caseNormalize: response.evaluation?.caseNormalize === true,
+    mathNormalize: response.evaluation?.mathNormalize === true,
+    allowScientificNotation: response.evaluation?.allowScientificNotation === true,
+  };
+  const intentByNode = Array.isArray(response.intentByNode) ? response.intentByNode : [];
+  const scoredNodeOrder = Array.isArray(response.scoredNodes) && response.scoredNodes.length > 0
+    ? response.scoredNodes
+    : intentByNode.map((entry) => String(entry.node || '')).filter(Boolean);
+  const intentMap = new Map(intentByNode.map((entry) => [String(entry.node || ''), entry]));
+
+  const outcomeBits = scoredNodeOrder.map((nodeId) => {
+    const intent = intentMap.get(nodeId);
+    if (!intent) {
+      return '0';
+    }
+    const actualValue = normalizeSparcComparableValue(sparcResult.submittedNodes[nodeId], evaluationOptions, intent.type);
+    const expectedValue = normalizeSparcComparableValue(intent.expected, evaluationOptions, intent.type);
+    return actualValue === expectedValue ? '1' : '0';
+  });
+
+  return {
+    isCorrect: outcomeBits.every((bit) => bit === '1'),
+    matchText: outcomeBits.join(''),
+  };
 }
 
 interface TimedDisplayContext extends ServiceRecord {
@@ -452,6 +535,11 @@ export async function evaluateAnswerService(context: AnswerEvaluationContext) {
       isCorrect: outcomes.every((outcome) => outcome.correct),
       matchText: outcomes.map((outcome) => outcome.correct ? '1' : '0').join(''),
     };
+  }
+
+  const sparcEvaluation = evaluateSparcNodeIntent(context);
+  if (sparcEvaluation) {
+    return sparcEvaluation;
   }
 
   const rawAnswer = typeof context.userAnswer === 'string' ? context.userAnswer : '';

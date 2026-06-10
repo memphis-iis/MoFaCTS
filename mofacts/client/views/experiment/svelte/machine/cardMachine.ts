@@ -170,7 +170,7 @@ export const cardMachine = createMachine(
               ],
               onError: {
                 target: '#cardMachine.error',
-                actions: ['errorActions', 'logStateTransition'],
+                actions: [...cardMachineActions.errorActions, 'logStateTransition'],
               },
             },
             // Guard for unsupported trial types
@@ -265,7 +265,7 @@ export const cardMachine = createMachine(
               ],
               onError: {
                 target: '#cardMachine.error',
-                actions: ['errorActions', 'logStateTransition'],
+                actions: [...cardMachineActions.errorActions, 'logStateTransition'],
               },
             },
           },
@@ -289,7 +289,7 @@ export const cardMachine = createMachine(
               },
               onError: {
                 target: '#cardMachine.error',
-                actions: ['errorActions', 'logStateTransition'],
+                actions: [...cardMachineActions.errorActions, 'logStateTransition'],
               },
             },
           },
@@ -317,7 +317,7 @@ export const cardMachine = createMachine(
               ],
               onError: {
                 target: '#cardMachine.error',
-                actions: ['errorActions', 'logStateTransition'],
+                actions: [...cardMachineActions.errorActions, 'logStateTransition'],
               },
             },
           },
@@ -558,7 +558,7 @@ export const cardMachine = createMachine(
               ],
               onError: {
                 target: '#cardMachine.error',
-                actions: ['errorActions', 'logStateTransition'],
+                actions: [...cardMachineActions.errorActions, 'logStateTransition'],
               },
             },
           },
@@ -1114,7 +1114,7 @@ export const cardMachine = createMachine(
         {
           target: `#cardMachine.${STATES.ERROR}`,
           guard: 'isHardError',
-          actions: ['errorActions', 'logStateTransition'],
+          actions: [...cardMachineActions.errorActions, 'logStateTransition'],
         },
       ],
       [EVENTS.UNIT_FINISHED]: {
@@ -1267,8 +1267,6 @@ export const cardMachine = createMachine(
       resumeVideoPlayback: cardMachineActions.resumeVideoPlayback,
       resetTimers: cardMachineActions.resetTimers,
 
-      // Composite actions
-      errorActions: cardMachineActions.errorActions,
     },
 
     actors: createServices(),

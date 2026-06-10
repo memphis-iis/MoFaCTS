@@ -17,6 +17,10 @@ import {
   LEARNING_SESSION_UNIT_TYPE,
 } from './learning-session/manifest';
 import {
+  sparcSessionUnitComponentManifest,
+  SPARC_SESSION_UNIT_TYPE,
+} from './sparcsession/manifest';
+import {
   videoSessionUnitComponentManifest,
   VIDEO_SESSION_UNIT_TYPE,
 } from './video-session/manifest';
@@ -24,6 +28,7 @@ import {
 export const defaultUnitComponentManifests: readonly LearningComponentManifest<CreateUnitEngineDeps>[] = [
   instructionUnitComponentManifest,
   learningSessionUnitComponentManifest,
+  sparcSessionUnitComponentManifest,
   assessmentSessionUnitComponentManifest,
   videoSessionUnitComponentManifest,
   autoTutorUnitComponentManifest,
@@ -34,5 +39,6 @@ export {
   AUTO_TUTOR_SESSION_UNIT_TYPE,
   INSTRUCTION_UNIT_TYPE,
   LEARNING_SESSION_UNIT_TYPE,
+  SPARC_SESSION_UNIT_TYPE,
   VIDEO_SESSION_UNIT_TYPE,
 };

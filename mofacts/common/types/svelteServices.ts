@@ -3,7 +3,7 @@
 
 import type { H5PTrialResult } from './h5p';
 
-export type UnitType = 'schedule' | 'video' | 'model' | 'autotutor' | 'instruction-only';
+export type UnitType = 'schedule' | 'video' | 'model' | 'sparc' | 'autotutor' | 'instruction-only';
 
 export type VideoCheckpointBehavior = 'none' | 'pause' | 'all' | 'some' | 'adaptive';
 

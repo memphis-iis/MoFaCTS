@@ -1105,7 +1105,8 @@
                               "learning",
                               "assessment",
                               "video",
-                              "autotutor"
+                              "autotutor",
+                              "sparc"
                             ]
                           },
                           "forceSpacing": {
@@ -1173,7 +1174,8 @@
                               "learning",
                               "assessment",
                               "video",
-                              "autotutor"
+                              "autotutor",
+                              "sparc"
                             ]
                           },
                           "practicetimer": {
@@ -1242,7 +1244,8 @@
                               "learning",
                               "assessment",
                               "video",
-                              "autotutor"
+                              "autotutor",
+                              "sparc"
                             ]
                           },
                           "correctprompt": {
@@ -1257,7 +1260,8 @@
                               "learning",
                               "assessment",
                               "video",
-                              "autotutor"
+                              "autotutor",
+                              "sparc"
                             ]
                           },
                           "skipstudy": {
@@ -1304,7 +1308,8 @@
                               "learning",
                               "assessment",
                               "video",
-                              "autotutor"
+                              "autotutor",
+                              "sparc"
                             ]
                           },
                           "autostopTranscriptionAttemptLimit": {
@@ -1319,7 +1324,8 @@
                               "learning",
                               "assessment",
                               "video",
-                              "autotutor"
+                              "autotutor",
+                              "sparc"
                             ]
                           },
                           "timeuntilaudio": {
@@ -1334,7 +1340,8 @@
                               "learning",
                               "assessment",
                               "video",
-                              "autotutor"
+                              "autotutor",
+                              "sparc"
                             ]
                           },
                           "prestimulusdisplaytime": {
@@ -1349,7 +1356,8 @@
                               "learning",
                               "assessment",
                               "video",
-                              "autotutor"
+                              "autotutor",
+                              "sparc"
                             ]
                           },
                           "forceCorrectPrompt": {
@@ -1364,7 +1372,8 @@
                               "learning",
                               "assessment",
                               "video",
-                              "autotutor"
+                              "autotutor",
+                              "sparc"
                             ]
                           },
                           "forcecorrecttimeout": {
@@ -1379,7 +1388,8 @@
                               "learning",
                               "assessment",
                               "video",
-                              "autotutor"
+                              "autotutor",
+                              "sparc"
                             ]
                           },
                           "checkOtherAnswers": {
@@ -1398,7 +1408,8 @@
                               "learning",
                               "assessment",
                               "video",
-                              "autotutor"
+                              "autotutor",
+                              "sparc"
                             ]
                           },
                           "falseAnswerLimit": {
@@ -1412,7 +1423,8 @@
                               "learning",
                               "assessment",
                               "video",
-                              "autotutor"
+                              "autotutor",
+                              "sparc"
                             ]
                           },
                           "allowPhoneticMatching": {
@@ -1431,7 +1443,8 @@
                               "learning",
                               "assessment",
                               "video",
-                              "autotutor"
+                              "autotutor",
+                              "sparc"
                             ]
                           },
                           "branchingEnabled": {
@@ -1450,7 +1463,8 @@
                               "learning",
                               "assessment",
                               "video",
-                              "autotutor"
+                              "autotutor",
+                              "sparc"
                             ]
                           },
                           "resetStudentPerformance": {
@@ -1469,7 +1483,8 @@
                               "learning",
                               "assessment",
                               "video",
-                              "autotutor"
+                              "autotutor",
+                              "sparc"
                             ]
                           },
                           "allowRevisitUnit": {
@@ -1503,7 +1518,8 @@
                               "learning",
                               "assessment",
                               "video",
-                              "autotutor"
+                              "autotutor",
+                              "sparc"
                             ]
                           },
                           "studyOnlyFields": {
@@ -1531,7 +1547,8 @@
                               "learning",
                               "assessment",
                               "video",
-                              "autotutor"
+                              "autotutor",
+                              "sparc"
                             ]
                           },
                           "stimuliPosition": {
@@ -1550,7 +1567,8 @@
                               "learning",
                               "assessment",
                               "video",
-                              "autotutor"
+                              "autotutor",
+                              "sparc"
                             ]
                           },
                           "displayCorrectFeedback": {
@@ -1565,7 +1583,8 @@
                               "learning",
                               "assessment",
                               "video",
-                              "autotutor"
+                              "autotutor",
+                              "sparc"
                             ]
                           },
                           "displayIncorrectFeedback": {
@@ -1580,7 +1599,8 @@
                               "learning",
                               "assessment",
                               "video",
-                              "autotutor"
+                              "autotutor",
+                              "sparc"
                             ]
                           },
                           "correctLabelText": {
@@ -1595,7 +1615,8 @@
                               "learning",
                               "assessment",
                               "video",
-                              "autotutor"
+                              "autotutor",
+                              "sparc"
                             ]
                           },
                           "incorrectLabelText": {
@@ -1610,7 +1631,8 @@
                               "learning",
                               "assessment",
                               "video",
-                              "autotutor"
+                              "autotutor",
+                              "sparc"
                             ]
                           },
                           "correctColor": {
@@ -1625,7 +1647,8 @@
                               "learning",
                               "assessment",
                               "video",
-                              "autotutor"
+                              "autotutor",
+                              "sparc"
                             ]
                           },
                           "incorrectColor": {
@@ -1640,7 +1663,8 @@
                               "learning",
                               "assessment",
                               "video",
-                              "autotutor"
+                              "autotutor",
+                              "sparc"
                             ]
                           },
                           "displayUserAnswerInFeedback": {
@@ -1666,7 +1690,8 @@
                               "learning",
                               "assessment",
                               "video",
-                              "autotutor"
+                              "autotutor",
+                              "sparc"
                             ]
                           },
                           "feedbackLayout": {
@@ -1685,7 +1710,8 @@
                               "learning",
                               "assessment",
                               "video",
-                              "autotutor"
+                              "autotutor",
+                              "sparc"
                             ]
                           },
                           "displayCorrectAnswerInIncorrectFeedback": {
@@ -1700,7 +1726,8 @@
                               "learning",
                               "assessment",
                               "video",
-                              "autotutor"
+                              "autotutor",
+                              "sparc"
                             ]
                           },
                           "displayPerformance": {
@@ -1715,7 +1742,8 @@
                               "learning",
                               "assessment",
                               "video",
-                              "autotutor"
+                              "autotutor",
+                              "sparc"
                             ]
                           },
                           "displayTimeoutBar": {
@@ -1730,7 +1758,8 @@
                               "learning",
                               "assessment",
                               "video",
-                              "autotutor"
+                              "autotutor",
+                              "sparc"
                             ]
                           },
                           "displayTimeoutCountdown": {
@@ -1745,7 +1774,8 @@
                               "learning",
                               "assessment",
                               "video",
-                              "autotutor"
+                              "autotutor",
+                              "sparc"
                             ]
                           },
                           "choiceButtonCols": {
@@ -1760,7 +1790,8 @@
                               "learning",
                               "assessment",
                               "video",
-                              "autotutor"
+                              "autotutor",
+                              "sparc"
                             ]
                           },
                           "inputPlaceholderText": {
@@ -1775,7 +1806,8 @@
                               "learning",
                               "assessment",
                               "video",
-                              "autotutor"
+                              "autotutor",
+                              "sparc"
                             ]
                           },
                           "continueButtonText": {
@@ -1818,7 +1850,8 @@
                               "learning",
                               "assessment",
                               "video",
-                              "autotutor"
+                              "autotutor",
+                              "sparc"
                             ]
                           },
                           "displayQuestionNumber": {
@@ -1833,7 +1866,8 @@
                               "learning",
                               "assessment",
                               "video",
-                              "autotutor"
+                              "autotutor",
+                              "sparc"
                             ]
                           },
                           "experimentLoginText": {
@@ -1876,7 +1910,8 @@
                                 "learning",
                                 "assessment",
                                 "video",
-                                "autotutor"
+                                "autotutor",
+                                "sparc"
                               ]
                             },
                             "forceSpacing": {
@@ -1944,7 +1979,8 @@
                                 "learning",
                                 "assessment",
                                 "video",
-                                "autotutor"
+                                "autotutor",
+                                "sparc"
                               ]
                             },
                             "practicetimer": {
@@ -2013,7 +2049,8 @@
                                 "learning",
                                 "assessment",
                                 "video",
-                                "autotutor"
+                                "autotutor",
+                                "sparc"
                               ]
                             },
                             "correctprompt": {
@@ -2028,7 +2065,8 @@
                                 "learning",
                                 "assessment",
                                 "video",
-                                "autotutor"
+                                "autotutor",
+                                "sparc"
                               ]
                             },
                             "skipstudy": {
@@ -2075,7 +2113,8 @@
                                 "learning",
                                 "assessment",
                                 "video",
-                                "autotutor"
+                                "autotutor",
+                                "sparc"
                               ]
                             },
                             "autostopTranscriptionAttemptLimit": {
@@ -2090,7 +2129,8 @@
                                 "learning",
                                 "assessment",
                                 "video",
-                                "autotutor"
+                                "autotutor",
+                                "sparc"
                               ]
                             },
                             "timeuntilaudio": {
@@ -2105,7 +2145,8 @@
                                 "learning",
                                 "assessment",
                                 "video",
-                                "autotutor"
+                                "autotutor",
+                                "sparc"
                               ]
                             },
                             "prestimulusdisplaytime": {
@@ -2120,7 +2161,8 @@
                                 "learning",
                                 "assessment",
                                 "video",
-                                "autotutor"
+                                "autotutor",
+                                "sparc"
                               ]
                             },
                             "forceCorrectPrompt": {
@@ -2135,7 +2177,8 @@
                                 "learning",
                                 "assessment",
                                 "video",
-                                "autotutor"
+                                "autotutor",
+                                "sparc"
                               ]
                             },
                             "forcecorrecttimeout": {
@@ -2150,7 +2193,8 @@
                                 "learning",
                                 "assessment",
                                 "video",
-                                "autotutor"
+                                "autotutor",
+                                "sparc"
                               ]
                             },
                             "checkOtherAnswers": {
@@ -2169,7 +2213,8 @@
                                 "learning",
                                 "assessment",
                                 "video",
-                                "autotutor"
+                                "autotutor",
+                                "sparc"
                               ]
                             },
                             "falseAnswerLimit": {
@@ -2183,7 +2228,8 @@
                                 "learning",
                                 "assessment",
                                 "video",
-                                "autotutor"
+                                "autotutor",
+                                "sparc"
                               ]
                             },
                             "allowPhoneticMatching": {
@@ -2202,7 +2248,8 @@
                                 "learning",
                                 "assessment",
                                 "video",
-                                "autotutor"
+                                "autotutor",
+                                "sparc"
                               ]
                             },
                             "branchingEnabled": {
@@ -2221,7 +2268,8 @@
                                 "learning",
                                 "assessment",
                                 "video",
-                                "autotutor"
+                                "autotutor",
+                                "sparc"
                               ]
                             },
                             "resetStudentPerformance": {
@@ -2240,7 +2288,8 @@
                                 "learning",
                                 "assessment",
                                 "video",
-                                "autotutor"
+                                "autotutor",
+                                "sparc"
                               ]
                             },
                             "allowRevisitUnit": {
@@ -2274,7 +2323,8 @@
                                 "learning",
                                 "assessment",
                                 "video",
-                                "autotutor"
+                                "autotutor",
+                                "sparc"
                               ]
                             },
                             "studyOnlyFields": {
@@ -2302,7 +2352,8 @@
                                 "learning",
                                 "assessment",
                                 "video",
-                                "autotutor"
+                                "autotutor",
+                                "sparc"
                               ]
                             },
                             "stimuliPosition": {
@@ -2321,7 +2372,8 @@
                                 "learning",
                                 "assessment",
                                 "video",
-                                "autotutor"
+                                "autotutor",
+                                "sparc"
                               ]
                             },
                             "displayCorrectFeedback": {
@@ -2336,7 +2388,8 @@
                                 "learning",
                                 "assessment",
                                 "video",
-                                "autotutor"
+                                "autotutor",
+                                "sparc"
                               ]
                             },
                             "displayIncorrectFeedback": {
@@ -2351,7 +2404,8 @@
                                 "learning",
                                 "assessment",
                                 "video",
-                                "autotutor"
+                                "autotutor",
+                                "sparc"
                               ]
                             },
                             "correctLabelText": {
@@ -2366,7 +2420,8 @@
                                 "learning",
                                 "assessment",
                                 "video",
-                                "autotutor"
+                                "autotutor",
+                                "sparc"
                               ]
                             },
                             "incorrectLabelText": {
@@ -2381,7 +2436,8 @@
                                 "learning",
                                 "assessment",
                                 "video",
-                                "autotutor"
+                                "autotutor",
+                                "sparc"
                               ]
                             },
                             "correctColor": {
@@ -2396,7 +2452,8 @@
                                 "learning",
                                 "assessment",
                                 "video",
-                                "autotutor"
+                                "autotutor",
+                                "sparc"
                               ]
                             },
                             "incorrectColor": {
@@ -2411,7 +2468,8 @@
                                 "learning",
                                 "assessment",
                                 "video",
-                                "autotutor"
+                                "autotutor",
+                                "sparc"
                               ]
                             },
                             "displayUserAnswerInFeedback": {
@@ -2437,7 +2495,8 @@
                                 "learning",
                                 "assessment",
                                 "video",
-                                "autotutor"
+                                "autotutor",
+                                "sparc"
                               ]
                             },
                             "feedbackLayout": {
@@ -2456,7 +2515,8 @@
                                 "learning",
                                 "assessment",
                                 "video",
-                                "autotutor"
+                                "autotutor",
+                                "sparc"
                               ]
                             },
                             "displayCorrectAnswerInIncorrectFeedback": {
@@ -2471,7 +2531,8 @@
                                 "learning",
                                 "assessment",
                                 "video",
-                                "autotutor"
+                                "autotutor",
+                                "sparc"
                               ]
                             },
                             "displayPerformance": {
@@ -2486,7 +2547,8 @@
                                 "learning",
                                 "assessment",
                                 "video",
-                                "autotutor"
+                                "autotutor",
+                                "sparc"
                               ]
                             },
                             "displayTimeoutBar": {
@@ -2501,7 +2563,8 @@
                                 "learning",
                                 "assessment",
                                 "video",
-                                "autotutor"
+                                "autotutor",
+                                "sparc"
                               ]
                             },
                             "displayTimeoutCountdown": {
@@ -2516,7 +2579,8 @@
                                 "learning",
                                 "assessment",
                                 "video",
-                                "autotutor"
+                                "autotutor",
+                                "sparc"
                               ]
                             },
                             "choiceButtonCols": {
@@ -2531,7 +2595,8 @@
                                 "learning",
                                 "assessment",
                                 "video",
-                                "autotutor"
+                                "autotutor",
+                                "sparc"
                               ]
                             },
                             "inputPlaceholderText": {
@@ -2546,7 +2611,8 @@
                                 "learning",
                                 "assessment",
                                 "video",
-                                "autotutor"
+                                "autotutor",
+                                "sparc"
                               ]
                             },
                             "continueButtonText": {
@@ -2589,7 +2655,8 @@
                                 "learning",
                                 "assessment",
                                 "video",
-                                "autotutor"
+                                "autotutor",
+                                "sparc"
                               ]
                             },
                             "displayQuestionNumber": {
@@ -2604,7 +2671,8 @@
                                 "learning",
                                 "assessment",
                                 "video",
-                                "autotutor"
+                                "autotutor",
+                                "sparc"
                               ]
                             },
                             "experimentLoginText": {
@@ -2628,6 +2696,50 @@
                   "learningsession": {
                     "type": "object",
                     "title": "Learning Session",
+                    "properties": {
+                      "clusterlist": {
+                        "title": "Cluster range list.",
+                        "description": "Space-delimited cluster ranges used by the learning session.",
+                        "type": "string",
+                        "default": "",
+                        "options": {
+                          "grid_columns": 12
+                        }
+                      },
+                      "unitMode": {
+                        "title": "Item-selection algorithm.",
+                        "description": "Unit engine mode used when selecting the next learning item.",
+                        "type": "string",
+                        "default": "",
+                        "options": {
+                          "grid_columns": 4
+                        }
+                      },
+                      "calculateProbability": {
+                        "title": "Custom probability function.",
+                        "description": "JavaScript function body used to customize item probability calculations.",
+                        "type": "string",
+                        "default": "",
+                        "format": "textarea",
+                        "options": {
+                          "grid_columns": 12
+                        }
+                      },
+                      "stimulusfile": {
+                        "title": "Learning-session stimulus file.",
+                        "description": "Optional learning-session-level stimulus filename used by content lookup workflows.",
+                        "type": "string",
+                        "default": "",
+                        "options": {
+                          "grid_columns": 12
+                        }
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "sparcsession": {
+                    "type": "object",
+                    "title": "SPARC Session",
                     "properties": {
                       "clusterlist": {
                         "title": "Cluster range list.",
@@ -3351,7 +3463,8 @@
                           "learning",
                           "assessment",
                           "video",
-                          "autotutor"
+                          "autotutor",
+                          "sparc"
                         ]
                       },
                       "forceSpacing": {
@@ -3419,7 +3532,8 @@
                           "learning",
                           "assessment",
                           "video",
-                          "autotutor"
+                          "autotutor",
+                          "sparc"
                         ]
                       },
                       "practicetimer": {
@@ -3488,7 +3602,8 @@
                           "learning",
                           "assessment",
                           "video",
-                          "autotutor"
+                          "autotutor",
+                          "sparc"
                         ]
                       },
                       "correctprompt": {
@@ -3503,7 +3618,8 @@
                           "learning",
                           "assessment",
                           "video",
-                          "autotutor"
+                          "autotutor",
+                          "sparc"
                         ]
                       },
                       "skipstudy": {
@@ -3550,7 +3666,8 @@
                           "learning",
                           "assessment",
                           "video",
-                          "autotutor"
+                          "autotutor",
+                          "sparc"
                         ]
                       },
                       "autostopTranscriptionAttemptLimit": {
@@ -3565,7 +3682,8 @@
                           "learning",
                           "assessment",
                           "video",
-                          "autotutor"
+                          "autotutor",
+                          "sparc"
                         ]
                       },
                       "timeuntilaudio": {
@@ -3580,7 +3698,8 @@
                           "learning",
                           "assessment",
                           "video",
-                          "autotutor"
+                          "autotutor",
+                          "sparc"
                         ]
                       },
                       "prestimulusdisplaytime": {
@@ -3595,7 +3714,8 @@
                           "learning",
                           "assessment",
                           "video",
-                          "autotutor"
+                          "autotutor",
+                          "sparc"
                         ]
                       },
                       "forceCorrectPrompt": {
@@ -3610,7 +3730,8 @@
                           "learning",
                           "assessment",
                           "video",
-                          "autotutor"
+                          "autotutor",
+                          "sparc"
                         ]
                       },
                       "forcecorrecttimeout": {
@@ -3625,7 +3746,8 @@
                           "learning",
                           "assessment",
                           "video",
-                          "autotutor"
+                          "autotutor",
+                          "sparc"
                         ]
                       },
                       "checkOtherAnswers": {
@@ -3644,7 +3766,8 @@
                           "learning",
                           "assessment",
                           "video",
-                          "autotutor"
+                          "autotutor",
+                          "sparc"
                         ]
                       },
                       "falseAnswerLimit": {
@@ -3658,7 +3781,8 @@
                           "learning",
                           "assessment",
                           "video",
-                          "autotutor"
+                          "autotutor",
+                          "sparc"
                         ]
                       },
                       "allowPhoneticMatching": {
@@ -3677,7 +3801,8 @@
                           "learning",
                           "assessment",
                           "video",
-                          "autotutor"
+                          "autotutor",
+                          "sparc"
                         ]
                       },
                       "branchingEnabled": {
@@ -3696,7 +3821,8 @@
                           "learning",
                           "assessment",
                           "video",
-                          "autotutor"
+                          "autotutor",
+                          "sparc"
                         ]
                       },
                       "resetStudentPerformance": {
@@ -3715,7 +3841,8 @@
                           "learning",
                           "assessment",
                           "video",
-                          "autotutor"
+                          "autotutor",
+                          "sparc"
                         ]
                       },
                       "allowRevisitUnit": {
@@ -3749,7 +3876,8 @@
                           "learning",
                           "assessment",
                           "video",
-                          "autotutor"
+                          "autotutor",
+                          "sparc"
                         ]
                       },
                       "studyOnlyFields": {
@@ -3777,7 +3905,8 @@
                           "learning",
                           "assessment",
                           "video",
-                          "autotutor"
+                          "autotutor",
+                          "sparc"
                         ]
                       },
                       "stimuliPosition": {
@@ -3796,7 +3925,8 @@
                           "learning",
                           "assessment",
                           "video",
-                          "autotutor"
+                          "autotutor",
+                          "sparc"
                         ]
                       },
                       "displayCorrectFeedback": {
@@ -3811,7 +3941,8 @@
                           "learning",
                           "assessment",
                           "video",
-                          "autotutor"
+                          "autotutor",
+                          "sparc"
                         ]
                       },
                       "displayIncorrectFeedback": {
@@ -3826,7 +3957,8 @@
                           "learning",
                           "assessment",
                           "video",
-                          "autotutor"
+                          "autotutor",
+                          "sparc"
                         ]
                       },
                       "correctLabelText": {
@@ -3841,7 +3973,8 @@
                           "learning",
                           "assessment",
                           "video",
-                          "autotutor"
+                          "autotutor",
+                          "sparc"
                         ]
                       },
                       "incorrectLabelText": {
@@ -3856,7 +3989,8 @@
                           "learning",
                           "assessment",
                           "video",
-                          "autotutor"
+                          "autotutor",
+                          "sparc"
                         ]
                       },
                       "correctColor": {
@@ -3871,7 +4005,8 @@
                           "learning",
                           "assessment",
                           "video",
-                          "autotutor"
+                          "autotutor",
+                          "sparc"
                         ]
                       },
                       "incorrectColor": {
@@ -3886,7 +4021,8 @@
                           "learning",
                           "assessment",
                           "video",
-                          "autotutor"
+                          "autotutor",
+                          "sparc"
                         ]
                       },
                       "displayUserAnswerInFeedback": {
@@ -3912,7 +4048,8 @@
                           "learning",
                           "assessment",
                           "video",
-                          "autotutor"
+                          "autotutor",
+                          "sparc"
                         ]
                       },
                       "feedbackLayout": {
@@ -3931,7 +4068,8 @@
                           "learning",
                           "assessment",
                           "video",
-                          "autotutor"
+                          "autotutor",
+                          "sparc"
                         ]
                       },
                       "displayCorrectAnswerInIncorrectFeedback": {
@@ -3946,7 +4084,8 @@
                           "learning",
                           "assessment",
                           "video",
-                          "autotutor"
+                          "autotutor",
+                          "sparc"
                         ]
                       },
                       "displayPerformance": {
@@ -3961,7 +4100,8 @@
                           "learning",
                           "assessment",
                           "video",
-                          "autotutor"
+                          "autotutor",
+                          "sparc"
                         ]
                       },
                       "displayTimeoutBar": {
@@ -3976,7 +4116,8 @@
                           "learning",
                           "assessment",
                           "video",
-                          "autotutor"
+                          "autotutor",
+                          "sparc"
                         ]
                       },
                       "displayTimeoutCountdown": {
@@ -3991,7 +4132,8 @@
                           "learning",
                           "assessment",
                           "video",
-                          "autotutor"
+                          "autotutor",
+                          "sparc"
                         ]
                       },
                       "choiceButtonCols": {
@@ -4006,7 +4148,8 @@
                           "learning",
                           "assessment",
                           "video",
-                          "autotutor"
+                          "autotutor",
+                          "sparc"
                         ]
                       },
                       "inputPlaceholderText": {
@@ -4021,7 +4164,8 @@
                           "learning",
                           "assessment",
                           "video",
-                          "autotutor"
+                          "autotutor",
+                          "sparc"
                         ]
                       },
                       "continueButtonText": {
@@ -4064,7 +4208,8 @@
                           "learning",
                           "assessment",
                           "video",
-                          "autotutor"
+                          "autotutor",
+                          "sparc"
                         ]
                       },
                       "displayQuestionNumber": {
@@ -4079,7 +4224,8 @@
                           "learning",
                           "assessment",
                           "video",
-                          "autotutor"
+                          "autotutor",
+                          "sparc"
                         ]
                       },
                       "experimentLoginText": {
@@ -4122,7 +4268,8 @@
                             "learning",
                             "assessment",
                             "video",
-                            "autotutor"
+                            "autotutor",
+                            "sparc"
                           ]
                         },
                         "forceSpacing": {
@@ -4190,7 +4337,8 @@
                             "learning",
                             "assessment",
                             "video",
-                            "autotutor"
+                            "autotutor",
+                            "sparc"
                           ]
                         },
                         "practicetimer": {
@@ -4259,7 +4407,8 @@
                             "learning",
                             "assessment",
                             "video",
-                            "autotutor"
+                            "autotutor",
+                            "sparc"
                           ]
                         },
                         "correctprompt": {
@@ -4274,7 +4423,8 @@
                             "learning",
                             "assessment",
                             "video",
-                            "autotutor"
+                            "autotutor",
+                            "sparc"
                           ]
                         },
                         "skipstudy": {
@@ -4321,7 +4471,8 @@
                             "learning",
                             "assessment",
                             "video",
-                            "autotutor"
+                            "autotutor",
+                            "sparc"
                           ]
                         },
                         "autostopTranscriptionAttemptLimit": {
@@ -4336,7 +4487,8 @@
                             "learning",
                             "assessment",
                             "video",
-                            "autotutor"
+                            "autotutor",
+                            "sparc"
                           ]
                         },
                         "timeuntilaudio": {
@@ -4351,7 +4503,8 @@
                             "learning",
                             "assessment",
                             "video",
-                            "autotutor"
+                            "autotutor",
+                            "sparc"
                           ]
                         },
                         "prestimulusdisplaytime": {
@@ -4366,7 +4519,8 @@
                             "learning",
                             "assessment",
                             "video",
-                            "autotutor"
+                            "autotutor",
+                            "sparc"
                           ]
                         },
                         "forceCorrectPrompt": {
@@ -4381,7 +4535,8 @@
                             "learning",
                             "assessment",
                             "video",
-                            "autotutor"
+                            "autotutor",
+                            "sparc"
                           ]
                         },
                         "forcecorrecttimeout": {
@@ -4396,7 +4551,8 @@
                             "learning",
                             "assessment",
                             "video",
-                            "autotutor"
+                            "autotutor",
+                            "sparc"
                           ]
                         },
                         "checkOtherAnswers": {
@@ -4415,7 +4571,8 @@
                             "learning",
                             "assessment",
                             "video",
-                            "autotutor"
+                            "autotutor",
+                            "sparc"
                           ]
                         },
                         "falseAnswerLimit": {
@@ -4429,7 +4586,8 @@
                             "learning",
                             "assessment",
                             "video",
-                            "autotutor"
+                            "autotutor",
+                            "sparc"
                           ]
                         },
                         "allowPhoneticMatching": {
@@ -4448,7 +4606,8 @@
                             "learning",
                             "assessment",
                             "video",
-                            "autotutor"
+                            "autotutor",
+                            "sparc"
                           ]
                         },
                         "branchingEnabled": {
@@ -4467,7 +4626,8 @@
                             "learning",
                             "assessment",
                             "video",
-                            "autotutor"
+                            "autotutor",
+                            "sparc"
                           ]
                         },
                         "resetStudentPerformance": {
@@ -4486,7 +4646,8 @@
                             "learning",
                             "assessment",
                             "video",
-                            "autotutor"
+                            "autotutor",
+                            "sparc"
                           ]
                         },
                         "allowRevisitUnit": {
@@ -4520,7 +4681,8 @@
                             "learning",
                             "assessment",
                             "video",
-                            "autotutor"
+                            "autotutor",
+                            "sparc"
                           ]
                         },
                         "studyOnlyFields": {
@@ -4548,7 +4710,8 @@
                             "learning",
                             "assessment",
                             "video",
-                            "autotutor"
+                            "autotutor",
+                            "sparc"
                           ]
                         },
                         "stimuliPosition": {
@@ -4567,7 +4730,8 @@
                             "learning",
                             "assessment",
                             "video",
-                            "autotutor"
+                            "autotutor",
+                            "sparc"
                           ]
                         },
                         "displayCorrectFeedback": {
@@ -4582,7 +4746,8 @@
                             "learning",
                             "assessment",
                             "video",
-                            "autotutor"
+                            "autotutor",
+                            "sparc"
                           ]
                         },
                         "displayIncorrectFeedback": {
@@ -4597,7 +4762,8 @@
                             "learning",
                             "assessment",
                             "video",
-                            "autotutor"
+                            "autotutor",
+                            "sparc"
                           ]
                         },
                         "correctLabelText": {
@@ -4612,7 +4778,8 @@
                             "learning",
                             "assessment",
                             "video",
-                            "autotutor"
+                            "autotutor",
+                            "sparc"
                           ]
                         },
                         "incorrectLabelText": {
@@ -4627,7 +4794,8 @@
                             "learning",
                             "assessment",
                             "video",
-                            "autotutor"
+                            "autotutor",
+                            "sparc"
                           ]
                         },
                         "correctColor": {
@@ -4642,7 +4810,8 @@
                             "learning",
                             "assessment",
                             "video",
-                            "autotutor"
+                            "autotutor",
+                            "sparc"
                           ]
                         },
                         "incorrectColor": {
@@ -4657,7 +4826,8 @@
                             "learning",
                             "assessment",
                             "video",
-                            "autotutor"
+                            "autotutor",
+                            "sparc"
                           ]
                         },
                         "displayUserAnswerInFeedback": {
@@ -4683,7 +4853,8 @@
                             "learning",
                             "assessment",
                             "video",
-                            "autotutor"
+                            "autotutor",
+                            "sparc"
                           ]
                         },
                         "feedbackLayout": {
@@ -4702,7 +4873,8 @@
                             "learning",
                             "assessment",
                             "video",
-                            "autotutor"
+                            "autotutor",
+                            "sparc"
                           ]
                         },
                         "displayCorrectAnswerInIncorrectFeedback": {
@@ -4717,7 +4889,8 @@
                             "learning",
                             "assessment",
                             "video",
-                            "autotutor"
+                            "autotutor",
+                            "sparc"
                           ]
                         },
                         "displayPerformance": {
@@ -4732,7 +4905,8 @@
                             "learning",
                             "assessment",
                             "video",
-                            "autotutor"
+                            "autotutor",
+                            "sparc"
                           ]
                         },
                         "displayTimeoutBar": {
@@ -4747,7 +4921,8 @@
                             "learning",
                             "assessment",
                             "video",
-                            "autotutor"
+                            "autotutor",
+                            "sparc"
                           ]
                         },
                         "displayTimeoutCountdown": {
@@ -4762,7 +4937,8 @@
                             "learning",
                             "assessment",
                             "video",
-                            "autotutor"
+                            "autotutor",
+                            "sparc"
                           ]
                         },
                         "choiceButtonCols": {
@@ -4777,7 +4953,8 @@
                             "learning",
                             "assessment",
                             "video",
-                            "autotutor"
+                            "autotutor",
+                            "sparc"
                           ]
                         },
                         "inputPlaceholderText": {
@@ -4792,7 +4969,8 @@
                             "learning",
                             "assessment",
                             "video",
-                            "autotutor"
+                            "autotutor",
+                            "sparc"
                           ]
                         },
                         "continueButtonText": {
@@ -4835,7 +5013,8 @@
                             "learning",
                             "assessment",
                             "video",
-                            "autotutor"
+                            "autotutor",
+                            "sparc"
                           ]
                         },
                         "displayQuestionNumber": {
@@ -4850,7 +5029,8 @@
                             "learning",
                             "assessment",
                             "video",
-                            "autotutor"
+                            "autotutor",
+                            "sparc"
                           ]
                         },
                         "experimentLoginText": {
@@ -4874,6 +5054,50 @@
               "learningsession": {
                 "type": "object",
                 "title": "Learning Session",
+                "properties": {
+                  "clusterlist": {
+                    "title": "Cluster range list.",
+                    "description": "Space-delimited cluster ranges used by the learning session.",
+                    "type": "string",
+                    "default": "",
+                    "options": {
+                      "grid_columns": 12
+                    }
+                  },
+                  "unitMode": {
+                    "title": "Item-selection algorithm.",
+                    "description": "Unit engine mode used when selecting the next learning item.",
+                    "type": "string",
+                    "default": "",
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "calculateProbability": {
+                    "title": "Custom probability function.",
+                    "description": "JavaScript function body used to customize item probability calculations.",
+                    "type": "string",
+                    "default": "",
+                    "format": "textarea",
+                    "options": {
+                      "grid_columns": 12
+                    }
+                  },
+                  "stimulusfile": {
+                    "title": "Learning-session stimulus file.",
+                    "description": "Optional learning-session-level stimulus filename used by content lookup workflows.",
+                    "type": "string",
+                    "default": "",
+                    "options": {
+                      "grid_columns": 12
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
+              "sparcsession": {
+                "type": "object",
+                "title": "SPARC Session",
                 "properties": {
                   "clusterlist": {
                     "title": "Cluster range list.",
@@ -5352,7 +5576,8 @@
                 "learning",
                 "assessment",
                 "video",
-                "autotutor"
+                "autotutor",
+                "sparc"
               ]
             },
             "forceSpacing": {
@@ -5420,7 +5645,8 @@
                 "learning",
                 "assessment",
                 "video",
-                "autotutor"
+                "autotutor",
+                "sparc"
               ]
             },
             "practicetimer": {
@@ -5489,7 +5715,8 @@
                 "learning",
                 "assessment",
                 "video",
-                "autotutor"
+                "autotutor",
+                "sparc"
               ]
             },
             "correctprompt": {
@@ -5504,7 +5731,8 @@
                 "learning",
                 "assessment",
                 "video",
-                "autotutor"
+                "autotutor",
+                "sparc"
               ]
             },
             "skipstudy": {
@@ -5551,7 +5779,8 @@
                 "learning",
                 "assessment",
                 "video",
-                "autotutor"
+                "autotutor",
+                "sparc"
               ]
             },
             "autostopTranscriptionAttemptLimit": {
@@ -5566,7 +5795,8 @@
                 "learning",
                 "assessment",
                 "video",
-                "autotutor"
+                "autotutor",
+                "sparc"
               ]
             },
             "timeuntilaudio": {
@@ -5581,7 +5811,8 @@
                 "learning",
                 "assessment",
                 "video",
-                "autotutor"
+                "autotutor",
+                "sparc"
               ]
             },
             "prestimulusdisplaytime": {
@@ -5596,7 +5827,8 @@
                 "learning",
                 "assessment",
                 "video",
-                "autotutor"
+                "autotutor",
+                "sparc"
               ]
             },
             "forceCorrectPrompt": {
@@ -5611,7 +5843,8 @@
                 "learning",
                 "assessment",
                 "video",
-                "autotutor"
+                "autotutor",
+                "sparc"
               ]
             },
             "forcecorrecttimeout": {
@@ -5626,7 +5859,8 @@
                 "learning",
                 "assessment",
                 "video",
-                "autotutor"
+                "autotutor",
+                "sparc"
               ]
             },
             "checkOtherAnswers": {
@@ -5645,7 +5879,8 @@
                 "learning",
                 "assessment",
                 "video",
-                "autotutor"
+                "autotutor",
+                "sparc"
               ]
             },
             "falseAnswerLimit": {
@@ -5659,7 +5894,8 @@
                 "learning",
                 "assessment",
                 "video",
-                "autotutor"
+                "autotutor",
+                "sparc"
               ]
             },
             "allowPhoneticMatching": {
@@ -5678,7 +5914,8 @@
                 "learning",
                 "assessment",
                 "video",
-                "autotutor"
+                "autotutor",
+                "sparc"
               ]
             },
             "branchingEnabled": {
@@ -5697,7 +5934,8 @@
                 "learning",
                 "assessment",
                 "video",
-                "autotutor"
+                "autotutor",
+                "sparc"
               ]
             },
             "resetStudentPerformance": {
@@ -5716,7 +5954,8 @@
                 "learning",
                 "assessment",
                 "video",
-                "autotutor"
+                "autotutor",
+                "sparc"
               ]
             },
             "allowRevisitUnit": {
@@ -5750,7 +5989,8 @@
                 "learning",
                 "assessment",
                 "video",
-                "autotutor"
+                "autotutor",
+                "sparc"
               ]
             },
             "studyOnlyFields": {
@@ -5778,7 +6018,8 @@
                 "learning",
                 "assessment",
                 "video",
-                "autotutor"
+                "autotutor",
+                "sparc"
               ]
             },
             "stimuliPosition": {
@@ -5797,7 +6038,8 @@
                 "learning",
                 "assessment",
                 "video",
-                "autotutor"
+                "autotutor",
+                "sparc"
               ]
             },
             "displayCorrectFeedback": {
@@ -5812,7 +6054,8 @@
                 "learning",
                 "assessment",
                 "video",
-                "autotutor"
+                "autotutor",
+                "sparc"
               ]
             },
             "displayIncorrectFeedback": {
@@ -5827,7 +6070,8 @@
                 "learning",
                 "assessment",
                 "video",
-                "autotutor"
+                "autotutor",
+                "sparc"
               ]
             },
             "correctLabelText": {
@@ -5842,7 +6086,8 @@
                 "learning",
                 "assessment",
                 "video",
-                "autotutor"
+                "autotutor",
+                "sparc"
               ]
             },
             "incorrectLabelText": {
@@ -5857,7 +6102,8 @@
                 "learning",
                 "assessment",
                 "video",
-                "autotutor"
+                "autotutor",
+                "sparc"
               ]
             },
             "correctColor": {
@@ -5872,7 +6118,8 @@
                 "learning",
                 "assessment",
                 "video",
-                "autotutor"
+                "autotutor",
+                "sparc"
               ]
             },
             "incorrectColor": {
@@ -5887,7 +6134,8 @@
                 "learning",
                 "assessment",
                 "video",
-                "autotutor"
+                "autotutor",
+                "sparc"
               ]
             },
             "displayUserAnswerInFeedback": {
@@ -5913,7 +6161,8 @@
                 "learning",
                 "assessment",
                 "video",
-                "autotutor"
+                "autotutor",
+                "sparc"
               ]
             },
             "feedbackLayout": {
@@ -5932,7 +6181,8 @@
                 "learning",
                 "assessment",
                 "video",
-                "autotutor"
+                "autotutor",
+                "sparc"
               ]
             },
             "displayCorrectAnswerInIncorrectFeedback": {
@@ -5947,7 +6197,8 @@
                 "learning",
                 "assessment",
                 "video",
-                "autotutor"
+                "autotutor",
+                "sparc"
               ]
             },
             "displayPerformance": {
@@ -5962,7 +6213,8 @@
                 "learning",
                 "assessment",
                 "video",
-                "autotutor"
+                "autotutor",
+                "sparc"
               ]
             },
             "displayTimeoutBar": {
@@ -5977,7 +6229,8 @@
                 "learning",
                 "assessment",
                 "video",
-                "autotutor"
+                "autotutor",
+                "sparc"
               ]
             },
             "displayTimeoutCountdown": {
@@ -5992,7 +6245,8 @@
                 "learning",
                 "assessment",
                 "video",
-                "autotutor"
+                "autotutor",
+                "sparc"
               ]
             },
             "choiceButtonCols": {
@@ -6007,7 +6261,8 @@
                 "learning",
                 "assessment",
                 "video",
-                "autotutor"
+                "autotutor",
+                "sparc"
               ]
             },
             "inputPlaceholderText": {
@@ -6022,7 +6277,8 @@
                 "learning",
                 "assessment",
                 "video",
-                "autotutor"
+                "autotutor",
+                "sparc"
               ]
             },
             "continueButtonText": {
@@ -6065,7 +6321,8 @@
                 "learning",
                 "assessment",
                 "video",
-                "autotutor"
+                "autotutor",
+                "sparc"
               ]
             },
             "displayQuestionNumber": {
@@ -6080,7 +6337,8 @@
                 "learning",
                 "assessment",
                 "video",
-                "autotutor"
+                "autotutor",
+                "sparc"
               ]
             },
             "experimentLoginText": {

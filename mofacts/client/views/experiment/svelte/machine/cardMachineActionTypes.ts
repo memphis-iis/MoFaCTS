@@ -1,5 +1,6 @@
 import { assign as xAssign } from 'xstate';
 import type { H5PTrialResult } from '../../../../../common/types';
+import type { SparcTrialResult } from '../../../../../../learning-components/trial-displays/sparc/SparcTrialDisplayAdapter';
 
 export type PreparedAdvanceMode = 'none' | 'seamless' | 'direct';
 
@@ -29,6 +30,7 @@ export type ActionContext = {
   preparedTrial?: Record<string, unknown> | null;
   source?: string;
   h5pResult?: H5PTrialResult | null;
+  sparcResult?: SparcTrialResult | null;
   questionIndex: number;
   videoSession?: { isActive?: boolean; currentCheckpointIndex?: number };
   timestamps: {
@@ -64,6 +66,7 @@ export type ActionEvent = {
   timestamp?: number;
   userAnswer?: string;
   h5pResult?: H5PTrialResult | null;
+  sparcResult?: SparcTrialResult | null;
   transcript?: string;
   isCorrect?: boolean;
   sessionId?: string;

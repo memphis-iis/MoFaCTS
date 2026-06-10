@@ -13,6 +13,10 @@ const SUPPORTED_DISPLAY_FIELD_SET = new Set<string>(SUPPORTED_DISPLAY_FIELDS);
 
 type DisplaySubsetParams = Record<string, unknown> | null | undefined;
 
+function isStructuredOwnedDisplay(display: Record<string, unknown>): boolean {
+  return display.type === "sparc";
+}
+
 function parseDisplayFields(value: unknown, paramName: string): string[] | null {
   if (value === null || value === undefined || value === "") {
     return null;
@@ -56,6 +60,10 @@ export function applyDisplayFieldSubset<T extends Record<string, unknown>>(
   deliverySettings: DisplaySubsetParams,
   testType: unknown,
 ): Partial<T> {
+  if (isStructuredOwnedDisplay(display)) {
+    return { ...display };
+  }
+
   const fields = getSubsetFieldsForTrial(deliverySettings, testType);
   if (!fields) {
     return { ...display };

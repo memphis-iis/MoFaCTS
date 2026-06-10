@@ -71,6 +71,10 @@ type ScheduleButtonTrialArtifact = {
   isButtonTrial?: unknown;
 };
 
+function isStructuredSparcDisplay(display: unknown): display is Record<string, unknown> & { type: 'sparc' } {
+  return Boolean(display) && typeof display === 'object' && !Array.isArray(display) && (display as Record<string, unknown>).type === 'sparc';
+}
+
 export function shouldUseScheduleButtonTrial(params: {
   currentUnit?: TdfUnitLike | null | undefined;
   schedule?: ScheduleButtonTrialArtifact | null | undefined;
@@ -465,6 +469,35 @@ export function getPreparedCardDataFromSelection(
   const rawVideoSrc = resolveStimMediaSource(stim, 'video');
   const rawAudioSrc = resolveStimMediaSource(stim, 'audio');
   const preparedDisplay = (preparedState.currentDisplay || preparedState.currentDisplayEngine || {}) as Record<string, unknown>;
+  if (isStructuredSparcDisplay(preparedDisplay)) {
+    const currentDisplay = applyDisplayFieldSubset(preparedDisplay, getCurrentDeliverySettings(), selection.testType ?? stim.testType ?? Session.get('testType') ?? 'd');
+    const fullAnswer = typeof preparedState.newExperimentState === 'object' &&
+      typeof (preparedState.newExperimentState as Record<string, unknown>).originalAnswer === 'string'
+      ? String((preparedState.newExperimentState as Record<string, unknown>).originalAnswer)
+      : resolveStimAnswer(stim);
+    const correctAnswer = typeof preparedState.currentAnswer === 'string'
+      ? String(preparedState.currentAnswer)
+      : (fullAnswer.split('~')[0] ?? '').trim();
+
+    return buildCardDataFromResolvedTrial({
+      resolvedClusterIndex,
+      whichStim,
+      probabilityEstimate: selection.probabilityEstimate,
+      forceButtonTrial: selection.forceButtonTrial === true,
+      questionIndex,
+      currentDisplay,
+      fullAnswer,
+      correctAnswer,
+      testTypeOverride: typeof selection.testType === 'string'
+        ? selection.testType
+        : typeof stim.testType === 'string'
+          ? stim.testType
+          : typeof Session.get('testType') === 'string'
+            ? Session.get('testType')
+            : 'd',
+    });
+  }
+
   const displayAttribution = normalizeDisplayAttribution(
     preparedDisplay.attribution,
     stim.display?.attribution,

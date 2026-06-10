@@ -20,6 +20,9 @@ export interface TrialDisplayContent {
   audioSrc?: string;
   h5p?: unknown;
   attribution?: TrialDisplayAttribution;
+  type?: string;
+  schema?: string;
+  [key: string]: unknown;
 }
 
 export interface TrialSubset {
@@ -94,6 +97,7 @@ export function cloneAttribution(attribution: TrialDisplayAttribution | null | u
 
 export function cloneDisplay(display: TrialDisplayContent | null | undefined): TrialDisplayContent {
   const cloned: TrialDisplayContent = {
+    ...(display ? JSON.parse(JSON.stringify(display)) as TrialDisplayContent : {}),
     text: display?.text || '',
     clozeText: display?.clozeText || '',
     imgSrc: display?.imgSrc || '',
@@ -101,13 +105,11 @@ export function cloneDisplay(display: TrialDisplayContent | null | undefined): T
     audioSrc: display?.audioSrc || '',
   };
 
-  if (display?.h5p && typeof display.h5p === 'object') {
-    cloned.h5p = JSON.parse(JSON.stringify(display.h5p));
-  }
-
   const attribution = cloneAttribution(display?.attribution);
   if (attribution) {
     cloned.attribution = attribution;
+  } else {
+    delete cloned.attribution;
   }
 
   return cloned;
@@ -162,11 +164,14 @@ export function buildTrialSubsetKey(params: {
     params.isVideoSession ? params.context.videoSession?.currentCheckpointIndex ?? '' : '',
     params.isVideoSession ? params.context.engineIndices?.clusterIndex ?? '' : '',
     params.isVideoSession ? params.context.questionIndex ?? '' : '',
+    display.type || '',
+    display.schema || '',
     display.text || '',
     display.clozeText || '',
     display.imgSrc || '',
     display.videoSrc || '',
     display.audioSrc || '',
+    display.type === 'sparc' ? JSON.stringify(display) : '',
     attribution?.creatorName || '',
     attribution?.sourceName || '',
     attribution?.sourceUrl || '',
