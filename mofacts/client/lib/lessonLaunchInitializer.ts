@@ -32,8 +32,6 @@ export async function prepareLessonLaunchContext(params: PrepareLessonLaunchPara
   const {
     currentTdfId,
     currentStimuliSetId,
-    ignoreOutOfGrammarResponses,
-    speechOutOfGrammarFeedback,
     source,
     applyContent,
     setLaunchLoadingMessage,
@@ -63,6 +61,16 @@ export async function prepareLessonLaunchContext(params: PrepareLessonLaunchPara
   if (applyContent) {
     content = applyContent(content);
   }
+
+  const setspec = content?.tdfs?.tutor?.setspec || {};
+  const ignoreOutOfGrammarResponses = params.ignoreOutOfGrammarResponses ?? (
+    typeof setspec.speechIgnoreOutOfGrammarResponses === 'string'
+      ? setspec.speechIgnoreOutOfGrammarResponses.toLowerCase() === 'true'
+      : Boolean(setspec.speechIgnoreOutOfGrammarResponses)
+  );
+  const speechOutOfGrammarFeedback = params.speechOutOfGrammarFeedback
+    ?? setspec.speechOutOfGrammarFeedback
+    ?? 'Response not in answer set';
 
   const hasConditionPool = Array.isArray(content?.tdfs?.tutor?.setspec?.condition)
     && content.tdfs.tutor.setspec.condition.length > 0;

@@ -415,6 +415,23 @@ const {
   normalizeOptionalString,
 } = packageMethods;
 
+const dashboardCacheMethods = createDashboardCacheMethods({
+  Meteor,
+  Roles,
+  Histories,
+  GlobalExperimentStates,
+  Tdfs,
+  Assignments,
+  Sections,
+  SectionUserMap,
+  UserDashboardCache,
+  usersCollection: MeteorAny.users,
+  serverConsole,
+  computePracticeTimeMs,
+  canViewDashboardTdf,
+  redisBoundary
+});
+
 const analyticsMethods = createAnalyticsMethods({
   serverConsole,
   Histories,
@@ -446,6 +463,17 @@ const analyticsMethods = createAnalyticsMethods({
   getClassPerformanceByTdfWorkflow,
   getStimuliSetById,
   hasMeaningfulProgressSignal,
+  onHistoryInserted: async (context, historyRecord) => {
+    const tdfId = normalizeCanonicalId(historyRecord?.TDFId);
+    if (!tdfId) {
+      throw new Error('History insert completed without a TDFId for dashboard cache update');
+    }
+    const updateDashboardCacheForTdf = (dashboardCacheMethods as Record<string, any>).updateDashboardCacheForTdf;
+    if (typeof updateDashboardCacheForTdf !== 'function') {
+      throw new Error('Dashboard cache update method is not registered');
+    }
+    await updateDashboardCacheForTdf.call(context, tdfId);
+  },
 });
 
 const {
@@ -989,19 +1017,7 @@ export const asyncMethods: Record<string, unknown> = {
     getApiKeyResolutionDeps,
   }),
 
-  ...createDashboardCacheMethods({
-    Meteor,
-    Roles,
-    Histories,
-    GlobalExperimentStates,
-    Tdfs,
-    UserDashboardCache,
-    usersCollection: MeteorAny.users,
-    serverConsole,
-    computePracticeTimeMs,
-    canViewDashboardTdf,
-    redisBoundary
-  }),
+  ...dashboardCacheMethods,
 
   ...createDeploymentReadinessMethods({
     Roles,

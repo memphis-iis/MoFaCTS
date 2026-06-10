@@ -76,6 +76,7 @@ type AnalyticsMethodsDeps = {
   ) => Promise<unknown>;
   getStimuliSetById: (stimuliSetId: string | number) => Promise<Array<{ clusterKC?: string | number; stimulusKC?: string | number }>>;
   hasMeaningfulProgressSignal: (experimentState: unknown) => boolean;
+  onHistoryInserted?: (context: MethodContext, historyRecord: UnknownRecord) => Promise<void>;
 };
 
 const INSERT_HISTORY_TIMING_ENABLED = process.env.MOFACTS_INSERT_HISTORY_TIMING === '1';
@@ -458,6 +459,17 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     const crowdStatsStartTime = Date.now();
     await recordStimulusCrowdOutcome(deps.StimulusCrowdStats, sanitizedHistoryRecord);
     const crowdStatsMs = elapsedMsSince(crowdStatsStartTime);
+    if (deps.onHistoryInserted) {
+      try {
+        await deps.onHistoryInserted(this, sanitizedHistoryRecord);
+      } catch (error) {
+        deps.serverConsole('[insertHistory] Dashboard cache update failed after history insert', {
+          userId: actingUserId,
+          TDFId: tdfId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
 
     if (INSERT_HISTORY_TIMING_ENABLED) {
       deps.serverConsole('[insertHistory timing]', {

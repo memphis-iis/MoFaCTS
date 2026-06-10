@@ -48,6 +48,145 @@ describe('dashboardCacheMethods', function() {
     expect(stats.lastPracticeTimestamp).to.equal(new Date('2026-02-11T10:00:00.000Z').getTime());
   });
 
+  it('getPracticeDashboardSnapshot returns compact display rows from cached stats', async function() {
+    const userId = 'learner-1';
+    const lessonDoc = {
+      _id: 'tdfA',
+      stimuliSetId: 'stim-set-a',
+      ownerId: 'teacher-1',
+      content: {
+        fileName: 'lesson-a.json',
+        isMultiTdf: false,
+        tdfs: {
+          tutor: {
+            setspec: {
+              lessonname: 'Lesson A',
+              tags: ['math'],
+              userselect: 'true',
+              speechOutOfGrammarFeedback: 'Try one of the listed answers',
+              audioInputEnabled: 'true',
+              enableAudioPromptAndFeedback: 'false'
+            },
+          }
+        }
+      }
+    };
+    const tdfFindOptions: any[] = [];
+    const queryCounts = {
+      tdfsFind: 0,
+      usersFindOne: 0,
+      cacheFindOne: 0,
+      sectionUserMapFind: 0,
+      sectionsFind: 0,
+      assignmentsFind: 0
+    };
+    const methods = createDashboardCacheMethods({
+      Meteor: {
+        Error: class MeteorError extends Error {
+          error: string;
+          constructor(error: string, reason?: string) {
+            super(reason || error);
+            this.error = error;
+          }
+        }
+      },
+      Roles: { userIsInRoleAsync: async () => false },
+      Histories: {
+        find: () => ({ fetchAsync: async () => [] }),
+        findOneAsync: async () => null,
+        rawCollection: () => ({ distinct: async () => [] })
+      },
+      Tdfs: {
+        find: (_selector: any, options: any) => {
+          queryCounts.tdfsFind++;
+          tdfFindOptions.push(options);
+          return { fetchAsync: async () => [lessonDoc] };
+        },
+        findOneAsync: async () => null
+      },
+      Assignments: { find: () => { queryCounts.assignmentsFind++; return { fetchAsync: async () => [] }; } },
+      Sections: { find: () => { queryCounts.sectionsFind++; return { fetchAsync: async () => [] }; } },
+      SectionUserMap: { find: () => { queryCounts.sectionUserMapFind++; return { fetchAsync: async () => [] }; } },
+      UserDashboardCache: {
+        findOneAsync: async () => {
+          queryCounts.cacheFindOne++;
+          return ({
+          userId,
+          tdfStats: {
+            tdfA: {
+              displayName: 'Lesson A',
+              totalTrials: 2,
+              correctTrials: 1,
+              incorrectTrials: 1,
+              totalTimeMs: 90000,
+              totalTimeMinutes: 1.5,
+              itemsPracticedCount: 2,
+              itemsPracticedApplies: true,
+              totalSessions: 1,
+              overallAccuracy: 50,
+              accuracyApplies: true,
+              firstPracticeDate: new Date('2026-06-01T00:00:00.000Z'),
+              lastPracticeDate: new Date('2026-06-01T00:00:00.000Z'),
+              lastPracticeTimestamp: new Date('2026-06-01T00:00:00.000Z').getTime(),
+              lastProcessedHistoryId: 'h2',
+              lastProcessedTimestamp: new Date('2026-06-01T00:00:00.000Z')
+            }
+          },
+          learnerTdfConfigs: {
+            tdfA: {
+              source: { tdfId: 'tdfA', unitCount: 1, unitSignature: [] },
+              overrides: { setspec: { audioPromptMode: 'feedback' } }
+            }
+          }
+        });
+        }
+      },
+      usersCollection: {
+        findOneAsync: async () => {
+          queryCounts.usersFindOne++;
+          return { _id: userId, accessedTDFs: [], speechAPIKey: 'sr', textToSpeechAPIKey: 'tts' };
+        }
+      },
+      serverConsole: () => {},
+      computePracticeTimeMs: (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0),
+      canViewDashboardTdf: () => true,
+      redisBoundary: disabledRedisBoundary
+    });
+
+    const snapshot = await (methods as any).getPracticeDashboardSnapshot.call({ userId });
+
+    expect(snapshot.version).to.equal(1);
+    expect(snapshot.lessons).to.have.length(1);
+    expect(snapshot.lessons[0]).to.include({
+      TDFId: 'tdfA',
+      displayName: 'Lesson A',
+      currentStimuliSetId: 'stim-set-a',
+      hasConfigurableSettings: true,
+      isUsed: true
+    });
+    expect(snapshot.lessons[0].progress).to.include({
+      attempts: 2,
+      accuracy: 50,
+      totalTimeMinutes: 1.5,
+      itemsPracticed: 2,
+      totalPracticeItems: null
+    });
+    expect(snapshot.lessons[0].totalTrials).to.equal(undefined);
+    expect(snapshot.lessons[0].overallAccuracy).to.equal(undefined);
+    expect(snapshot.lessons[0].totalPracticeItems).to.equal(undefined);
+    expect(snapshot.lessons[0].learnerConfig.overrides.setspec.audioPromptMode).to.equal('feedback');
+    expect(snapshot.lessons[0].content).to.equal(undefined);
+    expect(JSON.stringify(tdfFindOptions)).not.to.include('unit');
+    expect(queryCounts).to.deep.equal({
+      tdfsFind: 2,
+      usersFindOne: 1,
+      cacheFindOne: 1,
+      sectionUserMapFind: 1,
+      sectionsFind: 0,
+      assignmentsFind: 0
+    });
+  });
+
   it('does not count legacy model itemId as canonical practiced stimulus identity', function() {
     const stats = computeCacheStats([
       {

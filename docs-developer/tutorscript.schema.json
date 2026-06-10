@@ -1,0 +1,1158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mofacts.dev/schemas/tutorscript.schema.json",
+  "title": "TutorScript",
+  "description": "Canonical schema for SPARC lessons: semantic pages with adaptive rules and cognition.",
+  "type": "object",
+  "required": ["schemaVersion", "document", "nodes", "components", "rules", "stateModel", "eventSchema", "telemetry"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "document": {
+      "$ref": "#/$defs/documentMetadata"
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/documentNode"
+      }
+    },
+    "components": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/componentSpec"
+      }
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/adaptiveRule"
+      }
+    },
+    "stateModel": {
+      "$ref": "#/$defs/stateModel"
+    },
+    "eventSchema": {
+      "$ref": "#/$defs/eventSchema"
+    },
+    "interpreter": {
+      "$ref": "#/$defs/semanticInterpreter"
+    },
+    "studentModel": {
+      "$ref": "#/$defs/studentModelConfig"
+    },
+    "simulation": {
+      "$ref": "#/$defs/simulationSpec"
+    },
+    "behaviorGraphs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/behaviorGraph"
+      }
+    },
+    "authoring": {
+      "$ref": "#/$defs/authoringHints"
+    },
+    "telemetry": {
+      "$ref": "#/$defs/telemetryConfig"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "documentMetadata": {
+      "type": "object",
+      "required": ["id", "title", "primaryLanguage", "kcs"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 3
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "slug": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "author": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+(?:\\.\\d+)?$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "primaryLanguage": {
+          "type": "string",
+          "minLength": 2
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "prerequisites": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "kcs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/kcSpec"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "kcSpec": {
+      "type": "object",
+      "required": ["id", "label", "initialMastery"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "initialMastery": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "domain": {
+          "type": "string"
+        },
+        "difficulty": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "documentNode": {
+      "type": "object",
+      "required": ["id", "kind"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "rich-text-block",
+            "prompt-block",
+            "multiple-choice",
+            "numeric-response",
+            "short-text-response",
+            "hint-panel",
+            "feedback-panel",
+            "adaptive-region",
+            "worked-example",
+            "faded-worked-example",
+            "slider",
+            "graph-plot",
+            "simulation-container",
+            "reflection-response",
+            "navigation-marker",
+            "container"
+          ]
+        },
+        "activityId": {
+          "type": "string"
+        },
+        "componentRef": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/documentNode"
+          }
+        },
+        "layout": {
+          "type": "object",
+          "properties": {
+            "columns": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 4
+            },
+            "alignment": {
+              "type": "string",
+              "enum": ["start", "center", "end", "stretch"]
+            },
+            "spacing": {
+              "type": "string",
+              "enum": ["compact", "normal", "spacious"]
+            }
+          },
+          "additionalProperties": false
+        },
+        "when": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/conditionExpr"
+          }
+        },
+        "entryActions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/runtimeAction"
+          }
+        },
+        "exitActions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/runtimeAction"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "container"
+              }
+            }
+          },
+          "then": {
+            "required": ["children"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "rich-text-block",
+                  "prompt-block"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": ["text"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "multiple-choice",
+                  "numeric-response",
+                  "short-text-response",
+                  "slider",
+                  "graph-plot",
+                  "reflection-response",
+                  "simulation-container"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": ["componentRef", "activityId"]
+          }
+        }
+      ]
+    },
+    "componentSpec": {
+      "type": "object",
+      "required": ["id", "type", "bindings"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "rich-text-block",
+            "prompt-block",
+            "multiple-choice",
+            "numeric-response",
+            "short-text-response",
+            "hint-panel",
+            "feedback-panel",
+            "adaptive-region",
+            "worked-example",
+            "faded-worked-example",
+            "slider",
+            "graph-plot",
+            "simulation-container",
+            "reflection-response",
+            "navigation-marker"
+          ]
+        },
+        "version": {
+          "type": "string"
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "focus",
+              "input",
+              "submit",
+              "correct",
+              "incorrect",
+              "hint_requested",
+              "play",
+              "pause",
+              "complete",
+              "change",
+              "cancel"
+            ]
+          }
+        },
+        "semanticActions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "state": {
+          "type": "object",
+          "properties": {
+            "valueType": {
+              "type": "string",
+              "enum": ["string", "number", "boolean", "array", "object", "null"]
+            },
+            "attemptLimit": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "requiresInput": {
+              "type": "boolean"
+            },
+            "partialCredit": {
+              "type": "boolean"
+            }
+          },
+          "required": ["valueType"],
+          "additionalProperties": true
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "set_value",
+              "set_enabled",
+              "set_disabled",
+              "set_correct",
+              "focus",
+              "show_feedback",
+              "clear_feedback",
+              "reveal_hint",
+              "set_visibility",
+              "mark_complete",
+              "show_explanation",
+              "pause_simulation",
+              "resume_simulation",
+              "emit_event"
+            ]
+          }
+        },
+        "bindings": {
+          "$ref": "#/$defs/componentBindings"
+        },
+        "scoring": {
+          "$ref": "#/$defs/scoringSpec"
+        },
+        "config": {
+          "type": "object",
+          "description": "Component-type-specific configuration payload."
+        }
+      },
+      "additionalProperties": false
+    },
+    "componentBindings": {
+      "type": "object",
+      "required": ["activityId", "rulesetId"],
+      "properties": {
+        "activityId": {
+          "type": "string"
+        },
+        "rulesetId": {
+          "type": "string"
+        },
+        "kcIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "stepId": {
+          "type": "string"
+        },
+        "strategyTags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "adaptivePriority": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5
+        }
+      },
+      "additionalProperties": false
+    },
+    "scoringSpec": {
+      "type": "object",
+      "properties": {
+        "correctValue": {
+          "type": ["number", "string", "boolean", "null"]
+        },
+        "tolerance": {
+          "type": "number",
+          "minimum": 0
+        },
+        "acceptedAlternatives": {
+          "type": "array",
+          "items": {
+            "type": ["number", "string", "boolean"]
+          }
+        },
+        "numericRange": {
+          "type": "object",
+          "properties": {
+            "min": {
+              "type": "number"
+            },
+            "max": {
+              "type": "number"
+            },
+            "inclusive": {
+              "type": "boolean"
+            }
+          },
+          "required": ["min", "max"],
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": true
+    },
+    "adaptiveRule": {
+      "type": "object",
+      "required": ["id", "when", "then"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "appliesTo": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "when": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/conditionExpr"
+          }
+        },
+        "then": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/runtimeAction"
+          }
+        },
+        "meta": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "conditionExpr": {
+      "type": "object",
+      "required": ["op"],
+      "properties": {
+        "op": {
+          "type": "string",
+          "enum": [
+            "eq",
+            "ne",
+            "lt",
+            "lte",
+            "gt",
+            "gte",
+            "in",
+            "notIn",
+            "contains",
+            "all",
+            "any",
+            "not",
+            "between",
+            "regex"
+          ]
+        },
+        "left": {
+          "type": "string",
+          "description": "Variable name in runtime state, e.g. state.currentStep.id"
+        },
+        "right": {
+          "type": ["string", "number", "boolean", "null", "array", "object"]
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/conditionExpr"
+          }
+        },
+        "all": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/conditionExpr"
+          }
+        },
+        "any": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/conditionExpr"
+          }
+        },
+        "not": {
+          "$ref": "#/$defs/conditionExpr"
+        }
+      },
+      "additionalProperties": false
+    },
+    "runtimeAction": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "show_feedback",
+            "hide_feedback",
+            "open_hint",
+            "close_hint",
+            "advance_step",
+            "set_state",
+            "set_component_state",
+            "dispatch_component_action",
+            "pause_simulation",
+            "resume_simulation",
+            "emit_rule_metric",
+            "set_learning_path",
+            "set_page_marker",
+            "log_message",
+            "assign_kc_weight"
+          ]
+        },
+        "target": {
+          "type": "string"
+        },
+        "value": {
+          "type": ["string", "number", "boolean", "object", "array", "null"]
+        },
+        "payload": {
+          "type": "object"
+        },
+        "componentId": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string"
+        },
+        "delayMs": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "stateModel": {
+      "type": "object",
+      "required": ["discrete", "semantic", "quantitative", "simulation"],
+      "properties": {
+        "discrete": {
+          "type": "object",
+          "properties": {
+            "goal": {
+              "type": "string"
+            },
+            "activityId": {
+              "type": "string"
+            },
+            "stepId": {
+              "type": "string"
+            },
+            "mode": {
+              "type": "string",
+              "enum": ["reading", "attempting", "hinting", "simulating", "reflecting", "completed"]
+            },
+            "strategyPath": {
+              "type": "string"
+            },
+            "hintLevel": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10
+            }
+          },
+          "additionalProperties": true
+        },
+        "semantic": {
+          "type": "object",
+          "properties": {
+            "lastMeaningfulAction": {
+              "type": "string"
+            },
+            "expectedAction": {
+              "type": "string"
+            },
+            "correctness": {
+              "type": "string",
+              "enum": ["unknown", "correct", "incorrect", "buggy", "hintRelevant"]
+            },
+            "buggyRule": {
+              "type": "string"
+            },
+            "misconceptions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "stepHistory": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/semanticAction"
+              }
+            },
+            "strategyTrace": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": true
+        },
+        "quantitative": {
+          "type": "object",
+          "properties": {
+            "kcMastery": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "predictedCorrectness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "elapsedMs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "stepElapsedMs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "timeSinceMeaningfulActionMs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "latencyMs": {
+              "type": "number",
+              "minimum": 0
+            },
+            "hintCount": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "errorCount": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "practiceScheduleState": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "additionalProperties": true
+        },
+        "simulation": {
+          "type": "object",
+          "properties": {
+            "running": {
+              "type": "boolean"
+            },
+            "variables": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "learnerParams": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "outcomes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": ["string", "number", "boolean", "null"]
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": ["name", "value", "timestamp"]
+              }
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "eventSchema": {
+      "type": "object",
+      "required": ["rawEvents", "semanticActions"],
+      "properties": {
+        "rawEvents": {
+          "type": "object",
+          "properties": {
+            "requiredFields": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "eventId",
+                  "timestamp",
+                  "sessionId",
+                  "learnerId",
+                  "documentId",
+                  "activityId",
+                  "componentId",
+                  "eventType",
+                  "value"
+                ]
+              }
+            }
+          },
+          "required": ["requiredFields"]
+        },
+        "semanticActions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/semanticAction"
+          }
+        },
+        "appendOnly": {
+          "type": "boolean",
+          "const": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "semanticAction": {
+      "type": "object",
+      "required": ["actionType", "componentId", "activityId", "timestamp"],
+      "properties": {
+        "actionType": {
+          "type": "string"
+        },
+        "componentId": {
+          "type": "string"
+        },
+        "activityId": {
+          "type": "string"
+        },
+        "stepId": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "value": {
+          "type": ["string", "number", "boolean", "object", "array", "null"]
+        },
+        "expectedValue": {
+          "type": ["string", "number", "boolean", "null"]
+        },
+        "result": {
+          "type": "string",
+          "enum": ["correct", "incorrect", "buggy", "irrelevant", "partiallyCorrect"]
+        },
+        "bugCode": {
+          "type": "string"
+        },
+        "kcIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "latencyMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ruleHits": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "semanticInterpreter": {
+      "type": "object",
+      "required": ["mappings", "fallback"],
+      "properties": {
+        "mappings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["rawEventType", "componentTypes", "toSemanticAction"],
+            "properties": {
+              "rawEventType": {
+                "type": "string"
+              },
+              "componentTypes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "conditions": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/conditionExpr"
+                }
+              },
+              "toSemanticAction": {
+                "type": "string"
+              },
+              "extract": {
+                "type": "object",
+                "description": "Raw event field mappings to semantic action payload."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "fallback": {
+          "type": "object",
+          "properties": {
+            "onUnmapped": {
+              "type": "string",
+              "enum": ["ignore", "log", "flag", "routeToDeveloperReview"]
+            },
+            "onConflict": {
+              "type": "string",
+              "enum": ["preferMostSpecific", "preferLatest", "flag"]
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "studentModelConfig": {
+      "type": "object",
+      "properties": {
+        "defaultModel": {
+          "type": "string",
+          "enum": ["logistic", "afm", "bkt", "hybrid-lkt"]
+        },
+        "kcModel": {
+          "type": "object",
+          "properties": {
+            "pPrior": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "pLearn": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "pGuess": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "pSlip": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "decayRate": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "hintPenalty": {
+              "type": "number"
+            },
+            "latencyPenalty": {
+              "type": "number"
+            }
+          },
+          "additionalProperties": true
+        },
+        "updateTriggers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "simulationSpec": {
+      "type": "object",
+      "properties": {
+        "engines": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "name", "type"],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "schema": {
+                "type": "object"
+              },
+              "stateMappings": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/simulationStateBinding"
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "globalRules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/adaptiveRule"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "simulationStateBinding": {
+      "type": "object",
+      "required": ["activityId", "variable", "path", "readonly"],
+      "properties": {
+        "activityId": {
+          "type": "string"
+        },
+        "variable": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "readonly": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "behaviorGraph": {
+      "type": "object",
+      "required": ["id", "nodes", "edges"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "label", "expectedAction"],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "step": {
+                "type": "string"
+              },
+              "expectedAction": {
+                "type": "string"
+              },
+              "isStart": {
+                "type": "boolean"
+              },
+              "isTerminal": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["from", "to", "label"],
+            "properties": {
+              "from": {
+                "type": "string"
+              },
+              "to": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "conditions": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/conditionExpr"
+                }
+              },
+              "pathType": {
+                "type": "string",
+                "enum": ["correct", "alternative", "buggy", "hint", "deadEnd", "repair"]
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "authoringHints": {
+      "type": "object",
+      "properties": {
+        "aiAssist": {
+          "type": "boolean"
+        },
+        "requiredReviews": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "missingKcTags",
+              "unreachableRule",
+              "emptyTrace",
+              "noHintPath",
+              "noTimeBasedRule",
+              "unboundComponent",
+              "invalidTelemetryField"
+            ]
+          }
+        },
+        "workflow": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "telemetryConfig": {
+      "type": "object",
+      "required": ["appendOnly", "retentionDays", "sampling"],
+      "properties": {
+        "appendOnly": {
+          "type": "boolean",
+          "const": true
+        },
+        "retentionDays": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "sampling": {
+          "type": "string",
+          "enum": ["all", "sampled", "researchOnly"]
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "replayEnabled": {
+          "type": "boolean"
+        },
+        "storage": {
+          "type": "string",
+          "enum": ["local", "remote", "hybrid"]
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

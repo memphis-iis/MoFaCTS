@@ -43,6 +43,9 @@ Keep `docs/` focused on software consortium, repository, user, author, operator,
 - `production-smoke-load-test.md`: production smoke load-test notes.
 - `tdf-schema-source-of-truth-plan.md`: TDF and stimulus schema source-of-truth plan.
 - `video-session-state-machine-audit-plan.md`: video session state-machine audit and fix plan.
+- `tutorscript.schema.json`: TutorScript canonical JSON schema for SPARC plans.
+- `sparc-semantic-pages-with-adaptive-rules-and-cognition.md`: SPARC: Semantic Pages with Adaptive Rules and Cognition plan.
+- `hybrid-model-traced-reactive-instructional-document-system-plan.md`: hybrid model-traced reactive instructional document system plan.
 
 ## Initial Migration Map
 

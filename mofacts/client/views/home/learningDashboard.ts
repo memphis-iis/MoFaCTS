@@ -1,11 +1,8 @@
 import {ReactiveVar} from 'meteor/reactive-var';
-import { Tracker } from 'meteor/tracker';
 import './learningDashboard.html';
 import './learningDashboard.css';
 import {getExperimentState} from '../experiment/svelte/services/experimentState';
 import {meteorCallAsync, clientConsole} from '../..';
-/** @typedef {import('../../../server/methods/dashboardCacheMethods.contracts').InitializeDashboardCacheResult} InitializeDashboardCacheResult */
-/** @typedef {import('../../../server/methods/dashboardCacheMethods.contracts').EnsureDashboardCacheCurrentResult} EnsureDashboardCacheCurrentResult */
 import {sessionCleanUp} from '../../lib/sessionUtils';
 import {checkUserSession} from '../../lib/userSessionHelpers';
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra');
@@ -27,8 +24,6 @@ import { shouldLockMultiTdfLaunchToCurrentUnit } from '../../lib/lessonLaunchLoc
 import { CARD_ENTRY_INTENT, setCardEntryIntent, type CardEntryIntent } from '../../lib/cardEntryIntent';
 import { normalizeTutorUnits } from '../../lib/tdfUtils';
 import { prepareLessonLaunchContext } from '../../lib/lessonLaunchInitializer';
-import { applyFallbackProgressSignals, shouldUseProgressSignalFallback } from './progressSignals';
-import { passesDashboardEntitlement } from './dashboardEntitlement';
 import {
   LEARNER_TDF_FIELD_DEFINITIONS,
   applyLearnerTdfConfig,
@@ -47,7 +42,6 @@ declare const Template: any;
 declare const Meteor: any;
 declare const Session: any;
 declare const $: any;
-declare const Tdfs: any;
 declare const UserDashboardCache: any;
 
 type LearnerConfigState = {
@@ -82,10 +76,88 @@ const EMPTY_CONFIG_STATE: LearnerConfigState = {
   resettingProgress: false,
 };
 
-const DASHBOARD_CACHE_VERSION = 3;
+const PRACTICE_DASHBOARD_SNAPSHOT_VERSION = 1;
 const LEARNER_CONFIG_CLOSE_FALLBACK_MS = 200;
 const LEARNER_CONFIG_AUTOSAVE_DELAY_MS = 500;
 const LEARNER_CONFIG_SLIDER_DISPLAY_SESSION_KEY = 'learnerConfigSliderDisplayValues';
+
+type PracticeDashboardSnapshot = {
+  version: number;
+  userId: string;
+  generatedAt: number;
+  lessons: any[];
+};
+
+function dashboardSnapshotStorageKey(userId: string) {
+  if (!userId) {
+    throw new Error('[LearningDashboard] Cannot build dashboard snapshot key without a user id');
+  }
+  return `mofacts.practiceDashboardSnapshot.v${PRACTICE_DASHBOARD_SNAPSHOT_VERSION}.${userId}`;
+}
+
+function loadLocalPracticeDashboardSnapshot(userId: string): PracticeDashboardSnapshot | null {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return null;
+  }
+  const raw = window.localStorage.getItem(dashboardSnapshotStorageKey(userId));
+  if (!raw) {
+    return null;
+  }
+  const snapshot = JSON.parse(raw) as PracticeDashboardSnapshot;
+  if (snapshot?.version !== PRACTICE_DASHBOARD_SNAPSHOT_VERSION || snapshot.userId !== userId || !Array.isArray(snapshot.lessons)) {
+    throw new Error('[LearningDashboard] Local practice dashboard snapshot has an invalid shape');
+  }
+  return snapshot;
+}
+
+function saveLocalPracticeDashboardSnapshot(snapshot: PracticeDashboardSnapshot) {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return;
+  }
+  window.localStorage.setItem(dashboardSnapshotStorageKey(snapshot.userId), JSON.stringify(snapshot));
+}
+
+function formatSnapshotLesson(lesson: any) {
+  const lastPracticeTimestamp = Number(lesson.lastPracticeTimestamp || lesson.progress?.lastPracticedTimestamp || 0);
+  const isUsed = Boolean(lesson.isUsed || Number(lesson.progress?.attempts || 0) > 0);
+  return {
+    ...lesson,
+    isUsed,
+    hasBeenAttempted: Boolean(lesson.hasBeenAttempted || isUsed),
+    totalTrials: lesson.totalTrials ?? lesson.progress?.attempts,
+    overallAccuracy: lesson.overallAccuracy ?? lesson.progress?.accuracy,
+    accuracyApplies: lesson.accuracyApplies ?? lesson.progress?.accuracyApplies,
+    totalTimeMinutes: lesson.totalTimeMinutes ?? lesson.progress?.totalTimeMinutes,
+    itemsPracticed: lesson.itemsPracticed ?? lesson.progress?.itemsPracticed,
+    itemsPracticedApplies: lesson.itemsPracticedApplies ?? lesson.progress?.itemsPracticedApplies,
+    totalPracticeItems: lesson.totalPracticeItems ?? lesson.progress?.totalPracticeItems,
+    lastPracticeTimestamp: Number.isFinite(lastPracticeTimestamp) ? lastPracticeTimestamp : 0,
+    lastPracticeDate: lesson.lastPracticeDate || (lesson.progress?.lastPracticed
+      ? new Date(lesson.progress.lastPracticed).toLocaleDateString()
+      : undefined),
+    totalSessions: lesson.totalSessions ?? lesson.progress?.sessionDays,
+    tags: Array.isArray(lesson.tags) ? lesson.tags : [],
+    conditions: Array.isArray(lesson.conditions) && lesson.conditions.length > 0 ? lesson.conditions : null,
+  };
+}
+
+function applyPracticeDashboardSnapshot(instance: any, snapshot: PracticeDashboardSnapshot) {
+  if (snapshot.userId) {
+    const learnerConfigs: Record<string, LearnerTdfConfig> = {};
+    for (const lesson of snapshot.lessons || []) {
+      if (lesson?.TDFId && lesson.learnerConfig) {
+        learnerConfigs[String(lesson.TDFId)] = lesson.learnerConfig;
+      }
+    }
+    Session.set('learnerTdfConfigOverrides', learnerConfigs);
+  }
+  const rows = (snapshot.lessons || []).map(formatSnapshotLesson);
+  const { used, unused } = splitTdfsByUsage(rows);
+  const combinedTdfs = [...used, ...unused];
+  Session.set('homeHasPracticeRecords', used.length > 0);
+  instance.allTdfsList.set(combinedTdfs);
+  instance.isLoading.set(false);
+}
 
 function parseCssDurationMs(rawValue: string | null | undefined) {
   const value = String(rawValue || '').trim();
@@ -325,43 +397,6 @@ function tdfHasLearnerConfigurableFields(content: any) {
   return getLearnerConfigurableUnitIndexes(content).length > 0;
 }
 
-function getConditionRefs(setspec: any) {
-  const refs = new Set<string>();
-  const conditionFileNames = Array.isArray(setspec?.condition) ? setspec.condition : [];
-  const conditionTdfIds = Array.isArray(setspec?.conditionTdfIds) ? setspec.conditionTdfIds : [];
-  for (const fileName of conditionFileNames) {
-    if (typeof fileName === 'string' && fileName.trim()) refs.add(fileName.trim());
-  }
-  for (const tdfId of conditionTdfIds) {
-    if (typeof tdfId === 'string' && tdfId.trim()) refs.add(tdfId.trim());
-  }
-  return Array.from(refs);
-}
-
-function tdfFamilyHasConfigurableRuntime(tdfObject: any, tdfsById: Map<string, any>, tdfsByFileName: Map<string, any>) {
-  if (tdfHasConfigurableRuntime(tdfObject)) {
-    return true;
-  }
-
-  const refs = getConditionRefs(tdfObject?.tdfs?.tutor?.setspec);
-  return refs.some((ref) => {
-    const child = tdfsById.get(ref) || tdfsByFileName.get(ref);
-    return tdfHasConfigurableRuntime(child?.content);
-  });
-}
-
-function tdfFamilyHasLearnerConfigurableFields(tdfObject: any, tdfsById: Map<string, any>, tdfsByFileName: Map<string, any>) {
-  if (tdfHasLearnerConfigurableFields(tdfObject)) {
-    return true;
-  }
-
-  const refs = getConditionRefs(tdfObject?.tdfs?.tutor?.setspec);
-  return refs.some((ref) => {
-    const child = tdfsById.get(ref) || tdfsByFileName.get(ref);
-    return tdfHasLearnerConfigurableFields(child?.content);
-  });
-}
-
 function getPrimaryConfigurableUnitIndex(state: LearnerConfigState) {
   return getLearnerConfigurableUnitIndexes(state.content)[0] ?? null;
 }
@@ -599,89 +634,6 @@ function displayLabelForTdf(tdf: any) {
   return tdf.displayName;
 }
 
-function resolveDashboardTdfFileName(tdf: any, tdfObject: any) {
-  const contentFileName = typeof tdfObject?.fileName === 'string' ? tdfObject.fileName.trim() : '';
-  if (contentFileName) {
-    return contentFileName;
-  }
-
-  const packageTdfFileName = typeof tdf?.tdfFileName === 'string' ? tdf.tdfFileName.trim() : '';
-  if (packageTdfFileName) {
-    return packageTdfFileName;
-  }
-
-  return undefined;
-}
-
-function expandClusterToken(token: string, tdfLabel: string): number[] {
-  const value = token.trim();
-  if (!value) {
-    return [];
-  }
-  if (!value.includes('-')) {
-    const item = Number(value);
-    if (!Number.isInteger(item) || item < 0) {
-      throw new Error(`[LearningDashboard] Invalid clusterlist item "${value}" in ${tdfLabel}`);
-    }
-    return [item];
-  }
-
-  const [startRaw, endRaw, extra] = value.split('-');
-  if (extra !== undefined) {
-    throw new Error(`[LearningDashboard] Invalid clusterlist range "${value}" in ${tdfLabel}`);
-  }
-  const start = Number(startRaw);
-  const end = Number(endRaw);
-  if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start) {
-    throw new Error(`[LearningDashboard] Invalid clusterlist range "${value}" in ${tdfLabel}`);
-  }
-
-  const items: number[] = [];
-  for (let item = start; item <= end; item += 1) {
-    items.push(item);
-  }
-  return items;
-}
-
-function addClusterListItems(totalItems: Set<number>, clusterList: unknown, tdfLabel: string) {
-  if (clusterList === undefined || clusterList === null || String(clusterList).trim() === '') {
-    return;
-  }
-  const tokens = String(clusterList).trim().split(/\s+/);
-  for (const token of tokens) {
-    for (const item of expandClusterToken(token, tdfLabel)) {
-      totalItems.add(item);
-    }
-  }
-}
-
-function getLearningSessionClusterList(unit: any): unknown {
-  return unit?.learningsession?.clusterlist;
-}
-
-function isConditionRootTdf(tdfContent: any): boolean {
-  return Array.isArray(tdfContent?.tdfs?.tutor?.setspec?.condition);
-}
-
-function countTotalPracticeItems(tdfContent: any, tdfLabel: string): number | null {
-  const units = tdfContent?.tdfs?.tutor?.unit;
-  if (!Array.isArray(units)) {
-    if (isConditionRootTdf(tdfContent)) {
-      return null;
-    }
-    throw new Error(`[LearningDashboard] TDF "${tdfLabel}" is missing tdfs.tutor.unit; cannot report total practice items`);
-  }
-
-  const totalItems = new Set<number>();
-  for (const unit of units) {
-    if (!unit?.learningsession) {
-      continue;
-    }
-    addClusterListItems(totalItems, getLearningSessionClusterList(unit), tdfLabel);
-  }
-  return totalItems.size;
-}
-
 function configForLessonCard(tdf: any) {
   const templateData = Template.parentData(1) as { learnerConfigState?: LearnerConfigState } | undefined;
   const state = templateData?.learnerConfigState;
@@ -729,7 +681,7 @@ const lessonRowHelpers = {
     const practiced = this.isUsed ? Number(this.itemsPracticed || 0) : 0;
     const total = Number(this.totalPracticeItems);
     if (!Number.isFinite(total)) {
-      throw new Error(`[LearningDashboard] Missing totalPracticeItems for TDF "${this.TDFId}"`);
+      return Number.isFinite(practiced) ? String(practiced) : '-';
     }
     return `${Number.isFinite(practiced) ? practiced : 0} / ${total}`;
   },
@@ -981,24 +933,16 @@ Template.learningDashboard.events({
     event.preventDefault();
     unlockAppleMobileAudioForUserGesture();
     const target = $(event.currentTarget);
-    const tdfId = target.data('tdfid');
-    const lessonName = target.data('lessonname');
-
-    // Get TDF info from Tdfs collection
-    const tdf = Tdfs.findOne({_id: tdfId});
-    if (tdf) {
-      const setspec = tdf.content.tdfs.tutor.setspec;
-      await safeSelectTdf(
-        tdfId,
-        lessonName,
-        tdf.stimuliSetId,
-        setspec.speechIgnoreOutOfGrammarResponses === 'true',
-        setspec.speechOutOfGrammarFeedback || 'Response not in answer set',
-        'Continue from practice menu',
-        tdf.content.isMultiTdf,
-        setspec,
-      );
-    }
+    await safeSelectTdf(
+      target.data('tdfid'),
+      target.data('lessonname'),
+      target.data('currentstimulisetid'),
+      null,
+      null,
+      'Continue from practice menu',
+      target.data('ismultitdf'),
+      null,
+    );
   },
 
   'click .start-lesson': async function(event: any) {
@@ -1009,15 +953,15 @@ Template.learningDashboard.events({
       target.data('tdfid'),
       target.data('lessonname'),
       target.data('currentstimulisetid'),
-      target.data('ignoreoutofgrammarresponses'),
-      target.data('speechoutofgrammarfeedback'),
+      null,
+      null,
       'Start from practice menu',
       target.data('ismultitdf'),
       null,
     );
   },
 
-  'click .start-condition-root': async function(event: any) {
+  'click .start-condition-root': async function(this: any, event: any) {
     event.preventDefault();
     unlockAppleMobileAudioForUserGesture();
     const row = $(event.currentTarget).closest('tr, .learning-dashboard-card');
@@ -1027,22 +971,19 @@ Template.learningDashboard.events({
     if (!selectedId) return;
 
     const isExplicitCondition = selectedId !== rootId;
-    const tdfDoc = Tdfs.findOne({ _id: isExplicitCondition ? rootId : selectedId });
-    if (!tdfDoc) return;
-    const setspec = tdfDoc.content?.tdfs?.tutor?.setspec || {};
     Session.set('preselectedConditionTdfId', isExplicitCondition ? selectedId : null);
     Session.set('tdfFamilyRootTdfId', rootId);
 
     // isOwnerLaunch = true: owner's session does not increment conditionCounts
     await safeSelectTdf(
       rootId,
-      setspec.lessonname || tdfDoc.content?.fileName || selectedId,
-      tdfDoc.stimuliSetId,
-      setspec.speechIgnoreOutOfGrammarResponses === 'true',
-      setspec.speechOutOfGrammarFeedback || 'Response not in answer set',
+      this.displayName || selectedId,
+      this.currentStimuliSetId,
+      null,
+      null,
       'Owner condition launch from practice menu',
-      tdfDoc.content?.isMultiTdf,
-      setspec,
+      this.isMultiTdf,
+      null,
       false,
       true, // isOwnerLaunch
     );
@@ -1217,298 +1158,69 @@ Template.learningDashboard.rendered = async function(this: any) {
     return;
   }
   instance._dashboardSubscribed = true;
+  const dashboardRenderStart = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  let studentID = Session.get('curStudentID') || Meteor.userId();
+  let renderedLocalSnapshot = false;
+  const tryRenderLocalSnapshot = (userId: string | null | undefined) => {
+    if (!userId || renderedLocalSnapshot) {
+      return;
+    }
+    try {
+      const localSnapshot = loadLocalPracticeDashboardSnapshot(userId);
+      if (localSnapshot) {
+        applyPracticeDashboardSnapshot(instance, localSnapshot);
+        renderedLocalSnapshot = true;
+        const firstLayoutPaintMs = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - dashboardRenderStart;
+        (window as any).__mofactsDashboardLocalPaintMs = firstLayoutPaintMs;
+        (window as any).__mofactsDashboardLocalSnapshotLessons = localSnapshot.lessons.length;
+        clientConsole(2, '[Dashboard] Rendered local practice snapshot', {
+          lessons: localSnapshot.lessons.length,
+          ageMs: Date.now() - Number(localSnapshot.generatedAt || 0),
+          firstLayoutPaintMs,
+        });
+      }
+    } catch (error) {
+      clientConsole(1, '[Dashboard] Local practice snapshot could not be used:', error);
+    }
+  };
+
+  tryRenderLocalSnapshot(studentID);
+
   // sessionCleanUp() removed - it's already called in selectTdf() at the right time
   // Calling it here causes problems because rendered() can fire multiple times
   // due to reactivity, clearing session variables while card.js is using them
   await checkUserSession();
   Session.set('showSpeechAPISetup', true);
 
-  const studentID = Session.get('curStudentID') || Meteor.userId();
-  // Subscribe to lightweight TDF listing before reading collections
-  const subs = [
-    Meteor.subscribe('dashboardTdfsListing'),
-  ];
-  instance.subscriptions.push(...subs);
-
-  await new Promise<void>((resolve) => {
-    const handle = Tracker.autorun(() => {
-      const ready = subs.every((sub) => sub && sub.ready());
-      if (ready) {
-        handle.stop();
-        resolve();
-      }
-    });
-  });
-
-  // Get all TDFs the user can access with field projection
-  // Excludes large 'unit' array to reduce data transfer by 50-70%
-  const tdfFields = {
-    _id: 1,
-    stimuliSetId: 1,
-    ownerId: 1,
-    accessors: 1,
-    conditionCounts: 1,
-    tdfFileName: 1,
-    'content.fileName': 1,
-    'content.isMultiTdf': 1,
-    'content.tdfs.tutor.setspec.lessonname': 1,
-    'content.tdfs.tutor.setspec.tags': 1,
-    'content.tdfs.tutor.setspec.condition': 1,
-    'content.tdfs.tutor.setspec.conditionTdfIds': 1,
-    'content.tdfs.tutor.setspec.speechIgnoreOutOfGrammarResponses': 1,
-    'content.tdfs.tutor.setspec.speechOutOfGrammarFeedback': 1,
-    'content.tdfs.tutor.setspec.audioInputEnabled': 1,
-    'content.tdfs.tutor.setspec.enableAudioPromptAndFeedback': 1,
-    'content.tdfs.tutor.unit.learningsession': 1,
-    'content.tdfs.tutor.unit.autotutorsession': 1
-    // Include only runtime markers from units so Configure can stay hidden for non-configurable lessons.
-  };
-  let allTdfs = Tdfs.find({}, { fields: tdfFields }).fetch();
-  Session.set('allTdfs', allTdfs);
-
-  // PHASE 2: Subscribe to dashboard cache for pre-computed stats
-  // This provides O(1) loading instead of N queries per TDF
-  clientConsole(2, '[Dashboard] Subscribing to dashboardCache...');
-  await new Promise<void>((resolve) => {
-    Meteor.subscribe('dashboardCache', {
-      onReady: () => {
-        clientConsole(2, '[Dashboard] Subscription ready');
-        resolve();
-      },
-      onStop: (error: any) => { if (error) clientConsole(1, '[Dashboard] Subscription error:', error); resolve(); }
-    });
-  });
-
-  // Get cache from local Minimongo
-  let cache = UserDashboardCache.findOne({ userId: studentID });
-  clientConsole(2, '[Dashboard] Cache found:', cache ? 'yes' : 'no', cache ? `with ${Object.keys(cache.tdfStats || {}).length} TDFs` : '');
-
-  // The cache version only proves schema shape. Before trusting a current-version
-  // cache, verify it covers the learner's latest history writes.
-  try {
-    /** @type {EnsureDashboardCacheCurrentResult} */
-    const ensureResult = await meteorCallAsync('ensureDashboardCacheCurrent');
-    clientConsole(2, '[Dashboard] ensureDashboardCacheCurrent result:', ensureResult);
-    cache = UserDashboardCache.findOne({ userId: studentID });
-    clientConsole(2, '[Dashboard] Cache after freshness check:', cache ? `${Object.keys(cache.tdfStats || {}).length} TDFs` : 'still null');
-  } catch (err) {
-    clientConsole(1, '[Dashboard] Failed to ensure cache freshness:', err);
+  studentID = Session.get('curStudentID') || Meteor.userId();
+  if (!studentID) {
+    throw new Error('[LearningDashboard] Cannot render practice dashboard without an authenticated user id');
   }
 
-  // If no current cache exists, initialize it.
-  if (!cache || cache.version !== DASHBOARD_CACHE_VERSION) {
-    clientConsole(2, '[Dashboard] Cache missing or stale, initializing...');
-    try {
-      /** @type {InitializeDashboardCacheResult} */
-      const initResult = await meteorCallAsync('initializeDashboardCache');
-      clientConsole(2, '[Dashboard] initializeDashboardCache result:', initResult);
-      // Re-fetch cache after initialization
-      cache = UserDashboardCache.findOne({ userId: studentID });
-      clientConsole(2, '[Dashboard] Cache after init:', cache ? `${Object.keys(cache.tdfStats || {}).length} TDFs` : 'still null');
-    } catch (err) {
-      clientConsole(1, '[Dashboard] Failed to initialize cache:', err);
-      // Cache will be null, statsMap will be empty
-    }
-  }
+  tryRenderLocalSnapshot(studentID);
 
-  // Build statsMap from cache (O(1) lookup)
-  const statsMap = new Map();
-  const attemptedTdfIds = new Set<string>();
-  const tdfsWithMeaningfulProgress = new Set<string>();
-
-  if (cache?.tdfStats) {
-    for (const [TDFId, stats] of Object.entries(cache.tdfStats as Record<string, any>)) {
-      attemptedTdfIds.add(TDFId);
-      if ((stats?.totalTrials || 0) > 0) {
-        tdfsWithMeaningfulProgress.add(TDFId);
+  meteorCallAsync('getPracticeDashboardSnapshot')
+    .then((snapshot) => {
+      const practiceSnapshot = snapshot as PracticeDashboardSnapshot;
+      if (practiceSnapshot.userId !== studentID) {
+        throw new Error('[LearningDashboard] Practice dashboard snapshot was returned for a different user');
       }
-      if (stats.totalTrials > 0) {
-        const practicedCount = stats.itemsPracticedApplies === false
-          ? '-'
-          : stats.itemsPracticedCount ?? stats.itemsPracticed ?? stats.uniqueItemIds?.length ?? 0;
-        const totalSessions = stats.totalSessions ?? stats.sessionDates?.length ?? 0;
-        const lastPracticeTimestamp = Number(stats.lastPracticeTimestamp) || (stats.lastPracticeDate
-          ? new Date(stats.lastPracticeDate).getTime()
-          : 0);
-        statsMap.set(TDFId, {
-          totalTrials: stats.totalTrials,
-          overallAccuracy: stats.overallAccuracy,
-          accuracyApplies: stats.accuracyApplies !== false && stats.overallAccuracy !== null && stats.overallAccuracy !== undefined,
-          totalTimeMinutes: stats.totalTimeMinutes,
-          itemsPracticed: practicedCount,
-          itemsPracticedApplies: stats.itemsPracticedApplies !== false,
-          lastPracticeTimestamp: Number.isFinite(lastPracticeTimestamp) ? lastPracticeTimestamp : 0,
-          lastPracticeDate: stats.lastPracticeDate
-            ? new Date(stats.lastPracticeDate).toLocaleDateString()
-            : 'N/A',
-          totalSessions
-        });
-      }
-    }
-    clientConsole(2, '[Dashboard] Built statsMap with', statsMap.size, 'TDFs');
-  } else {
-    clientConsole(2, '[Dashboard] No tdfStats in cache');
-  }
-
-  // Fallback for cache-miss/stale-cache cases: pull progress signals from persisted experiment state.
-  if (shouldUseProgressSignalFallback(cache, tdfsWithMeaningfulProgress.size) && studentID) {
-    try {
-      const fallbackSignals = await meteorCallAsync('getLearnerProgressSignals', studentID) as {
-        attemptedTdfIds?: string[];
-        meaningfulProgressTdfIds?: string[];
-      };
-      applyFallbackProgressSignals(attemptedTdfIds, tdfsWithMeaningfulProgress, fallbackSignals);
-      clientConsole(2, '[Dashboard] Applied progress-signal fallback', {
-        attemptedCount: attemptedTdfIds.size,
-        meaningfulCount: tdfsWithMeaningfulProgress.size,
+      saveLocalPracticeDashboardSnapshot(practiceSnapshot);
+      applyPracticeDashboardSnapshot(instance, practiceSnapshot);
+      const backgroundSyncBytes = JSON.stringify(practiceSnapshot).length;
+      (window as any).__mofactsDashboardSyncBytes = backgroundSyncBytes;
+      (window as any).__mofactsDashboardSyncLessonCount = practiceSnapshot.lessons.length;
+      clientConsole(2, '[Dashboard] Applied authoritative practice snapshot', {
+        lessons: practiceSnapshot.lessons.length,
+        bytes: backgroundSyncBytes,
       });
-    } catch (err) {
-      clientConsole(1, '[Dashboard] Failed to load fallback progress signals', err);
-    }
-  }
-
-  // Check if user has personal API keys configured
-  const user = Meteor.user();
-  const userHasSpeechAPIKey = !!(user?.speechAPIKey && user.speechAPIKey.trim());
-  const userHasTTSAPIKey = !!(user?.textToSpeechAPIKey && user.textToSpeechAPIKey.trim());
-
-  const allTdfObjects = [];
-
-  // Build sets of condition-child filenames and IDs so they can be suppressed
-  // as standalone rows (they are only accessible via their owner's condition selector).
-  const conditionChildFileNames = new Set<string>();
-  const conditionChildIds = new Set<string>();
-  const tdfsById = new Map<string, any>();
-  const tdfsByFileName = new Map<string, any>();
-  for (const tdf of allTdfs) {
-    if (tdf?._id) {
-      tdfsById.set(String(tdf._id), tdf);
-    }
-    const resolvedFileName = resolveDashboardTdfFileName(tdf, tdf?.content);
-    if (resolvedFileName) {
-      tdfsByFileName.set(resolvedFileName, tdf);
-    }
-    const sp = tdf?.content?.tdfs?.tutor?.setspec;
-    const conditionFileNames: unknown[] = Array.isArray(sp?.condition) ? sp.condition : [];
-    const conditionTdfIds: unknown[] = Array.isArray(sp?.conditionTdfIds) ? sp.conditionTdfIds : [];
-    for (const fn of conditionFileNames) {
-      if (typeof fn === 'string' && fn.trim()) conditionChildFileNames.add(fn.trim());
-    }
-    for (const id of conditionTdfIds) {
-      if (typeof id === 'string' && id.trim()) conditionChildIds.add(id.trim());
-    }
-  }
-
-  // SINGLE PASS: Process TDFs and add stats in one iteration
-  // Optimized from 2-pass algorithm - O(n) instead of O(2n)
-  for (const tdf of allTdfs) {
-    const TDFId = tdf._id;
-    const tdfObject = tdf.content;
-    const isMultiTdf = tdfObject.isMultiTdf;
-    const currentStimuliSetId = tdf.stimuliSetId;
-
-    // Make sure we have a valid TDF (with a setspec)
-    const setspec = tdfObject.tdfs?.tutor?.setspec;
-    if (!setspec) {
-      continue;
-    }
-
-    // Skip condition children — they are accessible only via their parent root's selector
-    const fileName = resolveDashboardTdfFileName(tdf, tdfObject);
-
-    if (conditionChildIds.has(String(TDFId)) || conditionChildFileNames.has(String(fileName))) {
-      continue;
-    }
-
-    const name = setspec.lessonname;
-    const totalPracticeItems = countTotalPracticeItems(tdfObject, fileName || name || TDFId);
-    const itemsPracticedApplies = typeof totalPracticeItems === 'number' && totalPracticeItems > 0;
-    const hasConfigurableRuntime = tdfFamilyHasConfigurableRuntime(tdfObject, tdfsById, tdfsByFileName);
-    const hasLearnerConfigurableFields = tdfFamilyHasLearnerConfigurableFields(tdfObject, tdfsById, tdfsByFileName);
-    const ignoreOutOfGrammarResponses = setspec.speechIgnoreOutOfGrammarResponses ?
-      setspec.speechIgnoreOutOfGrammarResponses.toLowerCase() == 'true' : false;
-    const speechOutOfGrammarFeedback = setspec.speechOutOfGrammarFeedback ?
-      setspec.speechOutOfGrammarFeedback : 'Response not in answer set';
-
-    // Extract audio features from TDF setspec
-    const audioInputEnabled = setspec.audioInputEnabled ? setspec.audioInputEnabled == 'true' : false;
-    const enableAudioPromptAndFeedback = setspec.enableAudioPromptAndFeedback ?
-      setspec.enableAudioPromptAndFeedback == 'true' : false;
-
-    // Embedded TDF API key values are intentionally not published in dashboard listing rows.
-    const hasSpeechAPIKey = userHasSpeechAPIKey;
-    const hasTTSAPIKey = userHasTTSAPIKey;
-
-    // Determine ownership and build condition selector data for owner rows
-    const isOwner = tdf.ownerId === Meteor.userId();
-    let conditions: { fileName: string; tdfId: string | null; count: number }[] | null = null;
-    if (isOwner && Array.isArray(setspec.condition) && setspec.condition.length > 0) {
-      const condTdfIds: unknown[] = Array.isArray(setspec.conditionTdfIds) ? setspec.conditionTdfIds : [];
-      const condCounts: unknown[] = Array.isArray((tdf as any).conditionCounts) ? (tdf as any).conditionCounts : [];
-      conditions = (setspec.condition as string[]).map((fn: string, i: number) => ({
-        fileName: fn,
-        tdfId: typeof condTdfIds[i] === 'string' ? condTdfIds[i] as string : null,
-        count: typeof condCounts[i] === 'number' ? condCounts[i] as number : 0,
-      }));
-    }
-
-    // Check if this TDF has been attempted
-    const hasBeenAttempted = attemptedTdfIds.has(TDFId);
-
-    // Server publication is the source of truth for dashboard access.
-    const shouldShow = true;
-
-    const passesEntitlement = passesDashboardEntitlement({
-      isPublishedByServer: true,
+    })
+    .catch((error) => {
+      clientConsole(1, '[Dashboard] Failed to sync authoritative practice snapshot:', error);
+      if (instance.isLoading.get()) {
+        instance.isLoading.set(false);
+      }
     });
-
-    if (shouldShow && passesEntitlement) {
-      // Get stats for this TDF (O(1) lookup from pre-built map)
-      const stats = statsMap.get(TDFId);
-      const isUsed = !!stats;
-
-      // Build complete object with TDF properties and stats in single pass
-      const tdfData = {
-        TDFId: TDFId,
-        displayName: name,
-        fileName: fileName,
-        currentStimuliSetId: currentStimuliSetId,
-        ignoreOutOfGrammarResponses: ignoreOutOfGrammarResponses,
-        speechOutOfGrammarFeedback: speechOutOfGrammarFeedback,
-        audioInputEnabled: audioInputEnabled,
-        enableAudioPromptAndFeedback: enableAudioPromptAndFeedback,
-        hasSpeechAPIKey: hasSpeechAPIKey,
-        hasTTSAPIKey: hasTTSAPIKey,
-        hasConfigurableSettings: hasLearnerConfigurableFields || (currentUserHasRole('admin') && hasConfigurableRuntime),
-        isMultiTdf: isMultiTdf,
-        tags: setspec.tags || [],
-        isOwner: isOwner,
-        conditions: conditions,
-        isUsed: isUsed,
-        hasBeenAttempted: hasBeenAttempted,
-        // Add stats if available (inline instead of second pass)
-        totalTrials: stats?.totalTrials,
-        overallAccuracy: stats?.overallAccuracy,
-        accuracyApplies: stats?.accuracyApplies,
-        totalTimeMinutes: stats?.totalTimeMinutes,
-        itemsPracticed: stats?.itemsPracticed,
-        itemsPracticedApplies: stats?.itemsPracticedApplies ?? itemsPracticedApplies,
-        totalPracticeItems,
-        lastPracticeTimestamp: stats?.lastPracticeTimestamp,
-        lastPracticeDate: stats?.lastPracticeDate,
-        totalSessions: stats?.totalSessions
-      };
-
-      allTdfObjects.push(tdfData);
-    }
-  }
-
-  const { used: usedTdfs, unused: unusedTdfs } = splitTdfsByUsage(allTdfObjects);
-  const combinedTdfs = [...usedTdfs, ...unusedTdfs];
-
-  Session.set('homeHasPracticeRecords', usedTdfs.length > 0);
-  this.allTdfsList.set(combinedTdfs);
-  this.isLoading.set(false);
 
   // Ensure body styles from offcanvas are cleared before fade-in
   document.body.style.overflow = '';

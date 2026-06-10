@@ -1,6 +1,7 @@
 import type {
   ComputePracticeTimeMs,
   DashboardHistoryRecord,
+  PracticeDashboardSnapshotLesson,
   DashboardStatsByTdf,
   DashboardSummaryStats,
   DashboardTdfStats,
@@ -21,6 +22,9 @@ type DashboardCacheDeps = {
   Histories: any;
   GlobalExperimentStates?: any;
   Tdfs: any;
+  Assignments?: any;
+  Sections?: any;
+  SectionUserMap?: any;
   UserDashboardCache: any;
   usersCollection: any;
   serverConsole: (...args: any[]) => void;
@@ -34,6 +38,7 @@ type DashboardCacheDeps = {
 
 const DASHBOARD_LEVEL_UNIT_TYPES = ['model', 'schedule', 'autotutor'];
 const DASHBOARD_CACHE_VERSION = 4;
+const PRACTICE_DASHBOARD_SNAPSHOT_VERSION = 1;
 
 function roundOneDecimal(value: number): number {
   return Number(value.toFixed(1));
@@ -77,6 +82,18 @@ function shouldCountDashboardHistoryRecord(record: DashboardHistoryRecord): bool
     return false;
   }
   return true;
+}
+
+function normalizeOptionalString(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value);
+  }
+  return null;
 }
 
 function resolveDashboardModelStimulusKey(record: DashboardHistoryRecord): string | null {
@@ -271,12 +288,63 @@ export function computeUsageSummary(tdfStats: DashboardStatsByTdf | null | undef
   };
 }
 
+function resolveDashboardTdfFileName(tdf: any) {
+  return normalizeOptionalString(tdf?.content?.fileName)
+    || normalizeOptionalString(tdf?.tdfFileName)
+    || undefined;
+}
+
+function buildDashboardStatsProjection(stats: DashboardTdfStats | undefined, totalPracticeItems: number | null) {
+  if (!stats || Number(stats.totalTrials || 0) <= 0) {
+    return {
+      isUsed: false,
+      hasBeenAttempted: Boolean(stats),
+      progress: {
+        attempts: 0,
+        accuracy: null,
+        accuracyApplies: false,
+        totalTimeMinutes: 0,
+        itemsPracticed: null,
+        itemsPracticedApplies: false,
+        totalPracticeItems,
+        sessionDays: 0,
+        lastPracticed: null,
+        lastPracticedTimestamp: 0
+      }
+    };
+  }
+
+  const lastPracticeTimestamp = Number(stats.lastPracticeTimestamp) || timestampValue(stats.lastPracticeDate);
+  const itemsPracticedApplies = stats.itemsPracticedApplies !== false;
+  const itemsPracticed = itemsPracticedApplies ? Number(stats.itemsPracticedCount || 0) : null;
+  const accuracyApplies = stats.accuracyApplies !== false && stats.overallAccuracy !== null && stats.overallAccuracy !== undefined;
+  return {
+    isUsed: true,
+    hasBeenAttempted: true,
+    progress: {
+      attempts: stats.totalTrials,
+      accuracy: accuracyApplies ? stats.overallAccuracy : null,
+      accuracyApplies,
+      totalTimeMinutes: stats.totalTimeMinutes,
+      itemsPracticed,
+      itemsPracticedApplies,
+      totalPracticeItems,
+      sessionDays: stats.totalSessions,
+      lastPracticed: stats.lastPracticeDate,
+      lastPracticedTimestamp: Number.isFinite(lastPracticeTimestamp) ? lastPracticeTimestamp : 0
+    }
+  };
+}
+
 export function createDashboardCacheMethods({
   Meteor,
   Roles,
   Histories,
   GlobalExperimentStates,
   Tdfs,
+  Assignments,
+  Sections,
+  SectionUserMap,
   UserDashboardCache,
   usersCollection,
   serverConsole,
@@ -312,6 +380,175 @@ export function createDashboardCacheMethods({
     }
 
     return tdf;
+  }
+
+  async function resolveAssignedRootTdfIdsForUser(userId: string) {
+    if (!Assignments || !Sections || !SectionUserMap) {
+      throw new Error('Practice dashboard snapshot requires Assignments, Sections, and SectionUserMap dependencies');
+    }
+    const enrollmentRows = await SectionUserMap.find(
+      { userId },
+      { fields: { sectionId: 1 } }
+    ).fetchAsync();
+    const sectionIds = enrollmentRows
+      .map((row: any) => normalizeOptionalString(row?.sectionId))
+      .filter((id: string | null): id is string => !!id);
+    if (sectionIds.length === 0) return [];
+
+    const sections = await Sections.find(
+      { _id: { $in: sectionIds } },
+      { fields: { courseId: 1 } }
+    ).fetchAsync();
+    const courseIds = sections
+      .map((section: any) => normalizeOptionalString(section?.courseId))
+      .filter((id: string | null): id is string => !!id);
+    if (courseIds.length === 0) return [];
+
+    const assignmentRows = await Assignments.find(
+      { courseId: { $in: [...new Set(courseIds)] } },
+      { fields: { TDFId: 1 } }
+    ).fetchAsync();
+    return assignmentRows
+      .map((row: any) => normalizeOptionalString(row?.TDFId))
+      .filter((id: string | null): id is string => !!id);
+  }
+
+  async function getDashboardVisibleTdfs(userId: string) {
+    const [assignedRootIds, user] = await Promise.all([
+      resolveAssignedRootTdfIdsForUser(userId),
+      usersCollection.findOneAsync(
+        { _id: userId },
+        { fields: { accessedTDFs: 1, speechAPIKey: 1, textToSpeechAPIKey: 1 } }
+      )
+    ]);
+
+    const explicitDashboardIds = [
+      ...new Set([
+        ...assignedRootIds,
+        ...(Array.isArray(user?.accessedTDFs) ? user.accessedTDFs : [])
+          .map((id: unknown) => normalizeOptionalString(id))
+          .filter((id: string | null): id is string => !!id)
+      ])
+    ];
+    const visibilityTerms: any[] = [
+      { ownerId: userId },
+      { 'accessors.userId': userId },
+      { 'content.tdfs.tutor.setspec.userselect': 'true' },
+    ];
+    if (explicitDashboardIds.length > 0) {
+      visibilityTerms.push({ _id: { $in: explicitDashboardIds } });
+    }
+
+    const projection = {
+      _id: 1,
+      stimuliSetId: 1,
+      ownerId: 1,
+      accessors: 1,
+      conditionCounts: 1,
+      tdfFileName: 1,
+      'content.fileName': 1,
+      'content.isMultiTdf': 1,
+      'content.tdfs.tutor.setspec.lessonname': 1,
+      'content.tdfs.tutor.setspec.tags': 1,
+      'content.tdfs.tutor.setspec.condition': 1,
+      'content.tdfs.tutor.setspec.conditionTdfIds': 1,
+      'content.tdfs.tutor.setspec.audioInputEnabled': 1,
+      'content.tdfs.tutor.setspec.enableAudioPromptAndFeedback': 1
+    };
+
+    const accessibleRoots = await Tdfs.find(
+      { $or: visibilityTerms },
+      {
+        fields: {
+          _id: 1,
+          'content.fileName': 1,
+          'content.tdfs.tutor.setspec.condition': 1,
+          'content.tdfs.tutor.setspec.conditionTdfIds': 1
+        }
+      }
+    ).fetchAsync();
+
+    const conditionFileNames = new Set<string>();
+    const conditionTdfIds = new Set<string>();
+    for (const root of accessibleRoots) {
+      const setspec = root?.content?.tdfs?.tutor?.setspec || {};
+      const conditions = Array.isArray(setspec.condition) ? setspec.condition : [];
+      const resolvedIds = Array.isArray(setspec.conditionTdfIds) ? setspec.conditionTdfIds : [];
+      for (const condition of conditions) {
+        const normalized = normalizeOptionalString(condition);
+        if (normalized) conditionFileNames.add(normalized);
+      }
+      for (const conditionTdfId of resolvedIds) {
+        const normalized = normalizeOptionalString(conditionTdfId);
+        if (normalized) conditionTdfIds.add(normalized);
+      }
+    }
+
+    if (conditionFileNames.size > 0) {
+      visibilityTerms.push({ 'content.fileName': { $in: Array.from(conditionFileNames) } });
+    }
+    if (conditionTdfIds.size > 0) {
+      visibilityTerms.push({ _id: { $in: Array.from(conditionTdfIds) } });
+    }
+
+    const tdfs = await Tdfs.find({ $or: visibilityTerms }, { fields: projection }).fetchAsync();
+    return {
+      tdfs,
+      hasSpeechAPIKey: Boolean(user?.speechAPIKey && String(user.speechAPIKey).trim()),
+      hasTTSAPIKey: Boolean(user?.textToSpeechAPIKey && String(user.textToSpeechAPIKey).trim())
+    };
+  }
+
+  function buildPracticeDashboardLesson(
+    userId: string,
+    tdf: any,
+    stats: DashboardTdfStats | undefined,
+    learnerConfig: LearnerTdfConfig | null,
+    hasSpeechAPIKey: boolean,
+    hasTTSAPIKey: boolean
+  ): PracticeDashboardSnapshotLesson | null {
+    const TDFId = normalizeOptionalString(tdf?._id);
+    const tdfObject = tdf?.content;
+    const setspec = tdfObject?.tdfs?.tutor?.setspec;
+    if (!TDFId || !setspec) return null;
+
+    const fileName = resolveDashboardTdfFileName(tdf);
+    const displayName = normalizeOptionalString(setspec.lessonname) || fileName || TDFId;
+    const totalPracticeItems = null;
+    const statsProjection = buildDashboardStatsProjection(stats, totalPracticeItems);
+    const conditions = tdf.ownerId === userId && Array.isArray(setspec.condition) && setspec.condition.length > 0
+      ? (setspec.condition as string[]).map((conditionFileName: string, index: number) => ({
+          fileName: conditionFileName,
+          tdfId: Array.isArray(setspec.conditionTdfIds) && typeof setspec.conditionTdfIds[index] === 'string'
+            ? setspec.conditionTdfIds[index]
+            : null,
+          count: Array.isArray(tdf.conditionCounts) && typeof tdf.conditionCounts[index] === 'number'
+            ? tdf.conditionCounts[index]
+            : 0
+        }))
+      : null;
+
+    return {
+      TDFId,
+      displayName,
+      fileName: fileName || '',
+      tags: Array.isArray(setspec.tags) ? setspec.tags : [],
+      availability: 'available',
+      currentStimuliSetId: tdf.stimuliSetId ?? null,
+      learnerConfig,
+      completed: false,
+      locked: false,
+      hidden: false,
+      audioInputEnabled: String(setspec.audioInputEnabled || '').toLowerCase() === 'true',
+      enableAudioPromptAndFeedback: String(setspec.enableAudioPromptAndFeedback || '').toLowerCase() === 'true',
+      hasSpeechAPIKey,
+      hasTTSAPIKey,
+      hasConfigurableSettings: true,
+      isMultiTdf: Boolean(tdfObject.isMultiTdf),
+      isOwner: tdf.ownerId === userId,
+      conditions,
+      ...statsProjection
+    };
   }
 
   function hasConfigurablePatchValue(value: unknown): boolean {
@@ -501,6 +738,62 @@ export function createDashboardCacheMethods({
   }
 
   const methods = {
+    getPracticeDashboardSnapshot: async function(this: any) {
+      if (!this.userId) {
+        throw new Meteor.Error('not-authorized', 'Must be logged in');
+      }
+
+      const userId = this.userId;
+      const [{ tdfs, hasSpeechAPIKey, hasTTSAPIKey }, cache] = await Promise.all([
+        getDashboardVisibleTdfs(userId),
+        UserDashboardCache.findOneAsync({ userId })
+      ]);
+
+      const conditionChildFileNames = new Set<string>();
+      const conditionChildIds = new Set<string>();
+      for (const tdf of tdfs) {
+        const setspec = tdf?.content?.tdfs?.tutor?.setspec || {};
+        const conditions = Array.isArray(setspec.condition) ? setspec.condition : [];
+        const conditionTdfIds = Array.isArray(setspec.conditionTdfIds) ? setspec.conditionTdfIds : [];
+        for (const condition of conditions) {
+          const normalized = normalizeOptionalString(condition);
+          if (normalized) conditionChildFileNames.add(normalized);
+        }
+        for (const conditionTdfId of conditionTdfIds) {
+          const normalized = normalizeOptionalString(conditionTdfId);
+          if (normalized) conditionChildIds.add(normalized);
+        }
+      }
+
+      const lessons: PracticeDashboardSnapshotLesson[] = [];
+      for (const tdf of tdfs) {
+        const TDFId = normalizeOptionalString(tdf?._id);
+        const fileName = resolveDashboardTdfFileName(tdf);
+        if (!TDFId) continue;
+        if (conditionChildIds.has(TDFId) || (fileName && conditionChildFileNames.has(fileName))) {
+          continue;
+        }
+        const lesson = buildPracticeDashboardLesson(
+          userId,
+          tdf,
+          cache?.tdfStats?.[TDFId],
+          cache?.learnerTdfConfigs?.[TDFId] || null,
+          hasSpeechAPIKey,
+          hasTTSAPIKey
+        );
+        if (lesson && !lesson.hidden) {
+          lessons.push(lesson);
+        }
+      }
+
+      return {
+        version: PRACTICE_DASHBOARD_SNAPSHOT_VERSION,
+        userId,
+        generatedAt: Date.now(),
+        lessons
+      };
+    },
+
     saveLearnerTdfConfig: async function(this: any, tdfId: string, configPatch: LearnerTdfOverrides) {
       if (!this.userId) {
         throw new Meteor.Error('not-authorized', 'Must be logged in');

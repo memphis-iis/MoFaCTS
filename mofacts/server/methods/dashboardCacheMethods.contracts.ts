@@ -1,5 +1,6 @@
 // Owner: Dashboard Platform Team
 // Contracts for dashboard cache method payloads and computed aggregates.
+import type { LearnerTdfConfig } from '../../common/lib/learnerTdfConfig';
 
 export type DashboardOutcome = 'correct' | 'incorrect' | string;
 
@@ -91,4 +92,48 @@ export interface EnsureDashboardCacheCurrentResult {
   action: 'current' | 'refreshed';
   tdfCount: number;
   reason?: 'missing' | 'version' | 'history-newer';
+}
+
+export interface PracticeDashboardProgressStats {
+  attempts: number;
+  accuracy: number | null;
+  accuracyApplies: boolean;
+  totalTimeMinutes: number;
+  itemsPracticed: number | null;
+  itemsPracticedApplies: boolean;
+  totalPracticeItems: number | null;
+  sessionDays: number;
+  lastPracticed: Date | number | string | null;
+  lastPracticedTimestamp: number;
+}
+
+export interface PracticeDashboardSnapshotLesson {
+  TDFId: string;
+  displayName: string;
+  fileName?: string;
+  tags: string[];
+  availability: 'available';
+  currentStimuliSetId: string | number | null;
+  learnerConfig: LearnerTdfConfig | null;
+  progress: PracticeDashboardProgressStats;
+  completed: boolean;
+  locked: boolean;
+  hidden: boolean;
+  isUsed: boolean;
+  hasBeenAttempted: boolean;
+  audioInputEnabled: boolean;
+  enableAudioPromptAndFeedback: boolean;
+  hasSpeechAPIKey: boolean;
+  hasTTSAPIKey: boolean;
+  hasConfigurableSettings: boolean;
+  isMultiTdf: boolean;
+  isOwner: boolean;
+  conditions: Array<{ fileName: string; tdfId: string | null; count: number }> | null;
+}
+
+export interface PracticeDashboardSnapshot {
+  version: 1;
+  userId: string;
+  generatedAt: number;
+  lessons: PracticeDashboardSnapshotLesson[];
 }
