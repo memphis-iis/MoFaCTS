@@ -176,8 +176,12 @@ order.
 (`balloons.brd` and `cookies.brd`) and carries explicit BRD-derived reference
 traces plus matching SPARC trace fixtures generated from authored SPARC display
 metadata and submitted values for those production-rule/action sequences. Those
-fixtures prove the trace-comparison oracle and trace-generation boundary; full
-authored SPARC document content for the same problems remains separate work.
+fixtures prove the trace-comparison oracle and trace-generation boundary.
+`assertAllSparcSampleTracesMatchCtatBrds` is the batch verification entry point:
+the caller supplies CTAT-root-relative BRD XML by path, SPARC extracts each BRD
+trace, selects the authored sample subtrace, and compares every selected sample
+fixture. Full authored SPARC document content for the same problems remains
+separate work.
 `sparcSampleDocuments.ts` adds the next layer: small authored SPARC document
 fixtures for the same samples, with stable widget nodes, separate regions, and
 cross-region references into nested content. These are trace/document skeletons,

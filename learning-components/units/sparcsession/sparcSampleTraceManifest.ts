@@ -3,7 +3,11 @@ import type {
   SparcReferenceTraceStep,
   SparcTraceStep,
 } from './sparcSessionContracts';
-import { selectCtatReferenceSubtrace } from './ctatBrdTraceExtractor';
+import {
+  extractCtatBrdReferenceTrace,
+  selectCtatReferenceSubtrace,
+  type CtatBrdXmlParser,
+} from './ctatBrdTraceExtractor';
 import {
   createSparcReferenceTraceForSample,
   createSparcTraceForSampleDocument,
@@ -98,4 +102,35 @@ export function assertSparcSampleTraceMatchesCtatBrdTrace(params: {
       `SPARC sample trace fixture "${params.fixture.id}" does not match selected CTAT BRD trace: ${JSON.stringify(result.mismatches)}`,
     );
   }
+}
+
+export type SparcSampleTraceBrdReadResult = {
+  readonly fixtureId: string;
+  readonly ctatRootRelativeBrdPath: string;
+  readonly ctatTraceLength: number;
+  readonly selectedTraceLength: number;
+};
+
+export function assertAllSparcSampleTracesMatchCtatBrds(params: {
+  readonly readCtatBrdXml: (ctatRootRelativeBrdPath: string) => string;
+  readonly fixtures?: readonly SparcSampleTraceFixture[];
+  readonly parser?: CtatBrdXmlParser;
+}): readonly SparcSampleTraceBrdReadResult[] {
+  const results: SparcSampleTraceBrdReadResult[] = [];
+  for (const fixture of params.fixtures ?? SPARC_SAMPLE_TRACE_FIXTURES) {
+    assertSparcSampleTraceFixtureReady(fixture);
+    const brdXml = params.readCtatBrdXml(fixture.ctatRootRelativeBrdPath);
+    const ctatTrace = extractCtatBrdReferenceTrace(brdXml, params.parser);
+    assertSparcSampleTraceMatchesCtatBrdTrace({
+      fixture,
+      ctatTrace,
+    });
+    results.push({
+      fixtureId: fixture.id,
+      ctatRootRelativeBrdPath: fixture.ctatRootRelativeBrdPath,
+      ctatTraceLength: ctatTrace.length,
+      selectedTraceLength: fixture.referenceTrace.length,
+    });
+  }
+  return results;
 }

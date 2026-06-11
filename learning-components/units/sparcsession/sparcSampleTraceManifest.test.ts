@@ -1,11 +1,35 @@
 import assert from 'node:assert/strict';
 import {
+  assertAllSparcSampleTracesMatchCtatBrds,
   assertSparcSampleTraceMatchesCtatBrdTrace,
   assertSparcSampleTraceFixtureReady,
   compareSparcSampleTraceFixture,
   SPARC_SAMPLE_TRACE_FIXTURES,
 } from './sparcSampleTraceManifest';
 import type { SparcSampleTraceFixture } from './sparcSampleTraceManifest';
+import type { SparcReferenceTraceStep } from './sparcSessionContracts';
+
+function brdXmlForTrace(trace: readonly SparcReferenceTraceStep[]): string {
+  const edges = trace.map((step) => {
+    const [selection, action, input] = step.actionId.split('::');
+    return `
+      <edge>
+        <actionLabel>
+          <message>
+            <properties>
+              <Selection><value>${selection ?? ''}</value></Selection>
+              <Action><value>${action ?? ''}</value></Action>
+              <Input><value>${input ?? ''}</value></Input>
+            </properties>
+          </message>
+          <actionType>${step.outcome === 'incorrect' ? 'Buggy Action' : 'Correct Action'}</actionType>
+        </actionLabel>
+        <rule><text>${step.productionRuleId}</text></rule>
+      </edge>
+    `;
+  }).join('');
+  return `<stateGraph>${edges}</stateGraph>`;
+}
 
 describe('sparcSampleTraceManifest', function() {
   it('tracks the first two CTAT BRD sample trace fixtures', function() {
@@ -174,5 +198,36 @@ describe('sparcSampleTraceManifest', function() {
         outcome: 'correct',
       }],
     }));
+  });
+
+  it('checks all selected sample fixtures against CTAT BRD XML read by path', function() {
+    const brdXmlByPath = new Map(
+      SPARC_SAMPLE_TRACE_FIXTURES.map((fixture) => [
+        fixture.ctatRootRelativeBrdPath,
+        brdXmlForTrace(fixture.referenceTrace ?? []),
+      ]),
+    );
+
+    const results = assertAllSparcSampleTracesMatchCtatBrds({
+      readCtatBrdXml(path) {
+        const brdXml = brdXmlByPath.get(path);
+        if (!brdXml) {
+          throw new Error(`missing BRD XML for ${path}`);
+        }
+        return brdXml;
+      },
+    });
+
+    assert.deepEqual(results, [{
+      fixtureId: 'html-factors-balloons',
+      ctatRootRelativeBrdPath: 'docs/HTML Factors/FinalBRDs/balloons.brd',
+      ctatTraceLength: 12,
+      selectedTraceLength: 12,
+    }, {
+      fixtureId: 'html-factors-cookies',
+      ctatRootRelativeBrdPath: 'docs/HTML Factors/FinalBRDs/cookies.brd',
+      ctatTraceLength: 12,
+      selectedTraceLength: 12,
+    }]);
   });
 });
