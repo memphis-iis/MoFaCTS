@@ -31,19 +31,38 @@ The application source tree lives under `mofacts/`.
 
 ## Operational Rules
 
+### Change Discipline
+
 - Silent fallbacks are not allowed; fail clearly when invariants break.
 - Do not make "patch" fixes that leave broken or rickety wiring in place and merely make the immediate symptom appear to work. When a subsystem boundary or flow is wrong, analyze the whole flow, name the invariants, and rebuild the subsystem or integration point so it is coherent and durable.
 - When a plan and its invariants make sense, work toward it incrementally using hill climbing: make the smallest coherent move, verify whether it improved the system, and continue. Stop and re-analyze only when the plan or invariants no longer make sense.
 - Do not fix a new behavior by changing unrelated working behavior. Existing working paths, especially explicitly identified reference paths, must be treated as regression-sensitive and preserved unless the user explicitly asks to redesign them.
+
+### Git And Branch Hygiene
+
 - Stay on the current branch for local commits and pushes unless the user explicitly asks to create or switch branches.
 - Do not create `codex/*` or other work branches automatically.
 - This repository normally expects agent commits to be made on `main` when the checkout is on `main`.
 - Do not add compatibility fallback paths unless explicitly requested.
+
+### Generated Files And Public Repo Hygiene
+
+- Do not commit root `outputs/`, root `tmp/`, one-off inventory JSON, working-copy notes, generated slide decks, screenshots, local analysis dumps, or other ad hoc artifacts.
+- Curated examples must live under an intentional public path such as `examples/`, `docs/`, or a documented asset folder, with enough provenance for license and source review.
+- If an artifact is only useful locally, keep it ignored rather than tracked. Update `.gitignore` when a repeatable tool produces new local output.
+- If public setup, local run, admin bootstrap, test, deployment, TDF schema, or unit-extension behavior changes, update the concise public docs in the same change. Do not leave private/local knowledge as the only working path.
+- Do not point contributors at scaffold packages as implementation entry points when an active source root exists. For unit behavior, point to `learning-components/` unless the scaffold package has become the real contract.
 - Do not generate, edit, or keep side-by-side emitted `.js` files next to `.ts` source files in `mofacts/client/`, `mofacts/server/`, or `mofacts/common/`.
 - Treat untracked `.js` twins beside `.ts` files in `mofacts/` as build spill unless proven otherwise.
+
+### Logging And UI Hygiene
+
 - Never add raw client `console.*` for routine logging; use `mofacts/client/lib/clientLogger.ts`.
 - Preserve admin-controlled client verbosity behavior.
 - Use inline UI patterns instead of modal popups unless explicitly requested.
+
+### Runtime And Deployment Hygiene
+
 - Never run `meteor run` in automation except through the native hotfix dev loop documented below.
 - Do not use local Meteor CLI workflows as release-confidence substitutes for the supported Docker Compose workflow.
 - Do not run Docker build, push, or deploy commands unless explicitly requested.
@@ -132,3 +151,11 @@ The server should stay minimized; the client should do as much processor work as
 - Avoid server-side reshaping that the client can do from data it already has.
 - Rate-limit public and unauthenticated methods.
 - Extract large helpers out of `methods.ts` into `server/lib/` or `common/`.
+
+## Scalability-Sensitive Surfaces
+
+- Do not publish broad full TDF documents reactively. Keep listing publications field-limited and reserve full TDF content for exact-ID runtime, launch, or edit publications.
+- Avoid full collection scans, unbounded `find({})` publications, and full-document payloads on dashboard, admin, or learner startup paths.
+- Cache rebuilds, admin refreshes, and migration-style jobs must use supporting indexes, bounded concurrency, and progress logging when they can touch many users or history rows.
+- Prefer child-to-root or explicit reference indexes over scanning every TDF/root document to reconstruct lesson families.
+- When a broad or expensive path is intentionally retained for compatibility, document the invariant, limit the returned fields, and verify the relevant index or bound in the same change.

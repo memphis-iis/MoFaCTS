@@ -11,8 +11,8 @@ This folder contains executable deployment examples and scripts for MoFaCTS. Hum
 - `.env.self-hosted.example`: shareable self-hosted environment template. Copy it to ignored `.env.self-hosted`.
 - `settings.self-hosted.example.json`: shareable self-hosted settings template. Copy it to ignored private settings before use.
 - `.env.local.example`: shareable local environment template. Copy it to ignored `.env.local` for machine-specific values.
-- `settings.local.example.json`: shareable local settings template.
-- Private settings files under `deploy/` are mounted into the container at runtime; they are not copied into the image.
+- `settings.local.example.json`: shareable local settings template for `C:\Users\ppavl\OneDrive\Desktop\settings.local.json`.
+- Private settings files under `deploy/` are mounted into the container at runtime; the native hotfix dev loop reads `C:\Users\ppavl\OneDrive\Desktop\settings.local.json`.
 - `docker/`: scripts copied into the app image.
 - `hotfix-dev.ps1`: native Windows Meteor hotfix dev server launcher.
 - `hotfix/`: scripts used by the local-only bundle runner.
@@ -50,6 +50,14 @@ For local Docker Compose validation, start from the tracked template:
 ```bash
 cp .env.local.example .env.local
 ```
+
+For the native Windows hotfix dev loop, create or update:
+
+```text
+C:\Users\ppavl\OneDrive\Desktop\settings.local.json
+```
+
+Start from `settings.local.example.json`, then replace placeholders. The launcher fails clearly if that Desktop settings file is missing.
 
 The LAN HTTPS helper also requires an explicit Caddy executable path:
 
@@ -119,7 +127,7 @@ The dev app is exposed at:
 http://localhost:3200
 ```
 
-The launcher also ensures a local admin account for the owner configured in `settings.local.json`. On a new local database, the default hotfix-dev login is `admin@localhost.test` with password `local-admin-2026`. Credentials are written to ignored local state and preserved there:
+The launcher also ensures a local admin account for the owner configured in `C:\Users\ppavl\OneDrive\Desktop\settings.local.json`. On a new local database, the default hotfix-dev login is `admin@localhost.test` with password `local-admin-2026`. Credentials are written to ignored local state and preserved there:
 
 ```powershell
 Get-Content .\local-dev\agent-secrets.env

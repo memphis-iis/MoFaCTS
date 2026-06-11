@@ -27,6 +27,16 @@ The active learner card experience uses Svelte components and state-machine-orie
 
 Reusable unit behavior lives under `learning-components/`. The next modularity pass should harden component registration, explicit runtime capabilities, and unit/trial boundaries so new component families such as AutoTutor or H5P can be added without editing central app switchboards. See `../docs-developer/modularity-extension-boundary-plan.md`.
 
+For current contributor work, treat `learning-components/` as the source root for unit behavior:
+
+- Unit packages live under `learning-components/units/`.
+- Unit manifests live in `learning-components/units/*/manifest.ts`.
+- The default in-repo component catalog is `learning-components/defaultLearningComponentCatalog.ts`.
+- The app-facing unit creation facade is `learning-components/units/createUnitEngine.ts`.
+- The legacy app path `mofacts/client/views/experiment/unitEngine.ts` should stay a behavior-preserving dependency facade.
+
+The public package at `packages/unit-engine-api` is not the implementation entry point yet; it is a scaffold for a future stable contract. See [development.md](development.md#modify-or-add-a-unit-type) and [learning-component-contracts.md](learning-component-contracts.md) before adding or changing a unit type.
+
 ## Server Runtime
 
 Server code handles persistence, authentication and authorization checks, content upload, external integrations, import/export workflows, and data access that cannot safely run on the client.

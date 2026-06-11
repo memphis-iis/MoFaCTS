@@ -17,7 +17,7 @@ $stdoutPath = Join-Path $localDevDir "meteor.stdout.log"
 $stderrPath = Join-Path $localDevDir "meteor.stderr.log"
 $watcherStdoutPath = Join-Path $localDevDir "commonjs-watcher.stdout.log"
 $watcherStderrPath = Join-Path $localDevDir "commonjs-watcher.stderr.log"
-$settingsPath = Join-Path $deployDir "settings.local.json"
+$settingsPath = "C:\Users\ppavl\OneDrive\Desktop\settings.local.json"
 $localDataHome = Join-Path $deployDir "local-data"
 $commonJsWatcherScript = Join-Path $deployDir "hotfix-dev\ensure-commonjs-build.ps1"
 $localAdminScript = Join-Path $deployDir "hotfix-dev\ensure-local-admin.cjs"
@@ -374,7 +374,7 @@ function Assert-RequiredFiles {
     }
 
     if (-not (Test-Path $settingsPath)) {
-        throw "Missing settings.local.json in $deployDir"
+        throw "Missing settings.local.json at $settingsPath"
     }
 
     if (-not (Test-Path $localDataHome)) {
