@@ -185,6 +185,75 @@ describe('sparcStateReplay', function() {
     );
   });
 
+  it('rejects SPARC history when extension and source documents disagree', function() {
+    const transition: SparcStateTransition = {
+      transitionId: 'transition-1',
+      event: {
+        eventId: 'event-1',
+        type: 'value-changed',
+        source: {
+          documentId: 'doc-1',
+          nodeId: 'region-1',
+        },
+        time: 2000,
+      },
+      writes: [{
+        target: {
+          documentId: 'doc-1',
+          nodeId: 'region-1',
+        },
+        key: 'visible',
+        value: true,
+      }],
+    };
+
+    assert.throws(
+      () => replaySparcHistory([
+        makeBaseSparcRecord({
+          documentId: 'doc-2',
+          sourceAddress: transition.event.source,
+          stateTransition: transition,
+        }),
+      ]),
+      /sparc\.sourceAddress\.documentId "doc-1" does not match SPARC history document "doc-2"/,
+    );
+  });
+
+  it('rejects SPARC state-transition writes that target another document', function() {
+    assert.throws(
+      () => replaySparcHistory([
+        makeBaseSparcRecord({
+          documentId: 'doc-1',
+          sourceAddress: {
+            documentId: 'doc-1',
+            nodeId: 'region-1',
+          },
+          stateTransition: {
+            transitionId: 'transition-1',
+            event: {
+              eventId: 'event-1',
+              type: 'value-changed',
+              source: {
+                documentId: 'doc-1',
+                nodeId: 'region-1',
+              },
+              time: 2000,
+            },
+            writes: [{
+              target: {
+                documentId: 'doc-2',
+                nodeId: 'region-1',
+              },
+              key: 'visible',
+              value: true,
+            }],
+          },
+        }),
+      ]),
+      /sparc\.stateTransition\.writes\[0\]\.target\.documentId "doc-2" does not match SPARC history document "doc-1"/,
+    );
+  });
+
   it('rejects malformed replay writes instead of inferring state', function() {
     assert.throws(
       () => replaySparcHistory([

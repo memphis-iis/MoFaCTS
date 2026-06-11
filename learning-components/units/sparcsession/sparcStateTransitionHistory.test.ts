@@ -64,4 +64,29 @@ describe('sparcStateTransitionHistory', function() {
       /SPARC state-transition history requires userId or anonStudentId/,
     );
   });
+
+  it('refuses to create history for transitions that write into another document', function() {
+    assert.throws(
+      () => createSparcStateTransitionHistoryRecord({
+        core: {
+          TDFId: 'tdf-1',
+          sessionID: 'session-1',
+          levelUnit: 2,
+          userId: 'user-1',
+        },
+        transition: {
+          ...transition,
+          writes: [{
+            target: {
+              documentId: 'doc-2',
+              nodeId: 'region-7',
+            },
+            key: 'visible',
+            value: true,
+          }],
+        },
+      }),
+      /write\[0\] target documentId "doc-2" does not match source document "doc-1"/,
+    );
+  });
 });
