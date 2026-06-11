@@ -12,6 +12,7 @@ export const sparcSessionUnitComponentManifest: LearningComponentManifest<Create
     'session',
     'delivery-settings',
     'stimuli',
+    'card-state',
     'adaptive-model',
     'history',
     'server-methods',

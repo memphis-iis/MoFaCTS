@@ -14,6 +14,7 @@ describe('sparcSessionUnitComponentManifest', function() {
     assert.deepEqual(summary.requiredCapabilities, [
       'adaptive-model',
       'authz',
+      'card-state',
       'delivery-settings',
       'history',
       'logging',

@@ -5,6 +5,25 @@ import {
 } from './LearningComponentContext';
 
 describe('LearningComponentContext capabilities', function() {
+  it('requires card-state runtimes to expose question index updates', function() {
+    assert.throws(
+      () => getLearningComponentCapabilitySet({
+        cardState: {} as never,
+      }),
+      /Runtime capability "cardState" is missing required functions: setQuestionIndex/,
+    );
+  });
+
+  it('declares card-state capability when the unit state runtime shape is present', function() {
+    const context = createLearningComponentRuntimeContext({
+      cardState: {
+        setQuestionIndex() {},
+      },
+    });
+
+    assert.equal(context.capabilities.has('card-state'), true);
+  });
+
   it('requires adaptive-model runtimes to expose model-practice update application', function() {
     assert.throws(
       () => getLearningComponentCapabilitySet({

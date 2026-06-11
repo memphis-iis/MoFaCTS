@@ -13,6 +13,7 @@ export const assessmentSessionUnitComponentManifest: LearningComponentManifest<C
     'session',
     'assessment-state',
     'stimuli',
+    'card-state',
     'logging',
     'ui-alerts',
   ],

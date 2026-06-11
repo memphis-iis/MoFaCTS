@@ -95,6 +95,7 @@ export interface LearningComponentCapabilities {
   session?: SessionRuntime;
   deliverySettings?: DeliverySettingsRuntime;
   stimuli?: unknown;
+  cardState?: unknown;
   adaptiveModel?: ModelPracticeRuntime;
   assessmentState?: unknown;
   media?: MediaRuntime;
@@ -113,6 +114,7 @@ const runtimeCapabilityEntries: readonly [
   ['session', 'session'],
   ['deliverySettings', 'delivery-settings'],
   ['stimuli', 'stimuli'],
+  ['cardState', 'card-state'],
   ['adaptiveModel', 'adaptive-model'],
   ['assessmentState', 'assessment-state'],
   ['media', 'media'],
@@ -130,6 +132,7 @@ const runtimeCapabilityFunctionRequirements: Partial<Record<
 >> = {
   session: ['getSessionValue', 'setSessionValue'],
   deliverySettings: ['getDeliverySettings'],
+  cardState: ['setQuestionIndex'],
   adaptiveModel: ['applyModelPracticeUpdate', 'queryModelPracticeState'],
   media: ['resolveMediaUrl'],
   history: ['normalizeResult', 'writeResult', 'writeCanonicalHistory'],

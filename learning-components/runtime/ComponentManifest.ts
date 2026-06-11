@@ -10,6 +10,7 @@ export const learningComponentCapabilities = [
   'session',
   'delivery-settings',
   'stimuli',
+  'card-state',
   'adaptive-model',
   'assessment-state',
   'media',

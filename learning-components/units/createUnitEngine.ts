@@ -170,6 +170,9 @@ export function getCreateUnitEngineCapabilitySet(
   if (hasRuntimeFunctions(deps.stimuli, 'getStimCount', 'getStimCluster', 'getStimKCBaseForCurrentStimuliSet')) {
     capabilities.add('stimuli');
   }
+  if (hasRuntimeFunctions(deps.cardState, 'setQuestionIndex')) {
+    capabilities.add('card-state');
+  }
   if (hasRuntimeFunctions(deps.adaptiveModel, 'createAdaptiveQuestionLogic')) {
     capabilities.add('adaptive-model');
   }

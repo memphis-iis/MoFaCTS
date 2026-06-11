@@ -13,6 +13,7 @@ export const learningSessionUnitComponentManifest: LearningComponentManifest<Cre
     'session',
     'delivery-settings',
     'stimuli',
+    'card-state',
     'adaptive-model',
     'history',
     'server-methods',
