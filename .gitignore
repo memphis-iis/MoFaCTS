@@ -17,6 +17,8 @@ build/*.tar.gz
 mofacts/settings.json
 .tags*
 docker-out/
+outputs/
+tmp/
 \#*\#
 *~
 mofacts/private/certs/*
@@ -39,6 +41,11 @@ installer/src/obj/Debug/net6.0/*
 db/mongodump.tar.gz
 **settings.json
 .claude/settings.local.json
+
+# Local/generated analysis artifacts
+spacing-inventory.json
+padding-inventory*.json
+autotutor-concern-matrix-working-copy.md
 
 # Shareable local Docker/dev config
 !deploy/.env.local.example
