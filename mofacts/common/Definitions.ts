@@ -156,5 +156,6 @@ export const HISTORY_KEY_MAP: Record<string, string> = {
   '75': 'stimulusKC',
   '76': 'clusterKC',
   '77': 'responseKC',
-  '78': 'responseKey'
+  '78': 'responseKey',
+  '79': 'sparc'
 };

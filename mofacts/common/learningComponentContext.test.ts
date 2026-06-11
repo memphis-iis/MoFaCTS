@@ -19,7 +19,16 @@ describe('Learning component runtime capabilities', function() {
         getDeliverySettings: () => ({}),
       },
       stimuli: {},
-      adaptiveModel: {},
+      adaptiveModel: {
+        applyModelPracticeUpdate() {
+          return {
+            record: {},
+          };
+        },
+        queryModelPracticeState() {
+          return undefined;
+        },
+      },
       assessmentState: {},
       media: {
         resolveMediaUrl: () => null,
@@ -109,6 +118,10 @@ describe('Learning component runtime capabilities', function() {
     expect(() => getLearningComponentCapabilitySet({
       aiProvider: {} as any,
     })).to.throw('Runtime capability "aiProvider" is missing required functions: callOpenRouterJson');
+
+    expect(() => getLearningComponentCapabilitySet({
+      adaptiveModel: {} as any,
+    })).to.throw('Runtime capability "adaptiveModel" is missing required functions: applyModelPracticeUpdate, queryModelPracticeState');
   });
 
   it('projects named server methods into the manifest runtime context', function() {

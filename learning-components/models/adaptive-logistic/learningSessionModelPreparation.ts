@@ -6,8 +6,10 @@ import {
 } from '../../content/tdf/clusterListParser';
 import { calculateCardProbabilities as runCalculateCardProbabilities } from './probabilityCalculation';
 
+import type { UnitEngineSessionReadKey } from '../../units/UnitEngineSessionKeys';
+
 export interface LearningSessionModelPreparationDeps {
-  readonly getSessionValue: (key: string) => any;
+  readonly getSessionValue: (key: UnitEngineSessionReadKey) => any;
   readonly getDeliverySettings: () => Record<string, any>;
   readonly getDisplayAnswerText: (answer: any) => string;
   readonly findTdfById: (tdfId: any) => any;

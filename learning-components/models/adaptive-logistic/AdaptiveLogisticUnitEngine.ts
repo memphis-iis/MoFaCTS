@@ -19,6 +19,7 @@ import {
   updateCardAndStimExposure,
 } from './learningSessionCardState';
 import { applyLearningSessionAnswer } from './learningSessionAnswerCoordinator';
+import type { UnitEngineSessionReadKey, UnitEngineSessionWriteKey } from '../../units/UnitEngineSessionKeys';
 import {
   calculateLearningSessionCardProbabilities,
   setUpLearningSessionClusterList,
@@ -40,6 +41,16 @@ import {
   peekLockedNextCard as runPeekLockedNextCard,
   prefetchNextCard as runPrefetchNextCard,
 } from './prefetchAndLocking';
+import {
+  applyModelPracticeUpdateToAdaptiveLogistic,
+  queryAdaptiveLogisticModelPracticeState,
+} from './modelPracticeUpdateApplication';
+import { createModelPracticeRuntime } from '../../runtime/modelPracticeRuntime';
+import {
+  createCanonicalModelPracticeHistoryRecord,
+  type ModelPracticeHistoryCore,
+  type ModelPracticeUpdateRequest,
+} from '../../runtime/modelPracticeUpdates';
 
 type StimClusterLike = {
   stims: Array<{
@@ -78,8 +89,8 @@ export interface AdaptiveLogisticUnitEngineConfig {
 }
 
 export interface CreateAdaptiveLogisticUnitEngineDeps {
-  readonly getSessionValue: (key: string) => any;
-  readonly setSessionValue: (key: string, value: any) => void;
+  readonly getSessionValue: (key: UnitEngineSessionReadKey) => any;
+  readonly setSessionValue: (key: UnitEngineSessionWriteKey, value: any) => void;
   readonly getDeliverySettings: () => Record<string, any>;
   readonly getStimCount: () => number;
   readonly getStimCluster: (clusterIndex: any) => StimClusterLike;
@@ -246,6 +257,32 @@ export async function createAdaptiveLogisticUnitEngine(
     },
     getCardProbabilitiesNoCalc: function() {
       return cardProbabilities;
+    },
+
+    applyModelPracticeUpdate: async function(
+      core: ModelPracticeHistoryCore,
+      request: ModelPracticeUpdateRequest,
+      extensionFields?: Record<string, unknown>,
+    ) {
+      const runtime = createModelPracticeRuntime({
+        applyUpdate: (currentRequest) => applyModelPracticeUpdateToAdaptiveLogistic({
+          cardProbabilities,
+          request: currentRequest,
+        }),
+        queryState: (query) => queryAdaptiveLogisticModelPracticeState({
+          cardProbabilities,
+          query,
+        }),
+        createHistoryRecord: createCanonicalModelPracticeHistoryRecord,
+      });
+      return await runtime.applyModelPracticeUpdate(core, request, extensionFields);
+    },
+
+    queryModelPracticeState: function(query: any) {
+      return queryAdaptiveLogisticModelPracticeState({
+        cardProbabilities,
+        query,
+      });
     },
 
     findCurrentCardInfo: function() {

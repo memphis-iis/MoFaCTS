@@ -1,0 +1,224 @@
+import assert from 'node:assert/strict';
+import { withCanonicalHistorySchemaVersion } from '../../runtime/historyEnvelope';
+import { createSparcPracticeHistoryBridge } from './sparcPracticeHistoryBridge';
+import {
+  createEmptySparcReplayState,
+  createSparcStateCellKey,
+  replaySparcHistory,
+} from './sparcStateReplay';
+import type {
+  SparcCanonicalHistoryRecord,
+  SparcPracticeObservation,
+  SparcStateTransition,
+  SparcTraceStep,
+} from './sparcSessionContracts';
+
+function makeBaseSparcRecord(
+  sparc: SparcCanonicalHistoryRecord['sparc'],
+): SparcCanonicalHistoryRecord {
+  return withCanonicalHistorySchemaVersion({
+    TDFId: 'tdf-1',
+    sessionID: 'session-1',
+    userId: 'user-1',
+    levelUnit: 1,
+    levelUnitName: 'SPARC Unit',
+    levelUnitType: 'sparc',
+    time: 2000,
+    problemStartTime: 1000,
+    selection: 'doc-1:region-1',
+    action: 'sparc-state-transition',
+    outcome: 'unknown',
+    typeOfResponse: 'sparc',
+    responseValue: '',
+    input: '',
+    displayedStimulus: '',
+    eventType: 'sparc',
+    sparc,
+  }) as SparcCanonicalHistoryRecord;
+}
+
+describe('sparcStateReplay', function() {
+  it('recreates document state from ordered SPARC state-transition history', function() {
+    const firstTransition: SparcStateTransition = {
+      transitionId: 'transition-1',
+      event: {
+        eventId: 'event-1',
+        type: 'value-changed',
+        source: {
+          documentId: 'doc-1',
+          nodeId: 'region-1',
+        },
+        time: 2000,
+      },
+      writes: [
+        {
+          target: {
+            documentId: 'doc-1',
+            nodeId: 'region-7',
+            path: ['widget-3', 'input'],
+          },
+          key: 'value',
+          value: 'draft answer',
+        },
+      ],
+    };
+    const secondTransition: SparcStateTransition = {
+      transitionId: 'transition-2',
+      event: {
+        eventId: 'event-2',
+        type: 'outcome-recorded',
+        source: {
+          documentId: 'doc-1',
+          nodeId: 'region-7',
+          path: ['widget-3'],
+        },
+        time: 2500,
+      },
+      writes: [
+        {
+          target: {
+            documentId: 'doc-1',
+            nodeId: 'region-7',
+            path: ['widget-3', 'input'],
+          },
+          key: 'value',
+          value: 'final answer',
+        },
+        {
+          target: {
+            documentId: 'doc-1',
+            nodeId: 'region-7',
+            path: ['widget-3', 'feedback'],
+          },
+          key: 'visible',
+          value: true,
+        },
+      ],
+    };
+
+    const state = replaySparcHistory([
+      makeBaseSparcRecord({
+        documentId: 'doc-1',
+        sourceAddress: firstTransition.event.source,
+        stateTransition: firstTransition,
+      }),
+      makeBaseSparcRecord({
+        documentId: 'doc-1',
+        sourceAddress: secondTransition.event.source,
+        stateTransition: secondTransition,
+      }),
+    ]);
+    const valueCellKey = createSparcStateCellKey(
+      {
+        documentId: 'doc-1',
+        nodeId: 'region-7',
+        path: ['widget-3', 'input'],
+      },
+      'value',
+    );
+    const feedbackCellKey = createSparcStateCellKey(
+      {
+        documentId: 'doc-1',
+        nodeId: 'region-7',
+        path: ['widget-3', 'feedback'],
+      },
+      'visible',
+    );
+
+    assert.equal(state.cells[valueCellKey]?.value, 'final answer');
+    assert.equal(state.cells[valueCellKey]?.transitionId, 'transition-2');
+    assert.equal(state.cells[feedbackCellKey]?.value, true);
+    assert.deepEqual(state.transitions, [firstTransition, secondTransition]);
+  });
+
+  it('collects practice observations and trace steps from canonical SPARC history', function() {
+    const bridge = createSparcPracticeHistoryBridge({
+      TDFId: 'tdf-1',
+      sessionID: 'session-1',
+      levelUnit: 1,
+      userId: 'user-1',
+    });
+    const observation: SparcPracticeObservation = {
+      observationId: 'obs-1',
+      sourceAddress: {
+        documentId: 'doc-1',
+        nodeId: 'widget-1',
+      },
+      time: 3000,
+      problemStartTime: 1000,
+      outcome: 'correct',
+      responseValue: '42',
+    };
+    const traceStep: SparcTraceStep = {
+      traceId: 'trace-1',
+      sourceAddress: observation.sourceAddress,
+      productionRuleId: 'rule-1',
+      actionId: 'widget-1::UpdateTextArea::42',
+      outcome: 'correct',
+      time: 3000,
+    };
+
+    const state = replaySparcHistory([
+      bridge.toCanonicalHistoryRecord(observation),
+      makeBaseSparcRecord({
+        documentId: 'doc-1',
+        sourceAddress: observation.sourceAddress,
+        traceStep,
+      }),
+    ]);
+
+    assert.deepEqual(state.observations, [observation]);
+    assert.deepEqual(state.traceSteps, [traceStep]);
+  });
+
+  it('preserves caller-provided initial state and ignores non-SPARC records', function() {
+    const initialState = createEmptySparcReplayState();
+    const state = replaySparcHistory([{ eventType: 'h5p' }], initialState);
+
+    assert.equal(state, initialState);
+  });
+
+  it('throws clearly when a SPARC event lacks the typed SPARC extension', function() {
+    assert.throws(
+      () => replaySparcHistory([{ eventType: 'sparc' }]),
+      /SPARC history record missing sparc extension/,
+    );
+  });
+
+  it('rejects malformed replay writes instead of inferring state', function() {
+    assert.throws(
+      () => replaySparcHistory([
+        makeBaseSparcRecord({
+          documentId: 'doc-1',
+          sourceAddress: {
+            documentId: 'doc-1',
+            nodeId: 'region-1',
+          },
+          stateTransition: {
+            transitionId: 'transition-1',
+            event: {
+              eventId: 'event-1',
+              type: 'value-changed',
+              source: {
+                documentId: 'doc-1',
+                nodeId: 'region-1',
+              },
+              time: 2000,
+            },
+            writes: [
+              {
+                target: {
+                  documentId: 'doc-1',
+                  nodeId: 'region-1',
+                },
+                key: '',
+                value: 'unaddressed',
+              },
+            ],
+          },
+        }),
+      ]),
+      /sparc\.stateTransition\.writes\[0\]\.key is required/,
+    );
+  });
+});

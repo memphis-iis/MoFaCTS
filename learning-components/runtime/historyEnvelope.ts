@@ -11,6 +11,7 @@ export const HISTORY_EVENT_TYPES = [
   'video',
   'h5p',
   'autotutor-turn',
+  'sparc',
 ] as const;
 
 export type HistoryEventType = typeof HISTORY_EVENT_TYPES[number];
@@ -47,6 +48,7 @@ const RUNTIME_SNAPSHOT_FIELD_NAMES = new Set([
 const COMPONENT_EXTENSION_FIELD_NAMES = [
   'CFNote',
   'h5p',
+  'sparc',
 ] as const;
 
 const HISTORY_EVENT_TYPE_SET = new Set<string>(HISTORY_EVENT_TYPES);

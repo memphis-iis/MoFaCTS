@@ -1,9 +1,11 @@
+import type { UnitEngineSessionReadKey, UnitEngineSessionWriteKey } from '../../units/UnitEngineSessionKeys';
+
 export interface CommitPreparedSelectionParams {
   readonly selection: any;
   readonly cardProbabilities: any;
   readonly context: {
-    readonly setSessionValue: (key: string, value: any) => void;
-    readonly getSessionValue: (key: string) => any;
+    readonly setSessionValue: (key: UnitEngineSessionWriteKey, value: any) => void;
+    readonly getSessionValue: (key: UnitEngineSessionReadKey) => any;
     readonly setQuestionIndex: (index: number) => void;
     readonly log: (level: number, ...args: unknown[]) => void;
   };

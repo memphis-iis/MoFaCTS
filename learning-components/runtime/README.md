@@ -12,6 +12,9 @@ Belongs here:
 - Component-level runtime events.
 - Trial-display adapters that declare interaction ownership and normalization contracts.
 - The canonical history envelope contract in `historyEnvelope.ts`; app/common code may re-export it, but learning components should import the runtime-owned contract directly.
+- Generic model-practice update contracts in `modelPracticeUpdates.ts`; SPARC, flashcards, and future components should use this shared path when they need canonical `levelUnitType: "model"` history rows.
+- Generic model-practice history exchange in `modelPracticeHistoryExchange.ts`; SPARC, flashcards, and future components should read shared `levelUnitType: "model"` rows through this API before applying component-specific extension fields.
+- The adaptive-model runtime contract in `modelPracticeRuntime.ts`; hosts provide this capability to apply a generic model-practice update request and answer live model-state queries without exposing Learning Session or SPARC internals.
 - History runtime contracts such as `HistoryRuntime.writeCanonicalHistory`, which require components to emit the shared app history envelope instead of calling persistence directly. The app stamps and validates `historySchemaVersion`, total wire size, and known extension-field size on that envelope before persistence.
 - Named server-method requirements on manifests. A component that needs `server-methods` must declare the specific method names it expects instead of relying on an undocumented generic call pipe.
 - Adapter-context helpers that project app-supplied functions into component contracts without naming a specific host runtime.

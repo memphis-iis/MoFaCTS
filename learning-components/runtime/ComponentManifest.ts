@@ -40,6 +40,7 @@ export type LearningComponentManifest<TDeps = unknown> = {
   readonly displayTypes?: readonly string[];
   readonly requiredCapabilities: readonly LearningComponentCapability[];
   readonly requiredServerMethods?: readonly string[];
+  readonly providedServices?: readonly string[];
   register(context: LearningComponentRuntimeContext<TDeps>): void;
 };
 
@@ -104,6 +105,20 @@ function validateRequiredServerMethods(manifest: LearningComponentManifest): voi
   );
 }
 
+function validateProvidedServices(manifest: LearningComponentManifest): void {
+  if (manifest.providedServices === undefined) {
+    return;
+  }
+  if (!Array.isArray(manifest.providedServices)) {
+    throw new Error(`Learning component "${manifest.id}" must declare providedServices as an array`);
+  }
+  assertUniqueNormalizedEntries(
+    manifest.providedServices,
+    `Learning component "${manifest.id}" provided service`,
+    `Learning component "${manifest.id}" declares duplicate provided service`,
+  );
+}
+
 export function validateLearningComponentManifest(manifest: LearningComponentManifest): void {
   normalizeNonEmpty(manifest.id, 'Learning component id');
   if (manifest.kind !== 'unit' && manifest.kind !== 'trial-display') {
@@ -111,6 +126,7 @@ export function validateLearningComponentManifest(manifest: LearningComponentMan
   }
   validateRequiredCapabilities(manifest);
   validateRequiredServerMethods(manifest);
+  validateProvidedServices(manifest);
   if (manifest.kind === 'unit' && (!Array.isArray(manifest.unitTypes) || manifest.unitTypes.length === 0)) {
     throw new Error(`Learning component "${manifest.id}" must declare at least one unit type`);
   }

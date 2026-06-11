@@ -18,6 +18,7 @@ Current extension boundaries:
 - `runtime/TrialDisplayAdapterRegistry.ts`: display-owned trial adapter registry for H5P-style interactions.
 - `units/UnitEngineRegistry.ts`: unit engine registration and creation.
 - `units/learning-session/`: model learning-session unit package, including learning/video session runtime-config interpretation and model-card selection behavior.
+- `units/sparcsession/`: SPARC session unit package; current wrapper over shared adaptive/logistic sequencing and target home for the reactive instructional document graph described in its README.
 - `units/assessment-session/`: assessment schedule unit package and authored schedule construction.
 - `units/autotutor/`: AutoTutor unit package, runtime contracts, saved state/history validation, and planning helpers.
 - `units/instruction/`: instruction-only unit-engine package.
@@ -50,8 +51,9 @@ Use this checklist before adding a production component such as a deeper AutoTut
 3. Keep Meteor routing, publications, collections, authorization enforcement, server methods, upload/storage persistence, and app shell UI in `mofacts/`.
 4. Export exactly one `LearningComponentManifest` from the package entry point.
 5. Declare every required capability in the manifest. Do not read Meteor globals or app singletons to hide a missing dependency.
-6. Add focused fixtures/tests near the package or in `mofacts/common/` proving registration, capability failure, and runtime behavior.
-7. Add the manifest to the approved default catalog only when the component should ship by default.
-8. Run `npm run typecheck`, `npm run lint`, and any schema generation required by changed TDF/stimulus fields.
+6. Declare component-owned service surfaces in `providedServices` when the package exposes renderer-independent behavior such as replay, layout validation, trace comparison, or history bridges.
+7. Add focused fixtures/tests near the package or in `mofacts/common/` proving registration, capability failure, and runtime behavior.
+8. Add the manifest to the approved default catalog only when the component should ship by default.
+9. Run `npm run typecheck`, `npm run lint`, and any schema generation required by changed TDF/stimulus fields.
 
 External package discovery is intentionally not part of this checklist yet. Approved in-repo or local bundles should be explicitly imported and composed through the catalog validation boundary until manifest validation, capability validation, and package fixtures are strong enough to support discovery.

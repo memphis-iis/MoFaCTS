@@ -3,17 +3,22 @@ import type {
   LearningComponentRuntimeContext,
 } from './ComponentManifest';
 import type { CanonicalHistoryRecord } from './historyEnvelope';
+import type { ModelPracticeRuntime } from './modelPracticeRuntime';
+import type {
+  UnitEngineSessionReadKey,
+  UnitEngineSessionWriteKey,
+} from '../units/UnitEngineSessionKeys';
 
 export interface LearningComponentContext {
-  getSessionValue(key: string): any;
-  setSessionValue(key: string, value: any): void;
+  getSessionValue(key: UnitEngineSessionReadKey): any;
+  setSessionValue(key: UnitEngineSessionWriteKey, value: any): void;
   getDeliverySettings(): Record<string, unknown>;
   log(level: number, ...args: unknown[]): void;
 }
 
 export interface SessionRuntime {
-  getSessionValue(key: string): unknown;
-  setSessionValue(key: string, value: unknown): void;
+  getSessionValue(key: UnitEngineSessionReadKey): unknown;
+  setSessionValue(key: UnitEngineSessionWriteKey, value: unknown): void;
 }
 
 export interface DeliverySettingsRuntime {
@@ -90,7 +95,7 @@ export interface LearningComponentCapabilities {
   session?: SessionRuntime;
   deliverySettings?: DeliverySettingsRuntime;
   stimuli?: unknown;
-  adaptiveModel?: unknown;
+  adaptiveModel?: ModelPracticeRuntime;
   assessmentState?: unknown;
   media?: MediaRuntime;
   history?: HistoryRuntime;
@@ -125,6 +130,7 @@ const runtimeCapabilityFunctionRequirements: Partial<Record<
 >> = {
   session: ['getSessionValue', 'setSessionValue'],
   deliverySettings: ['getDeliverySettings'],
+  adaptiveModel: ['applyModelPracticeUpdate', 'queryModelPracticeState'],
   media: ['resolveMediaUrl'],
   history: ['normalizeResult', 'writeResult', 'writeCanonicalHistory'],
   authorization: ['currentUserHasRole'],

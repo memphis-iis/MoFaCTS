@@ -24,6 +24,27 @@ export const sparcSessionUnitComponentManifest: LearningComponentManifest<Create
     'getResponseKCMapForTdf',
     'getStimulusCrowdStatsForDeck',
   ],
+  providedServices: [
+    'sparc.authored-initial-state',
+    'sparc.authored-model-targets',
+    'sparc.authored-response-outcome',
+    'sparc.condition-evaluation',
+    'sparc.ctat-trace-comparison',
+    'sparc.document-addressing',
+    'sparc.document-replay',
+    'sparc.model-history-exchange',
+    'sparc.model-query-adapter',
+    'sparc.model-update-request',
+    'sparc.response-outcome-authored-rules',
+    'sparc.response-outcome-commit',
+    'sparc.response-outcome-history',
+    'sparc.reactive-rule-commit',
+    'sparc.reactive-rule-evaluation',
+    'sparc.sample-documents',
+    'sparc.state-replay',
+    'sparc.state-transition-history',
+    'sparc.vertical-layout-validation',
+  ],
   register(context) {
     context.registerUnitEngineWithDeps(SPARC_SESSION_UNIT_TYPE, (currentDeps) => {
       return createSparcSessionUnitEngine({

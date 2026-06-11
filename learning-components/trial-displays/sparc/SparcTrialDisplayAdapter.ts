@@ -9,6 +9,15 @@ export interface SparcIntentExpectation {
   type?: string;
 }
 
+export interface SparcTraceExpectation {
+  node: string;
+  productionRuleId: string;
+  actionId: string;
+  submittedValue?: unknown;
+  stimulusKC?: string | number;
+  responseKC?: string | number;
+}
+
 export interface SparcTrialDisplay {
   type: 'sparc';
   schema?: string;
@@ -17,6 +26,7 @@ export interface SparcTrialDisplay {
     gradingMode?: string;
     scoredNodes?: string[];
     intentByNode?: SparcIntentExpectation[];
+    traceByNode?: SparcTraceExpectation[];
     evaluation?: Record<string, unknown>;
   };
   [key: string]: unknown;
@@ -69,6 +79,22 @@ export const sparcTrialDisplayAdapter: TrialDisplayAdapter<SparcTrialDisplay, Sp
                   node: String(entry.node || ''),
                   expected: entry.expected,
                   ...(typeof entry.type === 'string' ? { type: entry.type } : {}),
+                }))
+            : [],
+          traceByNode: Array.isArray(display.response.traceByNode)
+            ? display.response.traceByNode
+                .filter(isPlainObject)
+                .map((entry) => ({
+                  node: String(entry.node || ''),
+                  productionRuleId: String(entry.productionRuleId || ''),
+                  actionId: String(entry.actionId || ''),
+                  ...('submittedValue' in entry ? { submittedValue: entry.submittedValue } : {}),
+                  ...(typeof entry.stimulusKC === 'string' || typeof entry.stimulusKC === 'number'
+                    ? { stimulusKC: entry.stimulusKC }
+                    : {}),
+                  ...(typeof entry.responseKC === 'string' || typeof entry.responseKC === 'number'
+                    ? { responseKC: entry.responseKC }
+                    : {}),
                 }))
             : [],
         }

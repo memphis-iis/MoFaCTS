@@ -10,6 +10,8 @@ Belongs here:
 - Shared probability functions and calculation.
 - Shared selection policies.
 - Stable model-policy contracts.
+- Shared model-practice update application helpers that consume canonical practice requests without depending on a particular unit such as Learning Session or SPARC.
+- Live model-state query helpers for metrics such as probability that cannot be reconstructed from history alone.
 
 Does not belong here:
 

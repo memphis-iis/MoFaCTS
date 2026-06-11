@@ -10,6 +10,7 @@ Belongs here:
 - Unit engine registry and factory code.
 - Unit component manifests that declare unit types and required runtime capabilities, colocated with the owning unit folder.
 - Instruction, learning-session, assessment-session, and video-session engines.
+- SPARC session ownership as a separate unit family, not a learning-session subtype.
 - Shared card preparation and unit progression logic.
 
 Does not belong here:

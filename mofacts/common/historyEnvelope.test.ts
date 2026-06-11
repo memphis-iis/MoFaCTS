@@ -212,6 +212,45 @@ describe('canonical history envelope', function() {
     expect((decompressed.h5p as Record<string, unknown>).passed).to.equal(false);
   });
 
+  it('accepts compact SPARC extension fields on the canonical history path', function() {
+    const record = createHistoryRecord({
+      typeOfResponse: 'sparc',
+      selection: 'sparc document response',
+      action: 'response-submitted',
+      eventType: 'sparc',
+      sparc: {
+        documentId: 'doc-1',
+        sourceAddress: {
+          documentId: 'doc-1',
+          nodeId: 'region-1',
+          path: ['widget-7', 'input'],
+        },
+        practiceObservation: {
+          observationId: 'obs-1',
+          sourceAddress: {
+            documentId: 'doc-1',
+            nodeId: 'region-1',
+            path: ['widget-7', 'input'],
+          },
+          time: 2000,
+          problemStartTime: 1000,
+          outcome: 'correct',
+          responseValue: 'answer',
+        },
+      },
+    });
+
+    expect(() => assertCanonicalHistoryEnvelope(record)).not.to.throw();
+    const compressed = compressHistoryRecord(record);
+    const result = validateHistoryWirePayload(compressed);
+    const decompressed = decompressHistoryRecord(compressed);
+
+    expect(result.wirePayloadBytes).to.be.lessThan(2048);
+    expect(compressed['63']).to.equal('sparc');
+    expect(compressed['79']).to.be.an('object');
+    expect((decompressed.sparc as Record<string, unknown>).documentId).to.equal('doc-1');
+  });
+
   it('rejects component-specific extension fields that exceed their own budget', function() {
     const record = createHistoryRecord({
       CFNote: 'x'.repeat(256),
