@@ -82,7 +82,59 @@ describe('sparcLayoutPolicy', function() {
     assert.deepEqual(result.issues, [{
       kind: 'missing-wide-content-policy',
       nodeId: 'wide-region',
-      message: 'SPARC node "wide-region" with maxWidth must declare reflow, shrink, stack, or constrain behavior',
+      message: 'SPARC node "wide-region" with width constraints must declare reflow, shrink, stack, or constrain behavior',
+    }]);
+  });
+
+  it('flags fixed minimum widths without reflow behavior', function() {
+    const document: SparcAuthoredDocument = {
+      ...validDocument(),
+      root: {
+        ...validDocument().root,
+        children: [{
+          id: 'wide-table',
+          kind: 'region',
+          layout: {
+            minWidth: '1200px',
+          },
+        }],
+      },
+    };
+
+    const result = validateSparcVerticalLayout(document);
+
+    assert.equal(result.valid, false);
+    assert.deepEqual(result.issues, [{
+      kind: 'missing-wide-content-policy',
+      nodeId: 'wide-table',
+      message: 'SPARC node "wide-table" with width constraints must declare reflow, shrink, stack, or constrain behavior',
+    }]);
+  });
+
+  it('rejects explicit horizontal overflow on authored nodes', function() {
+    const document = {
+      ...validDocument(),
+      root: {
+        ...validDocument().root,
+        children: [{
+          id: 'scrolling-table',
+          kind: 'region',
+          layout: {
+            maxWidth: '100%',
+            wideContent: 'stack',
+            overflowX: 'auto',
+          },
+        }],
+      },
+    } as unknown as SparcAuthoredDocument;
+
+    const result = validateSparcVerticalLayout(document);
+
+    assert.equal(result.valid, false);
+    assert.deepEqual(result.issues, [{
+      kind: 'horizontal-overflow',
+      nodeId: 'scrolling-table',
+      message: 'SPARC node "scrolling-table" declares horizontal overflow',
     }]);
   });
 

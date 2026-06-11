@@ -45,8 +45,11 @@ export type SparcWideContentPolicy =
 
 export type SparcLayoutPolicy = {
   readonly scrollAxis?: SparcScrollAxis;
+  readonly width?: number | string;
+  readonly minWidth?: number | string;
   readonly maxWidth?: number | string;
   readonly wideContent?: SparcWideContentPolicy;
+  readonly overflowX?: 'clip' | 'hidden' | 'visible';
 };
 
 export type SparcAuthoredNode = {

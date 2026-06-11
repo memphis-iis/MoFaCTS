@@ -215,8 +215,10 @@ The layout invariant remains vertical scrolling only. Wide authored elements
 should declare how they reflow, shrink, stack, or render inside a constrained
 viewer. Page-level horizontal scrolling should be treated as a layout error.
 `sparcLayoutPolicy.ts` is the first executable check for that invariant: SPARC
-documents must declare vertical layout, and authored nodes with a max width must
-declare `reflow`, `shrink`, `stack`, or `constrain` behavior.
+documents must declare vertical layout; authored nodes with `width`, `minWidth`,
+or `maxWidth` must declare `reflow`, `shrink`, `stack`, or `constrain`
+behavior; and authored nodes must not request horizontal overflow through
+`overflowX: "auto"` or `overflowX: "scroll"`.
 
 ## Open Design Questions And Recommended Answers
 
