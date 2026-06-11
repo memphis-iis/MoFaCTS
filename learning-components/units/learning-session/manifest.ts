@@ -14,7 +14,7 @@ export const learningSessionUnitComponentManifest: LearningComponentManifest<Cre
     'delivery-settings',
     'stimuli',
     'card-state',
-    'adaptive-model',
+    'adaptive-card-model',
     'history',
     'server-methods',
     'authz',

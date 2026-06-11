@@ -12,7 +12,7 @@ describe('sparcSessionUnitComponentManifest', function() {
     assert.equal(summary.id, 'mofacts.sparcsession-unit');
     assert.deepEqual(summary.unitTypes, [SPARC_SESSION_UNIT_TYPE]);
     assert.deepEqual(summary.requiredCapabilities, [
-      'adaptive-model',
+      'adaptive-card-model',
       'authz',
       'card-state',
       'delivery-settings',

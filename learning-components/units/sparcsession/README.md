@@ -138,6 +138,10 @@ The unit registry should become the long-term plugin boundary. SPARC should get
 rendering, history, adaptive-model, practice-record, content-state, and external
 sync capabilities through explicit runtime interfaces instead of reaching into
 learning-session or Meteor internals.
+The current unit manifest still declares `adaptive-card-model` because the
+wrapper borrows the shared adaptive-logistic card engine; that is a visible
+transitional dependency, separate from the generic model-practice
+`adaptive-model` API used for SPARC outcome updates and model-state queries.
 `SparcSessionUnitEngine.ts` now exposes document-runtime entry points directly:
 combined authored-document validation, document-reference validation,
 authored-start-state plus history replay, and authored response commit through

@@ -173,8 +173,15 @@ export function getCreateUnitEngineCapabilitySet(
   if (hasRuntimeFunctions(deps.cardState, 'setQuestionIndex')) {
     capabilities.add('card-state');
   }
-  if (hasRuntimeFunctions(deps.adaptiveModel, 'createAdaptiveQuestionLogic')) {
-    capabilities.add('adaptive-model');
+  if (hasRuntimeFunctions(
+    deps.adaptiveModel,
+    'createAdaptiveQuestionLogic',
+    'getHiddenItems',
+    'setNumVisibleCards',
+    'updateCurStudentPerformance',
+    'updateCurStudedentPracticeTime',
+  )) {
+    capabilities.add('adaptive-card-model');
   }
   if (hasRuntimeFunctions(
     deps.assessmentState,

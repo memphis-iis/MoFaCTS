@@ -12,6 +12,7 @@ export const learningComponentCapabilities = [
   'stimuli',
   'card-state',
   'adaptive-model',
+  'adaptive-card-model',
   'assessment-state',
   'media',
   'history',
