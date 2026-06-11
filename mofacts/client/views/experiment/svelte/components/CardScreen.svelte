@@ -11,7 +11,6 @@
   } from '../services/speechRecognitionService';
   import { completeCleanup } from '../utils/lifecycleCleanup';
   import { createActor } from 'xstate';
-  import { Tracker } from 'meteor/tracker';
   import { Session } from 'meteor/session';
   import { Meteor } from 'meteor/meteor';
   import { FlowRouter } from 'meteor/ostrio:flow-router-extra';
@@ -39,6 +38,10 @@
   } from '../services/cardReadiness';
   import { routeCardInitializationFailure } from '../services/cardLaunchFailure';
   import {
+    buildCardInitializeFailureDiagnostic,
+    runCardLaunchOrchestration,
+  } from '../services/cardLaunchOrchestration';
+  import {
     createFirstTrialRevealController,
     getElementTransitionDurationMs,
   } from '../services/firstTrialReveal';
@@ -50,7 +53,17 @@
     isOutgoingFreezeState as isOutgoingFreezeSnapshot,
     isPreparedAdvanceWaitState as isPreparedAdvanceWaitSnapshot,
   } from '../services/trialDisplayState';
+  import {
+    buildDisplayTimeoutMessage,
+    createTimeoutCountdownController,
+    getDisplayTimeoutValue,
+    getFeedbackTimeoutStartMs,
+    getQuestionTimeoutStartMs,
+    resolveDisplayTimeoutStartMs,
+    resolveTimeoutMode,
+  } from '../services/timeoutCountdown';
   import { createVideoMachineBridge } from '../services/videoMachineBridge';
+  import { createVideoSessionBridge } from '../services/videoSessionBridge';
   import { resolveVideoPlaybackPolicyForUnit } from '../services/videoCardInit';
   import { waitForBrowserPaint } from '../utils/paintTiming';
   import { deriveSrStatus } from '../utils/srStatus';
@@ -66,14 +79,16 @@
   } from '../services/sparcTrialDisplay';
   import { buildLearningProgressPanelSnapshot } from '../services/learningProgressPanel';
   import {
-    resolveSessionContentSurface,
     resolveSessionSurfaceDiagnostic,
     resolveSessionSurfaceLaunchCompletion,
     resolveSessionSurfaceLearningProgressPanel,
     resolveSessionSurfaceShell,
-    resolveSessionSurfaceState,
-    shouldShowSessionVideoInstructionOverlay,
   } from '../services/sessionSurfaceMode';
+  import {
+    buildCardSessionRuntimeSnapshot,
+    startVideoInstructionTimer,
+  } from '../services/cardSessionRuntime';
+  import { createMeteorCardReactiveTrackers } from '../services/cardReactiveTrackers';
   import { CardStore } from '../../modules/cardStore';
   import LearningProgressPanel from './LearningProgressPanel.svelte';
   import AutoTutorSession from './AutoTutorSession.svelte';
@@ -317,28 +332,30 @@
   $: preparedTrial = context.preparedTrial || null;
   $: deliverySettings = { ...DEFAULT_DELIVERY_SETTINGS, ...(context.deliverySettings || {}) };
   $: audioState = context.audio || { waitingForTranscription: false, srAttempts: 0, maxSrAttempts: 0 };
-  $: currentTdfUnit = (sessionUnitModeVersion, Session.get('currentTdfUnit') || {});
-  $: sessionSurfaceState = (sessionUnitModeVersion, resolveSessionSurfaceState({
+  $: cardSessionRuntimeSnapshot = (sessionUnitModeVersion, buildCardSessionRuntimeSnapshot({
+    currentTdfUnit: Session.get('currentTdfUnit'),
     deliverySettings,
     sessionIsVideoSession: Session.get('isVideoSession'),
     sessionUnitType: Session.get('unitType'),
-    currentTdfUnit,
+    curUnitInstructionsSeen: Session.get('curUnitInstructionsSeen'),
+    videoInstructionDismissed,
+    sanitizeInstructionHtml,
   }));
-  $: sessionContentSurface = resolveSessionContentSurface(sessionSurfaceState);
-  $: rawVideoInstructionText = typeof currentTdfUnit?.unitinstructions === 'string'
-    ? currentTdfUnit.unitinstructions.trim()
-    : '';
-  $: sanitizedVideoInstructionText = sanitizeInstructionHtml(rawVideoInstructionText);
-  $: videoInstructionsSeen = Session.get('curUnitInstructionsSeen') === true || videoInstructionDismissed;
-  $: showVideoInstructionOverlay = shouldShowSessionVideoInstructionOverlay({
-    contentSurface: sessionContentSurface,
-    instructionText: rawVideoInstructionText,
-    instructionsSeen: videoInstructionsSeen,
+  $: currentTdfUnit = cardSessionRuntimeSnapshot.currentTdfUnit;
+  $: sessionSurfaceState = cardSessionRuntimeSnapshot.sessionSurfaceState;
+  $: sessionContentSurface = cardSessionRuntimeSnapshot.sessionContentSurface;
+  $: rawVideoInstructionText = cardSessionRuntimeSnapshot.rawVideoInstructionText;
+  $: sanitizedVideoInstructionText = cardSessionRuntimeSnapshot.sanitizedVideoInstructionText;
+  $: videoInstructionsSeen = cardSessionRuntimeSnapshot.videoInstructionsSeen;
+  $: showVideoInstructionOverlay = cardSessionRuntimeSnapshot.showVideoInstructionOverlay;
+  $: videoInstructionsShownAt = startVideoInstructionTimer({
+    showVideoInstructionOverlay,
+    videoInstructionsShownAt,
+    now: Date.now,
+    setInstructionClientStart: (timestamp) => {
+      Session.set('instructionClientStart', timestamp);
+    },
   });
-  $: if (showVideoInstructionOverlay && !videoInstructionsShownAt) {
-    videoInstructionsShownAt = Date.now();
-    Session.set('instructionClientStart', videoInstructionsShownAt);
-  }
   $: layoutMode = deliverySettings.stimuliPosition;
   $: fontSizeScale = (parsePositiveNumber(deliverySettings?.fontsize) ?? 24) / 16;
   $: cardFontSizeStyle = `--card-font-size: calc(var(--app-font-size-base) * ${fontSizeScale});`;
@@ -790,7 +807,10 @@
   $: displayMinSeconds = getDisplayTimeoutValue(deliverySettings.displayMinSeconds ?? 0);
   $: displayMaxSeconds = getDisplayTimeoutValue(deliverySettings.displayMaxSeconds ?? 0);
   $: hasDisplayTimeout = displayMinSeconds > 0 || displayMaxSeconds > 0;
-  $: displayTimeoutStartMs = getDisplayTimeoutStartMs();
+  $: displayTimeoutStartMs = resolveDisplayTimeoutStartMs({
+    currentUnitStartTime: Session.get('currentUnitStartTime'),
+    displayTimeoutMountMs,
+  });
   $: displayTimeoutElapsedSeconds = hasDisplayTimeout
     ? Math.max(0, Math.floor((displayTimeoutNow - displayTimeoutStartMs) / 1000))
     : 0;
@@ -875,7 +895,6 @@
   $: timeoutMode = testMode && testTimeout?.mode ? testTimeout.mode : getTimeoutMode(state);
   let timeoutProgress = 0;
   let remainingTime = 0;
-  let timeoutInterval;
   let displayTimeoutInterval;
   let displayTimeoutNow = Date.now();
   let displayTimeoutMountMs = Date.now();
@@ -890,6 +909,16 @@
   let lastTimeoutResetCounter = 0;
   let textAnswer = '';
   let lastInputTrialStart = null;
+  let timeoutModeState = 'none';
+  const timeoutCountdown = createTimeoutCountdownController({
+    onUpdate: (snapshot) => {
+      timeoutModeState = snapshot.modeState;
+      timeoutProgress = snapshot.progress;
+      remainingTime = snapshot.remainingTime;
+      timeoutStart = snapshot.start;
+      timeoutDuration = snapshot.duration;
+    },
+  });
 
   $: {
     if (state.matches('presenting.loading') || state.matches('transition.clearing')) {
@@ -905,8 +934,6 @@
       context.userAnswer = '';
     }
   }
-
-  let timeoutModeState = 'none';
 
   $: livePerformanceSlotProps = {
     showPerformanceStats,
@@ -936,60 +963,15 @@
   $: showTrialTimerArea = showTimeoutBar || showTimeoutCountdown;
 
   function getTimeoutMode(currentState) {
-    if (isOutgoingFreezeState && timeoutModeState !== 'none') return timeoutModeState;
-    if (currentState.matches('presenting.awaiting')) return 'question';
-    if (currentState.matches('presenting.readyPrompt')) return 'feedback';
-    if (currentState.matches('feedback.waiting') || currentState.matches('study.waiting')) return 'feedback';
-    return 'none';
-  }
-
-  function getDisplayTimeoutValue(value) {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-
-  function getDisplayTimeoutStartMs() {
-    const unitStart = Number(Session.get('currentUnitStartTime'));
-    return Number.isFinite(unitStart) && unitStart > 0 ? unitStart : displayTimeoutMountMs;
-  }
-
-  function buildDisplayTimeoutMessage(minSecs, maxSecs, elapsedSecs) {
-    if (minSecs > 0 && elapsedSecs < minSecs) {
-      return `You can continue in ${Math.max(0, minSecs - elapsedSecs)}s`;
-    }
-    if (maxSecs > 0) {
-      const remaining = Math.max(0, maxSecs - elapsedSecs);
-      return remaining > 0 ? `Time remaining: ${remaining}s` : 'Continuing...';
-    }
-    if (minSecs > 0) {
-      return 'You can continue whenever you want';
-    }
-    return '';
-  }
-
-  function getQuestionTimeoutStartMs() {
-    const timeoutStart = Number(context.timestamps?.timeoutStart);
-    if (Number.isFinite(timeoutStart) && timeoutStart > 0) {
-      return timeoutStart;
-    }
-    const trialStart = Number(context.timestamps?.trialStart);
-    return Number.isFinite(trialStart) && trialStart > 0 ? trialStart : Date.now();
-  }
-
-  function getFeedbackTimeoutStartMs() {
-    const feedbackStart = Number(context.timestamps?.feedbackStart);
-    if (Number.isFinite(feedbackStart) && feedbackStart > 0) {
-      return feedbackStart;
-    }
-    const trialStart = Number(context.timestamps?.trialStart);
-    return Number.isFinite(trialStart) && trialStart > 0 ? trialStart : Date.now();
+    return resolveTimeoutMode({
+      state: currentState,
+      isOutgoingFreezeState,
+      currentModeState: timeoutModeState,
+    });
   }
 
   function clearTimeoutInterval() {
-    if (timeoutInterval) {
-      clearInterval(timeoutInterval);
-      timeoutInterval = null;
-    }
+    timeoutCountdown.stopInterval();
   }
 
   function clearDisplayTimeoutInterval() {
@@ -999,40 +981,8 @@
     }
   }
 
-  function updateTimeoutCountdown() {
-    if (!timeoutStart || !timeoutDuration) {
-      timeoutProgress = 0;
-      remainingTime = 0;
-      return;
-    }
-
-    const elapsed = Date.now() - timeoutStart;
-    const remaining = Math.max(0, timeoutDuration - elapsed);
-    timeoutProgress = Math.min(100, (elapsed / timeoutDuration) * 100);
-    remainingTime = Math.ceil(remaining / 1000);
-
-    if (remaining <= 0) {
-      clearTimeoutInterval();
-    }
-  }
-
   function startTimeoutCountdown(duration, mode, startTimestamp = Date.now()) {
-    if (!duration || duration <= 0) {
-      timeoutProgress = 0;
-      remainingTime = 0;
-      timeoutModeState = 'none';
-      clearTimeoutInterval();
-      return;
-    }
-
-    timeoutStart = Number.isFinite(Number(startTimestamp)) && Number(startTimestamp) > 0
-      ? Number(startTimestamp)
-      : Date.now();
-    timeoutDuration = duration;
-    timeoutModeState = mode;
-    updateTimeoutCountdown();
-    clearTimeoutInterval();
-    timeoutInterval = setInterval(updateTimeoutCountdown, 100);
+    timeoutCountdown.start(duration, mode, startTimestamp);
   }
 
   // Event handlers
@@ -1397,9 +1347,7 @@
     };
   }
 
-  let performanceTracker;
-  let userTracker;
-  let videoCheckpointTracker;
+  let cardReactiveTrackers;
   let startRecordingHandler;
   let stopRecordingHandler;
   let displayAnswerHandler;
@@ -1431,6 +1379,18 @@
     },
     stateMatches: (path) => state.matches(path),
     waitForDomUpdate: tick,
+  });
+  const videoSessionBridge = createVideoSessionBridge({
+    getCurrentState: () => currentState,
+    getVideoCheckpoints: () => videoCheckpoints,
+    getVideoPlayer: () => videoPlayer,
+    isTestMode: () => testMode,
+    log: clientConsole,
+    send,
+    setSessionValue: (key, value) => {
+      Session.set(key, value);
+    },
+    stateMatches: (path) => state.matches(path),
   });
 
   function getCorrectAnswerImageSrc(buttonList, correctAnswer) {
@@ -1551,6 +1511,29 @@
     });
   }
 
+  function buildCurrentCardInitializeFailureDiagnostic(error) {
+    const currentTdfUnitForDiagnostic = Session.get('currentTdfUnit');
+    return buildCardInitializeFailureDiagnostic({
+      error,
+      currentTdfFile: Session.get('currentTdfFile'),
+      currentTdfId: Session.get('currentTdfId'),
+      currentRootTdfId: Session.get('currentRootTdfId'),
+      currentStimuliSetId: Session.get('currentStimuliSetId'),
+      currentUnitNumber: Session.get('currentUnitNumber'),
+      currentTdfUnit: currentTdfUnitForDiagnostic,
+      currentStimuliSet: Session.get('currentStimuliSet'),
+      sessionSurfaceDiagnostic: resolveSessionSurfaceDiagnostic(currentTdfUnitForDiagnostic),
+    });
+  }
+
+  function setCardInitFailureDiagnostic(stage, diagnostic) {
+    Session.set('cardInitFailureDiagnostic', {
+      stage,
+      capturedAt: Date.now(),
+      ...diagnostic,
+    });
+  }
+
   function routeInitializationFailure() {
     routeCardInitializationFailure({
       finishLaunchLoading,
@@ -1616,77 +1599,33 @@
     }
 
     (async () => {
-      let initResult;
-      try {
-        setLaunchLoadingMessage('Loading content...');
-        markLaunchLoadingTiming('initializeSvelteCard:start');
-        initResult = await initializeSvelteCard();
-        markLaunchLoadingTiming('initializeSvelteCard:complete', {
-          redirected: !!initResult?.redirected,
-        });
-      } catch (error) {
-        const currentTdfUnitForDiagnostic = Session.get('currentTdfUnit');
-        const sessionSurfaceDiagnostic = resolveSessionSurfaceDiagnostic(currentTdfUnitForDiagnostic);
-        const diagnostic = {
-          error,
-          currentTdfName: Session.get('currentTdfFile')?.name || Session.get('currentTdfFile')?.fileName || null,
-          currentTdfId: Session.get('currentTdfId') || null,
-          currentRootTdfId: Session.get('currentRootTdfId') || null,
-          currentStimuliSetId: Session.get('currentStimuliSetId') || null,
-          currentUnitNumber: Session.get('currentUnitNumber') ?? null,
-          currentUnitName: currentTdfUnitForDiagnostic?.unitname || null,
-          clusterlist: sessionSurfaceDiagnostic.clusterlist,
-          stimuliCount: Array.isArray(Session.get('currentStimuliSet'))
-            ? Session.get('currentStimuliSet').length
-            : null,
-        };
-        Session.set('cardInitFailureDiagnostic', {
-          stage: 'initializeSvelteCard',
-          capturedAt: Date.now(),
-          ...diagnostic,
-          errorMessage: error?.message || String(error),
-          errorStack: error?.stack || null,
-        });
-        clientConsole(1, '[CardScreen] initializeSvelteCard failed', diagnostic);
-        routeInitializationFailure();
-        return;
-      }
-      if (initResult?.redirected) {
-        // Overlay stays active; Template.instructions.rendered calls finishLaunchLoading.
-        return;
-      }
-
-      markLaunchLoadingTiming('cardReadinessWait:start');
-      const ready = await waitForCardReadinessService(getCurrentCardReadinessDependencies());
-      markLaunchLoadingTiming('cardReadinessWait:complete', { ready });
-      if (!ready) {
-        const diagnostic = buildCurrentCardReadinessDiagnostic();
-        Session.set('cardInitFailureDiagnostic', {
-          stage: 'cardReadinessTimeout',
-          capturedAt: Date.now(),
-          ...diagnostic,
-        });
-        clientConsole(1, '[CardScreen] Readiness timeout before machine start', diagnostic);
-        routeInitializationFailure();
-        return;
-      }
-
-      sessionUnitModeVersion += 1;
-      initializedForRender = true;
-      await tick();
-      const launchCompletion = resolveSessionSurfaceLaunchCompletion({
-        contentSurface: sessionContentSurface,
-        isLaunchLoadingActive: isLaunchLoadingActive(),
-        showVideoInstructionOverlay,
-        videoPlayerReady,
+      const launchResult = await runCardLaunchOrchestration({
+        initializeCard: initializeSvelteCard,
+        waitForCardReadiness: waitForCardReadinessService,
+        getReadinessDependencies: getCurrentCardReadinessDependencies,
+        buildReadinessDiagnostic: buildCurrentCardReadinessDiagnostic,
+        buildInitializeFailureDiagnostic: buildCurrentCardInitializeFailureDiagnostic,
+        setFailureDiagnostic: setCardInitFailureDiagnostic,
+        log: clientConsole,
+        routeInitializationFailure,
+        setLaunchLoadingMessage,
+        markLaunchLoadingTiming,
+        prepareRender: async () => {
+          sessionUnitModeVersion += 1;
+          initializedForRender = true;
+          await tick();
+        },
+        resolveLaunchCompletion: () => resolveSessionSurfaceLaunchCompletion({
+          contentSurface: sessionContentSurface,
+          isLaunchLoadingActive: isLaunchLoadingActive(),
+          showVideoInstructionOverlay,
+          videoPlayerReady,
+        }),
+        waitForBrowserPaint,
+        finishLaunchLoading,
       });
-      if (launchCompletion) {
-        await waitForBrowserPaint();
-        markLaunchLoadingTiming(launchCompletion.timingName, launchCompletion.timingData);
-        finishLaunchLoading(launchCompletion.finishReason);
-        if (launchCompletion.stopInitialization) {
-          return;
-        }
+      if (launchResult.status !== 'ready') {
+        return;
       }
 
       if (typeof window !== 'undefined') {
@@ -1749,19 +1688,21 @@
         actor.start();
       }
 
-      performanceTracker = Tracker.autorun(() => {
-        const performance = Session.get('curStudentPerformance');
-        performanceData = buildPerformanceData(performance);
+      cardReactiveTrackers = createMeteorCardReactiveTrackers({
+        setPerformanceData: (performance) => {
+          performanceData = buildPerformanceData(performance);
+        },
+        setUser: (nextUser) => {
+          user = nextUser;
+        },
+        setVideoCheckpoints: (nextVideoCheckpoints) => {
+          videoCheckpoints = nextVideoCheckpoints;
+        },
+        resetCompletedVideoQuestions: () => {
+          completedVideoQuestions = new Set();
+        },
       });
-
-      userTracker = Tracker.autorun(() => {
-        user = Meteor.user();
-      });
-
-      videoCheckpointTracker = Tracker.autorun(() => {
-        videoCheckpoints = Session.get('videoCheckpoints');
-        completedVideoQuestions = new Set();
-      });
+      cardReactiveTrackers.start();
 
       forceUnitAdvanceShortcutHandler = async (event) => {
         const saveShortcutPressed =
@@ -1824,17 +1765,9 @@
     }
     clearTimeoutInterval();
     clearDisplayTimeoutInterval();
-    if (performanceTracker) {
-      performanceTracker.stop();
-      performanceTracker = null;
-    }
-    if (userTracker) {
-      userTracker.stop();
-      userTracker = null;
-    }
-    if (videoCheckpointTracker) {
-      videoCheckpointTracker.stop();
-      videoCheckpointTracker = null;
+    if (cardReactiveTrackers) {
+      cardReactiveTrackers.stop();
+      cardReactiveTrackers = null;
     }
     if (typeof window !== 'undefined' && resumeVideoHandler) {
       window.removeEventListener('cardMachine:resumeVideo', resumeVideoHandler);
@@ -1873,16 +1806,17 @@
 
   $: {
     if (testMode) {
-      timeoutModeState = testTimeout?.mode || getTimeoutMode(state);
-      timeoutProgress = Number.isFinite(testTimeout?.progress) ? testTimeout.progress : 0;
-      remainingTime = Number.isFinite(testTimeout?.remainingTime) ? testTimeout.remainingTime : 0;
-      clearTimeoutInterval();
+      timeoutCountdown.applyTestSnapshot({
+        modeState: testTimeout?.mode || getTimeoutMode(state),
+        progress: testTimeout?.progress,
+        remainingTime: testTimeout?.remainingTime,
+      });
     } else {
       const mode = getTimeoutMode(state);
       if (mode === 'question') {
         const duration = getMainTimeoutMs({ ...context, deliverySettings });
         const resetCounter = Number.isFinite(context.timeoutResetCounter) ? context.timeoutResetCounter : 0;
-        const startTimestamp = getQuestionTimeoutStartMs();
+        const startTimestamp = getQuestionTimeoutStartMs(context);
         if (
           timeoutModeState !== mode ||
           timeoutDuration !== duration ||
@@ -1902,18 +1836,13 @@
             : Date.now();
         } else {
           duration = getFeedbackTimeoutMs({ ...context, deliverySettings });
-          startTimestamp = getFeedbackTimeoutStartMs();
+          startTimestamp = getFeedbackTimeoutStartMs(context);
         }
         if (timeoutModeState !== mode || timeoutDuration !== duration || timeoutStart !== startTimestamp) {
           startTimeoutCountdown(duration, mode, startTimestamp);
         }
       } else if (timeoutModeState !== 'none') {
-        timeoutModeState = 'none';
-        timeoutStart = null;
-        timeoutDuration = 0;
-        timeoutProgress = 0;
-        remainingTime = 0;
-        clearTimeoutInterval();
+        timeoutCountdown.clear();
       }
     }
   }
@@ -1923,53 +1852,17 @@
   }
 
   async function handleVideoCheckpoint(event) {
-    const { index, questionIndex } = event.detail || {};
-    if (!state.matches('videoWaiting')) {
-      clientConsole(1, '[CardScreen] Rejected video checkpoint outside videoWaiting', {
-        state: currentState,
-        index,
-        questionIndex,
-      });
-      if (videoPlayer && typeof videoPlayer.recoverRejectedCheckpoint === 'function') {
-        videoPlayer.recoverRejectedCheckpoint();
-      }
-      return;
-    }
-    if (!Number.isFinite(questionIndex)) {
-      throw new Error('[CardScreen] Video checkpoint missing question index');
-    }
-    const checkpointTime = Number(videoCheckpoints?.times?.[index]);
-    if (!Number.isFinite(checkpointTime)) {
-      throw new Error('[CardScreen] Video checkpoint missing checkpoint time');
-    }
-    Session.set('engineIndices', { clusterIndex: questionIndex, stimIndex: 0 });
-    if (!testMode) {
-      Session.set('videoResumeAnchor', {
-        resumeStartTime: checkpointTime,
-        resumeCheckpointIndex: index,
-      });
-    }
-    send({ type: 'VIDEO_CHECKPOINT', checkpointIndex: index, questionIndex });
+    videoSessionBridge.handleCheckpoint(event.detail || {});
   }
 
   function handleVideoEnded() {
-    Session.set('engineIndices', undefined);
-    send({ type: 'VIDEO_ENDED' });
+    videoSessionBridge.handleEnded();
   }
 
   function handleVideoReady() {
     videoPlayerReady = true;
     void videoMachineBridge.flushPendingResume('video-ready');
-    if (!state.matches('videoWaiting') || !videoPlayer || showVideoInstructionOverlay) return;
-    const player = typeof videoPlayer.getPlayer === 'function'
-      ? videoPlayer.getPlayer()
-      : null;
-    if (player) {
-      player.muted = false;
-      player.volume = Number.isFinite(player.volume) && player.volume > 0
-        ? player.volume
-        : 1;
-    }
+    videoSessionBridge.prepareReadyPlayer(showVideoInstructionOverlay);
   }
 
   function markVideoInstructionsContinued() {
