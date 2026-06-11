@@ -122,6 +122,36 @@ function assertStateTransition(
   });
 }
 
+function assertPracticeObservation(
+  value: SparcPracticeObservation,
+  label: string,
+  documentId: string,
+): void {
+  if (!isRecord(value)) {
+    throw new Error(`${label} must be an object`);
+  }
+  if (typeof value.observationId !== 'string' || value.observationId.trim().length === 0) {
+    throw new Error(`${label}.observationId is required`);
+  }
+  assertAddress(value.sourceAddress, `${label}.sourceAddress`);
+  assertSameDocument(value.sourceAddress.documentId, documentId, `${label}.sourceAddress`);
+}
+
+function assertTraceStep(
+  value: SparcTraceStep,
+  label: string,
+  documentId: string,
+): void {
+  if (!isRecord(value)) {
+    throw new Error(`${label} must be an object`);
+  }
+  if (typeof value.traceId !== 'string' || value.traceId.trim().length === 0) {
+    throw new Error(`${label}.traceId is required`);
+  }
+  assertAddress(value.sourceAddress, `${label}.sourceAddress`);
+  assertSameDocument(value.sourceAddress.documentId, documentId, `${label}.sourceAddress`);
+}
+
 function readSparcExtension(record: CanonicalHistoryRecord): SparcCanonicalHistoryExtension | null {
   if (record.eventType !== 'sparc') {
     return null;
@@ -165,6 +195,13 @@ export function applySparcHistoryRecord(
       };
     }
     nextTransitions = [...state.transitions, extension.stateTransition];
+  }
+
+  if (extension.practiceObservation) {
+    assertPracticeObservation(extension.practiceObservation, 'sparc.practiceObservation', extension.documentId);
+  }
+  if (extension.traceStep) {
+    assertTraceStep(extension.traceStep, 'sparc.traceStep', extension.documentId);
   }
 
   const observations = extension.practiceObservation

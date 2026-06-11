@@ -254,6 +254,58 @@ describe('sparcStateReplay', function() {
     );
   });
 
+  it('rejects SPARC practice observations that point at another document', function() {
+    assert.throws(
+      () => replaySparcHistory([
+        makeBaseSparcRecord({
+          documentId: 'doc-1',
+          sourceAddress: {
+            documentId: 'doc-1',
+            nodeId: 'region-1',
+          },
+          practiceObservation: {
+            observationId: 'obs-1',
+            sourceAddress: {
+              documentId: 'doc-2',
+              nodeId: 'widget-1',
+            },
+            time: 2000,
+            problemStartTime: 1000,
+            outcome: 'correct',
+            responseValue: 'answer',
+          },
+        }),
+      ]),
+      /sparc\.practiceObservation\.sourceAddress\.documentId "doc-2" does not match SPARC history document "doc-1"/,
+    );
+  });
+
+  it('rejects SPARC trace steps that point at another document', function() {
+    assert.throws(
+      () => replaySparcHistory([
+        makeBaseSparcRecord({
+          documentId: 'doc-1',
+          sourceAddress: {
+            documentId: 'doc-1',
+            nodeId: 'region-1',
+          },
+          traceStep: {
+            traceId: 'trace-1',
+            sourceAddress: {
+              documentId: 'doc-2',
+              nodeId: 'widget-1',
+            },
+            productionRuleId: 'rule-1',
+            actionId: 'widget-1::UpdateTextField::answer',
+            outcome: 'correct',
+            time: 2000,
+          },
+        }),
+      ]),
+      /sparc\.traceStep\.sourceAddress\.documentId "doc-2" does not match SPARC history document "doc-1"/,
+    );
+  });
+
   it('rejects malformed replay writes instead of inferring state', function() {
     assert.throws(
       () => replaySparcHistory([
