@@ -142,8 +142,8 @@ response-outcome history, authored initial state, authored model targets,
 authored response outcomes, condition evaluation, model-history exchange,
 model-query adaptation, model-update requests, response-outcome
 commit/authored-rules, vertical layout validation, CTAT trace comparison,
-reactive rule commit/evaluation, state-transition history, and sample
-documents.
+CTAT sample BRD verification, reactive rule commit/evaluation,
+state-transition history, and sample documents.
 
 ## BRD And CTAT Role
 

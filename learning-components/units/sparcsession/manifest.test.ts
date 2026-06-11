@@ -27,6 +27,7 @@ describe('sparcSessionUnitComponentManifest', function() {
       'sparc.authored-model-targets',
       'sparc.authored-response-outcome',
       'sparc.condition-evaluation',
+      'sparc.ctat-sample-brd-verification',
       'sparc.ctat-trace-comparison',
       'sparc.document-addressing',
       'sparc.document-replay',
