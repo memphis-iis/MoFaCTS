@@ -227,6 +227,32 @@ function validateReactiveRuleConditionReferences(
   }
 }
 
+function validateNodeReactiveConditionReferences(
+  document: SparcAuthoredDocument,
+  node: SparcAuthoredNode,
+  issues: SparcReferenceValidationIssue[],
+): void {
+  if (node.reactive?.visibleWhen) {
+    validateConditionReferences({
+      document,
+      condition: node.reactive.visibleWhen,
+      sourceNodeId: `${node.id}:reactive.visibleWhen`,
+      issues,
+    });
+  }
+  if (node.reactive?.enabledWhen) {
+    validateConditionReferences({
+      document,
+      condition: node.reactive.enabledWhen,
+      sourceNodeId: `${node.id}:reactive.enabledWhen`,
+      issues,
+    });
+  }
+  for (const child of node.children ?? []) {
+    validateNodeReactiveConditionReferences(document, child, issues);
+  }
+}
+
 function validateInitialStateReferences(
   document: SparcAuthoredDocument,
   issues: SparcReferenceValidationIssue[],
@@ -360,6 +386,7 @@ export function validateSparcDocumentReferences(
   validateInitialStateReferences(document, issues);
   validateReactiveRuleReferences(document, issues);
   validateReactiveRuleConditionReferences(document, issues);
+  validateNodeReactiveConditionReferences(document, document.root, issues);
   validateAuthoredModelTargets(document, document.root, issues);
   return {
     valid: issues.length === 0,

@@ -62,6 +62,11 @@ export type SparcLayoutPolicy = {
   readonly overflowX?: 'clip' | 'hidden' | 'visible';
 };
 
+export type SparcNodeReactivity = {
+  readonly visibleWhen?: SparcCondition;
+  readonly enabledWhen?: SparcCondition;
+};
+
 export type SparcAuthoredNode = {
   readonly id: string;
   readonly kind: SparcNodeKind;
@@ -69,6 +74,7 @@ export type SparcAuthoredNode = {
   readonly refs?: readonly SparcAddressReference[];
   readonly modelTarget?: SparcModelTargetIdentity;
   readonly layout?: SparcLayoutPolicy;
+  readonly reactive?: SparcNodeReactivity;
 };
 
 export type SparcAuthoredDocument = {

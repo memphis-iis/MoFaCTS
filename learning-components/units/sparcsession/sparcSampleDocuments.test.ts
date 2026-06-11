@@ -103,6 +103,7 @@ describe('sparcSampleDocuments', function() {
   it('authors initial state and reactive rules as part of the sample document start state', function() {
     const sample = findSparcSampleDocument('html-factors-balloons');
     assert.ok(sample);
+    const finalAnswerRegion = sample.document.root.children?.find((node) => node.id === 'final-answer-region');
 
     assert.deepEqual(sample.document.initialState, [{
       target: {
@@ -138,6 +139,21 @@ describe('sparcSampleDocuments', function() {
         value: true,
       }],
     }]);
+    assert.deepEqual(finalAnswerRegion?.reactive, {
+      visibleWhen: {
+        type: 'state',
+        query: {
+          target: {
+            documentId: 'html-factors-balloons',
+            nodeId: 'conversion-table',
+            path: ['CV2'],
+          },
+          key: 'lastOutcome',
+        },
+        compare: 'eq',
+        value: 'correct',
+      },
+    });
   });
 
   it('generates CTAT-comparable traces from authored sample documents', function() {

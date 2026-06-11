@@ -382,6 +382,95 @@ describe('sparcDocumentAddressing', function() {
     assert.match(result.issues[0]?.message ?? '', /path segment "missing-widget" not found/);
   });
 
+  it('validates authored node reactive state-condition targets below region level', function() {
+    const document: SparcAuthoredDocument = {
+      id: 'doc-1',
+      schemaVersion: 1,
+      layout: {
+        scrollAxis: 'vertical',
+        maxWidth: '100%',
+        wideContent: 'reflow',
+      },
+      root: {
+        id: 'root',
+        kind: 'document',
+        children: [{
+          id: 'region-1',
+          kind: 'region',
+          children: [{
+            id: 'widget-1',
+            kind: 'widget',
+          }],
+        }, {
+          id: 'feedback-output',
+          kind: 'output',
+          reactive: {
+            visibleWhen: {
+              type: 'state',
+              query: {
+                target: {
+                  documentId: 'doc-1',
+                  nodeId: 'region-1',
+                  path: ['widget-1'],
+                },
+                key: 'lastOutcome',
+              },
+              compare: 'eq',
+              value: 'correct',
+            },
+          },
+        }],
+      },
+    };
+
+    assert.deepEqual(validateSparcDocumentReferences(document), {
+      valid: true,
+      issues: [],
+    });
+  });
+
+  it('validates authored node reactive model-condition targets', function() {
+    const document: SparcAuthoredDocument = {
+      id: 'doc-1',
+      schemaVersion: 1,
+      root: {
+        id: 'root',
+        kind: 'document',
+        children: [{
+          id: 'adaptive-panel',
+          kind: 'panel',
+          reactive: {
+            enabledWhen: {
+              type: 'model',
+              query: {
+                target: {
+                  sparcDocumentId: 'doc-1',
+                  sparcNodeId: 'adaptive-panel',
+                  stimuliSetId: 'stim-set-1',
+                  stimulusKC: 'kc-1',
+                  clusterKC: 'cluster-1',
+                  KCId: 'wrong-kc',
+                  KCDefault: 'kc-1',
+                  KCCluster: 'cluster-1',
+                },
+                metric: 'probability',
+              },
+              compare: 'gte',
+              value: 0.8,
+            },
+          },
+        }],
+      },
+    };
+
+    const result = validateSparcDocumentReferences(document);
+
+    assert.equal(result.valid, false);
+    assert.equal(result.issues[0]?.sourceNodeId, 'adaptive-panel:reactive.enabledWhen');
+    assert.equal(result.issues[0]?.reference.relation, 'model-target');
+    assert.match(result.issues[0]?.message ?? '', /KCId must equal stimulusKC/);
+  });
+
   it('validates authored initial-state write targets', function() {
     const document: SparcAuthoredDocument = {
       id: 'doc-1',

@@ -330,6 +330,21 @@ function createConversionFactorDocument(
             maxWidth: '100%',
             wideContent: 'reflow',
           },
+          reactive: {
+            visibleWhen: {
+              type: 'state',
+              query: {
+                target: {
+                  documentId: id,
+                  nodeId: 'conversion-table',
+                  path: ['CV2'],
+                },
+                key: 'lastOutcome',
+              },
+              compare: 'eq',
+              value: 'correct',
+            },
+          },
           children: [
             widgetNode('A3', id, [targetRef(id, 'conversion-table', 'depends-on')]),
             widgetNode('done', id, [targetRef(id, 'A3', 'depends-on')]),

@@ -36,6 +36,11 @@ model as a separate widget island.
 boundary. Conditions can query replayed SPARC state cells, query model-state
 metrics through `sparcModelQueries.ts`, and compose those checks with
 `all`/`any`/`not` without using renderer globals or string evaluation.
+Authored nodes can also declare `reactive.visibleWhen` or
+`reactive.enabledWhen`, giving SPARC a Shiny-style conditional panel/output
+shape while keeping the condition language shared with authored rules.
+Document validation resolves those node-level state and model conditions before
+runtime, including references into nested content below a region.
 
 SPARC practice and flashcard practice must use the same canonical history and
 database records where their concepts overlap. Shared fields include time,
