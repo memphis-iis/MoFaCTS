@@ -4,11 +4,7 @@ import {
   parseUnitClusterList,
   resolveModelClusterList,
 } from '../../content/tdf/clusterListParser';
-import { calculateCardProbabilities as runCalculateCardProbabilities } from './model/probabilityCalculation';
-import {
-  resolveLearningSessionClusterListSource,
-  resolveLearningSessionModelPreparationClusterListSource,
-} from './learningSessionRuntimeConfig';
+import { calculateCardProbabilities as runCalculateCardProbabilities } from './probabilityCalculation';
 
 export interface LearningSessionModelPreparationDeps {
   readonly getSessionValue: (key: string) => any;
@@ -19,6 +15,8 @@ export interface LearningSessionModelPreparationDeps {
   readonly rangeVal: (source: any) => any[];
   readonly legacyFloat: (source: any) => number;
   readonly legacyInt: (source: any) => number;
+  readonly resolveUnitClusterListSource: (unit: any, activeVideoSession: boolean) => unknown;
+  readonly resolveModelPreparationClusterListSource: (unit: any) => unknown;
   readonly log: (level: number, ...args: unknown[]) => void;
 }
 
@@ -30,9 +28,8 @@ export function calculateLearningSessionCardProbabilities(params: {
 }) {
   const unitNumber = params.deps.getSessionValue('currentUnitNumber');
   const curTdf = params.deps.findTdfById(params.deps.getSessionValue('currentTdfId'));
-  const clusterList = resolveLearningSessionModelPreparationClusterListSource(
-    curTdf.content.tdfs.tutor.unit[unitNumber],
-  );
+  const unit = curTdf.content.tdfs.tutor.unit[unitNumber];
+  const clusterList = params.deps.resolveModelPreparationClusterListSource(unit);
   if (!clusterList) {
     params.deps.log(2, 'no clusterlist found for unit ' + unitNumber);
   }
@@ -62,7 +59,7 @@ export function setUpLearningSessionClusterList(params: {
     currentTdfFile: params.deps.getSessionValue('currentTdfFile'),
     currentUnitNumber: params.deps.getSessionValue('currentUnitNumber'),
     subTdfIndex: params.deps.getSessionValue('subTdfIndex'),
-    unitClusterListSource: resolveLearningSessionClusterListSource(
+    unitClusterListSource: params.deps.resolveUnitClusterListSource(
       params.curUnit,
       params.deps.getSessionValue('isVideoSession') === true,
     ),

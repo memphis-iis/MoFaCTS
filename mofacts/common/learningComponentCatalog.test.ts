@@ -18,26 +18,71 @@ import type { LearningComponentManifest } from '../../learning-components/runtim
 describe('Learning component catalog', function() {
   it('derives unit runtime capabilities from the concrete app adapter', function() {
     const adapter: Partial<CreateUnitEngineDeps> = {
-      getSessionValue: () => undefined,
-      setSessionValue() {},
-      getDeliverySettings: () => ({}),
-      getStimCount: () => 0,
-      getStimCluster: () => ({}),
-      getStimKCBaseForCurrentStimuliSet: () => 0,
-      createAdaptiveQuestionLogic: () => ({}),
-      getExperimentState: () => ({}),
-      hasScheduleArtifactForUnit: () => false,
-      createExperimentState: async () => ({}),
-      reconstructLearningStateFromHistory: () => ({}),
+      session: {
+        getSessionValue: () => undefined,
+        setSessionValue() {},
+      },
+      deliverySettings: {
+        getDeliverySettings: () => ({}),
+      },
+      stimuli: {
+        getStimCount: () => 0,
+        getStimCluster: () => ({}),
+        getStimKCBaseForCurrentStimuliSet: () => 0,
+        getTestType: () => '',
+        getDisplayAnswerText: () => '',
+        extractDelimFields() {},
+        rangeVal: () => [],
+        legacyFloat: () => 0,
+        legacyInt: () => 0,
+        displayify: (value) => value,
+        findTdfById: () => ({}),
+      },
+      adaptiveModel: {
+        createAdaptiveQuestionLogic: () => ({}),
+        getHiddenItems: () => [],
+        setNumVisibleCards() {},
+        updateCurStudentPerformance() {},
+        updateCurStudedentPracticeTime() {},
+      },
+      assessmentState: {
+        getExperimentState: () => ({}),
+        hasScheduleArtifactForUnit: () => false,
+        createExperimentState: async () => ({}),
+      },
+      history: {
+        reconstructLearningStateFromHistory: () => ({}),
+      },
       serverMethods: {
         getAutoTutorHistoryForUnit: async () => [],
         getLearningHistoryForUnit: async () => [],
         getResponseKCMapForTdf: async () => ({}),
         getStimulusCrowdStatsForDeck: async () => [],
       },
-      currentUserHasRole: () => false,
-      log() {},
-      alertUser() {},
+      authz: {
+        currentUserHasRole: () => false,
+      },
+      progression: {
+        unitIsFinished() {},
+      },
+      cardState: {
+        setQuestionIndex() {},
+        setCardValue() {},
+        setAlternateDisplayIndex() {},
+        setOriginalQuestion() {},
+      },
+      user: {
+        getCurrentUserId: () => undefined,
+      },
+      app: {
+        extend: (target, source) => Object.assign(target, source),
+      },
+      logging: {
+        log() {},
+      },
+      uiAlerts: {
+        alertUser() {},
+      },
       aiProvider: {
         async callOpenRouterJson(options) {
           return {

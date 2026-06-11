@@ -2,9 +2,9 @@ import { expect } from 'chai';
 import {
   applyStimulusCrowdStatsToCards,
   collectStimulusKCsForCrowdStats,
-} from '../../learning-components/units/learning-session/model/stimulusCrowdStatsModel';
-import { calculateSingleProbability } from '../../learning-components/units/learning-session/model/probabilityCalculation';
-import { applyAnswerUpdate } from '../../learning-components/units/learning-session/model/answerUpdates';
+} from '../../learning-components/models/adaptive-logistic/stimulusCrowdStatsModel';
+import { calculateSingleProbability } from '../../learning-components/models/adaptive-logistic/probabilityCalculation';
+import { applyAnswerUpdate } from '../../learning-components/models/adaptive-logistic/answerUpdates';
 
 describe('learning-session crowd stats integration', function() {
   it('collects each stimulus KC once for the startup batch read', function() {

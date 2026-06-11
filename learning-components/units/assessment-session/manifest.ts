@@ -18,15 +18,15 @@ export const assessmentSessionUnitComponentManifest: LearningComponentManifest<C
   ],
   register(context) {
     context.registerUnitEngineWithDeps(ASSESSMENT_SESSION_UNIT_TYPE, (currentDeps) => createAssessmentUnitEngine({
-      getSessionValue: currentDeps.getSessionValue,
-      setSessionValue: currentDeps.setSessionValue,
-      getExperimentState: currentDeps.getExperimentState,
-      hasScheduleArtifactForUnit: currentDeps.hasScheduleArtifactForUnit,
-      createExperimentState: currentDeps.createExperimentState,
-      getStimCount: currentDeps.getStimCount,
-      setQuestionIndex: currentDeps.setQuestionIndex,
-      alertUser: currentDeps.alertUser,
-      log: currentDeps.log,
+      getSessionValue: currentDeps.session.getSessionValue,
+      setSessionValue: currentDeps.session.setSessionValue,
+      getExperimentState: currentDeps.assessmentState.getExperimentState,
+      hasScheduleArtifactForUnit: currentDeps.assessmentState.hasScheduleArtifactForUnit,
+      createExperimentState: currentDeps.assessmentState.createExperimentState,
+      getStimCount: currentDeps.stimuli.getStimCount,
+      setQuestionIndex: currentDeps.cardState.setQuestionIndex,
+      alertUser: currentDeps.uiAlerts.alertUser,
+      log: currentDeps.logging.log,
     }));
   },
 };

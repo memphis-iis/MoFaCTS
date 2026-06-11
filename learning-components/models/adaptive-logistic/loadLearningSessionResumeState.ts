@@ -1,4 +1,4 @@
-import { applyResumeModelState } from './model/resumeModelState';
+import { applyResumeModelState } from './resumeModelState';
 
 export interface LoadLearningSessionResumeStateParams {
   readonly userId: any;

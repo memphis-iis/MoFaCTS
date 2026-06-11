@@ -11,8 +11,8 @@ export const videoSessionUnitComponentManifest: LearningComponentManifest<Create
   requiredCapabilities: ['session', 'logging'],
   register(context) {
     context.registerUnitEngineWithDeps(VIDEO_SESSION_UNIT_TYPE, (currentDeps) => createVideoSessionUnitEngine({
-      setSessionValue: currentDeps.setSessionValue,
-      log: currentDeps.log,
+      setSessionValue: currentDeps.session.setSessionValue,
+      log: currentDeps.logging.log,
     }));
   },
 };

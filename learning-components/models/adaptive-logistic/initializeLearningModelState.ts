@@ -1,10 +1,9 @@
-import { createInitialModelState } from './model/modelStateFactory';
+import { createInitialModelState } from './modelStateFactory';
 import {
   applyStimulusCrowdStatsToCards,
   collectStimulusKCsForCrowdStats,
   type StimulusCrowdStat,
-} from './model/stimulusCrowdStatsModel';
-import { resolveLearningSessionRuntimeConfig } from './learningSessionRuntimeConfig';
+} from './stimulusCrowdStatsModel';
 
 export interface InitializeLearningModelStateParams {
   readonly numQuestions: number;
@@ -20,6 +19,8 @@ export interface InitializeLearningModelStateParams {
   readonly normalizeResponseText: (rawResponse: unknown) => string;
   readonly setUpClusterList: (cards: any[]) => void;
   readonly initCardProbs: (overrideData: any) => void;
+  readonly resolveRuntimeConfig: (unit: any) => Record<string, unknown> | null;
+  readonly unitLabel: string;
   readonly alertUser: (message: string) => void;
   readonly log: (level: number, ...args: unknown[]) => void;
 }
@@ -64,14 +65,14 @@ export async function initializeLearningModelState(
   params.log(2, 'initCards:', initCards, initProbs);
 
   if (!initCards || initCards.length === 0) {
-    const session = resolveLearningSessionRuntimeConfig(params.currentTdfUnit) || {};
-    const errorMsg = `Learning/video session in unit "${params.currentTdfUnit.unitname}" (unit ${params.currentUnitNumber}) has no cards. ` +
+    const session = params.resolveRuntimeConfig(params.currentTdfUnit) || {};
+    const errorMsg = `${params.unitLabel} in unit "${params.currentTdfUnit.unitname}" (unit ${params.currentUnitNumber}) has no cards. ` +
       `Check clusterlist configuration. ` +
       `Clusterlist: "${session.clusterlist || 'MISSING'}", ` +
       `NumQuestions: ${params.numQuestions}, ` +
       `InitCards length: ${initCards ? initCards.length : 'null'}`;
     params.log(1, '[Unit Engine] EMPTY MODEL ERROR:', errorMsg);
-    params.alertUser('Learning session has no cards - check TDF clusterlist configuration');
+    params.alertUser(`${params.unitLabel} has no cards - check TDF clusterlist configuration`);
     throw new Error(errorMsg);
   }
 }

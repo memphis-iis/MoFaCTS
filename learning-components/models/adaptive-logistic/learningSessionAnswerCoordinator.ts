@@ -1,5 +1,5 @@
 import { stripSpacesAndLowerCase } from '../../content/response-normalization/responseKey';
-import { applyAnswerUpdate } from './model/answerUpdates';
+import { applyAnswerUpdate } from './answerUpdates';
 
 export async function applyLearningSessionAnswer(params: {
   readonly cardProbabilities: any;

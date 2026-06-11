@@ -49,43 +49,69 @@ function getRandomInt(max: any) {
 
 function createUnitEngineDeps(): CreateUnitEngineDeps {
   return {
-    extend: (target, source) => _.extend(target, source),
-    createAdaptiveQuestionLogic: () => new AdaptiveQuestionLogic(),
-    getSessionValue: (key) => Session.get(key),
-    setSessionValue: (key, value) => Session.set(key, value),
-    getDeliverySettings: () => deliverySettingsStore.get() as Record<string, any>,
-    getStimCount,
-    getStimCluster: (clusterIndex) => getStimCluster(clusterIndex) as any,
-    getStimKCBaseForCurrentStimuliSet,
-    getTestType,
-    getHiddenItems: () => CardStore.getHiddenItems(),
-    setNumVisibleCards: (numVisibleCards) => CardStore.setNumVisibleCards(numVisibleCards),
-    setQuestionIndex: (questionIndex) => CardStore.setQuestionIndex(questionIndex),
-    getDisplayAnswerText: (answer) => Answers.getDisplayAnswerText(answer),
-    updateCurStudentPerformance,
-    updateCurStudedentPracticeTime,
+    app: {
+      extend: (target, source) => _.extend(target, source),
+    },
+    session: {
+      getSessionValue: (key) => Session.get(key),
+      setSessionValue: (key, value) => Session.set(key, value),
+    },
+    deliverySettings: {
+      getDeliverySettings: () => deliverySettingsStore.get() as Record<string, any>,
+    },
+    stimuli: {
+      getStimCount,
+      getStimCluster: (clusterIndex) => getStimCluster(clusterIndex) as any,
+      getStimKCBaseForCurrentStimuliSet,
+      getTestType,
+      getDisplayAnswerText: (answer) => Answers.getDisplayAnswerText(answer),
+      extractDelimFields,
+      rangeVal,
+      legacyFloat,
+      legacyInt,
+      displayify,
+      findTdfById: (tdfId) => Tdfs.findOne({_id: tdfId}),
+    },
+    adaptiveModel: {
+      createAdaptiveQuestionLogic: () => new AdaptiveQuestionLogic(),
+      getHiddenItems: () => CardStore.getHiddenItems(),
+      setNumVisibleCards: (numVisibleCards) => CardStore.setNumVisibleCards(numVisibleCards),
+      updateCurStudentPerformance,
+      updateCurStudedentPracticeTime,
+    },
+    history: {
+      reconstructLearningStateFromHistory,
+    },
+    cardState: {
+      setQuestionIndex: (questionIndex) => CardStore.setQuestionIndex(questionIndex),
+      setCardValue: (key, value) => CardStore.setCardValue(key, value),
+      setAlternateDisplayIndex: (value) => CardStore.setAlternateDisplayIndex(value),
+      setOriginalQuestion: (value) => CardStore.setOriginalQuestion(value),
+    },
     serverMethods: createUnitEngineServerMethods({ meteorCallAsync }),
-    getCurrentUserId: () => Meteor.userId(),
-    reconstructLearningStateFromHistory,
-    extractDelimFields,
-    rangeVal,
-    legacyFloat,
-    legacyInt,
-    currentUserHasRole,
-    displayify,
-    unitIsFinished,
-    findTdfById: (tdfId) => Tdfs.findOne({_id: tdfId}),
-    getExperimentState: () => ExperimentStateStore.get(),
-    hasScheduleArtifactForUnit,
-    createExperimentState,
-    setCardValue: (key, value) => CardStore.setCardValue(key, value),
-    setAlternateDisplayIndex: (value) => CardStore.setAlternateDisplayIndex(value),
-    setOriginalQuestion: (value) => CardStore.setOriginalQuestion(value),
-    alertUser: (message) => alert(message),
+    user: {
+      getCurrentUserId: () => Meteor.userId(),
+    },
+    authz: {
+      currentUserHasRole,
+    },
+    progression: {
+      unitIsFinished,
+    },
+    assessmentState: {
+      getExperimentState: () => ExperimentStateStore.get(),
+      hasScheduleArtifactForUnit,
+      createExperimentState,
+    },
+    uiAlerts: {
+      alertUser: (message) => alert(message),
+    },
     aiProvider: {
       callOpenRouterJson,
     },
-    log: (level, ...args) => clientConsole(level, ...args),
+    logging: {
+      log: (level, ...args) => clientConsole(level, ...args),
+    },
   };
 }
 

@@ -19,3 +19,30 @@ export function resolveSparcSessionClusterListSource(
     ? clusterlist.trim()
     : clusterlist;
 }
+
+export function resolveSparcSessionUnitMode(
+  unit: SparcSessionConfigUnit | null | undefined,
+): string {
+  const unitMode = resolveSparcSessionRuntimeConfig(unit)?.unitMode;
+  return typeof unitMode === 'string' && unitMode.trim()
+    ? unitMode.trim()
+    : 'default';
+}
+
+export function resolveSparcSessionProbabilitySource(
+  unit: SparcSessionConfigUnit | null | undefined,
+): string | undefined {
+  const calculateProbability = resolveSparcSessionRuntimeConfig(unit)?.calculateProbability;
+  if (typeof calculateProbability !== 'string') {
+    return undefined;
+  }
+
+  const trimmed = calculateProbability.trim();
+  return trimmed || undefined;
+}
+
+export function resolveSparcSessionModelPreparationClusterListSource(
+  unit: SparcSessionConfigUnit | null | undefined,
+): unknown {
+  return resolveSparcSessionClusterListSource(unit);
+}

@@ -23,42 +23,94 @@ import {
   VIDEO_SESSION_UNIT_TYPE,
 } from './defaultUnitComponents';
 
-export interface CreateUnitEngineDeps {
+export interface UnitEngineAppRuntime {
   readonly extend: (target: any, source: any) => any;
-  readonly createAdaptiveQuestionLogic: () => any;
+}
+
+export interface UnitEngineSessionRuntime {
   readonly getSessionValue: (key: string) => any;
   readonly setSessionValue: (key: string, value: any) => void;
+}
+
+export interface UnitEngineDeliverySettingsRuntime {
   readonly getDeliverySettings: () => Record<string, any>;
+}
+
+export interface UnitEngineStimuliRuntime {
   readonly getStimCount: () => number;
   readonly getStimCluster: (clusterIndex: any) => any;
   readonly getStimKCBaseForCurrentStimuliSet: () => any;
   readonly getTestType: () => string;
-  readonly getHiddenItems: () => unknown[];
-  readonly setNumVisibleCards: (numVisibleCards: number) => void;
-  readonly setQuestionIndex: (questionIndex: number) => void;
   readonly getDisplayAnswerText: (answer: any) => string;
-  readonly updateCurStudentPerformance: (wasCorrect: any, practiceTime: any, testType: any) => void;
-  readonly updateCurStudedentPracticeTime: (practiceTime: any) => void;
-  readonly serverMethods: UnitEngineServerMethods;
-  readonly getCurrentUserId: () => any;
-  readonly reconstructLearningStateFromHistory: (historyRows: any[]) => any;
   readonly extractDelimFields: (source: any, target: any[]) => void;
   readonly rangeVal: (source: any) => any[];
   readonly legacyFloat: (source: any) => number;
   readonly legacyInt: (source: any) => number;
-  readonly currentUserHasRole: (roles: string) => boolean;
   readonly displayify: (value: any) => any;
-  readonly unitIsFinished: (reason: string) => void;
   readonly findTdfById: (tdfId: any) => any;
-  readonly getExperimentState: () => any;
-  readonly hasScheduleArtifactForUnit: (experimentState: any, unitNumber: any) => boolean;
-  readonly createExperimentState: (newExperimentState: any) => Promise<any>;
+}
+
+export interface UnitEngineAdaptiveModelRuntime {
+  readonly createAdaptiveQuestionLogic: () => any;
+  readonly getHiddenItems: () => unknown[];
+  readonly setNumVisibleCards: (numVisibleCards: number) => void;
+  readonly updateCurStudentPerformance: (wasCorrect: any, practiceTime: any, testType: any) => void;
+  readonly updateCurStudedentPracticeTime: (practiceTime: any) => void;
+}
+
+export interface UnitEngineHistoryRuntime {
+  readonly reconstructLearningStateFromHistory: (historyRows: any[]) => any;
+}
+
+export interface UnitEngineCardStateRuntime {
+  readonly setQuestionIndex: (questionIndex: number) => void;
   readonly setCardValue: (key: string, value: unknown) => void;
   readonly setAlternateDisplayIndex: (value: number | undefined) => void;
   readonly setOriginalQuestion: (value: unknown) => void;
+}
+
+export interface UnitEngineUserRuntime {
+  readonly getCurrentUserId: () => any;
+}
+
+export interface UnitEngineAuthorizationRuntime {
+  readonly currentUserHasRole: (roles: string) => boolean;
+}
+
+export interface UnitEngineProgressionRuntime {
+  readonly unitIsFinished: (reason: string) => void;
+}
+
+export interface UnitEngineAssessmentStateRuntime {
+  readonly getExperimentState: () => any;
+  readonly hasScheduleArtifactForUnit: (experimentState: any, unitNumber: any) => boolean;
+  readonly createExperimentState: (newExperimentState: any) => Promise<any>;
+}
+
+export interface UnitEngineUserAlertsRuntime {
   readonly alertUser: (message: string) => void;
-  readonly aiProvider: AiProviderRuntime;
+}
+
+export interface UnitEngineLoggerRuntime {
   readonly log: (level: number, ...args: unknown[]) => void;
+}
+
+export interface CreateUnitEngineDeps {
+  readonly app: UnitEngineAppRuntime;
+  readonly session: UnitEngineSessionRuntime;
+  readonly deliverySettings: UnitEngineDeliverySettingsRuntime;
+  readonly stimuli: UnitEngineStimuliRuntime;
+  readonly adaptiveModel: UnitEngineAdaptiveModelRuntime;
+  readonly history: UnitEngineHistoryRuntime;
+  readonly cardState: UnitEngineCardStateRuntime;
+  readonly serverMethods: UnitEngineServerMethods;
+  readonly user: UnitEngineUserRuntime;
+  readonly authz: UnitEngineAuthorizationRuntime;
+  readonly progression: UnitEngineProgressionRuntime;
+  readonly assessmentState: UnitEngineAssessmentStateRuntime;
+  readonly uiAlerts: UnitEngineUserAlertsRuntime;
+  readonly aiProvider: AiProviderRuntime;
+  readonly logging: UnitEngineLoggerRuntime;
 }
 
 async function createWithBase(
@@ -68,22 +120,18 @@ async function createWithBase(
 ) {
   const baseEngine = createDefaultUnitEngine(deps, curExperimentData);
   const engineExtension = await createRegisteredUnitEngine(unitType, deps);
-  const engine = deps.extend(baseEngine, engineExtension);
+  const engine = deps.app.extend(baseEngine, engineExtension);
   await engine.init();
   return engine;
 }
 
 function getStimAnswer(deps: CreateUnitEngineDeps, clusterIndex: any, whichAnswer: any) {
-  const cluster = deps.getStimCluster(clusterIndex);
+  const cluster = deps.stimuli.getStimCluster(clusterIndex);
   const stim = cluster.stims[whichAnswer];
   if (!stim) {
     throw new Error(`Stim not found for cluster ${clusterIndex}, stim ${whichAnswer}`);
   }
   return stim.correctResponse;
-}
-
-function hasFunctions(deps: Partial<CreateUnitEngineDeps>, ...names: Array<keyof CreateUnitEngineDeps>): boolean {
-  return names.every((name) => typeof deps[name] === 'function');
 }
 
 function hasNamedServerMethods(deps: Partial<CreateUnitEngineDeps>): boolean {
@@ -93,6 +141,11 @@ function hasNamedServerMethods(deps: Partial<CreateUnitEngineDeps>): boolean {
   return [...getUnitEngineServerMethodNames()].every((methodName) =>
     typeof deps.serverMethods?.[methodName] === 'function'
   );
+}
+
+function hasRuntimeFunctions(value: unknown, ...names: string[]): boolean {
+  return Boolean(value && typeof value === 'object') &&
+    names.every((name) => typeof (value as Record<string, unknown>)[name] === 'function');
 }
 
 export function getCreateUnitEngineServerMethodSet(
@@ -108,37 +161,42 @@ export function getCreateUnitEngineCapabilitySet(
   deps: Partial<CreateUnitEngineDeps>,
 ): Set<LearningComponentCapability> {
   const capabilities = new Set<LearningComponentCapability>();
-  if (hasFunctions(deps, 'getSessionValue', 'setSessionValue')) {
+  if (hasRuntimeFunctions(deps.session, 'getSessionValue', 'setSessionValue')) {
     capabilities.add('session');
   }
-  if (hasFunctions(deps, 'getDeliverySettings')) {
+  if (hasRuntimeFunctions(deps.deliverySettings, 'getDeliverySettings')) {
     capabilities.add('delivery-settings');
   }
-  if (hasFunctions(deps, 'getStimCount', 'getStimCluster', 'getStimKCBaseForCurrentStimuliSet')) {
+  if (hasRuntimeFunctions(deps.stimuli, 'getStimCount', 'getStimCluster', 'getStimKCBaseForCurrentStimuliSet')) {
     capabilities.add('stimuli');
   }
-  if (hasFunctions(deps, 'createAdaptiveQuestionLogic')) {
+  if (hasRuntimeFunctions(deps.adaptiveModel, 'createAdaptiveQuestionLogic')) {
     capabilities.add('adaptive-model');
   }
-  if (hasFunctions(deps, 'getExperimentState', 'hasScheduleArtifactForUnit', 'createExperimentState')) {
+  if (hasRuntimeFunctions(
+    deps.assessmentState,
+    'getExperimentState',
+    'hasScheduleArtifactForUnit',
+    'createExperimentState',
+  )) {
     capabilities.add('assessment-state');
   }
-  if (hasFunctions(deps, 'reconstructLearningStateFromHistory')) {
+  if (hasRuntimeFunctions(deps.history, 'reconstructLearningStateFromHistory')) {
     capabilities.add('history');
   }
   if (hasNamedServerMethods(deps)) {
     capabilities.add('server-methods');
   }
-  if (hasFunctions(deps, 'currentUserHasRole')) {
+  if (hasRuntimeFunctions(deps.authz, 'currentUserHasRole')) {
     capabilities.add('authz');
   }
-  if (hasFunctions(deps, 'log')) {
+  if (hasRuntimeFunctions(deps.logging, 'log')) {
     capabilities.add('logging');
   }
-  if (hasFunctions(deps, 'alertUser')) {
+  if (hasRuntimeFunctions(deps.uiAlerts, 'alertUser')) {
     capabilities.add('ui-alerts');
   }
-  if (deps.aiProvider && typeof deps.aiProvider.callOpenRouterJson === 'function') {
+  if (hasRuntimeFunctions(deps.aiProvider, 'callOpenRouterJson')) {
     capabilities.add('ai-provider');
   }
   return capabilities;
@@ -146,24 +204,24 @@ export function getCreateUnitEngineCapabilitySet(
 
 export function createDefaultUnitEngine(deps: CreateUnitEngineDeps, curExperimentData: any): any {
   const stimClusters: any[] = [];
-  const numQuestions = deps.getStimCount();
+  const numQuestions = deps.stimuli.getStimCount();
   for (let i = 0; i < numQuestions; ++i) {
-    stimClusters.push(deps.getStimCluster(i));
+    stimClusters.push(deps.stimuli.getStimCluster(i));
   }
   const engine = createBaseUnitEngine({
     experimentState: curExperimentData.experimentState,
-    adaptiveQuestionLogic: deps.createAdaptiveQuestionLogic(),
+    adaptiveQuestionLogic: deps.adaptiveModel.createAdaptiveQuestionLogic(),
     stimClusters,
-    getCurrentTestType: () => deps.getSessionValue('testType'),
-    getDeliverySettings: deps.getDeliverySettings,
+    getCurrentTestType: () => deps.session.getSessionValue('testType'),
+    getDeliverySettings: deps.deliverySettings.getDeliverySettings,
     getStimAnswer: (clusterIndex, whichAnswer) => getStimAnswer(deps, clusterIndex, whichAnswer),
-    setSessionValue: deps.setSessionValue,
-    setCardValue: deps.setCardValue,
-    setAlternateDisplayIndex: deps.setAlternateDisplayIndex,
-    setOriginalQuestion: deps.setOriginalQuestion,
-    log: deps.log,
+    setSessionValue: deps.session.setSessionValue,
+    setCardValue: deps.cardState.setCardValue,
+    setAlternateDisplayIndex: deps.cardState.setAlternateDisplayIndex,
+    setOriginalQuestion: deps.cardState.setOriginalQuestion,
+    log: deps.logging.log,
   });
-  deps.log(1, 'curExperimentData:', curExperimentData);
+  deps.logging.log(1, 'curExperimentData:', curExperimentData);
   return engine;
 }
 

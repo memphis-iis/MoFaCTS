@@ -1,7 +1,7 @@
 import {
   selectCardBelowOptimalProbability,
   selectCardClosestToOptimalProbability,
-} from './model/selectionPolicy';
+} from './selectionPolicy';
 
 export interface SelectLearningSessionIndicesParams {
   readonly unitMode: string;
