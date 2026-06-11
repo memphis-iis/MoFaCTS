@@ -33,6 +33,12 @@ export async function createPerformanceIndexes() {
     serverConsole('  Created: Histories.userId_TDFId_type_time');
 
     await Histories.rawCollection().createIndex(
+      { userId: 1, levelUnitType: 1, TDFId: 1, recordedServerTime: 1 },
+      { name: 'dash_user_type_tdf_recorded_time', background: true }
+    );
+    serverConsole('  Created: Histories.dashboard_user_type_tdf_recorded_time');
+
+    await Histories.rawCollection().createIndex(
       { TDFId: 1, levelUnitType: 1, recordedServerTime: -1 },
       { name: 'perf_TDFId_type_time', background: true }
     );
@@ -133,6 +139,18 @@ export async function createPerformanceIndexes() {
     );
     serverConsole('  Created: Tdfs.accessors_user_lessonname_id');
 
+    await Tdfs.rawCollection().createIndex(
+      { 'content.tdfs.tutor.setspec.condition': 1 },
+      { name: 'dash_condition_ref', background: true }
+    );
+    serverConsole('  Created: Tdfs.dashboard_condition_ref');
+
+    await Tdfs.rawCollection().createIndex(
+      { 'content.tdfs.tutor.setspec.conditionTdfIds': 1 },
+      { name: 'dash_condition_tdf_ids', background: true }
+    );
+    serverConsole('  Created: Tdfs.dashboard_condition_tdf_ids');
+
     serverConsole('Creating indexes for Stims collection...');
     await Stims.rawCollection().createIndex(
       { 'meta.fileName': 1 },
@@ -222,10 +240,10 @@ export async function createPerformanceIndexes() {
     serverConsole('  Created: UserDashboardCache.usageSummary.lastActivityDate');
 
     serverConsole('========================================');
-    serverConsole('All 31 performance indexes created successfully');
+    serverConsole('All 34 performance indexes created successfully');
     serverConsole('========================================');
 
-    return { success: true, indexesCreated: 31 };
+    return { success: true, indexesCreated: 34 };
   } catch (error) {
     serverConsole('========================================');
     serverConsole('Error creating performance indexes:', error);

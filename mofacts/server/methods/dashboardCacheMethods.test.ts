@@ -648,6 +648,167 @@ describe('dashboardCacheMethods', function() {
     expect(cacheDoc.summary.totalTrialsAllTime).to.equal(1);
   });
 
+  it('initializeDashboardCache resolves condition roots with a targeted child-reference query', async function() {
+    const userId = 'learner-1';
+    const tdfFindSelectors: any[] = [];
+    let cacheDoc: any = null;
+    const childTdf = {
+      _id: 'child-tdf',
+      content: {
+        fileName: 'child.json',
+        tdfs: { tutor: { setspec: { lessonname: 'Child Lesson' } } }
+      }
+    };
+    const rootTdf = {
+      _id: 'root-tdf',
+      content: {
+        tdfs: {
+          tutor: {
+            setspec: {
+              lessonname: 'Root Lesson',
+              conditionTdfIds: ['child-tdf']
+            }
+          }
+        }
+      }
+    };
+    const methods = createDashboardCacheMethods({
+      Meteor: {
+        Error: class MeteorError extends Error {
+          error: string;
+          constructor(error: string, reason?: string) {
+            super(reason || error);
+            this.error = error;
+          }
+        }
+      },
+      Roles: { userIsInRoleAsync: async () => false },
+      Histories: {
+        find: () => ({
+          fetchAsync: async () => [
+            {
+              _id: 'h1',
+              userId,
+              TDFId: 'child-tdf',
+              outcome: 'correct',
+              CFEndLatency: 1000,
+              CFFeedbackLatency: 500,
+              stimuliSetId: 'set-a',
+              stimulusKC: 'stim-a',
+              clusterKC: 'cluster-a',
+              recordedServerTime: new Date('2026-05-01T00:00:00.000Z'),
+              levelUnitType: 'model'
+            }
+          ]
+        }),
+        rawCollection: () => ({ distinct: async () => ['child-tdf'] })
+      },
+      Tdfs: {
+        findOneAsync: async () => null,
+        find: (selector: any) => {
+          tdfFindSelectors.push(selector);
+          return {
+            fetchAsync: async () => {
+              if (selector?._id?.$in?.includes('child-tdf')) {
+                return [childTdf];
+              }
+              if (selector?.$or?.some((term: any) =>
+                term['content.tdfs.tutor.setspec.conditionTdfIds']?.$in?.includes('child-tdf')
+              )) {
+                return [rootTdf];
+              }
+              return [];
+            }
+          };
+        }
+      },
+      UserDashboardCache: {
+        upsertAsync: async (_selector: any, modifier: any) => {
+          cacheDoc = {
+            ...(cacheDoc || {}),
+            ...(modifier.$set || {})
+          };
+        },
+        findOneAsync: async () => cacheDoc
+      },
+      usersCollection: { findOneAsync: async () => ({ _id: userId }) },
+      serverConsole: () => undefined,
+      computePracticeTimeMs: (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0),
+      canViewDashboardTdf: () => true,
+      redisBoundary: disabledRedisBoundary
+    });
+
+    const result = await methods.initializeDashboardCache.call({ userId });
+
+    expect(result.tdfCount).to.equal(1);
+    expect(cacheDoc.tdfStats).to.have.property('root-tdf');
+    expect(cacheDoc.tdfStats).to.not.have.property('child-tdf');
+    expect(tdfFindSelectors[1]).to.deep.equal({
+      $or: [
+        { 'content.tdfs.tutor.setspec.condition': { $in: ['child-tdf', 'child.json'] } },
+        { 'content.tdfs.tutor.setspec.conditionTdfIds': { $in: ['child-tdf'] } }
+      ]
+    });
+    expect(tdfFindSelectors.some((selector) => selector?.['content.tdfs.tutor.setspec.condition']?.$exists === true)).to.equal(false);
+  });
+
+  it('refreshUserAdminUsageCaches refreshes users with bounded concurrency and progress logging', async function() {
+    const adminId = 'admin-1';
+    const userIds = Array.from({ length: 12 }, (_value, index) => `user-${index + 1}`);
+    const logs: string[] = [];
+    let activeDistincts = 0;
+    let maxActiveDistincts = 0;
+
+    const methods = createDashboardCacheMethods({
+      Meteor: {
+        Error: class MeteorError extends Error {
+          error: string;
+          constructor(error: string, reason?: string) {
+            super(reason || error);
+            this.error = error;
+          }
+        }
+      },
+      Roles: { userIsInRoleAsync: async () => true },
+      Histories: {
+        find: () => ({ fetchAsync: async () => [] }),
+        rawCollection: () => ({
+          distinct: async () => {
+            activeDistincts += 1;
+            maxActiveDistincts = Math.max(maxActiveDistincts, activeDistincts);
+            await new Promise((resolve) => setTimeout(resolve, 5));
+            activeDistincts -= 1;
+            return [];
+          }
+        })
+      },
+      Tdfs: {
+        findOneAsync: async () => null,
+        find: () => ({ fetchAsync: async () => [] })
+      },
+      UserDashboardCache: {
+        upsertAsync: async () => undefined,
+        findOneAsync: async () => null
+      },
+      usersCollection: { findOneAsync: async (_selector: any) => ({ _id: _selector._id }) },
+      serverConsole: (...args: any[]) => { logs.push(args.join(' ')); },
+      computePracticeTimeMs: (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0),
+      canViewDashboardTdf: () => true,
+      redisBoundary: disabledRedisBoundary
+    });
+
+    const result = await methods.refreshUserAdminUsageCaches.call({ userId: adminId }, userIds);
+
+    expect(result.success).to.equal(true);
+    expect(result.refreshed).to.have.length(12);
+    expect(result.failed).to.deep.equal([]);
+    expect(maxActiveDistincts).to.be.greaterThan(1);
+    expect(maxActiveDistincts).to.be.at.most(4);
+    expect(logs.some((line) => line.includes('Refreshing 12 user dashboard caches with concurrency 4'))).to.equal(true);
+    expect(logs.some((line) => line.includes('Refreshed 10/12 user dashboard caches'))).to.equal(true);
+    expect(logs.some((line) => line.includes('Refreshed 12/12 user dashboard caches'))).to.equal(true);
+  });
+
   it('resetAdminLessonProgress clears admin history, experiment state, and root cache stats for a condition family', async function() {
     const userId = 'admin-1';
     const docs = {

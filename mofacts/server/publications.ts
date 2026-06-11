@@ -514,12 +514,12 @@ Meteor.publish('allUserExperimentState', function() {
     return GlobalExperimentStates.find({userId: this.userId});
 });
 
-Meteor.publish('currentTdf', async function(tdfId: any) {
-    // Security: Require authentication to access TDF content
-    if (!this.userId) {
-        return this.ready();
+async function publishRuntimeTdfsByIds(publication: any, tdfIdOrIds: any) {
+    if (!publication.userId) {
+        return publication.ready();
     }
-    const assignedRootIds = new Set(await resolveAssignedRootTdfIdsForUser(this.userId as string));
+
+    const assignedRootIds = new Set(await resolveAssignedRootTdfIdsForUser(publication.userId as string));
     const canAccessRequestedTdf = async (requestedId: string) => {
         const tdf = await Tdfs.findOneAsync(
             { _id: requestedId },
@@ -528,13 +528,13 @@ Meteor.publish('currentTdf', async function(tdfId: any) {
         if (!tdf) {
             return false;
         }
-        return canViewDashboardTdf(this.userId, tdf) || assignedRootIds.has(requestedId);
+        return canViewDashboardTdf(publication.userId, tdf) || assignedRootIds.has(requestedId);
     };
 
-    if (tdfId && typeof tdfId === 'object') {
-        const normalizedIds = normalizeIdList(tdfId);
+    if (tdfIdOrIds && typeof tdfIdOrIds === 'object') {
+        const normalizedIds = normalizeIdList(tdfIdOrIds);
         if (!normalizedIds.length) {
-            return this.ready();
+            return publication.ready();
         }
         const allowedIds: string[] = [];
         for (const requestedId of normalizedIds) {
@@ -543,19 +543,30 @@ Meteor.publish('currentTdf', async function(tdfId: any) {
             }
         }
         if (!allowedIds.length) {
-            return this.ready();
+            return publication.ready();
         }
         return Tdfs.find({ _id: { $in: allowedIds } }, { fields: TDF_RUNTIME_SECRET_EXCLUSION_FIELDS });
     }
 
-    const normalizedTdfId = normalizeOptionalStringId(tdfId);
+    const normalizedTdfId = normalizeOptionalStringId(tdfIdOrIds);
     if (!normalizedTdfId) {
-        return this.ready();
+        return publication.ready();
     }
     if (!await canAccessRequestedTdf(normalizedTdfId)) {
-        return this.ready();
+        return publication.ready();
     }
     return Tdfs.find({ _id: normalizedTdfId }, { fields: TDF_RUNTIME_SECRET_EXCLUSION_FIELDS });
+}
+
+Meteor.publish('currentTdf', async function(tdfId: any) {
+    return publishRuntimeTdfsByIds(this, tdfId);
+});
+
+Meteor.publish('tdfByIds', async function(tdfIds: any) {
+    if (!Array.isArray(tdfIds)) {
+        return this.ready();
+    }
+    return publishRuntimeTdfsByIds(this, tdfIds);
 });
 
 // Publication for content/TDF editor - returns TDF with full content for editing
@@ -861,8 +872,9 @@ Meteor.publish('contentUploadOwners', async function(ownerIds: any[] = []) {
     );
 });
 
-// ===== FULL TDF PUBLICATION =====
-// For pages that need full TDF content (card, experiment, etc.)
+// ===== LEGACY TDF LISTING PUBLICATION =====
+// Kept for compatibility with old clients, but intentionally listing-only.
+// Full runtime content must come from exact-ID publications such as currentTdf or tdfByIds.
 Meteor.publish('allTdfs', async function() {
     // Security: Filter TDFs based on user role and access permissions
     if (!this.userId) {
@@ -871,7 +883,7 @@ Meteor.publish('allTdfs', async function() {
 
     // Admins can see all TDFs
     if (await Roles.userIsInRoleAsync(this.userId, ['admin'])) {
-        return Tdfs.find({}, { fields: TDF_RUNTIME_SECRET_EXCLUSION_FIELDS });
+        return Tdfs.find({}, { fields: TDF_LISTING_FIELDS });
     }
 
     // Teachers can see their own TDFs, TDFs they have access to, public TDFs, and all TDFs with experimentTarget
@@ -883,7 +895,7 @@ Meteor.publish('allTdfs', async function() {
                 { 'content.tdfs.tutor.setspec.userselect': 'true' },
                 { 'content.tdfs.tutor.setspec.experimentTarget': { $exists: true, $ne: null } }
             ]
-        }, { fields: TDF_RUNTIME_SECRET_EXCLUSION_FIELDS });
+        }, { fields: TDF_LISTING_FIELDS });
     }
 
     const user = await (Meteor.users as any).findOneAsync(
@@ -899,7 +911,7 @@ Meteor.publish('allTdfs', async function() {
             { 'content.tdfs.tutor.setspec.userselect': 'true' },
             { _id: { $in: accessedTdfIds } }
         ]
-    }, { fields: TDF_RUNTIME_SECRET_EXCLUSION_FIELDS });
+    }, { fields: TDF_LISTING_FIELDS });
 });
 
 Meteor.publish('ownedTdfs', async function(ownerId: any) {
@@ -914,7 +926,59 @@ Meteor.publish('ownedTdfs', async function(ownerId: any) {
         return this.ready(); // Return empty result
     }
 
-    return Tdfs.find({'ownerId': ownerId});
+    return Tdfs.find({ ownerId }, { fields: TDF_LISTING_FIELDS });
+});
+
+Meteor.publish('pagedTdfsListing', async function(page: any = 0, limit: any = 50) {
+    if (!this.userId) {
+        return this.ready();
+    }
+
+    const normalizedPage = Number(page);
+    const normalizedLimit = Number(limit);
+    if (!Number.isInteger(normalizedPage) || normalizedPage < 0) {
+        return this.ready();
+    }
+    if (!Number.isInteger(normalizedLimit) || normalizedLimit < 1 || normalizedLimit > 200) {
+        return this.ready();
+    }
+
+    const options = {
+        fields: TDF_LISTING_FIELDS,
+        sort: { 'content.tdfs.tutor.setspec.lessonname': 1, 'content.fileName': 1, _id: 1 },
+        skip: normalizedPage * normalizedLimit,
+        limit: normalizedLimit
+    };
+
+    if (await Roles.userIsInRoleAsync(this.userId, ['admin'])) {
+        return Tdfs.find({}, options);
+    }
+
+    if (await Roles.userIsInRoleAsync(this.userId, ['teacher'])) {
+        return Tdfs.find({
+            $or: [
+                { ownerId: this.userId },
+                { 'accessors.userId': this.userId },
+                { 'content.tdfs.tutor.setspec.userselect': 'true' },
+                { 'content.tdfs.tutor.setspec.experimentTarget': { $exists: true, $ne: null } }
+            ]
+        }, options);
+    }
+
+    const user = await (Meteor.users as any).findOneAsync(
+        { _id: this.userId },
+        { fields: { accessedTDFs: 1 } }
+    );
+    const accessedTdfIds = normalizeIdList(user?.accessedTDFs || []);
+
+    return Tdfs.find({
+        $or: [
+            { ownerId: this.userId },
+            { 'accessors.userId': this.userId },
+            { 'content.tdfs.tutor.setspec.userselect': 'true' },
+            { _id: { $in: accessedTdfIds } }
+        ]
+    }, options);
 });
 
 Meteor.publish('tdfByExperimentTarget', async function(experimentTarget: any, experimentConditions: any = undefined) {
