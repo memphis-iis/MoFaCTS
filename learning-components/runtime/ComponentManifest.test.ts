@@ -26,7 +26,10 @@ describe('ComponentManifest providedServices', function() {
     const summary = summarizeLearningComponentManifest(manifest({
       providedServices: [
         'sample.state-replay',
-        'sample.history-bridge',
+        {
+          name: 'sample.history-bridge',
+          runtimeEntry: 'SampleUnitEngine.commitHistoryBridge',
+        },
       ],
     }));
 
@@ -34,6 +37,14 @@ describe('ComponentManifest providedServices', function() {
       'sample.history-bridge',
       'sample.state-replay',
     ]);
+    assert.deepEqual(summary.providedServiceDetails, [{
+      serviceName: 'sample.history-bridge',
+      componentId: 'mofacts.sample-unit',
+      runtimeEntry: 'SampleUnitEngine.commitHistoryBridge',
+    }, {
+      serviceName: 'sample.state-replay',
+      componentId: 'mofacts.sample-unit',
+    }]);
   });
 
   it('rejects duplicate provided service declarations', function() {
@@ -57,13 +68,37 @@ describe('ComponentManifest providedServices', function() {
     );
   });
 
+  it('rejects invalid provided service descriptor shapes', function() {
+    assert.throws(
+      () => validateLearningComponentManifest(manifest({
+        providedServices: [null as unknown as string],
+      })),
+      /provided service must be a string or descriptor/,
+    );
+  });
+
+  it('rejects blank provided service runtime entries', function() {
+    assert.throws(
+      () => validateLearningComponentManifest(manifest({
+        providedServices: [{
+          name: 'sample.history-bridge',
+          runtimeEntry: ' ',
+        }],
+      })),
+      /provided service "sample\.history-bridge" runtime entry must be a non-empty string/,
+    );
+  });
+
   it('summarizes provided services across registered component manifests', function() {
     assert.deepEqual(summarizeProvidedServices([
       manifest({
         id: 'mofacts.sparc',
         providedServices: [
           'sparc.document-replay',
-          'sparc.ctat-sample-brd-verification',
+          {
+            name: 'sparc.ctat-sample-brd-verification',
+            runtimeEntry: 'SparcSessionUnitEngine.assertAllSparcSampleTracesMatchCtatBrds',
+          },
         ],
       }),
       manifest({
@@ -79,6 +114,7 @@ describe('ComponentManifest providedServices', function() {
     }, {
       serviceName: 'sparc.ctat-sample-brd-verification',
       componentId: 'mofacts.sparc',
+      runtimeEntry: 'SparcSessionUnitEngine.assertAllSparcSampleTracesMatchCtatBrds',
     }, {
       serviceName: 'sparc.document-replay',
       componentId: 'mofacts.sparc',

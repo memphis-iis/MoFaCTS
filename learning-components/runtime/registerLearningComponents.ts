@@ -5,6 +5,7 @@ import {
   type LearningComponentCapability,
   type LearningComponentManifest,
   type LearningComponentKind,
+  type LearningComponentProvidedService,
   type LearningComponentRuntimeContext,
 } from './ComponentManifest';
 
@@ -20,25 +21,49 @@ export type LearningComponentManifestSummary = {
   requiredCapabilities: LearningComponentCapability[];
   requiredServerMethods: string[];
   providedServices: string[];
+  providedServiceDetails: LearningComponentProvidedServiceSummary[];
 };
 
 export type LearningComponentProvidedServiceSummary = {
   serviceName: string;
   componentId: string;
+  runtimeEntry?: string;
 };
+
+function summarizeProvidedService(
+  service: LearningComponentProvidedService,
+  componentId: string,
+): LearningComponentProvidedServiceSummary {
+  if (typeof service === 'string') {
+    return {
+      serviceName: service.trim(),
+      componentId,
+    };
+  }
+  return {
+    serviceName: service.name.trim(),
+    componentId,
+    ...(service.runtimeEntry === undefined ? {} : { runtimeEntry: service.runtimeEntry.trim() }),
+  };
+}
 
 export function summarizeLearningComponentManifest(
   manifest: LearningComponentManifest,
 ): LearningComponentManifestSummary {
   validateLearningComponentManifest(manifest);
+  const componentId = manifest.id.trim();
+  const providedServiceDetails = [...(manifest.providedServices ?? [])]
+    .map((service) => summarizeProvidedService(service, componentId))
+    .sort((left, right) => left.serviceName.localeCompare(right.serviceName));
   return {
-    id: manifest.id.trim(),
+    id: componentId,
     kind: manifest.kind,
     unitTypes: [...(manifest.unitTypes ?? [])].map((unitType) => unitType.trim()).sort(),
     displayTypes: [...(manifest.displayTypes ?? [])].map((displayType) => displayType.trim()).sort(),
     requiredCapabilities: [...manifest.requiredCapabilities].sort(),
     requiredServerMethods: [...(manifest.requiredServerMethods ?? [])].map((methodName) => methodName.trim()).sort(),
-    providedServices: [...(manifest.providedServices ?? [])].map((serviceName) => serviceName.trim()).sort(),
+    providedServices: providedServiceDetails.map((service) => service.serviceName),
+    providedServiceDetails,
   };
 }
 
@@ -57,22 +82,19 @@ export function summarizeProvidedServices(
   const serviceOwners = new Map<string, string>();
 
   for (const summary of summaries) {
-    for (const serviceName of summary.providedServices) {
-      const existingOwner = serviceOwners.get(serviceName);
+    for (const service of summary.providedServiceDetails) {
+      const existingOwner = serviceOwners.get(service.serviceName);
       if (existingOwner) {
         throw new Error(
-          `Provided service "${serviceName}" is declared by both "${existingOwner}" and "${summary.id}"`,
+          `Provided service "${service.serviceName}" is declared by both "${existingOwner}" and "${summary.id}"`,
         );
       }
-      serviceOwners.set(serviceName, summary.id);
+      serviceOwners.set(service.serviceName, summary.id);
     }
   }
 
-  return [...serviceOwners.entries()]
-    .map(([serviceName, componentId]) => ({
-      serviceName,
-      componentId,
-    }))
+  return summaries
+    .flatMap((summary) => summary.providedServiceDetails)
     .sort((left, right) => left.serviceName.localeCompare(right.serviceName));
 }
 

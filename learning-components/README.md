@@ -51,7 +51,7 @@ Use this checklist before adding a production component such as a deeper AutoTut
 3. Keep Meteor routing, publications, collections, authorization enforcement, server methods, upload/storage persistence, and app shell UI in `mofacts/`.
 4. Export exactly one `LearningComponentManifest` from the package entry point.
 5. Declare every required capability in the manifest. Do not read Meteor globals or app singletons to hide a missing dependency.
-6. Declare component-owned service surfaces in `providedServices` when the package exposes renderer-independent behavior such as replay, layout validation, trace comparison, or history bridges.
+6. Declare component-owned service surfaces in `providedServices` when the package exposes renderer-independent behavior such as replay, layout validation, trace comparison, or history bridges. Use a service descriptor with `name` and `runtimeEntry` when the service is exposed through a concrete unit-engine or adapter method.
 7. Add focused fixtures/tests near the package or in `mofacts/common/` proving registration, capability failure, and runtime behavior.
 8. Add the manifest to the approved default catalog only when the component should ship by default.
 9. Run `npm run typecheck`, `npm run lint`, and any schema generation required by changed TDF/stimulus fields.

@@ -44,5 +44,28 @@ describe('sparcSessionUnitComponentManifest', function() {
       'sparc.state-transition-history',
       'sparc.vertical-layout-validation',
     ]);
+    assert.deepEqual(
+      summary.providedServiceDetails
+        .filter((service) => service.runtimeEntry !== undefined)
+        .map((service) => [service.serviceName, service.runtimeEntry]),
+      [
+        [
+          'sparc.ctat-sample-brd-verification',
+          'SparcSessionUnitEngine.assertAllSparcSampleTracesMatchCtatBrds',
+        ],
+        [
+          'sparc.document-addressing',
+          'SparcSessionUnitEngine.validateSparcDocumentReferences',
+        ],
+        [
+          'sparc.document-replay',
+          'SparcSessionUnitEngine.replaySparcDocumentHistory',
+        ],
+        [
+          'sparc.response-outcome-commit',
+          'SparcSessionUnitEngine.processAndCommitSparcAuthoredResponseOutcome',
+        ],
+      ],
+    );
   });
 });

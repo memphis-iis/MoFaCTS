@@ -33,6 +33,11 @@ export type LearningComponentRuntimeContext<TDeps = unknown> = {
   registerTrialDisplayAdapter(adapter: TrialDisplayAdapter): void;
 };
 
+export type LearningComponentProvidedService = string | {
+  readonly name: string;
+  readonly runtimeEntry?: string;
+};
+
 export type LearningComponentManifest<TDeps = unknown> = {
   readonly id: string;
   readonly kind: LearningComponentKind;
@@ -40,7 +45,7 @@ export type LearningComponentManifest<TDeps = unknown> = {
   readonly displayTypes?: readonly string[];
   readonly requiredCapabilities: readonly LearningComponentCapability[];
   readonly requiredServerMethods?: readonly string[];
-  readonly providedServices?: readonly string[];
+  readonly providedServices?: readonly LearningComponentProvidedService[];
   register(context: LearningComponentRuntimeContext<TDeps>): void;
 };
 
@@ -112,11 +117,30 @@ function validateProvidedServices(manifest: LearningComponentManifest): void {
   if (!Array.isArray(manifest.providedServices)) {
     throw new Error(`Learning component "${manifest.id}" must declare providedServices as an array`);
   }
-  assertUniqueNormalizedEntries(
-    manifest.providedServices,
-    `Learning component "${manifest.id}" provided service`,
-    `Learning component "${manifest.id}" declares duplicate provided service`,
-  );
+  const seen = new Set<string>();
+  for (const service of manifest.providedServices) {
+    if (
+      typeof service !== 'string'
+      && (typeof service !== 'object' || service === null)
+    ) {
+      throw new Error(`Learning component "${manifest.id}" provided service must be a string or descriptor`);
+    }
+    const serviceName = typeof service === 'string' ? service : service.name;
+    const normalizedServiceName = normalizeNonEmpty(
+      serviceName,
+      `Learning component "${manifest.id}" provided service`,
+    );
+    if (seen.has(normalizedServiceName)) {
+      throw new Error(`Learning component "${manifest.id}" declares duplicate provided service: ${normalizedServiceName}`);
+    }
+    seen.add(normalizedServiceName);
+    if (typeof service !== 'string' && service.runtimeEntry !== undefined) {
+      normalizeNonEmpty(
+        service.runtimeEntry,
+        `Learning component "${manifest.id}" provided service "${normalizedServiceName}" runtime entry`,
+      );
+    }
+  }
 }
 
 export function validateLearningComponentManifest(manifest: LearningComponentManifest): void {
