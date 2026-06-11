@@ -110,7 +110,7 @@ function validateReactiveRuleReferences(
   issues: SparcReferenceValidationIssue[],
 ): void {
   for (const rule of document.reactiveRules ?? []) {
-    for (const write of rule.writes) {
+    for (const [index, write] of rule.writes.entries()) {
       try {
         resolveSparcDocumentAddress(document, write.target);
       } catch (error) {
@@ -121,6 +121,16 @@ function validateReactiveRuleReferences(
             target: write.target,
           },
           message: error instanceof Error ? error.message : String(error),
+        });
+      }
+      if (typeof write.key !== 'string' || write.key.trim().length === 0) {
+        issues.push({
+          sourceNodeId: `reactive-rule:${rule.id}`,
+          reference: {
+            relation: 'controls',
+            target: write.target,
+          },
+          message: `SPARC reactive rule "${rule.id}" writes[${index}].key is required`,
         });
       }
     }
@@ -145,6 +155,19 @@ function validateConditionReferences(params: {
             target: params.condition.query.target,
           },
           message: error instanceof Error ? error.message : String(error),
+        });
+      }
+      if (
+        typeof params.condition.query.key !== 'string'
+        || params.condition.query.key.trim().length === 0
+      ) {
+        params.issues.push({
+          sourceNodeId: params.sourceNodeId,
+          reference: {
+            relation: 'depends-on',
+            target: params.condition.query.target,
+          },
+          message: 'SPARC state-condition query key is required',
         });
       }
       return;
@@ -219,6 +242,16 @@ function validateInitialStateReferences(
           target: write.target,
         },
         message: error instanceof Error ? error.message : String(error),
+      });
+    }
+    if (typeof write.key !== 'string' || write.key.trim().length === 0) {
+      issues.push({
+        sourceNodeId: `initial-state:${index}`,
+        reference: {
+          relation: 'controls',
+          target: write.target,
+        },
+        message: `SPARC authored initialState[${index}].key is required`,
       });
     }
   }

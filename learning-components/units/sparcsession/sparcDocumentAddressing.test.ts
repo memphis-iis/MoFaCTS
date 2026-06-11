@@ -110,6 +110,38 @@ describe('sparcDocumentAddressing', function() {
     assert.match(result.issues[0]?.message ?? '', /path segment "missing" not found/);
   });
 
+  it('validates authored reactive rule write keys', function() {
+    const document: SparcAuthoredDocument = {
+      id: 'doc-1',
+      schemaVersion: 1,
+      reactiveRules: [{
+        id: 'bad-write-key',
+        writes: [{
+          target: {
+            documentId: 'doc-1',
+            nodeId: 'region-1',
+          },
+          key: ' ',
+          value: true,
+        }],
+      }],
+      root: {
+        id: 'root',
+        kind: 'document',
+        children: [{
+          id: 'region-1',
+          kind: 'region',
+        }],
+      },
+    };
+
+    const result = validateSparcDocumentReferences(document);
+
+    assert.equal(result.valid, false);
+    assert.equal(result.issues[0]?.sourceNodeId, 'reactive-rule:bad-write-key');
+    assert.match(result.issues[0]?.message ?? '', /writes\[0\]\.key is required/);
+  });
+
   it('validates authored reactive rule state-condition targets', function() {
     const document: SparcAuthoredDocument = {
       id: 'doc-1',
@@ -153,6 +185,49 @@ describe('sparcDocumentAddressing', function() {
     assert.equal(result.issues[0]?.sourceNodeId, 'reactive-rule:bad-condition:when');
     assert.equal(result.issues[0]?.reference.relation, 'depends-on');
     assert.match(result.issues[0]?.message ?? '', /path segment "missing" not found/);
+  });
+
+  it('validates authored reactive rule state-condition query keys', function() {
+    const document: SparcAuthoredDocument = {
+      id: 'doc-1',
+      schemaVersion: 1,
+      reactiveRules: [{
+        id: 'bad-condition-key',
+        when: {
+          type: 'state',
+          query: {
+            target: {
+              documentId: 'doc-1',
+              nodeId: 'region-1',
+            },
+            key: '',
+          },
+          compare: 'truthy',
+        },
+        writes: [{
+          target: {
+            documentId: 'doc-1',
+            nodeId: 'region-1',
+          },
+          key: 'visible',
+          value: true,
+        }],
+      }],
+      root: {
+        id: 'root',
+        kind: 'document',
+        children: [{
+          id: 'region-1',
+          kind: 'region',
+        }],
+      },
+    };
+
+    const result = validateSparcDocumentReferences(document);
+
+    assert.equal(result.valid, false);
+    assert.equal(result.issues[0]?.sourceNodeId, 'reactive-rule:bad-condition-key:when');
+    assert.match(result.issues[0]?.message ?? '', /state-condition query key is required/);
   });
 
   it('validates nested authored reactive rule condition targets', function() {
@@ -335,6 +410,35 @@ describe('sparcDocumentAddressing', function() {
     assert.equal(result.valid, false);
     assert.equal(result.issues[0]?.sourceNodeId, 'initial-state:0');
     assert.match(result.issues[0]?.message ?? '', /path segment "missing" not found/);
+  });
+
+  it('validates authored initial-state write keys', function() {
+    const document: SparcAuthoredDocument = {
+      id: 'doc-1',
+      schemaVersion: 1,
+      initialState: [{
+        target: {
+          documentId: 'doc-1',
+          nodeId: 'region-1',
+        },
+        key: '',
+        value: false,
+      }],
+      root: {
+        id: 'root',
+        kind: 'document',
+        children: [{
+          id: 'region-1',
+          kind: 'region',
+        }],
+      },
+    };
+
+    const result = validateSparcDocumentReferences(document);
+
+    assert.equal(result.valid, false);
+    assert.equal(result.issues[0]?.sourceNodeId, 'initial-state:0');
+    assert.match(result.issues[0]?.message ?? '', /initialState\[0\]\.key is required/);
   });
 
   it('validates authored model targets against their authored address', function() {
