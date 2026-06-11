@@ -3,8 +3,11 @@ import type {
   SparcAddressSegment,
   SparcAuthoredDocument,
   SparcAuthoredNode,
+  SparcCondition,
   SparcDocumentAddress,
+  SparcModelTargetIdentity,
 } from './sparcSessionContracts';
+import { assertModelPracticeHistoryIdentity } from '../../runtime/historyStimulusIdentity';
 
 export type SparcResolvedAddress = {
   readonly document: SparcAuthoredDocument;
@@ -124,6 +127,83 @@ function validateReactiveRuleReferences(
   }
 }
 
+function validateConditionReferences(params: {
+  readonly document: SparcAuthoredDocument;
+  readonly condition: SparcCondition;
+  readonly sourceNodeId: string;
+  readonly issues: SparcReferenceValidationIssue[];
+}): void {
+  switch (params.condition.type) {
+    case 'state':
+      try {
+        resolveSparcDocumentAddress(params.document, params.condition.query.target);
+      } catch (error) {
+        params.issues.push({
+          sourceNodeId: params.sourceNodeId,
+          reference: {
+            relation: 'depends-on',
+            target: params.condition.query.target,
+          },
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+      return;
+    case 'model':
+      try {
+        resolveSparcDocumentAddress(
+          params.document,
+          modelTargetReferenceAddress(params.condition.query.target),
+        );
+      } catch (error) {
+        params.issues.push({
+          sourceNodeId: params.sourceNodeId,
+          reference: {
+            relation: 'model-target',
+            target: modelTargetReferenceAddress(params.condition.query.target),
+          },
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+      validateModelTargetIdentity({
+        target: params.condition.query.target,
+        sourceNodeId: params.sourceNodeId,
+        issues: params.issues,
+      });
+      return;
+    case 'all':
+    case 'any':
+      for (const condition of params.condition.conditions) {
+        validateConditionReferences({
+          ...params,
+          condition,
+        });
+      }
+      return;
+    case 'not':
+      validateConditionReferences({
+        ...params,
+        condition: params.condition.condition,
+      });
+  }
+}
+
+function validateReactiveRuleConditionReferences(
+  document: SparcAuthoredDocument,
+  issues: SparcReferenceValidationIssue[],
+): void {
+  for (const rule of document.reactiveRules ?? []) {
+    if (!rule.when) {
+      continue;
+    }
+    validateConditionReferences({
+      document,
+      condition: rule.when,
+      sourceNodeId: `reactive-rule:${rule.id}:when`,
+      issues,
+    });
+  }
+}
+
 function validateInitialStateReferences(
   document: SparcAuthoredDocument,
   issues: SparcReferenceValidationIssue[],
@@ -144,6 +224,101 @@ function validateInitialStateReferences(
   }
 }
 
+function modelTargetAddressForNode(
+  document: SparcAuthoredDocument,
+  node: SparcAuthoredNode,
+): SparcDocumentAddress {
+  return {
+    documentId: document.id,
+    nodeId: node.id,
+  };
+}
+
+function modelTargetReferenceAddress(
+  target: SparcModelTargetIdentity,
+): SparcDocumentAddress {
+  return {
+    documentId: target.sparcDocumentId,
+    nodeId: target.sparcNodeId,
+    ...(target.sparcPath !== undefined ? { path: target.sparcPath } : {}),
+  };
+}
+
+function validateModelTargetIdentity(params: {
+  readonly target: SparcModelTargetIdentity;
+  readonly sourceNodeId: string;
+  readonly issues: SparcReferenceValidationIssue[];
+}): void {
+  try {
+    assertModelPracticeHistoryIdentity({
+      levelUnitType: 'model',
+      ...params.target,
+    });
+  } catch (error) {
+    params.issues.push({
+      sourceNodeId: params.sourceNodeId,
+      reference: {
+        relation: 'model-target',
+        target: modelTargetReferenceAddress(params.target),
+      },
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+function modelTargetMatchesAuthoredAddress(
+  target: SparcModelTargetIdentity,
+  address: SparcDocumentAddress,
+): boolean {
+  if (target.sparcDocumentId !== address.documentId || target.sparcNodeId !== address.nodeId) {
+    return false;
+  }
+  if (target.sparcPath === undefined || target.sparcPath.length === 0) {
+    return true;
+  }
+  return String(target.sparcPath[target.sparcPath.length - 1]) === address.nodeId;
+}
+
+function modelTargetAddressMessage(
+  target: SparcModelTargetIdentity,
+  address: SparcDocumentAddress,
+): string {
+  return `SPARC authored modelTarget for node "${address.nodeId}" must match authored address `
+    + `${JSON.stringify(address)} and any sparcPath must end at that node; got ${JSON.stringify({
+      sparcDocumentId: target.sparcDocumentId,
+      sparcNodeId: target.sparcNodeId,
+      sparcPath: target.sparcPath ?? [],
+    })}`;
+}
+
+function validateAuthoredModelTargets(
+  document: SparcAuthoredDocument,
+  node: SparcAuthoredNode,
+  issues: SparcReferenceValidationIssue[],
+): void {
+  if (node.modelTarget) {
+    const address = modelTargetAddressForNode(document, node);
+    validateModelTargetIdentity({
+      target: node.modelTarget,
+      sourceNodeId: node.id,
+      issues,
+    });
+    if (!modelTargetMatchesAuthoredAddress(node.modelTarget, address)) {
+      issues.push({
+        sourceNodeId: node.id,
+        reference: {
+          relation: 'model-target',
+          target: address,
+        },
+        message: modelTargetAddressMessage(node.modelTarget, address),
+      });
+    }
+  }
+  for (const child of node.children ?? []) {
+    validateAuthoredModelTargets(document, child, issues);
+  }
+}
+
 export function validateSparcDocumentReferences(
   document: SparcAuthoredDocument,
 ): SparcReferenceValidationResult {
@@ -151,6 +326,8 @@ export function validateSparcDocumentReferences(
   validateNodeReferences(document, document.root, issues);
   validateInitialStateReferences(document, issues);
   validateReactiveRuleReferences(document, issues);
+  validateReactiveRuleConditionReferences(document, issues);
+  validateAuthoredModelTargets(document, document.root, issues);
   return {
     valid: issues.length === 0,
     issues,

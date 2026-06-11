@@ -83,7 +83,12 @@ and persist the returned canonical record through the `history` capability.
 Authored nodes can declare `modelTarget`; `sparcAuthoredModelTargets.ts`
 resolves the deepest model target for a full document address, and
 `sparcAuthoredResponseOutcome.ts` uses that authored binding when a response
-outcome does not supply an explicit override.
+outcome does not supply an explicit override. Document validation checks that
+an authored model target names the same SPARC document and authored node where
+it is attached; when `sparcPath` is present, it must end at that authored node.
+The same validation also applies the shared model-history identity rules, so
+`KCId`/`KCDefault` must match `stimulusKC` and `KCCluster` must match
+`clusterKC` before a document can emit model practice records.
 `sparcResponseOutcomeCommit.ts` is the SPARC-side orchestration point for that:
 model-linked outcomes are applied through `adaptive-model` before the returned
 shared model record is written, while SPARC-only reactive outcomes write their
@@ -96,7 +101,9 @@ outcome.
 returns replayable state transitions. Rule writes target full
 `SparcDocumentAddress` values, so a rule from one region can update another
 region or a nested address inside that region without relying on visual layout
-order.
+order. Document validation also resolves state-condition query targets inside
+authored rules, including nested `all`/`any`/`not` condition trees, so reactive
+dependencies fail at authoring time instead of at first learner interaction.
 `sparcStateTransitionHistory.ts` wraps those transitions in canonical SPARC
 history records so replay can recreate rule-driven document changes from the
 authored start state.
