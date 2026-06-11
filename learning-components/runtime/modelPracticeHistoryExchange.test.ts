@@ -51,6 +51,44 @@ function makeModelRecord(overrides: Record<string, unknown> = {}): CanonicalHist
   });
 }
 
+function makeCardHistoryLogRecord(overrides: Record<string, unknown> = {}): CanonicalHistoryRecord {
+  return withCanonicalHistorySchemaVersion({
+    TDFId: 'tdf-1',
+    sessionID: 'session-1',
+    userId: 'user-1',
+    anonStudentId: 'student-1',
+    levelUnit: 1,
+    levelUnitName: 'Learning Session',
+    levelUnitType: 'model',
+    time: 2000,
+    problemStartTime: 1000,
+    responseDuration: 300,
+    selection: 'selection-1',
+    action: 'UpdateTextField',
+    outcome: 'correct',
+    probabilityEstimate: 0.7,
+    typeOfResponse: 'text',
+    responseValue: 'Answer',
+    input: 'Answer',
+    displayedStimulus: 'Prompt',
+    eventType: '',
+    stimuliSetId: target.stimuliSetId,
+    stimulusKC: target.stimulusKC,
+    clusterKC: target.clusterKC,
+    KCId: target.KCId,
+    KCDefault: target.KCDefault,
+    KCCluster: target.KCCluster,
+    responseKC: target.response?.responseKC,
+    responseKey: target.response?.responseKey,
+    studentResponseType: 'ATTEMPT',
+    tutorResponseType: 'RESULT',
+    CFStimFileIndex: 0,
+    CFSetShuffledIndex: 0,
+    CFReviewEntry: '',
+    ...overrides,
+  });
+}
+
 describe('modelPracticeHistoryExchange', function() {
   it('reads any canonical model history row as a shared model-practice event', function() {
     const event = readSharedModelPracticeEvent(makeModelRecord());
@@ -59,6 +97,20 @@ describe('modelPracticeHistoryExchange', function() {
     assert.deepEqual(event.identity, target);
     assert.equal(event.outcome, 'correct');
     assert.equal(event.responseValue, 'Answer');
+    assert.equal(event.practiceDurationMs, 300);
+  });
+
+  it('reads the card practice history-log shape as a shared model-practice event', function() {
+    const event = readSharedModelPracticeEvent(makeCardHistoryLogRecord());
+
+    assert.ok(event);
+    assert.deepEqual(event.identity, target);
+    assert.equal(event.time, 2000);
+    assert.equal(event.problemStartTime, 1000);
+    assert.equal(event.outcome, 'correct');
+    assert.equal(event.responseValue, 'Answer');
+    assert.equal(event.input, 'Answer');
+    assert.equal(event.displayedStimulus, 'Prompt');
     assert.equal(event.practiceDurationMs, 300);
   });
 

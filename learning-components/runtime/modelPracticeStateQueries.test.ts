@@ -52,6 +52,23 @@ function makeModelRecord(
   });
 }
 
+function makeCardHistoryLogRecord(
+  outcome: string,
+  overrides: Record<string, unknown> = {},
+): CanonicalHistoryRecord {
+  return makeModelRecord(outcome, {
+    levelUnitName: 'Learning Session',
+    action: 'UpdateTextField',
+    probabilityEstimate: 0.7,
+    studentResponseType: outcome === 'study' ? 'HINT_REQUEST' : 'ATTEMPT',
+    tutorResponseType: outcome === 'study' ? 'HINT_MSG' : 'RESULT',
+    CFStimFileIndex: 0,
+    CFSetShuffledIndex: 0,
+    CFReviewEntry: '',
+    ...overrides,
+  });
+}
+
 describe('modelPracticeStateQueries', function() {
   it('answers shared model-history metrics from canonical practice records', function() {
     const records = [
@@ -88,6 +105,30 @@ describe('modelPracticeStateQueries', function() {
       target,
       metric: 'lastOutcome',
     }), 'study');
+  });
+
+  it('answers model-history metrics from card practice history-log records', function() {
+    const records = [
+      makeCardHistoryLogRecord('correct', { responseDuration: 250 }),
+      makeCardHistoryLogRecord('incorrect', { responseDuration: 350 }),
+    ];
+
+    assert.equal(queryModelPracticeHistory(records, {
+      target,
+      metric: 'priorCorrect',
+    }), 1);
+    assert.equal(queryModelPracticeHistory(records, {
+      target,
+      metric: 'priorIncorrect',
+    }), 1);
+    assert.equal(queryModelPracticeHistory(records, {
+      target,
+      metric: 'totalPracticeDuration',
+    }), 600);
+    assert.equal(queryModelPracticeHistory(records, {
+      target,
+      metric: 'lastOutcome',
+    }), 'incorrect');
   });
 
   it('counts SPARC model records written with canonical responseDuration', function() {
