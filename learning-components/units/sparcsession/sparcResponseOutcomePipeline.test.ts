@@ -205,6 +205,58 @@ describe('sparcResponseOutcomePipeline', function() {
     assert.equal(result.finalReplayState.cells[createSparcStateCellKey(feedbackAddress, 'visible')]?.value, true);
   });
 
+  it('evaluates authored probability conditions against the live adaptive model after a response update', async function() {
+    const writtenRecords: unknown[] = [];
+    const processed = processSparcResponseOutcome(core, {
+      observationId: 'obs-probability',
+      sourceAddress,
+      modelTarget,
+      time: 2600,
+      problemStartTime: 2000,
+      outcome: 'correct',
+      responseValue: 'Answer',
+    });
+
+    const result = await commitSparcResponseOutcomeWithAuthoredRules({
+      core,
+      document: documentWithRule({
+        type: 'model',
+        query: {
+          target: modelTarget,
+          metric: 'probability',
+        },
+        compare: 'gte',
+        value: 0.8,
+      }),
+      processed,
+      replayState: createEmptySparcReplayState(),
+      runtime: {
+        adaptiveModel: {
+          applyModelPracticeUpdate(currentCore, request, extensionFields) {
+            return {
+              record: createCanonicalModelPracticeHistoryRecord(currentCore, request, extensionFields),
+            };
+          },
+          queryModelPracticeState(query) {
+            assert.equal(query.metric, 'probability');
+            assert.deepEqual(query.target, modelTarget);
+            return 0.82;
+          },
+        },
+        history: {
+          async writeCanonicalHistory(record) {
+            writtenRecords.push(record);
+          },
+        },
+      },
+    });
+
+    assert.equal(result.responseCommit.usedAdaptiveModel, true);
+    assert.deepEqual(result.reactiveCommit.evaluation.matchedRuleIds, ['show-feedback']);
+    assert.equal(result.finalReplayState.cells[createSparcStateCellKey(feedbackAddress, 'visible')]?.value, true);
+    assert.equal(writtenRecords.length, 2);
+  });
+
   it('derives replay state from authored document plus prior canonical history before committing response rules', async function() {
     const writtenRecords: unknown[] = [];
     const priorCardRecord = createCanonicalModelPracticeHistoryRecord(core, {

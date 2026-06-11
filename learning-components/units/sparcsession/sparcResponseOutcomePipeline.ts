@@ -1,5 +1,6 @@
 import {
   createHistoryBackedModelPracticeStateProvider,
+  type ModelPracticeStateProvider,
 } from '../../runtime/modelPracticeStateQueries';
 import type { CanonicalHistoryRecord } from '../../runtime/historyEnvelope';
 import { commitSparcAuthoredReactiveEvent } from './sparcReactiveRuleCommit';
@@ -25,6 +26,21 @@ import {
   replaySparcHistory,
   type SparcReplayState,
 } from './sparcStateReplay';
+
+function createRuleModelQueryProvider(params: {
+  readonly historyRecords: readonly CanonicalHistoryRecord[];
+  readonly liveModelQueries: ModelPracticeStateProvider;
+}): ModelPracticeStateProvider {
+  const historyBackedProvider = createHistoryBackedModelPracticeStateProvider(params.historyRecords);
+  return {
+    queryModelPracticeState(query) {
+      if (query.metric === 'probability') {
+        return params.liveModelQueries.queryModelPracticeState(query);
+      }
+      return historyBackedProvider.queryModelPracticeState(query);
+    },
+  };
+}
 
 export type SparcResponseOutcomePipelineResult = {
   readonly responseCommit: SparcCommittedResponseOutcome;
@@ -62,10 +78,13 @@ export async function commitSparcResponseOutcomeWithAuthoredRules(params: {
     },
     context: {
       replayState: replayStateAfterResponse,
-      modelQueries: createHistoryBackedModelPracticeStateProvider([
-        ...(params.priorModelHistoryRecords ?? []),
-        responseCommit.historyRecord,
-      ]),
+      modelQueries: createRuleModelQueryProvider({
+        historyRecords: [
+          ...(params.priorModelHistoryRecords ?? []),
+          responseCommit.historyRecord,
+        ],
+        liveModelQueries: params.runtime.adaptiveModel,
+      }),
     },
     runtime: {
       history: params.runtime.history,
