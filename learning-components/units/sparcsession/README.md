@@ -131,20 +131,24 @@ rendering, history, adaptive-model, practice-record, content-state, and external
 sync capabilities through explicit runtime interfaces instead of reaching into
 learning-session or Meteor internals.
 `SparcSessionUnitEngine.ts` now exposes document-runtime entry points directly:
-document-reference validation, authored-start-state plus history replay, and
-authored response commit through canonical history. The commit entry point takes
-the history writer explicitly and uses the engine's shared adaptive-model API
-for model-linked outcomes; it does not import Learning Session unit code or
-create a SPARC-only persistence lane. The engine also exposes the CTAT sample
-BRD batch verifier advertised by the manifest, so hosts can run the sample
-production-rule equivalence check through the same unit-runtime boundary.
+combined authored-document validation, document-reference validation,
+authored-start-state plus history replay, and authored response commit through
+canonical history. The combined validation gate runs both address/reference
+checks and vertical-layout checks, so host runtimes do not have to remember two
+separate validators before rendering or committing a document. The commit entry
+point takes the history writer explicitly and uses the engine's shared
+adaptive-model API for model-linked outcomes; it does not import Learning
+Session unit code or create a SPARC-only persistence lane. The engine also
+exposes the CTAT sample BRD batch verifier advertised by the manifest, so hosts
+can run the sample production-rule equivalence check through the same
+unit-runtime boundary.
 The current manifest advertises the first SPARC-owned services through
 `providedServices`: document addressing, document replay, state replay,
-response-outcome history, authored initial state, authored model targets,
-authored response outcomes, condition evaluation, model-history exchange,
-model-query adaptation, model-update requests, response-outcome
-commit/authored-rules, vertical layout validation, CTAT trace comparison,
-CTAT sample BRD verification, reactive rule commit/evaluation,
+authored-document validation, response-outcome history, authored initial state,
+authored model targets, authored response outcomes, condition evaluation,
+model-history exchange, model-query adaptation, model-update requests,
+response-outcome commit/authored-rules, vertical layout validation, CTAT trace
+comparison, CTAT sample BRD verification, reactive rule commit/evaluation,
 state-transition history, and sample documents.
 
 ## BRD And CTAT Role

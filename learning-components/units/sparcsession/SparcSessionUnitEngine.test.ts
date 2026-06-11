@@ -155,6 +155,11 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
       valid: true,
       issues: [],
     });
+    assert.equal(engine.validateSparcAuthoredDocument(document).valid, false);
+    assert.deepEqual(
+      engine.validateSparcAuthoredDocument(document).layoutIssues.map((issue: { kind: string }) => issue.kind),
+      ['missing-document-layout'],
+    );
 
     const authoredStartState = engine.replaySparcDocumentHistory(document, []);
     assert.equal(

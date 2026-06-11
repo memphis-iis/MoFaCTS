@@ -39,6 +39,10 @@ export const sparcSessionUnitComponentManifest: LearningComponentManifest<Create
       runtimeEntry: 'SparcSessionUnitEngine.validateSparcDocumentReferences',
     },
     {
+      name: 'sparc.document-validation',
+      runtimeEntry: 'SparcSessionUnitEngine.validateSparcAuthoredDocument',
+    },
+    {
       name: 'sparc.document-replay',
       runtimeEntry: 'SparcSessionUnitEngine.replaySparcDocumentHistory',
     },

@@ -31,6 +31,7 @@ describe('sparcSessionUnitComponentManifest', function() {
       'sparc.ctat-trace-comparison',
       'sparc.document-addressing',
       'sparc.document-replay',
+      'sparc.document-validation',
       'sparc.model-history-exchange',
       'sparc.model-query-adapter',
       'sparc.model-update-request',
@@ -60,6 +61,10 @@ describe('sparcSessionUnitComponentManifest', function() {
         [
           'sparc.document-replay',
           'SparcSessionUnitEngine.replaySparcDocumentHistory',
+        ],
+        [
+          'sparc.document-validation',
+          'SparcSessionUnitEngine.validateSparcAuthoredDocument',
         ],
         [
           'sparc.response-outcome-commit',

@@ -12,6 +12,9 @@ import { replaySparcDocumentHistory } from './sparcDocumentReplay';
 import {
   validateSparcDocumentReferences,
 } from './sparcDocumentAddressing';
+import {
+  validateSparcAuthoredDocument,
+} from './sparcDocumentValidation';
 import type { SparcPracticeHistoryCore } from './sparcPracticeHistoryBridge';
 import {
   assertAllSparcSampleTracesMatchCtatBrds,
@@ -60,6 +63,8 @@ export async function createSparcSessionUnitEngine(
   });
   return {
     ...adaptiveEngine,
+
+    validateSparcAuthoredDocument,
 
     validateSparcDocumentReferences,
 
