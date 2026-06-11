@@ -8,13 +8,16 @@ import {
   type SharedModelPracticeEvent,
 } from './modelPracticeHistoryExchange';
 
-export type ModelPracticeMetric =
-  | 'probability'
-  | 'priorCorrect'
-  | 'priorIncorrect'
-  | 'priorStudy'
-  | 'totalPracticeDuration'
-  | 'lastOutcome';
+export const MODEL_PRACTICE_METRICS = [
+  'probability',
+  'priorCorrect',
+  'priorIncorrect',
+  'priorStudy',
+  'totalPracticeDuration',
+  'lastOutcome',
+] as const;
+
+export type ModelPracticeMetric = typeof MODEL_PRACTICE_METRICS[number];
 
 export type ModelPracticeStateQuery = {
   readonly target: ModelPracticeHistoryIdentity;

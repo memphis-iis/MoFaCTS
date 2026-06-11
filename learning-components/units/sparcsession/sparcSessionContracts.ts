@@ -1,5 +1,6 @@
 import type { CanonicalHistoryRecord } from '../../runtime/historyEnvelope';
 import type { ModelPracticeUpdateRequest } from '../../runtime/modelPracticeUpdates';
+import type { ModelPracticeMetric } from '../../runtime/modelPracticeStateQueries';
 import type {
   ModelPracticeHistoryIdentity,
   StimulusIdentityValue,
@@ -13,13 +14,7 @@ export type SparcDocumentAddress = {
   readonly path?: readonly SparcAddressSegment[];
 };
 
-export type SparcModelMetric =
-  | 'probability'
-  | 'priorCorrect'
-  | 'priorIncorrect'
-  | 'priorStudy'
-  | 'totalPracticeDuration'
-  | 'lastOutcome';
+export type SparcModelMetric = ModelPracticeMetric;
 
 export type SparcAddressReference = {
   readonly target: SparcDocumentAddress;

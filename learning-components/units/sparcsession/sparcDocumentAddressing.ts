@@ -8,6 +8,7 @@ import type {
   SparcModelTargetIdentity,
 } from './sparcSessionContracts';
 import { assertModelPracticeHistoryIdentity } from '../../runtime/historyStimulusIdentity';
+import { MODEL_PRACTICE_METRICS } from '../../runtime/modelPracticeStateQueries';
 
 export type SparcResolvedAddress = {
   readonly document: SparcAuthoredDocument;
@@ -25,15 +26,6 @@ export type SparcReferenceValidationResult = {
   readonly valid: boolean;
   readonly issues: readonly SparcReferenceValidationIssue[];
 };
-
-const MODEL_QUERY_METRICS = new Set([
-  'probability',
-  'priorCorrect',
-  'priorIncorrect',
-  'priorStudy',
-  'totalPracticeDuration',
-  'lastOutcome',
-]);
 
 function collectNodes(
   node: SparcAuthoredNode,
@@ -120,7 +112,7 @@ function validateNodeReferences(
     }
     if (
       reference.modelMetric !== undefined
-      && !MODEL_QUERY_METRICS.has(String(reference.modelMetric))
+      && !(MODEL_PRACTICE_METRICS as readonly string[]).includes(String(reference.modelMetric))
     ) {
       issues.push({
         sourceNodeId: sourceNode.id,

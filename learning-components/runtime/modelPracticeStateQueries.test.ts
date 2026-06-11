@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { withCanonicalHistorySchemaVersion } from './historyEnvelope';
 import {
   createHistoryBackedModelPracticeStateProvider,
+  MODEL_PRACTICE_METRICS,
   queryModelPracticeHistory,
 } from './modelPracticeStateQueries';
 import type { CanonicalHistoryRecord } from './historyEnvelope';
@@ -70,6 +71,17 @@ function makeCardHistoryLogRecord(
 }
 
 describe('modelPracticeStateQueries', function() {
+  it('exports the shared model-practice metric vocabulary', function() {
+    assert.deepEqual(MODEL_PRACTICE_METRICS, [
+      'probability',
+      'priorCorrect',
+      'priorIncorrect',
+      'priorStudy',
+      'totalPracticeDuration',
+      'lastOutcome',
+    ]);
+  });
+
   it('answers shared model-history metrics from canonical practice records', function() {
     const records = [
       makeModelRecord('correct', { responseDuration: 200 }),
