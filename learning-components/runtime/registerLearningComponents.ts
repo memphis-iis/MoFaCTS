@@ -22,6 +22,11 @@ export type LearningComponentManifestSummary = {
   providedServices: string[];
 };
 
+export type LearningComponentProvidedServiceSummary = {
+  serviceName: string;
+  componentId: string;
+};
+
 export function summarizeLearningComponentManifest(
   manifest: LearningComponentManifest,
 ): LearningComponentManifestSummary {
@@ -43,6 +48,32 @@ export function summarizeLearningComponentManifests(
   return manifests
     .map((manifest) => summarizeLearningComponentManifest(manifest))
     .sort((left, right) => left.id.localeCompare(right.id));
+}
+
+export function summarizeProvidedServices(
+  manifests: readonly LearningComponentManifest[],
+): LearningComponentProvidedServiceSummary[] {
+  const summaries = summarizeLearningComponentManifests(manifests);
+  const serviceOwners = new Map<string, string>();
+
+  for (const summary of summaries) {
+    for (const serviceName of summary.providedServices) {
+      const existingOwner = serviceOwners.get(serviceName);
+      if (existingOwner) {
+        throw new Error(
+          `Provided service "${serviceName}" is declared by both "${existingOwner}" and "${summary.id}"`,
+        );
+      }
+      serviceOwners.set(serviceName, summary.id);
+    }
+  }
+
+  return [...serviceOwners.entries()]
+    .map(([serviceName, componentId]) => ({
+      serviceName,
+      componentId,
+    }))
+    .sort((left, right) => left.serviceName.localeCompare(right.serviceName));
 }
 
 export function registerLearningComponents<TDeps>(
