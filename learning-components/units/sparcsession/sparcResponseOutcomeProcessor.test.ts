@@ -72,7 +72,7 @@ describe('sparcResponseOutcomeProcessor', function() {
       displayedStimulus: 'Prompt',
       time: 3000,
       problemStartTime: 2000,
-      selection: 'doc-1:region-1',
+      selection: 'doc-1:region-7',
       action: 'sparc-response-outcome',
       typeOfResponse: 'sparc',
       eventType: 'sparc',
@@ -151,6 +151,68 @@ describe('sparcResponseOutcomeProcessor', function() {
         responseValue: null,
       }),
       /observationId is required/,
+    );
+  });
+
+  it('rejects model targets from another SPARC document before creating history', function() {
+    assert.throws(
+      () => processSparcResponseOutcome({
+        TDFId: 'tdf-1',
+        sessionID: 'session-1',
+        levelUnit: 2,
+        userId: 'user-1',
+      }, {
+        observationId: 'obs-cross-doc-model',
+        sourceAddress: {
+          documentId: 'doc-1',
+          nodeId: 'node-1',
+        },
+        modelTarget: {
+          sparcDocumentId: 'doc-2',
+          sparcNodeId: 'node-1',
+          stimuliSetId: 'stim-set-1',
+          stimulusKC: 'kc-1',
+          clusterKC: 'cluster-1',
+          KCId: 'kc-1',
+          KCDefault: 'kc-1',
+          KCCluster: 'cluster-1',
+        },
+        time: 1000,
+        problemStartTime: 1000,
+        outcome: 'correct',
+        responseValue: 'Answer',
+      }),
+      /modelTarget\.sparcDocumentId "doc-2" does not match sourceAddress document "doc-1"/,
+    );
+  });
+
+  it('rejects response outcome writes into another SPARC document before creating history', function() {
+    assert.throws(
+      () => processSparcResponseOutcome({
+        TDFId: 'tdf-1',
+        sessionID: 'session-1',
+        levelUnit: 2,
+        userId: 'user-1',
+      }, {
+        observationId: 'obs-cross-doc-write',
+        sourceAddress: {
+          documentId: 'doc-1',
+          nodeId: 'node-1',
+        },
+        time: 1000,
+        problemStartTime: 1000,
+        outcome: 'unknown',
+        responseValue: null,
+        stateWrites: [{
+          target: {
+            documentId: 'doc-2',
+            nodeId: 'node-1',
+          },
+          key: 'visible',
+          value: true,
+        }],
+      }),
+      /stateWrites\[0\] target documentId "doc-2" does not match source document "doc-1"/,
     );
   });
 });

@@ -111,4 +111,81 @@ describe('sparcPracticeHistoryBridge', function() {
       /SPARC history bridge requires userId or anonStudentId/,
     );
   });
+
+  it('refuses to write model-linked SPARC observations whose model target names another document', function() {
+    const bridge = createSparcPracticeHistoryBridge({
+      TDFId: 'tdf-1',
+      sessionID: 'session-1',
+      levelUnit: 2,
+      userId: 'user-1',
+    });
+
+    assert.throws(
+      () => bridge.toCanonicalHistoryRecord({
+        observationId: 'obs-cross-doc',
+        sourceAddress: {
+          documentId: 'doc-1',
+          nodeId: 'node-1',
+        },
+        modelTarget: {
+          sparcDocumentId: 'doc-2',
+          sparcNodeId: 'node-1',
+          stimuliSetId: 'stim-set-1',
+          stimulusKC: 'kc-1',
+          clusterKC: 'cluster-1',
+          KCId: 'kc-1',
+          KCDefault: 'kc-1',
+          KCCluster: 'cluster-1',
+        },
+        time: 1000,
+        problemStartTime: 1000,
+        outcome: 'correct',
+        responseValue: 'Answer',
+      }),
+      /modelTarget\.sparcDocumentId "doc-2" does not match sourceAddress document "doc-1"/,
+    );
+  });
+
+  it('refuses to read SPARC observations whose model target names another document', function() {
+    const bridge = createSparcPracticeHistoryBridge({
+      TDFId: 'tdf-1',
+      sessionID: 'session-1',
+      levelUnit: 2,
+      userId: 'user-1',
+    });
+    const record = bridge.toCanonicalHistoryRecord({
+      observationId: 'obs-1',
+      sourceAddress: {
+        documentId: 'doc-1',
+        nodeId: 'node-1',
+      },
+      time: 1000,
+      problemStartTime: 1000,
+      outcome: 'unknown',
+      responseValue: null,
+    });
+
+    assert.throws(
+      () => bridge.fromCanonicalHistoryRecord({
+        ...record,
+        sparc: {
+          ...record.sparc,
+          practiceObservation: {
+            ...record.sparc.practiceObservation,
+            modelTarget: {
+              sparcDocumentId: 'doc-2',
+              sparcNodeId: 'node-1',
+              stimuliSetId: 'stim-set-1',
+              stimulusKC: 'kc-1',
+              clusterKC: 'cluster-1',
+              KCId: 'kc-1',
+              KCDefault: 'kc-1',
+              KCCluster: 'cluster-1',
+            },
+          },
+        },
+      }),
+      /modelTarget\.sparcDocumentId "doc-2" does not match sourceAddress document "doc-1"/,
+    );
+  });
 });

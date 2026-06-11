@@ -59,6 +59,20 @@ function defaultStateWrites(input: SparcResponseOutcomeInput): readonly SparcSta
   }];
 }
 
+function assertWritesStayInSourceDocument(
+  sourceAddress: SparcDocumentAddress,
+  writes: readonly SparcStateWrite[],
+): void {
+  for (const [index, write] of writes.entries()) {
+    if (write.target.documentId !== sourceAddress.documentId) {
+      throw new Error(
+        `SPARC response outcome stateWrites[${index}] target documentId "${write.target.documentId}" `
+          + `does not match source document "${sourceAddress.documentId}"`,
+      );
+    }
+  }
+}
+
 function createObservation(input: SparcResponseOutcomeInput): SparcPracticeObservation {
   return {
     observationId: requireNonBlank(input.observationId, 'observationId'),
@@ -135,9 +149,11 @@ export function processSparcResponseOutcome(
   input: SparcResponseOutcomeInput,
 ): SparcProcessedResponseOutcome {
   const observation = createObservation(input);
+  const stateWrites = input.stateWrites ?? defaultStateWrites(input);
+  assertWritesStayInSourceDocument(observation.sourceAddress, stateWrites);
   const stateTransition = createStateTransition(
     observation,
-    input.stateWrites ?? defaultStateWrites(input),
+    stateWrites,
   );
   const traceStep = createTraceStep(input);
   const modelUpdateRequest = createModelUpdateRequest(observation);

@@ -110,6 +110,12 @@ function normalizeObservation(value: unknown): SparcPracticeObservation | null {
     responseValue: source.responseValue,
   };
   const modelTarget = normalizeModelTarget(source.modelTarget);
+  if (modelTarget && modelTarget.sparcDocumentId !== sourceAddress.documentId) {
+    throw new Error(
+      `sparc.practiceObservation.modelTarget.sparcDocumentId "${modelTarget.sparcDocumentId}" `
+        + `does not match sourceAddress document "${sourceAddress.documentId}"`,
+    );
+  }
   const observation: SparcPracticeObservation = {
     ...observationBase,
     ...(modelTarget ? { modelTarget } : {}),
@@ -137,6 +143,15 @@ export function createSparcPracticeHistoryBridge(
   return {
     toCanonicalHistoryRecord(observation) {
       const sourceAddress = normalizeAddress(observation.sourceAddress, 'observation.sourceAddress');
+      if (
+        observation.modelTarget
+        && observation.modelTarget.sparcDocumentId !== sourceAddress.documentId
+      ) {
+        throw new Error(
+          `observation.modelTarget.sparcDocumentId "${observation.modelTarget.sparcDocumentId}" `
+            + `does not match sourceAddress document "${sourceAddress.documentId}"`,
+        );
+      }
       const extension: SparcCanonicalHistoryExtension = {
         documentId: sourceAddress.documentId,
         sourceAddress,
