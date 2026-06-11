@@ -25,9 +25,11 @@ async function makeLocalStorageSettings() {
   const dynamicAssetsPath = path.join(base, 'dynamic-assets');
   const h5pContentPath = path.join(base, 'h5p-content');
   const h5pLibrariesPath = path.join(base, 'h5p-libraries');
+  const localBackupPath = path.join(base, 'backups');
   await fs.mkdir(dynamicAssetsPath);
   await fs.mkdir(h5pContentPath);
   await fs.mkdir(h5pLibrariesPath);
+  await fs.mkdir(localBackupPath);
   return {
     storage: {
       backend: 'local',
@@ -35,6 +37,12 @@ async function makeLocalStorageSettings() {
         dynamicAssetsPath,
         h5pContentPath,
         h5pLibrariesPath,
+      },
+    },
+    openCore: {
+      requireRedis: false,
+      backups: {
+        localBackupPath,
       },
     },
   };
@@ -110,9 +118,6 @@ describe('deploymentReadinessMethods', function() {
         requireEmailVerification: false,
         argon2Enabled: true,
       },
-      openCore: {
-        requireRedis: false,
-      },
       ...(await makeLocalStorageSettings()),
     };
 
@@ -125,7 +130,10 @@ describe('deploymentReadinessMethods', function() {
 
     const result = await methods.deploymentReadiness.call({ userId: 'admin-user' });
 
-    expect(result.ok).to.equal(true);
+    expect(
+      result.ok,
+      JSON.stringify(result.checks.filter((readinessCheck) => readinessCheck.status !== 'pass'), null, 2),
+    ).to.equal(true);
     expect(result.checks.map((check) => check.name)).to.include.members([
       'settings.source',
       'settings.required',

@@ -198,14 +198,24 @@ describe('Learning component catalog', function() {
         requiredCapabilities: ['assessment-state', 'logging', 'session', 'stimuli', 'ui-alerts'],
         requiredServerMethods: [],
       });
-    expect(summary.trialDisplays).to.deep.equal([{
-      id: 'mofacts.h5p-trial-display',
-      kind: 'trial-display',
-      unitTypes: [],
-      displayTypes: ['h5p'],
-      requiredCapabilities: ['history', 'media'],
-      requiredServerMethods: [],
-    }]);
+    expect(summary.trialDisplays).to.deep.equal([
+      {
+        id: 'mofacts.h5p-trial-display',
+        kind: 'trial-display',
+        unitTypes: [],
+        displayTypes: ['h5p'],
+        requiredCapabilities: ['history', 'media'],
+        requiredServerMethods: [],
+      },
+      {
+        id: 'mofacts.sparc-trial-display',
+        kind: 'trial-display',
+        unitTypes: [],
+        displayTypes: ['sparc'],
+        requiredCapabilities: ['history', 'media'],
+        requiredServerMethods: [],
+      },
+    ]);
   });
 
   it('combines approved catalogs through the same validation boundary', function() {
