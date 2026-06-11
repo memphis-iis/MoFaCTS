@@ -1,9 +1,12 @@
 import type { CanonicalHistoryRecord } from './historyEnvelope';
 import {
-  isBlankIdentityValue,
-  isModelPracticeHistoryRecord,
   type ModelPracticeHistoryIdentity,
 } from './historyStimulusIdentity';
+import {
+  modelPracticeIdentityMatches,
+  readSharedModelPracticeEvents,
+  type SharedModelPracticeEvent,
+} from './modelPracticeHistoryExchange';
 
 export type ModelPracticeMetric =
   | 'probability'
@@ -22,37 +25,6 @@ export type ModelPracticeStateProvider = {
   readonly queryModelPracticeState: (query: ModelPracticeStateQuery) => unknown;
 };
 
-function identityValuesMatch(left: unknown, right: unknown): boolean {
-  return !isBlankIdentityValue(left) && !isBlankIdentityValue(right) && String(left) === String(right);
-}
-
-function recordMatchesModelTarget(
-  record: Record<string, unknown>,
-  target: ModelPracticeHistoryIdentity,
-): boolean {
-  if (!isModelPracticeHistoryRecord(record)) {
-    return false;
-  }
-  if (!identityValuesMatch(record.stimuliSetId, target.stimuliSetId)) {
-    return false;
-  }
-  if (!identityValuesMatch(record.stimulusKC, target.stimulusKC)) {
-    return false;
-  }
-  if (!identityValuesMatch(record.clusterKC, target.clusterKC)) {
-    return false;
-  }
-  if (target.response) {
-    if (!identityValuesMatch(record.responseKC, target.response.responseKC)) {
-      return false;
-    }
-    if (!identityValuesMatch(record.responseKey, target.response.responseKey)) {
-      return false;
-    }
-  }
-  return true;
-}
-
 function isCorrectOutcome(outcome: unknown): boolean {
   return typeof outcome === 'string' && outcome.toLowerCase() === 'correct';
 }
@@ -61,28 +33,8 @@ function isIncorrectOutcome(outcome: unknown): boolean {
   return typeof outcome === 'string' && outcome.toLowerCase() === 'incorrect';
 }
 
-function isStudyOutcome(record: Record<string, unknown>): boolean {
-  return record.outcome === 'study' || record.typeOfResponse === 'study';
-}
-
-function getPracticeDuration(record: Record<string, unknown>): number {
-  if (Number.isFinite(Number(record.responseDuration))) {
-    return Number(record.responseDuration);
-  }
-  if (Number.isFinite(Number(record.practiceDurationMs))) {
-    return Number(record.practiceDurationMs);
-  }
-  if (record.sparc && typeof record.sparc === 'object' && !Array.isArray(record.sparc)) {
-    const extension = record.sparc as Record<string, unknown>;
-    const observation = extension.practiceObservation;
-    if (observation && typeof observation === 'object' && !Array.isArray(observation)) {
-      const practiceDurationMs = (observation as Record<string, unknown>).practiceDurationMs;
-      if (Number.isFinite(Number(practiceDurationMs))) {
-        return Number(practiceDurationMs);
-      }
-    }
-  }
-  return 0;
+function isStudyEvent(event: SharedModelPracticeEvent): boolean {
+  return event.outcome === 'study' || event.record.typeOfResponse === 'study';
 }
 
 export function queryModelPracticeHistory(
@@ -99,20 +51,20 @@ export function queryModelPracticeHistory(
   let totalPracticeDuration = 0;
   let lastOutcome: unknown;
 
-  for (const record of records) {
-    if (!recordMatchesModelTarget(record, query.target)) {
+  for (const event of readSharedModelPracticeEvents(records)) {
+    if (!modelPracticeIdentityMatches(query.target, event.identity)) {
       continue;
     }
-    if (isCorrectOutcome(record.outcome)) {
+    if (isCorrectOutcome(event.outcome)) {
       priorCorrect += 1;
-    } else if (isIncorrectOutcome(record.outcome)) {
+    } else if (isIncorrectOutcome(event.outcome)) {
       priorIncorrect += 1;
     }
-    if (isStudyOutcome(record)) {
+    if (isStudyEvent(event)) {
       priorStudy += 1;
     }
-    totalPracticeDuration += getPracticeDuration(record);
-    lastOutcome = record.outcome;
+    totalPracticeDuration += event.practiceDurationMs ?? 0;
+    lastOutcome = event.outcome;
   }
 
   switch (query.metric) {

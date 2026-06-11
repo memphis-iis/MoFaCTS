@@ -109,6 +109,92 @@ describe('modelPracticeStateQueries', function() {
     }), 450);
   });
 
+  it('uses SPARC observation duration through the shared model-history exchange', function() {
+    assert.equal(queryModelPracticeHistory([
+      makeModelRecord('correct', {
+        eventType: 'sparc',
+        responseDuration: undefined,
+        practiceDurationMs: undefined,
+        sparc: {
+          documentId: 'doc-1',
+          sourceAddress: {
+            documentId: 'doc-1',
+            nodeId: 'widget-1',
+          },
+          practiceObservation: {
+            observationId: 'obs-1',
+            sourceAddress: {
+              documentId: 'doc-1',
+              nodeId: 'widget-1',
+            },
+            time: 2000,
+            problemStartTime: 1000,
+            practiceDurationMs: 500,
+            outcome: 'correct',
+            responseValue: 'answer',
+          },
+        },
+      }),
+    ], {
+      target,
+      metric: 'totalPracticeDuration',
+    }), 500);
+  });
+
+  it('lets target-level queries read card or SPARC rows with response identities', function() {
+    const targetWithoutResponse: ModelPracticeHistoryIdentity = {
+      stimuliSetId: target.stimuliSetId,
+      stimulusKC: target.stimulusKC,
+      clusterKC: target.clusterKC,
+      KCId: target.KCId,
+      KCDefault: target.KCDefault,
+      KCCluster: target.KCCluster,
+    };
+
+    assert.equal(queryModelPracticeHistory([
+      makeModelRecord('correct', {
+        responseKC: 'response-kc-1',
+        responseKey: 'answer',
+      }),
+      makeModelRecord('incorrect', {
+        eventType: 'sparc',
+        responseKC: 'response-kc-2',
+        responseKey: 'alternate-answer',
+      }),
+    ], {
+      target: targetWithoutResponse,
+      metric: 'priorCorrect',
+    }), 1);
+    assert.equal(queryModelPracticeHistory([
+      makeModelRecord('correct', {
+        responseKC: 'response-kc-1',
+        responseKey: 'answer',
+      }),
+      makeModelRecord('incorrect', {
+        eventType: 'sparc',
+        responseKC: 'response-kc-2',
+        responseKey: 'alternate-answer',
+      }),
+    ], {
+      target: targetWithoutResponse,
+      metric: 'priorIncorrect',
+    }), 1);
+  });
+
+  it('fails clearly when a model row is not in the shared model-history format', function() {
+    assert.throws(
+      () => queryModelPracticeHistory([
+        makeModelRecord('correct', {
+          KCCluster: undefined,
+        }),
+      ], {
+        target,
+        metric: 'priorCorrect',
+      }),
+      /Model practice history record missing KCCluster/,
+    );
+  });
+
   it('can be exposed as a generic model-state provider', function() {
     const provider = createHistoryBackedModelPracticeStateProvider([
       makeModelRecord('correct'),
