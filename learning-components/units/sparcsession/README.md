@@ -130,6 +130,12 @@ The unit registry should become the long-term plugin boundary. SPARC should get
 rendering, history, adaptive-model, practice-record, content-state, and external
 sync capabilities through explicit runtime interfaces instead of reaching into
 learning-session or Meteor internals.
+`SparcSessionUnitEngine.ts` now exposes document-runtime entry points directly:
+document-reference validation, authored-start-state plus history replay, and
+authored response commit through canonical history. The commit entry point takes
+the history writer explicitly and uses the engine's shared adaptive-model API
+for model-linked outcomes; it does not import Learning Session unit code or
+create a SPARC-only persistence lane.
 The current manifest advertises the first SPARC-owned services through
 `providedServices`: document addressing, document replay, state replay,
 response-outcome history, authored initial state, authored model targets,
