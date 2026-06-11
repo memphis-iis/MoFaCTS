@@ -52,9 +52,25 @@ export type SparcLayoutMode =
   | 'sidebar'
   | 'tabs';
 
+export type SparcVisualPreset =
+  | 'assignment'
+  | 'chapter'
+  | 'section'
+  | 'practice-panel'
+  | 'feedback-panel'
+  | 'callout'
+  | 'control-panel';
+
+export type SparcVisualDensity =
+  | 'compact'
+  | 'comfortable'
+  | 'spacious';
+
 export type SparcLayoutPolicy = {
   readonly scrollAxis?: SparcScrollAxis;
   readonly layoutMode?: SparcLayoutMode;
+  readonly visualPreset?: SparcVisualPreset;
+  readonly density?: SparcVisualDensity;
   readonly width?: number | string;
   readonly minWidth?: number | string;
   readonly maxWidth?: number | string;

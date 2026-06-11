@@ -241,6 +241,8 @@ function createConversionFactorDocument(
       layout: {
         scrollAxis: 'vertical',
         layoutMode: 'document',
+        visualPreset: 'assignment',
+        density: 'comfortable',
         maxWidth: '100%',
         wideContent: 'reflow',
       },
@@ -284,6 +286,8 @@ function createConversionFactorDocument(
         layout: {
           scrollAxis: 'vertical',
           layoutMode: 'stack',
+          visualPreset: 'chapter',
+          density: 'comfortable',
           maxWidth: '100%',
           wideContent: 'reflow',
         },
@@ -292,6 +296,8 @@ function createConversionFactorDocument(
           kind: 'section',
           layout: {
             layoutMode: 'stack',
+            visualPreset: 'section',
+            density: 'comfortable',
             maxWidth: '100%',
             wideContent: 'reflow',
           },
@@ -311,6 +317,8 @@ function createConversionFactorDocument(
           kind: 'region',
           layout: {
             layoutMode: 'columns',
+            visualPreset: 'practice-panel',
+            density: 'comfortable',
             maxWidth: '100%',
             wideContent: 'stack',
           },
@@ -327,6 +335,8 @@ function createConversionFactorDocument(
           kind: 'region',
           layout: {
             layoutMode: 'stack',
+            visualPreset: 'feedback-panel',
+            density: 'comfortable',
             maxWidth: '100%',
             wideContent: 'reflow',
           },

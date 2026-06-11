@@ -12,6 +12,8 @@ function validDocument(): SparcAuthoredDocument {
     layout: {
       scrollAxis: 'vertical',
       layoutMode: 'document',
+      visualPreset: 'assignment',
+      density: 'comfortable',
       maxWidth: '100%',
       wideContent: 'reflow',
     },
@@ -21,6 +23,8 @@ function validDocument(): SparcAuthoredDocument {
       layout: {
         scrollAxis: 'vertical',
         layoutMode: 'stack',
+        visualPreset: 'chapter',
+        density: 'comfortable',
         maxWidth: '100%',
         wideContent: 'reflow',
       },
@@ -29,6 +33,8 @@ function validDocument(): SparcAuthoredDocument {
         kind: 'region',
         layout: {
           layoutMode: 'stack',
+          visualPreset: 'section',
+          density: 'comfortable',
           maxWidth: '100%',
           wideContent: 'stack',
         },
@@ -53,6 +59,8 @@ describe('sparcLayoutPolicy', function() {
       ...validDocument(),
       layout: {
         scrollAxis: 'horizontal',
+        visualPreset: 'assignment',
+        density: 'comfortable',
         maxWidth: '100%',
         wideContent: 'reflow',
       },
@@ -62,6 +70,76 @@ describe('sparcLayoutPolicy', function() {
 
     assert.equal(result.valid, false);
     assert.deepEqual(result.issues.map((issue) => issue.kind), ['horizontal-scroll-axis']);
+  });
+
+  it('requires document-level assignment/chapter visual presets', function() {
+    const missingPreset = {
+      ...validDocument(),
+      layout: {
+        scrollAxis: 'vertical',
+        layoutMode: 'document',
+        maxWidth: '100%',
+        wideContent: 'reflow',
+      },
+    } as unknown as SparcAuthoredDocument;
+    const panelPreset = {
+      ...validDocument(),
+      layout: {
+        scrollAxis: 'vertical',
+        layoutMode: 'document',
+        visualPreset: 'practice-panel',
+        maxWidth: '100%',
+        wideContent: 'reflow',
+      },
+    } as unknown as SparcAuthoredDocument;
+
+    assert.deepEqual(validateSparcVerticalLayout(missingPreset).issues.map((issue) => issue.kind), [
+      'missing-document-visual-preset',
+    ]);
+    assert.deepEqual(validateSparcVerticalLayout(panelPreset).issues.map((issue) => issue.kind), [
+      'invalid-visual-preset',
+    ]);
+  });
+
+  it('rejects unrecognized visual preset and density tokens', function() {
+    const document = {
+      ...validDocument(),
+      layout: {
+        scrollAxis: 'vertical',
+        layoutMode: 'document',
+        visualPreset: 'assignment',
+        density: 'dense',
+        maxWidth: '100%',
+        wideContent: 'reflow',
+      },
+      root: {
+        ...validDocument().root,
+        children: [{
+          id: 'novel-section',
+          kind: 'section',
+          layout: {
+            layoutMode: 'stack',
+            visualPreset: 'dashboard',
+            density: 'quiet',
+            maxWidth: '100%',
+            wideContent: 'reflow',
+          },
+        }],
+      },
+    } as unknown as SparcAuthoredDocument;
+
+    assert.deepEqual(validateSparcVerticalLayout(document).issues, [{
+      kind: 'invalid-visual-density',
+      message: 'SPARC document "doc-1" density "dense" is not recognized',
+    }, {
+      kind: 'invalid-visual-preset',
+      nodeId: 'novel-section',
+      message: 'SPARC node "novel-section" visualPreset "dashboard" is not recognized',
+    }, {
+      kind: 'invalid-visual-density',
+      nodeId: 'novel-section',
+      message: 'SPARC node "novel-section" density "quiet" is not recognized',
+    }]);
   });
 
   it('flags wide authored nodes that do not declare shrink/reflow/stack/constrain behavior', function() {
@@ -151,6 +229,8 @@ describe('sparcLayoutPolicy', function() {
           kind: 'module',
           layout: {
             layoutMode: 'sidebar',
+            visualPreset: 'practice-panel',
+            density: 'comfortable',
             maxWidth: '100%',
             wideContent: 'stack',
           },
@@ -159,6 +239,8 @@ describe('sparcLayoutPolicy', function() {
             kind: 'panel',
             layout: {
               layoutMode: 'stack',
+              visualPreset: 'control-panel',
+              density: 'compact',
               maxWidth: '100%',
               wideContent: 'reflow',
             },
@@ -167,6 +249,8 @@ describe('sparcLayoutPolicy', function() {
             kind: 'panel',
             layout: {
               layoutMode: 'stack',
+              visualPreset: 'feedback-panel',
+              density: 'comfortable',
               maxWidth: '100%',
               wideContent: 'reflow',
             },
@@ -191,6 +275,7 @@ describe('sparcLayoutPolicy', function() {
           kind: 'panel',
           layout: {
             layoutMode: 'columns',
+            visualPreset: 'practice-panel',
             maxWidth: '100%',
             wideContent: 'shrink',
           },
@@ -205,6 +290,51 @@ describe('sparcLayoutPolicy', function() {
       kind: 'missing-responsive-layout-policy',
       nodeId: 'two-column-panel',
       message: 'SPARC node "two-column-panel" layoutMode "columns" must declare wideContent "reflow" or "stack"',
+    }]);
+  });
+
+  it('requires panel and module nodes to declare panel visual presets', function() {
+    const missingPreset: SparcAuthoredDocument = {
+      ...validDocument(),
+      root: {
+        ...validDocument().root,
+        children: [{
+          id: 'unstyled-panel',
+          kind: 'panel',
+          layout: {
+            layoutMode: 'stack',
+            maxWidth: '100%',
+            wideContent: 'reflow',
+          },
+        }],
+      },
+    };
+    const documentPreset: SparcAuthoredDocument = {
+      ...validDocument(),
+      root: {
+        ...validDocument().root,
+        children: [{
+          id: 'chapter-panel',
+          kind: 'panel',
+          layout: {
+            layoutMode: 'stack',
+            visualPreset: 'chapter',
+            maxWidth: '100%',
+            wideContent: 'reflow',
+          },
+        }],
+      },
+    };
+
+    assert.deepEqual(validateSparcVerticalLayout(missingPreset).issues, [{
+      kind: 'missing-panel-visual-preset',
+      nodeId: 'unstyled-panel',
+      message: 'SPARC panel "unstyled-panel" must declare a panel visualPreset',
+    }]);
+    assert.deepEqual(validateSparcVerticalLayout(documentPreset).issues, [{
+      kind: 'invalid-visual-preset',
+      nodeId: 'chapter-panel',
+      message: 'SPARC panel "chapter-panel" visualPreset "chapter" is not a panel preset',
     }]);
   });
 

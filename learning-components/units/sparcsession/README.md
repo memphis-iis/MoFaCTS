@@ -228,6 +228,12 @@ nodes can be `panel` or `module`, and layout policies can declare
 collapses into a vertical document instead of creating a horizontal-scroll
 surface.
 
+The visual vocabulary is also declarative: `visualPreset` can name assignment,
+chapter, section, practice-panel, feedback-panel, callout, or control-panel
+treatments, and `density` can be compact, comfortable, or spacious. Those tokens
+give the eventual renderer polished layout defaults for spacing, surfaces, and
+type scale without embedding per-node CSS or copying Shiny runtime behavior.
+
 The layout invariant remains vertical scrolling only. Wide authored elements
 should declare how they reflow, shrink, stack, or render inside a constrained
 viewer. Page-level horizontal scrolling should be treated as a layout error.
