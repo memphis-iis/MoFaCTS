@@ -26,6 +26,15 @@ export type SparcReferenceValidationResult = {
   readonly issues: readonly SparcReferenceValidationIssue[];
 };
 
+const MODEL_QUERY_METRICS = new Set([
+  'probability',
+  'priorCorrect',
+  'priorIncorrect',
+  'priorStudy',
+  'totalPracticeDuration',
+  'lastOutcome',
+]);
+
 function collectNodes(
   node: SparcAuthoredNode,
   nodes = new Map<string, SparcAuthoredNode>(),
@@ -97,6 +106,26 @@ function validateNodeReferences(
         sourceNodeId: sourceNode.id,
         reference,
         message: error instanceof Error ? error.message : String(error),
+      });
+    }
+    if (
+      reference.stateKey !== undefined
+      && (typeof reference.stateKey !== 'string' || reference.stateKey.trim().length === 0)
+    ) {
+      issues.push({
+        sourceNodeId: sourceNode.id,
+        reference,
+        message: `SPARC node "${sourceNode.id}" reference stateKey is required when declared`,
+      });
+    }
+    if (
+      reference.modelMetric !== undefined
+      && !MODEL_QUERY_METRICS.has(String(reference.modelMetric))
+    ) {
+      issues.push({
+        sourceNodeId: sourceNode.id,
+        reference,
+        message: `SPARC node "${sourceNode.id}" reference modelMetric "${String(reference.modelMetric)}" is not recognized`,
       });
     }
   }

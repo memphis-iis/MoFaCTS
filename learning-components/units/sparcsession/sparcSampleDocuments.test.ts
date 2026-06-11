@@ -75,6 +75,7 @@ describe('sparcSampleDocuments', function() {
       },
     }, {
       relation: 'depends-on',
+      stateKey: 'lastOutcome',
       target: {
         documentId: 'html-factors-balloons',
         nodeId: 'conversion-table',

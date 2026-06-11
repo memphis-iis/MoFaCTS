@@ -13,6 +13,14 @@ export type SparcDocumentAddress = {
   readonly path?: readonly SparcAddressSegment[];
 };
 
+export type SparcModelMetric =
+  | 'probability'
+  | 'priorCorrect'
+  | 'priorIncorrect'
+  | 'priorStudy'
+  | 'totalPracticeDuration'
+  | 'lastOutcome';
+
 export type SparcAddressReference = {
   readonly target: SparcDocumentAddress;
   readonly relation?:
@@ -22,6 +30,8 @@ export type SparcAddressReference = {
     | 'feedback-for'
     | 'model-target'
     | 'navigates-to';
+  readonly stateKey?: string;
+  readonly modelMetric?: SparcModelMetric;
 };
 
 export type SparcNodeKind =
@@ -135,13 +145,7 @@ export type SparcModelTargetIdentity = ModelPracticeHistoryIdentity & {
 
 export type SparcModelQuery = {
   readonly target: SparcModelTargetIdentity;
-  readonly metric:
-    | 'probability'
-    | 'priorCorrect'
-    | 'priorIncorrect'
-    | 'priorStudy'
-    | 'totalPracticeDuration'
-    | 'lastOutcome';
+  readonly metric: SparcModelMetric;
 };
 
 export type SparcStateQuery = {

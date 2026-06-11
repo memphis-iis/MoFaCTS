@@ -25,9 +25,11 @@ function targetRef(
   documentId: string,
   nodeId: string,
   relation: NonNullable<SparcAddressReference['relation']>,
+  metadata: Omit<SparcAddressReference, 'relation' | 'target'> = {},
 ): SparcAddressReference {
   return {
     relation,
+    ...metadata,
     target: {
       documentId,
       nodeId,
@@ -328,7 +330,9 @@ function createConversionFactorDocument(
             widgetNode('CV1', id),
             widgetNode('SF1', id),
             widgetNode('SF2', id),
-            widgetNode('CV2', id, [targetRef(id, 'final-answer-region', 'controls')]),
+            widgetNode('CV2', id, [targetRef(id, 'final-answer-region', 'controls', {
+              stateKey: 'enabled',
+            })]),
           ],
         }, {
           id: 'final-answer-region',
@@ -356,8 +360,12 @@ function createConversionFactorDocument(
             },
           },
           children: [
-            widgetNode('A3', id, [targetRef(id, 'conversion-table', 'depends-on')]),
-            widgetNode('done', id, [targetRef(id, 'A3', 'depends-on')]),
+            widgetNode('A3', id, [targetRef(id, 'conversion-table', 'depends-on', {
+              stateKey: 'lastOutcome',
+            })]),
+            widgetNode('done', id, [targetRef(id, 'A3', 'depends-on', {
+              stateKey: 'lastOutcome',
+            })]),
           ],
         }],
       },

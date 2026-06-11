@@ -77,6 +77,47 @@ describe('sparcDocumentAddressing', function() {
     );
   });
 
+  it('validates authored reference state keys and model metrics', function() {
+    const document: SparcAuthoredDocument = {
+      id: 'doc-1',
+      schemaVersion: 1,
+      root: {
+        id: 'root',
+        kind: 'document',
+        children: [{
+          id: 'source',
+          kind: 'region',
+          refs: [{
+            relation: 'depends-on',
+            target: {
+              documentId: 'doc-1',
+              nodeId: 'target',
+            },
+            stateKey: ' ',
+          }, {
+            relation: 'model-target',
+            target: {
+              documentId: 'doc-1',
+              nodeId: 'target',
+            },
+            modelMetric: 'fluency' as never,
+          }],
+        }, {
+          id: 'target',
+          kind: 'region',
+        }],
+      },
+    };
+
+    const result = validateSparcDocumentReferences(document);
+
+    assert.equal(result.valid, false);
+    assert.deepEqual(result.issues.map((issue) => issue.message), [
+      'SPARC node "source" reference stateKey is required when declared',
+      'SPARC node "source" reference modelMetric "fluency" is not recognized',
+    ]);
+  });
+
   it('validates authored reactive rule write targets', function() {
     const document: SparcAuthoredDocument = {
       id: 'doc-1',

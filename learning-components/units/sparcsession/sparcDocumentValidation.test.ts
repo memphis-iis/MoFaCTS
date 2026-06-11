@@ -12,6 +12,8 @@ function validDocument(): SparcAuthoredDocument {
     schemaVersion: 1,
     layout: {
       scrollAxis: 'vertical',
+      visualPreset: 'assignment',
+      density: 'comfortable',
       maxWidth: '100%',
       wideContent: 'reflow',
     },
@@ -20,6 +22,8 @@ function validDocument(): SparcAuthoredDocument {
       kind: 'document',
       layout: {
         scrollAxis: 'vertical',
+        visualPreset: 'chapter',
+        density: 'comfortable',
         maxWidth: '100%',
         wideContent: 'reflow',
       },
@@ -27,6 +31,8 @@ function validDocument(): SparcAuthoredDocument {
         id: 'region-1',
         kind: 'region',
         layout: {
+          visualPreset: 'section',
+          density: 'comfortable',
           maxWidth: '100%',
           wideContent: 'stack',
         },

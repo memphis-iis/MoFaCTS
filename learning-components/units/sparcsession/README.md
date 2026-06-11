@@ -26,6 +26,9 @@ nested targets.
 document id, node id, and optional nested path against an authored document tree
 and validates references without falling back to visual order or renderer DOM
 state.
+Authored `refs` can also declare `stateKey` or `modelMetric` metadata, so a
+cross-region link can say whether it depends on a specific replayed state cell
+or model query metric instead of merely naming another layout region.
 
 SPARC should be reactive. Widgets and authored expressions emit events; events
 update document state, model state, and history; dependent expressions then
