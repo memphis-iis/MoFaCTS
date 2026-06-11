@@ -215,6 +215,14 @@ conditional panels, reactive values, observers, modules, default usable layouts,
 state bookmarking/reproduction, and embedding interactive apps inside larger
 dynamic documents. It should not copy Shiny's runtime directly.
 
+The first authored-layout vocabulary for that direction is deliberately small:
+nodes can be `panel` or `module`, and layout policies can declare
+`layoutMode: "document"`, `"stack"`, `"columns"`, `"sidebar"`, or `"tabs"`.
+`columns` and `sidebar` are allowed only when the node also declares
+`wideContent: "reflow"` or `"stack"`, so Shiny-style multi-panel authoring still
+collapses into a vertical document instead of creating a horizontal-scroll
+surface.
+
 The layout invariant remains vertical scrolling only. Wide authored elements
 should declare how they reflow, shrink, stack, or render inside a constrained
 viewer. Page-level horizontal scrolling should be treated as a layout error.

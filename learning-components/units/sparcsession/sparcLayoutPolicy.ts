@@ -6,6 +6,7 @@ import type {
 export type SparcLayoutIssueKind =
   | 'horizontal-scroll-axis'
   | 'horizontal-overflow'
+  | 'missing-responsive-layout-policy'
   | 'missing-wide-content-policy'
   | 'missing-document-layout';
 
@@ -21,6 +22,8 @@ export type SparcLayoutValidationResult = {
 };
 
 const WIDE_CONTENT_POLICIES = new Set(['constrain', 'reflow', 'shrink', 'stack']);
+const RESPONSIVE_LAYOUT_MODES = new Set(['columns', 'sidebar']);
+const RESPONSIVE_WIDE_CONTENT_POLICIES = new Set(['reflow', 'stack']);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -52,6 +55,10 @@ function readOverflowX(layout: unknown): unknown {
   return isRecord(layout) ? layout.overflowX : undefined;
 }
 
+function readLayoutMode(layout: unknown): unknown {
+  return isRecord(layout) ? layout.layoutMode : undefined;
+}
+
 function pushWideContentIssue(params: {
   readonly issues: SparcLayoutIssue[];
   readonly documentId?: string;
@@ -69,6 +76,49 @@ function pushWideContentIssue(params: {
     kind: 'missing-wide-content-policy',
     message: `SPARC document "${params.documentId}" with width constraints must declare reflow, shrink, stack, or constrain behavior`,
   });
+}
+
+function pushResponsiveLayoutIssue(params: {
+  readonly issues: SparcLayoutIssue[];
+  readonly layoutMode: string;
+  readonly documentId?: string;
+  readonly nodeId?: string;
+}): void {
+  if (params.nodeId) {
+    params.issues.push({
+      kind: 'missing-responsive-layout-policy',
+      nodeId: params.nodeId,
+      message: `SPARC node "${params.nodeId}" layoutMode "${params.layoutMode}" must declare wideContent "reflow" or "stack"`,
+    });
+    return;
+  }
+  params.issues.push({
+    kind: 'missing-responsive-layout-policy',
+    message: `SPARC document "${params.documentId}" layoutMode "${params.layoutMode}" must declare wideContent "reflow" or "stack"`,
+  });
+}
+
+function validateResponsiveLayoutMode(params: {
+  readonly layout: unknown;
+  readonly issues: SparcLayoutIssue[];
+  readonly documentId?: string;
+  readonly nodeId?: string;
+}): void {
+  const layoutMode = readLayoutMode(params.layout);
+  if (!RESPONSIVE_LAYOUT_MODES.has(String(layoutMode))) {
+    return;
+  }
+  if (
+    !isRecord(params.layout)
+    || !RESPONSIVE_WIDE_CONTENT_POLICIES.has(String(params.layout.wideContent))
+  ) {
+    pushResponsiveLayoutIssue({
+      issues: params.issues,
+      layoutMode: String(layoutMode),
+      ...(params.documentId === undefined ? {} : { documentId: params.documentId }),
+      ...(params.nodeId === undefined ? {} : { nodeId: params.nodeId }),
+    });
+  }
 }
 
 function validateNodeLayout(
@@ -93,6 +143,11 @@ function validateNodeLayout(
   if (hasConstrainedWidth(node.layout) && !hasWideContentPolicy(node.layout)) {
     pushWideContentIssue({ issues, nodeId: node.id });
   }
+  validateResponsiveLayoutMode({
+    layout: node.layout,
+    issues,
+    nodeId: node.id,
+  });
   for (const child of node.children ?? []) {
     validateNodeLayout(child, issues);
   }
@@ -123,6 +178,11 @@ export function validateSparcVerticalLayout(
   if (hasConstrainedWidth(document.layout) && !hasWideContentPolicy(document.layout)) {
     pushWideContentIssue({ issues, documentId: document.id });
   }
+  validateResponsiveLayoutMode({
+    layout: document.layout,
+    issues,
+    documentId: document.id,
+  });
   validateNodeLayout(document.root, issues);
   return {
     valid: issues.length === 0,

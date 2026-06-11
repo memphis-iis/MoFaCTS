@@ -240,6 +240,7 @@ function createConversionFactorDocument(
       schemaVersion: 1,
       layout: {
         scrollAxis: 'vertical',
+        layoutMode: 'document',
         maxWidth: '100%',
         wideContent: 'reflow',
       },
@@ -282,6 +283,7 @@ function createConversionFactorDocument(
         kind: 'document',
         layout: {
           scrollAxis: 'vertical',
+          layoutMode: 'stack',
           maxWidth: '100%',
           wideContent: 'reflow',
         },
@@ -289,6 +291,7 @@ function createConversionFactorDocument(
           id: 'problem-statement',
           kind: 'section',
           layout: {
+            layoutMode: 'stack',
             maxWidth: '100%',
             wideContent: 'reflow',
           },
@@ -307,6 +310,7 @@ function createConversionFactorDocument(
           id: 'conversion-table',
           kind: 'region',
           layout: {
+            layoutMode: 'columns',
             maxWidth: '100%',
             wideContent: 'stack',
           },
@@ -322,6 +326,7 @@ function createConversionFactorDocument(
           id: 'final-answer-region',
           kind: 'region',
           layout: {
+            layoutMode: 'stack',
             maxWidth: '100%',
             wideContent: 'reflow',
           },

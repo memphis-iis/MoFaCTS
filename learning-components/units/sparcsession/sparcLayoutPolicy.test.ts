@@ -11,6 +11,7 @@ function validDocument(): SparcAuthoredDocument {
     schemaVersion: 1,
     layout: {
       scrollAxis: 'vertical',
+      layoutMode: 'document',
       maxWidth: '100%',
       wideContent: 'reflow',
     },
@@ -19,6 +20,7 @@ function validDocument(): SparcAuthoredDocument {
       kind: 'document',
       layout: {
         scrollAxis: 'vertical',
+        layoutMode: 'stack',
         maxWidth: '100%',
         wideContent: 'reflow',
       },
@@ -26,6 +28,7 @@ function validDocument(): SparcAuthoredDocument {
         id: 'wide-region',
         kind: 'region',
         layout: {
+          layoutMode: 'stack',
           maxWidth: '100%',
           wideContent: 'stack',
         },
@@ -135,6 +138,73 @@ describe('sparcLayoutPolicy', function() {
       kind: 'horizontal-overflow',
       nodeId: 'scrolling-table',
       message: 'SPARC node "scrolling-table" declares horizontal overflow',
+    }]);
+  });
+
+  it('accepts Shiny-style sidebar/module layout when it stacks on narrow widths', function() {
+    const document: SparcAuthoredDocument = {
+      ...validDocument(),
+      root: {
+        ...validDocument().root,
+        children: [{
+          id: 'practice-module',
+          kind: 'module',
+          layout: {
+            layoutMode: 'sidebar',
+            maxWidth: '100%',
+            wideContent: 'stack',
+          },
+          children: [{
+            id: 'controls-panel',
+            kind: 'panel',
+            layout: {
+              layoutMode: 'stack',
+              maxWidth: '100%',
+              wideContent: 'reflow',
+            },
+          }, {
+            id: 'output-panel',
+            kind: 'panel',
+            layout: {
+              layoutMode: 'stack',
+              maxWidth: '100%',
+              wideContent: 'reflow',
+            },
+          }],
+        }],
+      },
+    };
+
+    assert.deepEqual(validateSparcVerticalLayout(document), {
+      valid: true,
+      issues: [],
+    });
+  });
+
+  it('rejects column/sidebar layout modes without stack or reflow behavior', function() {
+    const document: SparcAuthoredDocument = {
+      ...validDocument(),
+      root: {
+        ...validDocument().root,
+        children: [{
+          id: 'two-column-panel',
+          kind: 'panel',
+          layout: {
+            layoutMode: 'columns',
+            maxWidth: '100%',
+            wideContent: 'shrink',
+          },
+        }],
+      },
+    };
+
+    const result = validateSparcVerticalLayout(document);
+
+    assert.equal(result.valid, false);
+    assert.deepEqual(result.issues, [{
+      kind: 'missing-responsive-layout-policy',
+      nodeId: 'two-column-panel',
+      message: 'SPARC node "two-column-panel" layoutMode "columns" must declare wideContent "reflow" or "stack"',
     }]);
   });
 

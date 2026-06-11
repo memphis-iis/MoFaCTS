@@ -28,6 +28,8 @@ export type SparcNodeKind =
   | 'document'
   | 'section'
   | 'region'
+  | 'panel'
+  | 'module'
   | 'widget'
   | 'input'
   | 'output'
@@ -43,8 +45,16 @@ export type SparcWideContentPolicy =
   | 'shrink'
   | 'stack';
 
+export type SparcLayoutMode =
+  | 'document'
+  | 'stack'
+  | 'columns'
+  | 'sidebar'
+  | 'tabs';
+
 export type SparcLayoutPolicy = {
   readonly scrollAxis?: SparcScrollAxis;
+  readonly layoutMode?: SparcLayoutMode;
   readonly width?: number | string;
   readonly minWidth?: number | string;
   readonly maxWidth?: number | string;
