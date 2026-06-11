@@ -4,17 +4,26 @@ import { isBlankIdentityValue } from '../../../common/historyEnvelope';
 export type LearningOutcome = 'study' | 'correct' | 'incorrect';
 
 export type LearningHistoryRecord = {
+  eventType?: string | null;
+  levelUnitType?: string | null;
   time?: number | string | null;
+  problemStartTime?: number | string | null;
   outcome?: LearningOutcome | string | null;
   stimuliSetId?: string | number | null;
   stimulusKC?: string | number | null;
   clusterKC?: string | number | null;
   KCCluster?: string | number | null;
   KCId?: string | number | null;
+  KCDefault?: string | number | null;
   CFCorrectAnswer?: string | number | null;
+  responseKey?: string | number | null;
+  responseDuration?: number | string | null;
+  practiceDurationMs?: number | string | null;
+  responseValue?: unknown;
   CFEndLatency?: number | string | null;
   CFFeedbackLatency?: number | string | null;
   instructionQuestionResult?: unknown;
+  sparc?: unknown;
 };
 
 type AggregateEntry = {
@@ -96,6 +105,62 @@ function requireLearningHistoryIdentityKey(
     );
   }
   return explicitKey;
+}
+
+function requireLearningHistoryResponseKey(row: LearningHistoryRecord): string {
+  const legacyResponseKey = isBlankIdentityValue(row.CFCorrectAnswer)
+    ? undefined
+    : String(row.CFCorrectAnswer);
+  const sharedResponseKey = isBlankIdentityValue(row.responseKey)
+    ? undefined
+    : String(row.responseKey);
+
+  if (legacyResponseKey && sharedResponseKey && legacyResponseKey !== sharedResponseKey) {
+    throw new Error('[History Reconstruction] Identity mismatch: responseKey must equal CFCorrectAnswer');
+  }
+  if (sharedResponseKey) {
+    return sharedResponseKey;
+  }
+  if (legacyResponseKey) {
+    return legacyResponseKey;
+  }
+  throw new Error('[History Reconstruction] Missing required field responseKey or CFCorrectAnswer');
+}
+
+function readFiniteOptionalNumber(value: unknown): number | undefined {
+  if (isBlankIdentityValue(value)) {
+    return undefined;
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return undefined;
+  }
+  return parsed;
+}
+
+function requireLearningHistoryPracticeTimeMs(row: LearningHistoryRecord): number {
+  const responseDuration = readFiniteOptionalNumber(row.responseDuration);
+  const practiceDurationMs = readFiniteOptionalNumber(row.practiceDurationMs);
+  if (
+    responseDuration !== undefined
+    && practiceDurationMs !== undefined
+    && responseDuration !== practiceDurationMs
+  ) {
+    throw new Error('[History Reconstruction] Duration mismatch: practiceDurationMs must equal responseDuration');
+  }
+
+  const sharedDuration = responseDuration ?? practiceDurationMs;
+  if (sharedDuration !== undefined) {
+    return sharedDuration;
+  }
+
+  if (
+    isBlankIdentityValue(row.CFEndLatency)
+    && isBlankIdentityValue(row.CFFeedbackLatency)
+  ) {
+    throw new Error('[History Reconstruction] Missing required field responseDuration or CF latency fields');
+  }
+  return computePracticeTimeMs(row.CFEndLatency, row.CFFeedbackLatency);
 }
 
 function requireOutcome(value: unknown): LearningOutcome {
@@ -228,8 +293,8 @@ export function reconstructLearningStateFromHistory(
     const time = row.time as number;
     const clusterKey = requireLearningHistoryIdentityKey(row, 'clusterKC', 'KCCluster');
     const stimulusKey = requireLearningHistoryIdentityKey(row, 'stimulusKC', 'KCId');
-    const responseKey = requireKey(row.CFCorrectAnswer, 'CFCorrectAnswer');
-    const practiceTimeMs = computePracticeTimeMs(row.CFEndLatency, row.CFFeedbackLatency);
+    const responseKey = requireLearningHistoryResponseKey(row);
+    const practiceTimeMs = requireLearningHistoryPracticeTimeMs(row);
 
     const cluster = clusterState[clusterKey] || (clusterState[clusterKey] = createClusterAggregate());
     const stimulus = stimulusState[stimulusKey] || (stimulusState[stimulusKey] = createStimulusAggregate());

@@ -55,6 +55,22 @@ Known component extension fields:
 
 Extension fields are bounded independently from the total wire payload budget. They must contain compact identifiers, outcomes, timestamps, scores, or resume checkpoints. They must not contain full runtime snapshots, global session state, full experiment state, or unbounded dialogue/history dumps.
 
+## Shared Model Practice Rows
+
+Model-linked practice rows use `levelUnitType: "model"` even when the event came
+from SPARC. Standard card history rows and model-linked SPARC rows must share the
+same model identity fields (`stimuliSetId`, `stimulusKC`, `clusterKC`, `KCId`,
+`KCDefault`, `KCCluster`, and optional `responseKey`/`responseKC`) so card
+practice, SPARC rules, and adaptive-model queries can read the same database
+records. SPARC-specific addresses, observations, and replay data belong in the
+bounded `sparc` extension; they must not replace the shared model fields.
+
+Learning-session reconstruction accepts the legacy card replay fields
+(`CFCorrectAnswer`, `CFEndLatency`, `CFFeedbackLatency`) and the shared
+model-practice fields (`responseKey`, `responseDuration` or
+`practiceDurationMs`). When both forms are present, their shared meanings must
+agree.
+
 ## Write Path
 
 Components must not call `insertHistory` directly. They emit canonical history through the app-owned helper/runtime capability:

@@ -191,6 +191,50 @@ describe('history reconstruction', function() {
     expect(result.stimulusState['stim-a']).to.not.equal(undefined);
   });
 
+  it('replays SPARC model-linked history rows through shared model-practice fields', function() {
+    const result = reconstructLearningStateFromHistory([
+      {
+        eventType: 'sparc',
+        levelUnitType: 'model',
+        time: 1000,
+        problemStartTime: 500,
+        outcome: 'correct',
+        stimuliSetId: 'set-a',
+        stimulusKC: 'stim-a',
+        clusterKC: 'cluster-a',
+        KCId: 'stim-a',
+        KCDefault: 'stim-a',
+        KCCluster: 'cluster-a',
+        responseKey: 'Alpha',
+        responseDuration: 375,
+        responseValue: 'Alpha',
+        sparc: {
+          documentId: 'doc-1',
+          practiceObservation: {
+            observationId: 'obs-1',
+            sourceAddress: {
+              documentId: 'doc-1',
+              nodeId: 'widget-1',
+            },
+            time: 1000,
+            problemStartTime: 500,
+            outcome: 'correct',
+            responseValue: 'Alpha',
+          },
+        },
+      },
+    ]);
+
+    expect(result.numQuestionsAnswered).to.equal(1);
+    expect(result.numCorrectAnswers).to.equal(1);
+    expect(result.overallOutcomeHistory).to.deep.equal([1]);
+    expect(result.clusterState['cluster-a']?.priorCorrect).to.equal(1);
+    expect(result.clusterState['cluster-a']?.totalPracticeDuration).to.equal(375);
+    expect(result.stimulusState['stim-a']?.timesSeen).to.equal(1);
+    expect(result.responseState.Alpha?.priorCorrect).to.equal(1);
+    expect(result.responseState.Alpha?.totalPracticeDuration).to.equal(375);
+  });
+
   it('rejects mismatched explicit identity aliases', function() {
     expect(() => reconstructLearningStateFromHistory([
       {
@@ -220,6 +264,36 @@ describe('history reconstruction', function() {
         CFFeedbackLatency: 100,
       },
     ])).to.throw('Missing required field clusterKC');
+  });
+
+  it('rejects mismatched shared and legacy response keys', function() {
+    expect(() => reconstructLearningStateFromHistory([
+      {
+        time: 1000,
+        outcome: 'correct',
+        stimuliSetId: 'set-a',
+        stimulusKC: 'stim-a',
+        clusterKC: 'cluster-a',
+        CFCorrectAnswer: 'Alpha',
+        responseKey: 'Beta',
+        responseDuration: 100,
+      },
+    ])).to.throw('responseKey must equal CFCorrectAnswer');
+  });
+
+  it('rejects mismatched shared duration fields', function() {
+    expect(() => reconstructLearningStateFromHistory([
+      {
+        time: 1000,
+        outcome: 'correct',
+        stimuliSetId: 'set-a',
+        stimulusKC: 'stim-a',
+        clusterKC: 'cluster-a',
+        responseKey: 'Alpha',
+        responseDuration: 100,
+        practiceDurationMs: 101,
+      },
+    ])).to.throw('practiceDurationMs must equal responseDuration');
   });
 
   it('fails closed when required replay fields are missing', function() {
