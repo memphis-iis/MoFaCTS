@@ -5,10 +5,14 @@ import {
 import {
   createSparcStateCellKey,
 } from './sparcStateReplay';
+import {
+  SPARC_SAMPLE_TRACE_FIXTURES,
+} from './sparcSampleTraceManifest';
 import type { CanonicalHistoryRecord } from '../../runtime/historyEnvelope';
 import type { UnitEngineSessionReadKey } from '../UnitEngineSessionKeys';
 import type {
   SparcAuthoredDocument,
+  SparcReferenceTraceStep,
 } from './sparcSessionContracts';
 
 function createMinimalDeps(overrides: Record<string, unknown> = {}): any {
@@ -119,6 +123,28 @@ function sampleDocument(): SparcAuthoredDocument {
   };
 }
 
+function brdXmlForTrace(trace: readonly SparcReferenceTraceStep[]): string {
+  const edges = trace.map((step) => {
+    const [selection, action, input] = step.actionId.split('::');
+    return `
+      <edge>
+        <actionLabel>
+          <message>
+            <properties>
+              <Selection><value>${selection ?? ''}</value></Selection>
+              <Action><value>${action ?? ''}</value></Action>
+              <Input><value>${input ?? ''}</value></Input>
+            </properties>
+          </message>
+          <actionType>${step.outcome === 'incorrect' ? 'Buggy Action' : 'Correct Action'}</actionType>
+        </actionLabel>
+        <rule><text>${step.productionRuleId}</text></rule>
+      </edge>
+    `;
+  }).join('');
+  return `<stateGraph>${edges}</stateGraph>`;
+}
+
 describe('SparcSessionUnitEngine document runtime boundary', function() {
   it('exposes SPARC document validation, replay, and authored response commit methods', async function() {
     const engine = await createSparcSessionUnitEngine(createMinimalDeps());
@@ -180,5 +206,30 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
       }, 'visible')]?.value,
       true,
     );
+  });
+
+  it('exposes CTAT sample BRD verification through the SPARC unit engine', async function() {
+    const engine = await createSparcSessionUnitEngine(createMinimalDeps());
+    const brdXmlByPath = new Map(
+      SPARC_SAMPLE_TRACE_FIXTURES.map((fixture) => [
+        fixture.ctatRootRelativeBrdPath,
+        brdXmlForTrace(fixture.referenceTrace ?? []),
+      ]),
+    );
+
+    const results = engine.assertAllSparcSampleTracesMatchCtatBrds({
+      readCtatBrdXml(path: string) {
+        const brdXml = brdXmlByPath.get(path);
+        if (!brdXml) {
+          throw new Error(`missing BRD XML for ${path}`);
+        }
+        return brdXml;
+      },
+    });
+
+    assert.deepEqual(results.map((result: { fixtureId: string }) => result.fixtureId), [
+      'html-factors-balloons',
+      'html-factors-cookies',
+    ]);
   });
 });

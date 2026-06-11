@@ -135,7 +135,9 @@ document-reference validation, authored-start-state plus history replay, and
 authored response commit through canonical history. The commit entry point takes
 the history writer explicitly and uses the engine's shared adaptive-model API
 for model-linked outcomes; it does not import Learning Session unit code or
-create a SPARC-only persistence lane.
+create a SPARC-only persistence lane. The engine also exposes the CTAT sample
+BRD batch verifier advertised by the manifest, so hosts can run the sample
+production-rule equivalence check through the same unit-runtime boundary.
 The current manifest advertises the first SPARC-owned services through
 `providedServices`: document addressing, document replay, state replay,
 response-outcome history, authored initial state, authored model targets,
