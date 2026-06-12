@@ -316,6 +316,7 @@
       attributionCaption,
       attributionLinkSignature,
       imageReady ? 'ready' : 'loading',
+      visible ? 'visible' : 'hidden',
     ].join('::');
 
     if (signature !== lastAttributionLayoutSignature) {
@@ -343,7 +344,10 @@
   $: {
     const blocking = Boolean(safeDisplay?.imgSrc);
     const src = safeDisplay?.imgSrc || '';
-    const ready = !blocking || (imageReady && attributionLayoutReady);
+    const ready = !blocking || (
+      imageReady &&
+      (!needsAttributedImageLayout || attributionLayoutReady || !visible)
+    );
     const signature = `${blocking}:${ready}:${src}`;
 
     if (signature !== lastBlockingAssetState) {
