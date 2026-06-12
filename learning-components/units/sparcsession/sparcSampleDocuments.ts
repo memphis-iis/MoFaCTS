@@ -11,6 +11,8 @@ import { createSparcTraceFromTrialResult } from './sparcTraceFromTrialResult';
 
 export type SparcSampleTraceRow = {
   readonly productionRuleId: string;
+  readonly productionRuleName?: string;
+  readonly productionSet?: string;
   readonly actionId: string;
   readonly outcome: Extract<SparcOutcome, 'correct' | 'incorrect'>;
 };
@@ -61,6 +63,8 @@ function traceRowsToReferenceTrace(
   return rows.map((row) => ({
     referenceSystem: 'ctat-brd',
     productionRuleId: row.productionRuleId,
+    ...(row.productionRuleName ? { productionRuleName: row.productionRuleName } : {}),
+    ...(row.productionSet ? { productionSet: row.productionSet } : {}),
     actionId: row.actionId,
     outcome: row.outcome,
   }));
@@ -108,6 +112,8 @@ function createSparcTraceFromSampleDocument(
           node: authoredNode.id,
           submittedValue,
           productionRuleId: row.productionRuleId,
+          ...(row.productionRuleName ? { productionRuleName: row.productionRuleName } : {}),
+          ...(row.productionSet ? { productionSet: row.productionSet } : {}),
           actionId: row.actionId,
         }],
       },
@@ -129,105 +135,160 @@ function createSparcTraceFromSampleDocument(
   });
 }
 
-const BALLOONS_TRACE_ROWS: readonly SparcSampleTraceRow[] = [{
-  productionRuleId: 'enter-given-from conversion-factors',
-  actionId: 'OV1::UpdateTextField::12',
-  outcome: 'correct',
-}, {
-  productionRuleId: 'enter-given-from conversion-factors',
-  actionId: 'OV2::UpdateTextField::4.25',
-  outcome: 'correct',
-}, {
-  productionRuleId: 'enter-given-to conversion-factors',
-  actionId: 'CV1::UpdateTextField::36',
-  outcome: 'correct',
-}, {
-  productionRuleId: 'enter-factor conversion-factors',
-  actionId: 'SF1::UpdateTextField::3',
-  outcome: 'correct',
-}, {
-  productionRuleId: 'enter-factor conversion-factors',
-  actionId: 'SF2::UpdateTextField::3',
-  outcome: 'correct',
-}, {
-  productionRuleId: 'scale-completed conversion-factors',
-  actionId: 'CV2::UpdateTextField::12.75',
-  outcome: 'correct',
-}, {
-  productionRuleId: 'complete-sentence conversion-factors',
-  actionId: 'A3::UpdateTextField::12.75',
-  outcome: 'correct',
-}, {
-  productionRuleId: 'unnamed',
-  actionId: 'done::ButtonPressed::-1',
-  outcome: 'correct',
-}, {
-  productionRuleId: 'unnamed',
-  actionId: 'OV2::UpdateTextField::12',
-  outcome: 'incorrect',
-}, {
-  productionRuleId: 'unnamed',
-  actionId: 'OV1::UpdateTextField::4.25',
-  outcome: 'incorrect',
-}, {
-  productionRuleId: 'unnamed',
-  actionId: 'CV1::UpdateTextField::12',
-  outcome: 'incorrect',
-}, {
-  productionRuleId: 'unnamed',
-  actionId: 'CV2::UpdateTextField::1',
-  outcome: 'incorrect',
-}];
+function sampleTraceRow(
+  productionRuleName: string,
+  productionSet: string,
+  actionId: string,
+  outcome: Extract<SparcOutcome, 'correct' | 'incorrect'>,
+): SparcSampleTraceRow {
+  return {
+    productionRuleId: `${productionRuleName} ${productionSet}`,
+    productionRuleName,
+    productionSet,
+    actionId,
+    outcome,
+  };
+}
 
-const COOKIES_TRACE_ROWS: readonly SparcSampleTraceRow[] = [{
-  productionRuleId: 'enter-given-from conversion-factors',
-  actionId: 'OV1::UpdateTextField::30',
-  outcome: 'correct',
-}, {
-  productionRuleId: 'enter-given-from conversion-factors',
-  actionId: 'OV2::UpdateTextField::120',
-  outcome: 'correct',
-}, {
-  productionRuleId: 'enter-given-to conversion-factors',
-  actionId: 'CV1::UpdateTextField::90',
-  outcome: 'correct',
-}, {
-  productionRuleId: 'enter-factor conversion-factors',
-  actionId: 'SF1::UpdateTextField::3',
-  outcome: 'correct',
-}, {
-  productionRuleId: 'enter-factor conversion-factors',
-  actionId: 'SF2::UpdateTextField::3',
-  outcome: 'correct',
-}, {
-  productionRuleId: 'scale-completed conversion-factors',
-  actionId: 'CV2::UpdateTextField::360',
-  outcome: 'correct',
-}, {
-  productionRuleId: 'complete-sentence conversion-factors',
-  actionId: 'A3::UpdateTextField::360',
-  outcome: 'correct',
-}, {
-  productionRuleId: 'unnamed',
-  actionId: 'done::ButtonPressed::-1',
-  outcome: 'correct',
-}, {
-  productionRuleId: 'unnamed',
-  actionId: 'OV2::UpdateTextField::30',
-  outcome: 'incorrect',
-}, {
-  productionRuleId: 'unnamed',
-  actionId: 'OV1::UpdateTextField::120',
-  outcome: 'incorrect',
-}, {
-  productionRuleId: 'unnamed',
-  actionId: 'CV1::UpdateTextField::30',
-  outcome: 'incorrect',
-}, {
-  productionRuleId: 'unnamed',
-  actionId: 'CV2::UpdateTextField::1',
-  outcome: 'incorrect',
-}];
+const BALLOONS_TRACE_ROWS: readonly SparcSampleTraceRow[] = [
+  sampleTraceRow(
+    'enter-given-from',
+    'conversion-factors',
+    'OV1::UpdateTextField::12',
+    'correct',
+  ),
+  sampleTraceRow(
+    'enter-given-from',
+    'conversion-factors',
+    'OV2::UpdateTextField::4.25',
+    'correct',
+  ),
+  sampleTraceRow(
+    'enter-given-to',
+    'conversion-factors',
+    'CV1::UpdateTextField::36',
+    'correct',
+  ),
+  sampleTraceRow(
+    'enter-factor',
+    'conversion-factors',
+    'SF1::UpdateTextField::3',
+    'correct',
+  ),
+  sampleTraceRow(
+    'enter-factor',
+    'conversion-factors',
+    'SF2::UpdateTextField::3',
+    'correct',
+  ),
+  sampleTraceRow(
+    'scale-completed',
+    'conversion-factors',
+    'CV2::UpdateTextField::12.75',
+    'correct',
+  ),
+  sampleTraceRow(
+    'complete-sentence',
+    'conversion-factors',
+    'A3::UpdateTextField::12.75',
+    'correct',
+  ),
+  {
+    productionRuleId: 'unnamed',
+    actionId: 'done::ButtonPressed::-1',
+    outcome: 'correct',
+  },
+  {
+    productionRuleId: 'unnamed',
+    actionId: 'OV2::UpdateTextField::12',
+    outcome: 'incorrect',
+  },
+  {
+    productionRuleId: 'unnamed',
+    actionId: 'OV1::UpdateTextField::4.25',
+    outcome: 'incorrect',
+  },
+  {
+    productionRuleId: 'unnamed',
+    actionId: 'CV1::UpdateTextField::12',
+    outcome: 'incorrect',
+  },
+  {
+    productionRuleId: 'unnamed',
+    actionId: 'CV2::UpdateTextField::1',
+    outcome: 'incorrect',
+  },
+];
+
+const COOKIES_TRACE_ROWS: readonly SparcSampleTraceRow[] = [
+  sampleTraceRow(
+    'enter-given-from',
+    'conversion-factors',
+    'OV1::UpdateTextField::30',
+    'correct',
+  ),
+  sampleTraceRow(
+    'enter-given-from',
+    'conversion-factors',
+    'OV2::UpdateTextField::120',
+    'correct',
+  ),
+  sampleTraceRow(
+    'enter-given-to',
+    'conversion-factors',
+    'CV1::UpdateTextField::90',
+    'correct',
+  ),
+  sampleTraceRow(
+    'enter-factor',
+    'conversion-factors',
+    'SF1::UpdateTextField::3',
+    'correct',
+  ),
+  sampleTraceRow(
+    'enter-factor',
+    'conversion-factors',
+    'SF2::UpdateTextField::3',
+    'correct',
+  ),
+  sampleTraceRow(
+    'scale-completed',
+    'conversion-factors',
+    'CV2::UpdateTextField::360',
+    'correct',
+  ),
+  sampleTraceRow(
+    'complete-sentence',
+    'conversion-factors',
+    'A3::UpdateTextField::360',
+    'correct',
+  ),
+  {
+    productionRuleId: 'unnamed',
+    actionId: 'done::ButtonPressed::-1',
+    outcome: 'correct',
+  },
+  {
+    productionRuleId: 'unnamed',
+    actionId: 'OV2::UpdateTextField::30',
+    outcome: 'incorrect',
+  },
+  {
+    productionRuleId: 'unnamed',
+    actionId: 'OV1::UpdateTextField::120',
+    outcome: 'incorrect',
+  },
+  {
+    productionRuleId: 'unnamed',
+    actionId: 'CV1::UpdateTextField::30',
+    outcome: 'incorrect',
+  },
+  {
+    productionRuleId: 'unnamed',
+    actionId: 'CV2::UpdateTextField::1',
+    outcome: 'incorrect',
+  },
+];
 
 function createConversionFactorDocument(
   id: string,

@@ -128,6 +128,32 @@ describe('sparcSampleTraceManifest', function() {
       'CV1::UpdateTextField::30',
       'CV2::UpdateTextField::1',
     ]);
+    assert.deepEqual(balloonsFixture?.referenceTrace?.slice(0, 3).map((step) => ({
+      productionRuleName: step.productionRuleName,
+      productionSet: step.productionSet,
+    })), [{
+      productionRuleName: 'enter-given-from',
+      productionSet: 'conversion-factors',
+    }, {
+      productionRuleName: 'enter-given-from',
+      productionSet: 'conversion-factors',
+    }, {
+      productionRuleName: 'enter-given-to',
+      productionSet: 'conversion-factors',
+    }]);
+    assert.deepEqual(balloonsFixture?.sparcTrace?.slice(0, 3).map((step) => ({
+      productionRuleName: step.details?.productionRuleName,
+      productionSet: step.details?.productionSet,
+    })), [{
+      productionRuleName: 'enter-given-from',
+      productionSet: 'conversion-factors',
+    }, {
+      productionRuleName: 'enter-given-from',
+      productionSet: 'conversion-factors',
+    }, {
+      productionRuleName: 'enter-given-to',
+      productionSet: 'conversion-factors',
+    }]);
   });
 
   it('compares a ready sample fixture through the shared trace comparator', function() {

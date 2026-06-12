@@ -113,6 +113,12 @@ export function createSparcTraceFromTrialResult(
     );
     const actionId = requireNonBlank(traceMetadata.actionId, `traceByNode.${nodeId}.actionId`);
     const details: Record<string, unknown> = {};
+    if (traceMetadata.productionRuleName !== undefined) {
+      details.productionRuleName = traceMetadata.productionRuleName;
+    }
+    if (traceMetadata.productionSet !== undefined) {
+      details.productionSet = traceMetadata.productionSet;
+    }
     if (traceMetadata.stimulusKC !== undefined) {
       details.stimulusKC = traceMetadata.stimulusKC;
     }

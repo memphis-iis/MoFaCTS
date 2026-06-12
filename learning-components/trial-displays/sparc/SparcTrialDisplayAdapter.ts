@@ -12,6 +12,8 @@ export interface SparcIntentExpectation {
 export interface SparcTraceExpectation {
   node: string;
   productionRuleId: string;
+  productionRuleName?: string;
+  productionSet?: string;
   actionId: string;
   submittedValue?: unknown;
   stimulusKC?: string | number;
@@ -87,6 +89,12 @@ export const sparcTrialDisplayAdapter: TrialDisplayAdapter<SparcTrialDisplay, Sp
                 .map((entry) => ({
                   node: String(entry.node || ''),
                   productionRuleId: String(entry.productionRuleId || ''),
+                  ...(typeof entry.productionRuleName === 'string'
+                    ? { productionRuleName: entry.productionRuleName }
+                    : {}),
+                  ...(typeof entry.productionSet === 'string'
+                    ? { productionSet: entry.productionSet }
+                    : {}),
                   actionId: String(entry.actionId || ''),
                   ...('submittedValue' in entry ? { submittedValue: entry.submittedValue } : {}),
                   ...(typeof entry.stimulusKC === 'string' || typeof entry.stimulusKC === 'number'

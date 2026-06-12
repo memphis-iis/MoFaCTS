@@ -270,6 +270,8 @@ export type SparcModelTraceComparison = {
 export type SparcReferenceTraceStep = {
   readonly referenceSystem: 'ctat-brd';
   readonly productionRuleId: string;
+  readonly productionRuleName?: string;
+  readonly productionSet?: string;
   readonly actionId: string;
   readonly outcome: SparcOutcome;
   readonly stimulusKC?: StimulusIdentityValue;

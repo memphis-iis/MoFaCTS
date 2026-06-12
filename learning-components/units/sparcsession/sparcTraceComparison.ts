@@ -7,6 +7,8 @@ import type {
 export type SparcTraceMismatchKind =
   | 'length'
   | 'production-rule'
+  | 'production-rule-name'
+  | 'production-set'
   | 'action'
   | 'outcome'
   | 'stimulus-kc'
@@ -26,7 +28,7 @@ export type SparcTraceComparisonResult = {
 };
 
 function valuesMatch(expected: unknown, actual: unknown): boolean {
-  return expected === undefined || actual === undefined || String(expected) === String(actual);
+  return expected === undefined || String(expected) === String(actual);
 }
 
 function compareStep(
@@ -42,6 +44,24 @@ function compareStep(
       expected: referenceStep.productionRuleId,
       actual: sparcStep.productionRuleId,
       message: `Trace step ${index} production rule differs`,
+    });
+  }
+  if (!valuesMatch(referenceStep.productionRuleName, sparcStep.details?.productionRuleName)) {
+    mismatches.push({
+      kind: 'production-rule-name',
+      index,
+      expected: referenceStep.productionRuleName,
+      actual: sparcStep.details?.productionRuleName,
+      message: `Trace step ${index} production rule name differs`,
+    });
+  }
+  if (!valuesMatch(referenceStep.productionSet, sparcStep.details?.productionSet)) {
+    mismatches.push({
+      kind: 'production-set',
+      index,
+      expected: referenceStep.productionSet,
+      actual: sparcStep.details?.productionSet,
+      message: `Trace step ${index} production set differs`,
     });
   }
   if (referenceStep.actionId !== sparcStep.actionId) {

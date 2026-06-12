@@ -45,6 +45,21 @@ function buildActionId(params: {
   return `${params.selection}::${params.action}::${params.input}`;
 }
 
+function parseRuleIdentity(ruleText: string): {
+  readonly productionRuleName?: string;
+  readonly productionSet?: string;
+} {
+  const normalized = ruleText.trim();
+  const [productionRuleName, ...productionSetParts] = normalized.split(/\s+/);
+  if (!productionRuleName || productionSetParts.length === 0) {
+    return {};
+  }
+  return {
+    productionRuleName,
+    productionSet: productionSetParts.join(' '),
+  };
+}
+
 function extractReferenceStep(edge: Element): SparcReferenceTraceStep | null {
   const actionLabel = firstElement(edge, 'actionLabel');
   if (!actionLabel) {
@@ -63,6 +78,7 @@ function extractReferenceStep(edge: Element): SparcReferenceTraceStep | null {
   return {
     referenceSystem: 'ctat-brd',
     productionRuleId: ruleText,
+    ...parseRuleIdentity(ruleText),
     actionId: buildActionId({ selection, action, input }),
     outcome: normalizeOutcome(actionType),
   };

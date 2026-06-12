@@ -24,7 +24,7 @@ const SAMPLE_BRD = `<?xml version="1.0" standalone="yes"?>
       <actionType>Correct Action</actionType>
     </actionLabel>
     <rule>
-      <text>enter-numerator</text>
+      <text>enter-numerator fractions</text>
       <indicator>-1</indicator>
     </rule>
     <sourceID>1</sourceID>
@@ -53,7 +53,9 @@ describe('ctatBrdTraceExtractor', function() {
 
     assert.deepEqual(trace, [{
       referenceSystem: 'ctat-brd',
-      productionRuleId: 'enter-numerator',
+      productionRuleId: 'enter-numerator fractions',
+      productionRuleName: 'enter-numerator',
+      productionSet: 'fractions',
       actionId: 'numerator-input::UpdateTextField::3',
       outcome: 'correct',
     }, {

@@ -20,6 +20,8 @@ function sparcStep(overrides: Partial<SparcTraceStep> = {}): SparcTraceStep {
     outcome: 'correct',
     time: 1000,
     details: {
+      productionRuleName: 'rule',
+      productionSet: 'set-1',
       stimulusKC: 'stim-1',
       responseKC: 'resp-1',
     },
@@ -33,6 +35,8 @@ function comparison(overrides: Partial<SparcModelTraceComparison> = {}): SparcMo
     referenceTrace: [{
       referenceSystem: 'ctat-brd',
       productionRuleId: 'rule-1',
+      productionRuleName: 'rule',
+      productionSet: 'set-1',
       actionId: 'action-1',
       outcome: 'correct',
       stimulusKC: 'stim-1',
@@ -81,6 +85,39 @@ describe('sparcTraceComparison', function() {
 
     assert.equal(result.equivalent, false);
     assert.deepEqual(result.mismatches.map((mismatch) => mismatch.kind), [
+      'stimulus-kc',
+      'response-kc',
+    ]);
+  });
+
+  it('checks structured production rule identity when the BRD reference supplies it', function() {
+    const result = compareSparcModelTrace(comparison({
+      sparcTrace: [sparcStep({
+        details: {
+          productionRuleName: 'other-rule',
+          productionSet: 'other-set',
+          stimulusKC: 'stim-1',
+          responseKC: 'resp-1',
+        },
+      })],
+    }));
+
+    assert.equal(result.equivalent, false);
+    assert.deepEqual(result.mismatches.map((mismatch) => mismatch.kind), [
+      'production-rule-name',
+      'production-set',
+    ]);
+  });
+
+  it('requires structured production rule identity when the BRD reference supplies it', function() {
+    const result = compareSparcModelTrace(comparison({
+      sparcTrace: [sparcStep({ details: {} })],
+    }));
+
+    assert.equal(result.equivalent, false);
+    assert.deepEqual(result.mismatches.map((mismatch) => mismatch.kind), [
+      'production-rule-name',
+      'production-set',
       'stimulus-kc',
       'response-kc',
     ]);

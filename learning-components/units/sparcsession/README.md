@@ -185,7 +185,9 @@ reference trace steps using the production rule and full SAI triple. The SPARC
 trace generator turns authored SPARC display trace metadata plus submitted nodes
 into comparable trace steps. The comparator checks SPARC trace steps against
 reference steps by production rule, action, outcome, and optional
-stimulus/response KC identities.
+stimulus/response KC identities. When a BRD production-rule label exposes both
+the rule name and production set, the comparator also checks those structured
+fields instead of treating the combined label as the only identity.
 Because the CTAT BRDs also contain startup/interface-population edges,
 `selectCtatReferenceSubtrace` projects the selected sample rule/action sequence
 from the larger BRD trace and fails if any expected step is missing or out of
@@ -221,11 +223,13 @@ and adaptive-model query execution to explicit future capabilities.
 
 ## Shiny-Inspired Layout
 
-Shiny for R is a better layout/reactivity inspiration than CTAT for parts of
-SPARC. SPARC should borrow the mental model of declarative inputs, outputs,
-conditional panels, reactive values, observers, modules, default usable layouts,
-state bookmarking/reproduction, and embedding interactive apps inside larger
-dynamic documents. It should not copy Shiny's runtime directly.
+Shiny for R is a better layout/reactivity inspiration than CTAT for the visual
+and reactive document experience SPARC wants. The Shiny thread is primarily
+about elegant default layout, readable vertical documents, and reactive
+authoring concepts. SPARC should borrow the mental model of declarative inputs,
+outputs, conditional panels, reactive values, observers, modules, default usable
+layouts, state bookmarking/reproduction, and embedding interactive apps inside
+larger dynamic documents. It should not copy Shiny's runtime directly.
 
 The first authored-layout vocabulary for that direction is deliberately small:
 nodes can be `panel` or `module`, and layout policies can declare
