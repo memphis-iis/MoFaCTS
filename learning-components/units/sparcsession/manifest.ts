@@ -53,6 +53,14 @@ export const sparcSessionUnitComponentManifest: LearningComponentManifest<Create
       name: 'sparc.production-rule-evaluation',
       runtimeEntry: 'SparcSessionUnitEngine.evaluateSparcAuthoredProductionRules',
     },
+    {
+      name: 'sparc.trial-display-production-rule-commit',
+      runtimeEntry: 'SparcSessionUnitEngine.commitSparcTrialDisplayProductionRuleEvents',
+    },
+    {
+      name: 'sparc.trial-display-production-rule-evaluation',
+      runtimeEntry: 'SparcSessionUnitEngine.evaluateSparcTrialDisplayProductionRuleEvents',
+    },
     'sparc.response-outcome-authored-rules',
     {
       name: 'sparc.response-outcome-commit',

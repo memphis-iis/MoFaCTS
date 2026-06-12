@@ -198,6 +198,81 @@ describe('machine services contracts', function() {
     });
   });
 
+  it('evaluates SPARC production-rule classifications and messages through the unit engine', async function() {
+    const result = await evaluateAnswerService({
+      engine: {
+        evaluateSparcTrialDisplayProductionRuleEvents(params: unknown) {
+          expect(params).to.have.nested.property('documentId', 'sparc-fractions-addition');
+          return {
+            document: { id: 'sparc-fractions-addition' },
+            events: [],
+            evaluations: [],
+            classifications: ['buggy'],
+            messages: [{
+              messageType: 'buggy',
+              text: 'Use a common denominator before adding numerators.',
+            }],
+            credits: [],
+          };
+        },
+      },
+      currentDisplay: {
+        type: 'sparc',
+        documentId: 'sparc-fractions-addition',
+        nodes: [],
+        productionRules: [{
+          id: 'fractions.buggy-premature-add-numerators',
+          when: [],
+          then: [],
+        }],
+      },
+      sparcResult: {
+        timestamp: 1,
+        submittedNodes: {
+          'node-sum-result-top': '2',
+        },
+      },
+    });
+
+    expect(result).to.deep.equal({
+      isCorrect: false,
+      matchText: 'Use a common denominator before adding numerators.',
+      sparcFeedbackMessage: 'Use a common denominator before adding numerators.',
+      sparcFeedbackType: 'buggy',
+      sparcClassification: 'buggy',
+    });
+  });
+
+  it('requires SPARC engine production-rule evaluation support for production-rule displays', async function() {
+    let rejectionMessage = '';
+
+    try {
+      await evaluateAnswerService({
+        engine: {},
+        currentDisplay: {
+          type: 'sparc',
+          documentId: 'sparc-fractions-addition',
+          nodes: [],
+          productionRules: [{
+            id: 'fractions.complete-reduced-path',
+            when: [],
+            then: [],
+          }],
+        },
+        sparcResult: {
+          timestamp: 1,
+          submittedNodes: {
+            'node-done-button': '-1',
+          },
+        },
+      });
+    } catch (error) {
+      rejectionMessage = error instanceof Error ? error.message : String(error);
+    }
+
+    expect(rejectionMessage).to.equal('[SPARC] Production-rule display requires SPARC session engine evaluation support');
+  });
+
   it('includes fade-out lead time in study countdown envelopes', function() {
     const remaining = getFeedbackTimeoutRemainingMs({
       testType: 's',

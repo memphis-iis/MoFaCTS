@@ -43,6 +43,8 @@ describe('sparcSessionUnitComponentManifest', function() {
       'sparc.reactive-rule-evaluation',
       'sparc.state-replay',
       'sparc.state-transition-history',
+      'sparc.trial-display-production-rule-commit',
+      'sparc.trial-display-production-rule-evaluation',
       'sparc.vertical-layout-validation',
     ]);
     assert.deepEqual(
@@ -69,6 +71,14 @@ describe('sparcSessionUnitComponentManifest', function() {
         [
           'sparc.production-rule-evaluation',
           'SparcSessionUnitEngine.evaluateSparcAuthoredProductionRules',
+        ],
+        [
+          'sparc.trial-display-production-rule-commit',
+          'SparcSessionUnitEngine.commitSparcTrialDisplayProductionRuleEvents',
+        ],
+        [
+          'sparc.trial-display-production-rule-evaluation',
+          'SparcSessionUnitEngine.evaluateSparcTrialDisplayProductionRuleEvents',
         ],
         [
           'sparc.response-outcome-commit',

@@ -327,7 +327,10 @@ function instantiateFiring(
         classifications.push(effect.outcome);
         break;
       case 'credit':
-        credits.push(requireNonBlank(effect.kc, 'SPARC production rule credit kc'));
+        credits.push(requireNonBlank(
+          interpolateTemplate(effect.kc, bindings),
+          'SPARC production rule credit kc',
+        ));
         break;
     }
   }

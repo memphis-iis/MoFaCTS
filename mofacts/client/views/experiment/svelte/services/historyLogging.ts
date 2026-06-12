@@ -41,6 +41,14 @@ import type {
   TrialTimingSummary,
   UnitEngineLike,
 } from '../../../../../common/types';
+import type { CanonicalHistoryRecord } from '../../../../../../learning-components/runtime/historyEnvelope';
+import type {
+  SparcTrialDisplay,
+  SparcTrialResult,
+} from '../../../../../../learning-components/trial-displays/sparc/SparcTrialDisplayAdapter';
+import type {
+  SparcTrialDisplayProductionRuleRuntimeParams,
+} from '../../../../../../learning-components/units/sparcsession/SparcSessionUnitEngine';
 
 import { legacyTrim } from '../../../../../common/underscoreCompat';
 type HistoryLoggingServiceContext = {
@@ -72,6 +80,7 @@ type HistoryLoggingServiceContext = {
   feedbackText?: string;
   feedbackSuppressed?: boolean;
   h5pResult?: H5PTrialResult | null;
+  sparcResult?: SparcTrialResult | null;
 };
 type HistoryAnswerContext = {
   originalDisplay?: unknown;
@@ -84,6 +93,15 @@ type HistoryEngineLike = UnitEngineLike & {
     probabilityEstimate?: unknown;
   };
   unitType?: unknown;
+};
+type SparcProductionRuleHistoryEngineLike = UnitEngineLike & {
+  commitSparcTrialDisplayProductionRuleEvents?: (
+    params: SparcTrialDisplayProductionRuleRuntimeParams
+  ) => Promise<unknown>;
+};
+type SparcDisplayWithProductionRules = SparcTrialDisplay & {
+  documentId: string;
+  productionRules: NonNullable<SparcTrialDisplay['productionRules']>;
 };
 type HistoryStimLike = {
   stimuliSetId?: string | number;
@@ -170,6 +188,72 @@ function getMeteorUser(): MeteorUserLike | null | undefined {
 
 function asHistorySchedule(value: unknown): HistoryScheduleLike | null {
   return value && typeof value === 'object' ? value as HistoryScheduleLike : null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function resolveSparcDisplayWithProductionRules(
+  display: unknown,
+): SparcDisplayWithProductionRules | null {
+  if (!isRecord(display) || display.type !== 'sparc' || !Array.isArray(display.productionRules)) {
+    return null;
+  }
+  const documentId = typeof display.documentId === 'string' ? display.documentId.trim() : '';
+  if (!documentId) {
+    throw new Error('[History Logging] SPARC production-rule display requires documentId');
+  }
+  if (!Array.isArray(display.nodes)) {
+    throw new Error('[History Logging] SPARC production-rule display requires nodes array');
+  }
+  return display as SparcDisplayWithProductionRules;
+}
+
+export async function commitSparcProductionRulesForHistory(params: {
+  engine: UnitEngineLike | null | undefined;
+  currentDisplay: unknown;
+  sparcResult: SparcTrialResult | null | undefined;
+  record: HistoryRecord;
+}): Promise<void> {
+  const sparcDisplay = resolveSparcDisplayWithProductionRules(params.currentDisplay);
+  if (!sparcDisplay) {
+    return;
+  }
+  if (!params.sparcResult) {
+    throw new Error('[History Logging] SPARC production-rule display missing sparcResult');
+  }
+  const engine = params.engine as SparcProductionRuleHistoryEngineLike | null | undefined;
+  if (typeof engine?.commitSparcTrialDisplayProductionRuleEvents !== 'function') {
+    throw new Error('[History Logging] SPARC production-rule display requires SPARC session engine commit support');
+  }
+  const requiredCore = ['TDFId', 'sessionID', 'levelUnit'] as const;
+  const missingCore = requiredCore.filter((field) => params.record[field] === undefined || params.record[field] === null);
+  if (missingCore.length > 0) {
+    throw new Error(`[History Logging] SPARC production-rule history core missing: ${missingCore.join(', ')}`);
+  }
+  if (!params.record.userId && !params.record.anonStudentId) {
+    throw new Error('[History Logging] SPARC production-rule history core requires userId or anonStudentId');
+  }
+
+  await engine.commitSparcTrialDisplayProductionRuleEvents({
+    core: {
+      TDFId: String(params.record.TDFId),
+      sessionID: String(params.record.sessionID),
+      levelUnit: Number(params.record.levelUnit),
+      ...(params.record.userId ? { userId: String(params.record.userId) } : {}),
+      ...(params.record.anonStudentId ? { anonStudentId: String(params.record.anonStudentId) } : {}),
+    },
+    documentId: sparcDisplay.documentId,
+    display: sparcDisplay,
+    result: params.sparcResult,
+    priorHistoryRecords: [],
+    history: {
+      async writeCanonicalHistory(historyRecord: CanonicalHistoryRecord) {
+        await insertHistoryRecord(historyRecord as HistoryRecord);
+      },
+    },
+  });
 }
 
 export function resolveHistoryTrialIndexState(params: {
@@ -769,6 +853,12 @@ export async function historyLoggingService(
     if (h5pBatch) {
       await insertH5PHistoryRows(record, h5pBatch, insertHistoryRecord);
     }
+    await commitSparcProductionRulesForHistory({
+      engine,
+      currentDisplay: context.currentDisplay,
+      sparcResult: context.sparcResult,
+      record,
+    });
 
     return { status: 'logged', record };
   } catch (error: unknown) {

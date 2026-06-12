@@ -130,7 +130,15 @@ across problem content instead of hard-coding a single BRD path.
 `sparcProductionRuleCommit.ts` and `sparcReactiveRuleCommit.ts` add persistence
 boundaries: authored production-rule and reactive-rule matches become canonical
 SPARC state-transition history records, and no-op rule passes do not write empty
-history.
+history. Production-rule assertions are persisted as hidden working-memory state
+cells and rehydrated into facts on later events, so a rule can infer model state
+such as an active common denominator and a later rule can match that inferred
+state without making it a visible document node. Interface effects remain
+explicit addressed node writes.
+Stoichiometry content uses the same mechanism with authored `chemistry-field`
+facts: rules derive accepted conversion values, units, cancellation, and result
+values from problem facts and prior completed-field facts, while BRD-derived
+buggy responses remain learner-facing feedback effects.
 `sparcResponseOutcomePipeline.ts` ties response commits to authored rules: it
 writes the response/model record first, replays that record into document state,
 then evaluates and persists any matching authored rules. The pipeline returns the

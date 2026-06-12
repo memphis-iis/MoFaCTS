@@ -19,7 +19,16 @@ import { CardStore } from '../../modules/cardStore';
 import { fromCallback, fromPromise, type AnyEventObject } from 'xstate';
 import { resolveH5PModelOutcomes } from '../../../../../common/lib/h5pTrialResult';
 import type { H5PTrialResult } from '../../../../../common/types';
-import type { SparcTrialResult } from '../../../../../../learning-components/trial-displays/sparc/SparcTrialDisplayAdapter';
+import type {
+  SparcTrialDisplay,
+  SparcTrialResult,
+} from '../../../../../../learning-components/trial-displays/sparc/SparcTrialDisplayAdapter';
+import type {
+  SparcTrialDisplayProductionRuleEvaluationResult,
+} from '../../../../../../learning-components/units/sparcsession/sparcTrialDisplayRuntimeBridge';
+import type {
+  SparcTrialDisplayProductionRuleEvaluationRuntimeParams,
+} from '../../../../../../learning-components/units/sparcsession/SparcSessionUnitEngine';
 
 type TimeoutContextLike = Parameters<typeof getMainTimeoutMs>[0] & {
   feedbackTimeoutMs?: number;
@@ -45,7 +54,12 @@ interface AnswerEvaluationContext extends ServiceRecord {
   originalAnswer?: string;
   h5pResult?: H5PTrialResult | null;
   sparcResult?: SparcTrialResult | null;
+  engine?: ServiceRecord | null;
   currentDisplay?: {
+    type?: string;
+    documentId?: string;
+    nodes?: unknown[];
+    productionRules?: unknown[];
     behaviorRefs?: Record<string, string>;
     behavior?: {
       feedback?: Array<Record<string, unknown>>;
@@ -95,6 +109,12 @@ type SparcNodeIntentEvaluation = {
 type SparcFeedbackMatch = {
   readonly sparcFeedbackId: string;
   readonly sparcFeedbackMessage?: string;
+};
+
+type SparcProductionRuleEvaluationEngineLike = ServiceRecord & {
+  evaluateSparcTrialDisplayProductionRuleEvents?: (
+    params: SparcTrialDisplayProductionRuleEvaluationRuntimeParams
+  ) => SparcTrialDisplayProductionRuleEvaluationResult;
 };
 
 function normalizeSparcComparableValue(
@@ -280,6 +300,58 @@ function resolveSparcFeedbackMatch(
     };
   }
   return null;
+}
+
+function hasSparcProductionRules(display: AnswerEvaluationContext['currentDisplay']): display is SparcTrialDisplay & {
+  documentId: string;
+  productionRules: NonNullable<SparcTrialDisplay['productionRules']>;
+} {
+  if (!display || display.type !== 'sparc' || !Array.isArray(display.productionRules)) {
+    return false;
+  }
+  const documentId = typeof display.documentId === 'string' ? display.documentId.trim() : '';
+  if (!documentId) {
+    throw new Error('[SPARC] Production-rule display requires documentId');
+  }
+  if (!Array.isArray(display.nodes)) {
+    throw new Error('[SPARC] Production-rule display requires nodes array');
+  }
+  return true;
+}
+
+function evaluateSparcProductionRuleOutcome(context: AnswerEvaluationContext) {
+  const display = context.currentDisplay;
+  if (!hasSparcProductionRules(display)) {
+    return null;
+  }
+  if (!context.sparcResult) {
+    throw new Error('[SPARC] Production-rule evaluation requires sparcResult');
+  }
+  const engine = context.engine as SparcProductionRuleEvaluationEngineLike | null | undefined;
+  if (typeof engine?.evaluateSparcTrialDisplayProductionRuleEvents !== 'function') {
+    throw new Error('[SPARC] Production-rule display requires SPARC session engine evaluation support');
+  }
+  const result = engine.evaluateSparcTrialDisplayProductionRuleEvents({
+    documentId: display.documentId,
+    display,
+    result: context.sparcResult,
+    priorHistoryRecords: [],
+  });
+  const lastClassification = result.classifications[result.classifications.length - 1];
+  const lastMessage = result.messages[result.messages.length - 1];
+  const isCorrect = lastClassification === 'correct';
+  const matchText = lastClassification
+    ? (isCorrect ? '1' : '0')
+    : '';
+  return {
+    isCorrect,
+    matchText: lastMessage?.text || matchText,
+    ...(lastMessage ? {
+      sparcFeedbackMessage: lastMessage.text,
+      sparcFeedbackType: lastMessage.messageType,
+    } : {}),
+    ...(lastClassification ? { sparcClassification: lastClassification } : {}),
+  };
 }
 
 function evaluateSparcNodeIntent(context: AnswerEvaluationContext) {
@@ -711,6 +783,11 @@ export async function evaluateAnswerService(context: AnswerEvaluationContext) {
       isCorrect: outcomes.every((outcome) => outcome.correct),
       matchText: outcomes.map((outcome) => outcome.correct ? '1' : '0').join(''),
     };
+  }
+
+  const sparcProductionRuleEvaluation = evaluateSparcProductionRuleOutcome(context);
+  if (sparcProductionRuleEvaluation) {
+    return sparcProductionRuleEvaluation;
   }
 
   const sparcEvaluation = evaluateSparcNodeIntent(context);

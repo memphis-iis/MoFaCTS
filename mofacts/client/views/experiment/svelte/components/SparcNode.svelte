@@ -61,6 +61,14 @@
     return String(candidate?.label || candidate?.value || '').trim();
   }
 
+  function skillBarFill(candidate) {
+    const fill = Number(candidate?.fill ?? 0);
+    if (!Number.isFinite(fill)) {
+      return 0;
+    }
+    return Math.max(0, Math.min(100, fill));
+  }
+
   $: renderItems = node?.nodeType === 'group' ? buildRenderItems(node.children || []) : [];
 </script>
 
@@ -105,6 +113,17 @@
 {:else if node?.nodeType === 'atomic'}
   {#if node.atomType === 'text-block' || node.atomType === 'text' || node.atomType === 'header-cell'}
     <div class={`sparc-atom sparc-${node.atomType}`}>{node.value || ''}</div>
+  {:else if node.atomType === 'message-box'}
+    <div class="sparc-atom sparc-message-box">{getNodeValue(node)}</div>
+  {:else if node.atomType === 'skill-bar'}
+    <div class="sparc-atom sparc-skill-bar" aria-label={node.label || ''}>
+      <div class="sparc-skill-track">
+        <div class="sparc-skill-fill" style={`width: ${skillBarFill(node)}%;`}></div>
+      </div>
+      {#if node.label}
+        <span class="sparc-skill-label">{node.label}</span>
+      {/if}
+    </div>
   {:else if node.atomType === 'operator'}
     <div class="sparc-atom sparc-operator">{node.value || ''}</div>
   {:else if node.atomType === 'fraction-box'}
@@ -213,6 +232,7 @@
   .sparc-text-block,
   .sparc-text,
   .sparc-header-cell,
+  .sparc-message-box,
   .sparc-fraction-box,
   .sparc-input,
   .sparc-select,
@@ -245,6 +265,37 @@
     align-items: center;
     justify-content: center;
     min-height: 2.5rem;
+  }
+
+  .sparc-message-box {
+    min-width: 14rem;
+    min-height: 3rem;
+  }
+
+  .sparc-skill-bar {
+    display: grid;
+    grid-template-columns: minmax(5rem, 10rem) max-content;
+    gap: 0.5rem;
+    align-items: center;
+    min-width: 13rem;
+  }
+
+  .sparc-skill-track {
+    height: 0.7rem;
+    border: 1px solid var(--app-secondary-surface-color);
+    border-radius: 999px;
+    background: var(--app-surface-color, #fff);
+    overflow: hidden;
+  }
+
+  .sparc-skill-fill {
+    height: 100%;
+    background: #d4a900;
+  }
+
+  .sparc-skill-label {
+    font-size: 0.8rem;
+    line-height: 1.1;
   }
 
   .sparc-button {

@@ -246,6 +246,31 @@ export function applySparcHistoryRecord(
   };
 }
 
+export function applySparcStateTransition(
+  state: SparcReplayState,
+  transition: SparcStateTransition,
+): SparcReplayState {
+  const documentId = transition.event.source.documentId;
+  assertStateTransition(transition, 'sparc.stateTransition', documentId);
+  const nextCells: Record<string, SparcReplayCell> = { ...state.cells };
+  for (const write of transition.writes) {
+    const cellKey = createSparcStateCellKey(write.target, write.key);
+    nextCells[cellKey] = {
+      address: write.target,
+      key: write.key,
+      value: write.value,
+      transitionId: transition.transitionId,
+      eventId: transition.event.eventId,
+      time: Number(transition.event.time),
+    };
+  }
+  return {
+    ...state,
+    cells: nextCells,
+    transitions: [...state.transitions, transition],
+  };
+}
+
 export function replaySparcHistory(
   records: Iterable<CanonicalHistoryRecord>,
   initialState: SparcReplayState = createEmptySparcReplayState(),

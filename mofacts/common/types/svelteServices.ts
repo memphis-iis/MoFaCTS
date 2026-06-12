@@ -2,6 +2,7 @@
 // Shared service contracts for Svelte card initialization/resume flows.
 
 import type { H5PTrialResult } from './h5p';
+import type { SparcTrialResult } from '../../../learning-components/trial-displays/sparc/SparcTrialDisplayAdapter';
 
 export type UnitType = 'schedule' | 'video' | 'model' | 'sparc' | 'autotutor' | 'instruction-only';
 
@@ -237,6 +238,7 @@ export interface HistoryLoggingContext {
   feedbackText?: string;
   feedbackSuppressed?: boolean;
   h5pResult?: H5PTrialResult | null;
+  sparcResult?: SparcTrialResult | null;
 }
 
 export interface HistoryLoggingEvent {

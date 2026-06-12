@@ -201,6 +201,52 @@ describe('sparcProductionRuleEvaluator', function() {
     }]);
   });
 
+  it('can credit a KC bound by a generalized rule', function() {
+    const facts: SparcWorkingMemoryFact[] = [{
+      factType: 'expected-response',
+      slots: {
+        selection: 'Numerator1Units',
+        action: 'UpdateComboBox',
+        input: 'g',
+        kc: 'Set-Numerator-Unit-of-Unit-Conversion',
+      },
+    }, {
+      factType: 'interface-event',
+      slots: {
+        selection: 'Numerator1Units',
+        action: 'UpdateComboBox',
+        input: 'g',
+      },
+    }];
+    const rules: SparcProductionRule[] = [{
+      id: 'stoich.accept-exact-response',
+      when: [{
+        factType: 'expected-response',
+        slots: {
+          selection: { type: 'bind', variable: 'selection' },
+          action: { type: 'bind', variable: 'action' },
+          input: { type: 'bind', variable: 'input' },
+          kc: { type: 'bind', variable: 'kc' },
+        },
+      }, {
+        factType: 'interface-event',
+        slots: {
+          selection: { type: 'bound', variable: 'selection' },
+          action: { type: 'bound', variable: 'action' },
+          input: { type: 'bound', variable: 'input' },
+        },
+      }],
+      then: [{
+        type: 'credit',
+        kc: '{kc}',
+      }],
+    }];
+
+    const [firing] = evaluateSparcProductionRules({ facts, rules });
+
+    assert.deepEqual(firing?.credits, ['Set-Numerator-Unit-of-Unit-Conversion']);
+  });
+
   it('keeps the Fractions product-denominator path as a different strategy over the same facts', function() {
     const facts: SparcWorkingMemoryFact[] = [{
       factType: 'problem',

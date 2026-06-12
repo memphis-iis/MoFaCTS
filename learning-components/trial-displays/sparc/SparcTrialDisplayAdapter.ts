@@ -28,8 +28,11 @@ export interface SparcTraceExpectation {
 
 export interface SparcTrialDisplay {
   type: 'sparc';
+  documentId?: string;
   schema?: string;
   nodes: unknown[];
+  workingMemoryFacts?: unknown[];
+  productionRules?: unknown[];
   response?: {
     gradingMode?: string;
     scoredNodes?: string[];

@@ -12,6 +12,10 @@ import {
   commitSparcAuthoredProductionRuleEvent,
   evaluateSparcAuthoredProductionRules,
 } from './sparcProductionRuleCommit';
+import {
+  commitSparcTrialDisplayProductionRuleEvents,
+  evaluateSparcTrialDisplayProductionRuleEvents,
+} from './sparcTrialDisplayRuntimeBridge';
 import { replaySparcDocumentHistory } from './sparcDocumentReplay';
 import {
   validateSparcDocumentReferences,
@@ -29,6 +33,10 @@ import type {
   SparcResponseOutcomeInput,
 } from './sparcResponseOutcomeProcessor';
 import type { SparcReplayState } from './sparcStateReplay';
+import type {
+  SparcTrialDisplay,
+  SparcTrialResult,
+} from '../../trial-displays/sparc/SparcTrialDisplayAdapter';
 import {
   resolveSparcSessionClusterListSource,
   resolveSparcSessionModelPreparationClusterListSource,
@@ -57,6 +65,22 @@ export type SparcAuthoredProductionRuleRuntimeParams = {
   readonly extraFacts?: readonly SparcWorkingMemoryFact[];
   readonly maxCycles?: number;
   readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory'>;
+};
+
+export type SparcTrialDisplayProductionRuleRuntimeParams = {
+  readonly core: SparcPracticeHistoryCore;
+  readonly documentId: string;
+  readonly display: SparcTrialDisplay;
+  readonly result: SparcTrialResult;
+  readonly priorHistoryRecords: readonly CanonicalHistoryRecord[];
+  readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory'>;
+};
+
+export type SparcTrialDisplayProductionRuleEvaluationRuntimeParams = {
+  readonly documentId: string;
+  readonly display: SparcTrialDisplay;
+  readonly result: SparcTrialResult;
+  readonly priorHistoryRecords: readonly CanonicalHistoryRecord[];
 };
 
 export async function createSparcSessionUnitEngine(
@@ -95,6 +119,30 @@ export async function createSparcSessionUnitEngine(
         runtime: {
           history: params.history,
         },
+      });
+    },
+
+    async commitSparcTrialDisplayProductionRuleEvents(
+      params: SparcTrialDisplayProductionRuleRuntimeParams,
+    ) {
+      return await commitSparcTrialDisplayProductionRuleEvents({
+        core: params.core,
+        documentId: params.documentId,
+        display: params.display,
+        result: params.result,
+        priorHistoryRecords: params.priorHistoryRecords,
+        history: params.history,
+      });
+    },
+
+    evaluateSparcTrialDisplayProductionRuleEvents(
+      params: SparcTrialDisplayProductionRuleEvaluationRuntimeParams,
+    ) {
+      return evaluateSparcTrialDisplayProductionRuleEvents({
+        documentId: params.documentId,
+        display: params.display,
+        result: params.result,
+        priorHistoryRecords: params.priorHistoryRecords,
       });
     },
 

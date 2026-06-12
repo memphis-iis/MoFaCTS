@@ -281,4 +281,161 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
     assert.equal(result.historyRecord?.action, 'sparc-production-rule');
     assert.equal(writtenRecords.length, 1);
   });
+
+  it('exposes trial-display production-rule commit at the unit-engine boundary', async function() {
+    const engine = await createSparcSessionUnitEngine(createMinimalDeps());
+    const writtenRecords: unknown[] = [];
+    const result = await engine.commitSparcTrialDisplayProductionRuleEvents({
+      core: {
+        TDFId: 'tdf-1',
+        sessionID: 'session-1',
+        levelUnit: 2,
+        userId: 'user-1',
+      },
+      documentId: 'doc-1',
+      display: {
+        type: 'sparc',
+        nodes: [{
+          id: 'answer-node',
+          nodeType: 'atomic',
+          atomType: 'text-input',
+        }, {
+          id: 'feedback-node',
+          nodeType: 'atomic',
+          atomType: 'text-block',
+        }],
+        behavior: {
+          steps: [{
+            id: 'answer',
+            responses: [{
+              selection: 'answerSelection',
+              action: 'UpdateTextField',
+              input: '42',
+              nodeRef: 'answer-node',
+            }],
+          }],
+        },
+        workingMemoryFacts: [{
+          factType: 'problem',
+          slots: {
+            type: 'answer-check',
+          },
+        }],
+        productionRules: [{
+          id: 'answer.correct',
+          when: [{
+            factType: 'problem',
+            slots: {
+              type: { type: 'literal', value: 'answer-check' },
+            },
+          }, {
+            factType: 'interface-event',
+            slots: {
+              documentId: { type: 'bind', variable: 'documentId' },
+              selection: { type: 'literal', value: 'answerSelection' },
+              action: { type: 'literal', value: 'UpdateTextField' },
+              input: { type: 'literal', value: '42' },
+            },
+          }],
+          then: [{
+            type: 'write-state',
+            write: {
+              target: {
+                documentId: variable('documentId'),
+                nodeId: literal('feedback-node'),
+              },
+              key: 'message',
+              value: literal('Good.'),
+            },
+          }],
+        }],
+      },
+      result: {
+        submittedNodes: {
+          'answer-node': '42',
+        },
+        timestamp: 4000,
+      },
+      priorHistoryRecords: [],
+      history: {
+        async writeCanonicalHistory(record: CanonicalHistoryRecord) {
+          writtenRecords.push(record);
+        },
+      },
+    });
+
+    assert.equal(result.document.id, 'doc-1');
+    assert.equal(result.commits[0]?.historyRecord?.action, 'sparc-production-rule');
+    assert.equal(writtenRecords.length, 1);
+  });
+
+  it('exposes trial-display production-rule evaluation at the unit-engine boundary', async function() {
+    const engine = await createSparcSessionUnitEngine(createMinimalDeps());
+    const result = engine.evaluateSparcTrialDisplayProductionRuleEvents({
+      documentId: 'doc-1',
+      display: {
+        type: 'sparc',
+        nodes: [{
+          id: 'answer-node',
+          nodeType: 'atomic',
+          atomType: 'text-input',
+        }],
+        behavior: {
+          steps: [{
+            id: 'answer',
+            responses: [{
+              selection: 'answerSelection',
+              action: 'UpdateTextField',
+              input: '42',
+              nodeRef: 'answer-node',
+            }],
+          }],
+        },
+        workingMemoryFacts: [{
+          factType: 'problem',
+          slots: {
+            type: 'answer-check',
+          },
+        }],
+        productionRules: [{
+          id: 'answer.correct',
+          when: [{
+            factType: 'problem',
+            slots: {
+              type: { type: 'literal', value: 'answer-check' },
+            },
+          }, {
+            factType: 'interface-event',
+            slots: {
+              documentId: { type: 'bind', variable: 'documentId' },
+              selection: { type: 'literal', value: 'answerSelection' },
+              action: { type: 'literal', value: 'UpdateTextField' },
+              input: { type: 'literal', value: '42' },
+            },
+          }],
+          then: [{
+            type: 'message',
+            messageType: 'success',
+            template: 'Good.',
+          }, {
+            type: 'classify',
+            outcome: 'correct',
+          }],
+        }],
+      },
+      result: {
+        submittedNodes: {
+          'answer-node': '42',
+        },
+        timestamp: 4000,
+      },
+      priorHistoryRecords: [],
+    });
+
+    assert.deepEqual(result.classifications, ['correct']);
+    assert.deepEqual(result.messages, [{
+      messageType: 'success',
+      text: 'Good.',
+    }]);
+  });
 });
