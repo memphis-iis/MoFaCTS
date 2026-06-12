@@ -46,10 +46,11 @@ The fastest supported contributor loop on Windows is the native hotfix dev serve
    ```powershell
    cd ..\deploy
    Copy-Item .env.local.example .env.local
-   Copy-Item settings.local.example.json C:\Users\ppavl\OneDrive\Desktop\settings.local.json
+   $LocalSettingsPath = "$env:USERPROFILE\Desktop\settings.local.json"
+   Copy-Item settings.local.example.json $LocalSettingsPath
    ```
 
-   Replace placeholder values in `.env.local` and `C:\Users\ppavl\OneDrive\Desktop\settings.local.json`. The Desktop settings file must define `owner`; the hotfix launcher uses that address for the local admin bootstrap. Keep these files private.
+   Replace placeholder values in `.env.local` and `$LocalSettingsPath`. The settings JSON must define `owner`; the hotfix launcher uses that address for the local admin bootstrap. Keep these files private.
 
 3. Confirm the local runtime prerequisites:
 
@@ -63,7 +64,7 @@ The fastest supported contributor loop on Windows is the native hotfix dev serve
 4. Start the app:
 
    ```powershell
-   .\hotfix-dev.ps1 start
+   .\hotfix-dev.ps1 start -SettingsPath $LocalSettingsPath
    .\hotfix-dev.ps1 logs
    ```
 
@@ -73,7 +74,7 @@ The fastest supported contributor loop on Windows is the native hotfix dev serve
    http://localhost:3200
    ```
 
-   The hotfix launcher creates or verifies a local admin account for the owner configured in `C:\Users\ppavl\OneDrive\Desktop\settings.local.json`. Read the ignored local credentials with:
+   The hotfix launcher creates or verifies a local admin account for the owner configured in the settings JSON passed with `-SettingsPath`. Read the ignored local credentials with:
 
    ```powershell
    Get-Content .\local-dev\agent-secrets.env

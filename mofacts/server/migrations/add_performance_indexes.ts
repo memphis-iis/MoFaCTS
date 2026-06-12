@@ -92,6 +92,12 @@ export async function createPerformanceIndexes() {
     serverConsole('  Created: Tdfs.experimentTarget');
 
     await Tdfs.rawCollection().createIndex(
+      { 'content.tdfs.tutor.setspec.userselect': 1 },
+      { name: 'perf_userselect', background: true }
+    );
+    serverConsole('  Created: Tdfs.userselect');
+
+    await Tdfs.rawCollection().createIndex(
       { stimuliSetId: 1 },
       { name: 'perf_stimuliSetId', background: true }
     );
@@ -240,10 +246,10 @@ export async function createPerformanceIndexes() {
     serverConsole('  Created: UserDashboardCache.usageSummary.lastActivityDate');
 
     serverConsole('========================================');
-    serverConsole('All 34 performance indexes created successfully');
+    serverConsole('All 35 performance indexes created successfully');
     serverConsole('========================================');
 
-    return { success: true, indexesCreated: 34 };
+    return { success: true, indexesCreated: 35 };
   } catch (error) {
     serverConsole('========================================');
     serverConsole('Error creating performance indexes:', error);

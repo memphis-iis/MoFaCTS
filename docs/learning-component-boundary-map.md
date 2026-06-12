@@ -45,6 +45,14 @@ Use explicit capability adapters instead of direct app access.
 - `assessment-state`: app-owned assessment persistence/state bridge.
 - `authz` and `ui-alerts`: app-owned authorization and user alert surfaces.
 
+Unit-engine components receive session state only through the typed key contract in
+`learning-components/units/UnitEngineSessionKeys.ts`. The app-owned compatibility
+facade in `mofacts/client/views/experiment/unitEngine.ts` must stay thin; raw
+Meteor `Session`, `CardStore`, `Tdfs`, browser globals, and user alerts are wired
+only by `mofacts/client/views/experiment/unitEngineRuntimeContext.ts`. If a unit
+requires a new app-state key, add it to the typed read/write list with a clear owner
+instead of passing arbitrary Session keys through the component adapter.
+
 The adapter boundary should also be an efficiency boundary: move pure interpretation, normalization, scheduling, and scoring logic into component/shared code so the app stops duplicating parsing or calling the server for pure compute.
 
 ## History Boundary

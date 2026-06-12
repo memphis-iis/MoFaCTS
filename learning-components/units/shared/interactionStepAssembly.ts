@@ -1,4 +1,5 @@
 import { applyDisplayFieldSubset } from '../../content/display/displayFieldSubsets';
+import type { UnitEngineSessionWriteKey } from '../UnitEngineSessionKeys';
 
 const blank = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;';
 
@@ -27,7 +28,7 @@ export interface PreparedInteractionStepState {
 }
 
 export interface ApplyPreparedInteractionStepDependencies {
-  readonly setSessionValue: (key: string, value: unknown) => void;
+  readonly setSessionValue: (key: UnitEngineSessionWriteKey, value: unknown) => void;
   readonly setCardValue: (key: string, value: unknown) => void;
   readonly setAlternateDisplayIndex: (value: number | undefined) => void;
   readonly setOriginalQuestion: (value: unknown) => void;

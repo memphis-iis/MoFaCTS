@@ -15,6 +15,10 @@ import {
   getUnitEngineServerMethodNames,
   type UnitEngineServerMethods,
 } from './UnitEngineServerMethods';
+import type {
+  UnitEngineSessionReadKey,
+  UnitEngineSessionWriteKey,
+} from './UnitEngineSessionKeys';
 import {
   ASSESSMENT_SESSION_UNIT_TYPE,
   AUTO_TUTOR_SESSION_UNIT_TYPE,
@@ -28,8 +32,8 @@ export interface UnitEngineAppRuntime {
 }
 
 export interface UnitEngineSessionRuntime {
-  readonly getSessionValue: (key: string) => any;
-  readonly setSessionValue: (key: string, value: any) => void;
+  readonly getSessionValue: (key: UnitEngineSessionReadKey) => any;
+  readonly setSessionValue: (key: UnitEngineSessionWriteKey, value: any) => void;
 }
 
 export interface UnitEngineDeliverySettingsRuntime {

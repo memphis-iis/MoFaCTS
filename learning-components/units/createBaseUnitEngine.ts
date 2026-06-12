@@ -2,6 +2,7 @@ import {
   applyPreparedInteractionStepState,
   buildPreparedInteractionStepState,
 } from './shared/interactionStepAssembly';
+import type { UnitEngineSessionWriteKey } from './UnitEngineSessionKeys';
 
 export interface CreateBaseUnitEngineParams {
   readonly experimentState: any;
@@ -10,7 +11,7 @@ export interface CreateBaseUnitEngineParams {
   readonly getCurrentTestType: () => string | undefined;
   readonly getDeliverySettings: () => Record<string, unknown> | null | undefined;
   readonly getStimAnswer: (clusterIndex: number, whichStim: number) => string;
-  readonly setSessionValue: (key: string, value: unknown) => void;
+  readonly setSessionValue: (key: UnitEngineSessionWriteKey, value: unknown) => void;
   readonly setCardValue: (key: string, value: unknown) => void;
   readonly setAlternateDisplayIndex: (value: number | undefined) => void;
   readonly setOriginalQuestion: (value: unknown) => void;

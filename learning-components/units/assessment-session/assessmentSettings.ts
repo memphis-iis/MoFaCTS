@@ -1,5 +1,7 @@
+import type { UnitEngineSessionReadKey } from '../UnitEngineSessionKeys';
+
 export interface AssessmentScheduleDependencies {
-  readonly getSessionValue: (key: string) => any;
+  readonly getSessionValue: (key: UnitEngineSessionReadKey) => any;
   readonly getStimCount: () => number;
 }
 

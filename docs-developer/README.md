@@ -26,6 +26,7 @@ Keep `docs/` focused on software consortium, repository, user, author, operator,
 - `h5p-no-scroll-container-policy.md`: H5P iframe sizing policy and implementation plan.
 - `h5p-stimuli-architecture-plan.md`: H5P stimuli architecture plan.
 - `autotutor-dialogue-planner-plan.md`: AutoTutor dialogue planner decomposition plan.
+- `autotutor-concern-matrix.md`: AutoTutor concern matrix and implementation audit notes.
 - `autotutor-implementation-questions.md`: AutoTutor implementation decision log.
 - `autotutor-unit-plan.md`: AutoTutor unit type implementation plan.
 - `learner-tdf-configuration-plan.md`: learner-facing per-lesson configuration plan.

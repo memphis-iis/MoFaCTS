@@ -1,5 +1,7 @@
+import type { UnitEngineSessionWriteKey } from '../UnitEngineSessionKeys';
+
 export interface CreateVideoSessionUnitEngineDeps {
-  readonly setSessionValue: (key: string, value: any) => void;
+  readonly setSessionValue: (key: UnitEngineSessionWriteKey, value: any) => void;
   readonly log: (level: number, ...args: unknown[]) => void;
 }
 

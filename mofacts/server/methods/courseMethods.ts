@@ -62,6 +62,19 @@ function getSetAMinusB<T>(arrayA: T[], arrayB: T[]) {
   return Array.from(difference);
 }
 
+function throwLoggedCourseOperationError(
+  deps: CourseMethodsDeps,
+  operation: string,
+  error: unknown,
+  ...context: unknown[]
+): never {
+  deps.serverConsole(`${operation} ERROR,`, ...context, error);
+  if (error instanceof Meteor.Error) {
+    throw error;
+  }
+  throw new Meteor.Error('course-operation-failed', `${operation} failed`);
+}
+
 export function createCourseMethods(deps: CourseMethodsDeps) {
   async function requireTeacherOrAdmin(thisArg: MethodContext) {
     const actingUserId = requireAuthenticatedUser(thisArg.userId, 'Must be logged in', 401);
@@ -119,8 +132,7 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
       }
       return courses;
     } catch (e: unknown) {
-      deps.serverConsole('getAllCourses ERROR,', e);
-      return null;
+      throwLoggedCourseOperationError(deps, 'getAllCourses', e);
     }
   }
 
@@ -161,8 +173,7 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
         },
       ]).toArray();
     } catch (e: unknown) {
-      deps.serverConsole('getAllCourseSections ERROR,', e);
-      return null;
+      throwLoggedCourseOperationError(deps, 'getAllCourseSections', e);
     }
   }
 
@@ -215,8 +226,7 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
         },
       ]).toArray();
     } catch (e: unknown) {
-      deps.serverConsole('getAllCourseAssignmentsForInstructor ERROR,', instructorId, ',', e);
-      return null;
+      throwLoggedCourseOperationError(deps, 'getAllCourseAssignmentsForInstructor', e, instructorId);
     }
   }
 
@@ -323,8 +333,7 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
       updateUserAssignments(newCourseAssignment.courseId);
       return newCourseAssignment;
     } catch (e: unknown) {
-      deps.serverConsole('editCourseAssignments ERROR for courseId:', newCourseAssignment.courseId, ',', e);
-      return null;
+      throwLoggedCourseOperationError(deps, 'editCourseAssignments', e, newCourseAssignment.courseId);
     }
   }
 
@@ -577,8 +586,7 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
       deps.serverConsole('assignmentTdfFileNames', assignmentTdfFileNames);
       return assignmentTdfFileNames;
     } catch (e: unknown) {
-      deps.serverConsole('getTdfNamesAssignedByInstructor ERROR,', e);
-      return null;
+      throwLoggedCourseOperationError(deps, 'getTdfNamesAssignedByInstructor', e);
     }
   }
 
@@ -590,8 +598,7 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
       deps.serverConsole('ownedTdfFileNames count:', ownedTdfFileNames.length);
       return ownedTdfFileNames;
     } catch (e: unknown) {
-      deps.serverConsole('getTdfNamesByOwnerId ERROR,', e);
-      return null;
+      throwLoggedCourseOperationError(deps, 'getTdfNamesByOwnerId', e);
     }
   }
 

@@ -11,8 +11,8 @@ This folder contains executable deployment examples and scripts for MoFaCTS. Hum
 - `.env.self-hosted.example`: shareable self-hosted environment template. Copy it to ignored `.env.self-hosted`.
 - `settings.self-hosted.example.json`: shareable self-hosted settings template. Copy it to ignored private settings before use.
 - `.env.local.example`: shareable local environment template. Copy it to ignored `.env.local` for machine-specific values.
-- `settings.local.example.json`: shareable local settings template for `C:\Users\ppavl\OneDrive\Desktop\settings.local.json`.
-- Private settings files under `deploy/` are mounted into the container at runtime; the native hotfix dev loop reads `C:\Users\ppavl\OneDrive\Desktop\settings.local.json`.
+- `settings.local.example.json`: shareable local settings template. Copy it to a private location and pass that path to `hotfix-dev.ps1` with `-SettingsPath`.
+- Private settings files under `deploy/` are mounted into the container at runtime; the native hotfix dev loop reads the explicit settings file passed with `-SettingsPath`.
 - `docker/`: scripts copied into the app image.
 - `hotfix-dev.ps1`: native Windows Meteor hotfix dev server launcher.
 - `hotfix/`: scripts used by the local-only bundle runner.
@@ -51,13 +51,14 @@ For local Docker Compose validation, start from the tracked template:
 cp .env.local.example .env.local
 ```
 
-For the native Windows hotfix dev loop, create or update:
+For the native Windows hotfix dev loop, create or update a private settings file wherever it is convenient on your machine:
 
-```text
-C:\Users\ppavl\OneDrive\Desktop\settings.local.json
+```powershell
+$LocalSettingsPath = "$env:USERPROFILE\Desktop\settings.local.json"
+Copy-Item settings.local.example.json $LocalSettingsPath
 ```
 
-Start from `settings.local.example.json`, then replace placeholders. The launcher fails clearly if that Desktop settings file is missing.
+Start from `settings.local.example.json`, then replace placeholders. The launcher fails clearly if the settings path is missing or invalid.
 
 The LAN HTTPS helper also requires an explicit Caddy executable path:
 
@@ -118,7 +119,8 @@ Start the persistent native Meteor dev server:
 
 ```powershell
 cd deploy
-.\hotfix-dev.ps1 start
+$LocalSettingsPath = "$env:USERPROFILE\Desktop\settings.local.json"
+.\hotfix-dev.ps1 start -SettingsPath $LocalSettingsPath
 ```
 
 The dev app is exposed at:
@@ -127,7 +129,7 @@ The dev app is exposed at:
 http://localhost:3200
 ```
 
-The launcher also ensures a local admin account for the owner configured in `C:\Users\ppavl\OneDrive\Desktop\settings.local.json`. On a new local database, the default hotfix-dev login is `admin@localhost.test` with password `local-admin-2026`. Credentials are written to ignored local state and preserved there:
+The launcher also ensures a local admin account for the owner configured in the settings JSON passed with `-SettingsPath`. On a new local database, the default hotfix-dev login is `admin@localhost.test` with password `local-admin-2026`. Credentials are written to ignored local state and preserved there:
 
 ```powershell
 Get-Content .\local-dev\agent-secrets.env
@@ -147,7 +149,7 @@ Check or control the service:
 
 ```powershell
 .\hotfix-dev.ps1 status
-.\hotfix-dev.ps1 restart
+.\hotfix-dev.ps1 restart -SettingsPath $LocalSettingsPath
 .\hotfix-dev.ps1 stop
 ```
 

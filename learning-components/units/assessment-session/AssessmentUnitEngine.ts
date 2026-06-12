@@ -1,9 +1,11 @@
 import { ASSESSMENT_SESSION_UNIT_TYPE } from '../unitTypes';
 import { createAssessmentSchedule } from './createAssessmentSchedule';
 
+import type { UnitEngineSessionReadKey, UnitEngineSessionWriteKey } from '../UnitEngineSessionKeys';
+
 export interface CreateAssessmentUnitEngineDeps {
-  readonly getSessionValue: (key: string) => any;
-  readonly setSessionValue: (key: string, value: any) => void;
+  readonly getSessionValue: (key: UnitEngineSessionReadKey) => any;
+  readonly setSessionValue: (key: UnitEngineSessionWriteKey, value: any) => void;
   readonly getExperimentState: () => any;
   readonly hasScheduleArtifactForUnit: (experimentState: any, unitNumber: any) => boolean;
   readonly createExperimentState: (newExperimentState: any) => Promise<any>;

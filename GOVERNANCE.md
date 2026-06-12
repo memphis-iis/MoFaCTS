@@ -11,6 +11,12 @@ Maintainers:
 - coordinate releases,
 - maintain project documentation and quality expectations.
 
+The current public code ownership map lives in `.github/CODEOWNERS`. The listed
+owners are responsible for review routing, not for guaranteeing immediate support
+for every issue or pull request. Additional maintainers should be added through a
+documented pull request that updates `CODEOWNERS`, this governance note, and any
+area-specific review expectations.
+
 ## Contributors
 
 Contributors are welcome to:

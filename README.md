@@ -49,13 +49,14 @@ npm run typecheck
 
 cd ..\deploy
 Copy-Item .env.local.example .env.local
-# Create or update C:\Users\ppavl\OneDrive\Desktop\settings.local.json from settings.local.example.json.
-# Edit .env.local and the Desktop settings file for your local machine.
+$LocalSettingsPath = "$env:USERPROFILE\Desktop\settings.local.json"
+Copy-Item settings.local.example.json $LocalSettingsPath
+# Edit .env.local and $LocalSettingsPath for your local machine.
 # Do not commit local settings or secrets.
-.\hotfix-dev.ps1 start
+.\hotfix-dev.ps1 start -SettingsPath $LocalSettingsPath
 ```
 
-Open `http://localhost:3200`. The Windows hotfix dev loop reads settings from `C:\Users\ppavl\OneDrive\Desktop\settings.local.json`, bootstraps a local admin account for the configured owner, and writes the ignored credentials to `deploy/local-dev/agent-secrets.env`. See [First Local Run](docs/development.md#first-local-run) for the full recipe, including Meteor installation, Docker Desktop, logs, and how to sign in.
+Open `http://localhost:3200`. The Windows hotfix dev loop reads settings from the explicit `-SettingsPath` value, bootstraps a local admin account for the configured owner, and writes the ignored credentials to `deploy/local-dev/agent-secrets.env`. See [First Local Run](docs/development.md#first-local-run) for the full recipe, including Meteor installation, Docker Desktop, logs, and how to sign in.
 
 The supported local runtime baseline is Node.js `22.x`, npm `10.x`, and Meteor `3.4`. See [SUPPORT.md](SUPPORT.md) for the current support policy.
 

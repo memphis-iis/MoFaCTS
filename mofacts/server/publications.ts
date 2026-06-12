@@ -5,6 +5,11 @@ import {
     hasSharedTdfAccess,
     isTdfOwner,
 } from './lib/contentAccessPolicy';
+import {
+    createTdfPublicationAccessResolver,
+    normalizeIdList,
+    normalizeOptionalStringId,
+} from './lib/tdfPublicationAccess';
 import { DynamicSettings } from '../common/Collections';
 import { themeRegistry } from './lib/themeRegistry';
 
@@ -19,28 +24,6 @@ Meteor.publish(null, function() {
   if (!this.userId) return this.ready();
   return getRoleAssignment().find({'user._id': this.userId});
 });
-
-function normalizeOptionalStringId(value: any) {
-    if (value === null || value === undefined) return null;
-    if (typeof value === 'string') {
-        const trimmed = value.trim();
-        return trimmed.length > 0 ? trimmed : null;
-    }
-    if (typeof value === 'number' && Number.isFinite(value)) {
-        return String(value);
-    }
-    return null;
-}
-
-function normalizeIdList(ids: any) {
-    if (!Array.isArray(ids)) return [];
-    const out = new Set<string>();
-    for (const id of ids) {
-        const normalized = normalizeOptionalStringId(id);
-        if (normalized) out.add(normalized);
-    }
-    return Array.from(out);
-}
 
 export const DYNAMIC_ASSET_PUBLICATION_FIELDS = {
     _id: 1,
@@ -275,166 +258,12 @@ Meteor.publish('files.assets.all', async function () {
         return this.ready(); // No data for unauthenticated users
     }
 
-    const normalizeStimSetIds = (ids: any[] = []) => {
-        const out = new Set();
-        for (const id of ids) {
-            if (id === null || id === undefined) {
-                continue;
-            }
-            if (typeof id === 'number' && Number.isFinite(id)) {
-                out.add(id);
-                out.add(String(id));
-                continue;
-            }
-            if (typeof id === 'string') {
-                const trimmed = id.trim();
-                if (!trimmed.length) {
-                    continue;
-                }
-                out.add(trimmed);
-                const asNumber = Number(trimmed);
-                if (Number.isFinite(asNumber)) {
-                    out.add(asNumber);
-                }
-            }
-        }
-        return Array.from(out);
-    };
-
-    let tdfQuery: any = {
-        $or: [
-            { ownerId: this.userId },
-            { 'accessors.userId': this.userId }
-        ]
-    };
-
-    if (await Roles.userIsInRoleAsync(this.userId, ['admin'])) {
-        tdfQuery = {};
-    } else if (await Roles.userIsInRoleAsync(this.userId, ['teacher'])) {
-        tdfQuery = {
-            $or: [
-                { ownerId: this.userId },
-                { 'accessors.userId': this.userId },
-                { 'content.tdfs.tutor.setspec.userselect': 'true' },
-                { 'content.tdfs.tutor.setspec.experimentTarget': { $exists: true, $ne: null } }
-            ]
-        };
-    } else {
-        const user = await (Meteor.users as any).findOneAsync(
-            { _id: this.userId },
-            { fields: { accessedTDFs: 1, profile: 1, loginParams: 1 } }
-        );
-        const accessedTdfIds = normalizeIdList(user?.accessedTDFs || []);
-        const experimentTarget =
-            typeof user?.profile?.experimentTarget === 'string'
-                ? user.profile.experimentTarget.trim().toLowerCase()
-                : '';
-
-        tdfQuery = {
-            $or: [
-                { ownerId: this.userId },
-                { 'accessors.userId': this.userId },
-                { _id: { $in: accessedTdfIds } },
-                { 'content.tdfs.tutor.setspec.userselect': 'true' }
-            ]
-        };
-
-        if (experimentTarget) {
-            tdfQuery = {
-                $or: [
-                    ...(tdfQuery.$or || []),
-                    { 'content.tdfs.tutor.setspec.experimentTarget': experimentTarget }
-                ]
-            };
-        }
-    }
-
-    const accessibleTdfs = await Tdfs.find(
-        tdfQuery,
-        {
-            fields: {
-                stimuliSetId: 1,
-                'content.tdfs.tutor.setspec.condition': 1
-            }
-        }
-    ).fetchAsync();
-
-    const conditionRefs = new Set();
-    for (const tdf of accessibleTdfs) {
-        const refs = tdf?.content?.tdfs?.tutor?.setspec?.condition;
-        if (Array.isArray(refs)) {
-            for (const ref of refs) {
-                if (typeof ref === 'string' && ref.trim().length > 0) {
-                    conditionRefs.add(ref.trim());
-                }
-            }
-        }
-    }
-
-    let conditionStimSetIds = [];
-    if (conditionRefs.size > 0) {
-        conditionStimSetIds = (await Tdfs.find(
-            {
-                $or: [
-                    { _id: { $in: Array.from(conditionRefs) } },
-                    { 'content.fileName': { $in: Array.from(conditionRefs) } }
-                ]
-            },
-            { fields: { stimuliSetId: 1 } }
-        ).fetchAsync())
-            .map((tdf: any) => tdf.stimuliSetId);
-    }
-
-    const userForExperimentAssets = await (Meteor.users as any).findOneAsync(
-        { _id: this.userId },
-        { fields: { profile: 1 } }
-    );
-    const participantExperimentTarget =
-        typeof userForExperimentAssets?.profile?.experimentTarget === 'string'
-            ? userForExperimentAssets.profile.experimentTarget.trim().toLowerCase()
-            : '';
-
-    let participantExperimentStimSetIds: any[] = [];
-    if (participantExperimentTarget) {
-        const participantRoot = await Tdfs.findOneAsync(
-            { 'content.tdfs.tutor.setspec.experimentTarget': participantExperimentTarget },
-            { fields: { stimuliSetId: 1, 'content.tdfs.tutor.setspec.condition': 1 } }
-        );
-
-        const participantConditionRefs = Array.isArray(participantRoot?.content?.tdfs?.tutor?.setspec?.condition)
-            ? participantRoot.content.tdfs.tutor.setspec.condition
-            : [];
-
-        const participantConditionStimSetIds = participantConditionRefs.length > 0
-            ? (await Tdfs.find(
-                {
-                    $or: [
-                        { _id: { $in: participantConditionRefs } },
-                        { 'content.fileName': { $in: participantConditionRefs } }
-                    ]
-                },
-                { fields: { stimuliSetId: 1 } }
-            ).fetchAsync()).map((tdf: any) => tdf.stimuliSetId)
-            : [];
-
-        participantExperimentStimSetIds = [
-            participantRoot?.stimuliSetId,
-            ...participantConditionStimSetIds
-        ].filter((id) => id !== null && id !== undefined && String(id).trim() !== '');
-    }
-
-    const rawStimSetIds = accessibleTdfs
-        .map((tdf: any) => tdf.stimuliSetId)
-        .concat(conditionStimSetIds)
-        .concat(participantExperimentStimSetIds);
-    const accessibleStimSetIds = normalizeStimSetIds(rawStimSetIds);
-
-    const uniqueStimSetIds = [...new Set(accessibleStimSetIds)];
-    const assetQuery = uniqueStimSetIds.length > 0
+    const accessibleStimSetIds = await tdfPublicationAccess.resolveAssetStimuliSetIds(this.userId);
+    const assetQuery = accessibleStimSetIds.length > 0
         ? {
             $or: [
                 { userId: this.userId },
-                { 'meta.stimuliSetId': { $in: uniqueStimSetIds } }
+                { 'meta.stimuliSetId': { $in: accessibleStimSetIds } }
             ]
         }
         : { userId: this.userId };
@@ -708,44 +537,21 @@ async function resolveAssignedRootTdfIdsForUser(userId: string) {
         .filter((id: string | null): id is string => !!id);
 }
 
+const tdfPublicationAccess = createTdfPublicationAccessResolver({
+    tdfs: Tdfs as any,
+    users: Meteor.users as any,
+    roles: Roles,
+    resolveAssignedRootTdfIdsForUser
+});
+
 Meteor.publish('allTdfsListing', async function() {
     // Security: Filter TDFs based on user role and access permissions
     if (!this.userId) {
         return this.ready();
     }
 
-    // Admins can see all TDFs
-    if (await Roles.userIsInRoleAsync(this.userId, ['admin'])) {
-        return Tdfs.find({}, { fields: TDF_LISTING_FIELDS });
-    }
-
-    // Teachers can see their own TDFs, TDFs they have access to, public TDFs, and all TDFs with experimentTarget
-    if (await Roles.userIsInRoleAsync(this.userId, ['teacher'])) {
-        return Tdfs.find({
-            $or: [
-                { ownerId: this.userId },
-                { 'accessors.userId': this.userId },
-                { 'content.tdfs.tutor.setspec.userselect': 'true' },
-                { 'content.tdfs.tutor.setspec.experimentTarget': { $exists: true, $ne: null } }
-            ]
-        }, { fields: TDF_LISTING_FIELDS });
-    }
-
-    // Students can see available TDFs only; cached stats for unavailable TDFs should not make rows visible.
-    const user = await (Meteor.users as any).findOneAsync(
-        { _id: this.userId },
-        { fields: { accessedTDFs: 1 } }
-    );
-    const accessedTdfIds = normalizeIdList(user?.accessedTDFs || []);
-
-    return Tdfs.find({
-        $or: [
-            { ownerId: this.userId },
-            { 'accessors.userId': this.userId },
-            { 'content.tdfs.tutor.setspec.userselect': 'true' },
-            { _id: { $in: accessedTdfIds } }
-        ]
-    }, { fields: TDF_LISTING_FIELDS });
+    const selector = await tdfPublicationAccess.resolveListingSelector(this.userId);
+    return Tdfs.find(selector, { fields: TDF_LISTING_FIELDS });
 });
 
 // ===== DASHBOARD TDF LISTING =====
@@ -755,69 +561,8 @@ Meteor.publish('dashboardTdfsListing', async function() {
         return this.ready();
     }
 
-    const [assignedRootIds, user] = await Promise.all([
-        resolveAssignedRootTdfIdsForUser(this.userId),
-        (Meteor.users as any).findOneAsync(
-            { _id: this.userId },
-            { fields: { accessedTDFs: 1 } }
-        )
-    ]);
-
-    const explicitDashboardIds = [
-        ...new Set([
-            ...normalizeIdList(assignedRootIds),
-            ...normalizeIdList(user?.accessedTDFs || [])
-        ])
-    ];
-    const visibilityTerms: any[] = [
-        { ownerId: this.userId },
-        { 'accessors.userId': this.userId },
-        { 'content.tdfs.tutor.setspec.userselect': 'true' },
-    ];
-    if (explicitDashboardIds.length > 0) {
-        visibilityTerms.push({ _id: { $in: explicitDashboardIds } });
-    }
-
-    const accessibleRoots = await Tdfs.find(
-        { $or: visibilityTerms },
-        {
-            fields: {
-                _id: 1,
-                'content.fileName': 1,
-                'content.tdfs.tutor.setspec.condition': 1,
-                'content.tdfs.tutor.setspec.conditionTdfIds': 1
-            }
-        }
-    ).fetchAsync();
-
-    const conditionFileNames = new Set<string>();
-    const conditionTdfIds = new Set<string>();
-    for (const root of accessibleRoots) {
-        const setspec = root?.content?.tdfs?.tutor?.setspec || {};
-        const conditions = Array.isArray(setspec.condition) ? setspec.condition : [];
-        const resolvedIds = Array.isArray(setspec.conditionTdfIds) ? setspec.conditionTdfIds : [];
-        for (const condition of conditions) {
-            const normalized = normalizeOptionalStringId(condition);
-            if (normalized) {
-                conditionFileNames.add(normalized);
-            }
-        }
-        for (const conditionTdfId of resolvedIds) {
-            const normalized = normalizeOptionalStringId(conditionTdfId);
-            if (normalized) {
-                conditionTdfIds.add(normalized);
-            }
-        }
-    }
-
-    if (conditionFileNames.size > 0) {
-        visibilityTerms.push({ 'content.fileName': { $in: Array.from(conditionFileNames) } });
-    }
-    if (conditionTdfIds.size > 0) {
-        visibilityTerms.push({ _id: { $in: Array.from(conditionTdfIds) } });
-    }
-
-    return Tdfs.find({ $or: visibilityTerms }, { fields: TDF_LISTING_FIELDS });
+    const selector = await tdfPublicationAccess.resolveDashboardSelector(this.userId);
+    return Tdfs.find(selector, { fields: TDF_LISTING_FIELDS });
 });
 
 Meteor.publish('tdfForContentUploadDetails', async function(tdfId: any) {
@@ -881,37 +626,8 @@ Meteor.publish('allTdfs', async function() {
         return this.ready(); // No data for unauthenticated users
     }
 
-    // Admins can see all TDFs
-    if (await Roles.userIsInRoleAsync(this.userId, ['admin'])) {
-        return Tdfs.find({}, { fields: TDF_LISTING_FIELDS });
-    }
-
-    // Teachers can see their own TDFs, TDFs they have access to, public TDFs, and all TDFs with experimentTarget
-    if (await Roles.userIsInRoleAsync(this.userId, ['teacher'])) {
-        return Tdfs.find({
-            $or: [
-                { ownerId: this.userId },
-                { 'accessors.userId': this.userId },
-                { 'content.tdfs.tutor.setspec.userselect': 'true' },
-                { 'content.tdfs.tutor.setspec.experimentTarget': { $exists: true, $ne: null } }
-            ]
-        }, { fields: TDF_LISTING_FIELDS });
-    }
-
-    const user = await (Meteor.users as any).findOneAsync(
-        { _id: this.userId },
-        { fields: { accessedTDFs: 1 } }
-    );
-    const accessedTdfIds = normalizeIdList(user?.accessedTDFs || []);
-
-    return Tdfs.find({
-        $or: [
-            { ownerId: this.userId },
-            { 'accessors.userId': this.userId },
-            { 'content.tdfs.tutor.setspec.userselect': 'true' },
-            { _id: { $in: accessedTdfIds } }
-        ]
-    }, { fields: TDF_LISTING_FIELDS });
+    const selector = await tdfPublicationAccess.resolveListingSelector(this.userId);
+    return Tdfs.find(selector, { fields: TDF_LISTING_FIELDS });
 });
 
 Meteor.publish('ownedTdfs', async function(ownerId: any) {
@@ -950,35 +666,8 @@ Meteor.publish('pagedTdfsListing', async function(page: any = 0, limit: any = 50
         limit: normalizedLimit
     };
 
-    if (await Roles.userIsInRoleAsync(this.userId, ['admin'])) {
-        return Tdfs.find({}, options);
-    }
-
-    if (await Roles.userIsInRoleAsync(this.userId, ['teacher'])) {
-        return Tdfs.find({
-            $or: [
-                { ownerId: this.userId },
-                { 'accessors.userId': this.userId },
-                { 'content.tdfs.tutor.setspec.userselect': 'true' },
-                { 'content.tdfs.tutor.setspec.experimentTarget': { $exists: true, $ne: null } }
-            ]
-        }, options);
-    }
-
-    const user = await (Meteor.users as any).findOneAsync(
-        { _id: this.userId },
-        { fields: { accessedTDFs: 1 } }
-    );
-    const accessedTdfIds = normalizeIdList(user?.accessedTDFs || []);
-
-    return Tdfs.find({
-        $or: [
-            { ownerId: this.userId },
-            { 'accessors.userId': this.userId },
-            { 'content.tdfs.tutor.setspec.userselect': 'true' },
-            { _id: { $in: accessedTdfIds } }
-        ]
-    }, options);
+    const selector = await tdfPublicationAccess.resolveListingSelector(this.userId);
+    return Tdfs.find(selector, options);
 });
 
 Meteor.publish('tdfByExperimentTarget', async function(experimentTarget: any, experimentConditions: any = undefined) {

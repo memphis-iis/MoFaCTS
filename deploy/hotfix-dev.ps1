@@ -1,7 +1,8 @@
 param(
     [ValidateSet("start", "restart", "stop", "status", "logs")]
     [string]$Action = "start",
-    [int]$LogTail = 120
+    [int]$LogTail = 120,
+    [string]$SettingsPath = ""
 )
 
 Set-StrictMode -Version Latest
@@ -17,7 +18,7 @@ $stdoutPath = Join-Path $localDevDir "meteor.stdout.log"
 $stderrPath = Join-Path $localDevDir "meteor.stderr.log"
 $watcherStdoutPath = Join-Path $localDevDir "commonjs-watcher.stdout.log"
 $watcherStderrPath = Join-Path $localDevDir "commonjs-watcher.stderr.log"
-$settingsPath = "C:\Users\ppavl\OneDrive\Desktop\settings.local.json"
+$settingsPath = ""
 $localDataHome = Join-Path $deployDir "local-data"
 $commonJsWatcherScript = Join-Path $deployDir "hotfix-dev\ensure-commonjs-build.ps1"
 $localAdminScript = Join-Path $deployDir "hotfix-dev\ensure-local-admin.cjs"
@@ -150,6 +151,18 @@ function Read-JsonFile {
     return Get-Content $Path -Raw | ConvertFrom-Json
 }
 
+function Resolve-HotfixDevSettingsPath {
+    if (-not $SettingsPath.Trim()) {
+        throw "Missing -SettingsPath. Pass the local Meteor settings JSON path explicitly, for example: .\hotfix-dev.ps1 start -SettingsPath C:\Path\To\settings.local.json"
+    }
+
+    if (-not (Test-Path $SettingsPath)) {
+        throw "Missing settings JSON at $SettingsPath"
+    }
+
+    return (Resolve-Path $SettingsPath).Path
+}
+
 function Read-AgentSecretValue {
     param([string]$Name)
 
@@ -195,7 +208,7 @@ function Get-LocalAdminEmail {
         $owner = [string]$settings.owner
     }
     if (-not $owner.Trim()) {
-        throw "settings.local.json must define owner for local admin bootstrap"
+        throw "The settings JSON passed with -SettingsPath must define owner for local admin bootstrap"
     }
 
     return $owner.Trim().ToLowerInvariant()
@@ -369,12 +382,14 @@ function Stop-ProcessTree {
 }
 
 function Assert-RequiredFiles {
+    $script:settingsPath = Resolve-HotfixDevSettingsPath
+
     if (-not (Test-Path (Join-Path $deployDir ".env.local"))) {
         throw "Missing .env.local in $deployDir"
     }
 
     if (-not (Test-Path $settingsPath)) {
-        throw "Missing settings.local.json at $settingsPath"
+        throw "Missing settings JSON at $settingsPath"
     }
 
     if (-not (Test-Path $localDataHome)) {
