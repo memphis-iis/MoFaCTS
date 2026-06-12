@@ -300,7 +300,7 @@ async function loadSchema(instance: any) {
 }
 
 // API key fields that are stored encrypted - clear for display, allow re-entry
-const API_KEY_FIELDS = ['speechAPIKey', 'textToSpeechAPIKey'];
+const API_KEY_FIELDS = ['speechAPIKey', 'textToSpeechAPIKey', 'openRouterApiKey'];
 
 /**
  * Check if a value is considered "empty" for display purposes

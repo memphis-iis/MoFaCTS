@@ -124,6 +124,31 @@ function getEncryptedAdminApiKey(settings: AdminApiKeySettingsDoc, kind: ApiKeyK
   return normalizeString(settings?.value?.[provider]?.keyEncrypted) || null;
 }
 
+function looksLikePlaintextProviderKey(value: string, kind: ApiKeyKind) {
+  if (kind === 'openrouter') {
+    return value.startsWith('sk-');
+  }
+  return value.startsWith('AIza');
+}
+
+function decryptTdfApiKey(
+  deps: Pick<ApiKeyResolutionDeps, 'decryptData'>,
+  value: string,
+  kind: ApiKeyKind
+) {
+  try {
+    return deps.decryptData(value);
+  } catch (error) {
+    if (looksLikePlaintextProviderKey(value, kind)) {
+      return value;
+    }
+    throw new Meteor.Error(
+      'tdf-api-key-resolution-failed',
+      `Could not resolve TDF ${kind} API key`,
+    );
+  }
+}
+
 export function getAdminOpenRouterModel(settings: AdminApiKeySettingsDoc) {
   return normalizeString(settings?.value?.openRouter?.model);
 }
@@ -178,7 +203,7 @@ export async function getAccessibleTdfApiKey(
   }
 
   const encryptedKey = getEncryptedTdfApiKey(tdf, params.kind);
-  return encryptedKey ? deps.decryptData(encryptedKey) : '';
+  return encryptedKey ? decryptTdfApiKey(deps, encryptedKey, params.kind) : '';
 }
 
 export async function resolvePreferredApiKey(
@@ -219,7 +244,10 @@ export async function resolvePreferredApiKey(
       if (error instanceof Meteor.Error && (error.error === 401 || error.error === 403)) {
         throw error;
       }
-      errors.tdf = error;
+      throw error instanceof Meteor.Error ? error : new Meteor.Error(
+        'tdf-api-key-resolution-failed',
+        `Could not resolve TDF ${params.kind} API key`,
+      );
     }
   }
 

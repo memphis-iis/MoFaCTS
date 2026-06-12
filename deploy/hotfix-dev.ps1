@@ -18,7 +18,7 @@ $stdoutPath = Join-Path $localDevDir "meteor.stdout.log"
 $stderrPath = Join-Path $localDevDir "meteor.stderr.log"
 $watcherStdoutPath = Join-Path $localDevDir "commonjs-watcher.stdout.log"
 $watcherStderrPath = Join-Path $localDevDir "commonjs-watcher.stderr.log"
-$settingsPath = ""
+$resolvedSettingsPath = ""
 $localDataHome = Join-Path $deployDir "local-data"
 $commonJsWatcherScript = Join-Path $deployDir "hotfix-dev\ensure-commonjs-build.ps1"
 $localAdminScript = Join-Path $deployDir "hotfix-dev\ensure-local-admin.cjs"
@@ -202,7 +202,7 @@ function Get-NativeMongoUrl {
 }
 
 function Get-LocalAdminEmail {
-    $settings = Read-JsonFile -Path $settingsPath
+    $settings = Read-JsonFile -Path $resolvedSettingsPath
     $owner = ""
     if ($null -ne $settings.owner) {
         $owner = [string]$settings.owner
@@ -382,14 +382,14 @@ function Stop-ProcessTree {
 }
 
 function Assert-RequiredFiles {
-    $script:settingsPath = Resolve-HotfixDevSettingsPath
+    $script:resolvedSettingsPath = Resolve-HotfixDevSettingsPath
 
     if (-not (Test-Path (Join-Path $deployDir ".env.local"))) {
         throw "Missing .env.local in $deployDir"
     }
 
-    if (-not (Test-Path $settingsPath)) {
-        throw "Missing settings JSON at $settingsPath"
+    if (-not (Test-Path $resolvedSettingsPath)) {
+        throw "Missing settings JSON at $resolvedSettingsPath"
     }
 
     if (-not (Test-Path $localDataHome)) {
@@ -484,7 +484,7 @@ function Start-HotfixDev {
         $env:EXPECTED_MONGO_DB_NAME = $expectedMongoDbName
         $env:ROOT_URL = $rootUrl
         $env:PORT = $port
-        $env:METEOR_SETTINGS_WORKAROUND = $settingsPath
+        $env:METEOR_SETTINGS_WORKAROUND = $resolvedSettingsPath
         $env:HOME = $localDataHome
         $env:METEOR_INSTALLATION = "$($meteorTool.InstallDir)\"
         $env:PATH = "$($meteorTool.ToolDir);$previousPath"
@@ -504,7 +504,7 @@ function Start-HotfixDev {
 
         $process = Start-Process `
             -FilePath $meteorTool.ToolBat `
-            -ArgumentList @("--settings", $settingsPath, "--port", $port) `
+            -ArgumentList @("--settings", $resolvedSettingsPath, "--port", $port) `
             -WorkingDirectory $appDir `
             -RedirectStandardOutput $stdoutPath `
             -RedirectStandardError $stderrPath `

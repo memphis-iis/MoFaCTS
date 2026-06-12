@@ -444,6 +444,9 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
         if (setspec?.speechAPIKey) {
           setspec.speechAPIKey = deps.encryptData(setspec.speechAPIKey);
         }
+        if (setspec?.openRouterApiKey) {
+          setspec.openRouterApiKey = deps.encryptData(setspec.openRouterApiKey);
+        }
         const upsertResult = await upsertTDFFile(
           filename,
           {fileName: filename, tdfs: jsonContents, ownerId: ownerId, source: 'upload'},
@@ -892,7 +895,7 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     this: MethodContext,
     tdfId: string,
     tdfContent: { tdfs?: { tutor?: { setspec?: { lessonname?: string; speechAPIKey?: string; textToSpeechAPIKey?: string; openRouterApiKey?: string; condition?: string[]; conditionTdfIds?: Array<string | null>; [key: string]: unknown } } } } & UnknownRecord,
-    apiKeyUpdates: { speechAPIKey?: boolean; textToSpeechAPIKey?: boolean } = {}
+    apiKeyUpdates: { speechAPIKey?: boolean; textToSpeechAPIKey?: boolean; openRouterApiKey?: boolean } = {}
   ) {
     check(tdfId, String);
     check(tdfContent, Object);
@@ -921,6 +924,10 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       if (apiKeyUpdates.textToSpeechAPIKey && setspec.textToSpeechAPIKey) {
         setspec.textToSpeechAPIKey = deps.encryptData(setspec.textToSpeechAPIKey);
         deps.serverConsole('saveTdfContent: Encrypted new textToSpeechAPIKey');
+      }
+      if (apiKeyUpdates.openRouterApiKey && setspec.openRouterApiKey) {
+        setspec.openRouterApiKey = deps.encryptData(setspec.openRouterApiKey);
+        deps.serverConsole('saveTdfContent: Encrypted new openRouterApiKey');
       }
       setspec.conditionTdfIds = await resolveConditionTdfIds(setspec);
     }

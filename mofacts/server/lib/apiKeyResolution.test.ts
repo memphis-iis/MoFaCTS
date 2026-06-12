@@ -72,6 +72,56 @@ describe('apiKeyResolution', function() {
     expect(result.apiKey).to.equal('user-openrouter');
   });
 
+  it('accepts legacy plaintext TDF provider keys', async function() {
+    const deps = createDeps({
+      getTdfById: async () => ({
+        ownerId: 'owner',
+        content: {
+          tdfs: {
+            tutor: {
+              setspec: {
+                userselect: 'true',
+                openRouterApiKey: 'sk-or-v1-plaintext',
+              },
+            },
+          },
+        },
+      }),
+      decryptData: () => {
+        throw new Error('bad decrypt');
+      },
+    });
+
+    const result = await resolvePreferredApiKey(deps, {
+      userId: 'learner',
+      tdfId: 'tdf',
+      kind: 'openrouter',
+    });
+
+    expect(result.source).to.equal('tdf');
+    expect(result.apiKey).to.equal('sk-or-v1-plaintext');
+  });
+
+  it('fails clearly when a configured TDF key cannot be decrypted', async function() {
+    const deps = createDeps({
+      decryptData: () => {
+        throw new Error('bad decrypt');
+      },
+    });
+
+    try {
+      await resolvePreferredApiKey(deps, {
+        userId: 'learner',
+        tdfId: 'tdf',
+        kind: 'speech',
+      });
+      throw new Error('Expected TDF key resolution failure');
+    } catch (error) {
+      expect(error).to.be.instanceOf(Meteor.Error);
+      expect((error as Meteor.Error).error).to.equal('tdf-api-key-resolution-failed');
+    }
+  });
+
   it('uses admin alternatives when TDF and user keys are absent', async function() {
     const deps = createDeps({
       getTdfById: async () => ({

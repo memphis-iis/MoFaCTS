@@ -467,6 +467,9 @@ async function preparePackageExportState(
       if (Object.prototype.hasOwnProperty.call(setspec, 'textToSpeechAPIKey')) {
         setspec.textToSpeechAPIKey = maybeDecryptPackageExportSecret(setspec.textToSpeechAPIKey, deps);
       }
+      if (Object.prototype.hasOwnProperty.call(setspec, 'openRouterApiKey')) {
+        setspec.openRouterApiKey = maybeDecryptPackageExportSecret(setspec.openRouterApiKey, deps);
+      }
       delete setspec.conditionTdfIds;
     }
 

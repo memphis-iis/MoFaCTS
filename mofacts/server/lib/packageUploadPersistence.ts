@@ -77,6 +77,7 @@ export async function processParsedPackageTdfs(args: {
             stimulusfile: string;
             textToSpeechAPIKey?: string;
             speechAPIKey?: string;
+            openRouterApiKey?: string;
             userselect?: string;
             experimentTarget?: string;
             lessonname?: unknown;
@@ -97,6 +98,9 @@ export async function processParsedPackageTdfs(args: {
       }
       if (tdfContents.tutor.setspec.speechAPIKey) {
         tdfContents.tutor.setspec.speechAPIKey = deps.encryptData(tdfContents.tutor.setspec.speechAPIKey);
+      }
+      if (tdfContents.tutor.setspec.openRouterApiKey) {
+        tdfContents.tutor.setspec.openRouterApiKey = deps.encryptData(tdfContents.tutor.setspec.openRouterApiKey);
       }
       if (!isTeacherOrAdmin) {
         tdfContents.tutor.setspec.userselect = 'false';
