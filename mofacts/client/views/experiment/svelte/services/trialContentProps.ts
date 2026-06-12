@@ -185,7 +185,7 @@ export function buildTrialContentPropsFromSubset(
   return {
     subset: input.subset,
     correctAnswerImageSrc,
-    expectedStimulusBlockerSrc: input.subset.displayVisible ? String(input.subset.display?.imgSrc || '') : '',
+    expectedStimulusBlockerSrc: String(input.subset.display?.imgSrc || ''),
     expectedFeedbackBlockerSrc: input.subset.feedbackVisible && !feedbackIsCorrect
       ? String(correctAnswerImageSrc || '')
       : '',

@@ -77,6 +77,43 @@ describe('trial content props adapter', function() {
     });
   });
 
+  it('keeps image stimulus blockers while the first active question is hidden for reveal', function() {
+    const subset = buildTrialSubset({
+      kind: 'question',
+      display: { text: 'Prompt', imgSrc: '/prompt.png' },
+      displayVisible: false,
+      responseVisible: true,
+    });
+
+    const result = buildTrialContentPropsFromSubset({
+      buttonList: [],
+      correctAnswer: 'Answer',
+      correctAnswerImageSrc: '',
+      correctColor: '',
+      defaultInputMode: 'text',
+      deliverySettings: {},
+      displayCorrectFeedback: false,
+      displayIncorrectFeedback: false,
+      feedbackMessage: '',
+      feedbackUserAnswer: '',
+      inputEnabled: true,
+      isCorrect: false,
+      isTimeout: false,
+      layoutMode: 'top',
+      srAttempt: 0,
+      srMaxAttempts: 0,
+      srStatus: 'idle',
+      subset,
+      userAnswer: '',
+    });
+
+    expect(result.expectedStimulusBlockerSrc).to.equal('/prompt.png');
+    expect(result.props).to.deep.include({
+      displayVisible: false,
+      responseVisible: true,
+    });
+  });
+
   it('uses incorrect feedback image as a feedback blocker', function() {
     const result = buildTrialContentProps({
       defaultInputMode: 'buttons',
