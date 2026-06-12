@@ -91,6 +91,26 @@ function assertSameDocument(
   }
 }
 
+function addressKey(address: SparcDocumentAddress): string {
+  return JSON.stringify([
+    address.documentId,
+    address.nodeId,
+    address.path ?? [],
+  ]);
+}
+
+function assertSameAddress(
+  actualAddress: SparcDocumentAddress,
+  expectedAddress: SparcDocumentAddress,
+  label: string,
+): void {
+  if (addressKey(actualAddress) !== addressKey(expectedAddress)) {
+    throw new Error(
+      `${label} ${JSON.stringify(actualAddress)} does not match SPARC sourceAddress ${JSON.stringify(expectedAddress)}`,
+    );
+  }
+}
+
 function assertStateTransition(
   value: SparcStateTransition,
   label: string,
@@ -182,6 +202,11 @@ export function applySparcHistoryRecord(
 
   if (extension.stateTransition) {
     assertStateTransition(extension.stateTransition, 'sparc.stateTransition', extension.documentId);
+    assertSameAddress(
+      extension.stateTransition.event.source,
+      extension.sourceAddress,
+      'sparc.stateTransition.event.source',
+    );
     nextCells = { ...state.cells };
     for (const write of extension.stateTransition.writes) {
       const cellKey = createSparcStateCellKey(write.target, write.key);
@@ -199,9 +224,19 @@ export function applySparcHistoryRecord(
 
   if (extension.practiceObservation) {
     assertPracticeObservation(extension.practiceObservation, 'sparc.practiceObservation', extension.documentId);
+    assertSameAddress(
+      extension.practiceObservation.sourceAddress,
+      extension.sourceAddress,
+      'sparc.practiceObservation.sourceAddress',
+    );
   }
   if (extension.traceStep) {
     assertTraceStep(extension.traceStep, 'sparc.traceStep', extension.documentId);
+    assertSameAddress(
+      extension.traceStep.sourceAddress,
+      extension.sourceAddress,
+      'sparc.traceStep.sourceAddress',
+    );
   }
 
   const observations = extension.practiceObservation

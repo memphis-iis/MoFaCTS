@@ -254,6 +254,42 @@ describe('sparcStateReplay', function() {
     );
   });
 
+  it('rejects SPARC state transitions whose event source differs from the history source', function() {
+    assert.throws(
+      () => replaySparcHistory([
+        makeBaseSparcRecord({
+          documentId: 'doc-1',
+          sourceAddress: {
+            documentId: 'doc-1',
+            nodeId: 'region-1',
+          },
+          stateTransition: {
+            transitionId: 'transition-1',
+            event: {
+              eventId: 'event-1',
+              type: 'value-changed',
+              source: {
+                documentId: 'doc-1',
+                nodeId: 'region-7',
+                path: ['widget-3'],
+              },
+              time: 2000,
+            },
+            writes: [{
+              target: {
+                documentId: 'doc-1',
+                nodeId: 'region-7',
+              },
+              key: 'visible',
+              value: true,
+            }],
+          },
+        }),
+      ]),
+      /sparc\.stateTransition\.event\.source .* does not match SPARC sourceAddress/,
+    );
+  });
+
   it('rejects SPARC practice observations that point at another document', function() {
     assert.throws(
       () => replaySparcHistory([
@@ -280,6 +316,33 @@ describe('sparcStateReplay', function() {
     );
   });
 
+  it('rejects SPARC practice observations whose source differs from the history source', function() {
+    assert.throws(
+      () => replaySparcHistory([
+        makeBaseSparcRecord({
+          documentId: 'doc-1',
+          sourceAddress: {
+            documentId: 'doc-1',
+            nodeId: 'region-1',
+          },
+          practiceObservation: {
+            observationId: 'obs-1',
+            sourceAddress: {
+              documentId: 'doc-1',
+              nodeId: 'region-7',
+              path: ['widget-3'],
+            },
+            time: 2000,
+            problemStartTime: 1000,
+            outcome: 'correct',
+            responseValue: 'answer',
+          },
+        }),
+      ]),
+      /sparc\.practiceObservation\.sourceAddress .* does not match SPARC sourceAddress/,
+    );
+  });
+
   it('rejects SPARC trace steps that point at another document', function() {
     assert.throws(
       () => replaySparcHistory([
@@ -303,6 +366,33 @@ describe('sparcStateReplay', function() {
         }),
       ]),
       /sparc\.traceStep\.sourceAddress\.documentId "doc-2" does not match SPARC history document "doc-1"/,
+    );
+  });
+
+  it('rejects SPARC trace steps whose source differs from the history source', function() {
+    assert.throws(
+      () => replaySparcHistory([
+        makeBaseSparcRecord({
+          documentId: 'doc-1',
+          sourceAddress: {
+            documentId: 'doc-1',
+            nodeId: 'region-1',
+          },
+          traceStep: {
+            traceId: 'trace-1',
+            sourceAddress: {
+              documentId: 'doc-1',
+              nodeId: 'region-7',
+              path: ['widget-3'],
+            },
+            productionRuleId: 'rule-1',
+            actionId: 'widget-1::UpdateTextField::answer',
+            outcome: 'correct',
+            time: 2000,
+          },
+        }),
+      ]),
+      /sparc\.traceStep\.sourceAddress .* does not match SPARC sourceAddress/,
     );
   });
 
