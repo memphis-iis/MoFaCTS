@@ -244,7 +244,7 @@ export async function resolvePreferredApiKey(
       if (error instanceof Meteor.Error && (error.error === 401 || error.error === 403)) {
         throw error;
       }
-      throw error instanceof Meteor.Error ? error : new Meteor.Error(
+      errors.tdf = error instanceof Meteor.Error ? error : new Meteor.Error(
         'tdf-api-key-resolution-failed',
         `Could not resolve TDF ${params.kind} API key`,
       );

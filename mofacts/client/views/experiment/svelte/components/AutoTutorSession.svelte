@@ -28,6 +28,8 @@
   let questionPrompt = '';
   let unitName = 'AutoTutor';
   let isMobileLayout = false;
+  let runtimeReady = false;
+  let chatReady = false;
 
   function toDeepChatHistory(dialogue) {
     return dialogue.map((message) => ({
@@ -56,8 +58,16 @@
     if (!chatElement) {
       return;
     }
-    const disabled = completed || !!errorMessage;
-    chatElement.setPlaceholderText?.(disabled ? 'Conversation complete' : 'Type your answer...');
+    const waitingForRuntime = !chatReady && !errorMessage;
+    const disabled = completed || !!errorMessage || waitingForRuntime;
+    const placeholder = errorMessage
+      ? 'AutoTutor unavailable'
+      : completed
+        ? 'Conversation complete'
+        : waitingForRuntime
+          ? 'Loading AutoTutor...'
+          : 'Type your answer...';
+    chatElement.setPlaceholderText?.(placeholder);
     chatElement.disableSubmitButton?.(disabled);
     const textInput = chatElement.shadowRoot?.querySelector('#text-input');
     if (textInput) {
@@ -149,6 +159,9 @@
   }
 
   function configureDeepChatVisuals() {
+    if (!chatElement) {
+      throw new Error('AutoTutor chat element is not mounted');
+    }
     applyDeepChatHostLayout();
     applyDeepChatIntroMessage();
     chatElement.textInput = {
@@ -217,6 +230,9 @@
   }
 
   function configureDeepChatRuntime() {
+    if (!chatElement || !runtime) {
+      throw new Error('AutoTutor chat cannot be configured before the runtime and chat element are ready');
+    }
     applyDeepChatIntroMessage();
     chatElement.connect = {
       handler: async (body, signals) => {
@@ -240,8 +256,9 @@
     };
 
     chatElement.history = toDeepChatHistory(runtime.getDialogue());
-    updateChatInputState();
     chatElement.onRender?.();
+    chatReady = true;
+    updateChatInputState();
   }
 
   onMount(() => {
@@ -256,11 +273,13 @@
 
     async function initializeAutoTutor() {
       try {
-        configureDeepChatVisuals();
         runtime = await createAutoTutorRuntime();
         questionPrompt = runtime.config.prompt;
         unitName = runtime.config.unitName;
         refreshRuntimeState();
+        runtimeReady = true;
+        await tick();
+        configureDeepChatVisuals();
         configureDeepChatRuntime();
         await tick();
         applyDeepChatHostLayout();
@@ -359,7 +378,7 @@
     </div>
   {/if}
 
-  <div class="auto-tutor-chat" class:auto-tutor-chat-disabled={!!errorMessage || completed}>
+  <div class="auto-tutor-chat" class:auto-tutor-chat-disabled={!!errorMessage || completed || !chatReady}>
     <div class="auto-tutor-mobile-progress" aria-label="AutoTutor progress">
       <div class="auto-tutor-meter-row">
         <div class="auto-tutor-meter-copy">
@@ -389,10 +408,18 @@
         {turnCount === 1 ? '1 turn' : `${turnCount} turns`}
       </div>
     </div>
-    <deep-chat
-      bind:this={chatElement}
-      class="auto-tutor-chat-host"
-    ></deep-chat>
+    {#if !chatReady && !errorMessage}
+      <div class="auto-tutor-loading" role="status">
+        Loading AutoTutor...
+      </div>
+    {/if}
+    {#if runtimeReady}
+      <deep-chat
+        bind:this={chatElement}
+        class="auto-tutor-chat-host"
+        class:auto-tutor-chat-pending={!chatReady}
+      ></deep-chat>
+    {/if}
   </div>
 
   <div class="auto-tutor-continue-bar" aria-label="AutoTutor continue controls">
@@ -544,6 +571,27 @@
 
   .auto-tutor-chat-disabled {
     opacity: 0.72;
+  }
+
+  .auto-tutor-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    min-height: 12rem;
+    border: 1px solid var(--app-secondary-surface-color);
+    border-radius: var(--app-border-radius-sm);
+    background: var(--learning-card-surface-color);
+    color: var(--app-secondary-text-color);
+    font-weight: 600;
+    box-sizing: border-box;
+  }
+
+  .auto-tutor-chat-pending {
+    visibility: hidden;
+    position: absolute;
+    inset: 0;
   }
 
   .auto-tutor-chat-host,

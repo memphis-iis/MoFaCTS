@@ -102,24 +102,48 @@ describe('apiKeyResolution', function() {
     expect(result.apiKey).to.equal('sk-or-v1-plaintext');
   });
 
-  it('fails clearly when a configured TDF key cannot be decrypted', async function() {
+  it('uses admin alternatives when a configured TDF key cannot be decrypted and no user key is available', async function() {
     const deps = createDeps({
-      decryptData: () => {
-        throw new Error('bad decrypt');
+      getUserById: async () => ({}),
+      decryptData: (value: string) => {
+        if (value.startsWith('enc-tdf-')) {
+          throw new Error('bad decrypt');
+        }
+        return value.replace(/^enc-/, '');
       },
     });
 
-    try {
-      await resolvePreferredApiKey(deps, {
-        userId: 'learner',
-        tdfId: 'tdf',
-        kind: 'speech',
-      });
-      throw new Error('Expected TDF key resolution failure');
-    } catch (error) {
-      expect(error).to.be.instanceOf(Meteor.Error);
-      expect((error as Meteor.Error).error).to.equal('tdf-api-key-resolution-failed');
-    }
+    const result = await resolvePreferredApiKey(deps, {
+      userId: 'learner',
+      tdfId: 'tdf',
+      kind: 'speech',
+    });
+
+    expect(result.source).to.equal('admin');
+    expect(result.apiKey).to.equal('admin-speech');
+    expect(result.errors.tdf).to.be.instanceOf(Meteor.Error);
+    expect((result.errors.tdf as Meteor.Error).error).to.equal('tdf-api-key-resolution-failed');
+  });
+
+  it('uses user keys before admin alternatives when a configured TDF key cannot be decrypted', async function() {
+    const deps = createDeps({
+      decryptData: (value: string) => {
+        if (value.startsWith('enc-tdf-')) {
+          throw new Error('bad decrypt');
+        }
+        return value.replace(/^enc-/, '');
+      },
+    });
+
+    const result = await resolvePreferredApiKey(deps, {
+      userId: 'learner',
+      tdfId: 'tdf',
+      kind: 'tts',
+    });
+
+    expect(result.source).to.equal('user');
+    expect(result.apiKey).to.equal('user-tts');
+    expect(result.errors.tdf).to.be.instanceOf(Meteor.Error);
   });
 
   it('uses admin alternatives when TDF and user keys are absent', async function() {
