@@ -31,11 +31,6 @@ export const sparcSessionUnitComponentManifest: LearningComponentManifest<Create
     'sparc.authored-response-outcome',
     'sparc.condition-evaluation',
     {
-      name: 'sparc.ctat-sample-brd-verification',
-      runtimeEntry: 'SparcSessionUnitEngine.assertAllSparcSampleTracesMatchCtatBrds',
-    },
-    'sparc.ctat-trace-comparison',
-    {
       name: 'sparc.document-addressing',
       runtimeEntry: 'SparcSessionUnitEngine.validateSparcDocumentReferences',
     },
@@ -58,7 +53,6 @@ export const sparcSessionUnitComponentManifest: LearningComponentManifest<Create
     'sparc.response-outcome-history',
     'sparc.reactive-rule-commit',
     'sparc.reactive-rule-evaluation',
-    'sparc.sample-documents',
     'sparc.state-replay',
     'sparc.state-transition-history',
     'sparc.vertical-layout-validation',

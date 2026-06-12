@@ -11,8 +11,7 @@ import type { SparcModelTargetIdentity } from './sparcSessionContracts';
 
 const modelTarget: SparcModelTargetIdentity = {
   sparcDocumentId: 'doc-1',
-  sparcNodeId: 'region-1',
-  sparcPath: ['input'],
+  sparcNodeId: 'input-node',
   stimuliSetId: 'stim-set-1',
   stimulusKC: 'kc-1',
   clusterKC: 'cluster-1',
@@ -89,8 +88,7 @@ describe('sparcModelHistoryExchange', function() {
       observationId: 'obs-1',
       sourceAddress: {
         documentId: 'doc-1',
-        nodeId: 'region-1',
-        path: ['input'],
+        nodeId: 'input-node',
       },
       modelTarget,
       time: 3000,

@@ -10,14 +10,12 @@ import type {
 
 const sourceAddress = {
   documentId: 'doc-1',
-  nodeId: 'region-7',
-  path: ['widget-3', 'input'],
+  nodeId: 'widget-3-input',
 };
 
 const modelTarget: SparcModelTargetIdentity = {
   sparcDocumentId: 'doc-1',
-  sparcNodeId: 'region-7',
-  sparcPath: ['widget-3', 'input'],
+  sparcNodeId: 'widget-3-input',
   stimuliSetId: 'stim-set-1',
   stimulusKC: 'kc-1',
   clusterKC: 'cluster-1',

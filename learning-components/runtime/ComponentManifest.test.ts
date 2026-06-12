@@ -96,8 +96,8 @@ describe('ComponentManifest providedServices', function() {
         providedServices: [
           'sparc.document-replay',
           {
-            name: 'sparc.ctat-sample-brd-verification',
-            runtimeEntry: 'SparcSessionUnitEngine.assertAllSparcSampleTracesMatchCtatBrds',
+            name: 'sparc.response-outcome-commit',
+            runtimeEntry: 'SparcSessionUnitEngine.processAndCommitSparcAuthoredResponseOutcome',
           },
         ],
       }),
@@ -112,9 +112,9 @@ describe('ComponentManifest providedServices', function() {
       serviceName: 'cards.practice-history',
       componentId: 'mofacts.cards',
     }, {
-      serviceName: 'sparc.ctat-sample-brd-verification',
+      serviceName: 'sparc.response-outcome-commit',
       componentId: 'mofacts.sparc',
-      runtimeEntry: 'SparcSessionUnitEngine.assertAllSparcSampleTracesMatchCtatBrds',
+      runtimeEntry: 'SparcSessionUnitEngine.processAndCommitSparcAuthoredResponseOutcome',
     }, {
       serviceName: 'sparc.document-replay',
       componentId: 'mofacts.sparc',

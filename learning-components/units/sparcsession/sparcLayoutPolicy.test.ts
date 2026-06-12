@@ -30,7 +30,7 @@ function validDocument(): SparcAuthoredDocument {
       },
       children: [{
         id: 'wide-region',
-        kind: 'region',
+        kind: 'panel',
         layout: {
           layoutMode: 'stack',
           visualPreset: 'section',
@@ -149,7 +149,7 @@ describe('sparcLayoutPolicy', function() {
         ...validDocument().root,
         children: [{
           id: 'wide-region',
-          kind: 'region',
+          kind: 'panel',
           layout: {
             maxWidth: '1200px',
           },
@@ -174,7 +174,7 @@ describe('sparcLayoutPolicy', function() {
         ...validDocument().root,
         children: [{
           id: 'wide-table',
-          kind: 'region',
+          kind: 'panel',
           layout: {
             minWidth: '1200px',
           },
@@ -199,7 +199,7 @@ describe('sparcLayoutPolicy', function() {
         ...validDocument().root,
         children: [{
           id: 'scrolling-table',
-          kind: 'region',
+          kind: 'panel',
           layout: {
             maxWidth: '100%',
             wideContent: 'stack',

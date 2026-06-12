@@ -131,6 +131,10 @@ export const sparcTrialDisplayComponentManifest: LearningComponentManifest = {
   kind: 'trial-display',
   displayTypes: [SPARC_TRIAL_DISPLAY_TYPE],
   requiredCapabilities: ['media', 'history'],
+  providedServices: [{
+    name: 'sparc.display-content-readiness',
+    runtimeEntry: 'sparcDisplayContentReadiness.validateSparcDisplayContentReadiness',
+  }],
   register(context) {
     if (typeof context.registerTrialDisplayAdapter !== 'function') {
       throw new Error('SPARC trial display component requires registerTrialDisplayAdapter');

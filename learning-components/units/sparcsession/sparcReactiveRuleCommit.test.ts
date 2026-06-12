@@ -10,8 +10,7 @@ const sourceAddress = {
 
 const targetAddress = {
   documentId: 'doc-1',
-  nodeId: 'region-7',
-  path: ['widget-3', 'feedback'],
+  nodeId: 'widget-3-feedback',
 };
 
 const document: SparcAuthoredDocument = {
@@ -38,15 +37,15 @@ const document: SparcAuthoredDocument = {
     kind: 'document',
     children: [{
       id: 'region-1',
-      kind: 'region',
+      kind: 'panel',
     }, {
       id: 'region-7',
-      kind: 'region',
+      kind: 'panel',
       children: [{
         id: 'widget-3',
         kind: 'widget',
         children: [{
-          id: 'feedback',
+          id: 'widget-3-feedback',
           kind: 'feedback',
         }],
       }],

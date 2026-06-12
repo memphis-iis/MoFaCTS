@@ -13,13 +13,11 @@ describe('sparcResponseOutcomeProcessor', function() {
   it('records model-linked response outcomes as canonical model history plus replayable SPARC state', function() {
     const sourceAddress = {
       documentId: 'doc-1',
-      nodeId: 'region-7',
-      path: ['widget-3', 'input'],
+      nodeId: 'widget-3-input',
     };
     const modelTarget = {
       sparcDocumentId: 'doc-1',
-      sparcNodeId: 'region-7',
-      sparcPath: ['widget-3', 'input'],
+      sparcNodeId: 'widget-3-input',
       stimuliSetId: 'stim-set-1',
       stimulusKC: 'kc-1',
       clusterKC: 'cluster-1',
@@ -72,7 +70,7 @@ describe('sparcResponseOutcomeProcessor', function() {
       displayedStimulus: 'Prompt',
       time: 3000,
       problemStartTime: 2000,
-      selection: 'doc-1:region-7',
+      selection: 'doc-1:widget-3-input',
       action: 'sparc-response-outcome',
       typeOfResponse: 'sparc',
       eventType: 'sparc',

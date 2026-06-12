@@ -8,7 +8,6 @@ import type {
 const authoredTarget: SparcModelTargetIdentity = {
   sparcDocumentId: 'doc-1',
   sparcNodeId: 'widget-1',
-  sparcPath: ['widget-1'],
   stimuliSetId: 'stim-set-1',
   stimulusKC: 'kc-1',
   clusterKC: 'cluster-1',
@@ -37,7 +36,7 @@ function authoredDocument(): SparcAuthoredDocument {
       kind: 'document',
       children: [{
         id: 'region-1',
-        kind: 'region',
+        kind: 'panel',
         children: [{
           id: 'widget-1',
           kind: 'widget',
@@ -49,7 +48,7 @@ function authoredDocument(): SparcAuthoredDocument {
 }
 
 describe('sparcAuthoredResponseOutcome', function() {
-  it('uses the authored model target for a nested widget response outcome', function() {
+  it('uses the authored model target for a widget response outcome', function() {
     const processed = processSparcAuthoredResponseOutcome({
       TDFId: 'tdf-1',
       sessionID: 'session-1',
@@ -59,8 +58,7 @@ describe('sparcAuthoredResponseOutcome', function() {
       observationId: 'obs-1',
       sourceAddress: {
         documentId: 'doc-1',
-        nodeId: 'region-1',
-        path: ['widget-1'],
+        nodeId: 'widget-1',
       },
       time: 2000,
       problemStartTime: 1000,
@@ -84,8 +82,7 @@ describe('sparcAuthoredResponseOutcome', function() {
       observationId: 'obs-2',
       sourceAddress: {
         documentId: 'doc-1',
-        nodeId: 'region-1',
-        path: ['widget-1'],
+        nodeId: 'widget-1',
       },
       modelTarget: explicitTarget,
       time: 2000,

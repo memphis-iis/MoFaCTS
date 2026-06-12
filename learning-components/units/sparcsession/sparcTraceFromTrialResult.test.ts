@@ -44,7 +44,7 @@ function result(submittedValue: unknown = '2'): SparcTrialResult {
 }
 
 describe('sparcTraceFromTrialResult', function() {
-  it('creates CTAT-comparable SPARC trace steps from authored display metadata and submitted nodes', function() {
+  it('creates SPARC trace steps from authored display metadata and submitted nodes', function() {
     const trace = createSparcTraceFromTrialResult({
       documentId: 'doc-1',
       display: display(),

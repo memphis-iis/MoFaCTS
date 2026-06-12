@@ -16,13 +16,11 @@ describe('sparcPracticeHistoryBridge', function() {
       observationId: 'obs-1',
       sourceAddress: {
         documentId: 'doc-1',
-        nodeId: 'region-1',
-        path: ['region-7', 'widget-3', 'input'],
+        nodeId: 'widget-3-input',
       },
       modelTarget: {
         sparcDocumentId: 'doc-1',
-        sparcNodeId: 'region-1',
-        sparcPath: ['region-7', 'widget-3', 'input'],
+        sparcNodeId: 'widget-3-input',
         stimuliSetId: 'stim-set-1',
         stimulusKC: 'kc-1',
         clusterKC: 'cluster-1',

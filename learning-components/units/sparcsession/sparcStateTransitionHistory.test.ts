@@ -17,8 +17,7 @@ const transition: SparcStateTransition = {
   writes: [{
     target: {
       documentId: 'doc-1',
-      nodeId: 'region-7',
-      path: ['widget-3', 'feedback'],
+      nodeId: 'widget-3-feedback',
     },
     key: 'visible',
     value: true,
@@ -45,8 +44,7 @@ describe('sparcStateTransitionHistory', function() {
     const replayed = replaySparcHistory([record]);
     const cellKey = createSparcStateCellKey({
       documentId: 'doc-1',
-      nodeId: 'region-7',
-      path: ['widget-3', 'feedback'],
+      nodeId: 'widget-3-feedback',
     }, 'visible');
     assert.equal(replayed.cells[cellKey]?.value, true);
   });

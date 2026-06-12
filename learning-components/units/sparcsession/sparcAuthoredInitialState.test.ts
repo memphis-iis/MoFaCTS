@@ -20,8 +20,7 @@ function authoredDocument(): SparcAuthoredDocument {
     initialState: [{
       target: {
         documentId: 'doc-1',
-        nodeId: 'region-7',
-        path: ['widget-3', 'feedback'],
+        nodeId: 'widget-3-feedback',
       },
       key: 'visible',
       value: false,
@@ -31,12 +30,12 @@ function authoredDocument(): SparcAuthoredDocument {
       kind: 'document',
       children: [{
         id: 'region-7',
-        kind: 'region',
+        kind: 'panel',
         children: [{
           id: 'widget-3',
           kind: 'widget',
           children: [{
-            id: 'feedback',
+            id: 'widget-3-feedback',
             kind: 'feedback',
           }],
         }],
@@ -78,8 +77,7 @@ describe('sparcAuthoredInitialState', function() {
     const state = createSparcAuthoredInitialReplayState(authoredDocument());
     const cellKey = createSparcStateCellKey({
       documentId: 'doc-1',
-      nodeId: 'region-7',
-      path: ['widget-3', 'feedback'],
+      nodeId: 'widget-3-feedback',
     }, 'visible');
 
     assert.equal(state.cells[cellKey]?.value, false);
@@ -97,16 +95,14 @@ describe('sparcAuthoredInitialState', function() {
         type: 'condition-evaluated',
         source: {
           documentId: 'doc-1',
-          nodeId: 'region-7',
-          path: ['widget-3'],
+          nodeId: 'widget-3',
         },
         time: 2500,
       },
       writes: [{
         target: {
           documentId: 'doc-1',
-          nodeId: 'region-7',
-          path: ['widget-3', 'feedback'],
+          nodeId: 'widget-3-feedback',
         },
         key: 'visible',
         value: true,
@@ -116,8 +112,7 @@ describe('sparcAuthoredInitialState', function() {
     const state = replaySparcHistory([makeSparcRecord(transition)], initialState);
     const cellKey = createSparcStateCellKey({
       documentId: 'doc-1',
-      nodeId: 'region-7',
-      path: ['widget-3', 'feedback'],
+      nodeId: 'widget-3-feedback',
     }, 'visible');
 
     assert.equal(state.cells[cellKey]?.value, true);
@@ -131,8 +126,7 @@ describe('sparcAuthoredInitialState', function() {
       initialState: [{
         target: {
           documentId: 'doc-1',
-          nodeId: 'region-7',
-          path: ['missing'],
+          nodeId: 'missing',
         },
         key: 'visible',
         value: false,
@@ -141,7 +135,7 @@ describe('sparcAuthoredInitialState', function() {
 
     assert.throws(
       () => createSparcAuthoredInitialReplayState(document),
-      /path segment "missing" not found/,
+      /node "missing" not found/,
     );
   });
 });

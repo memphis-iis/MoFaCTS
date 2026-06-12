@@ -37,20 +37,6 @@ function normalizeAddress(value: unknown, label: string): SparcDocumentAddress {
     documentId: requireNonBlank(source.documentId, `${label}.documentId`),
     nodeId: requireNonBlank(source.nodeId, `${label}.nodeId`),
   };
-  if (source.path !== undefined) {
-    if (!Array.isArray(source.path)) {
-      throw new Error(`${label}.path must be an array when present`);
-    }
-    return {
-      ...address,
-      path: source.path.map((segment) => {
-        if (typeof segment !== 'string' && typeof segment !== 'number') {
-          throw new Error(`${label}.path segments must be strings or numbers`);
-        }
-        return segment;
-      }),
-    };
-  }
   return address;
 }
 
@@ -59,18 +45,6 @@ function normalizeModelTarget(value: unknown): SparcModelTargetIdentity | undefi
     return undefined;
   }
   const source = value as Record<string, unknown>;
-  let sparcPath: readonly (string | number)[] | undefined;
-  if (source.sparcPath !== undefined) {
-    if (!Array.isArray(source.sparcPath)) {
-      throw new Error('sparc.practiceObservation.modelTarget.sparcPath must be an array when present');
-    }
-    sparcPath = source.sparcPath.map((segment) => {
-      if (typeof segment !== 'string' && typeof segment !== 'number') {
-        throw new Error('sparc.practiceObservation.modelTarget.sparcPath segments must be strings or numbers');
-      }
-      return segment;
-    });
-  }
   const identity: SparcModelTargetIdentity = {
     stimuliSetId: source.stimuliSetId as string | number,
     stimulusKC: source.stimulusKC as string | number,
@@ -80,7 +54,6 @@ function normalizeModelTarget(value: unknown): SparcModelTargetIdentity | undefi
     KCCluster: source.KCCluster as string | number,
     sparcDocumentId: requireNonBlank(source.sparcDocumentId, 'sparc.practiceObservation.modelTarget.sparcDocumentId'),
     sparcNodeId: requireNonBlank(source.sparcNodeId, 'sparc.practiceObservation.modelTarget.sparcNodeId'),
-    ...(sparcPath ? { sparcPath } : {}),
   };
   if (source.response && typeof source.response === 'object' && !Array.isArray(source.response)) {
     const responseSource = source.response as Record<string, unknown>;

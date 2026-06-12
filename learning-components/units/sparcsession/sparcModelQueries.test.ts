@@ -15,7 +15,6 @@ const query: SparcModelQuery = {
     KCCluster: 'cluster-1',
     sparcDocumentId: 'doc-1',
     sparcNodeId: 'widget-1',
-    sparcPath: ['input'],
     response: {
       responseKC: 'response-kc-1',
       responseKey: 'answer',

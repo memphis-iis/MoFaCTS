@@ -12,23 +12,22 @@ updates, and history records can interact across the document.
 The first contract types for that direction live in
 `sparcSessionContracts.ts`. They define document addresses, authored nodes,
 reactive events, practice observations, replayable state transitions, SPARC
-history extension records, and CTAT/BRD trace-comparison records.
+history extension records, and runtime trace records.
 
 ## Direction
 
-SPARC content should be addressable below the region level. A region may point
-to another region, a widget inside another region, an authored field, a response
-slot, a hint, or a nested subpart. Regions are layout containers, not the
-smallest semantic unit. The content format should therefore give every
-meaningful authored object a stable id and should allow path-like references to
-nested targets.
+SPARC content should be addressed by authored nodes only. Nodes can contain
+nodes, but references should not require authors or runtime code to describe a
+containment path. Any meaningful authored object that can be referenced,
+updated, scored, shown, hidden, or linked to model state should be a node with a
+stable id.
 `sparcDocumentAddressing.ts` is the first resolver for that rule. It resolves a
-document id, node id, and optional nested path against an authored document tree
-and validates references without falling back to visual order or renderer DOM
-state.
+document id and node id against an authored document tree and validates
+references without falling back to visual order, renderer DOM state, or
+hierarchy traversal.
 Authored `refs` can also declare `stateKey` or `modelMetric` metadata, so a
-cross-region link can say whether it depends on a specific replayed state cell
-or model query metric instead of merely naming another layout region.
+cross-node link can say whether it depends on a specific replayed state cell or
+model query metric instead of relying on visual placement.
 
 SPARC should be reactive. Widgets and authored expressions emit events; events
 update document state, model state, and history; dependent expressions then
@@ -43,7 +42,7 @@ Authored nodes can also declare `reactive.visibleWhen` or
 `reactive.enabledWhen`, giving SPARC a Shiny-style conditional panel/output
 shape while keeping the condition language shared with authored rules.
 Document validation resolves those node-level state and model conditions before
-runtime, including references into nested content below a region.
+runtime, including references to contained nodes by their own ids.
 
 SPARC practice and flashcard practice must use the same canonical history and
 database records where their concepts overlap. Shared fields include time,
@@ -89,11 +88,11 @@ session-local indices. A host runtime should expose that behavior through the
 generic `adaptive-model` capability from `../../runtime/modelPracticeRuntime.ts`
 and persist the returned canonical record through the `history` capability.
 Authored nodes can declare `modelTarget`; `sparcAuthoredModelTargets.ts`
-resolves the deepest model target for a full document address, and
+resolves the model target for the addressed authored node, and
 `sparcAuthoredResponseOutcome.ts` uses that authored binding when a response
 outcome does not supply an explicit override. Document validation checks that
 an authored model target names the same SPARC document and authored node where
-it is attached; when `sparcPath` is present, it must end at that authored node.
+it is attached.
 The same validation also applies the shared model-history identity rules, so
 `KCId`/`KCDefault` must match `stimulusKC` and `KCCluster` must match
 `clusterKC` before a document can emit model practice records.
@@ -107,9 +106,8 @@ such as prior correct, prior incorrect, total practice duration, and last
 outcome.
 `sparcReactiveRuleEvaluator.ts` evaluates condition-gated document rules and
 returns replayable state transitions. Rule writes target full
-`SparcDocumentAddress` values, so a rule from one region can update another
-region or a nested address inside that region without relying on visual layout
-order. Document validation also resolves state-condition query targets inside
+`SparcDocumentAddress` values, so a rule from one node can update another node
+without relying on visual layout order. Document validation also resolves state-condition query targets inside
 authored rules, including nested `all`/`any`/`not` condition trees, so reactive
 dependencies fail at authoring time instead of at first learner interaction.
 `sparcStateTransitionHistory.ts` wraps those transitions in canonical SPARC
@@ -150,62 +148,28 @@ checks and vertical-layout checks, so host runtimes do not have to remember two
 separate validators before rendering or committing a document. The commit entry
 point takes the history writer explicitly and uses the engine's shared
 adaptive-model API for model-linked outcomes; it does not import Learning
-Session unit code or create a SPARC-only persistence lane. The engine also
-exposes the CTAT sample BRD batch verifier advertised by the manifest, so hosts
-can run the sample production-rule equivalence check through the same
-unit-runtime boundary.
+Session unit code or create a SPARC-only persistence lane.
 The current manifest advertises the first SPARC-owned services through
 `providedServices`: document addressing, document replay, state replay,
 authored-document validation, response-outcome history, authored initial state,
 authored model targets, authored response outcomes, condition evaluation,
 model-history exchange, model-query adaptation, model-update requests,
-response-outcome commit/authored-rules, vertical layout validation, CTAT trace
-comparison, CTAT sample BRD verification, reactive rule commit/evaluation,
-state-transition history, and sample documents.
+response-outcome commit/authored-rules, vertical layout validation, reactive
+rule commit/evaluation, and state-transition history.
 
-## BRD And CTAT Role
+## Content Development Role
 
-CTAT BRD files are a reference and test oracle, not the final architecture. The
-primary BRD use is to prove that selected SPARC sample problems have equivalent
-production-rule logic and model-trace behavior to the CTAT originals.
+SPARC runtime code must stay generic. It must not import, special-case, or
+hard-code any particular lesson content. The active content-development targets
+live in the configuration repository, currently `C:\dev\mofacts_config\SPARC
+Fractions Addition` and `C:\dev\mofacts_config\SPARC Stoichiometry`.
 
-The recommended first BRD milestone is a trace-comparison adapter:
-
-- extract the expected CTAT rule/action sequence for the two sample BRD
-  problems;
-- author equivalent SPARC widgets and response events;
-- record SPARC trace events with stable rule/action ids;
-- compare the logical trace order and outcomes;
-- defer knowledge tracing until the production-rule equivalence is proven.
-
-The initial executable extraction/comparison boundary is
-`ctatBrdTraceExtractor.ts`, `sparcTraceFromTrialResult.ts`, and
-`sparcTraceComparison.ts`. The BRD extractor turns CTAT BRD edges into
-reference trace steps using the production rule and full SAI triple. The SPARC
-trace generator turns authored SPARC display trace metadata plus submitted nodes
-into comparable trace steps. The comparator checks SPARC trace steps against
-reference steps by production rule, action, outcome, and optional
-stimulus/response KC identities. When a BRD production-rule label exposes both
-the rule name and production set, the comparator also checks those structured
-fields instead of treating the combined label as the only identity.
-Because the CTAT BRDs also contain startup/interface-population edges,
-`selectCtatReferenceSubtrace` projects the selected sample rule/action sequence
-from the larger BRD trace and fails if any expected step is missing or out of
-order.
-`sparcSampleTraceManifest.ts` names the first two CTAT sample BRDs
-(`balloons.brd` and `cookies.brd`) and carries explicit BRD-derived reference
-traces plus matching SPARC trace fixtures generated from authored SPARC display
-metadata and submitted values for those production-rule/action sequences. Those
-fixtures prove the trace-comparison oracle and trace-generation boundary.
-`assertAllSparcSampleTracesMatchCtatBrds` is the batch verification entry point:
-the caller supplies CTAT-root-relative BRD XML by path, SPARC extracts each BRD
-trace, selects the authored sample subtrace, and compares every selected sample
-fixture. Full authored SPARC document content for the same problems remains
-separate work.
-`sparcSampleDocuments.ts` adds the next layer: small authored SPARC document
-fixtures for the same samples, with stable widget nodes, separate regions, and
-cross-region references into nested content. These are trace/document skeletons,
-not finished chapter-scale instructional layouts.
+Those TDF packages are the content test point for moving toward CTAT-like
+functionality in the new SPARC system. Development should improve the generic
+runtime contracts and, when necessary, the authored TDF content so those
+packages run correctly. CTAT may inform expected learner-facing behavior, but
+BRD files are not a SPARC runtime input, fixture source, service boundary, or
+test oracle in this codebase.
 
 ## Replay Boundary
 
@@ -216,20 +180,20 @@ events to carry the typed `sparc` extension, applies explicit
 steps. It does not infer state from DOM layout, renderer widgets, or node names.
 
 The current replay state is a key/value cell map addressed by document id, node
-id, optional nested path, and state key. This is intentionally lower level than
-the eventual document renderer: it proves that history records can replay
-changes below the region level while leaving layout, expression recomputation,
-and adaptive-model query execution to explicit future capabilities.
+id, and state key. This is intentionally lower level than the eventual document
+renderer: it proves that history records can replay node-level changes while
+leaving layout, expression recomputation, and adaptive-model query execution to
+explicit future capabilities.
 
 ## Shiny-Inspired Layout
 
-Shiny for R is a better layout/reactivity inspiration than CTAT for the visual
-and reactive document experience SPARC wants. The Shiny thread is primarily
-about elegant default layout, readable vertical documents, and reactive
-authoring concepts. SPARC should borrow the mental model of declarative inputs,
-outputs, conditional panels, reactive values, observers, modules, default usable
-layouts, state bookmarking/reproduction, and embedding interactive apps inside
-larger dynamic documents. It should not copy Shiny's runtime directly.
+Shiny for R is a useful layout/reactivity inspiration for the visual and
+reactive document experience SPARC wants. The Shiny thread is primarily about
+elegant default layout, readable vertical documents, and reactive authoring
+concepts. SPARC should borrow the mental model of declarative inputs, outputs,
+conditional panels, reactive values, observers, modules, default usable layouts,
+state bookmarking/reproduction, and embedding interactive apps inside larger
+dynamic documents. It should not copy Shiny's runtime directly.
 
 The first authored-layout vocabulary for that direction is deliberately small:
 nodes can be `panel` or `module`, and layout policies can declare
@@ -257,8 +221,8 @@ behavior; and authored nodes must not request horizontal overflow through
 ## Open Design Questions And Recommended Answers
 
 1. What is the address model?
-   Use stable authored ids plus nested path references. Do not rely on visual
-   region order as identity.
+   Use stable authored node ids. Do not rely on visual order or containment
+   paths as identity.
 
 2. What is the shared practice-event shape?
    Define a canonical practice event with required shared fields and typed
@@ -273,10 +237,10 @@ behavior; and authored nodes must not request horizontal overflow through
    capability. History-derived metrics can be answered from canonical model
    records; probability must come from the live model-state provider.
 
-5. How much BRD should be translated?
-   Translate enough to prove production-rule and model-trace equivalence for
-   the sample problems. Do not translate BRD layout or runtime assumptions
-   directly into SPARC.
+5. How should CTAT-like behavior be pursued?
+   Use the real SPARC TDF examples in the config repository as the content test
+   point. Do not import BRD files or hard-code lesson-specific behavior in the
+   runtime.
 
 6. What should be implemented next?
    Define types for SPARC document addresses, reactive events, canonical

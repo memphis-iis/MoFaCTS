@@ -51,7 +51,7 @@ Known component extension fields:
 - `CFNote`: compact component note payload, currently used by AutoTutor saved state.
 - `h5p`: compact H5P summary or part-event payload.
 - `sparc`: compact SPARC event payload for document addresses, practice
-  observations, state transitions, and BRD/CTAT trace-comparison steps.
+  observations, state transitions, and runtime trace steps.
 
 Extension fields are bounded independently from the total wire payload budget. They must contain compact identifiers, outcomes, timestamps, scores, or resume checkpoints. They must not contain full runtime snapshots, global session state, full experiment state, or unbounded dialogue/history dumps.
 

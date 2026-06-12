@@ -16,9 +16,6 @@ import {
   validateSparcAuthoredDocument,
 } from './sparcDocumentValidation';
 import type { SparcPracticeHistoryCore } from './sparcPracticeHistoryBridge';
-import {
-  assertAllSparcSampleTracesMatchCtatBrds,
-} from './sparcSampleTraceManifest';
 import type {
   SparcAuthoredDocument,
 } from './sparcSessionContracts';
@@ -45,10 +42,6 @@ export type SparcAuthoredResponseOutcomeRuntimeParams = {
   readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory'>;
 };
 
-export type SparcCtatSampleBrdVerificationParams = Parameters<
-  typeof assertAllSparcSampleTracesMatchCtatBrds
->[0];
-
 export async function createSparcSessionUnitEngine(
   deps: CreateSparcSessionUnitEngineDeps,
 ): Promise<any> {
@@ -69,12 +62,6 @@ export async function createSparcSessionUnitEngine(
     validateSparcDocumentReferences,
 
     replaySparcDocumentHistory,
-
-    assertAllSparcSampleTracesMatchCtatBrds(
-      params: SparcCtatSampleBrdVerificationParams,
-    ) {
-      return assertAllSparcSampleTracesMatchCtatBrds(params);
-    },
 
     async processAndCommitSparcAuthoredResponseOutcome(
       params: SparcAuthoredResponseOutcomeRuntimeParams,

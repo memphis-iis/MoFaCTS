@@ -20,8 +20,7 @@ const sourceAddress = {
 
 const feedbackAddress = {
   documentId: 'doc-1',
-  nodeId: 'region-7',
-  path: ['widget-3', 'feedback'],
+  nodeId: 'widget-3-feedback',
 };
 
 const document: SparcAuthoredDocument = {
@@ -48,23 +47,22 @@ const document: SparcAuthoredDocument = {
     kind: 'document',
     children: [{
       id: 'region-1',
-      kind: 'region',
+      kind: 'panel',
       refs: [{
         relation: 'controls',
         target: {
           documentId: 'doc-1',
-          nodeId: 'region-7',
-          path: ['widget-3', 'feedback'],
+          nodeId: 'widget-3-feedback',
         },
       }],
     }, {
       id: 'region-7',
-      kind: 'region',
+      kind: 'panel',
       children: [{
         id: 'widget-3',
         kind: 'widget',
         children: [{
-          id: 'feedback',
+          id: 'widget-3-feedback',
           kind: 'feedback',
         }],
       }],
@@ -127,7 +125,7 @@ describe('sparcReactiveRuleEvaluator', function() {
     assert.equal(result.transition?.writes[0]?.key, 'visible');
   });
 
-  it('writes from one region event into a nested target inside another region', function() {
+  it('writes from one node event into another node target', function() {
     const rules: SparcReactiveRule[] = [{
       id: 'show-region-7-feedback',
       when: {
@@ -158,8 +156,7 @@ describe('sparcReactiveRuleEvaluator', function() {
     });
 
     assert.deepEqual(result.matchedRuleIds, ['show-region-7-feedback']);
-    assert.equal(result.transition?.writes[0]?.target.nodeId, 'region-7');
-    assert.deepEqual(result.transition?.writes[0]?.target.path, ['widget-3', 'feedback']);
+    assert.equal(result.transition?.writes[0]?.target.nodeId, 'widget-3-feedback');
     assert.ok(result.transition);
     const replayed = replaySparcHistory([
       createSparcStateTransitionHistoryRecord({
@@ -173,7 +170,7 @@ describe('sparcReactiveRuleEvaluator', function() {
         action: 'sparc-reactive-rule',
       }),
     ], createContext().replayState);
-    const cellKey = JSON.stringify(['doc-1', 'region-7', ['widget-3', 'feedback'], 'visible']);
+    const cellKey = JSON.stringify(['doc-1', 'widget-3-feedback', 'visible']);
     assert.equal(replayed.cells[cellKey]?.value, true);
   });
 
@@ -210,7 +207,7 @@ describe('sparcReactiveRuleEvaluator', function() {
     assert.equal(result.transition?.writes[0]?.value, false);
   });
 
-  it('fails clearly when a rule targets a missing nested address', function() {
+  it('fails clearly when a rule targets a missing node address', function() {
     assert.throws(
       () => evaluateSparcReactiveRules({
         document,
@@ -225,8 +222,7 @@ describe('sparcReactiveRuleEvaluator', function() {
           writes: [{
             target: {
               documentId: 'doc-1',
-              nodeId: 'region-7',
-              path: ['missing'],
+              nodeId: 'missing',
             },
             key: 'visible',
             value: true,
@@ -234,7 +230,7 @@ describe('sparcReactiveRuleEvaluator', function() {
         }],
         context: createContext(),
       }),
-      /SPARC address path segment "missing" not found under node "region-7"/,
+      /SPARC address node "missing" not found/,
     );
   });
 });

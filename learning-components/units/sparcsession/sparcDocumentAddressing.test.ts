@@ -4,40 +4,68 @@ import {
   resolveSparcDocumentAddress,
   validateSparcDocumentReferences,
 } from './sparcDocumentAddressing';
-import { findSparcSampleDocument } from './sparcSampleDocuments';
 import type { SparcAuthoredDocument } from './sparcSessionContracts';
 
 function sampleDocument(): SparcAuthoredDocument {
-  const sample = findSparcSampleDocument('html-factors-balloons');
-  assert.ok(sample);
-  return sample.document;
+  return {
+    id: 'doc-1',
+    schemaVersion: 1,
+    root: {
+      id: 'root',
+      kind: 'document',
+      children: [{
+        id: 'prompt',
+        kind: 'section',
+        refs: [{
+          relation: 'depends-on',
+          target: {
+            documentId: 'doc-1',
+            nodeId: 'work-node',
+          },
+        }, {
+          relation: 'feedback-for',
+          target: {
+            documentId: 'doc-1',
+            nodeId: 'answer-node',
+          },
+        }],
+      }, {
+        id: 'work-node',
+        kind: 'panel',
+        children: [{
+          id: 'input-node',
+          kind: 'input',
+        }],
+      }, {
+        id: 'answer-node',
+        kind: 'feedback',
+      }],
+    },
+  };
 }
 
 describe('sparcDocumentAddressing', function() {
-  it('resolves authored addresses into nested content inside another region', function() {
+  it('resolves authored addresses directly to any authored node', function() {
     const document = sampleDocument();
     const resolved = resolveSparcDocumentAddress(document, {
-      documentId: 'html-factors-balloons',
-      nodeId: 'final-answer-region',
-      path: ['A3'],
+      documentId: 'doc-1',
+      nodeId: 'answer-node',
     });
 
-    assert.equal(resolved.node.id, 'final-answer-region');
-    assert.deepEqual(resolved.pathNodes.map((node) => node.id), ['A3']);
+    assert.equal(resolved.node.id, 'answer-node');
   });
 
-  it('resolves numeric path segments against authored children', function() {
+  it('resolves contained nodes without requiring their containment path', function() {
     const document = sampleDocument();
     const resolved = resolveSparcDocumentAddress(document, {
-      documentId: 'html-factors-balloons',
-      nodeId: 'conversion-table',
-      path: [1],
+      documentId: 'doc-1',
+      nodeId: 'input-node',
     });
 
-    assert.deepEqual(resolved.pathNodes.map((node) => node.id), ['OV2']);
+    assert.equal(resolved.node.id, 'input-node');
   });
 
-  it('validates cross-region references in the sample documents', function() {
+  it('validates cross-node references in the sample documents', function() {
     const document = sampleDocument();
 
     assert.deepEqual(validateSparcDocumentReferences(document), {
@@ -47,7 +75,7 @@ describe('sparcDocumentAddressing', function() {
     assert.doesNotThrow(() => assertSparcDocumentReferences(document));
   });
 
-  it('reports unresolved nested path references without guessing a target', function() {
+  it('reports unresolved node references without guessing a target', function() {
     const document: SparcAuthoredDocument = {
       ...sampleDocument(),
       root: {
@@ -58,9 +86,8 @@ describe('sparcDocumentAddressing', function() {
           refs: [{
             relation: 'feedback-for',
             target: {
-              documentId: 'html-factors-balloons',
-              nodeId: 'final-answer-region',
-              path: ['missing-widget'],
+              documentId: 'doc-1',
+              nodeId: 'missing-widget',
             },
           }],
         }, ...(sampleDocument().root.children ?? [])],
@@ -73,7 +100,7 @@ describe('sparcDocumentAddressing', function() {
     assert.equal(result.issues[0]?.sourceNodeId, 'source');
     assert.match(
       result.issues[0]?.message ?? '',
-      /path segment "missing-widget" not found under node "final-answer-region"/,
+      /node "missing-widget" not found/,
     );
   });
 
@@ -86,7 +113,7 @@ describe('sparcDocumentAddressing', function() {
         kind: 'document',
         children: [{
           id: 'source',
-          kind: 'region',
+          kind: 'panel',
           refs: [{
             relation: 'depends-on',
             target: {
@@ -104,7 +131,7 @@ describe('sparcDocumentAddressing', function() {
           }],
         }, {
           id: 'target',
-          kind: 'region',
+          kind: 'panel',
         }],
       },
     };
@@ -127,8 +154,7 @@ describe('sparcDocumentAddressing', function() {
         writes: [{
           target: {
             documentId: 'doc-1',
-            nodeId: 'region-1',
-            path: ['missing'],
+            nodeId: 'missing',
           },
           key: 'visible',
           value: true,
@@ -139,7 +165,7 @@ describe('sparcDocumentAddressing', function() {
         kind: 'document',
         children: [{
           id: 'region-1',
-          kind: 'region',
+          kind: 'panel',
         }],
       },
     };
@@ -148,7 +174,7 @@ describe('sparcDocumentAddressing', function() {
 
     assert.equal(result.valid, false);
     assert.equal(result.issues[0]?.sourceNodeId, 'reactive-rule:bad-rule');
-    assert.match(result.issues[0]?.message ?? '', /path segment "missing" not found/);
+    assert.match(result.issues[0]?.message ?? '', /node "missing" not found/);
   });
 
   it('validates authored reactive rule write keys', function() {
@@ -171,7 +197,7 @@ describe('sparcDocumentAddressing', function() {
         kind: 'document',
         children: [{
           id: 'region-1',
-          kind: 'region',
+          kind: 'panel',
         }],
       },
     };
@@ -194,8 +220,7 @@ describe('sparcDocumentAddressing', function() {
           query: {
             target: {
               documentId: 'doc-1',
-              nodeId: 'region-1',
-              path: ['missing'],
+              nodeId: 'missing',
             },
             key: 'ready',
           },
@@ -215,7 +240,7 @@ describe('sparcDocumentAddressing', function() {
         kind: 'document',
         children: [{
           id: 'region-1',
-          kind: 'region',
+          kind: 'panel',
         }],
       },
     };
@@ -225,7 +250,7 @@ describe('sparcDocumentAddressing', function() {
     assert.equal(result.valid, false);
     assert.equal(result.issues[0]?.sourceNodeId, 'reactive-rule:bad-condition:when');
     assert.equal(result.issues[0]?.reference.relation, 'depends-on');
-    assert.match(result.issues[0]?.message ?? '', /path segment "missing" not found/);
+    assert.match(result.issues[0]?.message ?? '', /node "missing" not found/);
   });
 
   it('validates authored reactive rule state-condition query keys', function() {
@@ -259,7 +284,7 @@ describe('sparcDocumentAddressing', function() {
         kind: 'document',
         children: [{
           id: 'region-1',
-          kind: 'region',
+          kind: 'panel',
         }],
       },
     };
@@ -308,7 +333,7 @@ describe('sparcDocumentAddressing', function() {
         kind: 'document',
         children: [{
           id: 'region-1',
-          kind: 'region',
+          kind: 'panel',
         }],
       },
     };
@@ -382,8 +407,7 @@ describe('sparcDocumentAddressing', function() {
           query: {
             target: {
               sparcDocumentId: 'doc-1',
-              sparcNodeId: 'region-1',
-              sparcPath: ['missing-widget'],
+              sparcNodeId: 'missing-widget',
               stimuliSetId: 'stim-set-1',
               stimulusKC: 'kc-1',
               clusterKC: 'cluster-1',
@@ -410,7 +434,7 @@ describe('sparcDocumentAddressing', function() {
         kind: 'document',
         children: [{
           id: 'region-1',
-          kind: 'region',
+          kind: 'panel',
         }],
       },
     };
@@ -420,10 +444,10 @@ describe('sparcDocumentAddressing', function() {
     assert.equal(result.valid, false);
     assert.equal(result.issues[0]?.sourceNodeId, 'reactive-rule:bad-model-address:when');
     assert.equal(result.issues[0]?.reference.relation, 'model-target');
-    assert.match(result.issues[0]?.message ?? '', /path segment "missing-widget" not found/);
+    assert.match(result.issues[0]?.message ?? '', /node "missing-widget" not found/);
   });
 
-  it('validates authored node reactive state-condition targets below region level', function() {
+  it('validates authored node reactive state-condition targets by direct node id', function() {
     const document: SparcAuthoredDocument = {
       id: 'doc-1',
       schemaVersion: 1,
@@ -437,7 +461,7 @@ describe('sparcDocumentAddressing', function() {
         kind: 'document',
         children: [{
           id: 'region-1',
-          kind: 'region',
+          kind: 'panel',
           children: [{
             id: 'widget-1',
             kind: 'widget',
@@ -451,8 +475,7 @@ describe('sparcDocumentAddressing', function() {
               query: {
                 target: {
                   documentId: 'doc-1',
-                  nodeId: 'region-1',
-                  path: ['widget-1'],
+                  nodeId: 'widget-1',
                 },
                 key: 'lastOutcome',
               },
@@ -519,8 +542,7 @@ describe('sparcDocumentAddressing', function() {
       initialState: [{
         target: {
           documentId: 'doc-1',
-          nodeId: 'region-1',
-          path: ['missing'],
+          nodeId: 'missing',
         },
         key: 'visible',
         value: false,
@@ -530,7 +552,7 @@ describe('sparcDocumentAddressing', function() {
         kind: 'document',
         children: [{
           id: 'region-1',
-          kind: 'region',
+          kind: 'panel',
         }],
       },
     };
@@ -539,7 +561,7 @@ describe('sparcDocumentAddressing', function() {
 
     assert.equal(result.valid, false);
     assert.equal(result.issues[0]?.sourceNodeId, 'initial-state:0');
-    assert.match(result.issues[0]?.message ?? '', /path segment "missing" not found/);
+    assert.match(result.issues[0]?.message ?? '', /node "missing" not found/);
   });
 
   it('validates authored initial-state write keys', function() {
@@ -559,7 +581,7 @@ describe('sparcDocumentAddressing', function() {
         kind: 'document',
         children: [{
           id: 'region-1',
-          kind: 'region',
+          kind: 'panel',
         }],
       },
     };
@@ -580,7 +602,7 @@ describe('sparcDocumentAddressing', function() {
         kind: 'document',
         children: [{
           id: 'region-1',
-          kind: 'region',
+          kind: 'panel',
           children: [{
             id: 'widget-1',
             kind: 'widget',
@@ -639,7 +661,7 @@ describe('sparcDocumentAddressing', function() {
     assert.match(result.issues[0]?.message ?? '', /KCDefault must equal stimulusKC/);
   });
 
-  it('allows authored model targets whose nested sparcPath ends at the authored node', function() {
+  it('allows authored model targets that name the authored node directly', function() {
     const document: SparcAuthoredDocument = {
       id: 'doc-1',
       schemaVersion: 1,
@@ -648,14 +670,13 @@ describe('sparcDocumentAddressing', function() {
         kind: 'document',
         children: [{
           id: 'region-1',
-          kind: 'region',
+          kind: 'panel',
           children: [{
             id: 'widget-1',
             kind: 'widget',
             modelTarget: {
               sparcDocumentId: 'doc-1',
               sparcNodeId: 'widget-1',
-              sparcPath: ['region-1', 'widget-1'],
               stimuliSetId: 'stim-set-1',
               stimulusKC: 'kc-1',
               clusterKC: 'cluster-1',
@@ -674,7 +695,7 @@ describe('sparcDocumentAddressing', function() {
     });
   });
 
-  it('rejects authored model targets whose sparcPath ends at another node', function() {
+  it('rejects authored model targets that name another authored node', function() {
     const document: SparcAuthoredDocument = {
       id: 'doc-1',
       schemaVersion: 1,
@@ -683,14 +704,13 @@ describe('sparcDocumentAddressing', function() {
         kind: 'document',
         children: [{
           id: 'region-1',
-          kind: 'region',
+          kind: 'panel',
           children: [{
             id: 'widget-1',
             kind: 'widget',
             modelTarget: {
               sparcDocumentId: 'doc-1',
-              sparcNodeId: 'widget-1',
-              sparcPath: ['region-1', 'other-widget'],
+              sparcNodeId: 'other-widget',
               stimuliSetId: 'stim-set-1',
               stimulusKC: 'kc-1',
               clusterKC: 'cluster-1',
@@ -707,7 +727,7 @@ describe('sparcDocumentAddressing', function() {
 
     assert.equal(result.valid, false);
     assert.equal(result.issues[0]?.sourceNodeId, 'widget-1');
-    assert.match(result.issues[0]?.message ?? '', /sparcPath must end at that node/);
+    assert.match(result.issues[0]?.message ?? '', /modelTarget for node "widget-1" must match authored address/);
   });
 
   it('fails clearly when an address points at another document', function() {
@@ -732,7 +752,7 @@ describe('sparcDocumentAddressing', function() {
           kind: 'section',
         }, {
           id: 'dup',
-          kind: 'region',
+          kind: 'panel',
         }],
       },
     };

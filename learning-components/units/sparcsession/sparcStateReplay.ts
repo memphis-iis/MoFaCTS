@@ -40,7 +40,6 @@ export function createSparcStateCellKey(
   return JSON.stringify([
     address.documentId,
     address.nodeId,
-    address.path ?? [],
     key,
   ]);
 }
@@ -58,16 +57,6 @@ function assertAddress(value: SparcDocumentAddress, label: string): void {
   }
   if (typeof value.nodeId !== 'string' || value.nodeId.trim().length === 0) {
     throw new Error(`${label}.nodeId is required`);
-  }
-  if (value.path !== undefined) {
-    if (!Array.isArray(value.path)) {
-      throw new Error(`${label}.path must be an array when present`);
-    }
-    for (const segment of value.path) {
-      if (typeof segment !== 'string' && typeof segment !== 'number') {
-        throw new Error(`${label}.path segments must be strings or numbers`);
-      }
-    }
   }
 }
 
@@ -95,7 +84,6 @@ function addressKey(address: SparcDocumentAddress): string {
   return JSON.stringify([
     address.documentId,
     address.nodeId,
-    address.path ?? [],
   ]);
 }
 

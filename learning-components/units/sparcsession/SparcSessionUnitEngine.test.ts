@@ -5,14 +5,10 @@ import {
 import {
   createSparcStateCellKey,
 } from './sparcStateReplay';
-import {
-  SPARC_SAMPLE_TRACE_FIXTURES,
-} from './sparcSampleTraceManifest';
 import type { CanonicalHistoryRecord } from '../../runtime/historyEnvelope';
 import type { UnitEngineSessionReadKey } from '../UnitEngineSessionKeys';
 import type {
   SparcAuthoredDocument,
-  SparcReferenceTraceStep,
 } from './sparcSessionContracts';
 
 function createMinimalDeps(overrides: Record<string, unknown> = {}): any {
@@ -75,8 +71,7 @@ function sampleDocument(): SparcAuthoredDocument {
     initialState: [{
       target: {
         documentId: 'doc-1',
-        nodeId: 'region-7',
-        path: ['feedback'],
+        nodeId: 'feedback',
       },
       key: 'visible',
       value: false,
@@ -98,8 +93,7 @@ function sampleDocument(): SparcAuthoredDocument {
       writes: [{
         target: {
           documentId: 'doc-1',
-          nodeId: 'region-7',
-          path: ['feedback'],
+          nodeId: 'feedback',
         },
         key: 'visible',
         value: true,
@@ -110,10 +104,10 @@ function sampleDocument(): SparcAuthoredDocument {
       kind: 'document',
       children: [{
         id: 'region-1',
-        kind: 'region',
+        kind: 'panel',
       }, {
         id: 'region-7',
-        kind: 'region',
+        kind: 'panel',
         children: [{
           id: 'feedback',
           kind: 'feedback',
@@ -121,28 +115,6 @@ function sampleDocument(): SparcAuthoredDocument {
       }],
     },
   };
-}
-
-function brdXmlForTrace(trace: readonly SparcReferenceTraceStep[]): string {
-  const edges = trace.map((step) => {
-    const [selection, action, input] = step.actionId.split('::');
-    return `
-      <edge>
-        <actionLabel>
-          <message>
-            <properties>
-              <Selection><value>${selection ?? ''}</value></Selection>
-              <Action><value>${action ?? ''}</value></Action>
-              <Input><value>${input ?? ''}</value></Input>
-            </properties>
-          </message>
-          <actionType>${step.outcome === 'incorrect' ? 'Buggy Action' : 'Correct Action'}</actionType>
-        </actionLabel>
-        <rule><text>${step.productionRuleId}</text></rule>
-      </edge>
-    `;
-  }).join('');
-  return `<stateGraph>${edges}</stateGraph>`;
 }
 
 describe('SparcSessionUnitEngine document runtime boundary', function() {
@@ -165,8 +137,7 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
     assert.equal(
       authoredStartState.cells[createSparcStateCellKey({
         documentId: 'doc-1',
-        nodeId: 'region-7',
-        path: ['feedback'],
+        nodeId: 'feedback',
       }, 'visible')]?.value,
       false,
     );
@@ -206,35 +177,9 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
     assert.equal(
       result.finalReplayState.cells[createSparcStateCellKey({
         documentId: 'doc-1',
-        nodeId: 'region-7',
-        path: ['feedback'],
+        nodeId: 'feedback',
       }, 'visible')]?.value,
       true,
     );
-  });
-
-  it('exposes CTAT sample BRD verification through the SPARC unit engine', async function() {
-    const engine = await createSparcSessionUnitEngine(createMinimalDeps());
-    const brdXmlByPath = new Map(
-      SPARC_SAMPLE_TRACE_FIXTURES.map((fixture) => [
-        fixture.ctatRootRelativeBrdPath,
-        brdXmlForTrace(fixture.referenceTrace ?? []),
-      ]),
-    );
-
-    const results = engine.assertAllSparcSampleTracesMatchCtatBrds({
-      readCtatBrdXml(path: string) {
-        const brdXml = brdXmlByPath.get(path);
-        if (!brdXml) {
-          throw new Error(`missing BRD XML for ${path}`);
-        }
-        return brdXml;
-      },
-    });
-
-    assert.deepEqual(results.map((result: { fixtureId: string }) => result.fixtureId), [
-      'html-factors-balloons',
-      'html-factors-cookies',
-    ]);
   });
 });

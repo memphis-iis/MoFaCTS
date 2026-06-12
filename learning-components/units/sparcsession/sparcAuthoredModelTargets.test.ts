@@ -19,7 +19,6 @@ const regionTarget: SparcModelTargetIdentity = {
 const widgetTarget: SparcModelTargetIdentity = {
   sparcDocumentId: 'doc-1',
   sparcNodeId: 'widget-3',
-  sparcPath: ['widget-3'],
   stimuliSetId: 'stim-set-1',
   stimulusKC: 'widget-kc',
   clusterKC: 'cluster-1',
@@ -41,7 +40,7 @@ function authoredDocument(): SparcAuthoredDocument {
       kind: 'document',
       children: [{
         id: 'region-7',
-        kind: 'region',
+        kind: 'panel',
         modelTarget: regionTarget,
         children: [{
           id: 'widget-3',
@@ -54,18 +53,17 @@ function authoredDocument(): SparcAuthoredDocument {
         }],
       }, {
         id: 'hint-region',
-        kind: 'region',
+        kind: 'panel',
       }],
     },
   };
 }
 
 describe('sparcAuthoredModelTargets', function() {
-  it('resolves the deepest authored model target for an address inside a region', function() {
+  it('resolves the authored model target for the addressed node', function() {
     const target = resolveSparcAuthoredModelTarget(authoredDocument(), {
       documentId: 'doc-1',
-      nodeId: 'region-7',
-      path: ['widget-3', 'input'],
+      nodeId: 'widget-3',
     });
 
     assert.deepEqual(target, widgetTarget);
@@ -93,10 +91,9 @@ describe('sparcAuthoredModelTargets', function() {
     assert.throws(
       () => resolveSparcAuthoredModelTarget(authoredDocument(), {
         documentId: 'doc-1',
-        nodeId: 'region-7',
-        path: ['missing-widget'],
+        nodeId: 'missing-widget',
       }),
-      /path segment "missing-widget" not found/,
+      /node "missing-widget" not found/,
     );
   });
 });

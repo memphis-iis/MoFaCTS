@@ -3,7 +3,6 @@ import {
   assertSparcAuthoredDocument,
   validateSparcAuthoredDocument,
 } from './sparcDocumentValidation';
-import { SPARC_SAMPLE_DOCUMENTS } from './sparcSampleDocuments';
 import type { SparcAuthoredDocument } from './sparcSessionContracts';
 
 function validDocument(): SparcAuthoredDocument {
@@ -29,7 +28,7 @@ function validDocument(): SparcAuthoredDocument {
       },
       children: [{
         id: 'region-1',
-        kind: 'region',
+        kind: 'panel',
         layout: {
           visualPreset: 'section',
           density: 'comfortable',
@@ -42,16 +41,16 @@ function validDocument(): SparcAuthoredDocument {
 }
 
 describe('sparcDocumentValidation', function() {
-  it('accepts sample documents through the combined authored-document validation gate', function() {
-    for (const sample of SPARC_SAMPLE_DOCUMENTS) {
-      assert.deepEqual(validateSparcAuthoredDocument(sample.document), {
-        valid: true,
-        referenceIssues: [],
-        layoutIssues: [],
-        issues: [],
-      });
-      assert.doesNotThrow(() => assertSparcAuthoredDocument(sample.document));
-    }
+  it('accepts authored documents through the combined validation gate', function() {
+    const document = validDocument();
+
+    assert.deepEqual(validateSparcAuthoredDocument(document), {
+      valid: true,
+      referenceIssues: [],
+      layoutIssues: [],
+      issues: [],
+    });
+    assert.doesNotThrow(() => assertSparcAuthoredDocument(document));
   });
 
   it('combines reference and layout validation issues for authored documents', function() {
@@ -61,7 +60,7 @@ describe('sparcDocumentValidation', function() {
         ...validDocument().root,
         children: [{
           id: 'wide-region',
-          kind: 'region',
+          kind: 'panel',
           refs: [{
             relation: 'depends-on',
             target: {

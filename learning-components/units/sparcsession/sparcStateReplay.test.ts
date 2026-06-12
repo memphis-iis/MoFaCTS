@@ -54,8 +54,7 @@ describe('sparcStateReplay', function() {
         {
           target: {
             documentId: 'doc-1',
-            nodeId: 'region-7',
-            path: ['widget-3', 'input'],
+            nodeId: 'widget-3-input',
           },
           key: 'value',
           value: 'draft answer',
@@ -69,8 +68,7 @@ describe('sparcStateReplay', function() {
         type: 'outcome-recorded',
         source: {
           documentId: 'doc-1',
-          nodeId: 'region-7',
-          path: ['widget-3'],
+          nodeId: 'widget-3',
         },
         time: 2500,
       },
@@ -78,8 +76,7 @@ describe('sparcStateReplay', function() {
         {
           target: {
             documentId: 'doc-1',
-            nodeId: 'region-7',
-            path: ['widget-3', 'input'],
+            nodeId: 'widget-3-input',
           },
           key: 'value',
           value: 'final answer',
@@ -87,8 +84,7 @@ describe('sparcStateReplay', function() {
         {
           target: {
             documentId: 'doc-1',
-            nodeId: 'region-7',
-            path: ['widget-3', 'feedback'],
+            nodeId: 'widget-3-feedback',
           },
           key: 'visible',
           value: true,
@@ -111,16 +107,14 @@ describe('sparcStateReplay', function() {
     const valueCellKey = createSparcStateCellKey(
       {
         documentId: 'doc-1',
-        nodeId: 'region-7',
-        path: ['widget-3', 'input'],
+        nodeId: 'widget-3-input',
       },
       'value',
     );
     const feedbackCellKey = createSparcStateCellKey(
       {
         documentId: 'doc-1',
-        nodeId: 'region-7',
-        path: ['widget-3', 'feedback'],
+        nodeId: 'widget-3-feedback',
       },
       'visible',
     );
@@ -270,8 +264,7 @@ describe('sparcStateReplay', function() {
               type: 'value-changed',
               source: {
                 documentId: 'doc-1',
-                nodeId: 'region-7',
-                path: ['widget-3'],
+                nodeId: 'widget-3',
               },
               time: 2000,
             },
@@ -329,8 +322,7 @@ describe('sparcStateReplay', function() {
             observationId: 'obs-1',
             sourceAddress: {
               documentId: 'doc-1',
-              nodeId: 'region-7',
-              path: ['widget-3'],
+              nodeId: 'widget-3',
             },
             time: 2000,
             problemStartTime: 1000,
@@ -382,8 +374,7 @@ describe('sparcStateReplay', function() {
             traceId: 'trace-1',
             sourceAddress: {
               documentId: 'doc-1',
-              nodeId: 'region-7',
-              path: ['widget-3'],
+              nodeId: 'widget-3',
             },
             productionRuleId: 'rule-1',
             actionId: 'widget-1::UpdateTextField::answer',

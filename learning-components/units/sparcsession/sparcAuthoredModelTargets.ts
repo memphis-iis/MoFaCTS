@@ -10,15 +10,8 @@ export function resolveSparcAuthoredModelTarget(
   address: SparcDocumentAddress,
 ): SparcModelTargetIdentity | undefined {
   const resolved = resolveSparcDocumentAddress(document, address);
-  const addressedNodes = [
-    resolved.node,
-    ...resolved.pathNodes,
-  ];
-
-  for (const node of addressedNodes.slice().reverse()) {
-    if (node.modelTarget) {
-      return node.modelTarget;
-    }
+  if (resolved.node.modelTarget) {
+    return resolved.node.modelTarget;
   }
 
   return undefined;

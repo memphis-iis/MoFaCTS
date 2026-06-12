@@ -28,8 +28,6 @@ describe('sparcSessionUnitComponentManifest', function() {
       'sparc.authored-model-targets',
       'sparc.authored-response-outcome',
       'sparc.condition-evaluation',
-      'sparc.ctat-sample-brd-verification',
-      'sparc.ctat-trace-comparison',
       'sparc.document-addressing',
       'sparc.document-replay',
       'sparc.document-validation',
@@ -41,7 +39,6 @@ describe('sparcSessionUnitComponentManifest', function() {
       'sparc.response-outcome-history',
       'sparc.reactive-rule-commit',
       'sparc.reactive-rule-evaluation',
-      'sparc.sample-documents',
       'sparc.state-replay',
       'sparc.state-transition-history',
       'sparc.vertical-layout-validation',
@@ -51,10 +48,6 @@ describe('sparcSessionUnitComponentManifest', function() {
         .filter((service) => service.runtimeEntry !== undefined)
         .map((service) => [service.serviceName, service.runtimeEntry]),
       [
-        [
-          'sparc.ctat-sample-brd-verification',
-          'SparcSessionUnitEngine.assertAllSparcSampleTracesMatchCtatBrds',
-        ],
         [
           'sparc.document-addressing',
           'SparcSessionUnitEngine.validateSparcDocumentReferences',

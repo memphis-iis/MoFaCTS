@@ -15,8 +15,7 @@ function authoredDocument(): SparcAuthoredDocument {
     initialState: [{
       target: {
         documentId: 'doc-1',
-        nodeId: 'region-1',
-        path: ['panel-1'],
+        nodeId: 'panel-1',
       },
       key: 'visible',
       value: false,
@@ -26,7 +25,7 @@ function authoredDocument(): SparcAuthoredDocument {
       kind: 'document',
       children: [{
         id: 'region-1',
-        kind: 'region',
+        kind: 'panel',
         children: [{
           id: 'panel-1',
           kind: 'output',
@@ -80,8 +79,7 @@ describe('sparcDocumentReplay', function() {
       writes: [{
         target: {
           documentId: 'doc-1',
-          nodeId: 'region-1',
-          path: ['panel-1'],
+          nodeId: 'panel-1',
         },
         key: 'visible',
         value: true,
@@ -93,8 +91,7 @@ describe('sparcDocumentReplay', function() {
     ]);
     const cellKey = createSparcStateCellKey({
       documentId: 'doc-1',
-      nodeId: 'region-1',
-      path: ['panel-1'],
+      nodeId: 'panel-1',
     }, 'visible');
 
     assert.equal(state.cells[cellKey]?.value, true);
@@ -106,8 +103,7 @@ describe('sparcDocumentReplay', function() {
     const state = replaySparcDocumentHistory(authoredDocument(), []);
     const cellKey = createSparcStateCellKey({
       documentId: 'doc-1',
-      nodeId: 'region-1',
-      path: ['panel-1'],
+      nodeId: 'panel-1',
     }, 'visible');
 
     assert.equal(state.cells[cellKey]?.value, false);

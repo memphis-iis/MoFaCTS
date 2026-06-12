@@ -27,8 +27,7 @@ const sourceAddress = {
 
 const feedbackAddress = {
   documentId: 'doc-1',
-  nodeId: 'region-7',
-  path: ['widget-3', 'feedback'],
+  nodeId: 'widget-3-feedback',
 };
 
 const modelTarget: SparcModelTargetIdentity = {
@@ -60,15 +59,15 @@ function documentWithRule(ruleWhen: SparcCondition): SparcAuthoredDocument {
       kind: 'document',
       children: [{
         id: 'region-1',
-        kind: 'region',
+        kind: 'panel',
       }, {
         id: 'region-7',
-        kind: 'region',
+        kind: 'panel',
         children: [{
           id: 'widget-3',
           kind: 'widget',
           children: [{
-            id: 'feedback',
+            id: 'widget-3-feedback',
             kind: 'feedback',
           }],
         }],

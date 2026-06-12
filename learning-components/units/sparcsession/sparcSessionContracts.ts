@@ -3,15 +3,11 @@ import type { ModelPracticeUpdateRequest } from '../../runtime/modelPracticeUpda
 import type { ModelPracticeMetric } from '../../runtime/modelPracticeStateQueries';
 import type {
   ModelPracticeHistoryIdentity,
-  StimulusIdentityValue,
 } from '../../runtime/historyStimulusIdentity';
-
-export type SparcAddressSegment = string | number;
 
 export type SparcDocumentAddress = {
   readonly documentId: string;
   readonly nodeId: string;
-  readonly path?: readonly SparcAddressSegment[];
 };
 
 export type SparcModelMetric = ModelPracticeMetric;
@@ -32,7 +28,6 @@ export type SparcAddressReference = {
 export type SparcNodeKind =
   | 'document'
   | 'section'
-  | 'region'
   | 'panel'
   | 'module'
   | 'widget'
@@ -135,7 +130,6 @@ export type SparcModelUpdateRequest = ModelPracticeUpdateRequest<SparcModelTarge
 export type SparcModelTargetIdentity = ModelPracticeHistoryIdentity & {
   readonly sparcDocumentId: string;
   readonly sparcNodeId: string;
-  readonly sparcPath?: readonly SparcAddressSegment[];
 };
 
 export type SparcModelQuery = {
@@ -260,20 +254,4 @@ export type SparcPracticeHistoryBridge = {
   readonly fromCanonicalHistoryRecord: (
     record: CanonicalHistoryRecord,
   ) => SparcPracticeObservation | null;
-};
-
-export type SparcModelTraceComparison = {
-  readonly sparcTrace: readonly SparcTraceStep[];
-  readonly referenceTrace: readonly SparcReferenceTraceStep[];
-};
-
-export type SparcReferenceTraceStep = {
-  readonly referenceSystem: 'ctat-brd';
-  readonly productionRuleId: string;
-  readonly productionRuleName?: string;
-  readonly productionSet?: string;
-  readonly actionId: string;
-  readonly outcome: SparcOutcome;
-  readonly stimulusKC?: StimulusIdentityValue;
-  readonly responseKC?: StimulusIdentityValue;
 };

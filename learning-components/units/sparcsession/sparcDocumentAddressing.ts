@@ -1,6 +1,5 @@
 import type {
   SparcAddressReference,
-  SparcAddressSegment,
   SparcAuthoredDocument,
   SparcAuthoredNode,
   SparcCondition,
@@ -13,7 +12,6 @@ import { MODEL_PRACTICE_METRICS } from '../../runtime/modelPracticeStateQueries'
 export type SparcResolvedAddress = {
   readonly document: SparcAuthoredDocument;
   readonly node: SparcAuthoredNode;
-  readonly pathNodes: readonly SparcAuthoredNode[];
 };
 
 export type SparcReferenceValidationIssue = {
@@ -41,25 +39,6 @@ function collectNodes(
   return nodes;
 }
 
-function resolvePathSegment(
-  parent: SparcAuthoredNode,
-  segment: SparcAddressSegment,
-): SparcAuthoredNode {
-  const children = parent.children ?? [];
-  if (typeof segment === 'number') {
-    const child = children[segment];
-    if (!child) {
-      throw new Error(`SPARC address path segment ${segment} is outside node "${parent.id}" children`);
-    }
-    return child;
-  }
-  const child = children.find((candidate) => candidate.id === segment);
-  if (!child) {
-    throw new Error(`SPARC address path segment "${segment}" not found under node "${parent.id}"`);
-  }
-  return child;
-}
-
 export function resolveSparcDocumentAddress(
   document: SparcAuthoredDocument,
   address: SparcDocumentAddress,
@@ -72,16 +51,9 @@ export function resolveSparcDocumentAddress(
   if (!node) {
     throw new Error(`SPARC address node "${address.nodeId}" not found in document "${document.id}"`);
   }
-  const pathNodes: SparcAuthoredNode[] = [];
-  let currentNode = node;
-  for (const segment of address.path ?? []) {
-    currentNode = resolvePathSegment(currentNode, segment);
-    pathNodes.push(currentNode);
-  }
   return {
     document,
     node,
-    pathNodes,
   };
 }
 
@@ -320,7 +292,6 @@ function modelTargetReferenceAddress(
   return {
     documentId: target.sparcDocumentId,
     nodeId: target.sparcNodeId,
-    ...(target.sparcPath !== undefined ? { path: target.sparcPath } : {}),
   };
 }
 
@@ -350,13 +321,7 @@ function modelTargetMatchesAuthoredAddress(
   target: SparcModelTargetIdentity,
   address: SparcDocumentAddress,
 ): boolean {
-  if (target.sparcDocumentId !== address.documentId || target.sparcNodeId !== address.nodeId) {
-    return false;
-  }
-  if (target.sparcPath === undefined || target.sparcPath.length === 0) {
-    return true;
-  }
-  return String(target.sparcPath[target.sparcPath.length - 1]) === address.nodeId;
+  return target.sparcDocumentId === address.documentId && target.sparcNodeId === address.nodeId;
 }
 
 function modelTargetAddressMessage(
@@ -364,10 +329,9 @@ function modelTargetAddressMessage(
   address: SparcDocumentAddress,
 ): string {
   return `SPARC authored modelTarget for node "${address.nodeId}" must match authored address `
-    + `${JSON.stringify(address)} and any sparcPath must end at that node; got ${JSON.stringify({
+    + `${JSON.stringify(address)}; got ${JSON.stringify({
       sparcDocumentId: target.sparcDocumentId,
       sparcNodeId: target.sparcNodeId,
-      sparcPath: target.sparcPath ?? [],
     })}`;
 }
 
