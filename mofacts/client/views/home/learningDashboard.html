@@ -182,7 +182,7 @@
                   {{#if this.conditions}}
                     <div class="learning-dashboard-action-group">
                       <button class="btn btn-sm btn-success learning-dashboard-action-button start-condition-root">Start</button>
-                      {{#if this.hasConfigurableSettings}}
+                      {{#if showSettingsButton}}
                         <button class="btn btn-sm btn-outline-secondary learning-dashboard-action-button configure-lesson" data-tdfid="{{this.TDFId}}">Settings</button>
                       {{/if}}
                     </div>
@@ -193,7 +193,7 @@
                         data-lessonname="{{this.displayName}}"
                         data-currentstimulisetid="{{this.currentStimuliSetId}}"
                         data-ismultitdf="{{this.isMultiTdf}}">Continue</button>
-                      {{#if this.hasConfigurableSettings}}
+                      {{#if showSettingsButton}}
                         <button class="btn btn-sm btn-outline-secondary learning-dashboard-action-button configure-lesson" data-tdfid="{{this.TDFId}}">Settings</button>
                       {{/if}}
                     </div>
@@ -204,7 +204,7 @@
                         data-lessonname="{{this.displayName}}"
                         data-currentstimulisetid="{{this.currentStimuliSetId}}"
                         data-ismultitdf="{{this.isMultiTdf}}">Start</button>
-                      {{#if this.hasConfigurableSettings}}
+                      {{#if showSettingsButton}}
                         <button class="btn btn-sm btn-outline-secondary learning-dashboard-action-button configure-lesson" data-tdfid="{{this.TDFId}}">Settings</button>
                       {{/if}}
                     </div>
@@ -315,7 +315,7 @@
         {{!-- Owner of a condition-pool root TDF: selector is in the card title; just show Start --}}
         <div class="learning-dashboard-card-actions">
           <button class="btn btn-sm btn-success start-condition-root learning-dashboard-card-button">Start</button>
-          {{#if this.hasConfigurableSettings}}
+          {{#if showSettingsButton}}
             <button class="btn btn-sm btn-outline-secondary configure-lesson learning-dashboard-card-button" data-tdfid="{{this.TDFId}}">Settings</button>
           {{/if}}
         </div>
@@ -337,7 +337,7 @@
             Details
             <span class="fa fa-chevron-down card-expand-icon"></span>
           </button>
-          {{#if this.hasConfigurableSettings}}
+          {{#if showSettingsButton}}
             <button class="btn btn-sm btn-outline-secondary configure-lesson learning-dashboard-card-button" data-tdfid="{{this.TDFId}}">
               Settings
             </button>
@@ -352,7 +352,7 @@
             data-ismultitdf="{{this.isMultiTdf}}">
             Start
           </button>
-          {{#if this.hasConfigurableSettings}}
+          {{#if showSettingsButton}}
             <button class="btn btn-sm btn-outline-secondary configure-lesson learning-dashboard-card-button" data-tdfid="{{this.TDFId}}">
               Settings
             </button>

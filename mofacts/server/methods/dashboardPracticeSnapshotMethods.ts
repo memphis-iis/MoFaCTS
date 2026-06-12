@@ -1,7 +1,10 @@
 import {
   buildLearnerTdfConfig,
+  LEARNER_TDF_FIELD_DEFINITIONS,
+  learnerTdfFieldAppliesToUnit,
   type LearnerTdfConfig,
 } from '../../common/lib/learnerTdfConfig';
+import { detectTdfUnitType } from '../../common/fieldApplicability';
 import type {
   DashboardTdfStats,
   PracticeDashboardSnapshotLesson,
@@ -99,7 +102,14 @@ async function getDashboardVisibleTdfs(deps: DashboardPracticeSnapshotDeps, user
     'content.tdfs.tutor.setspec.condition': 1,
     'content.tdfs.tutor.setspec.conditionTdfIds': 1,
     'content.tdfs.tutor.setspec.audioInputEnabled': 1,
-    'content.tdfs.tutor.setspec.enableAudioPromptAndFeedback': 1
+    'content.tdfs.tutor.setspec.enableAudioPromptAndFeedback': 1,
+    'content.tdfs.tutor.unit.learningsession': 1,
+    'content.tdfs.tutor.unit.autotutorsession': 1,
+    'content.tdfs.tutor.unit.assessmentsession': 1,
+    'content.tdfs.tutor.unit.videosession': 1,
+    'content.tdfs.tutor.unit.sparcsession': 1,
+    'content.tdfs.tutor.unit.unitinstructions': 1,
+    'content.tdfs.tutor.unit.unitinstructionsquestion': 1
   };
 
   const accessibleRoots = await deps.Tdfs.find(
@@ -153,6 +163,22 @@ function getTdfConfigSource(tdf: any) {
   };
 }
 
+function getTutorUnits(tdfObject: any): any[] {
+  const units = tdfObject?.tdfs?.tutor?.unit;
+  return Array.isArray(units) ? units : [];
+}
+
+function unitHasConfigurableRuntime(unit: any): boolean {
+  const unitType = detectTdfUnitType(unit);
+  return unitType === 'learning' || unitType === 'autotutor';
+}
+
+function unitHasLearnerConfigurableFields(unit: any): boolean {
+  return LEARNER_TDF_FIELD_DEFINITIONS.some((field) => (
+    field.scope === 'unit' && learnerTdfFieldAppliesToUnit(field, unit)
+  ));
+}
+
 function buildPracticeDashboardLesson(
   userId: string,
   tdf: any,
@@ -165,6 +191,7 @@ function buildPracticeDashboardLesson(
   const tdfObject = tdf?.content;
   const setspec = tdfObject?.tdfs?.tutor?.setspec;
   if (!TDFId || !setspec) return null;
+  const units = getTutorUnits(tdfObject);
 
   const fileName = resolveDashboardTdfFileName(tdf);
   const displayName = normalizeOptionalString(setspec.lessonname) || fileName || TDFId;
@@ -197,7 +224,8 @@ function buildPracticeDashboardLesson(
     enableAudioPromptAndFeedback: String(setspec.enableAudioPromptAndFeedback || '').toLowerCase() === 'true',
     hasSpeechAPIKey,
     hasTTSAPIKey,
-    hasConfigurableSettings: true,
+    hasConfigurableSettings: units.some(unitHasConfigurableRuntime),
+    hasLearnerConfigurableSettings: units.some(unitHasLearnerConfigurableFields),
     isMultiTdf: Boolean(tdfObject.isMultiTdf),
     isOwner: tdf.ownerId === userId,
     conditions,

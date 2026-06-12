@@ -637,13 +637,20 @@ function displayLabelForTdf(tdf: any) {
 function configForLessonCard(tdf: any) {
   const templateData = Template.parentData(1) as { learnerConfigState?: LearnerConfigState } | undefined;
   const state = templateData?.learnerConfigState;
-  return tdf.hasConfigurableSettings && state?.tdfId === tdf.TDFId ? { ...state, location: 'card' } : null;
+  return shouldShowSettingsButton(tdf) && state?.tdfId === tdf.TDFId ? { ...state, location: 'card' } : null;
 }
 
 function configForLessonTable(tdf: any) {
   const templateData = Template.parentData(1) as { learnerConfigState?: LearnerConfigState } | undefined;
   const state = templateData?.learnerConfigState;
-  return tdf.hasConfigurableSettings && state?.tdfId === tdf.TDFId ? { ...state, location: 'table' } : null;
+  return shouldShowSettingsButton(tdf) && state?.tdfId === tdf.TDFId ? { ...state, location: 'table' } : null;
+}
+
+function shouldShowSettingsButton(tdf: any): boolean {
+  if (currentUserHasRole('admin')) {
+    return Boolean(tdf.hasConfigurableSettings);
+  }
+  return Boolean(tdf.hasLearnerConfigurableSettings);
 }
 
 const lessonRowHelpers = {
@@ -703,6 +710,10 @@ const lessonRowHelpers = {
     return this.accuracyApplies === false || this.overallAccuracy === null || this.overallAccuracy === undefined
       ? 'bg-secondary'
       : 'bg-success';
+  },
+
+  showSettingsButton(this: any): boolean {
+    return shouldShowSettingsButton(this);
   },
 };
 

@@ -126,6 +126,7 @@ export interface PracticeDashboardSnapshotLesson {
   hasSpeechAPIKey: boolean;
   hasTTSAPIKey: boolean;
   hasConfigurableSettings: boolean;
+  hasLearnerConfigurableSettings: boolean;
   isMultiTdf: boolean;
   isOwner: boolean;
   conditions: Array<{ fileName: string; tdfId: string | null; count: number }> | null;

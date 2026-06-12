@@ -67,6 +67,9 @@ describe('dashboardCacheMethods', function() {
               audioInputEnabled: 'true',
               enableAudioPromptAndFeedback: 'false'
             },
+            unit: [
+              { learningsession: {} }
+            ],
           }
         }
       }
@@ -162,6 +165,7 @@ describe('dashboardCacheMethods', function() {
       displayName: 'Lesson A',
       currentStimuliSetId: 'stim-set-a',
       hasConfigurableSettings: true,
+      hasLearnerConfigurableSettings: true,
       isUsed: true
     });
     expect(snapshot.lessons[0].progress).to.include({
@@ -176,7 +180,7 @@ describe('dashboardCacheMethods', function() {
     expect(snapshot.lessons[0].totalPracticeItems).to.equal(undefined);
     expect(snapshot.lessons[0].learnerConfig.overrides.setspec.audioPromptMode).to.equal('feedback');
     expect(snapshot.lessons[0].content).to.equal(undefined);
-    expect(JSON.stringify(tdfFindOptions)).not.to.include('unit');
+    expect(JSON.stringify(tdfFindOptions)).to.include('content.tdfs.tutor.unit.learningsession');
     expect(queryCounts).to.deep.equal({
       tdfsFind: 2,
       usersFindOne: 1,
@@ -184,6 +188,80 @@ describe('dashboardCacheMethods', function() {
       sectionUserMapFind: 1,
       sectionsFind: 0,
       assignmentsFind: 0
+    });
+  });
+
+  it('keeps AutoTutor settings available for admins without advertising student learner settings', async function() {
+    const userId = 'learner-1';
+    const lessonDoc = {
+      _id: 'tdfAuto',
+      stimuliSetId: 'stim-set-auto',
+      ownerId: 'teacher-1',
+      content: {
+        fileName: 'autotutor.json',
+        isMultiTdf: false,
+        tdfs: {
+          tutor: {
+            setspec: {
+              lessonname: 'AutoTutor',
+              tags: [],
+              userselect: 'true',
+              audioInputEnabled: 'false',
+              enableAudioPromptAndFeedback: 'false'
+            },
+            unit: [
+              { autotutorsession: {} }
+            ],
+          }
+        }
+      }
+    };
+    const methods = createDashboardCacheMethods({
+      Meteor: {
+        Error: class MeteorError extends Error {
+          error: string;
+          constructor(error: string, reason?: string) {
+            super(reason || error);
+            this.error = error;
+          }
+        }
+      },
+      Roles: { userIsInRoleAsync: async () => false },
+      Histories: {
+        find: () => ({ fetchAsync: async () => [] }),
+        findOneAsync: async () => null,
+        rawCollection: () => ({ distinct: async () => [] })
+      },
+      Tdfs: {
+        find: () => ({ fetchAsync: async () => [lessonDoc] }),
+        findOneAsync: async () => null
+      },
+      Assignments: { find: () => ({ fetchAsync: async () => [] }) },
+      Sections: { find: () => ({ fetchAsync: async () => [] }) },
+      SectionUserMap: { find: () => ({ fetchAsync: async () => [] }) },
+      UserDashboardCache: {
+        findOneAsync: async () => ({
+          userId,
+          tdfStats: {},
+          learnerTdfConfigs: {}
+        })
+      },
+      usersCollection: {
+        findOneAsync: async () => ({ _id: userId, accessedTDFs: [] })
+      },
+      serverConsole: () => {},
+      computePracticeTimeMs: (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0),
+      canViewDashboardTdf: () => true,
+      redisBoundary: disabledRedisBoundary
+    });
+
+    const snapshot = await (methods as any).getPracticeDashboardSnapshot.call({ userId });
+
+    expect(snapshot.lessons).to.have.length(1);
+    expect(snapshot.lessons[0]).to.include({
+      TDFId: 'tdfAuto',
+      hasConfigurableSettings: true,
+      hasLearnerConfigurableSettings: false
     });
   });
 
