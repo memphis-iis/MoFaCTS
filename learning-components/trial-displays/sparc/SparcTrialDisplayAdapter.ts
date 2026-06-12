@@ -6,7 +6,13 @@ export const SPARC_TRIAL_DISPLAY_TYPE = 'sparc';
 export interface SparcIntentExpectation {
   node: string;
   expected: unknown;
+  acceptedValues?: unknown[];
   type?: string;
+}
+
+export interface SparcPathIntentExpectation {
+  path: string;
+  intentByNode?: SparcIntentExpectation[];
 }
 
 export interface SparcTraceExpectation {
@@ -28,6 +34,7 @@ export interface SparcTrialDisplay {
     gradingMode?: string;
     scoredNodes?: string[];
     intentByNode?: SparcIntentExpectation[];
+    intentByPath?: SparcPathIntentExpectation[];
     traceByNode?: SparcTraceExpectation[];
     evaluation?: Record<string, unknown>;
   };
@@ -80,7 +87,25 @@ export const sparcTrialDisplayAdapter: TrialDisplayAdapter<SparcTrialDisplay, Sp
                 .map((entry) => ({
                   node: String(entry.node || ''),
                   expected: entry.expected,
+                  ...(Array.isArray(entry.acceptedValues) ? { acceptedValues: entry.acceptedValues } : {}),
                   ...(typeof entry.type === 'string' ? { type: entry.type } : {}),
+                }))
+            : [],
+          intentByPath: Array.isArray(display.response.intentByPath)
+            ? display.response.intentByPath
+                .filter(isPlainObject)
+                .map((pathEntry) => ({
+                  path: String(pathEntry.path || ''),
+                  intentByNode: Array.isArray(pathEntry.intentByNode)
+                    ? pathEntry.intentByNode
+                        .filter(isPlainObject)
+                        .map((entry) => ({
+                          node: String(entry.node || ''),
+                          expected: entry.expected,
+                          ...(Array.isArray(entry.acceptedValues) ? { acceptedValues: entry.acceptedValues } : {}),
+                          ...(typeof entry.type === 'string' ? { type: entry.type } : {}),
+                        }))
+                    : [],
                 }))
             : [],
           traceByNode: Array.isArray(display.response.traceByNode)

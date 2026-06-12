@@ -51,6 +51,8 @@ describe('registerLearningComponents', function() {
         displayTypes: ['h5p'],
         requiredCapabilities: ['history', 'media'],
         requiredServerMethods: [],
+        providedServices: [],
+        providedServiceDetails: [],
       },
       {
         id: 'sample.unit',
@@ -59,6 +61,8 @@ describe('registerLearningComponents', function() {
         displayTypes: [],
         requiredCapabilities: ['logging', 'session'],
         requiredServerMethods: [],
+        providedServices: [],
+        providedServiceDetails: [],
       },
     ]);
   });

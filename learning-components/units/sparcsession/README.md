@@ -117,9 +117,20 @@ Authored SPARC documents can carry `reactiveRules` directly, keeping declarative
 reactivity with the authored start state instead of in renderer-local scripts.
 `evaluateSparcAuthoredReactiveRules` is the default entry point for executing
 those authored rules.
-`sparcReactiveRuleCommit.ts` adds the persistence boundary: authored rule
-matches become canonical SPARC state-transition history records, and no-op rule
-passes do not write empty history.
+`sparcProductionRuleEvaluator.ts` is the first SPARC-owned production-rule
+substrate for CTAT-informed tutor behavior. It treats interface state, learner
+events, problem givens, and inferred model state as working-memory facts, then
+matches Jess-like fact patterns with variable bindings and explicit tests. BRD
+edges are expected to be converted into evidence for these generalized rule
+families, not copied as graph transitions. Rule effects can assert new working
+memory facts, write addressed interface state, emit templated hint/buggy/success
+messages, classify an action, and credit KCs. This keeps SPARC declarative and
+node-addressed while allowing Fractions and Stoichiometry rules to generalize
+across problem content instead of hard-coding a single BRD path.
+`sparcProductionRuleCommit.ts` and `sparcReactiveRuleCommit.ts` add persistence
+boundaries: authored production-rule and reactive-rule matches become canonical
+SPARC state-transition history records, and no-op rule passes do not write empty
+history.
 `sparcResponseOutcomePipeline.ts` ties response commits to authored rules: it
 writes the response/model record first, replays that record into document state,
 then evaluates and persists any matching authored rules. The pipeline returns the
@@ -154,8 +165,9 @@ The current manifest advertises the first SPARC-owned services through
 authored-document validation, response-outcome history, authored initial state,
 authored model targets, authored response outcomes, condition evaluation,
 model-history exchange, model-query adaptation, model-update requests,
-response-outcome commit/authored-rules, vertical layout validation, reactive
-rule commit/evaluation, and state-transition history.
+production-rule commit/evaluation, response-outcome commit/authored-rules,
+vertical layout validation, reactive rule commit/evaluation, and
+state-transition history.
 
 ## Content Development Role
 

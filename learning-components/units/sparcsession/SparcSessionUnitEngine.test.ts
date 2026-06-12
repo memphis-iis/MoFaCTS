@@ -9,6 +9,7 @@ import type { CanonicalHistoryRecord } from '../../runtime/historyEnvelope';
 import type { UnitEngineSessionReadKey } from '../UnitEngineSessionKeys';
 import type {
   SparcAuthoredDocument,
+  SparcRuleExpression,
 } from './sparcSessionContracts';
 
 function createMinimalDeps(overrides: Record<string, unknown> = {}): any {
@@ -117,6 +118,64 @@ function sampleDocument(): SparcAuthoredDocument {
   };
 }
 
+const literal = (value: unknown): SparcRuleExpression => ({ type: 'literal', value });
+const variable = (name: string): SparcRuleExpression => ({ type: 'variable', name });
+
+function sampleProductionRuleDocument(): SparcAuthoredDocument {
+  return {
+    id: 'doc-1',
+    schemaVersion: 1,
+    workingMemoryFacts: [{
+      factType: 'problem',
+      slots: {
+        type: 'fraction-addition',
+      },
+    }],
+    productionRules: [{
+      id: 'production.correct-answer',
+      when: [{
+        factType: 'problem',
+        slots: {
+          type: { type: 'literal', value: 'fraction-addition' },
+        },
+      }, {
+        factType: 'interface-event',
+        slots: {
+          selection: { type: 'literal', value: 'region-1' },
+          responseValue: { type: 'bind', variable: 'responseValue' },
+        },
+      }],
+      tests: [{
+        op: 'eq',
+        left: variable('responseValue'),
+        right: literal('Answer'),
+      }],
+      then: [{
+        type: 'write-state',
+        write: {
+          target: {
+            documentId: 'doc-1',
+            nodeId: 'feedback',
+          },
+          key: 'message',
+          value: literal('Good job!'),
+        },
+      }],
+    }],
+    root: {
+      id: 'root',
+      kind: 'document',
+      children: [{
+        id: 'region-1',
+        kind: 'panel',
+      }, {
+        id: 'feedback',
+        kind: 'feedback',
+      }],
+    },
+  };
+}
+
 describe('SparcSessionUnitEngine document runtime boundary', function() {
   it('exposes SPARC document validation, replay, and authored response commit methods', async function() {
     const engine = await createSparcSessionUnitEngine(createMinimalDeps());
@@ -181,5 +240,45 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
       }, 'visible')]?.value,
       true,
     );
+  });
+
+  it('exposes authored production-rule commit at the unit-engine boundary', async function() {
+    const engine = await createSparcSessionUnitEngine(createMinimalDeps());
+    const writtenRecords: unknown[] = [];
+    const document = sampleProductionRuleDocument();
+
+    const result = await engine.commitSparcAuthoredProductionRuleEvent({
+      core: {
+        TDFId: 'tdf-1',
+        sessionID: 'session-1',
+        levelUnit: 2,
+        userId: 'user-1',
+      },
+      document,
+      event: {
+        eventId: 'event-production',
+        type: 'response-submitted',
+        source: {
+          documentId: 'doc-1',
+          nodeId: 'region-1',
+        },
+        time: 3000,
+        payload: {
+          selection: 'region-1',
+          responseValue: 'Answer',
+        },
+      },
+      history: {
+        async writeCanonicalHistory(record: CanonicalHistoryRecord) {
+          writtenRecords.push(record);
+        },
+      },
+    });
+
+    assert.deepEqual(result.execution.firings.map((firing: { ruleId: string }) => firing.ruleId), [
+      'production.correct-answer',
+    ]);
+    assert.equal(result.historyRecord?.action, 'sparc-production-rule');
+    assert.equal(writtenRecords.length, 1);
   });
 });

@@ -1,4 +1,6 @@
 import { expect } from 'chai';
+import { Session } from 'meteor/session';
+import type { UnitEngineLike } from '../../../../../common/types';
 import {
   firstNonEmptyString,
   getPreparedCardDataFromSelection,
@@ -103,7 +105,7 @@ describe('card payload builder helpers', function() {
       findCurrentCardInfo() {
         return { whichStim: 0, clusterIndex: 0 };
       },
-    } as any;
+    } satisfies UnitEngineLike;
 
     const sparcDisplay = {
       type: 'sparc',
@@ -126,14 +128,17 @@ describe('card payload builder helpers', function() {
       stims: [{ display: sparcDisplay, correctResponse: '' }],
     };
 
-    const originalGetStimCluster = (globalThis as any).getStimCluster;
-    (globalThis as any).getStimCluster = () => cluster;
+    const globalWithStimCluster = globalThis as typeof globalThis & {
+      getStimCluster: (() => typeof cluster) | undefined;
+    };
+    const originalGetStimCluster = globalWithStimCluster.getStimCluster;
+    globalWithStimCluster.getStimCluster = () => cluster;
 
     try {
       const result = getPreparedCardDataFromSelection(engine, selection, 1) as Record<string, unknown>;
       expect(result.currentDisplay).to.deep.equal(sparcDisplay);
     } finally {
-      (globalThis as any).getStimCluster = originalGetStimCluster;
+      globalWithStimCluster.getStimCluster = originalGetStimCluster;
       Session.set('currentTdfFile', originalGet.currentTdfFile);
       Session.set('currentStimuliSetId', originalGet.currentStimuliSetId);
       Session.set('testType', originalGet.testType);

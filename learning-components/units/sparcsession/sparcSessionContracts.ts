@@ -98,6 +98,8 @@ export type SparcAuthoredDocument = {
   readonly schemaVersion: number;
   readonly layout?: SparcLayoutPolicy;
   readonly initialState?: readonly SparcStateWrite[];
+  readonly workingMemoryFacts?: readonly SparcWorkingMemoryFact[];
+  readonly productionRules?: readonly SparcProductionRule[];
   readonly reactiveRules?: readonly SparcReactiveRule[];
   readonly root: SparcAuthoredNode;
 };
@@ -203,6 +205,120 @@ export type SparcStateWrite = {
   readonly target: SparcDocumentAddress;
   readonly key: string;
   readonly value: unknown;
+};
+
+export type SparcWorkingMemoryFact = {
+  readonly factId?: string;
+  readonly factType: string;
+  readonly slots?: Readonly<Record<string, unknown>>;
+};
+
+export type SparcRuleExpression =
+  | {
+      readonly type: 'literal';
+      readonly value: unknown;
+    }
+  | {
+      readonly type: 'variable';
+      readonly name: string;
+    }
+  | {
+      readonly type: 'function';
+      readonly name: 'add' | 'subtract' | 'multiply' | 'divide' | 'mod' | 'gcd' | 'lcm';
+      readonly args: readonly SparcRuleExpression[];
+    };
+
+export type SparcFactSlotPattern =
+  | {
+      readonly type: 'literal';
+      readonly value: unknown;
+    }
+  | {
+      readonly type: 'bind';
+      readonly variable: string;
+    }
+  | {
+      readonly type: 'bound';
+      readonly variable: string;
+    };
+
+export type SparcFactPattern = {
+  readonly factType: string;
+  readonly slots?: Readonly<Record<string, SparcFactSlotPattern>>;
+};
+
+export type SparcProductionRuleTest = {
+  readonly op: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte';
+  readonly left: SparcRuleExpression;
+  readonly right: SparcRuleExpression;
+};
+
+export type SparcProductionRuleEffect =
+  | {
+      readonly type: 'assert-fact';
+      readonly fact: SparcWorkingMemoryFactTemplate;
+    }
+  | {
+      readonly type: 'write-state';
+      readonly write: SparcStateWriteTemplate;
+    }
+  | {
+      readonly type: 'message';
+      readonly messageType: 'hint' | 'buggy' | 'success' | 'feedback';
+      readonly template: string;
+    }
+  | {
+      readonly type: 'classify';
+      readonly outcome: SparcOutcome | 'buggy';
+    }
+  | {
+      readonly type: 'credit';
+      readonly kc: string;
+    };
+
+export type SparcWorkingMemoryFactTemplate = {
+  readonly factId?: string;
+  readonly factType: string;
+  readonly slots?: Readonly<Record<string, SparcRuleExpression>>;
+};
+
+export type SparcStateWriteAddressTemplate = {
+  readonly documentId: string | SparcRuleExpression;
+  readonly nodeId: string | SparcRuleExpression;
+};
+
+export type SparcStateWriteTemplate = {
+  readonly target: SparcStateWriteAddressTemplate;
+  readonly key: string;
+  readonly value: SparcRuleExpression;
+};
+
+export type SparcProductionRule = {
+  readonly id: string;
+  readonly module?: string;
+  readonly salience?: number;
+  readonly when: readonly SparcFactPattern[];
+  readonly tests?: readonly SparcProductionRuleTest[];
+  readonly then: readonly SparcProductionRuleEffect[];
+};
+
+export type SparcProductionRuleFiring = {
+  readonly ruleId: string;
+  readonly bindings: Readonly<Record<string, unknown>>;
+  readonly assertedFacts: readonly SparcWorkingMemoryFact[];
+  readonly writes: readonly SparcStateWrite[];
+  readonly messages: readonly {
+    readonly messageType: 'hint' | 'buggy' | 'success' | 'feedback';
+    readonly text: string;
+  }[];
+  readonly classifications: readonly (SparcOutcome | 'buggy')[];
+  readonly credits: readonly string[];
+};
+
+export type SparcProductionRuleExecution = {
+  readonly facts: readonly SparcWorkingMemoryFact[];
+  readonly firings: readonly SparcProductionRuleFiring[];
+  readonly cycles: number;
 };
 
 export type SparcReactiveRule = {

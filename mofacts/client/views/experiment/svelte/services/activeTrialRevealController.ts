@@ -222,6 +222,42 @@ export function createActiveTrialRevealController(
       queuedRevealSequence = revealSequence;
       void revealQueued(key, revealSequence);
     },
+    revealMountedNowIfReady(params: {
+      allBlockingAssetsReady: boolean;
+      isOutgoingFreezeState: boolean;
+      isTestMode: boolean;
+      subsetKind: string;
+    }) {
+      if (
+        params.isOutgoingFreezeState ||
+        params.isTestMode ||
+        !snapshot.activeSlotMounted ||
+        snapshot.activeSlotVisible ||
+        snapshot.trialSubsetVisible ||
+        !params.allBlockingAssetsReady
+      ) {
+        return false;
+      }
+      const key = snapshot.stagedTrialSubsetKey;
+      if (!key || key === 'none') {
+        return false;
+      }
+
+      deps.log(2, '[CardScreen][Reveal] mounted ready reveal started', {
+        key,
+        subsetKind: params.subsetKind,
+      });
+      const fadeContext = markVisible(key, params.subsetKind);
+      deps.log(2, '[CardScreen][FadeTiming] mounted-ready-reveal', {
+        key,
+        subsetKind: params.subsetKind,
+        configuredDurationMs: fadeContext.configuredDurationMs,
+        visibleSetAt: fadeContext.visibleSetAt,
+      });
+      deps.markFirstRevealClassSet({ key, subsetKind: params.subsetKind });
+      deps.onRevealStarted(params.subsetKind);
+      return true;
+    },
     syncVisibility(params: {
       isOutgoingFreezeState: boolean;
       showOverlay: boolean;

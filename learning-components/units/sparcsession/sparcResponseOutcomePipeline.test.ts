@@ -11,6 +11,7 @@ import type {
   SparcAuthoredDocument,
   SparcCondition,
   SparcModelTargetIdentity,
+  SparcRuleExpression,
 } from './sparcSessionContracts';
 
 const core = {
@@ -28,6 +29,11 @@ const sourceAddress = {
 const feedbackAddress = {
   documentId: 'doc-1',
   nodeId: 'widget-3-feedback',
+};
+
+const productionAddress = {
+  documentId: 'doc-1',
+  nodeId: 'production-state',
 };
 
 const modelTarget: SparcModelTargetIdentity = {
@@ -61,6 +67,9 @@ function documentWithRule(ruleWhen: SparcCondition): SparcAuthoredDocument {
         id: 'region-1',
         kind: 'panel',
       }, {
+        id: 'production-state',
+        kind: 'output',
+      }, {
         id: 'region-7',
         kind: 'panel',
         children: [{
@@ -73,6 +82,49 @@ function documentWithRule(ruleWhen: SparcCondition): SparcAuthoredDocument {
         }],
       }],
     },
+  };
+}
+
+const literal = (value: unknown): SparcRuleExpression => ({ type: 'literal', value });
+const variable = (name: string): SparcRuleExpression => ({ type: 'variable', name });
+
+function documentWithProductionRuleThenReactiveRule(): SparcAuthoredDocument {
+  return {
+    ...documentWithRule({
+      type: 'state',
+      query: {
+        target: productionAddress,
+        key: 'feedback-ready',
+      },
+      compare: 'truthy',
+    }),
+    productionRules: [{
+      id: 'production.mark-feedback-ready',
+      when: [{
+        factType: 'practice-observation',
+        slots: {
+          outcome: { type: 'literal', value: 'correct' },
+          responseValue: { type: 'bind', variable: 'responseValue' },
+        },
+      }],
+      tests: [{
+        op: 'eq',
+        left: variable('responseValue'),
+        right: literal('Answer'),
+      }],
+      then: [{
+        type: 'write-state',
+        write: {
+          target: productionAddress,
+          key: 'feedback-ready',
+          value: literal(true),
+        },
+      }, {
+        type: 'message',
+        messageType: 'success',
+        template: 'Good job!',
+      }],
+    }],
   };
 }
 
@@ -145,11 +197,58 @@ describe('sparcResponseOutcomePipeline', function() {
     });
 
     assert.equal(result.responseCommit.usedAdaptiveModel, false);
+    assert.equal(result.productionCommit.execution.firings.length, 0);
     assert.deepEqual(result.reactiveCommit.evaluation.matchedRuleIds, ['show-feedback']);
     assert.equal(writtenRecords.length, 2);
     assert.equal(result.reactiveCommit.historyRecord?.action, 'sparc-reactive-rule');
     assert.equal(result.replayStateAfterResponse.cells[createSparcStateCellKey(sourceAddress, 'lastOutcome')]?.value, 'correct');
     assert.equal(result.finalReplayState.cells[createSparcStateCellKey(feedbackAddress, 'visible')]?.value, true);
+  });
+
+  it('runs authored production rules before authored reactive rules in the response cycle', async function() {
+    const writtenRecords: unknown[] = [];
+    const processed = processSparcResponseOutcome(core, {
+      observationId: 'obs-production',
+      sourceAddress,
+      time: 2200,
+      problemStartTime: 1500,
+      outcome: 'correct',
+      responseValue: 'Answer',
+    });
+
+    const result = await commitSparcResponseOutcomeWithAuthoredRules({
+      core,
+      document: documentWithProductionRuleThenReactiveRule(),
+      processed,
+      replayState: createEmptySparcReplayState(),
+      runtime: {
+        adaptiveModel: {
+          applyModelPracticeUpdate() {
+            throw new Error('adaptive model should not run for SPARC-only outcome');
+          },
+          queryModelPracticeState() {
+            throw new Error('model query not used');
+          },
+        },
+        history: {
+          async writeCanonicalHistory(record) {
+            writtenRecords.push(record);
+          },
+        },
+      },
+    });
+
+    assert.deepEqual(result.productionCommit.execution.firings.map((firing) => firing.ruleId), [
+      'production.mark-feedback-ready',
+    ]);
+    assert.equal(result.productionCommit.historyRecord?.action, 'sparc-production-rule');
+    assert.equal(
+      result.replayStateAfterProduction.cells[createSparcStateCellKey(productionAddress, 'feedback-ready')]?.value,
+      true,
+    );
+    assert.deepEqual(result.reactiveCommit.evaluation.matchedRuleIds, ['show-feedback']);
+    assert.equal(result.finalReplayState.cells[createSparcStateCellKey(feedbackAddress, 'visible')]?.value, true);
+    assert.equal(writtenRecords.length, 3);
   });
 
   it('commits a model-linked response before evaluating model-conditioned authored rules', async function() {

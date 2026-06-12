@@ -513,6 +513,35 @@
   $: videoEnded = state.matches('videoEnded');
   $: videoEndOverlayController.syncVideoEnded(videoEnded);
 
+  let standardCardLaunchFinishKey = '';
+  $: if (
+    !testMode &&
+    initializedForRender &&
+    sessionContentSurface.showStandardCardSession &&
+    trialContentVisible &&
+    isLaunchLoadingActive() &&
+    trialSubsetKey &&
+    trialSubsetKey !== 'none' &&
+    standardCardLaunchFinishKey !== trialSubsetKey
+  ) {
+    standardCardLaunchFinishKey = trialSubsetKey;
+    void (async (key) => {
+      await tick();
+      await waitForBrowserPaint();
+      if (
+        isLaunchLoadingActive() &&
+        trialContentVisible &&
+        trialSubsetKey === key
+      ) {
+        markLaunchLoadingTiming('standardCard:firstTrialVisible', {
+          key,
+          subsetKind: trialSubsetKind,
+        });
+        finishLaunchLoading('standard-card-first-trial-visible');
+      }
+    })(trialSubsetKey);
+  }
+
   $: activeTrialRevealController.syncStage({
     expectedFeedbackBlockerSrc,
     expectedStimulusBlockerSrc,
@@ -527,6 +556,21 @@
     allBlockingAssetsReady,
     isOutgoingFreezeState,
   });
+
+  $: if (
+    sessionContentSurface.showStandardCardSession &&
+    state.matches('presenting.awaiting') &&
+    activeSlotMounted &&
+    !activeSlotVisible &&
+    trialSubset.showOverlay
+  ) {
+    activeTrialRevealController.revealMountedNowIfReady({
+      allBlockingAssetsReady,
+      isOutgoingFreezeState,
+      isTestMode: testMode,
+      subsetKind: trialSubsetKind,
+    });
+  }
 
   $: incomingSlotDisplaySnapshot = buildIncomingTrialSlotDisplaySnapshot({
     defaultInputMode: inputMode,

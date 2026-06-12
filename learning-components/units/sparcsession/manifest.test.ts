@@ -34,6 +34,8 @@ describe('sparcSessionUnitComponentManifest', function() {
       'sparc.model-history-exchange',
       'sparc.model-query-adapter',
       'sparc.model-update-request',
+      'sparc.production-rule-commit',
+      'sparc.production-rule-evaluation',
       'sparc.response-outcome-authored-rules',
       'sparc.response-outcome-commit',
       'sparc.response-outcome-history',
@@ -59,6 +61,14 @@ describe('sparcSessionUnitComponentManifest', function() {
         [
           'sparc.document-validation',
           'SparcSessionUnitEngine.validateSparcAuthoredDocument',
+        ],
+        [
+          'sparc.production-rule-commit',
+          'SparcSessionUnitEngine.commitSparcAuthoredProductionRuleEvent',
+        ],
+        [
+          'sparc.production-rule-evaluation',
+          'SparcSessionUnitEngine.evaluateSparcAuthoredProductionRules',
         ],
         [
           'sparc.response-outcome-commit',

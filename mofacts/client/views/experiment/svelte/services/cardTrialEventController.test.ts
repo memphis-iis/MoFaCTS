@@ -1,5 +1,4 @@
 import { expect } from 'chai';
-import { describe, it } from 'mocha';
 import { createCardTrialEventController, type CardTrialMachineEvent } from './cardTrialEventController';
 
 describe('cardTrialEventController', () => {

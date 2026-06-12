@@ -287,7 +287,6 @@ export async function callOpenRouterEmbeddings(options: OpenRouterEmbeddingOptio
   });
 
   let httpStatus: number | undefined;
-  let lastResponseBody: unknown;
   try {
     let responseBody: unknown;
     for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -308,7 +307,6 @@ export async function callOpenRouterEmbeddings(options: OpenRouterEmbeddingOptio
 
       httpStatus = response.status;
       responseBody = await readOpenRouterResponseBody(response);
-      lastResponseBody = responseBody;
       if (!response.ok) {
         throw new Error(redactOpenRouterSecrets(openRouterErrorMessage(responseBody, response.status)));
       }

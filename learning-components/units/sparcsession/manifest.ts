@@ -45,6 +45,14 @@ export const sparcSessionUnitComponentManifest: LearningComponentManifest<Create
     'sparc.model-history-exchange',
     'sparc.model-query-adapter',
     'sparc.model-update-request',
+    {
+      name: 'sparc.production-rule-commit',
+      runtimeEntry: 'SparcSessionUnitEngine.commitSparcAuthoredProductionRuleEvent',
+    },
+    {
+      name: 'sparc.production-rule-evaluation',
+      runtimeEntry: 'SparcSessionUnitEngine.evaluateSparcAuthoredProductionRules',
+    },
     'sparc.response-outcome-authored-rules',
     {
       name: 'sparc.response-outcome-commit',

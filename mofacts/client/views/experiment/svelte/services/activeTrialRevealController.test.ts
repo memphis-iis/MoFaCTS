@@ -184,6 +184,42 @@ describe('active trial reveal controller', function() {
     expect(harness.logs.some((entry) => entry.message === '[CardScreen][Reveal] queued reveal skipped')).to.equal(true);
   });
 
+  it('reveals a mounted ready trial when the async reveal was missed', function() {
+    const harness = createHarness();
+    harness.controller.syncStage({
+      expectedFeedbackBlockerSrc: '',
+      expectedStimulusBlockerSrc: '',
+      isFadingOut: false,
+      isOutgoingFreezeState: false,
+      showOverlay: true,
+      trialSubsetKey: 'trial-a',
+      trialSubsetKind: 'question',
+    });
+
+    harness.setNow(1500);
+    const revealed = harness.controller.revealMountedNowIfReady({
+      allBlockingAssetsReady: true,
+      isOutgoingFreezeState: false,
+      isTestMode: false,
+      subsetKind: 'question',
+    });
+
+    expect(revealed).to.equal(true);
+    expect(harness.fadeContexts).to.deep.equal([{
+      key: 'trial-a',
+      subsetKind: 'question',
+      visibleSetAt: 1500,
+      configuredDurationMs: 240,
+    }]);
+    expect(harness.firstRevealMarks).to.deep.equal([{ key: 'trial-a', subsetKind: 'question' }]);
+    expect(harness.revealStarted).to.deep.equal(['question']);
+    expect(harness.controller.getSnapshot()).to.deep.include({
+      activeSlotMounted: true,
+      activeSlotVisible: true,
+      trialSubsetVisible: true,
+    });
+  });
+
   it('reveals prepared handoff after DOM update without marking first reveal', async function() {
     const harness = createHarness();
     harness.controller.markPreparedHandoffOnNextReveal({

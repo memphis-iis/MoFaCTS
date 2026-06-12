@@ -3,7 +3,6 @@ import { Meteor } from 'meteor/meteor';
 import { Roles } from 'meteor/alanning:roles';
 import { asyncMethods, methods } from './serverComposition';
 import sinon from 'sinon';
-import StubCollections from 'meteor/hwillson:stub-collections';
 import { Random } from 'meteor/random';
 import { expect } from 'chai';
 import { compressHistoryRecord } from '../common/historyCompression';
@@ -28,6 +27,48 @@ const AuthThrottleStateAny = (globalThis as any).AuthThrottleState as any;
 const PasswordResetTokensAny = (globalThis as any).PasswordResetTokens as any;
 
 (Meteor.settings as any).auth.requireEmailVerification = false;
+
+type RemovableCollection = {
+  removeAsync: (selector: Record<string, never>) => Promise<unknown>;
+};
+
+function requireRemovableCollection(collection: unknown, name: string): RemovableCollection {
+  if (
+    !collection ||
+    typeof collection !== 'object' ||
+    typeof (collection as Partial<RemovableCollection>).removeAsync !== 'function'
+  ) {
+    throw new Error(`Expected ${name} to expose removeAsync in Meteor integration tests`);
+  }
+  return collection as RemovableCollection;
+}
+
+async function clearServerCompositionCollections() {
+  const collections: Array<[string, unknown]> = [
+    ['AuditLog', AuditLogAny],
+    ['Assignments', AssignmentsAny],
+    ['AuthThrottleState', AuthThrottleStateAny],
+    ['Courses', CoursesAny],
+    ['DynamicSettings', DynamicSettingsAny],
+    ['GlobalExperimentStates', GlobalExperimentStatesAny],
+    ['Histories', HistoriesAny],
+    ['StimulusCrowdStats', StimulusCrowdStatsAny],
+    ['Meteor.users', MeteorUsersAny],
+    ['PasswordResetTokens', PasswordResetTokensAny],
+    ['Sections', SectionsAny],
+    ['SectionUserMap', SectionUserMapAny],
+    ['Tdfs', TdfsAny],
+    ['UserDashboardCache', UserDashboardCacheAny],
+    ['UserMetrics', UserMetricsAny],
+    ['UserTimesLog', UserTimesLogAny],
+    ['UserUploadQuota', UserUploadQuotaAny],
+    ['Meteor.roleAssignment', (Meteor as any).roleAssignment],
+  ];
+
+  await Promise.all(
+    collections.map(([name, collection]) => requireRemovableCollection(collection, name).removeAsync({})),
+  );
+}
 
 function createServerHistoryRecord(overrides: Record<string, unknown> = {}) {
   return compressHistoryRecord({
@@ -58,43 +99,9 @@ function createServerHistoryRecord(overrides: Record<string, unknown> = {}) {
   });
 }
 
-StubCollections.stub(AuditLogAny);
-StubCollections.stub(AssignmentsAny);
-StubCollections.stub(AuthThrottleStateAny);
-StubCollections.stub(CoursesAny);
-StubCollections.stub(DynamicSettingsAny);
-StubCollections.stub(GlobalExperimentStatesAny);
-StubCollections.stub(HistoriesAny);
-StubCollections.stub(StimulusCrowdStatsAny);
-StubCollections.stub(PasswordResetTokensAny);
-StubCollections.stub(SectionsAny);
-StubCollections.stub(SectionUserMapAny);
-StubCollections.stub(TdfsAny);
-StubCollections.stub(UserDashboardCacheAny);
-StubCollections.stub(UserMetricsAny);
-StubCollections.stub(UserTimesLogAny);
-StubCollections.stub(UserUploadQuotaAny);
-
 describe('server auth and session methods', function() {
-  beforeEach(function() {
-    AuditLogAny.remove({});
-    AssignmentsAny.remove({});
-    AuthThrottleStateAny.remove({});
-    CoursesAny.remove({});
-    DynamicSettingsAny.remove({});
-    GlobalExperimentStatesAny.remove({});
-    HistoriesAny.remove({});
-    StimulusCrowdStatsAny.remove({});
-    MeteorUsersAny.remove({});
-    PasswordResetTokensAny.remove({});
-    SectionsAny.remove({});
-    SectionUserMapAny.remove({});
-    TdfsAny.remove({});
-    UserDashboardCacheAny.remove({});
-    UserMetricsAny.remove({});
-    UserTimesLogAny.remove({});
-    UserUploadQuotaAny.remove({});
-    (Meteor as any).roleAssignment?.remove({});
+  beforeEach(async function() {
+    await clearServerCompositionCollections();
   });
 
   it('writes auth.signupCompleted for native signup', async function() {
@@ -102,7 +109,7 @@ describe('server auth and session methods', function() {
     const password = `LongPassword-${Random.id()}123`;
 
     const result = await methods.signUpUser.call({}, email, password);
-    const auditEntry = AuditLogAny.findOne({
+    const auditEntry = await AuditLogAny.findOneAsync({
       action: 'auth.signupCompleted',
       targetUserId: result.userId
     }) as any;
@@ -142,7 +149,7 @@ describe('server auth and session methods', function() {
 
     const populateResult = await methods.populateSSOProfile.call({ userId }, userId);
     const updatedUser = await MeteorUsersAny.findOneAsync({_id: userId}) as any;
-    const auditEntry = AuditLogAny.findOne({
+    const auditEntry = await AuditLogAny.findOneAsync({
       action: 'auth.emailChanged',
       targetUserId: userId
     }) as any;
@@ -185,7 +192,7 @@ describe('server auth and session methods', function() {
     }
 
     const updatedUser = await MeteorUsersAny.findOneAsync({_id: userId}) as any;
-    const auditEntry = AuditLogAny.findOne({
+    const auditEntry = await AuditLogAny.findOneAsync({
       action: 'auth.sessionRevoked',
       actorUserId: userId,
       targetUserId: userId
@@ -265,23 +272,8 @@ describe('server auth and session methods', function() {
 });
 
 describe('public TDF and stimulus method authorization', function() {
-  beforeEach(function() {
-    AuditLogAny.remove({});
-    AuthThrottleStateAny.remove({});
-    CoursesAny.remove({});
-    DynamicSettingsAny.remove({});
-    GlobalExperimentStatesAny.remove({});
-    HistoriesAny.remove({});
-    StimulusCrowdStatsAny.remove({});
-    MeteorUsersAny.remove({});
-    PasswordResetTokensAny.remove({});
-    SectionUserMapAny.remove({});
-    TdfsAny.remove({});
-    UserDashboardCacheAny.remove({});
-    UserMetricsAny.remove({});
-    UserTimesLogAny.remove({});
-    UserUploadQuotaAny.remove({});
-    (Meteor as any).roleAssignment?.remove({});
+  beforeEach(async function() {
+    await clearServerCompositionCollections();
   });
 
   it('denies unauthenticated public TDF lookup by id', async function() {
@@ -502,6 +494,7 @@ describe('public TDF and stimulus method authorization', function() {
             setspec: {
               lessonname: 'AutoTutor Derived',
               stimulusfile: 'autotutor-stims.json',
+              openRouterModel: 'openai/test-model',
               userselect: 'false',
             },
             unit: [
@@ -708,23 +701,8 @@ describe('public TDF and stimulus method authorization', function() {
 });
 
 describe('learner analytics method authorization', function() {
-  beforeEach(function() {
-    AuditLogAny.remove({});
-    AuthThrottleStateAny.remove({});
-    CoursesAny.remove({});
-    DynamicSettingsAny.remove({});
-    GlobalExperimentStatesAny.remove({});
-    HistoriesAny.remove({});
-    StimulusCrowdStatsAny.remove({});
-    MeteorUsersAny.remove({});
-    PasswordResetTokensAny.remove({});
-    SectionUserMapAny.remove({});
-    TdfsAny.remove({});
-    UserDashboardCacheAny.remove({});
-    UserMetricsAny.remove({});
-    UserTimesLogAny.remove({});
-    UserUploadQuotaAny.remove({});
-    (Meteor as any).roleAssignment?.remove({});
+  beforeEach(async function() {
+    await clearServerCompositionCollections();
   });
 
   it('denies cross-user learner history helper reads', async function() {
@@ -859,23 +837,8 @@ describe('learner analytics method authorization', function() {
 });
 
 describe('system method authorization', function() {
-  beforeEach(function() {
-    AuditLogAny.remove({});
-    AuthThrottleStateAny.remove({});
-    CoursesAny.remove({});
-    DynamicSettingsAny.remove({});
-    GlobalExperimentStatesAny.remove({});
-    HistoriesAny.remove({});
-    StimulusCrowdStatsAny.remove({});
-    MeteorUsersAny.remove({});
-    PasswordResetTokensAny.remove({});
-    SectionUserMapAny.remove({});
-    TdfsAny.remove({});
-    UserDashboardCacheAny.remove({});
-    UserMetricsAny.remove({});
-    UserTimesLogAny.remove({});
-    UserUploadQuotaAny.remove({});
-    (Meteor as any).roleAssignment?.remove({});
+  beforeEach(async function() {
+    await clearServerCompositionCollections();
   });
 
   it('requires admin access for server status and verbosity controls', async function() {
@@ -939,23 +902,8 @@ describe('system method authorization', function() {
 });
 
 describe('condition count method authorization', function() {
-  beforeEach(function() {
-    AuditLogAny.remove({});
-    AuthThrottleStateAny.remove({});
-    CoursesAny.remove({});
-    DynamicSettingsAny.remove({});
-    GlobalExperimentStatesAny.remove({});
-    HistoriesAny.remove({});
-    StimulusCrowdStatsAny.remove({});
-    MeteorUsersAny.remove({});
-    PasswordResetTokensAny.remove({});
-    SectionUserMapAny.remove({});
-    TdfsAny.remove({});
-    UserDashboardCacheAny.remove({});
-    UserMetricsAny.remove({});
-    UserTimesLogAny.remove({});
-    UserUploadQuotaAny.remove({});
-    (Meteor as any).roleAssignment?.remove({});
+  beforeEach(async function() {
+    await clearServerCompositionCollections();
   });
 
   it('denies unauthenticated condition count updates', async function() {
@@ -1439,23 +1387,8 @@ describe('condition count method authorization', function() {
 });
 
 describe('course method authorization', function() {
-  beforeEach(function() {
-    AuditLogAny.remove({});
-    AuthThrottleStateAny.remove({});
-    CoursesAny.remove({});
-    DynamicSettingsAny.remove({});
-    GlobalExperimentStatesAny.remove({});
-    HistoriesAny.remove({});
-    StimulusCrowdStatsAny.remove({});
-    MeteorUsersAny.remove({});
-    PasswordResetTokensAny.remove({});
-    SectionUserMapAny.remove({});
-    TdfsAny.remove({});
-    UserDashboardCacheAny.remove({});
-    UserMetricsAny.remove({});
-    UserTimesLogAny.remove({});
-    UserUploadQuotaAny.remove({});
-    (Meteor as any).roleAssignment?.remove({});
+  beforeEach(async function() {
+    await clearServerCompositionCollections();
   });
 
   it('denies course creation by non-teachers', async function() {
@@ -1522,28 +1455,13 @@ describe('course method authorization', function() {
 });
 
 describe('content helper authorization', function() {
-  beforeEach(function() {
-    AuditLogAny.remove({});
-    AuthThrottleStateAny.remove({});
-    CoursesAny.remove({});
-    DynamicSettingsAny.remove({});
-    GlobalExperimentStatesAny.remove({});
-    HistoriesAny.remove({});
-    StimulusCrowdStatsAny.remove({});
-    MeteorUsersAny.remove({});
-    PasswordResetTokensAny.remove({});
-    SectionUserMapAny.remove({});
-    TdfsAny.remove({});
-    UserDashboardCacheAny.remove({});
-    UserMetricsAny.remove({});
-    UserTimesLogAny.remove({});
-    UserUploadQuotaAny.remove({});
-    (Meteor as any).roleAssignment?.remove({});
+  beforeEach(async function() {
+    await clearServerCompositionCollections();
   });
 
   it('requires login for owner display lookup', async function() {
     try {
-      await (asyncMethods.getTdfOwnersMap as any).call({}, ['owner-user']);
+      await (methods.getTdfOwnersMap as any).call({}, ['owner-user']);
       expect.fail('Expected anonymous owner lookup to be denied');
     } catch (error: any) {
       expect(error.error).to.equal(401);
@@ -1552,7 +1470,7 @@ describe('content helper authorization', function() {
 
   it('denies cross-owner TDF listing', async function() {
     try {
-      await (asyncMethods.getTdfsByOwnerId as any).call({ userId: 'student-user' }, 'owner-user');
+      await (methods.getTdfsByOwnerId as any).call({ userId: 'student-user' }, 'owner-user');
       expect.fail('Expected cross-owner TDF listing to be denied');
     } catch (error: any) {
       expect(error.error).to.equal(403);
@@ -1585,23 +1503,8 @@ describe('content helper authorization', function() {
 });
 
 describe('MTurk workflow authorization', function() {
-  beforeEach(function() {
-    AuditLogAny.remove({});
-    AuthThrottleStateAny.remove({});
-    CoursesAny.remove({});
-    DynamicSettingsAny.remove({});
-    GlobalExperimentStatesAny.remove({});
-    HistoriesAny.remove({});
-    StimulusCrowdStatsAny.remove({});
-    MeteorUsersAny.remove({});
-    PasswordResetTokensAny.remove({});
-    SectionUserMapAny.remove({});
-    TdfsAny.remove({});
-    UserDashboardCacheAny.remove({});
-    UserMetricsAny.remove({});
-    UserTimesLogAny.remove({});
-    UserUploadQuotaAny.remove({});
-    (Meteor as any).roleAssignment?.remove({});
+  beforeEach(async function() {
+    await clearServerCompositionCollections();
   });
 
   it('requires teacher or admin role for MTurk experiment listing and AWS profile updates', async function() {

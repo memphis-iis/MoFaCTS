@@ -1,5 +1,4 @@
 import { expect } from 'chai';
-import { describe, it } from 'mocha';
 import {
   CARD_INSTRUCTION_HTML_SANITIZER_CONFIG,
   sanitizeCardInstructionHtml,

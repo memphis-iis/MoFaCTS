@@ -8,6 +8,10 @@ import { SPARC_SESSION_UNIT_TYPE } from '../unitTypes';
 import {
   processAndCommitSparcAuthoredResponseOutcome,
 } from './sparcResponseOutcomePipeline';
+import {
+  commitSparcAuthoredProductionRuleEvent,
+  evaluateSparcAuthoredProductionRules,
+} from './sparcProductionRuleCommit';
 import { replaySparcDocumentHistory } from './sparcDocumentReplay';
 import {
   validateSparcDocumentReferences,
@@ -18,10 +22,13 @@ import {
 import type { SparcPracticeHistoryCore } from './sparcPracticeHistoryBridge';
 import type {
   SparcAuthoredDocument,
+  SparcReactiveEvent,
+  SparcWorkingMemoryFact,
 } from './sparcSessionContracts';
 import type {
   SparcResponseOutcomeInput,
 } from './sparcResponseOutcomeProcessor';
+import type { SparcReplayState } from './sparcStateReplay';
 import {
   resolveSparcSessionClusterListSource,
   resolveSparcSessionModelPreparationClusterListSource,
@@ -39,6 +46,16 @@ export type SparcAuthoredResponseOutcomeRuntimeParams = {
   readonly document: SparcAuthoredDocument;
   readonly input: SparcResponseOutcomeInput;
   readonly priorHistoryRecords: readonly CanonicalHistoryRecord[];
+  readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory'>;
+};
+
+export type SparcAuthoredProductionRuleRuntimeParams = {
+  readonly core: SparcPracticeHistoryCore;
+  readonly document: SparcAuthoredDocument;
+  readonly replayState?: SparcReplayState;
+  readonly event: SparcReactiveEvent;
+  readonly extraFacts?: readonly SparcWorkingMemoryFact[];
+  readonly maxCycles?: number;
   readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory'>;
 };
 
@@ -62,6 +79,24 @@ export async function createSparcSessionUnitEngine(
     validateSparcDocumentReferences,
 
     replaySparcDocumentHistory,
+
+    evaluateSparcAuthoredProductionRules,
+
+    async commitSparcAuthoredProductionRuleEvent(
+      params: SparcAuthoredProductionRuleRuntimeParams,
+    ) {
+      return await commitSparcAuthoredProductionRuleEvent({
+        core: params.core,
+        document: params.document,
+        ...(params.replayState ? { replayState: params.replayState } : {}),
+        event: params.event,
+        ...(params.extraFacts ? { extraFacts: params.extraFacts } : {}),
+        ...(params.maxCycles !== undefined ? { maxCycles: params.maxCycles } : {}),
+        runtime: {
+          history: params.history,
+        },
+      });
+    },
 
     async processAndCommitSparcAuthoredResponseOutcome(
       params: SparcAuthoredResponseOutcomeRuntimeParams,

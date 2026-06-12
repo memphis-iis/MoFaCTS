@@ -72,6 +72,132 @@ describe('machine services contracts', function() {
     });
   });
 
+  it('evaluates SPARC path-scoped SAI intents using the best active path', async function() {
+    const result = await evaluateAnswerService({
+      currentDisplay: {
+        response: {
+          gradingMode: 'sai-path-intent',
+          evaluation: {
+            trimWhitespace: true,
+            mathNormalize: true,
+          },
+          intentByPath: [{
+            path: 'lcd-12',
+            intentByNode: [
+              { node: 'firstDen', expected: '12', type: 'numeric' },
+              { node: 'answerNum', expected: '5', type: 'numeric' },
+              { node: 'answerDen', expected: '12', type: 'numeric' },
+            ],
+          }, {
+            path: 'common-denominator-24',
+            intentByNode: [
+              { node: 'firstDen', expected: '24', type: 'numeric' },
+              { node: 'answerNum', expected: '10', type: 'numeric' },
+              { node: 'answerDen', expected: '24', type: 'numeric' },
+              { node: 'finalNum', expected: '5', type: 'numeric' },
+              { node: 'finalDen', expected: '12', type: 'numeric' },
+            ],
+          }],
+        },
+      },
+      sparcResult: {
+        timestamp: 1,
+        submittedNodes: {
+          firstDen: '24',
+          answerNum: '10',
+          answerDen: '24',
+          finalNum: '5',
+          finalDen: '12',
+        },
+      },
+    });
+
+    expect(result).to.deep.equal({
+      isCorrect: true,
+      matchText: '11111',
+      sparcPath: 'common-denominator-24',
+    });
+  });
+
+  it('evaluates SPARC dependency intents with accepted SAI input variants', async function() {
+    const result = await evaluateAnswerService({
+      currentDisplay: {
+        response: {
+          gradingMode: 'sai-dependency-intent',
+          scoredNodes: ['resultValue'],
+          evaluation: {
+            trimWhitespace: true,
+            allowScientificNotation: true,
+          },
+          intentByNode: [{
+            node: 'resultValue',
+            expected: '0.0106',
+            acceptedValues: ['0.0106', '.0106', '1.06E-02'],
+            type: 'scientific',
+          }],
+        },
+      },
+      sparcResult: {
+        timestamp: 1,
+        submittedNodes: {
+          resultValue: '1.06E-02',
+        },
+      },
+    });
+
+    expect(result).to.deep.equal({
+      isCorrect: true,
+      matchText: '1',
+    });
+  });
+
+  it('returns authored SPARC feedback matches through behaviorRefs', async function() {
+    const result = await evaluateAnswerService({
+      currentDisplay: {
+        behaviorRefs: {
+          firstDenConv: 'firstDen',
+        },
+        behavior: {
+          feedback: [{
+            id: 'added-denominators',
+            when: {
+              selection: 'firstDenConv',
+              action: 'UpdateTextArea',
+              input: '10',
+            },
+            message: 'Choose a denominator that both denominators divide into.',
+          }],
+        },
+        response: {
+          gradingMode: 'sai-dependency-intent',
+          scoredNodes: ['firstDen'],
+          evaluation: {
+            trimWhitespace: true,
+            mathNormalize: true,
+          },
+          intentByNode: [{
+            node: 'firstDen',
+            expected: '12',
+            type: 'numeric',
+          }],
+        },
+      },
+      sparcResult: {
+        timestamp: 1,
+        submittedNodes: {
+          firstDen: '10',
+        },
+      },
+    });
+
+    expect(result).to.deep.equal({
+      isCorrect: false,
+      matchText: '0',
+      sparcFeedbackId: 'added-denominators',
+      sparcFeedbackMessage: 'Choose a denominator that both denominators divide into.',
+    });
+  });
+
   it('includes fade-out lead time in study countdown envelopes', function() {
     const remaining = getFeedbackTimeoutRemainingMs({
       testType: 's',

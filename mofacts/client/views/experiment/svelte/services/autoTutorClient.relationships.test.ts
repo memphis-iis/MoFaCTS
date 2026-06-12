@@ -4,6 +4,10 @@ import sinon from 'sinon';
 
 import type { AutoTutorRuntimeCapabilities } from '../../../../../../learning-components/units/autotutor/AutoTutorRuntimeCapabilities';
 
+type MeteorCallAsyncHost = typeof Meteor & {
+  callAsync: (name: string, ...args: unknown[]) => Promise<unknown>;
+};
+
 function buildCapabilities(): AutoTutorRuntimeCapabilities {
   const script = {
     id: 'script-relationships',
@@ -104,9 +108,9 @@ describe('autoTutorClient relationship graph initialization', function() {
   });
 
   it('generates and persists missing expectation relationships before planner state initializes', async function() {
-    const meteorCallStub = sinon.stub(Meteor as any, 'callAsync');
+    const meteorCallStub = sinon.stub(Meteor as MeteorCallAsyncHost, 'callAsync');
     meteorCallStub.withArgs('persistAutoTutorExpectationRelationships').resolves({ success: true });
-    const fetchStub = sinon.stub(globalThis, 'fetch' as any);
+    const fetchStub = sinon.stub(globalThis, 'fetch');
     fetchStub.resolves(new Response(JSON.stringify({
       data: [
         { embedding: [1, 0, 0] },

@@ -4,6 +4,9 @@ import {
 } from '../../runtime/modelPracticeStateQueries';
 import type { CanonicalHistoryRecord } from '../../runtime/historyEnvelope';
 import { commitSparcAuthoredReactiveEvent } from './sparcReactiveRuleCommit';
+import {
+  commitSparcAuthoredProductionRuleEvent,
+} from './sparcProductionRuleCommit';
 import { replaySparcDocumentHistory } from './sparcDocumentReplay';
 import {
   commitSparcProcessedResponseOutcome,
@@ -15,6 +18,9 @@ import type { SparcPracticeHistoryCore } from './sparcPracticeHistoryBridge';
 import type {
   SparcCommittedReactiveRuleEvaluation,
 } from './sparcReactiveRuleCommit';
+import type {
+  SparcCommittedProductionRuleEvaluation,
+} from './sparcProductionRuleCommit';
 import type {
   SparcAuthoredDocument,
 } from './sparcSessionContracts';
@@ -44,8 +50,10 @@ function createRuleModelQueryProvider(params: {
 
 export type SparcResponseOutcomePipelineResult = {
   readonly responseCommit: SparcCommittedResponseOutcome;
+  readonly productionCommit: SparcCommittedProductionRuleEvaluation;
   readonly reactiveCommit: SparcCommittedReactiveRuleEvaluation;
   readonly replayStateAfterResponse: SparcReplayState;
+  readonly replayStateAfterProduction: SparcReplayState;
   readonly finalReplayState: SparcReplayState;
 };
 
@@ -66,18 +74,36 @@ export async function commitSparcResponseOutcomeWithAuthoredRules(params: {
     [responseCommit.historyRecord],
     params.replayState,
   );
+  const authoredRuleEvent = {
+    eventId: `${params.processed.observation.observationId}:authored-rules`,
+    type: responseCommit.usedAdaptiveModel ? 'model-updated' as const : 'outcome-recorded' as const,
+    source: params.processed.observation.sourceAddress,
+    time: params.processed.observation.time,
+    payload: {
+      outcome: params.processed.observation.outcome,
+      responseValue: params.processed.observation.responseValue,
+      ...(params.processed.observation.input !== undefined ? { input: params.processed.observation.input } : {}),
+    },
+    practiceObservation: params.processed.observation,
+  };
+  const productionCommit = await commitSparcAuthoredProductionRuleEvent({
+    core: params.core,
+    document: params.document,
+    event: authoredRuleEvent,
+    replayState: replayStateAfterResponse,
+    runtime: {
+      history: params.runtime.history,
+    },
+  });
+  const replayStateAfterProduction = productionCommit.historyRecord
+    ? replaySparcHistory([productionCommit.historyRecord], replayStateAfterResponse)
+    : replayStateAfterResponse;
   const reactiveCommit = await commitSparcAuthoredReactiveEvent({
     core: params.core,
     document: params.document,
-    event: {
-      eventId: `${params.processed.observation.observationId}:authored-rules`,
-      type: responseCommit.usedAdaptiveModel ? 'model-updated' : 'outcome-recorded',
-      source: params.processed.observation.sourceAddress,
-      time: params.processed.observation.time,
-      practiceObservation: params.processed.observation,
-    },
+    event: authoredRuleEvent,
     context: {
-      replayState: replayStateAfterResponse,
+      replayState: replayStateAfterProduction,
       modelQueries: createRuleModelQueryProvider({
         historyRecords: [
           ...(params.priorModelHistoryRecords ?? []),
@@ -91,13 +117,15 @@ export async function commitSparcResponseOutcomeWithAuthoredRules(params: {
     },
   });
   const finalReplayState = reactiveCommit.historyRecord
-    ? replaySparcHistory([reactiveCommit.historyRecord], replayStateAfterResponse)
-    : replayStateAfterResponse;
+    ? replaySparcHistory([reactiveCommit.historyRecord], replayStateAfterProduction)
+    : replayStateAfterProduction;
 
   return {
     responseCommit,
+    productionCommit,
     reactiveCommit,
     replayStateAfterResponse,
+    replayStateAfterProduction,
     finalReplayState,
   };
 }

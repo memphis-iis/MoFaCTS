@@ -6,6 +6,8 @@ export type SparcDisplayContentReadinessIssue = {
     | 'missing-node-id'
     | 'missing-scored-node'
     | 'missing-intent'
+    | 'missing-behavior-ref-node'
+    | 'missing-path-intent-node'
     | 'missing-layout-zone';
   readonly message: string;
   readonly nodeId?: string;
@@ -92,6 +94,53 @@ function validatePlacements(
   }
 }
 
+function collectIntentNodes(display: SparcTrialDisplay): Set<string> {
+  const intentNodes = new Set((display.response?.intentByNode ?? []).map((intent) => intent.node));
+  for (const pathEntry of display.response?.intentByPath ?? []) {
+    for (const intent of pathEntry.intentByNode ?? []) {
+      intentNodes.add(intent.node);
+    }
+  }
+  return intentNodes;
+}
+
+function validatePathIntents(
+  display: SparcTrialDisplay,
+  nodeIds: ReadonlySet<string>,
+  issues: SparcDisplayContentReadinessIssue[],
+): void {
+  for (const pathEntry of display.response?.intentByPath ?? []) {
+    for (const intent of pathEntry.intentByNode ?? []) {
+      if (!nodeIds.has(intent.node)) {
+        issues.push({
+          kind: 'missing-path-intent-node',
+          nodeId: intent.node,
+          message: `SPARC path intent node "${intent.node}" is not declared in display nodes`,
+        });
+      }
+    }
+  }
+}
+
+function validateBehaviorRefs(
+  display: SparcTrialDisplay,
+  nodeIds: ReadonlySet<string>,
+  issues: SparcDisplayContentReadinessIssue[],
+): void {
+  if (!isRecord(display.behaviorRefs)) {
+    return;
+  }
+  for (const [refName, nodeId] of Object.entries(display.behaviorRefs)) {
+    if (typeof nodeId !== 'string' || !nodeIds.has(nodeId)) {
+      issues.push({
+        kind: 'missing-behavior-ref-node',
+        ...(typeof nodeId === 'string' ? { nodeId } : {}),
+        message: `SPARC behaviorRef "${refName}" references missing node "${String(nodeId)}"`,
+      });
+    }
+  }
+}
+
 export function validateSparcDisplayContentReadiness(
   display: SparcTrialDisplay,
 ): SparcDisplayContentReadinessResult {
@@ -99,7 +148,7 @@ export function validateSparcDisplayContentReadiness(
   const nodeIds = new Set<string>();
   collectNodeIds(display.nodes, nodeIds, issues);
 
-  const intentNodes = new Set((display.response?.intentByNode ?? []).map((intent) => intent.node));
+  const intentNodes = collectIntentNodes(display);
   for (const nodeId of display.response?.scoredNodes ?? []) {
     if (!nodeIds.has(nodeId)) {
       issues.push({
@@ -117,6 +166,8 @@ export function validateSparcDisplayContentReadiness(
     }
   }
 
+  validatePathIntents(display, nodeIds, issues);
+  validateBehaviorRefs(display, nodeIds, issues);
   validatePlacements(display.nodes, collectLayoutZoneIds(display), issues);
 
   return {

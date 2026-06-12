@@ -95,10 +95,11 @@ describe('Learning component catalog', function() {
     };
 
     expect([...getCreateUnitEngineCapabilitySet(adapter)].sort()).to.deep.equal([
-      'adaptive-model',
+      'adaptive-card-model',
       'ai-provider',
       'assessment-state',
       'authz',
+      'card-state',
       'delivery-settings',
       'history',
       'logging',
@@ -156,6 +157,8 @@ describe('Learning component catalog', function() {
         displayTypes: [],
         requiredCapabilities: ['logging'],
         requiredServerMethods: [],
+        providedServices: [],
+        providedServiceDetails: [],
       }],
       trialDisplays: [{
         id: 'sample.display',
@@ -164,6 +167,8 @@ describe('Learning component catalog', function() {
         displayTypes: ['sample-display'],
         requiredCapabilities: ['media'],
         requiredServerMethods: [],
+        providedServices: [],
+        providedServiceDetails: [],
       }],
     });
   });
@@ -195,7 +200,7 @@ describe('Learning component catalog', function() {
       .to.deep.include({
         id: 'mofacts.assessment-session-unit',
         kind: 'unit',
-        requiredCapabilities: ['assessment-state', 'logging', 'session', 'stimuli', 'ui-alerts'],
+        requiredCapabilities: ['assessment-state', 'card-state', 'logging', 'session', 'stimuli', 'ui-alerts'],
         requiredServerMethods: [],
       });
     expect(summary.trialDisplays).to.deep.equal([
@@ -206,6 +211,8 @@ describe('Learning component catalog', function() {
         displayTypes: ['h5p'],
         requiredCapabilities: ['history', 'media'],
         requiredServerMethods: [],
+        providedServices: [],
+        providedServiceDetails: [],
       },
       {
         id: 'mofacts.sparc-trial-display',
@@ -214,6 +221,12 @@ describe('Learning component catalog', function() {
         displayTypes: ['sparc'],
         requiredCapabilities: ['history', 'media'],
         requiredServerMethods: [],
+        providedServices: ['sparc.display-content-readiness'],
+        providedServiceDetails: [{
+          serviceName: 'sparc.display-content-readiness',
+          componentId: 'mofacts.sparc-trial-display',
+          runtimeEntry: 'sparcDisplayContentReadiness.validateSparcDisplayContentReadiness',
+        }],
       },
     ]);
   });
@@ -260,6 +273,8 @@ describe('Learning component catalog', function() {
         displayTypes: [],
         requiredCapabilities: ['logging'],
         requiredServerMethods: [],
+        providedServices: [],
+        providedServiceDetails: [],
       }],
       trialDisplays: [{
         id: 'sample.display',
@@ -268,6 +283,8 @@ describe('Learning component catalog', function() {
         displayTypes: ['sample-display'],
         requiredCapabilities: ['media'],
         requiredServerMethods: [],
+        providedServices: [],
+        providedServiceDetails: [],
       }],
     });
 
@@ -309,6 +326,8 @@ describe('Learning component catalog', function() {
         displayTypes: [],
         requiredCapabilities: ['logging'],
         requiredServerMethods: [],
+        providedServices: [],
+        providedServiceDetails: [],
       });
 
     expect(() => combineLearningComponentCatalogs([
