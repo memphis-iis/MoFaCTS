@@ -10,8 +10,6 @@ import { createUnitEngine } from '../../engineConstructors';
 import { getCurrentDeliverySettings } from '../../../../lib/currentTestingHelpers';
 import { clientConsole } from '../../../../lib/clientLogger';
 import { deliverySettingsStore } from '../../../../lib/state/deliverySettingsStore';
-import { getEngine } from '../../../../lib/engineManager';
-import { ExperimentStateStore } from '../../../../lib/state/experimentStateStore';
 import { computePracticeTimeMs } from '../../../../../lib/practiceTime';
 import { calculateTrialTimings } from './historyLogging';
 import { getExperimentState } from './experimentState';
@@ -20,6 +18,22 @@ import { assertIdInvariants, logIdInvariantBreachOnce } from '../../../../lib/id
 import { resolveH5PModelOutcomes } from '../../../../../common/lib/h5pTrialResult';
 import { getPreparedCardDataFromSelection as buildPreparedCardDataFromSelection } from './cardPayloadBuilder';
 import { resolveSessionSurfaceState } from './sessionSurfaceMode';
+import {
+  clearResumeToQuestion,
+  getIsVideoSessionFlag,
+  getEngineIndices,
+  getRuntimeExperimentState,
+  getSessionClusterIndex,
+  hasCurrentTdfId,
+  isResumeInProgress,
+  isResumeRequested,
+  publishEngineIndices,
+  resolveRuntimeEngine,
+  setCurrentAnswer,
+  setCurrentDeliverySettings,
+  setEngineIndices,
+  setVideoEngineIndices,
+} from './cardRuntimeState';
 import type {
   EngineServiceResult,
   ExperimentState,
@@ -125,7 +139,7 @@ type PreparedTrialCommitRoute = 'model-locked-card' | 'schedule-prepared-card' |
 
 function isUnitEngineVideoSurfaceActive(): boolean {
   return resolveSessionSurfaceState({
-    sessionIsVideoSession: Session.get('isVideoSession'),
+    sessionIsVideoSession: getIsVideoSessionFlag(),
   }).isVideoSession;
 }
 
@@ -424,7 +438,7 @@ function isPreparedAdvanceEligible(
   if (isUnitEngineVideoSurfaceActive()) {
     return false;
   }
-  if (Session.get('resumeToQuestion') === true || Session.get('resumeInProgress') === true) {
+  if (isResumeRequested() || isResumeInProgress()) {
     return false;
   }
   if (context?.videoSession?.pendingQuestionIndex !== undefined && context?.videoSession?.pendingQuestionIndex !== null) {
@@ -454,7 +468,10 @@ export function startEarlyLockForCurrentTrial(
   context: UnitEngineServiceContext,
   engineArg?: UnitEngineLike | null | undefined,
 ): void {
-  const engine = (engineArg || context.engine || getEngine()) as UnitEngineLike | null | undefined;
+  const engine = resolveRuntimeEngine({
+    explicitEngine: engineArg,
+    contextEngine: context.engine,
+  }) as UnitEngineLike | null | undefined;
   if (!isPreparedAdvanceEligible(engine, context) || typeof engine?.lockNextCardEarly !== 'function') {
     return;
   }
@@ -465,7 +482,7 @@ export function startEarlyLockForCurrentTrial(
   };
   const ownerToken = engine.currentCardOwnerToken || null;
   const nextQuestionIndex = Number.isFinite(context.questionIndex) ? Number(context.questionIndex) + 1 : 1;
-  void engine.lockNextCardEarly(undefined, ExperimentStateStore.get(), {
+  void engine.lockNextCardEarly(undefined, getRuntimeExperimentState(), {
     currentCardRef,
     ownerToken,
   })
@@ -499,7 +516,10 @@ export async function prepareIncomingTrialService(
   context: UnitEngineServiceContext,
   event: SelectCardServiceEvent | UpdateEngineServiceEvent | Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
-  const engine = (event?.engine || context.engine || getEngine()) as UnitEngineLike | null | undefined;
+  const engine = resolveRuntimeEngine({
+    eventEngine: event?.engine as UnitEngineLike | null | undefined,
+    contextEngine: context.engine,
+  }) as UnitEngineLike | null | undefined;
   if (!engine) {
     throw new Error('No engine available for prepared incoming trial');
   }
@@ -515,7 +535,7 @@ export async function prepareIncomingTrialService(
     };
   }
 
-  const curExperimentState = (ExperimentStateStore.get() || {}) as ExperimentState;
+  const curExperimentState = getRuntimeExperimentState() as ExperimentState;
   if (route.kind === 'model-lock') {
     const preparedTrial = await prepareLockedNextTrial(engine, context, curExperimentState, nextQuestionIndex);
     if (preparedTrial) {
@@ -551,8 +571,11 @@ export function commitPreparedTrialRuntime(
     return;
   }
 
-  const engine = (preparedTrial.engine || context.engine || getEngine()) as UnitEngineLike | null | undefined;
-  const curExperimentState = (ExperimentStateStore.get() || {}) as ExperimentState;
+  const engine = resolveRuntimeEngine({
+    explicitEngine: preparedTrial.engine as UnitEngineLike | null | undefined,
+    contextEngine: context.engine,
+  }) as UnitEngineLike | null | undefined;
+  const curExperimentState = getRuntimeExperimentState() as ExperimentState;
   const preparedSelection = preparedTrial.preparedSelection || null;
   const commitRoute = resolvePreparedTrialCommitRoute(engine);
   let committed = false;
@@ -570,19 +593,16 @@ export function commitPreparedTrialRuntime(
   CardStore.setButtonTrial(Boolean(preparedTrial.buttonTrial));
   CardStore.setButtonList(Array.isArray(preparedTrial.buttonList) ? preparedTrial.buttonList : []);
   if (preparedTrial.deliverySettings) {
-    Session.set('currentDeliverySettings', preparedTrial.deliverySettings);
+    setCurrentDeliverySettings(preparedTrial.deliverySettings);
   }
   if (preparedTrial.engineIndices) {
-    const { clusterIndex, whichStim, stimIndex } = preparedTrial.engineIndices;
-    if (typeof clusterIndex === 'number') Session.set('clusterIndex', clusterIndex);
-    if (typeof whichStim === 'number') Session.set('whichStim', whichStim);
-    if (typeof stimIndex === 'number') Session.set('stimIndex', stimIndex);
+    publishEngineIndices(preparedTrial.engineIndices);
   }
   const questionIndex = preparedTrial.questionIndex;
   if (typeof questionIndex === 'number') {
     CardStore.setQuestionIndex(questionIndex);
   }
-  Session.set('currentAnswer', preparedTrial.currentAnswer || '');
+  setCurrentAnswer(preparedTrial.currentAnswer);
 
   if (typeof engine?.setPreparedNextTrialContent === 'function') {
     engine.setPreparedNextTrialContent(null);
@@ -615,13 +635,15 @@ export async function selectCardService(
     // event is nested under event.event.
     const machineEvent = (event?.event || event || {}) as Record<string, unknown>;
 
-    // Get engine from event data, context, or global engineManager
-    const engine = (event.engine || context.engine || getEngine()) as UnitEngineLike | null | undefined;
+    const engine = resolveRuntimeEngine({
+      eventEngine: event.engine as UnitEngineLike | null | undefined,
+      contextEngine: context.engine,
+    }) as UnitEngineLike | null | undefined;
     const pendingVideoQuestionIndex = context?.videoSession?.pendingQuestionIndex;
     const resolvedVideoClusterIndex = getFiniteNumber(pendingVideoQuestionIndex);
     const eventClusterIndex = getFiniteNumber(machineEvent.clusterIndex);
     const contextClusterIndex = getFiniteNumber(context.engineIndices?.clusterIndex);
-    const sessionClusterIndex = getFiniteNumber(Session.get('clusterIndex')) ?? 0;
+    const sessionClusterIndex = getSessionClusterIndex();
     const clusterIndex = eventClusterIndex !== undefined
       ? eventClusterIndex
       : resolvedVideoClusterIndex !== undefined
@@ -633,24 +655,23 @@ export async function selectCardService(
     const questionIndex = eventQuestionIndex !== undefined
       ? eventQuestionIndex
       : (context.questionIndex || 1);
-    let engineIndices = Session.get('engineIndices');
-    if (isUnitEngineVideoSurfaceActive() && Number.isFinite(resolvedVideoClusterIndex)) {
-      engineIndices = { clusterIndex: resolvedVideoClusterIndex, stimIndex: 0 };
-      Session.set('engineIndices', engineIndices);
+    let engineIndices = getEngineIndices();
+    if (isUnitEngineVideoSurfaceActive() && resolvedVideoClusterIndex !== undefined) {
+      engineIndices = setVideoEngineIndices(resolvedVideoClusterIndex);
     }
-    const resumeRequested = Session.get('resumeToQuestion') === true;
+    const resumeRequested = isResumeRequested();
     const isVideoCheckpointSelection = machineEvent?.type === 'VIDEO_CHECKPOINT' ||
       Number.isFinite(resolvedVideoClusterIndex);
     const isResume = resumeRequested && !isVideoCheckpointSelection;
     if (resumeRequested && isVideoCheckpointSelection) {
-      Session.set('resumeToQuestion', false);
+      clearResumeToQuestion();
     }
     if (machineEvent?.type === 'START' || isResume) {
       clearPreparedNextRuntimeState(engine, isResume ? 'resume-entry' : 'start-entry');
     }
     /** @type {ExperimentState} */
-    const curExperimentState = (ExperimentStateStore.get() || {}) as ExperimentState;
-    if (!Session.get('currentTdfId')) {
+    const curExperimentState = getRuntimeExperimentState() as ExperimentState;
+    if (!hasCurrentTdfId()) {
       logIdInvariantBreachOnce('unitEngine.selectCardService:missing-currentTdfId');
     }
 
@@ -688,7 +709,7 @@ export async function selectCardService(
     // This must be called before getCardDataFromEngine() which calls findCurrentCardInfo()
     if (isResume) {
       await engine.selectNextCard(engineIndices, curExperimentState);
-      Session.set('resumeToQuestion', false);
+      clearResumeToQuestion();
     } else {
       if (typeof engine.clearPrefetchedNextCard === 'function') {
         engine.clearPrefetchedNextCard();
@@ -791,13 +812,15 @@ export async function updateEngineService(
 
       if (!isUnitEngineVideoSurfaceActive()) {
         const modelCardRef = resolveModelEngineCardRef(engine);
-        if (modelCardRef) {
-          Session.set('engineIndices', {
-            clusterIndex: modelCardRef.clusterIndex,
-            stimIndex: modelCardRef.stimIndex,
+        const modelClusterIndex = getFiniteNumber(modelCardRef?.clusterIndex);
+        const modelStimIndex = getFiniteNumber(modelCardRef?.stimIndex);
+        if (modelClusterIndex !== undefined && modelStimIndex !== undefined) {
+          setEngineIndices({
+            clusterIndex: modelClusterIndex,
+            stimIndex: modelStimIndex,
           });
         } else {
-          Session.set('engineIndices', undefined);
+          setEngineIndices(undefined);
         }
       }
     } else {

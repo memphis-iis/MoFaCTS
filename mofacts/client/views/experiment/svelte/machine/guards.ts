@@ -10,6 +10,12 @@ import { getFeedbackTimeoutMs } from '../utils/timeoutUtils';
 import { evaluateSrAvailability } from '../../../../lib/audioAvailability';
 import { selfHostedH5PTrialDisplayOwnsInteraction } from '../services/h5pTrialDisplay';
 import { resolveSessionSurfaceState } from '../services/sessionSurfaceMode';
+import {
+  getIsVideoSessionFlag,
+  getVideoCheckpoints,
+  isResumeInProgress,
+  isResumeRequested,
+} from '../services/cardRuntimeState';
 
 type FeedbackTimeoutContext = Parameters<typeof getFeedbackTimeoutMs>[0];
 type PreparedAdvanceMode = 'none' | 'seamless' | 'direct';
@@ -479,7 +485,7 @@ export function canUsePreparedAdvance(args: CardMachineActorArgs): boolean {
   if (isVideoSession(args)) {
     return false;
   }
-  if (Session.get('resumeToQuestion') === true || Session.get('resumeInProgress') === true) {
+  if (isResumeRequested() || isResumeInProgress()) {
     return false;
   }
   return true;
@@ -534,7 +540,7 @@ export function isSoftError({ event }: CardMachineActorArgs): boolean {
 export function isVideoSession({ context }: CardMachineActorArgs): boolean {
   return resolveSessionSurfaceState({
     deliverySettings: context.deliverySettings,
-    sessionIsVideoSession: Session.get('isVideoSession'),
+    sessionIsVideoSession: getIsVideoSessionFlag(),
   }).isVideoSession;
 }
 
@@ -561,7 +567,7 @@ export function canAcceptVideoCheckpoint(args: CardMachineActorArgs): boolean {
     return false;
   }
 
-  const checkpoints = Session.get('videoCheckpoints') as {
+  const checkpoints = getVideoCheckpoints() as {
     times?: unknown[];
     questions?: unknown[];
   } | null | undefined;

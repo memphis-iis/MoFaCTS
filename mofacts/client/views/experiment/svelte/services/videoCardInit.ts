@@ -5,6 +5,12 @@ import { deliverySettingsStore } from '../../../../lib/state/deliverySettingsSto
 import { extractDelimFields, rangeVal } from '../../../../lib/currentTestingHelpers';
 import { resolveDynamicAssetPath } from './mediaResolver';
 import { resolveVideoResumeAnchor } from './videoResume';
+import {
+  clearVideoSessionState,
+  setVideoCheckpoints,
+  setVideoResumeAnchor,
+  setVideoSessionActive,
+} from './cardRuntimeState';
 import type {
   RewindCheckpointData,
   VideoCheckpointBehavior,
@@ -218,12 +224,11 @@ function resolveVideoQuestionTimes(videoSession: VideoSessionLike): number[] {
 export async function initVideoSessionData(curTdfUnit: VideoTdfUnitLike | null | undefined) {
   const videoSession = curTdfUnit?.videosession;
   if (!videoSession) {
-    Session.set('isVideoSession', false);
-    Session.set('videoResumeAnchor', null);
+    clearVideoSessionState();
     return;
   }
 
-  Session.set('isVideoSession', true);
+  setVideoSessionActive(true);
 
   if (!videoSession.videosource) {
     throw new Error('[Svelte Init] Video session missing videosource');
@@ -241,7 +246,7 @@ export async function initVideoSessionData(curTdfUnit: VideoTdfUnitLike | null |
     Session.get('currentStimuliSet') as Array<{ checkpoint?: boolean }> | null | undefined,
   );
 
-  Session.set('videoCheckpoints', {
+  setVideoCheckpoints({
     times,
     questions: parsedQuestions,
     checkpointBehavior,
@@ -261,7 +266,7 @@ export async function initVideoSessionData(curTdfUnit: VideoTdfUnitLike | null |
     );
   }
   const videoResumeAnchor = resolveVideoResumeAnchor(times, completedCheckpointQuestionCount);
-  Session.set('videoResumeAnchor', videoResumeAnchor);
+  setVideoResumeAnchor(videoResumeAnchor);
 
   const resolvedVideoUrl = resolveDynamicAssetPath(videoSession.videosource, { logPrefix: '[Svelte Init]' });
 

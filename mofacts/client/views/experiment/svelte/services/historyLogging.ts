@@ -26,6 +26,7 @@ import {
   resolveOriginalClusterIndex,
   validateMappingRecord,
 } from './mappingRecordService';
+import { recordRuntimeOutcomeHistories } from './cardRuntimeState';
 import {
   applyH5PSummaryToRecord,
   insertH5PHistoryRows,
@@ -412,36 +413,7 @@ function checkAudioInputMode(): boolean {
 }
 
 function recordSessionOutcomeHistories(testType: string, outcomes: boolean[]): void {
-  if (typeof testType !== 'string') {
-    throw new Error('[History Logging] testType is missing or invalid');
-  }
-  const overallOutcomeHistory = Session.get('overallOutcomeHistory');
-  if (!Array.isArray(overallOutcomeHistory)) {
-    throw new Error('[History Logging] overallOutcomeHistory is not initialized');
-  }
-
-  if (testType !== 'i' && testType !== 's') {
-    if (!Array.isArray(outcomes) || outcomes.length === 0 || outcomes.some((outcome) => typeof outcome !== 'boolean')) {
-      throw new Error('[History Logging] outcome history update requires at least one boolean outcome');
-    }
-    for (const outcome of outcomes) {
-      overallOutcomeHistory.push(outcome ? 1 : 0);
-    }
-    Session.set('overallOutcomeHistory', overallOutcomeHistory);
-  }
-
-  const overallStudyHistory = Session.get('overallStudyHistory');
-  if (!Array.isArray(overallStudyHistory)) {
-    throw new Error('[History Logging] overallStudyHistory is not initialized');
-  }
-
-  if (testType === 's') {
-    overallStudyHistory.push(1);
-  }
-  if (testType === 'd') {
-    overallStudyHistory.push(0);
-  }
-  Session.set('overallStudyHistory', overallStudyHistory);
+  recordRuntimeOutcomeHistories(testType, outcomes);
 }
 
 /**

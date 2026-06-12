@@ -32,6 +32,7 @@ import {
   evaluateSrAvailability,
   resolveSpeechApiKeyAvailability,
 } from '../../../../lib/audioAvailability';
+import { getCurrentAnswer } from './cardRuntimeState';
 import {
   buildPhoneticIndexForLanguage,
   findPhoneticConflictsWithCorrectAnswerForLanguage,
@@ -884,7 +885,7 @@ async function processAudioData(audioData: ArrayBuffer | string): Promise<Speech
     answerGrammar = phraseHints;
   } else {
     const experimentState = ExperimentStateStore.get();
-    const rawCorrectAnswer = Session.get('currentAnswer') ||
+    const rawCorrectAnswer = getCurrentAnswer() ||
       experimentState?.currentAnswer ||
       experimentState?.originalAnswer;
     configuredSpeechTargets = extractSpeechRecognitionTargets(rawCorrectAnswer);

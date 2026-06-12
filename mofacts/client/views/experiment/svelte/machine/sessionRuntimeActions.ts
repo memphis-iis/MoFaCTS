@@ -1,8 +1,14 @@
-import { Session } from 'meteor/session';
 import { LOG_PREFIXES } from './constants';
 import { deliverySettingsStore } from '../../../../lib/state/deliverySettingsStore';
 import { clientConsole } from '../../../../lib/clientLogger';
 import { CardStore } from '../../modules/cardStore';
+import {
+  type EngineIndices,
+  publishEngineIndices,
+  setCurrentAnswer,
+  setCurrentDeliverySettings,
+  setEngineIndices,
+} from '../services/cardRuntimeState';
 import { assign, type ActionArgs } from './cardMachineActionTypes';
 
 export const initializeSession = assign({
@@ -16,7 +22,7 @@ export const initializeSession = assign({
 
 export const syncDeliverySettings = ({ context }: ActionArgs) => {
   if (context.deliverySettings) {
-    Session.set('currentDeliverySettings', context.deliverySettings);
+    setCurrentDeliverySettings(context.deliverySettings);
     deliverySettingsStore.set(context.deliverySettings as Parameters<typeof deliverySettingsStore.set>[0]);
   }
 };
@@ -30,14 +36,20 @@ export const syncCardStore = ({ context, event }: ActionArgs) => {
 
 export function syncSessionIndices({ context }: ActionArgs) {
   const indices = context.engineIndices || {};
-  if (Number.isFinite(indices.clusterIndex)) {
-    Session.set('clusterIndex', indices.clusterIndex);
-  }
+  publishEngineIndices(indices);
   if (Number.isFinite(indices.stimIndex) || Number.isFinite(indices.whichStim)) {
-    Session.set('engineIndices', {
-      ...indices,
-      stimIndex: Number.isFinite(indices.stimIndex) ? indices.stimIndex : indices.whichStim,
-    });
+    const nextIndices: EngineIndices = {};
+    if (typeof indices.clusterIndex === 'number') {
+      nextIndices.clusterIndex = indices.clusterIndex;
+    }
+    if (typeof indices.whichStim === 'number') {
+      nextIndices.whichStim = indices.whichStim;
+    }
+    const nextStimIndex = Number.isFinite(indices.stimIndex) ? indices.stimIndex : indices.whichStim;
+    if (typeof nextStimIndex === 'number') {
+      nextIndices.stimIndex = nextStimIndex;
+      setEngineIndices(nextIndices);
+    }
   }
   CardStore.setQuestionIndex(context.questionIndex || 1);
 }
@@ -51,7 +63,7 @@ export const incrementQuestionIndex = assign({
 
 export const syncCurrentAnswer = ({ context }: ActionArgs) => {
   const currentAnswer = context.currentAnswer || '';
-  Session.set('currentAnswer', currentAnswer);
+  setCurrentAnswer(currentAnswer);
 };
 
 export function handleUnitCompletion({ context: _context, event: _event }: ActionArgs) {

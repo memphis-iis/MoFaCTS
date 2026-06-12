@@ -1,6 +1,7 @@
 import { Session } from 'meteor/session';
 import { getCurrentDeliverySettings, getStimCluster } from '../../../../lib/currentTestingHelpers';
 import { deliverySettingsStore } from '../../../../lib/state/deliverySettingsStore';
+import { getIsVideoSessionFlag } from './cardRuntimeState';
 import { sanitizeHTML, nextChar } from '../../../../lib/stringUtils';
 import { Answers } from '../../answerAssess';
 import { resolveDynamicAssetPath } from './mediaResolver';
@@ -407,7 +408,7 @@ export function buildCardDataFromResolvedTrial(params: {
   const deliverySettings = resolveCardPayloadDeliverySettings({
     baseDeliverySettings,
     existingDeliverySettings,
-    sessionIsVideoSession: Session.get('isVideoSession'),
+    sessionIsVideoSession: getIsVideoSessionFlag(),
   });
   const currentTdfFile = Session.get('currentTdfFile') as TdfFileLike | null | undefined;
   const setspec = currentTdfFile?.tdfs?.tutor?.setspec || {};

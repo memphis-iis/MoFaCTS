@@ -55,6 +55,20 @@ import {
 import { ensureCurrentStimuliSetId } from './mediaResolver';
 import { isVideoResumeSession, resolveVideoResumeSource } from './videoResume';
 import {
+  getEngineIndices,
+  isInResume,
+  isResumeInProgress,
+  markResumeRuntimeInactive,
+  resetRuntimeHistories,
+  setDisplayReadyState,
+  setEngineIndices,
+  setInResume,
+  setInputReadyState,
+  setResumeInProgress,
+  setRuntimeHistories,
+  setVideoSessionActive,
+} from './cardRuntimeState';
+import {
   assertIdInvariants,
   clearConditionResolutionContext,
   logIdInvariantBreachOnce,
@@ -302,8 +316,7 @@ function handleResumeFailure(message: string, options: { redirectTo?: string; va
   const { redirectTo = '/home', variant = 'danger' } = options;
   setUiMessage(message, variant);
   Session.set('appLoading', false);
-  Session.set('resumeInProgress', false);
-  Session.set('inResume', false);
+  markResumeRuntimeInactive();
   return { redirected: true, redirectTo, error: message };
 }
 
@@ -403,19 +416,19 @@ function preloadVideos(): void {
 export async function resumeFromExperimentState(_initialTdfFile: unknown): Promise<SvelteCardInitResult> {
   let resolvedUnitList: TdfUnitLike[] | null = null;
   let resolvedTdfFile: TdfFileLike | null = null;
-  if (Session.get('resumeInProgress')) {
+  if (isResumeInProgress()) {
     clientConsole(2, 'RESUME DENIED - already running in resumeInProgress');
     return { redirected: true, redirectTo: '/card' };
   }
-  Session.set('resumeInProgress', true);
+  setResumeInProgress(true);
   Session.set('uiMessage', null);
 
-  if (Session.get('inResume')) {
+  if (isInResume()) {
     clientConsole(2, 'RESUME DENIED - already running in resume');
-    Session.set('resumeInProgress', false);
+    setResumeInProgress(false);
     return { redirected: true, redirectTo: '/card' };
   }
-  Session.set('inResume', true);
+  setInResume(true);
   assertIdInvariants('resume.start', { requireCurrentTdfId: false, requireStimuliSetId: false });
 
   clientConsole(2, 'Resuming from canonical experiment state');
@@ -427,8 +440,8 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
     CardStore.setCurIntervalId(undefined);
     CardStore.setVarLenTimeoutName(undefined);
     CardStore.setScrollListCount(0);
-    CardStore.setDisplayReady(false);
-    CardStore.setInputReady(false);
+    setDisplayReadyState(false);
+    setInputReadyState(false);
     CardStore.setInFeedback(false);
 
     const feedbackDisplay = document.getElementById('feedbackDisplay');
@@ -903,11 +916,11 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
       return handleResumeFailure('Unable to load the current unit for this lesson. Please contact your administrator.');
     }
     if (isVideoResumeSession(curTdfUnit)) {
-      Session.set('isVideoSession', true)
+      setVideoSessionActive(true);
       clientConsole(2, 'video type questions detected, pre-loading video');
       preloadVideos();
     } else {
-      Session.set('isVideoSession', false)
+      setVideoSessionActive(false);
     }
     Session.set('currentTdfUnit', curTdfUnit);
     clientConsole(2, 'resume, currentTdfUnit:', curTdfUnit);
@@ -944,8 +957,7 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
       const reconstruction = reconstructLearningStateFromHistory(historyRows);
       
       // Populate Session aggregates (Legacy compatibility for UI/Dashboard)
-      Session.set('overallOutcomeHistory', reconstruction.overallOutcomeHistory);
-      Session.set('overallStudyHistory', reconstruction.overallStudyHistory);
+      setRuntimeHistories(reconstruction.overallOutcomeHistory, reconstruction.overallStudyHistory);
       
       // Update CardStore with reconstructed learning aggregates
       CardStore.setReconstructedLearningState(reconstruction);
@@ -978,8 +990,7 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
         assessmentHasDurableResumeProgress,
       });
     } else {
-      Session.set('overallOutcomeHistory', []);
-      Session.set('overallStudyHistory', []);
+      resetRuntimeHistories();
     }
 
     CardStore.setQuestionIndex(CardStore.getQuestionIndex() || 0);
@@ -1034,8 +1045,7 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
 
     if (moduleCompleted) {
       clientConsole(2, 'TDF already completed - leaving for learning dashboard.');
-      Session.set('inResume', false);
-      Session.set('resumeInProgress', false);
+      markResumeRuntimeInactive();
       return { redirected: true, redirectTo: COMPLETED_LESSON_REDIRECT };
     }
 
@@ -1099,20 +1109,19 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
       engine.setScheduleCursor(derivedScheduleCursor);
     }
 
-    Session.set('inResume', false);
-    Session.set('resumeInProgress', false);
+    markResumeRuntimeInactive();
     await setStudentPerformance(userId, userDisplayIdentifier, currentTdfId);
 
     // Video sessions use time-based playback with Plyr, not probability-based card selection
     if (isVideoResumeSession(curTdfUnit)) {
-      let indices = Session.get('engineIndices');
+      let indices = getEngineIndices();
       if(!indices){
         indices = {
           'clusterIndex': 0,
           'stimIndex': 0
         }
       }
-      Session.set('engineIndices', indices);
+      setEngineIndices(indices);
 
       const isLastUnit = Session.get("currentUnitNumber") + 1 == Session.get("currentTdfFile").tdfs.tutor.unit.length;
       if(isLastUnit){
@@ -1185,7 +1194,7 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
       clientConsole(2, 'RESUME FINISHED: next-question logic to commence');
 
       if(Session.get('unitType') == "model") {
-        Session.set('engineIndices', await engine.calculateIndices());
+        setEngineIndices(await engine.calculateIndices());
       }
 
       // Normal continuation

@@ -14,9 +14,7 @@
   import { Session } from 'meteor/session';
   import { Meteor } from 'meteor/meteor';
   import { FlowRouter } from 'meteor/ostrio:flow-router-extra';
-  import DOMPurify from 'dompurify';
   import { currentUserHasRole } from '../../../../lib/roleUtils';
-  import { evaluateSrAvailability } from '../../../../lib/audioAvailability';
   import { stopStimDisplayTypeMapVersionSync } from '../../../../lib/stimDisplayTypeMapSync';
   import { deliverySettingsStore } from '../../../../lib/state/deliverySettingsStore';
   import { clientConsole } from '../../../../lib/clientLogger';
@@ -32,15 +30,10 @@
   import { initializeSvelteCard } from '../services/svelteInit';
   import { createExperimentState } from '../services/experimentState';
   import {
-    buildCardReadinessDiagnostic,
-    getCardReadinessState,
     waitForCardReadiness as waitForCardReadinessService,
   } from '../services/cardReadiness';
-  import { routeCardInitializationFailure } from '../services/cardLaunchFailure';
-  import {
-    buildCardInitializeFailureDiagnostic,
-    runCardLaunchOrchestration,
-  } from '../services/cardLaunchOrchestration';
+  import { runCardLaunchOrchestration } from '../services/cardLaunchOrchestration';
+  import { createCardLaunchEnvironment } from '../services/cardLaunchEnvironment';
   import {
     createFirstTrialRevealController,
     getElementTransitionDurationMs,
@@ -48,25 +41,29 @@
   import {
     buildTrialSubset,
     buildTrialSubsetKey,
-    cloneDisplay,
     getBaseTrialSubsetKind,
     isOutgoingFreezeState as isOutgoingFreezeSnapshot,
     isPreparedAdvanceWaitState as isPreparedAdvanceWaitSnapshot,
   } from '../services/trialDisplayState';
   import {
-    buildDisplayTimeoutMessage,
+    buildActiveTrialCurrentDisplayValues,
+    createActiveTrialDisplayStateController,
+  } from '../services/activeTrialDisplayState';
+  import {
+    createDisplayTimeoutController,
     createTimeoutCountdownController,
-    getDisplayTimeoutValue,
-    getFeedbackTimeoutStartMs,
-    getQuestionTimeoutStartMs,
-    resolveDisplayTimeoutStartMs,
-    resolveTimeoutMode,
+    createTimeoutCountdownSyncController,
   } from '../services/timeoutCountdown';
   import { createVideoMachineBridge } from '../services/videoMachineBridge';
   import { createVideoSessionBridge } from '../services/videoSessionBridge';
-  import { resolveVideoPlaybackPolicyForUnit } from '../services/videoCardInit';
+  import { createVideoSessionRuntimeController } from '../services/videoSessionRuntime';
+  import { createVideoEndOverlayController } from '../services/videoEndOverlay';
+  import { createCardVideoEventRuntime } from '../services/cardVideoEventRuntime';
+  import {
+    buildCardVideoRuntimeSnapshot,
+    createCompletedVideoQuestionsStore,
+  } from '../services/cardVideoRuntime';
   import { waitForBrowserPaint } from '../utils/paintTiming';
-  import { deriveSrStatus } from '../utils/srStatus';
   import { getMainTimeoutMs, getFeedbackTimeoutMs } from '../utils/timeoutUtils';
   import { recordCurrentInstructionContinue } from '../../instructions';
   import {
@@ -77,24 +74,64 @@
     resolveSparcTrialDisplayResult,
     sparcTrialDisplayOwnsInteraction,
   } from '../services/sparcTrialDisplay';
-  import { buildLearningProgressPanelSnapshot } from '../services/learningProgressPanel';
+  import { createTrialDisplaySubmissionController } from '../services/trialDisplaySubmission';
+  import { createLearningProgressRuntimeController } from '../services/learningProgressPanelRuntime';
   import {
-    resolveSessionSurfaceDiagnostic,
+    notifyLearningProgressLayoutChange,
+  } from '../services/learningProgressPanelViewport';
+  import {
     resolveSessionSurfaceLaunchCompletion,
-    resolveSessionSurfaceLearningProgressPanel,
-    resolveSessionSurfaceShell,
   } from '../services/sessionSurfaceMode';
   import {
     buildCardSessionRuntimeSnapshot,
     startVideoInstructionTimer,
   } from '../services/cardSessionRuntime';
+  import {
+    createCardWakeLockController,
+    shouldHoldScreenWakeLock,
+  } from '../services/cardWakeLock';
+  import {
+    continueToNextRuntimeUnit,
+    createCardUnitContinuationController,
+  } from '../services/cardUnitContinuation';
+  import { createCardRuntimeWindowEventController } from '../services/cardRuntimeWindowEvents';
+  import {
+    getIsVideoSessionFlag,
+    getVideoCheckpoints,
+    getVideoResumeAnchor,
+  } from '../services/cardRuntimeState';
+  import {
+    createCardMachineRuntimeController,
+    getInitialCardMachineSnapshot,
+  } from '../services/cardMachineRuntime';
+  import { createCardRuntimeLifecycleController } from '../services/cardRuntimeLifecycle';
+  import { createCardScreenLifecycleRuntime } from '../services/cardScreenLifecycleRuntime';
   import { createMeteorCardReactiveTrackers } from '../services/cardReactiveTrackers';
+  import { buildCardInputSrSnapshot } from '../services/cardInputSrState';
+  import {
+    buildCardPerformanceData,
+    buildCardPerformanceDisplaySnapshot,
+  } from '../services/cardPerformanceDisplay';
+  import { createCardTextInputController } from '../services/cardTextInputController';
+  import { createCardTrialEventController } from '../services/cardTrialEventController';
+  import { createCardReviewEventController } from '../services/cardReviewEventController';
+  import { sanitizeCardInstructionHtml } from '../services/cardInstructionSanitizer';
+  import { createCardBlockingAssetController } from '../services/cardBlockingAssetState';
+  import {
+    createIncomingTrialSlotController,
+  } from '../services/incomingTrialSlotController';
+  import { buildIncomingTrialSlotDisplaySnapshot } from '../services/incomingTrialSlotDisplay';
+  import { createActiveTrialRevealController } from '../services/activeTrialRevealController';
+  import { createTrialFadeTransitionController } from '../services/trialFadeTransitionController';
+  import {
+    buildTrialContentPropsFromSubset,
+    getCorrectAnswerImageSrc,
+  } from '../services/trialContentProps';
   import { CardStore } from '../../modules/cardStore';
-  import LearningProgressPanel from './LearningProgressPanel.svelte';
   import AutoTutorSession from './AutoTutorSession.svelte';
-  import PerformanceArea from './PerformanceArea.svelte';
-  import TrialContent from './TrialContent.svelte';
-  import VideoSessionMode from './VideoSessionMode.svelte';
+  import DisplayTimeoutFooter from './DisplayTimeoutFooter.svelte';
+  import StandardCardSessionSurface from './StandardCardSessionSurface.svelte';
+  import VideoCardSessionSurface from './VideoCardSessionSurface.svelte';
 
   /** @type {string} Session ID */
   export let sessionId = '';
@@ -119,52 +156,6 @@
 
   /** @type {{ mode?: 'question' | 'feedback' | 'none', progress?: number, remainingTime?: number }|null} */
   export let testTimeout = null;
-
-  function createMachineActor(machine) {
-    return createActor(machine);
-  }
-
-  function getInitialState() {
-    return {
-      value: 'idle',
-      context: {},
-      matches: (state) => state === 'idle',
-    };
-  }
-
-  function getActorSnapshot(actorInstance) {
-    if (!actorInstance) {
-      return getInitialState();
-    }
-    try {
-      return actorInstance.getSnapshot();
-    } catch (err) {
-      clientConsole(1, '[CardScreen] Failed to read actor snapshot, using initial state', err);
-    }
-    return getInitialState();
-  }
-
-  function sanitizeInstructionHtml(dirty) {
-    if (!dirty) return '';
-    return DOMPurify.sanitize(String(dirty), {
-      ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'u', 'br', 'p', 'span', 'div',
-        'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'table', 'tr', 'td', 'th',
-        'thead', 'tbody', 'ul', 'ol', 'li', 'center', 'a', 'img', 'audio',
-        'source'],
-      ALLOWED_ATTR: ['style', 'class', 'id', 'border', 'href', 'src', 'alt',
-        'width', 'height', 'controls', 'preload', 'data-audio-id'],
-      ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|blob):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i,
-      FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'button'],
-      FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur'],
-    });
-  }
-
-  function subscribeToActor(actorInstance, handler) {
-    if (!actorInstance || typeof handler !== 'function') {
-      return null;
-    }
-    return actorInstance.subscribe(handler);
-  }
 
   function normalizeTestSnapshot(snapshot) {
     if (!snapshot || typeof snapshot !== 'object') {
@@ -193,11 +184,6 @@
     return Boolean(value);
   }
 
-  function progressPanelDisabled(settings) {
-    const value = settings?.disableProgressReport;
-    return value === true || value === 'true' || value === 1 || value === '1';
-  }
-
   function cardDebugStateEnabled() {
     if (!Meteor.isDevelopment || typeof window === 'undefined') {
       return false;
@@ -209,118 +195,33 @@
     return window.localStorage.getItem('mofacts.cardDebugState') === '1';
   }
 
-  function setLearningProgressViewportOpen(open) {
-    if (typeof document === 'undefined') {
-      return;
-    }
-    document.documentElement.classList.toggle('learning-progress-panel-viewport-open', open);
-  }
-
-  async function notifyLearningProgressLayoutChange() {
-    if (typeof window === 'undefined') {
-      return;
-    }
-    await tick();
-    window.dispatchEvent(new Event('resize'));
-    window.setTimeout(() => {
-      window.dispatchEvent(new Event('resize'));
-    }, 260);
-  }
-
-  function buildTrialSlotProps(trialLike, slotState = {}) {
-    const trial = trialLike || {};
-    const subset = buildTrialSubset({
-      kind: slotState.kind || 'none',
-      display: trial.currentDisplay,
-      displayVisible: slotState.displayVisible,
-      feedbackVisible: slotState.feedbackVisible,
-      responseVisible: slotState.responseVisible,
-      isForceCorrecting: slotState.isForceCorrecting,
-      showQuestionNumber: slotState.showQuestionNumber,
-      questionNumber: slotState.questionNumber,
-      replayEnabled: slotState.replayEnabled,
-      showSkipStudyButton: slotState.showSkipStudyButton,
-    });
-    const buttonList = Array.isArray(trial.buttonList) ? trial.buttonList : [];
-    const correctAnswer = Answers.getDisplayAnswerText(String(trial.originalAnswer || trial.currentAnswer || '')) ||
-      String(trial.currentAnswer || '');
-    const feedbackIsCorrect = Boolean(slotState.isCorrect);
-    const correctAnswerImageSrc = getCorrectAnswerImageSrc(buttonList, correctAnswer);
-
-    return {
-      subset,
-      correctAnswerImageSrc,
-      expectedStimulusBlockerSrc: subset.displayVisible ? String(subset.display?.imgSrc || '') : '',
-      expectedFeedbackBlockerSrc: subset.feedbackVisible && !feedbackIsCorrect ? String(correctAnswerImageSrc || '') : '',
-      props: {
-        layoutMode,
-        subsetKind: subset.kind,
-        displayVisible: subset.displayVisible,
-        display: subset.display,
-        isForceCorrecting: subset.isForceCorrecting,
-        showQuestionNumber: subset.showQuestionNumber,
-        questionNumber: subset.questionNumber,
-        inputMode: slotState.inputMode || inputMode,
-        inputEnabled: Boolean(slotState.inputEnabled),
-        responseVisible: subset.responseVisible,
-        userAnswer: slotState.userAnswer || '',
-        feedbackUserAnswer: slotState.feedbackUserAnswer || '',
-        inputPlaceholder: deliverySettings.inputPlaceholderText,
-        showButtons: true,
-        buttonList,
-        buttonColumns: deliverySettings.choiceButtonCols,
-        srStatus: slotState.srStatus || 'idle',
-        srAttempt: Number.isFinite(slotState.srAttempt) ? slotState.srAttempt : 0,
-        srMaxAttempts: Number.isFinite(slotState.srMaxAttempts) ? slotState.srMaxAttempts : 0,
-        srError: '',
-        srTranscript: '',
-        feedbackVisible: subset.feedbackVisible,
-        isCorrect: feedbackIsCorrect,
-        isTimeout: Boolean(slotState.isTimeout),
-        correctAnswer,
-        correctAnswerImageSrc,
-        correctLabelText: deliverySettings.correctLabelText,
-        incorrectLabelText: deliverySettings.incorrectLabelText,
-        feedbackMessage: slotState.feedbackMessage || '',
-        forceCorrectPrompt: deliverySettings.forceCorrectPrompt || 'Please type the correct answer to continue',
-        correctColor: slotState.correctColor || deliverySettings.correctColor,
-        incorrectColor: deliverySettings.incorrectColor,
-        displayCorrectFeedback: Boolean(slotState.displayCorrectFeedback),
-        displayIncorrectFeedback: Boolean(slotState.displayIncorrectFeedback),
-        displayUserAnswerInFeedback: deliverySettings.displayUserAnswerInFeedback,
-        feedbackLayout: deliverySettings.feedbackLayout,
-        displayCorrectAnswerInIncorrectFeedback: deliverySettings.displayCorrectAnswerInIncorrectFeedback,
-        replayEnabled: subset.replayEnabled,
-      },
-    };
-  }
-
-  function matchesStatePath(snapshot, value) {
-    if (!snapshot || typeof snapshot.matches !== 'function') {
-      return false;
-    }
-    return snapshot.matches(value);
-  }
-
   // Initialize XState machine using a local actor to avoid version mismatches
-  let actor = null;
-  let state = getInitialState();
+  let cardMachineRuntimeController = null;
+  let state = getInitialCardMachineSnapshot();
   let videoInstructionDismissed = false;
   let videoInstructionStartBlocked = false;
   let videoInstructionsShownAt = 0;
   let videoPlayerReady = false;
-  let submittedH5PResultKey = '';
-  let submittedSparcResultKey = '';
   let sessionUnitModeVersion = 0;
   const send = (event) => {
     if (testMode) {
       clientConsole(2, '[CardScreen] Ignoring event in test mode:', event?.type || event);
       return;
     }
+    const actor = cardMachineRuntimeController?.getActor?.();
     if (actor && typeof actor.send === 'function') {
       actor.send(event);
     }
   };
+  const trialDisplaySubmissionController = createTrialDisplaySubmissionController({
+    getCurrentDisplay: () => context.currentDisplay,
+    h5pOwnsResponse: () => h5pOwnsResponse,
+    sparcOwnsResponse: () => sparcOwnsResponse,
+    resolveH5PResult: resolveH5PTrialDisplayResult,
+    resolveSparcResult: resolveSparcTrialDisplayResult,
+    now: () => Date.now(),
+    submit: send,
+  });
 
   $: if (testMode) {
     state = normalizeTestSnapshot(testSnapshot);
@@ -335,11 +236,11 @@
   $: cardSessionRuntimeSnapshot = (sessionUnitModeVersion, buildCardSessionRuntimeSnapshot({
     currentTdfUnit: Session.get('currentTdfUnit'),
     deliverySettings,
-    sessionIsVideoSession: Session.get('isVideoSession'),
+    sessionIsVideoSession: getIsVideoSessionFlag(),
     sessionUnitType: Session.get('unitType'),
     curUnitInstructionsSeen: Session.get('curUnitInstructionsSeen'),
     videoInstructionDismissed,
-    sanitizeInstructionHtml,
+    sanitizeInstructionHtml: sanitizeCardInstructionHtml,
   }));
   $: currentTdfUnit = cardSessionRuntimeSnapshot.currentTdfUnit;
   $: sessionSurfaceState = cardSessionRuntimeSnapshot.sessionSurfaceState;
@@ -360,83 +261,30 @@
   $: fontSizeScale = (parsePositiveNumber(deliverySettings?.fontsize) ?? 24) / 16;
   $: cardFontSizeStyle = `--card-font-size: calc(var(--app-font-size-base) * ${fontSizeScale});`;
 
-  // Timeout bar visibility - controlled by displayTimeoutBar boolean
-  $: showTimeoutBar = deliverySettings.displayTimeoutBar;
-  $: showTimeoutCountdown = deliverySettings.displayTimeoutCountdown;
-  $: showPerformanceStats = deliverySettings.displayPerformance;
-
   // Audio & SR settings
   let user = null;
-  $: srAvailability = evaluateSrAvailability({
+  $: inputSrSnapshot = buildCardInputSrSnapshot({
     user,
     tdfFile: Session.get('currentTdfFile'),
     sessionSpeechApiKey: Session.get('speechAPIKey'),
     serverSpeechConfigured: Session.get('speechAPIKeyConfigured'),
-    requireTextTrial: true,
-    isTextTrial: !context.buttonTrial,
+    buttonTrial: Boolean(context.buttonTrial),
+    source: context.source,
+    stateMatches: (value) => state.matches(value),
   });
-  $: isSrEnabled = srAvailability.status === 'available';
-  $: isSrReady = isSrEnabled && matchesStatePath(state, {
-    presenting: {
-      awaiting: {
-        speechRecognition: {
-          active: 'ready'
-        }
-      }
-    }
-  });
-  $: isSrProcessing = isSrEnabled && matchesStatePath(state, {
-    presenting: {
-      awaiting: {
-        speechRecognition: {
-          active: 'processing'
-        }
-      }
-    }
-  });
-  $: inputMode = !context.buttonTrial ? (isSrEnabled ? 'sr' : 'text') : 'buttons';
-  $: isSrRecording = isSrEnabled && matchesStatePath(state, {
-    presenting: {
-      awaiting: {
-        speechRecognition: {
-          active: 'recording'
-        }
-      }
-    }
-  });
-  $: isVoiceValidating = isSrEnabled &&
-    state.matches('presenting.validating') &&
-    context.source === 'voice';
-  $: srStatus = deriveSrStatus({
-    isSrEnabled,
-    isReady: isSrReady,
-    isRecording: isSrRecording,
-    isProcessing: isSrProcessing,
-    isVoiceValidating,
-  });
+  $: srAvailability = inputSrSnapshot.srAvailability;
+  $: isSrEnabled = inputSrSnapshot.isSrEnabled;
+  $: isSrReady = inputSrSnapshot.isSrReady;
+  $: isSrProcessing = inputSrSnapshot.isSrProcessing;
+  $: inputMode = inputSrSnapshot.inputMode;
+  $: isSrRecording = inputSrSnapshot.isSrRecording;
+  $: isVoiceValidating = inputSrSnapshot.isVoiceValidating;
+  $: srStatus = inputSrSnapshot.srStatus;
   $: if (typeof window !== 'undefined' && inputMode !== undefined) {
-    void syncScreenWakeLock('reactive update');
+    void cardWakeLockController.sync('reactive update');
   }
 
-  let frozenDisplayVisible = false;
-  let frozenFeedbackVisible = false;
-  let frozenIsForceCorrecting = false;
-  let frozenResponseVisible = false;
-  let frozenTrialSubsetKind = 'none';
-  let frozenShowSkipStudyButton = false;
-  let frozenFeedbackIsCorrect = false;
-  let frozenFeedbackCorrectColor = 'var(--feedback-correct-color)';
-  let frozenFeedbackText = '';
-  let frozenFeedbackCorrectAnswer = '';
-  let frozenDisplayCorrectFeedback = true;
-  let frozenDisplayIncorrectFeedback = true;
-  let trialSubsetVisible = false;
-  let stagedTrialSubsetKey = 'none';
-  let revealSequence = 0;
-  let queuedRevealKey = '';
-  let queuedRevealSequence = 0;
-  let stagedStimulusBlockerSrc = '';
-  let stagedFeedbackBlockerSrc = '';
+  const activeTrialDisplayStateController = createActiveTrialDisplayStateController();
   let trialContentFadeElement;
   let lastFadeLogContext = {
     key: 'none',
@@ -458,22 +306,94 @@
   });
   let stimulusBlockingAssetReady = true;
   let feedbackBlockingAssetReady = true;
-  let incomingStimulusBlockingAssetReady = true;
-  let incomingFeedbackBlockingAssetReady = true;
+  let incomingBlockingAssetVersion = 0;
+  const incomingBlockingAssetState = {
+    stimulusReady: true,
+    feedbackReady: true,
+  };
   let activeSlotMounted = false;
   let activeSlotVisible = false;
   let incomingSlotMounted = false;
-  let incomingSlotSequence = 0;
-  let lastIncomingSlotKey = 'none';
   let incomingReadySent = false;
   let transitionCompleteSent = false;
-  let preservePreparedHandoffOnNextReveal = false;
-  let preparedHandoffStimulusReady = false;
-  let preparedHandoffFeedbackReady = false;
+  const incomingTrialSlotController = createIncomingTrialSlotController({
+    onUpdate: (snapshot) => {
+      incomingSlotMounted = snapshot.mounted;
+      incomingReadySent = snapshot.readySent;
+      transitionCompleteSent = snapshot.transitionCompleteSent;
+    },
+    waitForBrowserPaint,
+    waitForDomUpdate: tick,
+  });
+  const activeTrialRevealController = createActiveTrialRevealController({
+    getRuntimeState: () => ({
+      allBlockingAssetsReady,
+      isFadingOut,
+      isTestMode: testMode,
+      subsetKind: trialSubset.kind,
+    }),
+    log: clientConsole,
+    markFirstRevealClassSet: firstTrialReveal.markRevealClassSet,
+    now: () => performance.now(),
+    onFadeContext: (context) => {
+      lastFadeLogContext = context;
+    },
+    onRevealStarted: (subsetKind) => {
+      send({
+        type: EVENTS.TRIAL_REVEAL_STARTED,
+        timestamp: Date.now(),
+        subsetKind,
+      });
+    },
+    onUpdate: (snapshot) => {
+      activeSlotMounted = snapshot.activeSlotMounted;
+      activeSlotVisible = snapshot.activeSlotVisible;
+      feedbackBlockingAssetReady = snapshot.feedbackBlockingAssetReady;
+      stimulusBlockingAssetReady = snapshot.stimulusBlockingAssetReady;
+    },
+    primeFadeStart: () => {
+      primeTrialContentFadeStart();
+    },
+    readTransitionDurationMs: () => getElementTransitionDurationMs(
+      trialContentFadeElement,
+      (element) => getComputedStyle(element),
+    ),
+    waitForBrowserPaint,
+    waitForDomUpdate: tick,
+  });
+  const trialFadeTransitionController = createTrialFadeTransitionController({
+    finishFirstRevealFromTransitionEvent: firstTrialReveal.finishFromTransitionEvent,
+    getComputedOpacity: () => trialContentFadeElement
+      ? getComputedStyle(trialContentFadeElement).opacity
+      : 'unknown',
+    getFadeContext: () => lastFadeLogContext,
+    getRuntimeState: () => ({
+      feedbackReadyForPreparedHandoff: incomingBlockingAssetState.feedbackReady,
+      isFadingOut,
+      isPreparedFadingOut,
+      isTestMode: testMode,
+      stimulusReadyForPreparedHandoff: incomingBlockingAssetState.stimulusReady,
+      transitionCompleteSent,
+      trialContentVisible,
+    }),
+    log: clientConsole,
+    markPreparedHandoffOnNextReveal: activeTrialRevealController.markPreparedHandoffOnNextReveal,
+    markTransitionCompleteSent: incomingTrialSlotController.markTransitionCompleteSent,
+    now: () => performance.now(),
+    sendTransitionComplete: () => {
+      send({ type: EVENTS.TRANSITION_COMPLETE, timestamp: Date.now() });
+    },
+  });
   let videoEndOverlayMounted = false;
   let videoEndOverlayVisible = false;
-  let videoEndOverlaySequence = 0;
-  let frozenDisplay = cloneDisplay({});
+  const videoEndOverlayController = createVideoEndOverlayController({
+    onUpdate: (snapshot) => {
+      videoEndOverlayMounted = snapshot.mounted;
+      videoEndOverlayVisible = snapshot.visible;
+    },
+    waitForBrowserPaint,
+    waitForDomUpdate: tick,
+  });
 
   $: isQuestionState = state.matches('presenting.fadingIn') ||
     state.matches('presenting.prestimulus') ||
@@ -492,67 +412,56 @@
     isQuestionState,
     isStudyState,
   });
-  $: baseDisplayVisible = baseTrialSubsetKind !== 'none';
-  $: baseFeedbackVisible = baseTrialSubsetKind === 'feedback' || baseTrialSubsetKind === 'study';
   $: h5pOwnsResponse = selfHostedH5PTrialDisplayOwnsInteraction(context.currentDisplay) && baseTrialSubsetKind === 'question';
   $: sparcOwnsResponse = sparcTrialDisplayOwnsInteraction(context.currentDisplay) && baseTrialSubsetKind === 'question';
-  $: baseResponseVisible = !h5pOwnsResponse && !sparcOwnsResponse && (baseTrialSubsetKind === 'question' || baseTrialSubsetKind === 'forceCorrect');
-  $: if (baseTrialSubsetKind !== 'question') {
-    submittedH5PResultKey = '';
-    submittedSparcResultKey = '';
-  }
+  $: trialDisplaySubmissionController.resetForDisplay(baseTrialSubsetKind === 'question' ? context.currentDisplay : undefined);
   let studyInteractionText = '';
-  $: baseShowSkipStudyButton = isStudyState && toBoolean(deliverySettings.skipstudy);
-  $: baseFeedbackIsCorrect = isStudyState ? true : context.isCorrect;
-  $: baseFeedbackCorrectColor = isStudyState ? 'var(--app-text-color)' : deliverySettings.correctColor;
-  $: studyAnswerText = isStudyState
-    ? Answers.getDisplayAnswerText(String(context.originalAnswer || context.currentAnswer || '')) || String(context.currentAnswer || '')
-    : '';
-  $: baseFeedbackText = isStudyState ? (studyInteractionText || studyAnswerText) : context.feedbackMessage;
-  $: baseFeedbackCorrectAnswer = Answers.getDisplayAnswerText(String(context.originalAnswer || context.currentAnswer || '')) ||
-    String(context.currentAnswer || '');
   $: if (!isStudyState && studyInteractionText) {
     studyInteractionText = '';
   }
-  $: baseDisplayCorrectFeedback = isStudyState ? true : deliverySettings.displayCorrectFeedback;
-  $: baseDisplayIncorrectFeedback = isStudyState ? false : deliverySettings.displayIncorrectFeedback;
   $: inputEnabled = state.matches('presenting.awaiting') || state.matches('feedback.forceCorrecting');
   $: isOutgoingFreezeState = isOutgoingFreezeSnapshot(state);
   $: isPreparedAdvanceWaitState = isPreparedAdvanceWaitSnapshot(state);
   $: isFadingOut = state.matches('transition.fadingOut');
   $: isPreparedFadingOut = isFadingOut && Boolean(preparedTrial);
+  $: activeTrialCurrentDisplay = buildActiveTrialCurrentDisplayValues({
+    correctColor: deliverySettings.correctColor,
+    currentAnswer: context.currentAnswer,
+    currentDisplay: context.currentDisplay,
+    displayCorrectFeedback: deliverySettings.displayCorrectFeedback,
+    displayIncorrectFeedback: deliverySettings.displayIncorrectFeedback,
+    feedbackMessage: context.feedbackMessage,
+    formatAnswerText: (answer) => Answers.getDisplayAnswerText(answer),
+    h5pOwnsResponse,
+    isCorrect: context.isCorrect,
+    isForceCorrecting: baseIsForceCorrecting,
+    isStudyState,
+    originalAnswer: context.originalAnswer,
+    skipStudyEnabled: toBoolean(deliverySettings.skipstudy),
+    sparcOwnsResponse,
+    studyInteractionText,
+    trialSubsetKind: baseTrialSubsetKind,
+  });
 
-  $: if (!isOutgoingFreezeState) {
-    frozenTrialSubsetKind = baseTrialSubsetKind;
-    frozenDisplayVisible = baseDisplayVisible;
-    frozenFeedbackVisible = baseFeedbackVisible;
-    frozenIsForceCorrecting = baseIsForceCorrecting;
-    frozenResponseVisible = baseResponseVisible;
-    frozenDisplay = cloneDisplay(context.currentDisplay);
-    frozenShowSkipStudyButton = baseShowSkipStudyButton;
-    frozenFeedbackIsCorrect = baseFeedbackIsCorrect;
-    frozenFeedbackCorrectColor = baseFeedbackCorrectColor;
-    frozenFeedbackText = baseFeedbackText;
-    frozenFeedbackCorrectAnswer = baseFeedbackCorrectAnswer;
-    frozenDisplayCorrectFeedback = baseDisplayCorrectFeedback;
-    frozenDisplayIncorrectFeedback = baseDisplayIncorrectFeedback;
-  }
-
-  $: trialSubsetKind = isOutgoingFreezeState ? frozenTrialSubsetKind : baseTrialSubsetKind;
-  $: displayVisible = isOutgoingFreezeState ? frozenDisplayVisible : baseDisplayVisible;
-  $: feedbackVisible = isOutgoingFreezeState ? frozenFeedbackVisible : baseFeedbackVisible;
-  $: isForceCorrecting = isOutgoingFreezeState ? frozenIsForceCorrecting : baseIsForceCorrecting;
-  $: responseVisible = isOutgoingFreezeState ? frozenResponseVisible : baseResponseVisible;
-  $: showSkipStudyButton = isOutgoingFreezeState ? frozenShowSkipStudyButton : baseShowSkipStudyButton;
-  $: feedbackIsCorrect = isOutgoingFreezeState ? frozenFeedbackIsCorrect : baseFeedbackIsCorrect;
-  $: feedbackCorrectColor = isOutgoingFreezeState ? frozenFeedbackCorrectColor : baseFeedbackCorrectColor;
-  $: feedbackText = isOutgoingFreezeState ? frozenFeedbackText : baseFeedbackText;
-  $: feedbackCorrectAnswer = isOutgoingFreezeState ? frozenFeedbackCorrectAnswer : baseFeedbackCorrectAnswer;
-  $: displayCorrectFeedback = isOutgoingFreezeState ? frozenDisplayCorrectFeedback : baseDisplayCorrectFeedback;
-  $: displayIncorrectFeedback = isOutgoingFreezeState ? frozenDisplayIncorrectFeedback : baseDisplayIncorrectFeedback;
+  $: activeTrialDisplaySnapshot = activeTrialDisplayStateController.buildSnapshot({
+    current: activeTrialCurrentDisplay,
+    isOutgoingFreezeState,
+  });
+  $: trialSubsetKind = activeTrialDisplaySnapshot.active.trialSubsetKind;
+  $: displayVisible = activeTrialDisplaySnapshot.active.displayVisible;
+  $: feedbackVisible = activeTrialDisplaySnapshot.active.feedbackVisible;
+  $: isForceCorrecting = activeTrialDisplaySnapshot.active.isForceCorrecting;
+  $: responseVisible = activeTrialDisplaySnapshot.active.responseVisible;
+  $: showSkipStudyButton = activeTrialDisplaySnapshot.active.showSkipStudyButton;
+  $: feedbackIsCorrect = activeTrialDisplaySnapshot.active.feedbackIsCorrect;
+  $: feedbackCorrectColor = activeTrialDisplaySnapshot.active.feedbackCorrectColor;
+  $: feedbackText = activeTrialDisplaySnapshot.active.feedbackText;
+  $: feedbackCorrectAnswer = activeTrialDisplaySnapshot.active.feedbackCorrectAnswer;
+  $: displayCorrectFeedback = activeTrialDisplaySnapshot.active.displayCorrectFeedback;
+  $: displayIncorrectFeedback = activeTrialDisplaySnapshot.active.displayIncorrectFeedback;
   $: trialSubset = buildTrialSubset({
     kind: trialSubsetKind,
-    display: isOutgoingFreezeState ? frozenDisplay : context.currentDisplay,
+    display: activeTrialDisplaySnapshot.active.display,
     displayVisible,
     feedbackVisible,
     responseVisible,
@@ -562,8 +471,29 @@
     replayEnabled: !feedbackVisible,
     showSkipStudyButton,
   });
-  $: expectedStimulusBlockerSrc = trialSubset.displayVisible ? String(trialSubset.display?.imgSrc || '') : '';
-  $: expectedFeedbackBlockerSrc = trialSubset.feedbackVisible && !feedbackIsCorrect ? String(correctAnswerImageSrc || '') : '';
+  $: activeTrialContent = buildTrialContentPropsFromSubset({
+    buttonList: context.buttonList,
+    correctAnswer: feedbackCorrectAnswer,
+    correctAnswerImageSrc,
+    correctColor: feedbackCorrectColor,
+    defaultInputMode: inputMode,
+    deliverySettings,
+    displayCorrectFeedback,
+    displayIncorrectFeedback,
+    feedbackMessage: feedbackText,
+    feedbackUserAnswer: context.userAnswer,
+    inputEnabled,
+    isCorrect: feedbackIsCorrect,
+    isTimeout: context.isTimeout,
+    layoutMode,
+    srAttempt: audioState.srAttempts,
+    srMaxAttempts: audioState.maxSrAttempts,
+    srStatus,
+    subset: trialSubset,
+    userAnswer: textAnswer,
+  });
+  $: expectedStimulusBlockerSrc = activeTrialContent.expectedStimulusBlockerSrc;
+  $: expectedFeedbackBlockerSrc = activeTrialContent.expectedFeedbackBlockerSrc;
   $: trialSubsetKey = buildTrialSubsetKey({
     context,
     isVideoSession: sessionContentSurface.showVideoSession,
@@ -571,226 +501,57 @@
   });
   $: allBlockingAssetsReady = (!expectedStimulusBlockerSrc || stimulusBlockingAssetReady) &&
     (!expectedFeedbackBlockerSrc || feedbackBlockingAssetReady);
-  $: if (isOutgoingFreezeState) {
-    activeSlotMounted = true;
-    activeSlotVisible = true;
-  }
-  $: if (!isOutgoingFreezeState && !trialSubset.showOverlay) {
-    activeSlotMounted = false;
-    activeSlotVisible = false;
-  }
+  $: activeTrialRevealController.syncVisibility({
+    isOutgoingFreezeState,
+    showOverlay: trialSubset.showOverlay,
+  });
   $: trialContentMounted = activeSlotMounted;
   $: trialContentVisible = activeSlotVisible;
   $: cardVisualReady = trialContentMounted || state.matches('videoWaiting') || videoEnded;
-  $: trialContentProps = {
-    layoutMode,
-    subsetKind: trialSubset.kind,
-    displayVisible: trialSubset.displayVisible,
-    display: trialSubset.display,
-    isForceCorrecting: trialSubset.isForceCorrecting,
-    showQuestionNumber: trialSubset.showQuestionNumber,
-    questionNumber: trialSubset.questionNumber,
-    inputMode,
-    inputEnabled,
-    responseVisible: trialSubset.responseVisible,
-    userAnswer: textAnswer,
-    feedbackUserAnswer: context.userAnswer,
-    inputPlaceholder: deliverySettings.inputPlaceholderText,
-    showButtons: true,
-    buttonList: context.buttonList,
-    buttonColumns: deliverySettings.choiceButtonCols,
-    srStatus,
-    srAttempt: audioState.srAttempts,
-    srMaxAttempts: audioState.maxSrAttempts,
-    srError: '',
-    srTranscript: '',
-    feedbackVisible: trialSubset.feedbackVisible,
-    isCorrect: feedbackIsCorrect,
-    isTimeout: context.isTimeout,
-    correctAnswer: feedbackCorrectAnswer,
-    correctAnswerImageSrc,
-    correctLabelText: deliverySettings.correctLabelText,
-    incorrectLabelText: deliverySettings.incorrectLabelText,
-    feedbackMessage: feedbackText,
-    forceCorrectPrompt: deliverySettings.forceCorrectPrompt || 'Please type the correct answer to continue',
-    correctColor: feedbackCorrectColor,
-    incorrectColor: deliverySettings.incorrectColor,
-    displayCorrectFeedback,
-    displayIncorrectFeedback,
-    displayUserAnswerInFeedback: deliverySettings.displayUserAnswerInFeedback,
-    feedbackLayout: deliverySettings.feedbackLayout,
-    displayCorrectAnswerInIncorrectFeedback: deliverySettings.displayCorrectAnswerInIncorrectFeedback,
-    replayEnabled: trialSubset.replayEnabled,
-  };
+  $: trialContentProps = activeTrialContent.props;
   $: videoEnded = state.matches('videoEnded');
-  $: if (videoEnded) {
-    videoEndOverlayMounted = true;
-    videoEndOverlayVisible = false;
-    videoEndOverlaySequence += 1;
-    queueVideoEndOverlayReveal(videoEndOverlaySequence);
-  } else {
-    videoEndOverlayMounted = false;
-    videoEndOverlayVisible = false;
-  }
+  $: videoEndOverlayController.syncVideoEnded(videoEnded);
 
-  $: if (!isOutgoingFreezeState && trialSubsetKey !== stagedTrialSubsetKey) {
-    const nextStimulusBlockerSrc = expectedStimulusBlockerSrc;
-    const nextFeedbackBlockerSrc = expectedFeedbackBlockerSrc;
-    const preservePreparedHandoff = preservePreparedHandoffOnNextReveal;
-    const preserveStimulusReady = Boolean(nextStimulusBlockerSrc) &&
-      nextStimulusBlockerSrc === stagedStimulusBlockerSrc &&
-      stimulusBlockingAssetReady;
-    const preserveFeedbackReady = Boolean(nextFeedbackBlockerSrc) &&
-      nextFeedbackBlockerSrc === stagedFeedbackBlockerSrc &&
-      feedbackBlockingAssetReady;
+  $: activeTrialRevealController.syncStage({
+    expectedFeedbackBlockerSrc,
+    expectedStimulusBlockerSrc,
+    isFadingOut,
+    isOutgoingFreezeState,
+    showOverlay: trialSubset.showOverlay,
+    trialSubsetKey,
+    trialSubsetKind,
+  });
 
-    clientConsole(2, '[CardScreen][Reveal] stage-reset', {
-      trialSubsetKind,
-      trialSubsetKey,
-      stagedTrialSubsetKey,
-      isFadingOut,
-      preservePreparedHandoff,
-      preserveStimulusReady,
-      preserveFeedbackReady,
-    });
-    stagedTrialSubsetKey = trialSubsetKey;
-    stagedStimulusBlockerSrc = nextStimulusBlockerSrc;
-    stagedFeedbackBlockerSrc = nextFeedbackBlockerSrc;
-    revealSequence += 1;
-    queuedRevealKey = '';
-    queuedRevealSequence = 0;
-    trialSubsetVisible = false;
-    activeSlotMounted = trialSubset.showOverlay || preservePreparedHandoff;
-    activeSlotVisible = false;
-    stimulusBlockingAssetReady = preservePreparedHandoff
-      ? (!nextStimulusBlockerSrc || preparedHandoffStimulusReady)
-      : (!nextStimulusBlockerSrc || preserveStimulusReady);
-    feedbackBlockingAssetReady = preservePreparedHandoff
-      ? (!nextFeedbackBlockerSrc || preparedHandoffFeedbackReady)
-      : (!nextFeedbackBlockerSrc || preserveFeedbackReady);
-    if (preservePreparedHandoff) {
-      const preparedRevealKey = trialSubsetKey;
-      const preparedRevealSequence = revealSequence;
-      preservePreparedHandoffOnNextReveal = false;
-      preparedHandoffStimulusReady = false;
-      preparedHandoffFeedbackReady = false;
-      void (async () => {
-        await tick();
-        primeTrialContentFadeStart();
-        if (
-          testMode ||
-          preparedRevealSequence !== revealSequence ||
-          preparedRevealKey !== stagedTrialSubsetKey ||
-          isFadingOut
-        ) {
-          clientConsole(2, '[CardScreen][Reveal] prepared handoff reveal skipped', {
-            testMode,
-            preparedRevealSequence,
-            revealSequence,
-            preparedRevealKey,
-            stagedTrialSubsetKey,
-            isFadingOut,
-            subsetKind: trialSubset.kind,
-          });
-          return;
-        }
-        clientConsole(2, '[CardScreen][Reveal] prepared handoff reveal started', {
-          preparedRevealKey,
-          subsetKind: trialSubset.kind,
-        });
-        lastFadeLogContext = {
-          key: preparedRevealKey,
-          subsetKind: trialSubset.kind,
-          visibleSetAt: performance.now(),
-          configuredDurationMs: getElementTransitionDurationMs(
-            trialContentFadeElement,
-            (element) => getComputedStyle(element),
-          ),
-        };
-        trialSubsetVisible = true;
-        activeSlotMounted = true;
-        activeSlotVisible = true;
-        send({
-          type: EVENTS.TRIAL_REVEAL_STARTED,
-          timestamp: Date.now(),
-          subsetKind: trialSubset.kind,
-        });
-      })();
+  $: activeTrialRevealController.queueRevealIfReady({
+    allBlockingAssetsReady,
+    isOutgoingFreezeState,
+  });
+
+  $: incomingSlotDisplaySnapshot = buildIncomingTrialSlotDisplaySnapshot({
+    defaultInputMode: inputMode,
+    deliverySettings,
+    formatAnswerText: (answer) => Answers.getDisplayAnswerText(answer),
+    layoutMode,
+    performanceCurrentTrial: performanceData?.currentTrial || 0,
+    preparedTrial,
+    skipStudyEnabled: toBoolean(deliverySettings.skipstudy),
+  });
+  $: incomingSlot = incomingSlotDisplaySnapshot.slot;
+  $: incomingExpectedStimulusBlockerSrc = incomingSlotDisplaySnapshot.expectedStimulusBlockerSrc;
+  $: incomingExpectedFeedbackBlockerSrc = incomingSlotDisplaySnapshot.expectedFeedbackBlockerSrc;
+  $: incomingSlotKey = incomingSlotDisplaySnapshot.slotKey;
+  $: {
+    incomingBlockingAssetVersion;
+    const incomingSlotChanged = incomingTrialSlotController.syncSlotKey(incomingSlotKey);
+    if (incomingSlotChanged) {
+      incomingBlockingAssetState.stimulusReady = !incomingExpectedStimulusBlockerSrc;
+      incomingBlockingAssetState.feedbackReady = !incomingExpectedFeedbackBlockerSrc;
     }
-  }
-
-  $: if (!isOutgoingFreezeState && activeSlotMounted && !trialSubsetVisible && allBlockingAssetsReady) {
-    queueTrialSubsetReveal(stagedTrialSubsetKey, revealSequence);
-  }
-
-  $: incomingPreparedSubsetKind = preparedTrial
-    ? (String(preparedTrial.testType || '').trim().toLowerCase() === 's' ? 'study' : 'question')
-    : 'none';
-  $: incomingSlot = preparedTrial
-    ? buildTrialSlotProps(preparedTrial, {
-        kind: incomingPreparedSubsetKind,
-        displayVisible: incomingPreparedSubsetKind !== 'none',
-        feedbackVisible: incomingPreparedSubsetKind === 'study',
-        responseVisible: incomingPreparedSubsetKind === 'question',
-        isForceCorrecting: false,
-        showQuestionNumber: deliverySettings.displayQuestionNumber,
-        questionNumber: (performanceData?.currentTrial || 0) + 1,
-        replayEnabled: incomingPreparedSubsetKind === 'question',
-        showSkipStudyButton: incomingPreparedSubsetKind === 'study' && toBoolean(deliverySettings.skipstudy),
-        inputEnabled: false,
-        userAnswer: '',
-        feedbackUserAnswer: '',
-        srStatus: 'idle',
-        srAttempt: 0,
-        srMaxAttempts: 0,
-        isCorrect: incomingPreparedSubsetKind === 'study',
-        isTimeout: false,
-        feedbackMessage: '',
-        correctColor: incomingPreparedSubsetKind === 'study' ? 'var(--app-text-color)' : deliverySettings.correctColor,
-        displayCorrectFeedback: incomingPreparedSubsetKind === 'study' ? true : deliverySettings.displayCorrectFeedback,
-        displayIncorrectFeedback: incomingPreparedSubsetKind === 'study' ? false : deliverySettings.displayIncorrectFeedback,
-      })
-    : null;
-  $: incomingExpectedStimulusBlockerSrc = incomingSlot?.expectedStimulusBlockerSrc || '';
-  $: incomingExpectedFeedbackBlockerSrc = incomingSlot?.expectedFeedbackBlockerSrc || '';
-  $: incomingAllBlockingAssetsReady = (!incomingExpectedStimulusBlockerSrc || incomingStimulusBlockingAssetReady) &&
-    (!incomingExpectedFeedbackBlockerSrc || incomingFeedbackBlockingAssetReady);
-  $: incomingSlotKey = incomingSlot?.subset?.showOverlay
-    ? [
-        preparedTrial?.questionIndex || 0,
-        incomingSlot.props.display?.text || '',
-        incomingSlot.props.display?.clozeText || '',
-        incomingSlot.props.display?.imgSrc || '',
-        incomingSlot.props.display?.videoSrc || '',
-        incomingSlot.props.display?.audioSrc || '',
-        incomingSlot.props.display?.h5p?.contentId || '',
-      ].join('::')
-    : 'none';
-  $: if (incomingSlotKey !== lastIncomingSlotKey) {
-    lastIncomingSlotKey = incomingSlotKey;
-    incomingSlotMounted = false;
-    incomingReadySent = false;
-    transitionCompleteSent = false;
-    incomingStimulusBlockingAssetReady = !incomingExpectedStimulusBlockerSrc;
-    incomingFeedbackBlockingAssetReady = !incomingExpectedFeedbackBlockerSrc;
-
-    if (incomingSlotKey !== 'none') {
-      incomingSlotSequence += 1;
-      const sequence = incomingSlotSequence;
-      void (async () => {
-        await tick();
-        await waitForBrowserPaint();
-        if (sequence !== incomingSlotSequence || incomingSlotKey === 'none') {
-          return;
-        }
-        incomingSlotMounted = true;
-      })();
-    }
+    incomingAllBlockingAssetsReady = (!incomingExpectedStimulusBlockerSrc || incomingBlockingAssetState.stimulusReady) &&
+      (!incomingExpectedFeedbackBlockerSrc || incomingBlockingAssetState.feedbackReady);
   }
   $: if (!preparedTrial) {
-    incomingSlotMounted = false;
-    incomingReadySent = false;
-    transitionCompleteSent = false;
+    incomingTrialSlotController.syncSlotKey('none');
   }
   $: if (
     !testMode &&
@@ -800,116 +561,123 @@
     incomingAllBlockingAssetsReady &&
     !incomingReadySent
   ) {
-    incomingReadySent = true;
+    incomingTrialSlotController.markReadySent();
     send({ type: 'INCOMING_READY' });
   }
 
-  $: displayMinSeconds = getDisplayTimeoutValue(deliverySettings.displayMinSeconds ?? 0);
-  $: displayMaxSeconds = getDisplayTimeoutValue(deliverySettings.displayMaxSeconds ?? 0);
-  $: hasDisplayTimeout = displayMinSeconds > 0 || displayMaxSeconds > 0;
-  $: displayTimeoutStartMs = resolveDisplayTimeoutStartMs({
-    currentUnitStartTime: Session.get('currentUnitStartTime'),
-    displayTimeoutMountMs,
+  let displayTimeoutClockVersion = 1;
+  let continuingToNextUnit = false;
+  const cardUnitContinuationController = createCardUnitContinuationController({
+    continueUnit: continueToNextRuntimeUnit,
+    isTestMode: () => testMode,
+    log: clientConsole,
+    onUpdate: (snapshot) => {
+      continuingToNextUnit = snapshot.continuing;
+    },
   });
-  $: displayTimeoutElapsedSeconds = hasDisplayTimeout
-    ? Math.max(0, Math.floor((displayTimeoutNow - displayTimeoutStartMs) / 1000))
-    : 0;
-  $: displayTimeoutCanContinue =
-    !hasDisplayTimeout ||
-    displayMinSeconds <= 0 ||
-    displayTimeoutElapsedSeconds >= displayMinSeconds;
-  $: footerMessage = buildDisplayTimeoutMessage(
-    displayMinSeconds,
-    displayMaxSeconds,
-    displayTimeoutElapsedSeconds
-  );
-  $: displayTimeoutScopeKey = [
-    Session.get('currentTdfId') || '',
-    Session.get('currentUnitNumber') ?? '',
-    displayTimeoutStartMs,
-  ].join(':');
-  $: if (displayTimeoutScopeKey !== lastDisplayTimeoutScopeKey) {
-    lastDisplayTimeoutScopeKey = displayTimeoutScopeKey;
-    displayTimeoutAutoAdvanced = false;
-  }
-  $: if (
-    !testMode &&
-    hasDisplayTimeout &&
-    displayMaxSeconds > 0 &&
-    displayTimeoutElapsedSeconds >= displayMaxSeconds &&
-    !displayTimeoutAutoAdvanced &&
-    !continuingToNextUnit
-  ) {
-    displayTimeoutAutoAdvanced = true;
+  const displayTimeoutController = createDisplayTimeoutController({
+    onTick: () => {
+      displayTimeoutClockVersion += 1;
+    },
+  });
+  $: displayTimeoutSnapshot = (displayTimeoutClockVersion, displayTimeoutController.buildSnapshot({
+    deliverySettings,
+    currentUnitStartTime: Session.get('currentUnitStartTime'),
+    currentTdfId: Session.get('currentTdfId'),
+    currentUnitNumber: Session.get('currentUnitNumber'),
+    continuingToNextUnit,
+    testMode,
+  }));
+  $: hasDisplayTimeout = displayTimeoutSnapshot.hasDisplayTimeout;
+  $: displayTimeoutCanContinue = displayTimeoutSnapshot.canContinue;
+  $: footerMessage = displayTimeoutSnapshot.footerMessage;
+  $: if (displayTimeoutSnapshot.shouldAutoAdvance) {
+    displayTimeoutController.markAutoAdvanced();
     void forceAdvanceToNextUnit('Display Max Seconds Reached');
   }
 
   $: correctAnswerImageSrc = getCorrectAnswerImageSrc(context.buttonList, context.currentAnswer);
 
-  let performanceData = buildPerformanceData();
-  let learningProgressPanelOpen = false;
-  let learningProgressSnapshot = buildLearningProgressPanelSnapshot(null, DEFAULT_DELIVERY_SETTINGS);
-  let lastLearningProgressFeedbackEnd = 0;
-  $: learningProgressRefreshKey = [
-    context.engine,
-    context.timestamps?.feedbackEnd || 0,
-    context.h5pResult?.batchId || '',
-  ].join(':');
-  $: {
-    learningProgressRefreshKey;
-    const nextLearningProgressSnapshot = buildLearningProgressPanelSnapshot(context.engine, deliverySettings, {
-      hiddenItems: CardStore.getHiddenItems(),
-    });
-    const feedbackEnd = Number(context.timestamps?.feedbackEnd || 0);
-    const shouldSeedInitialProgress =
-      !learningProgressSnapshot.available && nextLearningProgressSnapshot.available;
-    const shouldCommitCompletedTrialProgress =
-      feedbackEnd > 0 && feedbackEnd !== lastLearningProgressFeedbackEnd;
-    if (shouldSeedInitialProgress || shouldCommitCompletedTrialProgress) {
-      learningProgressSnapshot = nextLearningProgressSnapshot;
-      if (feedbackEnd > 0) {
-        lastLearningProgressFeedbackEnd = feedbackEnd;
-      }
-    } else if (!nextLearningProgressSnapshot.available && learningProgressSnapshot.available) {
-      learningProgressSnapshot = nextLearningProgressSnapshot;
-      lastLearningProgressFeedbackEnd = 0;
-    }
-  }
-  $: sessionSurfaceShell = resolveSessionSurfaceShell({
+  let performanceData = buildCardPerformanceData();
+  let learningProgressRequestVersion = 0;
+  const learningProgressRuntimeController = createLearningProgressRuntimeController({
+    defaultDeliverySettings: DEFAULT_DELIVERY_SETTINGS,
+    documentRef: () => typeof document === 'undefined' ? null : document,
+    getHiddenItems: () => CardStore.getHiddenItems(),
+  });
+  $: learningProgressRuntimeSnapshot = (learningProgressRequestVersion, learningProgressRuntimeController.buildRuntimeSnapshot({
+    deliverySettings,
+    engine: context.engine,
+    feedbackEnd: context.timestamps?.feedbackEnd || 0,
+    refreshSignal: context.h5pResult?.batchId || '',
     surfaceState: sessionSurfaceState,
-    progressPanelDisabled: progressPanelDisabled(deliverySettings),
-    learningProgressAvailable: learningProgressSnapshot.available,
-  });
-  $: learningProgressPanelState = resolveSessionSurfaceLearningProgressPanel({
-    shell: sessionSurfaceShell,
-    requestedOpen: learningProgressPanelOpen,
-  });
+  }));
+  $: sessionSurfaceShell = learningProgressRuntimeSnapshot.sessionSurfaceShell;
+  $: learningProgressSnapshot = learningProgressRuntimeSnapshot.snapshot;
+  $: learningProgressPanelState = learningProgressRuntimeSnapshot.panelState;
   $: showLearningProgressPanel = learningProgressPanelState.showPanel;
-  $: if (!sessionSurfaceShell.showLearningProgressPanel && learningProgressPanelOpen) {
-    learningProgressPanelOpen = false;
-  }
-  $: learningProgressViewportOpen = learningProgressPanelState.viewportOpen;
-  $: setLearningProgressViewportOpen(learningProgressViewportOpen);
 
   // Timeout tracking
-  $: timeoutMode = testMode && testTimeout?.mode ? testTimeout.mode : getTimeoutMode(state);
   let timeoutProgress = 0;
   let remainingTime = 0;
-  let displayTimeoutInterval;
-  let displayTimeoutNow = Date.now();
-  let displayTimeoutMountMs = Date.now();
-  let displayTimeoutStartMs = displayTimeoutMountMs;
-  let displayTimeoutElapsedSeconds = 0;
-  let displayTimeoutAutoAdvanced = false;
-  let displayTimeoutScopeKey = '';
-  let lastDisplayTimeoutScopeKey = '';
-  let continuingToNextUnit = false;
   let timeoutStart = null;
   let timeoutDuration = 0;
-  let lastTimeoutResetCounter = 0;
   let textAnswer = '';
-  let lastInputTrialStart = null;
   let timeoutModeState = 'none';
+  const cardTextInputController = createCardTextInputController({
+    getContext: () => context,
+    getState: () => state,
+    now: () => Date.now(),
+    send,
+    setContextUserAnswer: (value) => {
+      context.userAnswer = value;
+    },
+    setTextAnswer: (value) => {
+      textAnswer = value;
+    },
+  });
+  const cardTrialEventController = createCardTrialEventController({
+    getContext: () => context,
+    loadTtsPlayback: async () => {
+      const { ttsPlaybackService } = await import('../services/ttsService');
+      return ttsPlaybackService;
+    },
+    send,
+  });
+  const cardReviewEventController = createCardReviewEventController({
+    getSubsetKind: () => trialSubset.kind,
+    isTestMode: () => testMode,
+    log: clientConsole,
+    now: () => Date.now(),
+    send,
+    stateMatches: (path) => state.matches(path),
+  });
+  const cardBlockingAssetController = createCardBlockingAssetController({
+    getExpectedFeedbackSrc: (slot) => slot === 'incoming'
+      ? incomingExpectedFeedbackBlockerSrc
+      : expectedFeedbackBlockerSrc,
+    getExpectedStimulusSrc: (slot) => slot === 'incoming'
+      ? incomingExpectedStimulusBlockerSrc
+      : expectedStimulusBlockerSrc,
+    setReady: ({ owner, ready, slot }) => {
+      if (owner === 'stimulus') {
+        if (slot === 'incoming') {
+          incomingBlockingAssetState.stimulusReady = ready;
+          incomingBlockingAssetVersion += 1;
+        } else {
+          activeTrialRevealController.setBlockingAssetReady({ owner, ready });
+        }
+        return;
+      }
+
+      if (slot === 'incoming') {
+        incomingBlockingAssetState.feedbackReady = ready;
+        incomingBlockingAssetVersion += 1;
+      } else {
+        activeTrialRevealController.setBlockingAssetReady({ owner, ready });
+      }
+    },
+  });
   const timeoutCountdown = createTimeoutCountdownController({
     onUpdate: (snapshot) => {
       timeoutModeState = snapshot.modeState;
@@ -919,308 +687,73 @@
       timeoutDuration = snapshot.duration;
     },
   });
+  const timeoutCountdownSyncController = createTimeoutCountdownSyncController({
+    countdown: timeoutCountdown,
+    getMainTimeoutMs,
+    getFeedbackTimeoutMs,
+  });
 
-  $: {
-    if (state.matches('presenting.loading') || state.matches('transition.clearing')) {
-      textAnswer = '';
-    }
-  }
+  $: cardTextInputController.resetForRuntimeState(state);
+  $: cardTextInputController.syncTrialStart(context.timestamps?.trialStart);
+  $: timeoutMode = timeoutCountdownSyncController.sync({
+    testMode,
+    testTimeout,
+    state,
+    context,
+    deliverySettings,
+    isOutgoingFreezeState,
+  });
 
-  $: {
-    const currentTrialStart = context.timestamps?.trialStart ?? null;
-    if (currentTrialStart !== lastInputTrialStart) {
-      lastInputTrialStart = currentTrialStart;
-      textAnswer = '';
-      context.userAnswer = '';
-    }
-  }
-
-  $: livePerformanceSlotProps = {
-    showPerformanceStats,
-    showTimeoutBar,
-    showTimeoutCountdown,
-    totalTimeDisplay: performanceData.totalTimeDisplay,
-    percentCorrect: performanceData.percentCorrect,
-    cardsSeen: performanceData.cardsSeen,
-    totalCards: performanceData.totalCards,
-    currentTrial: performanceData.currentTrial,
+  $: performanceDisplaySnapshot = buildCardPerformanceDisplaySnapshot({
+    deliverySettings,
+    performanceData,
     timeoutMode,
     timeoutProgress,
     remainingTime,
-  };
-
-  $: performanceSlotProps = livePerformanceSlotProps;
-  $: performanceStatsProps = {
-    ...performanceSlotProps,
-    showPerformanceStats: true,
-    showTimeoutBar: false,
-    showTimeoutCountdown: false,
-  };
-  $: trialTimerProps = {
-    ...performanceSlotProps,
-    showPerformanceStats: false,
-  };
-  $: showTrialTimerArea = showTimeoutBar || showTimeoutCountdown;
-
-  function getTimeoutMode(currentState) {
-    return resolveTimeoutMode({
-      state: currentState,
-      isOutgoingFreezeState,
-      currentModeState: timeoutModeState,
-    });
-  }
-
-  function clearTimeoutInterval() {
-    timeoutCountdown.stopInterval();
-  }
-
-  function clearDisplayTimeoutInterval() {
-    if (displayTimeoutInterval) {
-      clearInterval(displayTimeoutInterval);
-      displayTimeoutInterval = null;
-    }
-  }
-
-  function startTimeoutCountdown(duration, mode, startTimestamp = Date.now()) {
-    timeoutCountdown.start(duration, mode, startTimestamp);
-  }
+  });
+  $: showTimeoutBar = performanceDisplaySnapshot.showTimeoutBar;
+  $: showTimeoutCountdown = performanceDisplaySnapshot.showTimeoutCountdown;
+  $: showPerformanceStats = performanceDisplaySnapshot.showPerformanceStats;
+  $: performanceSlotProps = performanceDisplaySnapshot.performanceSlotProps;
+  $: performanceStatsProps = performanceDisplaySnapshot.performanceStatsProps;
+  $: trialTimerProps = performanceDisplaySnapshot.trialTimerProps;
+  $: showTrialTimerArea = performanceDisplaySnapshot.showTrialTimerArea;
 
   // Event handlers
   function handleSubmit(event) {
-    send({
-      type: 'SUBMIT',
-      userAnswer: event.detail.answer,
-      timestamp: event.detail.timestamp,
-      source: 'keypress'
-    });
+    cardTrialEventController.handleSubmit(event);
   }
 
   function handleChoice(event) {
-    send({
-      type: 'SUBMIT',
-      userAnswer: event.detail.answer,
-      timestamp: event.detail.timestamp,
-      source: 'buttonClick'
-    });
+    cardTrialEventController.handleChoice(event);
   }
 
   function handleH5PResult(event) {
-    const detail = event.detail || {};
-    if (!h5pOwnsResponse) {
-      return;
-    }
-    if (submittedH5PResultKey) {
-      return;
-    }
-    const h5pResult = resolveH5PTrialDisplayResult(context.currentDisplay, detail, '[CardScreen]');
-    if (!h5pResult) {
-      throw new Error('[CardScreen] H5P result received for non-H5P display');
-    }
-    const resultKey = h5pResult.batchId;
-    submittedH5PResultKey = resultKey;
-    send({
-      type: 'SUBMIT',
-      userAnswer: h5pResult.completed ? '__H5P_COMPLETED__' : '__H5P_INCOMPLETE__',
-      timestamp: Date.now(),
-      source: 'h5p',
-      h5pResult
-    });
+    trialDisplaySubmissionController.handleH5PResult(event.detail || {});
   }
 
   function handleSparcSubmit(event) {
-    const detail = event.detail || {};
-    if (!sparcOwnsResponse) {
-      return;
-    }
-    const sparcResult = resolveSparcTrialDisplayResult(context.currentDisplay, detail, '[CardScreen]');
-    if (!sparcResult) {
-      throw new Error('[CardScreen] SPARC result received for non-SPARC display');
-    }
-    const resultKey = `${sparcResult.timestamp}:${sparcResult.triggeredBy || ''}`;
-    if (submittedSparcResultKey === resultKey) {
-      return;
-    }
-    submittedSparcResultKey = resultKey;
-    send({
-      type: 'SUBMIT',
-      userAnswer: '__SPARC_COMPLETED__',
-      timestamp: sparcResult.timestamp,
-      source: 'sparc',
-      sparcResult,
-    });
+    trialDisplaySubmissionController.handleSparcSubmit(event.detail || {});
   }
 
   function handleInput(event) {
-    // Update context with current input (for SR)
-    textAnswer = event.detail.value;
-    context.userAnswer = event.detail.value;
+    cardTextInputController.handleInput(event.detail);
   }
 
   function handleInputActivity(event) {
-    if (!state.matches('presenting.awaiting')) {
-      return;
-    }
-    send({
-      type: 'INPUT_ACTIVITY',
-      timestamp: event.detail?.timestamp || Date.now()
-    });
+    cardTextInputController.handleInputActivity(event.detail);
   }
 
   function handleBlockingAssetState(event, slot = 'active') {
-    const detail = event.detail || {};
-    const owner = detail.owner;
-    const blocking = detail.blocking === true;
-    const ready = detail.ready !== false;
-    const src = String(detail.src || '');
-    const expectedStimulusSrc = slot === 'incoming'
-      ? incomingExpectedStimulusBlockerSrc
-      : expectedStimulusBlockerSrc;
-    const expectedFeedbackSrc = slot === 'incoming'
-      ? incomingExpectedFeedbackBlockerSrc
-      : expectedFeedbackBlockerSrc;
-
-    if (owner === 'stimulus') {
-      if (blocking && src !== expectedStimulusSrc) {
-        return;
-      }
-      if (!blocking && expectedStimulusSrc) {
-        return;
-      }
-      if (slot === 'incoming') {
-        incomingStimulusBlockingAssetReady = ready;
-      } else {
-        stimulusBlockingAssetReady = ready;
-      }
-      return;
-    }
-
-    if (owner === 'feedback') {
-      if (blocking && src !== expectedFeedbackSrc) {
-        return;
-      }
-      if (!blocking && expectedFeedbackSrc) {
-        return;
-      }
-      if (slot === 'incoming') {
-        incomingFeedbackBlockingAssetReady = ready;
-      } else {
-        feedbackBlockingAssetReady = ready;
-      }
-    }
+    cardBlockingAssetController.handleBlockingAssetState(event.detail, slot);
   }
 
   function handleFeedbackContent(event) {
-    const detail = event.detail || {};
-    const feedbackText = String(detail.feedbackText || '').trim();
-
-    send({
-      type: 'FEEDBACK_CONTENT',
-      feedbackText,
-      feedbackHtml: String(detail.feedbackHtml || ''),
-      feedbackSuppressed: detail.suppressed === true,
-    });
+    cardReviewEventController.handleFeedbackContent(event.detail);
   }
 
   function handleReviewRevealStarted(event) {
-    if (testMode) {
-      return;
-    }
-
-    const subsetKind = event.detail?.subsetKind || trialSubset.kind;
-    const timestamp = event.detail?.timestamp || Date.now();
-    const transitionDurationMs = event.detail?.transitionDurationMs ?? null;
-
-    if (state.matches('study.preparing')) {
-      clientConsole(2, '[CardScreen][StudyReveal] started', {
-        subsetKind,
-        transitionDurationMs,
-      });
-
-      send({
-        type: EVENTS.TRIAL_REVEAL_STARTED,
-        timestamp,
-        subsetKind,
-      });
-      return;
-    }
-
-    if (!state.matches('feedback.preparing')) {
-      return;
-    }
-
-    clientConsole(2, '[CardScreen][ReviewReveal] started', {
-      subsetKind,
-      transitionDurationMs,
-    });
-
-    send({
-      type: 'REVIEW_REVEAL_STARTED',
-      timestamp,
-    });
-  }
-
-  function queueTrialSubsetReveal(key, sequence) {
-    if (!key || key === 'none') {
-      return;
-    }
-    if (queuedRevealKey === key && queuedRevealSequence === sequence) {
-      return;
-    }
-
-    queuedRevealKey = key;
-    queuedRevealSequence = sequence;
-
-    void (async () => {
-      await tick();
-      await waitForBrowserPaint();
-
-      if (sequence !== revealSequence || key !== stagedTrialSubsetKey || isFadingOut || !allBlockingAssetsReady) {
-        clientConsole(2, '[CardScreen][Reveal] queued reveal skipped', {
-          key,
-          stagedTrialSubsetKey,
-          sequence,
-          revealSequence,
-          isFadingOut,
-          allBlockingAssetsReady,
-          subsetKind: trialSubset.kind,
-        });
-        return;
-      }
-
-      clientConsole(2, '[CardScreen][Reveal] visible', {
-        key,
-        sequence,
-        subsetKind: trialSubset.kind,
-        isFadingOut,
-        allBlockingAssetsReady,
-      });
-      lastFadeLogContext = {
-        key,
-        subsetKind: trialSubset.kind,
-        visibleSetAt: performance.now(),
-        configuredDurationMs: getElementTransitionDurationMs(
-          trialContentFadeElement,
-          (element) => getComputedStyle(element),
-        ),
-      };
-      clientConsole(2, '[CardScreen][FadeTiming] reveal-trigger', {
-        key,
-        subsetKind: trialSubset.kind,
-        configuredDurationMs: lastFadeLogContext.configuredDurationMs,
-        visibleSetAt: lastFadeLogContext.visibleSetAt,
-      });
-      trialSubsetVisible = true;
-      activeSlotMounted = true;
-      activeSlotVisible = true;
-      firstTrialReveal.markRevealClassSet({ key, subsetKind: trialSubset.kind });
-      if (!testMode) {
-        send({
-          type: EVENTS.TRIAL_REVEAL_STARTED,
-          timestamp: Date.now(),
-          subsetKind: trialSubset.kind,
-        });
-      }
-    })();
+    cardReviewEventController.handleReviewRevealStarted(event.detail);
   }
 
   function primeTrialContentFadeStart() {
@@ -1235,136 +768,42 @@
   }
 
   function logTrialFadeEvent(event) {
-    if (!event || event.target !== trialContentFadeElement || event.propertyName !== 'opacity') {
-      return;
-    }
-
-    const now = performance.now();
-    const computedOpacity = trialContentFadeElement
-      ? getComputedStyle(trialContentFadeElement).opacity
-      : 'unknown';
-
-    clientConsole(2, '[CardScreen][FadeTiming]', {
-      eventType: event.type,
-      key: lastFadeLogContext.key,
-      subsetKind: lastFadeLogContext.subsetKind,
-      elapsedSinceRevealTriggerMs: lastFadeLogContext.visibleSetAt
-        ? Math.round(now - lastFadeLogContext.visibleSetAt)
-        : null,
-      configuredDurationMs: lastFadeLogContext.configuredDurationMs,
-      trialContentVisible,
-      isFadingOut,
-      opacity: computedOpacity,
-      pseudoElement: event.pseudoElement || '',
+    const transitionEvent = event?.detail?.target ? event.detail : event;
+    trialFadeTransitionController.handleTransitionEvent({
+      eventType: event?.type,
+      isOwnTarget: transitionEvent?.target === trialContentFadeElement,
+      propertyName: transitionEvent?.propertyName,
+      pseudoElement: transitionEvent?.pseudoElement || '',
     });
-
-    firstTrialReveal.finishFromTransitionEvent({ eventType: event.type });
-
-    if (!testMode && event.type === 'transitionend' && isFadingOut && !transitionCompleteSent) {
-      if (isPreparedFadingOut) {
-        preservePreparedHandoffOnNextReveal = true;
-        preparedHandoffStimulusReady = incomingStimulusBlockingAssetReady;
-        preparedHandoffFeedbackReady = incomingFeedbackBlockingAssetReady;
-      }
-      transitionCompleteSent = true;
-      send({ type: EVENTS.TRANSITION_COMPLETE, timestamp: Date.now() });
-    }
-  }
-
-  function queueVideoEndOverlayReveal(sequence) {
-    void (async () => {
-      await tick();
-      await waitForBrowserPaint();
-
-      if (!videoEnded || sequence !== videoEndOverlaySequence) {
-        return;
-      }
-
-      videoEndOverlayVisible = true;
-    })();
   }
 
   function handleFirstKeypress(event) {
-    send({
-      type: 'FIRST_KEYPRESS',
-      timestamp: event.detail.timestamp
-    });
+    cardTrialEventController.handleFirstKeypress(event);
   }
 
   function handleSkipStudy() {
-    send({ type: 'SKIP_STUDY' });
+    cardTrialEventController.handleSkipStudy();
   }
 
-  /**
-   * Replay stimulus audio.
-   * respepcts timer: stopped implicitly by stopTts() in cardMachine.js
-   * when leaving AWAITING state.
-   */
   async function handleReplay(event) {
-    const audioSrc = event.detail?.audioSrc;
-    if (!audioSrc) return;
-
-    const { ttsPlaybackService } = await import('../services/ttsService');
-    // We don't await here because it would block the UI, but stopTts 
-    // in navigationCleanup/stopTts will handle stopping it if state changes.
-    void ttsPlaybackService(context, {
-      audioSrc,
-      isQuestion: true,
-      autoRestartSr: true,
-    });
+    await cardTrialEventController.handleReplay(event);
   }
 
-  function buildPerformanceData(rawPerformance = {}) {
-    const performance = rawPerformance || {};
-    const numCorrect = Number(performance.numCorrect);
-    const numIncorrect = Number(performance.numIncorrect);
-    const divisor = Number.isFinite(numCorrect) && Number.isFinite(numIncorrect)
-      ? numCorrect + numIncorrect
-      : 0;
-
-    const percentCorrect = typeof performance.percentCorrect === 'string' && performance.percentCorrect
-      ? performance.percentCorrect
-      : divisor > 0
-        ? `${((numCorrect / divisor) * 100).toFixed(2)}%`
-        : 'N/A';
-
-    const totalTimeDisplay = performance.totalTimeDisplay != null && performance.totalTimeDisplay !== ''
-      ? String(performance.totalTimeDisplay)
-      : Number.isFinite(Number(performance.totalTime))
-        ? (Number(performance.totalTime) / (1000 * 60)).toFixed(1)
-        : '0.0';
-
-    const cardsSeen = Number.isFinite(Number(performance.stimsSeen)) ? Number(performance.stimsSeen) : null;
-    const totalCards = Number.isFinite(Number(performance.totalStimCount)) ? Number(performance.totalStimCount) : null;
-    const currentTrial = Number.isFinite(Number(performance.count)) ? Number(performance.count) : 0;
-
-    return {
-      totalTimeDisplay,
-      percentCorrect,
-      cardsSeen,
-      totalCards,
-      currentTrial,
-    };
-  }
-
-  let cardReactiveTrackers;
-  let startRecordingHandler;
-  let stopRecordingHandler;
-  let displayAnswerHandler;
-  let visibilityChangeHandler;
-  let pageHideHandler;
-  let beforeUnloadHandler;
-  let screenWakeLock = null;
-  let screenWakeLockReleaseHandler = null;
-  let resumeVideoHandler;
-  let videoAnswerHandler;
-  let forceUnitAdvanceShortcutHandler;
-  let completedVideoQuestions = new Set();
+  const completedVideoQuestionsStore = createCompletedVideoQuestionsStore();
+  const cardWakeLockController = createCardWakeLockController({
+    navigatorRef: () => typeof navigator === 'undefined' ? null : navigator,
+    documentRef: () => typeof document === 'undefined' ? null : document,
+    shouldHold: () => shouldHoldScreenWakeLock({
+      active: !testMode,
+      documentRef: typeof document === 'undefined' ? null : document,
+    }),
+    log: clientConsole,
+  });
   const videoMachineBridge = createVideoMachineBridge({
     addCompletedVideoQuestion: (questionIndex) => {
-      completedVideoQuestions.add(questionIndex);
+      completedVideoQuestionsStore.add(questionIndex);
     },
-    getCompletedVideoQuestions: () => completedVideoQuestions,
+    getCompletedVideoQuestions: completedVideoQuestionsStore.get,
     getCurrentState: () => currentState,
     getRepeatQuestionsSinceCheckpointEnabled: () => repeatQuestionsSinceCheckpointEnabled,
     getRewindOnIncorrectEnabled: () => rewindOnIncorrectEnabled,
@@ -1392,185 +831,84 @@
     },
     stateMatches: (path) => state.matches(path),
   });
+  const videoSessionRuntimeController = createVideoSessionRuntimeController({
+    getCurrentUnitNumber: () => Session.get('currentUnitNumber'),
+    getVideoInstructionsShownAt: () => videoInstructionsShownAt,
+    getVideoPlayer: () => videoPlayer,
+    log: clientConsole,
+    now: () => Date.now(),
+    persistInstructionState: createExperimentState,
+    prepareReadyPlayer: (showOverlay) => {
+      videoSessionBridge.prepareReadyPlayer(showOverlay);
+    },
+    recordInstructionContinue: recordCurrentInstructionContinue,
+    setSessionValue: (key, value) => {
+      Session.set(key, value);
+    },
+    setVideoInstructionDismissed: (value) => {
+      videoInstructionDismissed = value;
+    },
+    setVideoInstructionStartBlocked: (value) => {
+      videoInstructionStartBlocked = value;
+    },
+    setVideoPlayerReady: (value) => {
+      videoPlayerReady = value;
+    },
+    flushPendingResume: (reason) => videoMachineBridge.flushPendingResume(reason),
+  });
+  const cardVideoEventRuntime = createCardVideoEventRuntime({
+    getVideoPlayer: () => videoPlayer,
+    machineBridge: videoMachineBridge,
+    send,
+    sessionBridge: videoSessionBridge,
+    sessionRuntime: videoSessionRuntimeController,
+    stateMatches: (path) => state.matches(path),
+  });
 
-  function getCorrectAnswerImageSrc(buttonList, correctAnswer) {
-    if (!Array.isArray(buttonList) || !correctAnswer) return '';
+  const cardLaunchEnvironment = createCardLaunchEnvironment({
+    getSessionValue: (key) => Session.get(key),
+    setSessionValue: (key, value) => {
+      Session.set(key, value);
+    },
+    getDeliverySettings: () => deliverySettingsStore.get(),
+    getVideoCheckpoints,
+    getUser: () => Meteor.user(),
+    routeTo: (path) => FlowRouter.go(path),
+    finishLaunchLoading,
+    now: () => Date.now(),
+  });
 
-    const match = buttonList.find((button) => (
-      button &&
-      button.isImage &&
-      (button.buttonValue === correctAnswer ||
-        button.buttonName === correctAnswer ||
-        button.verbalChoice === correctAnswer)
-    ));
-
-    return match ? match.buttonName : '';
-  }
-
-  function canUseScreenWakeLock() {
-    if (typeof navigator === 'undefined' || typeof document === 'undefined') {
-      return false;
-    }
-    return typeof navigator.wakeLock?.request === 'function';
-  }
-
-  function shouldHoldScreenWakeLock() {
-    if (testMode) {
-      return false;
-    }
-    if (typeof document === 'undefined') {
-      return false;
-    }
-    return document.visibilityState === 'visible';
-  }
-
-  function clearScreenWakeLockListener() {
-    if (
-      screenWakeLock &&
-      screenWakeLockReleaseHandler &&
-      typeof screenWakeLock.removeEventListener === 'function'
-    ) {
-      screenWakeLock.removeEventListener('release', screenWakeLockReleaseHandler);
-    }
-    screenWakeLockReleaseHandler = null;
-  }
-
-  async function requestScreenWakeLock(reason = 'unspecified') {
-    if (!canUseScreenWakeLock() || !shouldHoldScreenWakeLock()) {
-      return;
-    }
-    if (screenWakeLock && !screenWakeLock.released) {
-      return;
-    }
-
-    try {
-      const nextWakeLock = await navigator.wakeLock.request('screen');
-      clearScreenWakeLockListener();
-      screenWakeLock = nextWakeLock;
-      screenWakeLockReleaseHandler = () => {
-        if (screenWakeLock === nextWakeLock) {
-          screenWakeLock = null;
-        }
-        screenWakeLockReleaseHandler = null;
-        clientConsole(2, `[CardScreen] Screen wake lock released (${reason})`);
-      };
-      if (typeof nextWakeLock.addEventListener === 'function') {
-        nextWakeLock.addEventListener('release', screenWakeLockReleaseHandler);
-      }
-      clientConsole(2, `[CardScreen] Screen wake lock acquired (${reason})`);
-    } catch (error) {
-      clientConsole(2, `[CardScreen] Screen wake lock request skipped (${reason})`, error);
-    }
-  }
-
-  async function releaseScreenWakeLock(reason = 'unspecified') {
-    if (!screenWakeLock) {
-      return;
-    }
-
-    const wakeLockToRelease = screenWakeLock;
-    clearScreenWakeLockListener();
-    screenWakeLock = null;
-
-    try {
-      if (!wakeLockToRelease.released && typeof wakeLockToRelease.release === 'function') {
-        await wakeLockToRelease.release();
-      }
-      clientConsole(2, `[CardScreen] Screen wake lock released by app (${reason})`);
-    } catch (error) {
-      clientConsole(2, `[CardScreen] Screen wake lock release failed (${reason})`, error);
-    }
-  }
-
-  async function syncScreenWakeLock(reason = 'unspecified') {
-    if (shouldHoldScreenWakeLock()) {
-      await requestScreenWakeLock(reason);
-      return;
-    }
-    await releaseScreenWakeLock(reason);
-  }
-
-  function getCurrentCardReadinessDependencies() {
-    return {
-      getCurrentTdfUnit: () => Session.get('currentTdfUnit'),
-      getDeliverySettings: () => deliverySettingsStore.get(),
-      getVideoCheckpoints: () => Session.get('videoCheckpoints'),
-    };
-  }
-
-  function buildCurrentCardReadinessDiagnostic() {
-    const unit = Session.get('currentTdfUnit');
-    return buildCardReadinessDiagnostic({
-      readiness: getCardReadinessState(getCurrentCardReadinessDependencies()),
-      currentTdfId: Session.get('currentTdfId') || null,
-      currentRootTdfId: Session.get('currentRootTdfId') || null,
-      currentStimuliSetId: Session.get('currentStimuliSetId') || null,
-      currentUnitNumber: Session.get('currentUnitNumber') ?? null,
-      currentUnitName: unit?.unitname || null,
-      deliverySettingsState: deliverySettingsStore.get() || {},
-    });
-  }
-
-  function buildCurrentCardInitializeFailureDiagnostic(error) {
-    const currentTdfUnitForDiagnostic = Session.get('currentTdfUnit');
-    return buildCardInitializeFailureDiagnostic({
-      error,
-      currentTdfFile: Session.get('currentTdfFile'),
-      currentTdfId: Session.get('currentTdfId'),
-      currentRootTdfId: Session.get('currentRootTdfId'),
-      currentStimuliSetId: Session.get('currentStimuliSetId'),
-      currentUnitNumber: Session.get('currentUnitNumber'),
-      currentTdfUnit: currentTdfUnitForDiagnostic,
-      currentStimuliSet: Session.get('currentStimuliSet'),
-      sessionSurfaceDiagnostic: resolveSessionSurfaceDiagnostic(currentTdfUnitForDiagnostic),
-    });
-  }
-
-  function setCardInitFailureDiagnostic(stage, diagnostic) {
-    Session.set('cardInitFailureDiagnostic', {
-      stage,
-      capturedAt: Date.now(),
-      ...diagnostic,
-    });
-  }
-
-  function routeInitializationFailure() {
-    routeCardInitializationFailure({
-      finishLaunchLoading,
-      getLoginMode: () => Session.get('loginMode'),
-      getUser: () => Meteor.user(),
-      routeTo: (path) => FlowRouter.go(path),
-      setSessionValue: (key, value) => {
-        Session.set(key, value);
-      },
-    });
-  }
-
-  function handleMachineVideoAnswer(event) {
-    videoMachineBridge.handleVideoAnswer(event.detail || {});
-  }
-
-  function registerMachineWindowListeners() {
+  function startRuntimeWindowEventController() {
     if (typeof window === 'undefined') {
-      return;
+      return null;
     }
 
-    if (!resumeVideoHandler) {
-      resumeVideoHandler = () => {
-        videoMachineBridge.requestResume('cardMachine:resumeVideo');
-      };
-      window.addEventListener('cardMachine:resumeVideo', resumeVideoHandler);
-    }
-
-    if (!videoAnswerHandler) {
-      videoAnswerHandler = handleMachineVideoAnswer;
-      window.addEventListener('cardMachine:videoAnswer', videoAnswerHandler);
-    }
+    const runtimeWindowEventController = createCardRuntimeWindowEventController({
+      windowTarget: window,
+      documentTarget: document,
+      startRecording: startSrRecording,
+      stopRecording: stopSrRecording,
+      cleanupAudioRecorder,
+      setStudyInteractionText: (next) => {
+        studyInteractionText = next;
+      },
+      requestVideoResume: (reason) => {
+        videoMachineBridge.requestResume(reason);
+      },
+      handleVideoAnswer: (detail) => {
+        videoMachineBridge.handleVideoAnswer(detail);
+      },
+      syncScreenWakeLock: cardWakeLockController.sync,
+      releaseScreenWakeLock: cardWakeLockController.release,
+      userCanForceAdvance: () => currentUserHasRole('admin,teacher'),
+      forceAdvanceToNextUnit,
+      log: clientConsole,
+    });
+    runtimeWindowEventController.start();
+    return runtimeWindowEventController;
   }
 
   // Lifecycle: Start machine on mount
-  let actorSubscription;
-  let startDispatched = false;
   let initializedForRender = false;
   const startPayload = {
     type: 'START',
@@ -1579,365 +917,126 @@
     tdfId,
     engineIndices
   };
+  cardMachineRuntimeController = createCardMachineRuntimeController({
+    machine: cardMachine,
+    createActor: (machine) => createActor(machine),
+    setState: (snapshot) => {
+      state = snapshot;
+    },
+    sendStartEvent: send,
+    startEvent: startPayload,
+    log: clientConsole,
+  });
+  const cardRuntimeLifecycleController = createCardRuntimeLifecycleController({
+    startRuntimeWindowEvents: startRuntimeWindowEventController,
+    machineRuntime: cardMachineRuntimeController,
+    createReactiveTrackers: () => createMeteorCardReactiveTrackers({
+      setPerformanceData: (performance) => {
+        performanceData = buildCardPerformanceData(performance);
+      },
+      setUser: (nextUser) => {
+        user = nextUser;
+      },
+      setVideoCheckpoints: (nextVideoCheckpoints) => {
+        videoCheckpoints = nextVideoCheckpoints;
+      },
+      resetCompletedVideoQuestions: () => {
+        completedVideoQuestionsStore.reset();
+      },
+    }),
+  });
 
   let cardScreenElement;
+  const cardScreenLifecycleRuntime = createCardScreenLifecycleRuntime({
+    applyTestPerformance: () => {
+      performanceData = { ...performanceData, ...testPerformance };
+    },
+    cleanupAudioRecorder,
+    clearDisplayTimeoutClock: displayTimeoutController.stopClock,
+    clearLearningProgressViewport: learningProgressRuntimeController.closeViewport,
+    clearTimeoutCountdown: timeoutCountdownSyncController.stopInterval,
+    completeCleanup,
+    launch: runCardLaunchOrchestration,
+    launchDeps: {
+      initializeCard: initializeSvelteCard,
+      waitForCardReadiness: waitForCardReadinessService,
+      getReadinessDependencies: cardLaunchEnvironment.getReadinessDependencies,
+      buildReadinessDiagnostic: cardLaunchEnvironment.buildReadinessDiagnostic,
+      buildInitializeFailureDiagnostic: cardLaunchEnvironment.buildInitializeFailureDiagnostic,
+      setFailureDiagnostic: cardLaunchEnvironment.setFailureDiagnostic,
+      log: clientConsole,
+      routeInitializationFailure: cardLaunchEnvironment.routeInitializationFailure,
+      setLaunchLoadingMessage,
+      markLaunchLoadingTiming,
+      prepareRender: async () => undefined,
+      resolveLaunchCompletion: () => resolveSessionSurfaceLaunchCompletion({
+        contentSurface: sessionContentSurface,
+        isLaunchLoadingActive: isLaunchLoadingActive(),
+        showVideoInstructionOverlay,
+        videoPlayerReady,
+      }),
+      waitForBrowserPaint,
+      finishLaunchLoading,
+    },
+    lifecycle: cardRuntimeLifecycleController,
+    normalizeTestSnapshot,
+    setInitializedForRender: (value) => {
+      initializedForRender = value;
+    },
+    setSessionUnitModeVersion: (updater) => {
+      sessionUnitModeVersion = updater(sessionUnitModeVersion);
+    },
+    setState: (nextState) => {
+      state = nextState;
+    },
+    startDisplayTimeoutClock: displayTimeoutController.startClock,
+    stopStimDisplayTypeMapVersionSync,
+    testMode: () => testMode,
+    testPerformance: () => testPerformance,
+    testSnapshot: () => testSnapshot,
+    waitForDomUpdate: tick,
+  });
 
   onMount(() => {
-    displayTimeoutMountMs = Date.now();
-    displayTimeoutNow = displayTimeoutMountMs;
-    clearDisplayTimeoutInterval();
-    displayTimeoutInterval = setInterval(() => {
-      displayTimeoutNow = Date.now();
-    }, 250);
-
-    if (testMode) {
-      state = normalizeTestSnapshot(testSnapshot);
-      if (testPerformance) {
-        performanceData = { ...performanceData, ...testPerformance };
-      }
-      return;
-    }
-
-    (async () => {
-      const launchResult = await runCardLaunchOrchestration({
-        initializeCard: initializeSvelteCard,
-        waitForCardReadiness: waitForCardReadinessService,
-        getReadinessDependencies: getCurrentCardReadinessDependencies,
-        buildReadinessDiagnostic: buildCurrentCardReadinessDiagnostic,
-        buildInitializeFailureDiagnostic: buildCurrentCardInitializeFailureDiagnostic,
-        setFailureDiagnostic: setCardInitFailureDiagnostic,
-        log: clientConsole,
-        routeInitializationFailure,
-        setLaunchLoadingMessage,
-        markLaunchLoadingTiming,
-        prepareRender: async () => {
-          sessionUnitModeVersion += 1;
-          initializedForRender = true;
-          await tick();
-        },
-        resolveLaunchCompletion: () => resolveSessionSurfaceLaunchCompletion({
-          contentSurface: sessionContentSurface,
-          isLaunchLoadingActive: isLaunchLoadingActive(),
-          showVideoInstructionOverlay,
-          videoPlayerReady,
-        }),
-        waitForBrowserPaint,
-        finishLaunchLoading,
-      });
-      if (launchResult.status !== 'ready') {
-        return;
-      }
-
-      if (typeof window !== 'undefined') {
-        startRecordingHandler = () => {
-          try {
-            startSrRecording();
-          } catch (error) {
-            clientConsole(1, '[SR] startRecording failed', error);
-          }
-        };
-        stopRecordingHandler = () => {
-          try {
-            stopSrRecording();
-          } catch (error) {
-            clientConsole(1, '[SR] stopRecording failed', error);
-          }
-        };
-        displayAnswerHandler = (event) => {
-          const next = String(event?.detail?.answer || '').trim();
-          studyInteractionText = next;
-        };
-        window.addEventListener('cardMachine:startRecording', startRecordingHandler);
-        window.addEventListener('cardMachine:stopRecording', stopRecordingHandler);
-        window.addEventListener('cardMachine:displayAnswer', displayAnswerHandler);
-
-        visibilityChangeHandler = () => {
-          if (document.visibilityState === 'hidden') {
-            cleanupAudioRecorder();
-          } else if (document.visibilityState === 'visible') {
-            clientConsole(2, '[CardScreen] visibilitychange visible; preserving card flow for mobile interruption recovery');
-          }
-          void syncScreenWakeLock('visibilitychange');
-        };
-        pageHideHandler = () => {
-          cleanupAudioRecorder();
-        };
-        beforeUnloadHandler = () => {
-          cleanupAudioRecorder();
-        };
-        document.addEventListener('visibilitychange', visibilityChangeHandler);
-        window.addEventListener('pagehide', pageHideHandler);
-        window.addEventListener('beforeunload', beforeUnloadHandler);
-      }
-
-      registerMachineWindowListeners();
-
-      if (!actor) {
-        actor = createMachineActor(cardMachine);
-      }
-      state = getActorSnapshot(actor);
-
-      actorSubscription = subscribeToActor(actor, (snapshot) => {
-        state = snapshot;
-        if (!startDispatched && snapshot?.matches?.('idle.ready')) {
-          startDispatched = true;
-          send(startPayload);
-        }
-      });
-      if (actor && typeof actor.start === 'function') {
-        actor.start();
-      }
-
-      cardReactiveTrackers = createMeteorCardReactiveTrackers({
-        setPerformanceData: (performance) => {
-          performanceData = buildPerformanceData(performance);
-        },
-        setUser: (nextUser) => {
-          user = nextUser;
-        },
-        setVideoCheckpoints: (nextVideoCheckpoints) => {
-          videoCheckpoints = nextVideoCheckpoints;
-        },
-        resetCompletedVideoQuestions: () => {
-          completedVideoQuestions = new Set();
-        },
-      });
-      cardReactiveTrackers.start();
-
-      forceUnitAdvanceShortcutHandler = async (event) => {
-        const saveShortcutPressed =
-          (event.ctrlKey || event.metaKey) &&
-          event.shiftKey &&
-          String(event.key || '').toLowerCase() === 's';
-        if (!saveShortcutPressed || event.repeat) {
-          return;
-        }
-
-        if (!currentUserHasRole('admin,teacher')) {
-          return;
-        }
-
-        event.preventDefault();
-        await forceAdvanceToNextUnit('Admin Teacher Shortcut Ctrl+Shift+S');
-      };
-      window.addEventListener('keydown', forceUnitAdvanceShortcutHandler);
-
-      // START is dispatched when the machine reaches idle.ready.
-    })();
+    cardScreenLifecycleRuntime.mount();
   });
 
   // Lifecycle: Cleanup on unmount
   onDestroy(() => {
-    if (typeof window !== 'undefined') {
-      if (startRecordingHandler) {
-        window.removeEventListener('cardMachine:startRecording', startRecordingHandler);
-        startRecordingHandler = null;
-      }
-      if (stopRecordingHandler) {
-        window.removeEventListener('cardMachine:stopRecording', stopRecordingHandler);
-        stopRecordingHandler = null;
-      }
-      if (displayAnswerHandler) {
-        window.removeEventListener('cardMachine:displayAnswer', displayAnswerHandler);
-        displayAnswerHandler = null;
-      }
-      if (visibilityChangeHandler) {
-        document.removeEventListener('visibilitychange', visibilityChangeHandler);
-        visibilityChangeHandler = null;
-      }
-      if (pageHideHandler) {
-        window.removeEventListener('pagehide', pageHideHandler);
-        pageHideHandler = null;
-      }
-      if (beforeUnloadHandler) {
-        window.removeEventListener('beforeunload', beforeUnloadHandler);
-        beforeUnloadHandler = null;
-      }
-      void releaseScreenWakeLock('card destroy');
-    }
-    if (actorSubscription && typeof actorSubscription.unsubscribe === 'function') {
-      actorSubscription.unsubscribe();
-      actorSubscription = null;
-    }
-    if (actor && typeof actor.stop === 'function') {
-      actor.stop();
-      actor = null;
-    }
-    clearTimeoutInterval();
-    clearDisplayTimeoutInterval();
-    if (cardReactiveTrackers) {
-      cardReactiveTrackers.stop();
-      cardReactiveTrackers = null;
-    }
-    if (typeof window !== 'undefined' && resumeVideoHandler) {
-      window.removeEventListener('cardMachine:resumeVideo', resumeVideoHandler);
-      resumeVideoHandler = null;
-    }
-    if (typeof window !== 'undefined' && videoAnswerHandler) {
-      window.removeEventListener('cardMachine:videoAnswer', videoAnswerHandler);
-      videoAnswerHandler = null;
-    }
-    if (typeof window !== 'undefined' && forceUnitAdvanceShortcutHandler) {
-      window.removeEventListener('keydown', forceUnitAdvanceShortcutHandler);
-      forceUnitAdvanceShortcutHandler = null;
-    }
-    if (!testMode) {
-      stopStimDisplayTypeMapVersionSync('svelte card destroy');
-      completeCleanup();
-      cleanupAudioRecorder();
-    }
-    setLearningProgressViewportOpen(false);
-    // Machine cleanup handled by XState
+    cardScreenLifecycleRuntime.unmount();
   });
 
   // Video player reference
   let videoPlayer;
   let videoCheckpoints = null;
-  let videoResumeAnchor = null;
-  $: videoResumeAnchor = Session.get('videoResumeAnchor');
-  $: videoPlaybackPolicy = resolveVideoPlaybackPolicyForUnit(currentTdfUnit);
-  $: preventScrubbingEnabled = videoPlaybackPolicy.preventScrubbing;
-  $: rewindOnIncorrectEnabled = videoPlaybackPolicy.rewindOnIncorrect;
-  $: repeatQuestionsSinceCheckpointEnabled = videoPlaybackPolicy.repeatQuestionsSinceCheckpoint;
-  $: if (videoMachineBridge.hasPendingResume() && videoPlayer && state.matches('videoWaiting')) {
-    void videoMachineBridge.flushPendingResume('reactive-ready');
-  }
+  $: videoRuntimeSnapshot = buildCardVideoRuntimeSnapshot({
+    currentState,
+    currentTdfUnit,
+    getVideoResumeAnchor,
+    state,
+    videoCheckpoints,
+  });
+  $: preventScrubbingEnabled = videoRuntimeSnapshot.preventScrubbingEnabled;
+  $: rewindOnIncorrectEnabled = videoRuntimeSnapshot.rewindOnIncorrectEnabled;
+  $: repeatQuestionsSinceCheckpointEnabled = videoRuntimeSnapshot.repeatQuestionsSinceCheckpointEnabled;
+  $: cardVideoEventRuntime.syncPendingResume();
   const showCardDebugState = cardDebugStateEnabled();
-
-  $: {
-    if (testMode) {
-      timeoutCountdown.applyTestSnapshot({
-        modeState: testTimeout?.mode || getTimeoutMode(state),
-        progress: testTimeout?.progress,
-        remainingTime: testTimeout?.remainingTime,
-      });
-    } else {
-      const mode = getTimeoutMode(state);
-      if (mode === 'question') {
-        const duration = getMainTimeoutMs({ ...context, deliverySettings });
-        const resetCounter = Number.isFinite(context.timeoutResetCounter) ? context.timeoutResetCounter : 0;
-        const startTimestamp = getQuestionTimeoutStartMs(context);
-        if (
-          timeoutModeState !== mode ||
-          timeoutDuration !== duration ||
-          resetCounter !== lastTimeoutResetCounter ||
-          timeoutStart !== startTimestamp
-        ) {
-          lastTimeoutResetCounter = resetCounter;
-          startTimeoutCountdown(duration, mode, startTimestamp);
-        }
-      } else if (mode === 'feedback') {
-        let duration;
-        let startTimestamp;
-        if (state.matches('presenting.readyPrompt')) {
-          duration = parseInt(deliverySettings.readyPromptStringDisplayTime, 10) || 0;
-          startTimestamp = timeoutModeState === mode && timeoutDuration === duration && timeoutStart
-            ? timeoutStart
-            : Date.now();
-        } else {
-          duration = getFeedbackTimeoutMs({ ...context, deliverySettings });
-          startTimestamp = getFeedbackTimeoutStartMs(context);
-        }
-        if (timeoutModeState !== mode || timeoutDuration !== duration || timeoutStart !== startTimestamp) {
-          startTimeoutCountdown(duration, mode, startTimestamp);
-        }
-      } else if (timeoutModeState !== 'none') {
-        timeoutCountdown.clear();
-      }
-    }
-  }
 
   $: if (testMode && testPerformance) {
     performanceData = { ...performanceData, ...testPerformance };
   }
 
-  async function handleVideoCheckpoint(event) {
-    videoSessionBridge.handleCheckpoint(event.detail || {});
-  }
-
-  function handleVideoEnded() {
-    videoSessionBridge.handleEnded();
-  }
-
-  function handleVideoReady() {
-    videoPlayerReady = true;
-    void videoMachineBridge.flushPendingResume('video-ready');
-    videoSessionBridge.prepareReadyPlayer(showVideoInstructionOverlay);
-  }
-
-  function markVideoInstructionsContinued() {
-    videoInstructionDismissed = true;
-    videoInstructionStartBlocked = false;
-    Session.set('curUnitInstructionsSeen', true);
-    Session.set('fromInstructions', true);
-
-    const currentUnitNumber = Session.get('currentUnitNumber') || 0;
-    void recordCurrentInstructionContinue(videoInstructionsShownAt || Date.now()).catch((error) => {
-      clientConsole(1, '[CardScreen] Failed to record video instructions continue:', error);
-    });
-    void createExperimentState({
-      currentUnitNumber,
-    }).catch((error) => {
-      clientConsole(1, '[CardScreen] Failed to persist video instructions state:', error);
-    });
-  }
-
-  function handleVideoInstructionContinue(event) {
-    event?.preventDefault?.();
-
-    if (!videoPlayer || typeof videoPlayer.play !== 'function') {
-      videoInstructionStartBlocked = true;
-      clientConsole(1, '[CardScreen] Video instructions continue clicked before player was ready');
-      return;
-    }
-
-    videoInstructionStartBlocked = false;
-    let playResult;
-    try {
-      playResult = videoPlayer.play();
-    } catch (error) {
-      videoInstructionStartBlocked = true;
-      clientConsole(1, '[CardScreen] Video start from instructions threw:', error?.message || error);
-      return;
-    }
-
-    if (playResult?.then) {
-      playResult
-        .then(() => {
-          markVideoInstructionsContinued();
-        })
-        .catch((error) => {
-          videoInstructionStartBlocked = true;
-          clientConsole(1, '[CardScreen] Video start from instructions was blocked:', error?.message || error);
-        });
-      return;
-    }
-
-    markVideoInstructionsContinued();
-  }
-
-  function handleVideoContinue() {
-    send({ type: 'VIDEO_CONTINUE' });
-  }
-
   async function forceAdvanceToNextUnit(reason) {
-    if (testMode || continuingToNextUnit) {
-      return;
-    }
-
-    continuingToNextUnit = true;
-    try {
-      const { unitIsFinished } = await import('../services/unitProgression');
-      await unitIsFinished(reason);
-    } catch (error) {
-      continuingToNextUnit = false;
-      clientConsole(1, '[CardScreen] Failed to continue to next unit:', error);
-    }
+    await cardUnitContinuationController.forceAdvanceToNextUnit(reason);
   }
 
   function handleLearningProgressPanelToggle(event) {
-    learningProgressPanelOpen = Boolean(event?.detail?.open);
-    void notifyLearningProgressLayoutChange();
+    learningProgressRuntimeController.setRequestedOpen(Boolean(event?.detail?.open));
+    learningProgressRequestVersion += 1;
+    void notifyLearningProgressLayoutChange({
+      windowRef: typeof window === 'undefined' ? null : window,
+      waitForDomUpdate: tick,
+    });
   }
 
   async function handleFooterContinue(event) {
@@ -1958,180 +1057,96 @@
   {#if sessionContentSurface.showAutoTutorSession}
     <AutoTutorSession on:complete={() => forceAdvanceToNextUnit('AutoTutor Complete')} />
   {:else if sessionContentSurface.showVideoSession}
-    {#if showPerformanceStats}
-      <PerformanceArea {...performanceStatsProps} />
-    {/if}
-
-    <VideoSessionMode
-      bind:this={videoPlayer}
-      videoUrl={deliverySettings.videoUrl}
-      questionTimes={videoCheckpoints?.times || []}
-      questionIndices={videoCheckpoints?.questions || []}
-      resumeStartTime={videoResumeAnchor?.resumeStartTime}
-      resumeCheckpointIndex={videoResumeAnchor?.resumeCheckpointIndex}
-      preventScrubbing={preventScrubbingEnabled}
-      canAcceptCheckpoint={state.matches('videoWaiting')}
-      checkpointGateState={JSON.stringify(currentState)}
-      startBlocked={showVideoInstructionOverlay}
+    <VideoCardSessionSurface
+      bind:videoPlayer={videoPlayer}
+      bind:trialContentFadeElement={trialContentFadeElement}
+      checkpointGateState={videoRuntimeSnapshot.checkpointGateState}
+      continueButtonText={deliverySettings.continueButtonText || 'Continue'}
+      {deliverySettings}
+      fadingOut={isFadingOut}
+      instructionHtml={sanitizedVideoInstructionText}
+      instructionStartBlocked={videoInstructionStartBlocked}
       overlayMounted={trialContentMounted}
       overlayVisible={trialContentVisible}
-      on:checkpoint={handleVideoCheckpoint}
-      on:ready={handleVideoReady}
-      on:play
-      on:pause
-      on:timeupdate
-      on:ended={handleVideoEnded}
-    >
-      <div
-        class="trial-content-fade"
-        bind:this={trialContentFadeElement}
-        class:trial-content-visible={trialContentVisible}
-        class:trial-content-fading-out={isFadingOut}
-        on:transitionrun={logTrialFadeEvent}
-        on:transitionstart={logTrialFadeEvent}
-        on:transitionend={logTrialFadeEvent}
-      >
-        {#if showTrialTimerArea}
-        <PerformanceArea {...trialTimerProps} />
-        {/if}
-
-        <TrialContent
-          {...trialContentProps}
-          parentVisible={trialContentVisible}
-          on:submit={handleSubmit}
-          on:choice={handleChoice}
-          on:input={handleInput}
-          on:activity={handleInputActivity}
-          on:firstKeypress={handleFirstKeypress}
-          on:feedbackcontent={handleFeedbackContent}
-          on:blockingassetstate={handleBlockingAssetState}
-          on:reviewrevealstarted={handleReviewRevealStarted}
-          on:h5presult={handleH5PResult}
-          on:sparcsubmit={handleSparcSubmit}
-        />
-      </div>
-
-    </VideoSessionMode>
-
-    {#if showVideoInstructionOverlay}
-      <div class="video-instruction-overlay" role="dialog" aria-modal="true" aria-live="polite">
-        <div class="video-instruction-panel">
-          <div class="video-instruction-copy">
-            {@html sanitizedVideoInstructionText}
-          </div>
-          {#if videoInstructionStartBlocked}
-            <p class="video-instruction-warning">
-              The browser blocked automatic video start. Press Continue again to start the video.
-            </p>
-          {/if}
-          <button
-            type="button"
-            class="btn btn-primary video-instruction-continue"
-            disabled={!videoPlayerReady}
-            on:click={handleVideoInstructionContinue}
-          >
-            {videoPlayerReady ? (deliverySettings.continueButtonText || 'Continue') : 'Loading video...'}
-          </button>
-        </div>
-      </div>
-    {/if}
-
-    {#if videoEndOverlayMounted}
-      <div class="video-end-overlay" class:video-end-overlay-visible={videoEndOverlayVisible}>
-        <button type="button" class="btn btn-primary video-continue-button" on:click={handleVideoContinue}>
-          {deliverySettings.continueButtonText || 'Continue'}
-        </button>
-      </div>
-    {/if}
+      performanceStatsProps={performanceStatsProps}
+      preventScrubbing={preventScrubbingEnabled}
+      questionIndices={videoRuntimeSnapshot.questionIndices}
+      questionTimes={videoRuntimeSnapshot.questionTimes}
+      resumeCheckpointIndex={videoRuntimeSnapshot.resumeCheckpointIndex}
+      resumeStartTime={videoRuntimeSnapshot.resumeStartTime}
+      showInstructionOverlay={showVideoInstructionOverlay}
+      showPerformanceStats={showPerformanceStats}
+      showTrialTimerArea={showTrialTimerArea}
+      startBlocked={showVideoInstructionOverlay}
+      trialContentProps={trialContentProps}
+      trialTimerProps={trialTimerProps}
+      videoCanAcceptCheckpoint={videoRuntimeSnapshot.canAcceptCheckpoint}
+      videoEndOverlayMounted={videoEndOverlayMounted}
+      videoEndOverlayVisible={videoEndOverlayVisible}
+      videoPlayerReady={videoPlayerReady}
+      on:checkpoint={(event) => cardVideoEventRuntime.handleCheckpoint(event)}
+      on:ready={() => cardVideoEventRuntime.handleReady(showVideoInstructionOverlay)}
+      on:ended={() => cardVideoEventRuntime.handleEnded()}
+      on:transitionrun={logTrialFadeEvent}
+      on:transitionstart={logTrialFadeEvent}
+      on:transitionend={logTrialFadeEvent}
+      on:submit={handleSubmit}
+      on:choice={handleChoice}
+      on:input={handleInput}
+      on:activity={handleInputActivity}
+      on:firstKeypress={handleFirstKeypress}
+      on:feedbackcontent={handleFeedbackContent}
+      on:blockingassetstate={handleBlockingAssetState}
+      on:reviewrevealstarted={handleReviewRevealStarted}
+      on:h5presult={handleH5PResult}
+      on:sparcsubmit={handleSparcSubmit}
+      on:instructioncontinue={(event) => cardVideoEventRuntime.handleInstructionContinue(event)}
+      on:videocontinue={() => cardVideoEventRuntime.handleContinue()}
+    />
   {:else if sessionContentSurface.showStandardCardSession}
-    <div
-      class="learning-session-layout"
-      class:learning-session-layout-panel-open={learningProgressPanelState.panelOpen}
-    >
-      <div class="learning-session-main">
-        {#if showPerformanceStats}
-          <PerformanceArea {...performanceStatsProps} />
-        {/if}
-
-        <div class="trial-content-stack">
-          <div
-            class="trial-content-fade trial-content-slot"
-            bind:this={trialContentFadeElement}
-            class:trial-content-visible={trialContentVisible}
-            class:trial-content-fading-out={isFadingOut}
-            on:transitionrun={logTrialFadeEvent}
-            on:transitionstart={logTrialFadeEvent}
-            on:transitionend={logTrialFadeEvent}
-          >
-            {#if showTrialTimerArea}
-            <PerformanceArea {...trialTimerProps} />
-            {/if}
-
-            <TrialContent
-              {...trialContentProps}
-              parentVisible={trialContentVisible}
-              on:submit={handleSubmit}
-              on:choice={handleChoice}
-              on:input={handleInput}
-              on:activity={handleInputActivity}
-              on:firstKeypress={handleFirstKeypress}
-              on:feedbackcontent={handleFeedbackContent}
-              on:replay={handleReplay}
-              on:blockingassetstate={handleBlockingAssetState}
-              on:reviewrevealstarted={handleReviewRevealStarted}
-              on:h5presult={handleH5PResult}
-              on:sparcsubmit={handleSparcSubmit}
-            />
-            {#if trialSubset.showSkipStudyButton}
-              <div class="skip-study-container">
-                <button type="button" class="btn btn-primary skip-study-button" on:click={handleSkipStudy}>
-                  {deliverySettings.skipStudyButtonText || 'Skip'}
-                </button>
-              </div>
-            {/if}
-          </div>
-
-          {#if incomingSlot}
-            <div
-              class="trial-content-fade trial-content-slot trial-content-slot-incoming-prepared"
-              aria-hidden="true"
-            >
-              <TrialContent
-                {...incomingSlot.props}
-                parentVisible={false}
-                on:feedbackcontent={handleFeedbackContent}
-                on:blockingassetstate={(event) => handleBlockingAssetState(event, 'incoming')}
-              />
-            </div>
-          {/if}
-        </div>
-      </div>
-
-      {#if showLearningProgressPanel}
-        <LearningProgressPanel
-          snapshot={learningProgressSnapshot}
-          open={learningProgressPanelState.panelOpen}
-          on:toggle={handleLearningProgressPanelToggle}
-        />
-      {/if}
-    </div>
+    <StandardCardSessionSurface
+      bind:trialContentFadeElement={trialContentFadeElement}
+      {deliverySettings}
+      fadingOut={isFadingOut}
+      incomingSlot={incomingSlot}
+      learningProgressPanelState={learningProgressPanelState}
+      learningProgressSnapshot={learningProgressSnapshot}
+      performanceStatsProps={performanceStatsProps}
+      showLearningProgressPanel={showLearningProgressPanel}
+      showPerformanceStats={showPerformanceStats}
+      showTrialTimerArea={showTrialTimerArea}
+      trialContentProps={trialContentProps}
+      trialContentVisible={trialContentVisible}
+      trialSubset={trialSubset}
+      trialTimerProps={trialTimerProps}
+      on:transitionrun={logTrialFadeEvent}
+      on:transitionstart={logTrialFadeEvent}
+      on:transitionend={logTrialFadeEvent}
+      on:submit={handleSubmit}
+      on:choice={handleChoice}
+      on:input={handleInput}
+      on:activity={handleInputActivity}
+      on:firstKeypress={handleFirstKeypress}
+      on:feedbackcontent={handleFeedbackContent}
+      on:replay={handleReplay}
+      on:blockingassetstate={handleBlockingAssetState}
+      on:incomingblockingassetstate={(event) => handleBlockingAssetState(event, 'incoming')}
+      on:reviewrevealstarted={handleReviewRevealStarted}
+      on:h5presult={handleH5PResult}
+      on:sparcsubmit={handleSparcSubmit}
+      on:skipstudy={handleSkipStudy}
+      on:learningprogresstoggle={handleLearningProgressPanelToggle}
+    />
   {/if}
 
   {#if hasDisplayTimeout}
-    <div class="fixed-footer" role="contentinfo">
-      <div class="fixed-footer__message">{footerMessage}</div>
-      <div class="fixed-footer__controls">
-        <button
-          type="button"
-          class="btn btn-primary fixed-footer__button"
-          on:click={handleFooterContinue}
-          disabled={continuingToNextUnit || !displayTimeoutCanContinue}
-          aria-busy={continuingToNextUnit}
-        >
-          {deliverySettings.continueButtonText || 'Continue'}
-        </button>
-      </div>
-    </div>
+    <DisplayTimeoutFooter
+      canContinue={displayTimeoutCanContinue}
+      continueButtonText={deliverySettings.continueButtonText || 'Continue'}
+      continuing={continuingToNextUnit}
+      message={footerMessage}
+      on:continue={handleFooterContinue}
+    />
   {/if}
 
   <!-- Debug state display (development only) -->
@@ -2178,138 +1193,6 @@
     min-height: 0;
   }
 
-  .learning-session-layout {
-    --learning-progress-panel-width: 136px;
-
-    position: relative;
-    flex: 1 1 auto;
-    min-height: 0;
-    display: flex;
-    align-items: stretch;
-    width: 100%;
-    overflow: hidden;
-  }
-
-  .learning-session-main {
-    flex: 1 1 auto;
-    min-width: 0;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    padding-right: var(--app-space-0);
-    transition: padding-right var(--app-transition-smooth) ease;
-  }
-
-  .learning-session-layout-panel-open .learning-session-main {
-    padding-right: var(--app-space-0);
-  }
-
-  .video-instruction-overlay {
-    position: absolute;
-    inset: 0;
-    z-index: 40;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: clamp(var(--app-space-4-px), 4vw, var(--app-space-5));
-    background: color-mix(in srgb, var(--app-background-color) 94%, transparent);
-  }
-
-  .video-instruction-panel {
-    width: min(760px, 100%);
-    max-height: min(78vh, 720px);
-    overflow: auto;
-    padding: clamp(calc(18px * var(--app-density-scale)), 3vw, calc(32px * var(--app-density-scale)));
-    border: 1px solid var(--app-secondary-surface-color);
-    background: var(--learning-card-surface-color);
-    color: var(--app-text-color);
-    box-shadow: var(--app-shadow-modal);
-  }
-
-  .video-instruction-copy {
-    font-size: clamp(var(--app-font-size-base), 1.6vw, calc(var(--app-font-size-base) * 1.2));
-    line-height: var(--app-line-height-relaxed);
-  }
-
-  .video-instruction-warning {
-    margin: var(--app-space-4-px) 0 0;
-    color: var(--app-state-error-color);
-    font-weight: var(--app-font-weight-semibold);
-  }
-
-  .video-instruction-continue {
-    width: min(420px, 100%);
-    margin: var(--app-space-5-px) auto 0;
-    border: 1px solid var(--app-secondary-surface-color);
-    background: var(--learning-card-primary-action-surface-color);
-    color: var(--learning-card-primary-action-text-color);
-    font-weight: var(--app-font-weight-bold);
-  }
-
-  .video-instruction-continue:disabled {
-    opacity: 0.65;
-    cursor: wait;
-  }
-
-  .trial-content-stack {
-    flex: 1;
-    min-height: 0;
-    position: relative;
-  }
-
-  .trial-content-fade {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    opacity: 0;
-    transition: opacity var(--app-transition-smooth) ease;
-  }
-
-  .trial-content-slot {
-    position: absolute;
-    inset: 0;
-    min-height: 0;
-  }
-
-  .trial-content-slot-incoming-prepared {
-    pointer-events: none;
-    visibility: hidden;
-  }
-
-  .trial-content-fade.trial-content-visible {
-    opacity: 1;
-  }
-
-  .trial-content-fade.trial-content-fading-out {
-    opacity: 0;
-    transition-duration: var(--app-transition-smooth);
-    pointer-events: none;
-  }
-
-  .fixed-footer {
-    flex-shrink: 0;
-    height: 30px;
-    background: var(--learning-card-surface-color);
-    border-top: 1px solid var(--app-secondary-surface-color);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--app-space-3-px);
-  }
-
-  .fixed-footer__message {
-    color: var(--app-secondary-text-color);
-    font-size: calc(var(--app-font-size-base) * 0.75);
-  }
-
-  .fixed-footer__button {
-    padding: var(--app-space-1-px) var(--app-space-4-px);
-    border: 1px solid var(--app-secondary-surface-color);
-    font-weight: var(--app-font-weight-semibold);
-    background: var(--learning-card-primary-action-surface-color);
-    color: var(--learning-card-primary-action-text-color);
-  }
-
   .debug-state {
     position: fixed;
     top: 10px;
@@ -2335,53 +1218,6 @@
     margin: var(--app-space-2) 0 0 0;
     white-space: pre-wrap;
     word-wrap: break-word;
-  }
-
-  .video-end-overlay {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: color-mix(in srgb, var(--app-text-color) 60%, transparent);
-    z-index: 120;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity var(--app-transition-smooth) ease;
-  }
-
-  .video-end-overlay.video-end-overlay-visible {
-    opacity: 1;
-    pointer-events: auto;
-  }
-
-  .video-continue-button {
-    padding: calc(0.75rem * var(--app-density-scale)) calc(2rem * var(--app-density-scale));
-    border: 1px solid var(--app-secondary-surface-color);
-    font-weight: var(--app-font-weight-semibold);
-    background: var(--learning-card-primary-action-surface-color);
-    color: var(--learning-card-primary-action-text-color);
-  }
-
-  .skip-study-container {
-    display: flex;
-    justify-content: center;
-    padding: var(--card-spacing-sm) var(--card-spacing-md);
-    flex-shrink: 0;
-  }
-
-  .skip-study-button {
-    padding: var(--app-space-2) var(--app-space-4);
-    border: 1px solid var(--app-secondary-surface-color);
-    font-weight: var(--app-font-weight-medium);
-    background: var(--learning-card-primary-action-surface-color);
-    color: var(--learning-card-primary-action-text-color);
-    opacity: 0.85;
-    transition: opacity 0.15s ease;
-  }
-
-  .skip-study-button:hover {
-    opacity: 1;
   }
 </style>
 

@@ -6,7 +6,6 @@
 
 import { Meteor } from 'meteor/meteor';
 import { Session } from 'meteor/session';
-import { getEngine } from '../../../../lib/engineManager';
 import { meteorCallAsync } from '../../../../index';
 import { clientConsole } from '../../../../lib/userSessionHelpers';
 import { refreshCurrentDeliverySettingsStore, setStudentPerformance } from '../../../../lib/currentTestingHelpers';
@@ -23,6 +22,7 @@ import type { ExperimentState } from '../../../../../common/types/experiment';
 import type { UnitCompletionEngine } from '../../../../../common/types/svelteServices';
 import { COMPLETED_LESSON_REDIRECT } from '../../../../lib/cardEntryIntent';
 import { assertIdInvariants, logIdInvariantBreachOnce } from '../../../../lib/idContext';
+import { resolveRuntimeEngine } from './cardRuntimeState';
 
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra') as {
   FlowRouter: { go(path: string): void };
@@ -142,7 +142,7 @@ export async function unitIsFinished(_reason: string): Promise<void> {
   const curExperimentState = await getExperimentState();
 
   if (adaptive) {
-    const engine = getEngine() as UnitProgressionEngine;
+    const engine = resolveRuntimeEngine() as unknown as UnitProgressionEngine;
     if (engine.adaptiveQuestionLogic) {
       const logic = engine.adaptiveQuestionLogic.curUnit?.adaptiveLogic;
       if (logic !== '' && logic !== undefined) {

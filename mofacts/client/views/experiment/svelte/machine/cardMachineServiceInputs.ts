@@ -1,4 +1,4 @@
-import { Session } from 'meteor/session';
+import { getOverallOutcomeHistory } from '../services/cardRuntimeState';
 import type { MachineArgs } from './cardMachineTypes';
 
 export function toServiceInput({ context, event }: MachineArgs) {
@@ -99,7 +99,7 @@ export function toOutcomeHistoryStateInput({ context, event }: MachineArgs) {
     context,
     event,
     stateUpdate: {
-      overallOutcomeHistory: Session.get('overallOutcomeHistory'),
+      overallOutcomeHistory: getOverallOutcomeHistory(),
     },
     source: 'cardMachine.transition.logging',
   };

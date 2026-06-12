@@ -8,6 +8,18 @@ export interface TimeoutCountdownSnapshot {
   duration: number;
 }
 
+export interface DisplayTimeoutSnapshot {
+  minSeconds: number;
+  maxSeconds: number;
+  hasDisplayTimeout: boolean;
+  startMs: number;
+  elapsedSeconds: number;
+  canContinue: boolean;
+  footerMessage: string;
+  scopeKey: string;
+  shouldAutoAdvance: boolean;
+}
+
 interface TimeoutCountdownControllerOptions {
   now?: () => number;
   setIntervalFn?: (callback: () => void, delayMs: number) => ReturnType<typeof setInterval>;
@@ -15,8 +27,48 @@ interface TimeoutCountdownControllerOptions {
   onUpdate?: (snapshot: TimeoutCountdownSnapshot) => void;
 }
 
+interface DisplayTimeoutControllerOptions {
+  now?: () => number;
+  setIntervalFn?: (callback: () => void, delayMs: number) => ReturnType<typeof setInterval>;
+  clearIntervalFn?: (handle: ReturnType<typeof setInterval>) => void;
+  onTick?: () => void;
+}
+
+interface DisplayTimeoutDeliverySettings {
+  displayMinSeconds?: unknown;
+  displayMaxSeconds?: unknown;
+}
+
 interface StateMatcher {
   matches?: (path: string) => boolean;
+}
+
+interface TimeoutCountdownContext {
+  timestamps?: {
+    timeoutStart?: unknown;
+    trialStart?: unknown;
+    feedbackStart?: unknown;
+  };
+  timeoutResetCounter?: unknown;
+  [key: string]: unknown;
+}
+
+export interface TimeoutCountdownSyncControllerOptions {
+  readonly countdown: ReturnType<typeof createTimeoutCountdownController>;
+  readonly getMainTimeoutMs: (params: TimeoutCountdownContext) => number;
+  readonly getFeedbackTimeoutMs: (params: TimeoutCountdownContext) => number;
+  readonly now?: () => number;
+}
+
+export interface TimeoutCountdownSyncParams {
+  readonly testMode: boolean;
+  readonly testTimeout?: Partial<Pick<TimeoutCountdownSnapshot, 'modeState' | 'progress' | 'remainingTime'>> & {
+    readonly mode?: TimeoutMode;
+  };
+  readonly state: StateMatcher | null | undefined;
+  readonly context: TimeoutCountdownContext;
+  readonly deliverySettings: Record<string, unknown>;
+  readonly isOutgoingFreezeState: boolean;
 }
 
 function cloneSnapshot(snapshot: TimeoutCountdownSnapshot): TimeoutCountdownSnapshot {
@@ -77,6 +129,63 @@ export function buildDisplayTimeoutMessage(
     return 'You can continue whenever you want';
   }
   return '';
+}
+
+export function buildDisplayTimeoutScopeKey(params: {
+  currentTdfId: unknown;
+  currentUnitNumber: unknown;
+  displayTimeoutStartMs: number;
+}): string {
+  return [
+    params.currentTdfId || '',
+    params.currentUnitNumber ?? '',
+    params.displayTimeoutStartMs,
+  ].join(':');
+}
+
+export function buildDisplayTimeoutSnapshot(params: {
+  deliverySettings: DisplayTimeoutDeliverySettings | null | undefined;
+  currentUnitStartTime: unknown;
+  currentTdfId: unknown;
+  currentUnitNumber: unknown;
+  displayTimeoutMountMs: number;
+  displayTimeoutNowMs: number;
+  autoAdvanced: boolean;
+  continuingToNextUnit: boolean;
+  testMode: boolean;
+}): DisplayTimeoutSnapshot {
+  const minSeconds = getDisplayTimeoutValue(params.deliverySettings?.displayMinSeconds ?? 0);
+  const maxSeconds = getDisplayTimeoutValue(params.deliverySettings?.displayMaxSeconds ?? 0);
+  const hasDisplayTimeout = minSeconds > 0 || maxSeconds > 0;
+  const startMs = resolveDisplayTimeoutStartMs({
+    currentUnitStartTime: params.currentUnitStartTime,
+    displayTimeoutMountMs: params.displayTimeoutMountMs,
+  });
+  const elapsedSeconds = hasDisplayTimeout
+    ? Math.max(0, Math.floor((params.displayTimeoutNowMs - startMs) / 1000))
+    : 0;
+  const scopeKey = buildDisplayTimeoutScopeKey({
+    currentTdfId: params.currentTdfId,
+    currentUnitNumber: params.currentUnitNumber,
+    displayTimeoutStartMs: startMs,
+  });
+
+  return {
+    minSeconds,
+    maxSeconds,
+    hasDisplayTimeout,
+    startMs,
+    elapsedSeconds,
+    canContinue: !hasDisplayTimeout || minSeconds <= 0 || elapsedSeconds >= minSeconds,
+    footerMessage: buildDisplayTimeoutMessage(minSeconds, maxSeconds, elapsedSeconds),
+    scopeKey,
+    shouldAutoAdvance: !params.testMode &&
+      hasDisplayTimeout &&
+      maxSeconds > 0 &&
+      elapsedSeconds >= maxSeconds &&
+      !params.autoAdvanced &&
+      !params.continuingToNextUnit,
+  };
 }
 
 export function getQuestionTimeoutStartMs(
@@ -198,5 +307,170 @@ export function createTimeoutCountdownController(options: TimeoutCountdownContro
       intervalHandle = setIntervalFn(updateCountdown, 100);
     },
     stopInterval,
+  };
+}
+
+export function createTimeoutCountdownSyncController(options: TimeoutCountdownSyncControllerOptions) {
+  const now = options.now || Date.now;
+  let lastTimeoutResetCounter = 0;
+
+  function resolveMode(params: {
+    readonly state: StateMatcher | null | undefined;
+    readonly isOutgoingFreezeState: boolean;
+    readonly testMode: boolean;
+    readonly testTimeout?: TimeoutCountdownSyncParams['testTimeout'];
+  }): TimeoutMode {
+    if (params.testMode && params.testTimeout?.mode) {
+      return params.testTimeout.mode;
+    }
+    return resolveTimeoutMode({
+      state: params.state,
+      isOutgoingFreezeState: params.isOutgoingFreezeState,
+      currentModeState: options.countdown.getSnapshot().modeState,
+    });
+  }
+
+  function sync(params: TimeoutCountdownSyncParams): TimeoutMode {
+    const mode = resolveMode({
+      state: params.state,
+      isOutgoingFreezeState: params.isOutgoingFreezeState,
+      testMode: params.testMode,
+      testTimeout: params.testTimeout,
+    });
+
+    if (params.testMode) {
+      const testSnapshot: Partial<Pick<TimeoutCountdownSnapshot, 'modeState' | 'progress' | 'remainingTime'>> = {
+        modeState: mode,
+      };
+      if (params.testTimeout && Number.isFinite(params.testTimeout.progress)) {
+        testSnapshot.progress = Number(params.testTimeout.progress);
+      }
+      if (params.testTimeout && Number.isFinite(params.testTimeout.remainingTime)) {
+        testSnapshot.remainingTime = Number(params.testTimeout.remainingTime);
+      }
+      options.countdown.applyTestSnapshot(testSnapshot);
+      return mode;
+    }
+
+    const snapshot = options.countdown.getSnapshot();
+    if (mode === 'question') {
+      const duration = options.getMainTimeoutMs({
+        ...params.context,
+        deliverySettings: params.deliverySettings,
+      });
+      const resetCounter = Number.isFinite(Number(params.context.timeoutResetCounter))
+        ? Number(params.context.timeoutResetCounter)
+        : 0;
+      const startTimestamp = getQuestionTimeoutStartMs(params.context, now);
+      if (
+        snapshot.modeState !== mode ||
+        snapshot.duration !== duration ||
+        resetCounter !== lastTimeoutResetCounter ||
+        snapshot.start !== startTimestamp
+      ) {
+        lastTimeoutResetCounter = resetCounter;
+        options.countdown.start(duration, mode, startTimestamp);
+      }
+      return mode;
+    }
+
+    if (mode === 'feedback') {
+      let duration: number;
+      let startTimestamp: number;
+      if (params.state?.matches?.('presenting.readyPrompt')) {
+        duration = parseInt(String(params.deliverySettings.readyPromptStringDisplayTime), 10) || 0;
+        startTimestamp = snapshot.modeState === mode && snapshot.duration === duration && snapshot.start
+          ? snapshot.start
+          : now();
+      } else {
+        duration = options.getFeedbackTimeoutMs({
+          ...params.context,
+          deliverySettings: params.deliverySettings,
+        });
+        startTimestamp = getFeedbackTimeoutStartMs(params.context, now);
+      }
+      if (snapshot.modeState !== mode || snapshot.duration !== duration || snapshot.start !== startTimestamp) {
+        options.countdown.start(duration, mode, startTimestamp);
+      }
+      return mode;
+    }
+
+    if (snapshot.modeState !== 'none') {
+      options.countdown.clear();
+    }
+    return mode;
+  }
+
+  return {
+    resolveMode,
+    sync,
+    stopInterval: options.countdown.stopInterval,
+  };
+}
+
+export function createDisplayTimeoutController(options: DisplayTimeoutControllerOptions = {}) {
+  const now = options.now || Date.now;
+  const setIntervalFn = options.setIntervalFn || setInterval;
+  const clearIntervalFn = options.clearIntervalFn || clearInterval;
+  const onTick = options.onTick || (() => undefined);
+  let intervalHandle: ReturnType<typeof setInterval> | null = null;
+  let mountMs = now();
+  let nowMs = mountMs;
+  let autoAdvanced = false;
+  let lastScopeKey = '';
+
+  function stopClock() {
+    if (intervalHandle) {
+      clearIntervalFn(intervalHandle);
+      intervalHandle = null;
+    }
+  }
+
+  function publishTick() {
+    onTick();
+  }
+
+  return {
+    startClock() {
+      stopClock();
+      mountMs = now();
+      nowMs = mountMs;
+      autoAdvanced = false;
+      lastScopeKey = '';
+      publishTick();
+      intervalHandle = setIntervalFn(() => {
+        nowMs = now();
+        publishTick();
+      }, 250);
+    },
+    stopClock,
+    buildSnapshot(params: {
+      deliverySettings: DisplayTimeoutDeliverySettings | null | undefined;
+      currentUnitStartTime: unknown;
+      currentTdfId: unknown;
+      currentUnitNumber: unknown;
+      continuingToNextUnit: boolean;
+      testMode: boolean;
+    }): DisplayTimeoutSnapshot {
+      const snapshotParams = {
+        ...params,
+        displayTimeoutMountMs: mountMs,
+        displayTimeoutNowMs: nowMs,
+        autoAdvanced,
+      };
+      const snapshot = buildDisplayTimeoutSnapshot(snapshotParams);
+      if (snapshot.scopeKey !== lastScopeKey) {
+        lastScopeKey = snapshot.scopeKey;
+        autoAdvanced = false;
+        return buildDisplayTimeoutSnapshot({
+          ...snapshotParams,
+          autoAdvanced,
+        });
+      }
+      return snapshot;
+    },
+    markAutoAdvanced() {
+      autoAdvanced = true;
+    },
   };
 }

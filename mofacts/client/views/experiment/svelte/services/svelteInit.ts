@@ -20,7 +20,7 @@ import {
   setAudioPromptSpeakingRate
 } from '../../../../lib/state/audioState';
 import { audioManager } from '../../../../lib/audioContextManager';
-import { getEngine, setEngine } from '../../../../lib/engineManager';
+import { setEngine } from '../../../../lib/engineManager';
 import { resolveUnitEngineTypeForUnit } from '../../engineConstructors';
 import { initializeEngine } from '../services/unitEngineService';
 import { initVideoSessionData } from '../services/videoCardInit';
@@ -61,6 +61,12 @@ import {
   type CardRefreshRebuildClassification,
 } from './cardEntryBootstrap';
 import { resolveSvelteEngineInitPolicy } from './svelteEngineInitPolicy';
+import {
+  markRuntimeResumeInactive,
+  resetCardRuntimeForInitialization,
+  resolveRuntimeEngine,
+  setResumeToQuestion,
+} from './cardRuntimeState';
 import {
   assertIdInvariants,
   setActiveTdfContext,
@@ -415,7 +421,7 @@ async function initializePersistedProgressResumeCard(
 ): Promise<SvelteCardInitResult> {
   const resumeResult = await resumeFromExperimentState(tdfFile) as SvelteCardInitResult;
 
-  Session.set('resumeToQuestion', !!resumeResult?.resumeToQuestion);
+  setResumeToQuestion(!!resumeResult?.resumeToQuestion);
 
   if (resumeResult.redirected) {
     if (resumeResult.redirectTo) {
@@ -479,7 +485,7 @@ async function initializeStandardCardEntry(
 ): Promise<SvelteCardInitResult> {
   const { prefetchedExperimentState } = dispatchContext;
 
-  Session.set('resumeToQuestion', false);
+  setResumeToQuestion(false);
 
   if (!prefetchedExperimentState) {
     markLaunchLoadingTiming('getExperimentState:start', { source: 'initializeStandardCardEntry' });
@@ -660,7 +666,7 @@ async function initializeStandardCardEntry(
   const userLowerInteraction = document.getElementById('userLowerInteraction');
   if (userLowerInteraction) userLowerInteraction.innerHTML = '';
 
-  const existingEngine = getEngine() as RuntimeEngine | null;
+  const existingEngine = resolveRuntimeEngine() as RuntimeEngine | null;
   const currentTdfId = Session.get('currentTdfId');
   const { shouldInitEngine } = resolveSvelteEngineInitPolicy({
     existingEngine,
@@ -687,7 +693,7 @@ async function initializeStandardCardEntry(
     Session.set('unitType', unitType);
   }
 
-  const engine = getEngine() as RuntimeEngine | null;
+  const engine = resolveRuntimeEngine() as RuntimeEngine | null;
   if (engine?.loadResumeState) {
     markLaunchLoadingTiming('engineLoadResumeState:start');
     await engine.loadResumeState();
@@ -804,25 +810,12 @@ async function initializeCardEntryByIntent(
  * @returns {Promise<SvelteCardInitResult>}
  */
 export async function initializeSvelteCard(): Promise<SvelteCardInitResult> {
-  CardStore.setScoringEnabled(undefined);
-  CardStore.setDisplayReady(false);
-  CardStore.setInputReady(false);
-  Session.set('displayReady', false);
-  Session.set('inputReady', false);
-  Session.set('isVideoSession', false);
-  Session.set('videoCheckpoints', null);
-  Session.set('videoResumeAnchor', null);
-  if (!Array.isArray(Session.get('overallOutcomeHistory'))) {
-    Session.set('overallOutcomeHistory', []);
-  }
-  if (!Array.isArray(Session.get('overallStudyHistory'))) {
-    Session.set('overallStudyHistory', []);
-  }
+  const runtimeInitSnapshot = resetCardRuntimeForInitialization();
 
   const cardEntryContext = getCardEntryContext();
   const requestedCardEntryIntent = cardEntryContext.intent;
 
-  let tdfFile = Session.get('currentTdfFile') as TdfFileLike | null | undefined;
+  let tdfFile = runtimeInitSnapshot.currentTdfFile as TdfFileLike | null | undefined;
   if (!tdfFile || !tdfFile.tdfs || !tdfFile.tdfs.tutor) {
     clientConsole(1, '[Svelte Init] No currentTdfFile - skipping init');
     return { redirected: false };
@@ -858,7 +851,7 @@ export async function initializeSvelteCard(): Promise<SvelteCardInitResult> {
     requiresConditionResolution,
   });
   clearCardEntryContext();
-  Session.set('inResume', false);
+  markRuntimeResumeInactive();
 
   CardStore.resetHiddenItems();
   setLaunchLoadingMessage('Loading content...');

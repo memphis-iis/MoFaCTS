@@ -1,6 +1,7 @@
 import { Meteor } from 'meteor/meteor';
 import { Session } from 'meteor/session';
 import { Tracker } from 'meteor/tracker';
+import { getVideoCheckpoints } from './cardRuntimeState';
 
 export interface ReactiveComputation {
   stop: () => void;
@@ -64,7 +65,7 @@ export function createMeteorCardReactiveTrackers(deps: {
     autorun: (callback) => Tracker.autorun(callback),
     getPerformance: () => Session.get('curStudentPerformance'),
     getUser: () => Meteor.user(),
-    getVideoCheckpoints: () => Session.get('videoCheckpoints'),
+    getVideoCheckpoints,
     ...deps,
   });
 }

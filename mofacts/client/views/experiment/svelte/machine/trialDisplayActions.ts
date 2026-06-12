@@ -1,6 +1,6 @@
 import { Session } from 'meteor/session';
 import { Answers } from '../../answerAssess';
-import { CardStore } from '../../modules/cardStore';
+import { setDisplayReadyState, setInputReadyState } from '../services/cardRuntimeState';
 import { assign, type ActionArgs } from './cardMachineActionTypes';
 
 export const setPrestimulusDisplay = assign({
@@ -24,8 +24,7 @@ export function focusInput() {
 }
 
 export function disableInput() {
-  CardStore.setInputReady(false);
-  Session.set('inputReady', false);
+  setInputReadyState(false);
 
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('cardMachine:disableInput'));
@@ -33,8 +32,7 @@ export function disableInput() {
 }
 
 export function enableInput() {
-  CardStore.setInputReady(true);
-  Session.set('inputReady', true);
+  setInputReadyState(true);
 
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('cardMachine:enableInput'));
@@ -90,8 +88,7 @@ export function displayFeedback({ context }: ActionArgs) {
 }
 
 export function setDisplayReady({ context: _context }: ActionArgs) {
-  CardStore.setDisplayReady(true);
-  Session.set('displayReady', true);
+  setDisplayReadyState(true);
 
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('cardMachine:displayReady'));
@@ -99,11 +96,9 @@ export function setDisplayReady({ context: _context }: ActionArgs) {
 }
 
 export function setDisplayNotReady() {
-  CardStore.setDisplayReady(false);
-  Session.set('displayReady', false);
+  setDisplayReadyState(false);
 }
 
 export function setInputNotReady() {
-  CardStore.setInputReady(false);
-  Session.set('inputReady', false);
+  setInputReadyState(false);
 }
