@@ -316,6 +316,7 @@
   let incomingSlotMounted = false;
   let incomingReadySent = false;
   let transitionCompleteSent = false;
+  let incomingAllBlockingAssetsReady = true;
   const incomingTrialSlotController = createIncomingTrialSlotController({
     onUpdate: (snapshot) => {
       incomingSlotMounted = snapshot.mounted;
