@@ -125,6 +125,7 @@ export interface PracticeDashboardSnapshotLesson {
   enableAudioPromptAndFeedback: boolean;
   hasSpeechAPIKey: boolean;
   hasTTSAPIKey: boolean;
+  firstContentUnitType: 'video' | 'autotutor' | 'assessment' | 'learning' | 'sparc' | 'conditionPool' | null;
   hasConfigurableSettings: boolean;
   hasLearnerConfigurableSettings: boolean;
   isMultiTdf: boolean;

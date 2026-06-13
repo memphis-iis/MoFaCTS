@@ -426,6 +426,7 @@ const dashboardCacheMethods = createDashboardCacheMethods({
   SectionUserMap,
   UserDashboardCache,
   usersCollection: MeteorAny.users,
+  DynamicSettings,
   serverConsole,
   computePracticeTimeMs,
   canViewDashboardTdf,

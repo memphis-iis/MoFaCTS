@@ -653,9 +653,56 @@ function shouldShowSettingsButton(tdf: any): boolean {
   return Boolean(tdf.hasLearnerConfigurableSettings);
 }
 
+function parseBooleanLike(value: unknown): boolean {
+  return value === true || value === 'true' || value === 1 || value === '1';
+}
+
+function getEffectiveSetSpecValue(tdf: any, key: 'audioInputEnabled' | 'audioPromptMode') {
+  const override = getLearnerTdfConfig(String(tdf?.TDFId || ''))?.overrides?.setspec?.[key];
+  return override !== undefined ? override : tdf?.[key];
+}
+
 const lessonRowHelpers = {
   displayLabel(this: any): string {
     return displayLabelForTdf(this);
+  },
+
+  firstContentUnitIconClass(this: any): string {
+    switch (this.firstContentUnitType) {
+      case 'video':
+        return 'fa-play-circle';
+      case 'autotutor':
+        return 'fa-comments';
+      case 'assessment':
+        return 'fa-question-circle';
+      case 'learning':
+        return 'fa-clone';
+      case 'sparc':
+        return 'fa-sitemap';
+      case 'conditionPool':
+        return 'fa-random';
+      default:
+        return '';
+    }
+  },
+
+  firstContentUnitIconTitle(this: any): string {
+    switch (this.firstContentUnitType) {
+      case 'video':
+        return 'First content unit is a video';
+      case 'autotutor':
+        return 'First content unit is an AutoTutor';
+      case 'assessment':
+        return 'First content unit is an assessment session';
+      case 'learning':
+        return 'First content unit is a learning session';
+      case 'sparc':
+        return 'First content unit is a SPARC page';
+      case 'conditionPool':
+        return 'Multiple condition TDFs';
+      default:
+        return '';
+    }
   },
 
   ttsIconClass(this: any): string {
@@ -664,6 +711,18 @@ const lessonRowHelpers = {
 
   srIconClass(this: any): string {
     return this.hasSpeechAPIKey ? 'icon-configured' : 'icon-needs-config';
+  },
+
+  showTtsIcon(this: any): boolean {
+    const effectiveAudioPromptMode = getEffectiveSetSpecValue(this, 'audioPromptMode');
+    if (effectiveAudioPromptMode !== undefined) {
+      return String(effectiveAudioPromptMode || '').trim().toLowerCase() !== 'silent';
+    }
+    return parseBooleanLike(this.enableAudioPromptAndFeedback);
+  },
+
+  showSrIcon(this: any): boolean {
+    return parseBooleanLike(getEffectiveSetSpecValue(this, 'audioInputEnabled'));
   },
 
   accuracyDisplay(this: any): string {

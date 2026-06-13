@@ -164,8 +164,8 @@
         <thead>
           <tr>
             <th scope="col" class="actions-heading">Actions</th>
-            <th scope="col" aria-label="Lesson type"></th>
-            <th scope="col">Study Set</th>
+            <th scope="col" class="features-heading">Features</th>
+            <th scope="col" class="study-set-heading">Study Set</th>
             <th scope="col" class="num">Total Trials</th>
             <th scope="col">Overall Accuracy</th>
             <th scope="col" class="num">Items Practiced</th>
@@ -211,12 +211,15 @@
                   {{/if}}
                 </div>
               </td>
-              <td class="learning-dashboard-cell practice-icon-cell" data-label="Type">
-                <span class="practice-feature-icons" aria-label="Audio features">
-                  {{#if this.enableAudioPromptAndFeedback}}
+              <td class="learning-dashboard-cell practice-icon-cell" data-label="Features">
+                <span class="practice-feature-icons" aria-label="Lesson features">
+                  {{#if firstContentUnitIconClass}}
+                    <span class="fa {{firstContentUnitIconClass}} content-unit-icon" title="{{firstContentUnitIconTitle}}"></span>
+                  {{/if}}
+                  {{#if showTtsIcon}}
                     <span class="fa fa-headphones {{ttsIconClass}}" title="Text-to-Speech {{#if this.hasTTSAPIKey}}(API key available){{else}}(needs API key in Audio Settings){{/if}}"></span>
                   {{/if}}
-                  {{#if this.audioInputEnabled}}
+                  {{#if showSrIcon}}
                     <span class="fa fa-microphone {{srIconClass}}" title="Speech Recognition {{#if this.hasSpeechAPIKey}}(API key available){{else}}(needs API key in Audio Settings){{/if}}"></span>
                   {{/if}}
                 </span>
@@ -291,15 +294,20 @@
 
       <div class="d-flex align-items-center learning-dashboard-card-features-row">
         <div class="learning-dashboard-card-feature-icons">
-          {{#if this.enableAudioPromptAndFeedback}}
+          {{#if firstContentUnitIconClass}}
+            <span class="fa {{firstContentUnitIconClass}} content-unit-icon" title="{{firstContentUnitIconTitle}}"></span>
+          {{/if}}
+          {{#if showTtsIcon}}
             <span class="fa fa-headphones {{ttsIconClass}}" title="Text-to-Speech {{#if this.hasTTSAPIKey}}(API key available){{else}}(needs API key in Audio Settings){{/if}}"></span>
           {{/if}}
-          {{#if this.audioInputEnabled}}
+          {{#if showSrIcon}}
             <span class="fa fa-microphone {{srIconClass}}" title="Speech Recognition {{#if this.hasSpeechAPIKey}}(API key available){{else}}(needs API key in Audio Settings){{/if}}"></span>
           {{/if}}
-          {{#unless this.enableAudioPromptAndFeedback}}
-            {{#unless this.audioInputEnabled}}
-              <span class="learning-dashboard-empty-value">None</span>
+          {{#unless showTtsIcon}}
+            {{#unless showSrIcon}}
+              {{#unless firstContentUnitIconClass}}
+                <span class="learning-dashboard-empty-value">None</span>
+              {{/unless}}
             {{/unless}}
           {{/unless}}
 

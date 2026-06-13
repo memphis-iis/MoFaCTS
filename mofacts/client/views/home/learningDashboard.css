@@ -353,7 +353,7 @@
 }
 
 .practice-col-icon {
-    width: 48px;
+    width: 68px;
 }
 
 .learning-dashboard-col-lesson {
@@ -414,6 +414,16 @@
     text-align: center !important;
 }
 
+.features-heading,
+.study-set-heading {
+    text-align: center !important;
+}
+
+.features-heading {
+    padding-right: 0 !important;
+    padding-left: 0 !important;
+}
+
 .practice-table tbody td,
 .practice-table tbody th {
     padding: calc(9px * var(--app-density-scale)) var(--app-space-2-px);
@@ -442,10 +452,11 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 5px;
+    flex-wrap: wrap;
+    gap: 4px;
+    max-width: 50px;
     min-height: var(--app-button-height);
     margin: 0 auto;
-    color: color-mix(in srgb, var(--app-accent-color) 78%, var(--app-text-color));
     font-size: calc(var(--app-font-size-base) * 0.75);
     line-height: 1;
 }
@@ -457,6 +468,18 @@
     width: 14px;
     height: 14px;
     line-height: 1;
+}
+
+.practice-feature-icons .content-unit-icon,
+.practice-feature-icons .icon-configured,
+.learning-dashboard-card-feature-icons .content-unit-icon,
+.learning-dashboard-card-feature-icons .icon-configured {
+    color: var(--practice-menu-accuracy-bar-fill-color);
+}
+
+.practice-feature-icons .icon-needs-config,
+.learning-dashboard-card-feature-icons .icon-needs-config {
+    color: color-mix(in srgb, var(--app-text-color) 42%, transparent);
 }
 
 .set-name {

@@ -150,6 +150,7 @@ describe('dashboardCacheMethods', function() {
           return { _id: userId, accessedTDFs: [], speechAPIKey: 'sr', textToSpeechAPIKey: 'tts' };
         }
       },
+      DynamicSettings: { findOneAsync: async () => null },
       serverConsole: () => {},
       computePracticeTimeMs: (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0),
       canViewDashboardTdf: () => true,
@@ -249,6 +250,7 @@ describe('dashboardCacheMethods', function() {
       usersCollection: {
         findOneAsync: async () => ({ _id: userId, accessedTDFs: [] })
       },
+      DynamicSettings: { findOneAsync: async () => null },
       serverConsole: () => {},
       computePracticeTimeMs: (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0),
       canViewDashboardTdf: () => true,
@@ -262,6 +264,172 @@ describe('dashboardCacheMethods', function() {
       TDFId: 'tdfAuto',
       hasConfigurableSettings: true,
       hasLearnerConfigurableSettings: false
+    });
+  });
+
+  it('adds cached feature metadata from first content unit and configured key alternatives', async function() {
+    const userId = 'learner-1';
+    const lessonDoc = {
+      _id: 'tdfVideo',
+      stimuliSetId: 'stim-set-video',
+      ownerId: 'teacher-1',
+      content: {
+        fileName: 'video.json',
+        isMultiTdf: false,
+        tdfs: {
+          tutor: {
+            setspec: {
+              lessonname: 'Video Lesson',
+              tags: [],
+              userselect: 'true',
+              audioInputEnabled: 'true',
+              enableAudioPromptAndFeedback: 'true',
+              speechAPIKey: 'encrypted-tdf-speech'
+            },
+            unit: [
+              { unitinstructions: { text: 'Read first' } },
+              { videosession: {} },
+              { learningsession: {} }
+            ],
+          }
+        }
+      }
+    };
+    const sparcDoc = {
+      _id: 'tdfSparc',
+      stimuliSetId: 'stim-set-sparc',
+      ownerId: 'teacher-1',
+      content: {
+        fileName: 'sparc.json',
+        isMultiTdf: false,
+        tdfs: {
+          tutor: {
+            setspec: {
+              lessonname: 'SPARC Lesson',
+              tags: [],
+              userselect: 'true',
+              audioInputEnabled: 'false',
+              enableAudioPromptAndFeedback: 'false'
+            },
+            unit: [
+              { unitinstructionsquestion: { text: 'Warmup' } },
+              { sparcsession: {} }
+            ],
+          }
+        }
+      }
+    };
+    const conditionRootDoc = {
+      _id: 'tdfConditionRoot',
+      stimuliSetId: 'stim-set-root',
+      ownerId: userId,
+      conditionCounts: [2, 1],
+      content: {
+        fileName: 'condition-root.json',
+        isMultiTdf: true,
+        tdfs: {
+          tutor: {
+            setspec: {
+              lessonname: 'Condition Root',
+              tags: [],
+              userselect: 'true',
+              audioInputEnabled: 'false',
+              enableAudioPromptAndFeedback: 'false',
+              condition: ['condition-a.json', 'condition-b.json'],
+              conditionTdfIds: ['condition-a', 'condition-b']
+            },
+            unit: [
+              { unitinstructions: { text: 'Root directions' } },
+              { learningsession: {} }
+            ],
+          }
+        }
+      }
+    };
+    const queryCounts = {
+      tdfsFind: 0,
+      usersFindOne: 0,
+      cacheFindOne: 0,
+      dynamicSettingsFindOne: 0
+    };
+    const methods = createDashboardCacheMethods({
+      Meteor: {
+        Error: class MeteorError extends Error {
+          error: string;
+          constructor(error: string, reason?: string) {
+            super(reason || error);
+            this.error = error;
+          }
+        }
+      },
+      Roles: { userIsInRoleAsync: async () => false },
+      Histories: {
+        find: () => ({ fetchAsync: async () => [] }),
+        findOneAsync: async () => null,
+        rawCollection: () => ({ distinct: async () => [] })
+      },
+      Tdfs: {
+        find: () => {
+          queryCounts.tdfsFind++;
+          return { fetchAsync: async () => [lessonDoc, sparcDoc, conditionRootDoc] };
+        },
+        findOneAsync: async () => null
+      },
+      Assignments: { find: () => ({ fetchAsync: async () => [] }) },
+      Sections: { find: () => ({ fetchAsync: async () => [] }) },
+      SectionUserMap: { find: () => ({ fetchAsync: async () => [] }) },
+      UserDashboardCache: {
+        findOneAsync: async () => {
+          queryCounts.cacheFindOne++;
+          return { userId, tdfStats: {}, learnerTdfConfigs: {} };
+        }
+      },
+      usersCollection: {
+        findOneAsync: async () => {
+          queryCounts.usersFindOne++;
+          return { _id: userId, accessedTDFs: [] };
+        }
+      },
+      DynamicSettings: {
+        findOneAsync: async () => {
+          queryCounts.dynamicSettingsFindOne++;
+          return { value: { googleTts: { keyEncrypted: 'encrypted-admin-tts' } } };
+        }
+      },
+      serverConsole: () => {},
+      computePracticeTimeMs: (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0),
+      canViewDashboardTdf: () => true,
+      redisBoundary: disabledRedisBoundary
+    });
+
+    const snapshot = await (methods as any).getPracticeDashboardSnapshot.call({ userId });
+
+    expect(snapshot.lessons).to.have.length(3);
+    const videoLesson = snapshot.lessons.find((lesson: any) => lesson.TDFId === 'tdfVideo');
+    const sparcLesson = snapshot.lessons.find((lesson: any) => lesson.TDFId === 'tdfSparc');
+    const conditionRootLesson = snapshot.lessons.find((lesson: any) => lesson.TDFId === 'tdfConditionRoot');
+    expect(videoLesson).to.include({
+      TDFId: 'tdfVideo',
+      firstContentUnitType: 'video',
+      audioInputEnabled: true,
+      enableAudioPromptAndFeedback: true,
+      hasSpeechAPIKey: true,
+      hasTTSAPIKey: true
+    });
+    expect(sparcLesson).to.include({
+      TDFId: 'tdfSparc',
+      firstContentUnitType: 'sparc'
+    });
+    expect(conditionRootLesson).to.include({
+      TDFId: 'tdfConditionRoot',
+      firstContentUnitType: 'conditionPool'
+    });
+    expect(conditionRootLesson.conditions).to.have.length(2);
+    expect(queryCounts).to.deep.equal({
+      tdfsFind: 2,
+      usersFindOne: 1,
+      cacheFindOne: 1,
+      dynamicSettingsFindOne: 1
     });
   });
 
@@ -608,6 +776,7 @@ describe('dashboardCacheMethods', function() {
         }
       },
       usersCollection: { findOneAsync: async () => ({ _id: userId }) },
+      DynamicSettings: { findOneAsync: async () => null },
       serverConsole: () => undefined,
       computePracticeTimeMs: (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0),
       canViewDashboardTdf: () => true,
@@ -698,6 +867,7 @@ describe('dashboardCacheMethods', function() {
         }
       },
       usersCollection: { findOneAsync: async () => ({ _id: userId }) },
+      DynamicSettings: { findOneAsync: async () => null },
       serverConsole: () => undefined,
       computePracticeTimeMs: (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0),
       canViewDashboardTdf: () => true,
@@ -810,6 +980,7 @@ describe('dashboardCacheMethods', function() {
         findOneAsync: async () => cacheDoc
       },
       usersCollection: { findOneAsync: async () => ({ _id: userId }) },
+      DynamicSettings: { findOneAsync: async () => null },
       serverConsole: () => undefined,
       computePracticeTimeMs: (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0),
       canViewDashboardTdf: () => true,
@@ -869,6 +1040,7 @@ describe('dashboardCacheMethods', function() {
         findOneAsync: async () => null
       },
       usersCollection: { findOneAsync: async (_selector: any) => ({ _id: _selector._id }) },
+      DynamicSettings: { findOneAsync: async () => null },
       serverConsole: (...args: any[]) => { logs.push(args.join(' ')); },
       computePracticeTimeMs: (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0),
       canViewDashboardTdf: () => true,
@@ -1011,6 +1183,7 @@ describe('dashboardCacheMethods', function() {
         upsertAsync: async () => undefined
       },
       usersCollection: { findOneAsync: async () => ({ _id: userId }) },
+      DynamicSettings: { findOneAsync: async () => null },
       serverConsole: () => undefined,
       computePracticeTimeMs: (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0),
       canViewDashboardTdf: () => true,

@@ -15,6 +15,7 @@ import {
   PRACTICE_DASHBOARD_SNAPSHOT_VERSION,
   resolveDashboardTdfFileName,
 } from './dashboardCacheShared';
+import { ADMIN_API_KEY_SETTINGS_KEY } from '../lib/apiKeyResolution';
 
 type DashboardPracticeSnapshotDeps = {
   Meteor: any;
@@ -24,8 +25,11 @@ type DashboardPracticeSnapshotDeps = {
   SectionUserMap?: any;
   UserDashboardCache: any;
   usersCollection: any;
+  DynamicSettings: any;
   canViewDashboardTdf: (userId: unknown, tdf: any) => boolean;
 };
+
+type FirstContentUnitType = 'video' | 'autotutor' | 'assessment' | 'learning' | 'sparc' | 'conditionPool' | null;
 
 async function resolveAssignedRootTdfIdsForUser({
   Assignments,
@@ -63,12 +67,13 @@ async function resolveAssignedRootTdfIdsForUser({
 }
 
 async function getDashboardVisibleTdfs(deps: DashboardPracticeSnapshotDeps, userId: string) {
-  const [assignedRootIds, user] = await Promise.all([
+  const [assignedRootIds, user, adminApiKeySettings] = await Promise.all([
     resolveAssignedRootTdfIdsForUser(deps, userId),
     deps.usersCollection.findOneAsync(
       { _id: userId },
-      { fields: { accessedTDFs: 1, speechAPIKey: 1, textToSpeechAPIKey: 1 } }
-    )
+      { fields: { accessedTDFs: 1, speechAPIKey: 1, textToSpeechAPIKey: 1, ttsAPIKey: 1 } }
+    ),
+    deps.DynamicSettings.findOneAsync({ key: ADMIN_API_KEY_SETTINGS_KEY })
   ]);
 
   const explicitDashboardIds = [
@@ -103,6 +108,8 @@ async function getDashboardVisibleTdfs(deps: DashboardPracticeSnapshotDeps, user
     'content.tdfs.tutor.setspec.conditionTdfIds': 1,
     'content.tdfs.tutor.setspec.audioInputEnabled': 1,
     'content.tdfs.tutor.setspec.enableAudioPromptAndFeedback': 1,
+    'content.tdfs.tutor.setspec.speechAPIKey': 1,
+    'content.tdfs.tutor.setspec.textToSpeechAPIKey': 1,
     'content.tdfs.tutor.unit.learningsession': 1,
     'content.tdfs.tutor.unit.autotutorsession': 1,
     'content.tdfs.tutor.unit.assessmentsession': 1,
@@ -151,7 +158,12 @@ async function getDashboardVisibleTdfs(deps: DashboardPracticeSnapshotDeps, user
   return {
     tdfs,
     hasSpeechAPIKey: Boolean(user?.speechAPIKey && String(user.speechAPIKey).trim()),
-    hasTTSAPIKey: Boolean(user?.textToSpeechAPIKey && String(user.textToSpeechAPIKey).trim())
+    hasTTSAPIKey: Boolean(
+      (user?.ttsAPIKey && String(user.ttsAPIKey).trim()) ||
+      (user?.textToSpeechAPIKey && String(user.textToSpeechAPIKey).trim())
+    ),
+    hasAdminSpeechAPIKey: Boolean(adminApiKeySettings?.value?.googleSpeech?.keyEncrypted && String(adminApiKeySettings.value.googleSpeech.keyEncrypted).trim()),
+    hasAdminTTSAPIKey: Boolean(adminApiKeySettings?.value?.googleTts?.keyEncrypted && String(adminApiKeySettings.value.googleTts.keyEncrypted).trim())
   };
 }
 
@@ -166,6 +178,31 @@ function getTdfConfigSource(tdf: any) {
 function getTutorUnits(tdfObject: any): any[] {
   const units = tdfObject?.tdfs?.tutor?.unit;
   return Array.isArray(units) ? units : [];
+}
+
+function tdfSetSpecHasKey(setspec: any, key: 'speechAPIKey' | 'textToSpeechAPIKey') {
+  return Boolean(setspec?.[key] && String(setspec[key]).trim());
+}
+
+function getFirstContentUnitType(units: any[]): FirstContentUnitType {
+  for (const unit of units) {
+    const unitType = detectTdfUnitType(unit);
+    if (!unitType || unitType === 'instructions') {
+      continue;
+    }
+    if (unitType === 'video' || unitType === 'autotutor' || unitType === 'assessment' || unitType === 'learning' || unitType === 'sparc') {
+      return unitType;
+    }
+    return null;
+  }
+  return null;
+}
+
+function getDashboardFeatureUnitType(setspec: any, units: any[]): FirstContentUnitType {
+  if (Array.isArray(setspec?.condition) && setspec.condition.length > 0) {
+    return 'conditionPool';
+  }
+  return getFirstContentUnitType(units);
 }
 
 function unitHasConfigurableRuntime(unit: any): boolean {
@@ -185,7 +222,9 @@ function buildPracticeDashboardLesson(
   stats: DashboardTdfStats | undefined,
   learnerConfig: LearnerTdfConfig | null,
   hasSpeechAPIKey: boolean,
-  hasTTSAPIKey: boolean
+  hasTTSAPIKey: boolean,
+  hasAdminSpeechAPIKey: boolean,
+  hasAdminTTSAPIKey: boolean
 ): PracticeDashboardSnapshotLesson | null {
   const TDFId = normalizeOptionalString(tdf?._id);
   const tdfObject = tdf?.content;
@@ -222,8 +261,9 @@ function buildPracticeDashboardLesson(
     hidden: false,
     audioInputEnabled: String(setspec.audioInputEnabled || '').toLowerCase() === 'true',
     enableAudioPromptAndFeedback: String(setspec.enableAudioPromptAndFeedback || '').toLowerCase() === 'true',
-    hasSpeechAPIKey,
-    hasTTSAPIKey,
+    hasSpeechAPIKey: hasSpeechAPIKey || hasAdminSpeechAPIKey || tdfSetSpecHasKey(setspec, 'speechAPIKey'),
+    hasTTSAPIKey: hasTTSAPIKey || hasAdminTTSAPIKey || tdfSetSpecHasKey(setspec, 'textToSpeechAPIKey'),
+    firstContentUnitType: getDashboardFeatureUnitType(setspec, units),
     hasConfigurableSettings: units.some(unitHasConfigurableRuntime),
     hasLearnerConfigurableSettings: units.some(unitHasLearnerConfigurableFields),
     isMultiTdf: Boolean(tdfObject.isMultiTdf),
@@ -241,7 +281,7 @@ export function createDashboardPracticeSnapshotMethods(deps: DashboardPracticeSn
       }
 
       const userId = this.userId;
-      const [{ tdfs, hasSpeechAPIKey, hasTTSAPIKey }, cache] = await Promise.all([
+      const [{ tdfs, hasSpeechAPIKey, hasTTSAPIKey, hasAdminSpeechAPIKey, hasAdminTTSAPIKey }, cache] = await Promise.all([
         getDashboardVisibleTdfs(deps, userId),
         deps.UserDashboardCache.findOneAsync({ userId })
       ]);
@@ -276,7 +316,9 @@ export function createDashboardPracticeSnapshotMethods(deps: DashboardPracticeSn
           cache?.tdfStats?.[TDFId],
           cache?.learnerTdfConfigs?.[TDFId] || null,
           hasSpeechAPIKey,
-          hasTTSAPIKey
+          hasTTSAPIKey,
+          hasAdminSpeechAPIKey,
+          hasAdminTTSAPIKey
         );
         if (lesson && !lesson.hidden) {
           lessons.push(lesson);

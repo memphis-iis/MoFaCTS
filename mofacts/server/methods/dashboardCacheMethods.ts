@@ -28,6 +28,7 @@ type DashboardCacheDeps = {
   SectionUserMap?: any;
   UserDashboardCache: any;
   usersCollection: any;
+  DynamicSettings: any;
   serverConsole: (...args: any[]) => void;
   computePracticeTimeMs: ComputePracticeTimeMs;
   canViewDashboardTdf: (userId: unknown, tdf: any) => boolean;
@@ -182,6 +183,7 @@ export function createDashboardCacheMethods({
   SectionUserMap,
   UserDashboardCache,
   usersCollection,
+  DynamicSettings,
   serverConsole,
   computePracticeTimeMs,
   canViewDashboardTdf,
@@ -390,6 +392,7 @@ export function createDashboardCacheMethods({
     SectionUserMap,
     UserDashboardCache,
     usersCollection,
+    DynamicSettings,
     canViewDashboardTdf
   });
   const learnerConfigMethods = createDashboardLearnerConfigMethods({
