@@ -18,17 +18,30 @@ if (isLocalWindows && !allowWindowsMeteorTests) {
 const hotfixDevScript = path.resolve(__dirname, '..', '..', 'deploy', 'hotfix-dev.ps1');
 const hotfixDevCwd = path.dirname(hotfixDevScript);
 
+function resolveOperatorLocalSettingsPath() {
+  if (!process.env.USERPROFILE) {
+    throw new Error('USERPROFILE is required to resolve the operator local Meteor settings path.');
+  }
+  return path.join(process.env.USERPROFILE, 'OneDrive', 'Desktop', 'settings.local.json');
+}
+
 function runHotfixDev(command, stdio = 'pipe') {
+  const args = [
+    '-NoProfile',
+    '-ExecutionPolicy',
+    'Bypass',
+    '-File',
+    hotfixDevScript,
+    command,
+  ];
+
+  if (command === 'start' || command === 'restart') {
+    args.push('-SettingsPath', resolveOperatorLocalSettingsPath());
+  }
+
   return spawnSync(
     'powershell.exe',
-    [
-      '-NoProfile',
-      '-ExecutionPolicy',
-      'Bypass',
-      '-File',
-      hotfixDevScript,
-      command,
-    ],
+    args,
     {
       cwd: hotfixDevCwd,
       encoding: 'utf8',

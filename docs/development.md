@@ -46,7 +46,8 @@ The fastest supported contributor loop on Windows is the native hotfix dev serve
    ```powershell
    cd ..\deploy
    Copy-Item .env.local.example .env.local
-   $LocalSettingsPath = "$env:USERPROFILE\Desktop\settings.local.json"
+   $OperatorRoot = Join-Path $env:USERPROFILE "OneDrive\Desktop"
+   $LocalSettingsPath = Join-Path $OperatorRoot "settings.local.json"
    Copy-Item settings.local.example.json $LocalSettingsPath
    ```
 
