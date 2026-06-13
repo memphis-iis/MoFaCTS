@@ -10,6 +10,10 @@ export const applyValidationResult = assign({
   },
   userAnswer: normalizeUserAnswerForFeedback,
   feedbackMessage: ({ event }: ActionArgs) => event?.output?.matchText || '',
+  sparcNodeValues: ({ context, event }: ActionArgs) => ({
+    ...(context.sparcNodeValues || {}),
+    ...(event?.output?.sparcNodeValues || {}),
+  }),
   feedbackTimeoutMs: ({ context, event }: ActionArgs) => {
     const timeoutContext: {
       deliverySettings?: Record<string, unknown>;

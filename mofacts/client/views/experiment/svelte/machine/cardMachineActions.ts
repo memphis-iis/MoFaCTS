@@ -6,4 +6,5 @@ export * from './trialTimingActions';
 export * from './trialDisplayActions';
 export * from './mediaRuntimeActions';
 export * from './trialValidationActions';
+export * from './sparcRuntimeActions';
 export * from './machineDiagnosticsActions';

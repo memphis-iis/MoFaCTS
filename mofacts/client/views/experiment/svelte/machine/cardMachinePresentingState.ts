@@ -346,11 +346,16 @@ export const cardMachinePresentingState = {
               },
               always: [
                 {
+                  target: 'disabled',
+                  guard: 'trialDisplayOwnsInteraction',
+                },
+                {
                   target: 'paused',
                   guard: 'waitingForTranscription',
                 },
               ],
             },
+            disabled: {},
             paused: {
               always: [
                 {

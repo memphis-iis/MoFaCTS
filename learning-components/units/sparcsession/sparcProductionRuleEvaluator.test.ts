@@ -201,6 +201,211 @@ describe('sparcProductionRuleEvaluator', function() {
     }]);
   });
 
+  it('keeps targeted message effects transient for a SPARC message node', function() {
+    const facts: SparcWorkingMemoryFact[] = [{
+      factType: 'interface-event',
+      slots: {
+        documentId: 'fractions-doc',
+        selection: 'HintButton',
+        action: 'ButtonPressed',
+        input: '?',
+      },
+    }];
+    const rules: SparcProductionRule[] = [{
+      id: 'fractions.hint-common-denominator',
+      when: [{
+        factType: 'interface-event',
+        slots: {
+          documentId: { type: 'bind', variable: 'documentId' },
+          selection: { type: 'literal', value: 'HintButton' },
+          action: { type: 'literal', value: 'ButtonPressed' },
+        },
+      }],
+      then: [{
+        type: 'message',
+        messageType: 'hint',
+        template: 'Choose a denominator both denominators divide into.',
+        target: {
+          documentId: variable('documentId'),
+          nodeId: literal('node-hint-message'),
+        },
+      }],
+    }];
+
+    const [firing] = evaluateSparcProductionRules({ facts, rules });
+
+    assert.deepEqual(firing?.messages, [{
+      messageType: 'hint',
+      text: 'Choose a denominator both denominators divide into.',
+      target: {
+        documentId: 'fractions-doc',
+        nodeId: 'node-hint-message',
+      },
+    }]);
+    assert.deepEqual(firing?.writes, []);
+  });
+
+  it('supports negated fact patterns for first hint state', function() {
+    const firstHintRule: SparcProductionRule = {
+      id: 'fractions.hint-1',
+      when: [{
+        factType: 'interface-event',
+        slots: {
+          documentId: { type: 'bind', variable: 'documentId' },
+          selection: { type: 'literal', value: 'hint' },
+          action: { type: 'literal', value: 'ButtonPressed' },
+        },
+      }, {
+        type: 'not',
+        pattern: {
+          factType: 'interface-state',
+          slots: {
+            documentId: { type: 'bound', variable: 'documentId' },
+            node: { type: 'literal', value: 'root' },
+            key: { type: 'literal', value: 'hintStage' },
+          },
+        },
+      }],
+      then: [{
+        type: 'message',
+        messageType: 'hint',
+        template: 'Choose a denominator both denominators divide into.',
+        target: {
+          documentId: variable('documentId'),
+          nodeId: literal('node-hint-message'),
+        },
+      }, {
+        type: 'write-state',
+        write: {
+          target: {
+            documentId: variable('documentId'),
+            nodeId: literal('root'),
+          },
+          key: 'hintStage',
+          value: literal(1),
+        },
+      }],
+    };
+
+    const withoutStage = evaluateSparcProductionRules({
+      facts: [{
+        factType: 'interface-event',
+        slots: {
+          documentId: 'fractions-doc',
+          selection: 'hint',
+          action: 'ButtonPressed',
+        },
+      }],
+      rules: [firstHintRule],
+    });
+    const withStage = evaluateSparcProductionRules({
+      facts: [{
+        factType: 'interface-event',
+        slots: {
+          documentId: 'fractions-doc',
+          selection: 'hint',
+          action: 'ButtonPressed',
+        },
+      }, {
+        factType: 'interface-state',
+        slots: {
+          documentId: 'fractions-doc',
+          node: 'root',
+          key: 'hintStage',
+          value: 1,
+        },
+      }],
+      rules: [firstHintRule],
+    });
+
+    assert.equal(withoutStage[0]?.ruleId, 'fractions.hint-1');
+    assert.equal(withStage.length, 0);
+  });
+
+  it('uses salience and re-evaluation to choose one hint activation per cycle', function() {
+    const facts: SparcWorkingMemoryFact[] = [{
+      factType: 'interface-event',
+      slots: {
+        documentId: 'fractions-doc',
+        selection: 'hint',
+        action: 'ButtonPressed',
+      },
+    }];
+    const selectGuard = {
+      type: 'not' as const,
+      pattern: {
+        factType: 'hint-selected',
+        slots: {
+          documentId: { type: 'literal' as const, value: 'fractions-doc' },
+        },
+      },
+    };
+    const rules: SparcProductionRule[] = [{
+      id: 'fractions.hint-denominator',
+      salience: 50,
+      when: [{
+        factType: 'interface-event',
+        slots: {
+          documentId: { type: 'bind', variable: 'documentId' },
+          selection: { type: 'literal', value: 'hint' },
+          action: { type: 'literal', value: 'ButtonPressed' },
+        },
+      }, selectGuard, {
+        type: 'not',
+        pattern: {
+          factType: 'model',
+          slots: {
+            name: { type: 'literal', value: 'active-common-denominator' },
+          },
+        },
+      }],
+      then: [{
+        type: 'assert-fact',
+        fact: {
+          factType: 'hint-selected',
+          slots: {
+            documentId: variable('documentId'),
+          },
+        },
+      }, {
+        type: 'message',
+        messageType: 'hint',
+        template: 'Choose the common denominator first.',
+      }],
+    }, {
+      id: 'fractions.hint-convert-numerators',
+      salience: 40,
+      when: [{
+        factType: 'interface-event',
+        slots: {
+          documentId: { type: 'bind', variable: 'documentId' },
+          selection: { type: 'literal', value: 'hint' },
+          action: { type: 'literal', value: 'ButtonPressed' },
+        },
+      }, selectGuard],
+      then: [{
+        type: 'assert-fact',
+        fact: {
+          factType: 'hint-selected',
+          slots: {
+            documentId: variable('documentId'),
+          },
+        },
+      }, {
+        type: 'message',
+        messageType: 'hint',
+        template: 'Convert the numerators next.',
+      }],
+    }];
+
+    const result = runSparcProductionRules({ facts, rules });
+
+    assert.deepEqual(result.firings.map((firing) => firing.ruleId), [
+      'fractions.hint-denominator',
+    ]);
+    assert.equal(result.firings[0]?.messages[0]?.text, 'Choose the common denominator first.');
+  });
+
   it('can credit a KC bound by a generalized rule', function() {
     const facts: SparcWorkingMemoryFact[] = [{
       factType: 'expected-response',

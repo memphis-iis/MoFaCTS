@@ -69,6 +69,7 @@ describe('card machine presenting state', function() {
   it('keeps awaiting input submit and timeout routed to validation', function() {
     const awaiting = states[STATES.AWAITING]!;
     const inputReady = awaiting.states!.inputMode!.states!.ready!;
+    const mainTimeoutRunning = awaiting.states!.mainTimeout!.states!.running!;
 
     expect(awaiting.type).to.equal('parallel');
     expect(awaiting.entry).to.include('enableInput');
@@ -80,6 +81,16 @@ describe('card machine presenting state', function() {
       target: '#cardMachine.presenting.validating',
       actions: ['markTimeout', 'logStateTransition'],
     });
+    expect(mainTimeoutRunning.always).to.deep.equal([
+      {
+        target: 'disabled',
+        guard: 'trialDisplayOwnsInteraction',
+      },
+      {
+        target: 'paused',
+        guard: 'waitingForTranscription',
+      },
+    ]);
   });
 
   it('keeps speech recognition success and exhaustion auto-submitting to validation', function() {

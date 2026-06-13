@@ -74,6 +74,7 @@
     resolveSparcTrialDisplayResult,
     sparcTrialDisplayOwnsInteraction,
   } from '../services/sparcTrialDisplay';
+  import { commitSparcProductionRuleAction } from '../services/sparcProductionRuleActionCommit';
   import { createTrialDisplaySubmissionController } from '../services/trialDisplaySubmission';
   import { createLearningProgressRuntimeController } from '../services/learningProgressPanelRuntime';
   import {
@@ -222,6 +223,43 @@
     now: () => Date.now(),
     submit: send,
   });
+
+  async function handleSparcAction(event) {
+    const display = context.currentDisplay;
+    if (!sparcOwnsResponse || !display || display.type !== 'sparc') {
+      return;
+    }
+    const documentId = typeof display.documentId === 'string' ? display.documentId.trim() : '';
+    const hasProductionRuleSource = Array.isArray(display.productionRules)
+      || (
+        display.behavior
+        && typeof display.behavior === 'object'
+        && Array.isArray(display.behavior.authoredProductionRules)
+      );
+    if (!documentId || !hasProductionRuleSource) {
+      return;
+    }
+    const sparcResult = resolveSparcTrialDisplayResult(display, event.detail || {}, '[CardScreen]');
+    if (!sparcResult) {
+      throw new Error('[CardScreen] SPARC action received for non-SPARC display');
+    }
+    const { sparcNodeValues } = await commitSparcProductionRuleAction({
+      engine: context.engine,
+      currentDisplay: display,
+      sparcResult,
+      tdfId: context.tdfId,
+      sessionId: context.sessionId,
+      levelUnit: context.unitId,
+    });
+    if (Object.keys(sparcNodeValues).length === 0) {
+      return;
+    }
+    send({
+      type: EVENTS.SPARC_ACTION,
+      timestamp: sparcResult.timestamp,
+      sparcNodeValues,
+    });
+  }
 
   $: if (testMode) {
     state = normalizeTestSnapshot(testSnapshot);
@@ -490,6 +528,7 @@
     srAttempt: audioState.srAttempts,
     srMaxAttempts: audioState.maxSrAttempts,
     srStatus,
+    sparcNodeValues: context.sparcNodeValues,
     subset: trialSubset,
     userAnswer: textAnswer,
   });
@@ -1145,6 +1184,7 @@
       on:reviewrevealstarted={handleReviewRevealStarted}
       on:h5presult={handleH5PResult}
       on:sparcsubmit={handleSparcSubmit}
+      on:sparcaction={handleSparcAction}
       on:instructioncontinue={(event) => cardVideoEventRuntime.handleInstructionContinue(event)}
       on:videocontinue={() => cardVideoEventRuntime.handleContinue()}
     />
@@ -1179,6 +1219,7 @@
       on:reviewrevealstarted={handleReviewRevealStarted}
       on:h5presult={handleH5PResult}
       on:sparcsubmit={handleSparcSubmit}
+      on:sparcaction={handleSparcAction}
       on:skipstudy={handleSkipStudy}
       on:learningprogresstoggle={handleLearningProgressPanelToggle}
     />

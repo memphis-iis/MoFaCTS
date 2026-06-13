@@ -15,6 +15,7 @@ import { experimentStateService } from '../services/experimentState';
 import { selectCardService, updateEngineService, prepareIncomingTrialService } from '../services/unitEngineService';
 import { ttsPlaybackService } from '../services/ttsService';
 import { speechRecognitionService as srService } from '../services/speechRecognitionService';
+import { readSparcProductionRuleHistoryRecords } from '../services/sparcProductionRuleHistoryCache';
 import { CardStore } from '../../modules/cardStore';
 import { fromCallback, fromPromise, type AnyEventObject } from 'xstate';
 import { resolveH5PModelOutcomes } from '../../../../../common/lib/h5pTrialResult';
@@ -62,6 +63,7 @@ interface AnswerEvaluationContext extends ServiceRecord {
     productionRules?: unknown[];
     behaviorRefs?: Record<string, string>;
     behavior?: {
+      authoredProductionRules?: unknown[];
       feedback?: Array<Record<string, unknown>>;
     };
     response?: {
@@ -83,6 +85,8 @@ interface AnswerEvaluationContext extends ServiceRecord {
   deliverySettings?: {
     caseSensitive?: boolean;
   };
+  tdfId?: unknown;
+  sessionId?: unknown;
   setspec?: unknown;
   buttonTrial?: boolean;
 }
@@ -302,11 +306,12 @@ function resolveSparcFeedbackMatch(
   return null;
 }
 
-function hasSparcProductionRules(display: AnswerEvaluationContext['currentDisplay']): display is SparcTrialDisplay & {
+function hasSparcProductionRuleSource(display: AnswerEvaluationContext['currentDisplay']): display is SparcTrialDisplay & {
   documentId: string;
-  productionRules: NonNullable<SparcTrialDisplay['productionRules']>;
 } {
-  if (!display || display.type !== 'sparc' || !Array.isArray(display.productionRules)) {
+  const hasDirectRules = Array.isArray(display?.productionRules);
+  const hasAuthoredRules = Array.isArray(display?.behavior?.authoredProductionRules);
+  if (!display || display.type !== 'sparc' || (!hasDirectRules && !hasAuthoredRules)) {
     return false;
   }
   const documentId = typeof display.documentId === 'string' ? display.documentId.trim() : '';
@@ -319,9 +324,70 @@ function hasSparcProductionRules(display: AnswerEvaluationContext['currentDispla
   return true;
 }
 
+function collectSparcMessageNodeIds(
+  nodes: readonly unknown[] | undefined,
+  ids = new Set<string>(),
+): Set<string> {
+  for (const node of nodes ?? []) {
+    if (!node || typeof node !== 'object' || Array.isArray(node)) {
+      continue;
+    }
+    const record = node as Record<string, unknown>;
+    const nodeId = typeof record.id === 'string' ? record.id.trim() : '';
+    if (nodeId && record.atomType === 'message-box') {
+      ids.add(nodeId);
+    }
+    if (Array.isArray(record.children)) {
+      collectSparcMessageNodeIds(record.children, ids);
+    }
+  }
+  return ids;
+}
+
+function extractCurrentSparcMessageNodeValues(
+  display: AnswerEvaluationContext['currentDisplay'],
+  result: SparcTrialDisplayProductionRuleEvaluationResult,
+): Record<string, unknown> {
+  const nodeValues: Record<string, unknown> = {};
+  for (const nodeId of collectSparcMessageNodeIds(display?.nodes)) {
+    nodeValues[nodeId] = '';
+  }
+  for (const evaluation of result.evaluations) {
+    for (const firing of evaluation.execution?.firings ?? []) {
+      for (const message of firing.messages ?? []) {
+        const nodeId = typeof message.target?.nodeId === 'string' ? message.target.nodeId.trim() : '';
+        if (nodeId) {
+          nodeValues[nodeId] = message.text;
+        }
+      }
+    }
+  }
+  return nodeValues;
+}
+
+function extractSparcNodeValuesFromEvaluation(
+  display: AnswerEvaluationContext['currentDisplay'],
+  result: SparcTrialDisplayProductionRuleEvaluationResult,
+): Record<string, unknown> {
+  const nodeValues: Record<string, unknown> = extractCurrentSparcMessageNodeValues(display, result);
+  for (const evaluation of result.evaluations) {
+    for (const write of evaluation.transition?.writes ?? []) {
+      if (!write?.target?.nodeId || !write.key) {
+        continue;
+      }
+      if (write.key === 'value' || write.key === 'message' || write.key === 'text') {
+        nodeValues[write.target.nodeId] = write.value;
+      } else if (write.key === 'correctness') {
+        nodeValues[`${write.target.nodeId}::correctness`] = write.value;
+      }
+    }
+  }
+  return nodeValues;
+}
+
 function evaluateSparcProductionRuleOutcome(context: AnswerEvaluationContext) {
   const display = context.currentDisplay;
-  if (!hasSparcProductionRules(display)) {
+  if (!hasSparcProductionRuleSource(display)) {
     return null;
   }
   if (!context.sparcResult) {
@@ -335,7 +401,11 @@ function evaluateSparcProductionRuleOutcome(context: AnswerEvaluationContext) {
     documentId: display.documentId,
     display,
     result: context.sparcResult,
-    priorHistoryRecords: [],
+    priorHistoryRecords: readSparcProductionRuleHistoryRecords({
+      tdfId: context.tdfId,
+      sessionId: context.sessionId,
+      documentId: display.documentId,
+    }),
   });
   const lastClassification = result.classifications[result.classifications.length - 1];
   const lastMessage = result.messages[result.messages.length - 1];
@@ -343,9 +413,11 @@ function evaluateSparcProductionRuleOutcome(context: AnswerEvaluationContext) {
   const matchText = lastClassification
     ? (isCorrect ? '1' : '0')
     : '';
+  const sparcNodeValues = extractSparcNodeValuesFromEvaluation(display, result);
   return {
     isCorrect,
     matchText: lastMessage?.text || matchText,
+    ...(Object.keys(sparcNodeValues).length > 0 ? { sparcNodeValues } : {}),
     ...(lastMessage ? {
       sparcFeedbackMessage: lastMessage.text,
       sparcFeedbackType: lastMessage.messageType,

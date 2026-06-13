@@ -28,6 +28,10 @@
     dispatch('sparcsubmit', event.detail);
   }
 
+  function handleSparcAction(event) {
+    dispatch('sparcaction', event.detail);
+  }
+
   /** @type {'top' | 'left'} Layout mode (top = over-under, left = split) */
   export let layoutMode = 'top';
 
@@ -144,6 +148,9 @@
 
   /** @type {boolean} Whether audio replay is enabled */
   export let replayEnabled = true;
+
+  /** @type {Record<string, unknown>} Runtime SPARC node values from production-rule effects */
+  export let sparcNodeValues = {};
 
   $: normalizedLayoutMode = String(layoutMode || '').trim().toLowerCase();
   $: isSplitLayout = normalizedLayoutMode === 'left';
@@ -320,8 +327,10 @@
       <div class="h5p-owned-surface">
         <SparcTrialSurface
           {display}
+          runtimeNodeValues={sparcNodeValues}
           {showQuestionNumber}
           {questionNumber}
+          on:sparcaction={handleSparcAction}
           on:sparcsubmit={handleSparcSubmit}
         />
       </div>

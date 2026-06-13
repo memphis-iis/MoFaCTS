@@ -32,6 +32,13 @@ describe('card machine global handlers', function() {
     expect(unitFinished.actions).to.include('logStateTransition');
   });
 
+  it('applies SPARC action results without leaving the active card state', function() {
+    const sparcAction = cardMachineGlobalHandlers[EVENTS.SPARC_ACTION] as Transition;
+
+    expect(sparcAction.target).to.equal(undefined);
+    expect(sparcAction.actions).to.deep.equal(['applySparcActionResult', 'logStateTransition']);
+  });
+
   it('treats top-level video checkpoints as unexpected errors', function() {
     const videoCheckpoint = cardMachineGlobalHandlers[EVENTS.VIDEO_CHECKPOINT] as Transition;
 

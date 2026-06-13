@@ -13,6 +13,9 @@ export const cardMachineGlobalHandlers = {
   [EVENTS.TRIAL_REVEAL_STARTED]: {
     actions: ['markTrialRevealStart', 'logStateTransition'],
   },
+  [EVENTS.SPARC_ACTION]: {
+    actions: ['applySparcActionResult', 'logStateTransition'],
+  },
   [EVENTS.ERROR]: [
     {
       target: `#cardMachine.${STATES.TRANSITION}`,

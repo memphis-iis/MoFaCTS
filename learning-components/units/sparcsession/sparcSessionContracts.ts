@@ -179,6 +179,7 @@ export type SparcCondition =
 export type SparcReactiveEventType =
   | 'document-loaded'
   | 'node-mounted'
+  | 'focus-changed'
   | 'value-changed'
   | 'response-submitted'
   | 'outcome-recorded'
@@ -247,6 +248,13 @@ export type SparcFactPattern = {
   readonly slots?: Readonly<Record<string, SparcFactSlotPattern>>;
 };
 
+export type SparcProductionRuleCondition =
+  | SparcFactPattern
+  | {
+      readonly type: 'not';
+      readonly pattern: SparcFactPattern;
+    };
+
 export type SparcProductionRuleTest = {
   readonly op: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte';
   readonly left: SparcRuleExpression;
@@ -257,6 +265,7 @@ export type SparcProductionRuleEffect =
   | {
       readonly type: 'assert-fact';
       readonly fact: SparcWorkingMemoryFactTemplate;
+      readonly persist?: boolean;
     }
   | {
       readonly type: 'write-state';
@@ -266,6 +275,7 @@ export type SparcProductionRuleEffect =
       readonly type: 'message';
       readonly messageType: 'hint' | 'buggy' | 'success' | 'feedback';
       readonly template: string;
+      readonly target?: SparcStateWriteAddressTemplate;
     }
   | {
       readonly type: 'classify';
@@ -297,7 +307,7 @@ export type SparcProductionRule = {
   readonly id: string;
   readonly module?: string;
   readonly salience?: number;
-  readonly when: readonly SparcFactPattern[];
+  readonly when: readonly SparcProductionRuleCondition[];
   readonly tests?: readonly SparcProductionRuleTest[];
   readonly then: readonly SparcProductionRuleEffect[];
 };
@@ -306,10 +316,12 @@ export type SparcProductionRuleFiring = {
   readonly ruleId: string;
   readonly bindings: Readonly<Record<string, unknown>>;
   readonly assertedFacts: readonly SparcWorkingMemoryFact[];
+  readonly persistentAssertedFacts: readonly SparcWorkingMemoryFact[];
   readonly writes: readonly SparcStateWrite[];
   readonly messages: readonly {
     readonly messageType: 'hint' | 'buggy' | 'success' | 'feedback';
     readonly text: string;
+    readonly target?: SparcDocumentAddress;
   }[];
   readonly classifications: readonly (SparcOutcome | 'buggy')[];
   readonly credits: readonly string[];

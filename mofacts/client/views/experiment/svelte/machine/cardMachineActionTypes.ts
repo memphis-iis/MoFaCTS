@@ -31,6 +31,7 @@ export type ActionContext = {
   source?: string;
   h5pResult?: H5PTrialResult | null;
   sparcResult?: SparcTrialResult | null;
+  sparcNodeValues?: Record<string, unknown>;
   questionIndex: number;
   videoSession?: { isActive?: boolean; currentCheckpointIndex?: number };
   timestamps: {
@@ -54,6 +55,7 @@ export type ActionEventOutput = {
   buttonList?: unknown[];
   isCorrect?: boolean;
   matchText?: string;
+  sparcNodeValues?: Record<string, unknown>;
 };
 
 export type ActionEvent = {
@@ -63,6 +65,8 @@ export type ActionEvent = {
   error?: unknown;
   cause?: unknown;
   output?: ActionEventOutput;
+  sparcNodeValues?: Record<string, unknown>;
+  eventType?: string;
   timestamp?: number;
   userAnswer?: string;
   h5pResult?: H5PTrialResult | null;

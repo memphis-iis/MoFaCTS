@@ -77,6 +77,7 @@ export const cardMachineOptions = {
     hitTimeoutThreshold: guards.hitTimeoutThreshold,
     waitingForTranscription: guards.waitingForTranscription,
     notWaitingForTranscription: guards.notWaitingForTranscription,
+    trialDisplayOwnsInteraction: guards.trialDisplayOwnsInteraction,
 
     // Unit/session guards
     unitFinished: guards.unitFinished,
@@ -126,6 +127,7 @@ export const cardMachineOptions = {
     clearErrorMessage: cardMachineActions.clearErrorMessage,
     validateAnswer: cardMachineActions.validateAnswer,
     applyValidationResult: cardMachineActions.applyValidationResult,
+    applySparcActionResult: cardMachineActions.applySparcActionResult,
     clearUserAnswer: cardMachineActions.clearUserAnswer,
     syncDeliverySettings: cardMachineActions.syncDeliverySettings,
     syncCardStore: cardMachineActions.syncCardStore,

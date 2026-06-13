@@ -8,8 +8,16 @@ import {
   questionAudioGateService,
   evaluateAnswerService,
 } from './services';
+import {
+  clearSparcProductionRuleHistoryCache,
+  rememberSparcProductionRuleHistoryRecord,
+} from '../services/sparcProductionRuleHistoryCache';
 
 describe('machine services contracts', function() {
+  afterEach(function() {
+    clearSparcProductionRuleHistoryCache();
+  });
+
   it('exposes the expected actor map keys used by cardMachine', function() {
     const services = createServices();
 
@@ -199,14 +207,43 @@ describe('machine services contracts', function() {
   });
 
   it('evaluates SPARC production-rule classifications and messages through the unit engine', async function() {
+    const priorRecord = {
+      eventType: 'sparc',
+      TDFId: 'tdf-1',
+      sessionID: 'session-1',
+      sparc: {
+        documentId: 'sparc-fractions-addition',
+        sourceAddress: {
+          documentId: 'sparc-fractions-addition',
+          nodeId: 'root',
+        },
+      },
+    };
+    rememberSparcProductionRuleHistoryRecord(priorRecord);
+
     const result = await evaluateAnswerService({
+      tdfId: 'tdf-1',
+      sessionId: 'session-1',
       engine: {
         evaluateSparcTrialDisplayProductionRuleEvents(params: unknown) {
           expect(params).to.have.nested.property('documentId', 'sparc-fractions-addition');
+          expect(params).to.have.deep.property('priorHistoryRecords', [priorRecord]);
           return {
             document: { id: 'sparc-fractions-addition' },
             events: [],
-            evaluations: [],
+            evaluations: [{
+              execution: { firings: [], facts: [], cycles: 0 },
+              transition: {
+                writes: [{
+                  target: {
+                    documentId: 'sparc-fractions-addition',
+                    nodeId: 'node-feedback',
+                  },
+                  key: 'message',
+                  value: 'Use a common denominator before adding numerators.',
+                }],
+              },
+            }],
             classifications: ['buggy'],
             messages: [{
               messageType: 'buggy',
@@ -237,6 +274,9 @@ describe('machine services contracts', function() {
     expect(result).to.deep.equal({
       isCorrect: false,
       matchText: 'Use a common denominator before adding numerators.',
+      sparcNodeValues: {
+        'node-feedback': 'Use a common denominator before adding numerators.',
+      },
       sparcFeedbackMessage: 'Use a common denominator before adding numerators.',
       sparcFeedbackType: 'buggy',
       sparcClassification: 'buggy',

@@ -19,6 +19,7 @@ function resetTrialResponseState() {
     feedbackSuppressed: false,
     h5pResult: null,
     sparcResult: null,
+    sparcNodeValues: {},
     isCorrect: false,
     isTimeout: false,
     feedbackTimeoutMs: undefined,

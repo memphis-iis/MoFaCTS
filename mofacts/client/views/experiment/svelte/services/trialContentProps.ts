@@ -51,6 +51,7 @@ export interface TrialContentSlotState {
   readonly srAttempt?: unknown;
   readonly srMaxAttempts?: unknown;
   readonly srStatus?: unknown;
+  readonly sparcNodeValues?: unknown;
   readonly userAnswer?: unknown;
 }
 
@@ -96,6 +97,7 @@ export interface TrialContentPropsFromSubsetInput {
   readonly srAttempt: unknown;
   readonly srMaxAttempts: unknown;
   readonly srStatus: unknown;
+  readonly sparcNodeValues?: unknown;
   readonly subset: TrialSubset;
   readonly userAnswer: unknown;
 }
@@ -170,6 +172,7 @@ export function buildTrialContentProps(
     srAttempt: slotState.srAttempt,
     srMaxAttempts: slotState.srMaxAttempts,
     srStatus: slotState.srStatus || 'idle',
+    sparcNodeValues: slotState.sparcNodeValues,
     subset,
     userAnswer: slotState.userAnswer || '',
   });
@@ -211,6 +214,9 @@ export function buildTrialContentPropsFromSubset(
       srMaxAttempts: Number.isFinite(Number(input.srMaxAttempts)) ? Number(input.srMaxAttempts) : 0,
       srError: '',
       srTranscript: '',
+      sparcNodeValues: input.sparcNodeValues && typeof input.sparcNodeValues === 'object'
+        ? input.sparcNodeValues
+        : {},
       feedbackVisible: input.subset.feedbackVisible,
       isCorrect: feedbackIsCorrect,
       isTimeout: Boolean(input.isTimeout),

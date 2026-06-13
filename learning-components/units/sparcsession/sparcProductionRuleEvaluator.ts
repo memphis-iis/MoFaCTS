@@ -2,6 +2,7 @@ import type {
   SparcFactPattern,
   SparcFactSlotPattern,
   SparcProductionRule,
+  SparcProductionRuleCondition,
   SparcProductionRuleExecution,
   SparcProductionRuleEffect,
   SparcProductionRuleFiring,
@@ -228,14 +229,24 @@ function matchFactPattern(
   return nextBindings;
 }
 
+function isNegatedPattern(
+  pattern: SparcProductionRuleCondition,
+): pattern is Extract<SparcProductionRuleCondition, { type: 'not' }> {
+  return 'type' in pattern && pattern.type === 'not';
+}
+
 function findPatternMatches(
   facts: readonly SparcWorkingMemoryFact[],
-  patterns: readonly SparcFactPattern[],
+  patterns: readonly SparcProductionRuleCondition[],
   bindings: SparcRuleBindings = {},
 ): readonly SparcRuleBindings[] {
   const [head, ...tail] = patterns;
   if (!head) {
     return [bindings];
+  }
+  if (isNegatedPattern(head)) {
+    const hasMatch = facts.some((fact) => matchFactPattern(head.pattern, fact, bindings));
+    return hasMatch ? [] : findPatternMatches(facts, tail, bindings);
   }
   const matches: SparcRuleBindings[] = [];
   for (const fact of facts) {
@@ -301,10 +312,12 @@ function instantiateFiring(
   bindings: SparcRuleBindings,
 ): SparcProductionRuleFiring {
   const assertedFacts: SparcWorkingMemoryFact[] = [];
+  const persistentAssertedFacts: SparcWorkingMemoryFact[] = [];
   const writes: SparcStateWrite[] = [];
   const messages: {
     readonly messageType: 'hint' | 'buggy' | 'success' | 'feedback';
     readonly text: string;
+    readonly target?: SparcStateWrite['target'];
   }[] = [];
   const classifications: (SparcProductionRuleFiring['classifications'][number])[] = [];
   const credits: string[] = [];
@@ -312,17 +325,41 @@ function instantiateFiring(
   for (const effect of rule.then) {
     switch (effect.type) {
       case 'assert-fact':
-        assertedFacts.push(instantiateFact(effect, bindings));
+        {
+        const fact = instantiateFact(effect, bindings);
+        assertedFacts.push(fact);
+        if (effect.persist !== false) {
+          persistentAssertedFacts.push(fact);
+        }
         break;
+        }
       case 'write-state':
         writes.push(instantiateWrite(effect, bindings));
         break;
       case 'message':
+        {
+        const text = interpolateTemplate(effect.template, bindings);
+        const target = effect.target
+          ? {
+              documentId: evaluateStringTemplateValue(
+                effect.target.documentId,
+                bindings,
+                'SPARC production rule message target documentId',
+              ),
+              nodeId: evaluateStringTemplateValue(
+                effect.target.nodeId,
+                bindings,
+                'SPARC production rule message target nodeId',
+              ),
+            }
+          : undefined;
         messages.push({
           messageType: effect.messageType,
-          text: interpolateTemplate(effect.template, bindings),
+          text,
+          ...(target ? { target } : {}),
         });
         break;
+        }
       case 'classify':
         classifications.push(effect.outcome);
         break;
@@ -339,6 +376,7 @@ function instantiateFiring(
     ruleId: rule.id,
     bindings,
     assertedFacts,
+    persistentAssertedFacts,
     writes,
     messages,
     classifications,
@@ -389,10 +427,10 @@ export function runSparcProductionRules(params: {
   const firings: SparcProductionRuleFiring[] = [];
 
   for (let cycle = 1; cycle <= maxCycles; cycle += 1) {
-    const nextFirings = evaluateSparcProductionRules({
+    const nextFiring = evaluateSparcProductionRules({
       facts,
       rules: params.rules,
-    }).filter((firing) => {
+    }).find((firing) => {
       const activationKey = createActivationKey(firing);
       if (firedActivationKeys.has(activationKey)) {
         return false;
@@ -401,7 +439,7 @@ export function runSparcProductionRules(params: {
       return true;
     });
 
-    if (nextFirings.length === 0) {
+    if (!nextFiring) {
       return {
         facts,
         firings,
@@ -409,16 +447,14 @@ export function runSparcProductionRules(params: {
       };
     }
 
-    firings.push(...nextFirings);
-    for (const firing of nextFirings) {
-      for (const fact of firing.assertedFacts) {
-        const factKey = createFactKey(fact);
-        if (factKeys.has(factKey)) {
-          continue;
-        }
-        factKeys.add(factKey);
-        facts.push(fact);
+    firings.push(nextFiring);
+    for (const fact of nextFiring.assertedFacts) {
+      const factKey = createFactKey(fact);
+      if (factKeys.has(factKey)) {
+        continue;
       }
+      factKeys.add(factKey);
+      facts.push(fact);
     }
   }
 

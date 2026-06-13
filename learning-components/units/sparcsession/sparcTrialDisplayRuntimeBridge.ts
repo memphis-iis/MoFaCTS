@@ -20,6 +20,7 @@ import type {
   SparcReactiveEvent,
   SparcWorkingMemoryFact,
 } from './sparcSessionContracts';
+import { compileSparcAuthoredProductionRules } from './sparcAuthoredProductionRuleCompiler';
 
 type DisplayNodeRecord = {
   readonly id?: unknown;
@@ -43,6 +44,7 @@ export type SparcTrialDisplayProductionRuleCommit = {
 export type SparcTrialDisplayProductionRuleCommitResult = {
   readonly document: SparcAuthoredDocument;
   readonly commits: readonly SparcTrialDisplayProductionRuleCommit[];
+  readonly evaluations: readonly SparcCommittedProductionRuleEvaluation[];
 };
 
 export type SparcTrialDisplayProductionRuleEvaluationResult = {
@@ -107,6 +109,19 @@ export function createSparcAuthoredDocumentFromTrialDisplay(params: {
   readonly documentId: string;
   readonly display: SparcTrialDisplay;
 }): SparcAuthoredDocument {
+  const authoredFacts = Array.isArray(params.display.workingMemoryFacts)
+    ? params.display.workingMemoryFacts as readonly SparcWorkingMemoryFact[]
+    : [];
+  const compiledAuthoredRules = compileSparcAuthoredProductionRules({
+    behavior: params.display.behavior,
+    workingMemoryFacts: authoredFacts,
+  });
+  const directProductionRules = Array.isArray(params.display.productionRules)
+    ? params.display.productionRules as readonly SparcProductionRule[]
+    : [];
+  if (compiledAuthoredRules && directProductionRules.length > 0) {
+    throw new Error('SPARC display cannot define both behavior.authoredProductionRules and top-level productionRules');
+  }
   return {
     id: requireNonBlank(params.documentId, 'SPARC document id'),
     schemaVersion: 1,
@@ -114,12 +129,11 @@ export function createSparcAuthoredDocumentFromTrialDisplay(params: {
       scrollAxis: 'vertical',
       layoutMode: 'document',
     },
-    workingMemoryFacts: Array.isArray(params.display.workingMemoryFacts)
-      ? params.display.workingMemoryFacts as readonly SparcWorkingMemoryFact[]
-      : [],
-    productionRules: Array.isArray(params.display.productionRules)
-      ? params.display.productionRules as readonly SparcProductionRule[]
-      : [],
+    workingMemoryFacts: [
+      ...authoredFacts,
+      ...(compiledAuthoredRules?.workingMemoryFacts ?? []),
+    ],
+    productionRules: compiledAuthoredRules?.productionRules ?? directProductionRules,
     root: {
       id: 'root',
       kind: 'document',
@@ -185,7 +199,29 @@ export function createSparcProductionRuleEventsFromTrialResult(params: {
   const responsesByNode = collectSaiResponsesFromBehavior(params.display.behavior);
   const events: SparcReactiveEvent[] = [];
   let index = 0;
-  for (const [nodeId, submittedValue] of Object.entries(params.result.submittedNodes)) {
+  const submittedEntries = Object.entries(params.result.submittedNodes);
+  if (params.result.eventType === 'focus-changed' && submittedEntries.length === 0) {
+    const nodeId = typeof params.result.triggeredBy === 'string' ? params.result.triggeredBy.trim() : '';
+    if (nodeId) {
+      events.push({
+        eventId: `${params.documentId}:${nodeId}:focus:trial-display`,
+        type: 'focus-changed',
+        source: {
+          documentId: params.documentId,
+          nodeId,
+        },
+        time: params.result.timestamp,
+        payload: {
+          selection: nodeId,
+          action: 'Focus',
+          input: '',
+          triggeredBy: nodeId,
+        },
+      });
+    }
+    return events;
+  }
+  for (const [nodeId, submittedValue] of submittedEntries) {
     if (submittedValue === undefined || submittedValue === null || submittedValue === '') {
       continue;
     }
@@ -229,6 +265,7 @@ export async function commitSparcTrialDisplayProductionRuleEvents(params: {
   });
   let replayState = replaySparcDocumentHistory(document, params.priorHistoryRecords);
   const commits: SparcTrialDisplayProductionRuleCommit[] = [];
+  const evaluations: SparcCommittedProductionRuleEvaluation[] = [];
   for (const event of createSparcProductionRuleEventsFromTrialResult({
     documentId: params.documentId,
     display: params.display,
@@ -250,10 +287,12 @@ export async function commitSparcTrialDisplayProductionRuleEvents(params: {
       event,
       ...(commit.historyRecord ? { historyRecord: commit.historyRecord } : {}),
     });
+    evaluations.push(commit);
   }
   return {
     document,
     commits,
+    evaluations,
   };
 }
 

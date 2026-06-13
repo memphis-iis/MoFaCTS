@@ -2,6 +2,8 @@
   export let node;
   export let nodeValues = {};
   export let onNodeValueChange = () => {};
+  export let onNodeCommit = () => {};
+  export let onNodeFocus = () => {};
   export let onButtonActivate = () => {};
 
   const FRACTION_ATOM_TYPES = new Set(['fraction-box', 'fraction-input']);
@@ -50,11 +52,31 @@
     return candidate.value ?? '';
   }
 
+  function getNodeCorrectness(candidate) {
+    if (!candidate?.id) {
+      return '';
+    }
+    const value = nodeValues[`${candidate.id}::correctness`];
+    return typeof value === 'string' ? value : '';
+  }
+
+  function correctnessClass(candidate) {
+    const correctness = getNodeCorrectness(candidate);
+    return correctness ? `sparc-correctness-${correctness}` : '';
+  }
+
   function updateNodeValue(candidate, nextValue) {
     if (!candidate?.id || candidate?.readOnly) {
       return;
     }
     onNodeValueChange(candidate.id, nextValue);
+  }
+
+  function commitNodeValue(candidate, nextValue) {
+    if (!candidate?.id || candidate?.readOnly) {
+      return;
+    }
+    onNodeCommit(candidate.id, nextValue);
   }
 
   function buttonLabel(candidate) {
@@ -86,6 +108,8 @@
                 node={item.top}
                 {nodeValues}
                 {onNodeValueChange}
+                {onNodeCommit}
+                {onNodeFocus}
                 {onButtonActivate}
               />
             </div>
@@ -95,6 +119,8 @@
                 node={item.bottom}
                 {nodeValues}
                 {onNodeValueChange}
+                {onNodeCommit}
+                {onNodeFocus}
                 {onButtonActivate}
               />
             </div>
@@ -104,6 +130,8 @@
             node={item.node}
             {nodeValues}
             {onNodeValueChange}
+            {onNodeCommit}
+            {onNodeFocus}
             {onButtonActivate}
           />
         {/if}
@@ -112,11 +140,11 @@
   </div>
 {:else if node?.nodeType === 'atomic'}
   {#if node.atomType === 'text-block' || node.atomType === 'text' || node.atomType === 'header-cell'}
-    <div class={`sparc-atom sparc-${node.atomType}`}>{node.value || ''}</div>
+    <div class={`sparc-atom sparc-${node.atomType}`} data-node-id={node.id}>{getNodeValue(node)}</div>
   {:else if node.atomType === 'message-box'}
-    <div class="sparc-atom sparc-message-box">{getNodeValue(node)}</div>
+    <div class="sparc-atom sparc-message-box" data-node-id={node.id}>{getNodeValue(node)}</div>
   {:else if node.atomType === 'skill-bar'}
-    <div class="sparc-atom sparc-skill-bar" aria-label={node.label || ''}>
+    <div class="sparc-atom sparc-skill-bar" data-node-id={node.id} aria-label={node.label || ''}>
       <div class="sparc-skill-track">
         <div class="sparc-skill-fill" style={`width: ${skillBarFill(node)}%;`}></div>
       </div>
@@ -125,49 +153,72 @@
       {/if}
     </div>
   {:else if node.atomType === 'operator'}
-    <div class="sparc-atom sparc-operator">{node.value || ''}</div>
+    <div class="sparc-atom sparc-operator" data-node-id={node.id}>{node.value || ''}</div>
   {:else if node.atomType === 'fraction-box'}
-    <div class={`sparc-atom sparc-fraction-box ${node.style ? `sparc-style-${node.style}` : ''}`}>{getNodeValue(node)}</div>
+    <div class={`sparc-atom sparc-fraction-box ${node.style ? `sparc-style-${node.style}` : ''}`} data-node-id={node.id}>{getNodeValue(node)}</div>
   {:else if node.atomType === 'fraction-input' || node.atomType === 'text-input'}
     <input
       class={`sparc-atom sparc-input sparc-input-${node.atomType}`}
+      class:sparc-correctness-correct={getNodeCorrectness(node) === 'correct'}
+      class:sparc-correctness-incorrect={getNodeCorrectness(node) === 'incorrect' || getNodeCorrectness(node) === 'buggy'}
+      data-node-id={node.id}
       type="text"
       value={getNodeValue(node)}
       maxlength={node.maxlength}
       placeholder={node.hint || ''}
       readonly={node.readOnly === true}
+      on:focus={() => onNodeFocus(node.id)}
       on:input={(event) => updateNodeValue(node, event.currentTarget.value)}
+      on:blur={(event) => commitNodeValue(node, event.currentTarget.value)}
+      on:keydown={(event) => {
+        if (event.key === 'Enter') {
+          commitNodeValue(node, event.currentTarget.value);
+        }
+      }}
     />
   {:else if node.atomType === 'dropdown'}
     <select
       class="sparc-atom sparc-select"
+      class:sparc-correctness-correct={getNodeCorrectness(node) === 'correct'}
+      class:sparc-correctness-incorrect={getNodeCorrectness(node) === 'incorrect' || getNodeCorrectness(node) === 'buggy'}
+      data-node-id={node.id}
       disabled={node.readOnly === true}
       value={getNodeValue(node)}
-      on:change={(event) => updateNodeValue(node, event.currentTarget.value)}
+      on:focus={() => onNodeFocus(node.id)}
+      on:change={(event) => {
+        updateNodeValue(node, event.currentTarget.value);
+        commitNodeValue(node, event.currentTarget.value);
+      }}
     >
       {#each node.options || [] as option}
         <option value={option}>{option}</option>
       {/each}
     </select>
   {:else if node.atomType === 'checkbox'}
-    <label class="sparc-atom sparc-checkbox">
+    <label class={`sparc-atom sparc-checkbox ${correctnessClass(node)}`} data-node-id={node.id}>
       <input
+        data-node-id={node.id}
         type="checkbox"
         checked={Boolean(getNodeValue(node))}
         disabled={node.readOnly === true}
-        on:change={(event) => updateNodeValue(node, event.currentTarget.checked)}
+        on:focus={() => onNodeFocus(node.id)}
+        on:change={(event) => {
+          updateNodeValue(node, event.currentTarget.checked);
+          commitNodeValue(node, event.currentTarget.checked);
+        }}
       />
     </label>
   {:else if node.atomType === 'button'}
     <button
       type="button"
       class={`sparc-atom sparc-button ${node.variant ? `sparc-button-${node.variant}` : ''}`}
+      data-node-id={node.id}
       on:click={() => onButtonActivate(node)}
     >
       {buttonLabel(node)}
     </button>
   {:else}
-    <div class="sparc-atom sparc-unknown">{node.atomType || 'unknown'}</div>
+    <div class="sparc-atom sparc-unknown" data-node-id={node.id}>{node.atomType || 'unknown'}</div>
   {/if}
 {/if}
 
@@ -258,6 +309,27 @@
   .sparc-input,
   .sparc-select {
     width: 100%;
+  }
+
+  .sparc-input.sparc-correctness-correct,
+  .sparc-select.sparc-correctness-correct {
+    color: limegreen;
+    border-color: limegreen;
+  }
+
+  .sparc-input.sparc-correctness-incorrect,
+  .sparc-select.sparc-correctness-incorrect {
+    color: red;
+    border-color: red;
+  }
+
+  .sparc-checkbox.sparc-correctness-correct {
+    box-shadow: 0 0 5px 0 limegreen;
+  }
+
+  .sparc-checkbox.sparc-correctness-incorrect,
+  .sparc-checkbox.sparc-correctness-buggy {
+    box-shadow: 0 0 5px 0 red;
   }
 
   .sparc-checkbox {

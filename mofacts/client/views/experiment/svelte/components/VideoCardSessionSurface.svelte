@@ -83,6 +83,7 @@
     on:blockingassetstate={(event) => forward('blockingassetstate', event.detail)}
     on:reviewrevealstarted={(event) => forward('reviewrevealstarted', event.detail)}
     on:h5presult={(event) => forward('h5presult', event.detail)}
+    on:sparcaction={(event) => forward('sparcaction', event.detail)}
     on:sparcsubmit={(event) => forward('sparcsubmit', event.detail)}
   />
 </VideoSessionMode>

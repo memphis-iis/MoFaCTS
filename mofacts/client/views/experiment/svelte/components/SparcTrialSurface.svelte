@@ -6,8 +6,11 @@
   const dispatch = createEventDispatcher();
 
   export let display = {};
+  export let runtimeNodeValues = {};
   export let showQuestionNumber = false;
   export let questionNumber = 0;
+
+  let activeNodeId = '';
 
   function buildInitialNodeValues(nodes = [], values = {}) {
     for (const node of nodes) {
@@ -32,6 +35,16 @@
     return values;
   }
 
+  function mergeRuntimeNodeValues(baseValues, runtimeValues) {
+    if (!runtimeValues || typeof runtimeValues !== 'object' || Array.isArray(runtimeValues)) {
+      return baseValues;
+    }
+    return {
+      ...baseValues,
+      ...runtimeValues,
+    };
+  }
+
   function isSubmitButton(node) {
     const label = String(node?.label || node?.value || '').trim().toLowerCase();
     return /done|submit|check/.test(label);
@@ -44,20 +57,64 @@
     };
   }
 
+  function handleNodeValueCommit(nodeId, value) {
+    nodeValues = {
+      ...nodeValues,
+      [nodeId]: value,
+    };
+    if (value === undefined || value === null || value === '') {
+      return;
+    }
+    dispatch('sparcaction', {
+      submittedNodes: {
+        [nodeId]: value,
+      },
+      triggeredBy: nodeId,
+      timestamp: Date.now(),
+    });
+  }
+
   function handleButtonActivate(node) {
+    const submittedNodes = {
+      ...nodeValues,
+      ...(node?.id ? { [node.id]: node.value ?? node.submitValue ?? buttonLabel(node) } : {}),
+    };
     if (!isSubmitButton(node)) {
+      dispatch('sparcaction', {
+        submittedNodes,
+        triggeredBy: node?.id,
+        timestamp: Date.now(),
+      });
       return;
     }
     dispatch('sparcsubmit', {
-      submittedNodes: nodeValues,
+      submittedNodes,
       triggeredBy: node?.id,
       timestamp: Date.now(),
     });
   }
 
+  function handleNodeFocus(nodeId) {
+    if (!nodeId || activeNodeId === nodeId) {
+      return;
+    }
+    activeNodeId = nodeId;
+    dispatch('sparcaction', {
+      submittedNodes: {},
+      triggeredBy: nodeId,
+      eventType: 'focus-changed',
+      timestamp: Date.now(),
+    });
+  }
+
+  function buttonLabel(node) {
+    return String(node?.label || node?.value || '').trim();
+  }
+
   $: sparcDisplay = resolveSparcTrialDisplay(display, '[SparcTrialSurface]');
   $: topLevelNodes = sparcDisplay?.nodes || [];
-  $: nodeValues = buildInitialNodeValues(topLevelNodes, {});
+  $: authoredNodeValues = buildInitialNodeValues(topLevelNodes, {});
+  $: nodeValues = mergeRuntimeNodeValues(authoredNodeValues, runtimeNodeValues);
 </script>
 
 <div class="sparc-surface">
@@ -80,6 +137,8 @@
         {node}
         {nodeValues}
         onNodeValueChange={handleNodeValueChange}
+        onNodeCommit={handleNodeValueCommit}
+        onNodeFocus={handleNodeFocus}
         onButtonActivate={handleButtonActivate}
       />
     {/each}

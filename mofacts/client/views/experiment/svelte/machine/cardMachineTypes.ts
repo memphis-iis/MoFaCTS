@@ -70,6 +70,7 @@ export interface CardMachineContext {
   feedbackSuppressed: boolean;
   h5pResult: H5PTrialResult | null;
   sparcResult: SparcTrialResult | null;
+  sparcNodeValues: Record<string, unknown>;
   isCorrect: boolean;
   isTimeout: boolean;
   feedbackTimeoutMs: number | undefined;
@@ -119,6 +120,7 @@ export interface CardMachineEvent extends Record<string, unknown> {
   feedbackSuppressed?: boolean;
   h5pResult?: H5PTrialResult | null;
   sparcResult?: SparcTrialResult | null;
+  sparcNodeValues?: Record<string, unknown>;
 }
 
 export interface CardSelectionResult extends Record<string, unknown> {
@@ -173,6 +175,7 @@ export const initialContext: CardMachineContext = {
   feedbackSuppressed: false,
   h5pResult: null,
   sparcResult: null,
+  sparcNodeValues: {},
   isCorrect: false,
   isTimeout: false,
   feedbackTimeoutMs: undefined,

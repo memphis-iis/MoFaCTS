@@ -1,10 +1,32 @@
 import { expect } from 'chai';
 import type { UnitEngineLike } from '../../../../../common/types';
 import { commitSparcProductionRulesForHistory } from './historyLogging';
+import {
+  clearSparcProductionRuleHistoryCache,
+  readSparcProductionRuleHistoryRecords,
+  rememberSparcProductionRuleHistoryRecord,
+} from './sparcProductionRuleHistoryCache';
 
 describe('history logging SPARC production-rule bridge', function() {
+  afterEach(function() {
+    clearSparcProductionRuleHistoryCache();
+  });
+
   it('commits SPARC production-rule display events through the unit engine', async function() {
     const calls: unknown[] = [];
+    const priorRecord = {
+      eventType: 'sparc',
+      TDFId: 'tdf-1',
+      sessionID: 'session-1',
+      sparc: {
+        documentId: 'sparc-fractions-addition',
+        sourceAddress: {
+          documentId: 'sparc-fractions-addition',
+          nodeId: 'root',
+        },
+      },
+    };
+    rememberSparcProductionRuleHistoryRecord(priorRecord);
     const display = {
       type: 'sparc',
       documentId: 'sparc-fractions-addition',
@@ -38,8 +60,57 @@ describe('history logging SPARC production-rule bridge', function() {
       display,
       result: sparcResult,
     });
+    expect(calls[0]).to.have.deep.property('priorHistoryRecords', [priorRecord]);
     expect(calls[0]).to.have.nested.property('core.anonStudentId', 'student-1');
     expect(calls[0]).to.have.nested.property('core.levelUnit', 2);
+  });
+
+  it('remembers canonical SPARC records after successful production-rule history writes', async function() {
+    const display = {
+      type: 'sparc',
+      documentId: 'sparc-fractions-addition',
+      nodes: [],
+      productionRules: [{ id: 'fractions.determine-lcd', when: [], then: [] }],
+    };
+    const writtenRecord = {
+      eventType: 'sparc',
+      TDFId: 'tdf-1',
+      sessionID: 'session-1',
+      sparc: {
+        documentId: 'sparc-fractions-addition',
+        sourceAddress: {
+          documentId: 'sparc-fractions-addition',
+          nodeId: 'node-known-1-equivalent-bottom',
+        },
+      },
+    };
+
+    await commitSparcProductionRulesForHistory({
+      engine: {
+        async commitSparcTrialDisplayProductionRuleEvents(params: {
+          history: { writeCanonicalHistory(record: typeof writtenRecord): Promise<void> };
+        }) {
+          await params.history.writeCanonicalHistory(writtenRecord);
+        },
+      } as unknown as UnitEngineLike,
+      currentDisplay: display,
+      sparcResult: {
+        submittedNodes: { firstDen: '12' },
+        timestamp: 3000,
+      },
+      record: {
+        TDFId: 'tdf-1',
+        sessionID: 'session-1',
+        levelUnit: 2,
+        anonStudentId: 'student-1',
+      },
+    });
+
+    expect(readSparcProductionRuleHistoryRecords({
+      TDFId: 'tdf-1',
+      sessionID: 'session-1',
+      documentId: 'sparc-fractions-addition',
+    })).to.deep.equal([writtenRecord]);
   });
 
   it('requires authored documentId on SPARC production-rule displays', async function() {

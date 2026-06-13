@@ -32,6 +32,10 @@ import {
   insertH5PHistoryRows,
   resolveH5PResultForHistory,
 } from './historyH5P';
+import {
+  readSparcProductionRuleHistoryRecords,
+  rememberSparcProductionRuleHistoryRecord,
+} from './sparcProductionRuleHistoryCache';
 import { resolveH5PModelOutcomes } from '../../../../../common/lib/h5pTrialResult';
 import type {
   HistoryLoggingEvent,
@@ -99,9 +103,8 @@ type SparcProductionRuleHistoryEngineLike = UnitEngineLike & {
     params: SparcTrialDisplayProductionRuleRuntimeParams
   ) => Promise<unknown>;
 };
-type SparcDisplayWithProductionRules = SparcTrialDisplay & {
+type SparcDisplayWithProductionRuleSource = SparcTrialDisplay & {
   documentId: string;
-  productionRules: NonNullable<SparcTrialDisplay['productionRules']>;
 };
 type HistoryStimLike = {
   stimuliSetId?: string | number;
@@ -194,10 +197,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
-function resolveSparcDisplayWithProductionRules(
+function hasSparcProductionRuleSource(display: Record<string, unknown>): boolean {
+  if (Array.isArray(display.productionRules)) {
+    return true;
+  }
+  return isRecord(display.behavior)
+    && Array.isArray(display.behavior.authoredProductionRules);
+}
+
+function resolveSparcDisplayWithProductionRuleSource(
   display: unknown,
-): SparcDisplayWithProductionRules | null {
-  if (!isRecord(display) || display.type !== 'sparc' || !Array.isArray(display.productionRules)) {
+): SparcDisplayWithProductionRuleSource | null {
+  if (!isRecord(display) || display.type !== 'sparc' || !hasSparcProductionRuleSource(display)) {
     return null;
   }
   const documentId = typeof display.documentId === 'string' ? display.documentId.trim() : '';
@@ -207,7 +218,7 @@ function resolveSparcDisplayWithProductionRules(
   if (!Array.isArray(display.nodes)) {
     throw new Error('[History Logging] SPARC production-rule display requires nodes array');
   }
-  return display as SparcDisplayWithProductionRules;
+  return display as SparcDisplayWithProductionRuleSource;
 }
 
 export async function commitSparcProductionRulesForHistory(params: {
@@ -216,7 +227,7 @@ export async function commitSparcProductionRulesForHistory(params: {
   sparcResult: SparcTrialResult | null | undefined;
   record: HistoryRecord;
 }): Promise<void> {
-  const sparcDisplay = resolveSparcDisplayWithProductionRules(params.currentDisplay);
+  const sparcDisplay = resolveSparcDisplayWithProductionRuleSource(params.currentDisplay);
   if (!sparcDisplay) {
     return;
   }
@@ -247,10 +258,15 @@ export async function commitSparcProductionRulesForHistory(params: {
     documentId: sparcDisplay.documentId,
     display: sparcDisplay,
     result: params.sparcResult,
-    priorHistoryRecords: [],
+    priorHistoryRecords: readSparcProductionRuleHistoryRecords({
+      TDFId: params.record.TDFId,
+      sessionID: params.record.sessionID,
+      documentId: sparcDisplay.documentId,
+    }),
     history: {
       async writeCanonicalHistory(historyRecord: CanonicalHistoryRecord) {
         await insertHistoryRecord(historyRecord as HistoryRecord);
+        rememberSparcProductionRuleHistoryRecord(historyRecord);
       },
     },
   });

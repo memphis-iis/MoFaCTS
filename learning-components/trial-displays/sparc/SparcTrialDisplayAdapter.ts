@@ -47,6 +47,7 @@ export interface SparcTrialDisplay {
 export interface SparcTrialResult {
   submittedNodes: Record<string, unknown>;
   triggeredBy?: string;
+  eventType?: string;
   timestamp: number;
 }
 
@@ -149,6 +150,7 @@ export const sparcTrialDisplayAdapter: TrialDisplayAdapter<SparcTrialDisplay, Sp
     return {
       submittedNodes: normalizeSubmittedNodes(result.submittedNodes),
       ...(typeof result.triggeredBy === 'string' ? { triggeredBy: result.triggeredBy } : {}),
+      ...(typeof result.eventType === 'string' ? { eventType: result.eventType } : {}),
       timestamp: Number.isFinite(result.timestamp) ? Number(result.timestamp) : Date.now(),
     };
   },

@@ -9,6 +9,7 @@ import { TRIAL_TYPES, SUPPORTED_TRIAL_TYPES, THRESHOLDS, ERROR_SEVERITY_MAP, ERR
 import { getFeedbackTimeoutMs } from '../utils/timeoutUtils';
 import { evaluateSrAvailability } from '../../../../lib/audioAvailability';
 import { selfHostedH5PTrialDisplayOwnsInteraction } from '../services/h5pTrialDisplay';
+import { sparcTrialDisplayOwnsInteraction } from '../services/sparcTrialDisplay';
 import { resolveSessionSurfaceState } from '../services/sessionSurfaceMode';
 import {
   getIsVideoSessionFlag,
@@ -438,6 +439,11 @@ export function waitingForTranscription({ context }: CardMachineActorArgs): bool
  */
 export function notWaitingForTranscription(args: CardMachineActorArgs): boolean {
   return !waitingForTranscription(args);
+}
+
+export function trialDisplayOwnsInteraction({ context }: CardMachineActorArgs): boolean {
+  return selfHostedH5PTrialDisplayOwnsInteraction(context.currentDisplay) ||
+    sparcTrialDisplayOwnsInteraction(context.currentDisplay);
 }
 
 // =============================================================================

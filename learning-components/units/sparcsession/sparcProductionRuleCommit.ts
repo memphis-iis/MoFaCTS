@@ -35,6 +35,7 @@ function productionRuleEventPayload(
       classifications: firing.classifications,
       credits: firing.credits,
       assertedFacts: firing.assertedFacts,
+      persistentAssertedFacts: firing.persistentAssertedFacts,
       writeCount: firing.writes.length,
     })),
     productionRuleCycles: execution.cycles,
@@ -50,13 +51,26 @@ function createProductionRuleTransition(params: {
     documentId: params.event.source.documentId,
     nodeId: params.document.root.id,
   };
+  const correctnessWrites = params.execution.firings.flatMap((firing) => (
+    firing.writes.some((write) => (
+      write.key === 'correctness'
+      && write.target.documentId === params.event.source.documentId
+      && write.target.nodeId === params.event.source.nodeId
+    ))
+      ? []
+      : firing.classifications.map((classification) => ({
+        target: params.event.source,
+        key: 'correctness',
+        value: classification,
+      }))
+  ));
   const writes = params.execution.firings.flatMap((firing) => [
     ...firing.writes,
-    ...firing.assertedFacts.map((fact) => createSparcWorkingMemoryFactStateWrite({
+    ...firing.persistentAssertedFacts.map((fact) => createSparcWorkingMemoryFactStateWrite({
       target: workingMemoryTarget,
       fact,
     })),
-  ]);
+  ]).concat(correctnessWrites);
   if (writes.length === 0) {
     return undefined;
   }

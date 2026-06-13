@@ -1,0 +1,8 @@
+import { assign, type ActionArgs } from './cardMachineActionTypes';
+
+export const applySparcActionResult = assign({
+  sparcNodeValues: ({ context, event }: ActionArgs) => ({
+    ...(context.sparcNodeValues || {}),
+    ...(event?.sparcNodeValues || {}),
+  }),
+});
