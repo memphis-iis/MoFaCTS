@@ -124,53 +124,6 @@ const CREATION_MODULES: Array<{
   { id: 'autoTutor', label: 'AutoTutor', shortLabel: 'Chat tutor', description: 'AutoTutor', icon: 'fa-star-o' },
 ];
 
-const PROMPT_STARTERS: Array<{
-  id: string;
-  label: string;
-  icon: string;
-  text: string;
-  modules: CreationModuleId[];
-  title?: string;
-  pulse?: boolean;
-}> = [
-  {
-    id: 'lecture-notes',
-    label: 'Lecture notes',
-    icon: 'fa-book',
-    text: "Paste your lecture notes or slides here. I'll pull out key terms and examples.",
-    modules: ['learningSession'],
-  },
-  {
-    id: 'brain-dump',
-    label: 'Brain dump',
-    icon: 'fa-lightbulb-o',
-    text: "Here's what I remember - messy is fine:\n\nWe'll organize it with a tutor, then build a quick quiz to check what stuck.",
-    modules: ['autoTutor', 'assessmentSession'],
-    pulse: true,
-  },
-  {
-    id: 'study-guide',
-    label: 'Study guide',
-    icon: 'fa-pencil-square-o',
-    text: "Topic:\nWhat I need to know:\nConfusing parts:\n\nWe'll create a study guide and a short quiz.",
-    modules: ['learningSession', 'assessmentSession'],
-  },
-  {
-    id: 'make-quiz',
-    label: 'Make a quiz',
-    icon: 'fa-question-circle',
-    text: 'Turn this into a quiz. Focus on:\n',
-    modules: ['assessmentSession'],
-  },
-  {
-    id: 'make-simple',
-    label: 'Make it simple',
-    icon: 'fa-magic',
-    text: "Explain this simply, like I'm 12:\n",
-    modules: ['autoTutor'],
-    title: 'AI will explain at about a 5th-grade level',
-  },
-];
 const CREATION_RECORDS_STORAGE_KEY = 'mofacts.aiContentCreation.records';
 const DEBUG_RECORDS_STORAGE_KEY = 'mofacts.aiContentCreation.debugRecords';
 const AI_CREATION_HANDOFF_STORAGE_KEY = 'mofacts.aiContentCreation.pendingRequest';
@@ -288,10 +241,6 @@ function isEmbedded(instance: AiCreatorInstance): boolean {
   return instance.data?.embedded === true;
 }
 
-function findStarter(starterId: string) {
-  return PROMPT_STARTERS.find((starter) => starter.id === starterId) || null;
-}
-
 function orderedModules(moduleIds: CreationModuleId[]): CreationModuleId[] {
   const selected = new Set(moduleIds);
   return CREATION_MODULES.map((module) => module.id).filter((moduleId) => selected.has(moduleId));
@@ -387,26 +336,32 @@ async function generateItemsFromAi(sourceText: string, selectedModules: Creation
   const rawAiResponse = await callOpenRouterForItems(sourceText, selectedModules, apiKey, model);
   const parsedJson = extractJsonObject(rawAiResponse);
   const repairs: ItemGenerationResult['repairs'] = [];
+  const repairWarnings: string[] = [];
   let validation = validateAiOutput(parsedJson);
   for (let pass = 0; pass < MAX_ITEM_CUE_REPAIR_PASSES; pass += 1) {
     const leaks = findCueLeaks(validation.output);
     if (leaks.length === 0) {
       break;
     }
-    const rawRepairResponse = await callOpenRouterForItemCueRepair(sourceText, selectedModules, rawAiResponse, leaks, apiKey, model);
-    const parsedRepairJson = extractJsonObject(rawRepairResponse);
-    const repairedItemIndexes = applyCueRepairResponse(parsedRepairJson, validation);
-    repairs.push({
-      rawAiResponse: rawRepairResponse,
-      parsedJson: parsedRepairJson,
-      repairedItemIndexes,
-    });
-    validation = validateAiOutput(validation.output);
+    try {
+      const rawRepairResponse = await callOpenRouterForItemCueRepair(sourceText, selectedModules, rawAiResponse, leaks, apiKey, model);
+      const parsedRepairJson = extractJsonObject(rawRepairResponse);
+      const repairedItemIndexes = applyCueRepairResponse(parsedRepairJson, validation);
+      repairs.push({
+        rawAiResponse: rawRepairResponse,
+        parsedJson: parsedRepairJson,
+        repairedItemIndexes,
+      });
+      validation = validateAiOutput(validation.output);
+    } catch (error) {
+      repairWarnings.push(`Cue repair pass ${pass + 1} did not return usable replacements: ${getErrorMessage(error)}`);
+      break;
+    }
   }
   const remainingLeaks = findCueLeaks(validation.output);
-  if (remainingLeaks.length > 0) {
-    throw new Error(`Generated cue text still includes answer terms after targeted repair: ${summarizeCueLeaks(remainingLeaks)}`);
-  }
+  const cueLeakWarnings = remainingLeaks.length > 0
+    ? [`Review generated cue text for possible answer hints: ${summarizeCueLeaks(remainingLeaks)}`]
+    : [];
   const enriched = await enrichAiContentMedia(validation.output, sourceText);
   return {
     rawAiResponse,
@@ -416,6 +371,8 @@ async function generateItemsFromAi(sourceText: string, selectedModules: Creation
       ...enriched,
       warnings: validation.warnings
         .concat(repairs.length ? [`Repaired answer-revealing cue text in ${repairs.reduce((count, repair) => count + repair.repairedItemIndexes.length, 0)} generated item${repairs.reduce((count, repair) => count + repair.repairedItemIndexes.length, 0) === 1 ? '' : 's'}.`] : [])
+        .concat(repairWarnings)
+        .concat(cueLeakWarnings)
         .concat(enriched.warnings),
       rejectedItems: validation.rejectedItems,
     },
@@ -636,9 +593,6 @@ Template.aiContentCreator.onCreated(function(this: AiCreatorInstance) {
 
 Template.aiContentCreator.onRendered(function(this: AiCreatorInstance) {
   void refreshOpenRouterCapability(this);
-  Meteor.setTimeout(() => {
-    this.findAll('.ai-pulse-once').forEach((element) => element.classList.remove('ai-pulse-once'));
-  }, 3200);
 
   if (!this.autoStartFromHandoff) {
     return;
@@ -662,12 +616,6 @@ Template.aiContentCreator.helpers({
   sourceLength() {
     const length = (Template.instance() as AiCreatorInstance).sourceText.get().length;
     return `${length} character${length === 1 ? '' : 's'}`;
-  },
-  promptStarters() {
-    return PROMPT_STARTERS.map((starter) => ({
-      ...starter,
-      pulseClass: starter.pulse ? 'ai-pulse-once' : '',
-    }));
   },
   modules() {
     const selected = new Set((Template.instance() as AiCreatorInstance).selectedModules.get());
@@ -704,26 +652,6 @@ Template.aiContentCreator.helpers({
 Template.aiContentCreator.events({
   'input #ai-source-text'(event: Event, instance: AiCreatorInstance) {
     instance.sourceText.set((event.currentTarget as HTMLTextAreaElement).value);
-  },
-  'click .ai-prompt-chip'(event: Event, instance: AiCreatorInstance) {
-    event.preventDefault();
-    const button = event.currentTarget as HTMLButtonElement;
-    const starter = findStarter(String(button.dataset.starterId || ''));
-    if (!starter) {
-      return;
-    }
-    if (!instance.sourceText.get().trim()) {
-      instance.sourceText.set(starter.text);
-      const textarea = instance.find('#ai-source-text') as HTMLTextAreaElement | null;
-      if (textarea) {
-        textarea.value = starter.text;
-        textarea.focus();
-        textarea.setSelectionRange(starter.text.length, starter.text.length);
-      }
-    } else {
-      (instance.find('#ai-source-text') as HTMLTextAreaElement | null)?.focus();
-    }
-    instance.selectedModules.set(orderedModules(starter.modules));
   },
   'click .ai-mode-card'(event: Event, instance: AiCreatorInstance) {
     event.preventDefault();

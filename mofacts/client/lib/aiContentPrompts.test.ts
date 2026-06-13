@@ -9,6 +9,9 @@ describe('aiContentPrompts', function() {
     expect(prompt).to.contain('about 50 flash-card/practice items');
     expect(prompt).to.contain('about 20 quiz items');
     expect(prompt).to.contain('atomic knowledge components');
+    expect(prompt).to.contain('usually 1 or 2 words');
+    expect(prompt).to.contain('Do not make response.correctResponse a sentence');
+    expect(prompt).to.contain('prefer multiple choice or create an AutoTutor expectation');
     expect(prompt).to.contain('Set visibility to "public" only');
     expect(prompt).to.contain('prompt.attribution');
     expect(prompt).to.contain('Source content:\nKrebs cycle source text');

@@ -182,4 +182,39 @@ describe('aiContentPackageSave', function() {
     expect(callAsync.thirdCall.args[0]).to.equal('saveAiGeneratedPackageContent');
     expect(result.outputs[0]!.title).to.equal('Replacement_Name');
   });
+
+  it('uploads each generated draft as its own package asset', async function() {
+    const drafts = [buildDraft('Learn Draft'), buildDraft('Tutor Draft')];
+    const callAsync = sinon.stub();
+    callAsync.onFirstCall().resolves([{
+      moduleId: 'learningSession',
+      title: 'Learn_Draft',
+      artifactKindLabel: 'Learning session',
+      packageAssetId: 'asset-1',
+      itemCount: 1,
+    }]);
+    callAsync.onSecondCall().resolves([{
+      moduleId: 'autoTutor',
+      title: 'Tutor_Draft',
+      artifactKindLabel: 'AutoTutor',
+      packageAssetId: 'asset-2',
+      itemCount: 1,
+    }]);
+    const deps = {
+      ...buildDeps({ callAsync, assetIds: ['asset-1', 'asset-2'] }),
+      promptForReplacementName: sinon.stub(),
+    };
+
+    const result = await buildUploadWithNameConflictRetry(drafts, 'summary', deps);
+
+    const insertStub = deps.dynamicAssets.insert as sinon.SinonStub;
+    expect(insertStub.callCount).to.equal(2);
+    expect(callAsync.firstCall.args[0]).to.equal('saveAiGeneratedPackageContent');
+    expect(callAsync.firstCall.args[1]).to.include({ packageAssetId: 'asset-1' });
+    expect(callAsync.firstCall.args[1].entries).to.have.length(1);
+    expect(callAsync.secondCall.args[0]).to.equal('saveAiGeneratedPackageContent');
+    expect(callAsync.secondCall.args[1]).to.include({ packageAssetId: 'asset-2' });
+    expect(callAsync.secondCall.args[1].entries).to.have.length(1);
+    expect(result.outputs.map((output) => output.packageAssetId)).to.deep.equal(['asset-1', 'asset-2']);
+  });
 });

@@ -141,23 +141,32 @@ export async function buildUploadWithNameConflictRetry(
     promptForReplacementName: (conflict: GeneratedNameConflict) => string | null;
   },
 ): Promise<{ builtPackage: BuiltImportPackage; outputs: CreatedOutput[] }> {
+  const outputs: CreatedOutput[] = [];
   const maxAttempts = drafts.length + 3;
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    const builtPackage = await buildImportPackageFromDraftLessons(drafts);
-    try {
-      const outputs = await uploadBuiltPackage(builtPackage, creationSummary, deps);
-      return { builtPackage, outputs };
-    } catch (error) {
-      const conflict = readGeneratedNameConflict(error);
-      if (!conflict || conflict.entryIndex >= drafts.length) {
-        throw error;
+  for (const draft of drafts) {
+    let saved = false;
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      const singlePackage = await buildImportPackageFromDraftLessons([draft]);
+      try {
+        outputs.push(...await uploadBuiltPackage(singlePackage, creationSummary, deps));
+        saved = true;
+        break;
+      } catch (error) {
+        const conflict = readGeneratedNameConflict(error);
+        if (!conflict || conflict.entryIndex !== 0) {
+          throw error;
+        }
+        const newName = deps.promptForReplacementName(conflict);
+        if (!newName) {
+          throw new Error('Generated content save canceled because the name already exists.');
+        }
+        renameDraftLesson(draft, newName);
       }
-      const newName = deps.promptForReplacementName(conflict);
-      if (!newName) {
-        throw new Error('Generated content save canceled because the name already exists.');
-      }
-      renameDraftLesson(drafts[conflict.entryIndex]!, newName);
+    }
+    if (!saved) {
+      throw new Error('Generated content could not be saved after repeated name conflicts.');
     }
   }
-  throw new Error('Generated content could not be saved after repeated name conflicts.');
+  const builtPackage = await buildImportPackageFromDraftLessons(drafts);
+  return { builtPackage, outputs };
 }
