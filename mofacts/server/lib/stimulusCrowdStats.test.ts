@@ -63,12 +63,15 @@ describe('stimulus crowd stats', function() {
     expect(stats.calls).to.have.length(2);
   });
 
-  it('ignores unsupported outcomes, non-model rows, and explicit event rows', async function() {
+  it('ignores unsupported outcomes, non-model rows, explicit event rows, and timeouts', async function() {
     const stats = createStatsCollection();
 
     expect(await recordStimulusCrowdOutcome(stats.collection, createRecord({ outcome: 'hint' }))).to.equal(false);
     expect(await recordStimulusCrowdOutcome(stats.collection, createRecord({ levelUnitType: 'video' }))).to.equal(false);
     expect(await recordStimulusCrowdOutcome(stats.collection, createRecord({ eventType: 'h5p' }))).to.equal(false);
+    expect(await recordStimulusCrowdOutcome(stats.collection, createRecord({ conditionTypeD: 'timeout' }))).to.equal(false);
+    expect(await recordStimulusCrowdOutcome(stats.collection, createRecord({ source: 'timeout' }))).to.equal(false);
+    expect(await recordStimulusCrowdOutcome(stats.collection, createRecord({ action: '[timeout]' }))).to.equal(false);
 
     expect(stats.calls).to.have.length(0);
   });
@@ -97,5 +100,9 @@ describe('stimulus crowd stats', function() {
     expect(shouldRecordStimulusCrowdOutcome(createRecord({ outcome: 'incorrect' }))).to.equal(true);
     expect(shouldRecordStimulusCrowdOutcome(createRecord({ outcome: 'study' }))).to.equal(false);
     expect(shouldRecordStimulusCrowdOutcome(createRecord({ eventType: 'h5p' }))).to.equal(false);
+    expect(shouldRecordStimulusCrowdOutcome(createRecord({ conditionTypeD: 'timeout' }))).to.equal(false);
+    expect(shouldRecordStimulusCrowdOutcome(createRecord({ source: 'timeout' }))).to.equal(false);
+    expect(shouldRecordStimulusCrowdOutcome(createRecord({ action: '[timeout]' }))).to.equal(false);
+    expect(shouldRecordStimulusCrowdOutcome(createRecord({ conditionTypeD: 'voice', outcome: 'incorrect' }))).to.equal(true);
   });
 });

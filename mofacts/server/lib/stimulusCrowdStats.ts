@@ -32,11 +32,20 @@ function isCountablePracticeEvent(record: UnknownRecord): boolean {
   return isBlankIdentityValue(record.eventType);
 }
 
+function isTimeoutResponse(record: UnknownRecord): boolean {
+  return record.conditionTypeD === 'timeout' ||
+    record.source === 'timeout' ||
+    record.action === '[timeout]';
+}
+
 export function shouldRecordStimulusCrowdOutcome(record: UnknownRecord): boolean {
   if (record.levelUnitType !== 'model') {
     return false;
   }
   if (!isCountablePracticeEvent(record)) {
+    return false;
+  }
+  if (isTimeoutResponse(record)) {
     return false;
   }
   return normalizeOutcome(record.outcome) !== null;

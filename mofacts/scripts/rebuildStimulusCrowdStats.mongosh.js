@@ -26,6 +26,7 @@
   const issueSamples = [];
   const rowsByStimulusKey = new Map();
   let scanned = 0;
+  let skippedTimeoutResponses = 0;
   let countable = 0;
 
   function isBlank(value) {
@@ -56,6 +57,12 @@
     return !isBlank(left) && !isBlank(right) && String(left) === String(right);
   }
 
+  function isTimeoutResponse(row) {
+    return row.conditionTypeD === 'timeout' ||
+      row.source === 'timeout' ||
+      row.action === '[timeout]';
+  }
+
   function lastOutcomeAt(row) {
     for (const fieldName of ['recordedServerTime', 'time', 'problemStartTime']) {
       const value = Number(row[fieldName]);
@@ -83,6 +90,9 @@
         KCDefault: 1,
         KCCluster: 1,
         outcome: 1,
+        conditionTypeD: 1,
+        source: 1,
+        action: 1,
         recordedServerTime: 1,
         time: 1,
         problemStartTime: 1,
@@ -94,6 +104,10 @@
   while (cursor.hasNext()) {
     const row = cursor.next();
     scanned += 1;
+    if (isTimeoutResponse(row)) {
+      skippedTimeoutResponses += 1;
+      continue;
+    }
     let valid = true;
     for (const fieldName of ['stimuliSetId', 'stimulusKC', 'clusterKC', 'KCId', 'KCDefault', 'KCCluster']) {
       valid = requireIdentity(row, fieldName) && valid;
@@ -145,6 +159,7 @@
   printjson({
     apply,
     scanned,
+    skippedTimeoutResponses,
     countable,
     aggregateRows: rowsByStimulusKey.size,
     issueCounts,
