@@ -9,8 +9,10 @@ import {
 function createHarness(options: {
   active?: boolean;
   fadeContext?: TrialFadeContext;
+  stable?: boolean;
 } = {}) {
   let active = options.active ?? true;
+  let stable = options.stable ?? true;
   let fadeContext = options.fadeContext || {
     key: 'trial-1',
     subsetKind: 'question',
@@ -19,7 +21,7 @@ function createHarness(options: {
   };
   const finished: string[] = [];
   const timings: Array<{ name: string; details?: Record<string, unknown> }> = [];
-  const timeouts: Array<() => void> = [];
+  const timeouts: Array<{ callback: () => void; delayMs: number }> = [];
   let now = 30;
 
   const controller = createFirstTrialRevealController({
@@ -29,6 +31,7 @@ function createHarness(options: {
     },
     getFadeContext: () => fadeContext,
     isLaunchLoadingActive: () => active,
+    isRevealStable: () => stable,
     markLaunchLoadingTiming: (name, details) => {
       const entry: { name: string; details?: Record<string, unknown> } = { name };
       if (details !== undefined) {
@@ -37,8 +40,8 @@ function createHarness(options: {
       timings.push(entry);
     },
     now: () => now,
-    scheduleTimeout: (callback) => {
-      timeouts.push(callback);
+    scheduleTimeout: (callback, delayMs) => {
+      timeouts.push({ callback, delayMs });
     },
     waitForBrowserPaint: async () => undefined,
     waitForDomUpdate: async () => undefined,
@@ -48,7 +51,7 @@ function createHarness(options: {
     controller,
     finished,
     runTimeouts: () => {
-      for (const callback of timeouts.splice(0)) {
+      for (const { callback } of timeouts.splice(0)) {
         callback();
       }
     },
@@ -60,6 +63,9 @@ function createHarness(options: {
     },
     setNow: (next: number) => {
       now = next;
+    },
+    setStable: (next: boolean) => {
+      stable = next;
     },
     timings,
     timeouts,
@@ -84,20 +90,23 @@ describe('first trial reveal launch loading', function() {
     expect(duration).to.equal(150);
   });
 
-  it('marks class set and finishes on transition start', function() {
+  it('marks class set and finishes on stable transition end', function() {
     const harness = createHarness();
 
     harness.controller.markRevealClassSet({ key: 'trial-1', subsetKind: 'question' });
     harness.controller.finishFromTransitionEvent({ eventType: 'transitionstart' });
+    expect(harness.finished).to.deep.equal([]);
 
-    expect(harness.finished).to.deep.equal(['first-trial-transitionstart']);
+    harness.controller.finishFromTransitionEvent({ eventType: 'transitionend' });
+
+    expect(harness.finished).to.deep.equal(['first-trial-transitionend']);
     expect(harness.timings.map((entry) => entry.name)).to.deep.equal([
       'firstReveal:classSet',
       'firstReveal:fadeStarted',
     ]);
     const fadeStartedDetails = harness.timings[1]?.details;
     expect(fadeStartedDetails).to.include({
-      reason: 'first-trial-transitionstart',
+      reason: 'first-trial-transitionend',
       key: 'trial-1',
       subsetKind: 'question',
       elapsedSinceRevealTriggerMs: 20,
@@ -134,6 +143,7 @@ describe('first trial reveal launch loading', function() {
     await Promise.resolve();
     await Promise.resolve();
     expect(harness.finished).to.deep.equal([]);
+    expect(harness.timeouts[0]?.delayMs).to.equal(230);
 
     harness.runTimeouts();
 
@@ -142,6 +152,19 @@ describe('first trial reveal launch loading', function() {
       'firstReveal:classSet',
       'firstReveal:transitionEventTimeout',
       'firstReveal:fadeStarted',
+    ]);
+  });
+
+  it('defers launch completion when the reveal is not stable yet', function() {
+    const harness = createHarness({ stable: false });
+
+    harness.controller.markRevealClassSet({ key: 'trial-1', subsetKind: 'question' });
+    harness.controller.finishFromTransitionEvent({ eventType: 'transitionend' });
+
+    expect(harness.finished).to.deep.equal([]);
+    expect(harness.timings.map((entry) => entry.name)).to.deep.equal([
+      'firstReveal:classSet',
+      'firstReveal:finishDeferredUntilStable',
     ]);
   });
 });

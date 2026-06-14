@@ -118,7 +118,7 @@ describe('trial display state', function() {
     }).showSkipStudyButton).to.equal(false);
   });
 
-  it('builds a stable trial subset key from selected trial identity, subset kind, display, and video fields', function() {
+  it('builds a stable trial subset key from display and video identity fields without reveal timing', function() {
     const subset = buildTrialSubset({
       kind: 'question',
       display: {
@@ -131,17 +131,17 @@ describe('trial display state', function() {
     expect(buildTrialSubsetKey({
       context: {
         videoSession: { currentCheckpointIndex: 4 },
-        engineIndices: { clusterIndex: 5, stimIndex: 2 },
+        engineIndices: { clusterIndex: 5 },
         questionIndex: 6,
       },
       isVideoSession: true,
       subset,
-    })).to.equal('4::5::2::6::question::::Prompt:::/image.png::::::Source:::');
+    })).to.equal('4::5::6::::Prompt:::/image.png::::::Source:::');
 
     expect(buildTrialSubsetKey({
       context: {
         videoSession: { currentCheckpointIndex: 4 },
-        engineIndices: { clusterIndex: 5, stimIndex: 2 },
+        engineIndices: { clusterIndex: 5 },
         questionIndex: 6,
       },
       isVideoSession: true,
@@ -150,7 +150,7 @@ describe('trial display state', function() {
       context: {
         timestamps: { trialStart: 123 },
         videoSession: { currentCheckpointIndex: 4 },
-        engineIndices: { clusterIndex: 5, stimIndex: 2 },
+        engineIndices: { clusterIndex: 5 },
         questionIndex: 6,
       },
       isVideoSession: true,

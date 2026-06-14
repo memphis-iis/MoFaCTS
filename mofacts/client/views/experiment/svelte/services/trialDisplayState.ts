@@ -147,7 +147,7 @@ export function buildTrialSubsetKey(params: {
   readonly context: {
     readonly timestamps?: { trialStart?: unknown };
     readonly videoSession?: { currentCheckpointIndex?: unknown };
-    readonly engineIndices?: { clusterIndex?: unknown; stimIndex?: unknown };
+    readonly engineIndices?: { clusterIndex?: unknown };
     readonly questionIndex?: unknown;
   };
   readonly isVideoSession: boolean;
@@ -159,13 +159,10 @@ export function buildTrialSubsetKey(params: {
 
   const display = params.subset.display;
   const attribution = display.attribution;
-  const engineIndices = params.context.engineIndices || {};
   return [
     params.isVideoSession ? params.context.videoSession?.currentCheckpointIndex ?? '' : '',
-    engineIndices.clusterIndex ?? '',
-    engineIndices.stimIndex ?? '',
-    params.context.questionIndex ?? '',
-    params.subset.kind,
+    params.isVideoSession ? params.context.engineIndices?.clusterIndex ?? '' : '',
+    params.isVideoSession ? params.context.questionIndex ?? '' : '',
     display.type || '',
     display.schema || '',
     display.text || '',

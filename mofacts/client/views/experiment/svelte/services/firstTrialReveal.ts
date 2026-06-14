@@ -9,6 +9,7 @@ export interface FirstTrialRevealDependencies {
   readonly finishLaunchLoading: (reason: string) => void;
   readonly getFadeContext: () => TrialFadeContext;
   readonly isLaunchLoadingActive: () => boolean;
+  readonly isRevealStable: (params: { key: string; subsetKind: string }) => boolean;
   readonly markLaunchLoadingTiming: (name: string, details?: Record<string, unknown>) => void;
   readonly now: () => number;
   readonly scheduleTimeout: (callback: () => void, delayMs: number) => void;
@@ -67,6 +68,15 @@ export function createFirstTrialRevealController(
     }
 
     const fadeContext = deps.getFadeContext();
+    if (!deps.isRevealStable({ key: fadeContext.key, subsetKind: fadeContext.subsetKind })) {
+      deps.markLaunchLoadingTiming('firstReveal:finishDeferredUntilStable', {
+        reason,
+        key: fadeContext.key,
+        subsetKind: fadeContext.subsetKind,
+      });
+      return;
+    }
+
     deps.markLaunchLoadingTiming('firstReveal:fadeStarted', {
       reason,
       key: fadeContext.key,
@@ -102,7 +112,7 @@ export function createFirstTrialRevealController(
           });
           finish('first-trial-transition-timeout');
         }
-      }, 80);
+      }, fadeContext.configuredDurationMs + 80);
       return;
     }
 
@@ -130,7 +140,7 @@ export function createFirstTrialRevealController(
         deps.isLaunchLoadingActive() &&
         pendingKey &&
         pendingKey === fadeContext.key &&
-        (eventType === 'transitionrun' || eventType === 'transitionstart')
+        eventType === 'transitionend'
       ) {
         finish(`first-trial-${eventType}`);
       }

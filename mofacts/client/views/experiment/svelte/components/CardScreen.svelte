@@ -330,10 +330,23 @@
     visibleSetAt: 0,
     configuredDurationMs: 0,
   };
+  function isFirstTrialRevealStable({ key, subsetKind }) {
+    return initializedForRender &&
+      activeSlotMounted &&
+      activeSlotVisible &&
+      trialContentVisible &&
+      allBlockingAssetsReady &&
+      !isFadingOut &&
+      trialSubset.showOverlay &&
+      trialSubsetKind === subsetKind &&
+      trialSubsetKey === key &&
+      (!trialContentFadeElement || getComputedStyle(trialContentFadeElement).opacity === '1');
+  }
   const firstTrialReveal = createFirstTrialRevealController({
     finishLaunchLoading,
     getFadeContext: () => lastFadeLogContext,
     isLaunchLoadingActive,
+    isRevealStable: isFirstTrialRevealStable,
     markLaunchLoadingTiming,
     now: () => performance.now(),
     scheduleTimeout: (callback, delayMs) => {
@@ -564,21 +577,20 @@
     standardCardLaunchFinishKey !== trialSubsetKey
   ) {
     standardCardLaunchFinishKey = trialSubsetKey;
-    void (async (key) => {
+    void (async (key, subsetKind) => {
       await tick();
       await waitForBrowserPaint();
       if (
         isLaunchLoadingActive() &&
-        trialContentVisible &&
-        trialSubsetKey === key
+        isFirstTrialRevealStable({ key, subsetKind })
       ) {
         markLaunchLoadingTiming('standardCard:firstTrialVisible', {
           key,
-          subsetKind: trialSubsetKind,
+          subsetKind,
         });
         finishLaunchLoading('standard-card-first-trial-visible');
       }
-    })(trialSubsetKey);
+    })(trialSubsetKey, trialSubsetKind);
   }
 
   $: activeTrialRevealController.syncStage({
