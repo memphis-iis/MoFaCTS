@@ -230,12 +230,7 @@
       return;
     }
     const documentId = typeof display.documentId === 'string' ? display.documentId.trim() : '';
-    const hasProductionRuleSource = Array.isArray(display.productionRules)
-      || (
-        display.behavior
-        && typeof display.behavior === 'object'
-        && Array.isArray(display.behavior.authoredProductionRules)
-      );
+    const hasProductionRuleSource = Array.isArray(display.productionRules);
     if (!documentId || !hasProductionRuleSource) {
       return;
     }

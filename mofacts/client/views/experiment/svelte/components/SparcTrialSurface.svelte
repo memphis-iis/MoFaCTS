@@ -1,6 +1,11 @@
 <script>
   import { createEventDispatcher } from 'svelte';
   import { resolveSparcTrialDisplay } from '../services/sparcTrialDisplay';
+  import { buildSparcBoxedNodeGroups } from '../../../../../../learning-components/trial-displays/sparc/sparcBoxLayout';
+  import {
+    SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY,
+    applySparcProgressiveNodeOperations,
+  } from '../../../../../../learning-components/trial-displays/sparc/sparcProgressiveNodes';
   import SparcNode from './SparcNode.svelte';
 
   const dispatch = createEventDispatcher();
@@ -111,8 +116,21 @@
     return String(node?.label || node?.value || '').trim();
   }
 
+  function getProgressiveNodeOperations(values = {}) {
+    const operations = values?.[SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY];
+    return Array.isArray(operations) ? operations : [];
+  }
+
   $: sparcDisplay = resolveSparcTrialDisplay(display, '[SparcTrialSurface]');
-  $: topLevelNodes = sparcDisplay?.nodes || [];
+  $: progressiveNodeOperations = getProgressiveNodeOperations(runtimeNodeValues);
+  $: topLevelNodes = sparcDisplay
+    ? applySparcProgressiveNodeOperations(sparcDisplay.nodes || [], progressiveNodeOperations)
+    : [];
+  $: realizedSparcDisplay = sparcDisplay
+    ? { ...sparcDisplay, nodes: topLevelNodes }
+    : null;
+  $: boxedNodeGroups = realizedSparcDisplay ? buildSparcBoxedNodeGroups(realizedSparcDisplay) : [];
+  $: usesBoxLayout = boxedNodeGroups.length > 0;
   $: authoredNodeValues = buildInitialNodeValues(topLevelNodes, {});
   $: nodeValues = mergeRuntimeNodeValues(authoredNodeValues, runtimeNodeValues);
 </script>
@@ -131,17 +149,39 @@
     </div>
   {/if}
 
-  <div class="sparc-surface-body">
-    {#each topLevelNodes as node (node.id)}
-      <SparcNode
-        {node}
-        {nodeValues}
-        onNodeValueChange={handleNodeValueChange}
-        onNodeCommit={handleNodeValueCommit}
-        onNodeFocus={handleNodeFocus}
-        onButtonActivate={handleButtonActivate}
-      />
-    {/each}
+  <div class:sparc-surface-body={!usesBoxLayout} class:sparc-box-layout={usesBoxLayout}>
+    {#if usesBoxLayout}
+      {#each boxedNodeGroups as group (group.box.id)}
+        <section
+          class={`sparc-box sparc-box-${group.box.id}`}
+          data-sparc-box-id={group.box.id}
+          data-sparc-box-role={group.box.role || ''}
+          data-sparc-box-region={group.box.region || ''}
+        >
+          {#each group.nodes as node (node.id)}
+            <SparcNode
+              {node}
+              {nodeValues}
+              onNodeValueChange={handleNodeValueChange}
+              onNodeCommit={handleNodeValueCommit}
+              onNodeFocus={handleNodeFocus}
+              onButtonActivate={handleButtonActivate}
+            />
+          {/each}
+        </section>
+      {/each}
+    {:else}
+      {#each topLevelNodes as node (node.id)}
+        <SparcNode
+          {node}
+          {nodeValues}
+          onNodeValueChange={handleNodeValueChange}
+          onNodeCommit={handleNodeValueCommit}
+          onNodeFocus={handleNodeFocus}
+          onButtonActivate={handleButtonActivate}
+        />
+      {/each}
+    {/if}
   </div>
 </div>
 
@@ -183,5 +223,34 @@
     display: flex;
     flex-direction: column;
     gap: 1rem;
+  }
+
+  .sparc-box-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+  }
+
+  .sparc-box {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    min-width: 0;
+  }
+
+  @media (min-width: 900px) {
+    .sparc-box-layout:has(.sparc-box[data-sparc-box-region="right"]) {
+      grid-template-columns: minmax(0, 3fr) minmax(16rem, 1fr);
+      align-items: start;
+    }
+
+    .sparc-box[data-sparc-box-region="right"] {
+      grid-column: 2;
+      grid-row: 1 / span 3;
+    }
+
+    .sparc-box[data-sparc-box-region="bottom"] {
+      grid-column: 1 / -1;
+    }
   }
 </style>

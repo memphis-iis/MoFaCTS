@@ -97,7 +97,7 @@ function display(): SparcTrialDisplay {
   };
 }
 
-function authoredFractionsDisplay(): SparcTrialDisplay {
+function unsupportedAuthoredRulesDisplay(): SparcTrialDisplay {
   return {
     type: 'sparc',
     documentId: 'sparc-fractions-addition',
@@ -135,45 +135,8 @@ function authoredFractionsDisplay(): SparcTrialDisplay {
       }],
       authoredProductionRules: [
         { id: 'choose-first-common-denominator', hintBehavior: { messages: ['Hint 1', 'Hint 2', 'Hint 3'] } },
-        { id: 'buggy-added-denominators' },
-        { id: 'buggy-premature-add-numerators' },
-        { id: 'fill-second-common-denominator' },
-        { id: 'copy-answer-denominator' },
-        { id: 'convert-numerator' },
-        { id: 'add-converted-numerators' },
-        { id: 'reduce-denominator' },
-        { id: 'reduce-numerator' },
-        { id: 'complete-problem' },
       ],
     },
-    workingMemoryFacts: [{
-      factType: 'problem',
-      slots: {
-        type: 'fraction-addition',
-        firstNumerator: 1,
-        firstDenominator: 4,
-        secondNumerator: 1,
-        secondDenominator: 6,
-        finalNumerator: 5,
-        finalDenominator: 12,
-      },
-    }, {
-      factType: 'node-role',
-      slots: {
-        node: 'node-known-1-equivalent-bottom',
-        selection: 'firstDenConv',
-        role: 'converted-denominator',
-        fraction: 'first',
-      },
-    }, {
-      factType: 'node-role',
-      slots: {
-        node: 'node-converted-bottom',
-        selection: 'secDenConv',
-        role: 'converted-denominator',
-        fraction: 'second',
-      },
-    }],
   };
 }
 
@@ -200,14 +163,11 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
     assert.equal(document.productionRules?.[0]?.id, 'stoich.set-result-unit');
   });
 
-  it('compiles authored Fractions production rules when no expanded rule array is present', function() {
-    const document = createSparcAuthoredDocumentFromTrialDisplay({
+  it('rejects non-executable authored production rules', function() {
+    assert.throws(() => createSparcAuthoredDocumentFromTrialDisplay({
       documentId: 'sparc-fractions-addition',
-      display: authoredFractionsDisplay(),
-    });
-
-    assert.equal(document.productionRules?.some((rule) => rule.id === 'fractions.authored.choose-first-common-denominator'), true);
-    assert.equal(document.workingMemoryFacts?.some((fact) => fact.factType === 'fraction-source'), true);
+      display: unsupportedAuthoredRulesDisplay(),
+    }), /behavior\.authoredProductionRules is not executable/);
   });
 
   it('turns submitted display nodes into SAI production-rule events', function() {
@@ -323,10 +283,10 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
     assert.deepEqual(result.credits, ['Set-Numerator-Unit-of-Unit-Conversion']);
   });
 
-  it('evaluates authored Fractions rules through the runtime bridge', function() {
-    const result = evaluateSparcTrialDisplayProductionRuleEvents({
+  it('rejects non-executable authored rules during production-rule evaluation', function() {
+    assert.throws(() => evaluateSparcTrialDisplayProductionRuleEvents({
       documentId: 'sparc-fractions-addition',
-      display: authoredFractionsDisplay(),
+      display: unsupportedAuthoredRulesDisplay(),
       result: {
         submittedNodes: {
           'node-known-1-equivalent-bottom': '12',
@@ -334,10 +294,6 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
         timestamp: 4000,
       },
       priorHistoryRecords: [],
-    });
-
-    assert.equal(result.events.length, 1);
-    assert.deepEqual(result.classifications, ['correct']);
-    assert.deepEqual(result.credits, ['determine-lcd']);
+    }), /behavior\.authoredProductionRules is not executable/);
   });
 });

@@ -26,10 +26,27 @@ export interface SparcTraceExpectation {
   responseKC?: string | number;
 }
 
+export interface SparcLayoutZone {
+  id: string;
+  role?: string;
+  region?: string;
+  flow?: string;
+  [key: string]: unknown;
+}
+
+export interface SparcBoxedNodeGroup {
+  box: SparcLayoutZone;
+  nodes: unknown[];
+}
+
 export interface SparcTrialDisplay {
   type: 'sparc';
   documentId?: string;
   schema?: string;
+  layout?: {
+    zones?: SparcLayoutZone[];
+    [key: string]: unknown;
+  };
   nodes: unknown[];
   workingMemoryFacts?: unknown[];
   productionRules?: unknown[];

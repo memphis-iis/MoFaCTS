@@ -8,7 +8,10 @@ export type SparcDisplayContentReadinessIssue = {
     | 'missing-intent'
     | 'missing-behavior-ref-node'
     | 'missing-path-intent-node'
-    | 'missing-layout-zone';
+    | 'missing-layout-zone'
+    | 'unsupported-authored-production-rules'
+    | 'invalid-production-rule'
+    | 'missing-production-rule-target-node';
   readonly message: string;
   readonly nodeId?: string;
 };
@@ -52,6 +55,50 @@ function collectNodeIds(
     }
     if (Array.isArray(node.children)) {
       collectNodeIds(node.children, nodeIds, issues);
+    }
+  }
+}
+
+function collectProgressiveNodeIdsFromNodeTemplate(
+  node: unknown,
+  nodeIds: Set<string>,
+): void {
+  if (!isRecord(node)) {
+    return;
+  }
+  const nodeId = typeof node.id === 'string'
+    ? node.id.trim()
+    : (isRecord(node.id) && node.id.type === 'literal' && typeof node.id.value === 'string'
+        ? node.id.value.trim()
+        : '');
+  if (nodeId) {
+    nodeIds.add(nodeId);
+  }
+  if (Array.isArray(node.children)) {
+    for (const child of node.children) {
+      collectProgressiveNodeIdsFromNodeTemplate(child, nodeIds);
+    }
+  }
+}
+
+function collectProgressiveNodeIds(
+  display: SparcTrialDisplay,
+  nodeIds: Set<string>,
+): void {
+  if (!Array.isArray(display.productionRules)) {
+    return;
+  }
+  for (const rule of display.productionRules) {
+    if (!isRecord(rule) || !Array.isArray(rule.then)) {
+      continue;
+    }
+    for (const effect of rule.then) {
+      if (!isRecord(effect)) {
+        continue;
+      }
+      if ((effect.type === 'append-node' || effect.type === 'insert-node') && 'node' in effect) {
+        collectProgressiveNodeIdsFromNodeTemplate(effect.node, nodeIds);
+      }
     }
   }
 }
@@ -141,12 +188,127 @@ function validateBehaviorRefs(
   }
 }
 
+function expressionAddressNodeId(target: unknown): string {
+  if (!isRecord(target)) {
+    return '';
+  }
+  const nodeId = target.nodeId;
+  if (typeof nodeId === 'string') {
+    return nodeId.trim();
+  }
+  if (isRecord(nodeId) && nodeId.type === 'literal' && typeof nodeId.value === 'string') {
+    return nodeId.value.trim();
+  }
+  return '';
+}
+
+function validateRuleTargetNode(params: {
+  readonly ruleId: string;
+  readonly target: unknown;
+  readonly nodeIds: ReadonlySet<string>;
+  readonly issues: SparcDisplayContentReadinessIssue[];
+}): void {
+  const nodeId = expressionAddressNodeId(params.target);
+  if (!nodeId || nodeId === 'root' || params.nodeIds.has(nodeId)) {
+    return;
+  }
+  params.issues.push({
+    kind: 'missing-production-rule-target-node',
+    nodeId,
+    message: `SPARC production rule "${params.ruleId}" targets missing node "${nodeId}"`,
+  });
+}
+
+function validateProductionRules(
+  display: SparcTrialDisplay,
+  nodeIds: ReadonlySet<string>,
+  issues: SparcDisplayContentReadinessIssue[],
+): void {
+  if (isRecord(display.behavior) && Array.isArray(display.behavior.authoredProductionRules)) {
+    issues.push({
+      kind: 'unsupported-authored-production-rules',
+      message: 'SPARC behavior.authoredProductionRules is not executable; use top-level productionRules',
+    });
+  }
+  if (display.productionRules === undefined) {
+    return;
+  }
+  if (!Array.isArray(display.productionRules)) {
+    issues.push({
+      kind: 'invalid-production-rule',
+      message: 'SPARC productionRules must be an array when declared',
+    });
+    return;
+  }
+  for (const [index, rule] of display.productionRules.entries()) {
+    if (!isRecord(rule)) {
+      issues.push({
+        kind: 'invalid-production-rule',
+        message: `SPARC productionRules[${index}] must be an object`,
+      });
+      continue;
+    }
+    const ruleId = typeof rule.id === 'string' && rule.id.trim() ? rule.id.trim() : `productionRules[${index}]`;
+    if (ruleId === `productionRules[${index}]`) {
+      issues.push({
+        kind: 'invalid-production-rule',
+        message: `SPARC productionRules[${index}].id is required`,
+      });
+    }
+    if (!Array.isArray(rule.when) || rule.when.length === 0) {
+      issues.push({
+        kind: 'invalid-production-rule',
+        message: `SPARC production rule "${ruleId}" requires a non-empty when array`,
+      });
+    }
+    if (!Array.isArray(rule.then)) {
+      issues.push({
+        kind: 'invalid-production-rule',
+        message: `SPARC production rule "${ruleId}" requires a then array`,
+      });
+      continue;
+    }
+    for (const [effectIndex, effect] of rule.then.entries()) {
+      if (!isRecord(effect) || typeof effect.type !== 'string' || !effect.type.trim()) {
+        issues.push({
+          kind: 'invalid-production-rule',
+          message: `SPARC production rule "${ruleId}" then[${effectIndex}] requires an effect type`,
+        });
+        continue;
+      }
+      if (effect.type === 'write-state') {
+        if (!isRecord(effect.write) || typeof effect.write.key !== 'string' || !effect.write.key.trim()) {
+          issues.push({
+            kind: 'invalid-production-rule',
+            message: `SPARC production rule "${ruleId}" write-state effect requires write.key`,
+          });
+          continue;
+        }
+        validateRuleTargetNode({
+          ruleId,
+          target: effect.write.target,
+          nodeIds,
+          issues,
+        });
+      } else if (effect.type === 'message' && 'target' in effect) {
+        validateRuleTargetNode({
+          ruleId,
+          target: effect.target,
+          nodeIds,
+          issues,
+        });
+      }
+    }
+  }
+}
+
 export function validateSparcDisplayContentReadiness(
   display: SparcTrialDisplay,
 ): SparcDisplayContentReadinessResult {
   const issues: SparcDisplayContentReadinessIssue[] = [];
   const nodeIds = new Set<string>();
   collectNodeIds(display.nodes, nodeIds, issues);
+  collectProgressiveNodeIds(display, nodeIds);
 
   const intentNodes = collectIntentNodes(display);
   for (const nodeId of display.response?.scoredNodes ?? []) {
@@ -169,6 +331,7 @@ export function validateSparcDisplayContentReadiness(
   validatePathIntents(display, nodeIds, issues);
   validateBehaviorRefs(display, nodeIds, issues);
   validatePlacements(display.nodes, collectLayoutZoneIds(display), issues);
+  validateProductionRules(display, nodeIds, issues);
 
   return {
     ready: issues.length === 0,

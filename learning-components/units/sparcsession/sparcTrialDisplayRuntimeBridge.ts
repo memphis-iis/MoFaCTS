@@ -20,7 +20,6 @@ import type {
   SparcReactiveEvent,
   SparcWorkingMemoryFact,
 } from './sparcSessionContracts';
-import { compileSparcAuthoredProductionRules } from './sparcAuthoredProductionRuleCompiler';
 
 type DisplayNodeRecord = {
   readonly id?: unknown;
@@ -112,16 +111,12 @@ export function createSparcAuthoredDocumentFromTrialDisplay(params: {
   const authoredFacts = Array.isArray(params.display.workingMemoryFacts)
     ? params.display.workingMemoryFacts as readonly SparcWorkingMemoryFact[]
     : [];
-  const compiledAuthoredRules = compileSparcAuthoredProductionRules({
-    behavior: params.display.behavior,
-    workingMemoryFacts: authoredFacts,
-  });
+  if (isRecord(params.display.behavior) && Array.isArray(params.display.behavior.authoredProductionRules)) {
+    throw new Error('SPARC behavior.authoredProductionRules is not executable; use top-level productionRules');
+  }
   const directProductionRules = Array.isArray(params.display.productionRules)
     ? params.display.productionRules as readonly SparcProductionRule[]
     : [];
-  if (compiledAuthoredRules && directProductionRules.length > 0) {
-    throw new Error('SPARC display cannot define both behavior.authoredProductionRules and top-level productionRules');
-  }
   return {
     id: requireNonBlank(params.documentId, 'SPARC document id'),
     schemaVersion: 1,
@@ -129,11 +124,8 @@ export function createSparcAuthoredDocumentFromTrialDisplay(params: {
       scrollAxis: 'vertical',
       layoutMode: 'document',
     },
-    workingMemoryFacts: [
-      ...authoredFacts,
-      ...(compiledAuthoredRules?.workingMemoryFacts ?? []),
-    ],
-    productionRules: compiledAuthoredRules?.productionRules ?? directProductionRules,
+    workingMemoryFacts: authoredFacts,
+    productionRules: directProductionRules,
     root: {
       id: 'root',
       kind: 'document',

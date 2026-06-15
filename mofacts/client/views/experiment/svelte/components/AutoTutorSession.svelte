@@ -379,6 +379,22 @@
   {/if}
 
   <div class="auto-tutor-chat" class:auto-tutor-chat-disabled={!!errorMessage || completed || !chatReady}>
+    {#if !chatReady && !errorMessage}
+      <div class="auto-tutor-loading" role="status">
+        Loading AutoTutor...
+      </div>
+    {/if}
+    {#if runtimeReady}
+      <deep-chat
+        bind:this={chatElement}
+        class="auto-tutor-chat-host"
+        class:auto-tutor-chat-pending={!chatReady}
+      ></deep-chat>
+    {/if}
+  </div>
+
+  <div class="auto-tutor-continue-bar" aria-label="AutoTutor continue controls">
+    <div class="auto-tutor-footer-label" aria-hidden="true">AutoTutor</div>
     <div class="auto-tutor-mobile-progress" aria-label="AutoTutor progress">
       <div class="auto-tutor-meter-row">
         <div class="auto-tutor-meter-copy">
@@ -408,22 +424,6 @@
         {turnCount === 1 ? '1 turn' : `${turnCount} turns`}
       </div>
     </div>
-    {#if !chatReady && !errorMessage}
-      <div class="auto-tutor-loading" role="status">
-        Loading AutoTutor...
-      </div>
-    {/if}
-    {#if runtimeReady}
-      <deep-chat
-        bind:this={chatElement}
-        class="auto-tutor-chat-host"
-        class:auto-tutor-chat-pending={!chatReady}
-      ></deep-chat>
-    {/if}
-  </div>
-
-  <div class="auto-tutor-continue-bar" aria-label="AutoTutor continue controls">
-    <div class="auto-tutor-footer-label" aria-hidden="true">AutoTutor</div>
     <button
       type="button"
       class="btn btn-primary auto-tutor-continue-button"
@@ -667,45 +667,36 @@
     }
 
     .auto-tutor-mobile-progress {
-      position: absolute;
-      top: var(--app-space-2);
-      right: var(--app-space-2);
-      z-index: 2;
       display: flex;
       flex-direction: column;
-      width: min(58vw, 220px);
-      gap: var(--app-space-1);
-      padding: calc(0.35rem * var(--app-density-scale)) calc(0.45rem * var(--app-density-scale));
-      border: 1px solid var(--app-secondary-surface-color);
-      border-radius: var(--app-border-radius-sm);
-      background: color-mix(in srgb, var(--app-background-color) 88%, transparent);
-      box-shadow: var(--app-shadow-floating-panel);
-      backdrop-filter: blur(3px);
-      pointer-events: none;
+      flex: 1 1 auto;
+      min-width: 0;
+      max-width: 15rem;
+      gap: calc(0.1875rem * var(--app-density-scale));
     }
 
     .auto-tutor-mobile-progress .auto-tutor-meter-row {
-      grid-template-columns: minmax(0, 1fr);
+      grid-template-columns: minmax(5.75rem, 7rem) minmax(2.5rem, 1fr);
       gap: calc(0.125rem * var(--app-density-scale));
     }
 
     .auto-tutor-mobile-progress .auto-tutor-meter-copy {
-      font-size: calc(var(--app-font-size-base) * 0.68);
+      font-size: calc(var(--app-font-size-base) * 0.64);
       line-height: 1;
     }
 
     .auto-tutor-mobile-progress .auto-tutor-meter-copy strong {
-      font-size: calc(var(--app-font-size-base) * 0.72);
+      font-size: calc(var(--app-font-size-base) * 0.68);
     }
 
     .auto-tutor-turns {
-      font-size: calc(var(--app-font-size-base) * 0.75);
+      font-size: calc(var(--app-font-size-base) * 0.68);
       line-height: 1.1;
-      text-align: center;
+      text-align: left;
     }
 
     .auto-tutor-progress-track {
-      height: 7px;
+      height: 6px;
     }
 
     .auto-tutor-error,
@@ -715,7 +706,13 @@
     }
 
     .auto-tutor-continue-bar {
+      align-items: center;
+      gap: calc(0.5rem * var(--app-density-scale));
       padding: calc(0.3rem * var(--app-density-scale)) calc(0.4rem * var(--app-density-scale));
+    }
+
+    .auto-tutor-footer-label {
+      display: none;
     }
 
     .auto-tutor-continue-button {

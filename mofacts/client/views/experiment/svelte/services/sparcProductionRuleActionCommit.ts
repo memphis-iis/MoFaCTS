@@ -12,6 +12,10 @@ import type {
 import type { UnitEngineLike } from '../../../../../common/types';
 import { insertCompressedHistory } from '../../../../lib/historyWire';
 import {
+  SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY,
+  collectSparcProgressiveNodeOperations,
+} from '../../../../../../learning-components/trial-displays/sparc/sparcProgressiveNodes';
+import {
   readSparcProductionRuleHistoryRecords,
   rememberSparcProductionRuleHistoryRecord,
 } from './sparcProductionRuleHistoryCache';
@@ -37,11 +41,7 @@ function nonBlankString(value: unknown): string {
 }
 
 function hasSparcProductionRuleSource(display: Record<string, unknown>): boolean {
-  if (Array.isArray(display.productionRules)) {
-    return true;
-  }
-  return isRecord(display.behavior)
-    && Array.isArray(display.behavior.authoredProductionRules);
+  return Array.isArray(display.productionRules);
 }
 
 function resolveSparcActionDisplay(display: unknown): SparcActionDisplay | null {
@@ -98,8 +98,20 @@ function extractCurrentMessageNodeValues(
 function extractSparcNodeValues(
   display: SparcActionDisplay,
   evaluations: readonly SparcCommittedProductionRuleEvaluation[] | undefined,
+  priorHistoryRecords: readonly CanonicalHistoryRecord[],
 ): Record<string, unknown> {
   const nodeValues: Record<string, unknown> = extractCurrentMessageNodeValues(display, evaluations);
+  const progressiveOperations = collectSparcProgressiveNodeOperations([
+    ...priorHistoryRecords.map((record) => (
+      isRecord(record.sparc) && isRecord(record.sparc.stateTransition)
+        ? record.sparc.stateTransition
+        : {}
+    )),
+    ...(evaluations ?? []).map((evaluation) => evaluation.transition ?? {}),
+  ]);
+  if (progressiveOperations.length > 0) {
+    nodeValues[SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY] = progressiveOperations;
+  }
   for (const evaluation of evaluations ?? []) {
     for (const write of evaluation.transition?.writes ?? []) {
       const nodeId = write?.target?.nodeId;
@@ -143,6 +155,11 @@ export async function commitSparcProductionRuleAction(params: {
   if (typeof engine?.commitSparcTrialDisplayProductionRuleEvents !== 'function') {
     throw new Error('[SPARC] Production-rule action requires SPARC session engine commit support');
   }
+  const priorHistoryRecords = readSparcProductionRuleHistoryRecords({
+    TDFId: tdfId,
+    sessionID: sessionId,
+    documentId: sparcDisplay.documentId,
+  });
 
   const result = await engine.commitSparcTrialDisplayProductionRuleEvents({
     core: {
@@ -154,11 +171,7 @@ export async function commitSparcProductionRuleAction(params: {
     documentId: sparcDisplay.documentId,
     display: sparcDisplay,
     result: params.sparcResult,
-    priorHistoryRecords: readSparcProductionRuleHistoryRecords({
-      TDFId: tdfId,
-      sessionID: sessionId,
-      documentId: sparcDisplay.documentId,
-    }),
+    priorHistoryRecords,
     history: {
       async writeCanonicalHistory(historyRecord: CanonicalHistoryRecord) {
         await insertCompressedHistory(historyRecord as Record<string, unknown>);
@@ -168,6 +181,6 @@ export async function commitSparcProductionRuleAction(params: {
   });
 
   return {
-    sparcNodeValues: extractSparcNodeValues(sparcDisplay, result.evaluations),
+    sparcNodeValues: extractSparcNodeValues(sparcDisplay, result.evaluations, priorHistoryRecords),
   };
 }

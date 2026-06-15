@@ -284,7 +284,8 @@ export type SparcProductionRuleEffect =
   | {
       readonly type: 'credit';
       readonly kc: string;
-    };
+    }
+  | SparcProgressiveNodeOperationTemplate;
 
 export type SparcWorkingMemoryFactTemplate = {
   readonly factId?: string;
@@ -302,6 +303,23 @@ export type SparcStateWriteTemplate = {
   readonly key: string;
   readonly value: SparcRuleExpression;
 };
+
+export type SparcProgressiveNodeTemplate = Readonly<Record<string, unknown>>;
+
+export type SparcProgressiveNodeOperationTemplate =
+  | {
+      readonly type: 'append-node';
+      readonly frontier?: string | SparcRuleExpression;
+      readonly boxId: string | SparcRuleExpression;
+      readonly node: SparcProgressiveNodeTemplate;
+    }
+  | {
+      readonly type: 'insert-node';
+      readonly boxId?: string | SparcRuleExpression;
+      readonly beforeNodeId?: string | SparcRuleExpression;
+      readonly afterNodeId?: string | SparcRuleExpression;
+      readonly node: SparcProgressiveNodeTemplate;
+    };
 
 export type SparcProductionRule = {
   readonly id: string;

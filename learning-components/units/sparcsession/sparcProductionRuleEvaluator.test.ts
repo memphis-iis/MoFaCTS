@@ -8,6 +8,7 @@ import type {
   SparcRuleExpression,
   SparcWorkingMemoryFact,
 } from './sparcSessionContracts';
+import { SPARC_PROGRESSIVE_NODE_OPERATION_STATE_KEY } from '../../trial-displays/sparc/sparcProgressiveNodes';
 
 const literal = (value: unknown): SparcRuleExpression => ({ type: 'literal', value });
 const variable = (name: string): SparcRuleExpression => ({ type: 'variable', name });
@@ -812,5 +813,76 @@ describe('sparcProductionRuleEvaluator', function() {
     assert.equal(result.cycles, 1);
     assert.equal(result.firings.length, 1);
     assert.equal(result.facts.filter((fact) => fact.factType === 'model').length, 1);
+  });
+
+  it('instantiates progressive append and insert node operations as ordered state writes', function() {
+    const facts: SparcWorkingMemoryFact[] = [{
+      factType: 'interface-event',
+      slots: {
+        documentId: 'chapter-doc',
+        selection: 'problem-1',
+        action: 'Submit',
+        input: 'incorrect',
+      },
+    }];
+    const rules: SparcProductionRule[] = [{
+      id: 'chapter.progress-after-miss',
+      when: [{
+        factType: 'interface-event',
+        slots: {
+          documentId: { type: 'bind', variable: 'documentId' },
+          selection: { type: 'literal', value: 'problem-1' },
+          action: { type: 'literal', value: 'Submit' },
+          input: { type: 'literal', value: 'incorrect' },
+        },
+      }],
+      then: [{
+        type: 'append-node',
+        frontier: 'main',
+        boxId: 'chapterFlowBox',
+        node: {
+          id: 'remediation-denominator',
+          nodeType: 'group',
+          groupType: 'paragraph',
+          children: [{
+            id: 'remediation-denominator-text',
+            nodeType: 'atomic',
+            atomType: 'text-block',
+            value: { type: 'literal', value: 'Review denominator meaning.' },
+          }],
+        },
+      }, {
+        type: 'insert-node',
+        afterNodeId: 'problem-1',
+        boxId: 'feedbackBox',
+        node: {
+          id: { type: 'literal', value: 'feedback-problem-1' },
+          nodeType: 'atomic',
+          atomType: 'message-box',
+          value: 'Try the scaffolded version next.',
+        },
+      }],
+    }];
+
+    const [firing] = evaluateSparcProductionRules({ facts, rules });
+
+    assert.equal(firing?.writes.length, 2);
+    assert.deepEqual(firing?.writes.map((write) => write.key), [
+      SPARC_PROGRESSIVE_NODE_OPERATION_STATE_KEY,
+      SPARC_PROGRESSIVE_NODE_OPERATION_STATE_KEY,
+    ]);
+    assert.deepEqual(firing?.writes.map((write) => write.target), [{
+      documentId: 'chapter-doc',
+      nodeId: 'root',
+    }, {
+      documentId: 'chapter-doc',
+      nodeId: 'root',
+    }]);
+    assert.equal((firing?.writes[0]?.value as { type?: string }).type, 'append-node');
+    assert.equal((firing?.writes[1]?.value as { type?: string }).type, 'insert-node');
+    assert.equal(
+      (((firing?.writes[0]?.value as { node?: { children?: { value?: unknown }[] } }).node?.children?.[0]?.value)),
+      'Review denominator meaning.',
+    );
   });
 });

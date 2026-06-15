@@ -16,6 +16,10 @@ import { selectCardService, updateEngineService, prepareIncomingTrialService } f
 import { ttsPlaybackService } from '../services/ttsService';
 import { speechRecognitionService as srService } from '../services/speechRecognitionService';
 import { readSparcProductionRuleHistoryRecords } from '../services/sparcProductionRuleHistoryCache';
+import {
+  SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY,
+  collectSparcProgressiveNodeOperations,
+} from '../../../../../../learning-components/trial-displays/sparc/sparcProgressiveNodes';
 import { CardStore } from '../../modules/cardStore';
 import { fromCallback, fromPromise, type AnyEventObject } from 'xstate';
 import { resolveH5PModelOutcomes } from '../../../../../common/lib/h5pTrialResult';
@@ -63,7 +67,6 @@ interface AnswerEvaluationContext extends ServiceRecord {
     productionRules?: unknown[];
     behaviorRefs?: Record<string, string>;
     behavior?: {
-      authoredProductionRules?: unknown[];
       feedback?: Array<Record<string, unknown>>;
     };
     response?: {
@@ -310,8 +313,7 @@ function hasSparcProductionRuleSource(display: AnswerEvaluationContext['currentD
   documentId: string;
 } {
   const hasDirectRules = Array.isArray(display?.productionRules);
-  const hasAuthoredRules = Array.isArray(display?.behavior?.authoredProductionRules);
-  if (!display || display.type !== 'sparc' || (!hasDirectRules && !hasAuthoredRules)) {
+  if (!display || display.type !== 'sparc' || !hasDirectRules) {
     return false;
   }
   const documentId = typeof display.documentId === 'string' ? display.documentId.trim() : '';
@@ -368,8 +370,26 @@ function extractCurrentSparcMessageNodeValues(
 function extractSparcNodeValuesFromEvaluation(
   display: AnswerEvaluationContext['currentDisplay'],
   result: SparcTrialDisplayProductionRuleEvaluationResult,
+  priorHistoryRecords: readonly Record<string, unknown>[] = [],
 ): Record<string, unknown> {
   const nodeValues: Record<string, unknown> = extractCurrentSparcMessageNodeValues(display, result);
+  const progressiveOperations = collectSparcProgressiveNodeOperations([
+    ...priorHistoryRecords.map((record) => (
+      record.sparc
+      && typeof record.sparc === 'object'
+      && !Array.isArray(record.sparc)
+      && 'stateTransition' in record.sparc
+      && record.sparc.stateTransition
+      && typeof record.sparc.stateTransition === 'object'
+      && !Array.isArray(record.sparc.stateTransition)
+        ? record.sparc.stateTransition as { writes?: readonly { key?: string; value?: unknown }[] }
+        : {}
+    )),
+    ...result.evaluations.map((evaluation) => evaluation.transition ?? {}),
+  ]);
+  if (progressiveOperations.length > 0) {
+    nodeValues[SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY] = progressiveOperations;
+  }
   for (const evaluation of result.evaluations) {
     for (const write of evaluation.transition?.writes ?? []) {
       if (!write?.target?.nodeId || !write.key) {
@@ -397,15 +417,16 @@ function evaluateSparcProductionRuleOutcome(context: AnswerEvaluationContext) {
   if (typeof engine?.evaluateSparcTrialDisplayProductionRuleEvents !== 'function') {
     throw new Error('[SPARC] Production-rule display requires SPARC session engine evaluation support');
   }
+  const priorHistoryRecords = readSparcProductionRuleHistoryRecords({
+    tdfId: context.tdfId,
+    sessionId: context.sessionId,
+    documentId: display.documentId,
+  });
   const result = engine.evaluateSparcTrialDisplayProductionRuleEvents({
     documentId: display.documentId,
     display,
     result: context.sparcResult,
-    priorHistoryRecords: readSparcProductionRuleHistoryRecords({
-      tdfId: context.tdfId,
-      sessionId: context.sessionId,
-      documentId: display.documentId,
-    }),
+    priorHistoryRecords,
   });
   const lastClassification = result.classifications[result.classifications.length - 1];
   const lastMessage = result.messages[result.messages.length - 1];
@@ -413,7 +434,7 @@ function evaluateSparcProductionRuleOutcome(context: AnswerEvaluationContext) {
   const matchText = lastClassification
     ? (isCorrect ? '1' : '0')
     : '';
-  const sparcNodeValues = extractSparcNodeValuesFromEvaluation(display, result);
+  const sparcNodeValues = extractSparcNodeValuesFromEvaluation(display, result, priorHistoryRecords);
   return {
     isCorrect,
     matchText: lastMessage?.text || matchText,

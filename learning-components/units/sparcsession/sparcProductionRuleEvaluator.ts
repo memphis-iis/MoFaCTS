@@ -7,10 +7,12 @@ import type {
   SparcProductionRuleEffect,
   SparcProductionRuleFiring,
   SparcProductionRuleTest,
+  SparcProgressiveNodeOperationTemplate,
   SparcRuleExpression,
   SparcStateWrite,
   SparcWorkingMemoryFact,
 } from './sparcSessionContracts';
+import { SPARC_PROGRESSIVE_NODE_OPERATION_STATE_KEY } from '../../trial-displays/sparc/sparcProgressiveNodes';
 
 type SparcRuleBindings = Record<string, unknown>;
 
@@ -307,6 +309,51 @@ function instantiateWrite(
   };
 }
 
+function isRuleExpression(value: unknown): value is SparcRuleExpression {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  return record.type === 'literal'
+    || record.type === 'variable'
+    || record.type === 'function';
+}
+
+function instantiateTemplateValue(value: unknown, bindings: SparcRuleBindings): unknown {
+  if (isRuleExpression(value)) {
+    return evaluateSparcRuleExpression(value, bindings);
+  }
+  if (Array.isArray(value)) {
+    return value.map((entry) => instantiateTemplateValue(entry, bindings));
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [
+      key,
+      instantiateTemplateValue(entry, bindings),
+    ]));
+  }
+  return value;
+}
+
+function instantiateProgressiveNodeWrite(
+  effect: SparcProgressiveNodeOperationTemplate,
+  bindings: SparcRuleBindings,
+): SparcStateWrite {
+  const operation = instantiateTemplateValue(effect, bindings);
+  return {
+    target: {
+      documentId: evaluateStringTemplateValue(
+        { type: 'variable', name: 'documentId' },
+        bindings,
+        'SPARC progressive node operation documentId',
+      ),
+      nodeId: 'root',
+    },
+    key: SPARC_PROGRESSIVE_NODE_OPERATION_STATE_KEY,
+    value: operation,
+  };
+}
+
 function instantiateFiring(
   rule: SparcProductionRule,
   bindings: SparcRuleBindings,
@@ -368,6 +415,10 @@ function instantiateFiring(
           interpolateTemplate(effect.kc, bindings),
           'SPARC production rule credit kc',
         ));
+        break;
+      case 'append-node':
+      case 'insert-node':
+        writes.push(instantiateProgressiveNodeWrite(effect, bindings));
         break;
     }
   }

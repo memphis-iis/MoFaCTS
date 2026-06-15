@@ -198,11 +198,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function hasSparcProductionRuleSource(display: Record<string, unknown>): boolean {
-  if (Array.isArray(display.productionRules)) {
-    return true;
-  }
-  return isRecord(display.behavior)
-    && Array.isArray(display.behavior.authoredProductionRules);
+  return Array.isArray(display.productionRules);
 }
 
 function resolveSparcDisplayWithProductionRuleSource(

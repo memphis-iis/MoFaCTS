@@ -140,4 +140,60 @@ describe('sparcDisplayContentReadiness', function() {
       'missing-behavior-ref-node',
     ]);
   });
+
+  it('rejects unsupported authored production rules without requiring a larger schema', function() {
+    const display = sparcTrialDisplayAdapter.normalizeDisplay({
+      type: 'sparc',
+      nodes: [{
+        id: 'node-answer',
+        nodeType: 'atomic',
+      }],
+      behavior: {
+        authoredProductionRules: [{ id: 'old-summary-rule' }],
+      },
+    });
+
+    assert.deepEqual(validateSparcDisplayContentReadiness(display).issues.map((issue) => issue.kind), [
+      'unsupported-authored-production-rules',
+    ]);
+  });
+
+  it('checks executable production rules for runnable structure and literal node targets', function() {
+    const display = sparcTrialDisplayAdapter.normalizeDisplay({
+      type: 'sparc',
+      nodes: [{
+        id: 'node-answer',
+        nodeType: 'atomic',
+      }],
+      productionRules: [{
+        id: 'rule-missing-target',
+        when: [{
+          factType: 'interface-event',
+          slots: {},
+        }],
+        then: [{
+          type: 'write-state',
+          write: {
+            target: {
+              documentId: { type: 'literal', value: 'doc-1' },
+              nodeId: { type: 'literal', value: 'node-missing' },
+            },
+            key: 'value',
+            value: { type: 'literal', value: 'ok' },
+          },
+        }],
+      }, {
+        id: '',
+        when: [],
+        then: 'not-array',
+      }],
+    });
+
+    assert.deepEqual(validateSparcDisplayContentReadiness(display).issues.map((issue) => issue.kind), [
+      'missing-production-rule-target-node',
+      'invalid-production-rule',
+      'invalid-production-rule',
+      'invalid-production-rule',
+    ]);
+  });
 });
