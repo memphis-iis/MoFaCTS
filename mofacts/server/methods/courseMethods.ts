@@ -4,13 +4,11 @@ import type {
   CourseAssignmentEditorSnapshot,
   CourseAssignmentSummary,
   CourseVisibility,
-  LearnerCourseSnapshotAssignment,
-  LearnerCourseSnapshotCourse,
   LearnerCoursesSnapshot,
   SaveCourseAssignmentsInput,
 } from '../../common/courseAssignments.contracts';
 import { getCourse } from '../orm';
-import { buildDashboardStatsProjection, normalizeOptionalString } from './dashboardCacheShared';
+import { normalizeOptionalString } from './dashboardCacheShared';
 import {
   getUserRoleFlags,
   requireAuthenticatedUser,
@@ -18,6 +16,7 @@ import {
   requireUserWithRoles,
   type MethodAuthorizationDeps,
 } from '../lib/methodAuthorization';
+import { createCourseLearnerSnapshotCacheHelpers } from '../lib/courseLearnerSnapshotCache';
 
 type UnknownRecord = Record<string, unknown>;
 type Logger = (...args: unknown[]) => void;
@@ -34,7 +33,6 @@ type DueDateException = {
   classId?: string;
   date: string | number | Date;
 };
-const COURSE_SNAPSHOT_VERSION = 1;
 const MAX_ASSIGNMENTS_PER_COURSE = 250;
 const DEFAULT_COURSE_TIMEZONE = 'America/Chicago';
 
@@ -291,47 +289,6 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     };
   }
 
-  async function invalidateCourseSnapshotForUser(userId: string, reason: string) {
-    const { CourseLearnerSnapshotCache } = requireCourseSnapshotDeps();
-    await CourseLearnerSnapshotCache.updateAsync(
-      { userId, version: COURSE_SNAPSHOT_VERSION },
-      { $set: { invalidatedAt: new Date(), rebuildReason: reason } }
-    );
-  }
-
-  async function invalidateCourseSnapshotsForCourse(courseId: string, reason: string) {
-    const { CourseLearnerSnapshotCache } = requireCourseSnapshotDeps();
-    const sections = await deps.Sections.find({ courseId }, { fields: { _id: 1 } }).fetchAsync();
-    const sectionIds = sections.map((section: any) => String(section?._id || '')).filter(Boolean);
-    const enrolledRows = sectionIds.length > 0
-      ? await deps.SectionUserMap.find({ sectionId: { $in: sectionIds } }, { fields: { userId: 1 } }).fetchAsync()
-      : [];
-    const enrolledUserIds = [...new Set(enrolledRows.map((row: any) => normalizeOptionalString(row?.userId)).filter(Boolean))];
-    if (enrolledUserIds.length > 0) {
-      await CourseLearnerSnapshotCache.updateAsync(
-        { userId: { $in: enrolledUserIds }, version: COURSE_SNAPSHOT_VERSION },
-        { $set: { invalidatedAt: new Date(), rebuildReason: reason } },
-        { multi: true }
-      );
-    }
-    const publicResult = await CourseLearnerSnapshotCache.updateAsync(
-      { publicCourseIds: courseId, version: COURSE_SNAPSHOT_VERSION },
-      { $set: { invalidatedAt: new Date(), rebuildReason: reason } },
-      { multi: true }
-    );
-    deps.serverConsole('[CourseSnapshot] invalidated course snapshots', { courseId, reason, enrolledCount: enrolledUserIds.length, publicResult });
-  }
-
-  async function invalidateCourseSnapshotsForAssignment(assignmentId: string, reason: string) {
-    const { CourseLearnerSnapshotCache } = requireCourseSnapshotDeps();
-    const result = await CourseLearnerSnapshotCache.updateAsync(
-      { assignmentIds: assignmentId, version: COURSE_SNAPSHOT_VERSION },
-      { $set: { invalidatedAt: new Date(), rebuildReason: reason } },
-      { multi: true }
-    );
-    deps.serverConsole('[CourseSnapshot] invalidated assignment snapshots', { assignmentId, reason, result });
-  }
-
   async function getTdfSummariesByIds(tdfIds: string[]) {
     if (tdfIds.length === 0) return new Map<string, ReturnType<typeof getTdfSummary>>();
     const tdfs = await deps.Tdfs.find(
@@ -350,6 +307,46 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
       }
     ).fetchAsync();
     return new Map(tdfs.map((tdf: any) => [String(tdf._id), getTdfSummary(tdf)]));
+  }
+
+  let courseSnapshotCache: ReturnType<typeof createCourseLearnerSnapshotCacheHelpers> | null = null;
+  function getCourseSnapshotCache() {
+    if (!courseSnapshotCache) {
+      courseSnapshotCache = createCourseLearnerSnapshotCacheHelpers({
+        ...requireCourseSnapshotDeps(),
+        serverConsole: deps.serverConsole,
+        Courses: deps.Courses,
+        Sections: deps.Sections,
+        SectionUserMap: deps.SectionUserMap,
+        Assignments: deps.Assignments,
+        Tdfs: deps.Tdfs,
+        usersCollection: deps.usersCollection,
+        getMethodAuthorizationDeps: deps.getMethodAuthorizationDeps,
+        getUserDisplayIdentifier: deps.getUserDisplayIdentifier,
+        normalizeCourseVisibility,
+        normalizeTimezone,
+        parseNullablePersistedDate,
+        normalizeAssignmentRow,
+        getTdfSummariesByIds,
+      });
+    }
+    return courseSnapshotCache;
+  }
+
+  async function invalidateCourseSnapshotForUser(userId: string, reason: string) {
+    return await getCourseSnapshotCache().invalidateCourseSnapshotForUser(userId, reason);
+  }
+
+  async function invalidateCourseSnapshotsForCourse(courseId: string, reason: string) {
+    return await getCourseSnapshotCache().invalidateCourseSnapshotsForCourse(courseId, reason);
+  }
+
+  async function invalidateCourseSnapshotsForAssignment(assignmentId: string, reason: string) {
+    return await getCourseSnapshotCache().invalidateCourseSnapshotsForAssignment(assignmentId, reason);
+  }
+
+  async function refreshCourseSnapshotAfterPractice(userId: string, TDFId: string) {
+    return await getCourseSnapshotCache().refreshCourseSnapshotAfterPractice(userId, TDFId);
   }
 
   async function fetchNormalizedAssignmentSummaries(courseId: string) {
@@ -877,150 +874,9 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     return Array.from(assignedIdSet);
   }
 
-  function courseIsDateVisible(course: any, now = new Date()) {
-    const beginDate = parseNullablePersistedDate(course?.beginDate);
-    const endDate = parseNullablePersistedDate(course?.endDate);
-    return (!beginDate || now.getTime() >= beginDate.getTime()) && (!endDate || now.getTime() <= endDate.getTime());
-  }
-
-  async function rebuildLearnerCoursesSnapshot(userId: string, reason: string): Promise<LearnerCoursesSnapshot> {
-    const { CourseLearnerSnapshotCache, UserDashboardCache } = requireCourseSnapshotDeps();
-    const roleFlags = await getUserRoleFlags(deps.getMethodAuthorizationDeps(), userId, ['admin', 'teacher'] as const);
-    const enrollmentRows = await deps.SectionUserMap.find({ userId }, { fields: { sectionId: 1 } }).fetchAsync();
-    const sectionIds = enrollmentRows.map((row: any) => normalizeOptionalString(row?.sectionId)).filter((id: string | null): id is string => !!id);
-    const sections = sectionIds.length > 0
-      ? await deps.Sections.find({ _id: { $in: sectionIds } }, { fields: { _id: 1, courseId: 1 } }).fetchAsync()
-      : [];
-    const enrolledCourseIds = [...new Set(sections.map((section: any) => normalizeOptionalString(section?.courseId)).filter((id: string | null): id is string => !!id))];
-    const now = new Date();
-    const courseSelector: any = {
-      $or: [
-        { visibility: 'public' },
-        { _id: { $in: enrolledCourseIds } },
-      ],
-    };
-    if (roleFlags.teacher) {
-      courseSelector.$or.push({ teacherUserId: userId });
-    }
-    if (roleFlags.admin) {
-      courseSelector.$or.push({ teacherUserId: { $exists: true } });
-    }
-    const rawCourses = await deps.Courses.find(
-      courseSelector,
-      { fields: { _id: 1, courseName: 1, visibility: 1, teacherUserId: 1, beginDate: 1, endDate: 1, timezone: 1 } }
-    ).fetchAsync();
-    const visibleCourses = rawCourses.filter((course: any) => {
-      const visibility = normalizeCourseVisibility(course.visibility);
-      if (roleFlags.admin || String(course.teacherUserId || '') === userId) return true;
-      if (visibility === 'public' || enrolledCourseIds.includes(String(course._id))) {
-        return courseIsDateVisible(course, now);
-      }
-      return false;
-    });
-    const courseIds = visibleCourses.map((course: any) => String(course._id));
-    const assignmentRows = courseIds.length > 0
-      ? await deps.Assignments.find(
-        { courseId: { $in: courseIds } },
-        { fields: { _id: 1, courseId: 1, TDFId: 1, order: 1, releaseAt: 1, dueAt: 1, required: 1, createdAt: 1, updatedAt: 1 } }
-      ).fetchAsync()
-      : [];
-    const tdfSummaries = await getTdfSummariesByIds(assignmentRows.map((row: any) => String(row?.TDFId || '')).filter(Boolean));
-    const titleById = new Map(Array.from(tdfSummaries.entries()).map(([tdfId, summary]) => [tdfId, summary.displayName]));
-    const dashboardCache = await UserDashboardCache.findOneAsync({ userId });
-    const assignmentsByCourseId = new Map<string, LearnerCourseSnapshotAssignment[]>();
-    for (const row of assignmentRows) {
-      const summary = normalizeAssignmentRow(row, 0, titleById, now);
-      if (!summary) continue;
-      const tdf = tdfSummaries.get(summary.TDFId);
-      if (!tdf) continue;
-      const progressProjection = buildDashboardStatsProjection(dashboardCache?.tdfStats?.[summary.TDFId], null);
-      const releaseAt = summary.releaseAt;
-      const ordinaryLearner = !roleFlags.admin && String(visibleCourses.find((course: any) => String(course._id) === summary.courseId)?.teacherUserId || '') !== userId;
-      const availability: LearnerCourseSnapshotAssignment['availability'] = releaseAt && releaseAt.getTime() > now.getTime() && ordinaryLearner ? 'scheduled' : 'available';
-      const enriched: LearnerCourseSnapshotAssignment = {
-        ...summary,
-        availability,
-        fileName: tdf.fileName,
-        tags: tdf.tags,
-        currentStimuliSetId: tdf.currentStimuliSetId,
-        ...progressProjection,
-      };
-      const list = assignmentsByCourseId.get(summary.courseId) || [];
-      list.push(enriched);
-      assignmentsByCourseId.set(summary.courseId, list);
-    }
-    const teacherIds = [...new Set(visibleCourses.map((course: any) => normalizeOptionalString(course?.teacherUserId)).filter((id: string | null): id is string => !!id))];
-    const teachers = teacherIds.length > 0
-      ? await deps.usersCollection.find({ _id: { $in: teacherIds } }, { fields: { _id: 1, username: 1, email_canonical: 1, emails: 1 } }).fetchAsync()
-      : [];
-    const teacherById = new Map(teachers.map((teacher: any) => [String(teacher._id), deps.getUserDisplayIdentifier(teacher)]));
-    const toSnapshotCourse = (course: any, membership: LearnerCourseSnapshotCourse['membership']): LearnerCourseSnapshotCourse => ({
-      courseId: String(course._id),
-      courseName: String(course.courseName || ''),
-      visibility: normalizeCourseVisibility(course.visibility),
-      beginDate: parseNullablePersistedDate(course.beginDate),
-      endDate: parseNullablePersistedDate(course.endDate),
-      timezone: normalizeTimezone(course.timezone, true),
-      teacherUserId: String(course.teacherUserId || ''),
-      teacherDisplayName: teacherById.get(String(course.teacherUserId || '')) || String(course.teacherUserId || ''),
-      membership,
-      assignments: (assignmentsByCourseId.get(String(course._id)) || [])
-        .sort((a, b) => a.order - b.order || a.title.localeCompare(b.title)),
-    });
-    const assignedCourses: LearnerCourseSnapshotCourse[] = [];
-    const publicCourses: LearnerCourseSnapshotCourse[] = [];
-    for (const course of visibleCourses) {
-      const courseId = String(course._id);
-      const isTeacherCourse = String(course.teacherUserId || '') === userId;
-      if (enrolledCourseIds.includes(courseId) || isTeacherCourse || roleFlags.admin) {
-        assignedCourses.push(toSnapshotCourse(course, roleFlags.admin ? 'admin' : isTeacherCourse ? 'teacher' : 'assigned'));
-      } else if (normalizeCourseVisibility(course.visibility) === 'public') {
-        publicCourses.push(toSnapshotCourse(course, 'public'));
-      }
-    }
-    const snapshot: LearnerCoursesSnapshot = {
-      version: COURSE_SNAPSHOT_VERSION,
-      userId,
-      generatedAt: Date.now(),
-      assignedCourses: assignedCourses.sort((a, b) => a.courseName.localeCompare(b.courseName)),
-      publicCourses: publicCourses.sort((a, b) => a.courseName.localeCompare(b.courseName)),
-      invalidatedAt: null,
-      source: 'rebuilt',
-    };
-    await CourseLearnerSnapshotCache.updateAsync(
-      { userId, version: COURSE_SNAPSHOT_VERSION },
-      {
-        $set: {
-          userId,
-          version: COURSE_SNAPSHOT_VERSION,
-          generatedAt: new Date(snapshot.generatedAt),
-          invalidatedAt: null,
-          assignedCourseIds: snapshot.assignedCourses.map((course) => course.courseId),
-          publicCourseIds: snapshot.publicCourses.map((course) => course.courseId),
-          assignmentIds: [...new Set([...snapshot.assignedCourses, ...snapshot.publicCourses].flatMap((course) => course.assignments.map((assignment) => assignment.assignmentId)))],
-          tdfIds: [...new Set([...snapshot.assignedCourses, ...snapshot.publicCourses].flatMap((course) => course.assignments.map((assignment) => assignment.TDFId)))],
-          snapshot,
-          rebuildReason: reason,
-        },
-      },
-      { upsert: true }
-    );
-    return snapshot;
-  }
-
   async function getLearnerCoursesSnapshot(this: MethodContext): Promise<LearnerCoursesSnapshot> {
     const userId = requireAuthenticatedUser(this.userId, 'Must be logged in', 401);
-    const { CourseLearnerSnapshotCache } = requireCourseSnapshotDeps();
-    const existing = await CourseLearnerSnapshotCache.findOneAsync({ userId, version: COURSE_SNAPSHOT_VERSION });
-    if (existing?.snapshot && existing.invalidatedAt === null && existing.version === COURSE_SNAPSHOT_VERSION) {
-      return {
-        ...(existing.snapshot as LearnerCoursesSnapshot),
-        source: 'cache',
-        invalidatedAt: null,
-      };
-    }
-    const reason = existing ? (existing.version !== COURSE_SNAPSHOT_VERSION ? 'version' : 'invalidated') : 'missing';
-    return await rebuildLearnerCoursesSnapshot(userId, reason);
+    return await getCourseSnapshotCache().ensureLearnerCoursesSnapshot(userId);
   }
 
   async function getTdfsAssignedToStudent(this: MethodContext, userId: string, curSectionId: string) {
@@ -1443,6 +1299,7 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     invalidateCourseSnapshotForUser,
     invalidateCourseSnapshotsForCourse,
     invalidateCourseSnapshotsForAssignment,
+    refreshCourseSnapshotAfterPractice,
     getTdfsAssignedToStudent,
     getTdfNamesAssignedByInstructor,
     getTdfNamesByOwnerId,

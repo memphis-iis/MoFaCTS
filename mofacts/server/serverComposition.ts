@@ -318,18 +318,19 @@ const courseMethods = createCourseMethods({
   normalizeCanonicalId,
 });
 
-  const {
-    resolveAssignedRootTdfIdsForUser: resolveAssignedRootTdfIdsForUserMethod,
-    invalidateCourseSnapshotForUser: invalidateCourseSnapshotForUserMethod,
-    invalidateCourseSnapshotsForCourse: _invalidateCourseSnapshotsForCourse,
-    invalidateCourseSnapshotsForAssignment: _invalidateCourseSnapshotsForAssignment,
-    getTdfNamesByOwnerId: getTdfNamesByOwnerIdMethod,
+const {
+  resolveAssignedRootTdfIdsForUser: resolveAssignedRootTdfIdsForUserMethod,
+  invalidateCourseSnapshotForUser: _invalidateCourseSnapshotForUser,
+  invalidateCourseSnapshotsForCourse: _invalidateCourseSnapshotsForCourse,
+  invalidateCourseSnapshotsForAssignment: _invalidateCourseSnapshotsForAssignment,
+  refreshCourseSnapshotAfterPractice: refreshCourseSnapshotAfterPracticeMethod,
+  getTdfNamesByOwnerId: getTdfNamesByOwnerIdMethod,
   getSourceSentences: _getSourceSentences,
   checkForTDFData: _checkForTDFData,
   ...publicCourseMethods
 } = courseMethods as Record<string, unknown>;
 const resolveAssignedRootTdfIdsForUser = resolveAssignedRootTdfIdsForUserMethod as (userId: string) => Promise<string[]>;
-const invalidateCourseSnapshotForUser = invalidateCourseSnapshotForUserMethod as (userId: string, reason: string) => Promise<void>;
+const refreshCourseSnapshotAfterPractice = refreshCourseSnapshotAfterPracticeMethod as (userId: string, TDFId: string) => Promise<void>;
 const getTdfNamesByOwnerId = getTdfNamesByOwnerIdMethod as (ownerId: string) => Promise<string[] | null>;
 
 const tdfLookupHelpers = createTdfLookupHelpers({
@@ -485,7 +486,7 @@ const analyticsMethods = createAnalyticsMethods({
     }
     await updateDashboardCacheForTdf.call(context, tdfId);
     if (historyRecord?.userId) {
-      await invalidateCourseSnapshotForUser(String(historyRecord.userId), 'progress-updated');
+      await refreshCourseSnapshotAfterPractice(String(historyRecord.userId), tdfId);
     }
   },
 });

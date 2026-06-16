@@ -19,10 +19,23 @@ type CoursesTemplateInstance = Blaze.TemplateInstance & {
   sort: ReactiveVar<string>;
 };
 
-function formatDate(value: unknown) {
+function formatDate(value: unknown, timezone?: string | null) {
   if (!value) return '';
   const date = new Date(value as string | number | Date);
-  return Number.isFinite(date.getTime()) ? date.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '';
+  if (!Number.isFinite(date.getTime())) return '';
+  return date.toLocaleString([], {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    ...(timezone ? { timeZone: timezone } : {}),
+  });
+}
+
+function parentCourseContext(): LearnerCourseSnapshotCourse | null {
+  return (Template.parentData(1) as LearnerCourseSnapshotCourse | undefined) || null;
+}
+
+function formatDateForCourse(value: unknown) {
+  return formatDate(value, parentCourseContext()?.timezone);
 }
 
 function flattenCourses(snapshot: LearnerCoursesSnapshot | null, section: 'assignedCourses' | 'publicCourses', instance: CoursesTemplateInstance) {
@@ -113,6 +126,26 @@ Template.courseSnapshotCourse.helpers({
     const membership = (this as LearnerCourseSnapshotCourse).membership;
     return membership === 'assigned' ? 'Assigned' : membership === 'public' ? 'Public' : membership === 'teacher' ? 'Teacher' : 'Admin';
   },
+  courseScheduleLabel() {
+    const course = this as LearnerCourseSnapshotCourse;
+    const begin = formatDate(course.beginDate, course.timezone);
+    const end = formatDate(course.endDate, course.timezone);
+    if (begin && end) return `${begin} to ${end}`;
+    if (begin) return `Starts ${begin}`;
+    if (end) return `Ends ${end}`;
+    return 'Always available';
+  },
+  timezoneLabel() {
+    return (this as LearnerCourseSnapshotCourse).timezone;
+  },
+  courseLastPracticeLabel() {
+    const course = this as LearnerCourseSnapshotCourse;
+    const latest = (course.assignments || [])
+      .map((assignment) => Number(assignment.progress?.lastPracticedTimestamp || 0))
+      .filter((timestamp) => Number.isFinite(timestamp) && timestamp > 0)
+      .sort((a, b) => b - a)[0];
+    return latest ? `Last practiced ${formatDate(latest, course.timezone)}` : 'No practice yet';
+  },
   isLocked() {
     return (this as LearnerCourseSnapshotAssignment).availability === 'scheduled';
   },
@@ -121,15 +154,15 @@ Template.courseSnapshotCourse.helpers({
   },
   releaseLabel() {
     const assignment = this as LearnerCourseSnapshotAssignment;
-    return assignment.releaseAt ? `Visible ${formatDate(assignment.releaseAt)}` : 'Visible now';
+    return assignment.releaseAt ? `Visible ${formatDateForCourse(assignment.releaseAt)}` : 'Visible now';
   },
   dueLabel() {
     const dueAt = (this as LearnerCourseSnapshotAssignment).dueAt;
     if (!dueAt) return 'No due date';
     const dueTime = new Date(dueAt).getTime();
     const now = Date.now();
-    if (dueTime < now) return `Overdue ${formatDate(dueAt)}`;
-    return `Due ${formatDate(dueAt)}`;
+    if (dueTime < now) return `Overdue ${formatDateForCourse(dueAt)}`;
+    return `Due ${formatDateForCourse(dueAt)}`;
   },
   attemptsLabel() {
     return `${(this as LearnerCourseSnapshotAssignment).progress?.attempts || 0} trials`;
@@ -150,7 +183,7 @@ Template.courseSnapshotCourse.helpers({
   },
   lastPracticeLabel() {
     const lastPracticed = (this as LearnerCourseSnapshotAssignment).progress?.lastPracticed;
-    return lastPracticed ? `Last ${formatDate(lastPracticed)}` : 'Not practiced';
+    return lastPracticed ? `Last ${formatDateForCourse(lastPracticed)}` : 'Not practiced';
   },
   actionLabel() {
     return (this as LearnerCourseSnapshotAssignment).isUsed ? 'Continue' : 'Start';
