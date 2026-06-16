@@ -33,10 +33,35 @@
                 <label for="newClassName" class="form-label">Class name</label>
                 <input class="form-control" type="text" placeholder="Enter classname here" id="newClassName" />
               </div>
+              <div class="col-md-4 col-12">
+                <label for="courseVisibility" class="form-label">Visibility</label>
+                <select id="courseVisibility" class="form-select">
+                  <option value="private" selected>Private</option>
+                  <option value="public">Public</option>
+                </select>
+                <div class="form-text">Private courses are visible to enrolled students; public courses are browsable by signed-in learners.</div>
+              </div>
+              <div class="col-md-4 col-12">
+                <label for="courseBeginDate" class="form-label">Begin date</label>
+                <input class="form-control" type="datetime-local" id="courseBeginDate" />
+              </div>
+              <div class="col-md-4 col-12">
+                <label for="courseEndDate" class="form-label">End date</label>
+                <input class="form-control" type="datetime-local" id="courseEndDate" />
+              </div>
+              <div class="col-12">
+                <label for="courseTimezone" class="form-label">Course timezone</label>
+                <input class="form-control" type="text" id="courseTimezone" placeholder="America/Chicago" />
+              </div>
               <div class="col-12">
                 <label for="sectionNames" class="form-label">Section names (one per line)</label>
                 <textarea class="form-control" rows="15" id="sectionNames" placeholder="Enter section names here"></textarea>
               </div>
+              {{#if classEditError}}
+                <div class="col-12">
+                  <div class="alert alert-danger" role="alert">{{classEditError}}</div>
+                </div>
+              {{/if}}
               <div class="col-12 text-center">
                 <button type='button' id='saveClass' class='btn btn-primary'>
                   <i class="fa fa-save"></i> Save Class

@@ -12,6 +12,7 @@ declare const Tdfs: any;
 const _state = new ReactiveDict('instructorReportingState');
 
 let curTdf = INVALID;
+let curAssignmentId: string | null = null;
 
 async function updateTables(_tdfId: string | number, date?: number | false){
   const dateInt = date || false;
@@ -46,6 +47,7 @@ Template.instructorReporting.events({
     Session.set('curInstructorReportingTdfs', curClassTdfs);
 
     curTdf = INVALID;
+    curAssignmentId = null;
     $('#tdf-select').val(INVALID);
     $('#tdf-select').prop('disabled', false);
     $('#practice-deadline-date').prop('disabled', true);
@@ -55,12 +57,17 @@ Template.instructorReporting.events({
   'change #tdf-select': async function(event: Event) {
     curTdf = $(event.currentTarget).val();
     _state.set('currentTdf', curTdf);
+    const curClassId = Session.get('curClass')?._id;
+    const assignmentRows = curClassId ? (Session.get('instructorReportingTdfs')?.[curClassId] || []) : [];
+    const selectedAssignment = assignmentRows.find((row: any) => String(row?.TDFId || '') === String(curTdf));
+    curAssignmentId = selectedAssignment?.assignmentId || null;
     
     updateTables(curTdf);
     if (Session.get('curClass')) {
       const tdfData = Session.get('allTdfs').find((x: any) => x._id == curTdf);
+      const assignmentDueDate = selectedAssignment?.dueAt;
       const tdfDate = tdfData.content.tdfs.tutor.setspec.duedate;
-      Session.set('selectedTdfDueDate', tdfDate);
+      Session.set('selectedTdfDueDate', assignmentDueDate || tdfDate);
       
     } else {
       Session.set('selectedTdfDueDate', undefined);
@@ -106,7 +113,7 @@ Template.instructorReporting.events({
     curTdf = (_state.get('currentTdf') as string);
     const classId = Session.get('curClass')._id;
     
-    await meteorCallAsync('addUserDueDateException', userId, curTdf, classId, dateInt);
+    await meteorCallAsync('addUserDueDateException', userId, curTdf, classId, dateInt, curAssignmentId);
     alert('Exception added');
     date = String(Session.get('selectedTdfDueDate') || '');
     dateInt = new Date(date).getTime();
@@ -118,7 +125,7 @@ Template.instructorReporting.events({
     curTdf = (_state.get('currentTdf') as string);
     const classId = Session.get('curClass')._id;
     
-    await meteorCallAsync('removeUserDueDateException', userId, curTdf, classId);
+    await meteorCallAsync('removeUserDueDateException', userId, curTdf, classId, curAssignmentId);
     alert('Exception removed');
     const date = String(Session.get('selectedTdfDueDate') || '');
     const dateInt = new Date(date).getTime();

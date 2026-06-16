@@ -1,0 +1,104 @@
+<template name="courses">
+  <div class="courses-page practice-menu-container">
+    <section class="table-card">
+      <div class="table-toolbar">
+        <div class="toolbar-search">
+          <span class="fa fa-search" aria-hidden="true"></span>
+          <input id="coursesSearch" type="text" placeholder="Search courses and assignments..." disabled="{{#if isLoading}}disabled{{/if}}">
+        </div>
+        <div class="toolbar-filters">
+          <select id="coursesSort" class="form-select form-select-sm">
+            <option value="course">Course</option>
+            <option value="due">Due date</option>
+            <option value="recent">Last practice</option>
+          </select>
+        </div>
+      </div>
+
+      {{#if errorMessage}}
+        <div class="alert alert-danger" role="alert">{{errorMessage}}</div>
+      {{/if}}
+
+      {{#if isLoading}}
+        <div class="learning-dashboard-loading-preview" aria-hidden="true">
+          <div class="learning-dashboard-loading-section">
+            <div class="learning-dashboard-loading-heading">
+              <span class="learning-dashboard-skeleton learning-dashboard-skeleton--heading"></span>
+            </div>
+            {{#each loadingRows}}
+              <div class="learning-dashboard-loading-row">
+                <span class="learning-dashboard-skeleton learning-dashboard-skeleton--button"></span>
+                <span class="learning-dashboard-skeleton learning-dashboard-skeleton--title"></span>
+                <span class="learning-dashboard-skeleton learning-dashboard-skeleton--short"></span>
+                <span class="learning-dashboard-skeleton learning-dashboard-skeleton--meter"></span>
+              </div>
+            {{/each}}
+          </div>
+        </div>
+      {{else}}
+        {{#if hasAssignedCourses}}
+          <div class="practice-section">
+            <div class="practice-section-heading">Assigned courses</div>
+            {{#each assignedCourses}}
+              {{> courseSnapshotCourse}}
+            {{/each}}
+          </div>
+        {{/if}}
+
+        <div class="practice-section">
+          <div class="practice-section-heading">Public courses</div>
+          {{#if hasPublicCourses}}
+            {{#each publicCourses}}
+              {{> courseSnapshotCourse}}
+            {{/each}}
+          {{else}}
+            <div class="practice-empty-state">
+              <p class="learning-dashboard-flush">No public courses are available.</p>
+            </div>
+          {{/if}}
+        </div>
+      {{/if}}
+    </section>
+  </div>
+</template>
+
+<template name="courseSnapshotCourse">
+  <article class="course-band">
+    <header class="course-band-header">
+      <div>
+        <h2>{{courseName}}</h2>
+        <div class="course-band-meta">{{teacherDisplayName}} · {{assignmentCount}} assignments</div>
+      </div>
+      <span class="badge bg-secondary">{{membershipLabel}}</span>
+    </header>
+    <div class="course-assignment-list">
+      {{#each assignments}}
+        <div class="course-assignment-row {{#if isLocked}}course-assignment-row--locked{{/if}}">
+          <div class="course-assignment-main">
+            <div class="course-assignment-title">{{title}}</div>
+            <div class="course-assignment-meta">
+              <span>{{requiredLabel}}</span>
+              <span>{{releaseLabel}}</span>
+              <span>{{dueLabel}}</span>
+            </div>
+          </div>
+          <div class="course-assignment-stats">
+            <span>{{attemptsLabel}}</span>
+            <span>{{accuracyLabel}}</span>
+            <span>{{itemsLabel}}</span>
+            <span>{{sessionDaysLabel}}</span>
+            <span>{{timeLabel}}</span>
+            <span>{{lastPracticeLabel}}</span>
+          </div>
+          <button type="button" class="btn btn-sm {{#if isLocked}}btn-outline-secondary{{else}}{{actionButtonClass}}{{/if}} launch-course-assignment"
+            data-assignmentid="{{assignmentId}}"
+            data-courseid="{{courseId}}"
+            data-tdfid="{{TDFId}}"
+            disabled="{{#if isLocked}}disabled{{/if}}">
+            {{actionLabel}}
+          </button>
+        </div>
+      {{/each}}
+    </div>
+  </article>
+</template>

@@ -7,3 +7,114 @@
 .pad-top{
   padding-top: var(--app-space-5);
 }
+
+.assignment-picker-list,
+.assignment-row-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-space-2);
+  max-height: 560px;
+  overflow: auto;
+  padding-block: var(--app-space-2);
+}
+
+.assignment-picker-row {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  border: 1px solid var(--app-border-color);
+  border-radius: var(--app-radius-sm);
+  background: var(--app-surface-color);
+  color: var(--app-text-color);
+  padding: var(--app-space-2) var(--app-space-3);
+  text-align: left;
+}
+
+.assignment-picker-row:hover,
+.assignment-picker-row:focus-visible {
+  border-color: var(--app-accent-color);
+  background: color-mix(in srgb, var(--app-accent-color) 8%, var(--app-surface-color));
+}
+
+.assignment-picker-title,
+.assignment-row-title {
+  font-weight: 600;
+}
+
+.assignment-picker-meta,
+.assignment-row-meta {
+  color: var(--app-muted-text-color);
+  font-size: var(--app-font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+.assignment-editor-header,
+.assignment-save-bar {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--app-space-3);
+}
+
+.assignment-save-bar {
+  justify-content: flex-end;
+}
+
+.assignment-editor-row {
+  align-items: start;
+  border: 1px solid var(--app-border-color);
+  border-radius: var(--app-radius-sm);
+  display: grid;
+  gap: var(--app-space-3);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: var(--app-space-3);
+}
+
+.assignment-row-order {
+  display: flex;
+  gap: var(--app-space-1);
+}
+
+.assignment-row-main {
+  min-width: 0;
+}
+
+.assignment-row-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--app-space-3);
+  margin-top: var(--app-space-2);
+}
+
+.assignment-date-control {
+  display: grid;
+  gap: var(--app-space-1);
+  min-width: 190px;
+}
+
+.assignment-required-wrap {
+  align-items: center;
+  display: flex;
+  min-width: 120px;
+}
+
+.assignment-editor-empty {
+  border: 1px dashed var(--app-border-color);
+  border-radius: var(--app-radius-sm);
+  padding: var(--app-space-4);
+  text-align: center;
+}
+
+@media (max-width: 720px) {
+  .assignment-editor-row {
+    grid-template-columns: 1fr;
+  }
+
+  .assignment-row-order {
+    order: 2;
+  }
+
+  .assignment-date-control {
+    min-width: 100%;
+  }
+}

@@ -2,12 +2,14 @@ export { getCourse, getHistory };
 
 function getCourse(course: any) {
   return {
-    courseId: course.courseid,
-    courseName: course.coursename,
-    teacherUserId: course.teacheruserid,
+    courseId: course.courseId ?? course._id ?? course.courseid,
+    courseName: course.courseName ?? course.coursename,
+    teacherUserId: course.teacherUserId ?? course.teacheruserid,
     semester: course.semester,
-    beginDate: course.begindate,
-    endDate: course.enddate,
+    beginDate: course.beginDate ?? course.begindate ?? null,
+    endDate: course.endDate ?? course.enddate ?? null,
+    timezone: course.timezone,
+    visibility: course.visibility,
   };
 }
 

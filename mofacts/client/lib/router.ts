@@ -176,6 +176,7 @@ function routeDeniedUserToEntryPoint(): void {
 const lazyTemplateLoaders: Record<string, any> = {
   card: () => import('../views/experiment/card'),
   classSelection: () => import('../views/home/classSelection'),
+  courses: () => import('../views/home/courses'),
   adminControls: () => import('../views/adminControls'),
   adminBackups: () => import('../views/adminBackups'),
   audioSettings: () => import('../views/audioSettings'),
@@ -748,6 +749,16 @@ FlowRouter.route('/help', {
   action: async function() {
     Session.set('curModule', 'help');
     await renderRouteTemplate(this, 'help');
+  }
+})
+
+FlowRouter.route('/courses', {
+  name: 'client.courses',
+  action: function() {
+    waitForAuthenticatedRoute(this, 'client.courses', async () => {
+      Session.set('curModule', 'courses');
+      await renderRouteTemplate(this, 'courses');
+    }, getRouteAccessPolicy('client.courses'));
   }
 })
 

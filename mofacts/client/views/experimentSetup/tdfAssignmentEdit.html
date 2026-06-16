@@ -1,55 +1,106 @@
 <template name="tdfAssignmentEdit">
 {{#if isInRole 'admin, teacher'}}
   <div class="container admin-page">
-    <h3 class="page-header-title">Chapter Assignments</h3>
+    <h3 class="page-header-title">Course Assignments</h3>
 
-    <!-- Add/Edit Assignments Section -->
     <div class="admin-section">
       <div class="card admin-card">
         <div class="card-body">
           <div class="admin-section-heading">
-            <i class="fa fa-book admin-section-icon"></i>
-            <h5>Add/Edit Assignments</h5>
+            <i class="fa fa-tasks admin-section-icon"></i>
+            <h5>Assignment Metadata</h5>
           </div>
+
           <div class="row g-3">
             <div class="col-12">
-              <label for="class-select" class="form-label">Select a class</label>
+              <label for="class-select" class="form-label">Course</label>
               <select id="class-select" class="form-select">
-                <option selected="selected" value="invalid" disabled="true">Select a class</option>
+                <option selected="selected" value="" disabled="true">Select a course</option>
                 {{#each courses}}
                   <option value="{{this._id}}">{{this.courseName}}</option>
                 {{/each}}
               </select>
             </div>
-            <div class="col-lg-6 col-12">
-              <label class="form-label fw-bold">Available Chapters</label>
-              <select size="20" class="form-select" id="notSelectedTdfs" multiple>
-                {{#each tdfsNotSelected}}
-                  <option value="{{this.fileName}}">{{this.displayName}} ({{this.fileName}})</option>
+
+            {{#if editorError}}
+              <div class="col-12">
+                <div class="alert alert-danger" role="alert">{{editorError}}</div>
+              </div>
+            {{/if}}
+
+            <div class="col-lg-4 col-12">
+              <label for="assignmentSearch" class="form-label fw-bold">Add lesson</label>
+              <input id="assignmentSearch" class="form-control" type="search" placeholder="Search lessons, files, tags">
+              <div class="assignment-picker-list">
+                {{#each filteredAssignableTdfs}}
+                  <button type="button" class="assignment-picker-row add-assignment" data-tdfid="{{this.TDFId}}">
+                    <span class="assignment-picker-title">{{this.displayName}}</span>
+                    <span class="assignment-picker-meta">{{this.fileName}}</span>
+                  </button>
                 {{/each}}
-              </select>
-              <div class="text-center admin-compact-action-row">
-                <a id="selectTdf" class="btn btn-outline-primary btn-sm">
-                  <i class="fa fa-arrow-right"></i> Add Selected Chapters
-                </a>
               </div>
             </div>
-            <div class="col-lg-6 col-12">
-              <label class="form-label fw-bold">Selected Chapters</label>
-              <select size="20" class="form-select" id="selectedTdfs" multiple>
-                {{#each tdfsSelected}}
-                  <option value="{{this.fileName}}">{{this.displayName}} ({{this.fileName}})</option>
-                {{/each}}
-              </select>
-              <div class="text-center admin-compact-action-row">
-                <a id="unselectTdf" class="btn btn-outline-danger btn-sm">
-                  <i class="fa fa-arrow-left"></i> Remove Selected Chapters
-                </a>
+
+            <div class="col-lg-8 col-12">
+              <div class="assignment-editor-header">
+                <span class="fw-bold">Selected assignments</span>
+                <span class="text-muted">{{#if isDirty}}Unsaved changes{{else}}Saved{{/if}}</span>
               </div>
+
+              {{#if isLoading}}
+                <div class="text-muted assignment-editor-empty">Loading assignments...</div>
+              {{else}}
+                {{#if hasAssignmentRows}}
+                  <div class="assignment-row-list">
+                    {{#each assignmentRows}}
+                      <div class="assignment-editor-row" data-assignment-index="{{@index}}">
+                        <div class="assignment-row-order">
+                          <span class="fa fa-bars" title="Drag handle" aria-hidden="true"></span>
+                          <button type="button" class="btn btn-sm btn-outline-secondary move-assignment-up" title="Move up">
+                            <span class="fa fa-arrow-up" aria-hidden="true"></span>
+                          </button>
+                          <button type="button" class="btn btn-sm btn-outline-secondary move-assignment-down" title="Move down">
+                            <span class="fa fa-arrow-down" aria-hidden="true"></span>
+                          </button>
+                        </div>
+                        <div class="assignment-row-main">
+                          <div class="assignment-row-title">{{this.title}}</div>
+                          <div class="assignment-row-meta">{{this.fileName}}</div>
+                          <div class="assignment-row-controls">
+                            <label class="form-check form-switch assignment-required-wrap">
+                              <input class="form-check-input assignment-required" type="checkbox" checked="{{isRequiredChecked}}">
+                              <span class="form-check-label">Required</span>
+                            </label>
+                            <label class="assignment-date-control">
+                              <span>Visible on</span>
+                              <input class="form-control form-control-sm assignment-release" type="datetime-local" value="{{releaseInputValue}}">
+                              <button type="button" class="btn btn-sm btn-link clear-release">Clear</button>
+                            </label>
+                            <label class="assignment-date-control">
+                              <span>Due on</span>
+                              <input class="form-control form-control-sm assignment-due" type="datetime-local" value="{{dueInputValue}}">
+                              <button type="button" class="btn btn-sm btn-link clear-due">Clear</button>
+                            </label>
+                          </div>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-danger remove-assignment" title="Remove">
+                          <span class="fa fa-trash" aria-hidden="true"></span>
+                        </button>
+                      </div>
+                    {{/each}}
+                  </div>
+                {{else}}
+                  <div class="text-muted assignment-editor-empty">No assignments selected.</div>
+                {{/if}}
+              {{/if}}
             </div>
-            <div class="col-12 text-center admin-action-row">
-              <button id="saveAssignment" class="btn btn-primary">
-                <i class="fa fa-save"></i> Save Assignment
+
+            <div class="col-12 assignment-save-bar">
+              <button id="reloadAssignments" type="button" class="btn btn-outline-secondary">
+                <i class="fa fa-refresh"></i> Reset
+              </button>
+              <button id="saveAssignment" type="button" class="btn btn-primary" disabled="{{#if isLoading}}disabled{{/if}}">
+                <i class="fa fa-save"></i> Save Assignments
               </button>
             </div>
           </div>

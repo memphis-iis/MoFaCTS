@@ -42,6 +42,9 @@ type AnalyticsMethodsDeps = {
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
     updateAsync: (selector: UnknownRecord, modifier: UnknownRecord) => Promise<unknown>;
   };
+  Assignments: {
+    findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
+  };
   Courses: {
     find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]> };
   };
@@ -73,7 +76,8 @@ type AnalyticsMethodsDeps = {
     classId: string,
     tdfId: string,
     date: number | false,
-    deps: any
+    deps: any,
+    assignmentContext?: { assignmentId?: string | null; dueAt?: Date | number | string | null }
   ) => Promise<unknown>;
   getStimuliSetById: (stimuliSetId: string | number) => Promise<Array<{ clusterKC?: string | number; stimulusKC?: string | number }>>;
   hasMeaningfulProgressSignal: (experimentState: unknown) => boolean;
@@ -108,6 +112,31 @@ function buildLearningHistoryScopeMatch(
 }
 
 export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
+  async function validateCourseAssignmentHistoryContext(historyRecord: UnknownRecord, tdfId: string) {
+    const context = historyRecord.courseAssignment;
+    if (context === undefined || context === null) return;
+    if (!context || typeof context !== 'object' || Array.isArray(context)) {
+      throw new Meteor.Error(400, 'Course assignment history context must be an object');
+    }
+    const record = context as UnknownRecord;
+    const assignmentId = deps.normalizeCanonicalId(record.assignmentId);
+    const courseId = deps.normalizeCanonicalId(record.courseId);
+    const contextTdfId = deps.normalizeCanonicalId(record.TDFId);
+    if (record.launchSource !== 'courses' || !assignmentId || !courseId || !contextTdfId) {
+      throw new Meteor.Error(400, 'Course assignment history context is incomplete');
+    }
+    if (contextTdfId !== tdfId) {
+      throw new Meteor.Error(400, 'Course assignment history TDFId does not match launched TDFId');
+    }
+    const assignment = await deps.Assignments.findOneAsync(
+      { _id: assignmentId, courseId, TDFId: contextTdfId },
+      { fields: { _id: 1 } }
+    );
+    if (!assignment) {
+      throw new Meteor.Error(400, 'Course assignment history context does not match an assignment');
+    }
+  }
+
   const validatedExperimentAccessCache = new Map<string, number>();
   const assignedConditionAccessCache = new Map<string, { cachedAt: number; rootTdfId: string; experimentState: UnknownRecord }>();
   const EXPERIMENT_ACCESS_CACHE_TTL = 5 * 60 * 1000;
@@ -402,6 +431,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     } catch (error: unknown) {
       throw new Meteor.Error(400, error instanceof Error ? error.message : String(error));
     }
+    await validateCourseAssignmentHistoryContext(decompressedRecord, tdfId);
     const sanitizeMs = elapsedMsSince(sanitizeStartTime);
 
     const authorizationStartTime = Date.now();
@@ -717,6 +747,10 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       forbiddenMessage: 'Can only access performance for your own course',
       forbiddenCode: 403,
     });
+    const assignment = await deps.Assignments.findOneAsync(
+      { courseId: classId, TDFId: tdfId },
+      { fields: { _id: 1, dueAt: 1 } }
+    );
     return deps.getClassPerformanceByTdfWorkflow(classId, tdfId, date, {
       serverConsole: deps.serverConsole,
       Sections: deps.Sections,
@@ -726,7 +760,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
         { _id: { $in: userIds } },
         { fields: { _id: 1, username: 1, dueDateExceptions: 1 } }
       ).fetchAsync(),
-    });
+    }, assignment ? { assignmentId: String(assignment._id || ''), dueAt: assignment.dueAt ?? null } : undefined);
   }
 
   async function getStimSetFromLearningSessionByClusterList(stimuliSetId: string | number, clusterList: Array<string | number>) {

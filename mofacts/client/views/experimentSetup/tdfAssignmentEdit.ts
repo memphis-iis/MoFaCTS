@@ -1,158 +1,267 @@
 import { Meteor } from 'meteor/meteor';
 import { Template } from 'meteor/templating';
 import { Session } from 'meteor/session';
-import { Tracker } from 'meteor/tracker';
 import './tdfAssignmentEdit.html';
 import { meteorCallAsync } from '../..';
+import type {
+  CourseAssignmentEditorSnapshot,
+  CourseAssignmentSummary,
+  SaveCourseAssignmentsInput,
+} from '../../../common/courseAssignments.contracts';
 declare const $: any;
 
+type AssignableTdf = CourseAssignmentEditorSnapshot['assignableTdfs'][number];
+type AssignmentEditorRow = CourseAssignmentSummary & {
+  fileName: string;
+  tags: string[];
+};
+
 Session.set('courses', []);
-Session.set('assignments', []);
-Session.set('allTdfFilenamesAndDisplayNames', []);
-Session.set('tdfsSelected', []);
-Session.set('tdfsNotSelected', []);
+Session.set('courseAssignmentRows', []);
+Session.set('courseAssignableTdfs', []);
+Session.set('courseAssignmentSearch', '');
+Session.set('courseAssignmentLoading', false);
+Session.set('courseAssignmentDirty', false);
+Session.set('courseAssignmentError', null);
+Session.set('courseAssignmentSelectedCourseId', '');
 
-type CourseAssignmentState = { courseName: string; courseId: string | undefined; tdfs: string[] };
-type TdfDisplay = { fileName: string; displayName: string };
-let curCourseAssignment: CourseAssignmentState = {courseName: '', courseId: undefined, tdfs: []};
+function toDatetimeLocalValue(value: unknown): string {
+  if (!value) return '';
+  const date = new Date(value as string | number | Date);
+  if (!Number.isFinite(date.getTime())) return '';
+  const pad = (num: number) => String(num).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
 
-Template.tdfAssignmentEdit.onCreated(function (this: any) {
-  this.autoruns = [];
-});
+function readRows(): AssignmentEditorRow[] {
+  return (Session.get('courseAssignmentRows') || []) as AssignmentEditorRow[];
+}
 
-Template.tdfAssignmentEdit.onRendered(async function (this: any) {
-  
+function writeRows(rows: AssignmentEditorRow[], dirty = true) {
+  Session.set('courseAssignmentRows', rows.map((row, order) => ({ ...row, order })));
+  Session.set('courseAssignmentDirty', dirty);
+}
 
-  // Parallelize all async calls for faster page load
-  const [courses, courseAssignments, accessableTDFS] = await Promise.all([
-    meteorCallAsync('getAllCoursesForInstructor', Meteor.userId()),
-    meteorCallAsync('getAllCourseAssignmentsForInstructor', Meteor.userId()),
-    meteorCallAsync('getAssignableTDFSForUser', Meteor.userId())
-  ]);
+function assignmentToRow(assignment: CourseAssignmentSummary, tdf: AssignableTdf | undefined): AssignmentEditorRow {
+  return {
+    ...assignment,
+    fileName: tdf?.fileName || '',
+    tags: tdf?.tags || [],
+    releaseAt: assignment.releaseAt ? new Date(assignment.releaseAt) : null,
+    dueAt: assignment.dueAt ? new Date(assignment.dueAt) : null,
+  };
+}
 
-  
-  Session.set('courses', courses);
-
-  // Process course assignments
-  const assignments: Record<string, Set<string> | string[]> = {};
-  for (const courseAssignment of courseAssignments as any[]) {
-    if (!assignments[courseAssignment.courseName]) assignments[courseAssignment.courseName] = new Set<string>();
-    (assignments[courseAssignment.courseName] as Set<string>).add(courseAssignment.fileName);
+async function loadCourseSnapshot(courseId: string) {
+  if (!courseId) return;
+  Session.set('courseAssignmentLoading', true);
+  Session.set('courseAssignmentError', null);
+  try {
+    const snapshot = await meteorCallAsync('getCourseAssignmentEditorSnapshot', courseId) as CourseAssignmentEditorSnapshot;
+    const tdfById = new Map(snapshot.assignableTdfs.map((tdf) => [tdf.TDFId, tdf]));
+    Session.set('courseAssignableTdfs', snapshot.assignableTdfs);
+    Session.set('courseAssignmentSelectedCourseId', courseId);
+    writeRows(snapshot.assignments.map((assignment) => assignmentToRow(assignment, tdfById.get(assignment.TDFId))), false);
+  } catch (error: any) {
+    Session.set('courseAssignmentError', error?.reason || error?.message || String(error));
+  } finally {
+    Session.set('courseAssignmentLoading', false);
   }
-  for (const assignmentKey of Object.keys(assignments)) {
-    assignments[assignmentKey] = Array.from(assignments[assignmentKey] as Set<string>);
+}
+
+function rowIndexFromEvent(event: Event) {
+  return Number($(event.currentTarget).closest('[data-assignment-index]').data('assignment-index'));
+}
+
+function setRowDate(index: number, field: 'releaseAt' | 'dueAt', value: string | null) {
+  const rows = readRows();
+  const row = rows[index];
+  if (!row) return;
+  rows[index] = { ...row, [field]: value || null };
+  writeRows(rows);
+}
+
+function validateRows(rows: AssignmentEditorRow[]) {
+  const seen = new Set<string>();
+  for (const row of rows) {
+    if (seen.has(row.TDFId)) {
+      return `Duplicate lesson selected: ${row.title}`;
+    }
+    seen.add(row.TDFId);
+    const releaseTime = row.releaseAt ? new Date(row.releaseAt).getTime() : null;
+    const dueTime = row.dueAt ? new Date(row.dueAt).getTime() : null;
+    if (releaseTime !== null && !Number.isFinite(releaseTime)) return `Invalid visible date for ${row.title}`;
+    if (dueTime !== null && !Number.isFinite(dueTime)) return `Invalid due date for ${row.title}`;
+    if (releaseTime !== null && dueTime !== null && dueTime < releaseTime) {
+      return `Due date must be after visible date for ${row.title}`;
+    }
   }
-  Session.set('assignments', assignments);
-  
-  curCourseAssignment = {courseName: '', courseId: undefined, tdfs: []};
+  return null;
+}
 
-  // Process accessible TDFs
-  const allTdfObjects = (accessableTDFS as any[]).map((tdf) => tdf.content);
-  if (!Session.get('allTdfs')) Session.set('allTdfs', allTdfObjects);
-  const allTdfDisplays: TdfDisplay[] = [];
-  for (const i in allTdfObjects) {
-    const tdf = allTdfObjects[i];
-    allTdfDisplays.push({fileName: tdf.fileName, displayName: tdf.tdfs.tutor.setspec.lessonname});
+Template.tdfAssignmentEdit.onRendered(async function() {
+  Session.set('courseAssignmentError', null);
+  Session.set('courseAssignmentLoading', true);
+  try {
+    const courses = await meteorCallAsync('getAllCoursesForInstructor', Meteor.userId());
+    Session.set('courses', courses);
+  } catch (error: any) {
+    Session.set('courseAssignmentError', error?.reason || error?.message || String(error));
+  } finally {
+    Session.set('courseAssignmentLoading', false);
   }
-  
-  Session.set('allTdfFilenamesAndDisplayNames', allTdfDisplays);
-
-  const autorun = Tracker.autorun(updateTdfsSelectedAndNotSelected);
-  this.autoruns.push(autorun);
-});
-
-Template.tdfAssignmentEdit.onDestroyed(function (this: any) {
-  // Clean up autoruns
-  this.autoruns.forEach((ar: { stop(): void }) => ar.stop());
 });
 
 Template.tdfAssignmentEdit.helpers({
   courses: () => Session.get('courses'),
-  tdfsSelected: () => Session.get('tdfsSelected'),
-  tdfsNotSelected: () => Session.get('tdfsNotSelected'),
+  assignmentRows: () => readRows(),
+  hasAssignmentRows: () => readRows().length > 0,
+  isLoading: () => Session.get('courseAssignmentLoading'),
+  isDirty: () => Session.get('courseAssignmentDirty'),
+  editorError: () => Session.get('courseAssignmentError'),
+  filteredAssignableTdfs: () => {
+    const query = String(Session.get('courseAssignmentSearch') || '').toLowerCase();
+    const selected = new Set(readRows().map((row) => row.TDFId));
+    return ((Session.get('courseAssignableTdfs') || []) as AssignableTdf[])
+      .filter((tdf) => !selected.has(tdf.TDFId))
+      .filter((tdf) => {
+        const haystack = `${tdf.displayName} ${tdf.fileName} ${(tdf.tags || []).join(' ')}`.toLowerCase();
+        return !query || haystack.includes(query);
+      });
+  },
+  releaseInputValue() {
+    return toDatetimeLocalValue((this as AssignmentEditorRow).releaseAt);
+  },
+  dueInputValue() {
+    return toDatetimeLocalValue((this as AssignmentEditorRow).dueAt);
+  },
+  isRequiredChecked() {
+    return (this as AssignmentEditorRow).required ? 'checked' : '';
+  },
 });
 
 Template.tdfAssignmentEdit.events({
   'change #class-select': function(event: Event) {
-    
-    const curCourseId = String($(event.currentTarget).val() || '');
-    const curCourseName = $('#class-select option:selected').text();
-    const assignments = (Session.get('assignments') || {}) as Record<string, string[]>;
-    const tempTdfs = assignments[curCourseName] || [];
-    curCourseAssignment = {courseName: curCourseName, courseId: curCourseId, tdfs: tempTdfs};
-    
-    updateTdfsSelectedAndNotSelected();
+    const courseId = String($(event.currentTarget).val() || '');
+    void loadCourseSnapshot(courseId);
   },
 
-  'click #selectTdf': function() {
-    
-    const tdfsToBeSelected = getselectedItems('notSelectedTdfs').map((x) => x.fileName);
-    curCourseAssignment.tdfs = curCourseAssignment.tdfs.concat(tdfsToBeSelected);
-    
-    updateTdfsSelectedAndNotSelected();
+  'input #assignmentSearch': function(event: Event) {
+    Session.set('courseAssignmentSearch', String((event.currentTarget as HTMLInputElement).value || ''));
   },
 
-  'click #unselectTdf': function() {
-    
-    const tdfsToBeUnselected = getselectedItems('selectedTdfs').map((x) => x.fileName);
-    curCourseAssignment.tdfs = curCourseAssignment.tdfs.filter((x) => tdfsToBeUnselected.indexOf(x) == -1);
-    
-    updateTdfsSelectedAndNotSelected();
+  'click .add-assignment': function(event: Event) {
+    const TDFId = String($(event.currentTarget).data('tdfid') || '');
+    const tdf = ((Session.get('courseAssignableTdfs') || []) as AssignableTdf[]).find((item) => item.TDFId === TDFId);
+    if (!tdf) return;
+    const rows = readRows();
+    rows.push({
+      assignmentId: '',
+      courseId: String(Session.get('courseAssignmentSelectedCourseId') || ''),
+      TDFId,
+      title: tdf.displayName,
+      fileName: tdf.fileName,
+      tags: tdf.tags || [],
+      order: rows.length,
+      releaseAt: null,
+      dueAt: null,
+      required: true,
+      availability: 'available',
+      createdAt: null,
+      updatedAt: null,
+    });
+    writeRows(rows);
   },
 
-  'click #saveAssignment': function() {
-    
-    if (!curCourseAssignment.courseName) {
-      alert('Please select a class to assign Chapters to.');
-    } else {
-      // dbCurCourseAssignment.tdfs = dbCurCourseAssignment.tdfs.map(x => x.fileName);
-      (async () => {
-        try {
-          const res = await meteorCallAsync('editCourseAssignments', curCourseAssignment);
-          if (res == null) {
-            alert('Error saving class (check server logs)');
-          } else {
-            alert('Saved class successfully!');
-            
-            const assignments = Session.get('assignments');
-            // assignments is an object keyed by courseName, not an array
-            assignments[curCourseAssignment.courseName] = curCourseAssignment.tdfs;
-            Session.set('assignments', assignments);
-          }
-        } catch (err) {
-          alert('Error saving class: ' + err);
-        }
-      })();
+  'click .remove-assignment': function(event: Event) {
+    const index = rowIndexFromEvent(event);
+    writeRows(readRows().filter((_row, rowIndex) => rowIndex !== index));
+  },
+
+  'click .move-assignment-up': function(event: Event) {
+    const index = rowIndexFromEvent(event);
+    if (index <= 0) return;
+    const rows = readRows();
+    if (!rows[index - 1] || !rows[index]) return;
+    const current = rows[index]!;
+    rows[index] = rows[index - 1]!;
+    rows[index - 1] = current;
+    writeRows(rows);
+  },
+
+  'click .move-assignment-down': function(event: Event) {
+    const index = rowIndexFromEvent(event);
+    const rows = readRows();
+    if (index < 0 || index >= rows.length - 1) return;
+    if (!rows[index] || !rows[index + 1]) return;
+    const current = rows[index]!;
+    rows[index] = rows[index + 1]!;
+    rows[index + 1] = current;
+    writeRows(rows);
+  },
+
+  'change .assignment-required': function(event: Event) {
+    const index = rowIndexFromEvent(event);
+    const rows = readRows();
+    if (!rows[index]) return;
+    rows[index] = { ...rows[index], required: Boolean((event.currentTarget as HTMLInputElement).checked) };
+    writeRows(rows);
+  },
+
+  'change .assignment-release': function(event: Event) {
+    setRowDate(rowIndexFromEvent(event), 'releaseAt', String((event.currentTarget as HTMLInputElement).value || '') || null);
+  },
+
+  'change .assignment-due': function(event: Event) {
+    setRowDate(rowIndexFromEvent(event), 'dueAt', String((event.currentTarget as HTMLInputElement).value || '') || null);
+  },
+
+  'click .clear-release': function(event: Event) {
+    setRowDate(rowIndexFromEvent(event), 'releaseAt', null);
+  },
+
+  'click .clear-due': function(event: Event) {
+    setRowDate(rowIndexFromEvent(event), 'dueAt', null);
+  },
+
+  'click #reloadAssignments': function() {
+    void loadCourseSnapshot(String(Session.get('courseAssignmentSelectedCourseId') || ''));
+  },
+
+  'click #saveAssignment': async function() {
+    const courseId = String(Session.get('courseAssignmentSelectedCourseId') || '');
+    if (!courseId) {
+      Session.set('courseAssignmentError', 'Please select a course.');
+      return;
+    }
+    const rows = readRows();
+    const validationError = validateRows(rows);
+    if (validationError) {
+      Session.set('courseAssignmentError', validationError);
+      return;
+    }
+    const payload: SaveCourseAssignmentsInput = {
+      courseId,
+      assignments: rows.map((row, order) => ({
+        ...(row.assignmentId ? { assignmentId: row.assignmentId } : {}),
+        TDFId: row.TDFId,
+        order,
+        releaseAt: row.releaseAt ? String(row.releaseAt) : null,
+        dueAt: row.dueAt ? String(row.dueAt) : null,
+        required: row.required,
+      })),
+    };
+    Session.set('courseAssignmentLoading', true);
+    Session.set('courseAssignmentError', null);
+    try {
+      const snapshot = await meteorCallAsync('saveCourseAssignments', payload) as CourseAssignmentEditorSnapshot;
+      const tdfById = new Map(snapshot.assignableTdfs.map((tdf) => [tdf.TDFId, tdf]));
+      Session.set('courseAssignableTdfs', snapshot.assignableTdfs);
+      writeRows(snapshot.assignments.map((assignment) => assignmentToRow(assignment, tdfById.get(assignment.TDFId))), false);
+    } catch (error: any) {
+      Session.set('courseAssignmentError', error?.reason || error?.message || String(error));
+    } finally {
+      Session.set('courseAssignmentLoading', false);
     }
   },
 });
-
-function getselectedItems(itemSelector: string): TdfDisplay[] {
-  const selectedItems: TdfDisplay[] = [];
-  const selectedOptions = $('select#' + itemSelector + ' option:selected');
-  selectedOptions.each(function(index: number, option: HTMLOptionElement) {
-    const selectedValue = option.value;
-    const selectedDisplay = option.text;
-    const selectedItem = {fileName: selectedValue, displayName: selectedDisplay};
-    
-    selectedItems.push(selectedItem);
-  });
-
-  return selectedItems;
-}
-
-function updateTdfsSelectedAndNotSelected(): void {
-  const allTdfDisplays = (Session.get('allTdfFilenamesAndDisplayNames') || []) as TdfDisplay[];
-  const tdfsNotSelected = allTdfDisplays.filter((x) => curCourseAssignment.tdfs.indexOf(x.fileName) == -1);
-  
-  const tdfsSelected = curCourseAssignment.tdfs.map((x) =>
-    allTdfDisplays.find((tdfDisplay) =>
-      tdfDisplay.fileName == x));
-  
-  Session.set('tdfsSelected', tdfsSelected);
-  Session.set('tdfsNotSelected', tdfsNotSelected);
-}
-
-
-
-

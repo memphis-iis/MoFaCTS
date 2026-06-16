@@ -140,6 +140,12 @@ export const COLLECTION_OWNERSHIP = {
     owner: 'analytics',
     purpose: 'Cached dashboard aggregates keyed by learner/content.',
   },
+  CourseLearnerSnapshotCache: {
+    mongoName: 'course_learner_snapshot_cache',
+    globalName: 'CourseLearnerSnapshotCache',
+    owner: 'course-assignment',
+    purpose: 'Persisted learner-facing course browse snapshots keyed by user and cache version.',
+  },
   UserUploadQuota: {
     mongoName: 'user_upload_quota',
     globalName: 'UserUploadQuota',

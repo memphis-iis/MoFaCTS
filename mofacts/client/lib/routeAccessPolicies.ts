@@ -9,6 +9,7 @@ export const routeAccessPolicies: Readonly<Record<string, RouteAccessPolicy>> = 
   'client.tdfAssignmentEdit': { requiresAuth: true, allowedRoles: 'admin,teacher' },
   'client.instructorReporting': { requiresAuth: true, allowedRoles: 'admin,teacher' },
   'client.classEdit': { requiresAuth: true, allowedRoles: 'admin,teacher' },
+  'client.courses': { requiresAuth: true },
   'client.contentUpload': { requiresAuth: true },
   'client.aiContentCreator': { requiresAuth: true },
   'client.manualContentCreator': { requiresAuth: true },

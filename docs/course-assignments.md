@@ -45,6 +45,7 @@ Implementation should stay inside the active MoFaCTS app tree under `mofacts/`.
 - Existing assignment rows containing only `courseId` and `TDFId` must remain readable during migration.
 - Course assignment context must be recorded into learner history when a learner launches from a course assignment.
 - Assignment `_id` is the durable assignment identity for history, reporting, due-date exceptions, cache entries, and client payloads.
+- New course section membership must send the learner an assignment email with the MoFaCTS link, a direct `/courses` link, and instructions to find the assigned course from the Courses menu.
 
 ## Data Model
 
@@ -370,6 +371,7 @@ Invalidation trigger points:
 - `addCourse` and `editCourse` invalidate affected course snapshots when visibility, begin date, end date, timezone, teacher, or name changes.
 - `saveCourseAssignments` invalidates affected course snapshots when assignment rows are inserted, removed, reordered, released, due-dated, required/optional changed, or pointed at a different TDF.
 - Section membership changes invalidate the affected user's course snapshot and the affected course snapshot cohort.
+- New section membership sends the learner a course assignment email. Repeated calls for an existing membership must not resend the email.
 - Practice history insertion and the dashboard cache update hook invalidate or refresh the current learner's course snapshot after `UserDashboardCache.tdfStats` changes.
 - Admin progress reset invalidates the affected learner course snapshots for any reset TDFs.
 - Migration jobs that normalize course visibility, course timezone, or assignment metadata invalidate all affected course snapshot caches after writes.
@@ -777,6 +779,8 @@ Server tests:
 - Learner course snapshot returns public courses to signed-in ordinary learners.
 - Private courses appear only for enrolled learners, owning teachers, and admins.
 - Public course browsing does not insert `SectionUserMap` rows.
+- New section membership sends a course assignment email with the app link, `/courses` link, and course-finding instructions.
+- Existing section membership does not resend the course assignment email.
 - Unreleased assignments appear as locked rows for ordinary learners and cannot launch.
 - Snapshot uses `UserDashboardCache.tdfStats` and `buildDashboardStatsProjection`.
 - Snapshot reads from `CourseLearnerSnapshotCache` when current.

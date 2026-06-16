@@ -9,9 +9,10 @@ import {
   withCanonicalHistorySchemaVersion,
 } from '../../common/historyEnvelope';
 import { meteorCallAsync } from './meteorAsync';
+import { applyCourseAssignmentLaunchContext } from './courseAssignmentLaunchContext';
 
 async function insertCompressedHistory(historyRecord: HistoryWireRecord): Promise<void> {
-  const versionedHistoryRecord = withCanonicalHistorySchemaVersion(historyRecord);
+  const versionedHistoryRecord = withCanonicalHistorySchemaVersion(applyCourseAssignmentLaunchContext(historyRecord));
   assertCanonicalHistoryEnvelope(versionedHistoryRecord);
   const compressedRecord = compressHistoryRecord(versionedHistoryRecord);
   validateHistoryWirePayload(compressedRecord);

@@ -35,6 +35,7 @@ const PasswordResetTokens = new Mongo.Collection(collectionMongoName('PasswordRe
 const AuditLog = new Mongo.Collection(collectionMongoName('AuditLog'));
 const AuthThrottleState = new Mongo.Collection(collectionMongoName('AuthThrottleState'));
 const UserDashboardCache = new Mongo.Collection(collectionMongoName('UserDashboardCache'));
+const CourseLearnerSnapshotCache = new Mongo.Collection(collectionMongoName('CourseLearnerSnapshotCache'));
 const UserUploadQuota = new Mongo.Collection(collectionMongoName('UserUploadQuota'));
 const ManualContentDrafts = new Mongo.Collection(collectionMongoName('ManualContentDrafts'));
 const H5PContents = new Mongo.Collection(collectionMongoName('H5PContents'));
@@ -135,6 +136,7 @@ Object.assign(globalThis, {
   AuditLog,
   AuthThrottleState,
   UserDashboardCache,
+  CourseLearnerSnapshotCache,
   UserUploadQuota,
   ManualContentDrafts,
   H5PContents,
@@ -142,7 +144,7 @@ Object.assign(globalThis, {
   DynamicAssets,
 });
 
-export { Tdfs, GlobalExperimentStates, DynamicSettings, UserDashboardCache, H5PContents, StimulusCrowdStats, BackupJobs };
+export { Tdfs, GlobalExperimentStates, DynamicSettings, UserDashboardCache, CourseLearnerSnapshotCache, H5PContents, StimulusCrowdStats, BackupJobs };
 
 GlobalExperimentStates.allow({
   update: function(userId: string, doc: unknown, _fieldNames: string[], _modifier: any) {

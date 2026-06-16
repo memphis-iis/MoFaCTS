@@ -32,6 +32,17 @@ type RunServerStartupDeps = {
     removeAsync: (selector: UnknownRecord) => Promise<number>;
     upsertAsync: (selector: UnknownRecord, modifier: UnknownRecord) => Promise<unknown>;
   };
+  Courses: {
+    find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]> };
+    updateAsync: (selector: UnknownRecord, modifier: UnknownRecord, options?: UnknownRecord) => Promise<number>;
+  };
+  Assignments: {
+    find: (selector?: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]> };
+    updateAsync: (selector: UnknownRecord, modifier: UnknownRecord, options?: UnknownRecord) => Promise<number>;
+  };
+  CourseLearnerSnapshotCache: {
+    updateAsync: (selector: UnknownRecord, modifier: UnknownRecord, options?: UnknownRecord) => Promise<number>;
+  };
   usersCollection: {
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
     updateAsync: (selector: UnknownRecord, modifier: UnknownRecord, options?: UnknownRecord) => Promise<number>;
@@ -281,6 +292,9 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
   await themeRegistry.initialize();
   await runStartupCleanupMigrations({
     DynamicSettings: deps.DynamicSettings,
+    Courses: deps.Courses,
+    Assignments: deps.Assignments,
+    CourseLearnerSnapshotCache: deps.CourseLearnerSnapshotCache,
     usersCollection: deps.usersCollection,
     serverConsole: deps.serverConsole,
     updateActiveThemeDocument: deps.updateActiveThemeDocument,

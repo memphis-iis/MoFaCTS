@@ -10,7 +10,14 @@ type ClassPerformanceEntry = {
   exception?: string | false;
 };
 
-type DueDateException = { tdfId: string; classId: string; date: string | number | Date };
+type DueDateException = {
+  assignmentId?: string;
+  courseId?: string;
+  TDFId?: string;
+  tdfId?: string;
+  classId?: string;
+  date: string | number | Date;
+};
 
 type UserDoc = {
   _id?: unknown;
@@ -59,7 +66,8 @@ function subtractGroupedStats(allStats: Partial<ClassPerformanceEntry>, metStats
 function buildUserPerformanceMetaById(
   users: UserDoc[],
   tdfId: string,
-  classId: string
+  classId: string,
+  assignmentId?: string | null
 ) {
   const metaByUserId = new Map<string, UserPerformanceMeta>();
 
@@ -72,7 +80,13 @@ function buildUserPerformanceMetaById(
     let exception: string | false = false;
     let exceptionRawDate: number | false = false;
     const exceptions = Array.isArray(user.dueDateExceptions) ? user.dueDateExceptions : [];
-    const exceptionEntry = exceptions.find((item) => item.tdfId === tdfId && item.classId === classId);
+    const assignmentExceptionEntry = assignmentId
+      ? exceptions.find((item) => item.assignmentId === assignmentId)
+      : null;
+    const exceptionEntry = assignmentExceptionEntry || exceptions.find((item) => (
+      (item.tdfId === tdfId && item.classId === classId) ||
+      (item.TDFId === tdfId && item.courseId === classId)
+    ));
     if (exceptionEntry) {
       const rawDate = new Date(exceptionEntry.date).getTime();
       exceptionRawDate = rawDate;
@@ -156,7 +170,8 @@ export async function getClassPerformanceByTdfWorkflow(
   classId: string,
   tdfId: string,
   date: number | false,
-  deps: GetClassPerformanceByTdfDeps
+  deps: GetClassPerformanceByTdfDeps,
+  assignmentContext?: { assignmentId?: string | null; dueAt?: Date | number | string | null }
 ) {
   deps.serverConsole('getClassPerformanceByTDF', classId, tdfId, date);
 
@@ -173,7 +188,8 @@ export async function getClassPerformanceByTdfWorkflow(
 
   const performanceMet: ClassPerformanceEntry[] = [];
   const performanceNotMet: ClassPerformanceEntry[] = [];
-  const cutoffDate = date || new Date().getTime();
+  const assignmentDueDate = assignmentContext?.dueAt ? new Date(assignmentContext.dueAt).getTime() : NaN;
+  const cutoffDate = date || (Number.isFinite(assignmentDueDate) ? assignmentDueDate : new Date().getTime());
   if (enrolledUserIds.length === 0) {
     return [performanceMet, performanceNotMet];
   }
@@ -184,7 +200,7 @@ export async function getClassPerformanceByTdfWorkflow(
     levelUnitType: { $ne: 'Instruction' }
   };
   const users = await deps.findUsersByIds(enrolledUserIds);
-  const userMetaById = buildUserPerformanceMetaById(users, tdfId, classId);
+  const userMetaById = buildUserPerformanceMetaById(users, tdfId, classId, assignmentContext?.assignmentId || null);
   const allStatsByUserId = await aggregateHistoryStatsByUser(baseMatch, deps);
   const baseMetStatsByUserId = await aggregateHistoryStatsByUser(baseMatch, deps, {
     $expr: {

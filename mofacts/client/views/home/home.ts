@@ -48,6 +48,7 @@ type HomeTourStep = {
 };
 
 const SIDEBAR_ACTION_ROUTES: Record<string, string> = {
+  coursesButton: '/courses',
   contentUploadButton: '/contentUpload',
   classEditButton: '/classEdit',
   instructorReportingButton: '/instructorReporting',
@@ -62,6 +63,7 @@ const SIDEBAR_ACTION_ROUTES: Record<string, string> = {
 };
 
 const PRACTICE_MENU_ACTION_ROUTES: Record<string, string> = {
+  courses: '/courses',
   home: '/home',
   contentUpload: '/contentUpload',
   dataDownload: '/dataDownload',
@@ -78,6 +80,7 @@ const PRACTICE_MENU_ACTION_ROUTES: Record<string, string> = {
 
 const SIDEBAR_ACTIVE_MATCHERS: Record<string, string[]> = {
   home: ['/home', '/'],
+  courses: ['/courses'],
   content: ['/contentUpload', '/contentCreate', '/contentEdit', '/tdfEdit'],
   data: ['/dataDownload'],
   classEdit: ['/classEdit'],

@@ -35,6 +35,7 @@ declare var DynamicConfig: any;
 declare var PasswordResetTokens: any;
 declare var AuditLog: any;
 declare var UserDashboardCache: any;
+declare var CourseLearnerSnapshotCache: any;
 declare var UserUploadQuota: any;
 declare var ManualContentDrafts: any;
 declare var H5PContents: any;

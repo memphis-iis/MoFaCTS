@@ -17,7 +17,10 @@ interface EditableClass {
   courseName: string;
   teacherUserId: string | null;
   semester: string;
-  beginDate: Date;
+  beginDate: Date | string | null;
+  endDate: Date | string | null;
+  timezone: string;
+  visibility: 'private' | 'public';
   sections: string[];
 }
 
@@ -37,9 +40,29 @@ let curClass: EditableClass = {
   courseName: '',
   teacherUserId: Meteor.userId(),
   semester: curSemester,
-  beginDate: new Date(),
+  beginDate: null,
+  endDate: null,
+  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || '',
+  visibility: 'private',
   sections: [],
 };
+
+function toDatetimeLocalValue(value: unknown): string {
+  if (!value) return '';
+  const date = new Date(value as string | number | Date);
+  if (!Number.isFinite(date.getTime())) return '';
+  const pad = (num: number) => String(num).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function readOptionalDateInput(selector: string): string | null {
+  const value = String($(selector).val() || '').trim();
+  return value || null;
+}
+
+function defaultTimezone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+}
 
 function classSelectedSetup(curClassName: string) {
   $('#class-select').children('[value="' + curClassName + '"]').prop('selected', true);
@@ -50,12 +73,22 @@ function classSelectedSetup(curClassName: string) {
     return;
   }
   $('#sectionNames').val(foundClass.sections.map((x: string) => x + '\n').join(''));
+  $('#courseVisibility').val(foundClass.visibility || 'private');
+  $('#courseBeginDate').val(toDatetimeLocalValue(foundClass.beginDate));
+  $('#courseEndDate').val(toDatetimeLocalValue(foundClass.endDate));
+  $('#courseTimezone').val(foundClass.timezone || defaultTimezone());
+  Session.set('classEditError', null);
   isNewClass = false;
 }
 
 function noClassSelectedSetup() {
   $('#newClassName').val('');
   $('#sectionNames').val('');
+  $('#courseVisibility').val('private');
+  $('#courseBeginDate').val('');
+  $('#courseEndDate').val('');
+  $('#courseTimezone').val(defaultTimezone());
+  Session.set('classEditError', null);
   isNewClass = true;
 }
 
@@ -88,12 +121,15 @@ Template.classEdit.onRendered(async function () {
   
 
   // Build classes object
-  const classes: Record<string, CourseSection> = {};
+  const classes: Record<string, CourseSection & { sections: string[] }> = {};
   const sectionsByInstructorId: Array<{ sectionId: string; courseName: string; sectionName: string }> = [];
 
   for (const courseSection of allCourseSections) {
     if (courseSection.teacherUserId != Meteor.userId()) continue;
-    classes[courseSection.courseId] = courseSection;
+    if (!classes[courseSection.courseId]) {
+      classes[courseSection.courseId] = { ...courseSection, sections: [] };
+    }
+    classes[courseSection.courseId]!.sections.push(courseSection.sectionName);
     sectionsByInstructorId.push({
       sectionId: courseSection.sectionId,
       courseName: courseSection.courseName,
@@ -110,6 +146,7 @@ Template.classEdit.onRendered(async function () {
 
 Template.classEdit.helpers({
   isLoading: () => Session.get('classes') === null,
+  classEditError: () => Session.get('classEditError'),
 
   classes: () => Session.get('classes'),
 
@@ -141,6 +178,7 @@ Template.classEdit.events({
   },
 
   'click #saveClass': function(_event: Event) {
+    Session.set('classEditError', null);
     const classes = (Session.get('classes') || []) as EditableClass[];
     if (isNewClass) {
       const curClassName = String($('#newClassName').val() || '');
@@ -153,7 +191,10 @@ Template.classEdit.events({
         courseName: curClassName,
         teacherUserId: Meteor.userId(),
         semester: curSemester,
-        beginDate: new Date(),
+        beginDate: null,
+        endDate: null,
+        timezone: defaultTimezone(),
+        visibility: 'private',
         sections: [],
       };
       classes.push(curClass);
@@ -178,10 +219,18 @@ Template.classEdit.events({
       }
     }
     curClass.sections = newSections;
+    curClass.visibility = String($('#courseVisibility').val() || 'private') === 'public' ? 'public' : 'private';
+    curClass.beginDate = readOptionalDateInput('#courseBeginDate');
+    curClass.endDate = readOptionalDateInput('#courseEndDate');
+    curClass.timezone = String($('#courseTimezone').val() || '').trim();
+    if (!curClass.timezone) {
+      Session.set('classEditError', 'Course timezone is required.');
+      return false;
+    }
 
     function handleSuccess(res: unknown) {
-      alert('Saved class successfully!');
       curClass.courseId = res as string;
+      Session.set('classEditSaved', true);
       
       Session.set('classes', classes);
       // Need a delay here so the reactive session var can update the template
@@ -191,11 +240,11 @@ Template.classEdit.events({
     }
 
     function handleError(err: unknown) {
-      alert('Error saving class: ' + err);
+      const message = (err as any)?.reason || (err as any)?.message || String(err);
+      Session.set('classEditError', 'Error saving class: ' + message);
     }
 
     if (isNewClass) {
-      curClass.beginDate = new Date();
       meteorCallAsync('addCourse', curClass)
         .then(handleSuccess)
         .catch(handleError);
