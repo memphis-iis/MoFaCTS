@@ -572,7 +572,7 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     const { actingUserId, roleFlags } = await requireTeacherOrAdmin(this);
     const tdfSelector = roleFlags.admin
       ? {}
-      : { $or: [{ ownerId: actingUserId }, { 'accessors.userId': actingUserId }] };
+      : { $or: [{ ownerId: actingUserId }, { accessors: actingUserId }, { 'accessors.userId': actingUserId }] };
     const assignableTdfs = await deps.Tdfs.find(
       tdfSelector,
       {
@@ -592,6 +592,7 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
         courseName: String(course.courseName || ''),
         visibility: normalizeCourseVisibility(course.visibility),
         teacherUserId: String(course.teacherUserId || ''),
+        timezone: normalizeTimezone(course.timezone, true),
       },
       assignments,
       assignableTdfs: assignableTdfs.map(getTdfSummary)

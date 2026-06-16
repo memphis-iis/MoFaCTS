@@ -24,12 +24,29 @@ Session.set('courseAssignmentLoading', false);
 Session.set('courseAssignmentDirty', false);
 Session.set('courseAssignmentError', null);
 Session.set('courseAssignmentSelectedCourseId', '');
+Session.set('courseAssignmentTimezone', '');
 
-function toDatetimeLocalValue(value: unknown): string {
+function toDatetimeLocalValue(value: unknown, timezone?: string): string {
   if (!value) return '';
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) {
+    return value;
+  }
   const date = new Date(value as string | number | Date);
   if (!Number.isFinite(date.getTime())) return '';
   const pad = (num: number) => String(num).padStart(2, '0');
+  if (timezone) {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(date);
+    const partValue = (type: string) => parts.find((part) => part.type === type)?.value || '';
+    return `${partValue('year')}-${partValue('month')}-${partValue('day')}T${partValue('hour')}:${partValue('minute')}`;
+  }
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
@@ -61,6 +78,7 @@ async function loadCourseSnapshot(courseId: string) {
     const tdfById = new Map(snapshot.assignableTdfs.map((tdf) => [tdf.TDFId, tdf]));
     Session.set('courseAssignableTdfs', snapshot.assignableTdfs);
     Session.set('courseAssignmentSelectedCourseId', courseId);
+    Session.set('courseAssignmentTimezone', snapshot.course.timezone);
     writeRows(snapshot.assignments.map((assignment) => assignmentToRow(assignment, tdfById.get(assignment.TDFId))), false);
   } catch (error: any) {
     Session.set('courseAssignmentError', error?.reason || error?.message || String(error));
@@ -130,10 +148,10 @@ Template.tdfAssignmentEdit.helpers({
       });
   },
   releaseInputValue() {
-    return toDatetimeLocalValue((this as AssignmentEditorRow).releaseAt);
+    return toDatetimeLocalValue((this as AssignmentEditorRow).releaseAt, String(Session.get('courseAssignmentTimezone') || ''));
   },
   dueInputValue() {
-    return toDatetimeLocalValue((this as AssignmentEditorRow).dueAt);
+    return toDatetimeLocalValue((this as AssignmentEditorRow).dueAt, String(Session.get('courseAssignmentTimezone') || ''));
   },
   isRequiredChecked() {
     return (this as AssignmentEditorRow).required ? 'checked' : '';
@@ -257,6 +275,7 @@ Template.tdfAssignmentEdit.events({
       const snapshot = await meteorCallAsync('saveCourseAssignments', payload) as CourseAssignmentEditorSnapshot;
       const tdfById = new Map(snapshot.assignableTdfs.map((tdf) => [tdf.TDFId, tdf]));
       Session.set('courseAssignableTdfs', snapshot.assignableTdfs);
+      Session.set('courseAssignmentTimezone', snapshot.course.timezone);
       writeRows(snapshot.assignments.map((assignment) => assignmentToRow(assignment, tdfById.get(assignment.TDFId))), false);
     } catch (error: any) {
       Session.set('courseAssignmentError', error?.reason || error?.message || String(error));

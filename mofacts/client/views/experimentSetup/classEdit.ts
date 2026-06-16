@@ -47,11 +47,27 @@ let curClass: EditableClass = {
   sections: [],
 };
 
-function toDatetimeLocalValue(value: unknown): string {
+function toDatetimeLocalValue(value: unknown, timezone?: string): string {
   if (!value) return '';
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) {
+    return value;
+  }
   const date = new Date(value as string | number | Date);
   if (!Number.isFinite(date.getTime())) return '';
   const pad = (num: number) => String(num).padStart(2, '0');
+  if (timezone) {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(date);
+    const partValue = (type: string) => parts.find((part) => part.type === type)?.value || '';
+    return `${partValue('year')}-${partValue('month')}-${partValue('day')}T${partValue('hour')}:${partValue('minute')}`;
+  }
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
@@ -73,10 +89,11 @@ function classSelectedSetup(curClassName: string) {
     return;
   }
   $('#sectionNames').val(foundClass.sections.map((x: string) => x + '\n').join(''));
+  const courseTimezone = foundClass.timezone || defaultTimezone();
   $('#courseVisibility').val(foundClass.visibility || 'private');
-  $('#courseBeginDate').val(toDatetimeLocalValue(foundClass.beginDate));
-  $('#courseEndDate').val(toDatetimeLocalValue(foundClass.endDate));
-  $('#courseTimezone').val(foundClass.timezone || defaultTimezone());
+  $('#courseBeginDate').val(toDatetimeLocalValue(foundClass.beginDate, courseTimezone));
+  $('#courseEndDate').val(toDatetimeLocalValue(foundClass.endDate, courseTimezone));
+  $('#courseTimezone').val(courseTimezone);
   Session.set('classEditError', null);
   isNewClass = false;
 }

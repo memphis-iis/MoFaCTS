@@ -69,6 +69,7 @@ export interface CourseAssignmentEditorSnapshot {
     courseName: string;
     visibility: CourseVisibility;
     teacherUserId: string;
+    timezone: string;
   };
   assignments: CourseAssignmentSummary[];
   assignableTdfs: Array<{

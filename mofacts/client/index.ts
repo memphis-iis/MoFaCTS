@@ -116,7 +116,7 @@ const APP_SHELL_TITLES: Record<string, string> = {
   theme: 'Theme',
   testRunner: 'Admin Tests',
   classEdit: 'Class Management',
-  tdfAssignmentEdit: 'Chapter Assignments',
+  tdfAssignmentEdit: 'Course Assignments',
   instructorReporting: 'Instructor Reporting',
 };
 

@@ -83,6 +83,11 @@ export function createCourseLearnerSnapshotCacheHelpers(deps: CourseLearnerSnaps
   }
 
   async function invalidateCourseSnapshotsForCourse(courseId: string, reason: string) {
+    const course = await deps.Courses.findOneAsync(
+      { _id: courseId },
+      { fields: { _id: 1, visibility: 1 } }
+    );
+    const courseIsPublic = deps.normalizeCourseVisibility(course?.visibility) === 'public';
     const sections = await deps.Sections.find({ courseId }, { fields: { _id: 1 } }).fetchAsync();
     const sectionIds = sections.map((section: any) => String(section?._id || '')).filter(Boolean);
     const enrolledRows = sectionIds.length > 0
@@ -97,14 +102,18 @@ export function createCourseLearnerSnapshotCacheHelpers(deps: CourseLearnerSnaps
         { multi: true }
       );
     }
+    const publicSelector = courseIsPublic
+      ? { version: COURSE_SNAPSHOT_VERSION }
+      : { publicCourseIds: courseId, version: COURSE_SNAPSHOT_VERSION };
     const publicResult = await deps.CourseLearnerSnapshotCache.updateAsync(
-      { publicCourseIds: courseId, version: COURSE_SNAPSHOT_VERSION },
+      publicSelector,
       { $set: { invalidatedAt: new Date(), rebuildReason: reason } },
       { multi: true }
     );
     deps.serverConsole('[CourseSnapshot] invalidated course snapshots', {
       courseId,
       reason,
+      publicScope: courseIsPublic ? 'all-current-public-course-viewers' : 'cached-course-viewers',
       enrolledCount: enrolledUserIds.length,
       enrolledResult: updateCount(enrolledResult),
       publicResult: updateCount(publicResult),
