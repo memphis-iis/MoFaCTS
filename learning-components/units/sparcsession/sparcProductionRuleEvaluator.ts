@@ -417,7 +417,9 @@ function instantiateFiring(
         ));
         break;
       case 'append-node':
+      case 'append-node-if-missing':
       case 'insert-node':
+      case 'append-text':
         writes.push(instantiateProgressiveNodeWrite(effect, bindings));
         break;
     }

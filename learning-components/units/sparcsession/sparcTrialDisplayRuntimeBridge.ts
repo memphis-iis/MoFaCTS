@@ -2,6 +2,7 @@ import type {
   SparcTrialDisplay,
   SparcTrialResult,
 } from '../../trial-displays/sparc/SparcTrialDisplayAdapter';
+import { sparcTrialDisplayAdapter } from '../../trial-displays/sparc/SparcTrialDisplayAdapter';
 import type { HistoryRuntime } from '../../runtime/LearningComponentContext';
 import type { CanonicalHistoryRecord } from '../../runtime/historyEnvelope';
 import {
@@ -108,14 +109,15 @@ export function createSparcAuthoredDocumentFromTrialDisplay(params: {
   readonly documentId: string;
   readonly display: SparcTrialDisplay;
 }): SparcAuthoredDocument {
-  const authoredFacts = Array.isArray(params.display.workingMemoryFacts)
-    ? params.display.workingMemoryFacts as readonly SparcWorkingMemoryFact[]
+  const display = sparcTrialDisplayAdapter.normalizeDisplay(params.display);
+  const authoredFacts = Array.isArray(display.workingMemoryFacts)
+    ? display.workingMemoryFacts as readonly SparcWorkingMemoryFact[]
     : [];
-  if (isRecord(params.display.behavior) && Array.isArray(params.display.behavior.authoredProductionRules)) {
+  if (isRecord(display.behavior) && Array.isArray(display.behavior.authoredProductionRules)) {
     throw new Error('SPARC behavior.authoredProductionRules is not executable; use top-level productionRules');
   }
-  const directProductionRules = Array.isArray(params.display.productionRules)
-    ? params.display.productionRules as readonly SparcProductionRule[]
+  const directProductionRules = Array.isArray(display.productionRules)
+    ? display.productionRules as readonly SparcProductionRule[]
     : [];
   return {
     id: requireNonBlank(params.documentId, 'SPARC document id'),
@@ -129,7 +131,7 @@ export function createSparcAuthoredDocumentFromTrialDisplay(params: {
     root: {
       id: 'root',
       kind: 'document',
-      children: params.display.nodes.filter(isRecord).map((node) => authoredNodeFromDisplayNode(node)),
+      children: display.nodes.filter(isRecord).map((node) => authoredNodeFromDisplayNode(node)),
     },
   };
 }

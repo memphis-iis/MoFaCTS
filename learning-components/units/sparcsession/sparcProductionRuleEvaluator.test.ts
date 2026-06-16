@@ -815,7 +815,7 @@ describe('sparcProductionRuleEvaluator', function() {
     assert.equal(result.facts.filter((fact) => fact.factType === 'model').length, 1);
   });
 
-  it('instantiates progressive append and insert node operations as ordered state writes', function() {
+  it('instantiates progressive append-if-missing, append-text, and insert operations as ordered state writes', function() {
     const facts: SparcWorkingMemoryFact[] = [{
       factType: 'interface-event',
       slots: {
@@ -837,7 +837,7 @@ describe('sparcProductionRuleEvaluator', function() {
         },
       }],
       then: [{
-        type: 'append-node',
+        type: 'append-node-if-missing',
         frontier: 'main',
         boxId: 'chapterFlowBox',
         node: {
@@ -851,6 +851,11 @@ describe('sparcProductionRuleEvaluator', function() {
             value: { type: 'literal', value: 'Review denominator meaning.' },
           }],
         },
+      }, {
+        type: 'append-text',
+        nodeId: 'remediation-denominator-text',
+        text: { type: 'literal', value: 'Use a common denominator before adding.' },
+        separator: ' ',
       }, {
         type: 'insert-node',
         afterNodeId: 'problem-1',
@@ -866,8 +871,9 @@ describe('sparcProductionRuleEvaluator', function() {
 
     const [firing] = evaluateSparcProductionRules({ facts, rules });
 
-    assert.equal(firing?.writes.length, 2);
+    assert.equal(firing?.writes.length, 3);
     assert.deepEqual(firing?.writes.map((write) => write.key), [
+      SPARC_PROGRESSIVE_NODE_OPERATION_STATE_KEY,
       SPARC_PROGRESSIVE_NODE_OPERATION_STATE_KEY,
       SPARC_PROGRESSIVE_NODE_OPERATION_STATE_KEY,
     ]);
@@ -877,12 +883,20 @@ describe('sparcProductionRuleEvaluator', function() {
     }, {
       documentId: 'chapter-doc',
       nodeId: 'root',
+    }, {
+      documentId: 'chapter-doc',
+      nodeId: 'root',
     }]);
-    assert.equal((firing?.writes[0]?.value as { type?: string }).type, 'append-node');
-    assert.equal((firing?.writes[1]?.value as { type?: string }).type, 'insert-node');
+    assert.equal((firing?.writes[0]?.value as { type?: string }).type, 'append-node-if-missing');
+    assert.equal((firing?.writes[1]?.value as { type?: string }).type, 'append-text');
+    assert.equal((firing?.writes[2]?.value as { type?: string }).type, 'insert-node');
     assert.equal(
       (((firing?.writes[0]?.value as { node?: { children?: { value?: unknown }[] } }).node?.children?.[0]?.value)),
       'Review denominator meaning.',
+    );
+    assert.equal(
+      ((firing?.writes[1]?.value as { text?: unknown }).text),
+      'Use a common denominator before adding.',
     );
   });
 });

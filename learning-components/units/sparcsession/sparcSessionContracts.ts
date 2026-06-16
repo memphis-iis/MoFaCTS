@@ -314,11 +314,25 @@ export type SparcProgressiveNodeOperationTemplate =
       readonly node: SparcProgressiveNodeTemplate;
     }
   | {
+      readonly type: 'append-node-if-missing';
+      readonly frontier?: string | SparcRuleExpression;
+      readonly boxId: string | SparcRuleExpression;
+      readonly beforeNodeId?: string | SparcRuleExpression;
+      readonly afterNodeId?: string | SparcRuleExpression;
+      readonly node: SparcProgressiveNodeTemplate;
+    }
+  | {
       readonly type: 'insert-node';
       readonly boxId?: string | SparcRuleExpression;
       readonly beforeNodeId?: string | SparcRuleExpression;
       readonly afterNodeId?: string | SparcRuleExpression;
       readonly node: SparcProgressiveNodeTemplate;
+    }
+  | {
+      readonly type: 'append-text';
+      readonly nodeId: string | SparcRuleExpression;
+      readonly text: string | SparcRuleExpression;
+      readonly separator?: string | SparcRuleExpression;
     };
 
 export type SparcProductionRule = {

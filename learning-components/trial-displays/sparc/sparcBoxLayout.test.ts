@@ -33,6 +33,39 @@ describe('sparcBoxLayout', function() {
     ]);
   });
 
+  it('keeps unordered progressive nodes after authored ordered nodes in the same box', function() {
+    const display: SparcTrialDisplay = {
+      type: 'sparc',
+      layout: {
+        zones: [
+          { id: 'chapterFlowBox', role: 'reading' },
+        ],
+      },
+      nodes: [{
+        id: 'intro',
+        placement: { region: 'chapterFlowBox', order: 1 },
+      }, {
+        id: 'multiple-choice',
+        placement: { region: 'chapterFlowBox', order: 2 },
+      }, {
+        id: 'remediation',
+        placement: { region: 'chapterFlowBox' },
+      }, {
+        id: 'challenge',
+        placement: { region: 'chapterFlowBox' },
+      }],
+    };
+
+    const groups = buildSparcBoxedNodeGroups(display);
+
+    assert.deepEqual(groups[0]?.nodes.map((node) => (node as { id: string }).id), [
+      'intro',
+      'multiple-choice',
+      'remediation',
+      'challenge',
+    ]);
+  });
+
   it('leaves document-flow displays without authored zones unboxed', function() {
     const display: SparcTrialDisplay = {
       type: 'sparc',

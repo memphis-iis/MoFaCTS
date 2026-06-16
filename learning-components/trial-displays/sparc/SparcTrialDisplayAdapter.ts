@@ -1,5 +1,6 @@
 import type { LearningComponentManifest } from '../../runtime/ComponentManifest';
 import type { TrialDisplayAdapter } from '../../runtime/TrialDisplayAdapterRegistry';
+import { expandSparcSemanticNodes } from './sparcSemanticNodes';
 
 export const SPARC_TRIAL_DISPLAY_TYPE = 'sparc';
 
@@ -156,7 +157,7 @@ export const sparcTrialDisplayAdapter: TrialDisplayAdapter<SparcTrialDisplay, Sp
     return {
       ...display,
       type: SPARC_TRIAL_DISPLAY_TYPE,
-      nodes: display.nodes.slice(),
+      nodes: expandSparcSemanticNodes(display.nodes),
       ...(normalizedResponse ? { response: normalizedResponse } : {}),
     };
   },

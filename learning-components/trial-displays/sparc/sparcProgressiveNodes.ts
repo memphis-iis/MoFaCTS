@@ -9,6 +9,20 @@ export type SparcProgressiveNodeOperation =
       readonly node: Record<string, unknown>;
     }
   | {
+      readonly type: 'append-node-if-missing';
+      readonly frontier?: string;
+      readonly boxId: string;
+      readonly beforeNodeId?: string;
+      readonly afterNodeId?: string;
+      readonly node: Record<string, unknown>;
+    }
+  | {
+      readonly type: 'append-text';
+      readonly nodeId: string;
+      readonly text: string;
+      readonly separator?: string;
+    }
+  | {
       readonly type: 'insert-node';
       readonly boxId?: string;
       readonly beforeNodeId?: string;
@@ -32,22 +46,30 @@ function nonBlankString(value: unknown): string {
 }
 
 function normalizeOperation(value: unknown): SparcProgressiveNodeOperation | null {
-  if (!isRecord(value) || !isRecord(value.node)) {
+  if (!isRecord(value)) {
     return null;
   }
-  if (value.type === 'append-node') {
+  if (value.type === 'append-node' || value.type === 'append-node-if-missing') {
+    if (!isRecord(value.node)) {
+      return null;
+    }
     const boxId = nonBlankString(value.boxId);
     if (!boxId) {
       return null;
     }
     return {
-      type: 'append-node',
+      type: value.type,
       ...(nonBlankString(value.frontier) ? { frontier: nonBlankString(value.frontier) } : {}),
+      ...(value.type === 'append-node-if-missing' && nonBlankString(value.beforeNodeId) ? { beforeNodeId: nonBlankString(value.beforeNodeId) } : {}),
+      ...(value.type === 'append-node-if-missing' && nonBlankString(value.afterNodeId) ? { afterNodeId: nonBlankString(value.afterNodeId) } : {}),
       boxId,
       node: value.node,
     };
   }
   if (value.type === 'insert-node') {
+    if (!isRecord(value.node)) {
+      return null;
+    }
     const boxId = nonBlankString(value.boxId);
     const beforeNodeId = nonBlankString(value.beforeNodeId);
     const afterNodeId = nonBlankString(value.afterNodeId);
@@ -57,6 +79,19 @@ function normalizeOperation(value: unknown): SparcProgressiveNodeOperation | nul
       ...(beforeNodeId ? { beforeNodeId } : {}),
       ...(afterNodeId ? { afterNodeId } : {}),
       node: value.node,
+    };
+  }
+  if (value.type === 'append-text') {
+    const targetNodeId = nonBlankString(value.nodeId);
+    const text = nonBlankString(value.text);
+    if (!targetNodeId || !text) {
+      return null;
+    }
+    return {
+      type: 'append-text',
+      nodeId: targetNodeId,
+      text,
+      ...(typeof value.separator === 'string' ? { separator: value.separator } : {}),
     };
   }
   return null;
@@ -103,6 +138,33 @@ function appendNode(nodes: readonly unknown[], operation: Extract<SparcProgressi
   return [...removeExistingNode(nodes, nodeId(nextNode)), nextNode];
 }
 
+function hasNodeId(nodes: readonly unknown[], id: string): boolean {
+  return nodes.some((node) => {
+    if (nodeId(node) === id) {
+      return true;
+    }
+    return isRecord(node) && Array.isArray(node.children) ? hasNodeId(node.children, id) : false;
+  });
+}
+
+function appendNodeIfMissing(nodes: readonly unknown[], operation: Extract<SparcProgressiveNodeOperation, { type: 'append-node-if-missing' }>): unknown[] {
+  const nextNode = withPlacementRegion(operation.node, operation.boxId);
+  const id = nodeId(nextNode);
+  if (id && hasNodeId(nodes, id)) {
+    return [...nodes];
+  }
+  if (operation.beforeNodeId || operation.afterNodeId) {
+    return insertNode(nodes, {
+      type: 'insert-node',
+      boxId: operation.boxId,
+      ...(operation.beforeNodeId ? { beforeNodeId: operation.beforeNodeId } : {}),
+      ...(operation.afterNodeId ? { afterNodeId: operation.afterNodeId } : {}),
+      node: nextNode,
+    });
+  }
+  return [...nodes, nextNode];
+}
+
 function insertNode(nodes: readonly unknown[], operation: Extract<SparcProgressiveNodeOperation, { type: 'insert-node' }>): unknown[] {
   const targetBoxId = operation.boxId || nodeRegion(operation.node);
   const nextNode = targetBoxId ? withPlacementRegion(operation.node, targetBoxId) : operation.node;
@@ -116,6 +178,34 @@ function insertNode(nodes: readonly unknown[], operation: Extract<SparcProgressi
     return insertAt(current, afterIndex >= 0 ? afterIndex + 1 : current.length, nextNode);
   }
   return [...current, nextNode];
+}
+
+function appendTextToNode(node: unknown, operation: Extract<SparcProgressiveNodeOperation, { type: 'append-text' }>): unknown {
+  if (!isRecord(node)) {
+    return node;
+  }
+  if (nodeId(node) === operation.nodeId) {
+    const currentValue = typeof node.value === 'string' ? node.value : '';
+    if (currentValue.includes(operation.text)) {
+      return node;
+    }
+    const separator = operation.separator ?? ' ';
+    return {
+      ...node,
+      value: currentValue ? `${currentValue}${separator}${operation.text}` : operation.text,
+    };
+  }
+  if (Array.isArray(node.children)) {
+    return {
+      ...node,
+      children: node.children.map((child) => appendTextToNode(child, operation)),
+    };
+  }
+  return node;
+}
+
+function appendText(nodes: readonly unknown[], operation: Extract<SparcProgressiveNodeOperation, { type: 'append-text' }>): unknown[] {
+  return nodes.map((node) => appendTextToNode(node, operation));
 }
 
 export function collectSparcProgressiveNodeOperations(
@@ -144,7 +234,12 @@ export function applySparcProgressiveNodeOperations(
     if (operation.type === 'append-node') {
       return appendNode(current, operation);
     }
+    if (operation.type === 'append-node-if-missing') {
+      return appendNodeIfMissing(current, operation);
+    }
+    if (operation.type === 'append-text') {
+      return appendText(current, operation);
+    }
     return insertNode(current, operation);
   }, nodes);
 }
-

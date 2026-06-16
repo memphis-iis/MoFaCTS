@@ -15,12 +15,34 @@ function placementRegion(node: unknown): string {
   return typeof node.placement.region === 'string' ? node.placement.region.trim() : '';
 }
 
-function placementOrder(node: unknown): number {
+function placementOrder(node: unknown): number | undefined {
   if (!isRecord(node) || !isRecord(node.placement)) {
-    return 0;
+    return undefined;
   }
-  const order = Number(node.placement.order ?? 0);
-  return Number.isFinite(order) ? order : 0;
+  const rawOrder = node.placement.order;
+  if (rawOrder === undefined || rawOrder === null || rawOrder === '') {
+    return undefined;
+  }
+  const order = Number(rawOrder);
+  return Number.isFinite(order) ? order : undefined;
+}
+
+function comparePlacementOrder(
+  left: { readonly node: unknown; readonly index: number },
+  right: { readonly node: unknown; readonly index: number },
+): number {
+  const leftOrder = placementOrder(left.node);
+  const rightOrder = placementOrder(right.node);
+  if (leftOrder !== undefined && rightOrder !== undefined) {
+    return leftOrder - rightOrder || left.index - right.index;
+  }
+  if (leftOrder !== undefined) {
+    return -1;
+  }
+  if (rightOrder !== undefined) {
+    return 1;
+  }
+  return left.index - right.index;
 }
 
 export function getSparcLayoutZones(display: SparcTrialDisplay): readonly SparcLayoutZone[] {
@@ -45,7 +67,9 @@ export function buildSparcBoxedNodeGroups(display: SparcTrialDisplay): readonly 
   return zones.map((box) => ({
     box,
     nodes: topLevelNodes
-      .filter((node) => placementRegion(node) === box.id)
-      .sort((left, right) => placementOrder(left) - placementOrder(right)),
+      .map((node, index) => ({ node, index }))
+      .filter((entry) => placementRegion(entry.node) === box.id)
+      .sort(comparePlacementOrder)
+      .map((entry) => entry.node),
   }));
 }

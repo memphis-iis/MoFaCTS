@@ -108,6 +108,7 @@
     /* Admin configurable via Theme Settings (2 values) */
     --app-border-radius-sm: 8px;   /* Buttons, inputs, small UI elements */
     --app-border-radius-lg: 12px;  /* Modals, cards, large containers */
+    --app-border-width: 1px;
     /* Fixed semantic values - not customizable (3 values) */
     --border-radius-pill: 999px; /* Fully rounded (toggles, badges) */
     --border-radius-circle: 50%; /* Perfect circles */
@@ -127,6 +128,33 @@
     --card-feedback-gap: calc(1.25rem * var(--app-density-scale));
     --card-element-gap: calc(0.75rem * var(--app-density-scale));
     --card-feedback-reserved-height: 200px;
+
+    /* SPARC document layout theme tokens */
+    --app-sparc-multiple-choice-width: 66.666%;
+    --app-sparc-answer-list-width: calc(var(--app-text-input-height) * 24);
+    --app-sparc-feedback-width-min: calc(var(--app-text-input-height) * 12);
+    --app-sparc-feedback-width-max: calc(var(--app-text-input-height) * 16);
+    --app-sparc-term-table-min-width: calc(var(--app-text-input-height) * 26);
+    --app-sparc-term-column-width-wide: calc(var(--app-text-input-height) * 5.25);
+    --app-sparc-term-column-width-medium: calc(var(--app-text-input-height) * 4.75);
+    --app-sparc-term-column-width-narrow: calc(var(--app-text-input-height) * 4.5);
+    --app-sparc-term-value-width: calc(var(--app-text-input-height) * 1.75);
+    --app-sparc-term-unit-width: calc(var(--app-text-input-height) * 1.35);
+    --app-sparc-term-substance-width: calc(var(--app-text-input-height) * 2.15);
+    --app-sparc-term-cancel-width: calc(var(--app-text-input-height) * 0.45);
+    --app-sparc-hint-min-height: calc(var(--app-text-input-height) * 4);
+    --app-sparc-hint-button-min-width: calc(var(--app-text-input-height) * 4);
+    --app-sparc-table-column-min-width: calc(var(--app-text-input-height) * 2);
+    --app-sparc-fraction-min-width: calc(var(--app-text-input-height) * 1.5);
+    --app-sparc-operator-min-width: calc(var(--app-text-input-height) * 0.75);
+    --app-sparc-message-min-width: calc(var(--app-text-input-height) * 6);
+    --app-sparc-skill-track-min-width: calc(var(--app-text-input-height) * 5);
+    --app-sparc-skill-track-max-width: calc(var(--app-text-input-height) * 10);
+    --app-sparc-skill-bar-min-width: calc(var(--app-text-input-height) * 13);
+    --app-sparc-skill-track-height: calc(var(--app-text-input-height) / 4);
+    --app-sparc-feedback-glow-radius: var(--app-space-2);
+    --app-sparc-primary-flex-grow: 999;
+    --app-sparc-term-unit-flex-ratio: 0.72fr;
 
     /* Precomputed button colors - avoid repeated color-mix calculations */
     --btn-border-color: color-mix(in srgb, var(--app-primary-action-surface-color) calc((100 - var(--app-button-border-darkness, 20)) * 1%), var(--app-text-color) calc(var(--app-button-border-darkness, 20) * 1%));

@@ -55,6 +55,10 @@
     return /done|submit|check/.test(label);
   }
 
+  function hasProductionRules() {
+    return Array.isArray(sparcDisplay?.productionRules);
+  }
+
   function handleNodeValueChange(nodeId, value) {
     nodeValues = {
       ...nodeValues,
@@ -80,20 +84,24 @@
   }
 
   function handleButtonActivate(node) {
-    const submittedNodes = {
-      ...nodeValues,
-      ...(node?.id ? { [node.id]: node.value ?? node.submitValue ?? buttonLabel(node) } : {}),
-    };
+    const buttonSubmission = node?.id
+      ? { [node.id]: node.value ?? node.submitValue ?? buttonLabel(node) }
+      : {};
     if (!isSubmitButton(node)) {
       dispatch('sparcaction', {
-        submittedNodes,
+        submittedNodes: buttonSubmission,
         triggeredBy: node?.id,
         timestamp: Date.now(),
       });
       return;
     }
     dispatch('sparcsubmit', {
-      submittedNodes,
+      submittedNodes: hasProductionRules()
+        ? buttonSubmission
+        : {
+            ...nodeValues,
+            ...buttonSubmission,
+          },
       triggeredBy: node?.id,
       timestamp: Date.now(),
     });
@@ -129,7 +137,9 @@
   $: realizedSparcDisplay = sparcDisplay
     ? { ...sparcDisplay, nodes: topLevelNodes }
     : null;
-  $: boxedNodeGroups = realizedSparcDisplay ? buildSparcBoxedNodeGroups(realizedSparcDisplay) : [];
+  $: boxedNodeGroups = realizedSparcDisplay
+    ? buildSparcBoxedNodeGroups(realizedSparcDisplay).filter((group) => group.nodes.length > 0)
+    : [];
   $: usesBoxLayout = boxedNodeGroups.length > 0;
   $: authoredNodeValues = buildInitialNodeValues(topLevelNodes, {});
   $: nodeValues = mergeRuntimeNodeValues(authoredNodeValues, runtimeNodeValues);
@@ -187,70 +197,147 @@
 
 <style>
   .sparc-surface {
+    --sparc-surface-color: var(--learning-card-stimulus-surface-color, var(--learning-card-surface-color, var(--app-background-color)));
+    --sparc-control-surface-color: var(--learning-card-surface-color, var(--app-background-color));
+    --sparc-muted-surface-color: var(--app-secondary-surface-color);
+    --sparc-subtle-surface-color: var(--app-subtle-surface-color);
+    --sparc-text-color: var(--app-text-color);
+    --sparc-secondary-text-color: var(--app-secondary-text-color, var(--app-text-color));
+    --sparc-heading-color: var(--app-page-header-text-color, var(--app-text-color));
+    --sparc-accent-color: var(--app-accent-color);
+    --sparc-primary-action-surface-color: var(--app-primary-action-surface-color, var(--app-accent-color));
+    --sparc-primary-action-text-color: var(--app-primary-action-text-color, var(--app-text-color));
+    --sparc-correct-color: var(--feedback-correct-color);
+    --sparc-error-color: var(--feedback-error-color);
+    --sparc-warning-color: var(--app-warning-color, var(--app-accent-color));
+    --sparc-border-color: color-mix(in srgb, var(--sparc-text-color) 16%, transparent);
+    --sparc-shadow-color: color-mix(in srgb, var(--sparc-text-color) 22%, transparent);
+    --sparc-font-family: var(--app-font-family);
+    --sparc-heading-font-family: var(--app-heading-font-family, var(--app-font-family));
+    --sparc-font-size-base: var(--app-font-size-base);
+    --sparc-font-size-small: calc(var(--app-font-size-base) * 0.875);
+    --sparc-font-size-large: calc(var(--app-font-size-base) * 1.18);
+    --sparc-density-scale: var(--app-density-scale);
+    --sparc-space-0: var(--app-space-0);
+    --sparc-space-1: var(--app-space-1);
+    --sparc-space-2: var(--app-space-2);
+    --sparc-space-3: var(--app-space-3);
+    --sparc-space-4: var(--app-space-4);
+    --sparc-control-padding-y: var(--app-space-0);
+    --sparc-control-padding-x: var(--app-space-3);
+    --sparc-control-line-height: var(--app-text-input-height);
+    --sparc-border-radius-sm: var(--app-border-radius-sm);
+    --sparc-border-radius-lg: var(--app-border-radius-lg);
+    --sparc-border-radius-pill: var(--border-radius-pill);
+    --sparc-border-width: var(--app-border-width);
+    --sparc-primary-flex-grow: var(--app-sparc-primary-flex-grow);
+    --sparc-multiple-choice-width: var(--app-sparc-multiple-choice-width);
+    --sparc-answer-list-width: var(--app-sparc-answer-list-width);
+    --sparc-feedback-width-min: var(--app-sparc-feedback-width-min);
+    --sparc-feedback-width-max: var(--app-sparc-feedback-width-max);
+    --sparc-term-table-min-width: var(--app-sparc-term-table-min-width);
+    --sparc-term-column-width-wide: var(--app-sparc-term-column-width-wide);
+    --sparc-term-column-width-medium: var(--app-sparc-term-column-width-medium);
+    --sparc-term-column-width-narrow: var(--app-sparc-term-column-width-narrow);
+    --sparc-term-value-width: var(--app-sparc-term-value-width);
+    --sparc-term-unit-width: var(--app-sparc-term-unit-width);
+    --sparc-term-unit-flex-ratio: var(--app-sparc-term-unit-flex-ratio);
+    --sparc-term-substance-width: var(--app-sparc-term-substance-width);
+    --sparc-term-cancel-width: var(--app-sparc-term-cancel-width);
+    --sparc-hint-min-height: var(--app-sparc-hint-min-height);
+    --sparc-hint-button-min-width: var(--app-sparc-hint-button-min-width);
+    --sparc-table-column-min-width: var(--app-sparc-table-column-min-width);
+    --sparc-fraction-min-width: var(--app-sparc-fraction-min-width);
+    --sparc-operator-min-width: var(--app-sparc-operator-min-width);
+    --sparc-message-min-width: var(--app-sparc-message-min-width);
+    --sparc-skill-track-min-width: var(--app-sparc-skill-track-min-width);
+    --sparc-skill-track-max-width: var(--app-sparc-skill-track-max-width);
+    --sparc-skill-bar-min-width: var(--app-sparc-skill-bar-min-width);
+    --sparc-skill-track-height: var(--app-sparc-skill-track-height);
+    --sparc-feedback-glow-radius: var(--app-sparc-feedback-glow-radius);
     width: 100%;
     height: 100%;
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
-    padding: 0.75rem;
+    gap: var(--sparc-space-2);
+    padding: var(--sparc-space-3);
     overflow: auto;
     box-sizing: border-box;
+    background: var(--sparc-surface-color);
+    color: var(--sparc-text-color);
+    font-family: var(--sparc-font-family);
+    font-size: var(--sparc-font-size-base);
   }
 
   .sparc-question-number {
-    font-size: 0.9rem;
-    font-weight: 600;
+    color: var(--sparc-secondary-text-color);
+    font-size: var(--sparc-font-size-small);
+    font-weight: var(--app-font-weight-semibold, 600);
   }
 
   .sparc-topbar {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
+    justify-content: flex-start;
+    gap: var(--sparc-space-3);
+    padding-bottom: var(--sparc-space-1);
   }
 
   .sparc-topbar-title {
-    font-size: 1.1rem;
-    font-weight: 700;
+    color: var(--sparc-heading-color);
+    font-family: var(--sparc-heading-font-family);
+    font-size: calc(var(--app-font-size-base) * 1.35);
+    font-weight: var(--app-font-weight-bold, 700);
+  }
+
+  .sparc-topbar-title::after {
+    content: "|";
+    margin-left: var(--sparc-space-4);
+    color: var(--sparc-heading-color);
+    font-weight: var(--app-font-weight-bold, 700);
   }
 
   .sparc-topbar-help {
-    font-size: 0.9rem;
-    opacity: 0.75;
+    color: var(--sparc-heading-color);
+    font-size: var(--sparc-font-size-small);
+    font-weight: var(--app-font-weight-semibold, 600);
   }
 
   .sparc-surface-body {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: var(--sparc-space-4);
   }
 
   .sparc-box-layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: 1rem;
+    gap: var(--sparc-space-3);
   }
 
   .sparc-box {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: var(--sparc-space-3);
     min-width: 0;
   }
 
-  @media (min-width: 900px) {
-    .sparc-box-layout:has(.sparc-box[data-sparc-box-region="right"]) {
-      grid-template-columns: minmax(0, 3fr) minmax(16rem, 1fr);
-      align-items: start;
-    }
+  .sparc-box-layout:has(.sparc-box[data-sparc-box-region="right"]) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
 
-    .sparc-box[data-sparc-box-region="right"] {
-      grid-column: 2;
-      grid-row: 1 / span 3;
-    }
+  .sparc-box[data-sparc-box-region="right"] {
+    flex: 1 1 var(--sparc-feedback-width-min);
+  }
 
-    .sparc-box[data-sparc-box-region="bottom"] {
-      grid-column: 1 / -1;
-    }
+  .sparc-box[data-sparc-box-region="left"],
+  .sparc-box:not([data-sparc-box-region="right"]):not([data-sparc-box-region="bottom"]) {
+    flex: var(--sparc-primary-flex-grow) 1 var(--sparc-answer-list-width);
+  }
+
+  .sparc-box[data-sparc-box-region="bottom"] {
+    flex: 1 1 100%;
   }
 </style>
