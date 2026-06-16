@@ -89,6 +89,7 @@ const APP_SHELL_TEMPLATES = new Set([
   'theme',
   'testRunner',
   'classEdit',
+  'courses',
   'tdfAssignmentEdit',
   'instructorReporting',
 ]);
@@ -116,6 +117,7 @@ const APP_SHELL_TITLES: Record<string, string> = {
   theme: 'Theme',
   testRunner: 'Admin Tests',
   classEdit: 'Class Management',
+  courses: 'Courses',
   tdfAssignmentEdit: 'Course Assignments',
   instructorReporting: 'Instructor Reporting',
 };
