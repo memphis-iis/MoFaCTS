@@ -192,6 +192,7 @@ const lazyTemplateLoaders: Record<string, any> = {
   aiContentCreator: () => import('../views/experimentSetup/aiContentCreator'),
   manualContentCreator: () => import('../views/experimentSetup/manualContentCreator'),
   contentEdit: () => import('../views/experimentSetup/contentEdit'),
+  sparcEdit: () => import('../views/experimentSetup/sparcEdit'),
   tdfEdit: () => import('../views/experimentSetup/tdfEdit'),
   tdfAssignmentEdit: () => import('../views/experimentSetup/tdfAssignmentEdit'),
   dataDownload: () => import('../views/experimentReporting/dataDownload'),
@@ -868,6 +869,16 @@ FlowRouter.route('/contentEdit/:tdfId', {
       Session.set('editingTdfId', params.tdfId);
       await renderRouteTemplate(this, 'contentEdit');
     }, getRouteAccessPolicy('client.contentEdit'));
+  }
+})
+
+FlowRouter.route('/sparcEdit/:tdfId', {
+  name: 'client.sparcEdit',
+  action: async function(params: any) {
+    waitForAuthenticatedRoute(this, 'client.sparcEdit', async () => {
+      Session.set('editingTdfId', params.tdfId);
+      await renderRouteTemplate(this, 'sparcEdit');
+    }, getRouteAccessPolicy('client.sparcEdit'));
   }
 })
 

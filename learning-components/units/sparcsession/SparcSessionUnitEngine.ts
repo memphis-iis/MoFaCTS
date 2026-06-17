@@ -117,6 +117,10 @@ export async function createSparcSessionUnitEngine(
         ...(params.extraFacts ? { extraFacts: params.extraFacts } : {}),
         ...(params.maxCycles !== undefined ? { maxCycles: params.maxCycles } : {}),
         runtime: {
+          adaptiveModel: {
+            applyModelPracticeUpdate: adaptiveEngine.applyModelPracticeUpdate,
+            queryModelPracticeState: adaptiveEngine.queryModelPracticeState,
+          },
           history: params.history,
         },
       });
@@ -132,6 +136,10 @@ export async function createSparcSessionUnitEngine(
         result: params.result,
         priorHistoryRecords: params.priorHistoryRecords,
         history: params.history,
+        adaptiveModel: {
+          applyModelPracticeUpdate: adaptiveEngine.applyModelPracticeUpdate,
+          queryModelPracticeState: adaptiveEngine.queryModelPracticeState,
+        },
       });
     },
 

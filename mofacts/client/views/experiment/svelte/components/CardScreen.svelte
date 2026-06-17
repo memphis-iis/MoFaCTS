@@ -537,6 +537,7 @@
     srMaxAttempts: audioState.maxSrAttempts,
     srStatus,
     sparcNodeValues: context.sparcNodeValues,
+    learningProgressSnapshot,
     subset: trialSubset,
     userAnswer: textAnswer,
   });
@@ -696,8 +697,21 @@
     documentRef: () => typeof document === 'undefined' ? null : document,
     getHiddenItems: () => CardStore.getHiddenItems(),
   });
+  $: currentSparcProgressReporter = context.currentDisplay?.type === 'sparc'
+    && context.currentDisplay?.progressReporter
+    && typeof context.currentDisplay.progressReporter === 'object'
+    ? context.currentDisplay.progressReporter
+    : null;
+  $: currentSparcRequestsProgressSidebar = currentSparcProgressReporter?.placement === 'sidebar';
+  $: learningProgressDeliverySettings = sparcTrialDisplayOwnsInteraction(context.currentDisplay)
+    && !currentSparcRequestsProgressSidebar
+      ? {
+          ...deliverySettings,
+          disableProgressReport: true,
+        }
+      : deliverySettings;
   $: learningProgressRuntimeSnapshot = (learningProgressRequestVersion, learningProgressRuntimeController.buildRuntimeSnapshot({
-    deliverySettings,
+    deliverySettings: learningProgressDeliverySettings,
     engine: context.engine,
     feedbackEnd: context.timestamps?.feedbackEnd || 0,
     refreshSignal: context.h5pResult?.batchId || '',

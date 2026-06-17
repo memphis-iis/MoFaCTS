@@ -4,6 +4,7 @@ import type {
 } from '../../trial-displays/sparc/SparcTrialDisplayAdapter';
 import { sparcTrialDisplayAdapter } from '../../trial-displays/sparc/SparcTrialDisplayAdapter';
 import type { HistoryRuntime } from '../../runtime/LearningComponentContext';
+import type { ModelPracticeRuntime } from '../../runtime/modelPracticeRuntime';
 import type { CanonicalHistoryRecord } from '../../runtime/historyEnvelope';
 import {
   commitSparcAuthoredProductionRuleEvent,
@@ -19,6 +20,7 @@ import type {
   SparcAuthoredNode,
   SparcProductionRule,
   SparcReactiveEvent,
+  SparcStimulusRegistryEntry,
   SparcWorkingMemoryFact,
 } from './sparcSessionContracts';
 
@@ -27,6 +29,8 @@ type DisplayNodeRecord = {
   readonly nodeType?: unknown;
   readonly atomType?: unknown;
   readonly children?: unknown;
+  readonly stimulusId?: unknown;
+  readonly stimulusIds?: unknown;
 };
 
 type SaiResponseRecord = {
@@ -85,6 +89,9 @@ function nodeKind(node: DisplayNodeRecord): SparcAuthoredNode['kind'] {
     case 'checkbox':
     case 'button':
       return 'input';
+    case 'panel-selector':
+    case 'html-block':
+    case 'learning-progress':
     case 'text-block':
     case 'static-text':
     case 'label':
@@ -98,11 +105,44 @@ function authoredNodeFromDisplayNode(node: DisplayNodeRecord): SparcAuthoredNode
   const children = Array.isArray(node.children)
     ? node.children.filter(isRecord).map((child) => authoredNodeFromDisplayNode(child))
     : [];
+  const stimulusIds = Array.isArray(node.stimulusIds)
+    ? node.stimulusIds.filter((value) => typeof value === 'string' && value.trim()).map((value) => value.trim())
+    : (typeof node.stimulusId === 'string' && node.stimulusId.trim() ? [node.stimulusId.trim()] : []);
   return {
     id: requireNonBlank(node.id, 'SPARC display node id'),
     kind: nodeKind(node),
+    ...(stimulusIds.length > 0 ? { stimulusIds } : {}),
     ...(children.length > 0 ? { children } : {}),
   };
+}
+
+function normalizeStimulusRegistry(display: SparcTrialDisplay): readonly SparcStimulusRegistryEntry[] {
+  if (!Array.isArray((display as Record<string, unknown>).stimulusRegistry)) {
+    return [];
+  }
+  return ((display as Record<string, unknown>).stimulusRegistry as unknown[])
+    .filter(isRecord)
+    .map((entry, index) => ({
+      stimulusId: requireNonBlank(entry.stimulusId, `SPARC stimulusRegistry[${index}].stimulusId`),
+      ...(typeof entry.label === 'string' && entry.label.trim() ? { label: entry.label.trim() } : {}),
+      stimuliSetId: entry.stimuliSetId as string | number,
+      stimulusKC: entry.stimulusKC as string | number,
+      clusterKC: entry.clusterKC as string | number,
+      KCId: entry.KCId as string | number,
+      KCDefault: entry.KCDefault as string | number,
+      KCCluster: entry.KCCluster as string | number,
+      ...(isRecord(entry.response)
+        ? {
+            response: {
+              responseKC: entry.response.responseKC as string | number,
+              responseKey: String(entry.response.responseKey ?? ''),
+            },
+          }
+        : {}),
+      ...(typeof entry.stimulusRecordId === 'string' && entry.stimulusRecordId.trim()
+        ? { stimulusRecordId: entry.stimulusRecordId.trim() }
+        : {}),
+    }));
 }
 
 export function createSparcAuthoredDocumentFromTrialDisplay(params: {
@@ -126,6 +166,7 @@ export function createSparcAuthoredDocumentFromTrialDisplay(params: {
       scrollAxis: 'vertical',
       layoutMode: 'document',
     },
+    stimulusRegistry: normalizeStimulusRegistry(display),
     workingMemoryFacts: authoredFacts,
     productionRules: directProductionRules,
     root: {
@@ -252,6 +293,7 @@ export async function commitSparcTrialDisplayProductionRuleEvents(params: {
   readonly result: SparcTrialResult;
   readonly priorHistoryRecords: readonly CanonicalHistoryRecord[];
   readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory'>;
+  readonly adaptiveModel?: ModelPracticeRuntime;
 }): Promise<SparcTrialDisplayProductionRuleCommitResult> {
   const document = createSparcAuthoredDocumentFromTrialDisplay({
     documentId: params.documentId,
@@ -271,6 +313,7 @@ export async function commitSparcTrialDisplayProductionRuleEvents(params: {
       replayState,
       event,
       runtime: {
+        ...(params.adaptiveModel ? { adaptiveModel: params.adaptiveModel } : {}),
         history: params.history,
       },
     });

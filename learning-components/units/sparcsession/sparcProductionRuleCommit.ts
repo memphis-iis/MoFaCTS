@@ -1,9 +1,13 @@
 import type { HistoryRuntime } from '../../runtime/LearningComponentContext';
+import type { ModelPracticeRuntime } from '../../runtime/modelPracticeRuntime';
 import type { SparcPracticeHistoryCore } from './sparcPracticeHistoryBridge';
+import { processSparcResponseOutcome } from './sparcResponseOutcomeProcessor';
+import { commitSparcProcessedResponseOutcome } from './sparcResponseOutcomeCommit';
 import { runSparcProductionRules } from './sparcProductionRuleEvaluator';
 import { createSparcStateTransitionHistoryRecord } from './sparcStateTransitionHistory';
 import { buildSparcWorkingMemoryFacts } from './sparcWorkingMemoryFacts';
 import { createSparcWorkingMemoryFactStateWrite } from './sparcWorkingMemoryState';
+import { resolveSparcProductionRuleModelTarget } from './sparcAuthoredModelTargets';
 import type { SparcReplayState } from './sparcStateReplay';
 import type {
   SparcAuthoredDocument,
@@ -15,6 +19,7 @@ import type {
 } from './sparcSessionContracts';
 
 export type SparcProductionRuleCommitRuntime = {
+  readonly adaptiveModel?: ModelPracticeRuntime;
   readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory'>;
 };
 
@@ -22,6 +27,7 @@ export type SparcCommittedProductionRuleEvaluation = {
   readonly execution: SparcProductionRuleExecution;
   readonly transition?: SparcStateTransition;
   readonly historyRecord?: SparcCanonicalHistoryRecord;
+  readonly modelHistoryRecords?: readonly SparcCanonicalHistoryRecord[];
 };
 
 function productionRuleEventPayload(
@@ -134,9 +140,16 @@ export async function commitSparcAuthoredProductionRuleEvent(params: {
   });
 
   if (!evaluation.transition) {
+    if (evaluation.execution.firings.some((firing) => firing.modelPracticeObservations.length > 0)) {
+      return {
+        ...evaluation,
+        modelHistoryRecords: await commitProductionRuleModelPracticeObservations(params, evaluation),
+      };
+    }
     return evaluation;
   }
 
+  const modelHistoryRecords = await commitProductionRuleModelPracticeObservations(params, evaluation);
   const historyRecord = createSparcStateTransitionHistoryRecord({
     core: params.core,
     transition: evaluation.transition,
@@ -146,5 +159,62 @@ export async function commitSparcAuthoredProductionRuleEvent(params: {
   return {
     ...evaluation,
     historyRecord,
+    ...(modelHistoryRecords.length > 0 ? { modelHistoryRecords } : {}),
   };
+}
+
+async function commitProductionRuleModelPracticeObservations(
+  params: {
+    readonly core: SparcPracticeHistoryCore;
+    readonly document: SparcAuthoredDocument;
+    readonly event: SparcReactiveEvent;
+    readonly runtime: SparcProductionRuleCommitRuntime;
+  },
+  evaluation: SparcCommittedProductionRuleEvaluation,
+): Promise<SparcCanonicalHistoryRecord[]> {
+  const observations = evaluation.execution.firings.flatMap((firing) => firing.modelPracticeObservations);
+  if (observations.length === 0) {
+    return [];
+  }
+  if (!params.runtime.adaptiveModel) {
+    throw new Error('SPARC production rule model-practice effect requires adaptive model runtime support');
+  }
+  const committed: SparcCanonicalHistoryRecord[] = [];
+  for (const [index, observation] of observations.entries()) {
+    const nodeId = observation.nodeId || params.event.source.nodeId;
+    const modelTarget = resolveSparcProductionRuleModelTarget({
+      document: params.document,
+      sourceAddress: params.event.source,
+      ...(observation.stimulusId ? { stimulusId: observation.stimulusId } : {}),
+      nodeId,
+    });
+    const processed = processSparcResponseOutcome(params.core, {
+      observationId: `${params.event.eventId}:model-practice:${index}`,
+      sourceAddress: {
+        documentId: params.event.source.documentId,
+        nodeId,
+      },
+      time: params.event.time,
+      problemStartTime: params.event.time,
+      outcome: observation.outcome,
+      responseValue: observation.responseValue ?? params.event.payload?.input ?? observation.outcome,
+      ...(observation.input !== undefined ? { input: observation.input } : {}),
+      displayedStimulus: {
+        documentId: params.event.source.documentId,
+        nodeId,
+        stimulusId: observation.stimulusId ?? null,
+      },
+      modelTarget,
+    });
+    const committedOutcome = await commitSparcProcessedResponseOutcome(
+      params.core,
+      processed,
+      {
+        adaptiveModel: params.runtime.adaptiveModel,
+        history: params.runtime.history,
+      },
+    );
+    committed.push(committedOutcome.historyRecord);
+  }
+  return committed;
 }

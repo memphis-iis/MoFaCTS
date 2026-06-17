@@ -7,6 +7,7 @@ import './aiContentCreator';
 import { meteorCallAsync, clientConsole } from '../..';
 import { ReactiveVar } from 'meteor/reactive-var';
 import { ReactiveDict } from 'meteor/reactive-dict';
+import { Tracker } from 'meteor/tracker';
 import { currentUserHasRole } from '../../lib/roleUtils';
 import { buildStimuliFromNormalizedItems, buildTutorFromNormalizedItems, getImportFileNames } from '../../lib/importCompositionBuilder';
 import type { NormalizedImportItem } from '../../lib/normalizedImportTypes';
@@ -87,6 +88,22 @@ function buildAccessMessageClass(level: any) {
   if (level === 'warning') return 'alert-warning';
   if (level === 'error') return 'alert-danger';
   return 'alert-info';
+}
+
+function isSparcStimulusDisplay(display: any) {
+  return display
+    && typeof display === 'object'
+    && display.type === 'sparc'
+    && Array.isArray(display.nodes);
+}
+
+function tdfHasSparcStimuli(tdf: any) {
+  const clusters = tdf?.rawStimuliFile?.setspec?.clusters;
+  if (!Array.isArray(clusters)) {
+    return false;
+  }
+  return clusters.some((cluster: any) => Array.isArray(cluster?.stims)
+    && cluster.stims.some((stim: any) => isSparcStimulusDisplay(stim?.display)));
 }
 
 function setAccessMessage(template: any, tdfId: any, text: any, level: any = 'info') {
@@ -824,7 +841,7 @@ Template.contentUpload.events({
   },
 
   // Open content editor for TDF (stimuli editing)
-  'click #content-edit-btn': function(event: any, _template: any) {
+  'click #content-edit-btn': function(event: any, template: any) {
     event.preventDefault();
     const button = event.currentTarget;
     const hasSelector = button.getAttribute('data-has-selector') === 'true';
@@ -855,7 +872,47 @@ Template.contentUpload.events({
       }
     }
 
-    FlowRouter.go('/contentEdit/' + tdfId + stimFileParam);
+    const routeToEditor = (selectedTdf: any) => {
+      const editorRoute = tdfHasSparcStimuli(selectedTdf) ? '/sparcEdit/' : '/contentEdit/';
+      FlowRouter.go(editorRoute + tdfId + stimFileParam);
+    };
+
+    const selectedTdf = TdfsCollection.findOne({ _id: tdfId });
+    if (selectedTdf) {
+      routeToEditor(selectedTdf);
+      return;
+    }
+
+    template?.ensureTdfDetails?.(tdfId);
+    const detailSub = template?.detailSubs?.get?.(tdfId);
+    button.disabled = true;
+    button.setAttribute('aria-busy', 'true');
+
+    const computation = Tracker.autorun((run: any) => {
+      const loadedTdf = TdfsCollection.findOne({ _id: tdfId });
+      if (loadedTdf) {
+        run.stop();
+        button.disabled = false;
+        button.removeAttribute('aria-busy');
+        routeToEditor(loadedTdf);
+        return;
+      }
+      if (detailSub?.ready?.()) {
+        run.stop();
+        button.disabled = false;
+        button.removeAttribute('aria-busy');
+        alert('Content details could not be loaded for this TDF.');
+      }
+    });
+
+    setTimeout(() => {
+      if (!computation.stopped) {
+        computation.stop();
+        button.disabled = false;
+        button.removeAttribute('aria-busy');
+        alert('Content details are still loading. Please try again after the row finishes loading.');
+      }
+    }, 10000);
   },
 
   // Open TDF settings editor (schema-driven)

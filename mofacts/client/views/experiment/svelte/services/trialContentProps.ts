@@ -98,6 +98,7 @@ export interface TrialContentPropsFromSubsetInput {
   readonly srMaxAttempts: unknown;
   readonly srStatus: unknown;
   readonly sparcNodeValues?: unknown;
+  readonly learningProgressSnapshot?: unknown;
   readonly subset: TrialSubset;
   readonly userAnswer: unknown;
 }
@@ -217,6 +218,7 @@ export function buildTrialContentPropsFromSubset(
       sparcNodeValues: input.sparcNodeValues && typeof input.sparcNodeValues === 'object'
         ? input.sparcNodeValues
         : {},
+      learningProgressSnapshot: input.learningProgressSnapshot || null,
       feedbackVisible: input.subset.feedbackVisible,
       isCorrect: feedbackIsCorrect,
       isTimeout: Boolean(input.isTimeout),

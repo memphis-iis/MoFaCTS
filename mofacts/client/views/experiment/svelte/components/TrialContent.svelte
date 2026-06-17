@@ -152,6 +152,9 @@
   /** @type {Record<string, unknown>} Runtime SPARC node values from production-rule effects */
   export let sparcNodeValues = {};
 
+  /** @type {Object | null} Learning progress snapshot shared with SPARC progress nodes */
+  export let learningProgressSnapshot = null;
+
   $: normalizedLayoutMode = String(layoutMode || '').trim().toLowerCase();
   $: isSplitLayout = normalizedLayoutMode === 'left';
   $: isOverUnder = !isSplitLayout;
@@ -328,6 +331,7 @@
         <SparcTrialSurface
           {display}
           runtimeNodeValues={sparcNodeValues}
+          {learningProgressSnapshot}
           {showQuestionNumber}
           {questionNumber}
           on:sparcaction={handleSparcAction}

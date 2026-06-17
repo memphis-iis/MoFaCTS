@@ -14,6 +14,7 @@ export const routeAccessPolicies: Readonly<Record<string, RouteAccessPolicy>> = 
   'client.aiContentCreator': { requiresAuth: true },
   'client.manualContentCreator': { requiresAuth: true },
   'client.contentEdit': { requiresAuth: true },
+  'client.sparcEdit': { requiresAuth: true },
   'client.tdfEdit': { requiresAuth: true },
   'client.profile': { requiresAuth: true },
   'client.dataDownload': { requiresAuth: true },

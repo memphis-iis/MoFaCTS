@@ -1,0 +1,22 @@
+<template name="sparcEdit">
+  <div class="container-fluid admin-page sparc-edit-page">
+    {{#if loading}}
+      <div class="loading-container">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    {{else}}
+      {{#if noData}}
+        <div class="alert alert-warning">
+          SPARC content was not found for this TDF.
+        </div>
+        <a href="/contentUpload" class="btn btn-secondary">
+          <i class="fa fa-arrow-left"></i> Back to Content Manager
+        </a>
+      {{else}}
+        <div id="sparc-editor-root"></div>
+      {{/if}}
+    {{/if}}
+  </div>
+</template>

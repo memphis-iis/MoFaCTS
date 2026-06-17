@@ -12,6 +12,7 @@
 
   export let display = {};
   export let runtimeNodeValues = {};
+  export let learningProgressSnapshot = null;
   export let showQuestionNumber = false;
   export let questionNumber = 0;
 
@@ -59,6 +60,26 @@
     return Array.isArray(sparcDisplay?.productionRules);
   }
 
+  function collectDefaultSubmissionValues(nodes = [], values = {}) {
+    for (const candidate of nodes || []) {
+      if (!candidate || typeof candidate !== 'object') {
+        continue;
+      }
+      if (candidate.nodeType === 'atomic' && candidate.id && candidate.atomType === 'checkbox') {
+        values[candidate.id] = candidate.checked === true;
+      }
+      if (Array.isArray(candidate.children)) {
+        collectDefaultSubmissionValues(candidate.children, values);
+      }
+      if (Array.isArray(candidate.panels)) {
+        for (const panel of candidate.panels) {
+          collectDefaultSubmissionValues(panel.children || [], values);
+        }
+      }
+    }
+    return values;
+  }
+
   function handleNodeValueChange(nodeId, value) {
     nodeValues = {
       ...nodeValues,
@@ -97,7 +118,11 @@
     }
     dispatch('sparcsubmit', {
       submittedNodes: hasProductionRules()
-        ? buttonSubmission
+        ? {
+            ...collectDefaultSubmissionValues(sparcDisplay?.nodes),
+            ...nodeValues,
+            ...buttonSubmission,
+          }
         : {
             ...nodeValues,
             ...buttonSubmission,
@@ -172,6 +197,7 @@
             <SparcNode
               {node}
               {nodeValues}
+              {learningProgressSnapshot}
               onNodeValueChange={handleNodeValueChange}
               onNodeCommit={handleNodeValueCommit}
               onNodeFocus={handleNodeFocus}
@@ -185,6 +211,7 @@
         <SparcNode
           {node}
           {nodeValues}
+          {learningProgressSnapshot}
           onNodeValueChange={handleNodeValueChange}
           onNodeCommit={handleNodeValueCommit}
           onNodeFocus={handleNodeFocus}

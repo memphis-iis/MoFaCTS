@@ -366,6 +366,13 @@ function instantiateFiring(
     readonly text: string;
     readonly target?: SparcStateWrite['target'];
   }[] = [];
+  const modelPracticeObservations: {
+    outcome: SparcProductionRuleFiring['modelPracticeObservations'][number]['outcome'];
+    stimulusId?: string;
+    nodeId?: string;
+    responseValue?: unknown;
+    input?: unknown;
+  }[] = [];
   const classifications: (SparcProductionRuleFiring['classifications'][number])[] = [];
   const credits: string[] = [];
 
@@ -416,6 +423,35 @@ function instantiateFiring(
           'SPARC production rule credit kc',
         ));
         break;
+      case 'model-practice':
+        modelPracticeObservations.push({
+          outcome: effect.outcome,
+          ...(effect.stimulusId !== undefined
+            ? {
+                stimulusId: evaluateStringTemplateValue(
+                  effect.stimulusId,
+                  bindings,
+                  'SPARC production rule model-practice stimulusId',
+                ),
+              }
+            : {}),
+          ...(effect.nodeId !== undefined
+            ? {
+                nodeId: evaluateStringTemplateValue(
+                  effect.nodeId,
+                  bindings,
+                  'SPARC production rule model-practice nodeId',
+                ),
+              }
+            : {}),
+          ...(effect.responseValue !== undefined
+            ? { responseValue: evaluateSparcRuleExpression(effect.responseValue, bindings) }
+            : {}),
+          ...(effect.input !== undefined
+            ? { input: evaluateSparcRuleExpression(effect.input, bindings) }
+            : {}),
+        });
+        break;
       case 'append-node':
       case 'append-node-if-missing':
       case 'insert-node':
@@ -432,6 +468,7 @@ function instantiateFiring(
     persistentAssertedFacts,
     writes,
     messages,
+    modelPracticeObservations,
     classifications,
     credits,
   };

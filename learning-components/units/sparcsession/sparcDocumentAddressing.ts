@@ -5,6 +5,7 @@ import type {
   SparcCondition,
   SparcDocumentAddress,
   SparcModelTargetIdentity,
+  SparcStimulusRegistryEntry,
 } from './sparcSessionContracts';
 import { assertModelPracticeHistoryIdentity } from '../../runtime/historyStimulusIdentity';
 import { MODEL_PRACTICE_METRICS } from '../../runtime/modelPracticeStateQueries';
@@ -363,16 +364,111 @@ function validateAuthoredModelTargets(
   }
 }
 
+function modelTargetFromRegistryEntry(
+  document: SparcAuthoredDocument,
+  entry: SparcStimulusRegistryEntry,
+): SparcModelTargetIdentity {
+  return {
+    stimuliSetId: entry.stimuliSetId,
+    stimulusKC: entry.stimulusKC,
+    clusterKC: entry.clusterKC,
+    KCId: entry.KCId,
+    KCDefault: entry.KCDefault,
+    KCCluster: entry.KCCluster,
+    ...(entry.response ? { response: entry.response } : {}),
+    ...(entry.stimulusRecordId ? { stimulusRecordId: entry.stimulusRecordId } : {}),
+    sparcDocumentId: document.id,
+    sparcNodeId: document.root.id,
+  };
+}
+
+function validateStimulusRegistry(
+  document: SparcAuthoredDocument,
+  issues: SparcReferenceValidationIssue[],
+): Set<string> {
+  const ids = new Set<string>();
+  for (const [index, entry] of (document.stimulusRegistry ?? []).entries()) {
+    const sourceNodeId = `stimulus-registry:${index}`;
+    if (typeof entry.stimulusId !== 'string' || entry.stimulusId.trim().length === 0) {
+      issues.push({
+        sourceNodeId,
+        reference: {
+          relation: 'model-target',
+          target: {
+            documentId: document.id,
+            nodeId: document.root.id,
+          },
+        },
+        message: `SPARC stimulusRegistry[${index}].stimulusId is required`,
+      });
+    } else if (ids.has(entry.stimulusId)) {
+      issues.push({
+        sourceNodeId,
+        reference: {
+          relation: 'model-target',
+          target: {
+            documentId: document.id,
+            nodeId: document.root.id,
+          },
+        },
+        message: `SPARC stimulusRegistry contains duplicate stimulusId "${entry.stimulusId}"`,
+      });
+    } else {
+      ids.add(entry.stimulusId);
+    }
+    validateModelTargetIdentity({
+      target: modelTargetFromRegistryEntry(document, entry),
+      sourceNodeId,
+      issues,
+    });
+  }
+  return ids;
+}
+
+function validateNodeStimulusAttachments(
+  document: SparcAuthoredDocument,
+  node: SparcAuthoredNode,
+  registryIds: ReadonlySet<string>,
+  issues: SparcReferenceValidationIssue[],
+): void {
+  for (const [index, stimulusId] of (node.stimulusIds ?? []).entries()) {
+    if (typeof stimulusId !== 'string' || stimulusId.trim().length === 0) {
+      issues.push({
+        sourceNodeId: node.id,
+        reference: {
+          relation: 'model-target',
+          target: modelTargetAddressForNode(document, node),
+        },
+        message: `SPARC node "${node.id}" stimulusIds[${index}] is required`,
+      });
+    } else if (!registryIds.has(stimulusId)) {
+      issues.push({
+        sourceNodeId: node.id,
+        reference: {
+          relation: 'model-target',
+          target: modelTargetAddressForNode(document, node),
+        },
+        message: `SPARC node "${node.id}" attaches unknown stimulusId "${stimulusId}"`,
+      });
+    }
+  }
+  for (const child of node.children ?? []) {
+    validateNodeStimulusAttachments(document, child, registryIds, issues);
+  }
+}
+
 export function validateSparcDocumentReferences(
   document: SparcAuthoredDocument,
 ): SparcReferenceValidationResult {
   const issues: SparcReferenceValidationIssue[] = [];
+  const registryIds = validateStimulusRegistry(document, issues);
   validateNodeReferences(document, document.root, issues);
   validateInitialStateReferences(document, issues);
   validateReactiveRuleReferences(document, issues);
   validateReactiveRuleConditionReferences(document, issues);
   validateNodeReactiveConditionReferences(document, document.root, issues);
   validateAuthoredModelTargets(document, document.root, issues);
+  validateNodeStimulusAttachments(document, document.root, registryIds, issues);
   return {
     valid: issues.length === 0,
     issues,

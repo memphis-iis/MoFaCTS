@@ -85,6 +85,17 @@ function collectNodeFacts(params: {
     });
   }
 
+  for (const stimulusId of params.node.stimulusIds ?? []) {
+    params.facts.push({
+      factType: 'node-stimulus-attachment',
+      slots: {
+        documentId: params.document.id,
+        node: params.node.id,
+        stimulusId,
+      },
+    });
+  }
+
   for (const child of params.node.children ?? []) {
     collectNodeFacts({
       ...params,

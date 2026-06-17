@@ -88,15 +88,22 @@ export type SparcAuthoredNode = {
   readonly kind: SparcNodeKind;
   readonly children?: readonly SparcAuthoredNode[];
   readonly refs?: readonly SparcAddressReference[];
+  readonly stimulusIds?: readonly string[];
   readonly modelTarget?: SparcModelTargetIdentity;
   readonly layout?: SparcLayoutPolicy;
   readonly reactive?: SparcNodeReactivity;
+};
+
+export type SparcStimulusRegistryEntry = ModelPracticeHistoryIdentity & {
+  readonly stimulusId: string;
+  readonly label?: string;
 };
 
 export type SparcAuthoredDocument = {
   readonly id: string;
   readonly schemaVersion: number;
   readonly layout?: SparcLayoutPolicy;
+  readonly stimulusRegistry?: readonly SparcStimulusRegistryEntry[];
   readonly initialState?: readonly SparcStateWrite[];
   readonly workingMemoryFacts?: readonly SparcWorkingMemoryFact[];
   readonly productionRules?: readonly SparcProductionRule[];
@@ -285,6 +292,14 @@ export type SparcProductionRuleEffect =
       readonly type: 'credit';
       readonly kc: string;
     }
+  | {
+      readonly type: 'model-practice';
+      readonly outcome: SparcOutcome;
+      readonly stimulusId?: string | SparcRuleExpression;
+      readonly nodeId?: string | SparcRuleExpression;
+      readonly responseValue?: SparcRuleExpression;
+      readonly input?: SparcRuleExpression;
+    }
   | SparcProgressiveNodeOperationTemplate;
 
 export type SparcWorkingMemoryFactTemplate = {
@@ -354,6 +369,13 @@ export type SparcProductionRuleFiring = {
     readonly messageType: 'hint' | 'buggy' | 'success' | 'feedback';
     readonly text: string;
     readonly target?: SparcDocumentAddress;
+  }[];
+  readonly modelPracticeObservations: readonly {
+    readonly outcome: SparcOutcome;
+    readonly stimulusId?: string;
+    readonly nodeId?: string;
+    readonly responseValue?: unknown;
+    readonly input?: unknown;
   }[];
   readonly classifications: readonly (SparcOutcome | 'buggy')[];
   readonly credits: readonly string[];

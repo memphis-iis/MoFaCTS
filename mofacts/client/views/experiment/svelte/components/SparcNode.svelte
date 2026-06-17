@@ -1,12 +1,29 @@
 <script>
+  import DOMPurify from 'dompurify';
+  import LearningProgressChart from './LearningProgressChart.svelte';
+
   export let node;
   export let nodeValues = {};
+  export let learningProgressSnapshot = null;
   export let onNodeValueChange = () => {};
   export let onNodeCommit = () => {};
   export let onNodeFocus = () => {};
   export let onButtonActivate = () => {};
 
+  let activeTabId = '';
+  let activePanelId = '';
+
   const FRACTION_ATOM_TYPES = new Set(['fraction-box', 'fraction-input']);
+  const SPARC_HTML_ALLOWED_TAGS = [
+    'a', 'abbr', 'aside', 'b', 'br', 'code', 'dd', 'details', 'div', 'dl', 'dt', 'em',
+    'figcaption', 'figure', 'h1', 'h2', 'h3', 'h4', 'h5', 'i', 'iframe', 'img', 'li',
+    'ol', 'p', 'pre', 'section', 'span', 'strong', 'sub', 'summary', 'sup', 'table',
+    'tbody', 'td', 'tfoot', 'th', 'thead', 'tr', 'u', 'ul',
+  ];
+  const SPARC_HTML_ALLOWED_ATTR = [
+    'allowfullscreen', 'alt', 'class', 'data-oli-page-link', 'height', 'href', 'loading',
+    'rel', 'src', 'target', 'title', 'width',
+  ];
 
   function sortByPlacementOrder(values = []) {
     return values.slice().sort((left, right) => {
@@ -83,6 +100,13 @@
     return String(candidate?.label || candidate?.value || '').trim();
   }
 
+  function sanitizeSparcHtml(value) {
+    return DOMPurify.sanitize(String(value || ''), {
+      ALLOWED_TAGS: SPARC_HTML_ALLOWED_TAGS,
+      ALLOWED_ATTR: SPARC_HTML_ALLOWED_ATTR,
+    });
+  }
+
   function skillBarFill(candidate) {
     const fill = Number(candidate?.fill ?? 0);
     if (!Number.isFinite(fill)) {
@@ -113,6 +137,11 @@
     return nodeLayoutRole(candidate) === 'header-feedback';
   }
 
+  function isChoiceTabsGroup(candidate) {
+    return candidate?.nodeType === 'group'
+      && (candidate?.groupType === 'choice-tabs' || glueString(candidate) === 'choice-tabs');
+  }
+
   $: headerFeedbackNode = node?.nodeType === 'group'
     ? (node.children || []).find(isHeaderFeedbackNode)
     : null;
@@ -120,6 +149,18 @@
     ? (node.children || []).filter((child) => !isHeaderFeedbackNode(child))
     : [];
   $: renderItems = node?.nodeType === 'group' ? buildRenderItems(bodyChildren) : [];
+  $: isChoiceTabs = isChoiceTabsGroup(node);
+  $: tabChildren = isChoiceTabs ? sortByPlacementOrder(bodyChildren) : [];
+  $: if (isChoiceTabs && tabChildren.length > 0 && !tabChildren.some((child) => child?.id === activeTabId)) {
+    activeTabId = tabChildren[0]?.id || '';
+  }
+  $: activeTabNode = tabChildren.find((child) => child?.id === activeTabId) || tabChildren[0] || null;
+  $: panelSelectorPanels = node?.atomType === 'panel-selector' ? sortByPlacementOrder(node.panels || []) : [];
+  $: if (node?.atomType === 'panel-selector' && panelSelectorPanels.length > 0 && !panelSelectorPanels.some((panel) => panel?.id === activePanelId)) {
+    activePanelId = node.selectedPanelId || panelSelectorPanels[0]?.id || '';
+  }
+  $: activePanel = panelSelectorPanels.find((panel) => panel?.id === activePanelId) || panelSelectorPanels[0] || null;
+  $: activePanelItems = activePanel ? buildRenderItems(activePanel.children || []) : [];
 </script>
 
 {#if node?.nodeType === 'group'}
@@ -140,6 +181,7 @@
             <svelte:self
               node={headerFeedbackNode}
               {nodeValues}
+              {learningProgressSnapshot}
               {onNodeValueChange}
               {onNodeCommit}
               {onNodeFocus}
@@ -150,49 +192,153 @@
       </div>
     {/if}
     <div class="sparc-group-body">
-      {#each renderItems as item (item.key)}
-        {#if item.kind === 'fraction'}
-          <div class="sparc-fraction">
-            <div class="sparc-fraction-top">
-              <svelte:self
-                node={item.top}
-                {nodeValues}
-                {onNodeValueChange}
-                {onNodeCommit}
-                {onNodeFocus}
-                {onButtonActivate}
-              />
-            </div>
-            <div class="sparc-fraction-divider"></div>
-            <div class="sparc-fraction-bottom">
-              <svelte:self
-                node={item.bottom}
-                {nodeValues}
-                {onNodeValueChange}
-                {onNodeCommit}
-                {onNodeFocus}
-                {onButtonActivate}
-              />
-            </div>
+      {#if isChoiceTabs}
+        <div class="sparc-choice-tabs" role="tablist">
+          {#each tabChildren as tab}
+            <button
+              type="button"
+              class:active={tab.id === activeTabId}
+              class="sparc-choice-tab"
+              role="tab"
+              aria-selected={tab.id === activeTabId}
+              on:click={() => {
+                activeTabId = tab.id;
+              }}
+            >
+              {tab.label || tab.id}
+            </button>
+          {/each}
+        </div>
+        {#if activeTabNode}
+          <div class="sparc-choice-tab-panel" role="tabpanel">
+            <svelte:self
+              node={activeTabNode}
+              {nodeValues}
+              {learningProgressSnapshot}
+              {onNodeValueChange}
+              {onNodeCommit}
+              {onNodeFocus}
+              {onButtonActivate}
+            />
           </div>
-        {:else}
-          <svelte:self
-            node={item.node}
-            {nodeValues}
-            {onNodeValueChange}
-            {onNodeCommit}
-            {onNodeFocus}
-            {onButtonActivate}
-          />
         {/if}
-      {/each}
+      {:else}
+        {#each renderItems as item (item.key)}
+          {#if item.kind === 'fraction'}
+            <div class="sparc-fraction">
+              <div class="sparc-fraction-top">
+                <svelte:self
+                  node={item.top}
+                  {nodeValues}
+                  {learningProgressSnapshot}
+                  {onNodeValueChange}
+                  {onNodeCommit}
+                  {onNodeFocus}
+                  {onButtonActivate}
+                />
+              </div>
+              <div class="sparc-fraction-divider"></div>
+              <div class="sparc-fraction-bottom">
+                <svelte:self
+                  node={item.bottom}
+                  {nodeValues}
+                  {learningProgressSnapshot}
+                  {onNodeValueChange}
+                  {onNodeCommit}
+                  {onNodeFocus}
+                  {onButtonActivate}
+                />
+              </div>
+            </div>
+          {:else}
+            <svelte:self
+              node={item.node}
+              {nodeValues}
+              {learningProgressSnapshot}
+              {onNodeValueChange}
+              {onNodeCommit}
+              {onNodeFocus}
+              {onButtonActivate}
+            />
+          {/if}
+        {/each}
+      {/if}
     </div>
   </div>
 {:else if node?.nodeType === 'atomic'}
   {#if node.atomType === 'text-block' || node.atomType === 'text' || node.atomType === 'header-cell'}
     <div class={`sparc-atom sparc-${node.atomType}`} data-node-id={node.id}>{getNodeValue(node)}</div>
+  {:else if node.atomType === 'html-block'}
+    <div class="sparc-atom sparc-html-block" data-node-id={node.id}>{@html sanitizeSparcHtml(getNodeValue(node))}</div>
+  {:else if node.atomType === 'panel-selector'}
+    <div class="sparc-atom sparc-panel-selector" data-node-id={node.id}>
+      {#if node.label}
+        <div class="sparc-panel-selector-label">{node.label}</div>
+      {/if}
+      <div class="sparc-panel-tabs" role="tablist">
+        {#each panelSelectorPanels as panel}
+          <button
+            type="button"
+            class:active={panel.id === activePanelId}
+            class="sparc-panel-tab"
+            role="tab"
+            aria-selected={panel.id === activePanelId}
+            on:click={() => {
+              activePanelId = panel.id;
+            }}
+          >
+            {panel.label || panel.id}
+          </button>
+        {/each}
+      </div>
+      {#if activePanel}
+        <div class="sparc-panel-selector-panel" role="tabpanel">
+          {#each activePanelItems as item (item.key)}
+            {#if item.kind === 'fraction'}
+              <div class="sparc-fraction">
+                <div class="sparc-fraction-top">
+                  <svelte:self
+                  node={item.top}
+                  {nodeValues}
+                  {learningProgressSnapshot}
+                  {onNodeValueChange}
+                    {onNodeCommit}
+                    {onNodeFocus}
+                    {onButtonActivate}
+                  />
+                </div>
+                <div class="sparc-fraction-divider"></div>
+                <div class="sparc-fraction-bottom">
+                  <svelte:self
+                  node={item.bottom}
+                  {nodeValues}
+                  {learningProgressSnapshot}
+                  {onNodeValueChange}
+                    {onNodeCommit}
+                    {onNodeFocus}
+                    {onButtonActivate}
+                  />
+                </div>
+              </div>
+            {:else}
+              <svelte:self
+                node={item.node}
+                {nodeValues}
+                {learningProgressSnapshot}
+                {onNodeValueChange}
+                {onNodeCommit}
+                {onNodeFocus}
+                {onButtonActivate}
+              />
+            {/if}
+          {/each}
+        </div>
+      {/if}
+    </div>
   {:else if node.atomType === 'message-box'}
-    <div class="sparc-atom sparc-message-box" data-node-id={node.id}>{getNodeValue(node)}</div>
+    {#if String(getNodeValue(node) || '').trim()}
+      <div class="sparc-atom sparc-message-box" data-node-id={node.id}>{@html sanitizeSparcHtml(getNodeValue(node))}</div>
+    {/if}
   {:else if node.atomType === 'skill-bar'}
     <div class="sparc-atom sparc-skill-bar" data-node-id={node.id} aria-label={node.label || ''}>
       <div class="sparc-skill-track">
@@ -201,6 +347,17 @@
       {#if node.label}
         <span class="sparc-skill-label">{node.label}</span>
       {/if}
+    </div>
+  {:else if node.atomType === 'learning-progress'}
+    <div class="sparc-atom sparc-learning-progress" data-node-id={node.id} aria-label={node.label || 'Learning progress'}>
+      {#if node.label}
+        <div class="sparc-learning-progress-label">{node.label}</div>
+      {/if}
+      <LearningProgressChart
+        snapshot={learningProgressSnapshot}
+        showReferenceLines={false}
+        compact={true}
+      />
     </div>
   {:else if node.atomType === 'operator'}
     <div class="sparc-atom sparc-operator" data-node-id={node.id}>{node.value || ''}</div>
@@ -331,8 +488,11 @@
   }
 
   .sparc-group-text-panel .sparc-text-block,
+  .sparc-group-text-panel .sparc-html-block,
   .sparc-group[data-sparc-visual-preset="corner-hint"] .sparc-text-block,
-  .sparc-group-hint-panel .sparc-text-block {
+  .sparc-group[data-sparc-visual-preset="corner-hint"] .sparc-html-block,
+  .sparc-group-hint-panel .sparc-text-block,
+  .sparc-group-hint-panel .sparc-html-block {
     border: 0;
     border-radius: 0;
     padding: 0;
@@ -354,7 +514,9 @@
   }
 
   .sparc-group[data-sparc-glue="multiple-choice"] > .sparc-group-body > .sparc-text-block,
-  .sparc-group-multiple-choice > .sparc-group-body > .sparc-text-block {
+  .sparc-group[data-sparc-glue="multiple-choice"] > .sparc-group-body > .sparc-html-block,
+  .sparc-group-multiple-choice > .sparc-group-body > .sparc-text-block,
+  .sparc-group-multiple-choice > .sparc-group-body > .sparc-html-block {
     width: 100%;
     text-align: left;
   }
@@ -375,7 +537,9 @@
   }
 
   .sparc-group[data-sparc-glue="intro-feedback"] > .sparc-group-body > .sparc-text-block,
-  .sparc-group-intro-feedback-row > .sparc-group-body > .sparc-text-block {
+  .sparc-group[data-sparc-glue="intro-feedback"] > .sparc-group-body > .sparc-html-block,
+  .sparc-group-intro-feedback-row > .sparc-group-body > .sparc-text-block,
+  .sparc-group-intro-feedback-row > .sparc-group-body > .sparc-html-block {
     flex: var(--sparc-primary-flex-grow) 1 var(--sparc-answer-list-width);
   }
 
@@ -390,6 +554,104 @@
     width: 100%;
     min-width: 0;
     height: 100%;
+  }
+
+  .sparc-group[data-sparc-visual-preset="example"],
+  .sparc-group-oli-example {
+    border: var(--sparc-border-width) solid var(--sparc-border-color);
+    border-radius: var(--sparc-border-radius-sm);
+    padding: var(--sparc-space-3);
+    background: color-mix(in srgb, var(--sparc-accent-color) 6%, var(--sparc-control-surface-color));
+  }
+
+  .sparc-group[data-sparc-visual-preset="example"] > .sparc-group-body,
+  .sparc-group-oli-example > .sparc-group-body {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+  }
+
+  .sparc-group[data-sparc-visual-preset="example"] > .sparc-group-body > .sparc-html-block:first-child,
+  .sparc-group[data-sparc-visual-preset="example"] > .sparc-group-body > .sparc-text-block:first-child,
+  .sparc-group-oli-example > .sparc-group-body > .sparc-html-block:first-child,
+  .sparc-group-oli-example > .sparc-group-body > .sparc-text-block:first-child {
+    font-weight: var(--app-font-weight-bold, 700);
+  }
+
+  .sparc-group-choice-tabs {
+    width: 100%;
+  }
+
+  .sparc-group-choice-tabs > .sparc-group-body {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: var(--sparc-space-3);
+  }
+
+  .sparc-choice-tabs,
+  .sparc-panel-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sparc-space-1);
+    border-bottom: var(--sparc-border-width) solid var(--sparc-border-color);
+  }
+
+  .sparc-choice-tab,
+  .sparc-panel-tab {
+    border: var(--sparc-border-width) solid transparent;
+    border-bottom: 0;
+    border-radius: var(--sparc-border-radius-sm) var(--sparc-border-radius-sm) 0 0;
+    padding: var(--sparc-space-2) var(--sparc-space-3);
+    background: transparent;
+    color: var(--sparc-secondary-text-color);
+    cursor: pointer;
+    font: inherit;
+    font-weight: var(--app-font-weight-semibold, 600);
+  }
+
+  .sparc-choice-tab:hover,
+  .sparc-panel-tab:hover {
+    background: var(--app-state-hover-surface-color, color-mix(in srgb, var(--sparc-accent-color) 10%, transparent));
+    color: var(--sparc-text-color);
+  }
+
+  .sparc-choice-tab.active,
+  .sparc-panel-tab.active {
+    border-color: var(--sparc-border-color);
+    background: var(--sparc-control-surface-color);
+    color: var(--sparc-text-color);
+  }
+
+  .sparc-panel-selector {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sparc-space-3);
+    width: 100%;
+  }
+
+  .sparc-panel-selector-label {
+    color: var(--sparc-text-color);
+    font-weight: var(--app-font-weight-semibold, 600);
+  }
+
+  .sparc-panel-selector-panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sparc-space-2);
+    width: 100%;
+  }
+
+  .sparc-choice-tab-panel,
+  .sparc-choice-tab-panel > .sparc-group-alternative-panel,
+  .sparc-group-alternative-panel > .sparc-group-body {
+    width: 100%;
+  }
+
+  .sparc-group-alternative-panel > .sparc-group-body {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
   }
 
   .sparc-group-activity-row,
@@ -407,9 +669,12 @@
   }
 
   .sparc-group-activity-row .sparc-text-block,
+  .sparc-group-activity-row .sparc-html-block,
   .sparc-group-activity-row .sparc-input-text-input,
   .sparc-group-remediation-panel .sparc-text-block,
+  .sparc-group-remediation-panel .sparc-html-block,
   .sparc-group[data-sparc-glue="fill-in"] .sparc-text-block,
+  .sparc-group[data-sparc-glue="fill-in"] .sparc-html-block,
   .sparc-group[data-sparc-glue="fill-in"] .sparc-input-text-input {
     width: 100%;
     min-height: var(--app-text-input-height);
@@ -622,6 +887,7 @@
   }
 
   .sparc-text-block,
+  .sparc-html-block,
   .sparc-text,
   .sparc-header-cell,
   .sparc-message-box,
@@ -641,6 +907,137 @@
   .sparc-header-cell {
     font-weight: var(--app-font-weight-semibold, 600);
     text-align: center;
+  }
+
+  .sparc-html-block p {
+    margin: 0 0 var(--sparc-space-2);
+  }
+
+  .sparc-html-block p:last-child,
+  .sparc-message-box p:last-child {
+    margin-bottom: 0;
+  }
+
+  .sparc-html-block .oli-definition,
+  .sparc-html-block .oli-callout,
+  .sparc-html-block .oli-popup,
+  .sparc-html-block .oli-embed,
+  .sparc-html-block .oli-missing-reference {
+    display: block;
+    margin: 0 0 var(--sparc-space-3);
+  }
+
+  .sparc-html-block .oli-definition {
+    border-left: calc(var(--sparc-border-width) * 3) solid var(--sparc-accent-color);
+    padding-left: var(--sparc-space-3);
+  }
+
+  .sparc-html-block .oli-callout {
+    border-left: calc(var(--sparc-border-width) * 3) solid var(--sparc-primary-action-surface-color);
+    padding-left: var(--sparc-space-3);
+  }
+
+  .sparc-html-block .oli-missing-reference {
+    border-left: calc(var(--sparc-border-width) * 3) solid var(--sparc-error-color);
+    padding: var(--sparc-space-2) 0 var(--sparc-space-2) var(--sparc-space-3);
+    color: var(--sparc-error-color);
+  }
+
+  .sparc-html-block .oli-popup summary {
+    cursor: pointer;
+    color: var(--app-link-color, var(--sparc-accent-color));
+    font-weight: var(--app-font-weight-bold, 700);
+  }
+
+  .sparc-html-block .oli-embed iframe {
+    display: block;
+    max-width: 100%;
+    border: var(--sparc-border-width) solid var(--sparc-border-color);
+    border-radius: var(--sparc-border-radius-sm);
+  }
+
+  .sparc-html-block figcaption {
+    margin-top: var(--sparc-space-1);
+    color: var(--sparc-muted-text-color);
+    font-size: calc(var(--sparc-font-size-base) * 0.9);
+  }
+
+  .sparc-html-block ul,
+  .sparc-html-block ol {
+    margin: 0 0 var(--sparc-space-2);
+    padding-left: 1.5rem;
+  }
+
+  .sparc-html-block h1,
+  .sparc-html-block h2,
+  .sparc-html-block h3,
+  .sparc-html-block h4,
+  .sparc-html-block h5 {
+    margin: 0 0 var(--sparc-space-2);
+    color: var(--sparc-heading-color);
+    line-height: 1.2;
+  }
+
+  .sparc-html-block h1 {
+    font-size: calc(var(--sparc-font-size-base) * 1.35);
+  }
+
+  .sparc-html-block h2 {
+    font-size: calc(var(--sparc-font-size-base) * 1.2);
+  }
+
+  .sparc-html-block h3,
+  .sparc-html-block h4,
+  .sparc-html-block h5 {
+    font-size: calc(var(--sparc-font-size-base) * 1.05);
+  }
+
+  .sparc-html-block code {
+    border-radius: var(--sparc-border-radius-sm);
+    padding: 0 var(--sparc-space-1);
+    background: color-mix(in srgb, var(--sparc-text-color) 8%, var(--sparc-control-surface-color));
+    font-family: var(--app-font-family-monospace, ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace);
+    font-size: 0.95em;
+  }
+
+  .sparc-html-block pre {
+    margin: 0 0 var(--sparc-space-2);
+    overflow-x: auto;
+    border: var(--sparc-border-width) solid var(--sparc-border-color);
+    border-radius: var(--sparc-border-radius-sm);
+    padding: var(--sparc-space-3);
+    background: color-mix(in srgb, var(--sparc-text-color) 6%, var(--sparc-control-surface-color));
+  }
+
+  .sparc-html-block pre code {
+    display: block;
+    padding: 0;
+    background: transparent;
+    white-space: pre-wrap;
+  }
+
+  .sparc-html-block table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0 0 var(--sparc-space-2);
+  }
+
+  .sparc-html-block th,
+  .sparc-html-block td {
+    border: var(--sparc-border-width) solid var(--sparc-border-color);
+    padding: var(--sparc-space-1) var(--sparc-space-2);
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .sparc-html-block a,
+  .sparc-message-box a {
+    color: var(--app-link-color, var(--sparc-accent-color));
+  }
+
+  .sparc-html-block img {
+    max-width: 100%;
+    height: auto;
   }
 
   .sparc-operator {
@@ -715,6 +1112,37 @@
   .sparc-skill-label {
     color: var(--sparc-secondary-text-color);
     font-size: calc(var(--sparc-font-size-base) * 0.8);
+    line-height: 1.1;
+  }
+
+  .sparc-learning-progress {
+    --progress-border-color: var(--sparc-border-color);
+    --progress-muted-bar: color-mix(in srgb, var(--sparc-control-surface-color) 82%, var(--sparc-surface-color));
+    --progress-target-color: var(--sparc-correct-color);
+    --progress-below-color: var(--sparc-warning-color);
+    --progress-bar-density-scale: max(0.5, min(var(--app-density-scale), 2));
+    --progress-bar-height: calc(3px * var(--progress-bar-density-scale));
+    --progress-bar-gap: calc(2px * var(--progress-bar-density-scale));
+    --progress-scrollbar-gutter: 0px;
+    --progress-panel-padding-x: 0px;
+    --progress-panel-padding-y: 0px;
+    --progress-panel-gap: var(--sparc-space-1);
+
+    display: flex;
+    flex-direction: column;
+    gap: var(--sparc-space-1);
+    width: min(100%, var(--sparc-skill-track-max-width));
+    min-width: var(--sparc-skill-track-min-width);
+    border: var(--sparc-border-width) solid var(--sparc-border-color);
+    border-radius: var(--sparc-border-radius-sm);
+    padding: var(--sparc-space-2);
+    background: var(--sparc-control-surface-color);
+  }
+
+  .sparc-learning-progress-label {
+    color: var(--sparc-secondary-text-color);
+    font-size: calc(var(--sparc-font-size-base) * 0.8);
+    font-weight: var(--app-font-weight-semibold, 600);
     line-height: 1.1;
   }
 

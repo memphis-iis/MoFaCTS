@@ -87,15 +87,16 @@ the canonical model target by identity rather than by SPARC or Learning Session
 session-local indices. A host runtime should expose that behavior through the
 generic `adaptive-model` capability from `../../runtime/modelPracticeRuntime.ts`
 and persist the returned canonical record through the `history` capability.
-Authored nodes can declare `modelTarget`; `sparcAuthoredModelTargets.ts`
-resolves the model target for the addressed authored node, and
-`sparcAuthoredResponseOutcome.ts` uses that authored binding when a response
-outcome does not supply an explicit override. Document validation checks that
-an authored model target names the same SPARC document and authored node where
-it is attached.
-The same validation also applies the shared model-history identity rules, so
-`KCId`/`KCDefault` must match `stimulusKC` and `KCCluster` must match
-`clusterKC` before a document can emit model practice records.
+Authored documents declare model identities in `stimulusRegistry`; SPARC nodes
+may attach zero or more registry `stimulusId` values through `stimulusIds`.
+Nodes remain interface/document elements, not model stimuli. `sparcAuthoredModelTargets.ts`
+resolves model-linked outcomes from an explicit registry stimulus or from an
+addressed node with exactly one stimulus attachment. Missing registry entries,
+ambiguous node attachments, and SPARC-only nodes fail clearly before model
+history is written. Document validation applies the shared model-history
+identity rules to registry entries, so `KCId`/`KCDefault` must match
+`stimulusKC` and `KCCluster` must match `clusterKC` before a document can emit
+model practice records.
 `sparcResponseOutcomeCommit.ts` is the SPARC-side orchestration point for that:
 model-linked outcomes are applied through `adaptive-model` before the returned
 shared model record is written, while SPARC-only reactive outcomes write their
@@ -176,6 +177,13 @@ model-history exchange, model-query adaptation, model-update requests,
 production-rule commit/evaluation, response-outcome commit/authored-rules,
 vertical layout validation, reactive rule commit/evaluation, and
 state-transition history.
+
+`sparcAuthoringCatalog.ts` is the source-owned starting point for editor-facing
+TutorScript/SPARC authoring palettes. It catalogs supported atomic nodes,
+generated group patterns, semantic nodes, layout policies and glue modes,
+production-rule fact patterns/tests/expressions/effects, and reactive
+state/model conditions. Editor UI should project from that catalog instead of
+retyping node and rule vocabularies in a separate surface.
 
 ## Content Development Role
 
