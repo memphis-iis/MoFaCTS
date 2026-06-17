@@ -1,7 +1,10 @@
 import type { HistoryRuntime } from '../../runtime/LearningComponentContext';
 import type { ModelPracticeRuntime } from '../../runtime/modelPracticeRuntime';
 import type { SparcPracticeHistoryCore } from './sparcPracticeHistoryBridge';
-import { processSparcResponseOutcome } from './sparcResponseOutcomeProcessor';
+import {
+  processSparcResponseOutcome,
+  type SparcProcessedResponseOutcome,
+} from './sparcResponseOutcomeProcessor';
 import { commitSparcProcessedResponseOutcome } from './sparcResponseOutcomeCommit';
 import { runSparcProductionRules } from './sparcProductionRuleEvaluator';
 import { createSparcStateTransitionHistoryRecord } from './sparcStateTransitionHistory';
@@ -28,6 +31,10 @@ export type SparcCommittedProductionRuleEvaluation = {
   readonly transition?: SparcStateTransition;
   readonly historyRecord?: SparcCanonicalHistoryRecord;
   readonly modelHistoryRecords?: readonly SparcCanonicalHistoryRecord[];
+};
+
+type ResolvedModelPracticeObservation = {
+  readonly processed: SparcProcessedResponseOutcome;
 };
 
 function productionRuleEventPayload(
@@ -179,8 +186,7 @@ async function commitProductionRuleModelPracticeObservations(
   if (!params.runtime.adaptiveModel) {
     throw new Error('SPARC production rule model-practice effect requires adaptive model runtime support');
   }
-  const committed: SparcCanonicalHistoryRecord[] = [];
-  for (const [index, observation] of observations.entries()) {
+  const resolvedObservations: ResolvedModelPracticeObservation[] = observations.map((observation, index) => {
     const nodeId = observation.nodeId || params.event.source.nodeId;
     const modelTarget = resolveSparcProductionRuleModelTarget({
       document: params.document,
@@ -206,6 +212,11 @@ async function commitProductionRuleModelPracticeObservations(
       },
       modelTarget,
     });
+    return { processed };
+  });
+
+  const committed: SparcCanonicalHistoryRecord[] = [];
+  for (const { processed } of resolvedObservations) {
     const committedOutcome = await commitSparcProcessedResponseOutcome(
       params.core,
       processed,

@@ -71,6 +71,13 @@ function stringOrUndefined(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value : undefined;
 }
 
+function requireOptionalNonBlankString(value: unknown, label: string): string {
+  if (typeof value !== 'string') {
+    throw new Error(`${label} must be a non-empty string`);
+  }
+  return requireNonBlank(value, label);
+}
+
 function requireNonBlank(value: unknown, label: string): string {
   const normalized = typeof value === 'string' ? value.trim() : '';
   if (!normalized) {
@@ -105,11 +112,17 @@ function authoredNodeFromDisplayNode(node: DisplayNodeRecord): SparcAuthoredNode
   const children = Array.isArray(node.children)
     ? node.children.filter(isRecord).map((child) => authoredNodeFromDisplayNode(child))
     : [];
+  const nodeId = requireNonBlank(node.id, 'SPARC display node id');
   const stimulusIds = Array.isArray(node.stimulusIds)
-    ? node.stimulusIds.filter((value) => typeof value === 'string' && value.trim()).map((value) => value.trim())
-    : (typeof node.stimulusId === 'string' && node.stimulusId.trim() ? [node.stimulusId.trim()] : []);
+    ? node.stimulusIds.map((value, index) => requireOptionalNonBlankString(
+        value,
+        `SPARC display node "${nodeId}" stimulusIds[${index}]`,
+      ))
+    : (node.stimulusId !== undefined
+        ? [requireOptionalNonBlankString(node.stimulusId, `SPARC display node "${nodeId}" stimulusId`)]
+        : []);
   return {
-    id: requireNonBlank(node.id, 'SPARC display node id'),
+    id: nodeId,
     kind: nodeKind(node),
     ...(stimulusIds.length > 0 ? { stimulusIds } : {}),
     ...(children.length > 0 ? { children } : {}),
@@ -177,7 +190,7 @@ export function createSparcAuthoredDocumentFromTrialDisplay(params: {
   };
 }
 
-function collectSaiResponsesFromBehavior(
+function collectResponseMappingsFromBehavior(
   behavior: unknown,
 ): Map<string, SaiResponseRecord[]> {
   const responsesByNode = new Map<string, SaiResponseRecord[]>();
@@ -218,7 +231,7 @@ function collectSaiResponsesFromBehavior(
   return responsesByNode;
 }
 
-function selectSaiResponse(
+function selectMappedResponse(
   candidates: readonly SaiResponseRecord[],
   submittedValue: unknown,
 ): SaiResponseRecord | undefined {
@@ -226,12 +239,76 @@ function selectSaiResponse(
   return exact ?? candidates[0];
 }
 
+function collectDisplayNodesById(nodes: readonly unknown[] | undefined, nodesById = new Map<string, DisplayNodeRecord>()): Map<string, DisplayNodeRecord> {
+  for (const node of nodes ?? []) {
+    if (!isRecord(node)) {
+      continue;
+    }
+    const nodeId = stringOrUndefined(node.id);
+    if (nodeId) {
+      nodesById.set(nodeId, node);
+    }
+    if (Array.isArray(node.children)) {
+      collectDisplayNodesById(node.children, nodesById);
+    }
+    if (Array.isArray(node.panels)) {
+      for (const panel of node.panels) {
+        if (isRecord(panel) && Array.isArray(panel.children)) {
+          collectDisplayNodesById(panel.children, nodesById);
+        }
+      }
+    }
+  }
+  return nodesById;
+}
+
+function directSparcActionForNode(node: DisplayNodeRecord, submittedValue: unknown): {
+  readonly selection: string;
+  readonly action: string;
+  readonly input: unknown;
+} | undefined {
+  const nodeId = stringOrUndefined(node.id);
+  if (!nodeId) {
+    return undefined;
+  }
+  switch (node.atomType) {
+    case 'button':
+      return {
+        selection: nodeId,
+        action: 'ButtonPressed',
+        input: submittedValue,
+      };
+    case 'select':
+    case 'dropdown':
+      return {
+        selection: nodeId,
+        action: 'UpdateComboBox',
+        input: submittedValue,
+      };
+    case 'checkbox':
+      return {
+        selection: nodeId,
+        action: 'UpdateCheckbox',
+        input: submittedValue,
+      };
+    case 'text-input':
+    case 'fraction-input':
+    default:
+      return {
+        selection: nodeId,
+        action: 'UpdateTextField',
+        input: submittedValue,
+      };
+  }
+}
+
 export function createSparcProductionRuleEventsFromTrialResult(params: {
   readonly documentId: string;
   readonly display: SparcTrialDisplay;
   readonly result: SparcTrialResult;
 }): readonly SparcReactiveEvent[] {
-  const responsesByNode = collectSaiResponsesFromBehavior(params.display.behavior);
+  const responsesByNode = collectResponseMappingsFromBehavior(params.display.behavior);
+  const nodesById = collectDisplayNodesById(params.display.nodes);
   const events: SparcReactiveEvent[] = [];
   let index = 0;
   const submittedEntries = Object.entries(params.result.submittedNodes);
@@ -260,9 +337,15 @@ export function createSparcProductionRuleEventsFromTrialResult(params: {
     if (submittedValue === undefined || submittedValue === null || submittedValue === '') {
       continue;
     }
-    const response = selectSaiResponse(responsesByNode.get(nodeId) ?? [], submittedValue);
-    const selection = stringOrUndefined(response?.selection);
-    const action = stringOrUndefined(response?.action);
+    const response = selectMappedResponse(responsesByNode.get(nodeId) ?? [], submittedValue);
+    const node = nodesById.get(nodeId);
+    if (!response && !node) {
+      throw new Error(`SPARC submitted node "${nodeId}" not found in display`);
+    }
+    const directAction = response ? undefined : directSparcActionForNode(node!, submittedValue);
+    const selection = stringOrUndefined(response?.selection) ?? directAction?.selection;
+    const action = stringOrUndefined(response?.action) ?? directAction?.action;
+    const input = response ? submittedValue : directAction?.input;
     if (!selection || !action) {
       continue;
     }
@@ -277,7 +360,7 @@ export function createSparcProductionRuleEventsFromTrialResult(params: {
       payload: {
         selection,
         action,
-        input: submittedValue,
+        input,
         triggeredBy: params.result.triggeredBy ?? null,
       },
     });

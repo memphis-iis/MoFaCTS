@@ -103,11 +103,22 @@ export function resolveSparcProductionRuleModelTarget(params: {
     documentId: params.sourceAddress.documentId,
     nodeId: params.nodeId || params.sourceAddress.nodeId,
   };
-  const target = resolveSparcAuthoredModelTarget(params.document, nodeAddress);
-  if (!target) {
+  const resolved = resolveSparcDocumentAddress(params.document, nodeAddress);
+  const stimulusIds = resolved.node.stimulusIds ?? [];
+  if (stimulusIds.length === 1) {
+    return resolveSparcStimulusRegistryTarget(params.document, stimulusIds[0] ?? '', nodeAddress);
+  }
+  if (stimulusIds.length > 1) {
     throw new Error(
-      `SPARC production rule model-practice effect for node "${nodeAddress.nodeId}" did not resolve a stimulus`,
+      `SPARC node "${nodeAddress.nodeId}" is attached to ${stimulusIds.length} stimuli; model target is ambiguous`,
     );
   }
-  return target;
+  if (resolved.node.modelTarget) {
+    throw new Error(
+      `SPARC production rule model-practice effect for node "${nodeAddress.nodeId}" must resolve through stimulusRegistry attachment, not node modelTarget`,
+    );
+  }
+  throw new Error(
+    `SPARC production rule model-practice effect for node "${nodeAddress.nodeId}" did not resolve a stimulus`,
+  );
 }

@@ -51,6 +51,8 @@ The fastest supported contributor loop on Windows is the native hotfix dev serve
    Copy-Item settings.local.example.json $LocalSettingsPath
    ```
 
+   On this developer setup, `C:\dev\mofacts_config\deploy and build.txt` is the operator cheat sheet for this path and currently sets `$LocalSettingsPath` to `$env:USERPROFILE\OneDrive\Desktop\settings.local.json`. Pass that path explicitly to `hotfix-dev.ps1`; do not use or infer `deploy\settings.local.json`.
+
    Replace placeholder values in `.env.local` and `$LocalSettingsPath`. The settings JSON must define `owner`; the hotfix launcher uses that address for the local admin bootstrap. Keep these files private.
 
 3. Confirm the local runtime prerequisites:

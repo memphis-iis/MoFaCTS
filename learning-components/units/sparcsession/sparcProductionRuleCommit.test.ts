@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import type { ModelPracticeUpdateRequest } from '../../runtime/modelPracticeUpdates';
 import {
   commitSparcAuthoredProductionRuleEvent,
   evaluateSparcAuthoredProductionRules,
@@ -368,6 +369,118 @@ describe('sparcProductionRuleCommit', function() {
     assert.equal(committed.historyRecord, undefined);
     assert.equal(committed.transition, undefined);
     assert.equal(committed.execution.firings.length, 1);
+    assert.deepEqual(writtenRecords, []);
+  });
+
+  it('resolves every model-practice target before applying any adaptive model update', async function() {
+    const modelUpdateRequests: ModelPracticeUpdateRequest[] = [];
+    const writtenRecords: unknown[] = [];
+    const modelPracticeDocument: SparcAuthoredDocument = {
+      id: 'fractions-doc',
+      schemaVersion: 1,
+      stimulusRegistry: [{
+        stimulusId: 'denominator-stimulus',
+        stimuliSetId: 'stim-set-1',
+        stimulusKC: 'denominator-kc',
+        clusterKC: 'cluster-kc',
+        KCId: 'denominator-kc',
+        KCDefault: 'denominator-kc',
+        KCCluster: 'cluster-kc',
+      }],
+      productionRules: [{
+        id: 'model-practice.partial-write-guard',
+        when: [{
+          factType: 'interface-event',
+          slots: {
+            selection: { type: 'literal', value: 'firstDenConv' },
+            action: { type: 'literal', value: 'UpdateTextArea' },
+          },
+        }],
+        then: [{
+          type: 'model-practice',
+          outcome: 'correct',
+          stimulusId: 'denominator-stimulus',
+          responseValue: literal('12'),
+        }, {
+          type: 'model-practice',
+          outcome: 'incorrect',
+          nodeId: 'missing-node',
+          responseValue: literal('24'),
+        }],
+      }],
+      root: {
+        id: 'root',
+        kind: 'document',
+        children: [{
+          id: 'firstDenConv',
+          kind: 'input',
+          stimulusIds: ['denominator-stimulus'],
+        }],
+      },
+    };
+
+    await assert.rejects(
+      async () => commitSparcAuthoredProductionRuleEvent({
+        core,
+        document: modelPracticeDocument,
+        event: {
+          eventId: 'event-model-practice',
+          type: 'value-changed',
+          source: sourceAddress,
+          time: 4000,
+          payload: {
+            selection: 'firstDenConv',
+            action: 'UpdateTextArea',
+            input: 12,
+          },
+        },
+        runtime: {
+          adaptiveModel: {
+            queryModelPracticeState() {
+              return null;
+            },
+            applyModelPracticeUpdate(modelCore, request, extensionFields) {
+              modelUpdateRequests.push(request);
+              return {
+                record: {
+                  historySchemaVersion: 1,
+                  TDFId: modelCore.TDFId,
+                  sessionID: modelCore.sessionID,
+                  userId: modelCore.userId,
+                  levelUnit: modelCore.levelUnit,
+                  levelUnitType: 'model',
+                  time: request.time,
+                  problemStartTime: request.problemStartTime,
+                  selection: request.selection,
+                  action: request.action,
+                  outcome: request.outcome,
+                  typeOfResponse: request.typeOfResponse,
+                  responseValue: request.responseValue,
+                  input: request.input ?? '',
+                  displayedStimulus: request.displayedStimulus ?? null,
+                  eventType: request.eventType,
+                  stimuliSetId: request.target.stimuliSetId,
+                  stimulusKC: request.target.stimulusKC,
+                  clusterKC: request.target.clusterKC,
+                  KCId: request.target.KCId,
+                  KCDefault: request.target.KCDefault,
+                  KCCluster: request.target.KCCluster,
+                  ...(extensionFields ?? {}),
+                },
+              };
+            },
+          },
+          history: {
+            async writeCanonicalHistory(record) {
+              writtenRecords.push(record);
+            },
+          },
+        },
+      }),
+      /node "missing-node" not found/,
+    );
+
+    assert.deepEqual(modelUpdateRequests, []);
     assert.deepEqual(writtenRecords, []);
   });
 });

@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
-import { resolveSparcAuthoredModelTarget } from './sparcAuthoredModelTargets';
+import {
+  resolveSparcAuthoredModelTarget,
+  resolveSparcProductionRuleModelTarget,
+} from './sparcAuthoredModelTargets';
 import type {
   SparcAuthoredDocument,
   SparcModelTargetIdentity,
@@ -35,17 +38,24 @@ function authoredDocument(): SparcAuthoredDocument {
   return {
     id: 'doc-1',
     schemaVersion: 1,
+    stimulusRegistry: [{
+      stimulusId: 'region-stimulus',
+      ...regionTarget,
+    }, {
+      stimulusId: 'widget-stimulus',
+      ...widgetTarget,
+    }],
     root: {
       id: 'root',
       kind: 'document',
       children: [{
         id: 'region-7',
         kind: 'panel',
-        modelTarget: regionTarget,
+        stimulusIds: ['region-stimulus'],
         children: [{
           id: 'widget-3',
           kind: 'widget',
-          modelTarget: widgetTarget,
+          stimulusIds: ['widget-stimulus'],
           children: [{
             id: 'input',
             kind: 'input',
@@ -69,7 +79,7 @@ describe('sparcAuthoredModelTargets', function() {
     assert.deepEqual(target, widgetTarget);
   });
 
-  it('falls back to an enclosing node model target when nested content has none', function() {
+  it('resolves an attached registry target for a region node', function() {
     const target = resolveSparcAuthoredModelTarget(authoredDocument(), {
       documentId: 'doc-1',
       nodeId: 'region-7',
@@ -94,6 +104,33 @@ describe('sparcAuthoredModelTargets', function() {
         nodeId: 'missing-widget',
       }),
       /node "missing-widget" not found/,
+    );
+  });
+
+  it('requires production-rule model-practice effects to resolve through the stimulus registry', function() {
+    const modelTargetOnlyDocument: SparcAuthoredDocument = {
+      id: 'doc-1',
+      schemaVersion: 1,
+      root: {
+        id: 'root',
+        kind: 'document',
+        children: [{
+          id: 'widget-3',
+          kind: 'widget',
+          modelTarget: widgetTarget,
+        }],
+      },
+    };
+
+    assert.throws(
+      () => resolveSparcProductionRuleModelTarget({
+        document: modelTargetOnlyDocument,
+        sourceAddress: {
+          documentId: 'doc-1',
+          nodeId: 'widget-3',
+        },
+      }),
+      /must resolve through stimulusRegistry attachment/,
     );
   });
 });

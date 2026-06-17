@@ -170,7 +170,7 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
     }), /behavior\.authoredProductionRules is not executable/);
   });
 
-  it('turns submitted display nodes into SAI production-rule events', function() {
+  it('turns submitted display nodes into mapped production-rule events', function() {
     const [event] = createSparcProductionRuleEventsFromTrialResult({
       documentId: 'doc-1',
       display: display(),
@@ -191,7 +191,7 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
     });
   });
 
-  it('turns mapped SPARC button activations into SAI production-rule events', function() {
+  it('turns mapped SPARC button activations into production-rule events', function() {
     const [event] = createSparcProductionRuleEventsFromTrialResult({
       documentId: 'doc-1',
       display: display(),
@@ -211,6 +211,66 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
       input: 'Hint',
       triggeredBy: 'node-hint-button',
     });
+  });
+
+  it('turns direct SPARC button activations into production-rule events without response mappings', function() {
+    const { behavior: _behavior, ...baseDisplay } = display();
+    const directDisplay: SparcTrialDisplay = {
+      ...baseDisplay,
+      productionRules: [{
+        id: 'direct.button',
+        when: [{
+          factType: 'interface-event',
+          slots: {
+            selection: { type: 'literal', value: 'node-hint-button' },
+            action: { type: 'literal', value: 'ButtonPressed' },
+          },
+        }],
+        then: [{
+          type: 'message',
+          messageType: 'feedback',
+          template: 'Direct button fired.',
+        }],
+      }],
+    };
+    const [event] = createSparcProductionRuleEventsFromTrialResult({
+      documentId: 'doc-1',
+      display: directDisplay,
+      result: {
+        submittedNodes: {
+          'node-hint-button': 'Hint',
+        },
+        triggeredBy: 'node-hint-button',
+        timestamp: 2150,
+      },
+    });
+
+    assert.equal(event?.source.nodeId, 'node-hint-button');
+    assert.deepEqual(event?.payload, {
+      selection: 'node-hint-button',
+      action: 'ButtonPressed',
+      input: 'Hint',
+      triggeredBy: 'node-hint-button',
+    });
+  });
+
+  it('rejects malformed stimulus attachments instead of dropping them during document normalization', function() {
+    assert.throws(
+      () => createSparcAuthoredDocumentFromTrialDisplay({
+        documentId: 'doc-1',
+        display: {
+          type: 'sparc',
+          schema: 'tutorscript-sparc/1.0',
+          nodes: [{
+            id: 'node-with-bad-attachment',
+            nodeType: 'atomic',
+            atomType: 'text-input',
+            stimulusIds: ['stimulus-1', null],
+          }],
+        } as unknown as SparcTrialDisplay,
+      }),
+      /stimulusIds\[1\] must be a non-empty string/,
+    );
   });
 
   it('turns active-node focus changes into instantaneous production-rule events', function() {
