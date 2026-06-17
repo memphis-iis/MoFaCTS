@@ -6,6 +6,16 @@ import { Cookie } from '../../lib/cookies';
 import { currentUserHasRole } from '../../lib/roleUtils';
 import { getUserDisplayName, getUserInitials } from '../../lib/userIdentity';
 import { applyThemeCSSProperties } from '../../lib/currentTestingHelpers';
+import {
+  clearSavedUserThemeSelection,
+  findAvailableUserTheme,
+  getAvailableUserThemes,
+  getSavedUserThemeId,
+  getThemeDisplayName,
+  saveUserThemeSelection,
+  serializeThemeSelection,
+  type ThemeLibraryEntry,
+} from '../../lib/userThemeSelection';
 import { findProfileAvatarIcon, normalizeProfileAvatarType } from '../../../common/profileAvatar';
 import './home.html';
 import './home.css';
@@ -13,26 +23,12 @@ import './home.css';
 declare const Template: any;
 declare const Session: any;
 declare const Meteor: any;
-declare const DynamicSettings: any;
 
 const MAIN_MENU_RETURN_TOUR_DURATION_MS = 5000;
 const HOME_SIDEBAR_COLLAPSED_KEY = 'mofacts.home.sidebarCollapsed';
 const PRACTICE_MENU_OPEN_KEY = 'mofacts.practice.menuOpen';
-const USER_THEME_SELECTION_KEY_PREFIX = 'mofacts.userThemeSelection.v1.';
 const HOME_WELCOME_ALLOWED_TAGS = ['h1', 'h2', 'h3', 'p', 'br', 'span', 'strong', 'em', 'b', 'i', 'u', 'a', 'ul', 'ol', 'li'];
 const HOME_WELCOME_ALLOWED_ATTR = ['href', 'title', 'target', 'rel', 'class', 'style'];
-
-type ThemeLibraryEntry = {
-  id?: string;
-  activeThemeId?: string;
-  enabled?: boolean;
-  themeName?: string;
-  properties?: Record<string, unknown>;
-  metadata?: {
-    name?: string;
-    updatedAt?: string;
-  };
-};
 
 type HomeTourStepId =
   | 'main-menu-return'
@@ -63,8 +59,8 @@ const SIDEBAR_ACTION_ROUTES: Record<string, string> = {
 };
 
 const PRACTICE_MENU_ACTION_ROUTES: Record<string, string> = {
-  courses: '/courses',
   home: '/home',
+  courses: '/courses',
   contentUpload: '/contentUpload',
   dataDownload: '/dataDownload',
   classEdit: '/classEdit',
@@ -179,6 +175,20 @@ function closeMobileSidebar(): void {
   window.setTimeout(clearClosingState, 320);
 }
 
+function toggleAccountMenu(): void {
+  const dropdown = document.getElementById('userDropdown');
+  const toggle = document.getElementById('userToggle');
+  const open = !dropdown?.classList.contains('open');
+  if (open) {
+    closeMobileSidebar();
+  }
+  dropdown?.classList.toggle('open', open);
+  toggle?.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (!open) {
+    Session.set('themeMenuOpen', false);
+  }
+}
+
 function scrollHomeToTop(): void {
   window.scrollTo({ top: 0, behavior: 'smooth' });
   document.querySelector('.content')?.scrollTo({ top: 0, behavior: 'smooth' });
@@ -216,49 +226,6 @@ function openSidebarForTour(): number {
   return 0;
 }
 
-function getThemeLibrary(): ThemeLibraryEntry[] {
-  const librarySetting = DynamicSettings.findOne({ key: 'themeLibrary' });
-  const library = librarySetting?.value;
-  return Array.isArray(library) ? library : [];
-}
-
-function getAvailableUserThemes(): ThemeLibraryEntry[] {
-  return getThemeLibrary().filter((theme) => {
-    return typeof theme?.id === 'string' && theme.id.trim().length > 0 && theme.enabled !== false && theme.properties;
-  });
-}
-
-function serializeThemeSelection(theme: ThemeLibraryEntry): ThemeLibraryEntry {
-  if (!theme.id || !theme.properties) {
-    throw new Error('[ThemeToggle] Selected theme is missing id or properties.');
-  }
-  return {
-    ...theme,
-    activeThemeId: theme.id,
-    themeName: theme.themeName || theme.properties.themeName as string || theme.metadata?.name || theme.id,
-  };
-}
-
-function getUserThemeSelectionKey(): string | null {
-  const userId = Meteor.userId();
-  if (!userId) {
-    return null;
-  }
-  return `${USER_THEME_SELECTION_KEY_PREFIX}${userId}`;
-}
-
-function saveUserThemeSelection(themeId: string): void {
-  const key = getUserThemeSelectionKey();
-  if (!key) {
-    throw new Error('[ThemeToggle] User theme selection requires a logged-in user.');
-  }
-  window.localStorage.setItem(key, themeId);
-}
-
-function clearActiveUserThemeOverride(): void {
-  Session.set('userThemeOverrideActive', false);
-}
-
 function applyUserSelectedTheme(theme: ThemeLibraryEntry): void {
   const selectedTheme = serializeThemeSelection(theme);
   Session.set('userThemeOverrideActive', true);
@@ -266,38 +233,8 @@ function applyUserSelectedTheme(theme: ThemeLibraryEntry): void {
   saveUserThemeSelection(selectedTheme.activeThemeId as string);
 }
 
-function findAvailableUserTheme(themeId: string | null): ThemeLibraryEntry | undefined {
-  if (!themeId) {
-    return undefined;
-  }
-  return getAvailableUserThemes().find((theme) => theme.id === themeId);
-}
-
-function getThemeDisplayName(theme: ThemeLibraryEntry): string {
-  const propertyThemeName = theme.properties?.themeName;
-  if (typeof theme.metadata?.name === 'string' && theme.metadata.name.trim()) {
-    return theme.metadata.name.trim();
-  }
-  if (typeof theme.themeName === 'string' && theme.themeName.trim()) {
-    return theme.themeName.trim();
-  }
-  if (typeof propertyThemeName === 'string' && propertyThemeName.trim()) {
-    return propertyThemeName.trim();
-  }
-  if (theme.id) {
-    return theme.id;
-  }
-  throw new Error('[ThemeToggle] Theme menu entry is missing a display name and id.');
-}
-
 function restoreUserSelectedTheme(): void {
-  const key = getUserThemeSelectionKey();
-  if (!key) {
-    Session.set('userThemeOverrideActive', false);
-    return;
-  }
-
-  const selectedThemeId = window.localStorage.getItem(key);
+  const selectedThemeId = getSavedUserThemeId();
   if (!selectedThemeId) {
     Session.set('userThemeOverrideActive', false);
     return;
@@ -305,7 +242,7 @@ function restoreUserSelectedTheme(): void {
 
   const selectedTheme = getAvailableUserThemes().find((theme) => theme.id === selectedThemeId);
   if (!selectedTheme) {
-    window.localStorage.removeItem(key);
+    clearSavedUserThemeSelection(selectedThemeId);
     Session.set('userThemeOverrideActive', false);
     throw new Error(`[ThemeToggle] Saved theme "${selectedThemeId}" is no longer configured.`);
   }
@@ -492,14 +429,7 @@ Template.appAccountMenu.events({
   'click #userToggle': function(event: any) {
     event.preventDefault();
     event.stopPropagation();
-    const dropdown = document.getElementById('userDropdown');
-    const toggle = document.getElementById('userToggle');
-    const open = !dropdown?.classList.contains('open');
-    dropdown?.classList.toggle('open', open);
-    toggle?.setAttribute('aria-expanded', open ? 'true' : 'false');
-    if (!open) {
-      Session.set('themeMenuOpen', false);
-    }
+    toggleAccountMenu();
   },
 
   'keydown #userToggle': function(event: any) {
@@ -507,14 +437,7 @@ Template.appAccountMenu.events({
       return;
     }
     event.preventDefault();
-    const dropdown = document.getElementById('userDropdown');
-    const toggle = document.getElementById('userToggle');
-    const open = !dropdown?.classList.contains('open');
-    dropdown?.classList.toggle('open', open);
-    toggle?.setAttribute('aria-expanded', open ? 'true' : 'false');
-    if (!open) {
-      Session.set('themeMenuOpen', false);
-    }
+    toggleAccountMenu();
   },
 
   'click [data-home-action]': function(event: any) {
@@ -541,7 +464,6 @@ Template.appAccountMenu.events({
       return;
     }
     if (action === 'logout') {
-      clearActiveUserThemeOverride();
       Session.set('loginMode', 'normal');
       Cookie.set('isExperiment', '0', 1);
       Cookie.set('experimentTarget', '', 1);
@@ -683,14 +605,7 @@ Template.home.events({
   'click #userToggle': function(event: any) {
     event.preventDefault();
     event.stopPropagation();
-    const dropdown = document.getElementById('userDropdown');
-    const toggle = document.getElementById('userToggle');
-    const open = !dropdown?.classList.contains('open');
-    dropdown?.classList.toggle('open', open);
-    toggle?.setAttribute('aria-expanded', open ? 'true' : 'false');
-    if (!open) {
-      Session.set('themeMenuOpen', false);
-    }
+    toggleAccountMenu();
   },
 
   'click [data-home-action]': function(event: any, template: any) {
@@ -714,7 +629,6 @@ Template.home.events({
       return;
     }
     if (action === 'logout') {
-      clearActiveUserThemeOverride();
       Session.set('loginMode', 'normal');
       Cookie.set('isExperiment', '0', 1);
       Cookie.set('experimentTarget', '', 1);
@@ -971,10 +885,6 @@ Template.appSidebar.onRendered(function() {
 Template.appAccountMenu.onRendered(function(this: any) {
   this.subscribe('themeLibrary');
   this._themeLibraryAutorun = this.autorun(() => {
-    if (!Meteor.userId()) {
-      Session.set('userThemeOverrideActive', false);
-      return;
-    }
     if (!this.subscriptionsReady()) {
       return;
     }

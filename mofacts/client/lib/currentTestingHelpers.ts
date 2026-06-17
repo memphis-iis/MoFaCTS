@@ -11,6 +11,12 @@ import { loadSessionMappingRecord, resolveOriginalClusterIndex } from '../views/
 import { createStimClusterMapping as createStimClusterMappingCore } from './clusterMappingUtils';
 import { normalizeThemePropertyValue } from '../../common/themePropertyNormalization';
 import { resolveThemeBrandLabel } from '../../common/themeBranding';
+import {
+  clearSavedUserThemeSelection,
+  findAvailableUserTheme,
+  getSavedUserThemeId,
+  serializeThemeSelection,
+} from './userThemeSelection';
 import { legacyInt, legacyTrim } from '../../common/underscoreCompat';
 import { resolveLearningSessionClusterListSource } from '../../../learning-components/units/learning-session/learningSessionRuntimeConfig';
 import { resolveSparcSessionClusterListSource } from '../../../learning-components/units/sparcsession/sparcSessionRuntimeConfig';
@@ -377,12 +383,14 @@ function applyThemeCSSProperties(themeData: ThemeData | null | undefined, option
 function getCurrentTheme() {
   clientConsole(2, 'getCurrentTheme - setting up theme subscription');
   const cachedTheme = loadCachedTheme();
-  if (cachedTheme) {
+  const savedThemeIdAtStartup = getSavedUserThemeId();
+  if (cachedTheme && !savedThemeIdAtStartup) {
     applyThemeCSSProperties(cachedTheme);
   }
 
   // Subscribe to theme publication and track when ready
   const themeSubscription = Meteor.subscribe('theme');
+  const themeLibrarySubscription = Meteor.subscribe('themeLibrary');
 
   // Set up reactive autorun to apply theme whenever it changes
   Tracker.autorun(() => {
@@ -416,11 +424,25 @@ function getCurrentTheme() {
       themeData = defaultTheme;
     }
 
-    if (!Meteor.userId() && Session.get('userThemeOverrideActive') === true) {
-      Session.set('userThemeOverrideActive', false);
+    const savedThemeId = getSavedUserThemeId();
+    if (savedThemeId) {
+      if (!themeLibrarySubscription.ready()) {
+        clientConsole(2, 'getCurrentTheme - theme library not ready, waiting for local theme selection');
+        return;
+      }
+      const selectedTheme = findAvailableUserTheme(savedThemeId);
+      if (!selectedTheme) {
+        clearSavedUserThemeSelection(savedThemeId);
+        Session.set('userThemeOverrideActive', false);
+        clientConsole(1, `[ThemeToggle] Saved theme "${savedThemeId}" is no longer configured.`);
+      } else {
+        Session.set('userThemeOverrideActive', true);
+        applyThemeCSSProperties(serializeThemeSelection(selectedTheme), { cache: false });
+        return;
+      }
     }
 
-    if (Meteor.userId() && Session.get('userThemeOverrideActive') === true) {
+    if (Session.get('userThemeOverrideActive') === true) {
       clientConsole(2, 'getCurrentTheme - user theme override active');
       return;
     }
