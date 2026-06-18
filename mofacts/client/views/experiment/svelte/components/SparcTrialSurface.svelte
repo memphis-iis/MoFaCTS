@@ -15,6 +15,8 @@
   export let learningProgressSnapshot = null;
   export let showQuestionNumber = false;
   export let questionNumber = 0;
+  export let onAuthoringNodeValueChange = null;
+  export let onAuthoringNodeFocus = null;
 
   let activeNodeId = '';
 
@@ -85,6 +87,9 @@
       ...nodeValues,
       [nodeId]: value,
     };
+    if (typeof onAuthoringNodeValueChange === 'function') {
+      onAuthoringNodeValueChange(nodeId, value);
+    }
   }
 
   function handleNodeValueCommit(nodeId, value) {
@@ -137,6 +142,9 @@
       return;
     }
     activeNodeId = nodeId;
+    if (typeof onAuthoringNodeFocus === 'function') {
+      onAuthoringNodeFocus(nodeId);
+    }
     dispatch('sparcaction', {
       submittedNodes: {},
       triggeredBy: nodeId,

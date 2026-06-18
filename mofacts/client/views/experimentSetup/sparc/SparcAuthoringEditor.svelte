@@ -17,7 +17,8 @@
     literalExpression,
     variableExpression,
   } from '../../../../../learning-components/units/sparcsession/sparcAuthoringEditorModel';
-  import SparcNode from '../../experiment/svelte/components/SparcNode.svelte';
+  import { SPARC_RULE_CATALOG } from '../../../../../learning-components/units/sparcsession/sparcAuthoringCatalog';
+  import SparcTrialSurface from '../../experiment/svelte/components/SparcTrialSurface.svelte';
 
   export let tdfId = '';
   export let initialTdf = null;
@@ -27,6 +28,11 @@
 
   const clone = (value) => JSON.parse(JSON.stringify(value));
   const paletteEntries = getRenderedSparcPaletteEntries();
+  const ruleCatalogEntries = SPARC_RULE_CATALOG;
+  const productionRuleCatalogEntries = ruleCatalogEntries.filter((entry) => entry.category.startsWith('production-rule-'));
+  const productionConditionCatalogEntries = ruleCatalogEntries.filter((entry) => entry.category === 'production-rule-condition');
+  const productionTestCatalogEntries = ruleCatalogEntries.filter((entry) => entry.category === 'production-rule-test');
+  const productionEffectCatalogEntries = ruleCatalogEntries.filter((entry) => entry.category === 'production-rule-effect');
   const productionEffectTypes = [
     'classify',
     'assert-fact',
@@ -55,13 +61,22 @@
   let activeNodeId = '';
   let htmlEditorElement;
   let htmlEditor = null;
+  let htmlToolbarRevision = 0;
+  let richTextLinkHref = '';
+  let activeVisualRuleTemplateId = 'rule.effect.classify';
   let saving = false;
   let errorText = '';
   let saveMessage = '';
-  let activeEditorTab = 'nodes';
+  let activeEditorTab = 'visual';
+  let showAdvancedEditors = false;
   let activeProductionRuleIndex = 0;
+  let activeScopedProductionRuleIndex = -1;
   let activeReactiveRuleIndex = 0;
   let activeStimulusIndex = 0;
+  let draggedPaletteEntryId = '';
+  let dropTarget = null;
+  let dropMarkerStyle = '';
+  let dropStateContextKey = '';
 
   $: activeTarget = sparcTargets.find((target) => target.key === activeTargetKey) || sparcTargets[0] || null;
   $: activeDisplay = activeTarget ? clusters[activeTarget.clusterIndex]?.stims?.[activeTarget.stimIndex]?.display : null;
@@ -79,6 +94,31 @@
   }
   $: activeNodeEntry = flatNodes.find((entry) => entry.node?.id === activeNodeId) || flatNodes[0] || null;
   $: activeNode = activeNodeEntry?.node || displayNodes[0] || null;
+  $: activeNodeProductionRuleEntries = productionRules
+    .map((rule, index) => ({ rule, index }))
+    .filter((entry) => productionRuleReferencesNode(entry.rule, activeNodeId));
+  $: selectedScopedProductionRuleEntry = activeNodeProductionRuleEntries.find((entry) => entry.index === activeScopedProductionRuleIndex)
+    || activeNodeProductionRuleEntries[0]
+    || null;
+  $: activeNodeProductionRule = selectedScopedProductionRuleEntry?.rule || null;
+  $: activeNodeProductionRuleIndex = selectedScopedProductionRuleEntry?.index ?? -1;
+  $: activeNodeRuleEffect = activeNodeProductionRule?.then?.[0] || null;
+  $: {
+    const nextDropStateContextKey = `${activeTargetKey}:${activeEditorTab}`;
+    if (dropStateContextKey && dropStateContextKey !== nextDropStateContextKey) {
+      clearDropState();
+    }
+    dropStateContextKey = nextDropStateContextKey;
+  }
+  $: isImageHtmlSelected = isImageHtmlNode(activeNode);
+  $: selectedImageSrc = getFirstImageAttribute(activeNode, 'src');
+  $: selectedImageAlt = getFirstImageAttribute(activeNode, 'alt');
+  $: selectedImageTitle = getFirstImageAttribute(activeNode, 'title');
+  $: isRichTextSelected = isRichTextNode(activeNode);
+  $: htmlToolbarRevision;
+  $: if (!showAdvancedEditors && activeEditorTab !== 'visual') {
+    activeEditorTab = 'visual';
+  }
   $: maintainHtmlEditor(activeNode, htmlEditorElement);
   $: syncHtmlEditor(activeNode);
 
@@ -130,6 +170,7 @@
       }
       : clone(entry.defaultValue);
     node.id = makeNodeId(entry);
+    scopeDefaultChildNodeIds(node, node.id);
     if (node.nodeType === 'group') {
       node.children = Array.isArray(node.children) ? node.children : [];
     }
@@ -144,6 +185,65 @@
       node.selectedPanelId = node.selectedPanelId || node.panels[0].id;
     }
     return node;
+  }
+
+  function scopeDefaultChildNodeIds(node, parentId) {
+    if (!node || typeof node !== 'object') {
+      return;
+    }
+    for (const [index, child] of (node.children || []).entries()) {
+      const childKey = child?.id ? String(child.id) : `child-${index + 1}`;
+      child.id = `${parentId}-${childKey}`;
+      scopeDefaultChildNodeIds(child, child.id);
+    }
+  }
+
+  function paletteEntryById(entryId) {
+    return paletteEntries.find((entry) => entry.id === entryId) || null;
+  }
+
+  function paletteIconClass(entry) {
+    const id = entry?.id || '';
+    const atomType = entry?.defaultValue?.atomType || entry?.schema?.properties?.atomType?.const || '';
+    const groupType = entry?.defaultValue?.groupType || entry?.schema?.properties?.groupType?.const || '';
+    const groupIcons = {
+      section: 'fa-file-text-o',
+      'multiple-choice': 'fa-list-ul',
+      'answer-list': 'fa-list-ol',
+      'targeted-cata': 'fa-check-square-o',
+      'checkbox-choice': 'fa-check-square-o',
+      'dropdown-exercise': 'fa-caret-square-o-down',
+      'dropdown-row': 'fa-caret-square-o-down',
+      'text-input-exercise': 'fa-pencil-square-o',
+      'text-input-row': 'fa-i-cursor',
+      'short-answer': 'fa-keyboard-o',
+      'choice-tabs': 'fa-folder-open-o',
+      fraction: 'fa-slash',
+      'alternative-panel': 'fa-columns',
+      'oli-group': 'fa-object-group',
+    };
+    const atomIcons = {
+      'html-block': 'fa-code',
+      'text-block': 'fa-align-left',
+      'message-box': 'fa-commenting-o',
+      button: 'fa-hand-pointer-o',
+      'text-input': 'fa-keyboard-o',
+      dropdown: 'fa-caret-square-o-down',
+      select: 'fa-caret-square-o-down',
+      checkbox: 'fa-check-square-o',
+      'panel-selector': 'fa-columns',
+      'skill-bar': 'fa-tasks',
+      'learning-progress': 'fa-line-chart',
+      operator: 'fa-plus',
+      'fraction-box': 'fa-slash',
+      'fraction-input': 'fa-pencil-square-o',
+      'header-cell': 'fa-header',
+      text: 'fa-font',
+    };
+    if (groupType) return groupIcons[groupType] || 'fa-object-group';
+    if (atomType) return atomIcons[atomType] || 'fa-cube';
+    if (id === 'semantic.multiple-choice') return 'fa-list-ul';
+    return 'fa-cube';
   }
 
   function activeChildren() {
@@ -182,6 +282,331 @@
     }
   }
 
+  function findNodeEntry(nodeId) {
+    return flatNodes.find((entry) => entry.node?.id === nodeId) || null;
+  }
+
+  function findPanelById(panelId, nodes = displayNodes) {
+    for (const node of nodes || []) {
+      if (node?.atomType === 'panel-selector') {
+        const panel = (node.panels || []).find((candidate) => candidate.id === panelId);
+        if (panel) return { owner: node, panel };
+        for (const candidatePanel of node.panels || []) {
+          const nested = findPanelById(panelId, candidatePanel.children || []);
+          if (nested) return nested;
+        }
+      }
+      if (node?.nodeType === 'group') {
+        const nested = findPanelById(panelId, node.children || []);
+        if (nested) return nested;
+      }
+    }
+    return null;
+  }
+
+  function ensurePanelSelectorPanel(node) {
+    node.panels = Array.isArray(node.panels) && node.panels.length
+      ? node.panels
+      : [{
+        id: `${node.id || 'panel-selector'}-panel-1`,
+        label: 'Panel 1',
+        children: [],
+      }];
+    const selectedPanel = node.panels.find((panel) => panel.id === node.selectedPanelId)
+      || node.panels[0];
+    node.selectedPanelId = selectedPanel.id;
+    selectedPanel.children = Array.isArray(selectedPanel.children) ? selectedPanel.children : [];
+    return selectedPanel;
+  }
+
+  function insertAtAnchor(nodes, node, anchorNodeId, position) {
+    if (!anchorNodeId || position === 'inside') {
+      nodes.push(node);
+      return;
+    }
+    const anchorIndex = nodes.findIndex((candidate) => candidate?.id === anchorNodeId);
+    if (anchorIndex < 0) {
+      throw new Error(`Drop target anchor "${anchorNodeId}" is not in the destination container.`);
+    }
+    nodes.splice(position === 'after' ? anchorIndex + 1 : anchorIndex, 0, node);
+  }
+
+  function normalizePlacementOrder(nodes, predicate = () => true) {
+    let order = 1;
+    for (const node of nodes || []) {
+      if (!predicate(node)) continue;
+      node.placement = node.placement && typeof node.placement === 'object' ? node.placement : {};
+      node.placement.order = order;
+      order += 1;
+    }
+  }
+
+  function nodeIsInRegion(node, region) {
+    return (node?.placement?.region || '') === region;
+  }
+
+  function nodeIsTopLevelFlow(node) {
+    return !node?.placement?.region;
+  }
+
+  function topLevelFlowUsesOrder() {
+    return (activeDisplay?.nodes || []).some((node) => (
+      nodeIsTopLevelFlow(node) && Number.isFinite(Number(node?.placement?.order))
+    ));
+  }
+
+  function insertPaletteNode(entry, target) {
+    if (!activeDisplay) {
+      throw new Error('No active SPARC display is selected.');
+    }
+    if (!entry) {
+      throw new Error('No SPARC palette entry was selected for insertion.');
+    }
+    if (!target?.kind) {
+      throw new Error('No valid Visual Editor drop target was found.');
+    }
+
+    activeDisplay.nodes = Array.isArray(activeDisplay.nodes) ? activeDisplay.nodes : [];
+    const node = createNode(entry);
+
+    if (target.kind === 'top-level-box') {
+      node.placement = node.placement && typeof node.placement === 'object' ? node.placement : {};
+      node.placement.region = target.boxId;
+      insertAtAnchor(activeDisplay.nodes, node, target.anchorNodeId, target.position);
+      normalizePlacementOrder(activeDisplay.nodes, (candidate) => nodeIsInRegion(candidate, target.boxId));
+    } else if (target.kind === 'top-level-flow') {
+      const shouldNormalizeFlowOrder = topLevelFlowUsesOrder();
+      insertAtAnchor(activeDisplay.nodes, node, target.anchorNodeId, target.position);
+      if (shouldNormalizeFlowOrder) {
+        normalizePlacementOrder(activeDisplay.nodes, nodeIsTopLevelFlow);
+      }
+    } else if (target.kind === 'group') {
+      const groupEntry = findNodeEntry(target.groupId);
+      if (!groupEntry?.node || groupEntry.node.nodeType !== 'group') {
+        throw new Error(`Drop target group "${target.groupId}" was not found.`);
+      }
+      groupEntry.node.children = Array.isArray(groupEntry.node.children) ? groupEntry.node.children : [];
+      insertAtAnchor(groupEntry.node.children, node, target.anchorNodeId, target.position);
+      normalizePlacementOrder(groupEntry.node.children);
+    } else if (target.kind === 'panel') {
+      const panelEntry = findPanelById(target.panelId);
+      if (!panelEntry?.panel) {
+        throw new Error(`Drop target panel "${target.panelId}" was not found.`);
+      }
+      panelEntry.panel.children = Array.isArray(panelEntry.panel.children) ? panelEntry.panel.children : [];
+      insertAtAnchor(panelEntry.panel.children, node, target.anchorNodeId, target.position);
+      normalizePlacementOrder(panelEntry.panel.children);
+    } else {
+      throw new Error(`Unsupported Visual Editor drop target "${target.kind}".`);
+    }
+
+    activeNodeId = node.id;
+    markChanged();
+  }
+
+  function startPaletteDrag(event, entry) {
+    draggedPaletteEntryId = entry.id;
+    dropTarget = null;
+    dropMarkerStyle = '';
+    event.dataTransfer?.setData('text/plain', entry.id);
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'copy';
+    }
+  }
+
+  function clearDropState() {
+    draggedPaletteEntryId = '';
+    dropTarget = null;
+    dropMarkerStyle = '';
+  }
+
+  function candidateElementEntries(surface, predicate) {
+    return Array.from(surface.querySelectorAll('[data-node-id]'))
+      .map((element) => {
+        const nodeId = element.getAttribute('data-node-id');
+        const entry = findNodeEntry(nodeId);
+        return entry ? { element, entry } : null;
+      })
+      .filter((entry) => entry && predicate(entry.entry, entry.element));
+  }
+
+  function nearestCandidate(candidates, clientX, clientY) {
+    let best = null;
+    for (const candidate of candidates) {
+      const rect = candidate.element.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) continue;
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const distance = Math.abs(clientY - centerY) * 2 + Math.abs(clientX - centerX);
+      if (!best || distance < best.distance) {
+        best = { ...candidate, rect, distance };
+      }
+    }
+    if (!best) return null;
+    return {
+      anchorNodeId: best.entry.node.id,
+      position: clientY > best.rect.top + best.rect.height / 2 ? 'after' : 'before',
+      rect: best.rect,
+    };
+  }
+
+  function markerFromRect(surface, rect, position) {
+    const surfaceRect = surface.getBoundingClientRect();
+    if (position === 'inside') {
+      return `left: ${rect.left - surfaceRect.left + surface.scrollLeft}px; top: ${rect.top - surfaceRect.top + surface.scrollTop}px; width: ${rect.width}px; height: ${rect.height}px;`;
+    }
+    const top = (position === 'after' ? rect.bottom : rect.top) - surfaceRect.top + surface.scrollTop;
+    return `left: ${rect.left - surfaceRect.left + surface.scrollLeft}px; top: ${top}px; width: ${rect.width}px;`;
+  }
+
+  function targetLabel(target) {
+    if (!target) return '';
+    if (target.kind === 'top-level-box') return target.boxId ? `box ${target.boxId}` : 'layout box';
+    if (target.kind === 'group') return `group ${target.groupId}`;
+    if (target.kind === 'panel') return 'active panel';
+    return 'top-level flow';
+  }
+
+  function computeDropTarget(event) {
+    const surface = event.currentTarget;
+    const clientX = event.clientX;
+    const clientY = event.clientY;
+    const eventElement = event.target?.closest?.('*');
+    if (!surface || !eventElement || !surface.contains(eventElement)) {
+      return { target: null, markerStyle: '' };
+    }
+
+    const directNodeElement = eventElement.closest('[data-node-id]');
+    const directNodeId = directNodeElement?.getAttribute('data-node-id') || '';
+    const directEntry = findNodeEntry(directNodeId);
+
+    if (directEntry?.node?.nodeType === 'group') {
+      const groupCandidates = candidateElementEntries(surface, (entry) => entry.parent === directEntry.node.id);
+      const nearest = nearestCandidate(groupCandidates, clientX, clientY);
+      const rect = directNodeElement.getBoundingClientRect();
+      return {
+        target: {
+          kind: 'group',
+          groupId: directEntry.node.id,
+          anchorNodeId: nearest?.anchorNodeId || '',
+          position: nearest?.position || 'inside',
+          label: targetLabel({ kind: 'group', groupId: directEntry.node.id }),
+        },
+        markerStyle: markerFromRect(surface, nearest?.rect || rect, nearest?.position || 'inside'),
+      };
+    }
+
+    if (directEntry?.node?.atomType === 'panel-selector') {
+      const panel = ensurePanelSelectorPanel(directEntry.node);
+      const panelCandidates = candidateElementEntries(surface, (entry) => entry.parent === panel.id);
+      const nearest = nearestCandidate(panelCandidates, clientX, clientY);
+      const rect = directNodeElement.getBoundingClientRect();
+      return {
+        target: {
+          kind: 'panel',
+          panelId: panel.id,
+          anchorNodeId: nearest?.anchorNodeId || '',
+          position: nearest?.position || 'inside',
+          label: targetLabel({ kind: 'panel', panelId: panel.id }),
+        },
+        markerStyle: markerFromRect(surface, nearest?.rect || rect, nearest?.position || 'inside'),
+      };
+    }
+
+    const anchorEntry = directEntry || null;
+    if (anchorEntry?.parent) {
+      const parentEntry = findNodeEntry(anchorEntry.parent);
+      const parentCandidates = candidateElementEntries(surface, (entry) => entry.parent === anchorEntry.parent);
+      const nearest = nearestCandidate(parentCandidates, clientX, clientY);
+      const kind = parentEntry?.node?.nodeType === 'group' ? 'group' : 'panel';
+      const target = kind === 'group'
+        ? { kind, groupId: anchorEntry.parent, anchorNodeId: nearest?.anchorNodeId || anchorEntry.node.id, position: nearest?.position || 'after' }
+        : { kind, panelId: anchorEntry.parent, anchorNodeId: nearest?.anchorNodeId || anchorEntry.node.id, position: nearest?.position || 'after' };
+      target.label = targetLabel(target);
+      return {
+        target,
+        markerStyle: nearest ? markerFromRect(surface, nearest.rect, nearest.position) : '',
+      };
+    }
+
+    const boxElement = eventElement.closest('.sparc-box[data-sparc-box-id]');
+    if (boxElement) {
+      const boxId = boxElement.getAttribute('data-sparc-box-id');
+      const boxCandidates = candidateElementEntries(surface, (entry, element) => (
+        !entry.parent && element.closest('.sparc-box[data-sparc-box-id]') === boxElement
+      ));
+      const nearest = nearestCandidate(boxCandidates, clientX, clientY);
+      const target = {
+        kind: 'top-level-box',
+        boxId,
+        anchorNodeId: nearest?.anchorNodeId || '',
+        position: nearest?.position || 'inside',
+      };
+      target.label = targetLabel(target);
+      return {
+        target,
+        markerStyle: markerFromRect(surface, nearest?.rect || boxElement.getBoundingClientRect(), nearest?.position || 'inside'),
+      };
+    }
+
+    const flowCandidates = candidateElementEntries(surface, (entry, element) => (
+      !entry.parent && !element.closest('.sparc-box[data-sparc-box-id]')
+    ));
+    if (surface.querySelector('.sparc-box[data-sparc-box-id]') && flowCandidates.length === 0) {
+      return { target: null, markerStyle: '' };
+    }
+    const nearest = nearestCandidate(flowCandidates, clientX, clientY);
+    const target = {
+      kind: 'top-level-flow',
+      anchorNodeId: nearest?.anchorNodeId || '',
+      position: nearest?.position || 'inside',
+    };
+    target.label = targetLabel(target);
+    return {
+      target,
+      markerStyle: nearest
+        ? markerFromRect(surface, nearest.rect, nearest.position)
+        : markerFromRect(surface, surface.getBoundingClientRect(), 'inside'),
+    };
+  }
+
+  function handleVisualDragOver(event) {
+    const transferTypes = event.dataTransfer?.types;
+    const hasPaletteTransfer = draggedPaletteEntryId
+      || transferTypes?.includes?.('text/plain')
+      || transferTypes?.contains?.('text/plain');
+    if (!hasPaletteTransfer) {
+      return;
+    }
+    event.preventDefault();
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'copy';
+    }
+    const computed = computeDropTarget(event);
+    dropTarget = computed.target;
+    dropMarkerStyle = computed.markerStyle;
+  }
+
+  function handleVisualDrop(event) {
+    event.preventDefault();
+    try {
+      const entryId = event.dataTransfer?.getData('text/plain') || draggedPaletteEntryId;
+      const entry = paletteEntryById(entryId);
+      const computed = computeDropTarget(event);
+      insertPaletteNode(entry, computed.target || dropTarget);
+    } catch (error) {
+      errorText = error.message || String(error);
+    } finally {
+      clearDropState();
+    }
+  }
+
+  function handleVisualDragLeave(event) {
+    if (!event.currentTarget?.contains?.(event.relatedTarget)) {
+      clearDropState();
+    }
+  }
+
   function updateField(fieldName, value) {
     if (!activeNode) return;
     const oldId = activeNode.id;
@@ -190,6 +615,243 @@
       activeNodeId = value;
     }
     markChanged();
+  }
+
+  function parseHtmlFragment(value) {
+    const template = document.createElement('template');
+    template.innerHTML = String(value || '');
+    return template;
+  }
+
+  function isImageHtmlNode(node) {
+    if (!node || (node.atomType !== 'html-block' && node.atomType !== 'message-box')) {
+      return false;
+    }
+    const value = String(node.value || '');
+    return /<img[\s>]/i.test(value);
+  }
+
+  function getFirstImageAttribute(node, attributeName) {
+    if (!isImageHtmlNode(node)) {
+      return '';
+    }
+    const template = parseHtmlFragment(node.value);
+    return template.content.querySelector('img')?.getAttribute(attributeName) || '';
+  }
+
+  function updateFirstImageAttribute(attributeName, value) {
+    if (!activeNode || !isImageHtmlNode(activeNode)) {
+      return;
+    }
+    const template = parseHtmlFragment(activeNode.value);
+    let image = template.content.querySelector('img');
+    if (!image) {
+      image = document.createElement('img');
+      template.content.appendChild(image);
+    }
+    const normalized = String(value || '').trim();
+    if (normalized) {
+      image.setAttribute(attributeName, normalized);
+    } else {
+      image.removeAttribute(attributeName);
+    }
+    activeNode.value = template.innerHTML;
+    markChanged();
+  }
+
+  function selectVisualNode(nodeId) {
+    if (!nodeId || !flatNodes.some((entry) => entry.node?.id === nodeId)) {
+      return;
+    }
+    activeNodeId = nodeId;
+  }
+
+  function handleVisualEditorClick(event) {
+    const nodeElement = event.target?.closest?.('[data-node-id]');
+    selectVisualNode(nodeElement?.getAttribute('data-node-id'));
+  }
+
+  function updateNodeAuthoredValue(nodeId, value) {
+    const target = flatNodes.find((entry) => entry.node?.id === nodeId)?.node;
+    if (!target || target.nodeType !== 'atomic') {
+      return;
+    }
+    activeNodeId = nodeId;
+    if (target.atomType === 'dropdown') {
+      target.selected = value;
+    } else if (target.atomType === 'checkbox') {
+      target.checked = value === true;
+    } else {
+      target.value = value;
+    }
+    markChanged();
+  }
+
+  function runRichTextCommand(command, value = undefined) {
+    if (!htmlEditor || !isRichTextSelected) {
+      return;
+    }
+    const chain = htmlEditor.chain().focus();
+    if (command === 'bold') {
+      chain.toggleBold().run();
+    } else if (command === 'italic') {
+      chain.toggleItalic().run();
+    } else if (command === 'paragraph') {
+      chain.setParagraph().run();
+    } else if (command === 'heading') {
+      chain.toggleHeading({ level: value }).run();
+    } else if (command === 'bullet-list') {
+      chain.toggleBulletList().run();
+    } else if (command === 'ordered-list') {
+      chain.toggleOrderedList().run();
+    } else if (command === 'undo') {
+      chain.undo().run();
+    } else if (command === 'redo') {
+      chain.redo().run();
+    } else if (command === 'link') {
+      const href = String(value || '').trim();
+      if (href) {
+        chain.extendMarkRange('link').setLink({ href }).run();
+      } else {
+        chain.extendMarkRange('link').unsetLink().run();
+      }
+    }
+    htmlToolbarRevision += 1;
+  }
+
+  function richTextCommandActive(command, attrs = undefined) {
+    htmlToolbarRevision;
+    if (!htmlEditor || !isRichTextSelected) {
+      return false;
+    }
+    return attrs ? htmlEditor.isActive(command, attrs) : htmlEditor.isActive(command);
+  }
+
+  function valueContainsNodeId(value, nodeId) {
+    if (!nodeId) {
+      return false;
+    }
+    if (value === nodeId || value === `node:${nodeId}`) {
+      return true;
+    }
+    if (Array.isArray(value)) {
+      return value.some((entry) => valueContainsNodeId(entry, nodeId));
+    }
+    if (value && typeof value === 'object') {
+      return Object.values(value).some((entry) => valueContainsNodeId(entry, nodeId));
+    }
+    return false;
+  }
+
+  function productionRuleReferencesNode(rule, nodeId) {
+    if (!rule || !nodeId) {
+      return false;
+    }
+    return valueContainsNodeId(rule, nodeId);
+  }
+
+  function scopedConditionForNode(nodeId) {
+    return {
+      factType: 'interface-event',
+      slots: {
+        selection: { type: 'literal', value: nodeId },
+        action: { type: 'bind', variable: 'action' },
+        input: { type: 'bind', variable: 'value' },
+      },
+    };
+  }
+
+  function ruleTypeFromCatalogEntry(entryId) {
+    if (entryId === 'rule.condition.fact-pattern') return 'condition:fact-pattern';
+    if (entryId === 'rule.condition.not-fact-pattern') return 'condition:not-fact-pattern';
+    if (entryId === 'rule.test.comparison') return 'test:comparison';
+    if (entryId === 'rule.effect.assert-fact') return 'effect:assert-fact';
+    if (entryId === 'rule.effect.write-state') return 'effect:write-state';
+    if (entryId === 'rule.effect.message') return 'effect:message';
+    if (entryId === 'rule.effect.classify') return 'effect:classify';
+    if (entryId === 'rule.effect.credit') return 'effect:credit';
+    if (entryId === 'rule.effect.progressive-node-operation') return 'effect:append-node';
+    return 'effect:classify';
+  }
+
+  function createScopedProductionRule(entryId = activeVisualRuleTemplateId) {
+    if (!activeDisplay || !activeNode?.id) {
+      return;
+    }
+    const rules = ensureProductionRules();
+    const rule = defaultProductionRule(rules.length);
+    const nodeId = activeNode.id;
+    rule.id = `${nodeId}.${entryId.replace(/^rule\./, '').replace(/\./g, '-')}.${rules.length + 1}`;
+    rule.module = nodeId;
+    rule.when = [scopedConditionForNode(nodeId)];
+    const ruleType = ruleTypeFromCatalogEntry(entryId);
+    if (ruleType.startsWith('condition:')) {
+      rule.when.push(defaultProductionCondition(ruleType.slice('condition:'.length)));
+      rule.then = [defaultProductionEffect('classify')];
+    } else if (ruleType === 'test:comparison') {
+      rule.tests = [defaultProductionTest()];
+      rule.then = [defaultProductionEffect('classify')];
+    } else if (ruleType.startsWith('effect:')) {
+      rule.then = [defaultProductionEffect(ruleType.slice('effect:'.length))];
+    }
+    rules.push(rule);
+    activeProductionRuleIndex = rules.length - 1;
+    activeScopedProductionRuleIndex = rules.length - 1;
+    markChanged();
+  }
+
+  function selectScopedProductionRule(index) {
+    if (index < 0 || index >= productionRules.length) {
+      return;
+    }
+    activeScopedProductionRuleIndex = index;
+    activeProductionRuleIndex = index;
+  }
+
+  function updateScopedProductionRuleField(fieldName, value) {
+    if (!activeNodeProductionRule) return;
+    if (fieldName === 'salience') {
+      const numberValue = Number(value);
+      if (value === '') {
+        delete activeNodeProductionRule.salience;
+      } else if (Number.isFinite(numberValue)) {
+        activeNodeProductionRule.salience = numberValue;
+      }
+    } else if (value === '' && fieldName === 'module') {
+      delete activeNodeProductionRule.module;
+    } else {
+      activeNodeProductionRule[fieldName] = value;
+    }
+    markChanged();
+  }
+
+  function changeScopedRulePrimaryEffectType(type) {
+    if (!activeNodeProductionRule) return;
+    activeNodeProductionRule.then = Array.isArray(activeNodeProductionRule.then) ? activeNodeProductionRule.then : [];
+    activeNodeProductionRule.then[0] = defaultProductionEffect(type);
+    markChanged();
+  }
+
+  function addCatalogPartToActiveRule(entryId) {
+    const targetRule = activeNodeProductionRule || activeProductionRule;
+    if (!targetRule) {
+      createScopedProductionRule(entryId);
+      return;
+    }
+    const ruleType = ruleTypeFromCatalogEntry(entryId);
+    if (ruleType.startsWith('condition:')) {
+      targetRule.when = Array.isArray(targetRule.when) ? targetRule.when : [];
+      targetRule.when.push(defaultProductionCondition(ruleType.slice('condition:'.length)));
+      markChanged();
+    } else if (ruleType === 'test:comparison') {
+      targetRule.tests = Array.isArray(targetRule.tests) ? targetRule.tests : [];
+      targetRule.tests.push(defaultProductionTest());
+      markChanged();
+    } else if (ruleType.startsWith('effect:')) {
+      targetRule.then = Array.isArray(targetRule.then) ? targetRule.then : [];
+      targetRule.then.push(defaultProductionEffect(ruleType.slice('effect:'.length)));
+      markChanged();
+    }
   }
 
   function updateOptions(value) {
@@ -788,7 +1450,7 @@
   }
 
   function isRichTextNode(node) {
-    return node && (node.atomType === 'html-block' || node.atomType === 'message-box');
+    return node && !isImageHtmlNode(node) && (node.atomType === 'html-block' || node.atomType === 'message-box');
   }
 
   function maintainHtmlEditor(node) {
@@ -817,6 +1479,13 @@
           activeNode.value = editor.getHTML();
           markChanged();
         }
+        htmlToolbarRevision += 1;
+      },
+      onSelectionUpdate: () => {
+        htmlToolbarRevision += 1;
+      },
+      onTransaction: () => {
+        htmlToolbarRevision += 1;
       },
     });
   }
@@ -1098,10 +1767,6 @@
     }
   }
 
-  function inertNodeValue() {}
-  function inertCommit() {}
-  function inertButton() {}
-
   onMount(async () => {
     await tick();
     ensureHtmlEditor();
@@ -1283,13 +1948,17 @@
 <div class="sparc-editor-shell">
   <header class="sparc-editor-header">
     <div>
-      <h1>SPARC Editor</h1>
+      <h1>Sparc Visual Editor</h1>
       <div class="sparc-editor-subtitle">{initialTdf?.content?.tdfs?.tutor?.setspec?.lessonname || tdfId}</div>
       {#if selectedStimFile}
         <div class="sparc-editor-subtitle">{selectedStimFile}</div>
       {/if}
     </div>
     <div class="sparc-editor-actions">
+      <label class="sparc-advanced-toggle">
+        <input type="checkbox" bind:checked={showAdvancedEditors} />
+        Advanced editors
+      </label>
       {#if saveMessage}<span class="sparc-save-message">{saveMessage}</span>{/if}
       <button type="button" class="btn btn-secondary" on:click={onCancel}>Cancel</button>
       <button type="button" class="btn btn-primary" on:click={handleSave} disabled={saving}>
@@ -1313,34 +1982,86 @@
     </div>
   {/if}
 
-  <div class="sparc-editor-tabs" role="tablist" aria-label="SPARC editor sections">
-    <button type="button" class:active={activeEditorTab === 'nodes'} on:click={() => activeEditorTab = 'nodes'}>Nodes</button>
-    <button type="button" class:active={activeEditorTab === 'model'} on:click={() => activeEditorTab = 'model'}>Stimuli</button>
-    <button type="button" class:active={activeEditorTab === 'preview'} on:click={() => activeEditorTab = 'preview'}>Preview</button>
-    <button type="button" class:active={activeEditorTab === 'production'} on:click={() => activeEditorTab = 'production'}>Production Rules</button>
-    <button type="button" class:active={activeEditorTab === 'reactive'} on:click={() => activeEditorTab = 'reactive'}>Reactive Rules</button>
-  </div>
+  {#if showAdvancedEditors}
+    <div class="sparc-editor-tabs" role="tablist" aria-label="SPARC editor sections">
+      <button type="button" class:active={activeEditorTab === 'visual'} on:click={() => activeEditorTab = 'visual'}>Visual Editor</button>
+      <button type="button" class:active={activeEditorTab === 'model'} on:click={() => activeEditorTab = 'model'}>Stimuli</button>
+      <button type="button" class:active={activeEditorTab === 'production'} on:click={() => activeEditorTab = 'production'}>Advanced Rules</button>
+      <button type="button" class:active={activeEditorTab === 'reactive'} on:click={() => activeEditorTab = 'reactive'}>Reactive Rules</button>
+    </div>
+  {/if}
 
-  {#if activeEditorTab === 'nodes'}
+  {#if activeEditorTab === 'visual'}
   <div class="sparc-editor-grid">
     <aside class="sparc-palette" aria-label="SPARC node palette">
-      <h2>Palette</h2>
+      <div class="sparc-panel-header">
+        <h2>Palette</h2>
+        <button type="button" class="btn btn-outline-danger btn-sm" on:click={removeActiveNode} disabled={!activeNode}>
+          Delete Selected
+        </button>
+      </div>
       {#each paletteEntries as entry}
-        <button type="button" class="sparc-palette-item" on:click={() => addNode(entry)}>
-          <span>{entry.label}</span>
-          <small>{entry.category}</small>
+        <button
+          type="button"
+          class="sparc-palette-item"
+          draggable="true"
+          on:click={() => addNode(entry)}
+          on:dragstart={(event) => startPaletteDrag(event, entry)}
+          on:dragend={clearDropState}
+        >
+          <span class={`fa ${paletteIconClass(entry)} sparc-palette-icon`} aria-hidden="true"></span>
+          <span class="sparc-palette-text">
+            <span>{entry.label}</span>
+            <small>{entry.category}</small>
+          </span>
         </button>
       {/each}
     </aside>
 
     <main class="sparc-canvas">
-      <div class="sparc-panel-header">
-        <h2>Canvas</h2>
-        <button type="button" class="btn btn-outline-danger btn-sm" on:click={removeActiveNode} disabled={!activeNode}>
-          Delete Selected
-        </button>
+      <div class="sparc-rich-text-toolbar" aria-label="Rich text formatting">
+        <button type="button" class:active={richTextCommandActive('bold')} disabled={!isRichTextSelected} on:click={() => runRichTextCommand('bold')}>B</button>
+        <button type="button" class:active={richTextCommandActive('italic')} disabled={!isRichTextSelected} on:click={() => runRichTextCommand('italic')}>I</button>
+        <button type="button" class:active={richTextCommandActive('paragraph')} disabled={!isRichTextSelected} on:click={() => runRichTextCommand('paragraph')}>Paragraph</button>
+        <button type="button" class:active={richTextCommandActive('heading', { level: 2 })} disabled={!isRichTextSelected} on:click={() => runRichTextCommand('heading', 2)}>H2</button>
+        <button type="button" class:active={richTextCommandActive('bulletList')} disabled={!isRichTextSelected} on:click={() => runRichTextCommand('bullet-list')}>Bullets</button>
+        <button type="button" class:active={richTextCommandActive('orderedList')} disabled={!isRichTextSelected} on:click={() => runRichTextCommand('ordered-list')}>Numbers</button>
+        <input placeholder="https://..." bind:value={richTextLinkHref} disabled={!isRichTextSelected} aria-label="Link URL" />
+        <button type="button" class:active={richTextCommandActive('link')} disabled={!isRichTextSelected} on:click={() => runRichTextCommand('link', richTextLinkHref)}>Link</button>
+        <button type="button" disabled={!isRichTextSelected} on:click={() => runRichTextCommand('link', '')}>Unlink</button>
+        <button type="button" disabled={!isRichTextSelected} on:click={() => runRichTextCommand('undo')}>Undo</button>
+        <button type="button" disabled={!isRichTextSelected} on:click={() => runRichTextCommand('redo')}>Redo</button>
       </div>
-      <div class="sparc-node-list">
+      <div
+        class="sparc-visual-editor-surface"
+        class:sparc-drop-active={dropTarget}
+        aria-label="SPARC Visual Editor drop surface"
+        on:click={handleVisualEditorClick}
+        on:dragover={handleVisualDragOver}
+        on:drop={handleVisualDrop}
+        on:dragleave={handleVisualDragLeave}
+      >
+        {#if dropMarkerStyle}
+          <div
+            class="sparc-drop-marker"
+            class:sparc-drop-marker-inside={dropTarget?.position === 'inside'}
+            style={dropMarkerStyle}
+            aria-hidden="true"
+          ></div>
+        {/if}
+        {#if dropTarget?.position === 'inside'}
+          <div class="sparc-drop-label" aria-live="polite">Drop into {dropTarget.label}</div>
+        {/if}
+        {#if activeDisplay}
+          <SparcTrialSurface
+            display={activeDisplay}
+            runtimeNodeValues={{}}
+            onAuthoringNodeValueChange={updateNodeAuthoredValue}
+            onAuthoringNodeFocus={selectVisualNode}
+          />
+        {/if}
+      </div>
+      <div class="sparc-node-list" aria-label="SPARC node outline">
         {#each flatNodes as entry}
           <button
             type="button"
@@ -1356,70 +2077,95 @@
       </div>
     </main>
 
-    <section class="sparc-inspector">
-      <h2>Inspector</h2>
+    <section class="sparc-context-panel">
+      <h2>Selection</h2>
       {#if activeNode}
-        <label>
-          ID
-          <input value={activeNode.id || ''} on:input={(event) => updateField('id', event.currentTarget.value)} />
-        </label>
-        {#if activeNode.nodeType === 'group'}
+        <div class="sparc-context-card">
+          <div class="sparc-selection-summary">
+            <strong>{activeNode.id}</strong>
+            <small>{activeNode.nodeType === 'group' ? activeNode.groupType : activeNode.atomType}</small>
+          </div>
           <label>
-            Group Type
-            <input value={activeNode.groupType || ''} on:input={(event) => updateField('groupType', event.currentTarget.value)} />
+            Node ID
+            <input value={activeNode.id || ''} on:input={(event) => updateField('id', event.currentTarget.value)} />
           </label>
-          <label>
-            Label
-            <input value={activeNode.label || ''} on:input={(event) => updateField('label', event.currentTarget.value)} />
-          </label>
-        {:else}
-          <label>
-            Atom Type
-            <input value={activeNode.atomType || ''} readonly />
-          </label>
-          {#if activeNode.atomType === 'html-block' || activeNode.atomType === 'message-box'}
-            <div class="sparc-rich-text-editor" bind:this={htmlEditorElement}></div>
-          {:else if activeNode.atomType === 'dropdown'}
+          {#if activeNode.nodeType === 'group'}
             <label>
-              Selected
-              <input value={activeNode.selected || ''} on:input={(event) => updateField('selected', event.currentTarget.value)} />
+              Section Type
+              <input value={activeNode.groupType || ''} on:input={(event) => updateField('groupType', event.currentTarget.value)} />
             </label>
             <label>
-              Options
-              <textarea rows="6" value={(activeNode.options || []).join('\n')} on:input={(event) => updateOptions(event.currentTarget.value)}></textarea>
-            </label>
-          {:else if activeNode.atomType === 'button'}
-            <label>
-              Label
+              Section Label
               <input value={activeNode.label || ''} on:input={(event) => updateField('label', event.currentTarget.value)} />
-            </label>
-            <label>
-              Value
-              <input value={activeNode.value || ''} on:input={(event) => updateField('value', event.currentTarget.value)} />
-            </label>
-          {:else if activeNode.atomType === 'learning-progress'}
-            <label>
-              Label
-              <input value={activeNode.label || ''} on:input={(event) => updateField('label', event.currentTarget.value)} />
-            </label>
-          {:else if activeNode.atomType === 'panel-selector'}
-            <label>
-              Label
-              <input value={activeNode.label || ''} on:input={(event) => updateField('label', event.currentTarget.value)} />
-            </label>
-            <label>
-              Selected Panel ID
-              <input value={activeNode.selectedPanelId || ''} on:input={(event) => updateField('selectedPanelId', event.currentTarget.value)} />
             </label>
           {:else}
             <label>
-              Value
-              <textarea rows="5" value={activeNode.value || ''} on:input={(event) => updateField('value', event.currentTarget.value)}></textarea>
+              Node Type
+              <input value={activeNode.atomType || ''} readonly />
             </label>
+            {#if isImageHtmlSelected}
+              <div class="sparc-image-editor">
+                <div class="sparc-image-preview">
+                  {@html activeNode.value || ''}
+                </div>
+                <label>
+                  Image file or URL
+                  <input value={selectedImageSrc} on:input={(event) => updateFirstImageAttribute('src', event.currentTarget.value)} />
+                </label>
+                <label>
+                  Alt text
+                  <input value={selectedImageAlt} on:input={(event) => updateFirstImageAttribute('alt', event.currentTarget.value)} />
+                </label>
+                <label>
+                  Title
+                  <input value={selectedImageTitle} on:input={(event) => updateFirstImageAttribute('title', event.currentTarget.value)} />
+                </label>
+              </div>
+            {:else if activeNode.atomType === 'html-block' || activeNode.atomType === 'message-box'}
+              <div class="sparc-rich-text-editor" bind:this={htmlEditorElement}></div>
+            {:else if activeNode.atomType === 'dropdown'}
+              <label>
+                Selected
+                <input value={activeNode.selected || ''} on:input={(event) => updateField('selected', event.currentTarget.value)} />
+              </label>
+              <label>
+                Options
+                <textarea rows="6" value={(activeNode.options || []).join('\n')} on:input={(event) => updateOptions(event.currentTarget.value)}></textarea>
+              </label>
+            {:else if activeNode.atomType === 'button'}
+              <label>
+                Label
+                <input value={activeNode.label || ''} on:input={(event) => updateField('label', event.currentTarget.value)} />
+              </label>
+              <label>
+                Value
+                <input value={activeNode.value || ''} on:input={(event) => updateField('value', event.currentTarget.value)} />
+              </label>
+            {:else if activeNode.atomType === 'learning-progress'}
+              <label>
+                Label
+                <input value={activeNode.label || ''} on:input={(event) => updateField('label', event.currentTarget.value)} />
+              </label>
+            {:else if activeNode.atomType === 'panel-selector'}
+              <label>
+                Label
+                <input value={activeNode.label || ''} on:input={(event) => updateField('label', event.currentTarget.value)} />
+              </label>
+              <label>
+                Selected Panel ID
+                <input value={activeNode.selectedPanelId || ''} on:input={(event) => updateField('selectedPanelId', event.currentTarget.value)} />
+              </label>
+            {:else}
+              <label>
+                Value
+                <textarea rows="5" value={activeNode.value || ''} on:input={(event) => updateField('value', event.currentTarget.value)}></textarea>
+              </label>
+            {/if}
           {/if}
-        {/if}
+        </div>
+
         {#if stimulusRegistry.length > 0}
-          <div class="sparc-rule-section">
+          <div class="sparc-context-card">
             <div class="sparc-panel-header">
               <h3>Stimulus Attachments</h3>
             </div>
@@ -1435,6 +2181,119 @@
             {/each}
           </div>
         {/if}
+
+        <div class="sparc-context-card">
+          <div class="sparc-panel-header">
+            <h3>Production Rules</h3>
+          </div>
+          <label>
+            Rule template
+            <select bind:value={activeVisualRuleTemplateId}>
+              {#each productionRuleCatalogEntries as entry}
+                <option value={entry.id}>{entry.label} ({entry.category.replace('production-rule-', '')})</option>
+              {/each}
+            </select>
+          </label>
+          <button type="button" class="btn btn-primary btn-sm" on:click={() => createScopedProductionRule(activeVisualRuleTemplateId)}>
+            Add Rule For Selection
+          </button>
+          <div class="sparc-scoped-rule-list">
+            {#each activeNodeProductionRuleEntries as entry}
+              <button
+                type="button"
+                class="sparc-rule-row"
+                class:selected={entry.index === activeProductionRuleIndex}
+                on:click={() => selectScopedProductionRule(entry.index)}
+              >
+                <span>{entry.rule.id}</span>
+                <small>{entry.rule.when?.length || 0} when / {entry.rule.then?.length || 0} then</small>
+              </button>
+            {/each}
+            {#if activeNodeProductionRuleEntries.length === 0}
+              <p class="sparc-muted">No production rules target this selection yet.</p>
+            {/if}
+          </div>
+
+          {#if activeNodeProductionRule}
+            <label>
+              Selected Rule ID
+              <input value={activeNodeProductionRule.id || ''} on:input={(event) => updateScopedProductionRuleField('id', event.currentTarget.value)} />
+            </label>
+            <label>
+              Add catalog part
+              <select on:change={(event) => { addCatalogPartToActiveRule(event.currentTarget.value); event.currentTarget.value = ''; }}>
+                <option value="">Choose condition, test, or effect...</option>
+                <optgroup label="Conditions">
+                  {#each productionConditionCatalogEntries as entry}
+                    <option value={entry.id}>{entry.label}</option>
+                  {/each}
+                </optgroup>
+                <optgroup label="Tests">
+                  {#each productionTestCatalogEntries as entry}
+                    <option value={entry.id}>{entry.label}</option>
+                  {/each}
+                </optgroup>
+                <optgroup label="Effects">
+                  {#each productionEffectCatalogEntries as entry}
+                    <option value={entry.id}>{entry.label}</option>
+                  {/each}
+                </optgroup>
+              </select>
+            </label>
+            {#if activeNodeRuleEffect}
+              <div class="sparc-rule-card">
+                <div class="sparc-inline-actions">
+                  <strong>{activeNodeRuleEffect.type}</strong>
+                  <select value={activeNodeRuleEffect.type} on:change={(event) => changeScopedRulePrimaryEffectType(event.currentTarget.value)}>
+                    {#each productionEffectTypes as type}
+                      <option value={type}>{type}</option>
+                    {/each}
+                  </select>
+                </div>
+                {#if activeNodeRuleEffect.type === 'classify'}
+                  <label>
+                    Outcome
+                    <select value={activeNodeRuleEffect.outcome} on:change={(event) => updateEffectField(activeNodeRuleEffect, 'outcome', event.currentTarget.value)}>
+                      {#each classifyOutcomes as outcome}
+                        <option value={outcome}>{outcome}</option>
+                      {/each}
+                    </select>
+                  </label>
+                {:else if activeNodeRuleEffect.type === 'message'}
+                  <label>
+                    Message Type
+                    <select value={activeNodeRuleEffect.messageType} on:change={(event) => updateEffectField(activeNodeRuleEffect, 'messageType', event.currentTarget.value)}>
+                      {#each messageTypes as type}
+                        <option value={type}>{type}</option>
+                      {/each}
+                    </select>
+                  </label>
+                  <label>
+                    Template
+                    <textarea rows="3" value={activeNodeRuleEffect.template || ''} on:input={(event) => updateEffectField(activeNodeRuleEffect, 'template', event.currentTarget.value)}></textarea>
+                  </label>
+                {:else if activeNodeRuleEffect.type === 'write-state'}
+                  <label>
+                    State Key
+                    <input value={activeNodeRuleEffect.write?.key || ''} on:input={(event) => updateEffectField(activeNodeRuleEffect.write, 'key', event.currentTarget.value)} />
+                  </label>
+                  <label>
+                    Value
+                    {@render ruleExpressionEditor(activeNodeRuleEffect.write.value, 'Value')}
+                  </label>
+                {:else if activeNodeRuleEffect.type === 'credit'}
+                  <label>
+                    KC
+                    <input value={activeNodeRuleEffect.kc || ''} on:input={(event) => updateEffectField(activeNodeRuleEffect, 'kc', event.currentTarget.value)} />
+                  </label>
+                {:else}
+                  <p class="sparc-muted">Open Advanced Rules for full details of this effect.</p>
+                {/if}
+              </div>
+            {/if}
+            <button type="button" class="btn btn-outline-secondary btn-sm" on:click={() => activeEditorTab = 'production'}>Open Advanced Rules</button>
+          {/if}
+        </div>
       {:else}
         <p class="sparc-muted">Select a node or add one from the palette.</p>
       {/if}
@@ -1516,26 +2375,10 @@
         </div>
       </div>
     </section>
-  {:else if activeEditorTab === 'preview'}
-    <section class="sparc-preview">
-      <h2>Renderer Preview</h2>
-      <div class="sparc-preview-surface">
-        {#each displayNodes as node}
-          <SparcNode
-            {node}
-            nodeValues={{}}
-            onNodeValueChange={inertNodeValue}
-            onNodeCommit={inertCommit}
-            onNodeFocus={inertCommit}
-            onButtonActivate={inertButton}
-          />
-        {/each}
-      </div>
-    </section>
   {:else if activeEditorTab === 'production'}
     <section class="sparc-rule-editor">
       <div class="sparc-panel-header">
-        <h2>Production Rules</h2>
+        <h2>Advanced Production Rules</h2>
         <button type="button" class="btn btn-primary btn-sm" on:click={addProductionRule}>Add Rule</button>
       </div>
       <div class="sparc-rule-layout">
@@ -1967,11 +2810,28 @@
     padding: 12px 0;
   }
 
+  .sparc-editor-actions {
+    justify-content: flex-end;
+  }
+
+  .sparc-advanced-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-right: 8px;
+    color: var(--app-secondary-text-color);
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+
+  .sparc-advanced-toggle input {
+    margin: 0;
+  }
+
   .sparc-editor-header h1,
   .sparc-palette h2,
   .sparc-canvas h2,
-  .sparc-inspector h2,
-  .sparc-preview h2 {
+  .sparc-context-panel h2 {
     margin: 0;
     font-size: 1.1rem;
   }
@@ -1988,6 +2848,10 @@
     grid-template-columns: minmax(170px, 220px) minmax(220px, 1fr) minmax(250px, 340px);
     grid-template-rows: auto minmax(280px, 1fr);
     gap: 12px;
+  }
+
+  .sparc-palette > .sparc-panel-header {
+    justify-content: space-between;
   }
 
   .sparc-editor-tabs,
@@ -2014,8 +2878,7 @@
 
   .sparc-palette,
   .sparc-canvas,
-  .sparc-inspector,
-  .sparc-preview,
+  .sparc-context-panel,
   .sparc-rule-editor {
     border: 1px solid var(--border-color);
     background: var(--app-surface-color);
@@ -2024,13 +2887,11 @@
     min-width: 0;
   }
 
-  .sparc-preview {
-    grid-column: 1 / -1;
-  }
-
   .sparc-palette,
   .sparc-node-list,
-  .sparc-inspector,
+  .sparc-context-panel,
+  .sparc-context-card,
+  .sparc-scoped-rule-list,
   .sparc-rule-list,
   .sparc-rule-detail,
   .sparc-rule-section {
@@ -2039,7 +2900,6 @@
     gap: 8px;
   }
 
-  .sparc-palette-item,
   .sparc-node-row,
   .sparc-rule-row {
     display: flex;
@@ -2055,6 +2915,39 @@
     text-align: left;
   }
 
+  .sparc-palette-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    border: 1px solid var(--border-color);
+    background: var(--app-subtle-surface-color);
+    color: var(--app-text-color);
+    border-radius: 4px;
+    padding: 8px;
+    text-align: left;
+    cursor: grab;
+  }
+
+  .sparc-palette-item:active {
+    cursor: grabbing;
+  }
+
+  .sparc-palette-icon {
+    flex: 0 0 18px;
+    width: 18px;
+    text-align: center;
+    color: var(--app-strong-text-color, var(--app-text-color));
+    opacity: 0.95;
+  }
+
+  .sparc-palette-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
   .sparc-node-row.selected {
     border-color: var(--app-info-color);
     background: var(--app-info-surface-color);
@@ -2065,7 +2958,7 @@
     background: var(--app-info-surface-color);
   }
 
-  .sparc-inspector label,
+  .sparc-context-panel label,
   .sparc-rule-detail label {
     display: flex;
     flex-direction: column;
@@ -2073,8 +2966,9 @@
     font-size: 0.85rem;
   }
 
-  .sparc-inspector input,
-  .sparc-inspector textarea,
+  .sparc-context-panel input,
+  .sparc-context-panel textarea,
+  .sparc-context-panel select,
   .sparc-target-row select,
   .sparc-rule-editor input,
   .sparc-rule-editor textarea,
@@ -2143,13 +3037,128 @@
     outline: none;
   }
 
-  .sparc-preview-surface {
+  .sparc-image-editor,
+  .sparc-image-preview {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .sparc-image-preview {
+    align-items: flex-start;
+    overflow: auto;
+    max-height: 220px;
+    border: 1px solid var(--border-color);
+    background: var(--app-surface-color);
+    border-radius: 4px;
+    padding: 8px;
+  }
+
+  .sparc-image-preview :global(img) {
+    max-width: 100%;
+    height: auto;
+  }
+
+  .sparc-rich-text-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--app-subtle-surface-color);
+    border-radius: 4px;
+  }
+
+  .sparc-rich-text-toolbar button {
+    border: 1px solid var(--border-color);
+    background: var(--app-surface-color);
+    color: var(--app-text-color);
+    border-radius: 4px;
+    padding: 5px 8px;
+  }
+
+  .sparc-rich-text-toolbar button.active {
+    border-color: var(--app-info-color);
+    background: var(--app-info-surface-color);
+  }
+
+  .sparc-rich-text-toolbar input {
+    min-width: 150px;
+    max-width: 230px;
+    border: 1px solid var(--border-color);
+    background: var(--input-background-color, var(--app-surface-color));
+    color: var(--app-text-color);
+    border-radius: 4px;
+    padding: 5px 8px;
+  }
+
+  .sparc-context-card {
+    border: 1px solid var(--border-color);
+    background: var(--app-subtle-surface-color);
+    border-radius: 4px;
+    padding: 10px;
+  }
+
+  .sparc-selection-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .sparc-visual-editor-surface {
+    position: relative;
     min-height: 220px;
     overflow: auto;
     border: 1px solid var(--border-color);
     background: var(--app-subtle-surface-color);
     border-radius: 4px;
     padding: 12px;
+  }
+
+  .sparc-visual-editor-surface.sparc-drop-active {
+    border-color: var(--app-info-color);
+    box-shadow: inset 0 0 0 1px var(--app-info-color);
+  }
+
+  .sparc-visual-editor-surface :global([data-node-id]) {
+    cursor: pointer;
+  }
+
+  .sparc-drop-marker {
+    position: absolute;
+    height: 3px;
+    min-width: 28px;
+    background: var(--app-info-color);
+    border-radius: 999px;
+    box-shadow: 0 0 0 2px var(--app-surface-color);
+    pointer-events: none;
+    z-index: 20;
+  }
+
+  .sparc-drop-marker-inside {
+    height: auto;
+    min-width: 0;
+    background: transparent;
+    border: 2px dashed var(--app-info-color);
+    border-radius: 6px;
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--app-info-color) 20%, transparent);
+  }
+
+  .sparc-drop-label {
+    position: sticky;
+    top: 0;
+    z-index: 21;
+    width: fit-content;
+    max-width: min(320px, 100%);
+    margin: 0 0 8px auto;
+    border: 1px solid var(--app-info-color);
+    background: var(--app-info-surface-color);
+    color: var(--app-text-color);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 0.8rem;
+    pointer-events: none;
   }
 
   .sparc-save-message {
@@ -2159,10 +3168,6 @@
   @media (max-width: 1000px) {
     .sparc-editor-grid {
       grid-template-columns: 1fr;
-    }
-
-    .sparc-preview {
-      grid-column: auto;
     }
 
     .sparc-rule-layout,
