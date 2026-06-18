@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   assertSparcAuthoredDocument,
+  sparcAuthoredDocumentUsesModelBackedFeatures,
   validateSparcAuthoredDocument,
 } from './sparcDocumentValidation';
 import type { SparcAuthoredDocument } from './sparcSessionContracts';
@@ -48,6 +49,7 @@ describe('sparcDocumentValidation', function() {
       valid: true,
       referenceIssues: [],
       layoutIssues: [],
+      modelConfigIssues: [],
       issues: [],
     });
     assert.doesNotThrow(() => assertSparcAuthoredDocument(document));
@@ -85,9 +87,98 @@ describe('sparcDocumentValidation', function() {
       nodeId: 'wide-region',
       message: 'SPARC node "wide-region" with width constraints must declare reflow, shrink, stack, or constrain behavior',
     }]);
+    assert.deepEqual(result.modelConfigIssues, []);
     assert.throws(
       () => assertSparcAuthoredDocument(document),
       /missing-region.*width constraints/s,
     );
+  });
+
+  it('requires unit-level sparcsession model config for model-backed authored features', function() {
+    const document: SparcAuthoredDocument = {
+      ...validDocument(),
+      root: {
+        ...validDocument().root,
+        children: [{
+          id: 'progress',
+          kind: 'output',
+          atomType: 'learning-progress',
+        } as never],
+      },
+    };
+
+    assert.equal(sparcAuthoredDocumentUsesModelBackedFeatures(document), true);
+
+    const missingUnitResult = validateSparcAuthoredDocument(document, {});
+    assert.equal(missingUnitResult.valid, false);
+    assert.deepEqual(missingUnitResult.modelConfigIssues.map((issue) => issue.kind), [
+      'missing-sparcsession-model-config',
+    ]);
+
+    const incompleteUnitResult = validateSparcAuthoredDocument(document, {
+      sparcsession: {},
+    });
+    assert.equal(incompleteUnitResult.valid, false);
+    assert.deepEqual(incompleteUnitResult.modelConfigIssues.map((issue) => issue.kind), [
+      'missing-sparcsession-clusterlist',
+      'missing-sparcsession-calculateProbability',
+    ]);
+
+    const validUnitResult = validateSparcAuthoredDocument(document, {
+      sparcsession: {
+        clusterlist: '0',
+        calculateProbability: 'return p;',
+      },
+    });
+    assert.equal(validUnitResult.valid, true);
+    assert.deepEqual(validUnitResult.modelConfigIssues, []);
+  });
+
+  it('detects model-practice effects, model conditions, and model-targeted node attachments', function() {
+    const modelTarget = {
+      sparcDocumentId: 'doc-1',
+      sparcNodeId: 'adaptive-panel',
+      stimuliSetId: 'stim-set',
+      stimulusKC: 'kc-1',
+      clusterKC: 'cluster-1',
+      KCId: 'kc-1',
+      KCDefault: 'kc-1',
+      KCCluster: 'cluster-1',
+    };
+    const document: SparcAuthoredDocument = {
+      ...validDocument(),
+      root: {
+        ...validDocument().root,
+        children: [{
+          id: 'adaptive-panel',
+          kind: 'panel',
+          stimulusIds: ['stimulus-1'],
+          reactive: {
+            enabledWhen: {
+              type: 'model',
+              query: {
+                target: modelTarget,
+                metric: 'probability',
+              },
+              compare: 'gte',
+              value: 0.8,
+            },
+          },
+        }],
+      },
+      productionRules: [{
+        id: 'credit-model',
+        when: [{
+          factType: 'interface-event',
+        }],
+        then: [{
+          type: 'model-practice',
+          outcome: 'correct',
+          stimulusId: 'stimulus-1',
+        }],
+      }],
+    };
+
+    assert.equal(sparcAuthoredDocumentUsesModelBackedFeatures(document), true);
   });
 });

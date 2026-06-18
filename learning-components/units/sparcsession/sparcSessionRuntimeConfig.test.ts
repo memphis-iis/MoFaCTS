@@ -5,6 +5,7 @@ import {
   resolveSparcSessionProbabilitySource,
   resolveSparcSessionRuntimeConfig,
   resolveSparcSessionUnitMode,
+  validateSparcSessionModelConfiguration,
 } from './sparcSessionRuntimeConfig';
 
 describe('sparc session runtime config', function() {
@@ -35,5 +36,25 @@ describe('sparc session runtime config', function() {
       resolveSparcSessionModelPreparationClusterListSource({ sparcsession: { clusterlist: ' 0 ' } }),
       '0'
     );
+  });
+
+  it('validates coherent model configuration for model-backed SPARC features', function() {
+    assert.deepEqual(validateSparcSessionModelConfiguration({}), [{
+      kind: 'missing-sparcsession-model-config',
+      message: 'SPARC model-backed features require unit-level sparcsession model configuration',
+    }]);
+    assert.deepEqual(validateSparcSessionModelConfiguration({ sparcsession: {} }), [{
+      kind: 'missing-sparcsession-clusterlist',
+      message: 'SPARC model-backed features require unit-level sparcsession.clusterlist',
+    }, {
+      kind: 'missing-sparcsession-calculateProbability',
+      message: 'SPARC model-backed features require unit-level sparcsession.calculateProbability',
+    }]);
+    assert.deepEqual(validateSparcSessionModelConfiguration({
+      sparcsession: {
+        clusterlist: '0',
+        calculateProbability: 'return p;',
+      },
+    }), []);
   });
 });

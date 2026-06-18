@@ -365,7 +365,7 @@ function getTutorUnits(content: any) {
 
 function unitHasConfigurableRuntime(unit: any) {
   const unitType = detectTdfUnitType(unit);
-  return unitType === 'learning' || unitType === 'autotutor';
+  return unitType === 'learning' || unitType === 'autotutor' || unitType === 'sparc';
 }
 
 function unitHasLearnerConfigurableFields(unit: any) {

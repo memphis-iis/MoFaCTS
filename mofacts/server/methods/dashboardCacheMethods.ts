@@ -261,12 +261,23 @@ export function createDashboardCacheMethods({
   }
 
   async function collectLessonFamilyResetScope(tdfId: string) {
+    function addTdfDocumentToResetScope(doc: any, params: { cache: boolean }) {
+      addNonEmptyString(tdfIds, doc?._id);
+      addNonEmptyString(tdfKeys, doc?._id);
+      addNonEmptyString(tdfKeys, doc?.content?.fileName);
+      addNonEmptyString(tdfKeys, doc?.content?.tdfs?.tutor?.setspec?.stimulusfile);
+      if (params.cache) {
+        addNonEmptyString(cacheTdfIds, doc?._id);
+      }
+    }
+
     const target = await Tdfs.findOneAsync(
       { _id: tdfId },
       {
         fields: {
           _id: 1,
           'content.fileName': 1,
+          'content.tdfs.tutor.setspec.stimulusfile': 1,
           'content.tdfs.tutor.setspec.condition': 1,
           'content.tdfs.tutor.setspec.conditionTdfIds': 1
         }
@@ -279,10 +290,7 @@ export function createDashboardCacheMethods({
     const tdfIds = new Set<string>();
     const tdfKeys = new Set<string>();
     const cacheTdfIds = new Set<string>();
-    addNonEmptyString(tdfIds, target._id);
-    addNonEmptyString(tdfKeys, target._id);
-    addNonEmptyString(tdfKeys, target.content?.fileName);
-    addNonEmptyString(cacheTdfIds, target._id);
+    addTdfDocumentToResetScope(target, { cache: true });
 
     const targetFileName = String(target.content?.fileName || '').trim();
     const parentRoots = await Tdfs.find({
@@ -295,6 +303,7 @@ export function createDashboardCacheMethods({
       fields: {
         _id: 1,
         'content.fileName': 1,
+        'content.tdfs.tutor.setspec.stimulusfile': 1,
         'content.tdfs.tutor.setspec.condition': 1,
         'content.tdfs.tutor.setspec.conditionTdfIds': 1
       }
@@ -303,10 +312,7 @@ export function createDashboardCacheMethods({
     const roots = [target, ...parentRoots];
     const childRefs = new Set<string>();
     for (const root of roots) {
-      addNonEmptyString(tdfIds, root._id);
-      addNonEmptyString(tdfKeys, root._id);
-      addNonEmptyString(tdfKeys, root.content?.fileName);
-      addNonEmptyString(cacheTdfIds, root._id);
+      addTdfDocumentToResetScope(root, { cache: true });
 
       const setspec = root.content?.tdfs?.tutor?.setspec || {};
       if (Array.isArray(setspec.condition)) {
@@ -333,14 +339,13 @@ export function createDashboardCacheMethods({
       }, {
         fields: {
           _id: 1,
-          'content.fileName': 1
+          'content.fileName': 1,
+          'content.tdfs.tutor.setspec.stimulusfile': 1
         }
       }).fetchAsync();
 
       for (const child of children) {
-        addNonEmptyString(tdfIds, child._id);
-        addNonEmptyString(tdfKeys, child._id);
-        addNonEmptyString(tdfKeys, child.content?.fileName);
+        addTdfDocumentToResetScope(child, { cache: false });
       }
     }
 

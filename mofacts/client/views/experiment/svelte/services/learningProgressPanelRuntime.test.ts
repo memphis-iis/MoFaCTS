@@ -11,7 +11,38 @@ const cardSurface: SessionSurfaceState = {
 function modelEngine(probabilityEstimate = 0.7) {
   return {
     unitType: 'model',
-    currentCardRef: { clusterIndex: 0, stimIndex: 0 },
+    getModelProgressItems: () => [
+      {
+        id: '0:0:kc-a',
+        probability: probabilityEstimate,
+        stimulusKC: 'kc-a',
+        introduced: true,
+        current: true,
+        canUse: true,
+      },
+    ],
+  };
+}
+
+function sparcSessionEngine(probabilityEstimate = 0.7) {
+  return {
+    unitType: 'sparcsession',
+    getModelProgressItems: () => [
+      {
+        id: '0:0:kc-a',
+        probability: probabilityEstimate,
+        stimulusKC: 'kc-a',
+        introduced: true,
+        current: true,
+        canUse: true,
+      },
+    ],
+  };
+}
+
+function legacyModelEngine(probabilityEstimate = 0.7) {
+  return {
+    unitType: 'model',
     getCardProbabilitiesNoCalc: () => ({
       cards: [
         {
@@ -58,7 +89,7 @@ describe('learning progress panel runtime', function() {
 
     const runtime = controller.buildRuntimeSnapshot({
       deliverySettings: { optimalThreshold: 0.8 },
-      engine: modelEngine(),
+      engine: sparcSessionEngine(),
       feedbackEnd: 0,
       surfaceState: cardSurface,
     });
@@ -71,6 +102,25 @@ describe('learning progress panel runtime', function() {
       className: 'learning-progress-panel-viewport-open',
       force: true,
     });
+  });
+
+  it('does not seed progress from the legacy raw card-probabilities shape alone', function() {
+    const controller = createLearningProgressRuntimeController({
+      defaultDeliverySettings: {},
+      documentRef: () => null,
+      getHiddenItems: () => [],
+    });
+
+    const runtime = controller.buildRuntimeSnapshot({
+      deliverySettings: {},
+      engine: legacyModelEngine(),
+      feedbackEnd: 0,
+      surfaceState: cardSurface,
+    });
+
+    expect(runtime.snapshot.available).to.equal(false);
+    expect(runtime.snapshot.reason).to.equal('Progress requires a model-progress provider.');
+    expect(runtime.showPanel).to.equal(false);
   });
 
   it('commits updated progress only for a new feedback end timestamp', function() {
@@ -106,6 +156,43 @@ describe('learning progress panel runtime', function() {
     });
     expect(controller.getSnapshot().rows[0]?.probability).to.equal(0.9);
     expect(controller.getLastFeedbackEnd()).to.equal(20);
+  });
+
+  it('commits updated progress for a new model refresh signal without feedback end', function() {
+    let probability = 0.6;
+    const controller = createLearningProgressRuntimeController({
+      defaultDeliverySettings: {},
+      documentRef: () => null,
+      getHiddenItems: () => [],
+    });
+
+    controller.buildRuntimeSnapshot({
+      deliverySettings: {},
+      engine: sparcSessionEngine(probability),
+      feedbackEnd: 0,
+      refreshSignal: 'sparc-action-1',
+      surfaceState: cardSurface,
+    });
+    expect(controller.getSnapshot().rows[0]?.probability).to.equal(0.6);
+
+    probability = 0.9;
+    controller.buildRuntimeSnapshot({
+      deliverySettings: {},
+      engine: sparcSessionEngine(probability),
+      feedbackEnd: 0,
+      refreshSignal: 'sparc-action-1',
+      surfaceState: cardSurface,
+    });
+    expect(controller.getSnapshot().rows[0]?.probability).to.equal(0.6);
+
+    controller.buildRuntimeSnapshot({
+      deliverySettings: {},
+      engine: sparcSessionEngine(probability),
+      feedbackEnd: 0,
+      refreshSignal: 'sparc-action-2',
+      surfaceState: cardSurface,
+    });
+    expect(controller.getSnapshot().rows[0]?.probability).to.equal(0.9);
   });
 
   it('closes and clears viewport state when the panel is unavailable', function() {

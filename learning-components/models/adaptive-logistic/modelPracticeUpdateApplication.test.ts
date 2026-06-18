@@ -91,10 +91,18 @@ describe('modelPracticeUpdateApplication', function() {
     assert.equal(cardProbabilities.numQuestionsAnsweredCurrentSession, 1);
     assert.equal(cardProbabilities.numCorrectAnswers, 1);
     assert.equal(cardProbabilities.cards[0].priorCorrect, 1);
+    assert.equal(cardProbabilities.cards[0].firstSeen, 2000);
+    assert.equal(cardProbabilities.cards[0].lastSeen, 2000);
+    assert.equal(cardProbabilities.cards[0].hasBeenIntroduced, true);
     assert.equal(cardProbabilities.cards[0].stims[0].priorCorrect, 1);
+    assert.equal(cardProbabilities.cards[0].stims[0].firstSeen, 2000);
+    assert.equal(cardProbabilities.cards[0].stims[0].lastSeen, 2000);
+    assert.equal(cardProbabilities.cards[0].stims[0].hasBeenIntroduced, true);
     assert.equal(cardProbabilities.cards[0].stims[0].timesSeen, 1);
     assert.equal(cardProbabilities.cards[0].stims[0].totalPracticeDuration, 250);
     assert.deepEqual(cardProbabilities.cards[0].outcomeStack, [1]);
+    assert.equal(cardProbabilities.responses.answer.firstSeen, 2000);
+    assert.equal(cardProbabilities.responses.answer.lastSeen, 2000);
     assert.deepEqual(cardProbabilities.responses.answer.outcomeStack, [1]);
   });
 
@@ -140,5 +148,45 @@ describe('modelPracticeUpdateApplication', function() {
         metric: 'probability',
       },
     }), 0.64);
+  });
+
+  it('matches model targets by stim-level cluster identity', function() {
+    const cardProbabilities = createCardProbabilities();
+    cardProbabilities.cards[0].clusterKC = 0;
+    cardProbabilities.cards[0].stims[0].clusterKC = 'cluster-1';
+
+    const applied = applyModelPracticeUpdateToAdaptiveLogistic({
+      cardProbabilities,
+      request,
+    });
+
+    assert.equal(applied.cardIndex, 0);
+    assert.equal(applied.stimIndex, 0);
+    assert.equal(cardProbabilities.cards[0].stims[0].priorCorrect, 1);
+  });
+
+  it('does not require response metrics for response-less model practice targets', function() {
+    const cardProbabilities = createCardProbabilities();
+    const { response: _response, ...targetWithoutResponse } = request.target;
+
+    const applied = applyModelPracticeUpdateToAdaptiveLogistic({
+      cardProbabilities,
+      request: {
+        ...request,
+        target: targetWithoutResponse,
+      },
+    });
+
+    assert.deepEqual(applied, {
+      cardIndex: 0,
+      stimIndex: 0,
+      wasCorrect: true,
+      testType: 'd',
+      practiceTime: 250,
+    });
+    assert.equal(cardProbabilities.numQuestionsAnswered, 1);
+    assert.equal(cardProbabilities.cards[0].priorCorrect, 1);
+    assert.equal(cardProbabilities.cards[0].stims[0].priorCorrect, 1);
+    assert.deepEqual(cardProbabilities.responses.answer.outcomeStack, []);
   });
 });

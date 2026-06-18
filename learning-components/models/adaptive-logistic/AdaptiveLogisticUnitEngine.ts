@@ -51,6 +51,7 @@ import {
   type ModelPracticeHistoryCore,
   type ModelPracticeUpdateRequest,
 } from '../../runtime/modelPracticeUpdates';
+import { buildAdaptiveLogisticModelProgressItems } from './modelProgressProvider';
 
 type StimClusterLike = {
   stims: Array<{
@@ -104,7 +105,10 @@ export interface CreateAdaptiveLogisticUnitEngineDeps {
   readonly updateCurStudedentPracticeTime: (practiceTime: any) => void;
   readonly serverMethods: AdaptiveLogisticServerMethods;
   readonly getCurrentUserId: () => any;
-  readonly reconstructLearningStateFromHistory: (historyRows: any[]) => any;
+  readonly reconstructLearningStateFromHistory: (
+    historyRows: any[],
+    options?: { allowResponseLessModelPractice?: boolean },
+  ) => any;
   readonly extractDelimFields: (source: any, target: any[]) => void;
   readonly rangeVal: (source: any) => any[];
   readonly legacyFloat: (source: any) => number;
@@ -192,6 +196,30 @@ export async function createAdaptiveLogisticUnitEngine(
     });
   }
 
+  function recordModelPracticeRuntimeHistories(outcome: string) {
+    const overallOutcomeHistory = deps.getSessionValue('overallOutcomeHistory');
+    if (!Array.isArray(overallOutcomeHistory)) {
+      throw new Error('Adaptive logistic model practice requires initialized overallOutcomeHistory');
+    }
+    if (outcome === 'correct') {
+      overallOutcomeHistory.push(1);
+    } else if (outcome === 'incorrect') {
+      overallOutcomeHistory.push(0);
+    }
+    deps.setSessionValue('overallOutcomeHistory', overallOutcomeHistory);
+
+    const overallStudyHistory = deps.getSessionValue('overallStudyHistory');
+    if (!Array.isArray(overallStudyHistory)) {
+      throw new Error('Adaptive logistic model practice requires initialized overallStudyHistory');
+    }
+    if (outcome === 'study') {
+      overallStudyHistory.push(1);
+    } else if (outcome === 'correct' || outcome === 'incorrect') {
+      overallStudyHistory.push(0);
+    }
+    deps.setSessionValue('overallStudyHistory', overallStudyHistory);
+  }
+
   return {
     calculateCardProbabilities: function calculateCardProbabilities() {
       calculateLearningSessionCardProbabilities({
@@ -243,6 +271,7 @@ export async function createAdaptiveLogisticUnitEngine(
         stimClusters,
         getLearningHistoryForUnit: deps.serverMethods.getLearningHistoryForUnit,
         reconstructLearningStateFromHistory: deps.reconstructLearningStateFromHistory,
+        allowResponseLessModelPractice: config.unitType === 'sparc',
         setOverallOutcomeHistory: (history) => deps.setSessionValue('overallOutcomeHistory', history),
         setOverallStudyHistory: (history) => deps.setSessionValue('overallStudyHistory', history),
         getHistoryCorrectAnswer,
@@ -257,6 +286,13 @@ export async function createAdaptiveLogisticUnitEngine(
     },
     getCardProbabilitiesNoCalc: function() {
       return cardProbabilities;
+    },
+
+    getModelProgressItems: function() {
+      return buildAdaptiveLogisticModelProgressItems({
+        cardProbabilities,
+        currentCardRef: this.currentCardRef,
+      });
     },
 
     applyModelPracticeUpdate: async function(
@@ -275,7 +311,15 @@ export async function createAdaptiveLogisticUnitEngine(
         }),
         createHistoryRecord: createCanonicalModelPracticeHistoryRecord,
       });
-      return await runtime.applyModelPracticeUpdate(core, request, extensionFields);
+      const result = await runtime.applyModelPracticeUpdate(core, request, extensionFields);
+      recordModelPracticeRuntimeHistories(request.outcome);
+      calculateLearningSessionCardProbabilities({
+        cardProbabilities,
+        stimClusters,
+        probabilityFunction: probFunction,
+        deps: modelDeps,
+      });
+      return result;
     },
 
     queryModelPracticeState: function(query: any) {

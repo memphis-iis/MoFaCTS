@@ -135,10 +135,14 @@ export async function commitSparcProductionRuleAction(params: {
   readonly tdfId: unknown;
   readonly sessionId: unknown;
   readonly levelUnit: unknown;
-}): Promise<{ readonly sparcNodeValues: Record<string, unknown> }> {
+}): Promise<{
+  readonly classifications: readonly string[];
+  readonly messages: readonly string[];
+  readonly sparcNodeValues: Record<string, unknown>;
+}> {
   const sparcDisplay = resolveSparcActionDisplay(params.currentDisplay);
   if (!sparcDisplay) {
-    return { sparcNodeValues: {} };
+    return { classifications: [], messages: [], sparcNodeValues: {} };
   }
 
   const tdfId = nonBlankString(params.tdfId);
@@ -181,6 +185,12 @@ export async function commitSparcProductionRuleAction(params: {
   });
 
   return {
+    classifications: (result.evaluations ?? []).flatMap((evaluation) => (
+      evaluation.execution?.firings ?? []
+    ).flatMap((firing) => firing.classifications ?? [])),
+    messages: (result.evaluations ?? []).flatMap((evaluation) => (
+      evaluation.execution?.firings ?? []
+    ).flatMap((firing) => (firing.messages ?? []).map((message) => message.text))),
     sparcNodeValues: extractSparcNodeValues(sparcDisplay, result.evaluations, priorHistoryRecords),
   };
 }

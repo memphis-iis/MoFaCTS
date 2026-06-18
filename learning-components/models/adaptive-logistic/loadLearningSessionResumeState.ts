@@ -14,7 +14,11 @@ export interface LoadLearningSessionResumeStateParams {
     currentUnitNumber: number,
     resetStudentPerformance: boolean,
   ) => Promise<any[]>;
-  readonly reconstructLearningStateFromHistory: (historyRows: any[]) => any;
+  readonly reconstructLearningStateFromHistory: (
+    historyRows: any[],
+    options?: { allowResponseLessModelPractice?: boolean },
+  ) => any;
+  readonly allowResponseLessModelPractice?: boolean;
   readonly setOverallOutcomeHistory: (history: any) => void;
   readonly setOverallStudyHistory: (history: any) => void;
   readonly getHistoryCorrectAnswer: (rawResponse: any) => string;
@@ -34,7 +38,9 @@ export async function loadLearningSessionResumeState(
     params.currentUnitNumber,
     params.resetStudentPerformance,
   );
-  const reconstructed = params.reconstructLearningStateFromHistory(historyRows || []);
+  const reconstructed = params.reconstructLearningStateFromHistory(historyRows || [], {
+    allowResponseLessModelPractice: params.allowResponseLessModelPractice === true,
+  });
 
   params.setOverallOutcomeHistory(reconstructed.overallOutcomeHistory);
   params.setOverallStudyHistory(reconstructed.overallStudyHistory);

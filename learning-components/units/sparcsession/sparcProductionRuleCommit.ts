@@ -17,6 +17,7 @@ import type {
   SparcCanonicalHistoryRecord,
   SparcProductionRuleExecution,
   SparcReactiveEvent,
+  SparcStateWrite,
   SparcStateTransition,
   SparcWorkingMemoryFact,
 } from './sparcSessionContracts';
@@ -55,6 +56,135 @@ function productionRuleEventPayload(
   };
 }
 
+function nonBlankString(value: unknown): string {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : '';
+}
+
+function eventHasNonEmptyInput(event: SparcReactiveEvent): boolean {
+  const input = event.payload?.input;
+  if (input === undefined || input === null) {
+    return false;
+  }
+  return typeof input !== 'string' || input.trim().length > 0;
+}
+
+function firingWritesCorrectnessForEvent(
+  firing: SparcProductionRuleExecution['firings'][number],
+  event: SparcReactiveEvent,
+): boolean {
+  return firing.writes.some((write) => (
+    write.key === 'correctness'
+    && write.target.documentId === event.source.documentId
+    && write.target.nodeId === event.source.nodeId
+  ));
+}
+
+function createUnhandledIncorrectWrites(params: {
+  readonly event: SparcReactiveEvent;
+  readonly execution: SparcProductionRuleExecution;
+}): SparcStateWrite[] {
+  if (
+    params.event.type !== 'response-submitted'
+    || params.event.payload?.sparcAnswerable !== true
+    || !eventHasNonEmptyInput(params.event)
+  ) {
+    return [];
+  }
+
+  const handled = params.execution.firings.some((firing) => (
+    firing.classifications.length > 0
+    || firingWritesCorrectnessForEvent(firing, params.event)
+  ));
+  if (handled) {
+    return [];
+  }
+
+  const defaultIncorrectMessage = nonBlankString(params.event.payload?.sparcDefaultIncorrectMessage)
+    || 'No, this is not correct.';
+  const feedbackNodeId = nonBlankString(params.event.payload?.sparcDefaultIncorrectFeedbackNodeId);
+  return [{
+    target: params.event.source,
+    key: 'correctness',
+    value: 'incorrect',
+  }, ...(feedbackNodeId ? [{
+    target: {
+      documentId: params.event.source.documentId,
+      nodeId: feedbackNodeId,
+    },
+    key: 'message',
+    value: defaultIncorrectMessage,
+  }] : [])];
+}
+
+function firingTargetsMessageNode(
+  firing: SparcProductionRuleExecution['firings'][number],
+  documentId: string,
+  nodeId: string,
+): boolean {
+  return firing.messages.some((message) => (
+    message.target?.documentId === documentId
+    && message.target.nodeId === nodeId
+  )) || firing.writes.some((write) => (
+    (write.key === 'message' || write.key === 'text' || write.key === 'value')
+    && write.target.documentId === documentId
+    && write.target.nodeId === nodeId
+  ));
+}
+
+function firingMarksEventCorrect(
+  firing: SparcProductionRuleExecution['firings'][number],
+  event: SparcReactiveEvent,
+): boolean {
+  return firing.classifications.includes('correct')
+    || firing.writes.some((write) => (
+      write.key === 'correctness'
+      && write.value === 'correct'
+      && write.target.documentId === event.source.documentId
+      && write.target.nodeId === event.source.nodeId
+    ));
+}
+
+function createCorrectFeedbackClearWrites(params: {
+  readonly event: SparcReactiveEvent;
+  readonly execution: SparcProductionRuleExecution;
+}): SparcStateWrite[] {
+  if (
+    params.event.type !== 'response-submitted'
+    || params.event.payload?.sparcAnswerable !== true
+    || !eventHasNonEmptyInput(params.event)
+  ) {
+    return [];
+  }
+
+  const feedbackNodeId = nonBlankString(params.event.payload?.sparcDefaultIncorrectFeedbackNodeId);
+  if (!feedbackNodeId) {
+    return [];
+  }
+
+  const hasCorrectClassification = params.execution.firings.some((firing) => (
+    firingMarksEventCorrect(firing, params.event)
+  ));
+  if (!hasCorrectClassification) {
+    return [];
+  }
+
+  const authoredMessageForFeedbackNode = params.execution.firings.some((firing) => (
+    firingTargetsMessageNode(firing, params.event.source.documentId, feedbackNodeId)
+  ));
+  if (authoredMessageForFeedbackNode) {
+    return [];
+  }
+
+  return [{
+    target: {
+      documentId: params.event.source.documentId,
+      nodeId: feedbackNodeId,
+    },
+    key: 'message',
+    value: '',
+  }];
+}
+
 function createProductionRuleTransition(params: {
   readonly document: SparcAuthoredDocument;
   readonly event: SparcReactiveEvent;
@@ -83,7 +213,17 @@ function createProductionRuleTransition(params: {
       target: workingMemoryTarget,
       fact,
     })),
-  ]).concat(correctnessWrites);
+  ]).concat(
+    correctnessWrites,
+    createCorrectFeedbackClearWrites({
+      event: params.event,
+      execution: params.execution,
+    }),
+    createUnhandledIncorrectWrites({
+      event: params.event,
+      execution: params.execution,
+    }),
+  );
   if (writes.length === 0) {
     return undefined;
   }

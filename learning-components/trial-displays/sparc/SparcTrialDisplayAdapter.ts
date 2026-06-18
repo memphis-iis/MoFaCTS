@@ -36,6 +36,16 @@ export interface SparcLayoutZone {
   [key: string]: unknown;
 }
 
+export type SparcProgressReporterPlacement = 'document' | 'sidebar';
+
+export interface SparcProgressReporterConfig {
+  placement: SparcProgressReporterPlacement;
+  nodeId?: string;
+  label?: string;
+  showReferenceLines?: boolean;
+  compact?: boolean;
+}
+
 export interface SparcBoxedNodeGroup {
   box: SparcLayoutZone;
   nodes: unknown[];
@@ -52,6 +62,7 @@ export interface SparcTrialDisplay {
   nodes: unknown[];
   workingMemoryFacts?: unknown[];
   productionRules?: unknown[];
+  progressReporter?: SparcProgressReporterConfig;
   response?: {
     gradingMode?: string;
     scoredNodes?: string[];
@@ -66,6 +77,7 @@ export interface SparcTrialDisplay {
 export interface SparcTrialResult {
   submittedNodes: Record<string, unknown>;
   triggeredBy?: string;
+  focusedNodeId?: string;
   eventType?: string;
   timestamp: number;
 }
@@ -79,6 +91,26 @@ function normalizeSubmittedNodes(value: unknown): Record<string, unknown> {
     throw new Error('SPARC trial result requires submittedNodes');
   }
   return value;
+}
+
+export function normalizeSparcProgressReporter(value: unknown): SparcProgressReporterConfig | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (!isPlainObject(value)) {
+    throw new Error('SPARC progressReporter must be an object');
+  }
+  if (value.placement !== 'document' && value.placement !== 'sidebar') {
+    throw new Error('SPARC progressReporter.placement must be "document" or "sidebar"');
+  }
+
+  return {
+    placement: value.placement,
+    ...(typeof value.nodeId === 'string' ? { nodeId: value.nodeId } : {}),
+    ...(typeof value.label === 'string' ? { label: value.label } : {}),
+    ...(typeof value.showReferenceLines === 'boolean' ? { showReferenceLines: value.showReferenceLines } : {}),
+    ...(typeof value.compact === 'boolean' ? { compact: value.compact } : {}),
+  };
 }
 
 export const sparcTrialDisplayAdapter: TrialDisplayAdapter<SparcTrialDisplay, SparcTrialResult> = {
@@ -98,6 +130,7 @@ export const sparcTrialDisplayAdapter: TrialDisplayAdapter<SparcTrialDisplay, Sp
     if (!Array.isArray(display.nodes)) {
       throw new Error('SPARC trial display requires a nodes array');
     }
+    const normalizedProgressReporter = normalizeSparcProgressReporter(display.progressReporter);
     const normalizedResponse = isPlainObject(display.response)
       ? {
           ...display.response,
@@ -159,6 +192,7 @@ export const sparcTrialDisplayAdapter: TrialDisplayAdapter<SparcTrialDisplay, Sp
       ...display,
       type: SPARC_TRIAL_DISPLAY_TYPE,
       nodes: normalizeSparcFractionGroups(expandSparcSemanticNodes(display.nodes)),
+      ...(normalizedProgressReporter ? { progressReporter: normalizedProgressReporter } : {}),
       ...(normalizedResponse ? { response: normalizedResponse } : {}),
     };
   },
@@ -169,6 +203,7 @@ export const sparcTrialDisplayAdapter: TrialDisplayAdapter<SparcTrialDisplay, Sp
     return {
       submittedNodes: normalizeSubmittedNodes(result.submittedNodes),
       ...(typeof result.triggeredBy === 'string' ? { triggeredBy: result.triggeredBy } : {}),
+      ...(typeof result.focusedNodeId === 'string' ? { focusedNodeId: result.focusedNodeId } : {}),
       ...(typeof result.eventType === 'string' ? { eventType: result.eventType } : {}),
       timestamp: Number.isFinite(result.timestamp) ? Number(result.timestamp) : Date.now(),
     };

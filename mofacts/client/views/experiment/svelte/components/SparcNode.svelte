@@ -5,6 +5,7 @@
   export let node;
   export let nodeValues = {};
   export let learningProgressSnapshot = null;
+  export let authoringSelectedNodeId = '';
   export let onNodeValueChange = () => {};
   export let onNodeCommit = () => {};
   export let onNodeFocus = () => {};
@@ -171,6 +172,7 @@
 {#if node?.nodeType === 'group'}
   <div
     class={`sparc-group sparc-group-${node.groupType || 'generic'}`}
+    class:sparc-authoring-selected={node.id === authoringSelectedNodeId}
     data-node-id={node.id}
     data-sparc-layout-mode={layoutString(node, 'layoutMode')}
     data-sparc-visual-preset={layoutString(node, 'visualPreset')}
@@ -184,6 +186,7 @@
               node={fractionNumerator}
               {nodeValues}
               {learningProgressSnapshot}
+              {authoringSelectedNodeId}
               {onNodeValueChange}
               {onNodeCommit}
               {onNodeFocus}
@@ -196,6 +199,7 @@
               node={fractionDenominator}
               {nodeValues}
               {learningProgressSnapshot}
+              {authoringSelectedNodeId}
               {onNodeValueChange}
               {onNodeCommit}
               {onNodeFocus}
@@ -217,6 +221,7 @@
               node={headerFeedbackNode}
               {nodeValues}
               {learningProgressSnapshot}
+              {authoringSelectedNodeId}
               {onNodeValueChange}
               {onNodeCommit}
               {onNodeFocus}
@@ -251,6 +256,7 @@
               node={activeTabNode}
               {nodeValues}
               {learningProgressSnapshot}
+              {authoringSelectedNodeId}
               {onNodeValueChange}
               {onNodeCommit}
               {onNodeFocus}
@@ -264,6 +270,7 @@
             node={item.node}
             {nodeValues}
             {learningProgressSnapshot}
+            {authoringSelectedNodeId}
             {onNodeValueChange}
             {onNodeCommit}
             {onNodeFocus}
@@ -276,11 +283,11 @@
   </div>
 {:else if node?.nodeType === 'atomic'}
   {#if node.atomType === 'text-block' || node.atomType === 'text' || node.atomType === 'header-cell'}
-    <div class={`sparc-atom sparc-${node.atomType}`} data-node-id={node.id}>{getNodeValue(node)}</div>
+    <div class={`sparc-atom sparc-${node.atomType}`} class:sparc-authoring-selected={node.id === authoringSelectedNodeId} data-node-id={node.id}>{getNodeValue(node)}</div>
   {:else if node.atomType === 'html-block'}
-    <div class="sparc-atom sparc-html-block" data-node-id={node.id}>{@html sanitizeSparcHtml(getNodeValue(node))}</div>
+    <div class="sparc-atom sparc-html-block" class:sparc-authoring-selected={node.id === authoringSelectedNodeId} data-node-id={node.id}>{@html sanitizeSparcHtml(getNodeValue(node))}</div>
   {:else if node.atomType === 'panel-selector'}
-    <div class="sparc-atom sparc-panel-selector" data-node-id={node.id}>
+    <div class="sparc-atom sparc-panel-selector" class:sparc-authoring-selected={node.id === authoringSelectedNodeId} data-node-id={node.id}>
       {#if node.label}
         <div class="sparc-panel-selector-label">{node.label}</div>
       {/if}
@@ -307,6 +314,7 @@
               node={item.node}
               {nodeValues}
               {learningProgressSnapshot}
+              {authoringSelectedNodeId}
               {onNodeValueChange}
               {onNodeCommit}
               {onNodeFocus}
@@ -318,10 +326,10 @@
     </div>
   {:else if node.atomType === 'message-box'}
     {#if String(getNodeValue(node) || '').trim()}
-      <div class="sparc-atom sparc-message-box" data-node-id={node.id}>{@html sanitizeSparcHtml(getNodeValue(node))}</div>
+      <div class="sparc-atom sparc-message-box" class:sparc-authoring-selected={node.id === authoringSelectedNodeId} data-node-id={node.id}>{@html sanitizeSparcHtml(getNodeValue(node))}</div>
     {/if}
   {:else if node.atomType === 'skill-bar'}
-    <div class="sparc-atom sparc-skill-bar" data-node-id={node.id} aria-label={node.label || ''}>
+    <div class="sparc-atom sparc-skill-bar" class:sparc-authoring-selected={node.id === authoringSelectedNodeId} data-node-id={node.id} aria-label={node.label || ''}>
       <div class="sparc-skill-track">
         <div class="sparc-skill-fill" style={`width: ${skillBarFill(node)}%;`}></div>
       </div>
@@ -330,7 +338,7 @@
       {/if}
     </div>
   {:else if node.atomType === 'learning-progress'}
-    <div class="sparc-atom sparc-learning-progress" data-node-id={node.id} aria-label={node.label || 'Learning progress'}>
+    <div class="sparc-atom sparc-learning-progress" class:sparc-authoring-selected={node.id === authoringSelectedNodeId} data-node-id={node.id} aria-label={node.label || 'Learning progress'}>
       {#if node.label}
         <div class="sparc-learning-progress-label">{node.label}</div>
       {/if}
@@ -341,12 +349,13 @@
       />
     </div>
   {:else if node.atomType === 'operator'}
-    <div class="sparc-atom sparc-operator" data-node-id={node.id}>{node.value || ''}</div>
+    <div class="sparc-atom sparc-operator" class:sparc-authoring-selected={node.id === authoringSelectedNodeId} data-node-id={node.id}>{node.value || ''}</div>
   {:else if node.atomType === 'fraction-box'}
-    <div class={`sparc-atom sparc-fraction-box ${node.style ? `sparc-style-${node.style}` : ''}`} data-node-id={node.id}>{getNodeValue(node)}</div>
+    <div class={`sparc-atom sparc-fraction-box ${node.style ? `sparc-style-${node.style}` : ''}`} class:sparc-authoring-selected={node.id === authoringSelectedNodeId} data-node-id={node.id}>{getNodeValue(node)}</div>
   {:else if node.atomType === 'fraction-input' || node.atomType === 'text-input'}
     <input
       class={`sparc-atom sparc-input sparc-input-${node.atomType}`}
+      class:sparc-authoring-selected={node.id === authoringSelectedNodeId}
       class:sparc-correctness-correct={getNodeCorrectness(node) === 'correct'}
       class:sparc-correctness-incorrect={getNodeCorrectness(node) === 'incorrect' || getNodeCorrectness(node) === 'buggy'}
       data-node-id={node.id}
@@ -367,6 +376,7 @@
   {:else if node.atomType === 'dropdown'}
     <select
       class="sparc-atom sparc-select"
+      class:sparc-authoring-selected={node.id === authoringSelectedNodeId}
       class:sparc-correctness-correct={getNodeCorrectness(node) === 'correct'}
       class:sparc-correctness-incorrect={getNodeCorrectness(node) === 'incorrect' || getNodeCorrectness(node) === 'buggy'}
       data-node-id={node.id}
@@ -383,7 +393,7 @@
       {/each}
     </select>
   {:else if node.atomType === 'checkbox'}
-    <label class={`sparc-atom sparc-checkbox ${correctnessClass(node)}`} data-node-id={node.id}>
+    <label class={`sparc-atom sparc-checkbox ${correctnessClass(node)}`} class:sparc-authoring-selected={node.id === authoringSelectedNodeId} data-node-id={node.id}>
       <input
         data-node-id={node.id}
         type="checkbox"
@@ -400,6 +410,7 @@
     <button
       type="button"
       class={`sparc-atom sparc-button ${node.variant ? `sparc-button-${node.variant}` : ''}`}
+      class:sparc-authoring-selected={node.id === authoringSelectedNodeId}
       class:sparc-correctness-correct={getNodeCorrectness(node) === 'correct'}
       class:sparc-correctness-incorrect={getNodeCorrectness(node) === 'incorrect' || getNodeCorrectness(node) === 'buggy'}
       data-node-id={node.id}
@@ -408,7 +419,7 @@
       {buttonLabel(node)}
     </button>
   {:else}
-    <div class="sparc-atom sparc-unknown" data-node-id={node.id}>{node.atomType || 'unknown'}</div>
+    <div class="sparc-atom sparc-unknown" class:sparc-authoring-selected={node.id === authoringSelectedNodeId} data-node-id={node.id}>{node.atomType || 'unknown'}</div>
   {/if}
 {/if}
 
@@ -421,6 +432,11 @@
     color: var(--sparc-text-color);
     font-family: var(--sparc-font-family);
     font-size: var(--sparc-font-size-base);
+  }
+
+  .sparc-authoring-selected {
+    outline: 2px solid var(--sparc-accent-color);
+    outline-offset: 2px;
   }
 
   .sparc-group-label {
@@ -1039,18 +1055,32 @@
     width: 100%;
     height: var(--app-text-input-height);
     min-height: var(--app-text-input-height);
+    border-width: calc(var(--sparc-border-width) * 3);
+    outline: none;
+    box-shadow: none;
+  }
+
+  .sparc-input:focus,
+  .sparc-select:focus,
+  .sparc-button:focus {
+    outline: none;
+    box-shadow: none;
   }
 
   .sparc-input.sparc-correctness-correct,
-  .sparc-select.sparc-correctness-correct {
+  .sparc-select.sparc-correctness-correct,
+  .sparc-input.sparc-correctness-correct:focus,
+  .sparc-select.sparc-correctness-correct:focus {
     color: var(--sparc-correct-color);
-    border-color: var(--sparc-correct-color);
+    border: calc(var(--sparc-border-width) * 3) solid var(--sparc-correct-color);
   }
 
   .sparc-input.sparc-correctness-incorrect,
-  .sparc-select.sparc-correctness-incorrect {
+  .sparc-select.sparc-correctness-incorrect,
+  .sparc-input.sparc-correctness-incorrect:focus,
+  .sparc-select.sparc-correctness-incorrect:focus {
     color: var(--sparc-error-color);
-    border-color: var(--sparc-error-color);
+    border: calc(var(--sparc-border-width) * 3) solid var(--sparc-error-color);
   }
 
   .sparc-checkbox.sparc-correctness-correct {
@@ -1107,8 +1137,8 @@
     --progress-target-color: var(--sparc-correct-color);
     --progress-below-color: var(--sparc-warning-color);
     --progress-bar-density-scale: max(0.5, min(var(--app-density-scale), 2));
-    --progress-bar-height: calc(3px * var(--progress-bar-density-scale));
-    --progress-bar-gap: calc(2px * var(--progress-bar-density-scale));
+    --progress-bar-height: calc(6px * var(--progress-bar-density-scale));
+    --progress-bar-gap: calc(3px * var(--progress-bar-density-scale));
     --progress-scrollbar-gutter: 0px;
     --progress-panel-padding-x: 0px;
     --progress-panel-padding-y: 0px;

@@ -5,8 +5,8 @@ import type {
   DashboardUsageSummary,
 } from './dashboardCacheMethods.contracts';
 
-export const DASHBOARD_LEVEL_UNIT_TYPES = ['model', 'schedule', 'autotutor'];
-export const DASHBOARD_CACHE_VERSION = 4;
+export const DASHBOARD_LEVEL_UNIT_TYPES = ['model', 'schedule', 'autotutor', 'sparc'];
+export const DASHBOARD_CACHE_VERSION = 5;
 export const PRACTICE_DASHBOARD_SNAPSHOT_VERSION = 1;
 
 export function normalizeOptionalString(value: unknown): string | null {

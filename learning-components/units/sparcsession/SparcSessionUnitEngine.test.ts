@@ -177,6 +177,52 @@ function sampleProductionRuleDocument(): SparcAuthoredDocument {
 }
 
 describe('SparcSessionUnitEngine document runtime boundary', function() {
+  it('inherits model-progress provider capability from the adaptive logistic engine', async function() {
+    const cluster = {
+      stims: [{
+        clusterKC: 'cluster-1',
+        stimulusKC: 'kc-1',
+        correctResponse: 'Answer',
+        params: '0,0',
+      }],
+    };
+    const engine = await createSparcSessionUnitEngine(createMinimalDeps({
+      getSessionValue(key: UnitEngineSessionReadKey) {
+        if (key === 'currentTdfUnit') {
+          return { sparcsession: {} };
+        }
+        if (key === 'currentTdfId') {
+          return 'tdf-1';
+        }
+        if (key === 'currentUnitNumber') {
+          return 2;
+        }
+        if (key === 'curStudentPerformance') {
+          return { totalTime: 0 };
+        }
+        return undefined;
+      },
+      getStimCount: () => 1,
+      getStimCluster: () => cluster,
+    }));
+
+    await engine.initializeLogisticModelState();
+    const cardProbabilities = engine.getCardProbabilitiesNoCalc();
+    cardProbabilities.cards[0].stims[0].probabilityEstimate = 0.74;
+
+    assert.deepEqual(engine.getModelProgressItems(), [
+      {
+        id: '0:0:kc-1',
+        stimulusKC: 'kc-1',
+        clusterKC: 'cluster-1',
+        probability: 0.74,
+        introduced: false,
+        current: false,
+        canUse: true,
+      },
+    ]);
+  });
+
   it('exposes SPARC document validation, replay, and authored response commit methods', async function() {
     const engine = await createSparcSessionUnitEngine(createMinimalDeps());
     const document = sampleDocument();

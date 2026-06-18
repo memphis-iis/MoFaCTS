@@ -161,6 +161,17 @@ describe('LearningSessionUnitEngine model practice updates', function() {
       documentId: 'doc-1',
     });
     cardProbabilities.cards[0].stims[0].probabilityEstimate = 0.81;
+    assert.deepEqual(engine.getModelProgressItems(), [
+      {
+        id: '0:0:kc-1',
+        stimulusKC: 'kc-1',
+        clusterKC: 'cluster-1',
+        probability: 0.81,
+        introduced: true,
+        current: false,
+        canUse: true,
+      },
+    ]);
     assert.equal(engine.queryModelPracticeState({
       target: {
         stimuliSetId: 'stim-set-1',

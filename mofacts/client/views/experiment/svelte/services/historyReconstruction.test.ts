@@ -235,6 +235,53 @@ describe('history reconstruction', function() {
     expect(result.responseState.Alpha?.totalPracticeDuration).to.equal(375);
   });
 
+  it('replays response-less SPARC model-practice rows when explicitly enabled', function() {
+    const result = reconstructLearningStateFromHistory([
+      {
+        eventType: 'sparc',
+        levelUnitType: 'model',
+        time: 1000,
+        problemStartTime: 500,
+        outcome: 'correct',
+        stimulusKC: 'fractions.lcd',
+        clusterKC: 'fractions.addition',
+        KCId: 'fractions.lcd',
+        KCDefault: 'fractions.lcd',
+        KCCluster: 'fractions.addition',
+        responseValue: '12',
+        sparc: {
+          documentId: 'sparc-fractions-addition',
+          practiceObservation: {
+            observationId: 'obs-1',
+          },
+        },
+      },
+    ], { allowResponseLessModelPractice: true });
+
+    expect(result.numQuestionsAnswered).to.equal(1);
+    expect(result.numCorrectAnswers).to.equal(1);
+    expect(result.overallOutcomeHistory).to.deep.equal([1]);
+    expect(result.clusterState['fractions.addition']?.priorCorrect).to.equal(1);
+    expect(result.clusterState['fractions.addition']?.totalPracticeDuration).to.equal(0);
+    expect(result.stimulusState['fractions.lcd']?.timesSeen).to.equal(1);
+    expect(result.stimulusState['fractions.lcd']?.totalPracticeDuration).to.equal(0);
+    expect(result.responseState).to.deep.equal({});
+  });
+
+  it('still rejects response-less SPARC model-practice rows by default', function() {
+    expect(() => reconstructLearningStateFromHistory([
+      {
+        eventType: 'sparc',
+        levelUnitType: 'model',
+        time: 1000,
+        outcome: 'correct',
+        stimulusKC: 'fractions.lcd',
+        clusterKC: 'fractions.addition',
+        responseDuration: 375,
+      },
+    ])).to.throw('responseKey or CFCorrectAnswer');
+  });
+
   it('rejects mismatched explicit identity aliases', function() {
     expect(() => reconstructLearningStateFromHistory([
       {

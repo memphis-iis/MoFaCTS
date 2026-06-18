@@ -727,13 +727,19 @@ describe('learner analytics method authorization', function() {
       levelUnit: 0,
       levelUnitType: 'model',
       time: 1000,
+      problemStartTime: 900,
       outcome: 'correct',
+      eventType: 'sparc',
       stimuliSetId: 'set-a',
       stimulusKC: 'stim-a',
       clusterKC: 'cluster-a',
       KCCluster: 'cluster-a',
       KCId: 'stim-a',
       CFCorrectAnswer: 'Alpha',
+      responseKey: 'Alpha',
+      responseDuration: 75,
+      practiceDurationMs: 75,
+      responseValue: 'Alpha',
       CFEndLatency: 100,
       CFFeedbackLatency: 100,
     });
@@ -752,6 +758,13 @@ describe('learner analytics method authorization', function() {
       clusterKC: 'cluster-a',
       KCCluster: 'cluster-a',
       KCId: 'stim-a',
+      eventType: 'sparc',
+      levelUnitType: 'model',
+      responseKey: 'Alpha',
+      responseDuration: 75,
+      practiceDurationMs: 75,
+      responseValue: 'Alpha',
+      problemStartTime: 900,
     });
   });
 

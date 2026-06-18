@@ -15,6 +15,80 @@ export interface InitialModelState {
   }>;
 }
 
+type ExplicitModelTarget = {
+  readonly stimulusId?: unknown;
+  readonly stimulusKC?: unknown;
+  readonly clusterKC?: unknown;
+  readonly KCId?: unknown;
+  readonly KCDefault?: unknown;
+  readonly KCCluster?: unknown;
+};
+
+function hasIdentity(value: unknown): value is string | number {
+  if (typeof value === 'number') {
+    return Number.isFinite(value);
+  }
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function normalizeIdentity(value: unknown, fieldName: string): string | number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string' && value.trim().length > 0) {
+    return value.trim();
+  }
+  throw new Error(`[Unit Engine] Missing ${fieldName}; refusing synthetic fallback.`);
+}
+
+function getSparcStimulusRegistry(clusterStim: any): ExplicitModelTarget[] {
+  const registry = clusterStim?.display?.stimulusRegistry;
+  if (!Array.isArray(registry)) {
+    return [];
+  }
+  return registry;
+}
+
+function createInitialCardStim(params: {
+  readonly clusterKC: string | number;
+  readonly stimKC: string | number;
+  readonly stimIndex: number;
+  readonly parameter: unknown[];
+  readonly modelPracticeOnly?: boolean;
+  readonly sourceStim?: any;
+}) {
+  return {
+    clusterKC: params.clusterKC,
+    stimIndex: params.stimIndex,
+    stimulusKC: params.stimKC,
+    priorCorrect: 0,
+    allTimeCorrect: 0,
+    allTimeIncorrect: 0,
+    curSessionPriorCorrect: 0,
+    priorIncorrect: 0,
+    curSessionPriorIncorrect: 0,
+    hasBeenIntroduced: false,
+    outcomeStack: [],
+    lastSeen: 0,
+    firstSeen: 0,
+    totalPracticeDuration: 0,
+    allTimeTotalPracticeDuration: 0,
+    otherPracticeTime: 0,
+    previousCalculatedProbabilities: [],
+    priorStudy: 0,
+    parameter: params.parameter,
+    instructionQuestionResult: null,
+    timesSeen: 0,
+    canUse: true,
+    probabilityEstimate: 0.5,
+    ...(params.modelPracticeOnly ? {
+      modelPracticeOnly: true,
+      correctResponse: params.sourceStim?.correctResponse || String(params.stimKC),
+      params: params.sourceStim?.params || '0,0.8',
+    } : {}),
+  };
+}
+
 export function createInitialModelState(
   dependencies: CreateInitialModelStateDependencies,
 ): InitialModelState {
@@ -25,11 +99,9 @@ export function createInitialModelState(
   for (let i = 0; i < dependencies.stimClusters.length; ++i) {
     const cluster = dependencies.stimClusters[i];
     const clusterKC = cluster.stims?.[0]?.clusterKC;
-    if (!Number.isFinite(clusterKC)) {
-      throw new Error(`[Unit Engine] Missing clusterKC for cluster index ${i}; refusing synthetic fallback.`);
-    }
+    const resolvedClusterKC = normalizeIdentity(clusterKC, `clusterKC for cluster index ${i}`);
     const card: any = {
-      clusterKC,
+      clusterKC: resolvedClusterKC,
       priorCorrect: 0,
       allTimeCorrect: 0,
       allTimeIncorrect: 0,
@@ -52,42 +124,18 @@ export function createInitialModelState(
     const numStims = cluster.stims.length;
     for (let j = 0; j < numStims; ++j) {
       const clusterStim = cluster.stims[j];
-      const stimClusterKC = clusterStim.clusterKC;
-      const stimKC = clusterStim.stimulusKC;
-      if (!Number.isFinite(stimClusterKC)) {
-        throw new Error(`[Unit Engine] Missing clusterKC for stim ${j} in cluster index ${i}; refusing synthetic fallback.`);
-      }
-      if (!Number.isFinite(stimKC)) {
-        throw new Error(`[Unit Engine] Missing stimulusKC for stim ${j} in cluster index ${i}; refusing synthetic fallback.`);
-      }
-      if (stimClusterKC !== clusterKC) {
-        throw new Error(`[Unit Engine] Inconsistent clusterKC in cluster index ${i}: cluster=${clusterKC}, stim=${stimClusterKC}.`);
+      const stimClusterKC = normalizeIdentity(clusterStim.clusterKC, `clusterKC for stim ${j} in cluster index ${i}`);
+      const stimKC = normalizeIdentity(clusterStim.stimulusKC, `stimulusKC for stim ${j} in cluster index ${i}`);
+      if (String(stimClusterKC) !== String(resolvedClusterKC)) {
+        throw new Error(`[Unit Engine] Inconsistent clusterKC in cluster index ${i}: cluster=${resolvedClusterKC}, stim=${stimClusterKC}.`);
       }
       const parameter = dependencies.getStimParameterArrayFromCluster(cluster, j);
-      card.stims.push({
+      card.stims.push(createInitialCardStim({
         clusterKC: stimClusterKC,
+        stimKC,
         stimIndex: j,
-        stimulusKC: stimKC,
-        priorCorrect: 0,
-        allTimeCorrect: 0,
-        allTimeIncorrect: 0,
-        curSessionPriorCorrect: 0,
-        priorIncorrect: 0,
-        curSessionPriorIncorrect: 0,
-        hasBeenIntroduced: false,
-        outcomeStack: [],
-        lastSeen: 0,
-        firstSeen: 0,
-        totalPracticeDuration: 0,
-        allTimeTotalPracticeDuration: 0,
-        otherPracticeTime: 0,
-        previousCalculatedProbabilities: [],
-        priorStudy: 0,
-        parameter: parameter,
-        instructionQuestionResult: null,
-        timesSeen: 0,
-        canUse: true,
-      });
+        parameter,
+      }));
 
       initProbs.push({
         cardIndex: i,
@@ -112,6 +160,28 @@ export function createInitialModelState(
           outcomeStack: [],
           instructionQuestionResult: null,
         };
+      }
+
+      for (const target of getSparcStimulusRegistry(clusterStim)) {
+        if (!hasIdentity(target.stimulusKC) || !hasIdentity(target.clusterKC)) {
+          throw new Error(`[Unit Engine] SPARC stimulusRegistry entry for stim ${j} in cluster index ${i} is missing clusterKC or stimulusKC.`);
+        }
+        const modelStimIndex = card.stims.length;
+        const modelClusterKC = normalizeIdentity(target.clusterKC, 'SPARC stimulusRegistry.clusterKC');
+        const modelStimKC = normalizeIdentity(target.stimulusKC, 'SPARC stimulusRegistry.stimulusKC');
+        card.stims.push(createInitialCardStim({
+          clusterKC: modelClusterKC,
+          stimKC: modelStimKC,
+          stimIndex: modelStimIndex,
+          parameter,
+          modelPracticeOnly: true,
+          sourceStim: clusterStim,
+        }));
+        initProbs.push({
+          cardIndex: i,
+          stimIndex: modelStimIndex,
+          probability: 0,
+        });
       }
     }
 

@@ -68,8 +68,12 @@ export function applyAnswerUpdate(params: ApplyAnswerUpdateParams): void {
   card.outcomeStack.push(params.wasCorrect ? 1 : 0);
   stim.outcomeStack.push(params.wasCorrect ? 1 : 0);
 
+  if (!params.answerText) {
+    return;
+  }
+
   let resp;
-  if (params.answerText && params.answerText in params.cardProbabilities.responses) {
+  if (params.answerText in params.cardProbabilities.responses) {
     resp = params.cardProbabilities.responses[params.answerText];
     if (params.wasCorrect) {
       resp.priorCorrect += 1;

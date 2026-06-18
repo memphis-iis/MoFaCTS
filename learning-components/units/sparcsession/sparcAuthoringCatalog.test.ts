@@ -30,6 +30,21 @@ describe('sparcAuthoringCatalog', function() {
     }
   });
 
+  it('distinguishes static skill bars from model-backed progress reporters', function() {
+    const entriesByAtomType = new Map(SPARC_ATOMIC_NODE_CATALOG.map((entry) => [
+      entry.schema.properties?.atomType?.const,
+      entry,
+    ]));
+
+    const skillBar = entriesByAtomType.get('skill-bar');
+    const learningProgress = entriesByAtomType.get('learning-progress');
+
+    assert.match(skillBar?.description ?? '', /Static authored/);
+    assert.match(skillBar?.description ?? '', /does not read or update adaptive model probabilities/);
+    assert.match(learningProgress?.description ?? '', /Model-backed adaptive progress reporter/);
+    assert.match(learningProgress?.description ?? '', /shared sidebar progress panel/);
+  });
+
   it('catalogs the OLI-generated SPARC group patterns', function() {
     const groupTypes = new Set(SPARC_GROUP_NODE_CATALOG.map((entry) => (
       entry.schema.properties?.groupType?.const
@@ -50,6 +65,16 @@ describe('sparcAuthoringCatalog', function() {
       'oli-group',
     ]) {
       assert.equal(groupTypes.has(groupType), true, `missing group node catalog entry for ${groupType}`);
+    }
+  });
+
+  it('provides authored starter templates for rendered group palette entries', function() {
+    for (const entry of SPARC_GROUP_NODE_CATALOG) {
+      const template = entry.defaultValue as any;
+      assert.equal(template?.nodeType, 'group', `${entry.id} missing group default`);
+      assert.equal(template?.groupType, entry.schema.properties?.groupType?.const, `${entry.id} default groupType mismatch`);
+      assert.equal(Array.isArray(template?.children), true, `${entry.id} default children must be an array`);
+      assert.equal(template.children.length > 0, true, `${entry.id} default children must not be empty`);
     }
   });
 

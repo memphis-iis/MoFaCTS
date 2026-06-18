@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createCanonicalModelPracticeHistoryRecord } from '../../runtime/modelPracticeUpdates';
 import type { SparcTrialDisplay } from '../../trial-displays/sparc/SparcTrialDisplayAdapter';
 import {
   commitSparcTrialDisplayProductionRuleEvents,
@@ -222,6 +223,8 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
       action: 'UpdateComboBox',
       input: 'g',
       triggeredBy: null,
+      sparcAnswerable: true,
+      sparcDefaultIncorrectMessage: 'No, this is not correct.',
     });
   });
 
@@ -244,6 +247,35 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
       action: 'ButtonPressed',
       input: 'Hint',
       triggeredBy: 'node-hint-button',
+      sparcAnswerable: false,
+      sparcDefaultIncorrectMessage: 'No, this is not correct.',
+    });
+  });
+
+  it('adds focused node and SAI selection context to mapped button activations', function() {
+    const [event] = createSparcProductionRuleEventsFromTrialResult({
+      documentId: 'doc-1',
+      display: display(),
+      result: {
+        submittedNodes: {
+          'node-hint-button': 'Hint',
+        },
+        triggeredBy: 'node-hint-button',
+        focusedNodeId: 'node-term-1-num-units',
+        timestamp: 2125,
+      },
+    });
+
+    assert.equal(event?.source.nodeId, 'node-hint-button');
+    assert.deepEqual(event?.payload, {
+      selection: 'hint',
+      action: 'ButtonPressed',
+      input: 'Hint',
+      triggeredBy: 'node-hint-button',
+      focusedNodeId: 'node-term-1-num-units',
+      focusedSelection: 'Numerator1Units',
+      sparcAnswerable: false,
+      sparcDefaultIncorrectMessage: 'No, this is not correct.',
     });
   });
 
@@ -285,6 +317,8 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
       action: 'ButtonPressed',
       input: 'Hint',
       triggeredBy: 'node-hint-button',
+      sparcAnswerable: false,
+      sparcDefaultIncorrectMessage: 'No, this is not correct.',
     });
   });
 
@@ -326,6 +360,8 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
       action: 'UpdateTextField',
       input: '3',
       triggeredBy: 'fraction-one-numerator',
+      sparcAnswerable: true,
+      sparcDefaultIncorrectMessage: 'No, this is not correct.',
     });
   });
 
@@ -367,6 +403,8 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
       action: 'Focus',
       input: '',
       triggeredBy: 'node-term-1-num-units',
+      focusedNodeId: 'node-term-1-num-units',
+      focusedSelection: 'Numerator1Units',
     });
   });
 
@@ -393,7 +431,222 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
 
     assert.equal(result.commits.length, 1);
     assert.equal(result.commits[0]?.historyRecord?.action, 'sparc-production-rule');
+    assert.deepEqual(
+      result.evaluations[0]?.transition?.writes.map((write) => ({
+        nodeId: write.target.nodeId,
+        key: write.key,
+        value: write.value,
+      })),
+      [{
+        nodeId: 'node-feedback',
+        key: 'message',
+        value: 'Unit accepted.',
+      }, {
+        nodeId: 'node-term-1-num-units',
+        key: 'correctness',
+        value: 'correct',
+      }],
+    );
     assert.equal(writtenRecords.length, 1);
+  });
+
+  it('commits unhandled answerable submissions as CTAT-style incorrect feedback', async function() {
+    const writtenRecords: unknown[] = [];
+
+    const result = await commitSparcTrialDisplayProductionRuleEvents({
+      core,
+      documentId: 'doc-1',
+      display: display(),
+      result: {
+        submittedNodes: {
+          'node-term-1-num-units': 'kg',
+        },
+        timestamp: 3100,
+      },
+      priorHistoryRecords: [],
+      history: {
+        async writeCanonicalHistory(record) {
+          writtenRecords.push(record);
+        },
+      },
+    });
+
+    assert.equal(result.commits.length, 1);
+    assert.equal(result.evaluations[0]?.execution.firings.length, 0);
+    assert.deepEqual(
+      result.evaluations[0]?.transition?.writes.map((write) => ({
+        nodeId: write.target.nodeId,
+        key: write.key,
+        value: write.value,
+      })),
+      [{
+        nodeId: 'node-term-1-num-units',
+        key: 'correctness',
+        value: 'incorrect',
+      }],
+    );
+    assert.equal(result.commits[0]?.historyRecord?.action, 'sparc-production-rule');
+    assert.equal(writtenRecords.length, 1);
+  });
+
+  it('does not mark unclassified control button actions incorrect', async function() {
+    const writtenRecords: unknown[] = [];
+    const controlDisplay: SparcTrialDisplay = {
+      ...display(),
+      productionRules: [],
+    };
+
+    const result = await commitSparcTrialDisplayProductionRuleEvents({
+      core,
+      documentId: 'doc-1',
+      display: controlDisplay,
+      result: {
+        submittedNodes: {
+          'node-hint-button': 'Hint',
+        },
+        triggeredBy: 'node-hint-button',
+        timestamp: 3200,
+      },
+      priorHistoryRecords: [],
+      history: {
+        async writeCanonicalHistory(record) {
+          writtenRecords.push(record);
+        },
+      },
+    });
+
+    assert.equal(result.commits.length, 1);
+    assert.equal(result.evaluations[0]?.transition, undefined);
+    assert.equal(writtenRecords.length, 0);
+  });
+
+  it('commits a correct LCD action as model practice for the fractions LCD stimulus', async function() {
+    const modelPracticeRequests: unknown[] = [];
+    const writtenRecords: unknown[] = [];
+    const lcdDisplay: SparcTrialDisplay = {
+      type: 'sparc',
+      documentId: 'sparc-fractions-addition',
+      schema: 'tutorscript-sparc/1.0',
+      nodes: [{
+        id: 'node-known-1-equivalent-bottom',
+        nodeType: 'atomic',
+        atomType: 'fraction-input',
+      }],
+      stimulusRegistry: [{
+        stimulusId: 'determine-lcd',
+        stimuliSetId: 'sparc-fractions-addition',
+        stimulusKC: 'fractions.lcd',
+        clusterKC: 'fractions.addition',
+        KCId: 'fractions.lcd',
+        KCDefault: 'fractions.lcd',
+        KCCluster: 'fractions.addition',
+      }],
+      behavior: {
+        steps: [{
+          id: 'choose-common-denominator',
+          responses: [{
+            selection: 'firstDenConv',
+            action: 'UpdateTextArea',
+            input: '12',
+            nodeRef: 'node-known-1-equivalent-bottom',
+          }],
+        }],
+      },
+      productionRules: [{
+        id: 'fractions.choose-first-common-denominator',
+        when: [{
+          factType: 'interface-event',
+          slots: {
+            selection: literal('firstDenConv'),
+            action: literal('UpdateTextArea'),
+            input: literal('12'),
+          },
+        }],
+        then: [{
+          type: 'classify',
+          outcome: 'correct',
+        }, {
+          type: 'model-practice',
+          outcome: 'correct',
+          stimulusId: 'determine-lcd',
+          nodeId: 'node-known-1-equivalent-bottom',
+          responseValue: literal('12'),
+          input: literal('12'),
+        }],
+      }],
+    };
+
+    const result = await commitSparcTrialDisplayProductionRuleEvents({
+      core,
+      documentId: 'sparc-fractions-addition',
+      display: lcdDisplay,
+      result: {
+        submittedNodes: {
+          'node-known-1-equivalent-bottom': '12',
+        },
+        triggeredBy: 'node-known-1-equivalent-bottom',
+        timestamp: 5000,
+      },
+      priorHistoryRecords: [],
+      history: {
+        async writeCanonicalHistory(record) {
+          writtenRecords.push(record);
+        },
+      },
+      adaptiveModel: {
+        queryModelPracticeState() {
+          return 0.5;
+        },
+        async applyModelPracticeUpdate(currentCore, request, extensionFields) {
+          modelPracticeRequests.push(request);
+          return {
+            record: createCanonicalModelPracticeHistoryRecord(
+              currentCore,
+              request,
+              extensionFields,
+            ),
+          };
+        },
+      },
+    });
+
+    assert.deepEqual(result.evaluations.flatMap((evaluation) => (
+      evaluation.execution.firings.map((firing) => firing.ruleId)
+    )), ['fractions.choose-first-common-denominator']);
+    assert.equal(modelPracticeRequests.length, 1);
+    assert.deepEqual(modelPracticeRequests[0], {
+      observationId: 'sparc-fractions-addition:node-known-1-equivalent-bottom:0:trial-display:model-practice:0',
+      target: {
+        stimuliSetId: 'sparc-fractions-addition',
+        stimulusKC: 'fractions.lcd',
+        clusterKC: 'fractions.addition',
+        KCId: 'fractions.lcd',
+        KCDefault: 'fractions.lcd',
+        KCCluster: 'fractions.addition',
+        sparcDocumentId: 'sparc-fractions-addition',
+        sparcNodeId: 'node-known-1-equivalent-bottom',
+      },
+      outcome: 'correct',
+      responseValue: '12',
+      input: '12',
+      displayedStimulus: {
+        documentId: 'sparc-fractions-addition',
+        nodeId: 'node-known-1-equivalent-bottom',
+        stimulusId: 'determine-lcd',
+      },
+      time: 5000,
+      problemStartTime: 5000,
+      selection: 'node-known-1-equivalent-bottom',
+      action: 'sparc-response',
+      typeOfResponse: 'sparc',
+      eventType: 'sparc',
+      sourceAddress: {
+        documentId: 'sparc-fractions-addition',
+        nodeId: 'node-known-1-equivalent-bottom',
+      },
+    });
+    assert.equal(writtenRecords.length, 1);
+    assert.equal((writtenRecords[0] as { stimulusKC?: unknown }).stimulusKC, 'fractions.lcd');
   });
 
   it('evaluates display production-rule classifications and messages without committing history', function() {

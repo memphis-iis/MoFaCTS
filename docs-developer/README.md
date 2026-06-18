@@ -31,6 +31,7 @@ Keep `docs/` focused on software consortium, repository, user, author, operator,
 - `autotutor-unit-plan.md`: AutoTutor unit type implementation plan.
 - `learner-tdf-configuration-plan.md`: learner-facing per-lesson configuration plan.
 - `learning-session-progress-panel-plan.md`: learning-session progress panel plan.
+- `sparc-generalized-model-progress-plan.md`: SPARC/shared adaptive logistic model progress provider and placement plan.
 - `lesson-launch-resume-cleanup-plan.md`: lesson launch/resume runtime cleanup plan.
 - `study-display-subsets-plan.md`: study/drill display subset configuration plan.
 - `mofacts-directory-restructure-plan.md`: target repository layout and contributor-orientation plan.

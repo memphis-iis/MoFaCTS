@@ -40,6 +40,48 @@ function defaultScoreOutcome(outcome: string): AdaptiveLogisticOutcomeScore {
   throw new Error(`Adaptive logistic model update cannot score outcome "${outcome}" without an explicit scoreOutcome adapter`);
 }
 
+function resolveModelPracticeTimestamp(request: ModelPracticeUpdateRequest): number {
+  const eventTime = Number(request.time);
+  if (Number.isFinite(eventTime) && eventTime > 0) {
+    return eventTime;
+  }
+  return Date.now();
+}
+
+function markTargetExposure(params: {
+  readonly card: any;
+  readonly stim: any;
+  readonly response: any;
+  readonly timestamp: number;
+  readonly testType: string;
+}): void {
+  params.card.lastSeen = params.timestamp;
+  if (!Number.isFinite(Number(params.card.firstSeen)) || Number(params.card.firstSeen) < 1) {
+    params.card.firstSeen = params.timestamp;
+  }
+  params.card.hasBeenIntroduced = true;
+
+  params.stim.lastSeen = params.timestamp;
+  if (!Number.isFinite(Number(params.stim.firstSeen)) || Number(params.stim.firstSeen) < 1) {
+    params.stim.firstSeen = params.timestamp;
+  }
+  params.stim.hasBeenIntroduced = true;
+
+  if (params.response) {
+    params.response.lastSeen = params.timestamp;
+    if (!Number.isFinite(Number(params.response.firstSeen)) || Number(params.response.firstSeen) < 1) {
+      params.response.firstSeen = params.timestamp;
+    }
+    if (params.testType === 's') {
+      params.response.priorStudy += 1;
+    }
+  }
+  if (params.testType === 's') {
+    params.card.priorStudy += 1;
+    params.stim.priorStudy += 1;
+  }
+}
+
 export function findAdaptiveLogisticModelTarget(params: {
   readonly cardProbabilities: any;
   readonly target: ModelPracticeUpdateRequest['target'];
@@ -51,16 +93,17 @@ export function findAdaptiveLogisticModelTarget(params: {
 
   for (let cardIndex = 0; cardIndex < cards.length; cardIndex += 1) {
     const card = cards[cardIndex];
-    if (!identityEquals(card?.clusterKC, params.target.clusterKC)) {
-      continue;
-    }
     const stims = card?.stims;
     if (!Array.isArray(stims)) {
       continue;
     }
     for (let stimIndex = 0; stimIndex < stims.length; stimIndex += 1) {
       const stim = stims[stimIndex];
-      if (identityEquals(stim?.stimulusKC, params.target.stimulusKC)) {
+      const clusterKC = stim?.clusterKC ?? card?.clusterKC;
+      if (
+        identityEquals(clusterKC, params.target.clusterKC) &&
+        identityEquals(stim?.stimulusKC, params.target.stimulusKC)
+      ) {
         return { cardIndex, stimIndex };
       }
     }
@@ -107,6 +150,17 @@ export function applyModelPracticeUpdateToAdaptiveLogistic(
   const score = (params.scoreOutcome ?? defaultScoreOutcome)(params.request.outcome);
   const responseKey = params.request.target.response?.responseKey;
   const practiceTime = params.request.practiceDurationMs ?? 0;
+  const card = params.cardProbabilities.cards[target.cardIndex];
+  const stim = card.stims[target.stimIndex];
+  const response = responseKey ? params.cardProbabilities.responses?.[responseKey] : undefined;
+
+  markTargetExposure({
+    card,
+    stim,
+    response,
+    timestamp: resolveModelPracticeTimestamp(params.request),
+    testType: score.testType,
+  });
 
   applyAnswerUpdate({
     cardProbabilities: params.cardProbabilities,

@@ -418,7 +418,9 @@ describe('dashboardCacheMethods', function() {
     });
     expect(sparcLesson).to.include({
       TDFId: 'tdfSparc',
-      firstContentUnitType: 'sparc'
+      firstContentUnitType: 'sparc',
+      hasConfigurableSettings: true,
+      hasLearnerConfigurableSettings: false
     });
     expect(conditionRootLesson).to.include({
       TDFId: 'tdfConditionRoot',
@@ -1070,6 +1072,7 @@ describe('dashboardCacheMethods', function() {
             tutor: {
               setspec: {
                 lessonname: 'Root Lesson',
+                stimulusfile: 'root-stims.json',
                 condition: ['condition-a.json'],
                 conditionTdfIds: ['condition-a']
               }
@@ -1194,7 +1197,13 @@ describe('dashboardCacheMethods', function() {
 
     expect(result.success).to.equal(true);
     expect(result.cacheTdfIds).to.deep.equal(['root']);
-    expect(removedSelectors[0].TDFId.$in).to.include.members(['root', 'root.json', 'condition-a', 'condition-a.json']);
+    expect(removedSelectors[0].TDFId.$in).to.include.members([
+      'root',
+      'root.json',
+      'root-stims.json',
+      'condition-a',
+      'condition-a.json',
+    ]);
     expect(stateRemovedSelectors[0].$or).to.deep.include({ TDFId: { $in: removedSelectors[0].TDFId.$in } });
     expect(cacheDoc.tdfStats).to.not.have.property('root');
     expect(cacheDoc.tdfStats).to.have.property('other');

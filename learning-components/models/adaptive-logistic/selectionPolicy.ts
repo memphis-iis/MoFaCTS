@@ -56,6 +56,7 @@ export function selectCardClosestToOptimalProbability(
     for (let j = 0; j < card.stims.length; j++) {
       const stim = card.stims[j];
       if (shouldExcludeCurrentCard(i, j, selectionOptions)) continue;
+      if (stim.modelPracticeOnly === true) continue;
       if (hiddenItemKeys.has(String(stim.stimulusKC)) || !stim.canUse) continue;
       const parameters = stim.parameter;
       const configuredThreshold = resolveConfiguredOptimalThreshold(currentDeliverySettings);
@@ -99,6 +100,7 @@ export function selectCardBelowOptimalProbability(
     for (let j = 0; j < card.stims.length; j++) {
       const stim = card.stims[j];
       if (shouldExcludeCurrentCard(i, j, selectionOptions)) continue;
+      if (stim.modelPracticeOnly === true) continue;
       if (hiddenItemKeys.has(String(stim.stimulusKC)) || !stim.canUse) continue;
       const parameters = stim.parameter;
       let thresholdCeiling = parameters[1];

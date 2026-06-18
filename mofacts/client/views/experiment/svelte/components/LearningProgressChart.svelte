@@ -1,4 +1,9 @@
 <script>
+  import {
+    buildCompactLearningProgressChartHeightExpression,
+    buildLearningProgressChartStyle,
+  } from '../services/learningProgressChartSizing';
+
   export let snapshot = null;
   export let showReferenceLines = true;
   export let compact = false;
@@ -21,6 +26,9 @@
   $: graphicLabel = available
     ? `${stats.totalItems} learning items. ${stats.atOrAboveThreshold} at or above target. ${stats.belowThreshold} below target.`
     : (snapshot?.reason || 'Progress is not ready yet.');
+  $: chartStyle = buildLearningProgressChartStyle(rows.length);
+  $: compactChartHeight = buildCompactLearningProgressChartHeightExpression();
+  $: chartInlineStyle = `${chartStyle}; --compact-chart-height: ${compactChartHeight}`;
 </script>
 
 {#if available}
@@ -45,7 +53,7 @@
     class:learning-progress-chart-no-reference-lines={!showReferenceLines}
     role="img"
     aria-label={graphicLabel}
-    style={`--progress-row-count: ${Math.max(rows.length, 1)}`}
+    style={chartInlineStyle}
   >
     {#if showReferenceLines}
       <div class="learning-progress-lines" aria-hidden="true">
@@ -101,10 +109,6 @@
     border-bottom: 1px solid var(--app-secondary-surface-color);
   }
 
-  .learning-progress-stats-compact {
-    display: none;
-  }
-
   .learning-progress-stats div {
     min-width: 0;
     display: flex;
@@ -133,6 +137,26 @@
     line-height: 1.1;
   }
 
+  .learning-progress-stats-compact {
+    gap: calc(var(--progress-panel-gap) * 0.75);
+    padding: 0 0 var(--progress-panel-gap);
+    border-bottom: 0;
+  }
+
+  .learning-progress-stats-compact div {
+    align-items: flex-start;
+    gap: calc(0.04rem * var(--app-density-scale));
+    padding: 0;
+  }
+
+  .learning-progress-stats-compact .learning-progress-stat-label {
+    font-size: calc(var(--app-font-size-base) * 0.48);
+  }
+
+  .learning-progress-stats-compact strong {
+    font-size: calc(var(--app-font-size-base) * 0.68);
+  }
+
   .learning-progress-chart {
     position: relative;
     flex: 1 1 auto;
@@ -143,10 +167,10 @@
 
   .learning-progress-chart-compact {
     flex: 0 0 auto;
-    height: calc(
+    height: var(--compact-chart-height, calc(
       var(--progress-row-count) * var(--progress-bar-height)
       + (var(--progress-row-count) - 1) * var(--progress-bar-gap)
-    );
+    ));
     min-height: var(--progress-bar-height);
     margin: 0;
   }

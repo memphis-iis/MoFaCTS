@@ -64,7 +64,13 @@ export function calculateSingleProbability(params: CalculateSingleProbabilityPar
   p.stimSecsSinceLastShown = elapsed(stim.lastSeen);
   p.stimSecsSinceFirstShown = elapsed(stim.firstSeen);
   p.stimSecsPracticingOthers = secs(stim.otherPracticeTime);
-  p.stim = params.stimCluster.stims[params.stimIndex];
+  const sourceStim = stim.modelPracticeOnly === true
+    ? stim
+    : params.stimCluster.stims[params.stimIndex];
+  if (!sourceStim) {
+    throw new Error(`Probability source stim not found for card ${params.cardIndex}, stim ${params.stimIndex}`);
+  }
+  p.stim = sourceStim;
 
   p.stimSuccessCount = stim.priorCorrect;
   p.stimFailureCount = stim.priorIncorrect;
@@ -75,7 +81,7 @@ export function calculateSingleProbability(params: CalculateSingleProbabilityPar
   p.stimStudyTrialCount = stim.priorStudy;
   p.stimTimeHistory = JSON.parse(JSON.stringify(stim.timeHistory || []));
   p.stimSpacingLagged = pFunc.spacingLagged(p.stimTimeHistory);
-  const stimAnswer = params.stimCluster.stims[params.stimIndex].correctResponse;
+  const stimAnswer = sourceStim.correctResponse;
   let answerText = params.getDisplayAnswerText(stimAnswer).toLowerCase();
   p.stimResponseText = params.normalizeResponseText(answerText);
   answerText = answerText.replace(/\./g, '_');
@@ -91,7 +97,7 @@ export function calculateSingleProbability(params: CalculateSingleProbabilityPar
   p.responseTimeHistory = JSON.parse(JSON.stringify(p.resp.timeHistory || []));
   p.responseSpacingLagged = pFunc.spacingLagged(p.responseTimeHistory);
 
-  p.stimParameters = params.stimCluster.stims[params.stimIndex].params.split(',').map((x: any) => params.legacyFloat(x));
+  p.stimParameters = String(sourceStim.params || '').split(',').map((x: any) => params.legacyFloat(x));
   if (params.deliverySettings.optimalThreshold) {
     p.stimParameters[1] = params.deliverySettings.optimalThreshold;
   }

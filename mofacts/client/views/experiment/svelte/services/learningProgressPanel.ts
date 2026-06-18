@@ -1,3 +1,14 @@
+import type {
+  ModelProgressItem,
+  ModelProgressProvider,
+} from '../../../../../../learning-components/runtime/modelProgressProvider';
+import type {
+  CurrentCardRefLike,
+} from '../../../../../../learning-components/models/adaptive-logistic/modelProgressProvider';
+import {
+  buildAdaptiveLogisticModelProgressItems,
+} from '../../../../../../learning-components/models/adaptive-logistic/modelProgressProvider';
+
 export type LearningProgressBand = 'at-or-above-threshold' | 'below-threshold';
 
 export type LearningProgressPanelRow = {
@@ -31,31 +42,9 @@ export type LearningProgressPanelSnapshot = {
 
 type ProgressEngineLike = {
   unitType?: unknown;
-  currentCardRef?: {
-    clusterIndex?: unknown;
-    stimIndex?: unknown;
-  } | null;
+  getModelProgressItems?: ModelProgressProvider['getModelProgressItems'];
   getCardProbabilitiesNoCalc?: () => unknown;
-};
-
-type CardProbabilitiesLike = {
-  cards?: unknown;
-};
-
-type ProgressCardLike = {
-  canUse?: unknown;
-  hasBeenIntroduced?: unknown;
-  stims?: unknown;
-};
-
-type ProgressStimLike = {
-  canUse?: unknown;
-  probabilityEstimate?: unknown;
-  stimulusKC?: unknown;
-  hasBeenIntroduced?: unknown;
-  timesSeen?: unknown;
-  priorCorrect?: unknown;
-  priorIncorrect?: unknown;
+  currentCardRef?: CurrentCardRefLike;
 };
 
 type SnapshotOptions = {
@@ -104,33 +93,11 @@ function asEngine(value: unknown): ProgressEngineLike | null {
   return value && typeof value === 'object' ? value as ProgressEngineLike : null;
 }
 
-function asCardProbabilities(value: unknown): CardProbabilitiesLike | null {
-  return value && typeof value === 'object' ? value as CardProbabilitiesLike : null;
-}
-
-function asCard(value: unknown): ProgressCardLike | null {
-  return value && typeof value === 'object' ? value as ProgressCardLike : null;
-}
-
-function asStim(value: unknown): ProgressStimLike | null {
-  return value && typeof value === 'object' ? value as ProgressStimLike : null;
-}
-
-function isHiddenStim(stim: ProgressStimLike, hiddenKeys: Set<string>): boolean {
-  if (stim.stimulusKC === undefined || stim.stimulusKC === null) {
+function isHiddenModelProgressItem(item: ModelProgressItem, hiddenKeys: Set<string>): boolean {
+  if (item.stimulusKC === undefined || item.stimulusKC === null) {
     return false;
   }
-  return hiddenKeys.has(String(stim.stimulusKC));
-}
-
-function isIntroduced(card: ProgressCardLike, stim: ProgressStimLike): boolean {
-  if (stim.hasBeenIntroduced === true || card.hasBeenIntroduced === true) {
-    return true;
-  }
-  const timesSeen = Number(stim.timesSeen);
-  const priorCorrect = Number(stim.priorCorrect);
-  const priorIncorrect = Number(stim.priorIncorrect);
-  return [timesSeen, priorCorrect, priorIncorrect].some((value) => Number.isFinite(value) && value > 0);
+  return hiddenKeys.has(String(item.stimulusKC));
 }
 
 function normalizeProbability(value: unknown): number | null {
@@ -144,16 +111,24 @@ function normalizeProbability(value: unknown): number | null {
   return parsed;
 }
 
-function isCurrentRow(engine: ProgressEngineLike, clusterIndex: number, stimIndex: number): boolean {
-  const currentClusterIndex = Number(engine.currentCardRef?.clusterIndex);
-  const currentStimIndex = Number(engine.currentCardRef?.stimIndex);
-  return currentClusterIndex === clusterIndex && currentStimIndex === stimIndex;
-}
-
 export function isLearningProgressPanelEngine(
   engine: ProgressEngineLike | null | undefined,
 ): engine is ProgressEngineLike {
-  return engine?.unitType === 'model';
+  return typeof engine?.getModelProgressItems === 'function'
+    || typeof engine?.getCardProbabilitiesNoCalc === 'function';
+}
+
+function getModelProgressItemsForEngine(engine: ProgressEngineLike): readonly ModelProgressItem[] {
+  if (typeof engine.getModelProgressItems === 'function') {
+    return engine.getModelProgressItems();
+  }
+  if (typeof engine.getCardProbabilitiesNoCalc === 'function') {
+    return buildAdaptiveLogisticModelProgressItems({
+      cardProbabilities: engine.getCardProbabilitiesNoCalc(),
+      currentCardRef: engine.currentCardRef,
+    });
+  }
+  throw new Error('Progress requires a model-progress provider.');
 }
 
 export function buildLearningProgressPanelSnapshot(
@@ -164,50 +139,44 @@ export function buildLearningProgressPanelSnapshot(
   const threshold = resolveThreshold(deliverySettings);
   const engine = asEngine(engineValue);
   if (!isLearningProgressPanelEngine(engine)) {
-    return unavailableSnapshot('Progress is available for adaptive learning sessions only.', threshold);
+    return unavailableSnapshot('Progress requires a model-progress provider.', threshold);
   }
-  if (typeof engine.getCardProbabilitiesNoCalc !== 'function') {
-    return unavailableSnapshot('The learning engine has not exposed item progress yet.', threshold);
-  }
-
-  const probabilities = asCardProbabilities(engine.getCardProbabilitiesNoCalc());
-  const cards = Array.isArray(probabilities?.cards) ? probabilities.cards : null;
-  if (!cards) {
-    return unavailableSnapshot('Item progress is not ready yet.', threshold);
-  }
-
   const hiddenKeys = new Set((options.hiddenItems || []).map((item) => String(item)));
   const rows: LearningProgressPanelRow[] = [];
   let invalidProbabilityCount = 0;
+  let items: readonly ModelProgressItem[];
 
-  for (let clusterIndex = 0; clusterIndex < cards.length; clusterIndex += 1) {
-    const card = asCard(cards[clusterIndex]);
-    if (!card || card.canUse === false || !Array.isArray(card.stims)) {
+  try {
+    items = getModelProgressItemsForEngine(engine);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Model progress provider failed.';
+    return unavailableSnapshot(message, threshold);
+  }
+
+  if (!Array.isArray(items)) {
+    return unavailableSnapshot('Model progress provider returned malformed progress items.', threshold);
+  }
+
+  for (const item of items) {
+    if (item.canUse === false || isHiddenModelProgressItem(item, hiddenKeys)) {
       continue;
     }
 
-    for (let stimIndex = 0; stimIndex < card.stims.length; stimIndex += 1) {
-      const stim = asStim(card.stims[stimIndex]);
-      if (!stim || stim.canUse === false || isHiddenStim(stim, hiddenKeys)) {
-        continue;
-      }
-
-      const probability = normalizeProbability(stim.probabilityEstimate);
-      if (probability === null) {
-        invalidProbabilityCount += 1;
-        continue;
-      }
-
-      rows.push({
-        id: `${clusterIndex}:${stimIndex}`,
-        index: rows.length + 1,
-        probability,
-        percent: Math.round(probability * 1000) / 10,
-        band: probability >= threshold ? 'at-or-above-threshold' : 'below-threshold',
-        introduced: isIntroduced(card, stim),
-        current: isCurrentRow(engine, clusterIndex, stimIndex),
-      });
+    const probability = normalizeProbability(item.probability);
+    if (probability === null) {
+      invalidProbabilityCount += 1;
+      continue;
     }
+
+    rows.push({
+      id: item.id,
+      index: rows.length + 1,
+      probability,
+      percent: Math.round(probability * 1000) / 10,
+      band: probability >= threshold ? 'at-or-above-threshold' : 'below-threshold',
+      introduced: item.introduced,
+      current: item.current,
+    });
   }
 
   if (rows.length === 0 && invalidProbabilityCount > 0) {

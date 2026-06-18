@@ -207,7 +207,7 @@ function getDashboardFeatureUnitType(setspec: any, units: any[]): FirstContentUn
 
 function unitHasConfigurableRuntime(unit: any): boolean {
   const unitType = detectTdfUnitType(unit);
-  return unitType === 'learning' || unitType === 'autotutor';
+  return unitType === 'learning' || unitType === 'autotutor' || unitType === 'sparc';
 }
 
 function unitHasLearnerConfigurableFields(unit: any): boolean {

@@ -17,6 +17,7 @@
   export let questionNumber = 0;
   export let onAuthoringNodeValueChange = null;
   export let onAuthoringNodeFocus = null;
+  export let authoringSelectedNodeId = '';
 
   let activeNodeId = '';
 
@@ -117,6 +118,7 @@
       dispatch('sparcaction', {
         submittedNodes: buttonSubmission,
         triggeredBy: node?.id,
+        focusedNodeId: activeNodeId || undefined,
         timestamp: Date.now(),
       });
       return;
@@ -130,9 +132,10 @@
           }
         : {
             ...nodeValues,
-            ...buttonSubmission,
-          },
+          ...buttonSubmission,
+        },
       triggeredBy: node?.id,
+      focusedNodeId: activeNodeId || undefined,
       timestamp: Date.now(),
     });
   }
@@ -206,6 +209,7 @@
               {node}
               {nodeValues}
               {learningProgressSnapshot}
+              {authoringSelectedNodeId}
               onNodeValueChange={handleNodeValueChange}
               onNodeCommit={handleNodeValueCommit}
               onNodeFocus={handleNodeFocus}
@@ -220,6 +224,7 @@
           {node}
           {nodeValues}
           {learningProgressSnapshot}
+          {authoringSelectedNodeId}
           onNodeValueChange={handleNodeValueChange}
           onNodeCommit={handleNodeValueCommit}
           onNodeFocus={handleNodeFocus}
@@ -238,6 +243,7 @@
     --sparc-subtle-surface-color: var(--app-subtle-surface-color);
     --sparc-text-color: var(--app-text-color);
     --sparc-secondary-text-color: var(--app-secondary-text-color, var(--app-text-color));
+    --sparc-muted-text-color: var(--app-secondary-text-color, var(--app-text-color));
     --sparc-heading-color: var(--app-page-header-text-color, var(--app-text-color));
     --sparc-accent-color: var(--app-accent-color);
     --sparc-primary-action-surface-color: var(--app-primary-action-surface-color, var(--app-accent-color));

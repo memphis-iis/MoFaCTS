@@ -72,6 +72,10 @@ type LearningReconstructionResult = {
   orderedRows: Array<Required<Pick<LearningHistoryRecord, 'time' | 'outcome'>> & LearningHistoryRecord>;
 };
 
+type LearningReconstructionOptions = {
+  allowResponseLessModelPractice?: boolean;
+};
+
 type OrderedLearningHistoryRecord = Required<Pick<LearningHistoryRecord, 'time' | 'outcome'>> &
   LearningHistoryRecord & {
     __originalIndex: number;
@@ -125,6 +129,24 @@ function requireLearningHistoryResponseKey(row: LearningHistoryRecord): string {
     return legacyResponseKey;
   }
   throw new Error('[History Reconstruction] Missing required field responseKey or CFCorrectAnswer');
+}
+
+function resolveLearningHistoryResponseKey(
+  row: LearningHistoryRecord,
+  options: LearningReconstructionOptions,
+): string | null {
+  try {
+    return requireLearningHistoryResponseKey(row);
+  } catch (error) {
+    if (
+      options.allowResponseLessModelPractice
+      && row.eventType === 'sparc'
+      && row.levelUnitType === 'model'
+    ) {
+      return null;
+    }
+    throw error;
+  }
 }
 
 function readFiniteOptionalNumber(value: unknown): number | undefined {
@@ -261,7 +283,8 @@ function updateOverallStudyHistory(overallStudyHistory: number[], row: LearningH
 }
 
 export function reconstructLearningStateFromHistory(
-  historyRows: LearningHistoryRecord[]
+  historyRows: LearningHistoryRecord[],
+  options: LearningReconstructionOptions = {},
 ): LearningReconstructionResult {
   const orderedRows: OrderedLearningHistoryRecord[] = (historyRows || [])
     .map((row, index) => ({
@@ -293,16 +316,22 @@ export function reconstructLearningStateFromHistory(
     const time = row.time as number;
     const clusterKey = requireLearningHistoryIdentityKey(row, 'clusterKC', 'KCCluster');
     const stimulusKey = requireLearningHistoryIdentityKey(row, 'stimulusKC', 'KCId');
-    const responseKey = requireLearningHistoryResponseKey(row);
-    const practiceTimeMs = requireLearningHistoryPracticeTimeMs(row);
+    const responseKey = resolveLearningHistoryResponseKey(row, options);
+    const practiceTimeMs = responseKey
+      ? requireLearningHistoryPracticeTimeMs(row)
+      : 0;
 
     const cluster = clusterState[clusterKey] || (clusterState[clusterKey] = createClusterAggregate());
     const stimulus = stimulusState[stimulusKey] || (stimulusState[stimulusKey] = createStimulusAggregate());
-    const response = responseState[responseKey] || (responseState[responseKey] = createResponseAggregate());
+    const response = responseKey
+      ? responseState[responseKey] || (responseState[responseKey] = createResponseAggregate())
+      : null;
 
     applyAggregateTrial(cluster, outcome, practiceTimeMs, time);
     applyAggregateTrial(stimulus, outcome, practiceTimeMs, time);
-    applyAggregateTrial(response, outcome, practiceTimeMs, time);
+    if (response) {
+      applyAggregateTrial(response, outcome, practiceTimeMs, time);
+    }
 
     stimulus.timesSeen += 1;
     cluster.hasBeenIntroduced = cluster.firstSeen > 0;
@@ -320,7 +349,9 @@ export function reconstructLearningStateFromHistory(
     if (row.instructionQuestionResult !== undefined) {
       cluster.instructionQuestionResult = row.instructionQuestionResult;
       stimulus.instructionQuestionResult = row.instructionQuestionResult;
-      response.instructionQuestionResult = row.instructionQuestionResult;
+      if (response) {
+        response.instructionQuestionResult = row.instructionQuestionResult;
+      }
     }
 
     for (const [otherClusterKey, otherCluster] of Object.entries(clusterState)) {

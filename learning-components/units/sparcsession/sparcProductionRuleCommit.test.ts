@@ -372,6 +372,50 @@ describe('sparcProductionRuleCommit', function() {
     assert.deepEqual(writtenRecords, []);
   });
 
+  it('clears stale default feedback when a submitted answer is classified correct', function() {
+    const classifiedCorrectDocument: SparcAuthoredDocument = {
+      ...document,
+      productionRules: [{
+        ...document.productionRules![0]!,
+        then: [{
+          type: 'classify',
+          outcome: 'correct',
+        }],
+      }],
+    };
+
+    const result = evaluateSparcAuthoredProductionRules({
+      document: classifiedCorrectDocument,
+      replayState: createSparcAuthoredInitialReplayState(classifiedCorrectDocument),
+      event: {
+        eventId: 'event-clear-feedback',
+        type: 'response-submitted',
+        source: sourceAddress,
+        time: 3500,
+        payload: {
+          selection: 'firstDenConv',
+          action: 'UpdateTextArea',
+          input: 12,
+          sparcAnswerable: true,
+          sparcDefaultIncorrectFeedbackNodeId: 'node-hint-message',
+        },
+      },
+    });
+
+    assert.deepEqual(result.transition?.writes, [{
+      target: sourceAddress,
+      key: 'correctness',
+      value: 'correct',
+    }, {
+      target: {
+        documentId: 'fractions-doc',
+        nodeId: 'node-hint-message',
+      },
+      key: 'message',
+      value: '',
+    }]);
+  });
+
   it('resolves every model-practice target before applying any adaptive model update', async function() {
     const modelUpdateRequests: ModelPracticeUpdateRequest[] = [];
     const writtenRecords: unknown[] = [];

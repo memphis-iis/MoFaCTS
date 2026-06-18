@@ -165,7 +165,6 @@ export function defaultSparcStimulusRegistryEntry(index: number): SparcStimulusR
 export function defaultProductionRule(index: number): SparcProductionRule {
   return {
     id: `production-rule-${index + 1}`,
-    salience: 0,
     when: [defaultProductionCondition()],
     tests: [],
     then: [defaultProductionEffect()],

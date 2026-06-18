@@ -29,6 +29,7 @@ type DisplayNodeRecord = {
   readonly nodeType?: unknown;
   readonly atomType?: unknown;
   readonly children?: unknown;
+  readonly panels?: unknown;
   readonly stimulusId?: unknown;
   readonly stimulusIds?: unknown;
 };
@@ -239,6 +240,23 @@ function selectMappedResponse(
   return exact ?? candidates[0];
 }
 
+function focusedNodePayload(
+  focusedNodeId: string | undefined,
+  responsesByNode: ReadonlyMap<string, readonly SaiResponseRecord[]>,
+): Record<string, unknown> {
+  const normalizedNodeId = typeof focusedNodeId === 'string' ? focusedNodeId.trim() : '';
+  if (!normalizedNodeId) {
+    return {};
+  }
+  const focusedSelection = responsesByNode.get(normalizedNodeId)
+    ?.map((response) => stringOrUndefined(response.selection))
+    .find((selection): selection is string => Boolean(selection));
+  return {
+    focusedNodeId: normalizedNodeId,
+    ...(focusedSelection ? { focusedSelection } : {}),
+  };
+}
+
 function collectDisplayNodesById(nodes: readonly unknown[] | undefined, nodesById = new Map<string, DisplayNodeRecord>()): Map<string, DisplayNodeRecord> {
   for (const node of nodes ?? []) {
     if (!isRecord(node)) {
@@ -260,6 +278,46 @@ function collectDisplayNodesById(nodes: readonly unknown[] | undefined, nodesByI
     }
   }
   return nodesById;
+}
+
+function nodeIsAnswerable(node: DisplayNodeRecord | undefined): boolean {
+  switch (node?.atomType) {
+    case 'text-input':
+    case 'fraction-input':
+    case 'select':
+    case 'dropdown':
+    case 'checkbox':
+      return true;
+    default:
+      return false;
+  }
+}
+
+function collectFirstMessageBoxId(nodes: readonly unknown[] | undefined): string | undefined {
+  for (const node of nodes ?? []) {
+    if (!isRecord(node)) {
+      continue;
+    }
+    const nodeId = stringOrUndefined(node.id);
+    if (nodeId && node.atomType === 'message-box') {
+      return nodeId;
+    }
+    const childMessageBoxId = collectFirstMessageBoxId(Array.isArray(node.children) ? node.children : []);
+    if (childMessageBoxId) {
+      return childMessageBoxId;
+    }
+    if (Array.isArray(node.panels)) {
+      for (const panel of node.panels) {
+        if (isRecord(panel)) {
+          const panelMessageBoxId = collectFirstMessageBoxId(Array.isArray(panel.children) ? panel.children : []);
+          if (panelMessageBoxId) {
+            return panelMessageBoxId;
+          }
+        }
+      }
+    }
+  }
+  return undefined;
 }
 
 function directSparcActionForNode(node: DisplayNodeRecord, submittedValue: unknown): {
@@ -309,6 +367,8 @@ export function createSparcProductionRuleEventsFromTrialResult(params: {
 }): readonly SparcReactiveEvent[] {
   const responsesByNode = collectResponseMappingsFromBehavior(params.display.behavior);
   const nodesById = collectDisplayNodesById(params.display.nodes);
+  const defaultIncorrectFeedbackNodeId = collectFirstMessageBoxId(params.display.nodes);
+  const focusPayload = focusedNodePayload(params.result.focusedNodeId, responsesByNode);
   const events: SparcReactiveEvent[] = [];
   let index = 0;
   const submittedEntries = Object.entries(params.result.submittedNodes);
@@ -328,6 +388,7 @@ export function createSparcProductionRuleEventsFromTrialResult(params: {
           action: 'Focus',
           input: '',
           triggeredBy: nodeId,
+          ...focusedNodePayload(nodeId, responsesByNode),
         },
       });
     }
@@ -362,6 +423,10 @@ export function createSparcProductionRuleEventsFromTrialResult(params: {
         action,
         input,
         triggeredBy: params.result.triggeredBy ?? null,
+        ...focusPayload,
+        sparcAnswerable: nodeIsAnswerable(node),
+        sparcDefaultIncorrectMessage: 'No, this is not correct.',
+        ...(defaultIncorrectFeedbackNodeId ? { sparcDefaultIncorrectFeedbackNodeId: defaultIncorrectFeedbackNodeId } : {}),
       },
     });
     index += 1;

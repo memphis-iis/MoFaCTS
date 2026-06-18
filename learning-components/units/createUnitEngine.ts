@@ -63,7 +63,10 @@ export interface UnitEngineAdaptiveModelRuntime {
 }
 
 export interface UnitEngineHistoryRuntime {
-  readonly reconstructLearningStateFromHistory: (historyRows: any[]) => any;
+  readonly reconstructLearningStateFromHistory: (
+    historyRows: any[],
+    options?: { allowResponseLessModelPractice?: boolean },
+  ) => any;
 }
 
 export interface UnitEngineCardStateRuntime {

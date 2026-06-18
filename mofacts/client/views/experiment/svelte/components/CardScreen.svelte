@@ -77,6 +77,7 @@
   import { commitSparcProductionRuleAction } from '../services/sparcProductionRuleActionCommit';
   import { createTrialDisplaySubmissionController } from '../services/trialDisplaySubmission';
   import { createLearningProgressRuntimeController } from '../services/learningProgressPanelRuntime';
+  import { resolveSparcProgressReporterState } from '../services/sparcProgressReporter';
   import {
     notifyLearningProgressLayoutChange,
   } from '../services/learningProgressPanelViewport';
@@ -100,6 +101,7 @@
     getIsVideoSessionFlag,
     getVideoCheckpoints,
     getVideoResumeAnchor,
+    resolveRuntimeEngine,
   } from '../services/cardRuntimeState';
   import {
     createCardMachineRuntimeController,
@@ -185,6 +187,13 @@
     return Boolean(value);
   }
 
+  function resolveLearningProgressEngine(contextEngine) {
+    if (contextEngine && typeof contextEngine.getModelProgressItems === 'function') {
+      return contextEngine;
+    }
+    return resolveRuntimeEngine();
+  }
+
   function cardDebugStateEnabled() {
     if (!Meteor.isDevelopment || typeof window === 'undefined') {
       return false;
@@ -246,6 +255,7 @@
       sessionId: context.sessionId,
       levelUnit: context.unitId,
     });
+    sparcProgressRefreshVersion += 1;
     if (Object.keys(sparcNodeValues).length === 0) {
       return;
     }
@@ -254,6 +264,49 @@
       timestamp: sparcResult.timestamp,
       sparcNodeValues,
     });
+  }
+
+  async function commitSparcSubmitProductionRules(detail) {
+    const display = context.currentDisplay;
+    if (!sparcOwnsResponse || !display || display.type !== 'sparc') {
+      return { canSubmit: true };
+    }
+    const documentId = typeof display.documentId === 'string' ? display.documentId.trim() : '';
+    const hasProductionRuleSource = Array.isArray(display.productionRules);
+    if (!documentId || !hasProductionRuleSource) {
+      return { canSubmit: true, productionRuleSubmit: false };
+    }
+    const sparcResult = resolveSparcTrialDisplayResult(display, detail || {}, '[CardScreen]');
+    if (!sparcResult) {
+      throw new Error('[CardScreen] SPARC submit received for non-SPARC display');
+    }
+    const triggeredBy = typeof sparcResult.triggeredBy === 'string' ? sparcResult.triggeredBy : '';
+    const submittedNodes = triggeredBy && Object.prototype.hasOwnProperty.call(sparcResult.submittedNodes, triggeredBy)
+      ? { [triggeredBy]: sparcResult.submittedNodes[triggeredBy] }
+      : sparcResult.submittedNodes;
+    const result = await commitSparcProductionRuleAction({
+      engine: context.engine,
+      currentDisplay: display,
+      sparcResult: {
+        ...sparcResult,
+        submittedNodes,
+      },
+      tdfId: context.tdfId,
+      sessionId: context.sessionId,
+      levelUnit: context.unitId,
+    });
+    sparcProgressRefreshVersion += 1;
+    if (Object.keys(result.sparcNodeValues).length > 0) {
+      send({
+        type: EVENTS.SPARC_ACTION,
+        timestamp: sparcResult.timestamp,
+        sparcNodeValues: result.sparcNodeValues,
+      });
+    }
+    return {
+      canSubmit: result.classifications.includes('correct'),
+      productionRuleSubmit: true,
+    };
   }
 
   $: if (testMode) {
@@ -692,29 +745,22 @@
 
   let performanceData = buildCardPerformanceData();
   let learningProgressRequestVersion = 0;
+  let sparcProgressRefreshVersion = 0;
   const learningProgressRuntimeController = createLearningProgressRuntimeController({
     defaultDeliverySettings: DEFAULT_DELIVERY_SETTINGS,
     documentRef: () => typeof document === 'undefined' ? null : document,
     getHiddenItems: () => CardStore.getHiddenItems(),
   });
-  $: currentSparcProgressReporter = context.currentDisplay?.type === 'sparc'
-    && context.currentDisplay?.progressReporter
-    && typeof context.currentDisplay.progressReporter === 'object'
-    ? context.currentDisplay.progressReporter
-    : null;
-  $: currentSparcRequestsProgressSidebar = currentSparcProgressReporter?.placement === 'sidebar';
-  $: learningProgressDeliverySettings = sparcTrialDisplayOwnsInteraction(context.currentDisplay)
-    && !currentSparcRequestsProgressSidebar
-      ? {
-          ...deliverySettings,
-          disableProgressReport: true,
-        }
-      : deliverySettings;
+  $: sparcProgressReporterState = resolveSparcProgressReporterState({
+    display: context.currentDisplay,
+    deliverySettings,
+  });
+  $: learningProgressDeliverySettings = sparcProgressReporterState.deliverySettings;
   $: learningProgressRuntimeSnapshot = (learningProgressRequestVersion, learningProgressRuntimeController.buildRuntimeSnapshot({
     deliverySettings: learningProgressDeliverySettings,
-    engine: context.engine,
+    engine: resolveLearningProgressEngine(context.engine),
     feedbackEnd: context.timestamps?.feedbackEnd || 0,
-    refreshSignal: context.h5pResult?.batchId || '',
+    refreshSignal: context.h5pResult?.batchId || context.sparcResult?.observationId || context.sparcResult?.responseValue || sparcProgressRefreshVersion || '',
     surfaceState: sessionSurfaceState,
   }));
   $: sessionSurfaceShell = learningProgressRuntimeSnapshot.sessionSurfaceShell;
@@ -837,8 +883,17 @@
     trialDisplaySubmissionController.handleH5PResult(event.detail || {});
   }
 
-  function handleSparcSubmit(event) {
-    trialDisplaySubmissionController.handleSparcSubmit(event.detail || {});
+  async function handleSparcSubmit(event) {
+    const detail = event.detail || {};
+    const { canSubmit, productionRuleSubmit } = await commitSparcSubmitProductionRules(detail);
+    if (!canSubmit) {
+      return;
+    }
+    if (productionRuleSubmit) {
+      await forceAdvanceToNextUnit('SPARC Done');
+      return;
+    }
+    trialDisplaySubmissionController.handleSparcSubmit(detail);
   }
 
   function handleInput(event) {
@@ -1090,6 +1145,7 @@
     },
     setSessionUnitModeVersion: (updater) => {
       sessionUnitModeVersion = updater(sessionUnitModeVersion);
+      learningProgressRequestVersion += 1;
     },
     setState: (nextState) => {
       state = nextState;
