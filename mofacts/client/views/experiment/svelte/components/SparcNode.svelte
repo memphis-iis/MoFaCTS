@@ -13,7 +13,6 @@
   let activeTabId = '';
   let activePanelId = '';
 
-  const FRACTION_ATOM_TYPES = new Set(['fraction-box', 'fraction-input']);
   const SPARC_HTML_ALLOWED_TAGS = [
     'a', 'abbr', 'aside', 'b', 'br', 'code', 'dd', 'details', 'div', 'dl', 'dt', 'em',
     'figcaption', 'figure', 'h1', 'h2', 'h3', 'h4', 'h5', 'i', 'iframe', 'img', 'li',
@@ -33,22 +32,12 @@
     });
   }
 
-  function isFractionAtom(candidate) {
-    return candidate?.nodeType === 'atomic' && FRACTION_ATOM_TYPES.has(candidate?.atomType);
-  }
-
   function buildRenderItems(children = []) {
     const items = [];
     const orderedChildren = sortByPlacementOrder(children);
     for (let index = 0; index < orderedChildren.length; index += 1) {
       const current = orderedChildren[index];
-      const next = orderedChildren[index + 1];
-      if (isFractionAtom(current) && current?.position === 'top' && isFractionAtom(next) && next?.position === 'bottom') {
-        items.push({ kind: 'fraction', top: current, bottom: next, key: `${current.id}-${next.id}` });
-        index += 1;
-      } else {
-        items.push({ kind: 'node', node: current, key: current?.id || `node-${index}` });
-      }
+      items.push({ kind: 'node', node: current, key: current?.id || `node-${index}` });
     }
     return items;
   }
@@ -142,6 +131,19 @@
       && (candidate?.groupType === 'choice-tabs' || glueString(candidate) === 'choice-tabs');
   }
 
+  function isFractionGroup(candidate) {
+    return candidate?.nodeType === 'group' && candidate?.groupType === 'fraction';
+  }
+
+  function fractionRole(candidate) {
+    const role = candidate?.fractionRole || candidate?.role || candidate?.layout?.role || '';
+    return typeof role === 'string' ? role.trim() : '';
+  }
+
+  function fractionChild(candidate, role) {
+    return (candidate?.children || []).find((child) => fractionRole(child) === role) || null;
+  }
+
   $: headerFeedbackNode = node?.nodeType === 'group'
     ? (node.children || []).find(isHeaderFeedbackNode)
     : null;
@@ -150,6 +152,9 @@
     : [];
   $: renderItems = node?.nodeType === 'group' ? buildRenderItems(bodyChildren) : [];
   $: isChoiceTabs = isChoiceTabsGroup(node);
+  $: isFraction = isFractionGroup(node);
+  $: fractionNumerator = isFraction ? fractionChild(node, 'numerator') : null;
+  $: fractionDenominator = isFraction ? fractionChild(node, 'denominator') : null;
   $: tabChildren = isChoiceTabs ? sortByPlacementOrder(bodyChildren) : [];
   $: if (isChoiceTabs && tabChildren.length > 0 && !tabChildren.some((child) => child?.id === activeTabId)) {
     activeTabId = tabChildren[0]?.id || '';
@@ -171,7 +176,37 @@
     data-sparc-visual-preset={layoutString(node, 'visualPreset')}
     data-sparc-glue={glueString(node)}
   >
-    {#if node.label || headerFeedbackNode}
+    {#if isFraction}
+      {#if fractionNumerator && fractionDenominator}
+        <div class="sparc-fraction">
+          <div class="sparc-fraction-top">
+            <svelte:self
+              node={fractionNumerator}
+              {nodeValues}
+              {learningProgressSnapshot}
+              {onNodeValueChange}
+              {onNodeCommit}
+              {onNodeFocus}
+              {onButtonActivate}
+            />
+          </div>
+          <div class="sparc-fraction-divider"></div>
+          <div class="sparc-fraction-bottom">
+            <svelte:self
+              node={fractionDenominator}
+              {nodeValues}
+              {learningProgressSnapshot}
+              {onNodeValueChange}
+              {onNodeCommit}
+              {onNodeFocus}
+              {onButtonActivate}
+            />
+          </div>
+        </div>
+      {:else}
+        <div class="sparc-unknown">Invalid fraction: missing numerator or denominator</div>
+      {/if}
+    {:else if node.label || headerFeedbackNode}
       <div class="sparc-group-header">
         {#if node.label}
           <div class="sparc-group-label">{node.label}</div>
@@ -191,7 +226,8 @@
         {/if}
       </div>
     {/if}
-    <div class="sparc-group-body">
+    {#if !isFraction}
+      <div class="sparc-group-body">
       {#if isChoiceTabs}
         <div class="sparc-choice-tabs" role="tablist">
           {#each tabChildren as tab}
@@ -224,46 +260,19 @@
         {/if}
       {:else}
         {#each renderItems as item (item.key)}
-          {#if item.kind === 'fraction'}
-            <div class="sparc-fraction">
-              <div class="sparc-fraction-top">
-                <svelte:self
-                  node={item.top}
-                  {nodeValues}
-                  {learningProgressSnapshot}
-                  {onNodeValueChange}
-                  {onNodeCommit}
-                  {onNodeFocus}
-                  {onButtonActivate}
-                />
-              </div>
-              <div class="sparc-fraction-divider"></div>
-              <div class="sparc-fraction-bottom">
-                <svelte:self
-                  node={item.bottom}
-                  {nodeValues}
-                  {learningProgressSnapshot}
-                  {onNodeValueChange}
-                  {onNodeCommit}
-                  {onNodeFocus}
-                  {onButtonActivate}
-                />
-              </div>
-            </div>
-          {:else}
-            <svelte:self
-              node={item.node}
-              {nodeValues}
-              {learningProgressSnapshot}
-              {onNodeValueChange}
-              {onNodeCommit}
-              {onNodeFocus}
-              {onButtonActivate}
-            />
-          {/if}
+          <svelte:self
+            node={item.node}
+            {nodeValues}
+            {learningProgressSnapshot}
+            {onNodeValueChange}
+            {onNodeCommit}
+            {onNodeFocus}
+            {onButtonActivate}
+          />
         {/each}
       {/if}
-    </div>
+      </div>
+    {/if}
   </div>
 {:else if node?.nodeType === 'atomic'}
   {#if node.atomType === 'text-block' || node.atomType === 'text' || node.atomType === 'header-cell'}
@@ -294,43 +303,15 @@
       {#if activePanel}
         <div class="sparc-panel-selector-panel" role="tabpanel">
           {#each activePanelItems as item (item.key)}
-            {#if item.kind === 'fraction'}
-              <div class="sparc-fraction">
-                <div class="sparc-fraction-top">
-                  <svelte:self
-                  node={item.top}
-                  {nodeValues}
-                  {learningProgressSnapshot}
-                  {onNodeValueChange}
-                    {onNodeCommit}
-                    {onNodeFocus}
-                    {onButtonActivate}
-                  />
-                </div>
-                <div class="sparc-fraction-divider"></div>
-                <div class="sparc-fraction-bottom">
-                  <svelte:self
-                  node={item.bottom}
-                  {nodeValues}
-                  {learningProgressSnapshot}
-                  {onNodeValueChange}
-                    {onNodeCommit}
-                    {onNodeFocus}
-                    {onButtonActivate}
-                  />
-                </div>
-              </div>
-            {:else}
-              <svelte:self
-                node={item.node}
-                {nodeValues}
-                {learningProgressSnapshot}
-                {onNodeValueChange}
-                {onNodeCommit}
-                {onNodeFocus}
-                {onButtonActivate}
-              />
-            {/if}
+            <svelte:self
+              node={item.node}
+              {nodeValues}
+              {learningProgressSnapshot}
+              {onNodeValueChange}
+              {onNodeCommit}
+              {onNodeFocus}
+              {onButtonActivate}
+            />
           {/each}
         </div>
       {/if}
@@ -456,6 +437,11 @@
 
   .sparc-group-header .sparc-group-label {
     flex: 0 1 auto;
+  }
+
+  .sparc-group-fraction {
+    width: auto;
+    display: inline-flex;
   }
 
   .sparc-group-header-feedback {

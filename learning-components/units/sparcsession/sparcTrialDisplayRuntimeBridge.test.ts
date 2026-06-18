@@ -163,6 +163,40 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
     assert.equal(document.productionRules?.[0]?.id, 'stoich.set-result-unit');
   });
 
+  it('preserves explicit fraction groups with addressable numerator and denominator children', function() {
+    const document = createSparcAuthoredDocumentFromTrialDisplay({
+      documentId: 'fraction-doc',
+      display: {
+        type: 'sparc',
+        schema: 'tutorscript-sparc/1.0',
+        nodes: [{
+          id: 'fraction-one',
+          nodeType: 'group',
+          groupType: 'fraction',
+          children: [{
+            id: 'fraction-one-numerator',
+            nodeType: 'atomic',
+            atomType: 'fraction-input',
+            fractionRole: 'numerator',
+          }, {
+            id: 'fraction-one-denominator',
+            nodeType: 'atomic',
+            atomType: 'fraction-box',
+            fractionRole: 'denominator',
+          }],
+        }],
+      } as SparcTrialDisplay,
+    });
+
+    const fraction = document.root.children?.[0];
+    assert.equal(fraction?.id, 'fraction-one');
+    assert.equal(fraction?.kind, 'panel');
+    assert.equal(fraction?.children?.[0]?.id, 'fraction-one-numerator');
+    assert.equal(fraction?.children?.[0]?.kind, 'input');
+    assert.equal(fraction?.children?.[1]?.id, 'fraction-one-denominator');
+    assert.equal(fraction?.children?.[1]?.kind, 'widget');
+  });
+
   it('rejects non-executable authored production rules', function() {
     assert.throws(() => createSparcAuthoredDocumentFromTrialDisplay({
       documentId: 'sparc-fractions-addition',
@@ -251,6 +285,47 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
       action: 'ButtonPressed',
       input: 'Hint',
       triggeredBy: 'node-hint-button',
+    });
+  });
+
+  it('turns direct explicit fraction numerator input into a production-rule event', function() {
+    const [event] = createSparcProductionRuleEventsFromTrialResult({
+      documentId: 'fraction-doc',
+      display: {
+        type: 'sparc',
+        schema: 'tutorscript-sparc/1.0',
+        nodes: [{
+          id: 'fraction-one',
+          nodeType: 'group',
+          groupType: 'fraction',
+          children: [{
+            id: 'fraction-one-numerator',
+            nodeType: 'atomic',
+            atomType: 'fraction-input',
+            fractionRole: 'numerator',
+          }, {
+            id: 'fraction-one-denominator',
+            nodeType: 'atomic',
+            atomType: 'fraction-box',
+            fractionRole: 'denominator',
+          }],
+        }],
+      } as SparcTrialDisplay,
+      result: {
+        submittedNodes: {
+          'fraction-one-numerator': '3',
+        },
+        triggeredBy: 'fraction-one-numerator',
+        timestamp: 2160,
+      },
+    });
+
+    assert.equal(event?.source.nodeId, 'fraction-one-numerator');
+    assert.deepEqual(event?.payload, {
+      selection: 'fraction-one-numerator',
+      action: 'UpdateTextField',
+      input: '3',
+      triggeredBy: 'fraction-one-numerator',
     });
   });
 

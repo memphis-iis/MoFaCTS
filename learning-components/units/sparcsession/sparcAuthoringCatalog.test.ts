@@ -23,8 +23,6 @@ describe('sparcAuthoringCatalog', function() {
       'panel-selector',
       'skill-bar',
       'operator',
-      'fraction-box',
-      'fraction-input',
       'header-cell',
       'text',
     ]) {
@@ -48,6 +46,7 @@ describe('sparcAuthoringCatalog', function() {
       'text-input-exercise',
       'text-input-row',
       'short-answer',
+      'fraction',
       'oli-group',
     ]) {
       assert.equal(groupTypes.has(groupType), true, `missing group node catalog entry for ${groupType}`);

@@ -332,30 +332,6 @@ export const SPARC_ATOMIC_NODE_CATALOG: readonly SparcAuthoringCatalogEntry[] = 
     renderedBy: ['SparcNode.svelte'],
   }),
   atomicEntry({
-    atomType: 'fraction-box',
-    label: 'Fraction box',
-    description: 'Static numerator/denominator cell for fraction layouts.',
-    properties: {
-      value: { type: 'string' },
-      position: { enum: ['top', 'bottom'] },
-      style: { type: 'string' },
-    },
-    defaultValue: { nodeType: 'atomic', atomType: 'fraction-box', value: '', position: 'top' },
-    renderedBy: ['SparcNode.svelte'],
-  }),
-  atomicEntry({
-    atomType: 'fraction-input',
-    label: 'Fraction input',
-    description: 'Text input cell paired into a numerator/denominator fraction layout.',
-    properties: {
-      value: { type: 'string' },
-      position: { enum: ['top', 'bottom'] },
-      expected: {},
-    },
-    defaultValue: { nodeType: 'atomic', atomType: 'fraction-input', value: '', position: 'top' },
-    renderedBy: ['SparcNode.svelte'],
-  }),
-  atomicEntry({
     atomType: 'header-cell',
     label: 'Header cell',
     description: 'Plain header cell used in table-like layouts.',
@@ -438,6 +414,28 @@ export const SPARC_GROUP_NODE_CATALOG: readonly SparcAuthoringCatalogEntry[] = [
     groupType: 'choice-tabs',
     label: 'Choice tabs',
     description: 'Tabbed group that displays one child panel at a time.',
+  }),
+  groupEntry({
+    groupType: 'fraction',
+    label: 'Fraction',
+    description: 'Explicit numerator-over-denominator fraction group. The renderer draws the fraction bar only for this group type.',
+    defaultValue: {
+      nodeType: 'group',
+      groupType: 'fraction',
+      children: [{
+        id: 'numerator',
+        nodeType: 'atomic',
+        atomType: 'fraction-input',
+        fractionRole: 'numerator',
+        value: '',
+      }, {
+        id: 'denominator',
+        nodeType: 'atomic',
+        atomType: 'fraction-input',
+        fractionRole: 'denominator',
+        value: '',
+      }],
+    },
   }),
   groupEntry({
     groupType: 'alternative-panel',

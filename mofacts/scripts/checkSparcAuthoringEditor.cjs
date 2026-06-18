@@ -8,6 +8,7 @@ const repoRoot = path.resolve(__dirname, '..', '..');
 const catalog = jiti(path.join(repoRoot, 'learning-components/units/sparcsession/sparcAuthoringCatalog.ts'));
 const editorModel = jiti(path.join(repoRoot, 'learning-components/units/sparcsession/sparcAuthoringEditorModel.ts'));
 const modelTargets = jiti(path.join(repoRoot, 'learning-components/units/sparcsession/sparcAuthoredModelTargets.ts'));
+const fractionGroups = jiti(path.join(repoRoot, 'learning-components/trial-displays/sparc/sparcFractionGroups.ts'));
 
 function stableHash(value) {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -187,10 +188,56 @@ function assertRegistryResolution() {
   );
 }
 
+function assertFractionNormalization() {
+  const nodes = fractionGroups.normalizeSparcFractionGroups([{
+    id: 'row',
+    nodeType: 'group',
+    groupType: 'equation-row',
+    children: [{
+      id: 'fraction-top',
+      nodeType: 'atomic',
+      atomType: 'fraction-input',
+      position: 'top',
+      value: '',
+    }, {
+      id: 'fraction-bottom',
+      nodeType: 'atomic',
+      atomType: 'fraction-box',
+      position: 'bottom',
+      value: '12',
+    }],
+  }]);
+  const row = nodes[0];
+  assert.equal(row.children.length, 1, 'adjacent fraction atoms should normalize into one fraction group');
+  assert.equal(row.children[0].groupType, 'fraction');
+  assert.equal(row.children[0].children[0].fractionRole, 'numerator');
+  assert.equal(row.children[0].children[1].fractionRole, 'denominator');
+
+  const explicit = fractionGroups.normalizeSparcFractionGroups([{
+    id: 'explicit-fraction',
+    nodeType: 'group',
+    groupType: 'fraction',
+    children: [{
+      id: 'explicit-top',
+      nodeType: 'atomic',
+      atomType: 'fraction-input',
+      fractionRole: 'numerator',
+    }, {
+      id: 'explicit-bottom',
+      nodeType: 'atomic',
+      atomType: 'fraction-input',
+      fractionRole: 'denominator',
+    }],
+  }]);
+  assert.equal(explicit[0].id, 'explicit-fraction');
+  assert.equal(explicit[0].children.length, 2, 'explicit fraction children should not be rewrapped');
+}
+
 const paletteEntries = assertPaletteCoverage();
 assertRuleCatalogCoverage();
 assertRuleRoundTrip();
 assertRegistryResolution();
+assertFractionNormalization();
 
 console.log(JSON.stringify({
   sparcAuthoringEditorCheck: true,
