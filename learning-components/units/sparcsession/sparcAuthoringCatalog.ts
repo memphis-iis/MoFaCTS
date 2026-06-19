@@ -353,11 +353,10 @@ export const SPARC_GROUP_NODE_CATALOG: readonly SparcAuthoringCatalogEntry[] = [
   groupEntry({
     groupType: 'section',
     label: 'Section',
-    description: 'Page or document section with a title and ordered child nodes.',
+    description: 'Document section container with ordered child nodes.',
     defaultValue: {
       nodeType: 'group',
       groupType: 'section',
-      label: 'Section',
       children: [{
         id: 'body',
         nodeType: 'atomic',
@@ -374,7 +373,6 @@ export const SPARC_GROUP_NODE_CATALOG: readonly SparcAuthoringCatalogEntry[] = [
     defaultValue: {
       nodeType: 'group',
       groupType: 'multiple-choice',
-      label: 'Multiple choice problem',
       children: [{
         id: 'prompt',
         nodeType: 'atomic',
@@ -436,7 +434,6 @@ export const SPARC_GROUP_NODE_CATALOG: readonly SparcAuthoringCatalogEntry[] = [
     defaultValue: {
       nodeType: 'group',
       groupType: 'targeted-cata',
-      label: 'Select all that apply',
       children: [{
         id: 'prompt',
         nodeType: 'atomic',
@@ -515,7 +512,6 @@ export const SPARC_GROUP_NODE_CATALOG: readonly SparcAuthoringCatalogEntry[] = [
     defaultValue: {
       nodeType: 'group',
       groupType: 'dropdown-exercise',
-      label: 'Dropdown exercise',
       children: [{
         id: 'prompt',
         nodeType: 'atomic',
@@ -575,7 +571,6 @@ export const SPARC_GROUP_NODE_CATALOG: readonly SparcAuthoringCatalogEntry[] = [
     defaultValue: {
       nodeType: 'group',
       groupType: 'text-input-exercise',
-      label: 'Text input exercise',
       children: [{
         id: 'prompt',
         nodeType: 'atomic',
@@ -635,7 +630,6 @@ export const SPARC_GROUP_NODE_CATALOG: readonly SparcAuthoringCatalogEntry[] = [
     defaultValue: {
       nodeType: 'group',
       groupType: 'short-answer',
-      label: 'Short answer',
       children: [{
         id: 'prompt',
         nodeType: 'atomic',
@@ -740,7 +734,6 @@ export const SPARC_GROUP_NODE_CATALOG: readonly SparcAuthoringCatalogEntry[] = [
     defaultValue: {
       nodeType: 'group',
       groupType: 'oli-group',
-      label: 'OLI group',
       children: [{
         id: 'body',
         nodeType: 'atomic',

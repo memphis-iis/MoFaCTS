@@ -1,6 +1,7 @@
 <script>
   import DOMPurify from 'dompurify';
   import LearningProgressChart from './LearningProgressChart.svelte';
+  import { sanitizeSparcRichHtml } from '../services/sparcRichHtml';
 
   export let node;
   export let nodeValues = {};
@@ -14,17 +15,6 @@
 
   let activeTabId = '';
   let activePanelId = '';
-
-  const SPARC_HTML_ALLOWED_TAGS = [
-    'a', 'abbr', 'aside', 'b', 'br', 'code', 'dd', 'details', 'div', 'dl', 'dt', 'em',
-    'figcaption', 'figure', 'h1', 'h2', 'h3', 'h4', 'h5', 'i', 'iframe', 'img', 'li',
-    'ol', 'p', 'pre', 'section', 'span', 'strong', 'sub', 'summary', 'sup', 'table',
-    'tbody', 'td', 'tfoot', 'th', 'thead', 'tr', 'u', 'ul',
-  ];
-  const SPARC_HTML_ALLOWED_ATTR = [
-    'allowfullscreen', 'alt', 'class', 'data-oli-page-link', 'height', 'href', 'loading',
-    'rel', 'src', 'target', 'title', 'width',
-  ];
 
   function sortByPlacementOrder(values = []) {
     return values.slice().sort((left, right) => {
@@ -99,12 +89,20 @@
     updateNodeValue(candidate, element.textContent || '');
   }
 
+  function handlePlainTextAuthoringPaste(candidate, element) {
+    setTimeout(() => handlePlainTextAuthoringInput(candidate, element), 0);
+  }
+
   function handlePlainTextAuthoringCommit(candidate) {
     commitNodeValue(candidate, candidate.value || '');
   }
 
   function handleHtmlAuthoringInput(candidate, element) {
     updateNodeValue(candidate, element.innerHTML || '');
+  }
+
+  function handleHtmlAuthoringPaste(candidate, element) {
+    setTimeout(() => handleHtmlAuthoringInput(candidate, element), 0);
   }
 
   function handleHtmlAuthoringCommit(candidate) {
@@ -116,10 +114,7 @@
   }
 
   function sanitizeSparcHtml(value) {
-    return DOMPurify.sanitize(String(value || ''), {
-      ALLOWED_TAGS: SPARC_HTML_ALLOWED_TAGS,
-      ALLOWED_ATTR: SPARC_HTML_ALLOWED_ATTR,
-    });
+    return sanitizeSparcRichHtml(value, DOMPurify.sanitize.bind(DOMPurify));
   }
 
   function skillBarFill(candidate) {
@@ -237,26 +232,21 @@
       {:else}
         <div class="sparc-unknown">Invalid fraction: missing numerator or denominator</div>
       {/if}
-    {:else if node.label || headerFeedbackNode}
+    {:else if headerFeedbackNode}
       <div class="sparc-group-header">
-        {#if node.label}
-          <div class="sparc-group-label">{node.label}</div>
-        {/if}
-        {#if headerFeedbackNode}
-          <div class="sparc-group-header-feedback">
-            <svelte:self
-              node={headerFeedbackNode}
-              {nodeValues}
-              {learningProgressSnapshot}
-              {authoringSelectedNodeId}
-              {authoringSelectOnly}
-              {onNodeValueChange}
-              {onNodeCommit}
-              {onNodeFocus}
-              {onButtonActivate}
-            />
-          </div>
-        {/if}
+        <div class="sparc-group-header-feedback">
+          <svelte:self
+            node={headerFeedbackNode}
+            {nodeValues}
+            {learningProgressSnapshot}
+            {authoringSelectedNodeId}
+            {authoringSelectOnly}
+            {onNodeValueChange}
+            {onNodeCommit}
+            {onNodeFocus}
+            {onButtonActivate}
+          />
+        </div>
       </div>
     {/if}
     {#if !isFraction}
@@ -325,7 +315,7 @@
         on:focus={() => onNodeFocus(node.id)}
         on:input={(event) => handlePlainTextAuthoringInput(node, event.currentTarget)}
         on:keyup={(event) => handlePlainTextAuthoringInput(node, event.currentTarget)}
-        on:paste={(event) => setTimeout(() => handlePlainTextAuthoringInput(node, event.currentTarget), 0)}
+        on:paste={(event) => handlePlainTextAuthoringPaste(node, event.currentTarget)}
         on:blur={() => handlePlainTextAuthoringCommit(node)}
       ></div>
     {:else}
@@ -344,7 +334,7 @@
         on:focus={() => onNodeFocus(node.id)}
         on:input={(event) => handleHtmlAuthoringInput(node, event.currentTarget)}
         on:keyup={(event) => handleHtmlAuthoringInput(node, event.currentTarget)}
-        on:paste={(event) => setTimeout(() => handleHtmlAuthoringInput(node, event.currentTarget), 0)}
+        on:paste={(event) => handleHtmlAuthoringPaste(node, event.currentTarget)}
         on:blur={() => handleHtmlAuthoringCommit(node)}
       ></div>
     {:else}
@@ -403,7 +393,7 @@
           on:focus={() => onNodeFocus(node.id)}
           on:input={(event) => handleHtmlAuthoringInput(node, event.currentTarget)}
           on:keyup={(event) => handleHtmlAuthoringInput(node, event.currentTarget)}
-          on:paste={(event) => setTimeout(() => handleHtmlAuthoringInput(node, event.currentTarget), 0)}
+          on:paste={(event) => handleHtmlAuthoringPaste(node, event.currentTarget)}
           on:blur={() => handleHtmlAuthoringCommit(node)}
         ></div>
       {:else}
@@ -557,6 +547,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
+    justify-content: center;
     gap: var(--sparc-space-2);
   }
 
@@ -617,6 +608,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: stretch;
+    justify-content: flex-start;
     gap: var(--sparc-space-3);
   }
 
@@ -653,6 +645,7 @@
     flex-direction: column;
     flex-wrap: nowrap;
     align-items: stretch;
+    justify-content: flex-start;
   }
 
   .sparc-group[data-sparc-visual-preset="example"] > .sparc-group-body > .sparc-html-block:first-child,
@@ -670,6 +663,7 @@
     flex-direction: column;
     flex-wrap: nowrap;
     align-items: stretch;
+    justify-content: flex-start;
     gap: var(--sparc-space-3);
   }
 
@@ -723,6 +717,8 @@
     display: flex;
     flex-direction: column;
     gap: var(--sparc-space-2);
+    align-items: stretch;
+    justify-content: flex-start;
     width: 100%;
   }
 
@@ -736,6 +732,7 @@
     flex-direction: column;
     flex-wrap: nowrap;
     align-items: stretch;
+    justify-content: flex-start;
   }
 
   .sparc-group-activity-row,
@@ -750,6 +747,7 @@
     flex-direction: column;
     flex-wrap: nowrap;
     align-items: stretch;
+    justify-content: flex-start;
   }
 
   .sparc-group-activity-row .sparc-text-block,
@@ -943,6 +941,7 @@
   .sparc-group-table-layout > .sparc-group-body {
     flex-direction: column;
     align-items: stretch;
+    justify-content: flex-start;
   }
 
   .sparc-group-table-header-row > .sparc-group-body,
@@ -1027,6 +1026,19 @@
     padding-left: var(--sparc-space-3);
   }
 
+  .sparc-html-block blockquote {
+    margin: 0 0 var(--sparc-space-2);
+    border-left: calc(var(--sparc-border-width) * 3) solid var(--sparc-accent-color);
+    padding: var(--sparc-space-1) 0 var(--sparc-space-1) var(--sparc-space-3);
+    color: var(--sparc-secondary-text-color);
+  }
+
+  .sparc-html-block hr {
+    border: 0;
+    border-top: var(--sparc-border-width) solid var(--sparc-border-color);
+    margin: var(--sparc-space-3) 0;
+  }
+
   .sparc-html-block .oli-callout {
     border-left: calc(var(--sparc-border-width) * 3) solid var(--sparc-primary-action-surface-color);
     padding-left: var(--sparc-space-3);
@@ -1047,6 +1059,7 @@
   .sparc-html-block .oli-embed iframe {
     display: block;
     max-width: 100%;
+    margin-inline: auto;
     border: var(--sparc-border-width) solid var(--sparc-border-color);
     border-radius: var(--sparc-border-radius-sm);
   }
@@ -1115,6 +1128,7 @@
     width: 100%;
     border-collapse: collapse;
     margin: 0 0 var(--sparc-space-2);
+    table-layout: fixed;
   }
 
   .sparc-html-block th,
@@ -1123,6 +1137,97 @@
     padding: var(--sparc-space-1) var(--sparc-space-2);
     text-align: left;
     vertical-align: top;
+    overflow-wrap: anywhere;
+  }
+
+  .sparc-html-block th {
+    background: color-mix(in srgb, var(--sparc-text-color) 7%, var(--sparc-control-surface-color));
+    font-weight: var(--app-font-weight-semibold, 600);
+  }
+
+  .sparc-html-block [data-sparc-callout] {
+    margin: var(--sparc-space-3) 0;
+    padding: var(--sparc-space-2) var(--sparc-space-3);
+    border: var(--sparc-border-width) solid var(--sparc-border-color);
+    border-left-width: 4px;
+    border-radius: var(--sparc-border-radius-sm);
+    background: color-mix(in srgb, var(--sparc-text-color) 5%, var(--sparc-control-surface-color));
+  }
+
+  .sparc-html-block [data-sparc-callout="correct"] {
+    border-left-color: var(--sparc-correct-color);
+  }
+
+  .sparc-html-block [data-sparc-callout="warning"] {
+    border-left-color: var(--sparc-warning-color);
+  }
+
+  .sparc-html-block [data-sparc-callout="error"] {
+    border-left-color: var(--sparc-error-color);
+  }
+
+  .sparc-html-block [data-align="left"],
+  .sparc-html-block .sparc-align-left {
+    text-align: left;
+  }
+
+  .sparc-html-block [data-align="center"],
+  .sparc-html-block .sparc-align-center {
+    text-align: center;
+  }
+
+  .sparc-html-block [data-align="right"],
+  .sparc-html-block .sparc-align-right {
+    text-align: right;
+  }
+
+  .sparc-html-block [data-align="justify"],
+  .sparc-html-block .sparc-align-justify {
+    text-align: justify;
+  }
+
+  .sparc-html-block .sparc-color-accent {
+    color: var(--sparc-accent-color);
+  }
+
+  .sparc-html-block .sparc-color-correct {
+    color: var(--sparc-correct-color);
+  }
+
+  .sparc-html-block .sparc-color-warning {
+    color: var(--sparc-warning-color);
+  }
+
+  .sparc-html-block .sparc-color-error {
+    color: var(--sparc-error-color);
+  }
+
+  .sparc-html-block .sparc-color-muted {
+    color: var(--sparc-muted-text-color);
+  }
+
+  .sparc-html-block mark,
+  .sparc-html-block .sparc-highlight {
+    border-radius: var(--sparc-border-radius-sm);
+    padding: 0 var(--sparc-space-1);
+    background: color-mix(in srgb, var(--sparc-warning-color) 24%, var(--sparc-control-surface-color));
+    color: var(--sparc-text-color);
+  }
+
+  .sparc-html-block ul[data-type="taskList"] {
+    list-style: none;
+    padding-left: 0;
+  }
+
+  .sparc-html-block li[data-type="taskItem"] {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sparc-space-2);
+  }
+
+  .sparc-html-block li[data-type="taskItem"] input[type="checkbox"] {
+    margin-top: 0.35em;
+    pointer-events: none;
   }
 
   .sparc-html-block a,
@@ -1131,8 +1236,10 @@
   }
 
   .sparc-html-block img {
+    display: block;
     max-width: 100%;
     height: auto;
+    margin-inline: auto;
   }
 
   .sparc-operator {

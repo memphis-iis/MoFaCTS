@@ -2,8 +2,29 @@
   import { onDestroy, onMount, tick } from 'svelte';
   import { Editor } from '@tiptap/core';
   import StarterKit from '@tiptap/starter-kit';
+  import { TextAlign } from '@tiptap/extension-text-align';
+  import { Underline } from '@tiptap/extension-underline';
+  import { Strike } from '@tiptap/extension-strike';
+  import { Highlight } from '@tiptap/extension-highlight';
+  import { Color } from '@tiptap/extension-color';
+  import { TextStyle } from '@tiptap/extension-text-style';
+  import { Typography } from '@tiptap/extension-typography';
+  import { Subscript } from '@tiptap/extension-subscript';
+  import { Superscript } from '@tiptap/extension-superscript';
+  import { Table } from '@tiptap/extension-table';
+  import { TableRow } from '@tiptap/extension-table-row';
+  import { TableCell } from '@tiptap/extension-table-cell';
+  import { TableHeader } from '@tiptap/extension-table-header';
+  import { Image } from '@tiptap/extension-image';
+  import { TaskList } from '@tiptap/extension-task-list';
+  import { TaskItem } from '@tiptap/extension-task-item';
   import Link from '@tiptap/extension-link';
   import Placeholder from '@tiptap/extension-placeholder';
+  import {
+    SPARC_RICH_TEXT_COLORS,
+    normalizeSparcRichHtml,
+    validateSparcRichHtml,
+  } from '../../experiment/svelte/services/sparcRichHtml';
   import {
     defaultProductionCondition,
     defaultProductionEffect,
@@ -63,6 +84,11 @@
   let htmlEditor = null;
   let htmlToolbarRevision = 0;
   let richTextLinkHref = '';
+  let richTextImageSrc = '';
+  let richTextImageAlt = '';
+  let richTextEmbedSrc = '';
+  let showRichTextSource = false;
+  let savedVisualRichTextRange = null;
   let activeVisualRuleTemplateId = 'rule.effect.classify';
   let saving = false;
   let errorText = '';
@@ -116,6 +142,7 @@
   $: selectedImageSrc = getFirstImageAttribute(activeNode, 'src');
   $: selectedImageAlt = getFirstImageAttribute(activeNode, 'alt');
   $: selectedImageTitle = getFirstImageAttribute(activeNode, 'title');
+  $: selectedHtmlMedia = getHtmlMediaSummary(activeNode);
   $: isRichTextSelected = isRichTextNode(activeNode);
   $: materializeBehaviorModelTargetsForNode(activeNode);
   $: htmlToolbarRevision;
@@ -205,7 +232,6 @@
   function seedVisiblePaletteNode(node, entry) {
     const label = entry?.label || node.atomType || node.groupType || 'Node';
     if (node.nodeType === 'group') {
-      node.label = node.label || label;
       return;
     }
     if (node.atomType === 'html-block' && !String(node.value || '').replace(/<[^>]*>/g, '').trim()) {
@@ -676,6 +702,38 @@
     return template.content.querySelector('img')?.getAttribute(attributeName) || '';
   }
 
+  function isHtmlMediaNode(node) {
+    if (!node || (node.atomType !== 'html-block' && node.atomType !== 'message-box')) {
+      return false;
+    }
+    const value = String(node.value || '');
+    return /<(iframe|video|audio|source|embed|object)\b/i.test(value);
+  }
+
+  function getHtmlMediaSummary(node) {
+    if (!isHtmlMediaNode(node)) {
+      return null;
+    }
+    const template = parseHtmlFragment(node.value);
+    const element = template.content.querySelector('iframe, video, audio, source, embed, object');
+    if (!element) {
+      return null;
+    }
+    const tagName = element.tagName.toLowerCase();
+    const src = element.getAttribute('src') || element.getAttribute('data') || '';
+    const title = element.getAttribute('title') || '';
+    const width = element.getAttribute('width') || '';
+    const height = element.getAttribute('height') || '';
+    return {
+      tagName,
+      src,
+      title,
+      width,
+      height,
+      hasLocalhostUrl: /\blocalhost\b|127\.0\.0\.1|\[::1\]/i.test(src),
+    };
+  }
+
   function updateFirstImageAttribute(attributeName, value) {
     if (!activeNode || !isImageHtmlNode(activeNode)) {
       return;
@@ -696,6 +754,28 @@
     markChanged();
   }
 
+  function updateFirstHtmlMediaAttribute(attributeName, value) {
+    if (!activeNode || !isHtmlMediaNode(activeNode)) {
+      return;
+    }
+    const template = parseHtmlFragment(activeNode.value);
+    const element = template.content.querySelector('iframe, video, audio, source, embed, object');
+    if (!element) {
+      return;
+    }
+    const normalized = String(value || '').trim();
+    const targetAttribute = attributeName === 'src' && element.tagName.toLowerCase() === 'object'
+      ? 'data'
+      : attributeName;
+    if (normalized) {
+      element.setAttribute(targetAttribute, normalized);
+    } else {
+      element.removeAttribute(targetAttribute);
+    }
+    activeNode.value = template.innerHTML;
+    markChanged();
+  }
+
   function selectVisualNode(nodeId) {
     if (!nodeId || !flatNodes.some((entry) => entry.node?.id === nodeId)) {
       return;
@@ -706,6 +786,40 @@
   function handleVisualEditorClick(event) {
     const nodeElement = event.target?.closest?.('[data-node-id]');
     selectVisualNode(nodeElement?.getAttribute('data-node-id'));
+  }
+
+  function targetAcceptsTextInput(target) {
+    const tagName = target?.tagName?.toLowerCase?.() || '';
+    return target?.isContentEditable
+      || tagName === 'input'
+      || tagName === 'textarea'
+      || tagName === 'select'
+      || Boolean(target?.closest?.('[contenteditable="true"]'));
+  }
+
+  function handleEditorDeleteKey(event) {
+    if (
+      event.defaultPrevented
+      || event.key !== 'Delete'
+      || event.altKey
+      || event.ctrlKey
+      || event.metaKey
+      || event.shiftKey
+      || activeEditorTab !== 'visual'
+      || !activeNode
+      || targetAcceptsTextInput(event.target)
+    ) {
+      return;
+    }
+    event.preventDefault();
+    removeActiveNode();
+  }
+
+  function handleRichTextToolbarMouseDown(event) {
+    if (event.target?.closest?.('button')) {
+      event.preventDefault();
+      rememberVisualRichTextSelection();
+    }
   }
 
   function readVisualEditorEventValue(event, node) {
@@ -765,8 +879,235 @@
     markChanged();
   }
 
+  function activeVisualRichTextElement() {
+    if (!activeNode?.id || !isRichTextSelected) {
+      return null;
+    }
+    return Array.from(document.querySelectorAll('.sparc-visual-editor-surface [data-node-id][contenteditable="true"]'))
+      .find((element) => element.getAttribute('data-node-id') === activeNode.id) || null;
+  }
+
+  function selectionIsInsideElement(selection, element) {
+    return Boolean(selection?.rangeCount && element?.contains(selection.anchorNode) && element.contains(selection.focusNode));
+  }
+
+  function rememberVisualRichTextSelection() {
+    const element = activeVisualRichTextElement();
+    const selection = window.getSelection?.();
+    if (!element || !selectionIsInsideElement(selection, element)) {
+      return;
+    }
+    savedVisualRichTextRange = selection.getRangeAt(0).cloneRange();
+  }
+
+  function restoreVisualRichTextSelection(element) {
+    const selection = window.getSelection?.();
+    if (!selection || !element) {
+      return false;
+    }
+    if (savedVisualRichTextRange && element.contains(savedVisualRichTextRange.commonAncestorContainer)) {
+      selection.removeAllRanges();
+      selection.addRange(savedVisualRichTextRange);
+      return true;
+    }
+    if (!selectionIsInsideElement(selection, element)) {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+    return true;
+  }
+
+  function setActiveVisualRichTextHtml(element) {
+    if (!activeNode || !element) {
+      return;
+    }
+    activeNode.value = normalizeSparcRichHtml(element.innerHTML || '<p></p>');
+    element.innerHTML = activeNode.value;
+    if (htmlEditor) {
+      htmlEditor.commands.setContent(activeNode.value || '<p></p>', false);
+    }
+    markChanged();
+    rememberVisualRichTextSelection();
+    htmlToolbarRevision += 1;
+  }
+
+  function insertHtmlAtVisualSelection(html) {
+    document.execCommand('insertHTML', false, html);
+  }
+
+  function activeTableCell() {
+    const selection = window.getSelection?.();
+    const node = selection?.anchorNode;
+    return (node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement)?.closest?.('td, th') || null;
+  }
+
+  function runVisualTableCommand(command) {
+    const cell = activeTableCell();
+    if (!cell) {
+      return false;
+    }
+    const row = cell.closest('tr');
+    const table = cell.closest('table');
+    if (!row || !table) {
+      return false;
+    }
+    if (command === 'table-add-row') {
+      const clone = row.cloneNode(true);
+      clone.querySelectorAll('th, td').forEach((entry) => {
+        entry.innerHTML = '<p></p>';
+      });
+      row.after(clone);
+      return true;
+    }
+    if (command === 'table-add-column') {
+      const index = Array.from(row.children).indexOf(cell);
+      table.querySelectorAll('tr').forEach((candidateRow) => {
+        const referenceCell = candidateRow.children[index] || candidateRow.lastElementChild;
+        const clone = (referenceCell || cell).cloneNode(false);
+        clone.innerHTML = '<p></p>';
+        referenceCell?.after(clone);
+      });
+      return true;
+    }
+    if (command === 'table-delete-row') {
+      row.remove();
+      if (!table.querySelector('tr')) {
+        table.remove();
+      }
+      return true;
+    }
+    if (command === 'table-delete-column') {
+      const index = Array.from(row.children).indexOf(cell);
+      table.querySelectorAll('tr').forEach((candidateRow) => {
+        candidateRow.children[index]?.remove();
+      });
+      if (!table.querySelector('td, th')) {
+        table.remove();
+      }
+      return true;
+    }
+    if (command === 'table-delete') {
+      table.remove();
+      return true;
+    }
+    return false;
+  }
+
+  function runVisualRichTextCommand(command, value = undefined) {
+    const element = activeVisualRichTextElement();
+    if (!element || !restoreVisualRichTextSelection(element)) {
+      return false;
+    }
+    element.focus();
+    if (command === 'bold') {
+      document.execCommand('bold');
+    } else if (command === 'italic') {
+      document.execCommand('italic');
+    } else if (command === 'underline') {
+      document.execCommand('underline');
+    } else if (command === 'strike') {
+      document.execCommand('strikeThrough');
+    } else if (command === 'subscript') {
+      document.execCommand('subscript');
+    } else if (command === 'superscript') {
+      document.execCommand('superscript');
+    } else if (command === 'paragraph') {
+      document.execCommand('formatBlock', false, 'p');
+    } else if (command === 'heading') {
+      document.execCommand('formatBlock', false, `h${Number(value) || 2}`);
+    } else if (command === 'align') {
+      const alignCommand = value === 'center' ? 'justifyCenter'
+        : value === 'right' ? 'justifyRight'
+          : value === 'justify' ? 'justifyFull'
+            : 'justifyLeft';
+      document.execCommand(alignCommand);
+    } else if (command === 'color') {
+      const color = SPARC_RICH_TEXT_COLORS.find((entry) => entry.token === value);
+      if (color) {
+        insertHtmlAtVisualSelection(`<span class="sparc-color-${color.token}" data-color="${color.token}">${window.getSelection()?.toString() || ''}</span>`);
+      } else {
+        document.execCommand('removeFormat');
+      }
+    } else if (command === 'highlight') {
+      insertHtmlAtVisualSelection(`<mark class="sparc-highlight">${window.getSelection()?.toString() || ''}</mark>`);
+    } else if (command === 'bullet-list') {
+      document.execCommand('insertUnorderedList');
+    } else if (command === 'ordered-list') {
+      document.execCommand('insertOrderedList');
+    } else if (command === 'blockquote') {
+      document.execCommand('formatBlock', false, 'blockquote');
+    } else if (command === 'code-block') {
+      document.execCommand('formatBlock', false, 'pre');
+    } else if (command === 'horizontal-rule') {
+      document.execCommand('insertHorizontalRule');
+    } else if (command === 'link') {
+      const href = String(value || '').trim();
+      if (href) {
+        document.execCommand('createLink', false, href);
+      } else {
+        document.execCommand('unlink');
+      }
+    } else if (command === 'image') {
+      const src = String(value?.src || '').trim();
+      if (!validHttpsUrl(src)) {
+        errorText = 'Image URL must be a valid https URL.';
+        return true;
+      }
+      insertHtmlAtVisualSelection(`<img src="${src}" alt="${String(value?.alt || '').replace(/"/g, '&quot;')}">`);
+    } else if (command === 'embed') {
+      const src = String(value || '').trim();
+      if (!validHttpsUrl(src)) {
+        errorText = 'Embed URL must be a valid https URL.';
+        return true;
+      }
+      insertHtmlAtVisualSelection(`<figure class="oli-embed"><iframe src="${src}" title="embed" width="100%" height="360" loading="lazy" allowfullscreen></iframe><figcaption></figcaption></figure>`);
+    } else if (command === 'table') {
+      insertHtmlAtVisualSelection('<table><tbody><tr><th><p></p></th><th><p></p></th><th><p></p></th></tr><tr><td><p></p></td><td><p></p></td><td><p></p></td></tr><tr><td><p></p></td><td><p></p></td><td><p></p></td></tr></tbody></table>');
+    } else if (command.startsWith('table-')) {
+      if (!runVisualTableCommand(command)) {
+        return true;
+      }
+    } else if (command === 'task-list') {
+      insertHtmlAtVisualSelection('<ul data-type="taskList"><li data-type="taskItem"><label><input type="checkbox" disabled="disabled"> <span>Task</span></label></li></ul>');
+    } else {
+      return false;
+    }
+    setActiveVisualRichTextHtml(element);
+    return true;
+  }
+
+  function setActiveRichTextHtml(value) {
+    if (!activeNode || (activeNode.atomType !== 'html-block' && activeNode.atomType !== 'message-box')) {
+      return;
+    }
+    activeNode.value = normalizeSparcRichHtml(value || '<p></p>');
+    markChanged();
+  }
+
+  function applyEditorHtmlUpdate(editor) {
+    if (!activeNode || (activeNode.atomType !== 'html-block' && activeNode.atomType !== 'message-box')) {
+      return;
+    }
+    activeNode.value = normalizeSparcRichHtml(editor.getHTML());
+    markChanged();
+  }
+
+  function validHttpsUrl(value) {
+    try {
+      return new URL(String(value || '').trim()).protocol === 'https:';
+    } catch (_error) {
+      return false;
+    }
+  }
+
   function runRichTextCommand(command, value = undefined) {
     if (!htmlEditor || !isRichTextSelected) {
+      return;
+    }
+    if (runVisualRichTextCommand(command, value)) {
       return;
     }
     const chain = htmlEditor.chain().focus();
@@ -774,14 +1115,67 @@
       chain.toggleBold().run();
     } else if (command === 'italic') {
       chain.toggleItalic().run();
+    } else if (command === 'underline') {
+      chain.toggleUnderline().run();
+    } else if (command === 'strike') {
+      chain.toggleStrike().run();
+    } else if (command === 'highlight') {
+      chain.toggleHighlight().run();
+    } else if (command === 'subscript') {
+      chain.toggleSubscript().run();
+    } else if (command === 'superscript') {
+      chain.toggleSuperscript().run();
     } else if (command === 'paragraph') {
       chain.setParagraph().run();
     } else if (command === 'heading') {
       chain.toggleHeading({ level: value }).run();
+    } else if (command === 'align') {
+      chain.setTextAlign(value).run();
+    } else if (command === 'color') {
+      const color = SPARC_RICH_TEXT_COLORS.find((entry) => entry.token === value);
+      if (color) {
+        chain.setColor(color.cssValue).run();
+      } else {
+        chain.unsetColor().run();
+      }
     } else if (command === 'bullet-list') {
       chain.toggleBulletList().run();
     } else if (command === 'ordered-list') {
       chain.toggleOrderedList().run();
+    } else if (command === 'task-list') {
+      chain.toggleTaskList().run();
+    } else if (command === 'blockquote') {
+      chain.toggleBlockquote().run();
+    } else if (command === 'code-block') {
+      chain.toggleCodeBlock().run();
+    } else if (command === 'horizontal-rule') {
+      chain.setHorizontalRule().run();
+    } else if (command === 'table') {
+      chain.insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+    } else if (command === 'table-add-row') {
+      chain.addRowAfter().run();
+    } else if (command === 'table-add-column') {
+      chain.addColumnAfter().run();
+    } else if (command === 'table-delete-row') {
+      chain.deleteRow().run();
+    } else if (command === 'table-delete-column') {
+      chain.deleteColumn().run();
+    } else if (command === 'table-delete') {
+      chain.deleteTable().run();
+    } else if (command === 'image') {
+      const src = String(value?.src || '').trim();
+      if (validHttpsUrl(src)) {
+        chain.setImage({ src, alt: String(value?.alt || '') }).run();
+      } else {
+        errorText = 'Image URL must be a valid https URL.';
+      }
+    } else if (command === 'embed') {
+      const src = String(value || '').trim();
+      if (validHttpsUrl(src)) {
+        chain.insertContent(`<figure class="oli-embed"><iframe src="${src}" title="embed" width="100%" height="360" loading="lazy" allowfullscreen></iframe><figcaption></figcaption></figure>`).run();
+      } else {
+        errorText = 'Embed URL must be a valid https URL.';
+      }
     } else if (command === 'undo') {
       chain.undo().run();
     } else if (command === 'redo') {
@@ -794,6 +1188,7 @@
         chain.extendMarkRange('link').unsetLink().run();
       }
     }
+    applyEditorHtmlUpdate(htmlEditor);
     htmlToolbarRevision += 1;
   }
 
@@ -803,6 +1198,18 @@
       return false;
     }
     return attrs ? htmlEditor.isActive(command, attrs) : htmlEditor.isActive(command);
+  }
+
+  function richTextAlignmentActive(value) {
+    htmlToolbarRevision;
+    return Boolean(htmlEditor?.isActive({ textAlign: value }));
+  }
+
+  function updateRichTextSource(value) {
+    setActiveRichTextHtml(value);
+    if (htmlEditor) {
+      htmlEditor.commands.setContent(activeNode?.value || '<p></p>', false);
+    }
   }
 
   function selectedNodeBehaviorKeys(nodeId) {
@@ -1615,7 +2022,7 @@
       return;
     }
     const current = htmlEditor.getHTML();
-    const next = node.value || '<p></p>';
+    const next = normalizeSparcRichHtml(node.value || '<p></p>');
     if (current !== next) {
       htmlEditor.commands.setContent(next, false);
     }
@@ -1641,16 +2048,31 @@
     htmlEditor = new Editor({
       element: htmlEditorElement,
       extensions: [
-        StarterKit,
+        StarterKit.configure({
+          strike: false,
+        }),
+        TextAlign.configure({ types: ['heading', 'paragraph'] }),
+        Underline,
+        Strike,
+        Highlight,
+        Color,
+        TextStyle,
+        Typography,
+        Subscript,
+        Superscript,
+        Table.configure({ resizable: true }),
+        TableRow,
+        TableCell,
+        TableHeader,
+        Image.configure({ inline: false, allowBase64: false }),
+        TaskList,
+        TaskItem.configure({ nested: true }),
         Link.configure({ openOnClick: false }),
         Placeholder.configure({ placeholder: 'Write formatted SPARC content...' }),
       ],
-      content: activeNode?.value || '<p></p>',
+      content: normalizeSparcRichHtml(activeNode?.value || '<p></p>'),
       onUpdate: ({ editor }) => {
-        if (activeNode && (activeNode.atomType === 'html-block' || activeNode.atomType === 'message-box')) {
-          activeNode.value = editor.getHTML();
-          markChanged();
-        }
+        applyEditorHtmlUpdate(editor);
         htmlToolbarRevision += 1;
       },
       onSelectionUpdate: () => {
@@ -1680,6 +2102,7 @@
   function validateBeforeSave() {
     for (const target of sparcTargets) {
       const display = clusters[target.clusterIndex]?.stims?.[target.stimIndex]?.display;
+      removeDeprecatedGroupLabels(display?.nodes || []);
       const seen = new Set();
       const stimulusRegistryIds = stimulusRegistryIdsForDisplay(display);
       for (const entry of flattenNodes(display?.nodes || [])) {
@@ -1696,9 +2119,35 @@
             throw new Error(`Node "${node.id}" in "${target.label}" attaches unknown stimulus "${stimulusId}".`);
           }
         }
+        if (node.atomType === 'html-block' || node.atomType === 'message-box') {
+          node.value = normalizeSparcRichHtml(node.value || '');
+          const richHtmlIssues = validateSparcRichHtml(node.value, `${target.label} node "${node.id}"`);
+          if (richHtmlIssues.length > 0) {
+            throw new Error(richHtmlIssues.join('; '));
+          }
+        }
       }
       validateStimulusRegistryBeforeSave(display, target.label);
       validateRulesBeforeSave(display, target.label);
+    }
+  }
+
+  function removeDeprecatedGroupLabels(nodes, parentGroupType = '') {
+    for (const node of nodes || []) {
+      if (!node || typeof node !== 'object') {
+        continue;
+      }
+      if (node.nodeType === 'group') {
+        if (parentGroupType !== 'choice-tabs') {
+          delete node.label;
+        }
+        removeDeprecatedGroupLabels(node.children || [], node.groupType || '');
+      }
+      if (node.atomType === 'panel-selector') {
+        for (const panel of node.panels || []) {
+          removeDeprecatedGroupLabels(panel.children || [], '');
+        }
+      }
     }
   }
 
@@ -1940,11 +2389,15 @@
   }
 
   onMount(async () => {
+    window.addEventListener('keydown', handleEditorDeleteKey);
+    document.addEventListener('selectionchange', rememberVisualRichTextSelection);
     await tick();
     ensureHtmlEditor();
   });
 
   onDestroy(() => {
+    window.removeEventListener('keydown', handleEditorDeleteKey);
+    document.removeEventListener('selectionchange', rememberVisualRichTextSelection);
     htmlEditor?.destroy();
     htmlEditor = null;
   });
@@ -2168,9 +2621,6 @@
     <aside class="sparc-palette" aria-label="SPARC node palette">
       <div class="sparc-panel-header">
         <h2>Palette</h2>
-        <button type="button" class="btn btn-outline-danger btn-sm" on:click={removeActiveNode} disabled={!activeNode}>
-          Delete Selected
-        </button>
       </div>
       <div class="sparc-palette-grid">
         {#each paletteEntries as entry}
@@ -2193,24 +2643,76 @@
     </aside>
 
     <main class="sparc-canvas" class:sparc-canvas-hierarchy-visible={showNodeHierarchy}>
-      <div class="sparc-rich-text-toolbar" aria-label="SPARC visual editor tools">
+      <div class="sparc-rich-text-toolbar" aria-label="SPARC visual editor tools" on:mousedown={handleRichTextToolbarMouseDown}>
         <label class="sparc-advanced-toggle sparc-toolbar-toggle">
           <input type="checkbox" bind:checked={showNodeHierarchy} />
           Show node hierarchy
         </label>
         {#if isRichTextSelected}
           <div class="sparc-toolbar-divider" aria-hidden="true"></div>
-          <button type="button" class:active={richTextCommandActive('bold')} on:click={() => runRichTextCommand('bold')}>B</button>
-          <button type="button" class:active={richTextCommandActive('italic')} on:click={() => runRichTextCommand('italic')}>I</button>
-          <button type="button" class:active={richTextCommandActive('paragraph')} on:click={() => runRichTextCommand('paragraph')}>Paragraph</button>
-          <button type="button" class:active={richTextCommandActive('heading', { level: 2 })} on:click={() => runRichTextCommand('heading', 2)}>H2</button>
-          <button type="button" class:active={richTextCommandActive('bulletList')} on:click={() => runRichTextCommand('bullet-list')}>Bullets</button>
-          <button type="button" class:active={richTextCommandActive('orderedList')} on:click={() => runRichTextCommand('ordered-list')}>Numbers</button>
-          <input class="sparc-link-input" placeholder="https://..." bind:value={richTextLinkHref} aria-label="Link URL" />
-          <button type="button" class:active={richTextCommandActive('link')} on:click={() => runRichTextCommand('link', richTextLinkHref)}>Link</button>
-          <button type="button" on:click={() => runRichTextCommand('link', '')}>Unlink</button>
-          <button type="button" on:click={() => runRichTextCommand('undo')}>Undo</button>
-          <button type="button" on:click={() => runRichTextCommand('redo')}>Redo</button>
+          <div class="sparc-toolbar-group" aria-label="Inline formatting">
+            <button type="button" class:active={richTextCommandActive('bold')} title="Bold" on:click={() => runRichTextCommand('bold')}>B</button>
+            <button type="button" class:active={richTextCommandActive('italic')} title="Italic" on:click={() => runRichTextCommand('italic')}>I</button>
+            <button type="button" class:active={richTextCommandActive('underline')} title="Underline" on:click={() => runRichTextCommand('underline')}>U</button>
+            <button type="button" class:active={richTextCommandActive('strike')} title="Strikethrough" on:click={() => runRichTextCommand('strike')}>S</button>
+            <button type="button" class:active={richTextCommandActive('highlight')} title="Highlight" on:click={() => runRichTextCommand('highlight')}>HL</button>
+            <button type="button" class:active={richTextCommandActive('subscript')} title="Subscript" on:click={() => runRichTextCommand('subscript')}>x2</button>
+            <button type="button" class:active={richTextCommandActive('superscript')} title="Superscript" on:click={() => runRichTextCommand('superscript')}>x^2</button>
+          </div>
+          <div class="sparc-toolbar-group" aria-label="Blocks and lists">
+            <button type="button" class:active={richTextCommandActive('paragraph')} on:click={() => runRichTextCommand('paragraph')}>Paragraph</button>
+            <button type="button" class:active={richTextCommandActive('heading', { level: 2 })} on:click={() => runRichTextCommand('heading', 2)}>H2</button>
+            <button type="button" class:active={richTextCommandActive('heading', { level: 3 })} on:click={() => runRichTextCommand('heading', 3)}>H3</button>
+            <button type="button" class:active={richTextCommandActive('bulletList')} on:click={() => runRichTextCommand('bullet-list')}>Bullets</button>
+            <button type="button" class:active={richTextCommandActive('orderedList')} on:click={() => runRichTextCommand('ordered-list')}>Numbers</button>
+            <button type="button" class:active={richTextCommandActive('taskList')} on:click={() => runRichTextCommand('task-list')}>Tasks</button>
+            <button type="button" class:active={richTextCommandActive('blockquote')} on:click={() => runRichTextCommand('blockquote')}>Quote</button>
+            <button type="button" class:active={richTextCommandActive('codeBlock')} on:click={() => runRichTextCommand('code-block')}>Code</button>
+            <button type="button" on:click={() => runRichTextCommand('horizontal-rule')}>Rule</button>
+          </div>
+          <div class="sparc-toolbar-group" aria-label="Alignment">
+            <button type="button" class:active={richTextAlignmentActive('left')} on:click={() => runRichTextCommand('align', 'left')}>Left</button>
+            <button type="button" class:active={richTextAlignmentActive('center')} on:click={() => runRichTextCommand('align', 'center')}>Center</button>
+            <button type="button" class:active={richTextAlignmentActive('right')} on:click={() => runRichTextCommand('align', 'right')}>Right</button>
+            <button type="button" class:active={richTextAlignmentActive('justify')} on:click={() => runRichTextCommand('align', 'justify')}>Justify</button>
+          </div>
+          <div class="sparc-toolbar-group" aria-label="Color">
+            {#each SPARC_RICH_TEXT_COLORS as color}
+              <button
+                type="button"
+                class="sparc-color-button"
+                style={`--sparc-toolbar-swatch: ${color.cssValue}`}
+                title={color.label}
+                on:click={() => runRichTextCommand('color', color.token)}
+              >
+                {color.label}
+              </button>
+            {/each}
+            <button type="button" on:click={() => runRichTextCommand('color', '')}>Clear</button>
+          </div>
+          <div class="sparc-toolbar-group" aria-label="Links and media">
+            <input class="sparc-link-input" placeholder="https://..." bind:value={richTextLinkHref} aria-label="Link URL" />
+            <button type="button" class:active={richTextCommandActive('link')} on:click={() => runRichTextCommand('link', richTextLinkHref)}>Link</button>
+            <button type="button" on:click={() => runRichTextCommand('link', '')}>Unlink</button>
+            <input class="sparc-link-input" placeholder="Image URL" bind:value={richTextImageSrc} aria-label="Image URL" />
+            <input class="sparc-short-input" placeholder="Alt" bind:value={richTextImageAlt} aria-label="Image alt text" />
+            <button type="button" on:click={() => runRichTextCommand('image', { src: richTextImageSrc, alt: richTextImageAlt })}>Image</button>
+            <input class="sparc-link-input" placeholder="Embed URL" bind:value={richTextEmbedSrc} aria-label="Embed URL" />
+            <button type="button" on:click={() => runRichTextCommand('embed', richTextEmbedSrc)}>Embed</button>
+          </div>
+          <div class="sparc-toolbar-group" aria-label="Table controls">
+            <button type="button" on:click={() => runRichTextCommand('table')}>Table</button>
+            <button type="button" on:click={() => runRichTextCommand('table-add-row')}>Row+</button>
+            <button type="button" on:click={() => runRichTextCommand('table-add-column')}>Col+</button>
+            <button type="button" on:click={() => runRichTextCommand('table-delete-row')}>Row-</button>
+            <button type="button" on:click={() => runRichTextCommand('table-delete-column')}>Col-</button>
+            <button type="button" on:click={() => runRichTextCommand('table-delete')}>Delete Table</button>
+          </div>
+          <div class="sparc-toolbar-group" aria-label="History and source">
+            <button type="button" on:click={() => runRichTextCommand('undo')}>Undo</button>
+            <button type="button" on:click={() => runRichTextCommand('redo')}>Redo</button>
+            <button type="button" class:active={showRichTextSource} on:click={() => showRichTextSource = !showRichTextSource}>HTML</button>
+          </div>
         {/if}
       </div>
       <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -2221,6 +2723,8 @@
         aria-label="SPARC Visual Editor drop surface"
         use:visualEditorValueBridge
         on:click={handleVisualEditorClick}
+        on:keyup={rememberVisualRichTextSelection}
+        on:mouseup={rememberVisualRichTextSelection}
         on:dragover={handleVisualDragOver}
         on:drop={handleVisualDrop}
         on:dragleave={handleVisualDragLeave}
@@ -2271,7 +2775,6 @@
           <h2>Selection</h2>
           <div class="sparc-selection-summary">
             <strong>{activeNode.id}</strong>
-            <small>{activeNode.nodeType === 'group' ? activeNode.groupType : activeNode.atomType}</small>
           </div>
           <div class="sparc-node-action-row">
             {#if activeParentNode}
@@ -2289,12 +2792,8 @@
           </label>
           {#if activeNode.nodeType === 'group'}
             <label>
-              Section Type
+              Node Type
               <input value={activeNode.groupType || ''} on:input={(event) => updateField('groupType', event.currentTarget.value)} />
-            </label>
-            <label>
-              Section Label
-              <input value={activeNode.label || ''} on:input={(event) => updateField('label', event.currentTarget.value)} />
             </label>
           {:else}
             <label>
@@ -2319,8 +2818,55 @@
                   <input value={selectedImageTitle} on:input={(event) => updateFirstImageAttribute('title', event.currentTarget.value)} />
                 </label>
               </div>
+            {:else if selectedHtmlMedia}
+              <div class="sparc-media-editor">
+                <div class="sparc-selection-summary sparc-media-summary">
+                  <strong>{selectedHtmlMedia.tagName}</strong>
+                  <small>{selectedHtmlMedia.src || 'No media URL'}</small>
+                </div>
+                {#if selectedHtmlMedia.hasLocalhostUrl}
+                  <div class="sparc-media-warning">
+                    This embed points at a local host URL. If the referenced service is not running on the same host and port, the frame will refuse to connect.
+                  </div>
+                {/if}
+                <label>
+                  Media URL
+                  <input value={selectedHtmlMedia.src} on:input={(event) => updateFirstHtmlMediaAttribute('src', event.currentTarget.value)} />
+                </label>
+                {#if selectedHtmlMedia.tagName === 'iframe'}
+                  <label>
+                    Frame title
+                    <input value={selectedHtmlMedia.title} on:input={(event) => updateFirstHtmlMediaAttribute('title', event.currentTarget.value)} />
+                  </label>
+                {/if}
+                <div class="sparc-media-size-fields">
+                  <label>
+                    Width
+                    <input value={selectedHtmlMedia.width} on:input={(event) => updateFirstHtmlMediaAttribute('width', event.currentTarget.value)} />
+                  </label>
+                  <label>
+                    Height
+                    <input value={selectedHtmlMedia.height} on:input={(event) => updateFirstHtmlMediaAttribute('height', event.currentTarget.value)} />
+                  </label>
+                </div>
+                <label>
+                  HTML
+                  <textarea rows="8" value={activeNode.value || ''} on:input={(event) => updateField('value', event.currentTarget.value)}></textarea>
+                </label>
+              </div>
             {:else if activeNode.atomType === 'html-block' || activeNode.atomType === 'message-box'}
               <div class="sparc-rich-text-editor" bind:this={htmlEditorElement}></div>
+              {#if showRichTextSource}
+                <label>
+                  HTML Source
+                  <textarea
+                    class="sparc-rich-text-source"
+                    rows="10"
+                    value={activeNode.value || ''}
+                    on:input={(event) => updateRichTextSource(event.currentTarget.value)}
+                  ></textarea>
+                </label>
+              {/if}
             {:else if activeNode.atomType === 'dropdown'}
               <label>
                 Selected
@@ -3279,6 +3825,33 @@
     background: var(--app-info-surface-color);
   }
 
+  .sparc-media-editor {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sparc-editor-gap-sm);
+  }
+
+  .sparc-media-summary small {
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  .sparc-media-warning {
+    border: 1px solid color-mix(in srgb, var(--app-warning-color) 45%, var(--border-color));
+    border-radius: var(--sparc-editor-border-radius-sm);
+    background: color-mix(in srgb, var(--app-warning-color) 12%, var(--sparc-editor-panel-surface));
+    color: var(--app-text-color);
+    padding: var(--sparc-editor-gap-xs) var(--sparc-editor-gap-sm);
+    font-size: calc(var(--app-font-size-base) * 0.8);
+    line-height: 1.25;
+  }
+
+  .sparc-media-size-fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sparc-editor-gap-sm);
+  }
+
   .sparc-context-panel label,
   .sparc-rule-detail label {
     display: flex;
@@ -3436,6 +4009,11 @@
     outline: none;
   }
 
+  .sparc-rich-text-source {
+    font-family: var(--sparc-editor-monospace-font-family);
+    font-size: calc(var(--app-font-size-base) * 0.78);
+  }
+
   .sparc-image-editor,
   .sparc-image-preview {
     display: flex;
@@ -3470,12 +4048,40 @@
     border-radius: var(--sparc-editor-border-radius-sm);
   }
 
+  .sparc-toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: var(--sparc-editor-gap-xs);
+    padding-right: var(--sparc-editor-gap-sm);
+    border-right: 1px solid var(--border-color);
+  }
+
+  .sparc-toolbar-group:last-child {
+    border-right: 0;
+  }
+
   .sparc-rich-text-toolbar button {
     border: 1px solid var(--border-color);
     background: var(--sparc-editor-control-surface);
     color: var(--app-text-color);
     border-radius: var(--sparc-editor-border-radius-sm);
     padding: var(--sparc-editor-control-padding-y) var(--sparc-editor-control-padding-x);
+    white-space: nowrap;
+  }
+
+  .sparc-rich-text-toolbar .sparc-color-button {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sparc-editor-gap-xs);
+  }
+
+  .sparc-rich-text-toolbar .sparc-color-button::before {
+    content: "";
+    width: 0.75rem;
+    height: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    background: var(--sparc-toolbar-swatch);
   }
 
   .sparc-rich-text-toolbar button.active {
@@ -3499,6 +4105,15 @@
   .sparc-rich-text-toolbar .sparc-link-input {
     min-width: 150px;
     max-width: 230px;
+    border: 1px solid var(--border-color);
+    background: var(--sparc-editor-input-surface);
+    color: var(--app-text-color);
+    border-radius: var(--sparc-editor-border-radius-sm);
+    padding: var(--sparc-editor-control-padding-y) var(--sparc-editor-control-padding-x);
+  }
+
+  .sparc-rich-text-toolbar .sparc-short-input {
+    width: 5rem;
     border: 1px solid var(--border-color);
     background: var(--sparc-editor-input-surface);
     color: var(--app-text-color);
