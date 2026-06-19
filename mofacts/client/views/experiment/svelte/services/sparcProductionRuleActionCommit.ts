@@ -1,3 +1,4 @@
+import { Meteor } from 'meteor/meteor';
 import type { CanonicalHistoryRecord } from '../../../../../../learning-components/runtime/historyEnvelope';
 import type {
   SparcTrialDisplay,
@@ -150,6 +151,10 @@ export async function commitSparcProductionRuleAction(params: {
   if (!tdfId || !sessionId) {
     throw new Error('[SPARC] Production-rule action history requires TDFId and sessionID');
   }
+  const userId = Meteor.userId();
+  if (!userId) {
+    throw new Error('[SPARC] Production-rule action history requires an authenticated user');
+  }
   const levelUnit = Number(params.levelUnit);
   if (!Number.isFinite(levelUnit)) {
     throw new Error('[SPARC] Production-rule action history requires finite levelUnit');
@@ -170,7 +175,7 @@ export async function commitSparcProductionRuleAction(params: {
       TDFId: tdfId,
       sessionID: sessionId,
       levelUnit,
-      userId: sessionId,
+      userId,
     },
     documentId: sparcDisplay.documentId,
     display: sparcDisplay,

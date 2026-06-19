@@ -1008,6 +1008,55 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     }).fetchAsync();
   }
 
+  async function getSparcHistoryForUnit(
+    userId: string,
+    TDFId: string,
+    levelUnit: number
+  ) {
+    return await deps.Histories.find({
+      userId,
+      TDFId,
+      levelUnit: Number(levelUnit),
+      eventType: 'sparc',
+      levelUnitType: { $in: ['model', 'sparc'] },
+    }, {
+      fields: {
+        historySchemaVersion: 1,
+        TDFId: 1,
+        sessionID: 1,
+        userId: 1,
+        anonStudentId: 1,
+        levelUnit: 1,
+        levelUnitName: 1,
+        levelUnitType: 1,
+        time: 1,
+        problemStartTime: 1,
+        selection: 1,
+        action: 1,
+        outcome: 1,
+        typeOfResponse: 1,
+        responseValue: 1,
+        input: 1,
+        displayedStimulus: 1,
+        eventType: 1,
+        stimuliSetId: 1,
+        stimulusKC: 1,
+        clusterKC: 1,
+        KCCluster: 1,
+        KCDefault: 1,
+        KCId: 1,
+        responseKC: 1,
+        responseKey: 1,
+        responseDuration: 1,
+        practiceDurationMs: 1,
+        sparc: 1,
+        recordedServerTime: 1,
+        eventId: 1,
+      },
+      sort: { time: 1, recordedServerTime: 1, eventId: 1 },
+    }).fetchAsync();
+  }
+
   async function getAutoTutorHistoryForUnit(
     userId: string,
     TDFId: string,
@@ -1322,6 +1371,15 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     ) {
       const scopedUserId = requireSelfScopedUserId(this, userId);
       return await getLearningHistoryForUnit(scopedUserId, requireNormalizedTdfId(TDFId), levelUnit, unitScopedOnly);
+    },
+    getSparcHistoryForUnit: async function(
+      this: MethodContext,
+      userId: string,
+      TDFId: string,
+      levelUnit: number
+    ) {
+      const scopedUserId = requireSelfScopedUserId(this, userId);
+      return await getSparcHistoryForUnit(scopedUserId, requireNormalizedTdfId(TDFId), levelUnit);
     },
     getAutoTutorHistoryForUnit: async function(
       this: MethodContext,

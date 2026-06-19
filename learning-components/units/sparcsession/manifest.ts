@@ -22,6 +22,7 @@ export const sparcSessionUnitComponentManifest: LearningComponentManifest<Create
   ],
   requiredServerMethods: [
     'getLearningHistoryForUnit',
+    'getSparcHistoryForUnit',
     'getResponseKCMapForTdf',
     'getStimulusCrowdStatsForDeck',
   ],

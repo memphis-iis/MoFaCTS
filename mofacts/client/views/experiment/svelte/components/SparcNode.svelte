@@ -6,6 +6,7 @@
   export let nodeValues = {};
   export let learningProgressSnapshot = null;
   export let authoringSelectedNodeId = '';
+  export let authoringSelectOnly = false;
   export let onNodeValueChange = () => {};
   export let onNodeCommit = () => {};
   export let onNodeFocus = () => {};
@@ -84,6 +85,30 @@
       return;
     }
     onNodeCommit(candidate.id, nextValue);
+  }
+
+  function isPlainTextAuthoringNode(candidate) {
+    return candidate?.atomType === 'text-block'
+      || candidate?.atomType === 'text'
+      || candidate?.atomType === 'header-cell'
+      || candidate?.atomType === 'operator'
+      || candidate?.atomType === 'fraction-box';
+  }
+
+  function handlePlainTextAuthoringInput(candidate, element) {
+    updateNodeValue(candidate, element.textContent || '');
+  }
+
+  function handlePlainTextAuthoringCommit(candidate) {
+    commitNodeValue(candidate, candidate.value || '');
+  }
+
+  function handleHtmlAuthoringInput(candidate, element) {
+    updateNodeValue(candidate, element.innerHTML || '');
+  }
+
+  function handleHtmlAuthoringCommit(candidate) {
+    commitNodeValue(candidate, candidate.value || '');
   }
 
   function buttonLabel(candidate) {
@@ -187,6 +212,7 @@
               {nodeValues}
               {learningProgressSnapshot}
               {authoringSelectedNodeId}
+              {authoringSelectOnly}
               {onNodeValueChange}
               {onNodeCommit}
               {onNodeFocus}
@@ -200,6 +226,7 @@
               {nodeValues}
               {learningProgressSnapshot}
               {authoringSelectedNodeId}
+              {authoringSelectOnly}
               {onNodeValueChange}
               {onNodeCommit}
               {onNodeFocus}
@@ -222,6 +249,7 @@
               {nodeValues}
               {learningProgressSnapshot}
               {authoringSelectedNodeId}
+              {authoringSelectOnly}
               {onNodeValueChange}
               {onNodeCommit}
               {onNodeFocus}
@@ -257,6 +285,7 @@
               {nodeValues}
               {learningProgressSnapshot}
               {authoringSelectedNodeId}
+              {authoringSelectOnly}
               {onNodeValueChange}
               {onNodeCommit}
               {onNodeFocus}
@@ -271,6 +300,7 @@
             {nodeValues}
             {learningProgressSnapshot}
             {authoringSelectedNodeId}
+            {authoringSelectOnly}
             {onNodeValueChange}
             {onNodeCommit}
             {onNodeFocus}
@@ -282,10 +312,44 @@
     {/if}
   </div>
 {:else if node?.nodeType === 'atomic'}
-  {#if node.atomType === 'text-block' || node.atomType === 'text' || node.atomType === 'header-cell'}
-    <div class={`sparc-atom sparc-${node.atomType}`} class:sparc-authoring-selected={node.id === authoringSelectedNodeId} data-node-id={node.id}>{getNodeValue(node)}</div>
+  {#if isPlainTextAuthoringNode(node)}
+    {#if authoringSelectOnly}
+      <div
+        class={`sparc-atom sparc-${node.atomType} sparc-authoring-inline-edit`}
+        class:sparc-authoring-selected={node.id === authoringSelectedNodeId}
+        data-node-id={node.id}
+        contenteditable="plaintext-only"
+        role="textbox"
+        tabindex="0"
+        bind:textContent={node.value}
+        on:focus={() => onNodeFocus(node.id)}
+        on:input={(event) => handlePlainTextAuthoringInput(node, event.currentTarget)}
+        on:keyup={(event) => handlePlainTextAuthoringInput(node, event.currentTarget)}
+        on:paste={(event) => setTimeout(() => handlePlainTextAuthoringInput(node, event.currentTarget), 0)}
+        on:blur={() => handlePlainTextAuthoringCommit(node)}
+      ></div>
+    {:else}
+      <div class={`sparc-atom sparc-${node.atomType}`} class:sparc-authoring-selected={node.id === authoringSelectedNodeId} data-node-id={node.id}>{getNodeValue(node)}</div>
+    {/if}
   {:else if node.atomType === 'html-block'}
-    <div class="sparc-atom sparc-html-block" class:sparc-authoring-selected={node.id === authoringSelectedNodeId} data-node-id={node.id}>{@html sanitizeSparcHtml(getNodeValue(node))}</div>
+    {#if authoringSelectOnly}
+      <div
+        class="sparc-atom sparc-html-block sparc-authoring-inline-edit"
+        class:sparc-authoring-selected={node.id === authoringSelectedNodeId}
+        data-node-id={node.id}
+        contenteditable="true"
+        role="textbox"
+        tabindex="0"
+        bind:innerHTML={node.value}
+        on:focus={() => onNodeFocus(node.id)}
+        on:input={(event) => handleHtmlAuthoringInput(node, event.currentTarget)}
+        on:keyup={(event) => handleHtmlAuthoringInput(node, event.currentTarget)}
+        on:paste={(event) => setTimeout(() => handleHtmlAuthoringInput(node, event.currentTarget), 0)}
+        on:blur={() => handleHtmlAuthoringCommit(node)}
+      ></div>
+    {:else}
+      <div class="sparc-atom sparc-html-block" class:sparc-authoring-selected={node.id === authoringSelectedNodeId} data-node-id={node.id}>{@html sanitizeSparcHtml(getNodeValue(node))}</div>
+    {/if}
   {:else if node.atomType === 'panel-selector'}
     <div class="sparc-atom sparc-panel-selector" class:sparc-authoring-selected={node.id === authoringSelectedNodeId} data-node-id={node.id}>
       {#if node.label}
@@ -315,6 +379,7 @@
               {nodeValues}
               {learningProgressSnapshot}
               {authoringSelectedNodeId}
+              {authoringSelectOnly}
               {onNodeValueChange}
               {onNodeCommit}
               {onNodeFocus}
@@ -325,8 +390,25 @@
       {/if}
     </div>
   {:else if node.atomType === 'message-box'}
-    {#if String(getNodeValue(node) || '').trim()}
-      <div class="sparc-atom sparc-message-box" class:sparc-authoring-selected={node.id === authoringSelectedNodeId} data-node-id={node.id}>{@html sanitizeSparcHtml(getNodeValue(node))}</div>
+    {#if authoringSelectOnly || String(getNodeValue(node) || '').trim()}
+      {#if authoringSelectOnly}
+        <div
+          class="sparc-atom sparc-message-box sparc-authoring-inline-edit"
+          class:sparc-authoring-selected={node.id === authoringSelectedNodeId}
+          data-node-id={node.id}
+          contenteditable="true"
+          role="textbox"
+          tabindex="0"
+          bind:innerHTML={node.value}
+          on:focus={() => onNodeFocus(node.id)}
+          on:input={(event) => handleHtmlAuthoringInput(node, event.currentTarget)}
+          on:keyup={(event) => handleHtmlAuthoringInput(node, event.currentTarget)}
+          on:paste={(event) => setTimeout(() => handleHtmlAuthoringInput(node, event.currentTarget), 0)}
+          on:blur={() => handleHtmlAuthoringCommit(node)}
+        ></div>
+      {:else}
+        <div class="sparc-atom sparc-message-box" class:sparc-authoring-selected={node.id === authoringSelectedNodeId} data-node-id={node.id}>{@html sanitizeSparcHtml(getNodeValue(node))}</div>
+      {/if}
     {/if}
   {:else if node.atomType === 'skill-bar'}
     <div class="sparc-atom sparc-skill-bar" class:sparc-authoring-selected={node.id === authoringSelectedNodeId} data-node-id={node.id} aria-label={node.label || ''}>
@@ -414,7 +496,7 @@
       class:sparc-correctness-correct={getNodeCorrectness(node) === 'correct'}
       class:sparc-correctness-incorrect={getNodeCorrectness(node) === 'incorrect' || getNodeCorrectness(node) === 'buggy'}
       data-node-id={node.id}
-      on:click={() => onButtonActivate(node)}
+      on:click={() => authoringSelectOnly ? onNodeFocus(node.id) : onButtonActivate(node)}
     >
       {buttonLabel(node)}
     </button>
@@ -888,6 +970,17 @@
     box-sizing: border-box;
   }
 
+  .sparc-authoring-inline-edit {
+    cursor: text;
+    min-width: 2.5rem;
+    min-height: calc(var(--sparc-control-line-height) * 1em + (var(--sparc-control-padding-y) * 2));
+  }
+
+  .sparc-authoring-inline-edit:focus {
+    outline: 2px solid var(--sparc-accent-color);
+    outline-offset: 2px;
+  }
+
   .sparc-text-block,
   .sparc-html-block,
   .sparc-text,
@@ -947,7 +1040,7 @@
 
   .sparc-html-block .oli-popup summary {
     cursor: pointer;
-    color: var(--app-link-color, var(--sparc-accent-color));
+    color: var(--sparc-link-color);
     font-weight: var(--app-font-weight-bold, 700);
   }
 
@@ -998,7 +1091,7 @@
     border-radius: var(--sparc-border-radius-sm);
     padding: 0 var(--sparc-space-1);
     background: color-mix(in srgb, var(--sparc-text-color) 8%, var(--sparc-control-surface-color));
-    font-family: var(--app-font-family-monospace, ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace);
+    font-family: var(--sparc-monospace-font-family);
     font-size: 0.95em;
   }
 
@@ -1034,7 +1127,7 @@
 
   .sparc-html-block a,
   .sparc-message-box a {
-    color: var(--app-link-color, var(--sparc-accent-color));
+    color: var(--sparc-link-color);
   }
 
   .sparc-html-block img {

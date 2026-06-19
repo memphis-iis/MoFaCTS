@@ -719,6 +719,20 @@ describe('learner analytics method authorization', function() {
     }
   });
 
+  it('denies cross-user SPARC history helper reads', async function() {
+    try {
+      await (asyncMethods.getSparcHistoryForUnit as any).call(
+        { userId: 'current-user' },
+        'other-user',
+        'tdf-1',
+        0
+      );
+      expect.fail('Expected cross-user SPARC history read to be denied');
+    } catch (error: any) {
+      expect(error.error).to.equal(403);
+    }
+  });
+
   it('returns explicit identity fields for learning history reconstruction', async function() {
     await HistoriesAny.insertAsync({
       _id: 'learning-history-explicit-identity',
@@ -766,6 +780,128 @@ describe('learner analytics method authorization', function() {
       responseValue: 'Alpha',
       problemStartTime: 900,
     });
+  });
+
+  it('returns exact-unit durable SPARC history with canonical extension fields', async function() {
+    const sparcExtension = {
+      documentId: 'doc-1',
+      sourceAddress: {
+        documentId: 'doc-1',
+        nodeId: 'node-1',
+      },
+      practiceObservation: {
+        observationId: 'obs-1',
+        sourceAddress: {
+          documentId: 'doc-1',
+          nodeId: 'node-1',
+        },
+        time: 1000,
+        problemStartTime: 900,
+        outcome: 'correct',
+        responseValue: '4',
+      },
+    };
+    await HistoriesAny.insertAsync({
+      _id: 'sparc-history-model',
+      historySchemaVersion: 1,
+      userId: 'current-user',
+      TDFId: 'tdf-sparc',
+      sessionID: 'session-1',
+      levelUnit: 2,
+      levelUnitType: 'model',
+      time: 1000,
+      recordedServerTime: 1100,
+      eventId: 1,
+      problemStartTime: 900,
+      outcome: 'correct',
+      eventType: 'sparc',
+      responseValue: '4',
+      stimulusKC: 'stim-a',
+      clusterKC: 'cluster-a',
+      KCCluster: 'cluster-a',
+      KCId: 'stim-a',
+      responseKC: 'response-a',
+      responseKey: '4',
+      sparc: sparcExtension,
+    });
+    await HistoriesAny.insertAsync({
+      _id: 'sparc-history-state-transition',
+      historySchemaVersion: 1,
+      userId: 'current-user',
+      TDFId: 'tdf-sparc',
+      sessionID: 'session-1',
+      levelUnit: 2,
+      levelUnitType: 'sparc',
+      time: 1200,
+      recordedServerTime: 1300,
+      eventId: 2,
+      problemStartTime: 1150,
+      outcome: 'study',
+      eventType: 'sparc',
+      responseValue: 'next',
+      sparc: {
+        documentId: 'doc-1',
+        sourceAddress: {
+          documentId: 'doc-1',
+          nodeId: 'node-2',
+        },
+      },
+    });
+    await HistoriesAny.insertAsync({
+      _id: 'sparc-history-other-user',
+      userId: 'other-user',
+      TDFId: 'tdf-sparc',
+      levelUnit: 2,
+      levelUnitType: 'sparc',
+      time: 900,
+      eventType: 'sparc',
+      sparc: { documentId: 'doc-ignored' },
+    });
+    await HistoriesAny.insertAsync({
+      _id: 'sparc-history-other-unit',
+      userId: 'current-user',
+      TDFId: 'tdf-sparc',
+      levelUnit: 1,
+      levelUnitType: 'sparc',
+      time: 950,
+      eventType: 'sparc',
+      sparc: { documentId: 'doc-ignored' },
+    });
+    await HistoriesAny.insertAsync({
+      _id: 'sparc-history-non-sparc-event',
+      userId: 'current-user',
+      TDFId: 'tdf-sparc',
+      levelUnit: 2,
+      levelUnitType: 'sparc',
+      time: 975,
+      eventType: 'h5p',
+      sparc: { documentId: 'doc-ignored' },
+    });
+
+    const rows = await (asyncMethods.getSparcHistoryForUnit as any).call(
+      { userId: 'current-user' },
+      'current-user',
+      'tdf-sparc',
+      2
+    );
+
+    expect(rows.map((row: any) => row._id)).to.deep.equal([
+      'sparc-history-model',
+      'sparc-history-state-transition',
+    ]);
+    expect(rows[0]).to.deep.include({
+      TDFId: 'tdf-sparc',
+      sessionID: 'session-1',
+      userId: 'current-user',
+      levelUnit: 2,
+      levelUnitType: 'model',
+      eventType: 'sparc',
+      stimulusKC: 'stim-a',
+      responseKC: 'response-a',
+      responseKey: '4',
+    });
+    expect(rows[0].sparc).to.deep.equal(sparcExtension);
+    expect(rows[1]).to.have.nested.property('sparc.documentId', 'doc-1');
   });
 
   it('counts one completed assessment trial per H5P summary row on resume', async function() {

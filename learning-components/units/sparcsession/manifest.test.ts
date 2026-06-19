@@ -23,6 +23,12 @@ describe('sparcSessionUnitComponentManifest', function() {
       'stimuli',
       'ui-alerts',
     ]);
+    assert.deepEqual(summary.requiredServerMethods, [
+      'getLearningHistoryForUnit',
+      'getResponseKCMapForTdf',
+      'getSparcHistoryForUnit',
+      'getStimulusCrowdStatsForDeck',
+    ]);
     assert.deepEqual(summary.providedServices, [
       'sparc.authored-initial-state',
       'sparc.authored-model-targets',

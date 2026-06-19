@@ -9,13 +9,15 @@ function toNonNegativeInteger(value: unknown): number {
 type ResumeUnitLike = {
   learningsession?: unknown;
   assessmentsession?: unknown;
+  sparcsession?: unknown;
 };
 
-export type ResumeHistoryRouteKind = 'learning' | 'assessment' | 'none';
+export type ResumeHistoryRouteKind = 'learning' | 'assessment' | 'sparc' | 'none';
 
 export type ResumeHistoryRoute = {
   kind: ResumeHistoryRouteKind;
   reconstructLearningHistory: boolean;
+  reconstructSparcHistory: boolean;
   inferAssessmentPosition: boolean;
   requiresAssessmentScheduleArtifact: boolean;
 };
@@ -25,6 +27,17 @@ export function resolveResumeHistoryRoute(unit: ResumeUnitLike | null | undefine
     return {
       kind: 'learning',
       reconstructLearningHistory: true,
+      reconstructSparcHistory: false,
+      inferAssessmentPosition: false,
+      requiresAssessmentScheduleArtifact: false,
+    };
+  }
+
+  if (unit?.sparcsession) {
+    return {
+      kind: 'sparc',
+      reconstructLearningHistory: false,
+      reconstructSparcHistory: true,
       inferAssessmentPosition: false,
       requiresAssessmentScheduleArtifact: false,
     };
@@ -34,6 +47,7 @@ export function resolveResumeHistoryRoute(unit: ResumeUnitLike | null | undefine
     return {
       kind: 'assessment',
       reconstructLearningHistory: false,
+      reconstructSparcHistory: false,
       inferAssessmentPosition: true,
       requiresAssessmentScheduleArtifact: true,
     };
@@ -42,6 +56,7 @@ export function resolveResumeHistoryRoute(unit: ResumeUnitLike | null | undefine
   return {
     kind: 'none',
     reconstructLearningHistory: false,
+    reconstructSparcHistory: false,
     inferAssessmentPosition: false,
     requiresAssessmentScheduleArtifact: false,
   };

@@ -10,6 +10,11 @@ export type UnitEngineServerMethods = {
     currentUnitNumber: number,
     resetStudentPerformance: boolean,
   ) => Promise<any[]>;
+  readonly getSparcHistoryForUnit: (
+    userId: string,
+    tdfId: string,
+    unitNumber: number,
+  ) => Promise<unknown[]>;
   readonly getResponseKCMapForTdf: (tdfId: any) => Promise<Record<string, unknown>>;
   readonly getStimulusCrowdStatsForDeck: (
     tdfId: any,
@@ -26,6 +31,7 @@ export function getUnitEngineServerMethodNames(): Set<keyof UnitEngineServerMeth
   return new Set([
     'getAutoTutorHistoryForUnit',
     'getLearningHistoryForUnit',
+    'getSparcHistoryForUnit',
     'getResponseKCMapForTdf',
     'getStimulusCrowdStatsForDeck',
   ]);

@@ -56,6 +56,7 @@ describe('Learning component catalog', function() {
       serverMethods: {
         getAutoTutorHistoryForUnit: async () => [],
         getLearningHistoryForUnit: async () => [],
+        getSparcHistoryForUnit: async () => [],
         getResponseKCMapForTdf: async () => ({}),
         getStimulusCrowdStatsForDeck: async () => [],
       },
@@ -115,6 +116,7 @@ describe('Learning component catalog', function() {
     expect([...getCreateUnitEngineServerMethodSet(adapter)].sort()).to.deep.equal([
       'getAutoTutorHistoryForUnit',
       'getLearningHistoryForUnit',
+      'getSparcHistoryForUnit',
       'getResponseKCMapForTdf',
       'getStimulusCrowdStatsForDeck',
     ]);
@@ -182,6 +184,7 @@ describe('Learning component catalog', function() {
       'mofacts.assessment-session-unit',
       'mofacts.video-session-unit',
       'mofacts.autotutor-unit',
+      'mofacts.sparcsession-unit',
     ]);
     expect(summary.units.find((manifest) => manifest.id === 'mofacts.autotutor-unit'))
       .to.deep.include({
@@ -195,6 +198,12 @@ describe('Learning component catalog', function() {
         id: 'mofacts.learning-session-unit',
         kind: 'unit',
         requiredServerMethods: ['getLearningHistoryForUnit', 'getResponseKCMapForTdf', 'getStimulusCrowdStatsForDeck'],
+      });
+    expect(summary.units.find((manifest) => manifest.id === 'mofacts.sparcsession-unit'))
+      .to.deep.include({
+        id: 'mofacts.sparcsession-unit',
+        kind: 'unit',
+        requiredServerMethods: ['getLearningHistoryForUnit', 'getResponseKCMapForTdf', 'getSparcHistoryForUnit', 'getStimulusCrowdStatsForDeck'],
       });
     expect(summary.units.find((manifest) => manifest.id === 'mofacts.assessment-session-unit'))
       .to.deep.include({

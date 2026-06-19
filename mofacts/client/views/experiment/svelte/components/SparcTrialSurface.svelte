@@ -18,6 +18,7 @@
   export let onAuthoringNodeValueChange = null;
   export let onAuthoringNodeFocus = null;
   export let authoringSelectedNodeId = '';
+  export let authoringSelectOnly = false;
 
   let activeNodeId = '';
 
@@ -98,6 +99,12 @@
       ...nodeValues,
       [nodeId]: value,
     };
+    if (authoringSelectOnly) {
+      if (typeof onAuthoringNodeValueChange === 'function') {
+        onAuthoringNodeValueChange(nodeId, value);
+      }
+      return;
+    }
     if (value === undefined || value === null || value === '') {
       return;
     }
@@ -111,6 +118,10 @@
   }
 
   function handleButtonActivate(node) {
+    if (authoringSelectOnly) {
+      handleNodeFocus(node?.id);
+      return;
+    }
     const buttonSubmission = node?.id
       ? { [node.id]: node.value ?? node.submitValue ?? buttonLabel(node) }
       : {};
@@ -147,6 +158,9 @@
     activeNodeId = nodeId;
     if (typeof onAuthoringNodeFocus === 'function') {
       onAuthoringNodeFocus(nodeId);
+    }
+    if (authoringSelectOnly) {
+      return;
     }
     dispatch('sparcaction', {
       submittedNodes: {},
@@ -210,6 +224,7 @@
               {nodeValues}
               {learningProgressSnapshot}
               {authoringSelectedNodeId}
+              {authoringSelectOnly}
               onNodeValueChange={handleNodeValueChange}
               onNodeCommit={handleNodeValueCommit}
               onNodeFocus={handleNodeFocus}
@@ -225,6 +240,7 @@
           {nodeValues}
           {learningProgressSnapshot}
           {authoringSelectedNodeId}
+          {authoringSelectOnly}
           onNodeValueChange={handleNodeValueChange}
           onNodeCommit={handleNodeValueCommit}
           onNodeFocus={handleNodeFocus}
@@ -246,6 +262,7 @@
     --sparc-muted-text-color: var(--app-secondary-text-color, var(--app-text-color));
     --sparc-heading-color: var(--app-page-header-text-color, var(--app-text-color));
     --sparc-accent-color: var(--app-accent-color);
+    --sparc-link-color: var(--app-accent-color);
     --sparc-primary-action-surface-color: var(--app-primary-action-surface-color, var(--app-accent-color));
     --sparc-primary-action-text-color: var(--app-primary-action-text-color, var(--app-text-color));
     --sparc-correct-color: var(--feedback-correct-color);
@@ -255,6 +272,7 @@
     --sparc-shadow-color: color-mix(in srgb, var(--sparc-text-color) 22%, transparent);
     --sparc-font-family: var(--app-font-family);
     --sparc-heading-font-family: var(--app-heading-font-family, var(--app-font-family));
+    --sparc-monospace-font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
     --sparc-font-size-base: var(--app-font-size-base);
     --sparc-font-size-small: calc(var(--app-font-size-base) * 0.875);
     --sparc-font-size-large: calc(var(--app-font-size-base) * 1.18);

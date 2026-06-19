@@ -26,6 +26,12 @@ export function createUnitEngineServerMethods(
       currentUnitNumber,
       resetStudentPerformance,
     ) as any[],
+    getSparcHistoryForUnit: async (userId, tdfId, unitNumber) => await deps.meteorCallAsync(
+      'getSparcHistoryForUnit',
+      userId,
+      tdfId,
+      unitNumber,
+    ) as unknown[],
     getResponseKCMapForTdf: async (tdfId) => await deps.meteorCallAsync(
       'getResponseKCMapForTdf',
       tdfId,

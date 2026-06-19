@@ -58,6 +58,30 @@ export function rememberSparcProductionRuleHistoryRecord(record: CanonicalHistor
   sparcProductionRuleHistoryByKey.set(key, [...records, record]);
 }
 
+export function hydrateSparcProductionRuleHistoryCache(
+  records: readonly CanonicalHistoryRecord[],
+): void {
+  const groupedRecords = new Map<string, CanonicalHistoryRecord[]>();
+  for (const record of records) {
+    if (record.eventType !== 'sparc') {
+      throw new Error('[SPARC] Durable history hydration received a non-SPARC record');
+    }
+    const documentId = readSparcDocumentId(record);
+    if (!documentId) {
+      throw new Error('[SPARC] Durable history record missing sparc.documentId');
+    }
+    const key = createCacheKey({
+      TDFId: record.TDFId,
+      sessionID: record.sessionID,
+      documentId,
+    });
+    groupedRecords.set(key, [...(groupedRecords.get(key) ?? []), record]);
+  }
+  for (const [key, grouped] of groupedRecords) {
+    sparcProductionRuleHistoryByKey.set(key, grouped);
+  }
+}
+
 export function clearSparcProductionRuleHistoryCache(): void {
   sparcProductionRuleHistoryByKey.clear();
 }

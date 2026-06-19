@@ -69,6 +69,7 @@
   let saveMessage = '';
   let activeEditorTab = 'visual';
   let showAdvancedEditors = false;
+  let showNodeHierarchy = false;
   let activeProductionRuleIndex = 0;
   let activeScopedProductionRuleIndex = -1;
   let activeReactiveRuleIndex = 0;
@@ -705,6 +706,47 @@
   function handleVisualEditorClick(event) {
     const nodeElement = event.target?.closest?.('[data-node-id]');
     selectVisualNode(nodeElement?.getAttribute('data-node-id'));
+  }
+
+  function readVisualEditorEventValue(event, node) {
+    const target = event.target;
+    if (!target || !node) {
+      return undefined;
+    }
+    if (node.atomType === 'checkbox') {
+      return target.checked === true;
+    }
+    if (node.atomType === 'dropdown' || node.atomType === 'text-input' || node.atomType === 'fraction-input') {
+      return target.value;
+    }
+    if (node.atomType === 'html-block' || node.atomType === 'message-box') {
+      return target.innerHTML;
+    }
+    return target.textContent;
+  }
+
+  function handleVisualEditorValueEvent(event) {
+    const nodeElement = event.target?.closest?.('[data-node-id]');
+    const nodeId = nodeElement?.getAttribute('data-node-id');
+    const node = flatNodes.find((entry) => entry.node?.id === nodeId)?.node;
+    if (!node || node.nodeType !== 'atomic') {
+      return;
+    }
+    updateNodeAuthoredValue(node.id, readVisualEditorEventValue(event, node));
+  }
+
+  function visualEditorValueBridge(element) {
+    const eventNames = ['input', 'keyup', 'focusout', 'change'];
+    for (const eventName of eventNames) {
+      element.addEventListener(eventName, handleVisualEditorValueEvent);
+    }
+    return {
+      destroy() {
+        for (const eventName of eventNames) {
+          element.removeEventListener(eventName, handleVisualEditorValueEvent);
+        }
+      },
+    };
   }
 
   function updateNodeAuthoredValue(nodeId, value) {
@@ -2150,24 +2192,34 @@
       </div>
     </aside>
 
-    <main class="sparc-canvas">
-      <div class="sparc-rich-text-toolbar" aria-label="Rich text formatting">
-        <button type="button" class:active={richTextCommandActive('bold')} disabled={!isRichTextSelected} on:click={() => runRichTextCommand('bold')}>B</button>
-        <button type="button" class:active={richTextCommandActive('italic')} disabled={!isRichTextSelected} on:click={() => runRichTextCommand('italic')}>I</button>
-        <button type="button" class:active={richTextCommandActive('paragraph')} disabled={!isRichTextSelected} on:click={() => runRichTextCommand('paragraph')}>Paragraph</button>
-        <button type="button" class:active={richTextCommandActive('heading', { level: 2 })} disabled={!isRichTextSelected} on:click={() => runRichTextCommand('heading', 2)}>H2</button>
-        <button type="button" class:active={richTextCommandActive('bulletList')} disabled={!isRichTextSelected} on:click={() => runRichTextCommand('bullet-list')}>Bullets</button>
-        <button type="button" class:active={richTextCommandActive('orderedList')} disabled={!isRichTextSelected} on:click={() => runRichTextCommand('ordered-list')}>Numbers</button>
-        <input placeholder="https://..." bind:value={richTextLinkHref} disabled={!isRichTextSelected} aria-label="Link URL" />
-        <button type="button" class:active={richTextCommandActive('link')} disabled={!isRichTextSelected} on:click={() => runRichTextCommand('link', richTextLinkHref)}>Link</button>
-        <button type="button" disabled={!isRichTextSelected} on:click={() => runRichTextCommand('link', '')}>Unlink</button>
-        <button type="button" disabled={!isRichTextSelected} on:click={() => runRichTextCommand('undo')}>Undo</button>
-        <button type="button" disabled={!isRichTextSelected} on:click={() => runRichTextCommand('redo')}>Redo</button>
+    <main class="sparc-canvas" class:sparc-canvas-hierarchy-visible={showNodeHierarchy}>
+      <div class="sparc-rich-text-toolbar" aria-label="SPARC visual editor tools">
+        <label class="sparc-advanced-toggle sparc-toolbar-toggle">
+          <input type="checkbox" bind:checked={showNodeHierarchy} />
+          Show node hierarchy
+        </label>
+        {#if isRichTextSelected}
+          <div class="sparc-toolbar-divider" aria-hidden="true"></div>
+          <button type="button" class:active={richTextCommandActive('bold')} on:click={() => runRichTextCommand('bold')}>B</button>
+          <button type="button" class:active={richTextCommandActive('italic')} on:click={() => runRichTextCommand('italic')}>I</button>
+          <button type="button" class:active={richTextCommandActive('paragraph')} on:click={() => runRichTextCommand('paragraph')}>Paragraph</button>
+          <button type="button" class:active={richTextCommandActive('heading', { level: 2 })} on:click={() => runRichTextCommand('heading', 2)}>H2</button>
+          <button type="button" class:active={richTextCommandActive('bulletList')} on:click={() => runRichTextCommand('bullet-list')}>Bullets</button>
+          <button type="button" class:active={richTextCommandActive('orderedList')} on:click={() => runRichTextCommand('ordered-list')}>Numbers</button>
+          <input class="sparc-link-input" placeholder="https://..." bind:value={richTextLinkHref} aria-label="Link URL" />
+          <button type="button" class:active={richTextCommandActive('link')} on:click={() => runRichTextCommand('link', richTextLinkHref)}>Link</button>
+          <button type="button" on:click={() => runRichTextCommand('link', '')}>Unlink</button>
+          <button type="button" on:click={() => runRichTextCommand('undo')}>Undo</button>
+          <button type="button" on:click={() => runRichTextCommand('redo')}>Redo</button>
+        {/if}
       </div>
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div
         class="sparc-visual-editor-surface"
         class:sparc-drop-active={dropTarget}
         aria-label="SPARC Visual Editor drop surface"
+        use:visualEditorValueBridge
         on:click={handleVisualEditorClick}
         on:dragover={handleVisualDragOver}
         on:drop={handleVisualDrop}
@@ -2189,25 +2241,28 @@
             display={activeDisplay}
             runtimeNodeValues={{}}
             authoringSelectedNodeId={activeNodeId}
+            authoringSelectOnly={true}
             onAuthoringNodeValueChange={updateNodeAuthoredValue}
             onAuthoringNodeFocus={selectVisualNode}
           />
         {/if}
       </div>
-      <div class="sparc-node-list" aria-label="SPARC node outline">
-        {#each flatNodes as entry}
-          <button
-            type="button"
-            class:selected={entry.node.id === activeNodeId}
-            class="sparc-node-row"
-            style={`padding-left: ${12 + (entry.depth || 0) * 18}px`}
-            on:click={() => activeNodeId = entry.node.id}
-          >
-            <span>{entry.node.id}</span>
-            <small>{entry.node.nodeType === 'group' ? entry.node.groupType : entry.node.atomType}</small>
-          </button>
-        {/each}
-      </div>
+      {#if showNodeHierarchy}
+        <div class="sparc-node-list sparc-node-list-bottom" aria-label="SPARC node hierarchy">
+          {#each flatNodes as entry}
+            <button
+              type="button"
+              class:selected={entry.node.id === activeNodeId}
+              class="sparc-node-row"
+              style={`padding-left: ${12 + (entry.depth || 0) * 18}px`}
+              on:click={() => activeNodeId = entry.node.id}
+            >
+              <span>{entry.node.id}</span>
+              <small>{entry.node.nodeType === 'group' ? entry.node.groupType : entry.node.atomType}</small>
+            </button>
+          {/each}
+        </div>
+      {/if}
     </main>
 
     <section class="sparc-context-panel">
@@ -2981,6 +3036,8 @@
     --sparc-editor-control-surface: var(--learning-card-surface-color);
     --sparc-editor-input-surface: var(--learning-card-stimulus-surface-color);
     --sparc-editor-subtle-surface: var(--app-subtle-surface-color);
+    --sparc-editor-strong-text-color: var(--app-page-header-text-color);
+    --sparc-editor-monospace-font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
     --sparc-editor-border-radius-sm: var(--app-border-radius-sm);
     --sparc-editor-border-radius-lg: var(--app-border-radius-lg);
     --sparc-editor-gap-xs: var(--app-space-1-px);
@@ -2996,6 +3053,9 @@
     color: var(--app-text-color);
     font-family: var(--app-font-family);
     font-size: var(--app-font-size-base);
+    height: calc(100vh - var(--app-space-4-px, 16px));
+    min-height: 0;
+    overflow: hidden;
   }
 
   .sparc-editor-header,
@@ -3054,8 +3114,11 @@
   .sparc-editor-grid {
     display: grid;
     grid-template-columns: minmax(220px, 280px) minmax(220px, 1fr) minmax(250px, 340px);
-    grid-template-rows: auto minmax(280px, 1fr);
+    grid-template-rows: minmax(0, 1fr);
     gap: var(--sparc-editor-gap-md);
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .sparc-palette > .sparc-panel-header {
@@ -3098,6 +3161,20 @@
     border-radius: var(--sparc-editor-border-radius-lg);
     padding: var(--sparc-editor-panel-padding);
     min-width: 0;
+    min-height: 0;
+  }
+
+  .sparc-palette,
+  .sparc-context-panel,
+  .sparc-rule-editor {
+    overflow: auto;
+  }
+
+  .sparc-canvas {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sparc-editor-gap-sm);
+    overflow: hidden;
   }
 
   .sparc-palette,
@@ -3111,6 +3188,16 @@
     display: flex;
     flex-direction: column;
     gap: var(--sparc-editor-gap-sm);
+  }
+
+  .sparc-node-list-bottom {
+    flex: 1 1 50%;
+    min-height: 120px;
+    overflow: auto;
+    border: 1px solid var(--border-color);
+    background: var(--sparc-editor-panel-surface);
+    border-radius: var(--sparc-editor-border-radius-lg);
+    padding: var(--sparc-editor-panel-padding);
   }
 
   .sparc-node-row,
@@ -3151,7 +3238,7 @@
     flex: 0 0 14px;
     width: 14px;
     text-align: center;
-    color: var(--app-strong-text-color, var(--app-text-color));
+    color: var(--sparc-editor-strong-text-color);
     opacity: 0.95;
     font-size: calc(var(--app-font-size-base) * 0.82);
   }
@@ -3286,7 +3373,7 @@
     white-space: nowrap;
     text-align: left;
     display: block;
-    font-family: var(--app-monospace-font-family, Consolas, monospace);
+    font-family: var(--sparc-editor-monospace-font-family);
     font-weight: var(--app-font-weight-semibold, 600);
   }
 
@@ -3318,7 +3405,7 @@
   }
 
   .sparc-rule-json-editor {
-    font-family: var(--app-monospace-font-family, Consolas, monospace);
+    font-family: var(--sparc-editor-monospace-font-family);
     font-size: calc(var(--app-font-size-base) * 0.9);
     line-height: 1.35;
     white-space: pre;
@@ -3372,6 +3459,7 @@
   }
 
   .sparc-rich-text-toolbar {
+    flex: 0 0 auto;
     display: flex;
     align-items: center;
     gap: var(--sparc-editor-gap-xs);
@@ -3391,11 +3479,24 @@
   }
 
   .sparc-rich-text-toolbar button.active {
-    border-color: var(--app-info-color);
-    background: var(--app-info-surface-color);
+    border-color: var(--app-primary-action-surface-color);
+    background: var(--app-primary-action-surface-color);
+    color: var(--app-primary-action-text-color);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-primary-action-text-color) 35%, transparent);
   }
 
-  .sparc-rich-text-toolbar input {
+  .sparc-toolbar-toggle {
+    margin-right: 0;
+  }
+
+  .sparc-toolbar-divider {
+    align-self: stretch;
+    width: 1px;
+    min-height: var(--app-button-height);
+    background: var(--border-color);
+  }
+
+  .sparc-rich-text-toolbar .sparc-link-input {
     min-width: 150px;
     max-width: 230px;
     border: 1px solid var(--border-color);
@@ -3427,13 +3528,18 @@
   }
 
   .sparc-visual-editor-surface {
+    flex: 1 1 auto;
     position: relative;
-    min-height: 220px;
+    min-height: 0;
     overflow: auto;
     border: 1px solid var(--border-color);
     background: var(--sparc-editor-subtle-surface);
     border-radius: var(--sparc-editor-border-radius-sm);
     padding: var(--sparc-editor-panel-padding);
+  }
+
+  .sparc-canvas-hierarchy-visible .sparc-visual-editor-surface {
+    flex: 1 1 50%;
   }
 
   .sparc-visual-editor-surface.sparc-drop-active {
@@ -3486,8 +3592,25 @@
   }
 
   @media (max-width: 1000px) {
+    .sparc-editor-shell {
+      height: auto;
+      overflow: visible;
+    }
+
     .sparc-editor-grid {
       grid-template-columns: 1fr;
+      overflow: visible;
+    }
+
+    .sparc-palette,
+    .sparc-canvas,
+    .sparc-context-panel,
+    .sparc-rule-editor {
+      overflow: visible;
+    }
+
+    .sparc-visual-editor-surface {
+      min-height: 320px;
     }
 
     .sparc-rule-layout,

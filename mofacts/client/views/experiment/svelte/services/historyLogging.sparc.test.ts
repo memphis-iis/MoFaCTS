@@ -3,6 +3,7 @@ import type { UnitEngineLike } from '../../../../../common/types';
 import { commitSparcProductionRulesForHistory } from './historyLogging';
 import {
   clearSparcProductionRuleHistoryCache,
+  hydrateSparcProductionRuleHistoryCache,
   readSparcProductionRuleHistoryRecords,
   rememberSparcProductionRuleHistoryRecord,
 } from './sparcProductionRuleHistoryCache';
@@ -111,6 +112,37 @@ describe('history logging SPARC production-rule bridge', function() {
       sessionID: 'session-1',
       documentId: 'sparc-fractions-addition',
     })).to.deep.equal([writtenRecord]);
+  });
+
+  it('hydrates durable SPARC production-rule history by document key', function() {
+    const durableRecord = {
+      eventType: 'sparc',
+      TDFId: 'tdf-1',
+      sessionID: 'session-1',
+      sparc: {
+        documentId: 'sparc-fractions-addition',
+        sourceAddress: {
+          documentId: 'sparc-fractions-addition',
+          nodeId: 'node-known-1-equivalent-bottom',
+        },
+      },
+    };
+
+    hydrateSparcProductionRuleHistoryCache([durableRecord]);
+
+    expect(readSparcProductionRuleHistoryRecords({
+      TDFId: 'tdf-1',
+      sessionID: 'session-1',
+      documentId: 'sparc-fractions-addition',
+    })).to.deep.equal([durableRecord]);
+    expect(() => hydrateSparcProductionRuleHistoryCache([{
+      ...durableRecord,
+      eventType: 'h5p',
+    }])).to.throw('[SPARC] Durable history hydration received a non-SPARC record');
+    expect(() => hydrateSparcProductionRuleHistoryCache([{
+      ...durableRecord,
+      sparc: {},
+    }])).to.throw('[SPARC] Durable history record missing sparc.documentId');
   });
 
   it('requires authored documentId on SPARC production-rule displays', async function() {
