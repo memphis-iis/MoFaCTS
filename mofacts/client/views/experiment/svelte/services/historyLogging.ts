@@ -33,9 +33,13 @@ import {
   resolveH5PResultForHistory,
 } from './historyH5P';
 import {
-  readSparcProductionRuleHistoryRecords,
+  createEmptySparcProductionRuleReplaySession,
+  readSparcProductionRuleReplaySession,
   rememberSparcProductionRuleHistoryRecord,
 } from './sparcProductionRuleHistoryCache';
+import {
+  getSparcTrialDisplayRuntimeContext,
+} from './sparcTrialDisplayRuntimeContextCache';
 import { resolveH5PModelOutcomes } from '../../../../../common/lib/h5pTrialResult';
 import type {
   HistoryLoggingEvent,
@@ -243,6 +247,24 @@ export async function commitSparcProductionRulesForHistory(params: {
     throw new Error('[History Logging] SPARC production-rule history core requires userId or anonStudentId');
   }
 
+  const sparcReplaySession = readSparcProductionRuleReplaySession({
+    TDFId: params.record.TDFId,
+    sessionID: params.record.sessionID,
+    documentId: sparcDisplay.documentId,
+  }) ?? createEmptySparcProductionRuleReplaySession({
+    TDFId: params.record.TDFId,
+    sessionID: params.record.sessionID,
+    documentId: sparcDisplay.documentId,
+  });
+  const sparcRuntimeContext = getSparcTrialDisplayRuntimeContext({
+    TDFId: String(params.record.TDFId),
+    sessionID: String(params.record.sessionID),
+    documentId: sparcDisplay.documentId,
+    display: sparcDisplay,
+    replaySession: sparcReplaySession,
+  });
+  const priorHistoryRecords = sparcReplaySession.retainedHistoryRecords;
+
   await engine.commitSparcTrialDisplayProductionRuleEvents({
     core: {
       TDFId: String(params.record.TDFId),
@@ -254,11 +276,9 @@ export async function commitSparcProductionRulesForHistory(params: {
     documentId: sparcDisplay.documentId,
     display: sparcDisplay,
     result: params.sparcResult,
-    priorHistoryRecords: readSparcProductionRuleHistoryRecords({
-      TDFId: params.record.TDFId,
-      sessionID: params.record.sessionID,
-      documentId: sparcDisplay.documentId,
-    }),
+    document: sparcRuntimeContext.document,
+    replayState: sparcRuntimeContext.replayState,
+    priorHistoryRecords,
     history: {
       async writeCanonicalHistory(historyRecord: CanonicalHistoryRecord) {
         await insertHistoryRecord(historyRecord as HistoryRecord);

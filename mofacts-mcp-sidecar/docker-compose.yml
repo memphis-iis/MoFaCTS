@@ -11,6 +11,10 @@ services:
       #
       # Use isolated browser contexts by default for repeatable experiment smoke tests.
       # This avoids stale cookies and profile lock errors between AI-driven runs.
+      - --caps
+      - devtools
+      - --device
+      - Galaxy S24
       - --isolated
       - --output-dir
       - /tmp/playwright-mcp/output

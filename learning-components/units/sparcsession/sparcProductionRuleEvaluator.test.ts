@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  compileSparcProductionRulePlan,
   evaluateSparcProductionRules,
   runSparcProductionRules,
 } from './sparcProductionRuleEvaluator';
@@ -321,6 +322,95 @@ describe('sparcProductionRuleEvaluator', function() {
 
     assert.equal(withoutStage[0]?.ruleId, 'fractions.hint-1');
     assert.equal(withStage.length, 0);
+  });
+
+  it('preserves firing parity when using a compiled rule plan and fact-type index', function() {
+    const facts: SparcWorkingMemoryFact[] = [{
+      factType: 'irrelevant',
+      slots: {
+        node: 'noise',
+      },
+    }, {
+      factType: 'interface-event',
+      slots: {
+        documentId: 'doc-1',
+        selection: 'answer',
+        action: 'UpdateTextArea',
+        input: '42',
+      },
+    }, {
+      factType: 'node-role',
+      slots: {
+        selection: 'answer',
+        node: 'answer-node',
+        role: 'response',
+      },
+    }];
+    const rules: SparcProductionRule[] = [{
+      id: 'answer.accept',
+      salience: 10,
+      when: [{
+        factType: 'interface-event',
+        slots: {
+          documentId: { type: 'bind', variable: 'documentId' },
+          selection: { type: 'bind', variable: 'selection' },
+          input: { type: 'bind', variable: 'input' },
+        },
+      }, {
+        factType: 'node-role',
+        slots: {
+          selection: { type: 'bound', variable: 'selection' },
+          node: { type: 'bind', variable: 'node' },
+          role: { type: 'literal', value: 'response' },
+        },
+      }, {
+        type: 'not',
+        pattern: {
+          factType: 'interface-state',
+          slots: {
+            node: { type: 'bound', variable: 'node' },
+            status: { type: 'literal', value: 'locked' },
+          },
+        },
+      }],
+      then: [{
+        type: 'write-state',
+        write: {
+          target: {
+            documentId: variable('documentId'),
+            nodeId: variable('node'),
+          },
+          key: 'value',
+          value: variable('input'),
+        },
+      }],
+    }, {
+      id: 'answer.lower-salience',
+      salience: 0,
+      when: [{
+        factType: 'interface-event',
+        slots: {
+          selection: { type: 'literal', value: 'answer' },
+        },
+      }],
+      then: [{
+        type: 'classify',
+        outcome: 'incorrect',
+      }],
+    }];
+
+    const ordinaryFirings = evaluateSparcProductionRules({ facts, rules });
+    const compiledFirings = evaluateSparcProductionRules({
+      facts,
+      rules,
+      compiledPlan: compileSparcProductionRulePlan(rules),
+    });
+
+    assert.deepEqual(compiledFirings, ordinaryFirings);
+    assert.deepEqual(compiledFirings.map((firing) => firing.ruleId), [
+      'answer.accept',
+      'answer.lower-salience',
+    ]);
   });
 
   it('uses salience and re-evaluation to choose one hint activation per cycle', function() {

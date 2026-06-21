@@ -1,4 +1,5 @@
 import { Meteor } from 'meteor/meteor';
+import { clientConsole } from '../../../../lib/clientLogger';
 import type { CanonicalHistoryRecord } from '../../../../../../learning-components/runtime/historyEnvelope';
 import type {
   SparcTrialDisplay,
@@ -17,9 +18,13 @@ import {
   collectSparcProgressiveNodeOperations,
 } from '../../../../../../learning-components/trial-displays/sparc/sparcProgressiveNodes';
 import {
-  readSparcProductionRuleHistoryRecords,
+  createEmptySparcProductionRuleReplaySession,
+  readSparcProductionRuleReplaySession,
   rememberSparcProductionRuleHistoryRecord,
 } from './sparcProductionRuleHistoryCache';
+import {
+  getSparcTrialDisplayRuntimeContext,
+} from './sparcTrialDisplayRuntimeContextCache';
 
 type SparcActionDisplay = SparcTrialDisplay & {
   documentId: string;
@@ -129,6 +134,41 @@ function extractSparcNodeValues(
   return nodeValues;
 }
 
+function sparcEvaluationCounts(
+  evaluations: readonly SparcCommittedProductionRuleEvaluation[] | undefined,
+): {
+  readonly evaluationCount: number;
+  readonly firingCount: number;
+  readonly writeCount: number;
+  readonly modelHistoryCount: number;
+  readonly classificationCount: number;
+  readonly messageCount: number;
+} {
+  let firingCount = 0;
+  let writeCount = 0;
+  let modelHistoryCount = 0;
+  let classificationCount = 0;
+  let messageCount = 0;
+  for (const evaluation of evaluations ?? []) {
+    modelHistoryCount += evaluation.modelHistoryRecords?.length ?? 0;
+    writeCount += evaluation.transition?.writes?.length ?? 0;
+    for (const firing of evaluation.execution?.firings ?? []) {
+      firingCount += 1;
+      writeCount += firing.writes?.length ?? 0;
+      classificationCount += firing.classifications?.length ?? 0;
+      messageCount += firing.messages?.length ?? 0;
+    }
+  }
+  return {
+    evaluationCount: evaluations?.length ?? 0,
+    firingCount,
+    writeCount,
+    modelHistoryCount,
+    classificationCount,
+    messageCount,
+  };
+}
+
 export async function commitSparcProductionRuleAction(params: {
   readonly engine: UnitEngineLike | null | undefined;
   readonly currentDisplay: unknown;
@@ -164,11 +204,25 @@ export async function commitSparcProductionRuleAction(params: {
   if (typeof engine?.commitSparcTrialDisplayProductionRuleEvents !== 'function') {
     throw new Error('[SPARC] Production-rule action requires SPARC session engine commit support');
   }
-  const priorHistoryRecords = readSparcProductionRuleHistoryRecords({
+  const sparcReplaySession = readSparcProductionRuleReplaySession({
+    TDFId: tdfId,
+    sessionID: sessionId,
+    documentId: sparcDisplay.documentId,
+  }) ?? createEmptySparcProductionRuleReplaySession({
     TDFId: tdfId,
     sessionID: sessionId,
     documentId: sparcDisplay.documentId,
   });
+  const sparcRuntimeContext = getSparcTrialDisplayRuntimeContext({
+    TDFId: tdfId,
+    sessionID: sessionId,
+    documentId: sparcDisplay.documentId,
+    display: sparcDisplay,
+    replaySession: sparcReplaySession,
+  });
+  const priorHistoryRecords = sparcReplaySession.retainedHistoryRecords;
+  const startedAt = Date.now();
+  let writtenHistoryCount = 0;
 
   const result = await engine.commitSparcTrialDisplayProductionRuleEvents({
     core: {
@@ -180,13 +234,28 @@ export async function commitSparcProductionRuleAction(params: {
     documentId: sparcDisplay.documentId,
     display: sparcDisplay,
     result: params.sparcResult,
+    document: sparcRuntimeContext.document,
+    replayState: sparcRuntimeContext.replayState,
     priorHistoryRecords,
     history: {
       async writeCanonicalHistory(historyRecord: CanonicalHistoryRecord) {
         await insertCompressedHistory(historyRecord as Record<string, unknown>);
         rememberSparcProductionRuleHistoryRecord(historyRecord);
+        writtenHistoryCount += 1;
       },
     },
+  });
+  const counts = sparcEvaluationCounts(result.evaluations);
+  clientConsole(2, '[SPARC][ProductionRules] committed action', {
+    documentId: sparcDisplay.documentId,
+    tdfId,
+    levelUnit,
+    triggeredBy: nonBlankString(params.sparcResult.triggeredBy) || undefined,
+    submittedNodeCount: Object.keys(params.sparcResult.submittedNodes ?? {}).length,
+    retainedHistoryCount: priorHistoryRecords.length,
+    writtenHistoryCount,
+    elapsedMs: Date.now() - startedAt,
+    ...counts,
   });
 
   return {

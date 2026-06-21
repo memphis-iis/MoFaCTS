@@ -35,7 +35,6 @@ import { deliverySettingsStore } from '../../../../lib/state/deliverySettingsSto
 import { ExperimentStateStore } from '../../../../lib/state/experimentStateStore';
 import { createUnitEngineForUnit } from '../../engineConstructors';
 import type { CanonicalHistoryRecord } from '../../../../../../learning-components/runtime/historyEnvelope';
-import { replaySparcHistory } from '../../../../../../learning-components/units/sparcsession/sparcStateReplay';
 import {
   refreshCurrentDeliverySettingsStore,
   getStimCount,
@@ -983,7 +982,6 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
         currentUnitNumber
       );
 
-      replaySparcHistory(sparcHistoryRows);
       hydrateSparcProductionRuleHistoryCache(sparcHistoryRows);
 
       clientConsole(2, '[Resume Service] SPARC history replay cache hydrated', {

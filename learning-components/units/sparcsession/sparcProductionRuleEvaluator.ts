@@ -15,6 +15,11 @@ import type {
 import { SPARC_PROGRESSIVE_NODE_OPERATION_STATE_KEY } from '../../trial-displays/sparc/sparcProgressiveNodes';
 
 type SparcRuleBindings = Record<string, unknown>;
+type SparcFactIndex = ReadonlyMap<string, readonly SparcWorkingMemoryFact[]>;
+
+export type SparcProductionRulePlan = {
+  readonly sortedRules: readonly SparcProductionRule[];
+};
 
 function requireNonBlank(value: unknown, label: string): string {
   const normalized = typeof value === 'string' ? value.trim() : '';
@@ -231,6 +236,25 @@ function matchFactPattern(
   return nextBindings;
 }
 
+function createFactIndex(facts: readonly SparcWorkingMemoryFact[]): SparcFactIndex {
+  const factsByType = new Map<string, SparcWorkingMemoryFact[]>();
+  for (const fact of facts) {
+    const factType = requireNonBlank(fact.factType, 'SPARC working-memory fact factType');
+    const typeFacts = factsByType.get(factType) ?? [];
+    typeFacts.push(fact);
+    factsByType.set(factType, typeFacts);
+  }
+  return factsByType;
+}
+
+function candidateFactsForPattern(
+  pattern: SparcFactPattern,
+  factIndex: SparcFactIndex,
+): readonly SparcWorkingMemoryFact[] {
+  const factType = requireNonBlank(pattern.factType, 'SPARC fact pattern factType');
+  return factIndex.get(factType) ?? [];
+}
+
 function isNegatedPattern(
   pattern: SparcProductionRuleCondition,
 ): pattern is Extract<SparcProductionRuleCondition, { type: 'not' }> {
@@ -238,7 +262,7 @@ function isNegatedPattern(
 }
 
 function findPatternMatches(
-  facts: readonly SparcWorkingMemoryFact[],
+  factIndex: SparcFactIndex,
   patterns: readonly SparcProductionRuleCondition[],
   bindings: SparcRuleBindings = {},
 ): readonly SparcRuleBindings[] {
@@ -247,16 +271,17 @@ function findPatternMatches(
     return [bindings];
   }
   if (isNegatedPattern(head)) {
-    const hasMatch = facts.some((fact) => matchFactPattern(head.pattern, fact, bindings));
-    return hasMatch ? [] : findPatternMatches(facts, tail, bindings);
+    const hasMatch = candidateFactsForPattern(head.pattern, factIndex)
+      .some((fact) => matchFactPattern(head.pattern, fact, bindings));
+    return hasMatch ? [] : findPatternMatches(factIndex, tail, bindings);
   }
   const matches: SparcRuleBindings[] = [];
-  for (const fact of facts) {
+  for (const fact of candidateFactsForPattern(head, factIndex)) {
     const matched = matchFactPattern(head, fact, bindings);
     if (!matched) {
       continue;
     }
-    matches.push(...findPatternMatches(facts, tail, matched));
+    matches.push(...findPatternMatches(factIndex, tail, matched));
   }
   return matches;
 }
@@ -477,9 +502,26 @@ function instantiateFiring(
 export function evaluateSparcProductionRules(params: {
   readonly facts: readonly SparcWorkingMemoryFact[];
   readonly rules: readonly SparcProductionRule[];
+  readonly compiledPlan?: SparcProductionRulePlan;
 }): readonly SparcProductionRuleFiring[] {
   const firings: SparcProductionRuleFiring[] = [];
-  const sortedRules = [...params.rules].sort((left, right) => {
+  const factIndex = createFactIndex(params.facts);
+  const sortedRules = params.compiledPlan?.sortedRules ?? compileSparcProductionRulePlan(params.rules).sortedRules;
+  for (const rule of sortedRules) {
+    const matches = findPatternMatches(factIndex, rule.when);
+    for (const bindings of matches) {
+      if ((rule.tests ?? []).every((test) => compareRuleTest(test, bindings))) {
+        firings.push(instantiateFiring(rule, bindings));
+      }
+    }
+  }
+  return firings;
+}
+
+export function compileSparcProductionRulePlan(
+  rules: readonly SparcProductionRule[],
+): SparcProductionRulePlan {
+  const sortedRules = [...rules].sort((left, right) => {
     const salienceDelta = (right.salience ?? 0) - (left.salience ?? 0);
     return salienceDelta || left.id.localeCompare(right.id);
   });
@@ -491,14 +533,8 @@ export function evaluateSparcProductionRules(params: {
     if (!Array.isArray(rule.then)) {
       throw new Error(`SPARC production rule "${rule.id}" then must be an array`);
     }
-    const matches = findPatternMatches(params.facts, rule.when);
-    for (const bindings of matches) {
-      if ((rule.tests ?? []).every((test) => compareRuleTest(test, bindings))) {
-        firings.push(instantiateFiring(rule, bindings));
-      }
-    }
   }
-  return firings;
+  return { sortedRules };
 }
 
 export function runSparcProductionRules(params: {
@@ -515,11 +551,13 @@ export function runSparcProductionRules(params: {
   const factKeys = new Set(facts.map((fact) => createFactKey(fact)));
   const firedActivationKeys = new Set<string>();
   const firings: SparcProductionRuleFiring[] = [];
+  const compiledPlan = compileSparcProductionRulePlan(params.rules);
 
   for (let cycle = 1; cycle <= maxCycles; cycle += 1) {
     const nextFiring = evaluateSparcProductionRules({
       facts,
       rules: params.rules,
+      compiledPlan,
     }).find((firing) => {
       const activationKey = createActivationKey(firing);
       if (firedActivationKeys.has(activationKey)) {

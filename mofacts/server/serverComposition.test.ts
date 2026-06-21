@@ -823,6 +823,12 @@ describe('learner analytics method authorization', function() {
       responseKC: 'response-a',
       responseKey: '4',
       sparc: sparcExtension,
+      serverOnlyLargePayload: {
+        shouldNotHydrateToClient: true,
+        nested: {
+          rawDocument: 'not part of the SPARC resume projection',
+        },
+      },
     });
     await HistoriesAny.insertAsync({
       _id: 'sparc-history-state-transition',
@@ -901,6 +907,7 @@ describe('learner analytics method authorization', function() {
       responseKey: '4',
     });
     expect(rows[0].sparc).to.deep.equal(sparcExtension);
+    expect(rows[0]).not.to.have.property('serverOnlyLargePayload');
     expect(rows[1]).to.have.nested.property('sparc.documentId', 'doc-1');
   });
 

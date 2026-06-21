@@ -15,7 +15,13 @@ import { experimentStateService } from '../services/experimentState';
 import { selectCardService, updateEngineService, prepareIncomingTrialService } from '../services/unitEngineService';
 import { ttsPlaybackService } from '../services/ttsService';
 import { speechRecognitionService as srService } from '../services/speechRecognitionService';
-import { readSparcProductionRuleHistoryRecords } from '../services/sparcProductionRuleHistoryCache';
+import {
+  createEmptySparcProductionRuleReplaySession,
+  readSparcProductionRuleReplaySession,
+} from '../services/sparcProductionRuleHistoryCache';
+import {
+  getSparcTrialDisplayRuntimeContext,
+} from '../services/sparcTrialDisplayRuntimeContextCache';
 import {
   SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY,
   collectSparcProgressiveNodeOperations,
@@ -417,15 +423,29 @@ function evaluateSparcProductionRuleOutcome(context: AnswerEvaluationContext) {
   if (typeof engine?.evaluateSparcTrialDisplayProductionRuleEvents !== 'function') {
     throw new Error('[SPARC] Production-rule display requires SPARC session engine evaluation support');
   }
-  const priorHistoryRecords = readSparcProductionRuleHistoryRecords({
+  const sparcReplaySession = readSparcProductionRuleReplaySession({
+    tdfId: context.tdfId,
+    sessionId: context.sessionId,
+    documentId: display.documentId,
+  }) ?? createEmptySparcProductionRuleReplaySession({
     tdfId: context.tdfId,
     sessionId: context.sessionId,
     documentId: display.documentId,
   });
+  const sparcRuntimeContext = getSparcTrialDisplayRuntimeContext({
+    TDFId: String(context.tdfId),
+    sessionID: String(context.sessionId),
+    documentId: display.documentId,
+    display,
+    replaySession: sparcReplaySession,
+  });
+  const priorHistoryRecords = sparcReplaySession.retainedHistoryRecords;
   const result = engine.evaluateSparcTrialDisplayProductionRuleEvents({
     documentId: display.documentId,
     display,
     result: context.sparcResult,
+    document: sparcRuntimeContext.document,
+    replayState: sparcRuntimeContext.replayState,
     priorHistoryRecords,
   });
   const lastClassification = result.classifications[result.classifications.length - 1];

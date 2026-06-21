@@ -233,6 +233,17 @@
     submit: send,
   });
 
+  function describeSparcBoundaryContext(display, source) {
+    const displayRecord = display && typeof display === 'object' ? display : {};
+    const documentId = typeof displayRecord.documentId === 'string' && displayRecord.documentId.trim()
+      ? displayRecord.documentId.trim()
+      : 'missing';
+    const displayType = typeof displayRecord.type === 'string' && displayRecord.type.trim()
+      ? displayRecord.type.trim()
+      : typeof display;
+    return `${source}; displayType=${displayType}; documentId=${documentId}; tdfId=${context.tdfId || 'missing'}; unit=${context.unitId ?? 'missing'}; hasSessionId=${Boolean(context.sessionId)}`;
+  }
+
   async function handleSparcAction(event) {
     const display = context.currentDisplay;
     if (!sparcOwnsResponse || !display || display.type !== 'sparc') {
@@ -245,7 +256,7 @@
     }
     const sparcResult = resolveSparcTrialDisplayResult(display, event.detail || {}, '[CardScreen]');
     if (!sparcResult) {
-      throw new Error('[CardScreen] SPARC action received for non-SPARC display');
+      throw new Error(describeSparcBoundaryContext(display, '[CardScreen] SPARC action received for non-SPARC display'));
     }
     const { sparcNodeValues } = await commitSparcProductionRuleAction({
       engine: context.engine,
@@ -278,7 +289,7 @@
     }
     const sparcResult = resolveSparcTrialDisplayResult(display, detail || {}, '[CardScreen]');
     if (!sparcResult) {
-      throw new Error('[CardScreen] SPARC submit received for non-SPARC display');
+      throw new Error(describeSparcBoundaryContext(display, '[CardScreen] SPARC submit received for non-SPARC display'));
     }
     const triggeredBy = typeof sparcResult.triggeredBy === 'string' ? sparcResult.triggeredBy : '';
     const submittedNodes = triggeredBy && Object.prototype.hasOwnProperty.call(sparcResult.submittedNodes, triggeredBy)

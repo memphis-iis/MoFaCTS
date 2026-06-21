@@ -1,4 +1,10 @@
 import type { CanonicalHistoryRecord } from '../../../../../../learning-components/runtime/historyEnvelope';
+import {
+  applySparcHistoryRecord,
+  createEmptySparcReplayState,
+  replaySparcHistory,
+  type SparcReplayState,
+} from '../../../../../../learning-components/units/sparcsession/sparcStateReplay';
 
 type SparcHistoryKeyInput = {
   readonly TDFId?: unknown;
@@ -8,20 +14,36 @@ type SparcHistoryKeyInput = {
   readonly documentId?: unknown;
 };
 
+export type SparcReplaySession = {
+  readonly TDFId: string;
+  readonly sessionID: string;
+  readonly documentId: string;
+  readonly replayState: SparcReplayState;
+  readonly retainedHistoryRecords: readonly CanonicalHistoryRecord[];
+};
+
 function nonBlankString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0
     ? value.trim()
     : null;
 }
 
-function createCacheKey(input: SparcHistoryKeyInput): string {
+function normalizeCacheKeyInput(input: SparcHistoryKeyInput): {
+  readonly TDFId: string;
+  readonly sessionID: string;
+  readonly documentId: string;
+} {
   const TDFId = nonBlankString(input.TDFId) ?? nonBlankString(input.tdfId);
   const sessionID = nonBlankString(input.sessionID) ?? nonBlankString(input.sessionId);
   const documentId = nonBlankString(input.documentId);
   if (!TDFId || !sessionID || !documentId) {
     throw new Error('[SPARC] Production-rule history replay requires TDFId, sessionID, and documentId');
   }
-  return JSON.stringify({ TDFId, sessionID, documentId });
+  return { TDFId, sessionID, documentId };
+}
+
+function createCacheKey(input: SparcHistoryKeyInput): string {
+  return JSON.stringify(normalizeCacheKeyInput(input));
 }
 
 function readSparcDocumentId(record: CanonicalHistoryRecord): string | null {
@@ -32,13 +54,37 @@ function readSparcDocumentId(record: CanonicalHistoryRecord): string | null {
   return nonBlankString((sparc as Record<string, unknown>).documentId);
 }
 
-const sparcProductionRuleHistoryByKey = new Map<string, CanonicalHistoryRecord[]>();
+function createReplaySession(
+  input: SparcHistoryKeyInput,
+  records: readonly CanonicalHistoryRecord[],
+): SparcReplaySession {
+  const key = normalizeCacheKeyInput(input);
+  return {
+    ...key,
+    replayState: replaySparcHistory(records),
+    retainedHistoryRecords: [...records],
+  };
+}
+
+const sparcReplaySessionByKey = new Map<string, SparcReplaySession>();
+
+export function readSparcProductionRuleReplaySession(
+  input: SparcHistoryKeyInput,
+): SparcReplaySession | null {
+  const session = sparcReplaySessionByKey.get(createCacheKey(input));
+  if (!session) {
+    return null;
+  }
+  return {
+    ...session,
+    retainedHistoryRecords: [...session.retainedHistoryRecords],
+  };
+}
 
 export function readSparcProductionRuleHistoryRecords(
   input: SparcHistoryKeyInput,
 ): readonly CanonicalHistoryRecord[] {
-  const key = createCacheKey(input);
-  return [...(sparcProductionRuleHistoryByKey.get(key) ?? [])];
+  return readSparcProductionRuleReplaySession(input)?.retainedHistoryRecords ?? [];
 }
 
 export function rememberSparcProductionRuleHistoryRecord(record: CanonicalHistoryRecord): void {
@@ -54,8 +100,20 @@ export function rememberSparcProductionRuleHistoryRecord(record: CanonicalHistor
     sessionID: record.sessionID,
     documentId,
   });
-  const records = sparcProductionRuleHistoryByKey.get(key) ?? [];
-  sparcProductionRuleHistoryByKey.set(key, [...records, record]);
+  const currentSession = sparcReplaySessionByKey.get(key);
+  if (!currentSession) {
+    sparcReplaySessionByKey.set(key, createReplaySession({
+      TDFId: record.TDFId,
+      sessionID: record.sessionID,
+      documentId,
+    }, [record]));
+    return;
+  }
+  sparcReplaySessionByKey.set(key, {
+    ...currentSession,
+    replayState: applySparcHistoryRecord(currentSession.replayState, record),
+    retainedHistoryRecords: [...currentSession.retainedHistoryRecords, record],
+  });
 }
 
 export function hydrateSparcProductionRuleHistoryCache(
@@ -78,10 +136,36 @@ export function hydrateSparcProductionRuleHistoryCache(
     groupedRecords.set(key, [...(groupedRecords.get(key) ?? []), record]);
   }
   for (const [key, grouped] of groupedRecords) {
-    sparcProductionRuleHistoryByKey.set(key, grouped);
+    const firstRecord = grouped[0];
+    if (!firstRecord) {
+      throw new Error('[SPARC] Durable history hydration produced an empty document group');
+    }
+    const documentId = readSparcDocumentId(firstRecord);
+    if (!documentId) {
+      throw new Error('[SPARC] Durable history record missing sparc.documentId');
+    }
+    sparcReplaySessionByKey.set(key, createReplaySession({
+      TDFId: firstRecord.TDFId,
+      sessionID: firstRecord.sessionID,
+      documentId,
+    }, grouped));
   }
 }
 
-export function clearSparcProductionRuleHistoryCache(): void {
-  sparcProductionRuleHistoryByKey.clear();
+export function clearSparcProductionRuleHistoryCache(input?: SparcHistoryKeyInput): void {
+  if (!input) {
+    sparcReplaySessionByKey.clear();
+    return;
+  }
+  sparcReplaySessionByKey.delete(createCacheKey(input));
+}
+
+export function createEmptySparcProductionRuleReplaySession(
+  input: SparcHistoryKeyInput,
+): SparcReplaySession {
+  return {
+    ...normalizeCacheKeyInput(input),
+    replayState: createEmptySparcReplayState(),
+    retainedHistoryRecords: [],
+  };
 }

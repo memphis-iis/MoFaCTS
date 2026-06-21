@@ -125,6 +125,77 @@ describe('sparcStateReplay', function() {
     assert.deepEqual(state.transitions, [firstTransition, secondTransition]);
   });
 
+  it('keeps batch-applied replay state equivalent to one-pass raw-history replay', function() {
+    const firstTransition: SparcStateTransition = {
+      transitionId: 'transition-1',
+      event: {
+        eventId: 'event-1',
+        type: 'value-changed',
+        source: {
+          documentId: 'doc-1',
+          nodeId: 'region-1',
+        },
+        time: 2000,
+      },
+      writes: [{
+        target: {
+          documentId: 'doc-1',
+          nodeId: 'answer',
+        },
+        key: 'value',
+        value: 'draft',
+      }],
+    };
+    const secondTransition: SparcStateTransition = {
+      transitionId: 'transition-2',
+      event: {
+        eventId: 'event-2',
+        type: 'outcome-recorded',
+        source: {
+          documentId: 'doc-1',
+          nodeId: 'region-1',
+        },
+        time: 2500,
+      },
+      writes: [
+        {
+          target: {
+            documentId: 'doc-1',
+            nodeId: 'answer',
+          },
+          key: 'value',
+          value: 'final',
+        },
+        {
+          target: {
+            documentId: 'doc-1',
+            nodeId: 'feedback',
+          },
+          key: 'visible',
+          value: true,
+        },
+      ],
+    };
+    const firstRecord = makeBaseSparcRecord({
+      documentId: 'doc-1',
+      sourceAddress: firstTransition.event.source,
+      stateTransition: firstTransition,
+    });
+    const secondRecord = makeBaseSparcRecord({
+      documentId: 'doc-1',
+      sourceAddress: secondTransition.event.source,
+      stateTransition: secondTransition,
+    });
+
+    const onePassState = replaySparcHistory([firstRecord, secondRecord]);
+    const batchAppliedState = replaySparcHistory(
+      [secondRecord],
+      replaySparcHistory([firstRecord]),
+    );
+
+    assert.deepEqual(batchAppliedState, onePassState);
+  });
+
   it('collects practice observations and trace steps from canonical SPARC history', function() {
     const bridge = createSparcPracticeHistoryBridge({
       TDFId: 'tdf-1',

@@ -73,6 +73,8 @@ export type SparcTrialDisplayProductionRuleRuntimeParams = {
   readonly display: SparcTrialDisplay;
   readonly result: SparcTrialResult;
   readonly priorHistoryRecords: readonly CanonicalHistoryRecord[];
+  readonly document?: SparcAuthoredDocument;
+  readonly replayState?: SparcReplayState;
   readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory'>;
 };
 
@@ -81,6 +83,8 @@ export type SparcTrialDisplayProductionRuleEvaluationRuntimeParams = {
   readonly display: SparcTrialDisplay;
   readonly result: SparcTrialResult;
   readonly priorHistoryRecords: readonly CanonicalHistoryRecord[];
+  readonly document?: SparcAuthoredDocument;
+  readonly replayState?: SparcReplayState;
 };
 
 export async function createSparcSessionUnitEngine(
@@ -135,6 +139,8 @@ export async function createSparcSessionUnitEngine(
         display: params.display,
         result: params.result,
         priorHistoryRecords: params.priorHistoryRecords,
+        ...(params.document ? { document: params.document } : {}),
+        ...(params.replayState ? { replayState: params.replayState } : {}),
         history: params.history,
         adaptiveModel: {
           applyModelPracticeUpdate: adaptiveEngine.applyModelPracticeUpdate,
@@ -151,6 +157,8 @@ export async function createSparcSessionUnitEngine(
         display: params.display,
         result: params.result,
         priorHistoryRecords: params.priorHistoryRecords,
+        ...(params.document ? { document: params.document } : {}),
+        ...(params.replayState ? { replayState: params.replayState } : {}),
       });
     },
 

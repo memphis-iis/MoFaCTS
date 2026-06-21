@@ -12,7 +12,11 @@ import {
   type SparcCommittedProductionRuleEvaluation,
 } from './sparcProductionRuleCommit';
 import { replaySparcDocumentHistory } from './sparcDocumentReplay';
-import { applySparcStateTransition, replaySparcHistory } from './sparcStateReplay';
+import {
+  applySparcStateTransition,
+  replaySparcHistory,
+  type SparcReplayState,
+} from './sparcStateReplay';
 import type { SparcPracticeHistoryCore } from './sparcPracticeHistoryBridge';
 import type {
   SparcAuthoredDocument,
@@ -440,14 +444,16 @@ export async function commitSparcTrialDisplayProductionRuleEvents(params: {
   readonly display: SparcTrialDisplay;
   readonly result: SparcTrialResult;
   readonly priorHistoryRecords: readonly CanonicalHistoryRecord[];
+  readonly document?: SparcAuthoredDocument;
+  readonly replayState?: SparcReplayState;
   readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory'>;
   readonly adaptiveModel?: ModelPracticeRuntime;
 }): Promise<SparcTrialDisplayProductionRuleCommitResult> {
-  const document = createSparcAuthoredDocumentFromTrialDisplay({
+  const document = params.document ?? createSparcAuthoredDocumentFromTrialDisplay({
     documentId: params.documentId,
     display: params.display,
   });
-  let replayState = replaySparcDocumentHistory(document, params.priorHistoryRecords);
+  let replayState = params.replayState ?? replaySparcDocumentHistory(document, params.priorHistoryRecords);
   const commits: SparcTrialDisplayProductionRuleCommit[] = [];
   const evaluations: SparcCommittedProductionRuleEvaluation[] = [];
   for (const event of createSparcProductionRuleEventsFromTrialResult({
@@ -486,12 +492,14 @@ export function evaluateSparcTrialDisplayProductionRuleEvents(params: {
   readonly display: SparcTrialDisplay;
   readonly result: SparcTrialResult;
   readonly priorHistoryRecords: readonly CanonicalHistoryRecord[];
+  readonly document?: SparcAuthoredDocument;
+  readonly replayState?: SparcReplayState;
 }): SparcTrialDisplayProductionRuleEvaluationResult {
-  const document = createSparcAuthoredDocumentFromTrialDisplay({
+  const document = params.document ?? createSparcAuthoredDocumentFromTrialDisplay({
     documentId: params.documentId,
     display: params.display,
   });
-  let replayState = replaySparcDocumentHistory(document, params.priorHistoryRecords);
+  let replayState = params.replayState ?? replaySparcDocumentHistory(document, params.priorHistoryRecords);
   const events = createSparcProductionRuleEventsFromTrialResult({
     documentId: params.documentId,
     display: params.display,
