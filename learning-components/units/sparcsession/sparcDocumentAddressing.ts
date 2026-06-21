@@ -5,7 +5,7 @@ import type {
   SparcCondition,
   SparcDocumentAddress,
   SparcModelTargetIdentity,
-  SparcStimulusRegistryEntry,
+  SparcClusterModelTarget,
 } from './sparcSessionContracts';
 import { assertModelPracticeHistoryIdentity } from '../../runtime/historyStimulusIdentity';
 import { MODEL_PRACTICE_METRICS } from '../../runtime/modelPracticeStateQueries';
@@ -364,9 +364,9 @@ function validateAuthoredModelTargets(
   }
 }
 
-function modelTargetFromRegistryEntry(
+function modelTargetFromClusterEntry(
   document: SparcAuthoredDocument,
-  entry: SparcStimulusRegistryEntry,
+  entry: SparcClusterModelTarget,
 ): SparcModelTargetIdentity {
   return {
     stimuliSetId: entry.stimuliSetId,
@@ -382,14 +382,14 @@ function modelTargetFromRegistryEntry(
   };
 }
 
-function validateStimulusRegistry(
+function validateClusterTargets(
   document: SparcAuthoredDocument,
   issues: SparcReferenceValidationIssue[],
-): Set<string> {
-  const ids = new Set<string>();
-  for (const [index, entry] of (document.stimulusRegistry ?? []).entries()) {
-    const sourceNodeId = `stimulus-registry:${index}`;
-    if (typeof entry.stimulusId !== 'string' || entry.stimulusId.trim().length === 0) {
+): Set<number> {
+  const ids = new Set<number>();
+  for (const [index, entry] of (document.clusterTargets ?? []).entries()) {
+    const sourceNodeId = `cluster-target:${index}`;
+    if (!Number.isInteger(entry.clusterIndex) || entry.clusterIndex < 0) {
       issues.push({
         sourceNodeId,
         reference: {
@@ -399,9 +399,9 @@ function validateStimulusRegistry(
             nodeId: document.root.id,
           },
         },
-        message: `SPARC stimulusRegistry[${index}].stimulusId is required`,
+        message: `SPARC clusterTargets[${index}].clusterIndex must be a non-negative integer`,
       });
-    } else if (ids.has(entry.stimulusId)) {
+    } else if (ids.has(entry.clusterIndex)) {
       issues.push({
         sourceNodeId,
         reference: {
@@ -411,13 +411,13 @@ function validateStimulusRegistry(
             nodeId: document.root.id,
           },
         },
-        message: `SPARC stimulusRegistry contains duplicate stimulusId "${entry.stimulusId}"`,
+        message: `SPARC clusterTargets contains duplicate clusterIndex ${entry.clusterIndex}`,
       });
     } else {
-      ids.add(entry.stimulusId);
+      ids.add(entry.clusterIndex);
     }
     validateModelTargetIdentity({
-      target: modelTargetFromRegistryEntry(document, entry),
+      target: modelTargetFromClusterEntry(document, entry),
       sourceNodeId,
       issues,
     });
@@ -428,32 +428,32 @@ function validateStimulusRegistry(
 function validateNodeStimulusAttachments(
   document: SparcAuthoredDocument,
   node: SparcAuthoredNode,
-  registryIds: ReadonlySet<string>,
+  clusterIndices: ReadonlySet<number>,
   issues: SparcReferenceValidationIssue[],
 ): void {
-  for (const [index, stimulusId] of (node.stimulusIds ?? []).entries()) {
-    if (typeof stimulusId !== 'string' || stimulusId.trim().length === 0) {
+  for (const [index, clusterIndex] of (node.clusterIndices ?? []).entries()) {
+    if (!Number.isInteger(clusterIndex) || clusterIndex < 0) {
       issues.push({
         sourceNodeId: node.id,
         reference: {
           relation: 'model-target',
           target: modelTargetAddressForNode(document, node),
         },
-        message: `SPARC node "${node.id}" stimulusIds[${index}] is required`,
+        message: `SPARC node "${node.id}" clusterIndices[${index}] must be a non-negative integer`,
       });
-    } else if (!registryIds.has(stimulusId)) {
+    } else if (!clusterIndices.has(clusterIndex)) {
       issues.push({
         sourceNodeId: node.id,
         reference: {
           relation: 'model-target',
           target: modelTargetAddressForNode(document, node),
         },
-        message: `SPARC node "${node.id}" attaches unknown stimulusId "${stimulusId}"`,
+        message: `SPARC node "${node.id}" attaches unknown clusterIndex ${clusterIndex}`,
       });
     }
   }
   for (const child of node.children ?? []) {
-    validateNodeStimulusAttachments(document, child, registryIds, issues);
+    validateNodeStimulusAttachments(document, child, clusterIndices, issues);
   }
 }
 
@@ -461,14 +461,14 @@ export function validateSparcDocumentReferences(
   document: SparcAuthoredDocument,
 ): SparcReferenceValidationResult {
   const issues: SparcReferenceValidationIssue[] = [];
-  const registryIds = validateStimulusRegistry(document, issues);
+  const clusterIndices = validateClusterTargets(document, issues);
   validateNodeReferences(document, document.root, issues);
   validateInitialStateReferences(document, issues);
   validateReactiveRuleReferences(document, issues);
   validateReactiveRuleConditionReferences(document, issues);
   validateNodeReactiveConditionReferences(document, document.root, issues);
   validateAuthoredModelTargets(document, document.root, issues);
-  validateNodeStimulusAttachments(document, document.root, registryIds, issues);
+  validateNodeStimulusAttachments(document, document.root, clusterIndices, issues);
   return {
     valid: issues.length === 0,
     issues,

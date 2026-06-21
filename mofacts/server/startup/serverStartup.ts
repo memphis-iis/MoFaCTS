@@ -514,11 +514,11 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
   if (adminUserId) {
     await Roles.addUsersToRolesAsync(adminUserId, 'admin');
     deps.serverConsole('Admin User Found ID:', adminUserId, 'with obj:', _.pick(adminUser, '_id', 'username', 'email'));
+  } else if (deps.isProd) {
+    deps.serverConsole('Warning: configured owner account could not be found. adminUser=', displayify(adminUser || 'null'));
+    deps.serverConsole('Warning: no owner is available for system TDFs until the configured owner account exists');
   } else {
-    deps.serverConsole('Admin user ID could not be found. adminUser=', displayify(adminUser || 'null'));
-    deps.serverConsole('ADMIN USER is MISSING: a restart might be required');
-    deps.serverConsole('Make sure you have valid Meteor settings (settings.json / METEOR_SETTINGS)');
-    deps.serverConsole('***IMPORTANT*** There will be no owner for system TDF\'s');
+    deps.serverConsole('Configured owner account is not present yet; owner-bound bootstrap is skipped until that account exists');
   }
 
   const roleSettings = ((Meteor.settings as any)?.initRoles || {}) as { admins?: unknown[]; teachers?: unknown[] };
@@ -528,7 +528,8 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     for (const username of requested) {
       const user = await findUserByName(deps, String(username || ''));
       if (!user || !user._id) {
-        deps.serverConsole('Warning: user', username, 'role', roleName, 'request, but user not found');
+        const messagePrefix = deps.isProd ? 'Warning: role assignment target missing' : 'Role assignment target not present yet';
+        deps.serverConsole(messagePrefix, { user: username, role: roleName });
         continue;
       }
       await Roles.addUsersToRolesAsync(user._id, roleName);

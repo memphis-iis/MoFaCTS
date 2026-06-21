@@ -116,8 +116,8 @@ describe('Learning component catalog', function() {
     expect([...getCreateUnitEngineServerMethodSet(adapter)].sort()).to.deep.equal([
       'getAutoTutorHistoryForUnit',
       'getLearningHistoryForUnit',
-      'getSparcHistoryForUnit',
       'getResponseKCMapForTdf',
+      'getSparcHistoryForUnit',
       'getStimulusCrowdStatsForDeck',
     ]);
     expect([...getCreateUnitEngineServerMethodSet(adapterWithoutServerMethods)].sort()).to.deep.equal([]);

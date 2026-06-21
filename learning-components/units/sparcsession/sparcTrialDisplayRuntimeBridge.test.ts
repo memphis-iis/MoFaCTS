@@ -365,7 +365,7 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
     });
   });
 
-  it('rejects malformed stimulus attachments instead of dropping them during document normalization', function() {
+  it('rejects malformed cluster attachments instead of dropping them during document normalization', function() {
     assert.throws(
       () => createSparcAuthoredDocumentFromTrialDisplay({
         documentId: 'doc-1',
@@ -376,11 +376,11 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
             id: 'node-with-bad-attachment',
             nodeType: 'atomic',
             atomType: 'text-input',
-            stimulusIds: ['stimulus-1', null],
+            clusterIndices: [0, null],
           }],
         } as unknown as SparcTrialDisplay,
       }),
-      /stimulusIds\[1\] must be a non-empty string/,
+      /clusterIndices\[1\] must be a non-negative integer/,
     );
   });
 
@@ -532,8 +532,8 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
         nodeType: 'atomic',
         atomType: 'fraction-input',
       }],
-      stimulusRegistry: [{
-        stimulusId: 'determine-lcd',
+      clusterTargets: [{
+        clusterIndex: 0,
         stimuliSetId: 'sparc-fractions-addition',
         stimulusKC: 'fractions.lcd',
         clusterKC: 'fractions.addition',
@@ -568,7 +568,7 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
         }, {
           type: 'model-practice',
           outcome: 'correct',
-          stimulusId: 'determine-lcd',
+          clusterIndex: 0,
           nodeId: 'node-known-1-equivalent-bottom',
           responseValue: literal('12'),
           input: literal('12'),
@@ -632,7 +632,7 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
       displayedStimulus: {
         documentId: 'sparc-fractions-addition',
         nodeId: 'node-known-1-equivalent-bottom',
-        stimulusId: 'determine-lcd',
+        clusterIndex: 0,
       },
       time: 5000,
       problemStartTime: 5000,

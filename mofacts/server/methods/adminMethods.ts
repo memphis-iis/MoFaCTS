@@ -40,6 +40,11 @@ type AdminMethodsDeps = {
   };
   DynamicAssets: {
     find: (selector: UnknownRecord, options?: UnknownRecord) => CountAndFetchCursor;
+    collection: {
+      rawCollection: () => {
+        countDocuments: (selector: UnknownRecord) => Promise<number>;
+      };
+    };
     removeAsync: (selector: UnknownRecord) => Promise<unknown>;
   };
   Courses: {
@@ -215,7 +220,7 @@ async function getUserDeletionBlockingReasons(deps: AdminMethodsDeps, targetUser
     reasons.push(`owns ${ownedTdfCount} lesson${ownedTdfCount === 1 ? '' : 's'}`);
   }
 
-  const uploadedAssetCount = await deps.DynamicAssets.find({ userId: targetUserId }, { fields: { _id: 1 } }).countAsync();
+  const uploadedAssetCount = await deps.DynamicAssets.collection.rawCollection().countDocuments({ userId: targetUserId });
   if (uploadedAssetCount > 0) {
     reasons.push(`has ${uploadedAssetCount} uploaded asset${uploadedAssetCount === 1 ? '' : 's'}`);
   }

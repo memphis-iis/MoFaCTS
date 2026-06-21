@@ -22,9 +22,9 @@ import type {
   SparcAuthoredDocument,
   SparcOutcome,
   SparcAuthoredNode,
+  SparcClusterModelTarget,
   SparcProductionRule,
   SparcReactiveEvent,
-  SparcStimulusRegistryEntry,
   SparcWorkingMemoryFact,
 } from './sparcSessionContracts';
 
@@ -34,8 +34,8 @@ type DisplayNodeRecord = {
   readonly atomType?: unknown;
   readonly children?: unknown;
   readonly panels?: unknown;
-  readonly stimulusId?: unknown;
-  readonly stimulusIds?: unknown;
+  readonly clusterIndex?: unknown;
+  readonly clusterIndices?: unknown;
 };
 
 type SaiResponseRecord = {
@@ -76,11 +76,12 @@ function stringOrUndefined(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value : undefined;
 }
 
-function requireOptionalNonBlankString(value: unknown, label: string): string {
-  if (typeof value !== 'string') {
-    throw new Error(`${label} must be a non-empty string`);
+function requireOptionalClusterIndex(value: unknown, label: string): number {
+  const numberValue = Number(value);
+  if (!Number.isInteger(numberValue) || numberValue < 0) {
+    throw new Error(`${label} must be a non-negative integer`);
   }
-  return requireNonBlank(value, label);
+  return numberValue;
 }
 
 function requireNonBlank(value: unknown, label: string): string {
@@ -118,30 +119,30 @@ function authoredNodeFromDisplayNode(node: DisplayNodeRecord): SparcAuthoredNode
     ? node.children.filter(isRecord).map((child) => authoredNodeFromDisplayNode(child))
     : [];
   const nodeId = requireNonBlank(node.id, 'SPARC display node id');
-  const stimulusIds = Array.isArray(node.stimulusIds)
-    ? node.stimulusIds.map((value, index) => requireOptionalNonBlankString(
+  const clusterIndices = Array.isArray(node.clusterIndices)
+    ? node.clusterIndices.map((value, index) => requireOptionalClusterIndex(
         value,
-        `SPARC display node "${nodeId}" stimulusIds[${index}]`,
+        `SPARC display node "${nodeId}" clusterIndices[${index}]`,
       ))
-    : (node.stimulusId !== undefined
-        ? [requireOptionalNonBlankString(node.stimulusId, `SPARC display node "${nodeId}" stimulusId`)]
+    : (node.clusterIndex !== undefined
+        ? [requireOptionalClusterIndex(node.clusterIndex, `SPARC display node "${nodeId}" clusterIndex`)]
         : []);
   return {
     id: nodeId,
     kind: nodeKind(node),
-    ...(stimulusIds.length > 0 ? { stimulusIds } : {}),
+    ...(clusterIndices.length > 0 ? { clusterIndices } : {}),
     ...(children.length > 0 ? { children } : {}),
   };
 }
 
-function normalizeStimulusRegistry(display: SparcTrialDisplay): readonly SparcStimulusRegistryEntry[] {
-  if (!Array.isArray((display as Record<string, unknown>).stimulusRegistry)) {
+function normalizeClusterTargets(display: SparcTrialDisplay): readonly SparcClusterModelTarget[] {
+  if (!Array.isArray((display as Record<string, unknown>).clusterTargets)) {
     return [];
   }
-  return ((display as Record<string, unknown>).stimulusRegistry as unknown[])
+  return ((display as Record<string, unknown>).clusterTargets as unknown[])
     .filter(isRecord)
     .map((entry, index) => ({
-      stimulusId: requireNonBlank(entry.stimulusId, `SPARC stimulusRegistry[${index}].stimulusId`),
+      clusterIndex: requireOptionalClusterIndex(entry.clusterIndex, `SPARC clusterTargets[${index}].clusterIndex`),
       ...(typeof entry.label === 'string' && entry.label.trim() ? { label: entry.label.trim() } : {}),
       stimuliSetId: entry.stimuliSetId as string | number,
       stimulusKC: entry.stimulusKC as string | number,
@@ -184,7 +185,7 @@ export function createSparcAuthoredDocumentFromTrialDisplay(params: {
       scrollAxis: 'vertical',
       layoutMode: 'document',
     },
-    stimulusRegistry: normalizeStimulusRegistry(display),
+    clusterTargets: normalizeClusterTargets(display),
     workingMemoryFacts: authoredFacts,
     productionRules: directProductionRules,
     root: {

@@ -88,14 +88,14 @@ export type SparcAuthoredNode = {
   readonly kind: SparcNodeKind;
   readonly children?: readonly SparcAuthoredNode[];
   readonly refs?: readonly SparcAddressReference[];
-  readonly stimulusIds?: readonly string[];
+  readonly clusterIndices?: readonly number[];
   readonly modelTarget?: SparcModelTargetIdentity;
   readonly layout?: SparcLayoutPolicy;
   readonly reactive?: SparcNodeReactivity;
 };
 
-export type SparcStimulusRegistryEntry = ModelPracticeHistoryIdentity & {
-  readonly stimulusId: string;
+export type SparcClusterModelTarget = ModelPracticeHistoryIdentity & {
+  readonly clusterIndex: number;
   readonly label?: string;
 };
 
@@ -103,7 +103,7 @@ export type SparcAuthoredDocument = {
   readonly id: string;
   readonly schemaVersion: number;
   readonly layout?: SparcLayoutPolicy;
-  readonly stimulusRegistry?: readonly SparcStimulusRegistryEntry[];
+  readonly clusterTargets?: readonly SparcClusterModelTarget[];
   readonly initialState?: readonly SparcStateWrite[];
   readonly workingMemoryFacts?: readonly SparcWorkingMemoryFact[];
   readonly productionRules?: readonly SparcProductionRule[];
@@ -295,7 +295,7 @@ export type SparcProductionRuleEffect =
   | {
       readonly type: 'model-practice';
       readonly outcome: SparcOutcome;
-      readonly stimulusId?: string | SparcRuleExpression;
+      readonly clusterIndex?: number | SparcRuleExpression;
       readonly nodeId?: string | SparcRuleExpression;
       readonly responseValue?: SparcRuleExpression;
       readonly input?: SparcRuleExpression;
@@ -372,7 +372,7 @@ export type SparcProductionRuleFiring = {
   }[];
   readonly modelPracticeObservations: readonly {
     readonly outcome: SparcOutcome;
-    readonly stimulusId?: string;
+    readonly clusterIndex?: number;
     readonly nodeId?: string;
     readonly responseValue?: unknown;
     readonly input?: unknown;

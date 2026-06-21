@@ -1,18 +1,29 @@
-export function findSparcTargets(candidateClusters) {
-  const targets = [];
-  (candidateClusters || []).forEach((cluster, clusterIndex) => {
-    (cluster?.stims || []).forEach((stim, stimIndex) => {
-      if (stim?.display?.type === 'sparc' && Array.isArray(stim.display.nodes)) {
-        targets.push({
-          key: `${clusterIndex}:${stimIndex}`,
-          clusterIndex,
-          stimIndex,
-          label: stim.display.documentId || cluster.clustername || `Cluster ${clusterIndex + 1}, Stim ${stimIndex + 1}`,
-        });
-      }
-    });
+export function findSparcTargets(candidatePages) {
+  return (candidatePages || []).map((page, pageIndex) => {
+    if (!page?.pageId || typeof page.pageId !== 'string') {
+      throw new Error(`SPARC page at setspec.sparcPages[${pageIndex}] requires a string pageId.`);
+    }
+    if (!page.display || typeof page.display !== 'object' || !Array.isArray(page.display.nodes)) {
+      throw new Error(`SPARC page "${page.pageId}" requires a display with nodes.`);
+    }
+    return {
+      key: page.pageId,
+      pageId: page.pageId,
+      pageIndex,
+      label: page.display.documentId || page.pageId,
+    };
   });
-  return targets;
+}
+
+export function clusterChoicesForAuthoring(clusters) {
+  return (clusters || []).map((cluster, clusterIndex) => {
+    const firstStim = Array.isArray(cluster?.stims) ? cluster.stims[0] : null;
+    return {
+      clusterIndex,
+      label: cluster?.clustername || firstStim?.textStimulus || firstStim?.text || `Cluster ${clusterIndex}`,
+      hasFirstStimulus: Boolean(firstStim),
+    };
+  });
 }
 
 export function flattenNodes(nodes, depth = 0, parent = null) {
@@ -32,10 +43,10 @@ export function flattenNodes(nodes, depth = 0, parent = null) {
   return results;
 }
 
-export function nodeStimulusIds(node) {
-  return Array.isArray(node?.stimulusIds) ? node.stimulusIds : [];
+export function nodeClusterIndices(node) {
+  return Array.isArray(node?.clusterIndices) ? node.clusterIndices : [];
 }
 
-export function stimulusRegistryIdsForDisplay(display) {
-  return new Set((display?.stimulusRegistry || []).map((entry) => entry?.stimulusId).filter(Boolean));
+export function clusterIndicesForChoices(clusterChoices) {
+  return new Set((clusterChoices || []).filter((entry) => entry.hasFirstStimulus).map((entry) => entry.clusterIndex));
 }

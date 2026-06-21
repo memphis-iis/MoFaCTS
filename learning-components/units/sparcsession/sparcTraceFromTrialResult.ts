@@ -119,8 +119,8 @@ export function createSparcTraceFromTrialResult(
     if (traceMetadata.productionSet !== undefined) {
       details.productionSet = traceMetadata.productionSet;
     }
-    if (traceMetadata.stimulusKC !== undefined) {
-      details.stimulusKC = traceMetadata.stimulusKC;
+    if (traceMetadata.clusterIndex !== undefined) {
+      details.clusterIndex = traceMetadata.clusterIndex;
     }
     if (traceMetadata.responseKC !== undefined) {
       details.responseKC = traceMetadata.responseKC;

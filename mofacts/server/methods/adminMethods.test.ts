@@ -16,6 +16,9 @@ function createAdminDeps() {
       removeAsync: async () => 0,
     },
     DynamicAssets: {
+      collection: {
+        rawCollection: () => ({ countDocuments: async () => 0 }),
+      },
       find: () => ({ countAsync: async () => 0, fetchAsync: async () => [] }),
       removeAsync: async () => 0,
     },

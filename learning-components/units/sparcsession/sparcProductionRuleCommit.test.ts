@@ -422,8 +422,8 @@ describe('sparcProductionRuleCommit', function() {
     const modelPracticeDocument: SparcAuthoredDocument = {
       id: 'fractions-doc',
       schemaVersion: 1,
-      stimulusRegistry: [{
-        stimulusId: 'denominator-stimulus',
+      clusterTargets: [{
+        clusterIndex: 0,
         stimuliSetId: 'stim-set-1',
         stimulusKC: 'denominator-kc',
         clusterKC: 'cluster-kc',
@@ -443,7 +443,7 @@ describe('sparcProductionRuleCommit', function() {
         then: [{
           type: 'model-practice',
           outcome: 'correct',
-          stimulusId: 'denominator-stimulus',
+          clusterIndex: 0,
           responseValue: literal('12'),
         }, {
           type: 'model-practice',
@@ -458,7 +458,7 @@ describe('sparcProductionRuleCommit', function() {
         children: [{
           id: 'firstDenConv',
           kind: 'input',
-          stimulusIds: ['denominator-stimulus'],
+          clusterIndices: [0],
         }],
       },
     };

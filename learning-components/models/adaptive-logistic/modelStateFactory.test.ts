@@ -14,7 +14,7 @@ function createDeps(stimClusters: any[]) {
 }
 
 describe('modelStateFactory', function() {
-  it('adds SPARC stimulusRegistry entries as non-selectable adaptive model targets', function() {
+  it('builds initial model state only from ordinary cluster stimuli', function() {
     const state = createInitialModelState(createDeps([{
       stims: [{
         clusterKC: 0,
@@ -23,12 +23,12 @@ describe('modelStateFactory', function() {
         params: '0,0.8',
         display: {
           type: 'sparc',
-          stimulusRegistry: [{
-            stimulusId: 'determine-lcd',
+          clusterTargets: [{
+            clusterIndex: 0,
             stimulusKC: 'fractions.lcd',
             clusterKC: 'fractions.addition',
           }, {
-            stimulusId: 'convert-numerator',
+            clusterIndex: 1,
             stimulusKC: 'fractions.convert-numerator',
             clusterKC: 'fractions.addition',
           }],
@@ -37,35 +37,10 @@ describe('modelStateFactory', function() {
     }]));
 
     assert.equal(state.cards.length, 1);
-    assert.equal(state.cards[0].stims.length, 3);
+    assert.equal(state.cards[0].stims.length, 1);
     assert.equal(state.cards[0].stims[0].modelPracticeOnly, undefined);
-    assert.equal(state.cards[0].stims[1].modelPracticeOnly, true);
-    assert.equal(state.cards[0].stims[1].stimulusKC, 'fractions.lcd');
-    assert.equal(state.cards[0].stims[1].clusterKC, 'fractions.addition');
-    assert.equal(state.cards[0].stims[1].probabilityEstimate, 0.5);
-    assert.equal(state.cards[0].stims[2].stimulusKC, 'fractions.convert-numerator');
-    assert.deepEqual(state.probabilities.map((item) => item.stimIndex), [0, 1, 2]);
-  });
-
-  it('requires explicit SPARC registry KC identities', function() {
-    assert.throws(
-      () => createInitialModelState(createDeps([{
-        stims: [{
-          clusterKC: 0,
-          stimulusKC: 1,
-          correctResponse: '__SPARC_COMPLETED__',
-          params: '0,0.8',
-          display: {
-            type: 'sparc',
-            stimulusRegistry: [{
-              stimulusId: 'determine-lcd',
-              stimulusKC: '',
-              clusterKC: 'fractions.addition',
-            }],
-          },
-        }],
-      }])),
-      /SPARC stimulusRegistry entry/,
-    );
+    assert.equal(state.cards[0].stims[0].stimulusKC, 1);
+    assert.equal(state.cards[0].stims[0].clusterKC, 0);
+    assert.deepEqual(state.probabilities.map((item) => item.stimIndex), [0]);
   });
 });

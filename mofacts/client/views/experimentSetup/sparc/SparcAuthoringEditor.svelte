@@ -5,6 +5,7 @@
     normalizeSparcRichHtml,
   } from '../../experiment/svelte/services/sparcRichHtml';
   import {
+    clusterChoicesForAuthoring,
     findSparcTargets,
     flattenNodes,
   } from './sparcAuthoringTargets';
@@ -82,12 +83,8 @@
     updateImageHtmlAttribute,
   } from './sparcAuthoringMedia';
   import {
-    addStimulusRegistryEntry as addStimulusRegistryEntryAction,
-    materializeBehaviorModelTargetsForNode as materializeBehaviorModelTargetsForNodeAction,
-    removeStimulusRegistryEntry as removeStimulusRegistryEntryAction,
-    toggleNodeStimulus as toggleNodeStimulusAction,
-    updateStimulusField as updateStimulusFieldAction,
-    updateStimulusResponseField as updateStimulusResponseFieldAction,
+    materializeBehaviorClusterTargetsForNode as materializeBehaviorClusterTargetsForNodeAction,
+    toggleNodeCluster as toggleNodeClusterAction,
   } from './sparcAuthoringStimulusActions';
   import {
     createVisualEditorValueBridge,
@@ -106,7 +103,6 @@
   import SparcAuthoringHeader from './SparcAuthoringHeader.svelte';
   import SparcProductionRulesEditor from './SparcProductionRulesEditor.svelte';
   import SparcReactiveRulesEditor from './SparcReactiveRulesEditor.svelte';
-  import SparcStimulusRegistryEditor from './SparcStimulusRegistryEditor.svelte';
   import SparcVisualEditorTab from './SparcVisualEditorTab.svelte';
 
   export let tdfId = '';
@@ -145,7 +141,9 @@
 
   let rawStimuliFile = clone(initialTdf?.rawStimuliFile || { setspec: { clusters: [] } });
   let clusters = rawStimuliFile?.setspec?.clusters || [];
-  let sparcTargets = findSparcTargets(clusters);
+  let sparcPages = rawStimuliFile?.setspec?.sparcPages || [];
+  let sparcTargets = findSparcTargets(sparcPages);
+  let clusterChoices = clusterChoicesForAuthoring(clusters);
   let activeTargetKey = sparcTargets[0]?.key || '';
   let activeNodeId = '';
   let htmlEditorElement;
@@ -165,22 +163,19 @@
   let activeProductionRuleIndex = 0;
   let activeScopedProductionRuleIndex = -1;
   let activeReactiveRuleIndex = 0;
-  let activeStimulusIndex = 0;
   let draggedPaletteEntryId = '';
   let dropTarget = null;
   let dropMarkerStyle = '';
   let dropStateContextKey = '';
 
   $: activeTarget = sparcTargets.find((target) => target.key === activeTargetKey) || sparcTargets[0] || null;
-  $: activeDisplay = activeTarget ? clusters[activeTarget.clusterIndex]?.stims?.[activeTarget.stimIndex]?.display : null;
+  $: activeDisplay = activeTarget ? sparcPages[activeTarget.pageIndex]?.display : null;
   $: selectedStimFile = queryParams?.stimFile ? String(queryParams.stimFile) : '';
   $: displayNodes = Array.isArray(activeDisplay?.nodes) ? activeDisplay.nodes : [];
   $: productionRules = Array.isArray(activeDisplay?.productionRules) ? activeDisplay.productionRules : [];
   $: reactiveRules = Array.isArray(activeDisplay?.reactiveRules) ? activeDisplay.reactiveRules : [];
-  $: stimulusRegistry = Array.isArray(activeDisplay?.stimulusRegistry) ? activeDisplay.stimulusRegistry : [];
   $: activeProductionRule = productionRules[activeProductionRuleIndex] || productionRules[0] || null;
   $: activeReactiveRule = reactiveRules[activeReactiveRuleIndex] || reactiveRules[0] || null;
-  $: activeStimulus = stimulusRegistry[activeStimulusIndex] || stimulusRegistry[0] || null;
   $: flatNodes = flattenNodes(displayNodes);
   $: if (flatNodes.length > 0 && !flatNodes.some((entry) => entry.node?.id === activeNodeId)) {
     activeNodeId = flatNodes[0].node.id;
@@ -215,6 +210,9 @@
   $: if (!showAdvancedEditors && activeEditorTab !== 'visual') {
     activeEditorTab = 'visual';
   }
+  $: if (activeEditorTab === 'model') {
+    activeEditorTab = 'visual';
+  }
   $: richTextController.maintainHtmlEditor(activeNode, htmlEditorElement);
   $: richTextController.syncHtmlEditor(activeNode);
 
@@ -223,24 +221,18 @@
     getActiveNode: () => activeNode,
     getActiveProductionRule: () => activeProductionRule,
     getActiveReactiveRule: () => activeReactiveRule,
-    getActiveStimulus: () => activeStimulus,
     getFlatNodes: () => flatNodes,
     getActiveNodeId: () => activeNodeId,
     setActiveProductionRuleIndex: (index) => { activeProductionRuleIndex = index; },
     setActiveReactiveRuleIndex: (index) => { activeReactiveRuleIndex = index; },
-    setActiveStimulusIndex: (index) => { activeStimulusIndex = index; },
     setErrorText: (value) => { errorText = value; },
     markChanged,
     ensureProductionRules,
     ensureReactiveRules,
-    ensureStimulusRegistry,
+    getClusterChoices: () => clusterChoices,
     actions: {
-      addStimulusRegistryEntry: addStimulusRegistryEntryAction,
-      removeStimulusRegistryEntry: removeStimulusRegistryEntryAction,
-      updateStimulusField: updateStimulusFieldAction,
-      updateStimulusResponseField: updateStimulusResponseFieldAction,
-      materializeBehaviorModelTargetsForNode: materializeBehaviorModelTargetsForNodeAction,
-      toggleNodeStimulus: toggleNodeStimulusAction,
+      materializeBehaviorClusterTargetsForNode: materializeBehaviorClusterTargetsForNodeAction,
+      toggleNodeCluster: toggleNodeClusterAction,
       addProductionRule: addProductionRuleAction,
       removeProductionRule: removeProductionRuleAction,
       moveRule,
@@ -538,12 +530,6 @@
     return activeDisplay.reactiveRules;
   }
 
-  function ensureStimulusRegistry() {
-    if (!activeDisplay) throw new Error('No active SPARC display is selected.');
-    activeDisplay.stimulusRegistry = Array.isArray(activeDisplay.stimulusRegistry) ? activeDisplay.stimulusRegistry : [];
-    return activeDisplay.stimulusRegistry;
-  }
-
   function updateProductionRuleField(fieldName, value) {
     if (!activeProductionRule) return;
     if (value === '' && fieldName === 'module') {
@@ -676,7 +662,9 @@
   function markChanged() {
     rawStimuliFile = rawStimuliFile;
     clusters = clusters;
-    sparcTargets = findSparcTargets(clusters);
+    sparcPages = rawStimuliFile?.setspec?.sparcPages || [];
+    sparcTargets = findSparcTargets(sparcPages);
+    clusterChoices = clusterChoicesForAuthoring(clusters);
     saveMessage = '';
   }
 
@@ -696,7 +684,7 @@
   }
 
   function validateBeforeSave() {
-    validateSparcDisplaysBeforeSave({ sparcTargets, clusters });
+    validateSparcDisplaysBeforeSave({ sparcTargets, sparcPages, clusters });
   }
 
   onMount(async () => {
@@ -750,7 +738,7 @@
       {selectedImageAlt}
       {selectedImageTitle}
       {selectedHtmlMedia}
-      {stimulusRegistry}
+      {clusterChoices}
       {dropTarget}
       {dropMarkerStyle}
       {flatNodes}
@@ -798,7 +786,7 @@
       onUpdateFirstHtmlMediaAttribute={updateFirstHtmlMediaAttribute}
       onUpdateRichTextSource={richTextController.updateRichTextSource}
       onUpdateOptions={updateOptions}
-      onToggleNodeStimulus={controllerActions.toggleNodeStimulus}
+      onToggleNodeCluster={controllerActions.toggleNodeCluster}
       onCreateScopedProductionRule={createScopedProductionRule}
       onSelectScopedProductionRule={selectScopedProductionRule}
       onUpdateScopedProductionRuleField={updateScopedProductionRuleField}
@@ -811,16 +799,6 @@
       onAddExpressionArg={addExpressionArg}
       onRemoveExpressionArg={removeExpressionArg}
     />
-  {:else if activeEditorTab === 'model'}
-    <SparcStimulusRegistryEditor
-      {stimulusRegistry}
-      bind:activeStimulusIndex
-      {activeStimulus}
-      onAddStimulusRegistryEntry={controllerActions.addStimulusRegistryEntry}
-      onRemoveStimulusRegistryEntry={controllerActions.removeStimulusRegistryEntry}
-      onUpdateStimulusField={controllerActions.updateStimulusField}
-      onUpdateStimulusResponseField={controllerActions.updateStimulusResponseField}
-    />
   {:else if activeEditorTab === 'production'}
     <SparcProductionRulesEditor
       {productionRules}
@@ -831,7 +809,7 @@
       {comparisonOps}
       {classifyOutcomes}
       {messageTypes}
-      {stimulusRegistry}
+      {clusterChoices}
       {ruleExpressionTypes}
       {functionNames}
       {variableExpression}

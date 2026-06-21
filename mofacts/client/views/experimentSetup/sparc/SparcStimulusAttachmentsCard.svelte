@@ -1,31 +1,32 @@
 <script>
-  import { nodeStimulusIds } from './sparcAuthoringTargets';
+  import { nodeClusterIndices } from './sparcAuthoringTargets';
 
   export let activeNode = null;
-  export let stimulusRegistry = [];
-  export let onToggleNodeStimulus = () => {};
+  export let clusterChoices = [];
+  export let onToggleNodeCluster = () => {};
 
-  $: activeNodeStimulusIds = activeNode ? nodeStimulusIds(activeNode) : [];
+  $: activeNodeClusterIndices = activeNode ? nodeClusterIndices(activeNode) : [];
 </script>
 
 <div class="sparc-context-card sparc-stimulus-attachments-card">
   <div class="sparc-panel-header">
-    <h3>Stimulus Attachments</h3>
+    <h3>Cluster Attachments</h3>
   </div>
   <table class="sparc-stimulus-attachment-table">
     <tbody>
-      {#each stimulusRegistry as stimulus}
+      {#each clusterChoices as cluster}
         <tr>
           <td class="sparc-stimulus-checkbox-cell">
             <input
               type="checkbox"
-              checked={activeNodeStimulusIds.includes(stimulus.stimulusId)}
-              on:change={(event) => onToggleNodeStimulus(stimulus.stimulusId, event.currentTarget.checked)}
-              aria-label={`Attach ${stimulus.label || stimulus.stimulusId}`}
+              checked={activeNodeClusterIndices.includes(cluster.clusterIndex)}
+              disabled={!cluster.hasFirstStimulus}
+              on:change={(event) => onToggleNodeCluster(cluster.clusterIndex, event.currentTarget.checked)}
+              aria-label={`Attach cluster ${cluster.clusterIndex}`}
             />
           </td>
           <td class="sparc-stimulus-definition-cell">
-            <span class="sparc-stimulus-id">{stimulus.stimulusId}</span>
+            <span class="sparc-stimulus-id">{cluster.clusterIndex}: {cluster.label}</span>
           </td>
         </tr>
       {/each}

@@ -72,7 +72,7 @@ function nodeUsesModel(node: SparcAuthoredNode): boolean {
   if (node.modelTarget) {
     return true;
   }
-  if ((node.stimulusIds ?? []).length > 0) {
+  if ((node.clusterIndices ?? []).length > 0) {
     return true;
   }
   if ((node.refs ?? []).some((ref) => ref.relation === 'model-target')) {

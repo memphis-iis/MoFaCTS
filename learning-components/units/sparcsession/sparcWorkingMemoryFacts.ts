@@ -85,13 +85,13 @@ function collectNodeFacts(params: {
     });
   }
 
-  for (const stimulusId of params.node.stimulusIds ?? []) {
+  for (const clusterIndex of params.node.clusterIndices ?? []) {
     params.facts.push({
-      factType: 'node-stimulus-attachment',
+      factType: 'node-cluster-attachment',
       slots: {
         documentId: params.document.id,
         node: params.node.id,
-        stimulusId,
+        clusterIndex,
       },
     });
   }

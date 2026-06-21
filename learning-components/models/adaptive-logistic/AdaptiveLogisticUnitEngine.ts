@@ -54,8 +54,13 @@ import {
 import { buildAdaptiveLogisticModelProgressItems } from './modelProgressProvider';
 
 type StimClusterLike = {
+  clusterKC?: unknown;
   stims: Array<{
     correctResponse: string;
+    stimuliSetId?: unknown;
+    stimulusKC?: unknown;
+    clusterKC?: unknown;
+    responseKC?: unknown;
     params: string;
   }>;
 };

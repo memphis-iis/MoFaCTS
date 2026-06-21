@@ -985,14 +985,14 @@ export const SPARC_RULE_CATALOG: readonly SparcAuthoringCatalogEntry[] = [{
   id: 'rule.effect.model-practice',
   label: 'Model practice update',
   category: 'production-rule-effect',
-  description: 'Write adaptive model history for the matched production-rule outcome. Without an explicit stimulus, the runtime resolves through the source node stimulus attachment.',
+  description: 'Write adaptive model history for the matched production-rule outcome. Without an explicit cluster index, the runtime resolves through the source node cluster attachment.',
   schema: {
     type: 'object',
     required: ['type', 'outcome'],
     properties: {
       type: { const: 'model-practice' },
       outcome: { enum: ['correct', 'incorrect', 'partial', 'study', 'skipped', 'unknown'] },
-      stimulusId: { anyOf: [{ type: 'string' }, ruleExpressionSchema] },
+      clusterIndex: { anyOf: [{ type: 'number' }, ruleExpressionSchema] },
       nodeId: { anyOf: [{ type: 'string' }, ruleExpressionSchema] },
       responseValue: ruleExpressionSchema,
       input: ruleExpressionSchema,

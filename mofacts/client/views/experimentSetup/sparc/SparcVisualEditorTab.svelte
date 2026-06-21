@@ -28,7 +28,7 @@
   export let selectedImageAlt = '';
   export let selectedImageTitle = '';
   export let selectedHtmlMedia = null;
-  export let stimulusRegistry = [];
+  export let clusterChoices = [];
   export let dropTarget = null;
   export let dropMarkerStyle = '';
   export let flatNodes = [];
@@ -70,7 +70,7 @@
   export let onUpdateFirstHtmlMediaAttribute = () => {};
   export let onUpdateRichTextSource = () => {};
   export let onUpdateOptions = () => {};
-  export let onToggleNodeStimulus = () => {};
+  export let onToggleNodeCluster = () => {};
   export let onCreateScopedProductionRule = () => {};
   export let onSelectScopedProductionRule = () => {};
   export let onUpdateScopedProductionRuleField = () => {};
@@ -147,11 +147,11 @@
         onUpdateOptions={onUpdateOptions}
       />
 
-      {#if stimulusRegistry.length > 0}
+      {#if clusterChoices.length > 0}
         <SparcStimulusAttachmentsCard
           {activeNode}
-          {stimulusRegistry}
-          onToggleNodeStimulus={onToggleNodeStimulus}
+          {clusterChoices}
+          onToggleNodeCluster={onToggleNodeCluster}
         />
       {/if}
 
@@ -168,7 +168,7 @@
         {productionEffectTypes}
         {classifyOutcomes}
         {messageTypes}
-        {stimulusRegistry}
+        {clusterChoices}
         {ruleExpressionTypes}
         {functionNames}
         {variableExpression}

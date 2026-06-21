@@ -14,7 +14,7 @@
   export let productionEffectTypes = [];
   export let classifyOutcomes = [];
   export let messageTypes = [];
-  export let stimulusRegistry = [];
+  export let clusterChoices = [];
   export let ruleExpressionTypes = [];
   export let functionNames = [];
   export let variableExpression = (name) => ({ type: 'variable', name });
@@ -169,11 +169,11 @@
             </select>
           </label>
           <label>
-            Explicit Stimulus
-            <select value={typeof activeNodeRuleEffect.stimulusId === 'string' ? activeNodeRuleEffect.stimulusId : ''} on:change={(event) => onUpdateOptionalEffectField(activeNodeRuleEffect, 'stimulusId', event.currentTarget.value)}>
+            Explicit Cluster
+            <select value={activeNodeRuleEffect.clusterIndex ?? ''} on:change={(event) => onUpdateOptionalEffectField(activeNodeRuleEffect, 'clusterIndex', event.currentTarget.value)}>
               <option value="">Resolve from selected node attachment</option>
-              {#each stimulusRegistry as stimulus}
-                <option value={stimulus.stimulusId}>{stimulus.label || stimulus.stimulusId}</option>
+              {#each clusterChoices as cluster}
+                <option value={cluster.clusterIndex} disabled={!cluster.hasFirstStimulus}>{cluster.clusterIndex}: {cluster.label}</option>
               {/each}
             </select>
           </label>

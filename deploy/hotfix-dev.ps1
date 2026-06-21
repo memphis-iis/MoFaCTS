@@ -38,10 +38,16 @@ $composeArgs = @(
     "-f", "docker-compose.hotfix-native.yml"
 )
 
+function Test-WindowsHost {
+    return [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform(
+        [System.Runtime.InteropServices.OSPlatform]::Windows
+    )
+}
+
 function Resolve-ExternalCommandName {
     param([string]$CommandName)
 
-    if ($IsWindows -or $env:OS -eq "Windows_NT") {
+    if (Test-WindowsHost) {
         $windowsCommand = Get-Command "${CommandName}.cmd" -ErrorAction SilentlyContinue
         if ($null -ne $windowsCommand) {
             return $windowsCommand.Source

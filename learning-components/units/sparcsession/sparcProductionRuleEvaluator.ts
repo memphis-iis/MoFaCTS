@@ -37,6 +37,14 @@ function requireFiniteNumber(value: unknown, label: string): number {
   return numberValue;
 }
 
+function requireNonNegativeInteger(value: unknown, label: string): number {
+  const numberValue = requireFiniteNumber(value, label);
+  if (!Number.isInteger(numberValue) || numberValue < 0) {
+    throw new Error(`${label} must evaluate to a non-negative integer`);
+  }
+  return numberValue;
+}
+
 function stableStringify(value: unknown): string {
   if (!value || typeof value !== 'object') {
     return JSON.stringify(value);
@@ -393,7 +401,7 @@ function instantiateFiring(
   }[] = [];
   const modelPracticeObservations: {
     outcome: SparcProductionRuleFiring['modelPracticeObservations'][number]['outcome'];
-    stimulusId?: string;
+    clusterIndex?: number;
     nodeId?: string;
     responseValue?: unknown;
     input?: unknown;
@@ -451,12 +459,16 @@ function instantiateFiring(
       case 'model-practice':
         modelPracticeObservations.push({
           outcome: effect.outcome,
-          ...(effect.stimulusId !== undefined
+          ...(effect.clusterIndex !== undefined
             ? {
-                stimulusId: evaluateStringTemplateValue(
-                  effect.stimulusId,
-                  bindings,
-                  'SPARC production rule model-practice stimulusId',
+                clusterIndex: requireNonNegativeInteger(
+                  evaluateSparcRuleExpression(
+                    typeof effect.clusterIndex === 'number'
+                      ? { type: 'literal', value: effect.clusterIndex }
+                      : effect.clusterIndex,
+                    bindings,
+                  ),
+                  'SPARC production rule model-practice clusterIndex',
                 ),
               }
             : {}),

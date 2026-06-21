@@ -176,6 +176,89 @@ function sampleProductionRuleDocument(): SparcAuthoredDocument {
   };
 }
 
+function createPageRuntimeDeps(overrides: Record<string, unknown> = {}): any {
+  const clusters = [{
+    stims: [{
+      stimuliSetId: 'stim-set-1',
+      clusterKC: 'cluster-0',
+      stimulusKC: 'kc-0',
+      responseKC: 'response-0',
+      correctResponse: 'Cluster zero answer',
+      params: '0,0.8',
+      textStimulus: 'Cluster zero',
+    }],
+  }, {
+    stims: [{
+      stimuliSetId: 'stim-set-1',
+      clusterKC: 'cluster-1',
+      stimulusKC: 'kc-1',
+      responseKC: 'response-1',
+      correctResponse: 'Cluster one answer',
+      params: '0,0.8',
+      textStimulus: 'Cluster one',
+    }],
+  }];
+  return createMinimalDeps({
+    getSessionValue(key: UnitEngineSessionReadKey) {
+      if (key === 'currentTdfUnit') {
+        return {
+          sparcsession: {
+            pageId: 'page-1',
+            clusterlist: '0-1',
+            calculateProbability: 'return p',
+          },
+        };
+      }
+      if (key === 'currentTdfId') {
+        return 'tdf-1';
+      }
+      if (key === 'currentStimuliSetId') {
+        return 'stim-set-1';
+      }
+      if (key === 'curStudentPerformance') {
+        return { totalTime: 0 };
+      }
+      return undefined;
+    },
+    getStimCount: () => clusters.length,
+    getStimCluster: (clusterIndex: number) => clusters[clusterIndex],
+    findTdfById: () => ({
+      rawStimuliFile: {
+        setspec: {
+          sparcPages: [{
+            pageId: 'page-1',
+            display: {
+              type: 'sparc',
+              documentId: 'doc-1',
+              nodes: [{
+                id: 'answer-node',
+                nodeType: 'atomic',
+                atomType: 'text-input',
+                clusterIndex: 1,
+              }],
+            },
+          }],
+        },
+      },
+    }),
+    extractDelimFields(source: string, fields: unknown[]) {
+      fields.push(...String(source).split(',').map((field) => field.trim()).filter(Boolean));
+    },
+    rangeVal(source: unknown) {
+      const match = String(source).match(/^(\d+)-(\d+)$/);
+      if (!match) {
+        return [];
+      }
+      const start = Number(match[1]);
+      const end = Number(match[2]);
+      return Array.from({ length: end - start + 1 }, (_, index) => start + index);
+    },
+    legacyInt: (source: unknown) => Number.parseInt(String(source), 10),
+    legacyFloat: (source: unknown) => Number(source),
+    ...overrides,
+  });
+}
+
 describe('SparcSessionUnitEngine document runtime boundary', function() {
   it('inherits model-progress provider capability from the adaptive logistic engine', async function() {
     const cluster = {
@@ -285,6 +368,61 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
         nodeId: 'feedback',
       }, 'visible')]?.value,
       true,
+    );
+  });
+
+  it('renders the sparcsession page while resolving model targets from ordinary clusters', async function() {
+    const engine = await createSparcSessionUnitEngine(createPageRuntimeDeps());
+
+    const preparedState = await engine.buildPreparedCardQuestionAndAnswerGlobals(0, 0, [0, 0.8]);
+
+    assert.equal(preparedState.currentDisplay.pageId, 'page-1');
+    assert.equal(preparedState.currentDisplay.documentId, 'doc-1');
+    assert.equal(preparedState.currentAnswer, '__SPARC_COMPLETED__');
+    assert.deepEqual(
+      preparedState.currentDisplay.clusterTargets.map((target: { clusterIndex: number; stimulusKC: string; clusterKC: string }) => ({
+        clusterIndex: target.clusterIndex,
+        stimulusKC: target.stimulusKC,
+        clusterKC: target.clusterKC,
+      })),
+      [{
+        clusterIndex: 0,
+        stimulusKC: 'kc-0',
+        clusterKC: 'cluster-0',
+      }, {
+        clusterIndex: 1,
+        stimulusKC: 'kc-1',
+        clusterKC: 'cluster-1',
+      }],
+    );
+  });
+
+  it('rejects SPARC pages that reference clusters outside sparcsession.clusterlist', async function() {
+    const engine = await createSparcSessionUnitEngine(createPageRuntimeDeps({
+      findTdfById: () => ({
+        rawStimuliFile: {
+          setspec: {
+            sparcPages: [{
+              pageId: 'page-1',
+              display: {
+                type: 'sparc',
+                documentId: 'doc-1',
+                nodes: [{
+                  id: 'bad-node',
+                  nodeType: 'atomic',
+                  atomType: 'text-input',
+                  clusterIndex: 2,
+                }],
+              },
+            }],
+          },
+        },
+      }),
+    }));
+
+    await assert.rejects(
+      () => engine.buildPreparedCardQuestionAndAnswerGlobals(0, 0, [0, 0.8]),
+      /references cluster 2, which is outside sparcsession\.clusterlist/,
     );
   });
 

@@ -87,14 +87,14 @@ the canonical model target by identity rather than by SPARC or Learning Session
 session-local indices. A host runtime should expose that behavior through the
 generic `adaptive-model` capability from `../../runtime/modelPracticeRuntime.ts`
 and persist the returned canonical record through the `history` capability.
-Authored documents declare model identities in `stimulusRegistry`; SPARC nodes
-may attach zero or more registry `stimulusId` values through `stimulusIds`.
+Authored documents declare model identities in `clusterTargets`; SPARC nodes
+may attach zero or more `clusterIndex` values through `clusterIndices`.
 Nodes remain interface/document elements, not model stimuli. `sparcAuthoredModelTargets.ts`
-resolves model-linked outcomes from an explicit registry stimulus or from an
-addressed node with exactly one stimulus attachment. Missing registry entries,
+resolves model-linked outcomes from an explicit cluster target or from an
+addressed node with exactly one cluster attachment. Missing cluster targets,
 ambiguous node attachments, and SPARC-only nodes fail clearly before model
 history is written. Document validation applies the shared model-history
-identity rules to registry entries, so `KCId`/`KCDefault` must match
+identity rules to cluster targets, so `KCId`/`KCDefault` must match
 `stimulusKC` and `KCCluster` must match `clusterKC` before a document can emit
 model practice records.
 `sparcResponseOutcomeCommit.ts` is the SPARC-side orchestration point for that:

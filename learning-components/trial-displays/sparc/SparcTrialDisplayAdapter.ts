@@ -24,7 +24,7 @@ export interface SparcTraceExpectation {
   productionSet?: string;
   actionId: string;
   submittedValue?: unknown;
-  stimulusKC?: string | number;
+  clusterIndex?: number;
   responseKC?: string | number;
 }
 
@@ -54,6 +54,7 @@ export interface SparcBoxedNodeGroup {
 export interface SparcTrialDisplay {
   type: 'sparc';
   documentId?: string;
+  pageId?: string;
   schema?: string;
   layout?: {
     zones?: SparcLayoutZone[];
@@ -62,6 +63,7 @@ export interface SparcTrialDisplay {
   nodes: unknown[];
   workingMemoryFacts?: unknown[];
   productionRules?: unknown[];
+  clusterTargets?: unknown[];
   progressReporter?: SparcProgressReporterConfig;
   response?: {
     gradingMode?: string;
@@ -178,8 +180,8 @@ export const sparcTrialDisplayAdapter: TrialDisplayAdapter<SparcTrialDisplay, Sp
                     : {}),
                   actionId: String(entry.actionId || ''),
                   ...('submittedValue' in entry ? { submittedValue: entry.submittedValue } : {}),
-                  ...(typeof entry.stimulusKC === 'string' || typeof entry.stimulusKC === 'number'
-                    ? { stimulusKC: entry.stimulusKC }
+                  ...(Number.isInteger(Number(entry.clusterIndex)) && Number(entry.clusterIndex) >= 0
+                    ? { clusterIndex: Number(entry.clusterIndex) }
                     : {}),
                   ...(typeof entry.responseKC === 'string' || typeof entry.responseKC === 'number'
                     ? { responseKC: entry.responseKC }

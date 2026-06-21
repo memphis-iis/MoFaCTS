@@ -3,17 +3,14 @@ export function createSparcAuthoringControllerAdapters({
   getActiveNode,
   getActiveProductionRule,
   getActiveReactiveRule,
-  getActiveStimulus,
-  getFlatNodes,
   getActiveNodeId,
   setActiveProductionRuleIndex,
   setActiveReactiveRuleIndex,
-  setActiveStimulusIndex,
   setErrorText,
   markChanged,
   ensureProductionRules,
   ensureReactiveRules,
-  ensureStimulusRegistry,
+  getClusterChoices,
   actions,
 }) {
   const markIfChanged = (changed) => {
@@ -21,32 +18,11 @@ export function createSparcAuthoringControllerAdapters({
   };
 
   return {
-    addStimulusRegistryEntry() {
-      try {
-        const registry = ensureStimulusRegistry();
-        setActiveStimulusIndex(actions.addStimulusRegistryEntry(registry));
-        markChanged();
-      } catch (error) {
-        setErrorText(error.message || String(error));
-      }
-    },
-    removeStimulusRegistryEntry(index) {
-      const registry = ensureStimulusRegistry();
-      actions.removeStimulusRegistryEntry({ registry, index, flatNodes: getFlatNodes() });
-      setActiveStimulusIndex(Math.max(0, Math.min(index, registry.length - 1)));
-      markChanged();
-    },
-    updateStimulusField(fieldName, value) {
-      markIfChanged(actions.updateStimulusField(getActiveStimulus(), fieldName, value));
-    },
-    updateStimulusResponseField(fieldName, value) {
-      markIfChanged(actions.updateStimulusResponseField(getActiveStimulus(), fieldName, value));
-    },
     materializeBehaviorModelTargetsForNode(node) {
-      markIfChanged(actions.materializeBehaviorModelTargetsForNode(getActiveDisplay(), node));
+      markIfChanged(actions.materializeBehaviorClusterTargetsForNode(getActiveDisplay(), node, getClusterChoices()));
     },
-    toggleNodeStimulus(stimulusId, checked) {
-      markIfChanged(actions.toggleNodeStimulus(getActiveNode(), stimulusId, checked));
+    toggleNodeCluster(clusterIndex, checked) {
+      markIfChanged(actions.toggleNodeCluster(getActiveNode(), clusterIndex, checked));
     },
     addProductionRule() {
       try {

@@ -118,7 +118,7 @@ The full TypeScript check is the required TypeScript verification path for app c
 
 The repository defines test scripts in `mofacts/package.json`. Some local Meteor workflows may require additional environment setup. For release preparation, record any test limitations explicitly rather than treating a narrowed check as full release confidence.
 
-`npm run test:ci` runs the Meteor server test suite and compiles the client test bundle in CI or another supported Meteor test environment. On local Windows, the script refuses to start Meteor unless `MOFACTS_ALLOW_WINDOWS_METEOR_TESTS=1` is set for deliberate harness debugging. Browser-side client tests require a configured `TEST_BROWSER_DRIVER`.
+`npm run test:ci` is CI-only. It runs the Meteor server test suite and compiles the client test bundle in CI; local development should use the targeted checks above and should record Meteor integration or client contract coverage as unavailable locally rather than substituting a narrower check.
 
 ## Modify Or Add A Unit Type
 

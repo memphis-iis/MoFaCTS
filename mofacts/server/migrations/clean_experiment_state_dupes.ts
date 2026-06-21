@@ -15,6 +15,13 @@ const serverConsole = (...args: any[]) => {
   console.log(new Date().toString(), ...args);
 };
 
+function isNamespaceMissing(error: unknown) {
+  const maybeError = error as { code?: unknown; codeName?: unknown; message?: unknown };
+  return maybeError?.code === 26
+    || maybeError?.codeName === 'NamespaceNotFound'
+    || String(maybeError?.message || '').includes('ns does not exist');
+}
+
 /**
  * For each (userId, TDFId) pair with multiple documents, keep the newest
  * (by lastActionTimeStamp then _id) and merge its state from older docs.
@@ -22,7 +29,16 @@ const serverConsole = (...args: any[]) => {
  */
 export async function cleanExperimentStateDupesAndAddUniqueIndex() {
   // Skip if the unique index already exists (migration already ran)
-  const existingIndexes = await GlobalExperimentStates.rawCollection().indexes();
+  let existingIndexes;
+  try {
+    existingIndexes = await GlobalExperimentStates.rawCollection().indexes();
+  } catch (error: unknown) {
+    if (isNamespaceMissing(error)) {
+      serverConsole('Experiment state collection does not exist, skipping dedup migration');
+      return { success: true, duplicatesRemoved: 0, groupsProcessed: 0, skipped: true };
+    }
+    throw error;
+  }
   if (existingIndexes.some((idx: { name?: string }) => idx.name === 'unique_user_tdf')) {
     serverConsole('Experiment state unique index already exists, skipping dedup migration');
     return { success: true, duplicatesRemoved: 0, groupsProcessed: 0, skipped: true };

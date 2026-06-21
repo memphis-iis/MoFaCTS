@@ -4,16 +4,26 @@ import {
 } from '../../experiment/svelte/services/sparcRichHtml.ts';
 import {
   flattenNodes,
-  nodeStimulusIds,
-  stimulusRegistryIdsForDisplay,
+  nodeClusterIndices,
 } from './sparcAuthoringTargets';
 
-export function validateSparcDisplaysBeforeSave({ sparcTargets, clusters }) {
+function validClusterIndicesForSave(clusters) {
+  const valid = new Set();
+  for (const [clusterIndex, cluster] of (clusters || []).entries()) {
+    const firstStim = Array.isArray(cluster?.stims) ? cluster.stims[0] : null;
+    if (firstStim) {
+      valid.add(clusterIndex);
+    }
+  }
+  return valid;
+}
+
+export function validateSparcDisplaysBeforeSave({ sparcTargets, sparcPages, clusters }) {
+  const validClusterIndices = validClusterIndicesForSave(clusters);
   for (const target of sparcTargets) {
-    const display = clusters[target.clusterIndex]?.stims?.[target.stimIndex]?.display;
+    const display = sparcPages[target.pageIndex]?.display;
     removeDeprecatedGroupLabels(display?.nodes || []);
     const seen = new Set();
-    const stimulusRegistryIds = stimulusRegistryIdsForDisplay(display);
     for (const entry of flattenNodes(display?.nodes || [])) {
       const node = entry.node;
       if (!node.id || typeof node.id !== 'string') {
@@ -23,9 +33,9 @@ export function validateSparcDisplaysBeforeSave({ sparcTargets, clusters }) {
         throw new Error(`Duplicate SPARC node id "${node.id}" in "${target.label}".`);
       }
       seen.add(node.id);
-      for (const stimulusId of node.stimulusIds || []) {
-        if (!stimulusRegistryIds.has(stimulusId)) {
-          throw new Error(`Node "${node.id}" in "${target.label}" attaches unknown stimulus "${stimulusId}".`);
+      for (const clusterIndex of node.clusterIndices || []) {
+        if (!Number.isInteger(Number(clusterIndex)) || !validClusterIndices.has(Number(clusterIndex))) {
+          throw new Error(`Node "${node.id}" in "${target.label}" attaches unknown clusterIndex ${String(clusterIndex)}.`);
         }
       }
       if (node.atomType === 'html-block' || node.atomType === 'message-box') {
@@ -36,8 +46,7 @@ export function validateSparcDisplaysBeforeSave({ sparcTargets, clusters }) {
         }
       }
     }
-    validateStimulusRegistryBeforeSave(display, target.label);
-    validateRulesBeforeSave(display, target.label);
+    validateRulesBeforeSave(display, target.label, validClusterIndices);
   }
 }
 
@@ -56,37 +65,6 @@ function removeDeprecatedGroupLabels(nodes, parentGroupType = '') {
       for (const panel of node.panels || []) {
         removeDeprecatedGroupLabels(panel.children || [], '');
       }
-    }
-  }
-}
-
-function validateStimulusRegistryBeforeSave(display, label) {
-  const seen = new Set();
-  for (const [index, stimulus] of (display?.stimulusRegistry || []).entries()) {
-    requireNonBlankString(stimulus?.stimulusId, `${label} stimulusRegistry[${index}] stimulusId`);
-    if (seen.has(stimulus.stimulusId)) {
-      throw new Error(`${label} has duplicate stimulusId "${stimulus.stimulusId}".`);
-    }
-    seen.add(stimulus.stimulusId);
-    for (const fieldName of ['stimuliSetId', 'stimulusKC', 'clusterKC', 'KCId', 'KCDefault', 'KCCluster']) {
-      if (stimulus?.[fieldName] === undefined || stimulus?.[fieldName] === null || String(stimulus[fieldName]).trim() === '') {
-        throw new Error(`${label} stimulus "${stimulus.stimulusId}" is missing ${fieldName}.`);
-      }
-    }
-    if (String(stimulus.KCId) !== String(stimulus.stimulusKC)) {
-      throw new Error(`${label} stimulus "${stimulus.stimulusId}" must have KCId equal stimulusKC.`);
-    }
-    if (String(stimulus.KCDefault) !== String(stimulus.stimulusKC)) {
-      throw new Error(`${label} stimulus "${stimulus.stimulusId}" must have KCDefault equal stimulusKC.`);
-    }
-    if (String(stimulus.KCCluster) !== String(stimulus.clusterKC)) {
-      throw new Error(`${label} stimulus "${stimulus.stimulusId}" must have KCCluster equal clusterKC.`);
-    }
-    if (stimulus.response) {
-      if (stimulus.response.responseKC === undefined || stimulus.response.responseKC === null || String(stimulus.response.responseKC).trim() === '') {
-        throw new Error(`${label} stimulus "${stimulus.stimulusId}" responseKC is required when response identity is used.`);
-      }
-      requireNonBlankString(stimulus.response.responseKey, `${label} stimulus "${stimulus.stimulusId}" responseKey`);
     }
   }
 }
@@ -177,7 +155,7 @@ function validateProductionEffect(effect, label) {
       break;
     case 'model-practice':
       requireNonBlankString(effect.outcome, `${label} outcome`);
-      if (effect.stimulusId && typeof effect.stimulusId === 'object') validateRuleExpression(effect.stimulusId, `${label} stimulusId`);
+      if (effect.clusterIndex && typeof effect.clusterIndex === 'object') validateRuleExpression(effect.clusterIndex, `${label} clusterIndex`);
       if (effect.nodeId && typeof effect.nodeId === 'object') validateRuleExpression(effect.nodeId, `${label} nodeId`);
       if (effect.responseValue !== undefined) validateRuleExpression(effect.responseValue, `${label} responseValue`);
       if (effect.input !== undefined) validateRuleExpression(effect.input, `${label} input`);
@@ -233,8 +211,7 @@ function validateReactiveCondition(condition, label) {
   }
 }
 
-function validateRulesBeforeSave(display, label) {
-  const stimulusRegistryIds = stimulusRegistryIdsForDisplay(display);
+function validateRulesBeforeSave(display, label, validClusterIndices) {
   const nodesById = new Map(flattenNodes(display?.nodes || []).map((entry) => [entry.node.id, entry.node]));
   for (const [index, rule] of (display?.productionRules || []).entries()) {
     requireNonBlankString(rule.id, `${label} productionRules[${index}] id`);
@@ -261,17 +238,20 @@ function validateRulesBeforeSave(display, label) {
       if (effect?.type !== 'model-practice') {
         return;
       }
-      if (typeof effect.stimulusId === 'string' && effect.stimulusId.trim() && !stimulusRegistryIds.has(effect.stimulusId)) {
-        throw new Error(`${label} productionRules[${index}].then[${effectIndex}] targets unknown stimulus "${effect.stimulusId}".`);
+      if (effect.clusterIndex !== undefined && typeof effect.clusterIndex !== 'object') {
+        const clusterIndex = Number(effect.clusterIndex);
+        if (!Number.isInteger(clusterIndex) || !validClusterIndices.has(clusterIndex)) {
+          throw new Error(`${label} productionRules[${index}].then[${effectIndex}] targets unknown clusterIndex ${String(effect.clusterIndex)}.`);
+        }
       }
-      if (!effect.stimulusId && typeof effect.nodeId === 'string' && effect.nodeId.trim()) {
+      if (effect.clusterIndex === undefined && typeof effect.nodeId === 'string' && effect.nodeId.trim()) {
         const node = nodesById.get(effect.nodeId);
         if (!node) {
           throw new Error(`${label} productionRules[${index}].then[${effectIndex}] targets unknown node "${effect.nodeId}".`);
         }
-        const ids = nodeStimulusIds(node);
-        if (ids.length !== 1) {
-          throw new Error(`${label} productionRules[${index}].then[${effectIndex}] node "${effect.nodeId}" must have exactly one stimulus attachment.`);
+        const clusterIndices = nodeClusterIndices(node);
+        if (clusterIndices.length !== 1) {
+          throw new Error(`${label} productionRules[${index}].then[${effectIndex}] node "${effect.nodeId}" must have exactly one cluster attachment.`);
         }
       }
     });

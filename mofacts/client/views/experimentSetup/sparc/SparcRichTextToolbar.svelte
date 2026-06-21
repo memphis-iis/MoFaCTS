@@ -13,7 +13,7 @@
   export let onToolbarMouseDown = () => {};
 </script>
 
-<div class="sparc-rich-text-toolbar" aria-label="SPARC visual editor tools" on:mousedown={onToolbarMouseDown}>
+<div class="sparc-rich-text-toolbar" role="toolbar" tabindex="-1" aria-label="SPARC visual editor tools" on:mousedown={onToolbarMouseDown}>
   <label class="sparc-advanced-toggle sparc-toolbar-toggle">
     <input type="checkbox" bind:checked={showNodeHierarchy} />
     Show node hierarchy

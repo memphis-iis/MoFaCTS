@@ -15,22 +15,6 @@ export interface InitialModelState {
   }>;
 }
 
-type ExplicitModelTarget = {
-  readonly stimulusId?: unknown;
-  readonly stimulusKC?: unknown;
-  readonly clusterKC?: unknown;
-  readonly KCId?: unknown;
-  readonly KCDefault?: unknown;
-  readonly KCCluster?: unknown;
-};
-
-function hasIdentity(value: unknown): value is string | number {
-  if (typeof value === 'number') {
-    return Number.isFinite(value);
-  }
-  return typeof value === 'string' && value.trim().length > 0;
-}
-
 function normalizeIdentity(value: unknown, fieldName: string): string | number {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value;
@@ -41,21 +25,11 @@ function normalizeIdentity(value: unknown, fieldName: string): string | number {
   throw new Error(`[Unit Engine] Missing ${fieldName}; refusing synthetic fallback.`);
 }
 
-function getSparcStimulusRegistry(clusterStim: any): ExplicitModelTarget[] {
-  const registry = clusterStim?.display?.stimulusRegistry;
-  if (!Array.isArray(registry)) {
-    return [];
-  }
-  return registry;
-}
-
 function createInitialCardStim(params: {
   readonly clusterKC: string | number;
   readonly stimKC: string | number;
   readonly stimIndex: number;
   readonly parameter: unknown[];
-  readonly modelPracticeOnly?: boolean;
-  readonly sourceStim?: any;
 }) {
   return {
     clusterKC: params.clusterKC,
@@ -81,11 +55,6 @@ function createInitialCardStim(params: {
     timesSeen: 0,
     canUse: true,
     probabilityEstimate: 0.5,
-    ...(params.modelPracticeOnly ? {
-      modelPracticeOnly: true,
-      correctResponse: params.sourceStim?.correctResponse || String(params.stimKC),
-      params: params.sourceStim?.params || '0,0.8',
-    } : {}),
   };
 }
 
@@ -160,28 +129,6 @@ export function createInitialModelState(
           outcomeStack: [],
           instructionQuestionResult: null,
         };
-      }
-
-      for (const target of getSparcStimulusRegistry(clusterStim)) {
-        if (!hasIdentity(target.stimulusKC) || !hasIdentity(target.clusterKC)) {
-          throw new Error(`[Unit Engine] SPARC stimulusRegistry entry for stim ${j} in cluster index ${i} is missing clusterKC or stimulusKC.`);
-        }
-        const modelStimIndex = card.stims.length;
-        const modelClusterKC = normalizeIdentity(target.clusterKC, 'SPARC stimulusRegistry.clusterKC');
-        const modelStimKC = normalizeIdentity(target.stimulusKC, 'SPARC stimulusRegistry.stimulusKC');
-        card.stims.push(createInitialCardStim({
-          clusterKC: modelClusterKC,
-          stimKC: modelStimKC,
-          stimIndex: modelStimIndex,
-          parameter,
-          modelPracticeOnly: true,
-          sourceStim: clusterStim,
-        }));
-        initProbs.push({
-          cardIndex: i,
-          stimIndex: modelStimIndex,
-          probability: 0,
-        });
       }
     }
 

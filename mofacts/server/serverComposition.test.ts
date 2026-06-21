@@ -782,6 +782,62 @@ describe('learner analytics method authorization', function() {
     });
   });
 
+  it('returns prior-unit model history for later units unless unit-scoped history is requested', async function() {
+    await HistoriesAny.insertAsync({
+      _id: 'sparc-model-unit-1',
+      userId: 'current-user',
+      TDFId: 'tdf-shared-model',
+      levelUnit: 1,
+      levelUnitType: 'model',
+      time: 1000,
+      outcome: 'correct',
+      eventType: 'sparc',
+      stimuliSetId: 'set-a',
+      stimulusKC: 'stim-a',
+      clusterKC: 'cluster-a',
+      KCCluster: 'cluster-a',
+      KCId: 'stim-a',
+      responseKey: 'Alpha',
+      responseDuration: 75,
+    });
+    await HistoriesAny.insertAsync({
+      _id: 'flashcard-model-unit-2',
+      userId: 'current-user',
+      TDFId: 'tdf-shared-model',
+      levelUnit: 2,
+      levelUnitType: 'model',
+      time: 2000,
+      outcome: 'incorrect',
+      eventType: '',
+      stimuliSetId: 'set-a',
+      stimulusKC: 'stim-a',
+      clusterKC: 'cluster-a',
+      KCCluster: 'cluster-a',
+      KCId: 'stim-a',
+      responseKey: 'Alpha',
+      responseDuration: 90,
+    });
+
+    const cumulativeRows = await (asyncMethods.getLearningHistoryForUnit as any).call(
+      { userId: 'current-user' },
+      'current-user',
+      'tdf-shared-model',
+      2,
+      false
+    );
+    expect(cumulativeRows.map((row: any) => row.time)).to.deep.equal([1000, 2000]);
+    expect(cumulativeRows.map((row: any) => row.eventType)).to.deep.equal(['sparc', '']);
+
+    const unitScopedRows = await (asyncMethods.getLearningHistoryForUnit as any).call(
+      { userId: 'current-user' },
+      'current-user',
+      'tdf-shared-model',
+      2,
+      true
+    );
+    expect(unitScopedRows.map((row: any) => row.time)).to.deep.equal([2000]);
+  });
+
   it('returns exact-unit durable SPARC history with canonical extension fields', async function() {
     const sparcExtension = {
       documentId: 'doc-1',

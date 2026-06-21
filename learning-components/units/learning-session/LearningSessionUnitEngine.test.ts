@@ -80,6 +80,153 @@ describe('LearningSessionUnitEngine selection completion guard', function() {
 });
 
 describe('LearningSessionUnitEngine model practice updates', function() {
+  it('loads prior SPARC model history into a later flashcard learning session for the same cluster model', async function() {
+    const cluster = {
+      stims: [{
+        clusterKC: 'cluster-1',
+        stimulusKC: 'kc-1',
+        correctResponse: 'Answer',
+        params: '0,0',
+      }],
+    };
+    const historyRows = [{
+      eventType: 'sparc',
+      levelUnitType: 'model',
+      time: 1000,
+      outcome: 'correct',
+      stimuliSetId: 'stim-set-1',
+      stimulusKC: 'kc-1',
+      clusterKC: 'cluster-1',
+      KCId: 'kc-1',
+      KCDefault: 'kc-1',
+      KCCluster: 'cluster-1',
+      responseKey: 'answer',
+      responseDuration: 250,
+      responseValue: 'Answer',
+    }];
+    let requestedUnitNumber: number | null = null;
+    let reconstructionRows: unknown[] = [];
+    const sessionValues = new Map<string, unknown>();
+    const deps = createMinimalDeps({
+      getSessionValue(key: UnitEngineSessionReadKey) {
+        if (sessionValues.has(key)) {
+          return sessionValues.get(key);
+        }
+        if (key === 'currentTdfUnit') {
+          return { learningsession: { clusterlist: '0' } };
+        }
+        if (key === 'currentTdfId') {
+          return 'tdf-1';
+        }
+        if (key === 'currentUnitNumber') {
+          return 2;
+        }
+        if (key === 'curStudentPerformance') {
+          return { totalTime: 0 };
+        }
+        return undefined;
+      },
+      setSessionValue(key: string, value: unknown) {
+        sessionValues.set(key, value);
+      },
+      getStimCount: () => 1,
+      getStimCluster: () => cluster,
+      serverMethods: {
+        getResponseKCMapForTdf: async () => ({ answer: 'response-kc-1' }),
+        getStimulusCrowdStatsForDeck: async () => [],
+        getLearningHistoryForUnit: async (_userId: string, _tdfId: string, currentUnitNumber: number) => {
+          requestedUnitNumber = currentUnitNumber;
+          return historyRows;
+        },
+      },
+      reconstructLearningStateFromHistory(rows: unknown[]) {
+        reconstructionRows = rows;
+        return {
+          clusterState: {
+            'cluster-1': {
+              firstSeen: 1000,
+              lastSeen: 1000,
+              priorCorrect: 1,
+              priorIncorrect: 0,
+              allTimeCorrect: 1,
+              allTimeIncorrect: 0,
+              priorStudy: 0,
+              outcomeStack: [1],
+              timeHistory: [1000],
+              totalPracticeDuration: 250,
+              allTimeTotalPracticeDuration: 250,
+              trialsSinceLastSeen: 0,
+              hasBeenIntroduced: true,
+              otherPracticeTime: 0,
+              instructionQuestionResult: null,
+            },
+          },
+          stimulusState: {
+            'kc-1': {
+              firstSeen: 1000,
+              lastSeen: 1000,
+              priorCorrect: 1,
+              priorIncorrect: 0,
+              allTimeCorrect: 1,
+              allTimeIncorrect: 0,
+              priorStudy: 0,
+              outcomeStack: [1],
+              timeHistory: [1000],
+              totalPracticeDuration: 250,
+              allTimeTotalPracticeDuration: 250,
+              curSessionPriorCorrect: 1,
+              curSessionPriorIncorrect: 0,
+              hasBeenIntroduced: true,
+              timesSeen: 1,
+              otherPracticeTime: 0,
+              instructionQuestionResult: null,
+            },
+          },
+          responseState: {
+            Answer: {
+              firstSeen: 1000,
+              lastSeen: 1000,
+              priorCorrect: 1,
+              priorIncorrect: 0,
+              allTimeCorrect: 1,
+              allTimeIncorrect: 0,
+              priorStudy: 0,
+              outcomeStack: [1],
+              timeHistory: [1000],
+              totalPracticeDuration: 250,
+              allTimeTotalPracticeDuration: 250,
+              instructionQuestionResult: null,
+            },
+          },
+          numQuestionsAnswered: 1,
+          numQuestionsAnsweredCurrentSession: 1,
+          numCorrectAnswers: 1,
+          overallOutcomeHistory: [1],
+          overallStudyHistory: [0],
+        };
+      },
+      extractDelimFields(source: string, fields: unknown[]) {
+        fields.push(source);
+      },
+      rangeVal: () => [],
+      legacyInt: (source: unknown) => Number(source),
+    });
+    const engine = await createLearningSessionUnitEngine(deps);
+    await engine.initializeLogisticModelState();
+
+    await engine.loadResumeState();
+
+    assert.equal(requestedUnitNumber, 2);
+    assert.deepEqual(reconstructionRows, historyRows);
+    const cardProbabilities = engine.getCardProbabilitiesNoCalc();
+    assert.equal(cardProbabilities.cards[0].priorCorrect, 1);
+    assert.equal(cardProbabilities.cards[0].hasBeenIntroduced, true);
+    assert.equal(cardProbabilities.cards[0].stims[0].priorCorrect, 1);
+    assert.equal(cardProbabilities.cards[0].stims[0].timesSeen, 1);
+    assert.equal(cardProbabilities.numQuestionsAnswered, 1);
+    assert.deepEqual(deps.getSessionValue('overallOutcomeHistory'), [1]);
+  });
+
   it('applies canonical model-practice updates through the shared adaptive-logistic engine state', async function() {
     const cluster = {
       stims: [{

@@ -16,6 +16,64 @@ const serverConsole = (...args: any[]) => {
   console.log.apply(this, disp);
 };
 
+type IndexInfo = {
+  name?: string;
+  key?: Record<string, unknown>;
+};
+
+function isNamespaceMissing(error: unknown) {
+  const maybeError = error as { code?: unknown; codeName?: unknown; message?: unknown };
+  return maybeError?.code === 26
+    || maybeError?.codeName === 'NamespaceNotFound'
+    || String(maybeError?.message || '').includes('ns does not exist');
+}
+
+function sameIndexKey(left: unknown, right: Record<string, unknown>) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+async function ensureSectionsCourseIndex() {
+  const collection = Sections.rawCollection();
+  const indexKey = { courseId: 1 };
+  let indexes: IndexInfo[];
+  try {
+    indexes = await collection.indexes() as IndexInfo[];
+  } catch (error: unknown) {
+    if (isNamespaceMissing(error)) {
+      await collection.createIndex(
+        indexKey,
+        { name: 'section_courseId', background: true }
+      );
+      serverConsole('  Created: Sections.section_courseId');
+      return;
+    }
+    throw error;
+  }
+  const canonicalIndex = indexes.find((index) => index.name === 'section_courseId');
+  if (canonicalIndex) {
+    if (!sameIndexKey(canonicalIndex.key, indexKey)) {
+      throw new Error(`Existing section_courseId index has unexpected key: ${JSON.stringify(canonicalIndex.key)}`);
+    }
+    serverConsole('  Existing: Sections.section_courseId');
+    return;
+  }
+
+  const legacyIndex = indexes.find((index) => index.name === 'perf_courseId');
+  if (legacyIndex) {
+    if (!sameIndexKey(legacyIndex.key, indexKey)) {
+      throw new Error(`Existing perf_courseId index has unexpected key: ${JSON.stringify(legacyIndex.key)}`);
+    }
+    await collection.dropIndex('perf_courseId');
+    serverConsole('  Dropped legacy: Sections.perf_courseId');
+  }
+
+  await collection.createIndex(
+    indexKey,
+    { name: 'section_courseId', background: true }
+  );
+  serverConsole('  Created: Sections.section_courseId');
+}
+
 /**
  * Create all performance indexes.
  */
@@ -114,17 +172,7 @@ export async function createPerformanceIndexes() {
     );
     serverConsole('  Created: SectionUserMap.section_user_lookup');
 
-    await Sections.rawCollection().createIndex(
-      { courseId: 1 },
-      { name: 'perf_courseId', background: true }
-    );
-    serverConsole('  Created: Sections.courseId');
-
-    await Sections.rawCollection().createIndex(
-      { courseId: 1 },
-      { name: 'section_courseId', background: true }
-    );
-    serverConsole('  Created: Sections.section_courseId');
+    await ensureSectionsCourseIndex();
 
     await Courses.rawCollection().createIndex(
       { teacherUserId: 1, semester: 1 },
@@ -338,10 +386,10 @@ export async function createPerformanceIndexes() {
     serverConsole('  Created: Histories.history_user_assignment_time');
 
     serverConsole('========================================');
-    serverConsole('All 35 performance indexes created successfully');
+    serverConsole('Performance indexes are ready');
     serverConsole('========================================');
 
-    return { success: true, indexesCreated: 35 };
+    return { success: true };
   } catch (error) {
     serverConsole('========================================');
     serverConsole('Error creating performance indexes:', error);

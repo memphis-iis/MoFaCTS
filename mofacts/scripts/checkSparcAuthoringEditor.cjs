@@ -41,6 +41,7 @@ function assertRuleCatalogCoverage() {
     'rule.effect.message',
     'rule.effect.classify',
     'rule.effect.credit',
+    'rule.effect.model-practice',
     'rule.effect.progressive-node-operation',
     'reactive.condition',
   ]) {
@@ -53,7 +54,10 @@ function assertRuleRoundTrip() {
   productionRule.id = 'roundtrip.production';
   productionRule.tests.push(editorModel.defaultProductionTest());
   productionRule.then.push(editorModel.defaultProductionEffect('write-state'));
-  productionRule.then.push(editorModel.defaultProductionEffect('model-practice'));
+  productionRule.then.push({
+    ...editorModel.defaultProductionEffect('model-practice'),
+    clusterIndex: 0,
+  });
   productionRule.then.push(editorModel.defaultProductionEffect('append-text'));
 
   const reactiveRule = editorModel.defaultReactiveRule(0);
@@ -66,42 +70,39 @@ function assertRuleRoundTrip() {
       clusters: [{
         clustername: 'roundtrip-cluster',
         stims: [{
+          stimulusid: 0,
           display: {
-            type: 'sparc',
-            documentId: 'doc-1',
-            stimulusRegistry: [{
-              stimulusId: 'roundtrip-stimulus',
-              label: 'Round Trip Stimulus',
-              stimuliSetId: 1,
-              stimulusKC: 'kc',
-              clusterKC: 'cluster',
-              KCId: 'kc',
-              KCDefault: 'kc',
-              KCCluster: 'cluster',
-              response: {
-                responseKC: 'response-kc',
-                responseKey: 'answer',
-              },
-            }],
-            nodes: [{
-              id: 'node-1',
-              nodeType: 'atomic',
-              atomType: 'text-block',
-              value: 'Round trip',
-              stimulusIds: ['roundtrip-stimulus'],
-            }],
-            initialState: [editorModel.defaultStateWrite('doc-1', 'node-1')],
-            productionRules: [productionRule],
-            reactiveRules: [reactiveRule],
-            layout: {
-              layoutMode: 'document',
-              scrollAxis: 'vertical',
-            },
-            forwardCompatibleField: {
-              preserved: true,
-            },
+            type: 'text',
+            text: 'Round trip cluster',
+          },
+          response: {
+            correctResponse: 'Answer',
           },
         }],
+      }],
+      sparcPages: [{
+        pageId: 'roundtrip-page',
+        display: {
+          type: 'sparc',
+          documentId: 'doc-1',
+          nodes: [{
+            id: 'node-1',
+            nodeType: 'atomic',
+            atomType: 'text-block',
+            value: 'Round trip',
+            clusterIndices: [0],
+          }],
+          initialState: [editorModel.defaultStateWrite('doc-1', 'node-1')],
+          productionRules: [productionRule],
+          reactiveRules: [reactiveRule],
+          layout: {
+            layoutMode: 'document',
+            scrollAxis: 'vertical',
+          },
+          forwardCompatibleField: {
+            preserved: true,
+          },
+        },
       }],
     },
   };
@@ -110,22 +111,21 @@ function assertRuleRoundTrip() {
   const roundTripped = clone(rawStimuliFile);
   const afterHash = stableHash(roundTripped);
 
-  assert.equal(afterHash, beforeHash, 'raw SPARC stimulus JSON changed during clone round trip');
-  const display = roundTripped.setspec.clusters[0].stims[0].display;
+  assert.equal(afterHash, beforeHash, 'raw SPARC page JSON changed during clone round trip');
+  const display = roundTripped.setspec.sparcPages[0].display;
   assert.equal(display.productionRules[0].id, 'roundtrip.production');
   assert.equal(display.reactiveRules[0].id, 'roundtrip.reactive');
-  assert.equal(display.stimulusRegistry[0].stimulusId, 'roundtrip-stimulus');
-  assert.equal(display.nodes[0].stimulusIds[0], 'roundtrip-stimulus');
-  assert.equal(display.productionRules[0].then.some((effect) => effect.type === 'model-practice'), true);
+  assert.equal(display.nodes[0].clusterIndices[0], 0);
+  assert.equal(display.productionRules[0].then.some((effect) => effect.type === 'model-practice' && effect.clusterIndex === 0), true);
   assert.equal(display.forwardCompatibleField.preserved, true);
 }
 
-function assertRegistryResolution() {
+function assertClusterResolution() {
   const document = {
     id: 'doc-1',
     schemaVersion: 1,
-    stimulusRegistry: [{
-      stimulusId: 'stim-a',
+    clusterTargets: [{
+      clusterIndex: 0,
       stimuliSetId: 'set-a',
       stimulusKC: 'kc-a',
       clusterKC: 'cluster-a',
@@ -133,7 +133,7 @@ function assertRegistryResolution() {
       KCDefault: 'kc-a',
       KCCluster: 'cluster-a',
     }, {
-      stimulusId: 'stim-b',
+      clusterIndex: 1,
       stimuliSetId: 'set-a',
       stimulusKC: 'kc-b',
       clusterKC: 'cluster-a',
@@ -147,11 +147,11 @@ function assertRegistryResolution() {
       children: [{
         id: 'single-node',
         kind: 'input',
-        stimulusIds: ['stim-a'],
+        clusterIndices: [0],
       }, {
         id: 'ambiguous-node',
         kind: 'input',
-        stimulusIds: ['stim-a', 'stim-b'],
+        clusterIndices: [0, 1],
       }, {
         id: 'sparc-only-node',
         kind: 'output',
@@ -184,8 +184,9 @@ function assertRegistryResolution() {
         nodeId: 'sparc-only-node',
       },
     }),
-    /did not resolve a stimulus/,
+    /did not resolve a cluster/,
   );
+  assert.equal('defaultSparcStimulusRegistryEntry' in editorModel, false);
 }
 
 function assertFractionNormalization() {
@@ -236,7 +237,7 @@ function assertFractionNormalization() {
 const paletteEntries = assertPaletteCoverage();
 assertRuleCatalogCoverage();
 assertRuleRoundTrip();
-assertRegistryResolution();
+assertClusterResolution();
 assertFractionNormalization();
 
 console.log(JSON.stringify({

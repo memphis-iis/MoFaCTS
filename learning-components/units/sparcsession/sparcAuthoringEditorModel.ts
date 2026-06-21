@@ -10,7 +10,6 @@ import type {
   SparcProductionRuleTest,
   SparcReactiveRule,
   SparcRuleExpression,
-  SparcStimulusRegistryEntry,
   SparcStateWrite,
 } from './sparcSessionContracts';
 
@@ -146,20 +145,6 @@ export function defaultProductionEffect(type = 'classify'): SparcProductionRuleE
         outcome: 'correct',
       };
   }
-}
-
-export function defaultSparcStimulusRegistryEntry(index: number): SparcStimulusRegistryEntry {
-  const stimulusId = `stimulus-${index + 1}`;
-  return {
-    stimulusId,
-    label: `Stimulus ${index + 1}`,
-    stimuliSetId: '',
-    stimulusKC: stimulusId,
-    clusterKC: '',
-    KCId: stimulusId,
-    KCDefault: stimulusId,
-    KCCluster: '',
-  };
 }
 
 export function defaultProductionRule(index: number): SparcProductionRule {

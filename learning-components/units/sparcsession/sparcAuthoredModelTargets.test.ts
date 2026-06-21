@@ -38,11 +38,11 @@ function authoredDocument(): SparcAuthoredDocument {
   return {
     id: 'doc-1',
     schemaVersion: 1,
-    stimulusRegistry: [{
-      stimulusId: 'region-stimulus',
+    clusterTargets: [{
+      clusterIndex: 0,
       ...regionTarget,
     }, {
-      stimulusId: 'widget-stimulus',
+      clusterIndex: 1,
       ...widgetTarget,
     }],
     root: {
@@ -51,11 +51,11 @@ function authoredDocument(): SparcAuthoredDocument {
       children: [{
         id: 'region-7',
         kind: 'panel',
-        stimulusIds: ['region-stimulus'],
+        clusterIndices: [0],
         children: [{
           id: 'widget-3',
           kind: 'widget',
-          stimulusIds: ['widget-stimulus'],
+          clusterIndices: [1],
           children: [{
             id: 'input',
             kind: 'input',
@@ -107,7 +107,7 @@ describe('sparcAuthoredModelTargets', function() {
     );
   });
 
-  it('requires production-rule model-practice effects to resolve through the stimulus registry', function() {
+  it('requires production-rule model-practice effects to resolve through cluster attachments', function() {
     const modelTargetOnlyDocument: SparcAuthoredDocument = {
       id: 'doc-1',
       schemaVersion: 1,
@@ -130,7 +130,7 @@ describe('sparcAuthoredModelTargets', function() {
           nodeId: 'widget-3',
         },
       }),
-      /must resolve through stimulusRegistry attachment/,
+      /must resolve through cluster attachment/,
     );
   });
 });

@@ -5,6 +5,7 @@ type SparcSessionConfigUnit = {
 export type SparcSessionModelConfigurationValidationIssue = {
   readonly kind:
     | 'missing-sparcsession-model-config'
+    | 'missing-sparcsession-pageId'
     | 'missing-sparcsession-clusterlist'
     | 'missing-sparcsession-calculateProbability';
   readonly message: string;
@@ -26,6 +27,17 @@ export function resolveSparcSessionClusterListSource(
   return typeof clusterlist === 'string'
     ? clusterlist.trim()
     : clusterlist;
+}
+
+export function resolveSparcSessionPageId(
+  unit: SparcSessionConfigUnit | null | undefined,
+): string | undefined {
+  const pageId = resolveSparcSessionRuntimeConfig(unit)?.pageId;
+  if (typeof pageId !== 'string') {
+    return undefined;
+  }
+  const trimmed = pageId.trim();
+  return trimmed || undefined;
 }
 
 export function resolveSparcSessionUnitMode(
@@ -67,6 +79,12 @@ export function validateSparcSessionModelConfiguration(
   }
 
   const issues: SparcSessionModelConfigurationValidationIssue[] = [];
+  if (!resolveSparcSessionPageId(unit)) {
+    issues.push({
+      kind: 'missing-sparcsession-pageId',
+      message: 'SPARC sessions require unit-level sparcsession.pageId',
+    });
+  }
   const clusterlist = resolveSparcSessionClusterListSource(unit);
   const hasClusterList = Array.isArray(clusterlist)
     ? clusterlist.length > 0

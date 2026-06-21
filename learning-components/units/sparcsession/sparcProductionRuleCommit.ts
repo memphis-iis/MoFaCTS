@@ -331,7 +331,7 @@ async function commitProductionRuleModelPracticeObservations(
     const modelTarget = resolveSparcProductionRuleModelTarget({
       document: params.document,
       sourceAddress: params.event.source,
-      ...(observation.stimulusId ? { stimulusId: observation.stimulusId } : {}),
+      ...(observation.clusterIndex !== undefined ? { clusterIndex: observation.clusterIndex } : {}),
       nodeId,
     });
     const processed = processSparcResponseOutcome(params.core, {
@@ -348,7 +348,7 @@ async function commitProductionRuleModelPracticeObservations(
       displayedStimulus: {
         documentId: params.event.source.documentId,
         nodeId,
-        stimulusId: observation.stimulusId ?? null,
+        clusterIndex: observation.clusterIndex ?? null,
       },
       modelTarget,
     });

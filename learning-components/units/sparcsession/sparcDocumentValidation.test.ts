@@ -120,12 +120,14 @@ describe('sparcDocumentValidation', function() {
     });
     assert.equal(incompleteUnitResult.valid, false);
     assert.deepEqual(incompleteUnitResult.modelConfigIssues.map((issue) => issue.kind), [
+      'missing-sparcsession-pageId',
       'missing-sparcsession-clusterlist',
       'missing-sparcsession-calculateProbability',
     ]);
 
     const validUnitResult = validateSparcAuthoredDocument(document, {
       sparcsession: {
+        pageId: 'page-1',
         clusterlist: '0',
         calculateProbability: 'return p;',
       },
@@ -152,7 +154,7 @@ describe('sparcDocumentValidation', function() {
         children: [{
           id: 'adaptive-panel',
           kind: 'panel',
-          stimulusIds: ['stimulus-1'],
+          clusterIndices: [0],
           reactive: {
             enabledWhen: {
               type: 'model',
@@ -174,7 +176,7 @@ describe('sparcDocumentValidation', function() {
         then: [{
           type: 'model-practice',
           outcome: 'correct',
-          stimulusId: 'stimulus-1',
+          clusterIndex: 0,
         }],
       }],
     };

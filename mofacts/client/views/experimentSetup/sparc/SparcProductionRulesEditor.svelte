@@ -10,7 +10,7 @@
   export let comparisonOps = [];
   export let classifyOutcomes = [];
   export let messageTypes = [];
-  export let stimulusRegistry = [];
+  export let clusterChoices = [];
   export let ruleExpressionTypes = [];
   export let functionNames = [];
   export let variableExpression = (name) => ({ type: 'variable', name });
@@ -301,11 +301,11 @@
                 </label>
                 <div class="sparc-expression-grid">
                   <label>
-                    Explicit Stimulus
-                    <select value={typeof effect.stimulusId === 'string' ? effect.stimulusId : ''} on:change={(event) => onUpdateOptionalEffectField(effect, 'stimulusId', event.currentTarget.value)}>
+                    Explicit Cluster
+                    <select value={effect.clusterIndex ?? ''} on:change={(event) => onUpdateOptionalEffectField(effect, 'clusterIndex', event.currentTarget.value)}>
                       <option value="">Resolve from node attachment</option>
-                      {#each stimulusRegistry as stimulus}
-                        <option value={stimulus.stimulusId}>{stimulus.label || stimulus.stimulusId}</option>
+                      {#each clusterChoices as cluster}
+                        <option value={cluster.clusterIndex} disabled={!cluster.hasFirstStimulus}>{cluster.clusterIndex}: {cluster.label}</option>
                       {/each}
                     </select>
                   </label>

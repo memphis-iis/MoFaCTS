@@ -281,6 +281,8 @@ export function updateOptionalEffectField(effect, fieldName, value) {
   if (!effect) return false;
   if (value === undefined || value === '') {
     delete effect[fieldName];
+  } else if (fieldName === 'clusterIndex') {
+    effect[fieldName] = Number(value);
   } else {
     effect[fieldName] = value;
   }

@@ -440,7 +440,8 @@ Meteor.publish('tdfForEditMetadata', async function(tdfId: any) {
         'content.fileName': 1,
         'content.tdfs.tutor.setspec': 1,
         // Include rawStimuliFile structure info but not full data
-        'rawStimuliFile.setspec.clusters': 1
+        'rawStimuliFile.setspec.clusters': 1,
+        'rawStimuliFile.setspec.sparcPages': 1
         // Explicitly EXCLUDES: stimuli (large array)
     };
 

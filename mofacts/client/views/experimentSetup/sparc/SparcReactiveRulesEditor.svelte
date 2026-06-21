@@ -222,8 +222,7 @@
     font-size: calc(var(--app-font-size-base) * 0.85);
   }
 
-  input,
-  select {
+  input {
     width: 100%;
     border: 1px solid var(--border-color);
     background: var(--sparc-editor-input-surface);
