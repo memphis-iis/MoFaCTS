@@ -10,7 +10,7 @@ Sources reviewed:
 
 ## Core Framing
 
-The common controller should not treat AutoTutor dialogue and SPARC pages as separate intelligences. The shared unit is an instructional decision made after a student action: interpret what the student did, update or consult the learner model/history, then decide whether the page should remain as-is, advance, give feedback, add scaffolding, revise content, or credit practice.
+The common controller should not treat AutoTutor dialogue and SPARC pages as separate intelligences. The shared flow is aligned with AutoTutor's current separation of responsibilities: interpret the learner event, plan the next instructional move, then realize that move through the current surface. SPARC differs because interpretation is not always LLM scoring. Some node responses are transparently scored by production rules or response logic, and the LLM interprets those known results in context rather than rescoring them.
 
 In SPARC, that decision should be realized through the machinery the system already uses:
 
@@ -22,7 +22,7 @@ In SPARC, that decision should be realized through the machinery the system alre
 - replayable SPARC history
 - shared model-history writes through the ordinary cluster/stimulus model
 
-AutoTutor is one realization style for these decisions, mainly conversational. SPARC is the broader workspace where the same decisions may also change the page, add non-dialog content, update state, or let the student continue without visible intervention. The proposed umbrella design label from the chats is FireTutor: a motivated pedagogical controller for adaptive dialogue, dynamic worksheets, and reactive instructional pages.
+AutoTutor is one realization style for these decisions, mainly conversational. SPARC is the broader workspace where the same planned moves may also change the page, add non-dialog content, update state, or let the student continue without visible intervention. The proposed umbrella design label from the chats is FireTutor: a motivated pedagogical controller for adaptive dialogue, dynamic worksheets, and reactive instructional pages.
 
 ## Corrected Vocabulary
 
@@ -38,14 +38,14 @@ AutoTutor is one realization style for these decisions, mainly conversational. S
 | # | Design point | Question to answer | Current leaning |
 |---|---|---|---|
 | 1 | Every student action should produce an interpretable event with node values, trigger, focus, page state, history, and relevant model state. | What exact event/context object should the controller receive? | Define a compact `ControllerContext` built from SPARC trial result, replay state, current page, cluster model state, and recent history. |
-| 2 | The controller should interpret the student's action before deciding what to do. | Should interpretation and action selection be one LLM call or separate steps? | Use one structured interpret-and-plan call initially, with separate fields for diagnosis, model evidence, and selected action. |
-| 3 | The system may update the model on each student action. | Which actions are scorable, and when should model-history writes happen relative to LLM interpretation? | Treat model credit as an explicit production-rule/controller effect; pass current model/history into the LLM and write validated credits through the cluster/stimulus bridge. |
+| 2 | Interpretation and planning should be separate, matching AutoTutor's scoring/interpretation, app planning, and realization split. | What exactly belongs in the SPARC interpretation result versus the SPARC plan? | Interpretation says what happened and what it means; planning chooses the next instructional/page action. |
+| 3 | SPARC interpretation is not always LLM scoring. | Which node responses are system-scored, LLM-scored, mixed, or not scorable? | Make response evaluation mode explicit for each event so the LLM knows whether to evaluate the response or interpret a known result. |
 | 4 | A valid controller decision may do nothing visible. | How should "let the student continue" be represented? | Make `no_visible_intervention` or `allow_continue` an explicit action, still recorded in trace/history when useful. |
-| 5 | SPARC behavior should remain production-rule-centered. | Should the LLM generate production rules, choose among authored rules, or emit production-rule-like actions? | Begin with production-rule-like actions constrained by a validator; later allow author-approved rule generation. |
+| 5 | SPARC behavior should remain production-rule-centered. | Should the planner choose among authored production rules, emit constrained production-rule-like actions, or generate reusable rules? | Begin with a planner that chooses among authored rules/action patterns or emits constrained action instances; reusable generated rules are later. |
 | 6 | Page changes should use the current progressive node operation style. | Which page/node operations are allowed in v1? | Start with existing operations: `append-node`, `append-node-if-missing`, `insert-node`, and `append-text`; add new operations only when required. |
 | 7 | Controller outputs must be executable and replayable. | What validator is needed before executing LLM-selected actions? | Validate node targets, operation types, required fields, KC/cluster targets, state keys, and history payloads before any runtime write. |
 | 8 | Nondeterministic templates are a target capability. | How do we represent generated non-dialog page actions without reducing them to authored text? | Define parameterized page-action patterns that can produce nodes, hints, feedback, state writes, or practice credits, not only utterances. |
-| 9 | AutoTutor-style generated text remains useful but is not the whole system. | When should the LLM generate prose versus structured page actions? | Let the controller select the instructional action first; prose is only one possible realization field. |
+| 9 | AutoTutor-style generated text remains useful but is not the whole system. | When should the realization step generate prose versus structured page-action content? | Let the planner select the instructional action first; prose is only one possible realization. |
 | 10 | Production rules define the possibility space. | How much of that possibility space is authored versus generated at runtime? | V1 should combine authored constraints with runtime-selected/generated action instances; fully generated reusable rules are a later step. |
 | 11 | The controller needs current learner model/history, as AutoTutor does. | How much history should be sent to the LLM? | Send recent relevant SPARC history, model state for targeted clusters, and summarized prior controller decisions rather than raw full history. |
 | 12 | SPARC page history and model learning history have different jobs. | What event shape keeps them separate but linked? | Record SPARC controller/action history separately; model writes still target ordinary cluster/stimulus identities. |
@@ -69,17 +69,31 @@ Create a compact context object for each student action. It should include:
 - recent SPARC history
 - relevant cluster/stimulus model state
 - page, node, or action-level controller mission
+- response evaluation mode, such as `system_scored`, `llm_scoring_required`, `mixed`, or `not_scorable`
+- system-known score/outcome when available
 
 This context is the SPARC equivalent of the information AutoTutor sends for response interpretation, expanded to include page state and possible page actions.
 
-### 2. Define The Controller Decision Schema
+### 2. Define The Interpretation Result
 
-The controller response should be structured, not just prose. It should include:
+The first LLM call should interpret the student action. It should not choose the final page operation or write the tutor-facing content. It should include:
 
 - student-action diagnosis
+- accepted system score/outcome, when one was provided
+- semantic score/evaluation only when the response evaluation mode requires it
 - evidence and confidence
 - model evidence or model-credit recommendation
-- selected instructional action
+- misconceptions, partial understanding, or productive progress
+- relevant history/context summary
+- provenance/debug explanation
+
+For multiple choice, numeric, button, drag/drop, or production-rule-scored input, the LLM should treat the system result as evidence and interpret its instructional meaning. For essay or short answer, the LLM may also evaluate the learner's response semantically.
+
+### 3. Define The Planner Output
+
+The planner consumes the interpretation result and current SPARC context. It chooses what should happen next. The planner output should include:
+
+- selected instructional action, including `allow_continue` when no visible intervention is warranted
 - target nodes and target clusters
 - visible or invisible realization
 - requested production-rule-like effects
@@ -87,7 +101,9 @@ The controller response should be structured, not just prose. It should include:
 
 The selected action may be visible or invisible. "Let the student continue" is a real decision, not a missing decision.
 
-### 3. Execute Through SPARC Production-Rule Effects
+The first implementation should decide whether this planner is deterministic app code, an LLM call constrained by schemas, or a hybrid. AutoTutor uses deterministic app planning after LLM scoring; SPARC should preserve that separation even if the planner later includes LLM assistance.
+
+### 4. Realize And Execute Through SPARC Production-Rule Effects
 
 Do not add a new graph/edge system. Controller decisions should compile into the same categories of effects SPARC already understands or can validate coherently:
 
@@ -100,9 +116,9 @@ Do not add a new graph/edge system. Controller decisions should compile into the
 
 For v1, use the existing progressive node operations where possible: `append-node`, `append-node-if-missing`, `insert-node`, and `append-text`.
 
-### 4. Add A Validator Boundary
+### 5. Add A Validator Boundary
 
-Before execution, validate every controller-selected effect. The validator should reject:
+Before execution, validate every planned or realized effect. The validator should reject:
 
 - unknown action/effect types
 - missing or invalid node IDs
@@ -114,7 +130,7 @@ Before execution, validate every controller-selected effect. The validator shoul
 
 The LLM may interpret and propose. The runtime remains responsible for deciding whether the proposal is executable.
 
-### 5. Support Nondeterministic Page-Action Patterns
+### 6. Support Nondeterministic Page-Action Patterns
 
 Move beyond deterministic templates and dialogue-only LLM prose by defining page-action patterns. A pattern is a constrained generator for one kind of instructional intervention, such as:
 
@@ -128,17 +144,58 @@ Move beyond deterministic templates and dialogue-only LLM prose by defining page
 
 These patterns should be able to generate non-dialog page changes, not just tutor utterances.
 
-### 6. Preserve Shared Learning History
+### 7. Align The Two LLM Calls With AutoTutor's Split
+
+The SPARC controller should keep two LLM calls, but the calls should not collapse interpretation and planning together.
+
+Call 1 is interpretation. It receives a bounded interpretation packet:
+
+- student event: submitted node values, focused node, trigger, and timestamp
+- current page state: relevant nodes, visible context, current progressive additions, and current working-memory/state values
+- response evaluation mode and system-known score/outcome when available
+- learner evidence: recent SPARC history, relevant cluster model state, and prior controller decisions
+- target structure: target clusters/KCs, expected ideas, known misconceptions, and completion criteria
+
+Call 1 emits an interpretation result:
+
+- diagnosis of the student action
+- accepted score/outcome or semantic evaluation
+- model evidence and misconception/understanding evidence
+- context summary for the planner
+- brief rationale/provenance
+
+Then the planner selects the next instructional action from the interpretation and the allowed SPARC possibility space. This may be deterministic app code, a constrained LLM-assisted planner, or a hybrid, but it should be a separate step from interpretation.
+
+Call 2 is realization. It receives the selected plan and emits only the concrete content or parameters needed to implement that plan:
+
+- tutor message text, when a message is needed
+- generated node content, when a page update is needed
+- page-action pattern parameters
+- proposed progressive node operation content
+- state/history payload fragments
+
+The runtime then validates and compiles the realized result into executable SPARC effects. For page changes, the first supported compilation targets should be the existing progressive node operations:
+
+- `append-node`
+- `append-node-if-missing`
+- `insert-node`
+- `append-text`
+
+This means the LLM does not simply emit arbitrary next node operations. It interprets when needed, and it may realize content or parameters for a selected action. The validated runtime turns the selected and realized action into production-rule-style effects. Later versions may allow LLM-assisted planning or reusable production-rule generation, but only through validation and approval boundaries.
+
+### 8. Preserve Shared Learning History
 
 When the controller credits practice or evidence for a KC, it should target the ordinary cluster model. Runtime should resolve the target cluster to its canonical first stimulus and write model history using the same identity that flashcard sessions use.
 
 SPARC page replay/history should stay page-scoped. Model learning history should stay shared across SPARC, flashcards, and later sessions that address the same clusters.
 
-### 7. Build A Pilot Before Broad Generalization
+### 9. Build A Pilot Before Broad Generalization
 
 Use one SPARC lesson as the first pilot. The pilot should demonstrate:
 
 - a student action interpreted with page state and model/history context
+- at least one system-scored response interpreted without LLM rescoring
+- at least one LLM-scored short-answer response, if the pilot includes text input
 - a possible no-visible-intervention decision
 - a visible feedback or hint decision
 - a non-dialog page update through progressive node operations
@@ -149,19 +206,21 @@ After the pilot works, broaden the action pattern library and revisit whether ru
 
 ## First Implementation Boundary
 
-The first implementation should not attempt unconstrained page generation. It should build the controller skeleton, the context and decision schemas, the validator, a small set of production-rule-like effects, replayable history, and a small library of nondeterministic page-action patterns.
+The first implementation should not attempt unconstrained page generation. It should build the controller skeleton, the context schema, the interpretation result schema, the planner output schema, the realization boundary, the validator, a small set of production-rule-like effects, replayable history, and a small library of nondeterministic page-action patterns.
 
 ## Questions To Resolve Next
 
 1. What exact fields belong in the per-action `ControllerContext`?
 2. Which student actions are immediately scorable, and which require LLM interpretation before model credit?
-3. Should the LLM choose among authored production rules first, or directly emit constrained action instances?
-4. What is the v1 set of allowed production-rule-like effects?
-5. Which progressive node operations are enough for the pilot, and what operation is missing if they are not enough?
-6. How should "allow continue / no visible intervention" be recorded in SPARC history?
-7. How much SPARC and model history should be sent to the LLM on each action?
-8. What is the minimum provenance needed for debugging and research analysis?
-9. Where should page-action patterns live in config: inside `sparcPages`, beside them, or in reusable controller templates?
-10. What is the first pilot lesson for validating this architecture?
-11. What authoring UI is needed for goals, misconceptions, allowed patterns, and target clusters?
-12. Should generated reusable production rules be allowed later, and if so what approval or validation workflow is required?
+3. Should the SPARC planner be deterministic app code like AutoTutor's planner, LLM-assisted, or a hybrid?
+4. If the planner is hybrid, what decisions can the LLM influence without bypassing validation?
+5. What is the v1 set of allowed production-rule-like effects?
+6. Which progressive node operations are enough for the pilot, and what operation is missing if they are not enough?
+7. How should "allow continue / no visible intervention" be recorded in SPARC history?
+8. How much SPARC and model history should be sent to the LLM interpretation call?
+9. What context should the realization call receive after the planner has selected an action?
+10. What is the minimum provenance needed for debugging and research analysis?
+11. Where should page-action patterns live in config: inside `sparcPages`, beside them, or in reusable controller templates?
+12. What is the first pilot lesson for validating this architecture?
+13. What authoring UI is needed for goals, misconceptions, allowed patterns, and target clusters?
+14. Should generated reusable production rules be allowed later, and if so what approval or validation workflow is required?
