@@ -217,10 +217,10 @@
                     <span class="fa {{firstContentUnitIconClass}} content-unit-icon" title="{{firstContentUnitIconTitle}}"></span>
                   {{/if}}
                   {{#if showTtsIcon}}
-                    <span class="fa fa-headphones {{ttsIconClass}}" title="Text-to-Speech {{#if this.hasTTSAPIKey}}(API key available){{else}}(needs API key in Audio Settings){{/if}}"></span>
+                    <span class="fa fa-headphones {{ttsIconClass}}" title="{{ttsIconTitle}}"></span>
                   {{/if}}
                   {{#if showSrIcon}}
-                    <span class="fa fa-microphone {{srIconClass}}" title="Speech Recognition {{#if this.hasSpeechAPIKey}}(API key available){{else}}(needs API key in Audio Settings){{/if}}"></span>
+                    <span class="fa fa-microphone {{srIconClass}}" title="{{srIconTitle}}"></span>
                   {{/if}}
                 </span>
               </td>
@@ -298,10 +298,10 @@
             <span class="fa {{firstContentUnitIconClass}} content-unit-icon" title="{{firstContentUnitIconTitle}}"></span>
           {{/if}}
           {{#if showTtsIcon}}
-            <span class="fa fa-headphones {{ttsIconClass}}" title="Text-to-Speech {{#if this.hasTTSAPIKey}}(API key available){{else}}(needs API key in Audio Settings){{/if}}"></span>
+            <span class="fa fa-headphones {{ttsIconClass}}" title="{{ttsIconTitle}}"></span>
           {{/if}}
           {{#if showSrIcon}}
-            <span class="fa fa-microphone {{srIconClass}}" title="Speech Recognition {{#if this.hasSpeechAPIKey}}(API key available){{else}}(needs API key in Audio Settings){{/if}}"></span>
+            <span class="fa fa-microphone {{srIconClass}}" title="{{srIconTitle}}"></span>
           {{/if}}
           {{#unless showTtsIcon}}
             {{#unless showSrIcon}}

@@ -657,9 +657,56 @@ function parseBooleanLike(value: unknown): boolean {
   return value === true || value === 'true' || value === 1 || value === '1';
 }
 
+function hasEnabledAudioPromptMode(value: unknown): boolean {
+  return typeof value === 'string' && value.trim().length > 0 && value.trim().toLowerCase() !== 'silent';
+}
+
 function getEffectiveSetSpecValue(tdf: any, key: 'audioInputEnabled' | 'audioPromptMode') {
   const override = getLearnerTdfConfig(String(tdf?.TDFId || ''))?.overrides?.setspec?.[key];
   return override !== undefined ? override : tdf?.[key];
+}
+
+function getUserAudioSettings() {
+  return (Meteor.user() as any)?.audioSettings || {};
+}
+
+function getEffectiveTtsState(tdf: any) {
+  const tdfId = String(tdf?.TDFId || '');
+  const promptModeOverride = learnerConfigHasSetSpecAudioOverride(tdfId, 'audioPromptMode');
+  const effectivePromptMode = promptModeOverride
+    ? getEffectiveSetSpecValue(tdf, 'audioPromptMode')
+    : getUserAudioSettings().audioPromptMode;
+  const tdfPromptsEnabled = parseBooleanLike(tdf?.enableAudioPromptAndFeedback);
+  const promptModeEnabled = hasEnabledAudioPromptMode(effectivePromptMode);
+  const keyAvailable = tdf?.hasTTSAPIKey === true;
+  const supported = tdfPromptsEnabled ||
+    promptModeOverride ||
+    hasEnabledAudioPromptMode(tdf?.audioPromptMode);
+
+  return {
+    supported,
+    active: tdfPromptsEnabled && promptModeEnabled && keyAvailable,
+    tdfPromptsEnabled,
+    promptModeEnabled,
+    keyAvailable,
+  };
+}
+
+function getEffectiveSrState(tdf: any) {
+  const tdfId = String(tdf?.TDFId || '');
+  const tdfAudioEnabled = parseBooleanLike(getEffectiveSetSpecValue(tdf, 'audioInputEnabled'));
+  const userAudioEnabled = getUserAudioSettings().audioInputMode === true;
+  const keyAvailable = tdf?.hasSpeechAPIKey === true;
+  const supported = parseBooleanLike(tdf?.audioInputEnabled) ||
+    learnerConfigHasSetSpecAudioOverride(tdfId, 'audioInputEnabled');
+
+  return {
+    supported,
+    active: tdfAudioEnabled && userAudioEnabled && keyAvailable,
+    tdfAudioEnabled,
+    userAudioEnabled,
+    keyAvailable,
+  };
 }
 
 const lessonRowHelpers = {
@@ -706,23 +753,41 @@ const lessonRowHelpers = {
   },
 
   ttsIconClass(this: any): string {
-    return this.hasTTSAPIKey ? 'icon-configured' : 'icon-needs-config';
+    const state = getEffectiveTtsState(this);
+    if (state.active) return 'icon-configured';
+    return state.keyAvailable ? 'icon-disabled' : 'icon-needs-config';
   },
 
   srIconClass(this: any): string {
-    return this.hasSpeechAPIKey ? 'icon-configured' : 'icon-needs-config';
+    const state = getEffectiveSrState(this);
+    if (state.active) return 'icon-configured';
+    return state.keyAvailable ? 'icon-disabled' : 'icon-needs-config';
+  },
+
+  ttsIconTitle(this: any): string {
+    const state = getEffectiveTtsState(this);
+    if (state.active) return 'Text-to-Speech is enabled';
+    if (!state.keyAvailable) return 'Text-to-Speech needs an API key in Audio Settings';
+    if (!state.tdfPromptsEnabled) return 'Text-to-Speech is disabled for this lesson';
+    if (!state.promptModeEnabled) return 'Text-to-Speech is turned off in your audio or lesson settings';
+    return 'Text-to-Speech is unavailable';
+  },
+
+  srIconTitle(this: any): string {
+    const state = getEffectiveSrState(this);
+    if (state.active) return 'Speech Recognition is enabled';
+    if (!state.keyAvailable) return 'Speech Recognition needs an API key in Audio Settings';
+    if (!state.tdfAudioEnabled) return 'Speech Recognition is disabled for this lesson';
+    if (!state.userAudioEnabled) return 'Speech Recognition is turned off in your audio settings';
+    return 'Speech Recognition is unavailable';
   },
 
   showTtsIcon(this: any): boolean {
-    const effectiveAudioPromptMode = getEffectiveSetSpecValue(this, 'audioPromptMode');
-    if (effectiveAudioPromptMode !== undefined) {
-      return String(effectiveAudioPromptMode || '').trim().toLowerCase() !== 'silent';
-    }
-    return parseBooleanLike(this.enableAudioPromptAndFeedback);
+    return getEffectiveTtsState(this).supported;
   },
 
   showSrIcon(this: any): boolean {
-    return parseBooleanLike(getEffectiveSetSpecValue(this, 'audioInputEnabled'));
+    return getEffectiveSrState(this).supported;
   },
 
   accuracyDisplay(this: any): string {

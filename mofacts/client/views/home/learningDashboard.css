@@ -482,6 +482,11 @@
     color: color-mix(in srgb, var(--app-text-color) 42%, transparent);
 }
 
+.practice-feature-icons .icon-disabled,
+.learning-dashboard-card-feature-icons .icon-disabled {
+    color: color-mix(in srgb, var(--app-text-color) 28%, transparent);
+}
+
 .set-name {
     color: var(--app-page-header-text-color);
     font-weight: 600;
