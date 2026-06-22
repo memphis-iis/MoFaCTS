@@ -48,7 +48,12 @@
       <div class="table-toolbar">
         <div class="toolbar-search">
           <span class="fa fa-search" aria-hidden="true"></span>
-          <input id="learningDashboardSearch" type="text" placeholder="Search your study sets..." disabled="{{#if isLoading}}disabled{{/if}}" aria-disabled="{{#if isLoading}}true{{else}}false{{/if}}">
+          <input id="learningDashboardSearch" type="text" placeholder="Search your study sets..." value="{{searchQuery}}" disabled="{{#if isLoading}}disabled{{/if}}" aria-disabled="{{#if isLoading}}true{{else}}false{{/if}}">
+          {{#if hasSearchQuery}}
+            <button type="button" class="learning-dashboard-search-clear" aria-label="Clear search" title="Clear search" disabled="{{#if isLoading}}disabled{{/if}}">
+              <span class="fa fa-times" aria-hidden="true"></span>
+            </button>
+          {{/if}}
         </div>
         <div class="toolbar-filters" aria-live="polite">
           <button type="button" class="filter">{{lessonSummaryText}}</button>

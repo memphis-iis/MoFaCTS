@@ -119,6 +119,9 @@
     --toolbar-search-icon-left: max(calc(14px * var(--app-density-scale)), 0.5rem);
     --toolbar-search-icon-gap: max(calc(8px * var(--app-density-scale)), 0.5rem);
     --toolbar-search-padding-left: calc(var(--toolbar-search-icon-left) + var(--toolbar-search-icon-size) + var(--toolbar-search-icon-gap));
+    --toolbar-search-clear-size: calc(28px * var(--app-density-scale));
+    --toolbar-search-clear-right: max(calc(6px * var(--app-density-scale)), 0.25rem);
+    --toolbar-search-padding-right: calc(var(--toolbar-search-clear-size) + var(--toolbar-search-clear-right) + var(--app-space-2-px));
     position: relative;
     flex: 1;
     max-width: 320px;
@@ -129,7 +132,7 @@
     width: 100%;
     height: var(--app-text-input-height);
     min-height: var(--app-text-input-height);
-    padding: var(--app-space-0) var(--app-space-3-px) var(--app-space-0) var(--toolbar-search-padding-left);
+    padding: var(--app-space-0) var(--toolbar-search-padding-right) var(--app-space-0) var(--toolbar-search-padding-left);
     border: 1px solid color-mix(in srgb, var(--app-text-color) 12%, transparent);
     border-radius: var(--app-border-radius-sm);
     background: color-mix(in srgb, var(--app-text-color) 4%, var(--learning-card-surface-color));
@@ -141,6 +144,7 @@
 
 #learningDashboardSearch {
     padding-left: var(--toolbar-search-padding-left);
+    padding-right: var(--toolbar-search-padding-right);
 }
 
 .toolbar-search input:focus {
@@ -158,6 +162,43 @@
     color: color-mix(in srgb, var(--app-text-color) 42%, transparent);
     font-size: calc(var(--app-font-size-base) * 0.875);
     transform: translateY(-50%);
+}
+
+.learning-dashboard-search-clear {
+    position: absolute;
+    right: var(--toolbar-search-clear-right);
+    top: 50%;
+    width: var(--toolbar-search-clear-size);
+    height: var(--toolbar-search-clear-size);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: color-mix(in srgb, var(--app-text-color) 48%, transparent);
+    cursor: pointer;
+    transform: translateY(-50%);
+}
+
+.learning-dashboard-search-clear:hover,
+.learning-dashboard-search-clear:focus {
+    background: color-mix(in srgb, var(--app-text-color) 8%, transparent);
+    color: var(--app-text-color);
+}
+
+.learning-dashboard-search-clear:disabled {
+    cursor: default;
+    opacity: 0.5;
+}
+
+.toolbar-search .learning-dashboard-search-clear .fa {
+    position: static;
+    width: auto;
+    height: auto;
+    font-size: calc(var(--app-font-size-base) * 0.75);
+    transform: none;
 }
 
 .toolbar-filters {

@@ -77,6 +77,7 @@ const EMPTY_CONFIG_STATE: LearnerConfigState = {
 };
 
 const PRACTICE_DASHBOARD_SNAPSHOT_VERSION = 1;
+const PRACTICE_DASHBOARD_SEARCH_VERSION = 1;
 const LEARNER_CONFIG_CLOSE_FALLBACK_MS = 200;
 const LEARNER_CONFIG_AUTOSAVE_DELAY_MS = 500;
 const LEARNER_CONFIG_SLIDER_DISPLAY_SESSION_KEY = 'learnerConfigSliderDisplayValues';
@@ -93,6 +94,54 @@ function dashboardSnapshotStorageKey(userId: string) {
     throw new Error('[LearningDashboard] Cannot build dashboard snapshot key without a user id');
   }
   return `mofacts.practiceDashboardSnapshot.v${PRACTICE_DASHBOARD_SNAPSHOT_VERSION}.${userId}`;
+}
+
+function dashboardSearchStorageKey(userId: string) {
+  if (!userId) {
+    throw new Error('[LearningDashboard] Cannot build dashboard search key without a user id');
+  }
+  return `mofacts.practiceDashboardSearch.v${PRACTICE_DASHBOARD_SEARCH_VERSION}.${userId}`;
+}
+
+function getPracticeDashboardUserId() {
+  return String(Session.get('curStudentID') || Meteor.userId() || '');
+}
+
+function loadPracticeDashboardSearch(userId: string) {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return '';
+  }
+  const raw = window.localStorage.getItem(dashboardSearchStorageKey(userId));
+  return raw === null ? '' : raw;
+}
+
+function savePracticeDashboardSearch(userId: string, search: string) {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return;
+  }
+  window.localStorage.setItem(dashboardSearchStorageKey(userId), search);
+}
+
+function applyLearningDashboardSearch(instance: any, search: string) {
+  const normalizedSearch = String(search || '');
+  instance.searchQuery.set(normalizedSearch);
+
+  if (normalizedSearch.length === 0) {
+    instance.searching.set(false);
+    instance.filteredTdfsList.set(false);
+    return;
+  }
+
+  const searchLower = normalizedSearch.toLowerCase();
+  const filteredTdfs = instance.allTdfsList.get().filter((tdf: any) => {
+    if (tdf.displayName.toLowerCase().includes(searchLower)) {
+      return true;
+    }
+    return Boolean(tdf.tags && tdf.tags.some((tag: any) => tag.toLowerCase().includes(searchLower)));
+  });
+
+  instance.searching.set(true);
+  instance.filteredTdfsList.set(filteredTdfs);
 }
 
 function loadLocalPracticeDashboardSnapshot(userId: string): PracticeDashboardSnapshot | null {
@@ -156,6 +205,7 @@ function applyPracticeDashboardSnapshot(instance: any, snapshot: PracticeDashboa
   const combinedTdfs = [...used, ...unused];
   Session.set('homeHasPracticeRecords', used.length > 0);
   instance.allTdfsList.set(combinedTdfs);
+  applyLearningDashboardSearch(instance, instance.searchQuery.get());
   instance.isLoading.set(false);
 }
 
@@ -845,6 +895,7 @@ Template.learningDashboard.onCreated(function(this: any) {
   this.allTdfsList = new ReactiveVar([]);
   this.filteredTdfsList = new ReactiveVar(false);
   this.searching = new ReactiveVar(false);
+  this.searchQuery = new ReactiveVar('');
   this.isLoading = new ReactiveVar(true);
   this.subscriptions = [];
   this.autoruns = [];
@@ -858,6 +909,14 @@ Template.learningDashboard.onCreated(function(this: any) {
 Template.learningDashboard.helpers({
   isLoading: () => {
     return ((Template.instance() as any) as any).isLoading.get();
+  },
+
+  searchQuery: () => {
+    return Template.instance().searchQuery.get();
+  },
+
+  hasSearchQuery: () => {
+    return Template.instance().searchQuery.get().length > 0;
   },
 
   recentUsedTdf: () => {
@@ -1028,7 +1087,12 @@ Template.learnerTdfConfigPanel.helpers({
 
 Template.learningDashboard.events({
   'input #learningDashboardSearch': function(event: any, instance: any) {
-    const search = event.target.value;
+    const search = String(event.target.value || '');
+    const userId = getPracticeDashboardUserId();
+    if (userId) {
+      savePracticeDashboardSearch(userId, search);
+    }
+    instance.searchQuery.set(search);
 
     // Debounce search to avoid excessive filtering on every keystroke
     if (instance.searchDebounceTimer) {
@@ -1036,32 +1100,22 @@ Template.learningDashboard.events({
     }
 
     instance.searchDebounceTimer = setTimeout(() => {
-      if (search.length > 0) {
-        instance.searching.set(true);
-      } else {
-        instance.searching.set(false);
-        instance.filteredTdfsList.set(false);
-        return;
-      }
-
-      const allTdfs = instance.allTdfsList.get();
-      const searchLower = search.toLowerCase();
-
-      // Single pass filter for both name and tags
-      const filteredTdfs = allTdfs.filter((tdf: any) => {
-        // Check display name
-        if (tdf.displayName.toLowerCase().includes(searchLower)) {
-          return true;
-        }
-        // Check tags
-        if (tdf.tags && tdf.tags.some((tag: any) => tag.toLowerCase().includes(searchLower))) {
-          return true;
-        }
-        return false;
-      });
-
-      instance.filteredTdfsList.set(filteredTdfs);
+      applyLearningDashboardSearch(instance, search);
     }, 200); // 200ms debounce
+  },
+
+  'click .learning-dashboard-search-clear': function(event: any, instance: any) {
+    event.preventDefault();
+    const userId = getPracticeDashboardUserId();
+    if (userId) {
+      savePracticeDashboardSearch(userId, '');
+    }
+    if (instance.searchDebounceTimer) {
+      clearTimeout(instance.searchDebounceTimer);
+      instance.searchDebounceTimer = null;
+    }
+    applyLearningDashboardSearch(instance, '');
+    instance.$('#learningDashboardSearch').trigger('focus');
   },
 
   'click .continue-lesson': async function(event: any) {
@@ -1295,6 +1349,18 @@ Template.learningDashboard.rendered = async function(this: any) {
   instance._dashboardSubscribed = true;
   const dashboardRenderStart = typeof performance !== 'undefined' ? performance.now() : Date.now();
   let studentID = Session.get('curStudentID') || Meteor.userId();
+  let restoredSearch = false;
+  const tryRestoreSearch = (userId: string | null | undefined) => {
+    if (!userId || restoredSearch) {
+      return;
+    }
+    try {
+      applyLearningDashboardSearch(instance, loadPracticeDashboardSearch(userId));
+      restoredSearch = true;
+    } catch (error) {
+      clientConsole(1, '[Dashboard] Practice dashboard search could not be restored:', error);
+    }
+  };
   let renderedLocalSnapshot = false;
   const tryRenderLocalSnapshot = (userId: string | null | undefined) => {
     if (!userId || renderedLocalSnapshot) {
@@ -1319,6 +1385,7 @@ Template.learningDashboard.rendered = async function(this: any) {
     }
   };
 
+  tryRestoreSearch(studentID);
   tryRenderLocalSnapshot(studentID);
 
   // sessionCleanUp() removed - it's already called in selectTdf() at the right time
@@ -1332,6 +1399,7 @@ Template.learningDashboard.rendered = async function(this: any) {
     throw new Error('[LearningDashboard] Cannot render practice dashboard without an authenticated user id');
   }
 
+  tryRestoreSearch(studentID);
   tryRenderLocalSnapshot(studentID);
 
   meteorCallAsync('getPracticeDashboardSnapshot')
