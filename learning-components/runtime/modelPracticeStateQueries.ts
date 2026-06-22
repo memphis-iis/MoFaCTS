@@ -3,10 +3,11 @@ import {
   type ModelPracticeHistoryIdentity,
 } from './historyStimulusIdentity';
 import {
-  modelPracticeIdentityMatches,
   readSharedModelPracticeEvents,
+  sharedModelPracticeIdentityMatches,
   type SharedModelPracticeEvent,
 } from './modelPracticeHistoryExchange';
+import type { ModelPracticeContext } from './sharedModelPracticeIdentity';
 
 export const MODEL_PRACTICE_METRICS = [
   'probability',
@@ -22,6 +23,8 @@ export type ModelPracticeMetric = typeof MODEL_PRACTICE_METRICS[number];
 export type ModelPracticeStateQuery = {
   readonly target: ModelPracticeHistoryIdentity;
   readonly metric: ModelPracticeMetric;
+  readonly userId?: string;
+  readonly modelContext?: ModelPracticeContext;
 };
 
 export type ModelPracticeStateProvider = {
@@ -55,7 +58,21 @@ export function queryModelPracticeHistory(
   let lastOutcome: unknown;
 
   for (const event of readSharedModelPracticeEvents(records)) {
-    if (!modelPracticeIdentityMatches(query.target, event.identity)) {
+    if (query.userId && query.modelContext) {
+      if (!sharedModelPracticeIdentityMatches({
+        target: query.target,
+        targetUserId: query.userId,
+        targetContext: query.modelContext,
+        event,
+      })) {
+        continue;
+      }
+    } else if (!sharedModelPracticeIdentityMatches({
+      target: query.target,
+      targetUserId: event.record.userId,
+      targetContext: event.sharedKey,
+      event,
+    })) {
       continue;
     }
     if (isCorrectOutcome(event.outcome)) {

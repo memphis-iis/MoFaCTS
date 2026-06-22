@@ -146,6 +146,7 @@ export function createSparcPracticeHistoryBridge(
           typeOfResponse: 'sparc',
           eventType: 'sparc',
         }, {
+          modelEvidenceSource: 'sparc',
           sparc: extension,
         });
         return record as SparcCanonicalHistoryRecord;

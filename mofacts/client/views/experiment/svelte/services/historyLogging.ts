@@ -50,6 +50,7 @@ import type {
   UnitEngineLike,
 } from '../../../../../common/types';
 import type { CanonicalHistoryRecord } from '../../../../../../learning-components/runtime/historyEnvelope';
+import { normalizeClusterKC } from '../../../../../../learning-components/runtime/sharedModelPracticeIdentity';
 import type {
   SparcTrialDisplay,
   SparcTrialResult,
@@ -152,6 +153,30 @@ function getLoggedFeedbackType(testType: string, isCorrect: boolean, feedbackSup
     return '';
   }
   return isCorrect ? 'correct' : 'incorrect';
+}
+
+function getModelEvidenceSource(unitType: unknown): 'learning' | 'assessment' | undefined {
+  if (unitType === 'model') {
+    return 'learning';
+  }
+  if (unitType === 'schedule') {
+    return 'assessment';
+  }
+  return undefined;
+}
+
+export function createAssessmentModelEvidenceRecord(record: HistoryRecord): HistoryRecord | null {
+  if (record.levelUnitType !== 'schedule' || record.modelEvidenceSource !== 'assessment') {
+    return null;
+  }
+  if (!record.clusterKC) {
+    throw new Error('[History Logging] Assessment model evidence requires clusterKC');
+  }
+  return {
+    ...record,
+    levelUnitType: 'model',
+    modelEvidenceSource: 'assessment',
+  };
 }
 
 function truncateToFiveDecimals(value: number): number {
@@ -615,11 +640,14 @@ export function createHistoryRecord({
     : cardInfo.probabilityEstimate;
   const cluster = getStimCluster(clusterIndex) as HistoryClusterLike;
   const { stimuliSetId, clusterKC, stimulusKC, responseKC } = cluster.stims[whichStim] || {};
+  const resolvedClusterKC = normalizeClusterKC(clusterKC);
 
   // Get TDF info
   const curTdf = Session.get('currentTdfFile');
   const unitNumber = Number(Session.get('currentUnitNumber') || 0);
+  const unitType = Session.get('unitType');
   const unitName = legacyTrim(curTdf?.tdfs?.tutor?.unit?.[unitNumber]?.unitname || '');
+  const modelEvidenceSource = getModelEvidenceSource(unitType);
 
   // Problem/step names
   const experimentState = (ExperimentStateStore.get() || {}) as Record<string, unknown>;
@@ -682,7 +710,7 @@ export function createHistoryRecord({
     // Core IDs
     'stimuliSetId': stimuliSetId,
     'stimulusKC': stimulusKC,
-    'clusterKC': clusterKC,
+    'clusterKC': resolvedClusterKC,
     ...responseIdentityFields,
     'KCId': stimulusKC,
     'userId': Meteor.userId(),
@@ -722,7 +750,8 @@ export function createHistoryRecord({
     // Unit/problem context
     'levelUnit': unitNumber,
     'levelUnitName': unitName,
-    'levelUnitType': Session.get('unitType'),
+    'levelUnitType': unitType,
+    ...(modelEvidenceSource ? { modelEvidenceSource } : {}),
     'problemName': problemName,
     'stepName': stepName,
     'time': transactionTimeStamp,
@@ -740,7 +769,7 @@ export function createHistoryRecord({
     // Knowledge components (multiple types)
     'KCDefault': stimulusKC,
     'KCCategoryDefault': '',
-    'KCCluster': clusterKC,
+    'KCCluster': resolvedClusterKC,
     'KCCategoryCluster': '',
 
     // Custom fields (CF prefix)
@@ -882,6 +911,10 @@ export async function historyLoggingService(
 
     // Insert record
     await insertHistoryRecord(record);
+    const assessmentModelRecord = createAssessmentModelEvidenceRecord(record);
+    if (assessmentModelRecord) {
+      await insertHistoryRecord(assessmentModelRecord);
+    }
     if (h5pBatch) {
       await insertH5PHistoryRows(record, h5pBatch, insertHistoryRecord);
     }

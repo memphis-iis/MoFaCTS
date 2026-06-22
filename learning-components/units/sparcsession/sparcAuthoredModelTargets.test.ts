@@ -88,6 +88,32 @@ describe('sparcAuthoredModelTargets', function() {
     assert.deepEqual(target, regionTarget);
   });
 
+  it('normalizes authored cluster target identity without changing stimulus identity', function() {
+    const document = {
+      ...authoredDocument(),
+      clusterTargets: [{
+        ...regionTarget,
+        clusterIndex: 0,
+        clusterKC: ' Fractions.LCD ',
+        KCCluster: ' Fractions.LCD ',
+        stimulusKC: ' Stim-A ',
+        KCId: ' Stim-A ',
+        KCDefault: ' Stim-A ',
+      }],
+    };
+
+    const target = resolveSparcAuthoredModelTarget(document, {
+      documentId: 'doc-1',
+      nodeId: 'region-7',
+    });
+
+    assert.equal(target?.clusterKC, 'fractions.lcd');
+    assert.equal(target?.KCCluster, 'fractions.lcd');
+    assert.equal(target?.stimulusKC, ' Stim-A ');
+    assert.equal(target?.KCId, ' Stim-A ');
+    assert.equal(target?.KCDefault, ' Stim-A ');
+  });
+
   it('returns undefined for authored content with no model target', function() {
     const target = resolveSparcAuthoredModelTarget(authoredDocument(), {
       documentId: 'doc-1',

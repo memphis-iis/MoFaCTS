@@ -38,6 +38,7 @@ export async function commitSparcProcessedResponseOutcome(
     core,
     processed.modelUpdateRequest,
     {
+      modelEvidenceSource: 'sparc',
       sparc: processed.historyRecord.sparc,
     },
   );

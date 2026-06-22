@@ -55,6 +55,7 @@ describe('sparcPracticeHistoryBridge', function() {
     assert.equal(record.KCCluster, 'cluster-1');
     assert.equal(record.responseKC, 'response-kc-1');
     assert.equal(record.responseKey, 'answer');
+    assert.equal(record.modelEvidenceSource, 'sparc');
     assert.deepEqual(record.sparc.practiceObservation, observation);
     assert.doesNotThrow(() => assertCanonicalHistoryEnvelope(record));
     assert.deepEqual(bridge.fromCanonicalHistoryRecord(record), observation);

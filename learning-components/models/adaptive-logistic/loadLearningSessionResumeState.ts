@@ -1,4 +1,5 @@
 import { applyResumeModelState } from './resumeModelState';
+import type { LearningHistoryReadOptions } from '../../units/UnitEngineServerMethods';
 
 export interface LoadLearningSessionResumeStateParams {
   readonly userId: any;
@@ -13,6 +14,7 @@ export interface LoadLearningSessionResumeStateParams {
     tdfId: any,
     currentUnitNumber: number,
     resetStudentPerformance: boolean,
+    options?: LearningHistoryReadOptions,
   ) => Promise<any[]>;
   readonly reconstructLearningStateFromHistory: (
     historyRows: any[],
@@ -27,6 +29,26 @@ export interface LoadLearningSessionResumeStateParams {
   readonly log: (level: number, ...args: unknown[]) => void;
 }
 
+function getResumeClusterKCs(cardProbabilities: any, stimClusters: any[]): Array<string | number> {
+  const seen = new Set<string>();
+  const clusterKCs: Array<string | number> = [];
+  const cards = Array.isArray(cardProbabilities?.cards) ? cardProbabilities.cards : [];
+  const sources = cards.length > 0 ? cards : stimClusters;
+  for (const source of sources) {
+    const value = source?.clusterKC ?? source?.stims?.[0]?.clusterKC;
+    if (typeof value !== 'string' && typeof value !== 'number') {
+      continue;
+    }
+    const key = `${typeof value}:${String(value).trim().toLowerCase()}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    clusterKCs.push(value);
+  }
+  return clusterKCs;
+}
+
 export async function loadLearningSessionResumeState(
   params: LoadLearningSessionResumeStateParams,
 ): Promise<void> {
@@ -37,6 +59,7 @@ export async function loadLearningSessionResumeState(
     params.tdfId,
     params.currentUnitNumber,
     params.resetStudentPerformance,
+    { clusterKCs: getResumeClusterKCs(params.cardProbabilities, params.stimClusters) },
   );
   const reconstructed = params.reconstructLearningStateFromHistory(historyRows || [], {
     allowResponseLessModelPractice: params.allowResponseLessModelPractice === true,

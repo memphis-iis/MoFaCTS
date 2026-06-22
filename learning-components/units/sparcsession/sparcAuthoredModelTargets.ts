@@ -5,6 +5,7 @@ import type {
   SparcDocumentAddress,
   SparcModelTargetIdentity,
 } from './sparcSessionContracts';
+import { normalizeClusterKC } from '../../runtime/sharedModelPracticeIdentity';
 
 function requireClusterIndex(value: unknown, label: string): number {
   const numberValue = Number(value);
@@ -36,13 +37,14 @@ function modelTargetFromCluster(
   cluster: SparcClusterModelTarget,
   address: SparcDocumentAddress,
 ): SparcModelTargetIdentity {
+  const clusterKC = normalizeClusterKC(cluster.clusterKC);
   return {
     stimuliSetId: cluster.stimuliSetId,
     stimulusKC: cluster.stimulusKC,
-    clusterKC: cluster.clusterKC,
+    clusterKC,
     KCId: cluster.KCId,
     KCDefault: cluster.KCDefault,
-    KCCluster: cluster.KCCluster,
+    KCCluster: clusterKC,
     ...(cluster.response ? { response: cluster.response } : {}),
     ...(cluster.stimulusRecordId ? { stimulusRecordId: cluster.stimulusRecordId } : {}),
     sparcDocumentId: address.documentId,

@@ -23,8 +23,10 @@ import { getRouteAccessPolicy, type RouteAccessPolicy } from './routeAccessPolic
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra');
 const BlazeLayout: any = (globalThis as any).BlazeLayout;
 const Tdfs: any = (globalThis as any).Tdfs;
+const COURSE_ASSIGNMENT_DIRECT_LAUNCH_DENIED_REASON = 'Launch this TDF through its active course assignment';
 
 export {routeToSignin};
+
 /* router.js - the routing logic we use for the application.
 
 If you need to create a new route, note that you should specify a name and an
@@ -1034,7 +1036,18 @@ FlowRouter.route('/card', {
         FlowRouter.go('/');
         return;
       }
-      const tdf: any = await meteorCallAsync('getTdfById', tdfId);
+      let tdf: any = null;
+      try {
+        tdf = await meteorCallAsync('getTdfById', tdfId);
+      } catch (error: unknown) {
+        const message = (error as { reason?: string })?.reason || getErrorMessage(error);
+        if (message === COURSE_ASSIGNMENT_DIRECT_LAUNCH_DENIED_REASON) {
+          clientConsole(2, '[Router] Card reload lost course launch context; redirecting to Courses', { tdfId });
+          FlowRouter.go('/courses');
+          return;
+        }
+        throw error;
+      }
       if(tdf) {
         const setspec = tdf.content.tdfs.tutor.setspec ? tdf.content.tdfs.tutor.setspec : null;
         const ignoreOutOfGrammarResponses = setspec.speechIgnoreOutOfGrammarResponses ?

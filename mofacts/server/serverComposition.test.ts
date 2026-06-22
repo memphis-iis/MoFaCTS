@@ -311,6 +311,138 @@ describe('public TDF and stimulus method authorization', function() {
     expect(tdf._id).to.equal('owned-tdf');
   });
 
+  it('blocks direct TDF lookup for a student with an active course assignment', async function() {
+    await CoursesAny.insertAsync({
+      _id: 'course-direct-block',
+      teacherUserId: 'teacher-user',
+      semester: 'SU_2022',
+    });
+    await SectionsAny.insertAsync({
+      _id: 'section-direct-block',
+      courseId: 'course-direct-block',
+    });
+    await SectionUserMapAny.insertAsync({
+      _id: 'enrollment-direct-block',
+      userId: 'assigned-student',
+      sectionId: 'section-direct-block',
+    });
+    await AssignmentsAny.insertAsync({
+      _id: 'assignment-direct-block',
+      courseId: 'course-direct-block',
+      TDFId: 'assigned-direct-tdf',
+    });
+    await TdfsAny.insertAsync({
+      _id: 'assigned-direct-tdf',
+      ownerId: 'teacher-user',
+      stimuliSetId: 108,
+      accessors: [{ userId: 'assigned-student' }],
+      content: {
+        fileName: 'AssignedDirect.json',
+        tdfs: { tutor: { setspec: { lessonname: 'Assigned Direct', userselect: 'true' } } },
+      },
+    });
+
+    try {
+      await (asyncMethods.getTdfById as any).call({ userId: 'assigned-student' }, 'assigned-direct-tdf');
+      expect.fail('Expected direct assigned TDF lookup to be denied');
+    } catch (error: any) {
+      expect(error.error).to.equal(403);
+      expect(error.reason).to.equal('Launch this TDF through its active course assignment');
+    }
+  });
+
+  it('allows active course-assignment TDF lookup with matching launch context', async function() {
+    await CoursesAny.insertAsync({
+      _id: 'course-launch-context',
+      teacherUserId: 'teacher-user',
+      semester: 'SU_2022',
+    });
+    await SectionsAny.insertAsync({
+      _id: 'section-launch-context',
+      courseId: 'course-launch-context',
+    });
+    await SectionUserMapAny.insertAsync({
+      _id: 'enrollment-launch-context',
+      userId: 'assigned-student',
+      sectionId: 'section-launch-context',
+    });
+    await AssignmentsAny.insertAsync({
+      _id: 'assignment-launch-context',
+      courseId: 'course-launch-context',
+      TDFId: 'assigned-context-tdf',
+    });
+    await TdfsAny.insertAsync({
+      _id: 'assigned-context-tdf',
+      ownerId: 'teacher-user',
+      stimuliSetId: 109,
+      content: {
+        fileName: 'AssignedContext.json',
+        tdfs: { tutor: { setspec: { lessonname: 'Assigned Context', userselect: 'false' } } },
+      },
+    });
+
+    const tdf = await (asyncMethods.getTdfById as any).call(
+      { userId: 'assigned-student' },
+      'assigned-context-tdf',
+      {
+        courseAssignment: {
+          assignmentId: 'assignment-launch-context',
+          courseId: 'course-launch-context',
+          TDFId: 'assigned-context-tdf',
+          launchSource: 'courses',
+        },
+      },
+    );
+
+    expect(tdf._id).to.equal('assigned-context-tdf');
+  });
+
+  it('rejects course-assignment TDF lookup when the current user is not enrolled in that course', async function() {
+    await CoursesAny.insertAsync({
+      _id: 'course-launch-unenrolled',
+      teacherUserId: 'teacher-user',
+      semester: 'SU_2022',
+    });
+    await SectionsAny.insertAsync({
+      _id: 'section-launch-unenrolled',
+      courseId: 'course-launch-unenrolled',
+    });
+    await AssignmentsAny.insertAsync({
+      _id: 'assignment-launch-unenrolled',
+      courseId: 'course-launch-unenrolled',
+      TDFId: 'assigned-unenrolled-tdf',
+    });
+    await TdfsAny.insertAsync({
+      _id: 'assigned-unenrolled-tdf',
+      ownerId: 'teacher-user',
+      stimuliSetId: 110,
+      accessors: [{ userId: 'not-enrolled-student' }],
+      content: {
+        fileName: 'AssignedUnenrolled.json',
+        tdfs: { tutor: { setspec: { lessonname: 'Assigned Unenrolled', userselect: 'true' } } },
+      },
+    });
+
+    try {
+      await (asyncMethods.getTdfById as any).call(
+        { userId: 'not-enrolled-student' },
+        'assigned-unenrolled-tdf',
+        {
+          courseAssignment: {
+            assignmentId: 'assignment-launch-unenrolled',
+            courseId: 'course-launch-unenrolled',
+            TDFId: 'assigned-unenrolled-tdf',
+            launchSource: 'courses',
+          },
+        },
+      );
+      expect.fail('Expected unenrolled course-assignment TDF lookup to be denied');
+    } catch (error: any) {
+      expect(error.error).to.equal(403);
+      expect(error.reason).to.equal('Course assignment launch context is not available for current user');
+    }
+  });
+
   it('denies unrelated user public TDF lookup by filename', async function() {
     await TdfsAny.insertAsync({
       _id: 'filename-private-tdf',
@@ -836,6 +968,214 @@ describe('learner analytics method authorization', function() {
       true
     );
     expect(unitScopedRows.map((row: any) => row.time)).to.deep.equal([2000]);
+  });
+
+  it('returns course-scoped learning history for matching cluster KCs across assigned TDFs', async function() {
+    await CoursesAny.insertAsync({
+      _id: 'course-a',
+      teacherUserId: 'teacher-user',
+      semester: 'SU_2022',
+    });
+    await SectionsAny.insertAsync({
+      _id: 'section-course-a',
+      courseId: 'course-a',
+    });
+    await SectionUserMapAny.insertAsync({
+      _id: 'enrollment-course-a',
+      userId: 'current-user',
+      sectionId: 'section-course-a',
+    });
+    await AssignmentsAny.insertAsync({
+      _id: 'assignment-a',
+      courseId: 'course-a',
+      TDFId: 'tdf-current',
+      order: 0,
+      required: true,
+    });
+    const baseRow = {
+      userId: 'current-user',
+      levelUnitType: 'model',
+      clusterKC: 'fractions.lcd',
+      KCCluster: 'fractions.lcd',
+      stimuliSetId: 'set-a',
+      stimulusKC: 'stim-a',
+      KCId: 'stim-a',
+      responseKey: 'answer',
+      outcome: 'correct',
+    };
+    await HistoriesAny.insertAsync({
+      ...baseRow,
+      _id: 'course-current-tdf',
+      TDFId: 'tdf-current',
+      levelUnit: 4,
+      time: 2000,
+      courseAssignment: {
+        assignmentId: 'assignment-a',
+        courseId: 'course-a',
+        TDFId: 'tdf-current',
+        launchSource: 'courses',
+      },
+    });
+    await HistoriesAny.insertAsync({
+      ...baseRow,
+      _id: 'course-prior-tdf-same-cluster',
+      TDFId: 'tdf-prior',
+      levelUnit: 9,
+      time: 1000,
+      stimuliSetId: 'other-set',
+      stimulusKC: 'other-stim',
+      KCId: 'other-stim',
+      courseAssignment: {
+        assignmentId: 'assignment-prior',
+        courseId: 'course-a',
+        TDFId: 'tdf-prior',
+        launchSource: 'courses',
+      },
+    });
+    await HistoriesAny.insertAsync({
+      ...baseRow,
+      _id: 'course-other-cluster',
+      TDFId: 'tdf-current',
+      levelUnit: 1,
+      time: 1500,
+      clusterKC: 'fractions.unlike',
+      KCCluster: 'fractions.unlike',
+      courseAssignment: {
+        assignmentId: 'assignment-a',
+        courseId: 'course-a',
+        TDFId: 'tdf-current',
+        launchSource: 'courses',
+      },
+    });
+    await HistoriesAny.insertAsync({
+      ...baseRow,
+      _id: 'course-other-course',
+      TDFId: 'tdf-other-course',
+      levelUnit: 1,
+      time: 1700,
+      courseAssignment: {
+        assignmentId: 'assignment-other',
+        courseId: 'course-b',
+        TDFId: 'tdf-other-course',
+        launchSource: 'courses',
+      },
+    });
+
+    const rows = await (asyncMethods.getLearningHistoryForUnit as any).call(
+      { userId: 'current-user' },
+      'current-user',
+      'tdf-current',
+      4,
+      false,
+      {
+        courseAssignment: {
+          assignmentId: 'assignment-a',
+          courseId: 'course-a',
+          TDFId: 'tdf-current',
+          launchSource: 'courses',
+        },
+        clusterKCs: [' Fractions.LCD '],
+      }
+    );
+
+    expect(rows.map((row: any) => row._id)).to.deep.equal([
+      'course-prior-tdf-same-cluster',
+      'course-current-tdf',
+    ]);
+    expect(rows.map((row: any) => row.TDFId)).to.deep.equal(['tdf-prior', 'tdf-current']);
+    expect(rows[0]).to.deep.include({
+      stimuliSetId: 'other-set',
+      stimulusKC: 'other-stim',
+      clusterKC: 'fractions.lcd',
+    });
+  });
+
+  it('fails clearly when course-scoped learning history lacks cluster KCs', async function() {
+    await CoursesAny.insertAsync({
+      _id: 'course-a',
+      teacherUserId: 'teacher-user',
+      semester: 'SU_2022',
+    });
+    await SectionsAny.insertAsync({
+      _id: 'section-course-a',
+      courseId: 'course-a',
+    });
+    await SectionUserMapAny.insertAsync({
+      _id: 'enrollment-course-a',
+      userId: 'current-user',
+      sectionId: 'section-course-a',
+    });
+    await AssignmentsAny.insertAsync({
+      _id: 'assignment-a',
+      courseId: 'course-a',
+      TDFId: 'tdf-current',
+      order: 0,
+      required: true,
+    });
+
+    try {
+      await (asyncMethods.getLearningHistoryForUnit as any).call(
+        { userId: 'current-user' },
+        'current-user',
+        'tdf-current',
+        4,
+        false,
+        {
+          courseAssignment: {
+            assignmentId: 'assignment-a',
+            courseId: 'course-a',
+            TDFId: 'tdf-current',
+            launchSource: 'courses',
+          },
+        }
+      );
+      expect.fail('Expected course-scoped learning history without clusterKCs to fail');
+    } catch (error: any) {
+      expect(error.error).to.equal(400);
+      expect(error.reason).to.equal('Course-scoped learning history requires clusterKCs');
+    }
+  });
+
+  it('rejects course-scoped learning history when the current user is not enrolled in that course', async function() {
+    await CoursesAny.insertAsync({
+      _id: 'course-unenrolled-history',
+      teacherUserId: 'teacher-user',
+      semester: 'SU_2022',
+    });
+    await SectionsAny.insertAsync({
+      _id: 'section-unenrolled-history',
+      courseId: 'course-unenrolled-history',
+    });
+    await AssignmentsAny.insertAsync({
+      _id: 'assignment-unenrolled-history',
+      courseId: 'course-unenrolled-history',
+      TDFId: 'tdf-unenrolled-history',
+      order: 0,
+      required: true,
+    });
+
+    try {
+      await (asyncMethods.getLearningHistoryForUnit as any).call(
+        { userId: 'current-user' },
+        'current-user',
+        'tdf-unenrolled-history',
+        4,
+        false,
+        {
+          courseAssignment: {
+            assignmentId: 'assignment-unenrolled-history',
+            courseId: 'course-unenrolled-history',
+            TDFId: 'tdf-unenrolled-history',
+            launchSource: 'courses',
+          },
+          clusterKCs: ['fractions.lcd'],
+        }
+      );
+      expect.fail('Expected unenrolled course-scoped learning history read to be denied');
+    } catch (error: any) {
+      expect(error.error).to.equal(403);
+      expect(error.reason).to.equal('Course assignment history context is not available for current user');
+    }
   });
 
   it('returns exact-unit durable SPARC history with canonical extension fields', async function() {

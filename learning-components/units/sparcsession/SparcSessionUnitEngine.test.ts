@@ -397,6 +397,30 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
     );
   });
 
+  it('uses normalized cluster-level KC for SPARC targets when first-stimulus KC is stale', async function() {
+    const engine = await createSparcSessionUnitEngine(createPageRuntimeDeps({
+      getStimCluster: (clusterIndex: number) => ({
+        clusterKC: clusterIndex === 0 ? ' Fractions.LCD ' : 'cluster-1',
+        stims: [{
+          stimuliSetId: 'stim-set-1',
+          clusterKC: 'legacy-stim-cluster',
+          stimulusKC: `kc-${clusterIndex}`,
+          responseKC: `response-${clusterIndex}`,
+          correctResponse: `Cluster ${clusterIndex} answer`,
+          params: '0,0.8',
+          textStimulus: `Cluster ${clusterIndex}`,
+        }],
+      }),
+    }));
+
+    const preparedState = await engine.buildPreparedCardQuestionAndAnswerGlobals(0, 0, [0, 0.8]);
+    const firstTarget = preparedState.currentDisplay.clusterTargets[0];
+
+    assert.equal(firstTarget.clusterKC, 'fractions.lcd');
+    assert.equal(firstTarget.KCCluster, 'fractions.lcd');
+    assert.equal(firstTarget.stimulusKC, 'kc-0');
+  });
+
   it('rejects SPARC pages that reference clusters outside sparcsession.clusterlist', async function() {
     const engine = await createSparcSessionUnitEngine(createPageRuntimeDeps({
       findTdfById: () => ({

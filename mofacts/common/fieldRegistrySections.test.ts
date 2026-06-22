@@ -41,4 +41,17 @@ describe('field registry section composition', function() {
       displayIncorrectFeedback: true,
     });
   });
+
+  it('allows cluster-level clusterKC in the public stimulus schema', function() {
+    const stimSchema = createStimSchemaFromRegistry() as any;
+    const clusterProperties = stimSchema.properties.setspec.properties.clusters.items.properties;
+
+    expect(clusterProperties.clusterKC).to.deep.include({
+      title: 'Cluster KC identity.',
+    });
+    expect(clusterProperties.clusterKC.anyOf).to.deep.equal([
+      { type: 'number' },
+      { type: 'string' },
+    ]);
+  });
 });

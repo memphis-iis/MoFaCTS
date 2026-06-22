@@ -4,6 +4,7 @@ import type {
   DashboardTdfStats,
 } from './dashboardCacheMethods.contracts';
 import { createStimulusKey, isBlankIdentityValue } from '../../common/historyEnvelope';
+import { curSemester } from '../../common/Definitions';
 import {
   DASHBOARD_CACHE_VERSION,
   DASHBOARD_LEVEL_UNIT_TYPES,
@@ -23,6 +24,7 @@ type DashboardCacheDeps = {
   Histories: any;
   GlobalExperimentStates?: any;
   Tdfs: any;
+  Courses?: any;
   Assignments?: any;
   Sections?: any;
   SectionUserMap?: any;
@@ -64,6 +66,9 @@ function isAutoTutorRecord(record: DashboardHistoryRecord): boolean {
 }
 
 function shouldCountDashboardHistoryRecord(record: DashboardHistoryRecord): boolean {
+  if (record.levelUnitType === 'model' && record.modelEvidenceSource === 'assessment') {
+    return false;
+  }
   if (isH5PSummaryRecord(record)) {
     return false;
   }
@@ -71,7 +76,11 @@ function shouldCountDashboardHistoryRecord(record: DashboardHistoryRecord): bool
 }
 
 function resolveDashboardModelStimulusKey(record: DashboardHistoryRecord): string | null {
-  if (record.levelUnitType !== 'model' || isH5PPartRecord(record)) {
+  if (
+    record.levelUnitType !== 'model' ||
+    record.modelEvidenceSource === 'assessment' ||
+    isH5PPartRecord(record)
+  ) {
     return null;
   }
   if (isBlankIdentityValue(record.stimuliSetId) || isBlankIdentityValue(record.stimulusKC)) {
@@ -91,6 +100,16 @@ function getHistoryPracticeTimeMs(
     return Math.max(0, record.h5p.latencyMs);
   }
   return computePracticeTimeMs(record.CFEndLatency, record.CFFeedbackLatency);
+}
+
+function dashboardHistorySelector(extraSelector: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    ...extraSelector,
+    levelUnitType: { $in: DASHBOARD_LEVEL_UNIT_TYPES },
+    $nor: [
+      { levelUnitType: 'model', modelEvidenceSource: 'assessment' },
+    ],
+  };
 }
 
 export function computeCacheStats(
@@ -178,6 +197,7 @@ export function createDashboardCacheMethods({
   Histories,
   GlobalExperimentStates,
   Tdfs,
+  Courses,
   Assignments,
   Sections,
   SectionUserMap,
@@ -356,6 +376,68 @@ export function createDashboardCacheMethods({
     };
   }
 
+  function normalizeOptionalId(value: unknown): string | null {
+    const normalized = typeof value === 'string' ? value.trim() : '';
+    return normalized || null;
+  }
+
+  async function assertNoAssignedCourseReset(userId: string, scope: { tdfIds: string[] }) {
+    if (scope.tdfIds.length === 0) {
+      return;
+    }
+    if (!Assignments?.find || !Courses?.find || !Sections?.find || !SectionUserMap?.find) {
+      throw new Meteor.Error(
+        'server-misconfigured',
+        'Course assignment collections are required before resetting lesson progress.'
+      );
+    }
+    const assignmentRows = await Assignments.find(
+      { TDFId: { $in: scope.tdfIds } },
+      { fields: { _id: 1, courseId: 1, TDFId: 1 } }
+    ).fetchAsync();
+    const assignedCourseIds = [...new Set(
+      assignmentRows
+        .map((row: any) => normalizeOptionalId(row?.courseId))
+        .filter((courseId: string | null): courseId is string => typeof courseId === 'string')
+    )];
+    if (assignedCourseIds.length === 0) {
+      return;
+    }
+
+    const activeCourses = await Courses.find(
+      { _id: { $in: assignedCourseIds }, semester: curSemester },
+      { fields: { _id: 1 } }
+    ).fetchAsync();
+    const activeCourseIds = activeCourses
+      .map((course: any) => normalizeOptionalId(course?._id))
+      .filter((courseId: string | null): courseId is string => typeof courseId === 'string');
+    if (activeCourseIds.length === 0) {
+      return;
+    }
+
+    const sectionRows = await Sections.find(
+      { courseId: { $in: activeCourseIds } },
+      { fields: { _id: 1 } }
+    ).fetchAsync();
+    const sectionIds = sectionRows
+      .map((section: any) => normalizeOptionalId(section?._id))
+      .filter((sectionId: string | null): sectionId is string => typeof sectionId === 'string');
+    if (sectionIds.length === 0) {
+      return;
+    }
+
+    const enrollmentRows = await SectionUserMap.find(
+      { userId, sectionId: { $in: sectionIds } },
+      { fields: { _id: 1 } }
+    ).fetchAsync();
+    if (enrollmentRows.length > 0) {
+      throw new Meteor.Error(
+        'course-reset-blocked',
+        'Cannot reset lesson progress for a TDF assigned through a course; course-scoped shared model reset is not implemented.'
+      );
+    }
+  }
+
   async function removeLessonProgressFromCache(userId: string, cacheTdfIds: string[]) {
     const cache = await UserDashboardCache.findOneAsync({ userId });
     if (!cache?.tdfStats) {
@@ -440,7 +522,7 @@ export function createDashboardCacheMethods({
 
       const attemptedTdfIds = await Histories.rawCollection().distinct('TDFId', {
         userId: targetUserId,
-        levelUnitType: { $in: DASHBOARD_LEVEL_UNIT_TYPES }
+        ...dashboardHistorySelector()
       });
 
       if (attemptedTdfIds.length === 0) {
@@ -516,7 +598,7 @@ export function createDashboardCacheMethods({
       const allHistory: DashboardHistoryRecord[] = await Histories.find({
         userId: targetUserId,
         TDFId: { $in: attemptedTdfIds },
-        levelUnitType: { $in: DASHBOARD_LEVEL_UNIT_TYPES }
+        ...dashboardHistorySelector()
       }, {
         sort: { recordedServerTime: 1 }
       }).fetchAsync();
@@ -605,7 +687,7 @@ export function createDashboardCacheMethods({
           const latestHistory = await Histories.findOneAsync(
             {
               userId,
-              levelUnitType: { $in: DASHBOARD_LEVEL_UNIT_TYPES }
+              ...dashboardHistorySelector()
             },
             {
               fields: { recordedServerTime: 1, time: 1 },
@@ -713,7 +795,7 @@ export function createDashboardCacheMethods({
         allHistory = await Histories.find({
           userId,
           TDFId: { $in: childTdfIds },
-          levelUnitType: { $in: DASHBOARD_LEVEL_UNIT_TYPES }
+          ...dashboardHistorySelector()
         }, {
           sort: { recordedServerTime: 1 }
         }).fetchAsync();
@@ -723,7 +805,7 @@ export function createDashboardCacheMethods({
         allHistory = await Histories.find({
           userId,
           TDFId,
-          levelUnitType: { $in: DASHBOARD_LEVEL_UNIT_TYPES }
+          ...dashboardHistorySelector()
         }, {
           sort: { recordedServerTime: 1 }
         }).fetchAsync();
@@ -806,6 +888,7 @@ export function createDashboardCacheMethods({
       if (scope.tdfKeys.length === 0) {
         throw new Meteor.Error('invalid-state', 'No lesson progress scope could be resolved');
       }
+      await assertNoAssignedCourseReset(this.userId, scope);
 
       const historyRemoved = await Histories.removeAsync({
         userId: this.userId,

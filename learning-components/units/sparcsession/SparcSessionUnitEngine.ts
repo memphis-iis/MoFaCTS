@@ -4,6 +4,7 @@ import {
 } from '../../models/adaptive-logistic/AdaptiveLogisticUnitEngine';
 import type { HistoryRuntime } from '../../runtime/LearningComponentContext';
 import type { CanonicalHistoryRecord } from '../../runtime/historyEnvelope';
+import { normalizeClusterKC } from '../../runtime/sharedModelPracticeIdentity';
 import { SPARC_SESSION_UNIT_TYPE } from '../unitTypes';
 import {
   processAndCommitSparcAuthoredResponseOutcome,
@@ -107,23 +108,24 @@ function createClusterTargetFromFirstStim(params: {
   }
   const stim = firstStim as Record<string, unknown>;
   const stimulusKC = stim.stimulusKC;
-  const clusterKC = stim.clusterKC ?? cluster.clusterKC;
+  const clusterKC = cluster.clusterKC ?? stim.clusterKC;
   if (stimulusKC === undefined || stimulusKC === null || stimulusKC === '') {
     throw new Error(`SPARC page references cluster ${params.clusterIndex}, but its first stimulus is missing stimulusKC`);
   }
   if (clusterKC === undefined || clusterKC === null || clusterKC === '') {
     throw new Error(`SPARC page references cluster ${params.clusterIndex}, but its first stimulus is missing clusterKC`);
   }
+  const resolvedClusterKC = normalizeClusterKC(clusterKC);
   const responseKC = stim.responseKC;
   return {
     clusterIndex: params.clusterIndex,
     label: String(stim.textStimulus || stim.text || stim.correctResponse || `Cluster ${params.clusterIndex}`),
     stimuliSetId: stim.stimuliSetId ?? params.deps.getSessionValue('currentStimuliSetId'),
     stimulusKC,
-    clusterKC,
+    clusterKC: resolvedClusterKC,
     KCId: stimulusKC,
     KCDefault: stimulusKC,
-    KCCluster: clusterKC,
+    KCCluster: resolvedClusterKC,
     ...(responseKC !== undefined && responseKC !== null
       ? {
           response: {

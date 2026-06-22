@@ -105,6 +105,7 @@ describe('LearningSessionUnitEngine model practice updates', function() {
       responseValue: 'Answer',
     }];
     let requestedUnitNumber: number | null = null;
+    let requestedLearningHistoryOptions: any = null;
     let reconstructionRows: unknown[] = [];
     const sessionValues = new Map<string, unknown>();
     const deps = createMinimalDeps({
@@ -134,8 +135,15 @@ describe('LearningSessionUnitEngine model practice updates', function() {
       serverMethods: {
         getResponseKCMapForTdf: async () => ({ answer: 'response-kc-1' }),
         getStimulusCrowdStatsForDeck: async () => [],
-        getLearningHistoryForUnit: async (_userId: string, _tdfId: string, currentUnitNumber: number) => {
+        getLearningHistoryForUnit: async (
+          _userId: string,
+          _tdfId: string,
+          currentUnitNumber: number,
+          _resetStudentPerformance: boolean,
+          options: any,
+        ) => {
           requestedUnitNumber = currentUnitNumber;
+          requestedLearningHistoryOptions = options;
           return historyRows;
         },
       },
@@ -217,6 +225,7 @@ describe('LearningSessionUnitEngine model practice updates', function() {
     await engine.loadResumeState();
 
     assert.equal(requestedUnitNumber, 2);
+    assert.deepEqual(requestedLearningHistoryOptions, { clusterKCs: ['cluster-1'] });
     assert.deepEqual(reconstructionRows, historyRows);
     const cardProbabilities = engine.getCardProbabilitiesNoCalc();
     assert.equal(cardProbabilities.cards[0].priorCorrect, 1);
@@ -304,6 +313,7 @@ describe('LearningSessionUnitEngine model practice updates', function() {
     assert.equal(cardProbabilities.cards[0].stims[0].priorCorrect, 1);
     assert.equal(result.record.levelUnitType, 'model');
     assert.equal(result.record.eventType, 'sparc');
+    assert.equal(result.record.modelEvidenceSource, 'sparc');
     assert.deepEqual(result.record.sparc, {
       documentId: 'doc-1',
     });

@@ -13,6 +13,9 @@ import {
 } from '../lib/stimulusCrowdStats';
 import { createAnalyticsConditionCountMethods } from './analyticsConditionCountMethods';
 import { createAnalyticsDownloadMethods } from './analyticsDownloadMethods';
+import { normalizeClusterKC } from '../../../learning-components/runtime/sharedModelPracticeIdentity';
+import type { LearningHistoryReadOptions } from '../../../learning-components/units/UnitEngineServerMethods';
+import { curSemester } from '../../common/Definitions';
 
 type UnknownRecord = Record<string, unknown>;
 type Logger = (...args: unknown[]) => void;
@@ -112,7 +115,36 @@ function buildLearningHistoryScopeMatch(
 }
 
 export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
-  async function validateCourseAssignmentHistoryContext(historyRecord: UnknownRecord, tdfId: string) {
+  async function validateCourseEnrollmentForUser(userId: string, courseId: string) {
+    const activeCourses = await deps.Courses.find(
+      { _id: courseId, semester: curSemester },
+      { fields: { _id: 1 } }
+    ).fetchAsync();
+    if (activeCourses.length === 0) {
+      throw new Meteor.Error(403, 'Course assignment history context is not active for current user');
+    }
+
+    const sectionRows = await deps.Sections.find(
+      { courseId },
+      { fields: { _id: 1 } }
+    ).fetchAsync();
+    const sectionIds = sectionRows
+      .map((section: any) => deps.normalizeCanonicalId(section?._id))
+      .filter((sectionId: string | null): sectionId is string => typeof sectionId === 'string');
+    if (sectionIds.length === 0) {
+      throw new Meteor.Error(403, 'Course assignment history context is not available for current user');
+    }
+
+    const enrollmentRows = await deps.SectionUserMap.find(
+      { userId, sectionId: { $in: sectionIds } },
+      { fields: { _id: 1 } }
+    ).fetchAsync();
+    if (enrollmentRows.length === 0) {
+      throw new Meteor.Error(403, 'Course assignment history context is not available for current user');
+    }
+  }
+
+  async function validateCourseAssignmentHistoryContext(historyRecord: UnknownRecord, tdfId: string, userId: string) {
     const context = historyRecord.courseAssignment;
     if (context === undefined || context === null) return;
     if (!context || typeof context !== 'object' || Array.isArray(context)) {
@@ -135,6 +167,29 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     if (!assignment) {
       throw new Meteor.Error(400, 'Course assignment history context does not match an assignment');
     }
+    await validateCourseEnrollmentForUser(userId, courseId);
+  }
+
+  async function buildCourseLearningHistoryScopeMatch(
+    userId: string,
+    TDFId: string,
+    options: LearningHistoryReadOptions,
+  ): Promise<UnknownRecord> {
+    const context = options.courseAssignment;
+    if (!context || typeof context !== 'object' || Array.isArray(context)) {
+      throw new Meteor.Error(400, 'Course-scoped learning history requires courseAssignment context');
+    }
+    await validateCourseAssignmentHistoryContext({ courseAssignment: context }, TDFId, userId);
+    const courseId = deps.normalizeCanonicalId(context.courseId);
+    if (!courseId) {
+      throw new Meteor.Error(400, 'Course-scoped learning history requires courseId');
+    }
+    return {
+      userId,
+      levelUnitType: 'model',
+      'courseAssignment.courseId': courseId,
+      clusterKC: { $in: normalizeCourseModelClusterKCs(options.clusterKCs) },
+    };
   }
 
   const validatedExperimentAccessCache = new Map<string, number>();
@@ -431,7 +486,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     } catch (error: unknown) {
       throw new Meteor.Error(400, error instanceof Error ? error.message : String(error));
     }
-    await validateCourseAssignmentHistoryContext(decompressedRecord, tdfId);
+    await validateCourseAssignmentHistoryContext(decompressedRecord, tdfId, actingUserId);
     const sanitizeMs = elapsedMsSince(sanitizeStartTime);
 
     const authorizationStartTime = Date.now();
@@ -981,10 +1036,15 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     userId: string,
     TDFId: string,
     levelUnit: number,
-    unitScopedOnly = false
+    unitScopedOnly = false,
+    options: LearningHistoryReadOptions = {}
   ) {
-    return await deps.Histories.find(buildLearningHistoryScopeMatch(userId, TDFId, levelUnit, unitScopedOnly), {
+    const selector = options.courseAssignment
+      ? await buildCourseLearningHistoryScopeMatch(userId, TDFId, options)
+      : buildLearningHistoryScopeMatch(userId, TDFId, levelUnit, unitScopedOnly);
+    return await deps.Histories.find(selector, {
       fields: {
+        TDFId: 1,
         time: 1,
         problemStartTime: 1,
         outcome: 1,
@@ -1367,10 +1427,11 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       userId: string,
       TDFId: string,
       levelUnit: number,
-      unitScopedOnly = false
+      unitScopedOnly = false,
+      options: LearningHistoryReadOptions = {}
     ) {
       const scopedUserId = requireSelfScopedUserId(this, userId);
-      return await getLearningHistoryForUnit(scopedUserId, requireNormalizedTdfId(TDFId), levelUnit, unitScopedOnly);
+      return await getLearningHistoryForUnit(scopedUserId, requireNormalizedTdfId(TDFId), levelUnit, unitScopedOnly, options);
     },
     getSparcHistoryForUnit: async function(
       this: MethodContext,
@@ -1617,4 +1678,36 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     ...downloadMethods,
     ...conditionCountMethods,
   };
+}
+
+function normalizeCourseModelClusterKCs(clusterKCs: unknown): Array<string | number> {
+  if (!Array.isArray(clusterKCs)) {
+    throw new Meteor.Error(400, 'Course-scoped learning history requires clusterKCs');
+  }
+  const normalizedValues: Array<string | number> = [];
+  const seen = new Set<string>();
+  for (const value of clusterKCs) {
+    let normalized: string;
+    try {
+      normalized = normalizeClusterKC(value);
+    } catch (error: unknown) {
+      throw new Meteor.Error(400, error instanceof Error ? error.message : String(error));
+    }
+    const normalizedKey = `string:${normalized}`;
+    if (!seen.has(normalizedKey)) {
+      seen.add(normalizedKey);
+      normalizedValues.push(normalized);
+    }
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      const numericKey = `number:${value}`;
+      if (!seen.has(numericKey)) {
+        seen.add(numericKey);
+        normalizedValues.push(value);
+      }
+    }
+  }
+  if (normalizedValues.length === 0) {
+    throw new Meteor.Error(400, 'Course-scoped learning history requires at least one clusterKC');
+  }
+  return normalizedValues;
 }

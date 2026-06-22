@@ -74,6 +74,7 @@ describe('sparcResponseOutcomeCommit', function() {
     });
 
     assert.equal(committed.usedAdaptiveModel, true);
+    assert.equal(committed.historyRecord.modelEvidenceSource, 'sparc');
     assert.deepEqual(committed.modelResult, {
       probabilityEstimate: 0.7,
     });

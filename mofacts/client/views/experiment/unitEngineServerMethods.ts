@@ -1,4 +1,5 @@
 import type { UnitEngineServerMethods } from '../../../../learning-components/units/UnitEngineServerMethods';
+import { getCourseAssignmentLaunchContext } from '../../lib/courseAssignmentLaunchContext';
 
 export type UnitEngineServerMethodDeps = {
   readonly meteorCallAsync: (name: string, ...args: any[]) => Promise<any>;
@@ -19,12 +20,17 @@ export function createUnitEngineServerMethods(
       tdfId,
       currentUnitNumber,
       resetStudentPerformance,
+      options,
     ) => await deps.meteorCallAsync(
       'getLearningHistoryForUnit',
       userId,
       tdfId,
       currentUnitNumber,
       resetStudentPerformance,
+      {
+        ...options,
+        courseAssignment: getCourseAssignmentLaunchContext(),
+      },
     ) as any[],
     getSparcHistoryForUnit: async (userId, tdfId, unitNumber) => await deps.meteorCallAsync(
       'getSparcHistoryForUnit',

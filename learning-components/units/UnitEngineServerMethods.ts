@@ -1,3 +1,13 @@
+export type LearningHistoryReadOptions = {
+  readonly courseAssignment?: {
+    readonly assignmentId: string;
+    readonly courseId: string;
+    readonly TDFId: string;
+    readonly launchSource: 'courses';
+  } | null;
+  readonly clusterKCs?: Array<string | number>;
+};
+
 export type UnitEngineServerMethods = {
   readonly getAutoTutorHistoryForUnit: (
     userId: string,
@@ -9,6 +19,7 @@ export type UnitEngineServerMethods = {
     tdfId: any,
     currentUnitNumber: number,
     resetStudentPerformance: boolean,
+    options?: LearningHistoryReadOptions,
   ) => Promise<any[]>;
   readonly getSparcHistoryForUnit: (
     userId: string,

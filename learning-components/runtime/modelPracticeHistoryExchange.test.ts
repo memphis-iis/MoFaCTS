@@ -4,6 +4,7 @@ import {
   modelPracticeIdentityMatches,
   readSharedModelPracticeEvent,
   readSharedModelPracticeEvents,
+  sharedModelPracticeIdentityMatches,
 } from './modelPracticeHistoryExchange';
 import type { ModelPracticeHistoryIdentity } from './historyStimulusIdentity';
 
@@ -95,6 +96,12 @@ describe('modelPracticeHistoryExchange', function() {
 
     assert.ok(event);
     assert.deepEqual(event.identity, target);
+    assert.deepEqual(event.sharedKey, {
+      userId: 'user-1',
+      contextKind: 'tdf',
+      contextId: 'tdf-1',
+      clusterKC: 'cluster-1',
+    });
     assert.equal(event.outcome, 'correct');
     assert.equal(event.responseValue, 'Answer');
     assert.equal(event.practiceDurationMs, 300);
@@ -168,6 +175,30 @@ describe('modelPracticeHistoryExchange', function() {
 
     assert.ok(event);
     assert.equal(modelPracticeIdentityMatches(target, event.identity), true);
+  });
+
+  it('matches shared model identity while ignoring the item envelope', function() {
+    const event = readSharedModelPracticeEvent(makeModelRecord({
+      courseAssignment: {
+        courseId: 'course-1',
+      },
+      stimuliSetId: 'other-set',
+      stimulusKC: 'other-item',
+      KCId: 'other-item',
+      KCDefault: 'other-item',
+    }));
+
+    assert.ok(event);
+    assert.equal(modelPracticeIdentityMatches(target, event.identity), false);
+    assert.equal(sharedModelPracticeIdentityMatches({
+      target,
+      targetUserId: 'user-1',
+      targetContext: {
+        contextKind: 'course',
+        contextId: 'course-1',
+      },
+      event,
+    }), true);
   });
 
   it('fails clearly when a model row is missing shared identity fields', function() {

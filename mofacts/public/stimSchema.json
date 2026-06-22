@@ -23,6 +23,21 @@
             "type": "object",
             "title": "Cluster",
             "properties": {
+              "clusterKC": {
+                "title": "Cluster KC identity.",
+                "description": "Optional cluster-level knowledge component identity. Semantic values enable intentional shared cluster models across lessons in the same course; numeric values remain valid for legacy/local models.",
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "options": {
+                  "grid_columns": 6
+                }
+              },
               "imageStimulus": {
                 "title": "Cluster image stimulus.",
                 "description": "Cluster-level image asset used when stims inherit the shared image.",

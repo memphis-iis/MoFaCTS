@@ -5,6 +5,7 @@ import {
   withCanonicalHistorySchemaVersion,
 } from './historyEnvelope';
 import type { ModelPracticeHistoryIdentity } from './historyStimulusIdentity';
+import { normalizeClusterKC } from './sharedModelPracticeIdentity';
 
 export type ModelPracticeHistoryCore = {
   readonly TDFId: string;
@@ -43,12 +44,13 @@ export function copyModelPracticeIdentityToRecord(
   record: Record<string, unknown>,
   target: ModelPracticeHistoryIdentity,
 ): void {
+  const clusterKC = normalizeClusterKC(target.clusterKC);
   record.stimuliSetId = target.stimuliSetId;
   record.stimulusKC = target.stimulusKC;
-  record.clusterKC = target.clusterKC;
+  record.clusterKC = clusterKC;
   record.KCId = target.KCId;
   record.KCDefault = target.KCDefault;
-  record.KCCluster = target.KCCluster;
+  record.KCCluster = clusterKC;
   if (target.response) {
     record.responseKC = target.response.responseKC;
     record.responseKey = target.response.responseKey;

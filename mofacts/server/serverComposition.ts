@@ -338,6 +338,10 @@ const tdfLookupHelpers = createTdfLookupHelpers({
   Tdfs,
   usersCollection: MeteorAny.users,
   GlobalExperimentStates,
+  Assignments,
+  Courses,
+  Sections,
+  SectionUserMap,
   normalizeCanonicalId,
   resolveAssignedRootTdfIdsForUser,
   canViewDashboardTdf,
@@ -431,6 +435,7 @@ const dashboardCacheMethods = createDashboardCacheMethods({
   Histories,
   GlobalExperimentStates,
   Tdfs,
+  Courses,
   Assignments,
   Sections,
   SectionUserMap,
@@ -746,9 +751,9 @@ function getStimuliSetIdCandidatesForMethod(stimuliSetId: string | number) {
   return Array.from(candidates);
 }
 
-async function getTdfByIdPublic(this: MethodContext, TDFId: string) {
+async function getTdfByIdPublic(this: MethodContext, TDFId: string, options?: unknown) {
   const userId = requireAuthenticatedUser(this.userId, 'Must be logged in to access TDF content', 401);
-  const tdf = await getTdfById.call({ userId }, TDFId);
+  const tdf = await getTdfById.call({ userId }, TDFId, options as any);
   return tdf ? removeRuntimeTdfSecrets(tdf) : tdf;
 }
 

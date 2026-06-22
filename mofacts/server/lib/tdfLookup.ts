@@ -1,8 +1,18 @@
 import { Meteor } from 'meteor/meteor';
+import { curSemester } from '../../common/Definitions';
 
 type UnknownRecord = Record<string, unknown>;
 type MethodContext = {
   userId?: string | null;
+};
+type CourseAssignmentLaunchContext = {
+  assignmentId: string;
+  courseId: string;
+  TDFId: string;
+  launchSource: 'courses';
+};
+type TdfLookupOptions = {
+  courseAssignment?: CourseAssignmentLaunchContext | null;
 };
 type TdfAccessDoc = {
   _id?: string;
@@ -28,6 +38,18 @@ type TdfLookupDeps = {
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
   };
   GlobalExperimentStates: {
+    find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]> };
+  };
+  Assignments: {
+    findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
+  };
+  Courses: {
+    find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]> };
+  };
+  Sections: {
+    find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]> };
+  };
+  SectionUserMap: {
     find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]> };
   };
   normalizeCanonicalId: (value: unknown) => string | null;
@@ -137,7 +159,64 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
     );
   }
 
-  async function getTdfById(this: MethodContext | void, TDFId: string) {
+  async function requireMatchingCourseAssignmentContext(
+    userId: string,
+    requestedTdfId: string,
+    options: TdfLookupOptions | undefined,
+  ) {
+    const context = options?.courseAssignment;
+    if (!context || typeof context !== 'object' || Array.isArray(context)) {
+      throw new Meteor.Error(403, 'Launch this TDF through its active course assignment');
+    }
+    const assignmentId = deps.normalizeCanonicalId(context.assignmentId);
+    const courseId = deps.normalizeCanonicalId(context.courseId);
+    const contextTdfId = deps.normalizeCanonicalId(context.TDFId);
+    if (context.launchSource !== 'courses' || !assignmentId || !courseId || !contextTdfId) {
+      throw new Meteor.Error(400, 'Course assignment launch context is incomplete');
+    }
+    if (contextTdfId !== requestedTdfId) {
+      throw new Meteor.Error(400, 'Course assignment launch context does not match requested TDF');
+    }
+    const assignment = await deps.Assignments.findOneAsync(
+      { _id: assignmentId, courseId, TDFId: requestedTdfId },
+      { fields: { _id: 1 } },
+    );
+    if (!assignment) {
+      throw new Meteor.Error(400, 'Course assignment launch context does not match an assignment');
+    }
+    await requireUserEnrollmentForCourseContext(userId, courseId);
+  }
+
+  async function requireUserEnrollmentForCourseContext(userId: string, courseId: string) {
+    const activeCourses = await deps.Courses.find(
+      { _id: courseId, semester: curSemester },
+      { fields: { _id: 1 } },
+    ).fetchAsync();
+    if (activeCourses.length === 0) {
+      throw new Meteor.Error(403, 'Course assignment launch context is not active for current user');
+    }
+
+    const sectionRows = await deps.Sections.find(
+      { courseId },
+      { fields: { _id: 1 } },
+    ).fetchAsync();
+    const sectionIds = sectionRows
+      .map((section: any) => deps.normalizeCanonicalId(section?._id))
+      .filter((id: string | null): id is string => typeof id === 'string');
+    if (sectionIds.length === 0) {
+      throw new Meteor.Error(403, 'Course assignment launch context is not available for current user');
+    }
+
+    const enrollmentRows = await deps.SectionUserMap.find(
+      { userId, sectionId: { $in: sectionIds } },
+      { fields: { _id: 1 } },
+    ).fetchAsync();
+    if (enrollmentRows.length === 0) {
+      throw new Meteor.Error(403, 'Course assignment launch context is not available for current user');
+    }
+  }
+
+  async function getTdfById(this: MethodContext | void, TDFId: string, options: TdfLookupOptions = {}) {
     if (!this?.userId) {
       return await deps.Tdfs.findOneAsync({ _id: TDFId });
     }
@@ -153,9 +232,16 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
     const loadFullTdf = async () => await deps.Tdfs.findOneAsync({ _id: TDFId });
     const assignedRootIds = new Set(await deps.resolveAssignedRootTdfIdsForUser(this.userId));
     const normalizedRequestedTdfId = deps.normalizeCanonicalId(TDFId);
+    if (normalizedRequestedTdfId && options.courseAssignment) {
+      await requireMatchingCourseAssignmentContext(this.userId, normalizedRequestedTdfId, options);
+      return await loadFullTdf();
+    }
+    if (normalizedRequestedTdfId && assignedRootIds.has(normalizedRequestedTdfId)) {
+      await requireMatchingCourseAssignmentContext(this.userId, normalizedRequestedTdfId, options);
+      return await loadFullTdf();
+    }
     if (
-      await deps.canViewDashboardTdf(this.userId, tdfAccess) ||
-      assignedRootIds.has(String(tdfAccess._id || ''))
+      await deps.canViewDashboardTdf(this.userId, tdfAccess)
     ) {
       return await loadFullTdf();
     }

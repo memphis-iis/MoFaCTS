@@ -229,14 +229,17 @@ Template.courses.events({
       return;
     }
     try {
-      const tdf: any = await meteorCallAsync('getTdfById', assignment.TDFId);
-      const setspec = tdf?.content?.tdfs?.tutor?.setspec || {};
-      setCourseAssignmentLaunchContext({
+      const launchContext = {
         assignmentId: assignment.assignmentId,
         courseId: assignment.courseId,
         TDFId: assignment.TDFId,
-        launchSource: 'courses',
+        launchSource: 'courses' as const,
+      };
+      const tdf: any = await meteorCallAsync('getTdfById', assignment.TDFId, {
+        courseAssignment: launchContext,
       });
+      const setspec = tdf?.content?.tdfs?.tutor?.setspec || {};
+      setCourseAssignmentLaunchContext(launchContext);
       await selectTdf(
         assignment.TDFId,
         assignment.title,

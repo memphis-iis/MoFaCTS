@@ -135,6 +135,7 @@ function updateThemeColorMeta(content: string) {
 type StimCluster = {
   shufIndex: number;
   clusterIndex: number;
+  clusterKC?: unknown;
   stims: unknown[];
 };
 
@@ -157,7 +158,26 @@ type StudentPerformanceAccumulator = {
 
 type DeliverySettings = Record<string, unknown>;
 
-export { extractDelimFields, rangeVal, shuffle, randomChoice, search, getUserDisplayIdentifier, haveMeteorUser, updateCurStudentPerformance, updateCurStudedentPracticeTime, setStudentPerformance, getStimCount, getStimCluster, getStimKCBaseForCurrentStimuliSet, createStimClusterMapping, getAllCurrentStimAnswers, getStimAnswerDisplayCase, getTestType, getCurrentDeliverySettings, refreshCurrentDeliverySettingsStore, getCurrentTheme, applyThemeCSSProperties };
+type RawStimulus = Record<string, any> & {
+  response?: {
+    correctResponse?: unknown;
+    incorrectResponses?: unknown;
+  };
+  display?: Record<string, unknown>;
+  parameter?: unknown;
+};
+
+type RawStimulusCluster = Record<string, any> & {
+  clusterKC?: unknown;
+  stims?: RawStimulus[];
+};
+
+type FlatStimulus = Record<string, any> & {
+  clusterKC?: unknown;
+  stimulusKC?: unknown;
+};
+
+export { extractDelimFields, rangeVal, shuffle, randomChoice, search, getUserDisplayIdentifier, haveMeteorUser, updateCurStudentPerformance, updateCurStudedentPracticeTime, setStudentPerformance, getStimCount, getStimCluster, getStimKCBaseForCurrentStimuliSet, createStimClusterMapping, getAllCurrentStimAnswers, getStimAnswerDisplayCase, getTestType, getCurrentDeliverySettings, refreshCurrentDeliverySettingsStore, getCurrentTheme, applyThemeCSSProperties, getNestedStimulusClustersFromTdfFile };
 
 
 // ===== PHASE 1.5 OPTIMIZATION: Theme Subscription =====
@@ -629,6 +649,22 @@ function getCurrentUnitStimulusCount(): number {
     return 0;
   }
 
+  const nestedClusters = getNestedStimulusClustersFromTdfFile({
+    tdfFile: Session.get('currentTdfFile'),
+    currentStimuliSet,
+    currentStimuliSetId: Session.get('currentStimuliSetId'),
+  });
+  if (nestedClusters) {
+    let totalStimCount = 0;
+    for (const clusterIndex of activeClusterIndexes) {
+      const cluster = nestedClusters[clusterIndex];
+      if (cluster) {
+        totalStimCount += cluster.stims.length;
+      }
+    }
+    return totalStimCount;
+  }
+
   let totalStimCount = 0;
   for (const stim of currentStimuliSet) {
     const clusterIndex = Number(stim?.clusterKC) % KC_MULTIPLE;
@@ -697,8 +733,127 @@ async function setStudentPerformance(
     'incorrect:', studentPerformance.numIncorrect, 'percent:', studentPerformance.percentCorrect);
 }
 
+function getRawStimulusClustersFromTdfFile(tdfFile: any): RawStimulusCluster[] | null {
+  const clusters = tdfFile?.rawStimuliFile?.setspec?.clusters;
+  return Array.isArray(clusters) ? clusters : null;
+}
+
+function flattenLegacyStimuliByNestedPosition(flatStimuli: unknown): FlatStimulus[] {
+  return Array.isArray(flatStimuli)
+    ? flatStimuli.filter((stim): stim is FlatStimulus => Boolean(stim) && typeof stim === 'object' && !Array.isArray(stim))
+    : [];
+}
+
+function resolveRawStimCorrectResponse(rawStim: RawStimulus): unknown {
+  if (rawStim.response && Object.prototype.hasOwnProperty.call(rawStim.response, 'correctResponse')) {
+    return rawStim.response.correctResponse;
+  }
+  return undefined;
+}
+
+function resolveRawStimIncorrectResponses(rawStim: RawStimulus): unknown {
+  if (rawStim.response && Object.prototype.hasOwnProperty.call(rawStim.response, 'incorrectResponses')) {
+    return rawStim.response.incorrectResponses;
+  }
+  return undefined;
+}
+
+function requireStimuliSetIdForNestedIdentity(value: unknown): string | number {
+  if (value === undefined || value === null || value === '') {
+    throw new Error('Nested stimulus identity generation requires stimuliSetId');
+  }
+  return typeof value === 'number' ? value : String(value);
+}
+
+function generateNestedStimulusKC(params: {
+  stimuliSetId: unknown;
+  clusterIndex: number;
+  stimIndex: number;
+}): string {
+  const stimuliSetId = requireStimuliSetIdForNestedIdentity(params.stimuliSetId);
+  return `${String(stimuliSetId)}:${params.clusterIndex}:${params.stimIndex}`;
+}
+
+function createRuntimeStimulusFromNestedSource(params: {
+  rawCluster: RawStimulusCluster;
+  rawStim: RawStimulus;
+  flatStim?: FlatStimulus;
+  stimuliSetId: unknown;
+  clusterIndex: number;
+  stimIndex: number;
+}): FlatStimulus {
+  const clusterKC = params.rawCluster.clusterKC ?? params.flatStim?.clusterKC;
+  if (clusterKC === undefined || clusterKC === null || clusterKC === '') {
+    throw new Error(`Nested stimulus cluster ${params.clusterIndex} is missing clusterKC`);
+  }
+  const stimulusKC = params.rawStim.stimulusKC ?? params.flatStim?.stimulusKC ?? generateNestedStimulusKC(params);
+  const correctResponse = resolveRawStimCorrectResponse(params.rawStim);
+  return {
+    ...(params.flatStim ?? {}),
+    stimuliSetId: params.flatStim?.stimuliSetId ?? params.stimuliSetId,
+    stimulusKC,
+    clusterKC,
+    params: params.rawStim.parameter ?? params.flatStim?.params,
+    correctResponse: correctResponse ?? params.flatStim?.correctResponse,
+    incorrectResponses: resolveRawStimIncorrectResponses(params.rawStim) ?? params.flatStim?.incorrectResponses,
+    clozeStimulus: params.rawStim.display?.clozeText ?? params.rawStim.display?.clozeStimulus ?? params.flatStim?.clozeStimulus,
+    textStimulus: params.rawStim.display?.text ?? params.rawStim.display?.textStimulus ?? params.flatStim?.textStimulus ?? '',
+    audioStimulus: params.rawStim.display?.audioSrc ?? params.flatStim?.audioStimulus,
+    imageStimulus: params.rawStim.display?.imgSrc ?? params.flatStim?.imageStimulus,
+    videoStimulus: params.rawStim.display?.videoSrc ?? params.flatStim?.videoStimulus,
+    display: params.rawStim.display ?? params.flatStim?.display,
+    autoTutor: params.rawStim.autoTutor ?? params.flatStim?.autoTutor,
+    alternateDisplays: params.rawStim.alternateDisplays ?? params.flatStim?.alternateDisplays,
+  };
+}
+
+function getNestedStimulusClustersFromTdfFile(params: {
+  tdfFile: any;
+  currentStimuliSet: unknown;
+  currentStimuliSetId: unknown;
+}): StimCluster[] | null {
+  const rawClusters = getRawStimulusClustersFromTdfFile(params.tdfFile);
+  if (!rawClusters) {
+    return null;
+  }
+  const flatStimuli = flattenLegacyStimuliByNestedPosition(params.currentStimuliSet);
+  let flatIndex = 0;
+  return rawClusters.map((rawCluster, clusterIndex) => {
+    if (!Array.isArray(rawCluster?.stims)) {
+      throw new Error(`Nested stimulus cluster ${clusterIndex} is missing stims`);
+    }
+    const clusterKC = rawCluster.clusterKC ?? flatStimuli[flatIndex]?.clusterKC;
+    const stims = rawCluster.stims.map((rawStim, stimIndex) => {
+      const flatStim = flatStimuli[flatIndex];
+      flatIndex += 1;
+      return createRuntimeStimulusFromNestedSource({
+        rawCluster,
+        rawStim,
+        ...(flatStim ? { flatStim } : {}),
+        stimuliSetId: params.tdfFile?.stimuliSetId ?? params.currentStimuliSetId,
+        clusterIndex,
+        stimIndex,
+      });
+    });
+    return {
+      shufIndex: clusterIndex,
+      clusterIndex,
+      clusterKC,
+      stims,
+    };
+  });
+}
+
 // Return the total number of stim clusters
 function getStimCount() {
+  const nestedClusters = getNestedStimulusClustersFromTdfFile({
+    tdfFile: Session.get('currentTdfFile'),
+    currentStimuliSet: Session.get('currentStimuliSet'),
+    currentStimuliSetId: Session.get('currentStimuliSetId'),
+  });
+  if (nestedClusters) {
+    return nestedClusters.length;
+  }
   const stimSet = Session.get('currentStimuliSet');
   if (!Array.isArray(stimSet)) {
     return 0;
@@ -730,6 +885,21 @@ function getStimCluster(clusterMappedIndex=0): StimCluster {
       clusterMappedIndex,
     });
     return cluster;
+  }
+  const nestedClusters = getNestedStimulusClustersFromTdfFile({
+    tdfFile: Session.get('currentTdfFile'),
+    currentStimuliSet: Session.get('currentStimuliSet'),
+    currentStimuliSetId: Session.get('currentStimuliSetId'),
+  });
+  if (nestedClusters) {
+    const nestedCluster = nestedClusters[rawIndex];
+    if (!nestedCluster) {
+      return cluster;
+    }
+    return {
+      ...nestedCluster,
+      shufIndex: clusterMappedIndex,
+    };
   }
   const stimuliSet = Session.get('currentStimuliSet');
   if (!stimuliSet) {

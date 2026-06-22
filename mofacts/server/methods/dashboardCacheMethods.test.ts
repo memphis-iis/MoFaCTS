@@ -483,6 +483,40 @@ describe('dashboardCacheMethods', function() {
     expect(stats.totalSessions).to.equal(2);
   });
 
+  it('computeCacheStats ignores assessment companion model rows for dashboard metrics', function() {
+    const stats = computeCacheStats([
+      {
+        _id: 'assessment-schedule',
+        outcome: 'correct',
+        levelUnitType: 'schedule',
+        modelEvidenceSource: 'assessment',
+        CFEndLatency: 4000,
+        CFFeedbackLatency: -1,
+        stimuliSetId: 'set-a',
+        stimulusKC: 'stim-a',
+        clusterKC: 'cluster-a',
+        recordedServerTime: new Date('2026-02-10T10:00:00.000Z')
+      },
+      {
+        _id: 'assessment-model-companion',
+        outcome: 'correct',
+        levelUnitType: 'model',
+        modelEvidenceSource: 'assessment',
+        CFEndLatency: 4000,
+        CFFeedbackLatency: -1,
+        stimuliSetId: 'set-a',
+        stimulusKC: 'stim-a',
+        clusterKC: 'cluster-a',
+        recordedServerTime: new Date('2026-02-10T10:00:00.000Z')
+      }
+    ], 'Assessment Demo', (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0));
+
+    expect(stats.totalTrials).to.equal(1);
+    expect(stats.correctTrials).to.equal(1);
+    expect(stats.itemsPracticedCount).to.equal(0);
+    expect(stats.itemsPracticedApplies).to.equal(false);
+  });
+
   it('computeCacheStats counts H5P exercise part rows without double-counting the summary row', function() {
     const stats = computeCacheStats([
       {
@@ -1175,6 +1209,7 @@ describe('dashboardCacheMethods', function() {
           }
         })
       },
+      Assignments: { find: () => ({ fetchAsync: async () => [] }) },
       UserDashboardCache: {
         findOneAsync: async () => cacheDoc,
         updateAsync: async (_selector: any, modifier: any) => {
@@ -1208,5 +1243,162 @@ describe('dashboardCacheMethods', function() {
     expect(cacheDoc.tdfStats).to.not.have.property('root');
     expect(cacheDoc.tdfStats).to.have.property('other');
     expect(cacheDoc.learnerTdfConfigs).to.have.property('root');
+  });
+
+  it('resetAdminLessonProgress fails before deleting history for course-assigned lessons', async function() {
+    const userId = 'admin-1';
+    let historyRemoveCalled = false;
+    let experimentStateRemoveCalled = false;
+    const methods = createDashboardCacheMethods({
+      Meteor: {
+        Error: class MeteorError extends Error {
+          error: string;
+          constructor(error: string, reason?: string) {
+            super(reason || error);
+            this.error = error;
+          }
+        }
+      },
+      Roles: { userIsInRoleAsync: async () => true },
+      Histories: {
+        removeAsync: async () => {
+          historyRemoveCalled = true;
+          return 0;
+        },
+        find: () => ({ fetchAsync: async () => [] }),
+        rawCollection: () => ({ distinct: async () => [] })
+      },
+      GlobalExperimentStates: {
+        removeAsync: async () => {
+          experimentStateRemoveCalled = true;
+          return 0;
+        }
+      },
+      Tdfs: {
+        findOneAsync: async () => ({
+          _id: 'root',
+          content: {
+            fileName: 'root.json',
+            tdfs: { tutor: { setspec: { lessonname: 'Root Lesson' } } }
+          }
+        }),
+        find: () => ({ fetchAsync: async () => [] })
+      },
+      Assignments: {
+        find: () => ({
+          fetchAsync: async () => [{ _id: 'assignment-1', courseId: 'course-1', TDFId: 'root' }]
+        })
+      },
+      Courses: {
+        find: () => ({
+          fetchAsync: async () => [{ _id: 'course-1', semester: 'SU_2022' }]
+        })
+      },
+      Sections: {
+        find: () => ({
+          fetchAsync: async () => [{ _id: 'section-1', courseId: 'course-1' }]
+        })
+      },
+      SectionUserMap: {
+        find: () => ({
+          fetchAsync: async () => [{ _id: 'enrollment-1', userId, sectionId: 'section-1' }]
+        })
+      },
+      UserDashboardCache: {
+        findOneAsync: async () => null,
+        updateAsync: async () => undefined,
+        upsertAsync: async () => undefined
+      },
+      usersCollection: { findOneAsync: async () => ({ _id: userId }) },
+      DynamicSettings: { findOneAsync: async () => null },
+      serverConsole: () => undefined,
+      computePracticeTimeMs: (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0),
+      canViewDashboardTdf: () => true,
+      redisBoundary: disabledRedisBoundary
+    });
+
+    try {
+      await methods.resetAdminLessonProgress.call({ userId }, 'root');
+      expect.fail('Expected course-assigned lesson reset to fail');
+    } catch (error: any) {
+      expect(error.error).to.equal('course-reset-blocked');
+      expect(error.message).to.contain('course-scoped shared model reset is not implemented');
+    }
+    expect(historyRemoveCalled).to.equal(false);
+    expect(experimentStateRemoveCalled).to.equal(false);
+  });
+
+  it('resetAdminLessonProgress remains available when the target user is not enrolled in the assigned course', async function() {
+    const userId = 'admin-1';
+    let historyRemoveCalled = false;
+    const methods = createDashboardCacheMethods({
+      Meteor: {
+        Error: class MeteorError extends Error {
+          error: string;
+          constructor(error: string, reason?: string) {
+            super(reason || error);
+            this.error = error;
+          }
+        }
+      },
+      Roles: { userIsInRoleAsync: async () => true },
+      Histories: {
+        removeAsync: async () => {
+          historyRemoveCalled = true;
+          return 0;
+        },
+        find: () => ({ fetchAsync: async () => [] }),
+        rawCollection: () => ({ distinct: async () => [] })
+      },
+      GlobalExperimentStates: {
+        removeAsync: async () => 0
+      },
+      Tdfs: {
+        findOneAsync: async () => ({
+          _id: 'root',
+          content: {
+            fileName: 'root.json',
+            tdfs: { tutor: { setspec: { lessonname: 'Root Lesson' } } }
+          }
+        }),
+        find: () => ({ fetchAsync: async () => [] })
+      },
+      Assignments: {
+        find: () => ({
+          fetchAsync: async () => [{ _id: 'assignment-1', courseId: 'course-1', TDFId: 'root' }]
+        })
+      },
+      Courses: {
+        find: () => ({
+          fetchAsync: async () => [{ _id: 'course-1', semester: 'SU_2022' }]
+        })
+      },
+      Sections: {
+        find: () => ({
+          fetchAsync: async () => [{ _id: 'section-1', courseId: 'course-1' }]
+        })
+      },
+      SectionUserMap: {
+        find: () => ({
+          fetchAsync: async () => []
+        })
+      },
+      UserDashboardCache: {
+        findOneAsync: async () => null,
+        updateAsync: async () => undefined,
+        upsertAsync: async () => undefined
+      },
+      usersCollection: { findOneAsync: async () => ({ _id: userId }) },
+      DynamicSettings: { findOneAsync: async () => null },
+      serverConsole: () => undefined,
+      computePracticeTimeMs: (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0),
+      canViewDashboardTdf: () => true,
+      redisBoundary: disabledRedisBoundary
+    });
+
+    const result = await methods.resetAdminLessonProgress.call({ userId }, 'root');
+
+    expect(result.success).to.equal(true);
+    expect(historyRemoveCalled).to.equal(true);
   });
 });

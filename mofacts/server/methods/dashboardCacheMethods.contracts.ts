@@ -20,6 +20,7 @@ export interface DashboardHistoryRecord {
   TDFId?: string;
   userId?: string;
   levelUnitType?: string;
+  modelEvidenceSource?: string;
   levelUnit?: number | string | null;
   sessionID?: string | null;
   CFNote?: string | null;

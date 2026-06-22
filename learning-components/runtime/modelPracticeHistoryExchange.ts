@@ -4,10 +4,19 @@ import {
   isModelPracticeHistoryRecord,
   type ModelPracticeHistoryIdentity,
 } from './historyStimulusIdentity';
+import {
+  modelPracticeEnvelopeMatches,
+  normalizeClusterKC,
+  resolveSharedModelPracticeKey,
+  sharedModelPracticeKeyMatches,
+  type ModelPracticeContext,
+  type SharedModelPracticeKey,
+} from './sharedModelPracticeIdentity';
 
 export type SharedModelPracticeEvent = {
   readonly record: CanonicalHistoryRecord;
   readonly identity: ModelPracticeHistoryIdentity;
+  readonly sharedKey: SharedModelPracticeKey;
   readonly time: number;
   readonly problemStartTime: number;
   readonly outcome: string;
@@ -68,14 +77,21 @@ export function readModelPracticeDuration(record: CanonicalHistoryRecord): numbe
 
 export function readSharedModelPracticeEvent(
   record: CanonicalHistoryRecord,
+  modelContext?: ModelPracticeContext,
 ): SharedModelPracticeEvent | null {
   if (!isModelPracticeHistoryRecord(record)) {
     return null;
   }
   const practiceDurationMs = readModelPracticeDuration(record);
+  const identity = readModelPracticeIdentity(record);
   return {
     record,
-    identity: readModelPracticeIdentity(record),
+    identity,
+    sharedKey: resolveSharedModelPracticeKey(
+      record.userId,
+      modelContext ?? resolveModelPracticeContextFromRecord(record),
+      identity,
+    ),
     time: Number(record.time),
     problemStartTime: Number(record.problemStartTime),
     outcome: String(record.outcome ?? 'unknown'),
@@ -88,10 +104,11 @@ export function readSharedModelPracticeEvent(
 
 export function readSharedModelPracticeEvents(
   records: Iterable<CanonicalHistoryRecord>,
+  modelContext?: ModelPracticeContext,
 ): SharedModelPracticeEvent[] {
   const events: SharedModelPracticeEvent[] = [];
   for (const record of records) {
-    const event = readSharedModelPracticeEvent(record);
+    const event = readSharedModelPracticeEvent(record, modelContext);
     if (event) {
       events.push(event);
     }
@@ -103,15 +120,33 @@ export function modelPracticeIdentityMatches(
   left: ModelPracticeHistoryIdentity,
   right: ModelPracticeHistoryIdentity,
 ): boolean {
-  return String(left.stimuliSetId) === String(right.stimuliSetId)
-    && String(left.stimulusKC) === String(right.stimulusKC)
-    && String(left.clusterKC) === String(right.clusterKC)
-    && String(left.KCId) === String(right.KCId)
-    && String(left.KCDefault) === String(right.KCDefault)
-    && String(left.KCCluster) === String(right.KCCluster)
-    && (!left.response || (
-      right.response !== undefined
-      && String(left.response.responseKC) === String(right.response.responseKC)
-      && String(left.response.responseKey) === String(right.response.responseKey)
-    ));
+  return modelPracticeEnvelopeMatches(left, right);
+}
+
+function resolveModelPracticeContextFromRecord(record: CanonicalHistoryRecord): ModelPracticeContext {
+  const courseAssignment = record.courseAssignment;
+  if (courseAssignment && typeof courseAssignment === 'object' && !Array.isArray(courseAssignment)) {
+    const courseId = (courseAssignment as Record<string, unknown>).courseId;
+    if (typeof courseId === 'string' && courseId.trim()) {
+      return { contextKind: 'course', contextId: courseId.trim() };
+    }
+  }
+  if (typeof record.TDFId === 'string' && record.TDFId.trim()) {
+    return { contextKind: 'tdf', contextId: record.TDFId.trim() };
+  }
+  throw new Error('Model practice history record missing model context');
+}
+
+export function sharedModelPracticeIdentityMatches(params: {
+  readonly target: ModelPracticeHistoryIdentity;
+  readonly targetUserId: unknown;
+  readonly targetContext: ModelPracticeContext;
+  readonly event: SharedModelPracticeEvent;
+}): boolean {
+  const targetKey = resolveSharedModelPracticeKey(
+    params.targetUserId,
+    params.targetContext,
+    { clusterKC: normalizeClusterKC(params.target.clusterKC) },
+  );
+  return sharedModelPracticeKeyMatches(targetKey, params.event.sharedKey);
 }

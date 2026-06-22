@@ -6,7 +6,7 @@ import {
   resolveSelectedCardExportQuestionIndex,
   selectCardService,
 } from './unitEngineService';
-import { createHistoryRecord, historyLoggingService } from './historyLogging';
+import { createAssessmentModelEvidenceRecord, createHistoryRecord, historyLoggingService } from './historyLogging';
 import type { HistoryLoggingContext } from '../../../../../common/types';
 
 type SelectCardResultLike = Record<string, unknown> & {
@@ -276,6 +276,148 @@ describe('resume runtime integration seams', function() {
     expect(record.outcome).to.equal('correct');
     expect(record.time).to.equal(1250);
     expect(record.problemStartTime).to.equal(1000);
+    expect(record.modelEvidenceSource).to.equal('assessment');
+    expect(record.clusterKC).to.equal('1000');
+    expect(record.KCCluster).to.equal('1000');
+    expect(record.stimulusKC).to.equal('KC-1');
+    expect(record.KCId).to.equal('KC-1');
+  });
+
+  it('creates a model-scoped companion row for assessment shared-model evidence', function() {
+    const record = createHistoryRecord({
+      trialEndTimeStamp: 2000,
+      trialStartTimeStamp: 1000,
+      transactionTimeStamp: 1250,
+      source: 'keyboard',
+      userAnswer: 'alpha',
+      isCorrect: true,
+      testType: 'd',
+      deliverySettings: { feedbackType: 'full' },
+      engine: {
+        unitType: 'schedule',
+        findCurrentCardInfo: () => ({
+          clusterIndex: 0,
+          whichStim: 0,
+          probabilityEstimate: 0.7,
+        }),
+      },
+      currentDisplay: { text: 'Prompt 1' },
+      buttonList: [],
+      wasButtonTrial: false,
+      questionIndex: 3,
+      answerContext: {
+        originalDisplay: 'Prompt 1',
+        originalAnswer: 'alpha',
+        currentAnswer: 'alpha',
+      },
+    });
+
+    const companion = createAssessmentModelEvidenceRecord(record);
+
+    expect(record.levelUnitType).to.equal('schedule');
+    expect(companion).to.include({
+      levelUnitType: 'model',
+      modelEvidenceSource: 'assessment',
+      clusterKC: '1000',
+      KCCluster: '1000',
+      stimulusKC: 'KC-1',
+      KCId: 'KC-1',
+    });
+  });
+
+  it('history logging records learning provenance for model units', function() {
+    ExperimentStateStore.set({
+      clusterMapping: [0],
+    });
+    Session.set('unitType', 'model');
+    Session.set('clusterIndex', 0);
+    CardStore.setQuestionIndex(2);
+
+    const record = createHistoryRecord({
+      trialEndTimeStamp: 2000,
+      trialStartTimeStamp: 1000,
+      transactionTimeStamp: 1250,
+      source: 'keyboard',
+      userAnswer: 'alpha',
+      isCorrect: true,
+      testType: 'd',
+      deliverySettings: { feedbackType: 'full' },
+      engine: {
+        unitType: 'model',
+        findCurrentCardInfo: () => ({
+          clusterIndex: 0,
+          whichStim: 0,
+          probabilityEstimate: 0.7,
+        }),
+      },
+      currentDisplay: { text: 'Prompt 1' },
+      buttonList: [],
+      wasButtonTrial: false,
+      questionIndex: 2,
+      answerContext: {
+        originalDisplay: 'Prompt 1',
+        originalAnswer: 'alpha',
+        currentAnswer: 'alpha',
+      },
+    });
+
+    expect(record.modelEvidenceSource).to.equal('learning');
+    expect(record.clusterKC).to.equal('1000');
+    expect(record.KCCluster).to.equal('1000');
+    expect(record.stimulusKC).to.equal('KC-1');
+    expect(record.KCId).to.equal('KC-1');
+  });
+
+  it('history logging normalizes semantic cluster identity without rewriting item identity', function() {
+    Session.set('currentStimuliSet', [
+      {
+        _id: 'stim-semantic',
+        clusterKC: ' Fractions.LCD ',
+        stimulusKC: ' Stim-A ',
+        correctResponse: 'alpha',
+        textStimulus: 'Prompt 1',
+        probFunctionParameters: {},
+      },
+    ]);
+    ExperimentStateStore.set({
+      clusterMapping: [0],
+    });
+    Session.set('unitType', 'model');
+    Session.set('clusterIndex', 0);
+
+    const record = createHistoryRecord({
+      trialEndTimeStamp: 2000,
+      trialStartTimeStamp: 1000,
+      transactionTimeStamp: 1250,
+      source: 'keyboard',
+      userAnswer: 'alpha',
+      isCorrect: true,
+      testType: 'd',
+      deliverySettings: { feedbackType: 'full' },
+      engine: {
+        unitType: 'model',
+        findCurrentCardInfo: () => ({
+          clusterIndex: 0,
+          whichStim: 0,
+          probabilityEstimate: 0.7,
+        }),
+      },
+      currentDisplay: { text: 'Prompt 1' },
+      buttonList: [],
+      wasButtonTrial: false,
+      questionIndex: 1,
+      answerContext: {
+        originalDisplay: 'Prompt 1',
+        originalAnswer: 'alpha',
+        currentAnswer: 'alpha',
+      },
+    });
+
+    expect(record.clusterKC).to.equal('fractions.lcd');
+    expect(record.KCCluster).to.equal('fractions.lcd');
+    expect(record.stimulusKC).to.equal(' Stim-A ');
+    expect(record.KCId).to.equal(' Stim-A ');
+    expect(record.KCDefault).to.equal(' Stim-A ');
   });
 
   it('history record construction fails clearly when display context is missing', function() {

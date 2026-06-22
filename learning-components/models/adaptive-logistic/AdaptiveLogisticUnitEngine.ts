@@ -52,6 +52,7 @@ import {
   type ModelPracticeUpdateRequest,
 } from '../../runtime/modelPracticeUpdates';
 import { buildAdaptiveLogisticModelProgressItems } from './modelProgressProvider';
+import type { LearningHistoryReadOptions } from '../../units/UnitEngineServerMethods';
 
 type StimClusterLike = {
   clusterKC?: unknown;
@@ -81,6 +82,7 @@ export type AdaptiveLogisticServerMethods = {
     tdfId: any,
     currentUnitNumber: number,
     resetStudentPerformance: boolean,
+    options?: LearningHistoryReadOptions,
   ) => Promise<any[]>;
 };
 
@@ -305,6 +307,7 @@ export async function createAdaptiveLogisticUnitEngine(
       request: ModelPracticeUpdateRequest,
       extensionFields?: Record<string, unknown>,
     ) {
+      const modelEvidenceSource = extensionFields?.sparc ? 'sparc' : 'learning';
       const runtime = createModelPracticeRuntime({
         applyUpdate: (currentRequest) => applyModelPracticeUpdateToAdaptiveLogistic({
           cardProbabilities,
@@ -316,7 +319,10 @@ export async function createAdaptiveLogisticUnitEngine(
         }),
         createHistoryRecord: createCanonicalModelPracticeHistoryRecord,
       });
-      const result = await runtime.applyModelPracticeUpdate(core, request, extensionFields);
+      const result = await runtime.applyModelPracticeUpdate(core, request, {
+        modelEvidenceSource,
+        ...extensionFields,
+      });
       recordModelPracticeRuntimeHistories(request.outcome);
       calculateLearningSessionCardProbabilities({
         cardProbabilities,

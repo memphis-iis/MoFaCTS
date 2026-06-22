@@ -10,6 +10,10 @@ import {
 } from './fieldRegistrySectionCore.ts';
 
 export const STIM_CLUSTER_FIELD_REGISTRY: SectionFieldRegistry = {
+  clusterKC: simpleField(withGrid({ anyOf: [{ type: 'number' }, { type: 'string' }] }, 6), {
+    brief: 'Cluster KC identity.',
+    verbose: 'Optional cluster-level knowledge component identity. Semantic values enable intentional shared cluster models across lessons in the same course; numeric values remain valid for legacy/local models.'
+  }),
   imageStimulus: simpleField(stringField('', 12), {
     brief: 'Cluster image stimulus.',
     verbose: 'Cluster-level image asset used when stims inherit the shared image.'

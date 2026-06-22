@@ -94,6 +94,8 @@ describe('modelPracticeStateQueries', function() {
         stimulusKC: 'other-kc',
         KCId: 'other-kc',
         KCDefault: 'other-kc',
+        clusterKC: 'other-cluster',
+        KCCluster: 'other-cluster',
       }),
     ];
 
@@ -117,6 +119,51 @@ describe('modelPracticeStateQueries', function() {
       target,
       metric: 'lastOutcome',
     }), 'study');
+  });
+
+  it('hydrates shared model history across different item envelope fields in one course', function() {
+    const records = [
+      makeModelRecord('correct', {
+        courseAssignment: { courseId: 'course-1' },
+        stimuliSetId: 'stim-set-a',
+        stimulusKC: 'item-a',
+        KCId: 'item-a',
+        KCDefault: 'item-a',
+      }),
+      makeModelRecord('incorrect', {
+        courseAssignment: { courseId: 'course-1' },
+        stimuliSetId: 'stim-set-b',
+        stimulusKC: 'item-b',
+        KCId: 'item-b',
+        KCDefault: 'item-b',
+      }),
+      makeModelRecord('correct', {
+        courseAssignment: { courseId: 'course-2' },
+        stimuliSetId: 'stim-set-c',
+        stimulusKC: 'item-c',
+        KCId: 'item-c',
+        KCDefault: 'item-c',
+      }),
+    ];
+
+    assert.equal(queryModelPracticeHistory(records, {
+      target,
+      userId: 'user-1',
+      modelContext: {
+        contextKind: 'course',
+        contextId: 'course-1',
+      },
+      metric: 'priorCorrect',
+    }), 1);
+    assert.equal(queryModelPracticeHistory(records, {
+      target,
+      userId: 'user-1',
+      modelContext: {
+        contextKind: 'course',
+        contextId: 'course-1',
+      },
+      metric: 'priorIncorrect',
+    }), 1);
   });
 
   it('answers model-history metrics from card practice history-log records', function() {

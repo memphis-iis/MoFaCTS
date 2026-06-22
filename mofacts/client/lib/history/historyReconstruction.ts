@@ -1,5 +1,6 @@
 import { computePracticeTimeMs } from '../../../lib/practiceTime';
 import { isBlankIdentityValue } from '../../../common/historyEnvelope';
+import { normalizeClusterKC } from '../../../../learning-components/runtime/sharedModelPracticeIdentity';
 
 export type LearningOutcome = 'study' | 'correct' | 'incorrect';
 
@@ -101,9 +102,16 @@ function requireLearningHistoryIdentityKey(
   explicitFieldName: 'clusterKC' | 'stimulusKC',
   aliasFieldName: 'KCCluster' | 'KCId',
 ): string {
-  const explicitKey = requireKey(row[explicitFieldName], explicitFieldName);
+  const explicitKey = explicitFieldName === 'clusterKC'
+    ? normalizeClusterKC(row[explicitFieldName])
+    : requireKey(row[explicitFieldName], explicitFieldName);
   const aliasValue = row[aliasFieldName];
-  if (!isBlankIdentityValue(aliasValue) && String(aliasValue) !== explicitKey) {
+  const aliasKey = !isBlankIdentityValue(aliasValue) && explicitFieldName === 'clusterKC'
+    ? normalizeClusterKC(aliasValue)
+    : !isBlankIdentityValue(aliasValue)
+      ? String(aliasValue)
+      : null;
+  if (aliasKey !== null && aliasKey !== explicitKey) {
     throw new Error(
       `[History Reconstruction] Identity mismatch: ${aliasFieldName} must equal ${explicitFieldName}`,
     );

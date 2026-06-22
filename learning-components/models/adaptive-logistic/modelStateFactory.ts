@@ -20,7 +20,7 @@ function normalizeIdentity(value: unknown, fieldName: string): string | number {
     return value;
   }
   if (typeof value === 'string' && value.trim().length > 0) {
-    return value.trim();
+    return value.trim().toLowerCase();
   }
   throw new Error(`[Unit Engine] Missing ${fieldName}; refusing synthetic fallback.`);
 }
@@ -67,7 +67,8 @@ export function createInitialModelState(
 
   for (let i = 0; i < dependencies.stimClusters.length; ++i) {
     const cluster = dependencies.stimClusters[i];
-    const clusterKC = cluster.stims?.[0]?.clusterKC;
+    const hasClusterLevelKC = cluster.clusterKC !== undefined && cluster.clusterKC !== null && cluster.clusterKC !== '';
+    const clusterKC = hasClusterLevelKC ? cluster.clusterKC : cluster.stims?.[0]?.clusterKC;
     const resolvedClusterKC = normalizeIdentity(clusterKC, `clusterKC for cluster index ${i}`);
     const card: any = {
       clusterKC: resolvedClusterKC,
@@ -93,7 +94,9 @@ export function createInitialModelState(
     const numStims = cluster.stims.length;
     for (let j = 0; j < numStims; ++j) {
       const clusterStim = cluster.stims[j];
-      const stimClusterKC = normalizeIdentity(clusterStim.clusterKC, `clusterKC for stim ${j} in cluster index ${i}`);
+      const stimClusterKC = hasClusterLevelKC
+        ? resolvedClusterKC
+        : normalizeIdentity(clusterStim.clusterKC, `clusterKC for stim ${j} in cluster index ${i}`);
       const stimKC = normalizeIdentity(clusterStim.stimulusKC, `stimulusKC for stim ${j} in cluster index ${i}`);
       if (String(stimClusterKC) !== String(resolvedClusterKC)) {
         throw new Error(`[Unit Engine] Inconsistent clusterKC in cluster index ${i}: cluster=${resolvedClusterKC}, stim=${stimClusterKC}.`);

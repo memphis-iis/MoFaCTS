@@ -268,6 +268,28 @@ describe('history reconstruction', function() {
     expect(result.responseState).to.deep.equal({});
   });
 
+  it('normalizes semantic cluster identity while reconstructing shared progress', function() {
+    const result = reconstructLearningStateFromHistory([
+      {
+        eventType: '',
+        levelUnitType: 'model',
+        time: 1000,
+        problemStartTime: 500,
+        outcome: 'correct',
+        stimulusKC: 'stim-a',
+        clusterKC: ' Fractions.LCD ',
+        KCId: 'stim-a',
+        KCDefault: 'stim-a',
+        KCCluster: 'fractions.lcd',
+        responseKey: 'Alpha',
+        responseDuration: 375,
+      },
+    ]);
+
+    expect(result.clusterState['fractions.lcd']?.priorCorrect).to.equal(1);
+    expect(result.clusterState[' Fractions.LCD ']).to.equal(undefined);
+  });
+
   it('still rejects response-less SPARC model-practice rows by default', function() {
     expect(() => reconstructLearningStateFromHistory([
       {

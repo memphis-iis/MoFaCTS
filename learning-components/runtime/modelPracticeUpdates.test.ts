@@ -74,4 +74,29 @@ describe('modelPracticeUpdates', function() {
       /Model practice history identity mismatch: KCId must equal stimulusKC/,
     );
   });
+
+  it('normalizes semantic cluster identity while preserving item identity fields', function() {
+    const record = createCanonicalModelPracticeHistoryRecord({
+      TDFId: 'tdf-1',
+      sessionID: 'session-1',
+      levelUnit: 2,
+      userId: 'user-1',
+    }, {
+      ...request,
+      target: {
+        ...request.target,
+        clusterKC: ' Fractions.LCD ',
+        KCCluster: ' Fractions.LCD ',
+        stimulusKC: ' Stim-A ',
+        KCId: ' Stim-A ',
+        KCDefault: ' Stim-A ',
+      },
+    });
+
+    assert.equal(record.clusterKC, 'fractions.lcd');
+    assert.equal(record.KCCluster, 'fractions.lcd');
+    assert.equal(record.stimulusKC, ' Stim-A ');
+    assert.equal(record.KCId, ' Stim-A ');
+    assert.equal(record.KCDefault, ' Stim-A ');
+  });
 });
