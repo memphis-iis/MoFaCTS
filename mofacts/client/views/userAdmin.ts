@@ -31,9 +31,9 @@ const NEWS_EMAIL_BODY = [
 
 type SortDirection = 'asc' | 'desc';
 type AdminApiKeyMetadata = {
-  openRouter?: { configured?: boolean; keyUpdatedAt?: unknown; modelUpdatedAt?: unknown; updatedBy?: unknown; model?: string };
-  googleTts?: { configured?: boolean; keyUpdatedAt?: unknown; updatedBy?: unknown };
-  googleSpeech?: { configured?: boolean; keyUpdatedAt?: unknown; updatedBy?: unknown };
+  openRouter?: { configured?: boolean; unusable?: boolean; keyUpdatedAt?: unknown; modelUpdatedAt?: unknown; updatedBy?: unknown; model?: string };
+  googleTts?: { configured?: boolean; unusable?: boolean; keyUpdatedAt?: unknown; updatedBy?: unknown };
+  googleSpeech?: { configured?: boolean; unusable?: boolean; keyUpdatedAt?: unknown; updatedBy?: unknown };
 };
 
 function getPagedUserIds(): string[] {
@@ -415,11 +415,13 @@ Template.userAdmin.helpers({
   },
 
   openRouterKeyPlaceholder: function() {
-    return apiKeyMetadata(Template.instance()).openRouter?.configured ? 'Configured; enter to replace' : 'Enter OpenRouter key';
+    const data = apiKeyMetadata(Template.instance()).openRouter;
+    return data?.configured || data?.unusable ? 'Configured; enter to replace' : 'Enter OpenRouter key';
   },
 
   openRouterKeyStatus: function() {
     const data = apiKeyMetadata(Template.instance()).openRouter;
+    if (data?.unusable) return 'Stored key cannot be decrypted; enter a new OpenRouter key to replace it';
     return data?.configured ? `Configured; key updated ${formatStatusDate(data.keyUpdatedAt)}` : 'No admin-provided OpenRouter key configured';
   },
 
@@ -429,20 +431,24 @@ Template.userAdmin.helpers({
   },
 
   googleTtsKeyPlaceholder: function() {
-    return apiKeyMetadata(Template.instance()).googleTts?.configured ? 'Configured; enter to replace' : 'Enter Google TTS key';
+    const data = apiKeyMetadata(Template.instance()).googleTts;
+    return data?.configured || data?.unusable ? 'Configured; enter to replace' : 'Enter Google TTS key';
   },
 
   googleTtsKeyStatus: function() {
     const data = apiKeyMetadata(Template.instance()).googleTts;
+    if (data?.unusable) return 'Stored key cannot be decrypted; enter a new Google TTS key to replace it';
     return data?.configured ? `Configured; key updated ${formatStatusDate(data.keyUpdatedAt)}` : 'No admin-provided Google TTS key configured';
   },
 
   googleSpeechKeyPlaceholder: function() {
-    return apiKeyMetadata(Template.instance()).googleSpeech?.configured ? 'Configured; enter to replace' : 'Enter Google Speech Recognition key';
+    const data = apiKeyMetadata(Template.instance()).googleSpeech;
+    return data?.configured || data?.unusable ? 'Configured; enter to replace' : 'Enter Google Speech Recognition key';
   },
 
   googleSpeechKeyStatus: function() {
     const data = apiKeyMetadata(Template.instance()).googleSpeech;
+    if (data?.unusable) return 'Stored key cannot be decrypted; enter a new Google Speech Recognition key to replace it';
     return data?.configured ? `Configured; key updated ${formatStatusDate(data.keyUpdatedAt)}` : 'No admin-provided Google SR key configured';
   },
 

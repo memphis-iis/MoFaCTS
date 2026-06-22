@@ -442,6 +442,7 @@ const dashboardCacheMethods = createDashboardCacheMethods({
   UserDashboardCache,
   usersCollection: MeteorAny.users,
   DynamicSettings,
+  decryptData,
   serverConsole,
   computePracticeTimeMs,
   canViewDashboardTdf,
@@ -648,6 +649,7 @@ export const methods: any = {
     deleteTdfRuntimeData,
     clearStimDisplayTypeMap,
     encryptData,
+    decryptData,
   }),
   ...createAuthMethods({
     serverConsole,

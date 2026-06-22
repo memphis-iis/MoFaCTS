@@ -165,6 +165,42 @@ describe('apiKeyResolution', function() {
     expect(result.apiKey).to.equal('admin-tts');
   });
 
+  it('uses admin alternatives when TDF key fields are blank strings', async function() {
+    const deps = createDeps({
+      getTdfById: async () => ({
+        ownerId: 'owner',
+        content: {
+          tdfs: {
+            tutor: {
+              setspec: {
+                userselect: 'true',
+                speechAPIKey: '',
+                textToSpeechAPIKey: '   ',
+              },
+            },
+          },
+        },
+      }),
+      getUserById: async () => ({}),
+    });
+
+    const speechResult = await resolvePreferredApiKey(deps, {
+      userId: 'learner',
+      tdfId: 'tdf',
+      kind: 'speech',
+    });
+    const ttsResult = await resolvePreferredApiKey(deps, {
+      userId: 'learner',
+      tdfId: 'tdf',
+      kind: 'tts',
+    });
+
+    expect(speechResult.source).to.equal('admin');
+    expect(speechResult.apiKey).to.equal('admin-speech');
+    expect(ttsResult.source).to.equal('admin');
+    expect(ttsResult.apiKey).to.equal('admin-tts');
+  });
+
   it('does not continue to user or admin alternatives when TDF access is denied', async function() {
     const deps = createDeps({
       getTdfById: async () => ({

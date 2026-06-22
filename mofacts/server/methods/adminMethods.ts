@@ -97,6 +97,7 @@ type AdminMethodsDeps = {
   deleteTdfRuntimeData: (tdfId: string) => Promise<void>;
   clearStimDisplayTypeMap: () => void;
   encryptData?: (value: string) => string;
+  decryptData?: (value: string) => string;
 };
 
 const OPENROUTER_MODEL_MAX_LENGTH = 160;
@@ -150,12 +151,34 @@ function normalizeAdminOpenRouterModel(value: unknown): string {
   return trimmed;
 }
 
-function summarizeAdminApiKeySettings(doc: AdminApiKeySettingsDoc) {
+function adminApiKeyUsability(
+  encryptedKey: unknown,
+  decryptData?: (value: string) => string
+) {
+  const configured = typeof encryptedKey === 'string' && encryptedKey.trim().length > 0;
+  if (!configured || !decryptData) {
+    return { configured, unusable: false };
+  }
+  try {
+    return {
+      configured: decryptData(encryptedKey).trim().length > 0,
+      unusable: false,
+    };
+  } catch (_error) {
+    return { configured: false, unusable: true };
+  }
+}
+
+function summarizeAdminApiKeySettings(
+  doc: AdminApiKeySettingsDoc,
+  decryptData?: (value: string) => string
+) {
   const value = doc?.value || {};
   const summarizeProvider = (provider: keyof typeof value) => {
     const entry = value[provider] || {};
+    const usability = adminApiKeyUsability(entry.keyEncrypted, decryptData);
     return {
-      configured: typeof entry.keyEncrypted === 'string' && entry.keyEncrypted.trim().length > 0,
+      ...usability,
       keyUpdatedAt: entry.keyUpdatedAt || null,
       modelUpdatedAt: provider === 'openRouter' ? entry.modelUpdatedAt || null : null,
       updatedBy: entry.updatedBy || null,
@@ -315,7 +338,7 @@ export function createAdminMethods(deps: AdminMethodsDeps) {
     getAdminApiKeyAlternativeMetadata: async function(this: MethodContext) {
       await deps.requireAdminUser(this.userId, 'Only admins can read API key alternative settings');
       const doc = await deps.DynamicSettings.findOneAsync({ key: ADMIN_API_KEY_SETTINGS_KEY });
-      return summarizeAdminApiKeySettings(doc);
+      return summarizeAdminApiKeySettings(doc, deps.decryptData);
     },
 
     saveAdminApiKeyAlternative: async function(
@@ -359,7 +382,7 @@ export function createAdminMethods(deps: AdminMethodsDeps) {
         modelUpdated: provider === 'openrouter',
       });
       const doc = await deps.DynamicSettings.findOneAsync({ key: ADMIN_API_KEY_SETTINGS_KEY });
-      return summarizeAdminApiKeySettings(doc);
+      return summarizeAdminApiKeySettings(doc, deps.decryptData);
     },
 
     deleteAdminApiKeyAlternative: async function(this: MethodContext, provider: AdminApiKeyProvider) {
@@ -383,7 +406,7 @@ export function createAdminMethods(deps: AdminMethodsDeps) {
       });
       await deps.writeAuditLog('admin.apiKeyAlternativeDeleted', this.userId || null, null, { provider });
       const doc = await deps.DynamicSettings.findOneAsync({ key: ADMIN_API_KEY_SETTINGS_KEY });
-      return summarizeAdminApiKeySettings(doc);
+      return summarizeAdminApiKeySettings(doc, deps.decryptData);
     },
 
     userAdminNewsEmailRecipients: async function(this: MethodContext) {

@@ -31,6 +31,7 @@ type DashboardCacheDeps = {
   UserDashboardCache: any;
   usersCollection: any;
   DynamicSettings: any;
+  decryptData?: (value: string) => string;
   serverConsole: (...args: any[]) => void;
   computePracticeTimeMs: ComputePracticeTimeMs;
   canViewDashboardTdf: (userId: unknown, tdf: any) => boolean;
@@ -204,6 +205,7 @@ export function createDashboardCacheMethods({
   UserDashboardCache,
   usersCollection,
   DynamicSettings,
+  decryptData,
   serverConsole,
   computePracticeTimeMs,
   canViewDashboardTdf,
@@ -480,7 +482,8 @@ export function createDashboardCacheMethods({
     UserDashboardCache,
     usersCollection,
     DynamicSettings,
-    canViewDashboardTdf
+    canViewDashboardTdf,
+    ...(decryptData ? { decryptData } : {})
   });
   const learnerConfigMethods = createDashboardLearnerConfigMethods({
     Meteor,

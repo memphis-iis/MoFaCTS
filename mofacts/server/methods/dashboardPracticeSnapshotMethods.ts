@@ -26,6 +26,7 @@ type DashboardPracticeSnapshotDeps = {
   UserDashboardCache: any;
   usersCollection: any;
   DynamicSettings: any;
+  decryptData?: (value: string) => string;
   canViewDashboardTdf: (userId: unknown, tdf: any) => boolean;
 };
 
@@ -162,8 +163,8 @@ async function getDashboardVisibleTdfs(deps: DashboardPracticeSnapshotDeps, user
       (user?.ttsAPIKey && String(user.ttsAPIKey).trim()) ||
       (user?.textToSpeechAPIKey && String(user.textToSpeechAPIKey).trim())
     ),
-    hasAdminSpeechAPIKey: Boolean(adminApiKeySettings?.value?.googleSpeech?.keyEncrypted && String(adminApiKeySettings.value.googleSpeech.keyEncrypted).trim()),
-    hasAdminTTSAPIKey: Boolean(adminApiKeySettings?.value?.googleTts?.keyEncrypted && String(adminApiKeySettings.value.googleTts.keyEncrypted).trim())
+    hasAdminSpeechAPIKey: adminApiKeyIsUsable(deps, adminApiKeySettings, 'googleSpeech'),
+    hasAdminTTSAPIKey: adminApiKeyIsUsable(deps, adminApiKeySettings, 'googleTts')
   };
 }
 
@@ -182,6 +183,25 @@ function getTutorUnits(tdfObject: any): any[] {
 
 function tdfSetSpecHasKey(setspec: any, key: 'speechAPIKey' | 'textToSpeechAPIKey') {
   return Boolean(setspec?.[key] && String(setspec[key]).trim());
+}
+
+function adminApiKeyIsUsable(
+  deps: Pick<DashboardPracticeSnapshotDeps, 'decryptData'>,
+  adminApiKeySettings: any,
+  provider: 'googleSpeech' | 'googleTts'
+) {
+  const encryptedKey = adminApiKeySettings?.value?.[provider]?.keyEncrypted;
+  if (!(typeof encryptedKey === 'string' && encryptedKey.trim())) {
+    return false;
+  }
+  if (!deps.decryptData) {
+    return true;
+  }
+  try {
+    return deps.decryptData(encryptedKey).trim().length > 0;
+  } catch (_error) {
+    return false;
+  }
 }
 
 function getFirstContentUnitType(units: any[]): FirstContentUnitType {
