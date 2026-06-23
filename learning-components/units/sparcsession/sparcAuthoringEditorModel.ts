@@ -3,12 +3,10 @@ import {
   type SparcAuthoringCatalogEntry,
 } from './sparcAuthoringCatalog';
 import type {
-  SparcCondition,
   SparcProductionRule,
   SparcProductionRuleCondition,
   SparcProductionRuleEffect,
   SparcProductionRuleTest,
-  SparcReactiveRule,
   SparcRuleExpression,
   SparcStateWrite,
 } from './sparcSessionContracts';
@@ -156,57 +154,6 @@ export function defaultProductionRule(index: number): SparcProductionRule {
   };
 }
 
-export function defaultReactiveCondition(type = 'state'): SparcCondition {
-  switch (type) {
-    case 'model':
-      return {
-        type: 'model',
-        query: {
-          target: {
-            sparcDocumentId: '',
-            sparcNodeId: '',
-            stimuliSetId: '',
-            stimulusKC: '',
-            clusterKC: '',
-            KCId: '',
-            KCDefault: '',
-            KCCluster: '',
-          },
-          metric: 'probability',
-        },
-        compare: 'truthy',
-      };
-    case 'all':
-      return {
-        type: 'all',
-        conditions: [defaultReactiveCondition('state')],
-      };
-    case 'any':
-      return {
-        type: 'any',
-        conditions: [defaultReactiveCondition('state')],
-      };
-    case 'not':
-      return {
-        type: 'not',
-        condition: defaultReactiveCondition('state'),
-      };
-    case 'state':
-    default:
-      return {
-        type: 'state',
-        query: {
-          target: {
-            documentId: '',
-            nodeId: '',
-          },
-          key: 'value',
-        },
-        compare: 'truthy',
-      };
-  }
-}
-
 export function defaultStateWrite(documentId = '', nodeId = ''): SparcStateWrite {
   return {
     target: {
@@ -215,13 +162,5 @@ export function defaultStateWrite(documentId = '', nodeId = ''): SparcStateWrite
     },
     key: 'visible',
     value: true,
-  };
-}
-
-export function defaultReactiveRule(index: number): SparcReactiveRule {
-  return {
-    id: `reactive-rule-${index + 1}`,
-    when: defaultReactiveCondition('state'),
-    writes: [defaultStateWrite()],
   };
 }

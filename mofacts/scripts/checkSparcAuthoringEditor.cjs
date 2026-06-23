@@ -43,7 +43,6 @@ function assertRuleCatalogCoverage() {
     'rule.effect.credit',
     'rule.effect.model-practice',
     'rule.effect.progressive-node-operation',
-    'reactive.condition',
   ]) {
     assert.equal(ruleIds.has(id), true, `missing rule catalog entry for ${id}`);
   }
@@ -59,11 +58,6 @@ function assertRuleRoundTrip() {
     clusterIndex: 0,
   });
   productionRule.then.push(editorModel.defaultProductionEffect('append-text'));
-
-  const reactiveRule = editorModel.defaultReactiveRule(0);
-  reactiveRule.id = 'roundtrip.reactive';
-  reactiveRule.when = editorModel.defaultReactiveCondition('all');
-  reactiveRule.writes.push(editorModel.defaultStateWrite('doc-1', 'node-1'));
 
   const rawStimuliFile = {
     setspec: {
@@ -94,7 +88,6 @@ function assertRuleRoundTrip() {
           }],
           initialState: [editorModel.defaultStateWrite('doc-1', 'node-1')],
           productionRules: [productionRule],
-          reactiveRules: [reactiveRule],
           layout: {
             layoutMode: 'document',
             scrollAxis: 'vertical',
@@ -114,7 +107,7 @@ function assertRuleRoundTrip() {
   assert.equal(afterHash, beforeHash, 'raw SPARC page JSON changed during clone round trip');
   const display = roundTripped.setspec.sparcPages[0].display;
   assert.equal(display.productionRules[0].id, 'roundtrip.production');
-  assert.equal(display.reactiveRules[0].id, 'roundtrip.reactive');
+  assert.equal(('reactive' + 'Rules') in display, false);
   assert.equal(display.nodes[0].clusterIndices[0], 0);
   assert.equal(display.productionRules[0].then.some((effect) => effect.type === 'model-practice' && effect.clusterIndex === 0), true);
   assert.equal(display.forwardCompatibleField.preserved, true);

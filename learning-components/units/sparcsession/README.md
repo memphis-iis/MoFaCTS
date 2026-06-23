@@ -11,7 +11,7 @@ updates, and history records can interact across the document.
 
 The first contract types for that direction live in
 `sparcSessionContracts.ts`. They define document addresses, authored nodes,
-reactive events, practice observations, replayable state transitions, SPARC
+interface events, practice observations, replayable state transitions, SPARC
 history extension records, and runtime trace records.
 
 ## Direction
@@ -29,20 +29,12 @@ Authored `refs` can also declare `stateKey` or `modelMetric` metadata, so a
 cross-node link can say whether it depends on a specific replayed state cell or
 model query metric instead of relying on visual placement.
 
-SPARC should be reactive. Widgets and authored expressions emit events; events
-update document state, model state, and history; dependent expressions then
-recompute. A response outcome will usually trigger an adaptive model update, and
-conditions should be able to query current model state without treating the
-model as a separate widget island.
-`sparcConditionEvaluator.ts` is the first renderer-independent condition
-boundary. Conditions can query replayed SPARC state cells, query model-state
-metrics through `sparcModelQueries.ts`, and compose those checks with
-`all`/`any`/`not` without using renderer globals or string evaluation.
-Authored nodes can also declare `reactive.visibleWhen` or
-`reactive.enabledWhen`, giving SPARC a Shiny-style conditional panel/output
-shape while keeping the condition language shared with authored rules.
-Document validation resolves those node-level state and model conditions before
-runtime, including references to contained nodes by their own ids.
+SPARC should be dynamic. Widgets and authored expressions emit events; events
+update document state, model state, and history; production rules then match
+interface-state, interface-event, problem, and model-state facts. A response
+outcome will usually trigger an adaptive model update, and rules can use
+runtime-created model-state facts without treating the model as a separate
+widget island.
 
 SPARC practice and flashcard practice must use the same canonical history and
 database records where their concepts overlap. Shared fields include time,
@@ -72,7 +64,7 @@ only learner/runtime changes from that baseline. `sparcDocumentReplay.ts`
 combines authored baseline creation with ordered history replay so document
 runtime callers do not have to rebuild that sequence by hand.
 `sparcResponseOutcomeProcessor.ts` is the first response-event boundary for
-that rule: it turns a widget/reactive response outcome into one canonical SPARC
+that rule: it turns a widget response outcome into one canonical SPARC
 history record containing the practice observation, replayable state transition,
 and optional trace step. Model-linked outcomes use shared model identity fields;
 non-model reactive outcomes remain SPARC history without pretending to be card
@@ -99,25 +91,12 @@ identity rules to cluster targets, so `KCId`/`KCDefault` must match
 model practice records.
 `sparcResponseOutcomeCommit.ts` is the SPARC-side orchestration point for that:
 model-linked outcomes are applied through `adaptive-model` before the returned
-shared model record is written, while SPARC-only reactive outcomes write their
+shared model record is written, while SPARC-only outcomes write their
 SPARC history record directly.
 The same `adaptive-model` capability answers live model-state queries such as
 probability; history-backed model queries continue to cover replayable metrics
 such as prior correct, prior incorrect, total practice duration, and last
 outcome.
-`sparcReactiveRuleEvaluator.ts` evaluates condition-gated document rules and
-returns replayable state transitions. Rule writes target full
-`SparcDocumentAddress` values, so a rule from one node can update another node
-without relying on visual layout order. Document validation also resolves state-condition query targets inside
-authored rules, including nested `all`/`any`/`not` condition trees, so reactive
-dependencies fail at authoring time instead of at first learner interaction.
-`sparcStateTransitionHistory.ts` wraps those transitions in canonical SPARC
-history records so replay can recreate rule-driven document changes from the
-authored start state.
-Authored SPARC documents can carry `reactiveRules` directly, keeping declarative
-reactivity with the authored start state instead of in renderer-local scripts.
-`evaluateSparcAuthoredReactiveRules` is the default entry point for executing
-those authored rules.
 `sparcProductionRuleEvaluator.ts` is the first SPARC-owned production-rule
 substrate for CTAT-informed tutor behavior. It treats interface state, learner
 events, problem givens, and inferred model state as working-memory facts, then
@@ -128,10 +107,10 @@ memory facts, write addressed interface state, emit templated hint/buggy/success
 messages, classify an action, and credit KCs. This keeps SPARC declarative and
 node-addressed while allowing Fractions and Stoichiometry rules to generalize
 across problem content instead of hard-coding a single BRD path.
-`sparcProductionRuleCommit.ts` and `sparcReactiveRuleCommit.ts` add persistence
-boundaries: authored production-rule and reactive-rule matches become canonical
-SPARC state-transition history records, and no-op rule passes do not write empty
-history. Production-rule assertions are persisted as hidden working-memory state
+`sparcProductionRuleCommit.ts` adds the persistence boundary: authored
+production-rule matches become canonical SPARC state-transition history records,
+and no-op rule passes do not write empty history. Production-rule assertions are
+persisted as hidden working-memory state
 cells and rehydrated into facts on later events, so a rule can infer model state
 such as an active common denominator and a later rule can match that inferred
 state without making it a visible document node. Interface effects remain
@@ -172,17 +151,15 @@ Session unit code or create a SPARC-only persistence lane.
 The current manifest advertises the first SPARC-owned services through
 `providedServices`: document addressing, document replay, state replay,
 authored-document validation, response-outcome history, authored initial state,
-authored model targets, authored response outcomes, condition evaluation,
+authored model targets, authored response outcomes,
 model-history exchange, model-query adaptation, model-update requests,
 production-rule commit/evaluation, response-outcome commit/authored-rules,
-vertical layout validation, reactive rule commit/evaluation, and
-state-transition history.
+vertical layout validation, and state-transition history.
 
 `sparcAuthoringCatalog.ts` is the source-owned starting point for editor-facing
 TutorScript/SPARC authoring palettes. It catalogs supported atomic nodes,
 generated group patterns, semantic nodes, layout policies and glue modes,
-production-rule fact patterns/tests/expressions/effects, and reactive
-state/model conditions. Editor UI should project from that catalog instead of
+and production-rule fact patterns/tests/expressions/effects. Editor UI should project from that catalog instead of
 retyping node and rule vocabularies in a separate surface.
 
 ## Content Development Role

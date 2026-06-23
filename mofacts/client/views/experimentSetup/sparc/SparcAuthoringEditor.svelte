@@ -18,17 +18,13 @@
     addProductionEffect as addProductionEffectAction,
     addProductionRule as addProductionRuleAction,
     addProductionTest as addProductionTestAction,
-    addReactiveRule as addReactiveRuleAction,
     addEffectFactSlot as addEffectFactSlotAction,
     addExpressionArg as addExpressionArgAction,
     addFactSlot as addFactSlotAction,
-    addReactiveConditionChild as addReactiveConditionChildAction,
-    changeReactiveCondition as changeReactiveConditionAction,
     changeProductionConditionKind as changeProductionConditionKindAction,
     changeProductionEffectType as changeProductionEffectTypeAction,
     createScopedProductionRule as createScopedProductionRuleAction,
     ensureEffectExpression,
-    ensureNegatedReactiveCondition,
     productionConditionKind,
     productionConditionPattern,
     removeEffectFactSlot as removeEffectFactSlotAction,
@@ -38,8 +34,6 @@
     removeProductionEffect as removeProductionEffectAction,
     removeProductionRule as removeProductionRuleAction,
     removeProductionTest as removeProductionTestAction,
-    removeReactiveRule as removeReactiveRuleAction,
-    removeReactiveConditionChild as removeReactiveConditionChildAction,
     renameEffectFactSlot as renameEffectFactSlotAction,
     renameFactSlot as renameFactSlotAction,
     moveRule,
@@ -52,9 +46,7 @@
     updateProductionConditionFactType as updateProductionConditionFactTypeAction,
     updateProductionTestField as updateProductionTestFieldAction,
     updateProgressiveNodeTemplate as updateProgressiveNodeTemplateAction,
-    updateReactiveCondition as updateReactiveConditionAction,
     updateRuleExpression as updateRuleExpressionAction,
-    updateStateWrite as updateStateWriteAction,
     updateScopedProductionRuleJson as updateScopedProductionRuleJsonAction,
   } from './sparcAuthoringRuleActions';
   import { computeDropTarget as computeSparcDropTarget } from './sparcAuthoringDropTarget';
@@ -68,9 +60,6 @@
     paletteIconClass,
     updateNodeAuthoredValue as updateNodeAuthoredValueAction,
   } from './sparcAuthoringNodeActions';
-  import {
-    ensureTarget,
-  } from './sparcAuthoringEditPrimitives';
   import {
     createSparcRichTextController,
   } from './sparcRichTextEditorBridge';
@@ -94,15 +83,12 @@
   import { validateSparcDisplaysBeforeSave } from './sparcAuthoringValidation';
   import {
     defaultProductionEffect,
-    defaultReactiveCondition,
-    defaultStateWrite,
     getRenderedSparcPaletteEntries,
     variableExpression,
   } from '../../../../../learning-components/units/sparcsession/sparcAuthoringEditorModel';
   import { SPARC_RULE_CATALOG } from '../../../../../learning-components/units/sparcsession/sparcAuthoringCatalog';
   import SparcAuthoringHeader from './SparcAuthoringHeader.svelte';
   import SparcProductionRulesEditor from './SparcProductionRulesEditor.svelte';
-  import SparcReactiveRulesEditor from './SparcReactiveRulesEditor.svelte';
   import SparcVisualEditorTab from './SparcVisualEditorTab.svelte';
 
   export let tdfId = '';
@@ -131,10 +117,8 @@
     'append-text',
   ];
   const productionConditionTypes = ['fact-pattern', 'not-fact-pattern'];
-  const reactiveConditionTypes = ['state', 'model', 'all', 'any', 'not'];
   const ruleExpressionTypes = ['literal', 'variable', 'function'];
-  const comparisonOps = ['eq', 'neq', 'gt', 'gte', 'lt', 'lte'];
-  const reactiveComparisonOps = ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'truthy', 'falsy'];
+  const comparisonOps = ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'truthy', 'falsy'];
   const classifyOutcomes = ['correct', 'incorrect', 'partial', 'study', 'skipped', 'unknown', 'buggy'];
   const messageTypes = ['hint', 'buggy', 'success', 'feedback'];
   const functionNames = ['add', 'subtract', 'multiply', 'divide', 'mod', 'gcd', 'lcm'];
@@ -162,7 +146,6 @@
   let showNodeHierarchy = false;
   let activeProductionRuleIndex = 0;
   let activeScopedProductionRuleIndex = -1;
-  let activeReactiveRuleIndex = 0;
   let draggedPaletteEntryId = '';
   let dropTarget = null;
   let dropMarkerStyle = '';
@@ -173,9 +156,7 @@
   $: selectedStimFile = queryParams?.stimFile ? String(queryParams.stimFile) : '';
   $: displayNodes = Array.isArray(activeDisplay?.nodes) ? activeDisplay.nodes : [];
   $: productionRules = Array.isArray(activeDisplay?.productionRules) ? activeDisplay.productionRules : [];
-  $: reactiveRules = Array.isArray(activeDisplay?.reactiveRules) ? activeDisplay.reactiveRules : [];
   $: activeProductionRule = productionRules[activeProductionRuleIndex] || productionRules[0] || null;
-  $: activeReactiveRule = reactiveRules[activeReactiveRuleIndex] || reactiveRules[0] || null;
   $: flatNodes = flattenNodes(displayNodes);
   $: if (flatNodes.length > 0 && !flatNodes.some((entry) => entry.node?.id === activeNodeId)) {
     activeNodeId = flatNodes[0].node.id;
@@ -210,7 +191,7 @@
   $: if (!showAdvancedEditors && activeEditorTab !== 'visual') {
     activeEditorTab = 'visual';
   }
-  $: if (activeEditorTab === 'model') {
+  $: if (activeEditorTab === 'model' || activeEditorTab === 'reactive') {
     activeEditorTab = 'visual';
   }
   $: richTextController.maintainHtmlEditor(activeNode, htmlEditorElement);
@@ -220,15 +201,11 @@
     getActiveDisplay: () => activeDisplay,
     getActiveNode: () => activeNode,
     getActiveProductionRule: () => activeProductionRule,
-    getActiveReactiveRule: () => activeReactiveRule,
     getFlatNodes: () => flatNodes,
-    getActiveNodeId: () => activeNodeId,
     setActiveProductionRuleIndex: (index) => { activeProductionRuleIndex = index; },
-    setActiveReactiveRuleIndex: (index) => { activeReactiveRuleIndex = index; },
     setErrorText: (value) => { errorText = value; },
     markChanged,
     ensureProductionRules,
-    ensureReactiveRules,
     getClusterChoices: () => clusterChoices,
     actions: {
       materializeBehaviorClusterTargetsForNode: materializeBehaviorClusterTargetsForNodeAction,
@@ -244,8 +221,6 @@
       addProductionEffect: addProductionEffectAction,
       removeProductionEffect: removeProductionEffectAction,
       changeProductionEffectType: changeProductionEffectTypeAction,
-      addReactiveRule: addReactiveRuleAction,
-      removeReactiveRule: removeReactiveRuleAction,
     },
   });
 
@@ -524,12 +499,6 @@
     return activeDisplay.productionRules;
   }
 
-  function ensureReactiveRules() {
-    if (!activeDisplay) throw new Error('No active SPARC display is selected.');
-    activeDisplay.reactiveRules = Array.isArray(activeDisplay.reactiveRules) ? activeDisplay.reactiveRules : [];
-    return activeDisplay.reactiveRules;
-  }
-
   function updateProductionRuleField(fieldName, value) {
     if (!activeProductionRule) return;
     if (value === '' && fieldName === 'module') {
@@ -610,34 +579,6 @@
 
   function updateStateWrite(write, fieldName, value) {
     if (updateStateWriteAction(write, fieldName, value)) markChanged();
-  }
-
-  function updateReactiveRuleField(fieldName, value) {
-    if (!activeReactiveRule) return;
-    activeReactiveRule[fieldName] = value;
-    markChanged();
-  }
-
-  function setReactiveCondition(type) {
-    if (!activeReactiveRule) return;
-    activeReactiveRule.when = defaultReactiveCondition(type);
-    markChanged();
-  }
-
-  function updateReactiveCondition(condition, path, value) {
-    if (updateReactiveConditionAction(condition, path, value, ensureTarget)) markChanged();
-  }
-
-  function changeReactiveCondition(condition, type) {
-    if (changeReactiveConditionAction(condition, type)) markChanged();
-  }
-
-  function addReactiveConditionChild(condition) {
-    if (addReactiveConditionChildAction(condition)) markChanged();
-  }
-
-  function removeReactiveConditionChild(condition, index) {
-    if (removeReactiveConditionChildAction(condition, index)) markChanged();
   }
 
   function updateProgressiveNodeTemplate(effect, fieldName, value) {
@@ -846,29 +787,6 @@
       onUpdateRuleExpression={updateRuleExpression}
       onAddExpressionArg={addExpressionArg}
       onRemoveExpressionArg={removeExpressionArg}
-      onMarkChanged={markChanged}
-    />
-  {:else if activeEditorTab === 'reactive'}
-    <SparcReactiveRulesEditor
-      {reactiveRules}
-      bind:activeReactiveRuleIndex
-      {activeReactiveRule}
-      {reactiveConditionTypes}
-      {reactiveComparisonOps}
-      onAddReactiveRule={controllerActions.addReactiveRule}
-      onRemoveReactiveRule={controllerActions.removeReactiveRule}
-      onMoveReactiveRule={controllerActions.moveReactiveRule}
-      onUpdateReactiveRuleField={updateReactiveRuleField}
-      onSetReactiveCondition={setReactiveCondition}
-      onRemoveReactiveCondition={() => { delete activeReactiveRule.when; markChanged(); }}
-      onChangeReactiveCondition={changeReactiveCondition}
-      onUpdateReactiveCondition={updateReactiveCondition}
-      onAddReactiveConditionChild={addReactiveConditionChild}
-      onRemoveReactiveConditionChild={removeReactiveConditionChild}
-      {ensureNegatedReactiveCondition}
-      onAddReactiveWrite={() => controllerActions.addReactiveWrite(defaultStateWrite)}
-      onRemoveReactiveWrite={controllerActions.removeReactiveWrite}
-      onUpdateStateWrite={updateStateWrite}
       onMarkChanged={markChanged}
     />
   {/if}

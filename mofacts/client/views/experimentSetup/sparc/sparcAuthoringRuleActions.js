@@ -3,8 +3,6 @@ import {
   defaultProductionEffect,
   defaultProductionRule,
   defaultProductionTest,
-  defaultReactiveCondition,
-  defaultReactiveRule,
   literalExpression,
 } from '../../../../../learning-components/units/sparcsession/sparcAuthoringEditorModel.ts';
 import {
@@ -109,16 +107,6 @@ export function changeProductionEffectType(rule, index, type) {
   if (!rule?.then) return false;
   rule.then[index] = defaultProductionEffect(type);
   return true;
-}
-
-export function addReactiveRule(rules) {
-  rules.push(defaultReactiveRule(rules.length));
-  return rules.length - 1;
-}
-
-export function removeReactiveRule(rules, index) {
-  rules.splice(index, 1);
-  return Math.max(0, Math.min(index, rules.length - 1));
 }
 
 export function updateScopedProductionRuleJson(rule, value) {
@@ -349,60 +337,6 @@ export function updateStateWrite(write, fieldName, value) {
     write[fieldName] = value;
   }
   return true;
-}
-
-export function updateReactiveCondition(condition, path, value, ensureTarget) {
-  if (!condition) return false;
-  if (path === 'compare') {
-    condition.compare = value;
-  } else if (path === 'value') {
-    condition.value = parseLooseValue(value);
-  } else if (path === 'query.key') {
-    condition.query = condition.query || {};
-    condition.query.key = value;
-  } else if (path === 'query.target.documentId') {
-    condition.query = condition.query || {};
-    condition.query.target = ensureTarget(condition.query.target || {});
-    condition.query.target.documentId = value;
-  } else if (path === 'query.target.nodeId') {
-    condition.query = condition.query || {};
-    condition.query.target = ensureTarget(condition.query.target || {});
-    condition.query.target.nodeId = value;
-  } else if (path === 'query.metric') {
-    condition.query = condition.query || {};
-    condition.query.metric = value;
-  } else if (path.startsWith('query.target.')) {
-    const fieldName = path.slice('query.target.'.length);
-    condition.query = condition.query || {};
-    condition.query.target = condition.query.target || {};
-    condition.query.target[fieldName] = value;
-  }
-  return true;
-}
-
-export function changeReactiveCondition(condition, type) {
-  if (!condition) return false;
-  replaceObjectContents(condition, defaultReactiveCondition(type));
-  return true;
-}
-
-export function addReactiveConditionChild(condition) {
-  if (!condition || (condition.type !== 'all' && condition.type !== 'any')) return false;
-  condition.conditions = Array.isArray(condition.conditions) ? condition.conditions : [];
-  condition.conditions.push(defaultReactiveCondition('state'));
-  return true;
-}
-
-export function removeReactiveConditionChild(condition, index) {
-  if (!condition?.conditions) return false;
-  condition.conditions.splice(index, 1);
-  return true;
-}
-
-export function ensureNegatedReactiveCondition(condition) {
-  if (!condition || condition.type !== 'not') return null;
-  condition.condition = condition.condition || defaultReactiveCondition('state');
-  return condition.condition;
 }
 
 export function updateProgressiveNodeTemplate(effect, fieldName, value) {

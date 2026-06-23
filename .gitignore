@@ -2,6 +2,7 @@
 *.txt
 .project
 .settings
+.vscode/
 mofacts/build/*.tar.gz
 mofacts/build/mof*
 .pyc

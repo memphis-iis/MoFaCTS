@@ -2,14 +2,10 @@ export function createSparcAuthoringControllerAdapters({
   getActiveDisplay,
   getActiveNode,
   getActiveProductionRule,
-  getActiveReactiveRule,
-  getActiveNodeId,
   setActiveProductionRuleIndex,
-  setActiveReactiveRuleIndex,
   setErrorText,
   markChanged,
   ensureProductionRules,
-  ensureReactiveRules,
   getClusterChoices,
   actions,
 }) {
@@ -66,38 +62,6 @@ export function createSparcAuthoringControllerAdapters({
     },
     changeProductionEffectType(index, type) {
       markIfChanged(actions.changeProductionEffectType(getActiveProductionRule(), index, type));
-    },
-    addReactiveRule() {
-      try {
-        setActiveReactiveRuleIndex(actions.addReactiveRule(ensureReactiveRules()));
-        markChanged();
-      } catch (error) {
-        setErrorText(error.message || String(error));
-      }
-    },
-    removeReactiveRule(index) {
-      setActiveReactiveRuleIndex(actions.removeReactiveRule(ensureReactiveRules(), index));
-      markChanged();
-    },
-    moveReactiveRule(index, delta) {
-      const nextIndex = actions.moveRule(ensureReactiveRules(), index, delta);
-      if (nextIndex !== index) {
-        setActiveReactiveRuleIndex(nextIndex);
-        markChanged();
-      }
-    },
-    addReactiveWrite(defaultStateWrite) {
-      const activeReactiveRule = getActiveReactiveRule();
-      if (!activeReactiveRule) return;
-      activeReactiveRule.writes = Array.isArray(activeReactiveRule.writes) ? activeReactiveRule.writes : [];
-      activeReactiveRule.writes.push(defaultStateWrite(getActiveDisplay()?.documentId || '', getActiveNodeId() || ''));
-      markChanged();
-    },
-    removeReactiveWrite(index) {
-      const activeReactiveRule = getActiveReactiveRule();
-      if (!activeReactiveRule?.writes) return;
-      activeReactiveRule.writes.splice(index, 1);
-      markChanged();
     },
   };
 }

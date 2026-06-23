@@ -3,7 +3,6 @@ import {
   type ModelPracticeStateProvider,
 } from '../../runtime/modelPracticeStateQueries';
 import type { CanonicalHistoryRecord } from '../../runtime/historyEnvelope';
-import { commitSparcAuthoredReactiveEvent } from './sparcReactiveRuleCommit';
 import {
   commitSparcAuthoredProductionRuleEvent,
 } from './sparcProductionRuleCommit';
@@ -15,9 +14,6 @@ import {
 } from './sparcResponseOutcomeCommit';
 import { processSparcAuthoredResponseOutcome } from './sparcAuthoredResponseOutcome';
 import type { SparcPracticeHistoryCore } from './sparcPracticeHistoryBridge';
-import type {
-  SparcCommittedReactiveRuleEvaluation,
-} from './sparcReactiveRuleCommit';
 import type {
   SparcCommittedProductionRuleEvaluation,
 } from './sparcProductionRuleCommit';
@@ -51,9 +47,7 @@ function createRuleModelQueryProvider(params: {
 export type SparcResponseOutcomePipelineResult = {
   readonly responseCommit: SparcCommittedResponseOutcome;
   readonly productionCommit: SparcCommittedProductionRuleEvaluation;
-  readonly reactiveCommit: SparcCommittedReactiveRuleEvaluation;
   readonly replayStateAfterResponse: SparcReplayState;
-  readonly replayStateAfterProduction: SparcReplayState;
   readonly finalReplayState: SparcReplayState;
 };
 
@@ -91,42 +85,28 @@ export async function commitSparcResponseOutcomeWithAuthoredRules(params: {
     document: params.document,
     event: authoredRuleEvent,
     replayState: replayStateAfterResponse,
+    extraFacts: [],
     runtime: {
-      history: params.runtime.history,
-    },
-  });
-  const replayStateAfterProduction = productionCommit.historyRecord
-    ? replaySparcHistory([productionCommit.historyRecord], replayStateAfterResponse)
-    : replayStateAfterResponse;
-  const reactiveCommit = await commitSparcAuthoredReactiveEvent({
-    core: params.core,
-    document: params.document,
-    event: authoredRuleEvent,
-    context: {
-      replayState: replayStateAfterProduction,
-      modelQueries: createRuleModelQueryProvider({
+      adaptiveModel: params.runtime.adaptiveModel,
+      modelState: createRuleModelQueryProvider({
         historyRecords: [
           ...(params.priorModelHistoryRecords ?? []),
           responseCommit.historyRecord,
         ],
         liveModelQueries: params.runtime.adaptiveModel,
       }),
-    },
-    runtime: {
       history: params.runtime.history,
     },
   });
-  const finalReplayState = reactiveCommit.historyRecord
-    ? replaySparcHistory([reactiveCommit.historyRecord], replayStateAfterProduction)
-    : replayStateAfterProduction;
+  const replayStateAfterProduction = productionCommit.historyRecord
+    ? replaySparcHistory([productionCommit.historyRecord], replayStateAfterResponse)
+    : replayStateAfterResponse;
 
   return {
     responseCommit,
     productionCommit,
-    reactiveCommit,
     replayStateAfterResponse,
-    replayStateAfterProduction,
-    finalReplayState,
+    finalReplayState: replayStateAfterProduction,
   };
 }
 

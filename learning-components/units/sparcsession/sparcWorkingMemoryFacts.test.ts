@@ -3,7 +3,7 @@ import { createSparcAuthoredInitialReplayState } from './sparcAuthoredInitialSta
 import { buildSparcWorkingMemoryFacts } from './sparcWorkingMemoryFacts';
 import type {
   SparcAuthoredDocument,
-  SparcReactiveEvent,
+  SparcInterfaceEvent,
 } from './sparcSessionContracts';
 
 const document: SparcAuthoredDocument = {
@@ -90,7 +90,7 @@ describe('sparcWorkingMemoryFacts', function() {
   });
 
   it('adds current interface event payload as a working-memory fact', function() {
-    const event: SparcReactiveEvent = {
+    const event: SparcInterfaceEvent = {
       eventId: 'event-1',
       type: 'value-changed',
       source: {
@@ -122,7 +122,7 @@ describe('sparcWorkingMemoryFacts', function() {
   });
 
   it('adds practice observations when a reactive event carries one', function() {
-    const event: SparcReactiveEvent = {
+    const event: SparcInterfaceEvent = {
       eventId: 'event-2',
       type: 'outcome-recorded',
       source: {

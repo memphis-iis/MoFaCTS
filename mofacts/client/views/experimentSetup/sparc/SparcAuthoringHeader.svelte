@@ -52,8 +52,7 @@
 {#if showAdvancedEditors}
   <div class="sparc-editor-tabs" role="tablist" aria-label="SPARC editor sections">
     <button type="button" class:active={activeEditorTab === 'visual'} on:click={() => activeEditorTab = 'visual'}>Visual Editor</button>
-    <button type="button" class:active={activeEditorTab === 'production'} on:click={() => activeEditorTab = 'production'}>Advanced Rules</button>
-    <button type="button" class:active={activeEditorTab === 'reactive'} on:click={() => activeEditorTab = 'reactive'}>Reactive Rules</button>
+    <button type="button" class:active={activeEditorTab === 'production'} on:click={() => activeEditorTab = 'production'}>Production Rules</button>
   </div>
 {/if}
 

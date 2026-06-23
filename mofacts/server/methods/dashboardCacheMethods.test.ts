@@ -1210,6 +1210,9 @@ describe('dashboardCacheMethods', function() {
         })
       },
       Assignments: { find: () => ({ fetchAsync: async () => [] }) },
+      Courses: { find: () => ({ fetchAsync: async () => [] }) },
+      Sections: { find: () => ({ fetchAsync: async () => [] }) },
+      SectionUserMap: { find: () => ({ fetchAsync: async () => [] }) },
       UserDashboardCache: {
         findOneAsync: async () => cacheDoc,
         updateAsync: async (_selector: any, modifier: any) => {

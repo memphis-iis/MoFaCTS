@@ -182,36 +182,11 @@ function validateProductionEffect(effect, label) {
   }
 }
 
-function validateReactiveCondition(condition, label) {
-  switch (condition?.type) {
-    case 'state':
-      requireNonBlankString(condition.query?.target?.documentId, `${label} state documentId`);
-      requireNonBlankString(condition.query?.target?.nodeId, `${label} state nodeId`);
-      requireNonBlankString(condition.query?.key, `${label} state key`);
-      requireNonBlankString(condition.compare, `${label} compare`);
-      break;
-    case 'model':
-      requireNonBlankString(condition.query?.target?.sparcDocumentId, `${label} model sparcDocumentId`);
-      requireNonBlankString(condition.query?.target?.sparcNodeId, `${label} model sparcNodeId`);
-      requireNonBlankString(condition.query?.metric, `${label} model metric`);
-      requireNonBlankString(condition.compare, `${label} compare`);
-      break;
-    case 'all':
-    case 'any':
-      if (!Array.isArray(condition.conditions)) {
-        throw new Error(`${label} ${condition.type} conditions must be an array.`);
-      }
-      condition.conditions.forEach((child, index) => validateReactiveCondition(child, `${label} ${condition.type}[${index}]`));
-      break;
-    case 'not':
-      validateReactiveCondition(condition.condition, `${label} not`);
-      break;
-    default:
-      throw new Error(`${label} has unsupported condition type "${String(condition?.type)}".`);
-  }
-}
-
 function validateRulesBeforeSave(display, label, validClusterIndices) {
+  const removedRuleField = 'reactive' + 'Rules';
+  if (Array.isArray(display?.[removedRuleField]) && display[removedRuleField].length > 0) {
+    throw new Error(`${label} contains a removed SPARC rule field; use productionRules.`);
+  }
   const nodesById = new Map(flattenNodes(display?.nodes || []).map((entry) => [entry.node.id, entry.node]));
   for (const [index, rule] of (display?.productionRules || []).entries()) {
     requireNonBlankString(rule.id, `${label} productionRules[${index}] id`);
@@ -228,7 +203,9 @@ function validateRulesBeforeSave(display, label, validClusterIndices) {
     for (const [testIndex, test] of (rule.tests || []).entries()) {
       requireNonBlankString(test.op, `${label} productionRules[${index}].tests[${testIndex}] op`);
       validateRuleExpression(test.left, `${label} productionRules[${index}].tests[${testIndex}] left`);
-      validateRuleExpression(test.right, `${label} productionRules[${index}].tests[${testIndex}] right`);
+      if (test.op !== 'truthy' && test.op !== 'falsy') {
+        validateRuleExpression(test.right, `${label} productionRules[${index}].tests[${testIndex}] right`);
+      }
     }
     if (!Array.isArray(rule.then)) {
       throw new Error(`${label} productionRules[${index}].then must be an array.`);
@@ -257,18 +234,4 @@ function validateRulesBeforeSave(display, label, validClusterIndices) {
     });
   }
 
-  for (const [index, rule] of (display?.reactiveRules || []).entries()) {
-    requireNonBlankString(rule.id, `${label} reactiveRules[${index}] id`);
-    if (rule.when) {
-      validateReactiveCondition(rule.when, `${label} reactiveRules[${index}].when`);
-    }
-    if (!Array.isArray(rule.writes)) {
-      throw new Error(`${label} reactiveRules[${index}].writes must be an array.`);
-    }
-    for (const [writeIndex, write] of rule.writes.entries()) {
-      requireNonBlankString(write.target?.documentId, `${label} reactiveRules[${index}].writes[${writeIndex}] documentId`);
-      requireNonBlankString(write.target?.nodeId, `${label} reactiveRules[${index}].writes[${writeIndex}] nodeId`);
-      requireNonBlankString(write.key, `${label} reactiveRules[${index}].writes[${writeIndex}] key`);
-    }
-  }
 }

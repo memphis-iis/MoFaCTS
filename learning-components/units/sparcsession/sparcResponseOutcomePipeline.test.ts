@@ -9,7 +9,6 @@ import {
 import { processSparcResponseOutcome } from './sparcResponseOutcomeProcessor';
 import type {
   SparcAuthoredDocument,
-  SparcCondition,
   SparcModelTargetIdentity,
   SparcRuleExpression,
 } from './sparcSessionContracts';
@@ -28,12 +27,7 @@ const sourceAddress = {
 
 const feedbackAddress = {
   documentId: 'doc-1',
-  nodeId: 'widget-3-feedback',
-};
-
-const productionAddress = {
-  documentId: 'doc-1',
-  nodeId: 'production-state',
+  nodeId: 'feedback',
 };
 
 const modelTarget: SparcModelTargetIdentity = {
@@ -47,19 +41,19 @@ const modelTarget: SparcModelTargetIdentity = {
   KCCluster: 'cluster-1',
 };
 
-function documentWithRule(ruleWhen: SparcCondition): SparcAuthoredDocument {
+const literal = (value: unknown): SparcRuleExpression => ({ type: 'literal', value });
+const variable = (name: string): SparcRuleExpression => ({ type: 'variable', name });
+
+function baseDocument(productionRules: NonNullable<SparcAuthoredDocument['productionRules']>): SparcAuthoredDocument {
   return {
     id: 'doc-1',
     schemaVersion: 1,
-    reactiveRules: [{
-      id: 'show-feedback',
-      when: ruleWhen,
-      writes: [{
-        target: feedbackAddress,
-        key: 'visible',
-        value: true,
-      }],
+    initialState: [{
+      target: feedbackAddress,
+      key: 'visible',
+      value: false,
     }],
+    productionRules,
     root: {
       id: 'root',
       kind: 'document',
@@ -67,95 +61,87 @@ function documentWithRule(ruleWhen: SparcCondition): SparcAuthoredDocument {
         id: 'region-1',
         kind: 'panel',
       }, {
-        id: 'production-state',
-        kind: 'output',
-      }, {
-        id: 'region-7',
-        kind: 'panel',
-        children: [{
-          id: 'widget-3',
-          kind: 'widget',
-          children: [{
-            id: 'widget-3-feedback',
-            kind: 'feedback',
-          }],
-        }],
+        id: 'feedback',
+        kind: 'feedback',
       }],
     },
   };
 }
 
-const literal = (value: unknown): SparcRuleExpression => ({ type: 'literal', value });
-const variable = (name: string): SparcRuleExpression => ({ type: 'variable', name });
-
-function documentWithProductionRuleThenReactiveRule(): SparcAuthoredDocument {
+function responseStateRule(): NonNullable<SparcAuthoredDocument['productionRules']>[number] {
   return {
-    ...documentWithRule({
-      type: 'state',
-      query: {
-        target: productionAddress,
-        key: 'feedback-ready',
+    id: 'show-feedback',
+    when: [{
+      factType: 'interface-state',
+      slots: {
+        documentId: { type: 'literal', value: 'doc-1' },
+        node: { type: 'literal', value: 'region-1' },
+        key: { type: 'literal', value: 'lastOutcome' },
+        value: { type: 'literal', value: 'correct' },
       },
-      compare: 'truthy',
-    }),
-    productionRules: [{
-      id: 'production.mark-feedback-ready',
-      when: [{
-        factType: 'practice-observation',
-        slots: {
-          outcome: { type: 'literal', value: 'correct' },
-          responseValue: { type: 'bind', variable: 'responseValue' },
-        },
-      }],
-      tests: [{
-        op: 'eq',
-        left: variable('responseValue'),
-        right: literal('Answer'),
-      }],
-      then: [{
-        type: 'write-state',
-        write: {
-          target: productionAddress,
-          key: 'feedback-ready',
-          value: literal(true),
-        },
-      }, {
-        type: 'message',
-        messageType: 'success',
-        template: 'Good job!',
-      }],
+    }],
+    then: [{
+      type: 'write-state',
+      write: {
+        target: feedbackAddress,
+        key: 'visible',
+        value: literal(true),
+      },
     }],
   };
 }
 
-function documentWithInitialStateAndRule(ruleWhen: SparcCondition): SparcAuthoredDocument {
+function modelStateRule(metric: 'priorCorrect' | 'probability', threshold: number) {
   return {
-    ...documentWithRule(ruleWhen),
-    initialState: [{
-      target: feedbackAddress,
-      key: 'visible',
-      value: false,
+    id: `show-feedback-from-${metric}`,
+    when: [{
+      factType: 'model-state',
+      slots: {
+        documentId: { type: 'literal' as const, value: 'doc-1' },
+        node: { type: 'literal' as const, value: 'region-1' },
+        metric: { type: 'literal' as const, value: metric },
+        value: { type: 'bind' as const, variable: 'modelValue' },
+      },
+    }],
+    tests: [{
+      op: 'gte' as const,
+      left: variable('modelValue'),
+      right: literal(threshold),
+    }],
+    then: [{
+      type: 'write-state' as const,
+      write: {
+        target: feedbackAddress,
+        key: 'visible',
+        value: literal(true),
+      },
     }],
   };
 }
 
-function documentWithAuthoredModelTargetAndRule(ruleWhen: SparcCondition): SparcAuthoredDocument {
-  const document = documentWithInitialStateAndRule(ruleWhen);
-  const [region1, region7] = document.root.children ?? [];
+function runtime(writtenRecords: unknown[], probability = 0.82): any {
   return {
-    ...document,
-    root: {
-      ...document.root,
-      children: [{
-        ...region1!,
-        modelTarget,
-      }, region7!],
+    adaptiveModel: {
+      applyModelPracticeUpdate(currentCore: typeof core, request: Parameters<typeof createCanonicalModelPracticeHistoryRecord>[1], extensionFields?: Record<string, unknown>) {
+        return {
+          record: createCanonicalModelPracticeHistoryRecord(currentCore, request, extensionFields),
+        };
+      },
+      queryModelPracticeState(query: { metric: string }) {
+        assert.equal(query.metric, 'probability');
+        return probability;
+      },
+    },
+    history: {
+      async writeCanonicalHistory(record: unknown) {
+        writtenRecords.push(record);
+      },
     },
   };
 }
 
 describe('sparcResponseOutcomePipeline', function() {
-  it('commits a SPARC-only response and then persists matching authored rule writes', async function() {
+  it('commits a SPARC-only response and then persists matching production-rule writes', async function() {
     const writtenRecords: unknown[] = [];
     const processed = processSparcResponseOutcome(core, {
       observationId: 'obs-1',
@@ -168,90 +154,21 @@ describe('sparcResponseOutcomePipeline', function() {
 
     const result = await commitSparcResponseOutcomeWithAuthoredRules({
       core,
-      document: documentWithRule({
-        type: 'state',
-        query: {
-          target: sourceAddress,
-          key: 'lastOutcome',
-        },
-        compare: 'eq',
-        value: 'correct',
-      }),
+      document: baseDocument([responseStateRule()]),
       processed,
       replayState: createEmptySparcReplayState(),
-      runtime: {
-        adaptiveModel: {
-          applyModelPracticeUpdate() {
-            throw new Error('adaptive model should not run for SPARC-only outcome');
-          },
-          queryModelPracticeState() {
-            throw new Error('model query not used');
-          },
-        },
-        history: {
-          async writeCanonicalHistory(record) {
-            writtenRecords.push(record);
-          },
-        },
-      },
+      runtime: runtime(writtenRecords),
     });
 
     assert.equal(result.responseCommit.usedAdaptiveModel, false);
-    assert.equal(result.productionCommit.execution.firings.length, 0);
-    assert.deepEqual(result.reactiveCommit.evaluation.matchedRuleIds, ['show-feedback']);
+    assert.deepEqual(result.productionCommit.execution.firings.map((firing) => firing.ruleId), ['show-feedback']);
+    assert.equal(result.productionCommit.historyRecord?.action, 'sparc-production-rule');
     assert.equal(writtenRecords.length, 2);
-    assert.equal(result.reactiveCommit.historyRecord?.action, 'sparc-reactive-rule');
     assert.equal(result.replayStateAfterResponse.cells[createSparcStateCellKey(sourceAddress, 'lastOutcome')]?.value, 'correct');
     assert.equal(result.finalReplayState.cells[createSparcStateCellKey(feedbackAddress, 'visible')]?.value, true);
   });
 
-  it('runs authored production rules before authored reactive rules in the response cycle', async function() {
-    const writtenRecords: unknown[] = [];
-    const processed = processSparcResponseOutcome(core, {
-      observationId: 'obs-production',
-      sourceAddress,
-      time: 2200,
-      problemStartTime: 1500,
-      outcome: 'correct',
-      responseValue: 'Answer',
-    });
-
-    const result = await commitSparcResponseOutcomeWithAuthoredRules({
-      core,
-      document: documentWithProductionRuleThenReactiveRule(),
-      processed,
-      replayState: createEmptySparcReplayState(),
-      runtime: {
-        adaptiveModel: {
-          applyModelPracticeUpdate() {
-            throw new Error('adaptive model should not run for SPARC-only outcome');
-          },
-          queryModelPracticeState() {
-            throw new Error('model query not used');
-          },
-        },
-        history: {
-          async writeCanonicalHistory(record) {
-            writtenRecords.push(record);
-          },
-        },
-      },
-    });
-
-    assert.deepEqual(result.productionCommit.execution.firings.map((firing) => firing.ruleId), [
-      'production.mark-feedback-ready',
-    ]);
-    assert.equal(result.productionCommit.historyRecord?.action, 'sparc-production-rule');
-    assert.equal(
-      result.replayStateAfterProduction.cells[createSparcStateCellKey(productionAddress, 'feedback-ready')]?.value,
-      true,
-    );
-    assert.deepEqual(result.reactiveCommit.evaluation.matchedRuleIds, ['show-feedback']);
-    assert.equal(result.finalReplayState.cells[createSparcStateCellKey(feedbackAddress, 'visible')]?.value, true);
-    assert.equal(writtenRecords.length, 3);
-  });
-
-  it('commits a model-linked response before evaluating model-conditioned authored rules', async function() {
+  it('converts history-backed model metrics into model-state facts before production evaluation', async function() {
     const writtenRecords: unknown[] = [];
     const processed = processSparcResponseOutcome(core, {
       observationId: 'obs-2',
@@ -265,45 +182,33 @@ describe('sparcResponseOutcomePipeline', function() {
 
     const result = await commitSparcResponseOutcomeWithAuthoredRules({
       core,
-      document: documentWithRule({
-        type: 'model',
-        query: {
-          target: modelTarget,
-          metric: 'priorCorrect',
-        },
-        compare: 'gte',
-        value: 1,
-      }),
-      processed,
-      replayState: createEmptySparcReplayState(),
-      runtime: {
-        adaptiveModel: {
-          applyModelPracticeUpdate(currentCore, request, extensionFields) {
-            return {
-              record: createCanonicalModelPracticeHistoryRecord(currentCore, request, extensionFields),
-            };
-          },
-          queryModelPracticeState() {
-            throw new Error('history-backed model condition should be used');
-          },
-        },
-        history: {
-          async writeCanonicalHistory(record) {
-            writtenRecords.push(record);
-          },
+      document: {
+        ...baseDocument([modelStateRule('priorCorrect', 1)]),
+        root: {
+          id: 'root',
+          kind: 'document',
+          children: [{
+            id: 'region-1',
+            kind: 'panel',
+            modelTarget,
+          }, {
+            id: 'feedback',
+            kind: 'feedback',
+          }],
         },
       },
+      processed,
+      replayState: createEmptySparcReplayState(),
+      runtime: runtime(writtenRecords),
     });
 
     assert.equal(result.responseCommit.usedAdaptiveModel, true);
-    assert.deepEqual(result.reactiveCommit.evaluation.matchedRuleIds, ['show-feedback']);
-    assert.equal(writtenRecords.length, 2);
-    assert.equal(result.responseCommit.historyRecord.levelUnitType, 'model');
-    assert.equal(result.reactiveCommit.historyRecord?.levelUnitType, 'sparc');
+    assert.deepEqual(result.productionCommit.execution.firings.map((firing) => firing.ruleId), ['show-feedback-from-priorCorrect']);
     assert.equal(result.finalReplayState.cells[createSparcStateCellKey(feedbackAddress, 'visible')]?.value, true);
+    assert.equal(writtenRecords.length, 2);
   });
 
-  it('evaluates authored probability conditions against the live adaptive model after a response update', async function() {
+  it('uses the live adaptive model for probability model-state facts', async function() {
     const writtenRecords: unknown[] = [];
     const processed = processSparcResponseOutcome(core, {
       observationId: 'obs-probability',
@@ -317,42 +222,28 @@ describe('sparcResponseOutcomePipeline', function() {
 
     const result = await commitSparcResponseOutcomeWithAuthoredRules({
       core,
-      document: documentWithRule({
-        type: 'model',
-        query: {
-          target: modelTarget,
-          metric: 'probability',
-        },
-        compare: 'gte',
-        value: 0.8,
-      }),
-      processed,
-      replayState: createEmptySparcReplayState(),
-      runtime: {
-        adaptiveModel: {
-          applyModelPracticeUpdate(currentCore, request, extensionFields) {
-            return {
-              record: createCanonicalModelPracticeHistoryRecord(currentCore, request, extensionFields),
-            };
-          },
-          queryModelPracticeState(query) {
-            assert.equal(query.metric, 'probability');
-            assert.deepEqual(query.target, modelTarget);
-            return 0.82;
-          },
-        },
-        history: {
-          async writeCanonicalHistory(record) {
-            writtenRecords.push(record);
-          },
+      document: {
+        ...baseDocument([modelStateRule('probability', 0.8)]),
+        root: {
+          id: 'root',
+          kind: 'document',
+          children: [{
+            id: 'region-1',
+            kind: 'panel',
+            modelTarget,
+          }, {
+            id: 'feedback',
+            kind: 'feedback',
+          }],
         },
       },
+      processed,
+      replayState: createEmptySparcReplayState(),
+      runtime: runtime(writtenRecords, 0.82),
     });
 
-    assert.equal(result.responseCommit.usedAdaptiveModel, true);
-    assert.deepEqual(result.reactiveCommit.evaluation.matchedRuleIds, ['show-feedback']);
+    assert.deepEqual(result.productionCommit.execution.firings.map((firing) => firing.ruleId), ['show-feedback-from-probability']);
     assert.equal(result.finalReplayState.cells[createSparcStateCellKey(feedbackAddress, 'visible')]?.value, true);
-    assert.equal(writtenRecords.length, 2);
   });
 
   it('derives replay state from authored document plus prior canonical history before committing response rules', async function() {
@@ -380,57 +271,52 @@ describe('sparcResponseOutcomePipeline', function() {
 
     const result = await commitSparcResponseOutcomeFromDocumentHistory({
       core,
-      document: documentWithInitialStateAndRule({
-        type: 'model',
-        query: {
-          target: modelTarget,
-          metric: 'priorCorrect',
-        },
-        compare: 'gte',
-        value: 2,
-      }),
-      processed,
-      priorHistoryRecords: [priorCardRecord],
-      runtime: {
-        adaptiveModel: {
-          applyModelPracticeUpdate(currentCore, request, extensionFields) {
-            return {
-              record: createCanonicalModelPracticeHistoryRecord(currentCore, request, extensionFields),
-            };
-          },
-          queryModelPracticeState() {
-            throw new Error('history-backed model condition should be used');
-          },
-        },
-        history: {
-          async writeCanonicalHistory(record) {
-            writtenRecords.push(record);
-          },
+      document: {
+        ...baseDocument([modelStateRule('priorCorrect', 2)]),
+        root: {
+          id: 'root',
+          kind: 'document',
+          children: [{
+            id: 'region-1',
+            kind: 'panel',
+            modelTarget,
+          }, {
+            id: 'feedback',
+            kind: 'feedback',
+          }],
         },
       },
+      processed,
+      priorHistoryRecords: [priorCardRecord],
+      runtime: runtime(writtenRecords),
     });
 
     assert.equal(result.responseCommit.usedAdaptiveModel, true);
-    assert.deepEqual(result.reactiveCommit.evaluation.matchedRuleIds, ['show-feedback']);
+    assert.deepEqual(result.productionCommit.execution.firings.map((firing) => firing.ruleId), ['show-feedback-from-priorCorrect']);
     assert.equal(result.replayStateAfterResponse.cells[createSparcStateCellKey(feedbackAddress, 'visible')]?.value, false);
     assert.equal(result.finalReplayState.cells[createSparcStateCellKey(feedbackAddress, 'visible')]?.value, true);
-    assert.equal(writtenRecords.length, 2);
   });
 
-  it('processes authored model targets before committing response and authored rules', async function() {
+  it('processes authored model targets before committing response and authored production rules', async function() {
     const writtenRecords: unknown[] = [];
 
     const result = await processAndCommitSparcAuthoredResponseOutcome({
       core,
-      document: documentWithAuthoredModelTargetAndRule({
-        type: 'model',
-        query: {
-          target: modelTarget,
-          metric: 'priorCorrect',
+      document: {
+        ...baseDocument([modelStateRule('priorCorrect', 1)]),
+        root: {
+          id: 'root',
+          kind: 'document',
+          children: [{
+            id: 'region-1',
+            kind: 'panel',
+            modelTarget,
+          }, {
+            id: 'feedback',
+            kind: 'feedback',
+          }],
         },
-        compare: 'gte',
-        value: 1,
-      }),
+      },
       input: {
         observationId: 'obs-4',
         sourceAddress,
@@ -440,31 +326,13 @@ describe('sparcResponseOutcomePipeline', function() {
         responseValue: 'Answer',
       },
       priorHistoryRecords: [],
-      runtime: {
-        adaptiveModel: {
-          applyModelPracticeUpdate(currentCore, request, extensionFields) {
-            assert.deepEqual(request.target, modelTarget);
-            return {
-              record: createCanonicalModelPracticeHistoryRecord(currentCore, request, extensionFields),
-            };
-          },
-          queryModelPracticeState() {
-            throw new Error('history-backed model condition should be used');
-          },
-        },
-        history: {
-          async writeCanonicalHistory(record) {
-            writtenRecords.push(record);
-          },
-        },
-      },
+      runtime: runtime(writtenRecords),
     });
 
     assert.equal(result.responseCommit.usedAdaptiveModel, true);
     assert.equal(result.responseCommit.historyRecord.levelUnitType, 'model');
     assert.equal(result.responseCommit.historyRecord.KCId, 'kc-1');
-    assert.deepEqual(result.reactiveCommit.evaluation.matchedRuleIds, ['show-feedback']);
+    assert.deepEqual(result.productionCommit.execution.firings.map((firing) => firing.ruleId), ['show-feedback-from-priorCorrect']);
     assert.equal(result.finalReplayState.cells[createSparcStateCellKey(feedbackAddress, 'visible')]?.value, true);
-    assert.equal(writtenRecords.length, 2);
   });
 });

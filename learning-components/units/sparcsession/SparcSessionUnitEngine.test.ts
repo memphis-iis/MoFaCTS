@@ -77,27 +77,27 @@ function sampleDocument(): SparcAuthoredDocument {
       key: 'visible',
       value: false,
     }],
-    reactiveRules: [{
+    productionRules: [{
       id: 'show-feedback',
-      when: {
-        type: 'state',
-        query: {
+      when: [{
+        factType: 'interface-state',
+        slots: {
+          documentId: { type: 'literal', value: 'doc-1' },
+          node: { type: 'literal', value: 'region-1' },
+          key: { type: 'literal', value: 'lastOutcome' },
+          value: { type: 'literal', value: 'correct' },
+        },
+      }],
+      then: [{
+        type: 'write-state',
+        write: {
           target: {
             documentId: 'doc-1',
-            nodeId: 'region-1',
+            nodeId: 'feedback',
           },
-          key: 'lastOutcome',
+          key: 'visible',
+          value: { type: 'literal', value: true },
         },
-        compare: 'eq',
-        value: 'correct',
-      },
-      writes: [{
-        target: {
-          documentId: 'doc-1',
-          nodeId: 'feedback',
-        },
-        key: 'visible',
-        value: true,
       }],
     }],
     root: {

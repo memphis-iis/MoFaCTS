@@ -27,7 +27,7 @@ import {
 import type { SparcPracticeHistoryCore } from './sparcPracticeHistoryBridge';
 import type {
   SparcAuthoredDocument,
-  SparcReactiveEvent,
+  SparcInterfaceEvent,
   SparcWorkingMemoryFact,
 } from './sparcSessionContracts';
 import type {
@@ -260,7 +260,7 @@ export type SparcAuthoredProductionRuleRuntimeParams = {
   readonly core: SparcPracticeHistoryCore;
   readonly document: SparcAuthoredDocument;
   readonly replayState?: SparcReplayState;
-  readonly event: SparcReactiveEvent;
+  readonly event: SparcInterfaceEvent;
   readonly extraFacts?: readonly SparcWorkingMemoryFact[];
   readonly maxCycles?: number;
   readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory'>;
@@ -346,6 +346,9 @@ export async function createSparcSessionUnitEngine(
         runtime: {
           adaptiveModel: {
             applyModelPracticeUpdate: adaptiveEngine.applyModelPracticeUpdate,
+            queryModelPracticeState: adaptiveEngine.queryModelPracticeState,
+          },
+          modelState: {
             queryModelPracticeState: adaptiveEngine.queryModelPracticeState,
           },
           history: params.history,

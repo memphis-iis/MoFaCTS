@@ -78,11 +78,6 @@ export type SparcLayoutPolicy = {
   readonly overflowX?: 'clip' | 'hidden' | 'visible';
 };
 
-export type SparcNodeReactivity = {
-  readonly visibleWhen?: SparcCondition;
-  readonly enabledWhen?: SparcCondition;
-};
-
 export type SparcAuthoredNode = {
   readonly id: string;
   readonly kind: SparcNodeKind;
@@ -91,7 +86,6 @@ export type SparcAuthoredNode = {
   readonly clusterIndices?: readonly number[];
   readonly modelTarget?: SparcModelTargetIdentity;
   readonly layout?: SparcLayoutPolicy;
-  readonly reactive?: SparcNodeReactivity;
 };
 
 export type SparcClusterModelTarget = ModelPracticeHistoryIdentity & {
@@ -107,7 +101,6 @@ export type SparcAuthoredDocument = {
   readonly initialState?: readonly SparcStateWrite[];
   readonly workingMemoryFacts?: readonly SparcWorkingMemoryFact[];
   readonly productionRules?: readonly SparcProductionRule[];
-  readonly reactiveRules?: readonly SparcReactiveRule[];
   readonly root: SparcAuthoredNode;
 };
 
@@ -151,39 +144,7 @@ export type SparcStateQuery = {
   readonly key: string;
 };
 
-export type SparcConditionComparison =
-  | 'eq'
-  | 'neq'
-  | 'gt'
-  | 'gte'
-  | 'lt'
-  | 'lte'
-  | 'truthy'
-  | 'falsy';
-
-export type SparcCondition =
-  | {
-      readonly type: 'state';
-      readonly query: SparcStateQuery;
-      readonly compare: SparcConditionComparison;
-      readonly value?: unknown;
-    }
-  | {
-      readonly type: 'model';
-      readonly query: SparcModelQuery;
-      readonly compare: SparcConditionComparison;
-      readonly value?: unknown;
-    }
-  | {
-      readonly type: 'all' | 'any';
-      readonly conditions: readonly SparcCondition[];
-    }
-  | {
-      readonly type: 'not';
-      readonly condition: SparcCondition;
-    };
-
-export type SparcReactiveEventType =
+export type SparcInterfaceEventType =
   | 'document-loaded'
   | 'node-mounted'
   | 'focus-changed'
@@ -194,9 +155,9 @@ export type SparcReactiveEventType =
   | 'condition-evaluated'
   | 'trace-step-recorded';
 
-export type SparcReactiveEvent = {
+export type SparcInterfaceEvent = {
   readonly eventId: string;
-  readonly type: SparcReactiveEventType;
+  readonly type: SparcInterfaceEventType;
   readonly source: SparcDocumentAddress;
   readonly time: number;
   readonly payload?: Record<string, unknown>;
@@ -205,7 +166,7 @@ export type SparcReactiveEvent = {
 
 export type SparcStateTransition = {
   readonly transitionId: string;
-  readonly event: SparcReactiveEvent;
+  readonly event: SparcInterfaceEvent;
   readonly writes: readonly SparcStateWrite[];
 };
 
@@ -263,9 +224,9 @@ export type SparcProductionRuleCondition =
     };
 
 export type SparcProductionRuleTest = {
-  readonly op: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte';
+  readonly op: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'truthy' | 'falsy';
   readonly left: SparcRuleExpression;
-  readonly right: SparcRuleExpression;
+  readonly right?: SparcRuleExpression;
 };
 
 export type SparcProductionRuleEffect =
@@ -385,12 +346,6 @@ export type SparcProductionRuleExecution = {
   readonly facts: readonly SparcWorkingMemoryFact[];
   readonly firings: readonly SparcProductionRuleFiring[];
   readonly cycles: number;
-};
-
-export type SparcReactiveRule = {
-  readonly id: string;
-  readonly when?: SparcCondition;
-  readonly writes: readonly SparcStateWrite[];
 };
 
 export type SparcTraceStep = {

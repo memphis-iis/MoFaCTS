@@ -30,7 +30,6 @@ export const sparcSessionUnitComponentManifest: LearningComponentManifest<Create
     'sparc.authored-initial-state',
     'sparc.authored-model-targets',
     'sparc.authored-response-outcome',
-    'sparc.condition-evaluation',
     {
       name: 'sparc.document-addressing',
       runtimeEntry: 'SparcSessionUnitEngine.validateSparcDocumentReferences',
@@ -68,8 +67,6 @@ export const sparcSessionUnitComponentManifest: LearningComponentManifest<Create
       runtimeEntry: 'SparcSessionUnitEngine.processAndCommitSparcAuthoredResponseOutcome',
     },
     'sparc.response-outcome-history',
-    'sparc.reactive-rule-commit',
-    'sparc.reactive-rule-evaluation',
     'sparc.state-replay',
     'sparc.state-transition-history',
     'sparc.vertical-layout-validation',

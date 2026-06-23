@@ -141,8 +141,8 @@ For any conditions, emit multiple production rules.
 For all conditions, emit one production rule with multiple fact conditions/tests.
 For not, use production-rule negated fact pattern.
 For model conditions:
-emit production-rule conditions over model-state facts only after the runtime can provide those facts through extraFacts.
-Until that support exists, do not generate model-conditioned production rules that cannot execute clearly.
+implement the runtime model-state fact path before emitting any model-conditioned production rules.
+The complete path is: identify model-state dependencies from authored/generated production rules, query the adaptive model in the SPARC runtime layer, convert those results to model-state extraFacts, pass them into production-rule evaluation, and cover the behavior with tests. Do not partially implement model-conditioned rules.
 
 The current OLI-to-SPARC converter is:
 
@@ -178,12 +178,12 @@ Also remove:
 SparcReactiveRule
 SparcCondition
 SparcNodeReactivity
-SparcReactiveEvent, or rename it to a production-rule-neutral event type if the same event payload remains part of the production-rule path
+SparcReactiveEvent, renamed to SparcInterfaceEvent
 reactiveRules
 visibleWhen
 enabledWhen
 
-unless SparcCondition is still needed somewhere else. If it remains only for non-rule node properties, it will preserve the split implicitly, so my recommendation is to remove it from the authored model unless there is a concrete non-rule use case.
+SparcCondition is the old mini-condition language used by reactiveRules and node reactive.visibleWhen/enabledWhen. It supports state/model/all/any/not conditions plus comparisons. In the production-rule-only system it is not a separate authored construct; its useful behavior must be represented directly as production-rule when patterns and tests.
 
 6. Runtime removal
 
@@ -210,7 +210,7 @@ commitSparcTrialDisplayProductionRuleEvents
 
 The current SparcSessionUnitEngine already exposes production-rule evaluation and commit functions. That is good. The target should be: this is the only rule path.
 
-Also clean up old naming that keeps the removed abstraction visible. The production-rule path currently uses event types named SparcReactiveEvent. If the payload shape is still right, rename it to a neutral event type such as SparcInterfaceEvent or SparcProductionRuleEvent rather than leaving "reactive" in runtime APIs.
+Also clean up old naming that keeps the removed abstraction visible. The production-rule path currently uses event types named SparcReactiveEvent. If the payload shape is still right, rename it to SparcInterfaceEvent rather than leaving "reactive" in runtime APIs.
 
 7. Editor removal
 
@@ -229,14 +229,13 @@ Plan:
 Delete SparcReactiveRulesEditor.svelte.
 Remove activeEditorTab === 'reactive'.
 Remove reactiveRules, activeReactiveRule, activeReactiveRuleIndex, and all reactive action handlers from SparcAuthoringEditor.svelte.
-Rename the remaining production tab from Advanced Rules to Rules or Production Rules.
-Prefer Rules if the authoring goal is conceptual unification.
+Rename the remaining production tab from Advanced Rules to Production Rules.
 Remove reactive actions from sparcAuthoringControllerAdapters.js.
 
 The editor should not retain a hidden “reactive” branch. It should have:
 
 Visual Editor
-Rules
+Production Rules
 
 not:
 
@@ -245,15 +244,9 @@ Production Rules
 Reactive Rules
 8. Validation and addressing
 
-Validation currently needs to reject reactiveRules, not tolerate them.
+Validation currently needs to remove reactiveRules, not tolerate them.
 
-For the transition branch, I would make validation strict:
-
-if ('reactiveRules' in displayOrDocument) {
-  throw new Error('SPARC reactiveRules have been removed. Use productionRules instead.');
-}
-
-Do this temporarily until all fixtures/configs are migrated, then remove the error if desired. But during the removal branch, this helps prevent accidental survival.
+There is no legacy compatibility reader and no fallback migration path. Remove reactiveRules from the contract and schema. Once schemas/contracts are closed over productionRules-only SPARC, reactiveRules are simply not part of valid SPARC.
 
 Update reference/address validation so that it only traverses production rules. Search results show sparcDocumentAddressing.ts references reactiveRules. That traversal should be removed or converted to production-rule traversal only.
 
@@ -362,7 +355,7 @@ Multiple generated production rules produce the same write
 Former reactive all behavior
 Multiple interface-state patterns required before firing
 Model-state fact behavior
-Runtime-created model-state extraFacts can satisfy production-rule conditions
+Production-rule evaluation with model conditions is complete end-to-end: runtime identifies required model-state facts, queries model state, passes extraFacts, and fires the expected production rules
 The production-rule evaluator does not query adaptive model state directly
 Converter regression
 Converter emits no reactiveRules
@@ -383,8 +376,8 @@ Add any missing helper support for formerly reactive conditions:
 
 state truthy/falsy
 state inequality comparisons
-runtime-created model-state extraFacts
-helper conversion functions from SparcCondition to production-rule fragments, if useful as temporary migration code
+runtime-created model-state extraFacts, including dependency discovery from rules and tests that prove model-conditioned rules execute
+temporary converter-local helpers for translating old condition-shaped source behavior to production-rule patterns and tests, if the converter needs them
 
 This phase should not remove anything yet.
 
@@ -400,16 +393,15 @@ Phase 3: Migrate fixtures/configs
 
 Update all config directory examples/tests and generated SPARC fixtures.
 
-After the application code and converter no longer support reactiveRules, run the fixed converter against the original OLI/SPARC source material and regenerate:
+After the application code and converter no longer support reactiveRules, run the fixed converter against the original OLI source material and regenerate:
 
-SPARC American History Progressive
-SPARC Fractions Addition
-SPARC Stoichiometry
 SPARC Intro Stats modules, including a new all-modules bulk-ready zip
 
-Use C:\Users\ppavl\OneDrive\Active projects\mofacts-private-config for the private original source documents when that is the current source location. Write upload-ready generated config outputs to the canonical config repo at C:\dev\mofacts_config.
+Use C:\Users\ppavl\OneDrive\Active projects\mofacts-private-config\extracted_intro_to_stats_full_l71p6 for the Intro Stats original OLI export. It contains 43 hierarchy modules.
 
-Add a temporary validation failure for reactiveRules so remaining fixtures are caught.
+American History, Fractions, and Stoichiometry were not created from this converter. Update their actual config files in C:\dev\mofacts_config directly as part of the reactiveRules removal. Do not look for or create private source folders for those.
+
+Remove or update remaining reactiveRules fixtures/configs. No legacy migration reader should be added; old SPARC content is updated in the config repo and the active app runs the updated production-rule content.
 
 Phase 4: Remove editor reactive UI
 
@@ -441,14 +433,14 @@ Repo search for SparcCondition returns no public SPARC contract hits.
 SPARC converter output contains no reactiveRules.
 SPARC converter all-module output is directly bulk-upload-ready.
 The regenerated Intro Stats all-modules zip contains only uploadable TDF/stimulus JSON pairs and required media, not conversion notes.
-SPARC schemas reject reactiveRules.
+SPARC schemas and contracts omit reactiveRules entirely.
 Config fixtures contain no reactiveRules.
 Tests pass with reactive evaluator and commit files deleted.
 The visual editor has no reactive tab.
 Production rules can express former visibility/enabled/page-mutation behavior.
 Runtime-created model-state extraFacts can drive production-rule conditions without evaluator-side model queries.
 Documentation no longer describes two rule systems.
-13. One design decision to settle during implementation
+13. Model-condition mapping decision
 
 Resolved decision: use Option B for model-condition mapping.
 
@@ -478,4 +470,4 @@ The runtime layer owns adaptive-model access through the existing model-state qu
 
 This keeps production rules pure over facts and keeps adaptive-model access in the runtime layer. The production evaluator should not know how to query the adaptive model.
 
-Everything else is straightforward removal work. The key is not to preserve reactive rules as “legacy support” unless you deliberately want a migration reader for old stored content. For active schemas, generated content, configs, and editor behavior, they should be gone.
+Everything else is removal work. Do not preserve reactive rules as legacy support. Old SPARC content is updated in the config repo; active schemas, generated content, configs, editor behavior, and runtime APIs use productionRules only.

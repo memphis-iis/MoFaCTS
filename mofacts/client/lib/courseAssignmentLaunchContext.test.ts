@@ -1,5 +1,5 @@
 import { Session } from 'meteor/session';
-import assert from 'node:assert/strict';
+import { expect } from 'chai';
 import {
   applyCourseAssignmentLaunchContext,
   getCourseAssignmentLaunchContext,
@@ -25,8 +25,8 @@ describe('courseAssignmentLaunchContext', function() {
       levelUnitType: 'model',
     });
 
-    assert.deepEqual(record.courseAssignment, context);
-    assert.deepEqual(getCourseAssignmentLaunchContext(), context);
+    expect(record.courseAssignment).to.deep.equal(context);
+    expect(getCourseAssignmentLaunchContext()).to.deep.equal(context);
   });
 
   it('fails clearly when history TDF does not match the course launch context', function() {
@@ -37,13 +37,12 @@ describe('courseAssignmentLaunchContext', function() {
       launchSource: 'courses',
     });
 
-    assert.throws(
+    expect(
       () => applyCourseAssignmentLaunchContext({
         TDFId: 'other-tdf',
         levelUnitType: 'model',
       }),
-      /History TDFId does not match course assignment launch context/,
-    );
+    ).to.throw(/History TDFId does not match course assignment launch context/);
   });
 
   it('fails clearly for malformed course launch context', function() {
@@ -54,9 +53,8 @@ describe('courseAssignmentLaunchContext', function() {
       launchSource: 'courses',
     });
 
-    assert.throws(
+    expect(
       () => getCourseAssignmentLaunchContext(),
-      /Invalid course assignment launch context/,
-    );
+    ).to.throw(/Invalid course assignment launch context/);
   });
 });

@@ -1,7 +1,7 @@
 import type {
   SparcAuthoredDocument,
   SparcAuthoredNode,
-  SparcReactiveEvent,
+  SparcInterfaceEvent,
   SparcWorkingMemoryFact,
 } from './sparcSessionContracts';
 import type { SparcReplayState } from './sparcStateReplay';
@@ -13,7 +13,7 @@ import {
 export type SparcWorkingMemoryFactBuildInput = {
   readonly document: SparcAuthoredDocument;
   readonly replayState?: SparcReplayState;
-  readonly event?: SparcReactiveEvent;
+  readonly event?: SparcInterfaceEvent;
   readonly extraFacts?: readonly SparcWorkingMemoryFact[];
 };
 
@@ -131,7 +131,7 @@ function replayStateFacts(replayState: SparcReplayState): readonly SparcWorkingM
   });
 }
 
-function eventFacts(event: SparcReactiveEvent): readonly SparcWorkingMemoryFact[] {
+function eventFacts(event: SparcInterfaceEvent): readonly SparcWorkingMemoryFact[] {
   const payloadSlots = isRecord(event.payload) ? event.payload : {};
   const facts: SparcWorkingMemoryFact[] = [{
     factType: 'interface-event',

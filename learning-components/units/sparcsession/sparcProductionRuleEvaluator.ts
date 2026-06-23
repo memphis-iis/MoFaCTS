@@ -176,12 +176,16 @@ function compareRuleTest(
   bindings: SparcRuleBindings,
 ): boolean {
   const left = evaluateSparcRuleExpression(test.left, bindings);
-  const right = evaluateSparcRuleExpression(test.right, bindings);
+  const right = test.right === undefined ? undefined : evaluateSparcRuleExpression(test.right, bindings);
   switch (test.op) {
     case 'eq':
       return left === right;
     case 'neq':
       return left !== right;
+    case 'truthy':
+      return Boolean(left);
+    case 'falsy':
+      return !left;
     case 'gt':
       return requireFiniteNumber(left, 'SPARC rule test left') > requireFiniteNumber(right, 'SPARC rule test right');
     case 'gte':

@@ -1036,60 +1036,6 @@ export const SPARC_RULE_CATALOG: readonly SparcAuthoringCatalogEntry[] = [{
       },
     }],
   },
-}, {
-  id: 'reactive.condition',
-  label: 'Reactive state/model condition',
-  category: 'reactive-rule-condition',
-  description: 'Condition language used by reactive rules and node visible/enabled checks.',
-  schema: {
-    oneOf: [{
-      type: 'object',
-      required: ['type', 'query', 'compare'],
-      properties: {
-        type: { const: 'state' },
-        query: {
-          type: 'object',
-          required: ['target', 'key'],
-          properties: {
-            target: {
-              type: 'object',
-              required: ['documentId', 'nodeId'],
-              properties: {
-                documentId: { type: 'string' },
-                nodeId: { type: 'string' },
-              },
-            },
-            key: { type: 'string' },
-          },
-        },
-        compare: { enum: ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'truthy', 'falsy'] },
-        value: {},
-      },
-    }, {
-      type: 'object',
-      required: ['type', 'query', 'compare'],
-      properties: {
-        type: { const: 'model' },
-        query: { type: 'object', additionalProperties: true },
-        compare: { enum: ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'truthy', 'falsy'] },
-        value: {},
-      },
-    }, {
-      type: 'object',
-      required: ['type', 'conditions'],
-      properties: {
-        type: { enum: ['all', 'any'] },
-        conditions: { type: 'array', items: { description: 'Nested reactive condition.' } },
-      },
-    }, {
-      type: 'object',
-      required: ['type', 'condition'],
-      properties: {
-        type: { const: 'not' },
-        condition: { description: 'Nested reactive condition.' },
-      },
-    }],
-  },
 }] as const;
 
 export const SPARC_AUTHORING_CATALOG: SparcAuthoringCatalog = {

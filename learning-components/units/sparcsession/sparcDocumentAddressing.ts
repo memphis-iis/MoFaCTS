@@ -2,7 +2,6 @@ import type {
   SparcAddressReference,
   SparcAuthoredDocument,
   SparcAuthoredNode,
-  SparcCondition,
   SparcDocumentAddress,
   SparcModelTargetIdentity,
   SparcClusterModelTarget,
@@ -96,154 +95,6 @@ function validateNodeReferences(
   }
   for (const child of sourceNode.children ?? []) {
     validateNodeReferences(document, child, issues);
-  }
-}
-
-function validateReactiveRuleReferences(
-  document: SparcAuthoredDocument,
-  issues: SparcReferenceValidationIssue[],
-): void {
-  for (const rule of document.reactiveRules ?? []) {
-    for (const [index, write] of rule.writes.entries()) {
-      try {
-        resolveSparcDocumentAddress(document, write.target);
-      } catch (error) {
-        issues.push({
-          sourceNodeId: `reactive-rule:${rule.id}`,
-          reference: {
-            relation: 'controls',
-            target: write.target,
-          },
-          message: error instanceof Error ? error.message : String(error),
-        });
-      }
-      if (typeof write.key !== 'string' || write.key.trim().length === 0) {
-        issues.push({
-          sourceNodeId: `reactive-rule:${rule.id}`,
-          reference: {
-            relation: 'controls',
-            target: write.target,
-          },
-          message: `SPARC reactive rule "${rule.id}" writes[${index}].key is required`,
-        });
-      }
-    }
-  }
-}
-
-function validateConditionReferences(params: {
-  readonly document: SparcAuthoredDocument;
-  readonly condition: SparcCondition;
-  readonly sourceNodeId: string;
-  readonly issues: SparcReferenceValidationIssue[];
-}): void {
-  switch (params.condition.type) {
-    case 'state':
-      try {
-        resolveSparcDocumentAddress(params.document, params.condition.query.target);
-      } catch (error) {
-        params.issues.push({
-          sourceNodeId: params.sourceNodeId,
-          reference: {
-            relation: 'depends-on',
-            target: params.condition.query.target,
-          },
-          message: error instanceof Error ? error.message : String(error),
-        });
-      }
-      if (
-        typeof params.condition.query.key !== 'string'
-        || params.condition.query.key.trim().length === 0
-      ) {
-        params.issues.push({
-          sourceNodeId: params.sourceNodeId,
-          reference: {
-            relation: 'depends-on',
-            target: params.condition.query.target,
-          },
-          message: 'SPARC state-condition query key is required',
-        });
-      }
-      return;
-    case 'model':
-      try {
-        resolveSparcDocumentAddress(
-          params.document,
-          modelTargetReferenceAddress(params.condition.query.target),
-        );
-      } catch (error) {
-        params.issues.push({
-          sourceNodeId: params.sourceNodeId,
-          reference: {
-            relation: 'model-target',
-            target: modelTargetReferenceAddress(params.condition.query.target),
-          },
-          message: error instanceof Error ? error.message : String(error),
-        });
-      }
-      validateModelTargetIdentity({
-        target: params.condition.query.target,
-        sourceNodeId: params.sourceNodeId,
-        issues: params.issues,
-      });
-      return;
-    case 'all':
-    case 'any':
-      for (const condition of params.condition.conditions) {
-        validateConditionReferences({
-          ...params,
-          condition,
-        });
-      }
-      return;
-    case 'not':
-      validateConditionReferences({
-        ...params,
-        condition: params.condition.condition,
-      });
-  }
-}
-
-function validateReactiveRuleConditionReferences(
-  document: SparcAuthoredDocument,
-  issues: SparcReferenceValidationIssue[],
-): void {
-  for (const rule of document.reactiveRules ?? []) {
-    if (!rule.when) {
-      continue;
-    }
-    validateConditionReferences({
-      document,
-      condition: rule.when,
-      sourceNodeId: `reactive-rule:${rule.id}:when`,
-      issues,
-    });
-  }
-}
-
-function validateNodeReactiveConditionReferences(
-  document: SparcAuthoredDocument,
-  node: SparcAuthoredNode,
-  issues: SparcReferenceValidationIssue[],
-): void {
-  if (node.reactive?.visibleWhen) {
-    validateConditionReferences({
-      document,
-      condition: node.reactive.visibleWhen,
-      sourceNodeId: `${node.id}:reactive.visibleWhen`,
-      issues,
-    });
-  }
-  if (node.reactive?.enabledWhen) {
-    validateConditionReferences({
-      document,
-      condition: node.reactive.enabledWhen,
-      sourceNodeId: `${node.id}:reactive.enabledWhen`,
-      issues,
-    });
-  }
-  for (const child of node.children ?? []) {
-    validateNodeReactiveConditionReferences(document, child, issues);
   }
 }
 
@@ -464,9 +315,6 @@ export function validateSparcDocumentReferences(
   const clusterIndices = validateClusterTargets(document, issues);
   validateNodeReferences(document, document.root, issues);
   validateInitialStateReferences(document, issues);
-  validateReactiveRuleReferences(document, issues);
-  validateReactiveRuleConditionReferences(document, issues);
-  validateNodeReactiveConditionReferences(document, document.root, issues);
   validateAuthoredModelTargets(document, document.root, issues);
   validateNodeStimulusAttachments(document, document.root, clusterIndices, issues);
   return {

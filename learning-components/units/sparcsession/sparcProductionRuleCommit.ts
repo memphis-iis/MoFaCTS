@@ -1,5 +1,10 @@
 import type { HistoryRuntime } from '../../runtime/LearningComponentContext';
 import type { ModelPracticeRuntime } from '../../runtime/modelPracticeRuntime';
+import {
+  MODEL_PRACTICE_METRICS,
+  type ModelPracticeMetric,
+  type ModelPracticeStateProvider,
+} from '../../runtime/modelPracticeStateQueries';
 import type { SparcPracticeHistoryCore } from './sparcPracticeHistoryBridge';
 import {
   processSparcResponseOutcome,
@@ -10,13 +15,19 @@ import { runSparcProductionRules } from './sparcProductionRuleEvaluator';
 import { createSparcStateTransitionHistoryRecord } from './sparcStateTransitionHistory';
 import { buildSparcWorkingMemoryFacts } from './sparcWorkingMemoryFacts';
 import { createSparcWorkingMemoryFactStateWrite } from './sparcWorkingMemoryState';
-import { resolveSparcProductionRuleModelTarget } from './sparcAuthoredModelTargets';
+import {
+  resolveSparcAuthoredModelTarget,
+  resolveSparcProductionRuleModelTarget,
+} from './sparcAuthoredModelTargets';
 import type { SparcReplayState } from './sparcStateReplay';
 import type {
   SparcAuthoredDocument,
   SparcCanonicalHistoryRecord,
+  SparcFactPattern,
+  SparcFactSlotPattern,
+  SparcProductionRuleCondition,
   SparcProductionRuleExecution,
-  SparcReactiveEvent,
+  SparcInterfaceEvent,
   SparcStateWrite,
   SparcStateTransition,
   SparcWorkingMemoryFact,
@@ -24,6 +35,7 @@ import type {
 
 export type SparcProductionRuleCommitRuntime = {
   readonly adaptiveModel?: ModelPracticeRuntime;
+  readonly modelState?: ModelPracticeStateProvider;
   readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory'>;
 };
 
@@ -36,6 +48,12 @@ export type SparcCommittedProductionRuleEvaluation = {
 
 type ResolvedModelPracticeObservation = {
   readonly processed: SparcProcessedResponseOutcome;
+};
+
+type ModelStateFactRequest = {
+  readonly documentId: string;
+  readonly nodeId: string;
+  readonly metric: ModelPracticeMetric;
 };
 
 function productionRuleEventPayload(
@@ -60,7 +78,101 @@ function nonBlankString(value: unknown): string {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : '';
 }
 
-function eventHasNonEmptyInput(event: SparcReactiveEvent): boolean {
+function literalSlotValue(
+  pattern: SparcFactSlotPattern | undefined,
+): unknown {
+  return pattern?.type === 'literal' ? pattern.value : undefined;
+}
+
+function isModelPracticeMetric(value: unknown): value is ModelPracticeMetric {
+  return (MODEL_PRACTICE_METRICS as readonly unknown[]).includes(value);
+}
+
+function patternForCondition(condition: SparcProductionRuleCondition): SparcFactPattern {
+  if ('type' in condition && condition.type === 'not') {
+    return condition.pattern;
+  }
+  return condition as SparcFactPattern;
+}
+
+function collectModelStateFactRequestsFromCondition(params: {
+  readonly condition: SparcProductionRuleCondition;
+  readonly event: SparcInterfaceEvent;
+  readonly requests: Map<string, ModelStateFactRequest>;
+}): void {
+  const pattern = patternForCondition(params.condition);
+  if (pattern.factType !== 'model-state') {
+    return;
+  }
+  const metric = literalSlotValue(pattern.slots?.metric);
+  if (!isModelPracticeMetric(metric)) {
+    throw new Error('SPARC model-state production-rule condition requires literal metric');
+  }
+  const documentId = nonBlankString(literalSlotValue(pattern.slots?.documentId))
+    || params.event.source.documentId;
+  const nodeId = nonBlankString(literalSlotValue(pattern.slots?.node))
+    || nonBlankString(literalSlotValue(pattern.slots?.nodeId))
+    || params.event.source.nodeId;
+  const key = `${documentId}\u0000${nodeId}\u0000${metric}`;
+  params.requests.set(key, {
+    documentId,
+    nodeId,
+    metric,
+  });
+}
+
+function collectModelStateFactRequests(params: {
+  readonly document: SparcAuthoredDocument;
+  readonly event: SparcInterfaceEvent;
+}): readonly ModelStateFactRequest[] {
+  const requests = new Map<string, ModelStateFactRequest>();
+  for (const rule of params.document.productionRules ?? []) {
+    for (const condition of rule.when) {
+      collectModelStateFactRequestsFromCondition({
+        condition,
+        event: params.event,
+        requests,
+      });
+    }
+  }
+  return [...requests.values()];
+}
+
+function createModelStateFacts(params: {
+  readonly document: SparcAuthoredDocument;
+  readonly event: SparcInterfaceEvent;
+  readonly provider: ModelPracticeStateProvider;
+}): readonly SparcWorkingMemoryFact[] {
+  return collectModelStateFactRequests({
+    document: params.document,
+    event: params.event,
+  }).map((request) => {
+    const address = {
+      documentId: request.documentId,
+      nodeId: request.nodeId,
+    };
+    const target = resolveSparcAuthoredModelTarget(params.document, address)
+      ?? resolveSparcProductionRuleModelTarget({
+        document: params.document,
+        sourceAddress: params.event.source,
+        nodeId: request.nodeId,
+      });
+    return {
+      factType: 'model-state',
+      slots: {
+        documentId: request.documentId,
+        node: request.nodeId,
+        metric: request.metric,
+        value: params.provider.queryModelPracticeState({
+          target,
+          metric: request.metric,
+        }),
+      },
+    };
+  });
+}
+
+function eventHasNonEmptyInput(event: SparcInterfaceEvent): boolean {
   const input = event.payload?.input;
   if (input === undefined || input === null) {
     return false;
@@ -70,7 +182,7 @@ function eventHasNonEmptyInput(event: SparcReactiveEvent): boolean {
 
 function firingWritesCorrectnessForEvent(
   firing: SparcProductionRuleExecution['firings'][number],
-  event: SparcReactiveEvent,
+  event: SparcInterfaceEvent,
 ): boolean {
   return firing.writes.some((write) => (
     write.key === 'correctness'
@@ -80,7 +192,7 @@ function firingWritesCorrectnessForEvent(
 }
 
 function createUnhandledIncorrectWrites(params: {
-  readonly event: SparcReactiveEvent;
+  readonly event: SparcInterfaceEvent;
   readonly execution: SparcProductionRuleExecution;
 }): SparcStateWrite[] {
   if (
@@ -133,7 +245,7 @@ function firingTargetsMessageNode(
 
 function firingMarksEventCorrect(
   firing: SparcProductionRuleExecution['firings'][number],
-  event: SparcReactiveEvent,
+  event: SparcInterfaceEvent,
 ): boolean {
   return firing.classifications.includes('correct')
     || firing.writes.some((write) => (
@@ -145,7 +257,7 @@ function firingMarksEventCorrect(
 }
 
 function createCorrectFeedbackClearWrites(params: {
-  readonly event: SparcReactiveEvent;
+  readonly event: SparcInterfaceEvent;
   readonly execution: SparcProductionRuleExecution;
 }): SparcStateWrite[] {
   if (
@@ -187,7 +299,7 @@ function createCorrectFeedbackClearWrites(params: {
 
 function createProductionRuleTransition(params: {
   readonly document: SparcAuthoredDocument;
-  readonly event: SparcReactiveEvent;
+  readonly event: SparcInterfaceEvent;
   readonly execution: SparcProductionRuleExecution;
 }): SparcStateTransition | undefined {
   const workingMemoryTarget = {
@@ -243,7 +355,7 @@ function createProductionRuleTransition(params: {
 export function evaluateSparcAuthoredProductionRules(params: {
   readonly document: SparcAuthoredDocument;
   readonly replayState?: SparcReplayState;
-  readonly event: SparcReactiveEvent;
+  readonly event: SparcInterfaceEvent;
   readonly extraFacts?: readonly SparcWorkingMemoryFact[];
   readonly maxCycles?: number;
 }): SparcCommittedProductionRuleEvaluation {
@@ -273,16 +385,26 @@ export async function commitSparcAuthoredProductionRuleEvent(params: {
   readonly core: SparcPracticeHistoryCore;
   readonly document: SparcAuthoredDocument;
   readonly replayState?: SparcReplayState;
-  readonly event: SparcReactiveEvent;
+  readonly event: SparcInterfaceEvent;
   readonly extraFacts?: readonly SparcWorkingMemoryFact[];
   readonly maxCycles?: number;
   readonly runtime: SparcProductionRuleCommitRuntime;
 }): Promise<SparcCommittedProductionRuleEvaluation> {
+  const modelStateFacts = params.runtime.modelState
+    ? createModelStateFacts({
+      document: params.document,
+      event: params.event,
+      provider: params.runtime.modelState,
+    })
+    : [];
   const evaluation = evaluateSparcAuthoredProductionRules({
     document: params.document,
     event: params.event,
     ...(params.replayState ? { replayState: params.replayState } : {}),
-    ...(params.extraFacts ? { extraFacts: params.extraFacts } : {}),
+    extraFacts: [
+      ...(params.extraFacts ?? []),
+      ...modelStateFacts,
+    ],
     ...(params.maxCycles !== undefined ? { maxCycles: params.maxCycles } : {}),
   });
 
@@ -314,7 +436,7 @@ async function commitProductionRuleModelPracticeObservations(
   params: {
     readonly core: SparcPracticeHistoryCore;
     readonly document: SparcAuthoredDocument;
-    readonly event: SparcReactiveEvent;
+    readonly event: SparcInterfaceEvent;
     readonly runtime: SparcProductionRuleCommitRuntime;
   },
   evaluation: SparcCommittedProductionRuleEvaluation,

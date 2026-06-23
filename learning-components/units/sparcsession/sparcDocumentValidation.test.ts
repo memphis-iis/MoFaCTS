@@ -136,17 +136,7 @@ describe('sparcDocumentValidation', function() {
     assert.deepEqual(validUnitResult.modelConfigIssues, []);
   });
 
-  it('detects model-practice effects, model conditions, and model-targeted node attachments', function() {
-    const modelTarget = {
-      sparcDocumentId: 'doc-1',
-      sparcNodeId: 'adaptive-panel',
-      stimuliSetId: 'stim-set',
-      stimulusKC: 'kc-1',
-      clusterKC: 'cluster-1',
-      KCId: 'kc-1',
-      KCDefault: 'kc-1',
-      KCCluster: 'cluster-1',
-    };
+  it('detects model-practice effects and model-targeted node attachments', function() {
     const document: SparcAuthoredDocument = {
       ...validDocument(),
       root: {
@@ -155,17 +145,6 @@ describe('sparcDocumentValidation', function() {
           id: 'adaptive-panel',
           kind: 'panel',
           clusterIndices: [0],
-          reactive: {
-            enabledWhen: {
-              type: 'model',
-              query: {
-                target: modelTarget,
-                metric: 'probability',
-              },
-              compare: 'gte',
-              value: 0.8,
-            },
-          },
         }],
       },
       productionRules: [{

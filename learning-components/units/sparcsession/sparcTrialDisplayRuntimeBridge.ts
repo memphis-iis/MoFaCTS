@@ -24,7 +24,7 @@ import type {
   SparcAuthoredNode,
   SparcClusterModelTarget,
   SparcProductionRule,
-  SparcReactiveEvent,
+  SparcInterfaceEvent,
   SparcWorkingMemoryFact,
 } from './sparcSessionContracts';
 
@@ -46,7 +46,7 @@ type SaiResponseRecord = {
 };
 
 export type SparcTrialDisplayProductionRuleCommit = {
-  readonly event: SparcReactiveEvent;
+  readonly event: SparcInterfaceEvent;
   readonly historyRecord?: CanonicalHistoryRecord;
 };
 
@@ -58,7 +58,7 @@ export type SparcTrialDisplayProductionRuleCommitResult = {
 
 export type SparcTrialDisplayProductionRuleEvaluationResult = {
   readonly document: SparcAuthoredDocument;
-  readonly events: readonly SparcReactiveEvent[];
+  readonly events: readonly SparcInterfaceEvent[];
   readonly evaluations: readonly SparcCommittedProductionRuleEvaluation[];
   readonly classifications: readonly (SparcOutcome | 'buggy')[];
   readonly messages: readonly {
@@ -369,12 +369,12 @@ export function createSparcProductionRuleEventsFromTrialResult(params: {
   readonly documentId: string;
   readonly display: SparcTrialDisplay;
   readonly result: SparcTrialResult;
-}): readonly SparcReactiveEvent[] {
+}): readonly SparcInterfaceEvent[] {
   const responsesByNode = collectResponseMappingsFromBehavior(params.display.behavior);
   const nodesById = collectDisplayNodesById(params.display.nodes);
   const defaultIncorrectFeedbackNodeId = collectFirstMessageBoxId(params.display.nodes);
   const focusPayload = focusedNodePayload(params.result.focusedNodeId, responsesByNode);
-  const events: SparcReactiveEvent[] = [];
+  const events: SparcInterfaceEvent[] = [];
   let index = 0;
   const submittedEntries = Object.entries(params.result.submittedNodes);
   if (params.result.eventType === 'focus-changed' && submittedEntries.length === 0) {
@@ -469,6 +469,7 @@ export async function commitSparcTrialDisplayProductionRuleEvents(params: {
       event,
       runtime: {
         ...(params.adaptiveModel ? { adaptiveModel: params.adaptiveModel } : {}),
+        ...(params.adaptiveModel ? { modelState: params.adaptiveModel } : {}),
         history: params.history,
       },
     });

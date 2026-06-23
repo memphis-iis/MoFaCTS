@@ -25,7 +25,7 @@ const transition: SparcStateTransition = {
 };
 
 describe('sparcStateTransitionHistory', function() {
-  it('wraps a reactive state transition in canonical SPARC history for replay', function() {
+  it('wraps a production-rule state transition in canonical SPARC history for replay', function() {
     const record = createSparcStateTransitionHistoryRecord({
       core: {
         TDFId: 'tdf-1',
@@ -34,11 +34,11 @@ describe('sparcStateTransitionHistory', function() {
         userId: 'user-1',
       },
       transition,
-      action: 'sparc-reactive-rule',
+      action: 'sparc-production-rule',
     });
 
     assert.equal(record.levelUnitType, 'sparc');
-    assert.equal(record.action, 'sparc-reactive-rule');
+    assert.equal(record.action, 'sparc-production-rule');
     assert.deepEqual(record.sparc.stateTransition, transition);
 
     const replayed = replaySparcHistory([record]);

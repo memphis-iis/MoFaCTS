@@ -78,7 +78,7 @@ describe('sparcAuthoringCatalog', function() {
     }
   });
 
-  it('catalogs production rule conditions, tests, expressions, effects, and reactive conditions', function() {
+  it('catalogs production rule conditions, tests, expressions, and effects', function() {
     const ruleIds = new Set(SPARC_RULE_CATALOG.map((entry) => entry.id));
 
     for (const id of [
@@ -91,8 +91,8 @@ describe('sparcAuthoringCatalog', function() {
       'rule.effect.message',
       'rule.effect.classify',
       'rule.effect.credit',
+      'rule.effect.model-practice',
       'rule.effect.progressive-node-operation',
-      'reactive.condition',
     ]) {
       assert.equal(ruleIds.has(id), true, `missing rule catalog entry for ${id}`);
     }

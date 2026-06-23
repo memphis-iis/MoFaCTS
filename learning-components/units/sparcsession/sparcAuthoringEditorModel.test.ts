@@ -3,8 +3,6 @@ import {
   defaultProductionCondition,
   defaultProductionEffect,
   defaultProductionRule,
-  defaultReactiveCondition,
-  defaultReactiveRule,
   getRenderedSparcPaletteEntries,
 } from './sparcAuthoringEditorModel';
 import {
@@ -39,23 +37,5 @@ describe('sparcAuthoringEditorModel', function() {
       type: 'classify',
       outcome: 'correct',
     });
-  });
-
-  it('creates runtime-shaped reactive rule defaults', function() {
-    const rule = defaultReactiveRule(1);
-
-    assert.equal(rule.id, 'reactive-rule-2');
-    assert.deepEqual(rule.writes, [{
-      target: {
-        documentId: '',
-        nodeId: '',
-      },
-      key: 'visible',
-      value: true,
-    }]);
-    assert.equal(defaultReactiveCondition('all').type, 'all');
-    assert.equal(defaultReactiveCondition('any').type, 'any');
-    assert.equal(defaultReactiveCondition('not').type, 'not');
-    assert.equal(defaultReactiveCondition('model').type, 'model');
   });
 });
