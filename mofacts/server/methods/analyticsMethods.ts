@@ -737,6 +737,16 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     tdfId: string,
     decompressedRecord: UnknownRecord
   ) {
+    const courseAssignment = decompressedRecord.courseAssignment;
+    if (courseAssignment && typeof courseAssignment === 'object' && !Array.isArray(courseAssignment)) {
+      const assignedCourseRootTdfId = deps.normalizeCanonicalId((courseAssignment as UnknownRecord).TDFId);
+      if (!assignedCourseRootTdfId) {
+        throw new Meteor.Error(400, 'Course assignment history context is incomplete');
+      }
+      await validateCourseAssignmentHistoryContext(decompressedRecord, tdfId, actingUserId);
+      return;
+    }
+
     const cacheKey = conditionAssignmentCacheKey(actingUserId, tdfId);
     const cachedAssignment = assignedConditionAccessCache.get(cacheKey);
     let assignedRootTdfId =
