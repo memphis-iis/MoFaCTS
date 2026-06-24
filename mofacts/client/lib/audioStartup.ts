@@ -50,10 +50,6 @@ function hasEnabledAudioPromptMode(value: unknown): boolean {
   return typeof value === 'string' && value.trim().length > 0 && value !== 'silent';
 }
 
-function parseBooleanLike(value: unknown): boolean {
-  return value === true || value === 'true' || value === 1 || value === '1';
-}
-
 export function getSpeechRecognitionMediaConstraints(): MediaStreamConstraints {
   return {
     audio: {
@@ -77,7 +73,6 @@ function supportsSr(currentTdfFile: AudioStartupTdf | null | undefined, user: Au
 
 function supportsTts(currentTdfFile: AudioStartupTdf | null | undefined, user: AudioStartupUser | null | undefined) {
   const userAudioPromptMode = user?.audioSettings?.audioPromptMode;
-  const tdfTtsEnabled = parseBooleanLike(currentTdfFile?.tdfs?.tutor?.setspec?.enableAudioPromptAndFeedback);
   const hasTtsKey = (
     typeof currentTdfFile?.tdfs?.tutor?.setspec?.textToSpeechAPIKey === 'string' &&
     currentTdfFile.tdfs.tutor.setspec.textToSpeechAPIKey.trim().length > 0
@@ -86,8 +81,7 @@ function supportsTts(currentTdfFile: AudioStartupTdf | null | undefined, user: A
     user.ttsAPIKey.trim().length > 0
   ) || Session.get('ttsAPIKeyConfigured') === true;
 
-  return tdfTtsEnabled &&
-    hasEnabledAudioPromptMode(userAudioPromptMode) &&
+  return hasEnabledAudioPromptMode(userAudioPromptMode) &&
     hasTtsKey;
 }
 

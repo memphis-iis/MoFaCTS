@@ -323,6 +323,130 @@ export function normalizeSpeechToken(value: unknown): string {
     .toLowerCase();
 }
 
+const SPOKEN_NUMBER_WORDS = new Map<string, string>([
+  ['zero', '0'],
+  ['oh', '0'],
+  ['one', '1'],
+  ['first', '1'],
+  ['two', '2'],
+  ['second', '2'],
+  ['three', '3'],
+  ['third', '3'],
+  ['four', '4'],
+  ['fourth', '4'],
+  ['for', '4'],
+  ['five', '5'],
+  ['fifth', '5'],
+  ['six', '6'],
+  ['sixth', '6'],
+  ['seven', '7'],
+  ['seventh', '7'],
+  ['eight', '8'],
+  ['eighth', '8'],
+  ['ate', '8'],
+  ['nine', '9'],
+  ['ninth', '9'],
+  ['ten', '10'],
+  ['tenth', '10'],
+  ['eleven', '11'],
+  ['eleventh', '11'],
+  ['twelve', '12'],
+  ['twelfth', '12'],
+  ['thirteen', '13'],
+  ['thirteenth', '13'],
+  ['fourteen', '14'],
+  ['fourteenth', '14'],
+  ['fifteen', '15'],
+  ['fifteenth', '15'],
+  ['sixteen', '16'],
+  ['sixteenth', '16'],
+  ['seventeen', '17'],
+  ['seventeenth', '17'],
+  ['eighteen', '18'],
+  ['eighteenth', '18'],
+  ['nineteen', '19'],
+  ['nineteenth', '19'],
+  ['twenty', '20'],
+  ['twentieth', '20'],
+]);
+
+const SPOKEN_TENS_WORDS = new Map<string, number>([
+  ['twenty', 20],
+  ['thirty', 30],
+  ['forty', 40],
+  ['fourty', 40],
+  ['fifty', 50],
+  ['sixty', 60],
+  ['seventy', 70],
+  ['eighty', 80],
+  ['ninety', 90],
+]);
+
+const SPOKEN_ONES_WORDS = new Map<string, number>([
+  ['one', 1],
+  ['first', 1],
+  ['two', 2],
+  ['second', 2],
+  ['three', 3],
+  ['third', 3],
+  ['four', 4],
+  ['fourth', 4],
+  ['for', 4],
+  ['five', 5],
+  ['fifth', 5],
+  ['six', 6],
+  ['sixth', 6],
+  ['seven', 7],
+  ['seventh', 7],
+  ['eight', 8],
+  ['eighth', 8],
+  ['ate', 8],
+  ['nine', 9],
+  ['ninth', 9],
+]);
+
+export function extractSpeechNumberSignature(value: unknown): string[] {
+  const tokens = normalizeSpeechToken(value)
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+  const numbers: string[] = [];
+
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index] || '';
+    if (/^\d+$/.test(token)) {
+      numbers.push(String(Number(token)));
+      continue;
+    }
+
+    const tens = SPOKEN_TENS_WORDS.get(token);
+    const nextToken = tokens[index + 1] || '';
+    const ones = SPOKEN_ONES_WORDS.get(nextToken);
+    if (tens !== undefined && ones !== undefined) {
+      numbers.push(String(tens + ones));
+      index += 1;
+      continue;
+    }
+
+    const numberWord = SPOKEN_NUMBER_WORDS.get(token);
+    if (numberWord) {
+      numbers.push(numberWord);
+    }
+  }
+
+  return numbers;
+}
+
+export function speechNumbersAreCompatible(spokenValue: unknown, targetValue: unknown): boolean {
+  const targetNumbers = extractSpeechNumberSignature(targetValue);
+  if (targetNumbers.length === 0) {
+    return true;
+  }
+
+  const spokenNumbers = extractSpeechNumberSignature(spokenValue);
+  return spokenNumbers.length === targetNumbers.length &&
+    targetNumbers.every((targetNumber, index) => spokenNumbers[index] === targetNumber);
+}
+
 export function buildSpeechRecognitionPhraseHints(targets: string[]): string[] {
   const hints: string[] = [];
   const seen = new Set<string>();
@@ -415,7 +539,7 @@ function getErrorMessage(error: unknown): string {
 
 /**
  * Check if SR is enabled.
- * Requires BOTH user pref AND TDF support.
+ * Uses the effective learner audio-input setting and resolved key state.
  *
  * @returns {boolean} True if SR is enabled
  */
@@ -863,7 +987,6 @@ async function processAudioData(audioData: ArrayBuffer | string): Promise<Speech
   let phraseHints: string[] = [];
   let answerGrammar: string[] = [];
   let requestCorrectAnswer: string | null = null;
-  let phoneticIndexForCurrentTrial: ReturnType<typeof buildPhoneticIndexForLanguage> | null = null;
   let configuredSpeechTargets: string[] = [];
   let configuredExclusions: string[] = [];
 
@@ -934,7 +1057,6 @@ async function processAudioData(audioData: ArrayBuffer | string): Promise<Speech
     }
 
     phraseHints = buildSpeechRecognitionPhraseHints(configuredSpeechTargets);
-    phoneticIndexForCurrentTrial = buildPhoneticIndexForLanguage(answerGrammar, speechRecognitionLanguage);
 
     if (!answerGrammar.includes('skip')) answerGrammar.push('skip');
     if (!answerGrammar.includes('enter')) answerGrammar.push('enter');
@@ -1157,10 +1279,16 @@ async function processAudioData(audioData: ArrayBuffer | string): Promise<Speech
         ));
 
         for (const altTranscript of uniqueAlternatives) {
+          const numericCompatibleTargets = configuredSpeechTargets.filter((target) =>
+            speechNumbersAreCompatible(altTranscript, target)
+          );
+          if (numericCompatibleTargets.length === 0) {
+            continue;
+          }
           phoneticMatch = findPhoneticMatchForLanguage(
             altTranscript,
-            configuredSpeechTargets,
-            phoneticIndexForCurrentTrial,
+            numericCompatibleTargets,
+            buildPhoneticIndexForLanguage(numericCompatibleTargets, speechRecognitionLanguage),
             speechRecognitionLanguage
           );
           if (phoneticMatch) {

@@ -15,6 +15,7 @@ const _ = underscore as unknown as UnderscoreLike;
 import { ExperimentStateStore } from '../../../../lib/state/experimentStateStore';
 import { CardStore } from '../../modules/cardStore';
 import { getStimCluster, getStimCount } from '../../../../lib/currentTestingHelpers';
+import { evaluateSrAvailability } from '../../../../lib/audioAvailability';
 import { clientConsole } from '../../../../lib/clientLogger';
 import { parseSchedItemCondition } from '../../../../lib/tdfUtils';
 import { SCHEDULE_UNIT } from '../../../../../common/Definitions';
@@ -543,14 +544,17 @@ export function calculateTrialTimings(
 
 /**
  * Check if audio input mode (SR) is enabled.
- * SR requires BOTH user preference AND TDF support.
+ * SR follows the effective learner audio-input setting and resolved key state.
  *
  * @returns {boolean} - True if SR is enabled
  */
 function checkAudioInputMode(): boolean {
-  const userAudioToggled = getMeteorUser()?.audioSettings?.audioInputMode || false;
-  const tdfAudioEnabled = Session.get('currentTdfFile')?.tdfs?.tutor?.setspec?.audioInputEnabled === 'true';
-  return userAudioToggled && tdfAudioEnabled;
+  return evaluateSrAvailability({
+    user: getMeteorUser() ?? null,
+    tdfFile: Session.get('currentTdfFile'),
+    sessionSpeechApiKey: Session.get('speechAPIKey'),
+    serverSpeechConfigured: Session.get('speechAPIKeyConfigured'),
+  }).status === 'available';
 }
 
 function recordSessionOutcomeHistories(testType: string, outcomes: boolean[]): void {

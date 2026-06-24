@@ -732,11 +732,12 @@ function getEffectiveTtsState(tdf: any) {
   const keyAvailable = tdf?.hasTTSAPIKey === true;
   const supported = tdfPromptsEnabled ||
     promptModeOverride ||
-    hasEnabledAudioPromptMode(tdf?.audioPromptMode);
+    hasEnabledAudioPromptMode(tdf?.audioPromptMode) ||
+    promptModeEnabled;
 
   return {
     supported,
-    active: tdfPromptsEnabled && promptModeEnabled && keyAvailable,
+    active: promptModeEnabled && keyAvailable,
     tdfPromptsEnabled,
     promptModeEnabled,
     keyAvailable,
@@ -749,11 +750,12 @@ function getEffectiveSrState(tdf: any) {
   const userAudioEnabled = getUserAudioSettings().audioInputMode === true;
   const keyAvailable = tdf?.hasSpeechAPIKey === true;
   const supported = parseBooleanLike(tdf?.audioInputEnabled) ||
-    learnerConfigHasSetSpecAudioOverride(tdfId, 'audioInputEnabled');
+    learnerConfigHasSetSpecAudioOverride(tdfId, 'audioInputEnabled') ||
+    userAudioEnabled;
 
   return {
     supported,
-    active: tdfAudioEnabled && userAudioEnabled && keyAvailable,
+    active: userAudioEnabled && keyAvailable,
     tdfAudioEnabled,
     userAudioEnabled,
     keyAvailable,
@@ -819,7 +821,6 @@ const lessonRowHelpers = {
     const state = getEffectiveTtsState(this);
     if (state.active) return 'Text-to-Speech is enabled';
     if (!state.keyAvailable) return 'Text-to-Speech needs an API key in Audio Settings';
-    if (!state.tdfPromptsEnabled) return 'Text-to-Speech is disabled for this lesson';
     if (!state.promptModeEnabled) return 'Text-to-Speech is turned off in your audio or lesson settings';
     return 'Text-to-Speech is unavailable';
   },
@@ -828,7 +829,6 @@ const lessonRowHelpers = {
     const state = getEffectiveSrState(this);
     if (state.active) return 'Speech Recognition is enabled';
     if (!state.keyAvailable) return 'Speech Recognition needs an API key in Audio Settings';
-    if (!state.tdfAudioEnabled) return 'Speech Recognition is disabled for this lesson';
     if (!state.userAudioEnabled) return 'Speech Recognition is turned off in your audio settings';
     return 'Speech Recognition is unavailable';
   },
@@ -1637,8 +1637,8 @@ async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId
   setAudioPromptFeedbackVoice(audioPromptFeedbackVoice);
   setAudioInputSensitivity(audioInputSensitivity);
 
-  // Check to see if the user has turned on audio prompt.
-  // If so and if the tdf has it enabled then turn on, otherwise we won't do anything
+  // Check to see if the user has turned on audio prompts. Experiment launches
+  // keep using the TDF value as the fixed protocol setting.
   const userAudioPromptFeedbackToggled = ((audioPromptFeedbackView as any) == 'feedback') || ((audioPromptFeedbackView as any) == 'all') || ((audioPromptFeedbackView as any) == 'question');
   const tdfAudioPromptFeedbackEnabled = !!curTdfContent.tdfs.tutor.setspec.enableAudioPromptAndFeedback &&
     curTdfContent.tdfs.tutor.setspec.enableAudioPromptAndFeedback == 'true';
@@ -1647,7 +1647,7 @@ async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId
   if (Session.get('experimentTarget')) {
     audioPromptFeedbackEnabled = tdfAudioPromptFeedbackEnabled;
   } else {
-    audioPromptFeedbackEnabled = tdfAudioPromptFeedbackEnabled && userAudioPromptFeedbackToggled;
+    audioPromptFeedbackEnabled = userAudioPromptFeedbackToggled;
   }
   Session.set('enableAudioPromptAndFeedback', audioPromptFeedbackEnabled);
 
@@ -1656,7 +1656,7 @@ async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId
   const userAudioToggled = audioInputEnabled;
   const tdfAudioEnabled = curTdfContent.tdfs.tutor.setspec.audioInputEnabled ?
     curTdfContent.tdfs.tutor.setspec.audioInputEnabled == 'true' : false;
-  const audioEnabled = !Session.get('experimentTarget') ? (tdfAudioEnabled && userAudioToggled) : tdfAudioEnabled;
+  const audioEnabled = !Session.get('experimentTarget') ? userAudioToggled : tdfAudioEnabled;
   setAudioEnabled(audioEnabled);
 
   let continueToCard = true;

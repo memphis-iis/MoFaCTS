@@ -8,6 +8,7 @@ import { Session } from 'meteor/session';
 import { TRIAL_TYPES, SUPPORTED_TRIAL_TYPES, THRESHOLDS, ERROR_SEVERITY_MAP, ERROR_SEVERITY } from './constants';
 import { getFeedbackTimeoutMs } from '../utils/timeoutUtils';
 import { evaluateSrAvailability } from '../../../../lib/audioAvailability';
+import { getAudioPromptMode } from '../../../../lib/state/audioState';
 import { selfHostedH5PTrialDisplayOwnsInteraction } from '../services/h5pTrialDisplay';
 import { sparcTrialDisplayOwnsInteraction } from '../services/sparcTrialDisplay';
 import { resolveSessionSurfaceState } from '../services/sessionSurfaceMode';
@@ -82,17 +83,11 @@ function resolveFeedbackTimeoutMs({ context, event }: CardMachineActorArgs): num
 
 type MeteorAudioSettings = {
   audioInputMode?: boolean;
-  audioPromptMode?: string;
 };
 
 type MeteorUserLike = {
   audioSettings?: MeteorAudioSettings;
 };
-
-function getMeteorUserAudioSettings(): MeteorAudioSettings {
-  const user = Meteor.user() as MeteorUserLike | null | undefined;
-  return user?.audioSettings ?? {};
-}
 
 // =============================================================================
 // TRIAL TYPE GUARDS
@@ -284,8 +279,8 @@ export function attemptsExhausted(args: CardMachineActorArgs): boolean {
  * @returns {boolean}
  */
 export function ttsEnabled(_args: CardMachineActorArgs): boolean {
-  const userPromptMode = getMeteorUserAudioSettings().audioPromptMode;
-  const questionTtsEnabled = !!userPromptMode && userPromptMode !== 'silent';
+  const audioPromptMode = getAudioPromptMode();
+  const questionTtsEnabled = !!audioPromptMode && audioPromptMode !== 'silent';
   const feedbackTtsEnabled = Session.get('enableAudioPromptAndFeedback') === true;
 
   return questionTtsEnabled || feedbackTtsEnabled;

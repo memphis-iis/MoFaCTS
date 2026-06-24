@@ -43,6 +43,7 @@ export const setAudioInputSensitivity = createSetter('audioInputSensitivity');
 export const setAudioInputSensitivityView = createSetter('audioInputSensitivityView');
 
 // Prompt mode
+export const getAudioPromptMode = createGetter('audioPromptMode');
 export const setAudioPromptMode = createSetter('audioPromptMode');
 
 export const getAudioPromptFeedbackView = createGetter('audioPromptFeedbackView');

@@ -24,7 +24,8 @@ import {
   getAudioPromptVoice,
   getAudioPromptFeedbackSpeakingRate,
   getAudioPromptFeedbackVolume,
-  getAudioPromptFeedbackVoice
+  getAudioPromptFeedbackVoice,
+  getAudioPromptMode
 } from '../../../../lib/state/audioState';
 import { resolveDynamicAssetPath } from './mediaResolver';
 import { logIdInvariantBreachOnce } from '../../../../lib/idContext';
@@ -199,10 +200,6 @@ function findMatchingBrowserVoice(voices: SpeechSynthesisVoice[], requestedVoice
   return null;
 }
 
-function parseBooleanLike(value: unknown): boolean {
-  return value === true || value === 'true' || value === 1 || value === '1';
-}
-
 function resolveTtsLanguageCode(
   setspec: { textToSpeechLanguage?: string | string[] } | null | undefined,
   requestedVoice: string
@@ -285,17 +282,16 @@ async function restartSrAfterTtsHandoff(): Promise<void> {
 
 /**
  * Check if TTS is enabled for questions.
- * Requires user pref AND TDF support.
+ * Uses the effective learner prompt mode selected at launch.
  *
  * @returns {boolean} True if question TTS enabled
  */
 function getEffectiveAudioPromptMode(): string {
+  const sessionAudioPromptMode = getAudioPromptMode();
   const userAudioPromptMode = (Meteor.user() as UserAudioProfile | null)?.audioSettings?.audioPromptMode;
-  const tdfTtsEnabled = parseBooleanLike(Session.get('currentTdfFile')?.tdfs?.tutor?.setspec?.enableAudioPromptAndFeedback);
+  const audioPromptMode = sessionAudioPromptMode || userAudioPromptMode;
 
-  const userWantsAudioPrompts = userAudioPromptMode && userAudioPromptMode !== 'silent';
-
-  return tdfTtsEnabled && userWantsAudioPrompts ? userAudioPromptMode : 'silent';
+  return audioPromptMode && audioPromptMode !== 'silent' ? audioPromptMode : 'silent';
 }
 
 /**
@@ -316,7 +312,7 @@ function isTtsEnabledForQuestions() {
 
 /**
  * Check if TTS is enabled for feedback.
- * Requires user pref AND TDF support.
+ * Uses the effective learner prompt mode selected at launch.
  *
  * @returns {boolean} True if feedback TTS enabled
  */

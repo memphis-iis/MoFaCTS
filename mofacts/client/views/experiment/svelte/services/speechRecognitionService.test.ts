@@ -3,7 +3,12 @@ import {
   resolveSpeechIgnoreOutOfGrammarResponses,
   resolveSpeechRecognitionLanguage
 } from '../../../../lib/speechRecognitionConfig';
-import { buildSpeechRecognitionPhraseHints, normalizeSpeechToken } from './speechRecognitionService';
+import {
+  buildSpeechRecognitionPhraseHints,
+  extractSpeechNumberSignature,
+  normalizeSpeechToken,
+  speechNumbersAreCompatible
+} from './speechRecognitionService';
 
 describe('speechRecognitionService phrase hints', function() {
   it('adds a dropped-final-th hint while preserving the canonical target', function() {
@@ -23,6 +28,20 @@ describe('speechRecognitionService phrase hints', function() {
     expect(normalizeSpeechToken('Él')).to.equal('el');
     expect(normalizeSpeechToken('que')).to.equal('que');
     expect(normalizeSpeechToken('año')).to.equal('año');
+  });
+
+  it('keeps digit identity available for speech matching', function() {
+    expect(normalizeSpeechToken('Chang Mu 3')).to.equal('chang mu 3');
+    expect(extractSpeechNumberSignature('Chang Mu 3')).to.deep.equal(['3']);
+    expect(extractSpeechNumberSignature('Chang Mu three')).to.deep.equal(['3']);
+    expect(extractSpeechNumberSignature('Chang Mu twenty one')).to.deep.equal(['21']);
+  });
+
+  it('rejects phonetic speech matches with mismatched target numbers', function() {
+    expect(speechNumbersAreCompatible('chang moo three', 'chang mu 3')).to.equal(true);
+    expect(speechNumbersAreCompatible('chang moo 7', 'chang mu 3')).to.equal(false);
+    expect(speechNumbersAreCompatible('chang moo', 'chang mu 3')).to.equal(false);
+    expect(speechNumbersAreCompatible('chang moo', 'chang mu')).to.equal(true);
   });
 });
 

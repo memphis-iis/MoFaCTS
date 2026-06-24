@@ -4,7 +4,6 @@ type SrAvailabilityDetail =
   | 'ok'
   | 'not_text_trial'
   | 'user_pref_disabled'
-  | 'tdf_audio_disabled'
   | 'missing_key'
   | 'unsupported'
   | 'insecure_context'
@@ -97,9 +96,6 @@ export function evaluateSrAvailability(input: SrAvailabilityInput): SrAvailabili
   }
   if (!userAudioEnabled) {
     return { status: 'blocked', detail: 'user_pref_disabled', userAudioEnabled, tdfAudioEnabled, hasAnySpeechApiKey };
-  }
-  if (!tdfAudioEnabled) {
-    return { status: 'blocked', detail: 'tdf_audio_disabled', userAudioEnabled, tdfAudioEnabled, hasAnySpeechApiKey };
   }
   if (!hasAnySpeechApiKey) {
     return { status: 'blocked', detail: 'missing_key', userAudioEnabled, tdfAudioEnabled, hasAnySpeechApiKey };

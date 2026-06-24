@@ -1,7 +1,7 @@
 // Owner: Learning Runtime Team
 // Shared contracts for persisted audio settings and per-session audio state.
 
-export type AudioPromptMode = 'none' | 'question' | 'feedback' | 'both';
+export type AudioPromptMode = 'silent' | 'question' | 'feedback' | 'all';
 
 export interface AudioStateValues {
   ttsWarmedUp: boolean;

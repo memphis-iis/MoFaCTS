@@ -172,14 +172,14 @@ export async function selectTdf(
     curTdfContent.tdfs.tutor.setspec.enableAudioPromptAndFeedback === 'true';
   const audioPromptFeedbackEnabled = Session.get('experimentTarget')
     ? tdfAudioPromptFeedbackEnabled
-    : tdfAudioPromptFeedbackEnabled && userAudioPromptFeedbackToggled;
+    : userAudioPromptFeedbackToggled;
   Session.set('enableAudioPromptAndFeedback', audioPromptFeedbackEnabled);
 
   const userAudioToggled = audioInputEnabled;
   const tdfAudioEnabled = curTdfContent.tdfs.tutor.setspec.audioInputEnabled
     ? curTdfContent.tdfs.tutor.setspec.audioInputEnabled === 'true'
     : false;
-  const audioEnabled = !Session.get('experimentTarget') ? (tdfAudioEnabled && userAudioToggled) : tdfAudioEnabled;
+  const audioEnabled = !Session.get('experimentTarget') ? userAudioToggled : tdfAudioEnabled;
   setAudioEnabled(audioEnabled);
 
   try {
