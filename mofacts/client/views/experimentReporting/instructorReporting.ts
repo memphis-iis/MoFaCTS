@@ -2,6 +2,7 @@ import { Meteor } from 'meteor/meteor';
 import { Template } from 'meteor/templating';
 import { Session } from 'meteor/session';
 import './instructorReporting.html';
+import './instructorReporting.css';
 import { ReactiveDict } from 'meteor/reactive-dict';
 import { meteorCallAsync } from '../..';
 import { INVALID } from '../../../common/Definitions';

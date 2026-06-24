@@ -108,7 +108,7 @@ const APP_SHELL_TITLES: Record<string, string> = {
   dataDownload: 'Detailed Data',
   profile: 'Profile',
   audioSettings: 'Audio Settings',
-  classSelection: 'Teacher Select',
+  classSelection: 'Join Courses',
   help: 'Help',
   adminControls: 'Admin Control Panel',
   adminBackups: 'Backups',
@@ -116,10 +116,10 @@ const APP_SHELL_TITLES: Record<string, string> = {
   turkWorkflow: 'Mechanical Turk',
   theme: 'Theme',
   testRunner: 'Admin Tests',
-  classEdit: 'Class Management',
+  classEdit: 'Courses',
   courses: 'Courses',
-  tdfAssignmentEdit: 'Course Assignments',
-  instructorReporting: 'Instructor Reporting',
+  tdfAssignmentEdit: 'Assignments',
+  instructorReporting: 'Grades',
 };
 
 type AuthenticatedChromeMode = 'none' | 'app' | 'practice';

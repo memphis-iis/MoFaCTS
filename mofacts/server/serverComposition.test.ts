@@ -397,6 +397,44 @@ describe('public TDF and stimulus method authorization', function() {
     expect(tdf._id).to.equal('assigned-context-tdf');
   });
 
+  it('allows public course-assignment TDF lookup without section enrollment', async function() {
+    await CoursesAny.insertAsync({
+      _id: 'course-launch-public',
+      teacherUserId: 'teacher-user',
+      semester: 'SU_2022',
+      visibility: 'public',
+    });
+    await AssignmentsAny.insertAsync({
+      _id: 'assignment-launch-public',
+      courseId: 'course-launch-public',
+      TDFId: 'assigned-public-tdf',
+    });
+    await TdfsAny.insertAsync({
+      _id: 'assigned-public-tdf',
+      ownerId: 'teacher-user',
+      stimuliSetId: 111,
+      content: {
+        fileName: 'AssignedPublic.json',
+        tdfs: { tutor: { setspec: { lessonname: 'Assigned Public', userselect: 'false' } } },
+      },
+    });
+
+    const tdf = await (asyncMethods.getTdfById as any).call(
+      { userId: 'not-enrolled-student' },
+      'assigned-public-tdf',
+      {
+        courseAssignment: {
+          assignmentId: 'assignment-launch-public',
+          courseId: 'course-launch-public',
+          TDFId: 'assigned-public-tdf',
+          launchSource: 'courses',
+        },
+      },
+    );
+
+    expect(tdf._id).to.equal('assigned-public-tdf');
+  });
+
   it('rejects course-assignment TDF lookup when the current user is not enrolled in that course', async function() {
     await CoursesAny.insertAsync({
       _id: 'course-launch-unenrolled',
@@ -1134,6 +1172,41 @@ describe('learner analytics method authorization', function() {
       expect(error.error).to.equal(400);
       expect(error.reason).to.equal('Course-scoped learning history requires clusterKCs');
     }
+  });
+
+  it('allows public course-scoped learning history without section enrollment', async function() {
+    await CoursesAny.insertAsync({
+      _id: 'course-public-history',
+      teacherUserId: 'teacher-user',
+      semester: 'SU_2022',
+      visibility: 'public',
+    });
+    await AssignmentsAny.insertAsync({
+      _id: 'assignment-public-history',
+      courseId: 'course-public-history',
+      TDFId: 'tdf-public-history',
+      order: 0,
+      required: true,
+    });
+
+    const rows = await (asyncMethods.getLearningHistoryForUnit as any).call(
+      { userId: 'current-user' },
+      'current-user',
+      'tdf-public-history',
+      4,
+      false,
+      {
+        courseAssignment: {
+          assignmentId: 'assignment-public-history',
+          courseId: 'course-public-history',
+          TDFId: 'tdf-public-history',
+          launchSource: 'courses',
+        },
+        clusterKCs: ['fractions.lcd'],
+      }
+    );
+
+    expect(rows).to.deep.equal([]);
   });
 
   it('rejects course-scoped learning history when the current user is not enrolled in that course', async function() {

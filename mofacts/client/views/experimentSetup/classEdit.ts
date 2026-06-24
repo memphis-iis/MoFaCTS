@@ -4,7 +4,6 @@ import { Session } from 'meteor/session';
 import './classEdit.html';
 import { meteorCallAsync } from '../..';
 import { curSemester } from '../../../common/Definitions';
-import { search } from '../../lib/currentTestingHelpers';
 import $ from 'jquery';
 
 // Initialize to null to detect loading state ([] means loaded but empty)
@@ -30,10 +29,26 @@ type CourseSection = {
   courseName: string;
   teacherUserId?: string;
   teacheruserid?: string;
-  sectionId: string;
-  sectionName: string;
+  semester?: string;
+  beginDate?: Date | string | null;
+  endDate?: Date | string | null;
+  timezone?: string;
+  visibility?: 'private' | 'public';
+  sectionId?: string;
+  sectionName?: string;
   sections?: string[];
 };
+
+const COURSE_TIMEZONE_OPTIONS = [
+  { value: 'America/New_York', label: 'Eastern Time' },
+  { value: 'America/Chicago', label: 'Central Time' },
+  { value: 'America/Denver', label: 'Mountain Time' },
+  { value: 'America/Phoenix', label: 'Arizona Time' },
+  { value: 'America/Los_Angeles', label: 'Pacific Time' },
+  { value: 'America/Anchorage', label: 'Alaska Time' },
+  { value: 'Pacific/Honolulu', label: 'Hawaii Time' },
+  { value: 'UTC', label: 'UTC' },
+];
 
 let curClass: EditableClass = {
   courseId: undefined,
@@ -80,21 +95,40 @@ function defaultTimezone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || '';
 }
 
-function classSelectedSetup(curClassName: string) {
-  $('#class-select').children('[value="' + curClassName + '"]').prop('selected', true);
-  $('#newClassName').val(curClassName);
+function timezoneLabel(timezone: string): string {
+  const knownOption = COURSE_TIMEZONE_OPTIONS.find((option) => option.value === timezone);
+  if (knownOption) return knownOption.label;
+  return timezone.replace(/_/g, ' ');
+}
+
+function ensureTimezoneOption(timezone: string) {
+  if (!timezone || $(`#courseTimezone option[value="${timezone}"]`).length > 0) {
+    return;
+  }
+  $('#courseTimezone').append($('<option>', { value: timezone, text: timezoneLabel(timezone) }));
+}
+
+function setTimezoneSelection(timezone: string) {
+  ensureTimezoneOption(timezone);
+  $('#courseTimezone').val(timezone);
+}
+
+function classSelectedSetup(courseId: string) {
+  $('#class-select').children('[value="' + courseId + '"]').prop('selected', true);
   const classes = (Session.get('classes') || []) as EditableClass[];
-  const foundClass = classes.find((c) => c.courseName === curClassName);
+  const foundClass = classes.find((c) => c.courseId === courseId);
   if (!foundClass) {
     return;
   }
+  $('#newClassName').val(foundClass.courseName);
   $('#sectionNames').val(foundClass.sections.map((x: string) => x + '\n').join(''));
   const courseTimezone = foundClass.timezone || defaultTimezone();
   $('#courseVisibility').val(foundClass.visibility || 'private');
   $('#courseBeginDate').val(toDatetimeLocalValue(foundClass.beginDate, courseTimezone));
   $('#courseEndDate').val(toDatetimeLocalValue(foundClass.endDate, courseTimezone));
-  $('#courseTimezone').val(courseTimezone);
+  setTimezoneSelection(courseTimezone);
   Session.set('classEditError', null);
+  Session.set('classEditMode', 'edit');
   isNewClass = false;
 }
 
@@ -104,25 +138,54 @@ function noClassSelectedSetup() {
   $('#courseVisibility').val('private');
   $('#courseBeginDate').val('');
   $('#courseEndDate').val('');
-  $('#courseTimezone').val(defaultTimezone());
+  setTimezoneSelection(defaultTimezone());
   Session.set('classEditError', null);
+  Session.set('classEditMode', 'new');
   isNewClass = true;
 }
 
-async function updateSections(){
+function readSectionNames(): string[] {
+  return String($('#sectionNames').val() || '')
+    .split(/\r?\n/)
+    .map((sectionName) => sectionName.trim())
+    .filter(Boolean);
+}
+
+async function loadCourseManagementData() {
   const allCourseSections = (await meteorCallAsync('getAllCourseSections')) as CourseSection[];
-  
-  const sectionsByInstructorId: Array<{ sectionId: string; courseName: string; sectionName: string }> = [];
-  //  //sectionid, courseandsectionname
+
+  const classes: Record<string, CourseSection & { sections: string[] }> = {};
+  const sectionsByInstructorId: Array<{ sectionId: string; courseName: string; sectionName: string; teacherUserId: string }> = [];
+
   for (const courseSection of allCourseSections) {
     if (courseSection.teacherUserId != Meteor.userId()) continue;
-    sectionsByInstructorId.push({
-      sectionId: courseSection.sectionId,
-      courseName: courseSection.courseName,
-      sectionName: courseSection.sectionName
-    });
+    if (!classes[courseSection.courseId]) {
+      classes[courseSection.courseId] = {
+        courseId: courseSection.courseId,
+        courseName: courseSection.courseName,
+        teacherUserId: courseSection.teacherUserId,
+        semester: courseSection.semester || curSemester,
+        beginDate: courseSection.beginDate || null,
+        endDate: courseSection.endDate || null,
+        timezone: courseSection.timezone || defaultTimezone(),
+        visibility: courseSection.visibility === 'public' ? 'public' : 'private',
+        sections: [],
+      };
+    }
+    const sectionId = String(courseSection.sectionId || '');
+    const sectionName = String(courseSection.sectionName || '');
+    if (sectionId && sectionName) {
+      classes[courseSection.courseId]!.sections.push(sectionName);
+      sectionsByInstructorId.push({
+        sectionId,
+        courseName: courseSection.courseName,
+        sectionName,
+        teacherUserId: String(courseSection.teacherUserId || '')
+      });
+    }
   }
-  
+
+  Session.set('classes', Object.values(classes));
   Session.set('sectionsByInstructorId', sectionsByInstructorId);
 }
 
@@ -133,37 +196,14 @@ Template.classEdit.onCreated(function() {
 });
 
 Template.classEdit.onRendered(async function () {
-  // Single API call - reuse result for both classes and sections
-  const allCourseSections = (await meteorCallAsync('getAllCourseSections')) as CourseSection[];
-  
-
-  // Build classes object
-  const classes: Record<string, CourseSection & { sections: string[] }> = {};
-  const sectionsByInstructorId: Array<{ sectionId: string; courseName: string; sectionName: string }> = [];
-
-  for (const courseSection of allCourseSections) {
-    if (courseSection.teacherUserId != Meteor.userId()) continue;
-    if (!classes[courseSection.courseId]) {
-      classes[courseSection.courseId] = { ...courseSection, sections: [] };
-    }
-    classes[courseSection.courseId]!.sections.push(courseSection.sectionName);
-    sectionsByInstructorId.push({
-      sectionId: courseSection.sectionId,
-      courseName: courseSection.courseName,
-      sectionName: courseSection.sectionName
-    });
-  }
-
-  
-  
-
-  Session.set('classes', Object.values(classes));
-  Session.set('sectionsByInstructorId', sectionsByInstructorId);
+  await loadCourseManagementData();
+  noClassSelectedSetup();
 });
 
 Template.classEdit.helpers({
   isLoading: () => Session.get('classes') === null,
   classEditError: () => Session.get('classEditError'),
+  isEditingCourse: () => Session.get('classEditMode') === 'edit',
 
   classes: () => Session.get('classes'),
 
@@ -179,15 +219,26 @@ Template.classEdit.helpers({
 
   'baseLink': function(){
     return "https://" + window.location.host + "/";
-  }
+  },
+
+  courseTimezoneOptions: () => {
+    const detectedTimezone = defaultTimezone();
+    if (!detectedTimezone || COURSE_TIMEZONE_OPTIONS.some((option) => option.value === detectedTimezone)) {
+      return COURSE_TIMEZONE_OPTIONS;
+    }
+    return [
+      ...COURSE_TIMEZONE_OPTIONS,
+      { value: detectedTimezone, label: timezoneLabel(detectedTimezone) },
+    ];
+  },
 
 });
 Template.classEdit.events({
   'change #class-select': function(event: Event) {
     
-    const curClassName = String((event.currentTarget as HTMLSelectElement | null)?.value || '');
-    if (curClassName) {
-      classSelectedSetup(curClassName);
+    const courseId = String((event.currentTarget as HTMLSelectElement | null)?.value || '');
+    if (courseId) {
+      classSelectedSetup(courseId);
     } else {
       // Creating a new class with name from $textBox
       noClassSelectedSetup();
@@ -200,7 +251,7 @@ Template.classEdit.events({
     if (isNewClass) {
       const curClassName = String($('#newClassName').val() || '');
       if(curClassName == ""){
-        alert("Class cannot be blank.");
+        alert("Course cannot be blank.");
         return false;
       }
       curClass = {
@@ -216,10 +267,10 @@ Template.classEdit.events({
       };
       classes.push(curClass);
     } else {
-      const curClassName = String($('#class-select').val() || '');
-      const foundClass = search(curClassName, 'courseName', classes as EditableClass[]);
+      const courseId = String($('#class-select').val() || '');
+      const foundClass = classes.find((course) => course.courseId === courseId);
       if (!foundClass) {
-        alert('Selected class was not found.');
+        alert('Selected course was not found.');
         return false;
       }
       curClass = foundClass;
@@ -227,38 +278,28 @@ Template.classEdit.events({
       curClass.courseName = newClassName;
     }
 
-    const newSections = String($('#sectionNames').val() || '').trim().split('\n');
-    for(let i = 0; i < newSections.length; i++){
-      const newSection = newSections[i];
-      if(newSection == "" || newSection == " "){
-        alert("Cannot have blank section names");
-        return false;
-      }
-    }
-    curClass.sections = newSections;
+    curClass.sections = readSectionNames();
     curClass.visibility = String($('#courseVisibility').val() || 'private') === 'public' ? 'public' : 'private';
     curClass.beginDate = readOptionalDateInput('#courseBeginDate');
     curClass.endDate = readOptionalDateInput('#courseEndDate');
     curClass.timezone = String($('#courseTimezone').val() || '').trim();
     if (!curClass.timezone) {
-      Session.set('classEditError', 'Course timezone is required.');
+      Session.set('classEditError', 'Choose a course timezone.');
       return false;
     }
 
     function handleSuccess(res: unknown) {
       curClass.courseId = res as string;
       Session.set('classEditSaved', true);
-      
-      Session.set('classes', classes);
-      // Need a delay here so the reactive session var can update the template
-      setTimeout(function() {
-        classSelectedSetup(curClass.courseName);
-      }, 200);
+
+      void loadCourseManagementData().then(function() {
+        classSelectedSetup(String(curClass.courseId || ''));
+      });
     }
 
     function handleError(err: unknown) {
       const message = (err as any)?.reason || (err as any)?.message || String(err);
-      Session.set('classEditError', 'Error saving class: ' + message);
+      Session.set('classEditError', 'Error saving course: ' + message);
     }
 
     if (isNewClass) {
@@ -270,7 +311,32 @@ Template.classEdit.events({
         .then(handleSuccess)
         .catch(handleError);
     }
-    updateSections();
+  },
+
+  'click #deleteCourse': function(_event: Event) {
+    Session.set('classEditError', null);
+    const courseId = String($('#class-select').val() || '');
+    const classes = (Session.get('classes') || []) as EditableClass[];
+    const foundClass = classes.find((course) => course.courseId === courseId);
+    if (!courseId || !foundClass) {
+      Session.set('classEditError', 'Select a course to delete.');
+      return false;
+    }
+    const confirmed = window.confirm(
+      `Delete "${foundClass.courseName}"?\n\nThis removes the course, section links, enrollments, and assignment rows. Learner history is kept.`
+    );
+    if (!confirmed) return false;
+
+    meteorCallAsync('deleteCourse', courseId)
+      .then(async function() {
+        await loadCourseManagementData();
+        noClassSelectedSetup();
+      })
+      .catch(function(err: unknown) {
+        const message = (err as any)?.reason || (err as any)?.message || String(err);
+        Session.set('classEditError', 'Error deleting course: ' + message);
+      });
+    return false;
   },
 });
 

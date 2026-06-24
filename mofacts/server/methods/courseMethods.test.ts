@@ -195,6 +195,85 @@ describe('course assignment metadata methods', function() {
     });
   });
 
+  it('creates a default section for new courses when no section names are supplied', async function() {
+    const sections = createMemoryCollection();
+    const methods = createCourseMethods(createDeps({
+      Courses: createMemoryCollection(),
+      Sections: sections,
+      SectionUserMap: createMemoryCollection(),
+      CourseLearnerSnapshotCache: createMemoryCollection(),
+      UserDashboardCache: createMemoryCollection(),
+    }));
+
+    const courseId = await methods.addCourse.call({ userId: 'teacher-user' }, {
+      courseName: 'Intro Course',
+      semester: 'current',
+      timezone: 'America/Chicago',
+      beginDate: null,
+      endDate: null,
+      sections: [],
+    });
+
+    expect(sections.rows).to.deep.include({
+      _id: 'inserted-1',
+      courseId,
+      sectionName: '001',
+    });
+  });
+
+  it('rejects duplicate course names for the same instructor and semester', async function() {
+    const methods = createCourseMethods(createDeps({
+      Courses: createMemoryCollection([{ _id: 'course-1', courseName: 'Intro Course', teacherUserId: 'teacher-user', semester: 'current' }]),
+      Sections: createMemoryCollection(),
+      SectionUserMap: createMemoryCollection(),
+      CourseLearnerSnapshotCache: createMemoryCollection(),
+      UserDashboardCache: createMemoryCollection(),
+    }));
+
+    try {
+      await methods.addCourse.call({ userId: 'teacher-user' }, {
+        courseName: ' intro course ',
+        semester: 'current',
+        timezone: 'America/Chicago',
+        sections: ['A'],
+      });
+      expect.fail('Expected duplicate course name to throw');
+    } catch (error) {
+      expect(error).to.be.instanceOf(Meteor.Error);
+      expect((error as Meteor.Error).reason).to.equal('A course with that name already exists for this instructor');
+    }
+  });
+
+  it('deletes course management records without touching histories', async function() {
+    const courses = createMemoryCollection([{ _id: 'course-1', courseName: 'Intro Course', teacherUserId: 'teacher-user', semester: 'current' }]);
+    const sections = createMemoryCollection([{ _id: 'section-1', courseId: 'course-1', sectionName: '001' }]);
+    const sectionUserMap = createMemoryCollection([{ _id: 'enrollment-1', sectionId: 'section-1', userId: 'student-user' }]);
+    const assignments = createMemoryCollection([{ _id: 'assignment-1', courseId: 'course-1', TDFId: 'tdf-1' }]);
+    const histories = {
+      rows: [{ _id: 'history-1', userId: 'student-user', courseAssignment: { courseId: 'course-1' } }],
+      async findOneAsync() {
+        return this.rows[0] || null;
+      },
+    };
+    const methods = createCourseMethods(createDeps({
+      Courses: courses,
+      Sections: sections,
+      SectionUserMap: sectionUserMap,
+      Assignments: assignments,
+      Histories: histories,
+      CourseLearnerSnapshotCache: createMemoryCollection(),
+      UserDashboardCache: createMemoryCollection(),
+    }));
+
+    await methods.deleteCourse.call({ userId: 'teacher-user' }, 'course-1');
+
+    expect(courses.rows).to.deep.equal([]);
+    expect(sections.rows).to.deep.equal([]);
+    expect(sectionUserMap.rows).to.deep.equal([]);
+    expect(assignments.rows).to.deep.equal([]);
+    expect(histories.rows).to.have.length(1);
+  });
+
   it('rejects invalid course visibility values', async function() {
     const methods = createCourseMethods(createDeps({
       Courses: createMemoryCollection(),

@@ -498,6 +498,11 @@ export function createAdminMethods(deps: AdminMethodsDeps) {
         await Roles.removeUsersFromRolesAsync(normalizedTargetUserId, normalizedRoleName);
       }
 
+      const targetRoles = {
+        admin: await Roles.userIsInRoleAsync(normalizedTargetUserId, ['admin']),
+        teacher: await Roles.userIsInRoleAsync(normalizedTargetUserId, ['teacher']),
+      };
+
       deps.serverConsole('Role change complete:', normalizedRoleAction, normalizedRoleName, 'for', targetUsername);
 
       return {
@@ -506,6 +511,7 @@ export function createAdminMethods(deps: AdminMethodsDeps) {
         targetUsername,
         roleAction: normalizedRoleAction,
         roleName: normalizedRoleName,
+        targetRoles,
       };
     },
 

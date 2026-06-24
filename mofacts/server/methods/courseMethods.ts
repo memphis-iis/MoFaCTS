@@ -35,6 +35,7 @@ type DueDateException = {
 };
 const MAX_ASSIGNMENTS_PER_COURSE = 250;
 const DEFAULT_COURSE_TIMEZONE = 'America/Chicago';
+const DEFAULT_COURSE_SECTION_NAME = '001';
 
 type Cursor<T = any> = {
   fetchAsync: () => Promise<T[]>;
@@ -82,6 +83,17 @@ function normalizeCourseVisibility(value: unknown): CourseVisibility {
   if (value === undefined || value === null || value === '') return 'private';
   if (value === 'private' || value === 'public') return value;
   throw new Meteor.Error(400, 'Course visibility must be private or public');
+}
+
+function normalizeCourseSections(value: unknown): string[] {
+  const sections = Array.isArray(value)
+    ? value.map((section) => String(section || '').trim()).filter(Boolean)
+    : [];
+  return sections.length > 0 ? sections : [DEFAULT_COURSE_SECTION_NAME];
+}
+
+function normalizeCourseName(value: unknown): string {
+  return String(value || '').trim();
 }
 
 function assertKnownFields(payload: UnknownRecord, allowedFields: string[], label: string) {
@@ -270,6 +282,21 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     return { course, actingUserId, roleFlags };
   }
 
+  async function assertUniqueCourseNameForTeacher(courseName: string, teacherUserId: string, semester: string, excludingCourseId?: string) {
+    const normalizedCourseName = courseName.toLowerCase();
+    const existingCourses = await deps.Courses.find(
+      { teacherUserId, semester },
+      { fields: { _id: 1, courseName: 1 } }
+    ).fetchAsync();
+    const duplicate = existingCourses.find((course: any) =>
+      String(course?._id || '') !== String(excludingCourseId || '') &&
+      normalizeCourseName(course?.courseName).toLowerCase() === normalizedCourseName
+    );
+    if (duplicate) {
+      throw new Meteor.Error(400, 'A course with that name already exists for this instructor');
+    }
+  }
+
   async function resolveInstructorForCaller(thisArg: MethodContext, requestedInstructorId: string) {
     const { actingUserId, roleFlags } = await requireTeacherOrAdmin(thisArg);
     const normalizedInstructorId = deps.normalizeCanonicalId(requestedInstructorId) || actingUserId;
@@ -389,12 +416,11 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
   }
 
   async function getAllCourseSections(this: MethodContext) {
-    if (!this.userId) {
-      throw new Meteor.Error(401, 'Must be logged in');
-    }
+    const actingUserId = requireAuthenticatedUser(this.userId, 'Must be logged in', 401);
     try {
       deps.serverConsole('getAllCourseSections');
-      return await deps.Courses.rawCollection().aggregate([
+      const roleFlags = await getUserRoleFlags(deps.getMethodAuthorizationDeps(), actingUserId, ['admin', 'teacher'] as const);
+      const allSections = await deps.Courses.rawCollection().aggregate([
         {
           $match: { semester: curSemester },
         },
@@ -409,6 +435,7 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
         {
           $unwind: {
             path: '$section',
+            preserveNullAndEmptyArrays: true,
           },
         },
         {
@@ -427,6 +454,18 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
           },
         },
       ]).toArray();
+      if (roleFlags.admin || roleFlags.teacher) {
+        return allSections;
+      }
+      const enrollmentRows = await deps.SectionUserMap.find(
+        { userId: actingUserId },
+        { fields: { sectionId: 1 } }
+      ).fetchAsync();
+      const enrolledSectionIds = new Set(enrollmentRows.map((row: any) => String(row?.sectionId || '')).filter(Boolean));
+      return allSections.filter((section: any) =>
+        section.visibility === 'public' ||
+        enrolledSectionIds.has(String(section.sectionId || ''))
+      );
     } catch (e: unknown) {
       throwLoggedCourseOperationError(deps, 'getAllCourseSections', e);
     }
@@ -1065,17 +1104,21 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     const { actingUserId, roleFlags } = await requireTeacherOrAdmin(this);
     assertKnownFields(mycourse, ['courseId', 'courseName', 'teacherUserId', 'semester', 'beginDate', 'endDate', 'timezone', 'visibility', 'sections'], 'Course');
     const { beginDate, endDate, timezone } = normalizeCourseDates(mycourse);
-    const sections = Array.isArray(mycourse.sections) ? mycourse.sections.map((section) => String(section || '').trim()).filter(Boolean) : [];
-    if (!normalizeOptionalString(mycourse.courseName)) {
+    const sections = normalizeCourseSections(mycourse.sections);
+    const courseName = normalizeCourseName(mycourse.courseName);
+    if (!courseName) {
       throw new Meteor.Error(400, 'Course name is required');
     }
-    const teacherUserId = roleFlags.admin && deps.normalizeCanonicalId(mycourse.teacherUserId)
-      ? deps.normalizeCanonicalId(mycourse.teacherUserId)
+    const adminTeacherUserId = deps.normalizeCanonicalId(mycourse.teacherUserId);
+    const teacherUserId = roleFlags.admin && adminTeacherUserId
+      ? adminTeacherUserId
       : actingUserId;
+    const semester = normalizeOptionalString(mycourse.semester) || curSemester;
+    await assertUniqueCourseNameForTeacher(courseName, teacherUserId, semester);
     const courseDoc = {
-      courseName: String(mycourse.courseName),
+      courseName,
       teacherUserId,
-      semester: normalizeOptionalString(mycourse.semester) || curSemester,
+      semester,
       beginDate,
       endDate,
       timezone,
@@ -1095,20 +1138,24 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     const targetCourseId = deps.normalizeCanonicalId(mycourse._id) || deps.normalizeCanonicalId(mycourse.courseId);
     const { course, actingUserId, roleFlags } = await assertCanManageCourse(this, targetCourseId || '');
     const { beginDate, endDate, timezone } = normalizeCourseDates(mycourse, course);
-    if (!normalizeOptionalString(mycourse.courseName)) {
+    const courseName = normalizeCourseName(mycourse.courseName);
+    if (!courseName) {
       throw new Meteor.Error(400, 'Course name is required');
     }
-    const teacherUserId = roleFlags.admin && deps.normalizeCanonicalId(mycourse.teacherUserId)
-      ? deps.normalizeCanonicalId(mycourse.teacherUserId)
+    const adminTeacherUserId = deps.normalizeCanonicalId(mycourse.teacherUserId);
+    const teacherUserId = roleFlags.admin && adminTeacherUserId
+      ? adminTeacherUserId
       : (!roleFlags.admin ? actingUserId : course.teacherUserId);
+    const semester = normalizeOptionalString(mycourse.semester) || course.semester || curSemester;
+    await assertUniqueCourseNameForTeacher(courseName, teacherUserId, semester, targetCourseId || undefined);
     const visibility = mycourse.visibility === undefined
       ? normalizeCourseVisibility(course.visibility)
       : normalizeCourseVisibility(mycourse.visibility);
     const courseUpdate = {
       $set: {
-        courseName: String(mycourse.courseName),
+        courseName,
         teacherUserId,
-        semester: normalizeOptionalString(mycourse.semester) || course.semester || curSemester,
+        semester,
         beginDate,
         endDate,
         timezone,
@@ -1117,7 +1164,7 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     };
     deps.serverConsole('editCourse:' + JSON.stringify(courseUpdate));
     await deps.Courses.updateAsync({ _id: targetCourseId }, courseUpdate);
-    const newSections = Array.isArray(mycourse.sections) ? mycourse.sections.map((section) => String(section || '').trim()).filter(Boolean) : [];
+    const newSections = normalizeCourseSections(mycourse.sections);
     const curCourseSections = await deps.Sections.find({ courseId: targetCourseId }).fetchAsync();
     const oldSections = curCourseSections.map((section: { sectionName: string }) => section.sectionName);
     deps.serverConsole('old/new', oldSections, newSections);
@@ -1136,6 +1183,28 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
 
     await invalidateCourseSnapshotsForCourse(String(targetCourseId), 'course-updated');
     return targetCourseId;
+  }
+
+  async function deleteCourse(this: MethodContext, courseId: string) {
+    const targetCourseId = deps.normalizeCanonicalId(courseId);
+    const { course } = await assertCanManageCourse(this, targetCourseId || '');
+    const sectionRows = await deps.Sections.find({ courseId: targetCourseId }, { fields: { _id: 1 } }).fetchAsync();
+    const sectionIds = sectionRows.map((section: any) => String(section?._id || '')).filter(Boolean);
+    await invalidateCourseSnapshotsForCourse(String(course._id), 'course-deleted');
+    const enrollmentRemoved = sectionIds.length > 0
+      ? await deps.SectionUserMap.removeAsync({ sectionId: { $in: sectionIds } })
+      : 0;
+    const assignmentsRemoved = await deps.Assignments.removeAsync({ courseId: targetCourseId });
+    const sectionsRemoved = await deps.Sections.removeAsync({ courseId: targetCourseId });
+    const coursesRemoved = await deps.Courses.removeAsync({ _id: targetCourseId });
+    deps.serverConsole('deleteCourse:', {
+      courseId: targetCourseId,
+      enrollmentRemoved,
+      assignmentsRemoved,
+      sectionsRemoved,
+      coursesRemoved,
+    });
+    return true;
   }
 
   async function addUserToTeachersClass(this: MethodContext, teacherID: string, sectionId: string) {
@@ -1307,6 +1376,7 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     getAllTeachers,
     addCourse,
     editCourse,
+    deleteCourse,
     addUserToTeachersClass,
     addUserDueDateException,
     checkForTDFData,

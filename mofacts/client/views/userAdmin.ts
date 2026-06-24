@@ -30,10 +30,17 @@ const NEWS_EMAIL_BODY = [
 ].join('\n');
 
 type SortDirection = 'asc' | 'desc';
+type RoleName = 'admin' | 'teacher';
+type RoleFlags = Record<RoleName, boolean>;
+type RoleStateOverrides = Record<string, Partial<RoleFlags>>;
 type AdminApiKeyMetadata = {
   openRouter?: { configured?: boolean; unusable?: boolean; keyUpdatedAt?: unknown; modelUpdatedAt?: unknown; updatedBy?: unknown; model?: string };
   googleTts?: { configured?: boolean; unusable?: boolean; keyUpdatedAt?: unknown; updatedBy?: unknown };
   googleSpeech?: { configured?: boolean; unusable?: boolean; keyUpdatedAt?: unknown; updatedBy?: unknown };
+};
+type UserAdminRoleChangeResult = {
+  targetUserId?: unknown;
+  targetRoles?: Partial<Record<RoleName, unknown>>;
 };
 
 function getPagedUserIds(): string[] {
@@ -110,6 +117,67 @@ function formatStatusDate(value: unknown): string {
 
 function apiKeyMetadata(instance: any): AdminApiKeyMetadata {
   return instance.apiKeyMetadata.get() || {};
+}
+
+function getPublishedRoleFlags(userId: string): RoleFlags {
+  return {
+    admin: userHasRole({ _id: userId }, 'admin'),
+    teacher: userHasRole({ _id: userId }, 'teacher'),
+  };
+}
+
+function getDisplayedRoleFlag(userId: string, roleName: RoleName, roleStateOverrides: RoleStateOverrides): boolean {
+  const overriddenValue = roleStateOverrides[userId]?.[roleName];
+  return typeof overriddenValue === 'boolean'
+    ? overriddenValue
+    : getPublishedRoleFlags(userId)[roleName];
+}
+
+function applyConfirmedRoleState(instance: any, result: UserAdminRoleChangeResult): void {
+  const targetUserId = typeof result?.targetUserId === 'string' ? result.targetUserId.trim() : '';
+  const targetRoles = result?.targetRoles;
+  if (!targetUserId || typeof targetRoles?.admin !== 'boolean' || typeof targetRoles?.teacher !== 'boolean') {
+    throw new Error('Role change completed without authoritative role state.');
+  }
+
+  const currentOverrides = instance.roleStateOverrides.get() as RoleStateOverrides;
+  instance.roleStateOverrides.set({
+    ...currentOverrides,
+    [targetUserId]: {
+      admin: targetRoles.admin,
+      teacher: targetRoles.teacher,
+    },
+  });
+}
+
+function clearSyncedRoleStateOverrides(instance: any): void {
+  const currentOverrides = instance.roleStateOverrides.get() as RoleStateOverrides;
+  const nextOverrides: RoleStateOverrides = {};
+  let changed = false;
+
+  for (const [userId, roles] of Object.entries(currentOverrides)) {
+    const publishedRoles = getPublishedRoleFlags(userId);
+    const remainingRoles: Partial<RoleFlags> = {};
+
+    for (const roleName of ['admin', 'teacher'] as RoleName[]) {
+      if (typeof roles[roleName] !== 'boolean') {
+        continue;
+      }
+      if (roles[roleName] === publishedRoles[roleName]) {
+        changed = true;
+      } else {
+        remainingRoles[roleName] = roles[roleName];
+      }
+    }
+
+    if (Object.keys(remainingRoles).length > 0) {
+      nextOverrides[userId] = remainingRoles;
+    }
+  }
+
+  if (changed) {
+    instance.roleStateOverrides.set(nextOverrides);
+  }
 }
 
 async function refreshAdminApiKeyMetadata(instance: any): Promise<void> {
@@ -216,6 +284,7 @@ Template.userAdmin.onCreated(function(this: any) {
   this.apiKeyMessageType = new ReactiveVar('info');
   this.sortField = new ReactiveVar('identifier');
   this.sortDirection = new ReactiveVar('asc' as SortDirection);
+  this.roleStateOverrides = new ReactiveVar({} as RoleStateOverrides);
   this.autoruns = [];
 
   // Debounce timer for filter changes
@@ -242,6 +311,12 @@ Template.userAdmin.onRendered(function(this: any) {
     instance.isLoading.set(!(usersSub.ready() && countSub.ready() && usageSub.ready()));
   });
   instance.autoruns.push(autorun);
+
+  const roleStateAutorun = this.autorun(() => {
+    (Meteor as any).roleAssignment?.find({}).fetch();
+    clearSyncedRoleStateOverrides(instance);
+  });
+  instance.autoruns.push(roleStateAutorun);
 });
 
 Template.userAdmin.onDestroyed(function(this: any) {
@@ -269,6 +344,7 @@ Template.userAdmin.helpers({
     const sortField = String(instance.sortField.get() || 'identifier');
     const sortDirection = instance.sortDirection.get() as SortDirection;
     const pagedUserIds = getPagedUserIds();
+    const roleStateOverrides = instance.roleStateOverrides.get() as RoleStateOverrides;
 
     if (pagedUserIds.length === 0) {
       return [];
@@ -288,8 +364,8 @@ Template.userAdmin.helpers({
       user.hasIdentifierInvariantViolation = hasIdentifierInvariantViolation;
       Object.assign(user, usageDisplay);
 
-      user.teacher = userHasRole(user, 'teacher');
-      user.admin = userHasRole(user, 'admin');
+      user.teacher = getDisplayedRoleFlag(user._id, 'teacher', roleStateOverrides);
+      user.admin = getDisplayedRoleFlag(user._id, 'admin', roleStateOverrides);
       return user;
     }).sort((a: any, b: any) => {
       const aViolation = !!a.hasIdentifierInvariantViolation;
@@ -732,10 +808,8 @@ Template.userAdmin.events({
     
 
     try {
-      await MeteorCompat.callAsync('userAdminRoleChange', userId, roleAction, roleName);
-      
-
-      // Role update is reactive; no manual refresh needed.
+      const result = await MeteorCompat.callAsync('userAdminRoleChange', userId, roleAction, roleName);
+      applyConfirmedRoleState(Template.instance(), result as UserAdminRoleChangeResult);
     } catch (error: unknown) {
       const disp = 'Failed to handle request. Error:' + getErrorMessage(error);
       

@@ -45,16 +45,16 @@
         </div>
       </div>
 
-      <!-- Select Chapter Section -->
+      <!-- Select Module Section -->
       <div class="admin-section">
         <div class="card admin-card">
           <div class="card-body">
             <div class="admin-section-heading">
               <i class="fa fa-book admin-section-icon"></i>
-              <h5>Select Chapter</h5>
+              <h5>Select Module</h5>
             </div>
             <select id="tdf-select" disabled="true" class="form-select">
-              <option selected="selected" value="{{INVALID}}" disabled="true">Select a lesson</option>
+              <option selected="selected" value="{{INVALID}}" disabled="true">Select a module</option>
               {{#each curInstructorReportingTdfs}}
                 <option value="{{this.TDFId}}">{{this.displayName}}</option>
               {{/each}}

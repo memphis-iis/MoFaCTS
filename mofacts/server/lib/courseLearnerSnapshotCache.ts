@@ -56,7 +56,7 @@ export type CourseLearnerSnapshotCacheDeps = {
   getTdfSummariesByIds: (tdfIds: string[]) => Promise<Map<string, TdfSummary>>;
 };
 
-export const COURSE_SNAPSHOT_VERSION = 1 as const;
+export const COURSE_SNAPSHOT_VERSION = 2 as const;
 
 function courseIsDateVisible(parseNullablePersistedDate: (value: unknown) => Date | null, course: any, now = new Date()) {
   const beginDate = parseNullablePersistedDate(course?.beginDate);
@@ -178,6 +178,8 @@ export function createCourseLearnerSnapshotCacheHelpers(deps: CourseLearnerSnaps
     const titleById = new Map(Array.from(tdfSummaries.entries()).map(([tdfId, summary]) => [tdfId, summary.displayName]));
     const dashboardCache = await deps.UserDashboardCache.findOneAsync({ userId });
     const assignmentsByCourseId = new Map<string, LearnerCourseSnapshotAssignment[]>();
+    const visibleCourseById = new Map(visibleCourses.map((course: any) => [String(course._id), course]));
+    const enrolledCourseIdSet = new Set(enrolledCourseIds);
     for (const row of assignmentRows) {
       const summary = deps.normalizeAssignmentRow(row, 0, titleById, now);
       if (!summary) continue;
@@ -185,8 +187,13 @@ export function createCourseLearnerSnapshotCacheHelpers(deps: CourseLearnerSnaps
       if (!tdf) continue;
       const progressProjection = buildDashboardStatsProjection(dashboardCache?.tdfStats?.[summary.TDFId], null);
       const releaseAt = summary.releaseAt;
-      const ordinaryLearner = !roleFlags.admin && String(visibleCourses.find((course: any) => String(course._id) === summary.courseId)?.teacherUserId || '') !== userId;
-      const availability: LearnerCourseSnapshotAssignment['availability'] = releaseAt && releaseAt.getTime() > now.getTime() && ordinaryLearner ? 'scheduled' : 'available';
+      const course = visibleCourseById.get(summary.courseId);
+      const ordinaryLearner = !roleFlags.admin && String(course?.teacherUserId || '') !== userId;
+      const isPublicCourse = deps.normalizeCourseVisibility(course?.visibility) === 'public';
+      const canLaunchCourseAssignment = isPublicCourse || enrolledCourseIdSet.has(summary.courseId);
+      const availability: LearnerCourseSnapshotAssignment['availability'] = !canLaunchCourseAssignment
+        ? 'unavailable'
+        : releaseAt && releaseAt.getTime() > now.getTime() && ordinaryLearner ? 'scheduled' : 'available';
       const enriched: LearnerCourseSnapshotAssignment = {
         ...summary,
         availability,

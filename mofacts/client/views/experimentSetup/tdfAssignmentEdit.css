@@ -12,10 +12,17 @@
 .assignment-row-list {
   display: flex;
   flex-direction: column;
-  gap: var(--app-space-2);
   max-height: 560px;
   overflow: auto;
   padding-block: var(--app-space-2);
+}
+
+.assignment-picker-list {
+  gap: var(--app-space-1);
+}
+
+.assignment-row-list {
+  gap: var(--app-space-4);
 }
 
 .assignment-picker-row {
@@ -28,6 +35,14 @@
   color: var(--app-text-color);
   padding: var(--app-space-2) var(--app-space-3);
   text-align: left;
+}
+
+.assignment-picker-title,
+.assignment-picker-meta,
+.assignment-row-title,
+.assignment-row-meta {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .assignment-picker-row:hover,
@@ -62,16 +77,18 @@
 
 .assignment-editor-row {
   align-items: start;
+  background: var(--app-surface-color);
   border: 1px solid var(--app-border-color);
   border-radius: var(--app-radius-sm);
   display: grid;
   gap: var(--app-space-3);
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(92px, auto) minmax(0, 1fr) auto;
   padding: var(--app-space-3);
 }
 
 .assignment-row-order {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--app-space-1);
 }
 
@@ -80,22 +97,34 @@
 }
 
 .assignment-row-controls {
-  display: flex;
-  flex-wrap: wrap;
+  align-items: start;
+  display: grid;
   gap: var(--app-space-3);
+  grid-template-columns: minmax(120px, max-content) repeat(2, minmax(180px, 1fr));
   margin-top: var(--app-space-2);
 }
 
 .assignment-date-control {
   display: grid;
   gap: var(--app-space-1);
-  min-width: 190px;
+  min-width: 0;
+}
+
+.assignment-date-control .form-control {
+  min-width: 0;
+  width: 100%;
 }
 
 .assignment-required-wrap {
   align-items: center;
   display: flex;
+  gap: var(--app-space-2);
   min-width: 120px;
+  padding-top: calc(var(--app-space-5) + 1px);
+}
+
+.assignment-editor-row .remove-assignment {
+  align-self: start;
 }
 
 .assignment-editor-empty {
@@ -112,6 +141,14 @@
 
   .assignment-row-order {
     order: 2;
+  }
+
+  .assignment-row-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .assignment-required-wrap {
+    padding-top: 0;
   }
 
   .assignment-date-control {

@@ -111,6 +111,12 @@ type UserWithAuthState = Meteor.User & {
   authState?: { primaryMethod?: string; emailVerificationRequired?: boolean; emailVerified?: boolean };
   emails?: Array<{ verified?: boolean; address?: string }>;
 };
+type PendingClassInvite = {
+  teacherId: string;
+  sectionId: string;
+};
+
+const PENDING_CLASS_INVITE_KEY = 'mofacts.pendingClassInvite.v1';
 
 function getUserLoginMode(user: Meteor.User | null | undefined): string {
   return (user as UserWithLoginParams | null | undefined)?.loginParams?.loginMode || 'normal';
@@ -172,6 +178,87 @@ function routeDeniedUserToEntryPoint(): void {
   }
 
   routeToSignin();
+}
+
+function normalizeRouteParam(value: unknown): string {
+  return String(value || '').trim();
+}
+
+function readPendingClassInvite(): PendingClassInvite | null {
+  try {
+    const raw = window.localStorage.getItem(PENDING_CLASS_INVITE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<PendingClassInvite>;
+    const teacherId = normalizeRouteParam(parsed.teacherId);
+    const sectionId = normalizeRouteParam(parsed.sectionId);
+    return teacherId && sectionId ? { teacherId, sectionId } : null;
+  } catch {
+    return null;
+  }
+}
+
+function writePendingClassInvite(invite: PendingClassInvite): void {
+  try {
+    window.localStorage.setItem(PENDING_CLASS_INVITE_KEY, JSON.stringify(invite));
+  } catch (error: unknown) {
+    clientConsole(1, '[ROUTER] Failed to store class invitation before sign-in:', getErrorMessage(error));
+  }
+}
+
+function clearPendingClassInvite(): void {
+  try {
+    window.localStorage.removeItem(PENDING_CLASS_INVITE_KEY);
+  } catch (error: unknown) {
+    clientConsole(1, '[ROUTER] Failed to clear pending class invitation:', getErrorMessage(error));
+  }
+}
+
+async function acceptClassInvite(teacherId: string, sectionId: string): Promise<void> {
+  const userId = Meteor.userId();
+  if (!userId) {
+    throw new Error('Class invitation requires a signed-in learner.');
+  }
+
+  const [teachers, sections] = await Promise.all([
+    meteorCallAsync('getAllTeachers') as Promise<any[]>,
+    meteorCallAsync('getAllCourseSections') as Promise<any[]>,
+  ]);
+  const teacher = Array.isArray(teachers)
+    ? teachers.find((row: any) => normalizeRouteParam(row?._id) === teacherId)
+    : null;
+  const curClass = Array.isArray(sections)
+    ? sections.find((row: any) => normalizeRouteParam(row?.sectionId) === sectionId)
+    : null;
+
+  await meteorCallAsync('addUserToTeachersClass', teacherId, sectionId);
+  const assignedTdfIds = await meteorCallAsync('getTdfsAssignedToStudent', userId, sectionId);
+  await meteorCallAsync(
+    'setUserLoginData',
+    'section-invite',
+    Session.get('loginMode') || 'password',
+    teacher || { _id: teacherId },
+    curClass || { sectionId, teacherUserId: teacherId },
+    assignedTdfIds
+  );
+  Session.set('curTeacher', teacher || { _id: teacherId });
+  Session.set('curClass', curClass || { sectionId, teacherUserId: teacherId });
+}
+
+function consumePendingClassInvite(controller: any = null): boolean {
+  const pendingInvite = readPendingClassInvite();
+  if (!pendingInvite) return false;
+  clearPendingClassInvite();
+  renderLayout(controller, 'customLoading');
+  void acceptClassInvite(pendingInvite.teacherId, pendingInvite.sectionId)
+    .then(() => {
+      FlowRouter.go('/courses');
+    })
+    .catch((error: unknown) => {
+      clientConsole(1, '[ROUTER] Failed to accept class invitation:', getErrorMessage(error));
+      alert('Could not join that class. Please ask your instructor for a fresh class link.');
+      FlowRouter.go('/classSelection');
+    });
+  return true;
 }
 
 // Load infrequently-used route modules on demand to keep the initial client bundle smaller.
@@ -299,6 +386,10 @@ function renderHomeForUser(controller: any, user: any) {
   if (shouldRedirectToVerifyEmail(user)) {
     clientConsole(2, '[ROUTER] Unverified password user detected, redirecting to verify-email');
     FlowRouter.go('/auth/verify-email');
+    return;
+  }
+
+  if (consumePendingClassInvite(controller)) {
     return;
   }
 
@@ -744,6 +835,27 @@ FlowRouter.route('/classSelection', {
       Session.set('curModule', 'classSelection');
       await renderRouteTemplate(this, 'classSelection');
     });
+  }
+})
+
+FlowRouter.route('/classes/:teacherId/:sectionId', {
+  name: 'client.classInvite',
+  action: function(params: { teacherId?: string; sectionId?: string }) {
+    const teacherId = normalizeRouteParam(params.teacherId);
+    const sectionId = normalizeRouteParam(params.sectionId);
+    if (!teacherId || !sectionId) {
+      alert('That class link is missing required information.');
+      FlowRouter.go('/home');
+      return;
+    }
+
+    writePendingClassInvite({ teacherId, sectionId });
+    if (!Meteor.userId() || !Meteor.user()) {
+      routeToSignin();
+      return;
+    }
+
+    consumePendingClassInvite(this);
   }
 })
 

@@ -8,7 +8,7 @@
         <div class="card-body">
           <div class="admin-section-heading">
             <i class="fa fa-tasks admin-section-icon"></i>
-            <h5>Assignment Metadata</h5>
+            <h5>Syllabus</h5>
           </div>
 
           <div class="row g-3">
@@ -17,7 +17,7 @@
               <select id="class-select" class="form-select">
                 <option selected="selected" value="" disabled="true">Select a course</option>
                 {{#each courses}}
-                  <option value="{{this._id}}">{{this.courseName}}</option>
+                  <option value="{{this._id}}" {{selectedCourseAttrs this._id}}>{{this.courseName}}</option>
                 {{/each}}
               </select>
             </div>

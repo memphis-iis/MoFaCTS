@@ -59,30 +59,30 @@
             <span class="fa fa-list-alt" aria-hidden="true"></span>
             <span>Courses</span>
           </button>
-          <button type="button" class="nav-item {{sidebarActiveClass 'content'}}" data-label="Create Content" id="contentUploadButton">
+          <button type="button" class="nav-item {{sidebarActiveClass 'content'}}" data-label="Content" id="contentUploadButton">
             <span class="fa fa-folder-open" aria-hidden="true"></span>
-            <span>Create Content</span>
+            <span>Content</span>
           </button>
-          <button type="button" class="nav-item {{sidebarActiveClass 'data'}}" data-label="Detailed Data" id="dataDownloadButton">
+          <button type="button" class="nav-item {{sidebarActiveClass 'data'}}" data-label="Data" id="dataDownloadButton">
             <span class="fa fa-download" aria-hidden="true"></span>
-            <span>Detailed Data</span>
+            <span>Data</span>
           </button>
         </div>
 
         {{#if isInRole 'teacher'}}
           <div class="section">
             <div class="section-title">Teacher</div>
-            <button type="button" class="nav-item {{sidebarActiveClass 'classEdit'}}" data-label="Class Management" id="classEditButton">
+            <button type="button" class="nav-item {{sidebarActiveClass 'classEdit'}}" data-label="Courses" id="classEditButton">
               <span class="fa fa-users" aria-hidden="true"></span>
-              <span>Class Management</span>
+              <span>Courses</span>
             </button>
-            <button type="button" class="nav-item {{sidebarActiveClass 'instructorReporting'}}" data-label="Instructor Reporting" id="instructorReportingButton">
+            <button type="button" class="nav-item {{sidebarActiveClass 'instructorReporting'}}" data-label="Grades" id="instructorReportingButton">
               <span class="fa fa-bar-chart" aria-hidden="true"></span>
-              <span>Instructor Reporting</span>
+              <span>Grades</span>
             </button>
-            <button type="button" class="nav-item {{sidebarActiveClass 'tdfAssignmentEdit'}}" data-label="Course Assignments" id="tdfAssignmentEditButton">
+            <button type="button" class="nav-item {{sidebarActiveClass 'tdfAssignmentEdit'}}" data-label="Assignments" id="tdfAssignmentEditButton">
               <span class="fa fa-tasks" aria-hidden="true"></span>
-              <span>Course Assignments</span>
+              <span>Assignments</span>
             </button>
           </div>
         {{/if}}
@@ -169,7 +169,7 @@
           <div class="theme-selection-empty">No themes configured</div>
         {{/if}}
       </div>
-      <button type="button" class="dropdown-item" data-home-action="classSelection">Teacher select</button>
+      <button type="button" class="dropdown-item" data-home-action="classSelection">Join Courses</button>
       <div class="dropdown-divider"></div>
       <button type="button" class="dropdown-item" data-home-action="help">Help</button>
       <button type="button" class="dropdown-item" data-home-action="tour">Tour</button>
@@ -192,9 +192,9 @@
       <button type="button" data-practice-menu-action="contentUpload"><span class="fa fa-folder-open" aria-hidden="true"></span> Create Content</button>
       <button type="button" data-practice-menu-action="dataDownload"><span class="fa fa-download" aria-hidden="true"></span> Detailed Data</button>
       {{#if isInRole 'teacher'}}
-        <button type="button" data-practice-menu-action="classEdit"><span class="fa fa-users" aria-hidden="true"></span> Class Management</button>
-        <button type="button" data-practice-menu-action="instructorReporting"><span class="fa fa-bar-chart" aria-hidden="true"></span> Instructor Reporting</button>
-        <button type="button" data-practice-menu-action="tdfAssignmentEdit"><span class="fa fa-tasks" aria-hidden="true"></span> Course Assignments</button>
+        <button type="button" data-practice-menu-action="classEdit"><span class="fa fa-users" aria-hidden="true"></span> Courses</button>
+        <button type="button" data-practice-menu-action="instructorReporting"><span class="fa fa-bar-chart" aria-hidden="true"></span> Grades</button>
+        <button type="button" data-practice-menu-action="tdfAssignmentEdit"><span class="fa fa-tasks" aria-hidden="true"></span> Assignments</button>
       {{/if}}
       {{#if isInRole 'admin'}}
         <button type="button" data-practice-menu-action="adminControls"><span class="fa fa-cogs" aria-hidden="true"></span> Admin Control Panel</button>

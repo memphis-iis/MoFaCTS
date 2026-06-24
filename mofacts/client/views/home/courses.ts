@@ -143,16 +143,18 @@ const courseAssignmentDisplayHelpers = {
     return this.timezone;
   },
   isLocked(this: CourseAssignmentDisplayRow) {
-    return this.availability === 'scheduled';
+    return this.availability !== 'available';
   },
   statusLabel(this: CourseAssignmentDisplayRow) {
     const row = this;
     if (row.availability === 'scheduled') return 'Locked';
+    if (row.availability === 'unavailable') return 'Not enrolled';
     return row.required ? 'Required' : 'Optional';
   },
   statusClass(this: CourseAssignmentDisplayRow) {
     const row = this;
     if (row.availability === 'scheduled') return 'course-assignment-status--locked';
+    if (row.availability === 'unavailable') return 'course-assignment-status--locked';
     return row.required ? 'course-assignment-status--required' : '';
   },
   releaseLabel(this: CourseAssignmentDisplayRow) {
@@ -203,6 +205,7 @@ const courseAssignmentDisplayHelpers = {
   actionLabel(this: CourseAssignmentDisplayRow) {
     const row = this;
     if (row.availability === 'scheduled') return 'Locked';
+    if (row.availability === 'unavailable') return 'Unavailable';
     return row.isUsed ? 'Continue' : 'Start';
   },
   actionButtonClass(this: CourseAssignmentDisplayRow) {
@@ -222,7 +225,7 @@ Template.courses.events({
   },
   'click .launch-course-assignment': async function(event: Event, instance: CoursesTemplateInstance) {
     const assignment = this as LearnerCourseSnapshotAssignment;
-    if (assignment.availability === 'scheduled') return;
+    if (assignment.availability !== 'available') return;
     const course = currentCourseFromAssignment(instance, assignment);
     if (!course) {
       instance.error.set('Course context was not found for this assignment.');

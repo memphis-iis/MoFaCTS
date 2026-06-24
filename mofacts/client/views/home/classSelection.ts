@@ -27,6 +27,12 @@ function selectedClassDisplayLabel() {
   return courseName || sectionName || 'Selected';
 }
 
+function isSectionSelectable(section: any) {
+  if (String(section?.visibility || 'private') === 'public') return true;
+  const currentClass = classSelectionContext();
+  return !!currentClass?.sectionId && String(currentClass.sectionId) === String(section?.sectionId || '');
+}
+
 function syncSelectedContextToSession() {
   const currentClass = classSelectionContext();
   const sections = Session.get('classSelectionSections') || [];
@@ -61,7 +67,10 @@ Template.classSelection.helpers({
     const selectedTeacherId = String(Session.get('classSelectionTeacherId') || '');
     if (!selectedTeacherId) return [];
     const sections = Session.get('classSelectionSections') || [];
-    return sections.filter((section: any) => String(section?.teacherUserId || '') === selectedTeacherId);
+    return sections.filter((section: any) =>
+      String(section?.teacherUserId || '') === selectedTeacherId &&
+      isSectionSelectable(section)
+    );
   },
   hasSelectedClassContext: function() {
     return !!classSelectionContext();
@@ -88,7 +97,7 @@ Template.classSelection.events({
     const teacherId = String(Session.get('classSelectionTeacherId') || '');
     const sectionId = String(Session.get('classSelectionSectionId') || '');
     if (!teacherId || !sectionId) {
-      alert('Please select both teacher and class.');
+      alert('Please select both instructor and course.');
       return;
     }
 
@@ -97,7 +106,7 @@ Template.classSelection.events({
     const teacher = teachers.find((row: any) => String(row?._id || '') === teacherId);
     const curClass = sections.find((row: any) => String(row?.sectionId || '') === sectionId);
     if (!teacher || !curClass) {
-      alert('Invalid teacher/class selection. Please try again.');
+      alert('Invalid instructor/course selection. Please try again.');
       return;
     }
 
@@ -114,11 +123,11 @@ Template.classSelection.events({
       );
       Session.set('curTeacher', teacher);
       Session.set('curClass', curClass);
-      alert('Class selection saved.');
+      alert('Course enrollment saved.');
       FlowRouter.go('/home');
     } catch (error: unknown) {
       clientConsole(1, '[CLASS_SELECTION] Failed saving class selection:', error);
-      alert('Could not save class selection. Please try again.');
+      alert('Could not save course enrollment. Please try again.');
     }
   },
 
@@ -136,7 +145,7 @@ Template.classSelection.onRendered(async function() {
     ]);
 
     Session.set('classSelectionTeachers', Array.isArray(teachers) ? teachers : []);
-    Session.set('classSelectionSections', Array.isArray(sections) ? sections : []);
+    Session.set('classSelectionSections', Array.isArray(sections) ? sections.filter(isSectionSelectable) : []);
     syncSelectedContextToSession();
     Session.set('classSelectionReady', true);
     syncSessionToSelectors();

@@ -2,6 +2,7 @@ import { Meteor } from 'meteor/meteor';
 import { Template } from 'meteor/templating';
 import { Session } from 'meteor/session';
 import './tdfAssignmentEdit.html';
+import './tdfAssignmentEdit.css';
 import { meteorCallAsync } from '../..';
 import type {
   CourseAssignmentEditorSnapshot,
@@ -132,6 +133,8 @@ Template.tdfAssignmentEdit.onRendered(async function() {
 
 Template.tdfAssignmentEdit.helpers({
   courses: () => Session.get('courses'),
+  selectedCourseAttrs: (courseId: string) =>
+    String(Session.get('courseAssignmentSelectedCourseId') || '') === String(courseId || '') ? { selected: true } : {},
   assignmentRows: () => readRows(),
   hasAssignmentRows: () => readRows().length > 0,
   isLoading: () => Session.get('courseAssignmentLoading'),

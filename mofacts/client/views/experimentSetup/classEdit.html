@@ -1,7 +1,7 @@
 <template name="classEdit">
 {{#if isInRole 'admin, teacher'}}
     <div class="container admin-page">
-      <h3 class="page-header-title class-edit-heading">Class Management</h3>
+      <h3 class="page-header-title class-edit-heading">Course Management</h3>
 
       {{#if isLoading}}
       <div class="text-center admin-loading-block">
@@ -11,27 +11,27 @@
         <p class="admin-loading-text text-muted">Loading class data...</p>
       </div>
       {{else}}
-      <!-- Add or Edit a Class Section -->
+      <!-- Add or Edit a Course Section -->
       <div class="admin-section">
         <div class="card admin-card">
           <div class="card-body">
             <div class="admin-section-heading">
               <i class="fa fa-pencil admin-section-icon"></i>
-              <h5>Add or Edit a Class</h5>
+              <h5>Add or Edit a Course</h5>
             </div>
             <div class="row g-3">
               <div class="col-12">
-                <label for="class-select" class="form-label">Select existing class to edit</label>
+                <label for="class-select" class="form-label">Select existing course to edit</label>
                 <select id="class-select" class="form-select">
-                  <option selected="selected" value="">Add a class</option>
+                  <option selected="selected" value="">Add a course</option>
                   {{#each classes}}
-                    <option value="{{this.courseName}}">{{this.courseName}}</option>
+                    <option value="{{this.courseId}}">{{this.courseName}}</option>
                   {{/each}}
                 </select>
               </div>
               <div class="col-12">
-                <label for="newClassName" class="form-label">Class name</label>
-                <input class="form-control" type="text" placeholder="Enter classname here" id="newClassName" />
+                <label for="newClassName" class="form-label">Course name</label>
+                <input class="form-control" type="text" placeholder="Enter course name" id="newClassName" />
               </div>
               <div class="col-md-4 col-12">
                 <label for="courseVisibility" class="form-label">Visibility</label>
@@ -51,11 +51,15 @@
               </div>
               <div class="col-12">
                 <label for="courseTimezone" class="form-label">Course timezone</label>
-                <input class="form-control" type="text" id="courseTimezone" placeholder="America/Chicago" />
+                <select id="courseTimezone" class="form-select">
+                  {{#each courseTimezoneOptions}}
+                    <option value="{{this.value}}">{{this.label}}</option>
+                  {{/each}}
+                </select>
               </div>
               <div class="col-12">
                 <label for="sectionNames" class="form-label">Section names (one per line)</label>
-                <textarea class="form-control" rows="15" id="sectionNames" placeholder="Enter section names here"></textarea>
+                <textarea class="form-control" rows="5" id="sectionNames" placeholder="Default: 001"></textarea>
               </div>
               {{#if classEditError}}
                 <div class="col-12">
@@ -64,8 +68,13 @@
               {{/if}}
               <div class="col-12 text-center">
                 <button type='button' id='saveClass' class='btn btn-primary'>
-                  <i class="fa fa-save"></i> Save Class
+                  <i class="fa fa-save"></i> Save Course
                 </button>
+                {{#if isEditingCourse}}
+                  <button type='button' id='deleteCourse' class='btn btn-outline-danger'>
+                    <i class="fa fa-trash"></i> Delete Course
+                  </button>
+                {{/if}}
               </div>
             </div>
           </div>
@@ -85,7 +94,7 @@
                 {{#each sections}}
                   <li class="admin-list-row">
                     <i class="fa fa-external-link admin-inline-icon"></i>
-                    <a href="{{baseLink}}classes/{{curTeacher}}/{{this.sectionId}}">{{this.courseName}} - {{this.sectionName}}</a>
+                    <a href="{{baseLink}}classes/{{this.teacherUserId}}/{{this.sectionId}}">{{this.courseName}} - {{this.sectionName}}</a>
                   </li>
                 {{/each}}
               </ul>

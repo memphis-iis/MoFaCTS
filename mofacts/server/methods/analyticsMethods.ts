@@ -118,10 +118,14 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
   async function validateCourseEnrollmentForUser(userId: string, courseId: string) {
     const activeCourses = await deps.Courses.find(
       { _id: courseId, semester: curSemester },
-      { fields: { _id: 1 } }
+      { fields: { _id: 1, visibility: 1 } }
     ).fetchAsync();
     if (activeCourses.length === 0) {
       throw new Meteor.Error(403, 'Course assignment history context is not active for current user');
+    }
+    const course = activeCourses[0];
+    if (course?.visibility === 'public') {
+      return;
     }
 
     const sectionRows = await deps.Sections.find(

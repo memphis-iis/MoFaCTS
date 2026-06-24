@@ -54,7 +54,7 @@ export interface LearnerCourseSnapshotCourse {
 }
 
 export interface LearnerCoursesSnapshot {
-  version: 1;
+  version: 2;
   userId: string;
   generatedAt: number;
   assignedCourses: LearnerCourseSnapshotCourse[];

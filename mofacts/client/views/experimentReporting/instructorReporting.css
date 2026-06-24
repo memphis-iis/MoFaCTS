@@ -8,3 +8,23 @@
   padding-left: calc(20px * var(--app-density-scale));
   padding-right: calc(20px * var(--app-density-scale));
 }
+
+#mainContent .form-select {
+  min-height: var(--app-text-input-height);
+  border-color: var(--border-color);
+  border-radius: var(--app-border-radius-sm);
+  background-color: var(--learning-card-surface-color);
+  color: var(--app-text-color);
+}
+
+#mainContent .form-select:focus {
+  border-color: var(--focus-ring-color);
+  box-shadow: 0 0 0 3px var(--app-focus-shadow-color);
+}
+
+#mainContent .form-select:disabled {
+  border-color: var(--border-color);
+  background-color: var(--app-muted-surface-color);
+  color: var(--app-secondary-text-color);
+  opacity: 1;
+}
