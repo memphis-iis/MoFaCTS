@@ -27,6 +27,7 @@ import { getSpeechRecognitionMediaConstraints } from '../../../../lib/audioStart
 import { getAllCurrentStimAnswers } from '../../../../lib/currentTestingHelpers';
 import {
   resolveSpeechIgnoreOutOfGrammarResponses,
+  resolveSpeechFilterCloseResponses,
   resolveSpeechRecognitionLanguage
 } from '../../../../lib/speechRecognitionConfig';
 import { clientConsole } from '../../../../lib/userSessionHelpers';
@@ -160,6 +161,7 @@ type CurrentTdfLike = {
       setspec?: {
         speechRecognitionLanguage?: string | string[];
         speechIgnoreOutOfGrammarResponses?: unknown;
+        srfilterclose?: unknown;
         speechAPIKey?: string;
       };
     };
@@ -971,9 +973,11 @@ async function processAudioData(audioData: ArrayBuffer | string): Promise<Speech
   const setSpec = (Session.get('currentTdfFile') as CurrentTdfLike | null | undefined)?.tdfs?.tutor?.setspec;
   let speechRecognitionLanguage: string;
   let ignoreOutOfGrammarResponses: boolean;
+  let filterCloseSpeechResponses: boolean;
   try {
     speechRecognitionLanguage = requireSpeechRecognitionLanguage(setSpec);
     ignoreOutOfGrammarResponses = requireIgnoreOutOfGrammarResponses(setSpec);
+    filterCloseSpeechResponses = resolveSpeechFilterCloseResponses(setSpec);
   } catch (error: unknown) {
     clientConsole(1, '[SR] Refusing to transcribe with missing SR configuration', {
       error: getErrorMessage(error),
@@ -1038,7 +1042,7 @@ async function processAudioData(audioData: ArrayBuffer | string): Promise<Speech
       ...configuredSpeechTargets,
     ]));
 
-    if (requestCorrectAnswer && answerGrammar.length > 0) {
+    if (filterCloseSpeechResponses && requestCorrectAnswer && answerGrammar.length > 0) {
       const phoneticIndexForConflicts = buildPhoneticIndexForLanguage(answerGrammar, speechRecognitionLanguage);
       const normalizedCurrentAnswer = normalizeSpeechToken(requestCorrectAnswer);
       const conflicts = findPhoneticConflictsWithCorrectAnswerForLanguage(

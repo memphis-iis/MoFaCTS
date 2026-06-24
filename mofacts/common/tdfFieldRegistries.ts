@@ -146,6 +146,10 @@ export const SETSPEC_FIELD_REGISTRY: SectionFieldRegistry = {
     brief: 'Ignore speech not in the answer set.',
     verbose: 'Discard speech transcripts that do not match the active grammar/answer set.'
   }),
+  srfilterclose: simpleField(legacyBooleanField('true'), {
+    brief: 'Filter close speech answers.',
+    verbose: 'Remove phonetically close non-target answers from the speech-recognition grammar.'
+  }),
   speechOutOfGrammarFeedback: simpleField(stringField('', 12), {
     brief: 'Message for ignored speech input.',
     verbose: 'Feedback shown when out-of-grammar speech is discarded.'
@@ -653,6 +657,7 @@ export const SETSPEC_DIRECT_RUNTIME_KEYS = Object.freeze([
   'showPageNumbers',
   'speechRecognitionLanguage',
   'speechIgnoreOutOfGrammarResponses',
+  'srfilterclose',
   'speechOutOfGrammarFeedback',
   'textToSpeechAPIKey',
   'textToSpeechLanguage',

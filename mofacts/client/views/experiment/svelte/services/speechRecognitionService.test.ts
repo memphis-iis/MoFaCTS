@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import {
+  resolveSpeechFilterCloseResponses,
   resolveSpeechIgnoreOutOfGrammarResponses,
   resolveSpeechRecognitionLanguage
 } from '../../../../lib/speechRecognitionConfig';
@@ -54,6 +55,21 @@ describe('speechRecognitionConfig', function() {
   it('honors explicit out-of-grammar filtering values', function() {
     expect(resolveSpeechIgnoreOutOfGrammarResponses({ speechIgnoreOutOfGrammarResponses: 'true' })).to.equal(true);
     expect(resolveSpeechIgnoreOutOfGrammarResponses({ speechIgnoreOutOfGrammarResponses: 'false' })).to.equal(false);
+  });
+
+  it('defaults close speech-response filtering to enabled', function() {
+    expect(resolveSpeechFilterCloseResponses({})).to.equal(true);
+    expect(resolveSpeechFilterCloseResponses(null)).to.equal(true);
+  });
+
+  it('honors explicit close speech-response filtering values', function() {
+    expect(resolveSpeechFilterCloseResponses({ srfilterclose: 'true' })).to.equal(true);
+    expect(resolveSpeechFilterCloseResponses({ srfilterclose: 'false' })).to.equal(false);
+  });
+
+  it('fails clearly on invalid close speech-response filtering values', function() {
+    expect(() => resolveSpeechFilterCloseResponses({ srfilterclose: 'sometimes' }))
+      .to.throw('Invalid setspec.srfilterclose value "sometimes" for SR');
   });
 
   it('keeps the existing speech language default', function() {
