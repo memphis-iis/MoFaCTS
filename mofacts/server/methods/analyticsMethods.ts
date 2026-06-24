@@ -1075,15 +1075,28 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
   async function getSparcHistoryForUnit(
     userId: string,
     TDFId: string,
-    levelUnit: number
+    levelUnit: number,
+    options: Pick<LearningHistoryReadOptions, 'courseAssignment'> = {}
   ) {
-    return await deps.Histories.find({
+    let selector: UnknownRecord = {
       userId,
       TDFId,
       levelUnit: Number(levelUnit),
       eventType: 'sparc',
       levelUnitType: { $in: ['model', 'sparc'] },
-    }, {
+    };
+    if (options.courseAssignment) {
+      await validateCourseAssignmentHistoryContext({ courseAssignment: options.courseAssignment }, TDFId, userId);
+      const courseId = deps.normalizeCanonicalId(options.courseAssignment.courseId);
+      if (!courseId) {
+        throw new Meteor.Error(400, 'Course-scoped SPARC history requires courseId');
+      }
+      selector = {
+        ...selector,
+        'courseAssignment.courseId': courseId,
+      };
+    }
+    return await deps.Histories.find(selector, {
       fields: {
         historySchemaVersion: 1,
         TDFId: 1,
@@ -1441,10 +1454,11 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       this: MethodContext,
       userId: string,
       TDFId: string,
-      levelUnit: number
+      levelUnit: number,
+      options: Pick<LearningHistoryReadOptions, 'courseAssignment'> = {}
     ) {
       const scopedUserId = requireSelfScopedUserId(this, userId);
-      return await getSparcHistoryForUnit(scopedUserId, requireNormalizedTdfId(TDFId), levelUnit);
+      return await getSparcHistoryForUnit(scopedUserId, requireNormalizedTdfId(TDFId), levelUnit, options);
     },
     getAutoTutorHistoryForUnit: async function(
       this: MethodContext,

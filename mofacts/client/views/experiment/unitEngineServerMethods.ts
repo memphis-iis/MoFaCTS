@@ -32,11 +32,15 @@ export function createUnitEngineServerMethods(
         courseAssignment: getCourseAssignmentLaunchContext(),
       },
     ) as any[],
-    getSparcHistoryForUnit: async (userId, tdfId, unitNumber) => await deps.meteorCallAsync(
+    getSparcHistoryForUnit: async (userId, tdfId, unitNumber, options) => await deps.meteorCallAsync(
       'getSparcHistoryForUnit',
       userId,
       tdfId,
       unitNumber,
+      {
+        ...options,
+        courseAssignment: getCourseAssignmentLaunchContext(),
+      },
     ) as unknown[],
     getResponseKCMapForTdf: async (tdfId) => await deps.meteorCallAsync(
       'getResponseKCMapForTdf',

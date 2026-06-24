@@ -43,6 +43,7 @@ import {
 } from '../../../../lib/currentTestingHelpers';
 import { clearPreparedNextRuntimeState } from './unitEngineService';
 import { COMPLETED_LESSON_REDIRECT, resolveCardLaunchProgress } from '../../../../lib/cardEntryIntent';
+import { getCourseAssignmentLaunchContext } from '../../../../lib/courseAssignmentLaunchContext';
 import type {
   ExperimentState,
   SvelteCardInitResult,
@@ -979,7 +980,10 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
         'getSparcHistoryForUnit',
         userId,
         currentTdfId,
-        currentUnitNumber
+        currentUnitNumber,
+        {
+          courseAssignment: getCourseAssignmentLaunchContext(),
+        }
       );
 
       hydrateSparcProductionRuleHistoryCache(sparcHistoryRows);

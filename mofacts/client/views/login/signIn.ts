@@ -12,6 +12,7 @@ import { selectTdf } from '../../lib/lessonLaunchRunner';
 import './signIn.html';
 import '../footer.html';
 import { setExperimentParticipantContext } from '../../lib/idContext';
+import { resolveSpeechIgnoreOutOfGrammarResponses } from '../../lib/speechRecognitionConfig';
 import '../../lib/memphisSaml';
 
 
@@ -819,8 +820,7 @@ async function resolveExperimentTargetForLogin() {
   }
 
   const setspec = foundExpTarget.content.tdfs.tutor.setspec;
-  const ignoreOutOfGrammarResponses = setspec.speechIgnoreOutOfGrammarResponses ?
-    setspec.speechIgnoreOutOfGrammarResponses.toLowerCase() == 'true' : false;
+  const ignoreOutOfGrammarResponses = resolveSpeechIgnoreOutOfGrammarResponses(setspec);
   const speechOutOfGrammarFeedback = setspec.speechOutOfGrammarFeedback ?
     setspec.speechOutOfGrammarFeedback : 'Response not in answer set';
 

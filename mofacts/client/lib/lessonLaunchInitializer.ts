@@ -6,6 +6,7 @@ import { clearConditionResolutionContext, setActiveTdfContext } from './idContex
 import { loadLaunchReadyTdf } from './launchReadyTdf';
 import { clientConsole } from './clientLogger';
 import { resolveCardLaunchProgress, type CardLaunchProgress } from './cardEntryIntent';
+import { resolveSpeechIgnoreOutOfGrammarResponses } from './speechRecognitionConfig';
 
 type LessonLaunchTimingLogger = (eventName: string, payload?: Record<string, unknown>) => void;
 type LessonLaunchMessageSetter = (message: string) => void;
@@ -63,11 +64,8 @@ export async function prepareLessonLaunchContext(params: PrepareLessonLaunchPara
   }
 
   const setspec = content?.tdfs?.tutor?.setspec || {};
-  const ignoreOutOfGrammarResponses = params.ignoreOutOfGrammarResponses ?? (
-    typeof setspec.speechIgnoreOutOfGrammarResponses === 'string'
-      ? setspec.speechIgnoreOutOfGrammarResponses.toLowerCase() === 'true'
-      : Boolean(setspec.speechIgnoreOutOfGrammarResponses)
-  );
+  const ignoreOutOfGrammarResponses = params.ignoreOutOfGrammarResponses
+    ?? resolveSpeechIgnoreOutOfGrammarResponses(setspec);
   const speechOutOfGrammarFeedback = params.speechOutOfGrammarFeedback
     ?? setspec.speechOutOfGrammarFeedback
     ?? 'Response not in answer set';

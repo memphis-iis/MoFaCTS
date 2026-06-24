@@ -5,6 +5,7 @@ import { Template } from 'meteor/templating';
 import { meteorCallAsync, clientConsole } from '../..';
 import { selectTdf } from '../../lib/lessonLaunchRunner';
 import { setCourseAssignmentLaunchContext } from '../../lib/courseAssignmentLaunchContext';
+import { resolveSpeechIgnoreOutOfGrammarResponses } from '../../lib/speechRecognitionConfig';
 import type {
   LearnerCourseSnapshotAssignment,
   LearnerCourseSnapshotCourse,
@@ -247,7 +248,7 @@ Template.courses.events({
         assignment.TDFId,
         assignment.title,
         assignment.currentStimuliSetId,
-        setspec.speechIgnoreOutOfGrammarResponses ? String(setspec.speechIgnoreOutOfGrammarResponses).toLowerCase() === 'true' : false,
+        resolveSpeechIgnoreOutOfGrammarResponses(setspec),
         setspec.speechOutOfGrammarFeedback || 'Response not in answer set',
         'Course assignment launch',
         Boolean(tdf?.content?.isMultiTdf),

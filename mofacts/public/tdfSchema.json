@@ -503,7 +503,7 @@
                   "type": "boolean"
                 }
               ],
-              "default": "false",
+              "default": "true",
               "options": {
                 "grid_columns": 4
               }

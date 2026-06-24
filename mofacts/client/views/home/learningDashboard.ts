@@ -21,6 +21,7 @@ import {
 import { getAudioLaunchPreparationPlan, prepareAudioForLaunchIfNeeded } from '../../lib/audioStartup';
 import { unlockAppleMobileAudioForUserGesture } from '../../lib/audioUnlock';
 import { shouldLockMultiTdfLaunchToCurrentUnit } from '../../lib/lessonLaunchLockPolicy';
+import { resolveLessonLaunchEntryRoute } from '../../lib/lessonLaunchEntryRoute';
 import { CARD_ENTRY_INTENT, setCardEntryIntent, type CardEntryIntent } from '../../lib/cardEntryIntent';
 import { normalizeTutorUnits } from '../../lib/tdfUtils';
 import { prepareLessonLaunchContext } from '../../lib/lessonLaunchInitializer';
@@ -1678,7 +1679,16 @@ async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId
       setCardEntryIntent(launchProgress.intent, {
         source: 'practiceMenu.selectTdf',
       });
-      FlowRouter.go('/card');
+      const entryRoute = resolveLessonLaunchEntryRoute({
+        content: curTdfContent,
+        intent: launchProgress.intent,
+      });
+      if (entryRoute.route === '/instructions') {
+        Session.set('currentUnitNumber', entryRoute.currentUnitNumber);
+        Session.set('currentTdfUnit', entryRoute.currentTdfUnit);
+        Session.set('curUnitInstructionsSeen', entryRoute.curUnitInstructionsSeen);
+      }
+      FlowRouter.go(entryRoute.route);
     }
   }
 }

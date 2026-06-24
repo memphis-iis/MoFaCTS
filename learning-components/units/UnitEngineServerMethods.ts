@@ -25,6 +25,7 @@ export type UnitEngineServerMethods = {
     userId: string,
     tdfId: string,
     unitNumber: number,
+    options?: Pick<LearningHistoryReadOptions, 'courseAssignment'>,
   ) => Promise<unknown[]>;
   readonly getResponseKCMapForTdf: (tdfId: any) => Promise<Record<string, unknown>>;
   readonly getStimulusCrowdStatsForDeck: (

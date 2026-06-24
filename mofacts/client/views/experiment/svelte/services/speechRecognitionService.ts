@@ -25,7 +25,10 @@ import { getAudioInputSensitivity, setAudioRecorderInitialized } from '../../../
 import { audioManager } from '../../../../lib/audioContextManager';
 import { getSpeechRecognitionMediaConstraints } from '../../../../lib/audioStartup';
 import { getAllCurrentStimAnswers } from '../../../../lib/currentTestingHelpers';
-import { resolveSpeechRecognitionLanguage } from '../../../../lib/speechRecognitionConfig';
+import {
+  resolveSpeechIgnoreOutOfGrammarResponses,
+  resolveSpeechRecognitionLanguage
+} from '../../../../lib/speechRecognitionConfig';
 import { clientConsole } from '../../../../lib/userSessionHelpers';
 import {
   classifySrInitFailure,
@@ -377,17 +380,7 @@ function requireSpeechRecognitionLanguage(setSpec: CurrentSetSpecLike | undefine
 }
 
 function requireIgnoreOutOfGrammarResponses(setSpec: CurrentSetSpecLike | undefined): boolean {
-  const raw = setSpec?.speechIgnoreOutOfGrammarResponses;
-  if (typeof raw === 'undefined' || raw === null) {
-    throw new Error('Missing required setspec.speechIgnoreOutOfGrammarResponses for SR');
-  }
-
-  const normalized = String(raw).trim().toLowerCase();
-  if (normalized !== 'true' && normalized !== 'false') {
-    throw new Error(`Invalid setspec.speechIgnoreOutOfGrammarResponses value "${String(raw)}" for SR`);
-  }
-
-  return normalized === 'true';
+  return resolveSpeechIgnoreOutOfGrammarResponses(setSpec);
 }
 
 function buildTranscriptionFailureResult(

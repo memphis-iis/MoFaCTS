@@ -1,7 +1,12 @@
 const DEFAULT_SPEECH_RECOGNITION_LANGUAGE = 'en-US' as const;
+const DEFAULT_IGNORE_OUT_OF_GRAMMAR_RESPONSES = true;
 
 type SetSpecWithSpeechLanguage = {
   speechRecognitionLanguage?: string | string[] | null;
+};
+
+type SetSpecWithSpeechGrammar = {
+  speechIgnoreOutOfGrammarResponses?: unknown;
 };
 
 export function resolveSpeechRecognitionLanguage(
@@ -18,4 +23,20 @@ export function resolveSpeechRecognitionLanguage(
 
   const language = String(raw || '').trim();
   return language || DEFAULT_SPEECH_RECOGNITION_LANGUAGE;
+}
+
+export function resolveSpeechIgnoreOutOfGrammarResponses(
+  setSpec: SetSpecWithSpeechGrammar | null | undefined
+): boolean {
+  const raw = setSpec?.speechIgnoreOutOfGrammarResponses;
+  if (typeof raw === 'undefined' || raw === null || String(raw).trim() === '') {
+    return DEFAULT_IGNORE_OUT_OF_GRAMMAR_RESPONSES;
+  }
+
+  const normalized = String(raw).trim().toLowerCase();
+  if (normalized !== 'true' && normalized !== 'false') {
+    throw new Error(`Invalid setspec.speechIgnoreOutOfGrammarResponses value "${String(raw)}" for SR`);
+  }
+
+  return normalized === 'true';
 }

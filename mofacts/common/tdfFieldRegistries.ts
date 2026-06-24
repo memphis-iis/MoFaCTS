@@ -142,7 +142,7 @@ export const SETSPEC_FIELD_REGISTRY: SectionFieldRegistry = {
     brief: 'Text-to-speech language code.',
     verbose: 'Google Text-to-Speech language code used for synthesized audio, such as "en-US" or "es-ES".'
   }),
-  speechIgnoreOutOfGrammarResponses: simpleField(legacyBooleanField('false'), {
+  speechIgnoreOutOfGrammarResponses: simpleField(legacyBooleanField('true'), {
     brief: 'Ignore speech not in the answer set.',
     verbose: 'Discard speech transcripts that do not match the active grammar/answer set.'
   }),

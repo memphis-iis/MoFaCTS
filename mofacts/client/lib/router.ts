@@ -20,6 +20,7 @@ import { getErrorMessage } from './errorUtils';
 import { CARD_ENTRY_INTENT, setCardEntryIntent } from './cardEntryIntent';
 import { isLaunchLoadingActive } from './launchLoading';
 import { getRouteAccessPolicy, type RouteAccessPolicy } from './routeAccessPolicies';
+import { resolveSpeechIgnoreOutOfGrammarResponses } from './speechRecognitionConfig';
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra');
 const BlazeLayout: any = (globalThis as any).BlazeLayout;
 const Tdfs: any = (globalThis as any).Tdfs;
@@ -1162,8 +1163,7 @@ FlowRouter.route('/card', {
       }
       if(tdf) {
         const setspec = tdf.content.tdfs.tutor.setspec ? tdf.content.tdfs.tutor.setspec : null;
-        const ignoreOutOfGrammarResponses = setspec.speechIgnoreOutOfGrammarResponses ?
-        setspec.speechIgnoreOutOfGrammarResponses.toLowerCase() == 'true' : false;
+        const ignoreOutOfGrammarResponses = resolveSpeechIgnoreOutOfGrammarResponses(setspec);
         const speechOutOfGrammarFeedback = setspec.speechOutOfGrammarFeedback ?
         setspec.speechOutOfGrammarFeedback : 'Response not in answer set';
 
@@ -1211,8 +1211,7 @@ FlowRouter.route('/card', {
           const tdfFile = Session.get('currentTdfFile');
           if (tdfFile && tdfFile.tdfs && tdfFile.tdfs.tutor && tdfFile.tdfs.tutor.setspec) {
             const setspec = tdfFile.tdfs.tutor.setspec;
-            const ignoreOutOfGrammarResponses = setspec.speechIgnoreOutOfGrammarResponses ?
-              setspec.speechIgnoreOutOfGrammarResponses.toLowerCase() === 'true' : false;
+            const ignoreOutOfGrammarResponses = resolveSpeechIgnoreOutOfGrammarResponses(setspec);
             CardStore.setIgnoreOutOfGrammarResponses(ignoreOutOfGrammarResponses);
             clientConsole(2, '[Router] Restored ignoreOutOfGrammarResponses from TDF:', ignoreOutOfGrammarResponses);
           }
