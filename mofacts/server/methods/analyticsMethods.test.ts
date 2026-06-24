@@ -69,11 +69,10 @@ function createAnalyticsDeps(overrides: Record<string, unknown> = {}) {
     },
     Tdfs: {
       find: () => ({ fetchAsync: async () => [] }),
-      findOneAsync: async () => ({
-        _id: 'tdf-1',
-        ownerId: 'teacher-1',
-        accessors: [],
+      findOneAsync: async (selector: Record<string, unknown>) => ({
+        _id: selector._id || 'tdf-1',
         content: {
+          fileName: selector._id === 'child-tdf' ? 'child.json' : 'root.json',
           tdfs: {
             tutor: {
               setspec: {
@@ -82,8 +81,13 @@ function createAnalyticsDeps(overrides: Record<string, unknown> = {}) {
             },
           },
         },
+        ownerId: 'teacher-1',
+        accessors: [],
       }),
       updateAsync: async () => true,
+    },
+    Assignments: {
+      findOneAsync: async () => null,
     },
     Courses: {
       find: () => ({ fetchAsync: async () => [] }),
@@ -175,5 +179,65 @@ describe('analyticsMethods', function() {
 
     expect(insertedHistory).to.have.length(1);
     expect(logEntries.some((entry) => String(entry[0]).includes('Dashboard cache update failed'))).to.equal(true);
+  });
+
+  it('insertHistory accepts course history for a resolved child of the assigned root TDF', async function() {
+    const { deps, insertedHistory } = createAnalyticsDeps({
+      Tdfs: {
+        find: () => ({ fetchAsync: async () => [] }),
+        findOneAsync: async (selector: Record<string, unknown>) => {
+          if (selector._id === 'root-tdf') {
+            return {
+              _id: 'root-tdf',
+              content: {
+                tdfs: {
+                  tutor: {
+                    setspec: {
+                      condition: ['child.json'],
+                      conditionTdfIds: ['child-tdf'],
+                    },
+                  },
+                },
+              },
+            };
+          }
+          if (selector._id === 'child-tdf') {
+            return { _id: 'child-tdf', content: { fileName: 'child.json' } };
+          }
+          return null;
+        },
+        updateAsync: async () => true,
+      },
+      Assignments: {
+        findOneAsync: async (selector: Record<string, unknown>) => (
+          selector._id === 'assignment-1' &&
+          selector.courseId === 'course-1' &&
+          selector.TDFId === 'root-tdf'
+            ? { _id: 'assignment-1' }
+            : null
+        ),
+      },
+      Courses: {
+        find: () => ({ fetchAsync: async () => [{ _id: 'course-1', visibility: 'public' }] }),
+      },
+    });
+    const methods = createAnalyticsMethods(deps as any) as Record<string, any>;
+
+    await methods.insertHistory.call({ userId: 'learner-1' }, createHistoryRecord({
+      TDFId: 'child-tdf',
+      courseAssignment: {
+        assignmentId: 'assignment-1',
+        courseId: 'course-1',
+        TDFId: 'root-tdf',
+        launchSource: 'courses',
+      },
+    }));
+
+    expect(insertedHistory).to.have.length(1);
+    expect(insertedHistory[0]?.courseAssignment).to.deep.include({
+      assignmentId: 'assignment-1',
+      courseId: 'course-1',
+      TDFId: 'root-tdf',
+    });
   });
 });

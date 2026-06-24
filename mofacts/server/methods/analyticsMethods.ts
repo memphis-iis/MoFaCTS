@@ -148,6 +148,41 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     }
   }
 
+  async function tdfBelongsToAssignedRoot(assignedTdfId: string, historyTdfId: string): Promise<boolean> {
+    if (assignedTdfId === historyTdfId) {
+      return true;
+    }
+    const rootTdf = await deps.Tdfs.findOneAsync(
+      { _id: assignedTdfId },
+      {
+        fields: {
+          _id: 1,
+          'content.tdfs.tutor.setspec.condition': 1,
+          'content.tdfs.tutor.setspec.conditionTdfIds': 1,
+        },
+      }
+    );
+    const rootSetspec = rootTdf?.content?.tdfs?.tutor?.setspec || {};
+    const conditionTdfIds = Array.isArray(rootSetspec.conditionTdfIds) ? rootSetspec.conditionTdfIds : [];
+    if (conditionTdfIds.some((id: unknown) => deps.normalizeCanonicalId(id) === historyTdfId)) {
+      return true;
+    }
+
+    const conditionRefs = Array.isArray(rootSetspec.condition) ? rootSetspec.condition : [];
+    if (conditionRefs.some((ref: unknown) => deps.normalizeCanonicalId(ref) === historyTdfId)) {
+      return true;
+    }
+
+    const historyTdf = await deps.Tdfs.findOneAsync(
+      { _id: historyTdfId },
+      { fields: { _id: 1, 'content.fileName': 1 } }
+    );
+    const historyFileName = deps.normalizeOptionalString(historyTdf?.content?.fileName);
+    return Boolean(historyFileName && conditionRefs.some((ref: unknown) =>
+      deps.normalizeOptionalString(ref) === historyFileName
+    ));
+  }
+
   async function validateCourseAssignmentHistoryContext(historyRecord: UnknownRecord, tdfId: string, userId: string) {
     const context = historyRecord.courseAssignment;
     if (context === undefined || context === null) return;
@@ -161,7 +196,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     if (record.launchSource !== 'courses' || !assignmentId || !courseId || !contextTdfId) {
       throw new Meteor.Error(400, 'Course assignment history context is incomplete');
     }
-    if (contextTdfId !== tdfId) {
+    if (!await tdfBelongsToAssignedRoot(contextTdfId, tdfId)) {
       throw new Meteor.Error(400, 'Course assignment history TDFId does not match launched TDFId');
     }
     const assignment = await deps.Assignments.findOneAsync(

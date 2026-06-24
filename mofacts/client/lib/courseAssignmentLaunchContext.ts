@@ -25,7 +25,11 @@ export function applyCourseAssignmentLaunchContext<T extends Record<string, unkn
   const context = getCourseAssignmentLaunchContext();
   if (!context) return historyRecord;
   const tdfId = String(historyRecord.TDFId || '');
-  if (tdfId !== context.TDFId) {
+  const rootTdfId = String(Session.get('currentRootTdfId') || '');
+  const currentTdfId = String(Session.get('currentTdfId') || rootTdfId);
+  const matchesAssignedTdf = tdfId === context.TDFId;
+  const matchesActiveResolvedTdf = rootTdfId === context.TDFId && tdfId === currentTdfId;
+  if (!matchesAssignedTdf && !matchesActiveResolvedTdf) {
     throw new Error('[CourseLaunch] History TDFId does not match course assignment launch context');
   }
   return {

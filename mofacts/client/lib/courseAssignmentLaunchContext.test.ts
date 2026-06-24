@@ -29,6 +29,25 @@ describe('courseAssignmentLaunchContext', function() {
     expect(getCourseAssignmentLaunchContext()).to.deep.equal(context);
   });
 
+  it('stamps course assignment context onto active resolved-child history records', function() {
+    const context = {
+      assignmentId: 'assignment-1',
+      courseId: 'course-1',
+      TDFId: 'root-tdf',
+      launchSource: 'courses' as const,
+    };
+    setCourseAssignmentLaunchContext(context);
+    Session.set('currentRootTdfId', 'root-tdf');
+    Session.set('currentTdfId', 'child-tdf');
+
+    const record = applyCourseAssignmentLaunchContext<Record<string, unknown>>({
+      TDFId: 'child-tdf',
+      levelUnitType: 'Instruction',
+    });
+
+    expect(record.courseAssignment).to.deep.equal(context);
+  });
+
   it('fails clearly when history TDF does not match the course launch context', function() {
     setCourseAssignmentLaunchContext({
       assignmentId: 'assignment-1',
