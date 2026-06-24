@@ -16,6 +16,7 @@ Current public/operator entry points:
 - `authoring.md`: content authoring overview.
 - `development.md`: contributor setup notes.
 - `deployment/`: self-hosted deployment, backup, upgrade, readiness, and release evidence.
+- `dependency-security.md`: dependency-audit residuals and remediation notes.
 - `license-compliance.md`: release license obligations.
 - `release-process.md`: public release process.
 - `architecture.md`: concise supported architecture overview.
