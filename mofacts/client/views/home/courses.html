@@ -89,9 +89,9 @@
     <div class="table-wrap">
       <table class="practice-table learning-dashboard-table course-assignment-table" role="treegrid">
         <colgroup>
-          <col class="course-assignment-col-action">
           <col class="course-assignment-col-course">
           <col class="course-assignment-col-assignment">
+          <col class="course-assignment-col-action">
           <col class="course-assignment-col-status">
           <col class="course-assignment-col-date">
           <col class="course-assignment-col-stat">
@@ -103,9 +103,9 @@
         </colgroup>
         <thead>
           <tr>
-            <th scope="col" class="actions-heading">Actions</th>
             <th scope="col">Course</th>
             <th scope="col">Assignment</th>
+            <th scope="col" class="actions-heading">Actions</th>
             <th scope="col">Status</th>
             <th scope="col">Due</th>
             <th scope="col" class="num">Trials</th>
@@ -133,9 +133,6 @@
 
 <template name="courseTreeCourseRow">
   <tr id="{{rowId}}" class="learning-dashboard-row course-tree-course-row" role="row" aria-level="1" aria-expanded="{{#if expanded}}true{{else}}false{{/if}}">
-    <td class="learning-dashboard-cell learning-dashboard-cell--action" data-label="Action">
-      <span class="learning-dashboard-cell__value course-tree-parent-action">-</span>
-    </td>
     <th scope="row" class="learning-dashboard-cell course-assignment-cell--course" data-label="Course">
       <button type="button" class="course-tree-toggle toggle-course-tree"
         data-courseid="{{courseId}}"
@@ -144,16 +141,14 @@
         <span class="course-assignment-course">
           <span class="set-name course-assignment-course-name" title="{{courseName}}">{{courseName}}</span>
           <span class="course-assignment-subline">{{teacherDisplayName}}</span>
-          <span class="course-assignment-subline">{{courseScheduleLabel}}</span>
-          <span class="course-assignment-badges">
-            <span class="badge bg-secondary course-assignment-badge">{{membershipLabel}}</span>
-            <span class="course-assignment-timezone">{{timezoneLabel}}</span>
-          </span>
         </span>
       </button>
     </th>
     <td class="learning-dashboard-cell course-assignment-cell--assignment" data-label="Assignment">
-      <span class="learning-dashboard-cell__value course-tree-assignment-count">{{assignmentCountLabel}}</span>
+      <span class="learning-dashboard-cell__value course-tree-assignment-count">{{assignmentCountLabel}} <span class="course-assignment-timezone">{{timezoneLabel}}</span></span>
+    </td>
+    <td class="learning-dashboard-cell learning-dashboard-cell--action" data-label="Action">
+      <span class="learning-dashboard-cell__value course-tree-parent-action">-</span>
     </td>
     <td class="learning-dashboard-cell course-assignment-cell--status" data-label="Status">
       <span class="learning-dashboard-cell__value">-</span>
@@ -184,6 +179,15 @@
 
 <template name="courseAssignmentTableRow">
   <tr id="{{rowId}}" class="learning-dashboard-row course-assignment-row course-tree-assignment-row {{#if isLocked}}course-assignment-row--locked{{else if isUsed}}learning-dashboard-row--used{{else}}learning-dashboard-row--unused{{/if}}" role="row" aria-level="2">
+    <th scope="row" class="learning-dashboard-cell course-assignment-cell--course" data-label="Course" aria-label="Assignment"></th>
+    <td class="learning-dashboard-cell course-assignment-cell--assignment" data-label="Assignment">
+      <div class="learning-dashboard-cell__value course-assignment-lesson">
+        <span class="course-assignment-title" title="{{title}}">{{title}}</span>
+        {{#if hasReleaseLabel}}
+          <span class="course-assignment-subline">{{releaseLabel}}</span>
+        {{/if}}
+      </div>
+    </td>
     <td class="learning-dashboard-cell learning-dashboard-cell--action" data-label="Action">
       <div class="learning-dashboard-cell__value learning-dashboard-action">
         <button type="button" class="btn btn-sm learning-dashboard-action-button {{#if isLocked}}btn-outline-secondary{{else}}{{actionButtonClass}}{{/if}} launch-course-assignment"
@@ -193,20 +197,6 @@
           disabled="{{#if isLocked}}disabled{{/if}}">
           {{actionLabel}}
         </button>
-      </div>
-    </td>
-    <th scope="row" class="learning-dashboard-cell course-assignment-cell--course" data-label="Course">
-      <div class="learning-dashboard-cell__value course-tree-child-marker">
-        <span class="course-tree-child-line" aria-hidden="true"></span>
-        <span class="course-tree-child-label">Assignment</span>
-      </div>
-    </th>
-    <td class="learning-dashboard-cell course-assignment-cell--assignment" data-label="Assignment">
-      <div class="learning-dashboard-cell__value course-assignment-lesson">
-        <span class="course-assignment-title" title="{{title}}">{{title}}</span>
-        {{#if hasReleaseLabel}}
-          <span class="course-assignment-subline">{{releaseLabel}}</span>
-        {{/if}}
       </div>
     </td>
     <td class="learning-dashboard-cell course-assignment-cell--status" data-label="Status">
@@ -257,9 +247,8 @@
           <span class="fa {{#if expanded}}fa-chevron-down{{else}}fa-chevron-right{{/if}}" aria-hidden="true"></span>
           <span>{{courseName}}</span>
         </span>
-        <span class="badge bg-secondary course-assignment-badge">{{membershipLabel}}</span>
       </span>
-      <span class="course-assignment-card-meta">{{teacherDisplayName}} · {{courseScheduleLabel}}</span>
+      <span class="course-assignment-card-meta">{{teacherDisplayName}}</span>
       <span class="course-assignment-card-meta">{{assignmentCountLabel}} · {{timezoneLabel}}</span>
     </button>
     {{#if expanded}}

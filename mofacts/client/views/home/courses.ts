@@ -42,6 +42,16 @@ function formatDate(value: unknown, timezone?: string | null) {
   });
 }
 
+function formatDateOnly(value: unknown, timezone?: string | null) {
+  if (!value) return '';
+  const date = new Date(value as string | number | Date);
+  if (!Number.isFinite(date.getTime())) return '';
+  return date.toLocaleDateString([], {
+    dateStyle: 'medium',
+    ...(timezone ? { timeZone: timezone } : {}),
+  });
+}
+
 function getExpandedCourseIds() {
   const stored = Session.get(EXPANDED_COURSES_SESSION_KEY);
   return new Set<string>(Array.isArray(stored) ? stored.map(String) : []);
@@ -119,20 +129,7 @@ Template.courses.helpers({
 });
 
 const courseAssignmentDisplayHelpers = {
-  membershipLabel(this: CourseAssignmentDisplayRow | CourseTreeCourseRow) {
-    const membership = this.membership;
-    return membership === 'assigned' ? 'Assigned' : membership === 'public' ? 'Public' : membership === 'teacher' ? 'Teacher' : 'Admin';
-  },
-  courseScheduleLabel(this: CourseAssignmentDisplayRow | CourseTreeCourseRow) {
-    const row = this;
-    const begin = formatDate(row.beginDate, row.timezone);
-    const end = formatDate(row.endDate, row.timezone);
-    if (begin && end) return `${begin} to ${end}`;
-    if (begin) return `Starts ${begin}`;
-    if (end) return `Ends ${end}`;
-    return 'Always available';
-  },
-  timezoneLabel(this: CourseAssignmentDisplayRow) {
+  timezoneLabel(this: CourseAssignmentDisplayRow | CourseTreeCourseRow) {
     return this.timezone;
   },
   isLocked(this: CourseAssignmentDisplayRow) {
@@ -196,7 +193,7 @@ const courseAssignmentDisplayHelpers = {
   lastPracticeValue(this: CourseAssignmentDisplayRow) {
     const row = this;
     const lastPracticed = row.progress?.lastPracticed;
-    return lastPracticed ? formatDate(lastPracticed, row.timezone) : '-';
+    return lastPracticed ? formatDateOnly(lastPracticed, row.timezone) : '-';
   },
   actionLabel(this: CourseAssignmentDisplayRow) {
     const row = this;

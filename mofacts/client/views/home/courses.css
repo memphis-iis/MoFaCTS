@@ -16,7 +16,7 @@
 }
 
 .course-assignment-col-course {
-  width: 170px;
+  width: 180px;
 }
 
 .course-assignment-col-assignment {
@@ -99,25 +99,6 @@
   outline-offset: 3px;
 }
 
-.course-tree-child-marker {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--app-space-2-px);
-  min-height: calc(var(--app-button-height) * 0.58);
-  padding-left: calc(18px * var(--app-density-scale));
-  color: color-mix(in srgb, var(--app-text-color) 52%, transparent);
-  font-size: calc(var(--app-font-size-base) * 0.68);
-  font-weight: 700;
-  line-height: 1;
-  text-transform: uppercase;
-}
-
-.course-tree-child-line {
-  width: calc(18px * var(--app-density-scale));
-  height: 1px;
-  background: color-mix(in srgb, var(--app-text-color) 28%, transparent);
-}
-
 .course-tree-assignment-row .course-assignment-title {
   line-height: 1.18;
 }
@@ -130,7 +111,7 @@
 .course-assignment-course,
 .course-assignment-lesson {
   display: grid;
-  gap: 3px;
+  gap: 2px;
   min-width: 0;
 }
 
@@ -157,19 +138,6 @@
   color: color-mix(in srgb, var(--app-text-color) 62%, transparent);
   font-size: calc(var(--app-font-size-base) * 0.75);
   line-height: 1.25;
-}
-
-.course-assignment-badges {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 2px;
-}
-
-.course-assignment-badge {
-  font-size: calc(var(--app-font-size-base) * 0.65);
-  line-height: 1.2;
 }
 
 .course-assignment-status {
