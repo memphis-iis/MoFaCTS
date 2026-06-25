@@ -325,6 +325,13 @@ export function normalizeSpeechToken(value: unknown): string {
     .toLowerCase();
 }
 
+export function normalizeSpeechGrammarLookupToken(value: unknown): string {
+  return normalizeSpeechToken(value)
+    .replace(/[^a-z0-9ñ]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 const SPOKEN_NUMBER_WORDS = new Map<string, string>([
   ['zero', '0'],
   ['oh', '0'],
@@ -494,6 +501,11 @@ function extractSpeechRecognitionTargets(value: unknown): string[] {
   ));
 }
 
+export function expandSpeechRecognitionGrammarAnswer(value: unknown): string[] {
+  const alternatives = extractSpeechRecognitionTargets(value);
+  return alternatives.length > 0 ? alternatives : [normalizeSpeechToken(value)].filter(Boolean);
+}
+
 function parseSpeechHintExclusionList(value: unknown): string[] {
   return String(value || '')
     .split(',')
@@ -541,7 +553,7 @@ function getErrorMessage(error: unknown): string {
 
 /**
  * Check if SR is enabled.
- * Uses the effective learner audio-input setting and resolved key state.
+ * Uses the effective learner audio-input setting, TDF opt-in, and resolved key state.
  *
  * @returns {boolean} True if SR is enabled
  */
@@ -1031,7 +1043,7 @@ async function processAudioData(audioData: ArrayBuffer | string): Promise<Speech
 
     const rawGrammarAnswers = getAllCurrentStimAnswers(false) as Iterable<unknown> | unknown[] | null | undefined;
     const normalizedGrammarAnswers = (Array.isArray(rawGrammarAnswers) ? rawGrammarAnswers : Array.from(rawGrammarAnswers || []))
-      .map((answer) => normalizeSpeechToken(answer))
+      .flatMap((answer) => expandSpeechRecognitionGrammarAnswer(answer))
       .filter(Boolean);
 
     // Keep recognition biased toward the current target, but allow other valid
@@ -1223,13 +1235,18 @@ async function processAudioData(audioData: ArrayBuffer | string): Promise<Speech
       const grammarByLower = new Map<string, string>();
       for (const g of answerGrammar) {
         grammarByLower.set(normalizeSpeechToken(g), g);
+        grammarByLower.set(normalizeSpeechGrammarLookupToken(g), g);
       }
       const normalizedCurrentAnswer = normalizeSpeechToken(requestCorrectAnswer || '');
+      const normalizedCurrentAnswerLookup = normalizeSpeechGrammarLookupToken(requestCorrectAnswer || '');
       const normalizedAlternatives = alternatives
         .map((alt) => normalizeSpeechToken(alt?.transcript || ''))
         .filter(Boolean);
+      const normalizedLookupAlternatives = alternatives
+        .map((alt) => normalizeSpeechGrammarLookupToken(alt?.transcript || ''))
+        .filter(Boolean);
       const exactGrammarAlternatives = Array.from(new Set(
-        normalizedAlternatives
+        normalizedLookupAlternatives
           .map((altTranscript) => {
             if (altTranscript === 'skip' || altTranscript === 'enter') {
               return altTranscript;
@@ -1239,9 +1256,14 @@ async function processAudioData(audioData: ArrayBuffer | string): Promise<Speech
           .filter((entry): entry is string => typeof entry === 'string' && entry.length > 0)
       ));
       const currentAnswerPresentInAlternatives = normalizedCurrentAnswer.length > 0 &&
-        normalizedAlternatives.includes(normalizedCurrentAnswer);
+        (
+          normalizedAlternatives.includes(normalizedCurrentAnswer) ||
+          normalizedLookupAlternatives.includes(normalizedCurrentAnswerLookup)
+        );
       const currentAnswerPresentAsExactGrammarAlternative = normalizedCurrentAnswer.length > 0 &&
-        exactGrammarAlternatives.some((entry) => entry.toLowerCase() === normalizedCurrentAnswer);
+        exactGrammarAlternatives.some((entry) =>
+          normalizeSpeechGrammarLookupToken(entry) === normalizedCurrentAnswerLookup
+        );
 
       const cachedIgnore = CardStore.getIgnoreOutOfGrammarResponses();
       if (cachedIgnore !== ignoreOutOfGrammarResponses) {
@@ -1264,7 +1286,7 @@ async function processAudioData(audioData: ArrayBuffer | string): Promise<Speech
           acceptancePath = 'command';
           break;
         }
-        const grammarEntry = grammarByLower.get(altLower);
+        const grammarEntry = grammarByLower.get(normalizeSpeechGrammarLookupToken(altRaw));
         if (grammarEntry !== undefined) {
           // Use the grammar entry's original case (authoritative casing from TDF)
           transcript = grammarEntry;

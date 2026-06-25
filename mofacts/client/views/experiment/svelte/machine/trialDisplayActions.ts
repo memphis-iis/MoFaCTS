@@ -76,11 +76,15 @@ export function displayAnswer({ context }: ActionArgs) {
 }
 
 export function displayFeedback({ context }: ActionArgs) {
+  const displayCorrectAnswerText = Answers.getDisplayAnswerText(
+    String(context.currentAnswer || ''),
+  ) || String(context.currentAnswer || '');
+
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('cardMachine:displayFeedback', {
       detail: {
         isCorrect: context.isCorrect,
-        correctAnswer: context.currentAnswer,
+        correctAnswer: displayCorrectAnswerText,
         userAnswer: context.userAnswer,
       },
     }));

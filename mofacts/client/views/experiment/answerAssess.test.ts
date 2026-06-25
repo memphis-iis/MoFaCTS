@@ -26,4 +26,37 @@ describe('answerAssess', function() {
     expect(result.isCorrect).to.equal(false);
     expect(result.matchText).to.equal('Incorrect.');
   });
+
+  it('uses only the first pipe-delimited answer for learner-facing display', function() {
+    expect(Answers.getDisplayAnswerText('Choong Moo one|Choong Moo 1')).to.equal('Choong Moo one');
+  });
+
+  it('uses only the first pipe-delimited answer in cloze study text', function() {
+    expect(Answers.clozeStudy('Practice ___ now.', 'Choong Moo one|Choong Moo 1'))
+      .to.equal('Practice Choong Moo one now.');
+  });
+
+  it('still matches pipe-delimited alternatives during answer evaluation', async function() {
+    const result = await Answers.answerIsCorrect(
+      'Choong Moo 1',
+      'Choong Moo one|Choong Moo 1',
+      'Choong Moo one|Choong Moo 1',
+      '',
+      { lfparameter: 0 }
+    );
+
+    expect(result.isCorrect).to.equal(true);
+  });
+
+  it('matches hyphenated pipe-delimited alternatives during answer evaluation', async function() {
+    const result = await Answers.answerIsCorrect(
+      'Hwa-Rang one',
+      'Hwa-Rang one|Hwa-Rang 1',
+      'Hwa-Rang one|Hwa-Rang 1',
+      '',
+      { lfparameter: 0 }
+    );
+
+    expect(result.isCorrect).to.equal(true);
+  });
 });

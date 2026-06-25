@@ -211,7 +211,7 @@ describe('audioStartup', function() {
     expect(plan.recorderPreInitialization).to.equal(true);
   });
 
-  it('prepares SR warmup from the learner audio setting when a resolved server key is available', function() {
+  it('skips SR warmup and recorder pre-initialization when the TDF does not enable speech input', function() {
     Session.set('speechAPIKeyConfigured', true);
 
     const plan = getAudioLaunchPreparationPlan(
@@ -219,6 +219,33 @@ describe('audioStartup', function() {
         tdfs: {
           tutor: {
             setspec: {},
+          },
+        },
+      },
+      {
+        audioSettings: {
+          audioPromptMode: 'silent',
+          audioInputMode: true,
+        },
+      },
+    );
+
+    expect(plan.requiresPreparation).to.equal(false);
+    expect(plan.ttsWarmup).to.equal(false);
+    expect(plan.srWarmup).to.equal(false);
+    expect(plan.recorderPreInitialization).to.equal(false);
+  });
+
+  it('prepares SR warmup from the learner audio setting when the TDF enables speech input and a resolved server key is available', function() {
+    Session.set('speechAPIKeyConfigured', true);
+
+    const plan = getAudioLaunchPreparationPlan(
+      {
+        tdfs: {
+          tutor: {
+            setspec: {
+              audioInputEnabled: 'true',
+            },
           },
         },
       },

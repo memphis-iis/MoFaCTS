@@ -6,7 +6,9 @@ import {
 } from '../../../../lib/speechRecognitionConfig';
 import {
   buildSpeechRecognitionPhraseHints,
+  expandSpeechRecognitionGrammarAnswer,
   extractSpeechNumberSignature,
+  normalizeSpeechGrammarLookupToken,
   normalizeSpeechToken,
   speechNumbersAreCompatible
 } from './speechRecognitionService';
@@ -31,6 +33,11 @@ describe('speechRecognitionService phrase hints', function() {
     expect(normalizeSpeechToken('año')).to.equal('año');
   });
 
+  it('normalizes punctuation separators for speech grammar lookup', function() {
+    expect(normalizeSpeechGrammarLookupToken('Hwa-Rang 2')).to.equal('hwa rang 2');
+    expect(normalizeSpeechGrammarLookupToken('Hwa Rang two')).to.equal('hwa rang two');
+  });
+
   it('keeps digit identity available for speech matching', function() {
     expect(normalizeSpeechToken('Chang Mu 3')).to.equal('chang mu 3');
     expect(extractSpeechNumberSignature('Chang Mu 3')).to.deep.equal(['3']);
@@ -43,6 +50,16 @@ describe('speechRecognitionService phrase hints', function() {
     expect(speechNumbersAreCompatible('chang moo 7', 'chang mu 3')).to.equal(false);
     expect(speechNumbersAreCompatible('chang moo', 'chang mu 3')).to.equal(false);
     expect(speechNumbersAreCompatible('chang moo', 'chang mu')).to.equal(true);
+  });
+
+  it('expands answer alternatives for speech grammar', function() {
+    expect(expandSpeechRecognitionGrammarAnswer('Choong Moo two|Choong Moo 2'))
+      .to.deep.equal(['choong moo two', 'choong moo 2']);
+  });
+
+  it('expands hyphenated answer alternatives for speech grammar', function() {
+    expect(expandSpeechRecognitionGrammarAnswer('Hwa-Rang two|Hwa-Rang 2'))
+      .to.deep.equal(['hwa-rang two', 'hwa-rang 2']);
   });
 });
 

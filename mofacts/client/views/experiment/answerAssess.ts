@@ -206,7 +206,7 @@ async function stringMatch(
   if (userInput === '' || userAnswer === ''){
     //user didnt enter a response.
     return 0;
-  } else if (/^[\|A-Za-z0-9 \.\%]+$/i.test(stimStr)) {
+  } else if (/^[\|A-Za-z0-9 \.\%-]+$/i.test(stimStr)) {
     // They have the regex matching our special condition - check it manually
     const checks = legacyTrim(stimStr).split('|');
     for (const check of checks) {
@@ -238,7 +238,7 @@ async function regExMatch(
   fullAnswer: string,
   caseSensitive = false
 ): Promise<number> {
-  if (lfparameter && /^[\|A-Za-z0-9 ]+$/i.test(regExStr)) {
+  if (lfparameter && /^[\|A-Za-z0-9 -]+$/i.test(regExStr)) {
     // They have an edit distance parameter and the regex matching our
     // special condition - check it manually
     const checks = legacyTrim(regExStr).split('|');
@@ -311,6 +311,15 @@ function _branchingCorrectText(answer: string): string {
   return resultParts[0] ?? '';
 }
 
+function displayAnswerText(answer: string): string {
+  if (answerIsBranched(answer)) {
+    return _branchingCorrectText(answer);
+  }
+
+  const [learnerFacingAnswer = ''] = legacyTrim(answer || '').split('|');
+  return legacyTrim(learnerFacingAnswer);
+}
+
 async function checkAnswer(
   userAnswer: string,
   correctAnswer: string,
@@ -377,7 +386,7 @@ const Answers = {
   // an answer suitable for display (including on a button). Note that this
   // may be an empty string (for instance, if it's a branched answer)
   getDisplayAnswerText: function(answer: string) {
-    return answerIsBranched(answer) ? _branchingCorrectText(answer) : answer;
+    return displayAnswerText(answer);
   },
 
   // Returns the close study question. For a branched response, we take the
@@ -389,6 +398,8 @@ const Answers = {
     if (answerIsBranched(answer)) {
       // Branched = use first entry's text
       answer = _branchingCorrectText(answer);
+    } else {
+      answer = displayAnswerText(answer);
     }
 
     // Fill in the blank

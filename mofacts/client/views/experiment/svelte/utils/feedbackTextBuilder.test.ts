@@ -39,6 +39,18 @@ describe('feedbackTextBuilder', function() {
     expect(content.feedbackHtml).to.equal('<b class="feedback-label">Incorrect.</b><br>The correct answer is Paris.');
   });
 
+  it('renders only the learner-facing answer text passed to incorrect feedback', function() {
+    const content = buildFeedbackContent({
+      message: 'Incorrect.',
+      isCorrectAnswer: false,
+      correctAnswerText: 'Choong Moo one',
+      displayCorrectAnswer: true,
+    });
+
+    expect(content.feedbackText).to.equal('Incorrect. The correct answer is Choong Moo one.');
+    expect(content.feedbackHtml).to.equal('<b class="feedback-label">Incorrect.</b><br>The correct answer is Choong Moo one.');
+  });
+
   it('keeps close-enough answer wording in the explanation instead of appending a second correct-answer segment', function() {
     const content = buildFeedbackContent({
       message: "Close enough to the correct answer 'Paris'.",
