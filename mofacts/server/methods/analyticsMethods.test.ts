@@ -264,6 +264,77 @@ describe('analyticsMethods', function() {
     }
   });
 
+  it('getLearningHistoryForUnit loads all course model history without requiring current-unit clusterKCs', async function() {
+    const courseRows = [
+      createHistoryRecord({
+        _id: 'history-1',
+        TDFId: 'sparc-tdf',
+        clusterKC: 'fractions.lcd',
+      }),
+      createHistoryRecord({
+        _id: 'history-2',
+        TDFId: 'definitions-tdf',
+        clusterKC: 'fractions.add-numerators',
+      }),
+    ];
+    let capturedSelector: Record<string, unknown> | null = null;
+    let capturedFindOptions: Record<string, unknown> | null = null;
+    const { deps } = createAssignedRootDeps({
+      Histories: {
+        find: (selector: Record<string, unknown>, options?: Record<string, unknown>) => {
+          capturedSelector = selector;
+          capturedFindOptions = options || null;
+          return {
+            fetchAsync: async () => courseRows,
+            countAsync: async () => courseRows.length,
+          };
+        },
+        findOneAsync: async () => null,
+        insertAsync: async () => 'history-id',
+        rawCollection: () => ({ aggregate: () => ({ toArray: async () => [] }) }),
+      },
+      Assignments: {
+        findOneAsync: async (selector: Record<string, unknown>) => (
+          selector._id === 'assignment-1' &&
+          selector.courseId === 'course-1' &&
+          selector.TDFId === 'root-tdf'
+            ? { _id: 'assignment-1' }
+            : null
+        ),
+      },
+      Courses: {
+        find: () => ({ fetchAsync: async () => [{ _id: 'course-1', visibility: 'public' }] }),
+      },
+    });
+    const methods = createAnalyticsMethods(deps as any) as Record<string, any>;
+
+    const rows = await methods.getLearningHistoryForUnit.call(
+      { userId: 'learner-1' },
+      'learner-1',
+      'root-tdf',
+      1,
+      false,
+      {
+        courseAssignment: {
+          assignmentId: 'assignment-1',
+          courseId: 'course-1',
+          TDFId: 'root-tdf',
+          launchSource: 'courses',
+        },
+      },
+    );
+
+    expect(rows).to.deep.equal(courseRows);
+    expect(capturedSelector).to.deep.equal({
+      userId: 'learner-1',
+      levelUnitType: 'model',
+      'courseAssignment.courseId': 'course-1',
+    });
+    expect(capturedFindOptions).to.deep.include({
+      sort: { time: 1 },
+    });
+  });
+
   it('getSparcHistoryForUnit rejects assigned child reads without course context', async function() {
     const { deps } = createAssignedRootDeps();
     const methods = createAnalyticsMethods(deps as any) as Record<string, any>;

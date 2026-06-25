@@ -13,7 +13,6 @@ import {
 } from '../lib/stimulusCrowdStats';
 import { createAnalyticsConditionCountMethods } from './analyticsConditionCountMethods';
 import { createAnalyticsDownloadMethods } from './analyticsDownloadMethods';
-import { normalizeClusterKC } from '../../../learning-components/runtime/sharedModelPracticeIdentity';
 import type { LearningHistoryReadOptions } from '../../../learning-components/units/UnitEngineServerMethods';
 import { curSemester } from '../../common/Definitions';
 
@@ -232,7 +231,6 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       userId,
       levelUnitType: 'model',
       'courseAssignment.courseId': courseId,
-      clusterKC: { $in: normalizeCourseModelClusterKCs(options.clusterKCs) },
     };
   }
 
@@ -1806,36 +1804,4 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     ...downloadMethods,
     ...conditionCountMethods,
   };
-}
-
-function normalizeCourseModelClusterKCs(clusterKCs: unknown): Array<string | number> {
-  if (!Array.isArray(clusterKCs)) {
-    throw new Meteor.Error(400, 'Course-scoped learning history requires clusterKCs');
-  }
-  const normalizedValues: Array<string | number> = [];
-  const seen = new Set<string>();
-  for (const value of clusterKCs) {
-    let normalized: string;
-    try {
-      normalized = normalizeClusterKC(value);
-    } catch (error: unknown) {
-      throw new Meteor.Error(400, error instanceof Error ? error.message : String(error));
-    }
-    const normalizedKey = `string:${normalized}`;
-    if (!seen.has(normalizedKey)) {
-      seen.add(normalizedKey);
-      normalizedValues.push(normalized);
-    }
-    if (typeof value === 'number' && Number.isFinite(value)) {
-      const numericKey = `number:${value}`;
-      if (!seen.has(numericKey)) {
-        seen.add(numericKey);
-        normalizedValues.push(value);
-      }
-    }
-  }
-  if (normalizedValues.length === 0) {
-    throw new Meteor.Error(400, 'Course-scoped learning history requires at least one clusterKC');
-  }
-  return normalizedValues;
 }
