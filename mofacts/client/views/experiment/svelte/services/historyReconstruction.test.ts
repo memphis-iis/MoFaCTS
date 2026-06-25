@@ -253,19 +253,75 @@ describe('history reconstruction', function() {
           documentId: 'sparc-fractions-addition',
           practiceObservation: {
             observationId: 'obs-1',
+            practiceDurationMs: 420,
           },
         },
       },
-    ], { allowResponseLessModelPractice: true });
+    ], { allowResponseLessSparcModelPractice: true });
 
     expect(result.numQuestionsAnswered).to.equal(1);
     expect(result.numCorrectAnswers).to.equal(1);
     expect(result.overallOutcomeHistory).to.deep.equal([1]);
     expect(result.clusterState['fractions.addition']?.priorCorrect).to.equal(1);
-    expect(result.clusterState['fractions.addition']?.totalPracticeDuration).to.equal(0);
+    expect(result.clusterState['fractions.addition']?.totalPracticeDuration).to.equal(420);
     expect(result.stimulusState['fractions.lcd']?.timesSeen).to.equal(1);
-    expect(result.stimulusState['fractions.lcd']?.totalPracticeDuration).to.equal(0);
+    expect(result.stimulusState['fractions.lcd']?.totalPracticeDuration).to.equal(420);
     expect(result.responseState).to.deep.equal({});
+  });
+
+  it('uses nested SPARC practice-observation duration for model-practice rows', function() {
+    const result = reconstructLearningStateFromHistory([
+      {
+        eventType: 'sparc',
+        levelUnitType: 'model',
+        time: 1000,
+        problemStartTime: 500,
+        outcome: 'correct',
+        stimulusKC: 'fractions.lcd',
+        clusterKC: 'fractions.addition',
+        KCId: 'fractions.lcd',
+        KCDefault: 'fractions.lcd',
+        KCCluster: 'fractions.addition',
+        responseKey: '12',
+        responseValue: '12',
+        sparc: {
+          documentId: 'sparc-fractions-addition',
+          practiceObservation: {
+            observationId: 'obs-1',
+            practiceDurationMs: 640,
+          },
+        },
+      },
+    ], { allowResponseLessSparcModelPractice: true });
+
+    expect(result.numQuestionsAnswered).to.equal(1);
+    expect(result.clusterState['fractions.addition']?.totalPracticeDuration).to.equal(640);
+    expect(result.stimulusState['fractions.lcd']?.totalPracticeDuration).to.equal(640);
+    expect(result.responseState['12']?.totalPracticeDuration).to.equal(640);
+  });
+
+  it('treats durationless SPARC model-practice evidence as zero only when explicitly enabled', function() {
+    const result = reconstructLearningStateFromHistory([
+      {
+        eventType: 'sparc',
+        levelUnitType: 'model',
+        time: 1000,
+        problemStartTime: 500,
+        outcome: 'correct',
+        stimulusKC: 'fractions.lcd',
+        clusterKC: 'fractions.addition',
+        KCId: 'fractions.lcd',
+        KCDefault: 'fractions.lcd',
+        KCCluster: 'fractions.addition',
+        responseKey: '12',
+        responseValue: '12',
+      },
+    ], { allowResponseLessSparcModelPractice: true });
+
+    expect(result.numQuestionsAnswered).to.equal(1);
+    expect(result.clusterState['fractions.addition']?.totalPracticeDuration).to.equal(0);
+    expect(result.stimulusState['fractions.lcd']?.totalPracticeDuration).to.equal(0);
+    expect(result.responseState['12']?.totalPracticeDuration).to.equal(0);
   });
 
   it('normalizes semantic cluster identity while reconstructing shared progress', function() {
@@ -302,6 +358,20 @@ describe('history reconstruction', function() {
         responseDuration: 375,
       },
     ])).to.throw('responseKey or CFCorrectAnswer');
+  });
+
+  it('still rejects durationless SPARC model-practice rows by default', function() {
+    expect(() => reconstructLearningStateFromHistory([
+      {
+        eventType: 'sparc',
+        levelUnitType: 'model',
+        time: 1000,
+        outcome: 'correct',
+        stimulusKC: 'fractions.lcd',
+        clusterKC: 'fractions.addition',
+        responseKey: '12',
+      },
+    ])).to.throw('responseDuration or CF latency fields');
   });
 
   it('rejects mismatched explicit identity aliases', function() {

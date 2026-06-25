@@ -74,7 +74,7 @@ type LearningReconstructionResult = {
 };
 
 type LearningReconstructionOptions = {
-  allowResponseLessModelPractice?: boolean;
+  allowResponseLessSparcModelPractice?: boolean;
 };
 
 type OrderedLearningHistoryRecord = Required<Pick<LearningHistoryRecord, 'time' | 'outcome'>> &
@@ -147,7 +147,7 @@ function resolveLearningHistoryResponseKey(
     return requireLearningHistoryResponseKey(row);
   } catch (error) {
     if (
-      options.allowResponseLessModelPractice
+      options.allowResponseLessSparcModelPractice
       && row.eventType === 'sparc'
       && row.levelUnitType === 'model'
     ) {
@@ -155,6 +155,15 @@ function resolveLearningHistoryResponseKey(
     }
     throw error;
   }
+}
+
+function isDurationOptionalSparcModelPractice(
+  row: LearningHistoryRecord,
+  options: LearningReconstructionOptions,
+): boolean {
+  return options.allowResponseLessSparcModelPractice === true
+    && row.eventType === 'sparc'
+    && row.levelUnitType === 'model';
 }
 
 function readFiniteOptionalNumber(value: unknown): number | undefined {
@@ -168,7 +177,21 @@ function readFiniteOptionalNumber(value: unknown): number | undefined {
   return parsed;
 }
 
-function requireLearningHistoryPracticeTimeMs(row: LearningHistoryRecord): number {
+function readSparcPracticeObservationDurationMs(row: LearningHistoryRecord): number | undefined {
+  if (!row.sparc || typeof row.sparc !== 'object') {
+    return undefined;
+  }
+  const observation = (row.sparc as Record<string, unknown>).practiceObservation;
+  if (!observation || typeof observation !== 'object') {
+    return undefined;
+  }
+  return readFiniteOptionalNumber((observation as Record<string, unknown>).practiceDurationMs);
+}
+
+function requireLearningHistoryPracticeTimeMs(
+  row: LearningHistoryRecord,
+  options: LearningReconstructionOptions,
+): number {
   const responseDuration = readFiniteOptionalNumber(row.responseDuration);
   const practiceDurationMs = readFiniteOptionalNumber(row.practiceDurationMs);
   if (
@@ -184,10 +207,18 @@ function requireLearningHistoryPracticeTimeMs(row: LearningHistoryRecord): numbe
     return sharedDuration;
   }
 
+  const sparcObservationDurationMs = readSparcPracticeObservationDurationMs(row);
+  if (sparcObservationDurationMs !== undefined) {
+    return sparcObservationDurationMs;
+  }
+
   if (
     isBlankIdentityValue(row.CFEndLatency)
     && isBlankIdentityValue(row.CFFeedbackLatency)
   ) {
+    if (isDurationOptionalSparcModelPractice(row, options)) {
+      return 0;
+    }
     throw new Error('[History Reconstruction] Missing required field responseDuration or CF latency fields');
   }
   return computePracticeTimeMs(row.CFEndLatency, row.CFFeedbackLatency);
@@ -325,9 +356,7 @@ export function reconstructLearningStateFromHistory(
     const clusterKey = requireLearningHistoryIdentityKey(row, 'clusterKC', 'KCCluster');
     const stimulusKey = requireLearningHistoryIdentityKey(row, 'stimulusKC', 'KCId');
     const responseKey = resolveLearningHistoryResponseKey(row, options);
-    const practiceTimeMs = responseKey
-      ? requireLearningHistoryPracticeTimeMs(row)
-      : 0;
+    const practiceTimeMs = requireLearningHistoryPracticeTimeMs(row, options);
 
     const cluster = clusterState[clusterKey] || (clusterState[clusterKey] = createClusterAggregate());
     const stimulus = stimulusState[stimulusKey] || (stimulusState[stimulusKey] = createStimulusAggregate());

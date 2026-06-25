@@ -9,8 +9,6 @@ import { Meteor } from 'meteor/meteor';
 import { Session } from 'meteor/session';
 import '../../../../../common/Collections';
 import { createExperimentState, getExperimentState } from './experimentState';
-import { reconstructLearningStateFromHistory } from './historyReconstruction';
-import type { LearningHistoryRecord } from './historyReconstruction';
 import { meteorCallAsync } from '../../../../lib/meteorAsync';
 import { clientConsole } from '../../../../lib/userSessionHelpers';
 import { createMappingSignature } from '../../../../lib/mappingSignature';
@@ -43,7 +41,10 @@ import {
 } from '../../../../lib/currentTestingHelpers';
 import { clearPreparedNextRuntimeState } from './unitEngineService';
 import { COMPLETED_LESSON_REDIRECT, resolveCardLaunchProgress } from '../../../../lib/cardEntryIntent';
-import { getCourseAssignmentLaunchContext } from '../../../../lib/courseAssignmentLaunchContext';
+import {
+  getCourseAssignmentLaunchContext,
+  restoreCourseAssignmentLaunchContextFromState,
+} from '../../../../lib/courseAssignmentLaunchContext';
 import type {
   ExperimentState,
   SvelteCardInitResult,
@@ -68,7 +69,6 @@ import {
   setInResume,
   setInputReadyState,
   setResumeInProgress,
-  setRuntimeHistories,
   setVideoSessionActive,
 } from './cardRuntimeState';
 import {
@@ -323,6 +323,33 @@ function handleResumeFailure(message: string, options: { redirectTo?: string; va
   return { redirected: true, redirectTo, error: message };
 }
 
+function getErrorReason(error: unknown): string {
+  if (error && typeof error === 'object') {
+    const record = error as Record<string, unknown>;
+    const reason = typeof record.reason === 'string' ? record.reason.trim() : '';
+    if (reason) return reason;
+    const message = typeof record.message === 'string' ? record.message.trim() : '';
+    if (message) return message;
+  }
+  if (error instanceof Error && error.message.trim()) {
+    return error.message.trim();
+  }
+  const fallback = String(error || '').trim();
+  return fallback || 'Unknown resume error';
+}
+
+function buildResumeFailureMessage(error: unknown): string {
+  const reason = getErrorReason(error);
+  const currentTdfId = String(Session.get('currentTdfId') || '').trim();
+  const currentUnitNumber = Session.get('currentUnitNumber');
+  const contextParts = [
+    currentTdfId ? `TDF ${currentTdfId}` : '',
+    Number.isFinite(Number(currentUnitNumber)) ? `unit ${String(currentUnitNumber)}` : '',
+  ].filter(Boolean);
+  const context = contextParts.length > 0 ? ` (${contextParts.join(', ')})` : '';
+  return `Unable to resume this session${context}: ${reason}`;
+}
+
 /**
  * @param {Record<string, unknown> | null | undefined} tdfFile
  * @returns {Record<string, unknown>[] | null}
@@ -459,10 +486,13 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
     // ====================
 
     const rootTdfId = Session.get('currentRootTdfId') || Session.get('currentTdfId');
+    let curExperimentState = (await getExperimentState()) as ResumeExperimentState;
+    const restoredCourseAssignment = restoreCourseAssignmentLaunchContextFromState(curExperimentState);
     let rootTDFBoxed: TdfDocumentLike | null = null;
     try {
       const launchReadyRoot = await loadLaunchReadyTdf(rootTdfId, {
         allowConditionRoot: true,
+        courseAssignment: restoredCourseAssignment,
         source: 'resume.root',
       });
       rootTDFBoxed = launchReadyRoot.tdfDoc as TdfDocumentLike;
@@ -486,7 +516,6 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
     const conditionOptions = setspec.condition ?? [];
     const needExpCondition = conditionOptions.length > 0;
 
-    let curExperimentState = (await getExperimentState()) as ResumeExperimentState;
     const newExperimentState = JSON.parse(JSON.stringify(curExperimentState)) as ResumeExperimentState;
 
     if (needExpCondition) {
@@ -621,7 +650,9 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
         if (setspec.countcompletion == "beginning") {
           rootTDFBoxed = findTdf({ _id: Session.get('currentRootTdfId') });
           if (!rootTDFBoxed || !isValidRootTdf(rootTDFBoxed)) {
-            rootTDFBoxed = await meteorCallAsync<TdfDocumentLike | null>('getTdfById', Session.get('currentRootTdfId'));
+            rootTDFBoxed = await meteorCallAsync<TdfDocumentLike | null>('getTdfById', Session.get('currentRootTdfId'), {
+              courseAssignment: getCourseAssignmentLaunchContext(),
+            });
           }
           if (rootTDFBoxed && rootTDFBoxed.conditionCounts) {
             const conditions = rootTDF.tdfs.tutor.setspec.condition ?? [];
@@ -632,7 +663,9 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
             );
             let conditionTdfForFileName = findTdf({ _id: conditionTdfId });
             if (!conditionTdfForFileName || !conditionTdfForFileName.content) {
-              conditionTdfForFileName = await meteorCallAsync<TdfDocumentLike | null>('getTdfById', conditionTdfId);
+              conditionTdfForFileName = await meteorCallAsync<TdfDocumentLike | null>('getTdfById', conditionTdfId, {
+                courseAssignment: getCourseAssignmentLaunchContext(),
+              });
             }
             const conditionFileName = conditionTdfForFileName?.content?.fileName;
             const conditionIndex = getConditionIndexOrThrow(conditions, conditionFileName, 'resume.condition.count-beginning');
@@ -680,6 +713,7 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
         clientConsole(1, 'Condition TDF failed invariant after launch-ready load:', conditionTdfId);
         return handleResumeFailure('Unfortunately, the experiment condition TDF could not be loaded. Please contact your administrator.');
       }
+      Session.set('currentTdfDoc', curTdf);
       Session.set('currentTdfFile', curTdf.content);
       Session.set('currentTdfName', curTdf.content.fileName);
       setActiveTdfContext({
@@ -691,6 +725,7 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
       clientConsole(2, 'condition stimuliSetId', curTdf);
     } else {
       newExperimentState.conditionTdfId = null;
+      Session.set('currentTdfDoc', rootTDFBoxed);
       Session.set('currentTdfFile', rootTDF);
       Session.set('currentTdfName', rootTDF.fileName);
       setActiveTdfContext({
@@ -894,6 +929,7 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
       return handleResumeFailure('Unable to load lesson units. Please contact your administrator.');
     }
     curTdf.content = resolvedTdfFile;
+    Session.set('currentTdfDoc', curTdf);
     Session.set('currentTdfFile', resolvedTdfFile);
     if (resolvedTdfFile.fileName) {
       Session.set('currentTdfName', resolvedTdfFile.fileName);
@@ -941,35 +977,16 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
     }
 
     // =========================================================================
-    // HISTORY RECONSTRUCTION (CORE RESUME LOGIC)
+    // RESUME-SPECIFIC DURABLE STATE
     // =========================================================================
     const resumeHistoryRoute = resolveResumeHistoryRoute(curTdfUnit);
 
     let completedAssessmentTrials = 0;
     let assessmentHasDurableResumeProgress = false;
 
-    if (resumeHistoryRoute.reconstructLearningHistory) {
-      clientConsole(2, '[Resume Service] Learning unit detected; reconstructing state from history');
-      const historyRows = await meteorCallAsync<LearningHistoryRecord[]>(
-        'getLearningHistoryForUnit',
-        Meteor.userId(),
-        Session.get('currentTdfId'),
-        currentUnitNumber
-      );
-      
-      const reconstruction = reconstructLearningStateFromHistory(historyRows);
-      
-      // Populate Session aggregates (Legacy compatibility for UI/Dashboard)
-      setRuntimeHistories(reconstruction.overallOutcomeHistory, reconstruction.overallStudyHistory);
-      
-      // Update CardStore with reconstructed learning aggregates
-      CardStore.setReconstructedLearningState(reconstruction);
-      
-      clientConsole(2, '[Resume Service] History reconstruction complete', {
-        trialsReplayed: historyRows.length,
-        outcomes: reconstruction.overallOutcomeHistory.length
-      });
-    } else if (resumeHistoryRoute.reconstructSparcHistory) {
+    if (resumeHistoryRoute.reconstructSparcHistory) {
+      // SPARC replay uses SPARC-specific rows to rebuild document/interface state.
+      // Shared cluster-model hydration happens separately through engine.loadResumeState().
       clientConsole(2, '[Resume Service] SPARC unit detected; loading durable SPARC history');
       const userId = Meteor.userId();
       const currentTdfId = Session.get('currentTdfId');
@@ -1235,6 +1252,6 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
 
   } catch (error) {
     clientConsole(1, '[Resume Service] ERROR during resume:', error);
-    return handleResumeFailure('Unfortunately, there was an error resuming your session. Please try again or contact support.');
+    return handleResumeFailure(buildResumeFailureMessage(error));
   }
 }

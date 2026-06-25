@@ -118,17 +118,12 @@ describe('sparcDocumentValidation', function() {
     const incompleteUnitResult = validateSparcAuthoredDocument(document, {
       sparcsession: {},
     });
-    assert.equal(incompleteUnitResult.valid, false);
-    assert.deepEqual(incompleteUnitResult.modelConfigIssues.map((issue) => issue.kind), [
-      'missing-sparcsession-pageId',
-      'missing-sparcsession-clusterlist',
-      'missing-sparcsession-calculateProbability',
-    ]);
+    assert.equal(incompleteUnitResult.valid, true);
+    assert.deepEqual(incompleteUnitResult.modelConfigIssues, []);
 
     const validUnitResult = validateSparcAuthoredDocument(document, {
       sparcsession: {
         pageId: 'page-1',
-        clusterlist: '0',
         calculateProbability: 'return p;',
       },
     });

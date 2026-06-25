@@ -544,7 +544,7 @@ export function calculateTrialTimings(
 
 /**
  * Check if audio input mode (SR) is enabled.
- * SR follows the effective learner audio-input setting and resolved key state.
+ * SR follows the effective learner audio-input setting, TDF opt-in, and resolved key state.
  *
  * @returns {boolean} - True if SR is enabled
  */

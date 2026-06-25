@@ -54,6 +54,7 @@ import {
   setCardEntryIntent,
   shouldUseProgressBootstrapForEntryIntent,
 } from '../../../../lib/cardEntryIntent';
+import { restoreCourseAssignmentLaunchContextFromState } from '../../../../lib/courseAssignmentLaunchContext';
 import {
   describeCardEntryBootstrapMode,
   resolveCardEntryBootstrap,
@@ -494,6 +495,7 @@ async function initializeStandardCardEntry(
   if (!prefetchedExperimentState) {
     markLaunchLoadingTiming('getExperimentState:complete', { source: 'initializeStandardCardEntry' });
   }
+  restoreCourseAssignmentLaunchContextFromState(experimentState);
   const { tdfFile, tutor } = restoreCanonicalTdfFileForStandardInit(initialTdfFile);
 
   const tips = tutor.setspec?.tips || [];
@@ -850,6 +852,9 @@ export async function initializeSvelteCard(): Promise<SvelteCardInitResult> {
     ),
     requiresConditionResolution,
   });
+  if (prefetchedExperimentState) {
+    restoreCourseAssignmentLaunchContextFromState(prefetchedExperimentState);
+  }
   clearCardEntryContext();
   markRuntimeResumeInactive();
 

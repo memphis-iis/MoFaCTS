@@ -21,6 +21,7 @@ import '../../../../../common/Collections';
 import type { ExperimentState } from '../../../../../common/types/experiment';
 import type { UnitCompletionEngine } from '../../../../../common/types/svelteServices';
 import { COMPLETED_LESSON_REDIRECT } from '../../../../lib/cardEntryIntent';
+import { getCourseAssignmentLaunchContext } from '../../../../lib/courseAssignmentLaunchContext';
 import { assertIdInvariants, logIdInvariantBreachOnce } from '../../../../lib/idContext';
 import { resolveRuntimeEngine } from './cardRuntimeState';
 
@@ -233,7 +234,9 @@ export async function unitIsFinished(_reason: string): Promise<void> {
     let rootTDFBoxed = Tdfs ? Tdfs.findOne({ _id: rootTdfId }) : null;
     if (!rootTDFBoxed) {
       clientConsole(1, 'Root TDF not found in client collection, fetching from server:', rootTdfId);
-      rootTDFBoxed = (await meteorCallAsync('getTdfById', rootTdfId)) as RootTdfBoxed | null;
+      rootTDFBoxed = (await meteorCallAsync('getTdfById', rootTdfId, {
+        courseAssignment: getCourseAssignmentLaunchContext(),
+      })) as RootTdfBoxed | null;
       if (!rootTDFBoxed) {
         clientConsole(1, 'Could not find root TDF:', rootTdfId);
         alert('Unfortunately, the root TDF could not be loaded. Please contact your administrator.');

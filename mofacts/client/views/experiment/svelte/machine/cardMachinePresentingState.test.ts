@@ -116,6 +116,18 @@ describe('card machine presenting state', function() {
     });
   });
 
+  it('counts speech recognition errors toward retry exhaustion', function() {
+    const speechStates = states[STATES.AWAITING]!.states!.speechRecognition!.states!;
+    const activeStates = speechStates.active!.states!;
+
+    for (const stateName of ['ready', 'recording', 'processing']) {
+      expect(activeStates[stateName]!.on![EVENTS.TRANSCRIPTION_ERROR]).to.deep.equal({
+        target: 'error',
+        actions: ['incrementSrAttempt', 'clearWaitingForTranscription', 'logError'],
+      });
+    }
+  });
+
   it('routes answer validation through video and standard feedback branches', function() {
     const validateInvoke = states.validating!.invoke!;
     const transitions = validateInvoke.onDone as Transition[];

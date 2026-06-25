@@ -29,8 +29,13 @@ export function calculateLearningSessionCardProbabilities(params: {
   readonly deps: LearningSessionModelPreparationDeps;
 }) {
   const unitNumber = params.deps.getSessionValue('currentUnitNumber');
-  const curTdf = params.deps.findTdfById(params.deps.getSessionValue('currentTdfId'));
-  const unit = curTdf.content.tdfs.tutor.unit[unitNumber];
+  const currentTdfFile = params.deps.getSessionValue('currentTdfFile');
+  const unit = currentTdfFile?.tdfs?.tutor?.unit?.[unitNumber];
+  if (!unit) {
+    throw new Error(
+      `[Unit Engine] Adaptive model probability preparation requires currentTdfFile.tdfs.tutor.unit[${unitNumber}] for TDF ${String(params.deps.getSessionValue('currentTdfId') || '')}`,
+    );
+  }
   const clusterList = params.deps.resolveModelPreparationClusterListSource(unit);
   if (!clusterList) {
     params.deps.log(2, 'no clusterlist found for unit ' + unitNumber);

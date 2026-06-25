@@ -1,5 +1,4 @@
 import {
-  getHistoryCorrectAnswer,
   getHistoryResponseKey,
 } from '../../content/response-normalization/historyResponseKey';
 import { stripSpacesAndLowerCase } from '../../content/response-normalization/responseKey';
@@ -12,7 +11,7 @@ import { selectLearningSessionIndices } from './learningSessionSelection';
 import { commitPreparedSelection as runCommitPreparedSelection } from './cardCommit';
 import { learningUnitFinished } from './learningUnitFinished';
 import { initializeLearningModelState } from './initializeLearningModelState';
-import { loadLearningSessionResumeState } from './loadLearningSessionResumeState';
+import { hydrateLearningSessionModelState } from './hydrateLearningSessionModelState';
 import {
   createCurrentLearningCardInfoTracker,
   recordLearningCardAdminMetrics,
@@ -46,6 +45,7 @@ import {
   queryAdaptiveLogisticModelPracticeState,
 } from './modelPracticeUpdateApplication';
 import { createModelPracticeRuntime } from '../../runtime/modelPracticeRuntime';
+import { buildPreparedInteractionStepState } from '../../units/shared/interactionStepAssembly';
 import {
   createCanonicalModelPracticeHistoryRecord,
   type ModelPracticeHistoryCore,
@@ -114,7 +114,7 @@ export interface CreateAdaptiveLogisticUnitEngineDeps {
   readonly getCurrentUserId: () => any;
   readonly reconstructLearningStateFromHistory: (
     historyRows: any[],
-    options?: { allowResponseLessModelPractice?: boolean },
+    options?: { allowResponseLessSparcModelPractice?: boolean },
   ) => any;
   readonly extractDelimFields: (source: any, target: any[]) => void;
   readonly rangeVal: (source: any) => any[];
@@ -268,7 +268,7 @@ export async function createAdaptiveLogisticUnitEngine(
     },
 
     loadResumeState: async function() {
-      await loadLearningSessionResumeState({
+      await hydrateLearningSessionModelState({
         userId: deps.getCurrentUserId(),
         tdfId: deps.getSessionValue('currentTdfId'),
         currentUnitNumber: Number(deps.getSessionValue('currentUnitNumber') || 0),
@@ -278,10 +278,9 @@ export async function createAdaptiveLogisticUnitEngine(
         stimClusters,
         getLearningHistoryForUnit: deps.serverMethods.getLearningHistoryForUnit,
         reconstructLearningStateFromHistory: deps.reconstructLearningStateFromHistory,
-        allowResponseLessModelPractice: config.unitType === 'sparc',
+        allowResponseLessSparcModelPractice: true,
         setOverallOutcomeHistory: (history) => deps.setSessionValue('overallOutcomeHistory', history),
         setOverallStudyHistory: (history) => deps.setSessionValue('overallStudyHistory', history),
-        getHistoryCorrectAnswer,
         getHistoryResponseKey: (rawResponse) => getHistoryResponseKey(
           rawResponse,
           (answer) => deps.getDisplayAnswerText(answer),
@@ -385,6 +384,27 @@ export async function createAdaptiveLogisticUnitEngine(
 
     _buildCurrentOwnerToken: function(cardRef: any) {
       return buildCurrentOwnerToken(this._trialEpoch, cardRef);
+    },
+
+    buildPreparedCardQuestionAndAnswerGlobals: async function(
+      cardIndex: any,
+      whichStim: any,
+      probFunctionParameters: any,
+      options: any = {},
+    ) {
+      return await buildPreparedInteractionStepState(
+        cardIndex,
+        whichStim,
+        probFunctionParameters,
+        options,
+        {
+          stimClusters,
+          getCurrentTestType: () => deps.getTestType(),
+          getDeliverySettings: deps.getDeliverySettings,
+          getStimAnswer,
+          log: (...args: unknown[]) => deps.log(1, ...args),
+        },
+      );
     },
 
     _resolveSelectionTestType: function(card: any, stim: any) {

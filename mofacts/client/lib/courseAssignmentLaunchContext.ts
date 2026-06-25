@@ -3,22 +3,71 @@ import type { CourseAssignmentHistoryContext } from '../../common/courseAssignme
 
 const COURSE_ASSIGNMENT_LAUNCH_CONTEXT_KEY = 'courseAssignmentLaunchContext';
 
+function requireNonEmptyString(value: unknown, fieldName: string): string {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new Error(`[CourseLaunch] Invalid course assignment launch context: missing ${fieldName}`);
+  }
+  return value.trim();
+}
+
+export function readCourseAssignmentLaunchContext(value: unknown): CourseAssignmentHistoryContext | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('[CourseLaunch] Invalid course assignment launch context');
+  }
+  const record = value as Record<string, unknown>;
+  if (record.launchSource !== 'courses') {
+    throw new Error('[CourseLaunch] Invalid course assignment launch context: launchSource must be courses');
+  }
+  return {
+    assignmentId: requireNonEmptyString(record.assignmentId, 'assignmentId'),
+    courseId: requireNonEmptyString(record.courseId, 'courseId'),
+    TDFId: requireNonEmptyString(record.TDFId, 'TDFId'),
+    launchSource: 'courses',
+  };
+}
+
 export function setCourseAssignmentLaunchContext(context: CourseAssignmentHistoryContext | null) {
   Session.set(COURSE_ASSIGNMENT_LAUNCH_CONTEXT_KEY, context);
 }
 
+export function clearCourseAssignmentLaunchContext() {
+  setCourseAssignmentLaunchContext(null);
+}
+
 export function getCourseAssignmentLaunchContext(): CourseAssignmentHistoryContext | null {
-  const context = Session.get(COURSE_ASSIGNMENT_LAUNCH_CONTEXT_KEY) as CourseAssignmentHistoryContext | null | undefined;
-  if (!context) return null;
+  return readCourseAssignmentLaunchContext(Session.get(COURSE_ASSIGNMENT_LAUNCH_CONTEXT_KEY));
+}
+
+export function restoreCourseAssignmentLaunchContextFromState(
+  experimentState: Record<string, unknown> | null | undefined,
+): CourseAssignmentHistoryContext | null {
   if (
-    context.launchSource !== 'courses' ||
-    !context.assignmentId ||
-    !context.courseId ||
-    !context.TDFId
+    !experimentState
+    || !Object.prototype.hasOwnProperty.call(experimentState, COURSE_ASSIGNMENT_LAUNCH_CONTEXT_KEY)
   ) {
-    throw new Error('[CourseLaunch] Invalid course assignment launch context');
+    return getCourseAssignmentLaunchContext();
   }
+  const context = readCourseAssignmentLaunchContext(experimentState.courseAssignmentLaunchContext);
+  setCourseAssignmentLaunchContext(context);
   return context;
+}
+
+export function courseAssignmentContextForStateWrite(params: {
+  existingState?: Record<string, unknown> | null | undefined;
+  partialState?: Record<string, unknown> | null | undefined;
+}): CourseAssignmentHistoryContext | null {
+  const partialState = params.partialState || {};
+  if (Object.prototype.hasOwnProperty.call(partialState, COURSE_ASSIGNMENT_LAUNCH_CONTEXT_KEY)) {
+    return readCourseAssignmentLaunchContext(partialState.courseAssignmentLaunchContext);
+  }
+  const activeSessionValue = Session.get(COURSE_ASSIGNMENT_LAUNCH_CONTEXT_KEY);
+  if (activeSessionValue !== undefined) {
+    return readCourseAssignmentLaunchContext(activeSessionValue);
+  }
+  return readCourseAssignmentLaunchContext(params.existingState?.courseAssignmentLaunchContext);
 }
 
 export function applyCourseAssignmentLaunchContext<T extends Record<string, unknown>>(historyRecord: T): T {

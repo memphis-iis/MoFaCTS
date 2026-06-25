@@ -39,9 +39,7 @@ import type {
   SparcTrialResult,
 } from '../../trial-displays/sparc/SparcTrialDisplayAdapter';
 import {
-  resolveSparcSessionClusterListSource,
   resolveSparcSessionPageId,
-  resolveSparcSessionModelPreparationClusterListSource,
   resolveSparcSessionProbabilitySource,
   resolveSparcSessionRuntimeConfig,
   resolveSparcSessionUnitMode,
@@ -58,39 +56,6 @@ type SparcPageRecord = {
 
 function cloneRecord<T>(value: T): T {
   return JSON.parse(JSON.stringify(value));
-}
-
-function requirePageId(unit: unknown): string {
-  const pageId = resolveSparcSessionPageId(unit as { sparcsession?: Record<string, unknown> | null });
-  if (!pageId) {
-    throw new Error('SPARC session requires sparcsession.pageId');
-  }
-  return pageId;
-}
-
-function collectClusterListIndices(
-  deps: CreateSparcSessionUnitEngineDeps,
-  unit: unknown,
-): number[] {
-  const source = resolveSparcSessionClusterListSource(unit as { sparcsession?: Record<string, unknown> | null });
-  const fields: unknown[] = [];
-  deps.extractDelimFields(source || '', fields);
-  const indices: number[] = [];
-  for (const field of fields) {
-    const range = deps.rangeVal(field);
-    const fieldIndices = range.length > 0 ? range : [deps.legacyInt(field)];
-    for (const candidate of fieldIndices) {
-      const index = deps.legacyInt(candidate);
-      if (!Number.isInteger(index) || index < 0) {
-        throw new Error(`SPARC session clusterlist contains invalid cluster index "${String(candidate)}"`);
-      }
-      indices.push(index);
-    }
-  }
-  if (indices.length === 0) {
-    throw new Error('SPARC session requires sparcsession.clusterlist');
-  }
-  return indices;
 }
 
 function responseKeyForStim(stim: Record<string, unknown>): string {
@@ -193,38 +158,61 @@ function collectProductionRuleClusterReferences(display: SparcTrialDisplay, refe
   }
 }
 
-function validateSparcPageClusterReferences(
-  display: SparcTrialDisplay,
-  allowedClusterIndices: ReadonlySet<number>,
-): void {
+function collectDisplayClusterTargets(display: SparcTrialDisplay, references: Set<number>): void {
+  const targets = (display as Record<string, unknown>).clusterTargets;
+  for (const [index, target] of (Array.isArray(targets) ? targets : []).entries()) {
+    if (!target || typeof target !== 'object' || Array.isArray(target)) {
+      throw new Error(`SPARC page clusterTargets[${index}] must be an object`);
+    }
+    const clusterIndex = Number((target as Record<string, unknown>).clusterIndex);
+    if (!Number.isInteger(clusterIndex) || clusterIndex < 0) {
+      throw new Error(`SPARC page clusterTargets[${index}].clusterIndex is invalid`);
+    }
+    references.add(clusterIndex);
+  }
+}
+
+function collectSparcPageClusterIndices(display: SparcTrialDisplay): number[] {
   const references = new Set<number>();
+  collectDisplayClusterTargets(display, references);
   for (const node of Array.isArray(display.nodes) ? display.nodes : []) {
     collectNodeClusterReferences(node, references);
   }
   collectProductionRuleClusterReferences(display, references);
-  for (const clusterIndex of references) {
-    if (!allowedClusterIndices.has(clusterIndex)) {
-      throw new Error(`SPARC page "${display.pageId || display.documentId || ''}" references cluster ${clusterIndex}, which is outside sparcsession.clusterlist`);
-    }
+  if (references.size === 0) {
+    throw new Error(`SPARC page "${display.pageId || display.documentId || ''}" does not declare any model cluster references`);
   }
+  return Array.from(references).sort((a, b) => a - b);
 }
 
-function resolveSparcPageDisplay(
+function resolveSparcPage(
   deps: CreateSparcSessionUnitEngineDeps,
   unit: unknown,
-): SparcTrialDisplay {
-  const pageId = requirePageId(unit);
+): { pageId: string; documentId: string; pageDisplay: SparcTrialDisplay } {
   const tdf = deps.findTdfById(deps.getSessionValue('currentTdfId'));
   const sparcPages = tdf?.rawStimuliFile?.setspec?.sparcPages;
   if (!Array.isArray(sparcPages)) {
-    throw new Error('SPARC session pageId requires rawStimuliFile.setspec.sparcPages');
+    throw new Error(`SPARC session requires active TDF rawStimuliFile.setspec.sparcPages for TDF ${String(deps.getSessionValue('currentTdfId') || '')}`);
   }
-  const matches = sparcPages.filter((page: SparcPageRecord) => page?.pageId === pageId);
+  if (sparcPages.length === 0) {
+    throw new Error('SPARC session requires at least one rawStimuliFile.setspec.sparcPages entry');
+  }
+  const configuredPageId = resolveSparcSessionPageId(unit as { sparcsession?: Record<string, unknown> | null });
+  if (!configuredPageId && sparcPages.length > 1) {
+    throw new Error('SPARC session with multiple rawStimuliFile.setspec.sparcPages entries requires sparcsession.pageId');
+  }
+  const matches = configuredPageId
+    ? sparcPages.filter((page: SparcPageRecord) => page?.pageId === configuredPageId)
+    : [sparcPages[0] as SparcPageRecord];
+  const pageId = configuredPageId || String(matches[0]?.pageId || '').trim();
+  if (!pageId) {
+    throw new Error('Single-page SPARC session requires rawStimuliFile.setspec.sparcPages[0].pageId');
+  }
   if (matches.length === 0) {
-    throw new Error(`SPARC page "${pageId}" was not found in rawStimuliFile.setspec.sparcPages`);
+    throw new Error(`SPARC page "${configuredPageId}" was not found in rawStimuliFile.setspec.sparcPages`);
   }
   if (matches.length > 1) {
-    throw new Error(`SPARC page "${pageId}" is duplicated in rawStimuliFile.setspec.sparcPages`);
+    throw new Error(`SPARC page "${configuredPageId}" is duplicated in rawStimuliFile.setspec.sparcPages`);
   }
   const page = matches[0] as SparcPageRecord;
   if (!page?.display || typeof page.display !== 'object' || Array.isArray(page.display)) {
@@ -234,9 +222,23 @@ function resolveSparcPageDisplay(
   const documentId = typeof pageDisplay.documentId === 'string' && pageDisplay.documentId.trim()
     ? pageDisplay.documentId.trim()
     : pageId;
-  const clusterListIndices = collectClusterListIndices(deps, unit);
-  const allowedClusterIndices = new Set(clusterListIndices);
-  validateSparcPageClusterReferences({ ...pageDisplay, pageId, documentId }, allowedClusterIndices);
+  return { pageId, documentId, pageDisplay };
+}
+
+function resolveSparcPageClusterListSource(
+  deps: CreateSparcSessionUnitEngineDeps,
+  unit: unknown,
+): string {
+  const { pageId, documentId, pageDisplay } = resolveSparcPage(deps, unit);
+  return collectSparcPageClusterIndices({ ...pageDisplay, pageId, documentId }).join(' ');
+}
+
+function resolveSparcPageDisplay(
+  deps: CreateSparcSessionUnitEngineDeps,
+  unit: unknown,
+): SparcTrialDisplay {
+  const { pageId, documentId, pageDisplay } = resolveSparcPage(deps, unit);
+  const clusterListIndices = collectSparcPageClusterIndices({ ...pageDisplay, pageId, documentId });
   return {
     ...pageDisplay,
     type: 'sparc',
@@ -295,8 +297,8 @@ export async function createSparcSessionUnitEngine(
     resolveRuntimeConfig: resolveSparcSessionRuntimeConfig,
     resolveUnitMode: resolveSparcSessionUnitMode,
     resolveProbabilitySource: resolveSparcSessionProbabilitySource,
-    resolveUnitClusterListSource: (unit) => resolveSparcSessionClusterListSource(unit),
-    resolveModelPreparationClusterListSource: resolveSparcSessionModelPreparationClusterListSource,
+    resolveUnitClusterListSource: (unit) => resolveSparcPageClusterListSource(deps, unit),
+    resolveModelPreparationClusterListSource: (unit) => resolveSparcPageClusterListSource(deps, unit),
   });
   const buildAdaptivePreparedCard = adaptiveEngine.buildPreparedCardQuestionAndAnswerGlobals.bind(adaptiveEngine);
   return {

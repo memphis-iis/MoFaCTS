@@ -54,6 +54,7 @@ export const CARD_RUNTIME_SESSION_DEFAULTS: readonly SessionCleanupEntry[] = [
 
 export const FULL_LAUNCH_SESSION_DEFAULTS: readonly SessionCleanupEntry[] = [
   { key: 'currentTdfName', value: undefined, domain: 'launch', reason: 'Full cleanup leaves no active TDF name.' },
+  { key: 'currentTdfDoc', value: undefined, domain: 'launch', reason: 'Full cleanup leaves no active full TDF document.' },
   { key: 'currentTdfId', value: undefined, domain: 'launch', reason: 'Full cleanup leaves no active TDF id.' },
   { key: 'currentUnitNumber', value: undefined, domain: 'launch', reason: 'Full cleanup leaves no active unit number.' },
   { key: 'currentTdfUnit', value: undefined, domain: 'launch', reason: 'Full cleanup leaves no active unit payload.' },
@@ -68,10 +69,12 @@ export const FULL_LAUNCH_SESSION_DEFAULTS: readonly SessionCleanupEntry[] = [
   { key: 'furthestUnit', value: undefined, domain: 'progress', reason: 'New launch resets in-session furthest unit progress.' },
   { key: 'curUnitInstructionsSeen', value: false, domain: 'instructions', reason: 'New launch should show unit instructions unless set later.' },
   { key: 'ownerDashboardLaunch', value: false, domain: 'launch', reason: 'Owner dashboard launch is a per-launch flag.' },
+  { key: 'courseAssignmentLaunchContext', value: null, domain: 'launch', reason: 'Course assignment scope is owned by the active launch.' },
 ];
 
 export const CARD_LAUNCH_PRESERVED_UNIT_KEYS = [
   'currentTdfName',
+  'currentTdfDoc',
   'currentTdfId',
   'currentUnitNumber',
   'currentTdfUnit',

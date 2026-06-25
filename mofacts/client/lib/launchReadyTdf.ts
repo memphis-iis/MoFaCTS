@@ -2,6 +2,8 @@ import { Meteor } from 'meteor/meteor';
 import { Tracker } from 'meteor/tracker';
 import { meteorCallAsync } from './meteorAsync';
 import { clientConsole } from './clientLogger';
+import { getCourseAssignmentLaunchContext } from './courseAssignmentLaunchContext';
+import type { CourseAssignmentHistoryContext } from '../../common/courseAssignments.contracts';
 import {
   hasLaunchReadyTutorUnits,
   isConditionRootWithoutUnitArray,
@@ -12,6 +14,7 @@ declare const Tdfs: any;
 
 type LoadLaunchReadyTdfOptions = {
   allowConditionRoot?: boolean;
+  courseAssignment?: CourseAssignmentHistoryContext | null;
   source?: string;
 };
 
@@ -20,6 +23,14 @@ type LaunchReadyTdfResult = {
   content: any;
   isConditionRoot: boolean;
 };
+
+export function courseAssignmentContextForLaunchReadyTdf(
+  options: Pick<LoadLaunchReadyTdfOptions, 'courseAssignment'> = {},
+): CourseAssignmentHistoryContext | null {
+  return Object.prototype.hasOwnProperty.call(options, 'courseAssignment')
+    ? options.courseAssignment ?? null
+    : getCourseAssignmentLaunchContext();
+}
 
 function waitForSubscriptionReady(handle: { ready: () => boolean }): Promise<void> {
   return new Promise<void>((resolve) => {
@@ -86,6 +97,7 @@ export async function loadLaunchReadyTdf(
   const currentTdfId = String(tdfId || '').trim();
   const source = options.source || 'loadLaunchReadyTdf';
   const allowConditionRoot = options.allowConditionRoot === true;
+  const courseAssignment = courseAssignmentContextForLaunchReadyTdf(options);
 
   if (!currentTdfId) {
     throw new Error(`[${source}] Cannot load launch-ready TDF without a TDF id`);
@@ -99,7 +111,7 @@ export async function loadLaunchReadyTdf(
     clientConsole(1, `[${source}] currentTdf subscription did not provide content; fetching full TDF by id`, {
       currentTdfId,
     });
-    tdfDoc = await meteorCallAsync('getTdfById', currentTdfId);
+    tdfDoc = await meteorCallAsync('getTdfById', currentTdfId, { courseAssignment });
   }
 
   let content = tdfDoc?.content;
@@ -109,7 +121,7 @@ export async function loadLaunchReadyTdf(
     clientConsole(1, `[${source}] TDF content is not launch-ready after subscription; fetching full TDF by id`, {
       currentTdfId,
     });
-    tdfDoc = await meteorCallAsync('getTdfById', currentTdfId);
+    tdfDoc = await meteorCallAsync('getTdfById', currentTdfId, { courseAssignment });
     content = tdfDoc?.content;
     normalizeTutorUnits(content);
   }

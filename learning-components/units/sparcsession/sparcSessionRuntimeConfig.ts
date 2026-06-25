@@ -4,10 +4,7 @@ type SparcSessionConfigUnit = {
 
 export type SparcSessionModelConfigurationValidationIssue = {
   readonly kind:
-    | 'missing-sparcsession-model-config'
-    | 'missing-sparcsession-pageId'
-    | 'missing-sparcsession-clusterlist'
-    | 'missing-sparcsession-calculateProbability';
+    | 'missing-sparcsession-model-config';
   readonly message: string;
 };
 
@@ -18,15 +15,6 @@ export function resolveSparcSessionRuntimeConfig(
     return unit.sparcsession;
   }
   return null;
-}
-
-export function resolveSparcSessionClusterListSource(
-  unit: SparcSessionConfigUnit | null | undefined,
-): unknown {
-  const clusterlist = resolveSparcSessionRuntimeConfig(unit)?.clusterlist;
-  return typeof clusterlist === 'string'
-    ? clusterlist.trim()
-    : clusterlist;
 }
 
 export function resolveSparcSessionPageId(
@@ -61,12 +49,6 @@ export function resolveSparcSessionProbabilitySource(
   return trimmed || undefined;
 }
 
-export function resolveSparcSessionModelPreparationClusterListSource(
-  unit: SparcSessionConfigUnit | null | undefined,
-): unknown {
-  return resolveSparcSessionClusterListSource(unit);
-}
-
 export function validateSparcSessionModelConfiguration(
   unit: SparcSessionConfigUnit | null | undefined,
 ): readonly SparcSessionModelConfigurationValidationIssue[] {
@@ -79,27 +61,5 @@ export function validateSparcSessionModelConfiguration(
   }
 
   const issues: SparcSessionModelConfigurationValidationIssue[] = [];
-  if (!resolveSparcSessionPageId(unit)) {
-    issues.push({
-      kind: 'missing-sparcsession-pageId',
-      message: 'SPARC sessions require unit-level sparcsession.pageId',
-    });
-  }
-  const clusterlist = resolveSparcSessionClusterListSource(unit);
-  const hasClusterList = Array.isArray(clusterlist)
-    ? clusterlist.length > 0
-    : !(clusterlist === undefined || clusterlist === null || clusterlist === '');
-  if (!hasClusterList) {
-    issues.push({
-      kind: 'missing-sparcsession-clusterlist',
-      message: 'SPARC model-backed features require unit-level sparcsession.clusterlist',
-    });
-  }
-  if (!resolveSparcSessionProbabilitySource(unit)) {
-    issues.push({
-      kind: 'missing-sparcsession-calculateProbability',
-      message: 'SPARC model-backed features require unit-level sparcsession.calculateProbability',
-    });
-  }
   return issues;
 }

@@ -74,11 +74,20 @@ function getUnderscoreExtend(): (target: any, source: any) => any {
 }
 
 function findTdfById(tdfId: any): any {
+  const requestedId = String(tdfId || '').trim();
+  const activeTdfId = String(Session.get('currentTdfId') || '').trim();
+  const activeTdfDoc = Session.get('currentTdfDoc');
+  if (requestedId && requestedId === activeTdfId) {
+    if (!activeTdfDoc || typeof activeTdfDoc !== 'object') {
+      throw new Error(`[Unit Engine Runtime] Active TDF document is unavailable for currentTdfId ${requestedId}`);
+    }
+    return activeTdfDoc;
+  }
   const tdfs = (globalThis as { Tdfs?: { findOne?: (query: Record<string, unknown>) => any } }).Tdfs;
   if (typeof tdfs?.findOne !== 'function') {
     throw new Error('[Unit Engine Runtime] Tdfs.findOne is unavailable');
   }
-  return tdfs.findOne({ _id: tdfId });
+  return tdfs.findOne({ _id: requestedId });
 }
 
 export function createAppUnitEngineRuntimeContext(): AppUnitEngineRuntimeContext {

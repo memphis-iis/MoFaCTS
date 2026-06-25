@@ -204,7 +204,6 @@ function createPageRuntimeDeps(overrides: Record<string, unknown> = {}): any {
         return {
           sparcsession: {
             pageId: 'page-1',
-            clusterlist: '0-1',
             calculateProbability: 'return p',
           },
         };
@@ -230,6 +229,10 @@ function createPageRuntimeDeps(overrides: Record<string, unknown> = {}): any {
             display: {
               type: 'sparc',
               documentId: 'doc-1',
+              clusterTargets: [
+                { clusterIndex: 0 },
+                { clusterIndex: 1 },
+              ],
               nodes: [{
                 id: 'answer-node',
                 nodeType: 'atomic',
@@ -242,7 +245,7 @@ function createPageRuntimeDeps(overrides: Record<string, unknown> = {}): any {
       },
     }),
     extractDelimFields(source: string, fields: unknown[]) {
-      fields.push(...String(source).split(',').map((field) => field.trim()).filter(Boolean));
+      fields.push(...String(source).split(/[,\s]+/).map((field) => field.trim()).filter(Boolean));
     },
     rangeVal(source: unknown) {
       const match = String(source).match(/^(\d+)-(\d+)$/);
@@ -304,6 +307,155 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
         canUse: true,
       },
     ]);
+  });
+
+  it('hydrates SPARC local stimulus state from shared learning-session cluster history', async function() {
+    const clusters = [{
+      stims: [{
+        stimuliSetId: 'sparc-stim-set',
+        clusterKC: 'fractions.lcd',
+        stimulusKC: 'sparc-local-item',
+        responseKC: 'response-sparc',
+        correctResponse: 'Determine LCD',
+        params: '0,0.8',
+        textStimulus: 'Determine a common denominator',
+      }],
+    }];
+    const historyRows = [{
+      eventType: '',
+      levelUnitType: 'model',
+      time: 1000,
+      outcome: 'correct',
+      stimuliSetId: 'kc-definitions-stim-set',
+      stimulusKC: 'kc-definitions-local-item',
+      clusterKC: 'fractions.lcd',
+      KCId: 'kc-definitions-local-item',
+      KCDefault: 'kc-definitions-local-item',
+      KCCluster: 'fractions.lcd',
+      responseKey: 'lcd',
+      responseDuration: 250,
+      responseValue: 'lcd',
+    }];
+    const sessionValues = new Map<string, unknown>();
+    let requestedLearningHistoryOptions: any = null;
+    const engine = await createSparcSessionUnitEngine(createPageRuntimeDeps({
+      getSessionValue(key: UnitEngineSessionReadKey) {
+        if (sessionValues.has(key)) {
+          return sessionValues.get(key);
+        }
+        if (key === 'currentTdfUnit') {
+          return {
+            sparcsession: {
+              pageId: 'page-1',
+              calculateProbability: 'return p',
+            },
+          };
+        }
+        if (key === 'currentTdfId') {
+          return 'sparc-fractions-addition-tdf';
+        }
+        if (key === 'currentUnitNumber') {
+          return 1;
+        }
+        if (key === 'currentStimuliSetId') {
+          return 'sparc-stim-set';
+        }
+        if (key === 'currentTdfFile') {
+          return {
+            tdfs: {
+              tutor: {
+                unit: [{}, { sparcsession: { pageId: 'page-1' } }],
+              },
+            },
+          };
+        }
+        if (key === 'curStudentPerformance') {
+          return { totalTime: 0 };
+        }
+        return undefined;
+      },
+      setSessionValue(key: string, value: unknown) {
+        sessionValues.set(key, value);
+      },
+      getStimCount: () => clusters.length,
+      getStimCluster: (clusterIndex: number) => clusters[clusterIndex],
+      serverMethods: {
+        getResponseKCMapForTdf: async () => ({ determinelcd: 'response-sparc' }),
+        getStimulusCrowdStatsForDeck: async () => [],
+        getLearningHistoryForUnit: async (
+          _userId: string,
+          _tdfId: string,
+          _currentUnitNumber: number,
+          _resetStudentPerformance: boolean,
+          options: any,
+        ) => {
+          requestedLearningHistoryOptions = options;
+          return historyRows;
+        },
+      },
+      reconstructLearningStateFromHistory(rows: unknown[]) {
+        assert.deepEqual(rows, historyRows);
+        return {
+          clusterState: {
+            'fractions.lcd': {
+              firstSeen: 1000,
+              lastSeen: 1000,
+              priorCorrect: 1,
+              priorIncorrect: 0,
+              allTimeCorrect: 1,
+              allTimeIncorrect: 0,
+              priorStudy: 0,
+              outcomeStack: [1],
+              timeHistory: [1000],
+              totalPracticeDuration: 250,
+              allTimeTotalPracticeDuration: 250,
+              trialsSinceLastSeen: 0,
+              hasBeenIntroduced: true,
+              otherPracticeTime: 0,
+              instructionQuestionResult: null,
+            },
+          },
+          stimulusState: {
+            'kc-definitions-local-item': {
+              firstSeen: 1000,
+              lastSeen: 1000,
+              priorCorrect: 1,
+              priorIncorrect: 0,
+              allTimeCorrect: 1,
+              allTimeIncorrect: 0,
+              priorStudy: 0,
+              outcomeStack: [1],
+              timeHistory: [1000],
+              totalPracticeDuration: 250,
+              allTimeTotalPracticeDuration: 250,
+              curSessionPriorCorrect: 1,
+              curSessionPriorIncorrect: 0,
+              hasBeenIntroduced: true,
+              timesSeen: 1,
+              otherPracticeTime: 0,
+              instructionQuestionResult: null,
+            },
+          },
+          responseState: {},
+          numQuestionsAnswered: 1,
+          numQuestionsAnsweredCurrentSession: 1,
+          numCorrectAnswers: 1,
+          overallOutcomeHistory: [1],
+          overallStudyHistory: [0],
+        };
+      },
+    }));
+
+    await engine.initializeLogisticModelState();
+    await engine.loadResumeState();
+
+    assert.deepEqual(requestedLearningHistoryOptions, { clusterKCs: ['fractions.lcd'] });
+    const cardProbabilities = engine.getCardProbabilitiesNoCalc();
+    assert.equal(cardProbabilities.cards[0].priorCorrect, 1);
+    assert.equal(cardProbabilities.cards[0].stims[0].stimulusKC, 'sparc-local-item');
+    assert.equal(cardProbabilities.cards[0].stims[0].priorCorrect, 1);
+    assert.equal(cardProbabilities.cards[0].stims[0].hasBeenIntroduced, true);
+    assert.equal(cardProbabilities.cards[0].stims[0].timesSeen, 1);
   });
 
   it('exposes SPARC document validation, replay, and authored response commit methods', async function() {
@@ -397,6 +549,86 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
     );
   });
 
+  it('renders the only authored SPARC page when sparcsession.pageId is omitted', async function() {
+    const engine = await createSparcSessionUnitEngine(createPageRuntimeDeps({
+      getSessionValue(key: UnitEngineSessionReadKey) {
+        if (key === 'currentTdfUnit') {
+          return {
+            sparcsession: {},
+          };
+        }
+        if (key === 'currentTdfId') {
+          return 'tdf-1';
+        }
+        if (key === 'currentStimuliSetId') {
+          return 'stim-set-1';
+        }
+        if (key === 'curStudentPerformance') {
+          return { totalTime: 0 };
+        }
+        return undefined;
+      },
+    }));
+
+    const preparedState = await engine.buildPreparedCardQuestionAndAnswerGlobals(0, 0, [0, 0.8]);
+
+    assert.equal(preparedState.currentDisplay.pageId, 'page-1');
+    assert.deepEqual(
+      preparedState.currentDisplay.clusterTargets.map((target: { clusterIndex: number }) => target.clusterIndex),
+      [0, 1],
+    );
+  });
+
+  it('requires sparcsession.pageId only when the stimulus file has multiple SPARC pages', async function() {
+    const engine = await createSparcSessionUnitEngine(createPageRuntimeDeps({
+      getSessionValue(key: UnitEngineSessionReadKey) {
+        if (key === 'currentTdfUnit') {
+          return {
+            sparcsession: {
+              calculateProbability: 'return p',
+            },
+          };
+        }
+        if (key === 'currentTdfId') {
+          return 'tdf-1';
+        }
+        if (key === 'currentStimuliSetId') {
+          return 'stim-set-1';
+        }
+        if (key === 'curStudentPerformance') {
+          return { totalTime: 0 };
+        }
+        return undefined;
+      },
+      findTdfById: () => ({
+        rawStimuliFile: {
+          setspec: {
+            sparcPages: [{
+              pageId: 'page-1',
+              display: {
+                type: 'sparc',
+                documentId: 'doc-1',
+                nodes: [{ id: 'first', clusterIndex: 0 }],
+              },
+            }, {
+              pageId: 'page-2',
+              display: {
+                type: 'sparc',
+                documentId: 'doc-2',
+                nodes: [{ id: 'second', clusterIndex: 1 }],
+              },
+            }],
+          },
+        },
+      }),
+    }));
+
+    await assert.rejects(
+      () => engine.buildPreparedCardQuestionAndAnswerGlobals(0, 0, [0, 0.8]),
+      /multiple rawStimuliFile\.setspec\.sparcPages entries requires sparcsession\.pageId/,
+    );
+  });
+
   it('uses normalized cluster-level KC for SPARC targets when first-stimulus KC is stale', async function() {
     const engine = await createSparcSessionUnitEngine(createPageRuntimeDeps({
       getStimCluster: (clusterIndex: number) => ({
@@ -421,8 +653,20 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
     assert.equal(firstTarget.stimulusKC, 'kc-0');
   });
 
-  it('rejects SPARC pages that reference clusters outside sparcsession.clusterlist', async function() {
+  it('derives SPARC page model scope from authored page cluster references', async function() {
     const engine = await createSparcSessionUnitEngine(createPageRuntimeDeps({
+      getStimCount: () => 3,
+      getStimCluster: (clusterIndex: number) => ({
+        stims: [{
+          stimuliSetId: 'stim-set-1',
+          clusterKC: `cluster-${clusterIndex}`,
+          stimulusKC: `kc-${clusterIndex}`,
+          responseKC: `response-${clusterIndex}`,
+          correctResponse: `Cluster ${clusterIndex} answer`,
+          params: '0,0.8',
+          textStimulus: `Cluster ${clusterIndex}`,
+        }],
+      }),
       findTdfById: () => ({
         rawStimuliFile: {
           setspec: {
@@ -444,9 +688,16 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
       }),
     }));
 
-    await assert.rejects(
-      () => engine.buildPreparedCardQuestionAndAnswerGlobals(0, 0, [0, 0.8]),
-      /references cluster 2, which is outside sparcsession\.clusterlist/,
+    await engine.initializeLogisticModelState();
+    const cardProbabilities = engine.getCardProbabilitiesNoCalc();
+    assert.equal(cardProbabilities.cards[0].canUse, false);
+    assert.equal(cardProbabilities.cards[1].canUse, false);
+    assert.equal(cardProbabilities.cards[2].canUse, true);
+
+    const preparedState = await engine.buildPreparedCardQuestionAndAnswerGlobals(2, 0, [0, 0.8]);
+    assert.deepEqual(
+      preparedState.currentDisplay.clusterTargets.map((target: { clusterIndex: number }) => target.clusterIndex),
+      [2],
     );
   });
 

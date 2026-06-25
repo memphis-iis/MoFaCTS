@@ -3,6 +3,7 @@ export const UNIT_ENGINE_SESSION_READ_KEYS = [
   'clusterIndex',
   'curStudentPerformance',
   'currentRootTdfId',
+  'currentTdfDoc',
   'currentStimuliSetId',
   'currentTdfFile',
   'currentTdfId',

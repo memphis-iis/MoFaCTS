@@ -65,7 +65,7 @@ export interface UnitEngineAdaptiveModelRuntime {
 export interface UnitEngineHistoryRuntime {
   readonly reconstructLearningStateFromHistory: (
     historyRows: any[],
-    options?: { allowResponseLessModelPractice?: boolean },
+    options?: { allowResponseLessSparcModelPractice?: boolean },
   ) => any;
 }
 

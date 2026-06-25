@@ -7,6 +7,7 @@ import { loadLaunchReadyTdf } from './launchReadyTdf';
 import { clientConsole } from './clientLogger';
 import { resolveCardLaunchProgress, type CardLaunchProgress } from './cardEntryIntent';
 import { resolveSpeechIgnoreOutOfGrammarResponses } from './speechRecognitionConfig';
+import type { CourseAssignmentHistoryContext } from '../../common/courseAssignments.contracts';
 
 type LessonLaunchTimingLogger = (eventName: string, payload?: Record<string, unknown>) => void;
 type LessonLaunchMessageSetter = (message: string) => void;
@@ -17,6 +18,7 @@ type PrepareLessonLaunchParams = {
   ignoreOutOfGrammarResponses: unknown;
   speechOutOfGrammarFeedback: unknown;
   source: string;
+  courseAssignment?: CourseAssignmentHistoryContext | null;
   applyContent?: (content: any) => any;
   setLaunchLoadingMessage?: LessonLaunchMessageSetter;
   markLaunchLoadingTiming?: LessonLaunchTimingLogger;
@@ -50,6 +52,7 @@ export async function prepareLessonLaunchContext(params: PrepareLessonLaunchPara
   markLaunchLoadingTiming?.('loadLaunchReadyTdf:start', { currentTdfId });
   const launchTdf = await loadLaunchReadyTdf(currentTdfId, {
     allowConditionRoot: true,
+    courseAssignment: params.courseAssignment ?? null,
     source,
   });
   markLaunchLoadingTiming?.('loadLaunchReadyTdf:complete', { currentTdfId });
@@ -74,6 +77,7 @@ export async function prepareLessonLaunchContext(params: PrepareLessonLaunchPara
     && content.tdfs.tutor.setspec.condition.length > 0;
   Session.set('tdfLaunchMode', hasConditionPool ? 'root-random' : 'condition-fixed');
   Session.set('tdfFamilyRootTdfId', hasConditionPool ? currentTdfId : null);
+  Session.set('currentTdfDoc', tdfDoc);
   Session.set('currentTdfFile', content);
   Session.set('currentTdfName', content?.fileName);
   setActiveTdfContext({

@@ -11,6 +11,8 @@ import { prepareLessonLaunchContext } from './lessonLaunchInitializer';
 import { resolveLessonLaunchEntryRoute } from './lessonLaunchEntryRoute';
 import { shouldLockMultiTdfLaunchToCurrentUnit } from './lessonLaunchLockPolicy';
 import { sessionCleanUp } from './sessionUtils';
+import { setCourseAssignmentLaunchContext } from './courseAssignmentLaunchContext';
+import type { CourseAssignmentHistoryContext } from '../../common/courseAssignments.contracts';
 import {
   getAudioPromptFeedbackView,
   setAudioEnabled,
@@ -34,6 +36,10 @@ import {
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra');
 
 type SetSpecLike = Record<string, any>;
+
+type LessonLaunchOptions = {
+  courseAssignment?: CourseAssignmentHistoryContext | null;
+};
 
 async function navigateForMultiTdf(entryIntent: CardEntryIntent = CARD_ENTRY_INTENT.INITIAL_TDF_ENTRY) {
   const experimentState: any = await getExperimentState();
@@ -70,6 +76,7 @@ export async function selectTdf(
   setspec: SetSpecLike,
   isExperiment = false,
   isRefresh = false,
+  options: LessonLaunchOptions = {},
 ) {
   clientConsole(2, 'Starting Lesson:', lessonName, 'tdfId:', currentTdfId,
     'stimuliSetId:', currentStimuliSetId, 'isMultiTdf:', isMultiTdf, 'source:', how);
@@ -77,6 +84,7 @@ export async function selectTdf(
   const audioPromptFeedbackView = getAudioPromptFeedbackView();
 
   sessionCleanUp();
+  setCourseAssignmentLaunchContext(options.courseAssignment ?? null);
   Session.set('uiMessage', null);
 
   let preparedLaunch;
@@ -87,9 +95,11 @@ export async function selectTdf(
       ignoreOutOfGrammarResponses,
       speechOutOfGrammarFeedback,
       source: 'lessonLaunch.selectTdf',
+      courseAssignment: options.courseAssignment ?? null,
     });
   } catch (error) {
     clientConsole(1, '[LessonLaunch] Failed to load launch-ready TDF:', currentTdfId, error);
+    setCourseAssignmentLaunchContext(null);
     alert('Unable to load the selected lesson. Please try again or contact support.');
     return;
   }
@@ -109,6 +119,7 @@ export async function selectTdf(
       text: 'This lesson has already been completed and cannot be reopened.',
       variant: 'warning',
     });
+    setCourseAssignmentLaunchContext(null);
     return;
   }
 

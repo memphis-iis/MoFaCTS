@@ -6,6 +6,7 @@ import { CardStore } from './modules/cardStore';
 import { refreshCurrentDeliverySettingsStore, setStudentPerformance } from '../../lib/currentTestingHelpers';
 import { clientConsole } from '../../lib/userSessionHelpers';
 import { meteorCallAsync } from '../../index';
+import { getCourseAssignmentLaunchContext } from '../../lib/courseAssignmentLaunchContext';
 import { getExperimentState, createExperimentState } from './svelte/services/experimentState';
 import {
   resolveSessionContentSurface,
@@ -166,7 +167,9 @@ export async function unitIsFinished(reason: string, options: { engine?: unknown
     let rootTDFBoxed = Tdfs.findOne({ _id: Session.get('currentRootTdfId') });
     if (!rootTDFBoxed) {
       clientConsole(1, 'Root TDF not found in client collection, fetching from server:', Session.get('currentRootTdfId'));
-      rootTDFBoxed = (await meteorCallAsync('getTdfById', Session.get('currentRootTdfId'))) as RootTdfBoxed | null;
+      rootTDFBoxed = (await meteorCallAsync('getTdfById', Session.get('currentRootTdfId'), {
+        courseAssignment: getCourseAssignmentLaunchContext(),
+      })) as RootTdfBoxed | null;
       if (!rootTDFBoxed) {
         clientConsole(1, 'Could not find root TDF:', Session.get('currentRootTdfId'));
         alert('Unfortunately, the root TDF could not be loaded. Please contact your administrator.');

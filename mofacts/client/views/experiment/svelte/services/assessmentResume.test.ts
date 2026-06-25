@@ -13,10 +13,9 @@ import {
 
 describe('assessmentResume', function() {
   describe('resolveResumeHistoryRoute', function() {
-    it('names learning resume history reconstruction policy', function() {
+    it('routes learning resume history reconstruction through the unit engine', function() {
       expect(resolveResumeHistoryRoute({ learningsession: {} })).to.deep.equal({
         kind: 'learning',
-        reconstructLearningHistory: true,
         reconstructSparcHistory: false,
         inferAssessmentPosition: false,
         requiresAssessmentScheduleArtifact: false,
@@ -26,7 +25,6 @@ describe('assessmentResume', function() {
     it('names SPARC resume history replay policy', function() {
       expect(resolveResumeHistoryRoute({ sparcsession: {} })).to.deep.equal({
         kind: 'sparc',
-        reconstructLearningHistory: false,
         reconstructSparcHistory: true,
         inferAssessmentPosition: false,
         requiresAssessmentScheduleArtifact: false,
@@ -38,7 +36,6 @@ describe('assessmentResume', function() {
 
       expect(route).to.deep.equal({
         kind: 'assessment',
-        reconstructLearningHistory: false,
         reconstructSparcHistory: false,
         inferAssessmentPosition: true,
         requiresAssessmentScheduleArtifact: true,
@@ -52,7 +49,6 @@ describe('assessmentResume', function() {
 
       expect(route).to.deep.equal({
         kind: 'none',
-        reconstructLearningHistory: false,
         reconstructSparcHistory: false,
         inferAssessmentPosition: false,
         requiresAssessmentScheduleArtifact: false,

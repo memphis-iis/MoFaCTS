@@ -271,7 +271,7 @@ For a course context, this read filters by `userId`, `courseAssignment.courseId`
 
 For a TDF-local context, this implementation preserves the existing cumulative TDF/unit model-history read. It may carry the same `clusterKCs` option for a later exact cluster-scope tightening, but this migration should not change direct-launch progress semantics while introducing course-scoped sharing.
 
-Existing unit-history reads such as SPARC durable replay, assessment position counting, dashboard progress, hidden-item tracking, and crowd statistics should keep their current item/session scoping unless a specific call site is deliberately moved to course-scoped cluster history. Learning-session resume/model hydration is deliberately moved to the shared scoped history set in course context so model state and progress move together for matching `clusterKC` values.
+Existing unit-history reads such as SPARC interface-state replay, assessment position counting, dashboard progress, hidden-item tracking, and crowd statistics should keep their current item/session scoping unless a specific call site is deliberately moved to course-scoped cluster history. SPARC history rows can replay SPARC document/interface state because they carry SPARC-specific event fields. Non-SPARC model-practice rows do not imply SPARC document state; they only feed the shared cluster model through `levelUnitType: "model"` evidence. Learning-session resume/model hydration is deliberately moved to the shared scoped history set in course context so model state and progress move together for matching `clusterKC` values.
 
 Model-practice history writes should also include an audit-only evidence source:
 

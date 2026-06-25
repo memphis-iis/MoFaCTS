@@ -13,6 +13,9 @@ import { clientConsole } from '../../../../lib/clientLogger';
 import { meteorCallAsync } from '../../../../lib/meteorAsync';
 import type { ExperimentState } from '../../../../../common/types/experiment';
 import { assertIdInvariants, getCanonicalIdContext, logIdInvariantBreachOnce } from '../../../../lib/idContext';
+import {
+  courseAssignmentContextForStateWrite,
+} from '../../../../lib/courseAssignmentLaunchContext';
 
 interface ExperimentStateServiceEvent {
   stateUpdate?: ExperimentState;
@@ -47,6 +50,7 @@ function mergeExperimentState(
     'currentTdfId',
     'currentUnitNumber',
     'lastUnitCompleted',
+    'courseAssignmentLaunchContext',
     'experimentTarget',
     'lastActionTimeStamp'
   ];
@@ -88,6 +92,11 @@ function mergeExperimentState(
       filteredState.experimentTarget = normalizedTarget;
     }
   }
+
+  filteredState.courseAssignmentLaunchContext = courseAssignmentContextForStateWrite({
+    existingState,
+    partialState,
+  });
 
   return filteredState;
 }

@@ -1,7 +1,7 @@
 import { applyResumeModelState } from './resumeModelState';
 import type { LearningHistoryReadOptions } from '../../units/UnitEngineServerMethods';
 
-export interface LoadLearningSessionResumeStateParams {
+export interface HydrateLearningSessionModelStateParams {
   readonly userId: any;
   readonly tdfId: any;
   readonly currentUnitNumber: number;
@@ -18,12 +18,11 @@ export interface LoadLearningSessionResumeStateParams {
   ) => Promise<any[]>;
   readonly reconstructLearningStateFromHistory: (
     historyRows: any[],
-    options?: { allowResponseLessModelPractice?: boolean },
+    options?: { allowResponseLessSparcModelPractice?: boolean },
   ) => any;
-  readonly allowResponseLessModelPractice?: boolean;
+  readonly allowResponseLessSparcModelPractice?: boolean;
   readonly setOverallOutcomeHistory: (history: any) => void;
   readonly setOverallStudyHistory: (history: any) => void;
-  readonly getHistoryCorrectAnswer: (rawResponse: any) => string;
   readonly getHistoryResponseKey: (rawResponse: any) => string;
   readonly setNumVisibleCards: (numVisibleCards: number) => void;
   readonly log: (level: number, ...args: unknown[]) => void;
@@ -49,10 +48,10 @@ function getResumeClusterKCs(cardProbabilities: any, stimClusters: any[]): Array
   return clusterKCs;
 }
 
-export async function loadLearningSessionResumeState(
-  params: LoadLearningSessionResumeStateParams,
+export async function hydrateLearningSessionModelState(
+  params: HydrateLearningSessionModelStateParams,
 ): Promise<void> {
-  params.log(1, 'loadResumeState start');
+  params.log(1, 'hydrateLearningSessionModelState start');
 
   const historyRows = await params.getLearningHistoryForUnit(
     params.userId,
@@ -62,7 +61,7 @@ export async function loadLearningSessionResumeState(
     { clusterKCs: getResumeClusterKCs(params.cardProbabilities, params.stimClusters) },
   );
   const reconstructed = params.reconstructLearningStateFromHistory(historyRows || [], {
-    allowResponseLessModelPractice: params.allowResponseLessModelPractice === true,
+    allowResponseLessSparcModelPractice: params.allowResponseLessSparcModelPractice === true,
   });
 
   params.setOverallOutcomeHistory(reconstructed.overallOutcomeHistory);
@@ -72,7 +71,6 @@ export async function loadLearningSessionResumeState(
     cardProbabilities: params.cardProbabilities,
     stimClusters: params.stimClusters,
     reconstructed,
-    getHistoryCorrectAnswer: params.getHistoryCorrectAnswer,
     getHistoryResponseKey: params.getHistoryResponseKey,
   });
   params.setNumVisibleCards(numVisibleCards - params.hiddenItems.length);

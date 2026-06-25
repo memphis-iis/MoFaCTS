@@ -1,9 +1,38 @@
+import { normalizeClusterKC } from '../../runtime/sharedModelPracticeIdentity';
+
 export interface ApplyResumeModelStateParams {
   readonly cardProbabilities: any;
   readonly stimClusters: any[];
   readonly reconstructed: any;
-  readonly getHistoryCorrectAnswer: (rawResponse: unknown) => string;
   readonly getHistoryResponseKey: (rawResponse: unknown) => string;
+}
+
+function createStimulusStateFromSharedCluster(clusterState: any) {
+  if (!clusterState || typeof clusterState !== 'object') {
+    return null;
+  }
+  const priorCorrect = Number(clusterState.priorCorrect || 0);
+  const priorIncorrect = Number(clusterState.priorIncorrect || 0);
+  const priorStudy = Number(clusterState.priorStudy || 0);
+  return {
+    firstSeen: clusterState.firstSeen,
+    lastSeen: clusterState.lastSeen,
+    priorCorrect,
+    priorIncorrect,
+    allTimeCorrect: clusterState.allTimeCorrect,
+    allTimeIncorrect: clusterState.allTimeIncorrect,
+    priorStudy,
+    outcomeStack: Array.isArray(clusterState.outcomeStack) ? [...clusterState.outcomeStack] : [],
+    timeHistory: Array.isArray(clusterState.timeHistory) ? [...clusterState.timeHistory] : [],
+    totalPracticeDuration: clusterState.totalPracticeDuration,
+    allTimeTotalPracticeDuration: clusterState.allTimeTotalPracticeDuration,
+    curSessionPriorCorrect: priorCorrect,
+    curSessionPriorIncorrect: priorIncorrect,
+    hasBeenIntroduced: clusterState.hasBeenIntroduced === true || Number(clusterState.firstSeen || 0) > 0,
+    timesSeen: priorCorrect + priorIncorrect + priorStudy,
+    otherPracticeTime: clusterState.otherPracticeTime,
+    instructionQuestionResult: clusterState.instructionQuestionResult,
+  };
 }
 
 export function applyResumeModelState(params: ApplyResumeModelStateParams): number {
@@ -11,7 +40,7 @@ export function applyResumeModelState(params: ApplyResumeModelStateParams): numb
 
   for (let cardIndex = 0; cardIndex < cards.length; cardIndex++) {
     const card = cards[cardIndex];
-    const clusterState = params.reconstructed.clusterState[String(card.clusterKC)];
+    const clusterState = params.reconstructed.clusterState[normalizeClusterKC(card.clusterKC)];
     if (clusterState) {
       Object.assign(card, clusterState);
     }
@@ -21,6 +50,11 @@ export function applyResumeModelState(params: ApplyResumeModelStateParams): numb
       const stimulusState = params.reconstructed.stimulusState[String(stim.stimulusKC)];
       if (stimulusState) {
         Object.assign(stim, stimulusState);
+      } else {
+        const sharedClusterStimulusState = createStimulusStateFromSharedCluster(clusterState);
+        if (sharedClusterStimulusState) {
+          Object.assign(stim, sharedClusterStimulusState);
+        }
       }
     }
   }
@@ -29,9 +63,8 @@ export function applyResumeModelState(params: ApplyResumeModelStateParams): numb
     const card = cards[cardIndex];
     for (let stimIndex = 0; stimIndex < card.stims.length; stimIndex++) {
       const rawResponse = params.stimClusters[cardIndex]?.stims?.[stimIndex]?.correctResponse;
-      const correctAnswer = params.getHistoryCorrectAnswer(rawResponse);
       const responseKey = params.getHistoryResponseKey(rawResponse);
-      const responseState = params.reconstructed.responseState[String(correctAnswer)];
+      const responseState = params.reconstructed.responseState[String(responseKey)];
       if (responseKey && responseState && params.cardProbabilities.responses[responseKey]) {
         Object.assign(params.cardProbabilities.responses[responseKey], responseState);
       }

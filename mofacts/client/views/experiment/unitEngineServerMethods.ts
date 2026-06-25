@@ -5,6 +5,17 @@ export type UnitEngineServerMethodDeps = {
   readonly meteorCallAsync: (name: string, ...args: any[]) => Promise<any>;
 };
 
+function withActiveCourseAssignment(options?: Record<string, unknown>): Record<string, unknown> {
+  const context = getCourseAssignmentLaunchContext();
+  if (!context) {
+    return { ...(options || {}) };
+  }
+  return {
+    ...(options || {}),
+    courseAssignment: context,
+  };
+}
+
 export function createUnitEngineServerMethods(
   deps: UnitEngineServerMethodDeps,
 ): UnitEngineServerMethods {
@@ -27,29 +38,25 @@ export function createUnitEngineServerMethods(
       tdfId,
       currentUnitNumber,
       resetStudentPerformance,
-      {
-        ...options,
-        courseAssignment: getCourseAssignmentLaunchContext(),
-      },
+      withActiveCourseAssignment(options),
     ) as any[],
     getSparcHistoryForUnit: async (userId, tdfId, unitNumber, options) => await deps.meteorCallAsync(
       'getSparcHistoryForUnit',
       userId,
       tdfId,
       unitNumber,
-      {
-        ...options,
-        courseAssignment: getCourseAssignmentLaunchContext(),
-      },
+      withActiveCourseAssignment(options),
     ) as unknown[],
     getResponseKCMapForTdf: async (tdfId) => await deps.meteorCallAsync(
       'getResponseKCMapForTdf',
       tdfId,
+      withActiveCourseAssignment(),
     ) as Record<string, unknown>,
     getStimulusCrowdStatsForDeck: async (tdfId, stimulusKCs) => await deps.meteorCallAsync(
       'getStimulusCrowdStatsForDeck',
       tdfId,
       stimulusKCs,
+      withActiveCourseAssignment(),
     ) as Array<{
       stimulusKC: string | number;
       correctCount: number;
