@@ -1,6 +1,7 @@
 import './courses.html';
 import './courses.css';
 import { ReactiveVar } from 'meteor/reactive-var';
+import { Session } from 'meteor/session';
 import { Template } from 'meteor/templating';
 import { meteorCallAsync, clientConsole } from '../..';
 import { selectTdf } from '../../lib/lessonLaunchRunner';
@@ -11,23 +12,23 @@ import type {
   LearnerCourseSnapshotCourse,
   LearnerCoursesSnapshot,
 } from '../../../common/courseAssignments.contracts';
+import {
+  buildCourseTreeRows,
+  normalizeCourseTreeSort,
+  type CourseAssignmentDisplayRow,
+  type CourseTreeCourseRow,
+  type CourseTreeSection,
+  type CourseTreeSort,
+} from './courseTree';
+
+const EXPANDED_COURSES_SESSION_KEY = 'coursesExpandedCourseIds';
 
 type CoursesTemplateInstance = Blaze.TemplateInstance & {
   snapshot: ReactiveVar<LearnerCoursesSnapshot | null>;
   loading: ReactiveVar<boolean>;
   error: ReactiveVar<string | null>;
   search: ReactiveVar<string>;
-  sort: ReactiveVar<string>;
-};
-
-type CourseAssignmentDisplayRow = LearnerCourseSnapshotAssignment & {
-  courseName: string;
-  teacherDisplayName: string;
-  visibility: LearnerCourseSnapshotCourse['visibility'];
-  beginDate: LearnerCourseSnapshotCourse['beginDate'];
-  endDate: LearnerCourseSnapshotCourse['endDate'];
-  timezone: string;
-  membership: LearnerCourseSnapshotCourse['membership'];
+  sort: ReactiveVar<CourseTreeSort>;
 };
 
 function formatDate(value: unknown, timezone?: string | null) {
@@ -41,32 +42,20 @@ function formatDate(value: unknown, timezone?: string | null) {
   });
 }
 
-function flattenAssignmentRows(snapshot: LearnerCoursesSnapshot | null, section: 'assignedCourses' | 'publicCourses', instance: CoursesTemplateInstance) {
-  const query = instance.search.get().toLowerCase();
-  const sort = instance.sort.get();
-  const rows = (snapshot?.[section] || []).flatMap((course) => (
-    course.assignments.filter((assignment) => {
-      const haystack = `${course.courseName} ${course.teacherDisplayName} ${assignment.title} ${assignment.fileName} ${(assignment.tags || []).join(' ')}`.toLowerCase();
-      return !query || haystack.includes(query);
-    }).map((assignment): CourseAssignmentDisplayRow => ({
-      ...assignment,
-      courseName: course.courseName,
-      teacherDisplayName: course.teacherDisplayName,
-      visibility: course.visibility,
-      beginDate: course.beginDate,
-      endDate: course.endDate,
-      timezone: course.timezone,
-      membership: course.membership,
-    }))
-  ));
-  return rows.sort((a, b) => {
-    if (sort === 'due') {
-      return (new Date(a.dueAt || 8640000000000000).getTime()) - (new Date(b.dueAt || 8640000000000000).getTime());
-    }
-    if (sort === 'recent') {
-      return Number(b.progress?.lastPracticedTimestamp || 0) - Number(a.progress?.lastPracticedTimestamp || 0);
-    }
-    return a.courseName.localeCompare(b.courseName) || a.order - b.order || a.title.localeCompare(b.title);
+function getExpandedCourseIds() {
+  const stored = Session.get(EXPANDED_COURSES_SESSION_KEY);
+  return new Set<string>(Array.isArray(stored) ? stored.map(String) : []);
+}
+
+function setExpandedCourseIds(expandedIds: Set<string>) {
+  Session.set(EXPANDED_COURSES_SESSION_KEY, Array.from(expandedIds));
+}
+
+function getCourseRows(snapshot: LearnerCoursesSnapshot | null, section: CourseTreeSection, instance: CoursesTemplateInstance) {
+  return buildCourseTreeRows(snapshot, section, {
+    query: instance.search.get(),
+    sort: instance.sort.get(),
+    expandedCourseIds: getExpandedCourseIds(),
   });
 }
 
@@ -82,6 +71,9 @@ Template.courses.onCreated(function(this: CoursesTemplateInstance) {
   this.error = new ReactiveVar(null);
   this.search = new ReactiveVar('');
   this.sort = new ReactiveVar('course');
+  if (!Array.isArray(Session.get(EXPANDED_COURSES_SESSION_KEY))) {
+    Session.set(EXPANDED_COURSES_SESSION_KEY, []);
+  }
 });
 
 Template.courses.onRendered(async function(this: CoursesTemplateInstance) {
@@ -108,30 +100,30 @@ Template.courses.helpers({
   loadingRows() {
     return [1, 2, 3, 4];
   },
-  assignedAssignments() {
+  assignedCourses() {
     const instance = Template.instance() as CoursesTemplateInstance;
-    return flattenAssignmentRows(instance.snapshot.get(), 'assignedCourses', instance);
+    return getCourseRows(instance.snapshot.get(), 'assignedCourses', instance);
   },
-  publicAssignments() {
+  publicCourses() {
     const instance = Template.instance() as CoursesTemplateInstance;
-    return flattenAssignmentRows(instance.snapshot.get(), 'publicCourses', instance);
+    return getCourseRows(instance.snapshot.get(), 'publicCourses', instance);
   },
   hasAssignedAssignments() {
     const instance = Template.instance() as CoursesTemplateInstance;
-    return flattenAssignmentRows(instance.snapshot.get(), 'assignedCourses', instance).length > 0;
+    return getCourseRows(instance.snapshot.get(), 'assignedCourses', instance).length > 0;
   },
   hasPublicAssignments() {
     const instance = Template.instance() as CoursesTemplateInstance;
-    return flattenAssignmentRows(instance.snapshot.get(), 'publicCourses', instance).length > 0;
+    return getCourseRows(instance.snapshot.get(), 'publicCourses', instance).length > 0;
   },
 });
 
 const courseAssignmentDisplayHelpers = {
-  membershipLabel(this: CourseAssignmentDisplayRow) {
+  membershipLabel(this: CourseAssignmentDisplayRow | CourseTreeCourseRow) {
     const membership = this.membership;
     return membership === 'assigned' ? 'Assigned' : membership === 'public' ? 'Public' : membership === 'teacher' ? 'Teacher' : 'Admin';
   },
-  courseScheduleLabel(this: CourseAssignmentDisplayRow) {
+  courseScheduleLabel(this: CourseAssignmentDisplayRow | CourseTreeCourseRow) {
     const row = this;
     const begin = formatDate(row.beginDate, row.timezone);
     const end = formatDate(row.endDate, row.timezone);
@@ -160,7 +152,10 @@ const courseAssignmentDisplayHelpers = {
   },
   releaseLabel(this: CourseAssignmentDisplayRow) {
     const row = this;
-    return row.releaseAt ? `Visible ${formatDate(row.releaseAt, row.timezone)}` : 'Visible now';
+    return row.releaseAt ? `Opens ${formatDate(row.releaseAt, row.timezone)}` : '';
+  },
+  hasReleaseLabel(this: CourseAssignmentDisplayRow) {
+    return Boolean(this.releaseAt);
   },
   dueLabel(this: CourseAssignmentDisplayRow) {
     const row = this;
@@ -214,15 +209,31 @@ const courseAssignmentDisplayHelpers = {
   },
 };
 
+Template.courseTreeCourseRow.helpers({
+  ...courseAssignmentDisplayHelpers,
+});
 Template.courseAssignmentTableRow.helpers(courseAssignmentDisplayHelpers);
 Template.courseAssignmentCard.helpers(courseAssignmentDisplayHelpers);
+Template.courseAssignmentCourseCard.helpers(courseAssignmentDisplayHelpers);
 
 Template.courses.events({
   'input #coursesSearch': function(event: Event, instance: CoursesTemplateInstance) {
     instance.search.set(String((event.currentTarget as HTMLInputElement).value || ''));
   },
   'change #coursesSort': function(event: Event, instance: CoursesTemplateInstance) {
-    instance.sort.set(String((event.currentTarget as HTMLSelectElement).value || 'course'));
+    instance.sort.set(normalizeCourseTreeSort(String((event.currentTarget as HTMLSelectElement).value || 'course')));
+  },
+  'click .toggle-course-tree': function(event: Event) {
+    const target = event.currentTarget as HTMLElement;
+    const courseId = target.dataset.courseid;
+    if (!courseId) return;
+    const expandedIds = getExpandedCourseIds();
+    if (expandedIds.has(courseId)) {
+      expandedIds.delete(courseId);
+    } else {
+      expandedIds.add(courseId);
+    }
+    setExpandedCourseIds(expandedIds);
   },
   'click .launch-course-assignment': async function(event: Event, instance: CoursesTemplateInstance) {
     const assignment = this as LearnerCourseSnapshotAssignment;
@@ -243,7 +254,6 @@ Template.courses.events({
         courseAssignment: launchContext,
       });
       const setspec = tdf?.content?.tdfs?.tutor?.setspec || {};
-      setCourseAssignmentLaunchContext(launchContext);
       await selectTdf(
         assignment.TDFId,
         assignment.title,
@@ -255,6 +265,7 @@ Template.courses.events({
         setspec,
         false,
         false,
+        { courseAssignment: launchContext },
       );
     } catch (error: any) {
       setCourseAssignmentLaunchContext(null);

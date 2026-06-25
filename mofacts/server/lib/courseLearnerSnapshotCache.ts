@@ -134,6 +134,21 @@ export function createCourseLearnerSnapshotCacheHelpers(deps: CourseLearnerSnaps
     deps.serverConsole('[CourseSnapshot] refreshed after practice progress update', { userId, TDFId });
   }
 
+  async function cachedSnapshotAssignmentsExist(existing: any) {
+    const assignmentIds: string[] = Array.isArray(existing?.assignmentIds)
+      ? [...new Set<string>(existing.assignmentIds.map((id: unknown) => normalizeOptionalString(id)).filter((id: string | null): id is string => !!id))]
+      : [];
+    if (assignmentIds.length === 0) {
+      return true;
+    }
+    const rows = await deps.Assignments.find(
+      { _id: { $in: assignmentIds } },
+      { fields: { _id: 1 } },
+    ).fetchAsync();
+    const liveIds = new Set(rows.map((row: any) => normalizeOptionalString(row?._id)).filter((id: string | null): id is string => !!id));
+    return assignmentIds.every((assignmentId) => liveIds.has(assignmentId));
+  }
+
   async function rebuildLearnerCoursesSnapshot(userId: string, reason: string): Promise<LearnerCoursesSnapshot> {
     const roleFlags = await getUserRoleFlags(deps.getMethodAuthorizationDeps(), userId, ['admin', 'teacher'] as const);
     const enrollmentRows = await deps.SectionUserMap.find({ userId }, { fields: { sectionId: 1 } }).fetchAsync();
@@ -268,6 +283,9 @@ export function createCourseLearnerSnapshotCacheHelpers(deps: CourseLearnerSnaps
   async function ensureLearnerCoursesSnapshot(userId: string): Promise<LearnerCoursesSnapshot> {
     const existing = await deps.CourseLearnerSnapshotCache.findOneAsync({ userId, version: COURSE_SNAPSHOT_VERSION });
     if (existing?.snapshot && existing.invalidatedAt === null && existing.version === COURSE_SNAPSHOT_VERSION) {
+      if (!await cachedSnapshotAssignmentsExist(existing)) {
+        return await rebuildLearnerCoursesSnapshot(userId, 'stale-assignment-reference');
+      }
       return {
         ...(existing.snapshot as LearnerCoursesSnapshot),
         source: 'cache',

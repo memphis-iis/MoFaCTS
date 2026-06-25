@@ -144,6 +144,44 @@ function createAnalyticsDeps(overrides: Record<string, unknown> = {}) {
 }
 
 describe('analyticsMethods', function() {
+  function createAssignedRootDeps(overrides: Record<string, unknown> = {}) {
+    return createAnalyticsDeps({
+      resolveAssignedRootTdfIdsForUser: async () => ['root-tdf'],
+      Tdfs: {
+        find: () => ({ fetchAsync: async () => [] }),
+        findOneAsync: async (selector: Record<string, unknown>) => {
+          if (selector._id === 'root-tdf') {
+            return {
+              _id: 'root-tdf',
+              stimuliSetId: 'stim-set-1',
+              content: {
+                fileName: 'root.json',
+                tdfs: {
+                  tutor: {
+                    setspec: {
+                      conditionTdfIds: ['child-tdf'],
+                    },
+                  },
+                },
+              },
+            };
+          }
+          if (selector._id === 'child-tdf') {
+            return {
+              _id: 'child-tdf',
+              stimuliSetId: 'stim-set-1',
+              content: { fileName: 'child.json' },
+            };
+          }
+          return null;
+        },
+        updateAsync: async () => true,
+      },
+      resolveConditionTdfIds: async () => ['child-tdf'],
+      ...overrides,
+    });
+  }
+
   it('insertHistory invokes the dashboard summary hook after durable history insert', async function() {
     const hookRecords: Record<string, unknown>[] = [];
     const { deps, insertedHistory } = createAnalyticsDeps({
@@ -181,6 +219,79 @@ describe('analyticsMethods', function() {
     expect(logEntries.some((entry) => String(entry[0]).includes('Dashboard cache update failed'))).to.equal(true);
   });
 
+  it('insertHistory rejects assigned-root history without course context', async function() {
+    const { deps, insertedHistory } = createAssignedRootDeps();
+    const methods = createAnalyticsMethods(deps as any) as Record<string, any>;
+
+    try {
+      await methods.insertHistory.call({ userId: 'learner-1' }, createHistoryRecord({
+        TDFId: 'root-tdf',
+      }));
+      expect.fail('Expected assigned-root history without course context to fail');
+    } catch (error: any) {
+      expect(error.error).to.equal(403);
+      expect(error.reason).to.equal('Course-assigned history requires courseAssignment context');
+    }
+    expect(insertedHistory).to.have.length(0);
+  });
+
+  it('insertHistory rejects assigned child history without course context', async function() {
+    const { deps, insertedHistory } = createAssignedRootDeps();
+    const methods = createAnalyticsMethods(deps as any) as Record<string, any>;
+
+    try {
+      await methods.insertHistory.call({ userId: 'learner-1' }, createHistoryRecord({
+        TDFId: 'child-tdf',
+      }));
+      expect.fail('Expected assigned child history without course context to fail');
+    } catch (error: any) {
+      expect(error.error).to.equal(403);
+      expect(error.reason).to.equal('Course-assigned history requires courseAssignment context');
+    }
+    expect(insertedHistory).to.have.length(0);
+  });
+
+  it('getLearningHistoryForUnit rejects assigned TDF reads without course context', async function() {
+    const { deps } = createAssignedRootDeps();
+    const methods = createAnalyticsMethods(deps as any) as Record<string, any>;
+
+    try {
+      await methods.getLearningHistoryForUnit.call({ userId: 'learner-1' }, 'learner-1', 'root-tdf', 1);
+      expect.fail('Expected assigned learning history read without course context to fail');
+    } catch (error: any) {
+      expect(error.error).to.equal(403);
+      expect(error.reason).to.equal('Course-assigned learning history requires courseAssignment context');
+    }
+  });
+
+  it('getSparcHistoryForUnit rejects assigned child reads without course context', async function() {
+    const { deps } = createAssignedRootDeps();
+    const methods = createAnalyticsMethods(deps as any) as Record<string, any>;
+
+    try {
+      await methods.getSparcHistoryForUnit.call({ userId: 'learner-1' }, 'learner-1', 'child-tdf', 1);
+      expect.fail('Expected assigned SPARC history read without course context to fail');
+    } catch (error: any) {
+      expect(error.error).to.equal(403);
+      expect(error.reason).to.equal('Course-assigned SPARC history requires courseAssignment context');
+    }
+  });
+
+  it('getStimulusCrowdStatsForDeck rejects assigned TDF reads without course context before dashboard visibility', async function() {
+    const { deps } = createAssignedRootDeps({
+      canViewDashboardTdf: async () => true,
+    });
+    const methods = createAnalyticsMethods(deps as any) as Record<string, any>;
+
+    try {
+      await methods.getStimulusCrowdStatsForDeck.call({ userId: 'learner-1' }, 'root-tdf', ['101']);
+      expect.fail('Expected assigned crowd stats read without course context to fail');
+    } catch (error: any) {
+      expect(error.error).to.equal(403);
+      expect(error.reason).to.equal('Course-assigned crowd stats require courseAssignment context');
+    }
+  });
+
   it('insertHistory accepts course history for a resolved child of the assigned root TDF', async function() {
     const { deps, insertedHistory } = createAnalyticsDeps({
       Tdfs: {
@@ -194,7 +305,6 @@ describe('analyticsMethods', function() {
                   tutor: {
                     setspec: {
                       condition: ['child.json'],
-                      conditionTdfIds: ['child-tdf'],
                     },
                   },
                 },
@@ -220,6 +330,7 @@ describe('analyticsMethods', function() {
       Courses: {
         find: () => ({ fetchAsync: async () => [{ _id: 'course-1', visibility: 'public' }] }),
       },
+      resolveConditionTdfIds: async () => ['child-tdf'],
     });
     const methods = createAnalyticsMethods(deps as any) as Record<string, any>;
 

@@ -163,6 +163,11 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       }
     );
     const rootSetspec = rootTdf?.content?.tdfs?.tutor?.setspec || {};
+    const resolvedConditionTdfIds = await deps.resolveConditionTdfIds(rootSetspec);
+    if (resolvedConditionTdfIds.some((id: unknown) => deps.normalizeCanonicalId(id) === historyTdfId)) {
+      return true;
+    }
+
     const conditionTdfIds = Array.isArray(rootSetspec.conditionTdfIds) ? rootSetspec.conditionTdfIds : [];
     if (conditionTdfIds.some((id: unknown) => deps.normalizeCanonicalId(id) === historyTdfId)) {
       return true;
@@ -229,6 +234,27 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       'courseAssignment.courseId': courseId,
       clusterKC: { $in: normalizeCourseModelClusterKCs(options.clusterKCs) },
     };
+  }
+
+  async function rejectMissingCourseAssignmentContextForAssignedTdf(
+    userId: string,
+    tdfId: string,
+    context: unknown,
+    reason: string,
+  ) {
+    if (context !== undefined && context !== null) {
+      return;
+    }
+    const assignedRootTdfIds = await deps.resolveAssignedRootTdfIdsForUser(userId);
+    for (const assignedRootTdfId of assignedRootTdfIds) {
+      const normalizedAssignedRootTdfId = deps.normalizeCanonicalId(assignedRootTdfId);
+      if (
+        normalizedAssignedRootTdfId &&
+        await tdfBelongsToAssignedRoot(normalizedAssignedRootTdfId, tdfId)
+      ) {
+        throw new Meteor.Error(403, reason);
+      }
+    }
   }
 
   const validatedExperimentAccessCache = new Map<string, number>();
@@ -621,7 +647,12 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     return await deps.Histories.find({ TDFId }).fetchAsync();
   }
 
-  async function getStimulusCrowdStatsForDeck(this: MethodContext, TDFId: string, stimulusKCs: unknown[]) {
+  async function getStimulusCrowdStatsForDeck(
+    this: MethodContext,
+    TDFId: string,
+    stimulusKCs: unknown[],
+    options: Pick<LearningHistoryReadOptions, 'courseAssignment'> = {},
+  ) {
     const actorUserId = requireAuthenticatedUser(this.userId, 'Must be logged in', 401);
     const normalizedTdfId = deps.normalizeCanonicalId(TDFId);
     if (!normalizedTdfId) {
@@ -646,7 +677,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       return [];
     }
 
-    const tdf = await assertCrowdStatsReadAccess(actorUserId, normalizedTdfId);
+    const tdf = await assertCrowdStatsReadAccess(actorUserId, normalizedTdfId, options);
     const stimuliSetId = tdf?.stimuliSetId;
     if (stimuliSetId === undefined || stimuliSetId === null || (typeof stimuliSetId === 'string' && stimuliSetId.trim().length === 0)) {
       throw new Meteor.Error(400, 'TDF is missing stimuliSetId for stimulus crowd stats');
@@ -680,7 +711,11 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     }));
   }
 
-  async function assertCrowdStatsReadAccess(actorUserId: string, tdfId: string) {
+  async function assertCrowdStatsReadAccess(
+    actorUserId: string,
+    tdfId: string,
+    options: Pick<LearningHistoryReadOptions, 'courseAssignment'> = {},
+  ) {
     const tdf = await deps.Tdfs.findOneAsync(
       { _id: tdfId },
       { fields: { _id: 1, ownerId: 1, accessors: 1, stimuliSetId: 1, 'content.tdfs.tutor.setspec': 1 } }
@@ -688,6 +723,16 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     if (!tdf) {
       throw new Meteor.Error(404, 'TDF not found');
     }
+    if (options.courseAssignment) {
+      await validateCourseAssignmentHistoryContext({ courseAssignment: options.courseAssignment }, tdfId, actorUserId);
+      return tdf;
+    }
+    await rejectMissingCourseAssignmentContextForAssignedTdf(
+      actorUserId,
+      tdfId,
+      options.courseAssignment,
+      'Course-assigned crowd stats require courseAssignment context',
+    );
     if (await deps.canViewDashboardTdf(actorUserId, tdf)) {
       return tdf;
     }
@@ -746,6 +791,13 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       await validateCourseAssignmentHistoryContext(decompressedRecord, tdfId, actingUserId);
       return;
     }
+
+    await rejectMissingCourseAssignmentContextForAssignedTdf(
+      actingUserId,
+      tdfId,
+      courseAssignment,
+      'Course-assigned history requires courseAssignment context',
+    );
 
     const cacheKey = conditionAssignmentCacheKey(actingUserId, tdfId);
     const cachedAssignment = assignedConditionAccessCache.get(cacheKey);
@@ -1088,6 +1140,12 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     unitScopedOnly = false,
     options: LearningHistoryReadOptions = {}
   ) {
+    await rejectMissingCourseAssignmentContextForAssignedTdf(
+      userId,
+      TDFId,
+      options.courseAssignment,
+      'Course-assigned learning history requires courseAssignment context',
+    );
     const selector = options.courseAssignment
       ? await buildCourseLearningHistoryScopeMatch(userId, TDFId, options)
       : buildLearningHistoryScopeMatch(userId, TDFId, levelUnit, unitScopedOnly);
@@ -1111,6 +1169,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
         CFEndLatency: 1,
         CFFeedbackLatency: 1,
         responseValue: 1,
+        sparc: 1,
         instructionQuestionResult: 1,
       },
       sort: { time: 1 },
@@ -1123,6 +1182,12 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     levelUnit: number,
     options: Pick<LearningHistoryReadOptions, 'courseAssignment'> = {}
   ) {
+    await rejectMissingCourseAssignmentContextForAssignedTdf(
+      userId,
+      TDFId,
+      options.courseAssignment,
+      'Course-assigned SPARC history requires courseAssignment context',
+    );
     let selector: UnknownRecord = {
       userId,
       TDFId,

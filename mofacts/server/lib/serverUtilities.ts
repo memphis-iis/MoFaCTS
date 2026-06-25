@@ -3,16 +3,7 @@ import { Email } from 'meteor/email';
 import { check } from 'meteor/check';
 import { sendErrorReportSummariesWorkflow } from './errorReportSummary';
 
-type UnknownRecord = Record<string, unknown>;
-
 type ServerUtilityDeps = {
-  Assignments: { removeAsync: (selector: UnknownRecord) => Promise<unknown> };
-  Histories: {
-    removeAsync: (selector: UnknownRecord) => Promise<unknown>;
-  };
-  GlobalExperimentStates: {
-    removeAsync: (selector: UnknownRecord) => Promise<unknown>;
-  };
   ErrorReports: any;
   findUsersByIds: (userIds: string[]) => Promise<any[]>;
   adminUsers: string[];
@@ -110,17 +101,10 @@ export function createServerUtilityHelpers(deps: ServerUtilityDeps) {
     });
   }
 
-  async function deleteTdfRuntimeData(tdfId: string) {
-    await deps.Assignments.removeAsync({ TDFId: tdfId });
-    await deps.Histories.removeAsync({ TDFId: tdfId });
-    await deps.GlobalExperimentStates.removeAsync({ TDFId: tdfId });
-  }
-
   return {
     getDiskUsageInfo: getLoggedDiskUsageInfo,
     buildDiskUsageStatus,
     sendEmail,
     sendErrorReportSummaries,
-    deleteTdfRuntimeData,
   };
 }

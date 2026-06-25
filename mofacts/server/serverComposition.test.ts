@@ -397,6 +397,126 @@ describe('public TDF and stimulus method authorization', function() {
     expect(tdf._id).to.equal('assigned-context-tdf');
   });
 
+  it('blocks direct condition-child lookup for a student with an active root course assignment', async function() {
+    await CoursesAny.insertAsync({
+      _id: 'course-condition-direct-block',
+      teacherUserId: 'teacher-user',
+      semester: 'SU_2022',
+    });
+    await SectionsAny.insertAsync({
+      _id: 'section-condition-direct-block',
+      courseId: 'course-condition-direct-block',
+    });
+    await SectionUserMapAny.insertAsync({
+      _id: 'enrollment-condition-direct-block',
+      userId: 'assigned-student',
+      sectionId: 'section-condition-direct-block',
+    });
+    await AssignmentsAny.insertAsync({
+      _id: 'assignment-condition-direct-block',
+      courseId: 'course-condition-direct-block',
+      TDFId: 'assigned-condition-root',
+    });
+    await TdfsAny.insertAsync({
+      _id: 'assigned-condition-root',
+      ownerId: 'teacher-user',
+      stimuliSetId: 112,
+      content: {
+        fileName: 'AssignedConditionRoot.json',
+        tdfs: {
+          tutor: {
+            setspec: {
+              lessonname: 'Assigned Condition Root',
+              userselect: 'true',
+              conditionTdfIds: ['assigned-condition-child'],
+            },
+          },
+        },
+      },
+    });
+    await TdfsAny.insertAsync({
+      _id: 'assigned-condition-child',
+      ownerId: 'teacher-user',
+      stimuliSetId: 113,
+      accessors: [{ userId: 'assigned-student' }],
+      content: {
+        fileName: 'AssignedConditionChild.json',
+        tdfs: { tutor: { setspec: { lessonname: 'Assigned Condition Child', userselect: 'true' } } },
+      },
+    });
+
+    try {
+      await (asyncMethods.getTdfById as any).call({ userId: 'assigned-student' }, 'assigned-condition-child');
+      expect.fail('Expected direct assigned condition-child TDF lookup to be denied');
+    } catch (error: any) {
+      expect(error.error).to.equal(403);
+      expect(error.reason).to.equal('Launch this TDF through its active course assignment');
+    }
+  });
+
+  it('allows condition-child TDF lookup with matching root course-assignment launch context', async function() {
+    await CoursesAny.insertAsync({
+      _id: 'course-condition-launch-context',
+      teacherUserId: 'teacher-user',
+      semester: 'SU_2022',
+    });
+    await SectionsAny.insertAsync({
+      _id: 'section-condition-launch-context',
+      courseId: 'course-condition-launch-context',
+    });
+    await SectionUserMapAny.insertAsync({
+      _id: 'enrollment-condition-launch-context',
+      userId: 'assigned-student',
+      sectionId: 'section-condition-launch-context',
+    });
+    await AssignmentsAny.insertAsync({
+      _id: 'assignment-condition-launch-context',
+      courseId: 'course-condition-launch-context',
+      TDFId: 'assigned-condition-context-root',
+    });
+    await TdfsAny.insertAsync({
+      _id: 'assigned-condition-context-root',
+      ownerId: 'teacher-user',
+      stimuliSetId: 114,
+      content: {
+        fileName: 'AssignedConditionContextRoot.json',
+        tdfs: {
+          tutor: {
+            setspec: {
+              lessonname: 'Assigned Condition Context Root',
+              userselect: 'false',
+              conditionTdfIds: ['assigned-condition-context-child'],
+            },
+          },
+        },
+      },
+    });
+    await TdfsAny.insertAsync({
+      _id: 'assigned-condition-context-child',
+      ownerId: 'teacher-user',
+      stimuliSetId: 115,
+      content: {
+        fileName: 'AssignedConditionContextChild.json',
+        tdfs: { tutor: { setspec: { lessonname: 'Assigned Condition Context Child', userselect: 'false' } } },
+      },
+    });
+
+    const tdf = await (asyncMethods.getTdfById as any).call(
+      { userId: 'assigned-student' },
+      'assigned-condition-context-child',
+      {
+        courseAssignment: {
+          assignmentId: 'assignment-condition-launch-context',
+          courseId: 'course-condition-launch-context',
+          TDFId: 'assigned-condition-context-root',
+          launchSource: 'courses',
+        },
+      },
+    );
+
+    expect(tdf._id).to.equal('assigned-condition-context-child');
+  });
+
   it('allows public course-assignment TDF lookup without section enrollment', async function() {
     await CoursesAny.insertAsync({
       _id: 'course-launch-public',
@@ -500,7 +620,7 @@ describe('public TDF and stimulus method authorization', function() {
     }
   });
 
-  it('allows an enrolled student to load condition children of an assigned root before experiment state exists', async function() {
+  it('requires course context when an enrolled student loads condition children of an assigned root', async function() {
     await CoursesAny.insertAsync({
       _id: 'assigned-course',
       teacherUserId: 'teacher-user',
@@ -555,11 +675,36 @@ describe('public TDF and stimulus method authorization', function() {
       },
     });
 
-    const byId = await (asyncMethods.getTdfById as any).call({ userId: 'assigned-student' }, 'assigned-condition');
-    const byFileName = await (asyncMethods.getTdfByFileName as any).call({ userId: 'assigned-student' }, 'AssignedCondition.json');
+    try {
+      await (asyncMethods.getTdfById as any).call({ userId: 'assigned-student' }, 'assigned-condition');
+      expect.fail('Expected assigned condition-child lookup without course context to be denied');
+    } catch (error: any) {
+      expect(error.error).to.equal(403);
+      expect(error.reason).to.equal('Launch this TDF through its active course assignment');
+    }
 
-    expect(byId._id).to.equal('assigned-condition');
-    expect(byFileName._id).to.equal('assigned-condition');
+    try {
+      await (asyncMethods.getTdfByFileName as any).call({ userId: 'assigned-student' }, 'AssignedCondition.json');
+      expect.fail('Expected assigned condition-child filename lookup without course context to be denied');
+    } catch (error: any) {
+      expect(error.error).to.equal(403);
+      expect(error.reason).to.equal('Launch this TDF through its active course assignment');
+    }
+
+    const byCourseContext = await (asyncMethods.getTdfById as any).call(
+      { userId: 'assigned-student' },
+      'assigned-condition',
+      {
+        courseAssignment: {
+          assignmentId: 'assigned-row',
+          courseId: 'assigned-course',
+          TDFId: 'assigned-root',
+          launchSource: 'courses',
+        },
+      },
+    );
+
+    expect(byCourseContext._id).to.equal('assigned-condition');
   });
 
   it('denies unrelated user public stimulus lookup by stimuliSetId', async function() {
@@ -814,6 +959,7 @@ describe('public TDF and stimulus method authorization', function() {
               lessonname: 'Experiment Root',
               experimentTarget: 'study-a',
               experimentPasswordRequired: false,
+              srfilterclose: 'false',
               speechAPIKey: 'encrypted-speech-key',
               textToSpeechAPIKey: 'encrypted-tts-key',
               condition: ['condition-a.json'],
@@ -837,6 +983,7 @@ describe('public TDF and stimulus method authorization', function() {
     expect(entry.content.tdfs.tutor.unit).to.equal(undefined);
     expect(entry.content.tdfs.tutor.setspec.speechAPIKey).to.equal(undefined);
     expect(entry.content.tdfs.tutor.setspec.textToSpeechAPIKey).to.equal(undefined);
+    expect(entry.content.tdfs.tutor.setspec.srfilterclose).to.equal('false');
     expect(entry.content.tdfs.tutor.deliverySettings).to.deep.equal({
       experimentLoginText: 'Participant ID',
     });
@@ -2124,6 +2271,46 @@ describe('content helper authorization', function() {
     } catch (error: any) {
       expect(error.error).to.equal(401);
     }
+  });
+
+  it('preserves srfilterclose when confirming an uploaded TDF overwrite', async function() {
+    await TdfsAny.insertAsync({
+      _id: 'tdf-update',
+      ownerId: 'owner-user',
+      content: {
+        fileName: 'lesson.json',
+        tdfs: {
+          tutor: {
+            setspec: {
+              lessonname: 'Old Lesson',
+              stimulusfile: 'old-stim.json',
+            },
+            unit: [],
+          },
+        },
+      },
+    });
+
+    await (asyncMethods.tdfUpdateConfirmed as any).call({ userId: 'owner-user' }, {
+      _id: 'tdf-update',
+      ownerId: 'owner-user',
+      content: {
+        fileName: 'lesson.json',
+        tdfs: {
+          tutor: {
+            setspec: {
+              lessonname: 'Updated Lesson',
+              stimulusfile: 'stim.json',
+              srfilterclose: 'false',
+            },
+            unit: [],
+          },
+        },
+      },
+    });
+
+    const updated = await TdfsAny.findOneAsync({ _id: 'tdf-update' });
+    expect(updated.content.tdfs.tutor.setspec.srfilterclose).to.equal('false');
   });
 });
 

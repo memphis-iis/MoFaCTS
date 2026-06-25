@@ -174,11 +174,14 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
     if (context.launchSource !== 'courses' || !assignmentId || !courseId || !contextTdfId) {
       throw new Meteor.Error(400, 'Course assignment launch context is incomplete');
     }
-    if (contextTdfId !== requestedTdfId) {
+    const requestedIsAssignedTdf = contextTdfId === requestedTdfId;
+    const requestedIsConditionChild = !requestedIsAssignedTdf &&
+      await requestedTdfIsConditionOfRoots(requestedTdfId, [contextTdfId]);
+    if (!requestedIsAssignedTdf && !requestedIsConditionChild) {
       throw new Meteor.Error(400, 'Course assignment launch context does not match requested TDF');
     }
     const assignment = await deps.Assignments.findOneAsync(
-      { _id: assignmentId, courseId, TDFId: requestedTdfId },
+      { _id: assignmentId, courseId, TDFId: contextTdfId },
       { fields: { _id: 1 } },
     );
     if (!assignment) {
@@ -245,14 +248,14 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
       return await loadFullTdf();
     }
     if (
-      await deps.canViewDashboardTdf(this.userId, tdfAccess)
-    ) {
-      return await loadFullTdf();
-    }
-
-    if (
       normalizedRequestedTdfId &&
       await requestedTdfIsConditionOfRoots(normalizedRequestedTdfId, [...assignedRootIds])
+    ) {
+      await requireMatchingCourseAssignmentContext(this.userId, normalizedRequestedTdfId, options);
+      return await loadFullTdf();
+    }
+    if (
+      await deps.canViewDashboardTdf(this.userId, tdfAccess)
     ) {
       return await loadFullTdf();
     }

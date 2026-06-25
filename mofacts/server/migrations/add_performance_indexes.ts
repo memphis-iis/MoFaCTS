@@ -108,6 +108,12 @@ export async function createPerformanceIndexes() {
     );
     serverConsole('  Created: Histories.userId_time');
 
+    await Histories.rawCollection().createIndex(
+      { userId: 1, levelUnitType: 1, 'courseAssignment.courseId': 1, clusterKC: 1, time: 1 },
+      { name: 'history_course_shared_model_cluster_time', background: true }
+    );
+    serverConsole('  Created: Histories.history_course_shared_model_cluster_time');
+
     serverConsole('Creating indexes for Course/Assignment collections...');
     const duplicateAssignments = await Assignments.rawCollection().aggregate([
       {

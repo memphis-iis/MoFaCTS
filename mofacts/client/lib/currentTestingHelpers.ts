@@ -19,7 +19,7 @@ import {
 } from './userThemeSelection';
 import { legacyInt, legacyTrim } from '../../common/underscoreCompat';
 import { resolveLearningSessionClusterListSource } from '../../../learning-components/units/learning-session/learningSessionRuntimeConfig';
-import { resolveSparcSessionClusterListSource } from '../../../learning-components/units/sparcsession/sparcSessionRuntimeConfig';
+import { resolveSparcSessionPageId } from '../../../learning-components/units/sparcsession/sparcSessionRuntimeConfig';
 
 type IntValFn = (src: unknown, defaultVal?: unknown) => number;
 const _ = underscore as typeof underscore & { intval?: IntValFn };
@@ -619,35 +619,85 @@ function getDashboardCacheTotalTimeMs(tdfId: string | null | undefined) {
   return null;
 }
 
-function getCurrentUnitStimulusCount(): number {
-  const currentUnit = Session.get('currentTdfUnit');
-  const currentStimuliSet = Session.get('currentStimuliSet');
-  const clusterListSource = resolveSparcSessionClusterListSource(currentUnit)
-    ?? resolveLearningSessionClusterListSource(currentUnit, false);
-  if (!clusterListSource || !Array.isArray(currentStimuliSet)) {
-    return 0;
+function addActiveClusterIndex(value: unknown, activeClusterIndexes: Set<number>) {
+  const clusterIndex = Number(value);
+  if (Number.isInteger(clusterIndex) && clusterIndex >= 0) {
+    activeClusterIndexes.add(clusterIndex);
   }
+}
 
+function collectSparcPageClusterReferences(source: unknown, activeClusterIndexes: Set<number>) {
+  if (!source || typeof source !== 'object') {
+    return;
+  }
+  if (Array.isArray(source)) {
+    for (const item of source) {
+      collectSparcPageClusterReferences(item, activeClusterIndexes);
+    }
+    return;
+  }
+  const record = source as Record<string, unknown>;
+  if (record.clusterIndex !== undefined && typeof record.clusterIndex !== 'object') {
+    addActiveClusterIndex(record.clusterIndex, activeClusterIndexes);
+  }
+  if (Array.isArray(record.clusterIndices)) {
+    for (const clusterIndex of record.clusterIndices) {
+      addActiveClusterIndex(clusterIndex, activeClusterIndexes);
+    }
+  }
+  for (const value of Object.values(record)) {
+    collectSparcPageClusterReferences(value, activeClusterIndexes);
+  }
+}
+
+function getActiveClusterIndexesFromClusterList(clusterListSource: unknown) {
+  const activeClusterIndexes = new Set<number>();
+  if (!clusterListSource) {
+    return activeClusterIndexes;
+  }
   const clusterFields: string[] = [];
   extractDelimFields(clusterListSource, clusterFields);
-
-  const activeClusterIndexes = new Set<number>();
   for (const field of clusterFields) {
     if (field.includes('-')) {
       for (const value of rangeVal(field)) {
-        activeClusterIndexes.add(value);
+        addActiveClusterIndex(value, activeClusterIndexes);
       }
     } else {
-      const value = legacyInt(field, Number.NaN);
-      if (Number.isFinite(value)) {
-        activeClusterIndexes.add(value);
-      }
+      addActiveClusterIndex(legacyInt(field, Number.NaN), activeClusterIndexes);
     }
   }
+  return activeClusterIndexes;
+}
 
-  if (activeClusterIndexes.size === 0) {
+function getActiveClusterIndexesForCurrentUnit(currentUnit: any) {
+  if (!currentUnit?.sparcsession) {
+    return getActiveClusterIndexesFromClusterList(resolveLearningSessionClusterListSource(currentUnit, false));
+  }
+  const pageId = resolveSparcSessionPageId(currentUnit);
+  const tdfDoc = Session.get('currentTdfDoc') as { rawStimuliFile?: { setspec?: { sparcPages?: unknown[] } } } | null | undefined;
+  const sparcPages = tdfDoc?.rawStimuliFile?.setspec?.sparcPages;
+  const page = Array.isArray(sparcPages) && pageId
+    ? sparcPages.find((candidate) =>
+      candidate && typeof candidate === 'object' && (candidate as Record<string, unknown>).pageId === pageId
+    )
+    : Array.isArray(sparcPages) && sparcPages.length === 1
+      ? sparcPages[0]
+    : null;
+  const activeClusterIndexes = new Set<number>();
+  collectSparcPageClusterReferences(page && typeof page === 'object'
+    ? (page as Record<string, unknown>).display
+    : null, activeClusterIndexes);
+  return activeClusterIndexes;
+}
+
+function getCurrentUnitStimulusCount(): number {
+  const currentUnit = Session.get('currentTdfUnit');
+  const currentStimuliSet = Session.get('currentStimuliSet');
+  if (!Array.isArray(currentStimuliSet)) {
     return 0;
   }
+  const activeClusterIndexes = getActiveClusterIndexesForCurrentUnit(currentUnit);
+  if (activeClusterIndexes.size === 0) return 0;
 
   const nestedClusters = getNestedStimulusClustersFromTdfFile({
     tdfFile: Session.get('currentTdfFile'),

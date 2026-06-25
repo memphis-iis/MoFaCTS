@@ -508,6 +508,26 @@
                 "grid_columns": 4
               }
             },
+            "srfilterclose": {
+              "title": "Filter close speech answers.",
+              "description": "Remove phonetically close non-target answers from the speech-recognition grammar.",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                {
+                  "type": "boolean"
+                }
+              ],
+              "default": "true",
+              "options": {
+                "grid_columns": 4
+              }
+            },
             "speechOutOfGrammarFeedback": {
               "title": "Message for ignored speech input.",
               "description": "Feedback shown when out-of-grammar speech is discarded.",

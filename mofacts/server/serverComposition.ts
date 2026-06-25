@@ -38,6 +38,7 @@ import { getResponseKCAnswerKey } from '../common/lib/responseKCAnswerKey';
 import { validateAutoTutorContent } from '../common/lib/autoTutorContract';
 import { computePracticeTimeMs } from '../lib/practiceTime';
 import { createServerUtilityHelpers } from './lib/serverUtilities';
+import { createTdfRuntimeLifecycleHelpers } from './lib/tdfRuntimeLifecycle';
 import { createStimulusLookupHelpers } from './lib/stimulusLookup';
 import { createAccessMethods } from './methods/accessMethods';
 import { createAdminMethods } from './methods/adminMethods';
@@ -45,6 +46,7 @@ import { createAnalyticsMethods } from './methods/analyticsMethods';
 import { createAuthMethods } from './methods/authMethods';
 import { createContentMethods } from './methods/contentMethods';
 import { createCourseMethods } from './methods/courseMethods';
+import type { CourseAssignmentHistoryContext } from '../common/courseAssignments.contracts';
 import { createDashboardCacheMethods } from './methods/dashboardCacheMethods';
 import { createDeploymentReadinessMethods } from './methods/deploymentReadinessMethods';
 import { createBackupMethods, createBackupRegistry } from './methods/backupMethods';
@@ -252,9 +254,6 @@ serverConsole('thisServerUrl: ' + thisServerUrl);
 // const clozeGeneration = require('./lib/Process.js');
 
 const serverUtilities = createServerUtilityHelpers({
-  Assignments,
-  Histories,
-  GlobalExperimentStates,
   ErrorReports,
   findUsersByIds: (userIds) => MeteorAny.users.find(
     { _id: { $in: userIds } },
@@ -273,7 +272,6 @@ const {
   buildDiskUsageStatus,
   sendEmail,
   sendErrorReportSummaries,
-  deleteTdfRuntimeData,
 } = serverUtilities;
 
 const stimulusLookupHelpers = createStimulusLookupHelpers({
@@ -330,8 +328,20 @@ const {
   ...publicCourseMethods
 } = courseMethods as Record<string, unknown>;
 const resolveAssignedRootTdfIdsForUser = resolveAssignedRootTdfIdsForUserMethod as (userId: string) => Promise<string[]>;
+const invalidateCourseSnapshotsForCourse = _invalidateCourseSnapshotsForCourse as (courseId: string, reason: string) => Promise<unknown>;
+const invalidateCourseSnapshotsForAssignment = _invalidateCourseSnapshotsForAssignment as (assignmentId: string, reason: string) => Promise<unknown>;
 const refreshCourseSnapshotAfterPractice = refreshCourseSnapshotAfterPracticeMethod as (userId: string, TDFId: string) => Promise<void>;
 const getTdfNamesByOwnerId = getTdfNamesByOwnerIdMethod as (ownerId: string) => Promise<string[] | null>;
+
+const {
+  deleteTdfRuntimeData,
+} = createTdfRuntimeLifecycleHelpers({
+  Assignments,
+  Histories,
+  GlobalExperimentStates,
+  invalidateCourseSnapshotsForCourse,
+  invalidateCourseSnapshotsForAssignment,
+});
 
 const tdfLookupHelpers = createTdfLookupHelpers({
   serverConsole,
@@ -877,6 +887,7 @@ function buildPublicExperimentEntry(tdf: any) {
     'experimentTarget',
     'experimentPasswordRequired',
     'speechIgnoreOutOfGrammarResponses',
+    'srfilterclose',
     'speechOutOfGrammarFeedback',
     'showPageNumbers',
     'audioPromptMode',
@@ -978,9 +989,13 @@ async function getStimuliSetByIdPublic(this: MethodContext, stimuliSetId: string
   throw new Meteor.Error(403, 'Not authorized to access this stimulus set');
 }
 
-async function getResponseKCMapForTdfPublic(this: MethodContext, tdfId: string) {
+async function getResponseKCMapForTdfPublic(
+  this: MethodContext,
+  tdfId: string,
+  options: { courseAssignment?: CourseAssignmentHistoryContext | null } = {},
+) {
   const userId = requireAuthenticatedUser(this.userId, 'Must be logged in to access response mappings', 401);
-  await getTdfById.call({ userId }, tdfId);
+  await getTdfById.call({ userId }, tdfId, options);
   return await getResponseKCMapForTdf(tdfId);
 }
 

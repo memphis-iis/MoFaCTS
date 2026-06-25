@@ -61,16 +61,16 @@
             {{#if hasAssignedAssignments}}
               <div class="practice-section">
                 <div class="practice-section-heading">Assigned courses</div>
-                {{> courseAssignmentTable assignments=assignedAssignments}}
-                {{> courseAssignmentCards assignments=assignedAssignments}}
+                {{> courseAssignmentTable courses=assignedCourses}}
+                {{> courseAssignmentCards courses=assignedCourses}}
               </div>
             {{/if}}
 
             <div class="practice-section">
               <div class="practice-section-heading">Public courses</div>
               {{#if hasPublicAssignments}}
-                {{> courseAssignmentTable assignments=publicAssignments}}
-                {{> courseAssignmentCards assignments=publicAssignments}}
+                {{> courseAssignmentTable courses=publicCourses}}
+                {{> courseAssignmentCards courses=publicCourses}}
               {{else}}
                 <div class="practice-empty-state">
                   <p class="learning-dashboard-flush">No public courses are available.</p>
@@ -87,7 +87,7 @@
 <template name="courseAssignmentTable">
   <div class="learning-dashboard-table-shell course-assignment-table-shell">
     <div class="table-wrap">
-      <table class="practice-table learning-dashboard-table course-assignment-table">
+      <table class="practice-table learning-dashboard-table course-assignment-table" role="treegrid">
         <colgroup>
           <col class="course-assignment-col-action">
           <col class="course-assignment-col-course">
@@ -117,8 +117,13 @@
           </tr>
         </thead>
         <tbody>
-          {{#each assignments}}
-            {{> courseAssignmentTableRow}}
+          {{#each courses}}
+            {{> courseTreeCourseRow}}
+            {{#if expanded}}
+              {{#each assignments}}
+                {{> courseAssignmentTableRow}}
+              {{/each}}
+            {{/if}}
           {{/each}}
         </tbody>
       </table>
@@ -126,8 +131,59 @@
   </div>
 </template>
 
+<template name="courseTreeCourseRow">
+  <tr id="{{rowId}}" class="learning-dashboard-row course-tree-course-row" role="row" aria-level="1" aria-expanded="{{#if expanded}}true{{else}}false{{/if}}">
+    <td class="learning-dashboard-cell learning-dashboard-cell--action" data-label="Action">
+      <span class="learning-dashboard-cell__value course-tree-parent-action">-</span>
+    </td>
+    <th scope="row" class="learning-dashboard-cell course-assignment-cell--course" data-label="Course">
+      <button type="button" class="course-tree-toggle toggle-course-tree"
+        data-courseid="{{courseId}}"
+        aria-expanded="{{#if expanded}}true{{else}}false{{/if}}">
+        <span class="fa {{#if expanded}}fa-chevron-down{{else}}fa-chevron-right{{/if}}" aria-hidden="true"></span>
+        <span class="course-assignment-course">
+          <span class="set-name course-assignment-course-name" title="{{courseName}}">{{courseName}}</span>
+          <span class="course-assignment-subline">{{teacherDisplayName}}</span>
+          <span class="course-assignment-subline">{{courseScheduleLabel}}</span>
+          <span class="course-assignment-badges">
+            <span class="badge bg-secondary course-assignment-badge">{{membershipLabel}}</span>
+            <span class="course-assignment-timezone">{{timezoneLabel}}</span>
+          </span>
+        </span>
+      </button>
+    </th>
+    <td class="learning-dashboard-cell course-assignment-cell--assignment" data-label="Assignment">
+      <span class="learning-dashboard-cell__value course-tree-assignment-count">{{assignmentCountLabel}}</span>
+    </td>
+    <td class="learning-dashboard-cell course-assignment-cell--status" data-label="Status">
+      <span class="learning-dashboard-cell__value">-</span>
+    </td>
+    <td class="learning-dashboard-cell course-assignment-cell--date" data-label="Due">
+      <span class="learning-dashboard-cell__value">-</span>
+    </td>
+    <td class="learning-dashboard-cell learning-dashboard-cell--stat num" data-label="Trials">
+      <span class="learning-dashboard-cell__value">-</span>
+    </td>
+    <td class="learning-dashboard-cell learning-dashboard-cell--stat accuracy-cell" data-label="Accuracy">
+      <span class="learning-dashboard-cell__value">-</span>
+    </td>
+    <td class="learning-dashboard-cell learning-dashboard-cell--stat num" data-label="Items">
+      <span class="learning-dashboard-cell__value">-</span>
+    </td>
+    <td class="learning-dashboard-cell learning-dashboard-cell--stat num" data-label="Days">
+      <span class="learning-dashboard-cell__value">-</span>
+    </td>
+    <td class="learning-dashboard-cell learning-dashboard-cell--stat num" data-label="Time">
+      <span class="learning-dashboard-cell__value">-</span>
+    </td>
+    <td class="learning-dashboard-cell course-assignment-cell--date" data-label="Last Practice">
+      <span class="learning-dashboard-cell__value">-</span>
+    </td>
+  </tr>
+</template>
+
 <template name="courseAssignmentTableRow">
-  <tr class="learning-dashboard-row course-assignment-row {{#if isLocked}}course-assignment-row--locked{{else if isUsed}}learning-dashboard-row--used{{else}}learning-dashboard-row--unused{{/if}}">
+  <tr id="{{rowId}}" class="learning-dashboard-row course-assignment-row course-tree-assignment-row {{#if isLocked}}course-assignment-row--locked{{else if isUsed}}learning-dashboard-row--used{{else}}learning-dashboard-row--unused{{/if}}" role="row" aria-level="2">
     <td class="learning-dashboard-cell learning-dashboard-cell--action" data-label="Action">
       <div class="learning-dashboard-cell__value learning-dashboard-action">
         <button type="button" class="btn btn-sm learning-dashboard-action-button {{#if isLocked}}btn-outline-secondary{{else}}{{actionButtonClass}}{{/if}} launch-course-assignment"
@@ -140,20 +196,17 @@
       </div>
     </td>
     <th scope="row" class="learning-dashboard-cell course-assignment-cell--course" data-label="Course">
-      <div class="learning-dashboard-cell__value course-assignment-course">
-        <span class="set-name course-assignment-course-name" title="{{courseName}}">{{courseName}}</span>
-        <span class="course-assignment-subline">{{teacherDisplayName}}</span>
-        <span class="course-assignment-subline">{{courseScheduleLabel}}</span>
-        <span class="course-assignment-badges">
-          <span class="badge bg-secondary course-assignment-badge">{{membershipLabel}}</span>
-          <span class="course-assignment-timezone">{{timezoneLabel}}</span>
-        </span>
+      <div class="learning-dashboard-cell__value course-tree-child-marker">
+        <span class="course-tree-child-line" aria-hidden="true"></span>
+        <span class="course-tree-child-label">Assignment</span>
       </div>
     </th>
     <td class="learning-dashboard-cell course-assignment-cell--assignment" data-label="Assignment">
       <div class="learning-dashboard-cell__value course-assignment-lesson">
         <span class="course-assignment-title" title="{{title}}">{{title}}</span>
-        <span class="course-assignment-subline">{{releaseLabel}}</span>
+        {{#if hasReleaseLabel}}
+          <span class="course-assignment-subline">{{releaseLabel}}</span>
+        {{/if}}
       </div>
     </td>
     <td class="learning-dashboard-cell course-assignment-cell--status" data-label="Status">
@@ -188,21 +241,46 @@
 
 <template name="courseAssignmentCards">
   <div class="course-assignment-card-list">
-    {{#each assignments}}
-      {{> courseAssignmentCard}}
+    {{#each courses}}
+      {{> courseAssignmentCourseCard}}
     {{/each}}
+  </div>
+</template>
+
+<template name="courseAssignmentCourseCard">
+  <div class="learning-dashboard-card course-assignment-course-card border rounded shadow-sm">
+    <button type="button" class="course-tree-card-toggle toggle-course-tree"
+      data-courseid="{{courseId}}"
+      aria-expanded="{{#if expanded}}true{{else}}false{{/if}}">
+      <span class="course-assignment-card-title course-assignment-card-title--toggle">
+        <span class="course-tree-card-title-main">
+          <span class="fa {{#if expanded}}fa-chevron-down{{else}}fa-chevron-right{{/if}}" aria-hidden="true"></span>
+          <span>{{courseName}}</span>
+        </span>
+        <span class="badge bg-secondary course-assignment-badge">{{membershipLabel}}</span>
+      </span>
+      <span class="course-assignment-card-meta">{{teacherDisplayName}} · {{courseScheduleLabel}}</span>
+      <span class="course-assignment-card-meta">{{assignmentCountLabel}} · {{timezoneLabel}}</span>
+    </button>
+    {{#if expanded}}
+      <div id="{{rowId}}-assignments" class="course-assignment-card-children">
+        {{#each assignments}}
+          {{> courseAssignmentCard}}
+        {{/each}}
+      </div>
+    {{/if}}
   </div>
 </template>
 
 <template name="courseAssignmentCard">
   <div class="learning-dashboard-card course-assignment-card border rounded shadow-sm {{#if isLocked}}course-assignment-row--locked{{/if}}">
     <div class="learning-dashboard-card-title course-assignment-card-title">
-      <span>{{courseName}}</span>
-      <span class="badge bg-secondary course-assignment-badge">{{membershipLabel}}</span>
+      <span>{{title}}</span>
+      <span class="course-assignment-card-meta">{{statusLabel}}</span>
     </div>
-    <div class="course-assignment-card-meta">{{teacherDisplayName}} · {{courseScheduleLabel}}</div>
-    <div class="course-assignment-card-assignment">{{title}}</div>
-    <div class="course-assignment-card-meta">{{statusLabel}} · {{dueLabel}}</div>
+    <div class="course-assignment-card-meta">
+      {{#if hasReleaseLabel}}{{releaseLabel}} · {{/if}}Due {{dueLabel}}
+    </div>
     <div class="course-assignment-card-grid">
       <div>
         <span>Trials</span>

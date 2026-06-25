@@ -77,13 +77,15 @@ function clearSessionTimersForCleanup() {
   Session.set('varLenTimeoutName', null);
 }
 
-function resetSharedCardRuntimeState() {
+function resetSharedCardRuntimeState(options: { preserveCardEntryContext?: boolean } = {}) {
   Session.set('currentAnswer', undefined);
   resetAudioState();
   CardStore.resetHiddenItems();
   applySessionCleanupEntries(Session, CARD_RUNTIME_SESSION_DEFAULTS);
   clearMappingSessionStateForCleanup();
-  clearCardEntryContext();
+  if (!options.preserveCardEntryContext) {
+    clearCardEntryContext();
+  }
   CardStore.resetQuestionIndex();
   clearSessionTimersForCleanup();
   CardStore.resetReactiveDefaults();
@@ -108,7 +110,7 @@ function sessionCleanUp() {
       currentTdfUnit: Session.get('currentTdfUnit')?.unitname,
     });
 
-    resetSharedCardRuntimeState();
+    resetSharedCardRuntimeState({ preserveCardEntryContext: true });
     Session.set('fromInstructions', false);
     return;
   }

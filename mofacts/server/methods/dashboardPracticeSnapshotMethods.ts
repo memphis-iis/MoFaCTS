@@ -108,6 +108,7 @@ async function getDashboardVisibleTdfs(deps: DashboardPracticeSnapshotDeps, user
     'content.tdfs.tutor.setspec.condition': 1,
     'content.tdfs.tutor.setspec.conditionTdfIds': 1,
     'content.tdfs.tutor.setspec.audioInputEnabled': 1,
+    'content.tdfs.tutor.setspec.srfilterclose': 1,
     'content.tdfs.tutor.setspec.enableAudioPromptAndFeedback': 1,
     'content.tdfs.tutor.setspec.speechAPIKey': 1,
     'content.tdfs.tutor.setspec.textToSpeechAPIKey': 1,

@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import { Session } from 'meteor/session';
 import { sessionCleanUp, clearMappingSessionStateForCleanup } from './sessionUtils';
+import { CARD_ENTRY_INTENT, getCardEntryIntent, setCardEntryIntent } from './cardEntryIntent';
 import {
   CARD_LAUNCH_PRESERVED_UNIT_KEYS,
   LEGACY_SUBMISSION_LOCK_KEY,
@@ -24,6 +25,8 @@ describe('sessionUtils mapping cleanup', function() {
     Session.set('currentTdfUnit', undefined);
     Session.set('currentRootTdfId', undefined);
     Session.set('currentAnswer', undefined);
+    Session.set('cardEntryIntent', undefined);
+    Session.set('courseAssignmentLaunchContext', null);
     Session.set(LEGACY_SUBMISSION_LOCK_KEY, false);
   });
 
@@ -82,6 +85,12 @@ describe('sessionUtils mapping cleanup', function() {
     Session.set('currentRootTdfId', 'root-a');
     Session.set('currentAnswer', 'stale answer');
     Session.set(LEGACY_SUBMISSION_LOCK_KEY, true);
+    setCardEntryIntent(CARD_ENTRY_INTENT.INSTRUCTION_CONTINUE, {
+      source: 'session-utils-test',
+      rootTdfId: 'root-a',
+      currentTdfId: 'tdf-a',
+      unitNumber: 2,
+    });
     Object.defineProperty(document, 'location', {
       value: { pathname: '/card' },
       writable: true,
@@ -99,6 +108,7 @@ describe('sessionUtils mapping cleanup', function() {
     expect(Session.get('currentAnswer')).to.equal(undefined);
     expect(Session.get(LEGACY_SUBMISSION_LOCK_KEY)).to.equal(false);
     expect(Session.get('filter')).to.equal(USER_ADMIN_DEFAULT_FILTER);
+    expect(getCardEntryIntent()).to.equal(CARD_ENTRY_INTENT.INSTRUCTION_CONTINUE);
   });
 
   it('clears unit launch keys during full cleanup', function() {
@@ -109,6 +119,12 @@ describe('sessionUtils mapping cleanup', function() {
     Session.set('currentTdfUnit', { unitname: 'Unit 2' });
     Session.set('currentRootTdfId', 'root-a');
     Session.set('currentScore', 12);
+    Session.set('courseAssignmentLaunchContext', {
+      assignmentId: 'assignment-1',
+      courseId: 'course-1',
+      TDFId: 'tdf-a',
+      launchSource: 'courses',
+    });
     Object.defineProperty(document, 'location', {
       value: { pathname: '/experimentList' },
       writable: true,
@@ -124,5 +140,6 @@ describe('sessionUtils mapping cleanup', function() {
     expect(Session.get('currentRootTdfId')).to.equal(undefined);
     expect(Session.get('currentScore')).to.equal(0);
     expect(Session.get('curUnitInstructionsSeen')).to.equal(false);
+    expect(Session.get('courseAssignmentLaunchContext')).to.equal(null);
   });
 });
