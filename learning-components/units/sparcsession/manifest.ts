@@ -79,7 +79,6 @@ export const sparcSessionUnitComponentManifest: LearningComponentManifest<Create
         getDeliverySettings: currentDeps.deliverySettings.getDeliverySettings,
         getStimCount: currentDeps.stimuli.getStimCount,
         getStimCluster: currentDeps.stimuli.getStimCluster,
-        getStimKCBaseForCurrentStimuliSet: currentDeps.stimuli.getStimKCBaseForCurrentStimuliSet,
         getTestType: currentDeps.stimuli.getTestType,
         getHiddenItems: currentDeps.adaptiveModel.getHiddenItems,
         setNumVisibleCards: currentDeps.adaptiveModel.setNumVisibleCards,

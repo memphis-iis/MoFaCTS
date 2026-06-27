@@ -27,7 +27,6 @@ function createMinimalDeps(overrides: Record<string, unknown> = {}): any {
     getDeliverySettings: () => ({}),
     getStimCount: () => 0,
     getStimCluster: () => ({ stims: [] }),
-    getStimKCBaseForCurrentStimuliSet: () => [],
     getTestType: () => 'd',
     getHiddenItems: () => [],
     setNumVisibleCards() {},

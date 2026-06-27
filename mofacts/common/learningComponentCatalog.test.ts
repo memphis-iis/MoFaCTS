@@ -28,7 +28,6 @@ describe('Learning component catalog', function() {
       stimuli: {
         getStimCount: () => 0,
         getStimCluster: () => ({}),
-        getStimKCBaseForCurrentStimuliSet: () => 0,
         getTestType: () => '',
         getDisplayAnswerText: () => '',
         extractDelimFields() {},

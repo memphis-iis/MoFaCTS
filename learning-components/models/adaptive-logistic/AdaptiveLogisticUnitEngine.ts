@@ -102,7 +102,6 @@ export interface CreateAdaptiveLogisticUnitEngineDeps {
   readonly getDeliverySettings: () => Record<string, any>;
   readonly getStimCount: () => number;
   readonly getStimCluster: (clusterIndex: any) => StimClusterLike;
-  readonly getStimKCBaseForCurrentStimuliSet: () => any;
   readonly getTestType: () => string;
   readonly getHiddenItems: () => unknown[];
   readonly setNumVisibleCards: (numVisibleCards: number) => void;
@@ -248,7 +247,6 @@ export async function createAdaptiveLogisticUnitEngine(
     initializeLogisticModelState: async function() {
       await initializeLearningModelState({
         numQuestions: deps.getStimCount(),
-        curKCBase: deps.getStimKCBaseForCurrentStimuliSet(),
         currentTdfId: deps.getSessionValue('currentTdfId'),
         currentTdfUnit: deps.getSessionValue('currentTdfUnit'),
         currentUnitNumber: deps.getSessionValue('currentUnitNumber'),

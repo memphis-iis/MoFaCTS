@@ -6,7 +6,6 @@ import {
   rangeVal,
   getStimCount,
   getStimCluster,
-  getStimKCBaseForCurrentStimuliSet,
   getTestType,
   updateCurStudentPerformance,
   updateCurStudedentPracticeTime
@@ -113,7 +112,6 @@ export function createAppUnitEngineRuntimeContext(): AppUnitEngineRuntimeContext
     stimuli: {
       getStimCount,
       getStimCluster: (clusterIndex) => getStimCluster(clusterIndex) as any,
-      getStimKCBaseForCurrentStimuliSet,
       getTestType,
       getDisplayAnswerText: (answer) => Answers.getDisplayAnswerText(answer),
       extractDelimFields,

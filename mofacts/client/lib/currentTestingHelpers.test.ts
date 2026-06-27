@@ -116,14 +116,55 @@ describe('currentTestingHelpers nested stimulus clusters', function() {
     });
   });
 
-  it('returns null when nested clusters are unavailable so legacy flat access can continue', function() {
-    expect(getNestedStimulusClustersFromTdfFile({
+  it('uses the canonical TDF document when currentTdfFile omits raw stimuli', function() {
+    const clusters = getNestedStimulusClustersFromTdfFile({
+      tdfFile: {
+        stimuliSetId: 'stim-set-1',
+        fileName: 'Fraction KC Definitions_TDF.json',
+        tdfs: { tutor: { setspec: { lessonname: 'Fraction KC Definitions' } } },
+      },
+      currentTdfDoc: {
+        rawStimuliFile: {
+          setspec: {
+            clusters: [{
+              clusterKC: 'fractions.lcd',
+              stims: [{
+                display: { text: 'Find the least common denominator.' },
+                response: { correctResponse: 'lcd' },
+                parameter: '0,0.8',
+              }],
+            }],
+          },
+        },
+      },
+      currentStimuliSetId: 'stim-set-1',
+      currentStimuliSet: [{
+        stimuliSetId: 'stim-set-1',
+        clusterKC: 10000,
+        stimulusKC: 10001,
+        correctResponse: 'legacy numeric answer',
+        params: '0,0.7',
+      }],
+    });
+
+    expect(clusters[0]?.clusterKC).to.equal('fractions.lcd');
+    expect(clusters[0]?.stims[0]).to.deep.include({
+      clusterKC: 'fractions.lcd',
+      stimulusKC: 10001,
+      correctResponse: 'lcd',
+      textStimulus: 'Find the least common denominator.',
+    });
+  });
+
+  it('fails clearly instead of falling back to numeric clusterKC when raw clusters are unavailable', function() {
+    expect(() => getNestedStimulusClustersFromTdfFile({
       tdfFile: { stimuliSetId: 'stim-set-1' },
+      currentTdfId: 'tdf-without-raw-clusters',
       currentStimuliSetId: 'stim-set-1',
       currentStimuliSet: [{
         clusterKC: 10000,
         stimulusKC: 10001,
       }],
-    })).to.equal(null);
+    })).to.throw('refusing numeric clusterKC fallback');
   });
 });

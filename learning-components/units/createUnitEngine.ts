@@ -43,7 +43,6 @@ export interface UnitEngineDeliverySettingsRuntime {
 export interface UnitEngineStimuliRuntime {
   readonly getStimCount: () => number;
   readonly getStimCluster: (clusterIndex: any) => any;
-  readonly getStimKCBaseForCurrentStimuliSet: () => any;
   readonly getTestType: () => string;
   readonly getDisplayAnswerText: (answer: any) => string;
   readonly extractDelimFields: (source: any, target: any[]) => void;
@@ -174,7 +173,7 @@ export function getCreateUnitEngineCapabilitySet(
   if (hasRuntimeFunctions(deps.deliverySettings, 'getDeliverySettings')) {
     capabilities.add('delivery-settings');
   }
-  if (hasRuntimeFunctions(deps.stimuli, 'getStimCount', 'getStimCluster', 'getStimKCBaseForCurrentStimuliSet')) {
+  if (hasRuntimeFunctions(deps.stimuli, 'getStimCount', 'getStimCluster')) {
     capabilities.add('stimuli');
   }
   if (hasRuntimeFunctions(deps.cardState, 'setQuestionIndex')) {

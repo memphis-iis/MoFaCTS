@@ -7,7 +7,6 @@ import {
 
 export interface InitializeLearningModelStateParams {
   readonly numQuestions: number;
-  readonly curKCBase: any;
   readonly currentTdfId: any;
   readonly currentTdfUnit: any;
   readonly currentUnitNumber: any;
@@ -28,7 +27,7 @@ export interface InitializeLearningModelStateParams {
 export async function initializeLearningModelState(
   params: InitializeLearningModelStateParams,
 ): Promise<void> {
-  params.log(1, 'initializeLogisticModelState', params.numQuestions, params.curKCBase);
+  params.log(1, 'initializeLogisticModelState', params.numQuestions);
   const stimulusKCs = collectStimulusKCsForCrowdStats(params.stimClusters);
   const [responseKCMap, crowdStats] = await Promise.all([
     params.getResponseKCMapForTdf(params.currentTdfId),

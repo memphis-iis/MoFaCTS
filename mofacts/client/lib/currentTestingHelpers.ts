@@ -1,4 +1,3 @@
-import {KC_MULTIPLE} from '../../common/Definitions';
 import { _ as underscore } from 'meteor/underscore';
 import { Meteor } from 'meteor/meteor';
 import { clientConsole } from './userSessionHelpers';
@@ -177,7 +176,15 @@ type FlatStimulus = Record<string, any> & {
   stimulusKC?: unknown;
 };
 
-export { extractDelimFields, rangeVal, shuffle, randomChoice, search, getUserDisplayIdentifier, haveMeteorUser, updateCurStudentPerformance, updateCurStudedentPracticeTime, setStudentPerformance, getStimCount, getStimCluster, getStimKCBaseForCurrentStimuliSet, createStimClusterMapping, getAllCurrentStimAnswers, getStimAnswerDisplayCase, getTestType, getCurrentDeliverySettings, refreshCurrentDeliverySettingsStore, getCurrentTheme, applyThemeCSSProperties, getNestedStimulusClustersFromTdfFile };
+type NestedStimulusClusterSourceParams = {
+  tdfFile: any;
+  currentStimuliSet: unknown;
+  currentStimuliSetId: unknown;
+  currentTdfId?: unknown;
+  currentTdfDoc?: any;
+};
+
+export { extractDelimFields, rangeVal, shuffle, randomChoice, search, getUserDisplayIdentifier, haveMeteorUser, updateCurStudentPerformance, updateCurStudedentPracticeTime, setStudentPerformance, getStimCount, getStimCluster, createStimClusterMapping, getAllCurrentStimAnswers, getStimAnswerDisplayCase, getTestType, getCurrentDeliverySettings, refreshCurrentDeliverySettingsStore, getCurrentTheme, applyThemeCSSProperties, getNestedStimulusClustersFromTdfFile };
 
 
 // ===== PHASE 1.5 OPTIMIZATION: Theme Subscription =====
@@ -703,26 +710,15 @@ function getCurrentUnitStimulusCount(): number {
     tdfFile: Session.get('currentTdfFile'),
     currentStimuliSet,
     currentStimuliSetId: Session.get('currentStimuliSetId'),
+    currentTdfId: Session.get('currentTdfId'),
   });
-  if (nestedClusters) {
-    let totalStimCount = 0;
-    for (const clusterIndex of activeClusterIndexes) {
-      const cluster = nestedClusters[clusterIndex];
-      if (cluster) {
-        totalStimCount += cluster.stims.length;
-      }
-    }
-    return totalStimCount;
-  }
-
   let totalStimCount = 0;
-  for (const stim of currentStimuliSet) {
-    const clusterIndex = Number(stim?.clusterKC) % KC_MULTIPLE;
-    if (activeClusterIndexes.has(clusterIndex)) {
-      totalStimCount += 1;
+  for (const clusterIndex of activeClusterIndexes) {
+    const cluster = nestedClusters[clusterIndex];
+    if (cluster) {
+      totalStimCount += cluster.stims.length;
     }
   }
-
   return totalStimCount;
 }
 
@@ -783,9 +779,34 @@ async function setStudentPerformance(
     'incorrect:', studentPerformance.numIncorrect, 'percent:', studentPerformance.percentCorrect);
 }
 
-function getRawStimulusClustersFromTdfFile(tdfFile: any): RawStimulusCluster[] | null {
-  const clusters = tdfFile?.rawStimuliFile?.setspec?.clusters;
+function getRawStimulusClustersFromTdfDocument(tdfDocument: any): RawStimulusCluster[] | null {
+  const clusters = tdfDocument?.rawStimuliFile?.setspec?.clusters;
   return Array.isArray(clusters) ? clusters : null;
+}
+
+function findCanonicalTdfDocument(tdfId: unknown): any | null {
+  const normalizedTdfId = typeof tdfId === 'string' ? tdfId.trim() : '';
+  if (!normalizedTdfId) {
+    return null;
+  }
+  return (globalThis as any).Tdfs?.findOne?.({ _id: normalizedTdfId }) ?? null;
+}
+
+function getRawStimulusClusters(params: Pick<NestedStimulusClusterSourceParams, 'tdfFile' | 'currentTdfId' | 'currentTdfDoc'>): RawStimulusCluster[] {
+  const directClusters = getRawStimulusClustersFromTdfDocument(params.tdfFile);
+  if (directClusters) {
+    return directClusters;
+  }
+
+  const canonicalTdf = params.currentTdfDoc ?? findCanonicalTdfDocument(params.currentTdfId);
+  const canonicalClusters = getRawStimulusClustersFromTdfDocument(canonicalTdf);
+  if (canonicalClusters) {
+    return canonicalClusters;
+  }
+
+  throw new Error(
+    `[Unit Engine] Current TDF ${String(params.currentTdfId ?? '')} is missing rawStimuliFile.setspec.clusters; refusing numeric clusterKC fallback.`
+  );
 }
 
 function flattenLegacyStimuliByNestedPosition(flatStimuli: unknown): FlatStimulus[] {
@@ -857,15 +878,8 @@ function createRuntimeStimulusFromNestedSource(params: {
   };
 }
 
-function getNestedStimulusClustersFromTdfFile(params: {
-  tdfFile: any;
-  currentStimuliSet: unknown;
-  currentStimuliSetId: unknown;
-}): StimCluster[] | null {
-  const rawClusters = getRawStimulusClustersFromTdfFile(params.tdfFile);
-  if (!rawClusters) {
-    return null;
-  }
+function getNestedStimulusClustersFromTdfFile(params: NestedStimulusClusterSourceParams): StimCluster[] {
+  const rawClusters = getRawStimulusClusters(params);
   const flatStimuli = flattenLegacyStimuliByNestedPosition(params.currentStimuliSet);
   let flatIndex = 0;
   return rawClusters.map((rawCluster, clusterIndex) => {
@@ -900,23 +914,9 @@ function getStimCount() {
     tdfFile: Session.get('currentTdfFile'),
     currentStimuliSet: Session.get('currentStimuliSet'),
     currentStimuliSetId: Session.get('currentStimuliSetId'),
+    currentTdfId: Session.get('currentTdfId'),
   });
-  if (nestedClusters) {
-    return nestedClusters.length;
-  }
-  const stimSet = Session.get('currentStimuliSet');
-  if (!Array.isArray(stimSet)) {
-    return 0;
-  }
-  let numClusters = 0;
-  const seenClusters: Record<string, boolean> = {};
-  for (const stim of stimSet) {
-    if (!seenClusters[stim.clusterKC]) {
-      seenClusters[stim.clusterKC] = true;
-      numClusters += 1;
-    }
-  }
-  return numClusters;
+  return nestedClusters.length;
 }
 
 // Return the stim file cluster matching the index AFTER mapping it per the
@@ -940,37 +940,16 @@ function getStimCluster(clusterMappedIndex=0): StimCluster {
     tdfFile: Session.get('currentTdfFile'),
     currentStimuliSet: Session.get('currentStimuliSet'),
     currentStimuliSetId: Session.get('currentStimuliSetId'),
+    currentTdfId: Session.get('currentTdfId'),
   });
-  if (nestedClusters) {
-    const nestedCluster = nestedClusters[rawIndex];
-    if (!nestedCluster) {
-      return cluster;
-    }
-    return {
-      ...nestedCluster,
-      shufIndex: clusterMappedIndex,
-    };
-  }
-  const stimuliSet = Session.get('currentStimuliSet');
-  if (!stimuliSet) {
-    // Return empty cluster if stimuli not loaded yet - prevents iteration error during early initialization
+  const nestedCluster = nestedClusters[rawIndex];
+  if (!nestedCluster) {
     return cluster;
   }
-  for (const stim of stimuliSet) {
-    if (stim.clusterKC % KC_MULTIPLE == rawIndex) {
-      cluster.stims.push(stim);
-    }
-  }
-  // let cluster = cachedStimu.stimu.setspec.clusters[mappedIndex];
-  return cluster;
-}
-
-function getStimKCBaseForCurrentStimuliSet() {
-  if (Session.get('currentStimuliSet')) {
-    const oneOrderOfMagnitudeLess = (KC_MULTIPLE / 10);
-    return Math.round((Session.get('currentStimuliSet')[0].clusterKC) / oneOrderOfMagnitudeLess) *
-       oneOrderOfMagnitudeLess;
-  }
+  return {
+    ...nestedCluster,
+    shufIndex: clusterMappedIndex,
+  };
 }
 
 // Given a cluster count, a shuffleclusters string, and a swapclusters string,
