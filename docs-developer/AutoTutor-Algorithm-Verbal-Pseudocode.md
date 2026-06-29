@@ -16,12 +16,14 @@ The short version: the scorer LLM returns semantic scores and classifications; t
 The current hard-coded planner defaults are:
 
 - Coverage threshold: `0.8`. An expectation is treated as covered when `coverage >= 0.8`.
-- Misconception threshold: `0.65`. A misconception is eligible for correction when `current === true`, `repaired !== true`, and `confidence >= 0.65`.
-- Focus budget: `6` turns. A focused expectation can normally be continued while `focusTurnCount < 6`; low-agency learner contributions can keep the tutor on the same focus even after that.
+- Misconception threshold: `0.65`. A misconception is eligible for correction when `current === true`, `repaired !== true`, and `confidence >= 0.65`. pp overloaded current is opposit of repaired
+- Focus budget: `6` turns. A focused expectation can normally be continued while `focusTurnCount < 6`; low-agency learner contributions can keep the tutor on the same focus even after that. pp evaluate the exact function
 - Priority weights: `frontierWeight = 0.5`, `coherenceWeight = 0.3`, and `centralityWeight = 0.2`.
 - Near-threshold prompt rule: an expectation gets a prompt when `coverage >= 0.8 * 0.75`, meaning `coverage >= 0.6`, and `coverage < 0.8`.
 - Cost cap: `$0.20`. A session stops for cost when accumulated `costUsd >= 0.20`.
 - Default utterance temperature: `0.45` unless `autotutorsession.utteranceTemperature` supplies another valid value.
+
+## pp near threshold prompt rule (also cycling below)
 
 The authored unit also supplies parameters that vary by lesson:
 
@@ -61,13 +63,17 @@ The authored model comes from the AutoTutor script and session config:
 The runtime model is the evolving AutoTutor state:
 
 - Operational phase, transition log, and pedagogical state.
-- Planner state: focused expectation, focused misconception, last covered expectation, last selected target, focus-turn count, move-cycle index, misconception-cycle index, contribution streak, expectation scores, and misconception scores.
+- Planner state: focused expectation, focused misconception, last covered expectation, last selected target, focus-turn count, move-cycle index, misconception-cycle index, contribution streak, expectation scores, and misconception scores. pp student state and planner state seperation pp key to generalize
 - Expectation scores: current, coverage, evidence, missing pieces, post-assertion flags, frontier, coherence, centrality, and priority.
 - Misconception scores: current, confidence, evidence, repaired flag, and repair evidence.
 - Learner contribution classification, learner-question classification, answer quality, selected move, turn count, accumulated cost, progress, completion flags, and end reason.
 - Dialogue history as student/tutor turns.
 
+pp need to genralize to firetutor
+
 History is canonical state, not loose transcript reconstruction. Each turn writes a compressed history record whose note includes the AutoTutor script ID, the resumable state summary, progress, completion flags, end reason, cost-stop flag, and tutor message. On resume, `applySavedAutoTutorHistory(...)` rebuilds the visible dialogue from the saved rows, reads the latest AutoTutor note, verifies the saved `scriptId`, validates the end-state flags, validates the saved operational and pedagogical state, and restores the exact planner scores and counters. Missing or contradictory saved state fails clearly instead of being inferred from text.
+
+pp needs to treat expectations as clusters 
 
 ## AI Decisions Versus App Decisions
 
@@ -75,7 +81,7 @@ AutoTutor uses two LLM calls per normal learner turn.
 
 The scoring call is semantic interpretation. The LLM receives the authored script, scoreable expectation IDs, misconception rubric, current planner state, and dialogue context. It returns strict JSON with expectation coverage, misconception state, answer quality, learner contribution type, and learner-question metadata. It is explicitly told not to choose the dialogue target, choose the dialogue move, or write the tutor response.
 
-The application then validates the score envelope, validates IDs, applies explicit state-update rules to expectation and misconception scores, recomputes priority values, selects a target, selects a move, updates turn counters and end state, and records the selected pedagogical state.
+The application then validates the score envelope, validates IDs, applies explicit state-update rules to expectation and misconception scores, pp and what are these? recomputes priority values, selects a target, selects a move, updates turn counters and end state, and records the selected pedagogical state.
 
 The utterance call is realization. The LLM receives the selected plan, selected pedagogical state, relevant target content, scored planner state, learner contribution metadata, and dialogue history. It must return strict JSON containing `targetType`, `targetId`, `selectedMove`, and `tutorMessage`. Validation rejects the response if the utterance model changes the target type, target ID, or selected move. The utterance model also may not expose internal expectation or misconception IDs in the tutor message.
 
@@ -109,7 +115,7 @@ After these expectation and misconception score updates, the planner recomputes 
 1. If the learner contribution is a substantive question and `learnerQuestion.current` is true, target `learner_question`.
 2. Else, if there is an active unrepaired misconception with `confidence >= 0.65`, target the highest-confidence misconception, unless the learner contribution is low-agency.
 3. Else, if all required expectations have `coverage >= 0.8`, target `completion`.
-4. Else, if the current focused expectation is still required, still has `coverage < 0.8`, and `focusTurnCount < 6`, continue that expectation. Low-agency contributions can keep the tutor on the current focus even after the usual focus budget.
+pp huh 4. Else, if the current focused expectation is still required, still has `coverage < 0.8`, and `focusTurnCount < 6`, continue that expectation. Low-agency contributions can keep the tutor on the current focus even after the usual focus budget.
 5. Else, choose the uncovered required expectation with the highest priority. If possible, do not immediately reselect the just-abandoned focus.
 
 Move selection then follows the selected target. For expectation targets, the current code does not choose hint, prompt, or assertion from a general score band table for the targeted expectation. The target expectation's score matters for three narrower decisions: whether the expectation is already covered (`coverage >= 0.8`), whether it is near enough to coverage to force a prompt (`0.6 <= coverage < 0.8`), and how it contributes to priority before the target is selected.

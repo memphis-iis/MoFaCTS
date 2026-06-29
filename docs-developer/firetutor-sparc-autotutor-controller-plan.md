@@ -35,11 +35,11 @@ AutoTutor is one realization style for these decisions, mainly conversational. S
 
 ## Questions And Design Points
 
-| # | Design point | Question to answer | Current leaning |
-|---|---|---|---|
-| 1 | Every student action should produce an interpretable event with node values, trigger, focus, page state, history, and relevant model state. | What exact event/context object should the controller receive? | Define a compact `ControllerContext` built from SPARC trial result, replay state, current page, cluster model state, and recent history. |
-| 2 | Interpretation and planning should be separate, matching AutoTutor's scoring/interpretation, app planning, and realization split. | What exactly belongs in the SPARC interpretation result versus the SPARC plan? | Interpretation says what happened and what it means; planning chooses the next instructional/page action. |
-| 3 | SPARC interpretation is not always LLM scoring. | Which node responses are system-scored, LLM-scored, mixed, or not scorable? | Make response evaluation mode explicit for each event so the LLM knows whether to evaluate the response or interpret a known result. |
+| # | Design point | Question to answer | Current leaning | User Answer |
+|---|---|---|---|---|
+| 1 | Every student action should produce an interpretable event with node values, trigger, focus, page state, history, and relevant model state. | What exact event/context object should the controller receive? | Define a compact `ControllerContext` built from SPARC trial result, replay state, current page, cluster model state, and recent history. | generalize autotutor |
+| 2 | Interpretation and planning should be separate, matching AutoTutor's scoring/interpretation, app planning, and realization split. | What exactly belongs in the SPARC interpretation result versus the SPARC plan? | Interpretation says what happened and what it means; planning chooses the next instructional/page action. | Yes |
+| 3 | SPARC interpretation is not always LLM scoring. | Which node responses are system-scored, LLM-scored, mixed, or not scorable? | Make response evaluation mode explicit for each event so the LLM knows whether to evaluate the response or interpret a known result. | Some evaluations will be generalization of autotutor with LLM scoring. Many stuent actions will not need interpretation, but be intepreted the same way as clusterKC trial |
 | 4 | A valid controller decision may do nothing visible. | How should "let the student continue" be represented? | Make `no_visible_intervention` or `allow_continue` an explicit action, still recorded in trace/history when useful. |
 | 5 | SPARC behavior should remain production-rule-centered. | Should the planner choose among authored production rules, emit constrained production-rule-like actions, or generate reusable rules? | Begin with a planner that chooses among authored rules/action patterns or emits constrained action instances; reusable generated rules are later. |
 | 6 | Page changes should use the current progressive node operation style. | Which page/node operations are allowed in v1? | Start with existing operations: `append-node`, `append-node-if-missing`, `insert-node`, and `append-text`; add new operations only when required. |
