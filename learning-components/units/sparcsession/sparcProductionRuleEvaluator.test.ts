@@ -324,6 +324,335 @@ describe('sparcProductionRuleEvaluator', function() {
     assert.equal(withStage.length, 0);
   });
 
+  it('matches numeric range slot patterns without binding paper-specific aliases', function() {
+    const facts: SparcWorkingMemoryFact[] = [{
+      factType: 'learningTarget.score',
+      slots: {
+        clusterKC: 'lesson.kc.expectation-1',
+        coverage: 0.62,
+      },
+    }];
+    const rules: SparcProductionRule[] = [{
+      id: 'dialogue.prompt-near-threshold-target',
+      when: [{
+        factType: 'learningTarget.score',
+        slots: {
+          clusterKC: { type: 'bind', variable: 'clusterKC' },
+          coverage: {
+            type: 'range',
+            min: 0.6,
+            max: 0.8,
+            maxInclusive: false,
+          },
+        },
+      }],
+      then: [{
+        type: 'assert-fact',
+        fact: {
+          factType: 'dialogue.selectedAction',
+          slots: {
+            clusterKC: variable('clusterKC'),
+            action: literal('prompt'),
+          },
+        },
+      }],
+    }];
+
+    const [firing] = evaluateSparcProductionRules({ facts, rules });
+
+    assert.equal(firing?.ruleId, 'dialogue.prompt-near-threshold-target');
+    assert.deepEqual(firing.assertedFacts[0]?.slots, {
+      clusterKC: 'lesson.kc.expectation-1',
+      action: 'prompt',
+    });
+  });
+
+  it('honors inclusive and exclusive numeric range boundaries', function() {
+    const createRule = (range: { min?: number; max?: number; minInclusive?: boolean; maxInclusive?: boolean }): SparcProductionRule => ({
+      id: 'dialogue.range-boundary',
+      when: [{
+        factType: 'learningTarget.score',
+        slots: {
+          coverage: {
+            type: 'range',
+            ...range,
+          },
+        },
+      }],
+      then: [{
+        type: 'assert-fact',
+        fact: {
+          factType: 'dialogue.rangeMatched',
+        },
+      }],
+    });
+    const firingCount = (coverage: number, range: { min?: number; max?: number; minInclusive?: boolean; maxInclusive?: boolean }) => (
+      evaluateSparcProductionRules({
+        facts: [{
+          factType: 'learningTarget.score',
+          slots: { coverage },
+        }],
+        rules: [createRule(range)],
+      }).length
+    );
+
+    assert.equal(firingCount(0.6, { min: 0.6, max: 0.8 }), 1);
+    assert.equal(firingCount(0.8, { min: 0.6, max: 0.8 }), 1);
+    assert.equal(firingCount(0.6, { min: 0.6, minInclusive: false, max: 0.8 }), 0);
+    assert.equal(firingCount(0.61, { min: 0.6, minInclusive: false, max: 0.8 }), 1);
+    assert.equal(firingCount(0.8, { min: 0.6, max: 0.8, maxInclusive: false }), 0);
+    assert.equal(firingCount(0.79, { min: 0.6, max: 0.8, maxInclusive: false }), 1);
+  });
+
+  it('supports any conditions as explicit OR branches', function() {
+    const facts: SparcWorkingMemoryFact[] = [{
+      factType: 'learnerResponse.contribution',
+      slots: {
+        type: 'question',
+      },
+    }];
+    const rules: SparcProductionRule[] = [{
+      id: 'dialogue.respond-to-question-or-low-agency',
+      when: [{
+        type: 'any',
+        conditions: [{
+          factType: 'learnerResponse.contribution',
+          slots: {
+            type: { type: 'literal', value: 'question' },
+          },
+        }, {
+          factType: 'learnerResponse.answerQuality',
+          slots: {
+            value: { type: 'literal', value: 'low-agency' },
+          },
+        }],
+      }],
+      then: [{
+        type: 'assert-fact',
+        fact: {
+          factType: 'dialogue.selectedAction',
+          slots: {
+            action: literal('answer-question'),
+          },
+        },
+      }],
+    }];
+
+    const [firing] = evaluateSparcProductionRules({ facts, rules });
+
+    assert.equal(firing?.ruleId, 'dialogue.respond-to-question-or-low-agency');
+    assert.equal(firing?.assertedFacts[0]?.slots?.action, 'answer-question');
+  });
+
+  it('does not match an any condition when every branch is false', function() {
+    const facts: SparcWorkingMemoryFact[] = [{
+      factType: 'learnerResponse.contribution',
+      slots: {
+        type: 'assertion',
+      },
+    }];
+    const rules: SparcProductionRule[] = [{
+      id: 'dialogue.respond-to-question-or-low-agency',
+      when: [{
+        type: 'any',
+        conditions: [{
+          factType: 'learnerResponse.contribution',
+          slots: {
+            type: { type: 'literal', value: 'question' },
+          },
+        }, {
+          factType: 'learnerResponse.answerQuality',
+          slots: {
+            value: { type: 'literal', value: 'low-agency' },
+          },
+        }],
+      }],
+      then: [{
+        type: 'assert-fact',
+        fact: {
+          factType: 'dialogue.selectedAction',
+          slots: {
+            action: literal('answer-question'),
+          },
+        },
+      }],
+    }];
+
+    assert.equal(evaluateSparcProductionRules({ facts, rules }).length, 0);
+  });
+
+  it('fails clearly for invalid range patterns and nonnumeric range slots', function() {
+    const missingBoundsRule: SparcProductionRule = {
+      id: 'dialogue.invalid-range',
+      when: [{
+        factType: 'learningTarget.score',
+        slots: {
+          coverage: { type: 'range' },
+        },
+      }],
+      then: [],
+    };
+    const nonnumericFactRule: SparcProductionRule = {
+      id: 'dialogue.nonnumeric-range',
+      when: [{
+        factType: 'learningTarget.score',
+        slots: {
+          coverage: { type: 'range', min: 0.33 },
+        },
+      }],
+      then: [],
+    };
+
+    assert.throws(
+      () => evaluateSparcProductionRules({
+        facts: [{ factType: 'learningTarget.score', slots: { coverage: 0.5 } }],
+        rules: [missingBoundsRule],
+      }),
+      /range pattern requires min or max/,
+    );
+    assert.throws(
+      () => evaluateSparcProductionRules({
+        facts: [{ factType: 'learningTarget.score', slots: { coverage: 'medium' } }],
+        rules: [nonnumericFactRule],
+      }),
+      /range pattern requires a numeric fact-slot value/,
+    );
+  });
+
+  it('allows any branches with branch-local bindings that are not used outside the any condition', function() {
+    const rules: SparcProductionRule[] = [{
+      id: 'dialogue.local-any-bindings',
+      when: [{
+        type: 'any',
+        conditions: [{
+          factType: 'learningTarget.score',
+          slots: {
+            clusterKC: { type: 'bind', variable: 'targetClusterKC' },
+          },
+        }, {
+          factType: 'diagnostic.misconceptionScore',
+          slots: {
+            id: { type: 'bind', variable: 'misconceptionId' },
+          },
+        }],
+      }],
+      then: [{
+        type: 'assert-fact',
+        fact: {
+          factType: 'dialogue.localAnyMatched',
+        },
+      }],
+    }];
+
+    assert.doesNotThrow(() => compileSparcProductionRulePlan(rules));
+    assert.equal(
+      evaluateSparcProductionRules({
+        facts: [{ factType: 'learningTarget.score', slots: { clusterKC: 'kc-1' } }],
+        rules,
+      }).length,
+      1,
+    );
+  });
+
+  it('rejects any branch-local bindings that are used outside the any condition', function() {
+    const rules: SparcProductionRule[] = [{
+      id: 'dialogue.unsafe-any-bindings',
+      when: [{
+        type: 'any',
+        conditions: [{
+          factType: 'learningTarget.score',
+          slots: {
+            clusterKC: { type: 'bind', variable: 'targetClusterKC' },
+          },
+        }, {
+          factType: 'diagnostic.misconceptionScore',
+          slots: {
+            id: { type: 'bind', variable: 'misconceptionId' },
+          },
+        }],
+      }],
+      then: [{
+        type: 'assert-fact',
+        fact: {
+          factType: 'dialogue.selectedTarget',
+          slots: {
+            clusterKC: variable('targetClusterKC'),
+          },
+        },
+      }],
+    }];
+
+    assert.throws(
+      () => compileSparcProductionRulePlan(rules),
+      /any condition branch-local bindings are referenced outside the any condition: targetClusterKC/,
+    );
+  });
+
+  it('validates nested any and not condition bindings before execution', function() {
+    const safeNestedRule: SparcProductionRule = {
+      id: 'dialogue.safe-nested-any-not',
+      when: [{
+        type: 'any',
+        conditions: [{
+          factType: 'learnerResponse.answerQuality',
+          slots: {
+            value: { type: 'literal', value: 'high' },
+          },
+        }, {
+          type: 'not',
+          pattern: {
+            factType: 'diagnostic.misconceptionSelected',
+          },
+        }],
+      }],
+      then: [{
+        type: 'assert-fact',
+        fact: {
+          factType: 'dialogue.safeNestedMatch',
+        },
+      }],
+    };
+    assert.doesNotThrow(() => compileSparcProductionRulePlan([safeNestedRule]));
+    assert.equal(
+      evaluateSparcProductionRules({
+        facts: [{ factType: 'learnerResponse.answerQuality', slots: { value: 'low' } }],
+        rules: [safeNestedRule],
+      }).length,
+      1,
+    );
+
+    const unsafeNestedRule: SparcProductionRule = {
+      id: 'dialogue.unsafe-nested-any-not',
+      when: [{
+        type: 'any',
+        conditions: [{
+          factType: 'learningTarget.score',
+          slots: {
+            clusterKC: { type: 'bind', variable: 'targetClusterKC' },
+          },
+        }, {
+          type: 'not',
+          pattern: {
+            factType: 'diagnostic.misconceptionScore',
+            slots: {
+              id: { type: 'bind', variable: 'misconceptionId' },
+            },
+          },
+        }],
+      }, {
+        factType: 'learningTarget.metadata',
+        slots: {
+          clusterKC: { type: 'bound', variable: 'targetClusterKC' },
+        },
+      }],
+      then: [],
+    };
+    assert.throws(
+      () => compileSparcProductionRulePlan([unsafeNestedRule]),
+      /any condition branch-local bindings are referenced outside the any condition: targetClusterKC/,
+    );
+  });
+
   it('preserves firing parity when using a compiled rule plan and fact-type index', function() {
     const facts: SparcWorkingMemoryFact[] = [{
       factType: 'irrelevant',
@@ -495,6 +824,68 @@ describe('sparcProductionRuleEvaluator', function() {
       'fractions.hint-denominator',
     ]);
     assert.equal(result.firings[0]?.messages[0]?.text, 'Choose the common denominator first.');
+  });
+
+  it('terminates a salience-ranked production phase after the selected terminal rule fires', function() {
+    const facts: SparcWorkingMemoryFact[] = [{
+      factType: 'learningTarget.selected',
+      slots: {
+        clusterKC: 'lesson.kc.expectation-1',
+      },
+    }];
+    const rules: SparcProductionRule[] = [{
+      id: 'dialogue.select-prompt',
+      salience: 50,
+      when: [{
+        factType: 'learningTarget.selected',
+        slots: {
+          clusterKC: { type: 'bind', variable: 'clusterKC' },
+        },
+      }],
+      then: [{
+        type: 'assert-fact',
+        fact: {
+          factType: 'dialogue.selectedAction',
+          slots: {
+            clusterKC: variable('clusterKC'),
+            action: literal('prompt'),
+          },
+        },
+      }, {
+        type: 'terminate-production-phase',
+        reason: 'move-selected',
+      }],
+    }, {
+      id: 'dialogue.lower-salience-alternative',
+      salience: 10,
+      when: [{
+        factType: 'learningTarget.selected',
+        slots: {
+          clusterKC: { type: 'bind', variable: 'clusterKC' },
+        },
+      }],
+      then: [{
+        type: 'assert-fact',
+        fact: {
+          factType: 'dialogue.selectedAction',
+          slots: {
+            clusterKC: variable('clusterKC'),
+            action: literal('hint'),
+          },
+        },
+      }],
+    }];
+
+    const result = runSparcProductionRules({ facts, rules });
+
+    assert.deepEqual(result.firings.map((firing) => firing.ruleId), ['dialogue.select-prompt']);
+    assert.equal(result.firings[0]?.terminatesProductionPhase, true);
+    assert.equal(result.firings[0]?.terminalReason, 'move-selected');
+    assert.equal(result.cycles, 1);
+    assert.equal(
+      result.facts.some((fact) => fact.slots?.action === 'hint'),
+      false,
+    );
   });
 
   it('can credit a KC bound by a generalized rule', function() {

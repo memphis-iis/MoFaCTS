@@ -151,10 +151,13 @@ export function addCatalogPartToProductionRule(rule, entryId) {
 }
 
 export function productionConditionKind(condition) {
-  return condition?.type === 'not' ? 'not-fact-pattern' : 'fact-pattern';
+  if (condition?.type === 'not') return 'not-fact-pattern';
+  if (condition?.type === 'any') return 'any';
+  return 'fact-pattern';
 }
 
 export function productionConditionPattern(condition) {
+  if (condition?.type === 'any') return null;
   return condition?.type === 'not' ? condition.pattern : condition;
 }
 
@@ -201,10 +204,24 @@ export function updateFactSlotType(slot, type) {
     slot.type = 'literal';
     slot.value = '';
     delete slot.variable;
+    delete slot.min;
+    delete slot.max;
+    delete slot.minInclusive;
+    delete slot.maxInclusive;
+  } else if (type === 'range') {
+    slot.type = 'range';
+    slot.min = literalExpression(0);
+    slot.max = literalExpression(1);
+    delete slot.value;
+    delete slot.variable;
   } else {
     slot.type = type;
     slot.variable = slot.variable || 'value';
     delete slot.value;
+    delete slot.min;
+    delete slot.max;
+    delete slot.minInclusive;
+    delete slot.maxInclusive;
   }
   return true;
 }

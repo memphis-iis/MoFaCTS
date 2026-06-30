@@ -175,6 +175,99 @@ function sampleProductionRuleDocument(): SparcAuthoredDocument {
   };
 }
 
+function sampleDialogueControllerDocument(): SparcAuthoredDocument {
+  return {
+    id: 'dialogue-doc',
+    schemaVersion: 1,
+    workingMemoryFacts: [{
+      factType: 'controller.targetSelectionPolicy',
+      slots: {
+        policy: 'kc-graph-priority',
+        coverageThreshold: 0.8,
+        frontierWeight: 0.5,
+        coherenceWeight: 0.3,
+        centralityWeight: 0.2,
+      },
+    }, {
+      factType: 'learningTarget.source',
+      slots: { clusterKC: 'kc-a' },
+    }, {
+      factType: 'learningTarget.source',
+      slots: { clusterKC: 'kc-b' },
+    }, {
+      factType: 'learningTarget.score',
+      slots: { clusterKC: 'kc-a', coverage: 0.2 },
+    }, {
+      factType: 'learningTarget.score',
+      slots: { clusterKC: 'kc-b', coverage: 0.1 },
+    }, {
+      factType: 'kcGraph.node',
+      slots: { clusterKC: 'kc-a', centrality: 0.1 },
+    }, {
+      factType: 'kcGraph.node',
+      slots: { clusterKC: 'kc-b', centrality: 0.8 },
+    }, {
+      factType: 'kcGraph.relationship',
+      slots: { sourceClusterKC: 'kc-a', targetClusterKC: 'kc-b', strength: 0.9 },
+    }, {
+      factType: 'kcGraph.relationship',
+      slots: { sourceClusterKC: 'kc-b', targetClusterKC: 'kc-a', strength: 0.9 },
+    }, {
+      factType: 'dialogue.moveContent',
+      slots: {
+        targetType: 'learningTarget',
+        clusterKC: 'kc-b',
+        action: 'hint',
+        text: 'Use B.',
+      },
+    }, {
+      factType: 'dialogue.learnerWordCount',
+      slots: { cumulative: 2 },
+    }, {
+      factType: 'session.turnState',
+      slots: { turnCount: 1 },
+    }],
+    productionRules: [{
+      id: 'dialogue.move.hint',
+      module: 'dialogue.move-selection',
+      salience: 10,
+      when: [{
+        factType: 'learningTarget.selected',
+        slots: {
+          clusterKC: { type: 'bind', variable: 'targetClusterKC' },
+        },
+      }, {
+        factType: 'dialogue.learnerWordCount',
+        slots: {
+          cumulative: { type: 'range', min: 5 },
+        },
+      }],
+      then: [{
+        type: 'assert-fact',
+        fact: {
+          factType: 'controller.selectedAction',
+          slots: {
+            targetType: literal('learningTarget'),
+            clusterKC: variable('targetClusterKC'),
+            action: literal('hint'),
+          },
+        },
+      }, {
+        type: 'terminate-production-phase',
+        reason: 'move-selected',
+      }],
+    }],
+    root: {
+      id: 'root',
+      kind: 'document',
+      children: [{
+        id: 'learner-input',
+        kind: 'input',
+      }],
+    },
+  };
+}
+
 function createPageRuntimeDeps(overrides: Record<string, unknown> = {}): any {
   const clusters = [{
     stims: [{
@@ -386,7 +479,7 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
           _tdfId: string,
           _currentUnitNumber: number,
           _resetStudentPerformance: boolean,
-          options: any,
+          options?: unknown,
         ) => {
           requestedLearningHistoryOptions = options;
           return historyRows;
@@ -448,7 +541,7 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
     await engine.initializeLogisticModelState();
     await engine.loadResumeState();
 
-    assert.deepEqual(requestedLearningHistoryOptions, { clusterKCs: ['fractions.lcd'] });
+    assert.equal(requestedLearningHistoryOptions, undefined);
     const cardProbabilities = engine.getCardProbabilitiesNoCalc();
     assert.equal(cardProbabilities.cards[0].priorCorrect, 1);
     assert.equal(cardProbabilities.cards[0].stims[0].stimulusKC, 'sparc-local-item');
@@ -737,7 +830,60 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
       'production.correct-answer',
     ]);
     assert.equal(result.historyRecord?.action, 'sparc-production-rule');
-    assert.equal(writtenRecords.length, 1);
+    assert.equal(writtenRecords.length, 2);
+  });
+
+  it('exposes SPARC controller dialogue-turn commit at the unit-engine boundary', async function() {
+    const engine = await createSparcSessionUnitEngine(createMinimalDeps());
+    const writtenRecords: CanonicalHistoryRecord[] = [];
+
+    const result = await engine.commitSparcControllerDialogueTurn({
+      core: {
+        TDFId: 'tdf-1',
+        sessionID: 'session-1',
+        levelUnit: 2,
+        userId: 'user-1',
+      },
+      document: sampleDialogueControllerDocument(),
+      event: {
+        eventId: 'event-dialogue',
+        type: 'response-submitted',
+        source: {
+          documentId: 'dialogue-doc',
+          nodeId: 'learner-input',
+        },
+        time: 5000,
+        payload: {
+          input: 'three more words',
+        },
+      },
+      targetSelectionOptions: {
+        anchorClusterKC: 'kc-a',
+      },
+      generateTutorUtterance(request: { action: string; targetId: string }) {
+        assert.equal(request.action, 'hint');
+        assert.equal(request.targetId, 'kc-b');
+        return 'Think about B.';
+      },
+      history: {
+        async writeCanonicalHistory(record: CanonicalHistoryRecord) {
+          writtenRecords.push(record);
+        },
+      },
+    });
+
+    assert.equal(result.historyRecord?.action, 'sparc-dialogue-turn');
+    assert.equal(result.traceHistoryRecords?.length, 1);
+    assert.equal(writtenRecords.length, 2);
+    assert.equal(writtenRecords[0]?.action, 'sparc-production-rule-trace');
+    assert.equal(result.traceHistoryRecords?.[0]?.sparc.traceStep?.productionRuleId, 'dialogue.move.hint');
+    assert.equal(result.utteranceRequest.action, 'hint');
+    assert.equal(result.utteranceRequest.targetId, 'kc-b');
+    assert.ok(result.transition.writes.some((write: { value?: unknown }) => (
+      typeof write.value === 'object'
+      && write.value !== null
+      && (write.value as { factType?: string }).factType === 'controller.selectedAction'
+    )));
   });
 
   it('exposes trial-display production-rule commit at the unit-engine boundary', async function() {
@@ -824,7 +970,7 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
 
     assert.equal(result.document.id, 'doc-1');
     assert.equal(result.commits[0]?.historyRecord?.action, 'sparc-production-rule');
-    assert.equal(writtenRecords.length, 1);
+    assert.equal(writtenRecords.length, 2);
   });
 
   it('exposes trial-display production-rule evaluation at the unit-engine boundary', async function() {

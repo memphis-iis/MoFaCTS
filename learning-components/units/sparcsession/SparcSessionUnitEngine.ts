@@ -14,8 +14,15 @@ import {
   evaluateSparcAuthoredProductionRules,
 } from './sparcProductionRuleCommit';
 import {
+  commitSparcControllerDialogueTurn,
+  type SparcUtteranceGenerator,
+} from './sparcControllerDialogueTurn';
+import type { SparcLearnerResponseScoringResult } from './sparcLearnerResponseScoring';
+import {
+  commitSparcTrialDisplayControllerDialogueTurn,
   commitSparcTrialDisplayProductionRuleEvents,
   evaluateSparcTrialDisplayProductionRuleEvents,
+  type SparcTrialDisplayDialogueTurnScorer,
 } from './sparcTrialDisplayRuntimeBridge';
 import { replaySparcDocumentHistory } from './sparcDocumentReplay';
 import {
@@ -34,6 +41,7 @@ import type {
   SparcResponseOutcomeInput,
 } from './sparcResponseOutcomeProcessor';
 import type { SparcReplayState } from './sparcStateReplay';
+import type { SparcLearningTargetSelectionOptions } from './sparcTargetSelection';
 import type {
   SparcTrialDisplay,
   SparcTrialResult,
@@ -74,22 +82,22 @@ function createClusterTargetFromFirstStim(params: {
   const stim = firstStim as Record<string, unknown>;
   const stimulusKC = stim.stimulusKC;
   const clusterKC = cluster.clusterKC ?? stim.clusterKC;
-  if (stimulusKC === undefined || stimulusKC === null || stimulusKC === '') {
-    throw new Error(`SPARC page references cluster ${params.clusterIndex}, but its first stimulus is missing stimulusKC`);
-  }
   if (clusterKC === undefined || clusterKC === null || clusterKC === '') {
     throw new Error(`SPARC page references cluster ${params.clusterIndex}, but its first stimulus is missing clusterKC`);
   }
   const resolvedClusterKC = normalizeClusterKC(clusterKC);
+  const resolvedStimulusKC = stimulusKC === undefined || stimulusKC === null || stimulusKC === ''
+    ? resolvedClusterKC
+    : stimulusKC;
   const responseKC = stim.responseKC;
   return {
     clusterIndex: params.clusterIndex,
     label: String(stim.textStimulus || stim.text || stim.correctResponse || `Cluster ${params.clusterIndex}`),
     stimuliSetId: stim.stimuliSetId ?? params.deps.getSessionValue('currentStimuliSetId'),
-    stimulusKC,
+    stimulusKC: resolvedStimulusKC,
     clusterKC: resolvedClusterKC,
-    KCId: stimulusKC,
-    KCDefault: stimulusKC,
+    KCId: resolvedStimulusKC,
+    KCDefault: resolvedStimulusKC,
     KCCluster: resolvedClusterKC,
     ...(responseKC !== undefined && responseKC !== null
       ? {
@@ -268,6 +276,19 @@ export type SparcAuthoredProductionRuleRuntimeParams = {
   readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory'>;
 };
 
+export type SparcControllerDialogueTurnRuntimeParams = {
+  readonly core: SparcPracticeHistoryCore;
+  readonly document: SparcAuthoredDocument;
+  readonly replayState?: SparcReplayState;
+  readonly event: SparcInterfaceEvent;
+  readonly extraFacts?: readonly SparcWorkingMemoryFact[];
+  readonly learnerResponseScore?: SparcLearnerResponseScoringResult;
+  readonly targetSelectionOptions?: SparcLearningTargetSelectionOptions;
+  readonly maxProductionRuleCycles?: number;
+  readonly generateTutorUtterance: SparcUtteranceGenerator;
+  readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory'>;
+};
+
 export type SparcTrialDisplayProductionRuleRuntimeParams = {
   readonly core: SparcPracticeHistoryCore;
   readonly documentId: string;
@@ -276,6 +297,21 @@ export type SparcTrialDisplayProductionRuleRuntimeParams = {
   readonly priorHistoryRecords: readonly CanonicalHistoryRecord[];
   readonly document?: SparcAuthoredDocument;
   readonly replayState?: SparcReplayState;
+  readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory'>;
+};
+
+export type SparcTrialDisplayControllerDialogueTurnRuntimeParams = {
+  readonly core: SparcPracticeHistoryCore;
+  readonly documentId: string;
+  readonly display: SparcTrialDisplay;
+  readonly result: SparcTrialResult;
+  readonly priorHistoryRecords: readonly CanonicalHistoryRecord[];
+  readonly document?: SparcAuthoredDocument;
+  readonly replayState?: SparcReplayState;
+  readonly scoreLearnerResponse: SparcTrialDisplayDialogueTurnScorer;
+  readonly generateTutorUtterance: SparcUtteranceGenerator;
+  readonly targetSelectionOptions?: SparcLearningTargetSelectionOptions;
+  readonly maxProductionRuleCycles?: number;
   readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory'>;
 };
 
@@ -358,6 +394,25 @@ export async function createSparcSessionUnitEngine(
       });
     },
 
+    async commitSparcControllerDialogueTurn(
+      params: SparcControllerDialogueTurnRuntimeParams,
+    ) {
+      return await commitSparcControllerDialogueTurn({
+        core: params.core,
+        document: params.document,
+        ...(params.replayState ? { replayState: params.replayState } : {}),
+        event: params.event,
+        ...(params.extraFacts ? { extraFacts: params.extraFacts } : {}),
+        ...(params.learnerResponseScore ? { learnerResponseScore: params.learnerResponseScore } : {}),
+        ...(params.targetSelectionOptions ? { targetSelectionOptions: params.targetSelectionOptions } : {}),
+        ...(params.maxProductionRuleCycles !== undefined ? { maxProductionRuleCycles: params.maxProductionRuleCycles } : {}),
+        generateTutorUtterance: params.generateTutorUtterance,
+        runtime: {
+          history: params.history,
+        },
+      });
+    },
+
     async commitSparcTrialDisplayProductionRuleEvents(
       params: SparcTrialDisplayProductionRuleRuntimeParams,
     ) {
@@ -374,6 +429,25 @@ export async function createSparcSessionUnitEngine(
           applyModelPracticeUpdate: adaptiveEngine.applyModelPracticeUpdate,
           queryModelPracticeState: adaptiveEngine.queryModelPracticeState,
         },
+      });
+    },
+
+    async commitSparcTrialDisplayControllerDialogueTurn(
+      params: SparcTrialDisplayControllerDialogueTurnRuntimeParams,
+    ) {
+      return await commitSparcTrialDisplayControllerDialogueTurn({
+        core: params.core,
+        documentId: params.documentId,
+        display: params.display,
+        result: params.result,
+        priorHistoryRecords: params.priorHistoryRecords,
+        ...(params.document ? { document: params.document } : {}),
+        ...(params.replayState ? { replayState: params.replayState } : {}),
+        scoreLearnerResponse: params.scoreLearnerResponse,
+        generateTutorUtterance: params.generateTutorUtterance,
+        ...(params.targetSelectionOptions ? { targetSelectionOptions: params.targetSelectionOptions } : {}),
+        ...(params.maxProductionRuleCycles !== undefined ? { maxProductionRuleCycles: params.maxProductionRuleCycles } : {}),
+        history: params.history,
       });
     },
 

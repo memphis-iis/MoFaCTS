@@ -9,6 +9,7 @@ const catalog = jiti(path.join(repoRoot, 'learning-components/units/sparcsession
 const editorModel = jiti(path.join(repoRoot, 'learning-components/units/sparcsession/sparcAuthoringEditorModel.ts'));
 const modelTargets = jiti(path.join(repoRoot, 'learning-components/units/sparcsession/sparcAuthoredModelTargets.ts'));
 const fractionGroups = jiti(path.join(repoRoot, 'learning-components/trial-displays/sparc/sparcFractionGroups.ts'));
+const authoringValidation = jiti(path.join(repoRoot, 'mofacts/client/views/experimentSetup/sparc/sparcAuthoringValidation.js'));
 
 function stableHash(value) {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -26,7 +27,27 @@ function assertPaletteCoverage() {
   ]) {
     assert.equal(paletteIds.has(entry.id), true, `missing palette entry for ${entry.id}`);
   }
+  assert.equal(paletteIds.has('atomic.dialogue-utterance'), true, 'missing dialogue utterance palette entry');
+  assert.equal(paletteIds.has('group.dialogue-thread'), true, 'missing dialogue thread palette entry');
   return paletteIds.size;
+}
+
+function assertDialogueCatalogShape() {
+  const atomicEntriesByType = new Map(catalog.SPARC_ATOMIC_NODE_CATALOG.map((entry) => [
+    entry.schema.properties?.atomType?.const,
+    entry,
+  ]));
+  const groupEntriesByType = new Map(catalog.SPARC_GROUP_NODE_CATALOG.map((entry) => [
+    entry.schema.properties?.groupType?.const,
+    entry,
+  ]));
+  const utterance = atomicEntriesByType.get('dialogue-utterance');
+  assert.ok(utterance, 'missing dialogue-utterance atom catalog entry');
+  assert.deepEqual(utterance.schema.properties.speaker.enum, ['learner', 'tutor']);
+  assert.equal(utterance.defaultValue.speaker, 'tutor');
+  const thread = groupEntriesByType.get('dialogue-thread');
+  assert.ok(thread, 'missing dialogue-thread group catalog entry');
+  assert.equal(thread.defaultValue.children[0].atomType, 'dialogue-utterance');
 }
 
 function assertRuleCatalogCoverage() {
@@ -34,6 +55,7 @@ function assertRuleCatalogCoverage() {
   for (const id of [
     'rule.condition.fact-pattern',
     'rule.condition.not-fact-pattern',
+    'rule.condition.any',
     'rule.test.comparison',
     'rule.expression',
     'rule.effect.assert-fact',
@@ -111,6 +133,89 @@ function assertRuleRoundTrip() {
   assert.equal(display.nodes[0].clusterIndices[0], 0);
   assert.equal(display.productionRules[0].then.some((effect) => effect.type === 'model-practice' && effect.clusterIndex === 0), true);
   assert.equal(display.forwardCompatibleField.preserved, true);
+}
+
+function assertProductionRuleValidation() {
+  const clusters = [{
+    clustername: 'validation-cluster',
+    stims: [{
+      stimulusid: 0,
+      display: {
+        type: 'text',
+        text: 'Validation cluster',
+      },
+      response: {
+        correctResponse: 'Answer',
+      },
+    }],
+  }];
+  const validRule = {
+    id: 'validation.any.local-bindings',
+    when: [{
+      type: 'any',
+      conditions: [{
+        factType: 'learningTarget.score',
+        slots: {
+          clusterKC: { type: 'bind', variable: 'targetClusterKC' },
+          coverage: { type: 'range', min: 0.33, max: 0.67 },
+        },
+      }, {
+        factType: 'diagnostic.misconceptionScore',
+        slots: {
+          id: { type: 'bind', variable: 'misconceptionId' },
+        },
+      }],
+    }],
+    then: [{
+      type: 'assert-fact',
+      fact: {
+        factType: 'validation.anyMatched',
+      },
+    }],
+  };
+  const invalidRule = clone(validRule);
+  invalidRule.id = 'validation.any.unsafe-binding';
+  invalidRule.then = [{
+    type: 'assert-fact',
+    fact: {
+      factType: 'validation.selectedTarget',
+      slots: {
+        clusterKC: { type: 'variable', name: 'targetClusterKC' },
+      },
+    },
+  }];
+  const basePage = {
+    pageId: 'validation-page',
+    display: {
+      type: 'sparc',
+      documentId: 'validation-doc',
+      nodes: [{
+        id: 'node-1',
+        nodeType: 'atomic',
+        atomType: 'text-block',
+        value: 'Validation',
+        clusterIndices: [0],
+      }],
+      productionRules: [validRule],
+    },
+  };
+  const target = { pageIndex: 0, label: 'Validation page' };
+
+  assert.doesNotThrow(() => authoringValidation.validateSparcDisplaysBeforeSave({
+    sparcTargets: [target],
+    sparcPages: [clone(basePage)],
+    clusters,
+  }));
+  const invalidPage = clone(basePage);
+  invalidPage.display.productionRules = [invalidRule];
+  assert.throws(
+    () => authoringValidation.validateSparcDisplaysBeforeSave({
+      sparcTargets: [target],
+      sparcPages: [invalidPage],
+      clusters,
+    }),
+    /any branch-local bindings are referenced outside the any condition: targetClusterKC/,
+  );
 }
 
 function assertClusterResolution() {
@@ -228,8 +333,10 @@ function assertFractionNormalization() {
 }
 
 const paletteEntries = assertPaletteCoverage();
+assertDialogueCatalogShape();
 assertRuleCatalogCoverage();
 assertRuleRoundTrip();
+assertProductionRuleValidation();
 assertClusterResolution();
 assertFractionNormalization();
 

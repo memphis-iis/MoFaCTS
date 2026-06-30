@@ -252,6 +252,50 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
     });
   });
 
+  it('uses mapped SAI input and answerable handling for completion button activations', function() {
+    const completionDisplay: SparcTrialDisplay = {
+      ...display(),
+      response: {
+        completion: {
+          type: 'path-complete',
+          doneSelection: 'done',
+          doneAction: 'ButtonPressed',
+        },
+      },
+      behavior: {
+        steps: [{
+          id: 'complete',
+          responses: [{
+            selection: 'done',
+            action: 'ButtonPressed',
+            input: -1,
+            nodeRef: 'node-hint-button',
+          }],
+        }],
+      },
+    };
+    const [event] = createSparcProductionRuleEventsFromTrialResult({
+      documentId: 'doc-1',
+      display: completionDisplay,
+      result: {
+        submittedNodes: {
+          'node-hint-button': 'Done',
+        },
+        triggeredBy: 'node-hint-button',
+        timestamp: 2110,
+      },
+    });
+
+    assert.deepEqual(event?.payload, {
+      selection: 'done',
+      action: 'ButtonPressed',
+      input: -1,
+      triggeredBy: 'node-hint-button',
+      sparcAnswerable: true,
+      sparcDefaultIncorrectMessage: 'No, this is not correct.',
+    });
+  });
+
   it('adds focused node and SAI selection context to mapped button activations', function() {
     const [event] = createSparcProductionRuleEventsFromTrialResult({
       documentId: 'doc-1',
@@ -447,7 +491,7 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
         value: 'correct',
       }],
     );
-    assert.equal(writtenRecords.length, 1);
+    assert.equal(writtenRecords.length, 2);
   });
 
   it('commits unhandled answerable submissions as CTAT-style incorrect feedback', async function() {
@@ -486,7 +530,7 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
       }],
     );
     assert.equal(result.commits[0]?.historyRecord?.action, 'sparc-production-rule');
-    assert.equal(writtenRecords.length, 1);
+    assert.equal(writtenRecords.length, 2);
   });
 
   it('does not mark unclassified control button actions incorrect', async function() {

@@ -32,7 +32,12 @@ function getResumeClusterKCs(cardProbabilities: any, stimClusters: any[]): Array
   const seen = new Set<string>();
   const clusterKCs: Array<string | number> = [];
   const cards = Array.isArray(cardProbabilities?.cards) ? cardProbabilities.cards : [];
-  const sources = cards.length > 0 ? cards : stimClusters;
+  const usableCards = cards.filter((card: any) => card?.canUse === true);
+  const sources = usableCards.length > 0
+    ? usableCards
+    : cards.length > 0
+      ? cards
+      : stimClusters;
   for (const source of sources) {
     const value = source?.clusterKC ?? source?.stims?.[0]?.clusterKC;
     if (typeof value !== 'string' && typeof value !== 'number') {
@@ -48,19 +53,43 @@ function getResumeClusterKCs(cardProbabilities: any, stimClusters: any[]): Array
   return clusterKCs;
 }
 
+function normalizeClusterKey(value: unknown): string | null {
+  if (typeof value !== 'string' && typeof value !== 'number') {
+    return null;
+  }
+  const normalized = String(value).trim().toLowerCase();
+  return normalized ? normalized : null;
+}
+
+function filterHistoryRowsForActiveClusters(historyRows: any[], clusterKCs: Array<string | number>): any[] {
+  const activeClusterKeys = new Set(
+    clusterKCs
+      .map((clusterKC) => normalizeClusterKey(clusterKC))
+      .filter((clusterKC): clusterKC is string => clusterKC !== null),
+  );
+  if (activeClusterKeys.size === 0) {
+    return [];
+  }
+  return historyRows.filter((row) => {
+    const clusterKey = normalizeClusterKey(row?.clusterKC ?? row?.KCCluster);
+    return clusterKey !== null && activeClusterKeys.has(clusterKey);
+  });
+}
+
 export async function hydrateLearningSessionModelState(
   params: HydrateLearningSessionModelStateParams,
 ): Promise<void> {
   params.log(1, 'hydrateLearningSessionModelState start');
 
+  const activeClusterKCs = getResumeClusterKCs(params.cardProbabilities, params.stimClusters);
   const historyRows = await params.getLearningHistoryForUnit(
     params.userId,
     params.tdfId,
     params.currentUnitNumber,
     params.resetStudentPerformance,
-    { clusterKCs: getResumeClusterKCs(params.cardProbabilities, params.stimClusters) },
   );
-  const reconstructed = params.reconstructLearningStateFromHistory(historyRows || [], {
+  const activeHistoryRows = filterHistoryRowsForActiveClusters(historyRows || [], activeClusterKCs);
+  const reconstructed = params.reconstructLearningStateFromHistory(activeHistoryRows, {
     allowResponseLessSparcModelPractice: params.allowResponseLessSparcModelPractice === true,
   });
 

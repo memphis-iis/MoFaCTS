@@ -38,6 +38,8 @@ type SparcProductionRuleActionEngine = UnitEngineLike & {
   }>;
 };
 
+const SPARC_RENDER_STATE_KEYS = new Set(['visible']);
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
 }
@@ -105,8 +107,16 @@ function extractSparcNodeValues(
   display: SparcActionDisplay,
   evaluations: readonly SparcCommittedProductionRuleEvaluation[] | undefined,
   priorHistoryRecords: readonly CanonicalHistoryRecord[],
+  replayStateCells: Record<string, { address?: { nodeId?: string }; key?: string; value?: unknown }> = {},
 ): Record<string, unknown> {
   const nodeValues: Record<string, unknown> = extractCurrentMessageNodeValues(display, evaluations);
+  for (const cell of Object.values(replayStateCells)) {
+    const nodeId = nonBlankString(cell.address?.nodeId);
+    const key = nonBlankString(cell.key);
+    if (nodeId && SPARC_RENDER_STATE_KEYS.has(key)) {
+      nodeValues[`${nodeId}::${key}`] = cell.value;
+    }
+  }
   const progressiveOperations = collectSparcProgressiveNodeOperations([
     ...priorHistoryRecords.map((record) => (
       isRecord(record.sparc) && isRecord(record.sparc.stateTransition)
@@ -128,6 +138,8 @@ function extractSparcNodeValues(
         nodeValues[nodeId] = write.value;
       } else if (write.key === 'correctness') {
         nodeValues[`${nodeId}::correctness`] = write.value;
+      } else if (SPARC_RENDER_STATE_KEYS.has(write.key)) {
+        nodeValues[`${nodeId}::visible`] = write.value;
       }
     }
   }
@@ -265,6 +277,11 @@ export async function commitSparcProductionRuleAction(params: {
     messages: (result.evaluations ?? []).flatMap((evaluation) => (
       evaluation.execution?.firings ?? []
     ).flatMap((firing) => (firing.messages ?? []).map((message) => message.text))),
-    sparcNodeValues: extractSparcNodeValues(sparcDisplay, result.evaluations, priorHistoryRecords),
+    sparcNodeValues: extractSparcNodeValues(
+      sparcDisplay,
+      result.evaluations,
+      priorHistoryRecords,
+      sparcRuntimeContext.replayState.cells,
+    ),
   };
 }

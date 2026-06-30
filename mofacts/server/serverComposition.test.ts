@@ -1155,7 +1155,7 @@ describe('learner analytics method authorization', function() {
     expect(unitScopedRows.map((row: any) => row.time)).to.deep.equal([2000]);
   });
 
-  it('returns course-scoped learning history for matching cluster KCs across assigned TDFs', async function() {
+  it('returns course-scoped learning history across assigned TDFs without server-side cluster filtering', async function() {
     await CoursesAny.insertAsync({
       _id: 'course-a',
       teacherUserId: 'teacher-user',
@@ -1259,15 +1259,15 @@ describe('learner analytics method authorization', function() {
           TDFId: 'tdf-current',
           launchSource: 'courses',
         },
-        clusterKCs: [' Fractions.LCD '],
       }
     );
 
     expect(rows.map((row: any) => row._id)).to.deep.equal([
       'course-prior-tdf-same-cluster',
+      'course-other-cluster',
       'course-current-tdf',
     ]);
-    expect(rows.map((row: any) => row.TDFId)).to.deep.equal(['tdf-prior', 'tdf-current']);
+    expect(rows.map((row: any) => row.TDFId)).to.deep.equal(['tdf-prior', 'tdf-current', 'tdf-current']);
     expect(rows[0]).to.deep.include({
       stimuliSetId: 'other-set',
       stimulusKC: 'other-stim',
@@ -1275,7 +1275,7 @@ describe('learner analytics method authorization', function() {
     });
   });
 
-  it('fails clearly when course-scoped learning history lacks cluster KCs', async function() {
+  it('allows course-scoped learning history without caller-provided cluster KCs', async function() {
     await CoursesAny.insertAsync({
       _id: 'course-a',
       teacherUserId: 'teacher-user',
@@ -1298,27 +1298,23 @@ describe('learner analytics method authorization', function() {
       required: true,
     });
 
-    try {
-      await (asyncMethods.getLearningHistoryForUnit as any).call(
-        { userId: 'current-user' },
-        'current-user',
-        'tdf-current',
-        4,
-        false,
-        {
-          courseAssignment: {
-            assignmentId: 'assignment-a',
-            courseId: 'course-a',
-            TDFId: 'tdf-current',
-            launchSource: 'courses',
-          },
-        }
-      );
-      expect.fail('Expected course-scoped learning history without clusterKCs to fail');
-    } catch (error: any) {
-      expect(error.error).to.equal(400);
-      expect(error.reason).to.equal('Course-scoped learning history requires clusterKCs');
-    }
+    const rows = await (asyncMethods.getLearningHistoryForUnit as any).call(
+      { userId: 'current-user' },
+      'current-user',
+      'tdf-current',
+      4,
+      false,
+      {
+        courseAssignment: {
+          assignmentId: 'assignment-a',
+          courseId: 'course-a',
+          TDFId: 'tdf-current',
+          launchSource: 'courses',
+        },
+      }
+    );
+
+    expect(rows).to.deep.equal([]);
   });
 
   it('allows public course-scoped learning history without section enrollment', async function() {
@@ -1349,7 +1345,6 @@ describe('learner analytics method authorization', function() {
           TDFId: 'tdf-public-history',
           launchSource: 'courses',
         },
-        clusterKCs: ['fractions.lcd'],
       }
     );
 
@@ -1388,7 +1383,6 @@ describe('learner analytics method authorization', function() {
             TDFId: 'tdf-unenrolled-history',
             launchSource: 'courses',
           },
-          clusterKCs: ['fractions.lcd'],
         }
       );
       expect.fail('Expected unenrolled course-scoped learning history read to be denied');

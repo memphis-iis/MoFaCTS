@@ -11,6 +11,35 @@ describe('unit engine creation contracts', function() {
     expect(resolveUnitEngineTypeForUnit({ unitinstructions: 'Read this first' }, 'unit-engine-contract-test')).to.equal('instruction-only');
   });
 
+  it('keeps original AutoTutor and generated SPARC-backed AutoTutor runtime selection explicit', function() {
+    expect(resolveUnitEngineTypeForUnit({
+      unitname: 'Original AutoTutor',
+      autotutorsession: {
+        cluster: 0,
+      },
+    }, 'unit-engine-contract-test')).to.equal('autotutor');
+    expect(resolveUnitEngineTypeForUnit({
+      unitname: 'SPARC Session AutoTutor',
+      sparcsession: {
+        pageId: 'sparc-autotutor-fixture',
+      },
+    }, 'unit-engine-contract-test')).to.equal('sparc');
+  });
+
+  it('rejects units that declare both original AutoTutor and SPARC session selectors', function() {
+    expect(() => resolveUnitEngineTypeForUnit({
+      unitname: 'Ambiguous AutoTutor',
+      autotutorsession: {
+        cluster: 0,
+      },
+      sparcsession: {
+        pageId: 'sparc-autotutor-fixture',
+      },
+    }, 'unit-engine-contract-test')).to.throw(
+      'Unit "Ambiguous AutoTutor" declares multiple runnable unit shapes: sparcsession, autotutorsession. Choose exactly one session selector.',
+    );
+  });
+
   it('rejects missing unit data before choosing an engine implementation', async function() {
     try {
       await createUnitEngineForUnit(null, { experimentState: {} }, {

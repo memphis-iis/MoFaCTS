@@ -207,6 +207,171 @@ function Get-NativeMongoUrl {
     return $composeMongoUrl -replace "@mongodb:", "@127.0.0.1:" -replace "//mongodb:", "//127.0.0.1:"
 }
 
+function Parse-MongoUrlComponents {
+    param([string]$MongoUrl)
+
+    if ([string]::IsNullOrWhiteSpace($MongoUrl)) {
+        throw "Mongo URL cannot be empty."
+    }
+
+    if (-not $MongoUrl.StartsWith("mongodb://", [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Expected Mongo URL to start with mongodb://. Received: $MongoUrl"
+    }
+
+    $withoutScheme = $MongoUrl.Substring("mongodb://".Length)
+    $authority = $withoutScheme.Split("/", 2)[0]
+    $pathAndQuery = ($withoutScheme.Substring($authority.Length + 1))
+    if (-not $pathAndQuery) {
+        throw "Expected database path in Mongo URL: $MongoUrl"
+    }
+
+    $database = $pathAndQuery.Split("?", 2)[0]
+    if (-not $database) {
+        throw "Expected database name in Mongo URL: $MongoUrl"
+    }
+
+    $authAndHost = $authority
+    $credentials = ""
+    if ($authAndHost.Contains("@")) {
+        $splitAt = $authAndHost.LastIndexOf("@")
+        $credentials = $authAndHost.Substring(0, $splitAt)
+        $authority = $authAndHost.Substring($splitAt + 1)
+    }
+
+    $hostName = $authority
+    $port = 27017
+    $username = ""
+    $password = ""
+    if ($credentials) {
+        $splitColon = $credentials.IndexOf(":")
+        if ($splitColon -ge 0) {
+            $username = $credentials.Substring(0, $splitColon)
+            $password = $credentials.Substring($splitColon + 1)
+        }
+    }
+
+    $authSource = $database
+    if ($pathAndQuery.Contains("?")) {
+        $query = $pathAndQuery.Substring($pathAndQuery.IndexOf("?") + 1)
+        foreach ($pair in $query.Split("&")) {
+            $kv = $pair.Split("=")
+            if ($kv.Length -lt 2) {
+                continue
+            }
+            if ($kv[0].ToLowerInvariant() -eq "authsource") {
+                $authSource = $kv[1]
+            }
+        }
+    }
+
+    if ($authority.Contains("]")) {
+        $ipv6Match = [regex]::Match($authority, '^\[([^]]+)\]:(\d+)$')
+        if (-not $ipv6Match.Success) {
+            throw "Unsupported Mongo IPv6 URL authority: $authority"
+        }
+        $hostName = $ipv6Match.Groups[1].Value
+        $port = [int]$ipv6Match.Groups[2].Value
+    } elseif ($authority.Contains(":")) {
+        $authoritySplit = $authority.Split(":")
+        if ($authoritySplit.Length -ne 2 -or -not [int]::TryParse($authoritySplit[1], [ref]$port)) {
+            throw "Failed to parse Mongo host:port from $authority"
+        }
+        $hostName = $authoritySplit[0]
+    }
+
+    return @{
+        HostName = $hostName
+        Port = $port
+        Username = $username
+        Password = $password
+        Database = $database
+        AuthSource = $authSource
+    }
+}
+
+function Wait-ForMongo {
+    param(
+        [string]$HostName,
+        [int]$Port,
+        [string]$DockerComposeBinary,
+        [string[]]$ComposeArgs,
+        [string]$RootUser,
+        [string]$RootPassword,
+        [string]$AppUser,
+        [string]$AppPassword,
+        [string]$AppDatabase,
+        [string]$AppAuthSource,
+        [int]$TimeoutSeconds = 120,
+        [int]$DelayMilliseconds = 500
+    )
+
+    function Test-MongoCommand {
+        param(
+            [string]$Username,
+            [string]$Password,
+            [string]$AuthDb,
+            [string]$Evaluate
+        )
+
+        $command = @($DockerComposeBinary) + $ComposeArgs + @("exec", "-T", "mongodb", "mongosh", "--quiet", "--username", $Username, "--password", $Password, "--authenticationDatabase", $AuthDb, "--eval", $Evaluate)
+        $commandArgs = $command[1..($command.Length - 1)]
+        $result = & $command[0] @commandArgs 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            return $false
+        }
+
+        return (([string]$result).Trim() -eq "1")
+    }
+
+    function Test-MongoTcp {
+        try {
+            $tcp = New-Object System.Net.Sockets.TcpClient
+            try {
+                $connectResult = $tcp.BeginConnect($HostName, $Port, $null, $null)
+                if (-not $connectResult.AsyncWaitHandle.WaitOne(1000)) {
+                    throw "timeout"
+                }
+                $tcp.EndConnect($connectResult)
+                return $true
+            } finally {
+                $tcp.Close()
+            }
+        } catch {
+            return $false
+        }
+    }
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ($true) {
+        if (-not (Test-MongoTcp)) {
+            if ((Get-Date) -ge $deadline) {
+                throw "Timed out waiting for MongoDB TCP listener at ${HostName}:${Port} after ${TimeoutSeconds}s"
+            }
+
+            Start-Sleep -Milliseconds $DelayMilliseconds
+            continue
+        }
+
+        if (-not (Test-MongoCommand -Username $RootUser -Password $RootPassword -AuthDb "admin" -Evaluate "db.adminCommand({ ping: 1 }).ok")) {
+            if ((Get-Date) -ge $deadline) {
+                throw "Timed out waiting for MongoDB root auth at ${HostName}:${Port} after ${TimeoutSeconds}s"
+            }
+            Start-Sleep -Milliseconds $DelayMilliseconds
+            continue
+        }
+
+        if (-not (Test-MongoCommand -Username $AppUser -Password $AppPassword -AuthDb $AppAuthSource -Evaluate "db.runCommand({ ping: 1 }).ok")) {
+            if ((Get-Date) -ge $deadline) {
+                throw "Timed out waiting for MongoDB app user auth at ${HostName}:${Port} after ${TimeoutSeconds}s"
+            }
+            Start-Sleep -Milliseconds $DelayMilliseconds
+            continue
+        }
+
+        return
+    }
+}
+
 function Get-LocalAdminEmail {
     $settings = Read-JsonFile -Path $resolvedSettingsPath
     $owner = ""
@@ -471,6 +636,26 @@ function Start-HotfixDev {
 
     Invoke-ExternalChecked -CommandLine (@($dockerExe) + $composeArgs + @("config")) -WorkingDirectory $deployDir
     Invoke-ExternalChecked -CommandLine (@($dockerExe) + $composeArgs + @("up", "-d", "mongodb")) -WorkingDirectory $deployDir
+    $nativeMongoUrl = Get-NativeMongoUrl
+    $mongoEndpoint = Parse-MongoUrlComponents -MongoUrl $nativeMongoUrl
+    $rootMongoUsername = Read-LocalEnvValue -Name "MONGO_INITDB_ROOT_USERNAME"
+    $rootMongoPassword = Read-LocalEnvValue -Name "MONGO_INITDB_ROOT_PASSWORD"
+    if (-not $rootMongoUsername -or -not $rootMongoPassword) {
+        throw ".env.local must define MONGO_INITDB_ROOT_USERNAME and MONGO_INITDB_ROOT_PASSWORD for local Mongo readiness checks."
+    }
+
+    Write-Host "Waiting for MongoDB at $($mongoEndpoint.HostName):$($mongoEndpoint.Port)..."
+    Wait-ForMongo `
+        -HostName $mongoEndpoint.HostName `
+        -Port $mongoEndpoint.Port `
+        -DockerComposeBinary $dockerExe `
+        -ComposeArgs $composeArgs `
+        -RootUser $rootMongoUsername `
+        -RootPassword $rootMongoPassword `
+        -AppUser $mongoEndpoint.Username `
+        -AppPassword $mongoEndpoint.Password `
+        -AppDatabase $mongoEndpoint.Database `
+        -AppAuthSource $mongoEndpoint.AuthSource | Out-Null
     Ensure-LocalAgentSecrets | Out-Null
 
     Set-Content -Path $stdoutPath -Value ""
@@ -486,7 +671,7 @@ function Start-HotfixDev {
     $previousMeteorInstallation = $env:METEOR_INSTALLATION
 
     try {
-        $env:MONGO_URL = Get-NativeMongoUrl
+        $env:MONGO_URL = $nativeMongoUrl
         $env:EXPECTED_MONGO_DB_NAME = $expectedMongoDbName
         $env:ROOT_URL = $rootUrl
         $env:PORT = $port

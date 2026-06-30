@@ -7,6 +7,9 @@ import type {
   AiAutoTutorOutput,
   AiAutoTutorRelationshipProvenance,
 } from './aiContentTypes';
+import {
+  computeClusterKcRelationshipsFromEmbeddings,
+} from '../../../learning-components/runtime/clusterKcRelationshipEngine';
 
 export const AUTO_TUTOR_RELATIONSHIP_GRAPH_VERSION = 'autotutor-expectation-relationships-v1';
 export const AUTO_TUTOR_PRIMARY_EMBEDDING_MODEL = 'google/gemini-embedding-001';
@@ -114,22 +117,6 @@ export function computeAutoTutorRelationshipCacheKey(
   return stableHash(JSON.stringify(payload));
 }
 
-function normalizeVector(vector: number[]): number[] {
-  const magnitude = Math.sqrt(vector.reduce((sum, value) => sum + value * value, 0));
-  if (!Number.isFinite(magnitude) || magnitude === 0) {
-    throw new Error('AutoTutor relationship embedding vector has zero magnitude');
-  }
-  return vector.map((value) => value / magnitude);
-}
-
-function cosineSimilarity(normalizedA: number[], normalizedB: number[]): number {
-  if (normalizedA.length !== normalizedB.length) {
-    throw new Error('AutoTutor relationship embedding dimensions do not match');
-  }
-  const cosine = normalizedA.reduce((sum, value, index) => sum + value * (normalizedB[index] || 0), 0);
-  return Math.round(Math.max(0, Math.min(1, cosine)) * 1_000_000) / 1_000_000;
-}
-
 export function computeAutoTutorExpectationRelationshipsFromEmbeddings(
   expectations: AiAutoTutorExpectation[],
   embeddings: number[][],
@@ -140,21 +127,18 @@ export function computeAutoTutorExpectationRelationshipsFromEmbeddings(
   if (normalizedExpectations.length !== embeddings.length) {
     throw new Error('AutoTutor relationship embedding count does not match expectation count');
   }
-  const normalizedEmbeddings = embeddings.map(normalizeVector);
+  const clusterKcRelationships = computeClusterKcRelationshipsFromEmbeddings({
+    nodes: normalizedExpectations.map((expectation) => ({
+      clusterKC: expectation.id,
+      sourceId: expectation.id,
+      description: expectationEmbeddingText(expectation),
+    })),
+    embeddings,
+  });
   const relationships: Record<string, Record<string, number>> = {};
-  for (let sourceIndex = 0; sourceIndex < normalizedExpectations.length; sourceIndex += 1) {
-    const source = normalizedExpectations[sourceIndex]!;
-    relationships[source.id] = {};
-    for (let targetIndex = 0; targetIndex < normalizedExpectations.length; targetIndex += 1) {
-      if (sourceIndex === targetIndex) {
-        continue;
-      }
-      const target = normalizedExpectations[targetIndex]!;
-      relationships[source.id]![target.id] = cosineSimilarity(
-        normalizedEmbeddings[sourceIndex]!,
-        normalizedEmbeddings[targetIndex]!,
-      );
-    }
+  for (const relationship of clusterKcRelationships) {
+    relationships[relationship.sourceClusterKC] = relationships[relationship.sourceClusterKC] || {};
+    relationships[relationship.sourceClusterKC]![relationship.targetClusterKC] = relationship.strength;
   }
   return relationships;
 }

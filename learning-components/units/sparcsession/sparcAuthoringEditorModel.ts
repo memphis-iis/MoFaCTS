@@ -42,6 +42,12 @@ export function defaultProductionCondition(kind = 'fact-pattern'): SparcProducti
       },
     };
   }
+  if (kind === 'any') {
+    return {
+      type: 'any',
+      conditions: [defaultProductionCondition()],
+    };
+  }
   return {
     factType: 'interface-event',
     slots: {
@@ -96,6 +102,11 @@ export function defaultProductionEffect(type = 'classify'): SparcProductionRuleE
         type: 'model-practice',
         outcome: 'correct',
         responseValue: variableExpression('value'),
+      };
+    case 'terminate-production-phase':
+      return {
+        type: 'terminate-production-phase',
+        reason: 'selected',
       };
     case 'append-node':
       return {

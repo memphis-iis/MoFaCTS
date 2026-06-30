@@ -13,8 +13,12 @@ import {
 import { commitSparcProcessedResponseOutcome } from './sparcResponseOutcomeCommit';
 import { runSparcProductionRules } from './sparcProductionRuleEvaluator';
 import { createSparcStateTransitionHistoryRecord } from './sparcStateTransitionHistory';
+import { createSparcProductionRuleTraceHistoryRecords } from './sparcProductionRuleTraceHistory';
 import { buildSparcWorkingMemoryFacts } from './sparcWorkingMemoryFacts';
-import { createSparcWorkingMemoryFactStateWrite } from './sparcWorkingMemoryState';
+import {
+  createSparcStableWorkingMemoryFactStateWrite,
+  createSparcWorkingMemoryFactStateWrite,
+} from './sparcWorkingMemoryState';
 import {
   resolveSparcAuthoredModelTarget,
   resolveSparcProductionRuleModelTarget,
@@ -43,6 +47,7 @@ export type SparcCommittedProductionRuleEvaluation = {
   readonly execution: SparcProductionRuleExecution;
   readonly transition?: SparcStateTransition;
   readonly historyRecord?: SparcCanonicalHistoryRecord;
+  readonly traceHistoryRecords?: readonly SparcCanonicalHistoryRecord[];
   readonly modelHistoryRecords?: readonly SparcCanonicalHistoryRecord[];
 };
 
@@ -68,6 +73,8 @@ function productionRuleEventPayload(
       credits: firing.credits,
       assertedFacts: firing.assertedFacts,
       persistentAssertedFacts: firing.persistentAssertedFacts,
+      terminatesProductionPhase: firing.terminatesProductionPhase,
+      terminalReason: firing.terminalReason,
       writeCount: firing.writes.length,
     })),
     productionRuleCycles: execution.cycles,
@@ -88,9 +95,12 @@ function isModelPracticeMetric(value: unknown): value is ModelPracticeMetric {
   return (MODEL_PRACTICE_METRICS as readonly unknown[]).includes(value);
 }
 
-function patternForCondition(condition: SparcProductionRuleCondition): SparcFactPattern {
+function patternForCondition(condition: SparcProductionRuleCondition): SparcFactPattern | null {
   if ('type' in condition && condition.type === 'not') {
     return condition.pattern;
+  }
+  if ('type' in condition && condition.type === 'any') {
+    return null;
   }
   return condition as SparcFactPattern;
 }
@@ -101,6 +111,19 @@ function collectModelStateFactRequestsFromCondition(params: {
   readonly requests: Map<string, ModelStateFactRequest>;
 }): void {
   const pattern = patternForCondition(params.condition);
+  if (!pattern) {
+    const branches = 'conditions' in params.condition && Array.isArray(params.condition.conditions)
+      ? params.condition.conditions
+      : [];
+    for (const condition of branches) {
+      collectModelStateFactRequestsFromCondition({
+        condition,
+        event: params.event,
+        requests: params.requests,
+      });
+    }
+    return;
+  }
   if (pattern.factType !== 'model-state') {
     return;
   }
@@ -321,10 +344,19 @@ function createProductionRuleTransition(params: {
   ));
   const writes = params.execution.firings.flatMap((firing) => [
     ...firing.writes,
-    ...firing.persistentAssertedFacts.map((fact) => createSparcWorkingMemoryFactStateWrite({
-      target: workingMemoryTarget,
-      fact,
-    })),
+    ...firing.persistentAssertedFacts.map((fact, index) => {
+      const identitySlots = firing.persistentAssertedFactIdentitySlots[index];
+      return identitySlots
+        ? createSparcStableWorkingMemoryFactStateWrite({
+            target: workingMemoryTarget,
+            fact,
+            identitySlots,
+          })
+        : createSparcWorkingMemoryFactStateWrite({
+            target: workingMemoryTarget,
+            fact,
+          });
+    }),
   ]).concat(
     correctnessWrites,
     createCorrectFeedbackClearWrites({
@@ -358,13 +390,17 @@ export function evaluateSparcAuthoredProductionRules(params: {
   readonly event: SparcInterfaceEvent;
   readonly extraFacts?: readonly SparcWorkingMemoryFact[];
   readonly maxCycles?: number;
+  readonly factFilter?: (fact: SparcWorkingMemoryFact) => boolean;
 }): SparcCommittedProductionRuleEvaluation {
-  const facts = buildSparcWorkingMemoryFacts({
+  const baseFacts = buildSparcWorkingMemoryFacts({
     document: params.document,
     event: params.event,
     ...(params.replayState ? { replayState: params.replayState } : {}),
-    ...(params.extraFacts ? { extraFacts: params.extraFacts } : {}),
-  });
+  }).filter((fact) => (params.factFilter ? params.factFilter(fact) : true));
+  const facts = [
+    ...baseFacts,
+    ...(params.extraFacts ?? []),
+  ];
   const execution = runSparcProductionRules({
     facts,
     rules: params.document.productionRules ?? [],
@@ -410,15 +446,23 @@ export async function commitSparcAuthoredProductionRuleEvent(params: {
 
   if (!evaluation.transition) {
     if (evaluation.execution.firings.some((firing) => firing.modelPracticeObservations.length > 0)) {
+      const modelHistoryRecords = await commitProductionRuleModelPracticeObservations(params, evaluation);
+      const traceHistoryRecords = await commitProductionRuleTraceHistory(params, evaluation);
       return {
         ...evaluation,
-        modelHistoryRecords: await commitProductionRuleModelPracticeObservations(params, evaluation),
+        ...(traceHistoryRecords.length > 0 ? { traceHistoryRecords } : {}),
+        ...(modelHistoryRecords.length > 0 ? { modelHistoryRecords } : {}),
       };
     }
-    return evaluation;
+    const traceHistoryRecords = await commitProductionRuleTraceHistory(params, evaluation);
+    return {
+      ...evaluation,
+      ...(traceHistoryRecords.length > 0 ? { traceHistoryRecords } : {}),
+    };
   }
 
   const modelHistoryRecords = await commitProductionRuleModelPracticeObservations(params, evaluation);
+  const traceHistoryRecords = await commitProductionRuleTraceHistory(params, evaluation);
   const historyRecord = createSparcStateTransitionHistoryRecord({
     core: params.core,
     transition: evaluation.transition,
@@ -428,8 +472,33 @@ export async function commitSparcAuthoredProductionRuleEvent(params: {
   return {
     ...evaluation,
     historyRecord,
+    ...(traceHistoryRecords.length > 0 ? { traceHistoryRecords } : {}),
     ...(modelHistoryRecords.length > 0 ? { modelHistoryRecords } : {}),
   };
+}
+
+async function commitProductionRuleTraceHistory(
+  params: {
+    readonly core: SparcPracticeHistoryCore;
+    readonly document: SparcAuthoredDocument;
+    readonly event: SparcInterfaceEvent;
+    readonly runtime: SparcProductionRuleCommitRuntime;
+  },
+  evaluation: SparcCommittedProductionRuleEvaluation,
+): Promise<SparcCanonicalHistoryRecord[]> {
+  if (evaluation.execution.firings.length === 0) {
+    return [];
+  }
+  const records = createSparcProductionRuleTraceHistoryRecords({
+    core: params.core,
+    document: params.document,
+    event: params.event,
+    execution: evaluation.execution,
+  });
+  for (const record of records) {
+    await params.runtime.history.writeCanonicalHistory(record);
+  }
+  return records;
 }
 
 async function commitProductionRuleModelPracticeObservations(

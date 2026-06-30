@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { applySparcStateTransition, createEmptySparcReplayState } from './sparcStateReplay';
+import { createSparcStableWorkingMemoryFactStateWrite } from './sparcWorkingMemoryState';
 import { createSparcAuthoredInitialReplayState } from './sparcAuthoredInitialState';
 import { buildSparcWorkingMemoryFacts } from './sparcWorkingMemoryFacts';
 import type {
@@ -155,5 +157,63 @@ describe('sparcWorkingMemoryFacts', function() {
       && fact.slots.outcome === 'correct'
       && fact.slots.responseValue === 12
     )));
+  });
+
+  it('projects stable replayed working-memory facts with latest-value semantics', function() {
+    const target = {
+      documentId: 'fractions-doc',
+      nodeId: 'root',
+    };
+    const replayState = applySparcStateTransition(
+      applySparcStateTransition(createEmptySparcReplayState(), {
+        transitionId: 'turn-1',
+        event: {
+          eventId: 'turn-1',
+          type: 'response-submitted',
+          source: target,
+          time: 1000,
+        },
+        writes: [createSparcStableWorkingMemoryFactStateWrite({
+          target,
+          fact: {
+            factType: 'controller.selectedAction',
+            slots: {
+              action: 'hint',
+              targetType: 'learningTarget',
+              clusterKC: 'kc-a',
+            },
+          },
+        })],
+      }),
+      {
+        transitionId: 'turn-2',
+        event: {
+          eventId: 'turn-2',
+          type: 'response-submitted',
+          source: target,
+          time: 2000,
+        },
+        writes: [createSparcStableWorkingMemoryFactStateWrite({
+          target,
+          fact: {
+            factType: 'controller.selectedAction',
+            slots: {
+              action: 'summary',
+              targetType: 'learningTarget',
+              clusterKC: 'kc-b',
+            },
+          },
+        })],
+      },
+    );
+
+    const selectedActions = buildSparcWorkingMemoryFacts({
+      document,
+      replayState,
+    }).filter((fact) => fact.factType === 'controller.selectedAction');
+
+    assert.equal(selectedActions.length, 1);
+    assert.equal(selectedActions[0]?.slots?.action, 'summary');
+    assert.equal(selectedActions[0]?.slots?.clusterKC, 'kc-b');
   });
 });

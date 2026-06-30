@@ -63,6 +63,13 @@
     return correctness ? `sparc-correctness-${correctness}` : '';
   }
 
+  function nodeIsVisible(candidate) {
+    if (!candidate?.id || authoringSelectOnly) {
+      return true;
+    }
+    return nodeValues[`${candidate.id}::visible`] !== false;
+  }
+
   function updateNodeValue(candidate, nextValue) {
     if (!candidate?.id || candidate?.readOnly) {
       return;
@@ -117,6 +124,15 @@
     return sanitizeSparcRichHtml(value, DOMPurify.sanitize.bind(DOMPurify));
   }
 
+  function dialogueSpeaker(candidate) {
+    const speaker = String(candidate?.speaker || '').trim().toLowerCase();
+    return speaker === 'learner' ? 'learner' : 'tutor';
+  }
+
+  function dialogueSpeakerLabel(candidate) {
+    return dialogueSpeaker(candidate) === 'learner' ? 'Learner' : 'Tutor';
+  }
+
   function skillBarFill(candidate) {
     const fill = Number(candidate?.fill ?? 0);
     if (!Number.isFinite(fill)) {
@@ -169,7 +185,7 @@
     ? (node.children || []).find(isHeaderFeedbackNode)
     : null;
   $: bodyChildren = node?.nodeType === 'group'
-    ? (node.children || []).filter((child) => !isHeaderFeedbackNode(child))
+    ? (node.children || []).filter((child) => !isHeaderFeedbackNode(child) && nodeIsVisible(child))
     : [];
   $: renderItems = node?.nodeType === 'group' ? buildRenderItems(bodyChildren) : [];
   $: isChoiceTabs = isChoiceTabsGroup(node);
@@ -189,7 +205,7 @@
   $: activePanelItems = activePanel ? buildRenderItems(activePanel.children || []) : [];
 </script>
 
-{#if node?.nodeType === 'group'}
+{#if node && nodeIsVisible(node) && node?.nodeType === 'group'}
   <div
     class={`sparc-group sparc-group-${node.groupType || 'generic'}`}
     class:sparc-authoring-selected={node.id === authoringSelectedNodeId}
@@ -301,7 +317,7 @@
       </div>
     {/if}
   </div>
-{:else if node?.nodeType === 'atomic'}
+{:else if node && nodeIsVisible(node) && node?.nodeType === 'atomic'}
   {#if isPlainTextAuthoringNode(node)}
     {#if authoringSelectOnly}
       <div
@@ -400,6 +416,16 @@
         <div class="sparc-atom sparc-message-box" class:sparc-authoring-selected={node.id === authoringSelectedNodeId} data-node-id={node.id}>{@html sanitizeSparcHtml(getNodeValue(node))}</div>
       {/if}
     {/if}
+  {:else if node.atomType === 'dialogue-utterance'}
+    <div
+      class={`sparc-atom sparc-dialogue-utterance sparc-dialogue-utterance-${dialogueSpeaker(node)}`}
+      class:sparc-authoring-selected={node.id === authoringSelectedNodeId}
+      data-node-id={node.id}
+      data-sparc-speaker={dialogueSpeaker(node)}
+    >
+      <div class="sparc-dialogue-speaker">{dialogueSpeakerLabel(node)}</div>
+      <div class="sparc-dialogue-bubble">{getNodeValue(node)}</div>
+    </div>
   {:else if node.atomType === 'skill-bar'}
     <div class="sparc-atom sparc-skill-bar" class:sparc-authoring-selected={node.id === authoringSelectedNodeId} data-node-id={node.id} aria-label={node.label || ''}>
       <div class="sparc-skill-track">
@@ -486,6 +512,7 @@
       class:sparc-correctness-correct={getNodeCorrectness(node) === 'correct'}
       class:sparc-correctness-incorrect={getNodeCorrectness(node) === 'incorrect' || getNodeCorrectness(node) === 'buggy'}
       data-node-id={node.id}
+      disabled={node.readOnly === true}
       on:click={() => authoringSelectOnly ? onNodeFocus(node.id) : onButtonActivate(node)}
     >
       {buttonLabel(node)}
@@ -1010,6 +1037,49 @@
   :global(.sparc-html-block p:last-child),
   :global(.sparc-message-box p:last-child) {
     margin-bottom: 0;
+  }
+
+  .sparc-dialogue-utterance {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sparc-space-1);
+    max-width: min(78%, 42rem);
+    min-width: min(16rem, 100%);
+    align-self: flex-start;
+  }
+
+  .sparc-dialogue-utterance-learner {
+    align-self: flex-end;
+    align-items: flex-end;
+  }
+
+  .sparc-dialogue-utterance-tutor {
+    align-self: flex-start;
+    align-items: flex-start;
+  }
+
+  .sparc-dialogue-speaker {
+    color: var(--sparc-secondary-text-color);
+    font-size: var(--sparc-font-size-small);
+    font-weight: var(--app-font-weight-semibold, 600);
+  }
+
+  .sparc-dialogue-bubble {
+    width: 100%;
+    box-sizing: border-box;
+    border: var(--sparc-border-width) solid var(--sparc-border-color);
+    border-radius: var(--sparc-border-radius-lg);
+    padding: var(--sparc-space-2) var(--sparc-space-3);
+    background: var(--sparc-control-surface-color);
+    color: var(--sparc-text-color);
+    line-height: 1.45;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .sparc-dialogue-utterance-learner .sparc-dialogue-bubble {
+    background: color-mix(in srgb, var(--sparc-primary-action-surface-color) 18%, var(--sparc-control-surface-color));
+    border-color: color-mix(in srgb, var(--sparc-primary-action-surface-color) 42%, var(--sparc-border-color));
   }
 
   :global(.sparc-html-block .oli-definition),

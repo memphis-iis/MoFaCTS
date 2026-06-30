@@ -1,7 +1,8 @@
 {
   "name": "MoFaCTS",
   "short_name": "MoFaCTS",
-  "description": "Mobile Fact and Concept Training System",
+  "description": "MoFaCTS is an open-source learning system for adaptive practice, assessment, instruction, and research.",
+  "id": "/",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -11,12 +12,14 @@
     {
       "src": "/images/themes/brain-android-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "/images/themes/brain-android-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "/images/themes/brain-maskable-192.png",

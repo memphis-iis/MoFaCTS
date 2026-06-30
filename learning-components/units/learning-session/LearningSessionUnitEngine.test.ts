@@ -89,15 +89,22 @@ describe('LearningSessionUnitEngine selection completion guard', function() {
 
 describe('LearningSessionUnitEngine model practice updates', function() {
   it('loads prior SPARC model history into a later flashcard learning session for the same cluster model', async function() {
-    const cluster = {
+    const clusters = [{
       stims: [{
         clusterKC: 'cluster-1',
         stimulusKC: 'kc-1',
         correctResponse: 'Answer',
         params: '0,0',
       }],
-    };
-    const historyRows = [{
+    }, {
+      stims: [{
+        clusterKC: 'other-cluster',
+        stimulusKC: 'other-kc',
+        correctResponse: 'Other',
+        params: '0,0',
+      }],
+    }];
+    const relevantHistoryRow = {
       eventType: 'sparc',
       levelUnitType: 'model',
       time: 1000,
@@ -111,7 +118,17 @@ describe('LearningSessionUnitEngine model practice updates', function() {
       responseKey: 'answer',
       responseDuration: 250,
       responseValue: 'Answer',
-    }];
+    };
+    const unrelatedHistoryRow = {
+      ...relevantHistoryRow,
+      time: 900,
+      stimulusKC: 'other-kc',
+      clusterKC: 'other-cluster',
+      KCId: 'other-kc',
+      KCDefault: 'other-kc',
+      KCCluster: 'other-cluster',
+    };
+    const historyRows = [unrelatedHistoryRow, relevantHistoryRow];
     let requestedUnitNumber: number | null = null;
     let requestedLearningHistoryOptions: any = null;
     let reconstructionRows: unknown[] = [];
@@ -147,8 +164,8 @@ describe('LearningSessionUnitEngine model practice updates', function() {
       setSessionValue(key: string, value: unknown) {
         sessionValues.set(key, value);
       },
-      getStimCount: () => 1,
-      getStimCluster: () => cluster,
+      getStimCount: () => clusters.length,
+      getStimCluster: (clusterIndex: number) => clusters[clusterIndex],
       serverMethods: {
         getResponseKCMapForTdf: async () => ({ answer: 'response-kc-1' }),
         getStimulusCrowdStatsForDeck: async () => [],
@@ -157,7 +174,7 @@ describe('LearningSessionUnitEngine model practice updates', function() {
           _tdfId: string,
           currentUnitNumber: number,
           _resetStudentPerformance: boolean,
-          options: any,
+          options?: unknown,
         ) => {
           requestedUnitNumber = currentUnitNumber;
           requestedLearningHistoryOptions = options;
@@ -242,8 +259,8 @@ describe('LearningSessionUnitEngine model practice updates', function() {
     await engine.loadResumeState();
 
     assert.equal(requestedUnitNumber, 2);
-    assert.deepEqual(requestedLearningHistoryOptions, { clusterKCs: ['cluster-1'] });
-    assert.deepEqual(reconstructionRows, historyRows);
+    assert.equal(requestedLearningHistoryOptions, undefined);
+    assert.deepEqual(reconstructionRows, [relevantHistoryRow]);
     const cardProbabilities = engine.getCardProbabilitiesNoCalc();
     assert.equal(cardProbabilities.cards[0].priorCorrect, 1);
     assert.equal(cardProbabilities.cards[0].hasBeenIntroduced, true);
@@ -325,7 +342,7 @@ describe('LearningSessionUnitEngine model practice updates', function() {
           _tdfId: string,
           _currentUnitNumber: number,
           _resetStudentPerformance: boolean,
-          options: any,
+          options?: unknown,
         ) => {
           requestedLearningHistoryOptions = options;
           return historyRows;
@@ -394,7 +411,7 @@ describe('LearningSessionUnitEngine model practice updates', function() {
 
     await engine.loadResumeState();
 
-    assert.deepEqual(requestedLearningHistoryOptions, { clusterKCs: ['fractions.lcd'] });
+    assert.equal(requestedLearningHistoryOptions, undefined);
     assert.deepEqual(reconstructionOptions, { allowResponseLessSparcModelPractice: true });
     const cardProbabilities = engine.getCardProbabilitiesNoCalc();
     assert.equal(cardProbabilities.cards[0].priorCorrect, 1);

@@ -74,6 +74,13 @@
     resolveSparcTrialDisplayResult,
     sparcTrialDisplayOwnsInteraction,
   } from '../services/sparcTrialDisplay';
+  import {
+    commitSparcControllerDialogueSubmit,
+    isSparcControllerDialogueDisplay,
+  } from '../services/sparcControllerDialogueCommit';
+  import {
+    createSparcDialogueOpenRouterProvider,
+  } from '../services/sparcControllerDialogueOpenRouter';
   import { commitSparcProductionRuleAction } from '../services/sparcProductionRuleActionCommit';
   import { createTrialDisplaySubmissionController } from '../services/trialDisplaySubmission';
   import { createLearningProgressRuntimeController } from '../services/learningProgressPanelRuntime';
@@ -249,6 +256,9 @@
     if (!sparcOwnsResponse || !display || display.type !== 'sparc') {
       return;
     }
+    if (isSparcControllerDialogueDisplay(display)) {
+      return;
+    }
     const documentId = typeof display.documentId === 'string' ? display.documentId.trim() : '';
     const hasProductionRuleSource = Array.isArray(display.productionRules);
     if (!documentId || !hasProductionRuleSource) {
@@ -281,6 +291,34 @@
     const display = context.currentDisplay;
     if (!sparcOwnsResponse || !display || display.type !== 'sparc') {
       return { canSubmit: true };
+    }
+    if (isSparcControllerDialogueDisplay(display)) {
+      const sparcResult = resolveSparcTrialDisplayResult(display, detail || {}, '[CardScreen]');
+      if (!sparcResult) {
+        throw new Error(describeSparcBoundaryContext(display, '[CardScreen] SPARC dialogue submit received for non-SPARC display'));
+      }
+      const provider = createSparcDialogueOpenRouterProvider({
+        tdfId: typeof context.tdfId === 'string' ? context.tdfId : null,
+      });
+      const result = await commitSparcControllerDialogueSubmit({
+        engine: context.engine,
+        currentDisplay: display,
+        sparcResult,
+        tdfId: context.tdfId,
+        sessionId: context.sessionId,
+        levelUnit: context.unitId,
+        scoreLearnerResponse: provider.scoreLearnerResponse,
+        generateTutorUtterance: provider.generateTutorUtterance,
+      });
+      sparcProgressRefreshVersion += 1;
+      if (Object.keys(result.sparcNodeValues).length > 0) {
+        send({
+          type: EVENTS.SPARC_ACTION,
+          timestamp: sparcResult.timestamp,
+          sparcNodeValues: result.sparcNodeValues,
+        });
+      }
+      return { canSubmit: false, dialogueSubmit: true };
     }
     const documentId = typeof display.documentId === 'string' ? display.documentId.trim() : '';
     const hasProductionRuleSource = Array.isArray(display.productionRules);

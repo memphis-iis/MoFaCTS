@@ -5,6 +5,7 @@ import type {
 } from './sparcSessionContracts';
 
 export const SPARC_WORKING_MEMORY_FACT_STATE_KEY_PREFIX = 'workingMemoryFact:';
+export const SPARC_STABLE_WORKING_MEMORY_FACT_STATE_KEY_PREFIX = 'workingMemoryFactStable:';
 
 function stableStringify(value: unknown): string {
   if (!value || typeof value !== 'object') {
@@ -35,6 +36,17 @@ function factStateKey(fact: SparcWorkingMemoryFact): string {
   })}`;
 }
 
+function stableFactStateKey(params: {
+  readonly fact: SparcWorkingMemoryFact;
+  readonly identitySlots?: Readonly<Record<string, unknown>>;
+}): string {
+  return `${SPARC_STABLE_WORKING_MEMORY_FACT_STATE_KEY_PREFIX}${stableStringify({
+    factType: requireNonBlank(params.fact.factType, 'SPARC stable working-memory fact factType'),
+    ...(params.fact.factId ? { factId: params.fact.factId } : {}),
+    identitySlots: params.identitySlots ?? {},
+  })}`;
+}
+
 export function createSparcWorkingMemoryFactStateWrite(params: {
   readonly target: SparcDocumentAddress;
   readonly fact: SparcWorkingMemoryFact;
@@ -42,6 +54,18 @@ export function createSparcWorkingMemoryFactStateWrite(params: {
   return {
     target: params.target,
     key: factStateKey(params.fact),
+    value: params.fact,
+  };
+}
+
+export function createSparcStableWorkingMemoryFactStateWrite(params: {
+  readonly target: SparcDocumentAddress;
+  readonly fact: SparcWorkingMemoryFact;
+  readonly identitySlots?: Readonly<Record<string, unknown>>;
+}): SparcStateWrite {
+  return {
+    target: params.target,
+    key: stableFactStateKey(params),
     value: params.fact,
   };
 }

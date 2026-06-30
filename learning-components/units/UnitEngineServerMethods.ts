@@ -5,7 +5,6 @@ export type LearningHistoryReadOptions = {
     readonly TDFId: string;
     readonly launchSource: 'courses';
   } | null;
-  readonly clusterKCs?: Array<string | number>;
 };
 
 export type UnitEngineServerMethods = {

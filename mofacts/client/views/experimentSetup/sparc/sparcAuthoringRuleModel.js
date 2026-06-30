@@ -67,6 +67,7 @@ export function scopedConditionForNode(nodeId) {
 export function ruleTypeFromCatalogEntry(entryId) {
   if (entryId === 'rule.condition.fact-pattern') return 'condition:fact-pattern';
   if (entryId === 'rule.condition.not-fact-pattern') return 'condition:not-fact-pattern';
+  if (entryId === 'rule.condition.any') return 'condition:any';
   if (entryId === 'rule.test.comparison') return 'test:comparison';
   if (entryId === 'rule.effect.assert-fact') return 'effect:assert-fact';
   if (entryId === 'rule.effect.write-state') return 'effect:write-state';
@@ -74,6 +75,7 @@ export function ruleTypeFromCatalogEntry(entryId) {
   if (entryId === 'rule.effect.classify') return 'effect:classify';
   if (entryId === 'rule.effect.credit') return 'effect:credit';
   if (entryId === 'rule.effect.model-practice') return 'effect:model-practice';
+  if (entryId === 'rule.effect.terminate-production-phase') return 'effect:terminate-production-phase';
   if (entryId === 'rule.effect.progressive-node-operation') return 'effect:append-node';
   return 'effect:classify';
 }

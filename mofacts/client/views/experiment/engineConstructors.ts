@@ -48,6 +48,21 @@ export function resolveUnitEngineTypeForUnit(unit: EngineUnitLike | null | undef
     throw new Error(`${source}: Cannot create unit engine without currentTdfUnit`);
   }
 
+  const runnableSessionShapes = getAvailableUnitShapes(unit).filter((shape) => (
+    shape === 'assessmentsession'
+    || shape === 'learningsession'
+    || shape === 'sparcsession'
+    || shape === 'videosession'
+    || shape === 'autotutorsession'
+  ));
+  if (runnableSessionShapes.length > 1) {
+    const unitName = typeof unit.unitname === 'string' ? unit.unitname : '<unnamed>';
+    throw new Error(
+      `${source}: Unit "${unitName}" declares multiple runnable unit shapes: ${runnableSessionShapes.join(', ')}. ` +
+      'Choose exactly one session selector.',
+    );
+  }
+
   if (unit.assessmentsession) return SCHEDULE_UNIT;
   if (unit.videosession) return VIDEO_UNIT;
   if (unit.sparcsession) return SPARC_UNIT;

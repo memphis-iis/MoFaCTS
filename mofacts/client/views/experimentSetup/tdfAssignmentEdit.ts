@@ -27,6 +27,8 @@ Session.set('courseAssignmentError', null);
 Session.set('courseAssignmentSelectedCourseId', '');
 Session.set('courseAssignmentTimezone', '');
 
+let activeSnapshotRequestId = 0;
+
 function toDatetimeLocalValue(value: unknown, timezone?: string): string {
   if (!value) return '';
   if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) {
@@ -72,10 +74,16 @@ function assignmentToRow(assignment: CourseAssignmentSummary, tdf: AssignableTdf
 
 async function loadCourseSnapshot(courseId: string) {
   if (!courseId) return;
+  const requestId = ++activeSnapshotRequestId;
   Session.set('courseAssignmentLoading', true);
   Session.set('courseAssignmentError', null);
   try {
     const snapshot = await meteorCallAsync('getCourseAssignmentEditorSnapshot', courseId) as CourseAssignmentEditorSnapshot;
+
+    if (requestId !== activeSnapshotRequestId) {
+      return;
+    }
+
     const tdfById = new Map(snapshot.assignableTdfs.map((tdf) => [tdf.TDFId, tdf]));
     Session.set('courseAssignableTdfs', snapshot.assignableTdfs);
     Session.set('courseAssignmentSelectedCourseId', courseId);
@@ -87,6 +95,15 @@ async function loadCourseSnapshot(courseId: string) {
     Session.set('courseAssignmentLoading', false);
   }
 }
+
+Template.tdfAssignmentEdit.onCreated(function() {
+  const instance = this as any;
+  instance.courseSelectionAutorun = instance.autorun(() => {
+    const selectedCourseId = String(Session.get('courseAssignmentSelectedCourseId') || '');
+    if (!selectedCourseId) return;
+    void loadCourseSnapshot(selectedCourseId);
+  });
+});
 
 function rowIndexFromEvent(event: Event) {
   return Number($(event.currentTarget).closest('[data-assignment-index]').data('assignment-index'));
@@ -120,15 +137,38 @@ function validateRows(rows: AssignmentEditorRow[]) {
 
 Template.tdfAssignmentEdit.onRendered(async function() {
   Session.set('courseAssignmentError', null);
+  Session.set('courseAssignmentRows', []);
+  Session.set('courseAssignableTdfs', []);
+  Session.set('courseAssignmentSearch', '');
   Session.set('courseAssignmentLoading', true);
   try {
     const courses = await meteorCallAsync('getAllCoursesForInstructor', Meteor.userId());
     Session.set('courses', courses);
+
+    const previousCourseId = String(Session.get('courseAssignmentSelectedCourseId') || '');
+    const hasPrevious = !!previousCourseId && (courses || []).some((course: any) => String(course._id) === previousCourseId);
+    const nextCourseId = hasPrevious
+      ? previousCourseId
+      : String((courses && courses[0] && courses[0]._id) || '');
+
+    if (nextCourseId !== previousCourseId) {
+      Session.set('courseAssignmentSelectedCourseId', nextCourseId);
+    }
+
+    if (!nextCourseId) {
+      writeRows([], false);
+      Session.set('courseAssignmentLoading', false);
+    }
   } catch (error: any) {
     Session.set('courseAssignmentError', error?.reason || error?.message || String(error));
   } finally {
     Session.set('courseAssignmentLoading', false);
   }
+});
+
+Template.tdfAssignmentEdit.onDestroyed(function() {
+  const instance = this as any;
+  instance.courseSelectionAutorun?.stop();
 });
 
 Template.tdfAssignmentEdit.helpers({
@@ -164,7 +204,8 @@ Template.tdfAssignmentEdit.helpers({
 Template.tdfAssignmentEdit.events({
   'change #class-select': function(event: Event) {
     const courseId = String($(event.currentTarget).val() || '');
-    void loadCourseSnapshot(courseId);
+    Session.set('courseAssignmentSearch', '');
+    Session.set('courseAssignmentSelectedCourseId', courseId);
   },
 
   'input #assignmentSearch': function(event: Event) {

@@ -8,6 +8,7 @@ import type {
   SparcProductionRuleFiring,
   SparcProductionRuleTest,
   SparcProgressiveNodeOperationTemplate,
+  SparcRuleNumericExpression,
   SparcRuleExpression,
   SparcStateWrite,
   SparcWorkingMemoryFact,
@@ -197,10 +198,22 @@ function compareRuleTest(
   }
 }
 
+function evaluateNumericExpression(
+  expression: SparcRuleNumericExpression,
+  bindings: SparcRuleBindings,
+  label: string,
+): number {
+  return requireFiniteNumber(
+    typeof expression === 'number' ? expression : evaluateSparcRuleExpression(expression, bindings),
+    label,
+  );
+}
+
 function matchSlotPattern(
   pattern: SparcFactSlotPattern,
   actual: unknown,
   bindings: SparcRuleBindings,
+  label: string,
 ): SparcRuleBindings | null {
   switch (pattern.type) {
     case 'literal':
@@ -222,6 +235,30 @@ function matchSlotPattern(
       }
       return bindings[variable] === actual ? bindings : null;
     }
+    case 'range': {
+      if (pattern.min === undefined && pattern.max === undefined) {
+        throw new Error(`${label} range pattern requires min or max`);
+      }
+      const actualNumber = Number(actual);
+      if (!Number.isFinite(actualNumber)) {
+        throw new Error(`${label} range pattern requires a numeric fact-slot value`);
+      }
+      if (pattern.min !== undefined) {
+        const min = evaluateNumericExpression(pattern.min, bindings, `${label} range min`);
+        const minInclusive = pattern.minInclusive !== false;
+        if (minInclusive ? actualNumber < min : actualNumber <= min) {
+          return null;
+        }
+      }
+      if (pattern.max !== undefined) {
+        const max = evaluateNumericExpression(pattern.max, bindings, `${label} range max`);
+        const maxInclusive = pattern.maxInclusive !== false;
+        if (maxInclusive ? actualNumber > max : actualNumber >= max) {
+          return null;
+        }
+      }
+      return bindings;
+    }
   }
 }
 
@@ -239,7 +276,12 @@ function matchFactPattern(
     if (!fact.slots || !(slotName in fact.slots)) {
       return null;
     }
-    const matched = matchSlotPattern(slotPattern, fact.slots[slotName], nextBindings);
+    const matched = matchSlotPattern(
+      slotPattern,
+      fact.slots[slotName],
+      nextBindings,
+      `SPARC fact pattern "${factType}" slot "${slotName}"`,
+    );
     if (!matched) {
       return null;
     }
@@ -273,6 +315,288 @@ function isNegatedPattern(
   return 'type' in pattern && pattern.type === 'not';
 }
 
+function isAnyCondition(
+  pattern: SparcProductionRuleCondition,
+): pattern is Extract<SparcProductionRuleCondition, { type: 'any' }> {
+  return 'type' in pattern && pattern.type === 'any';
+}
+
+function collectBoundVariablesFromFactPattern(
+  pattern: SparcFactPattern,
+  variables: Set<string>,
+): void {
+  for (const slotPattern of Object.values(pattern.slots ?? {})) {
+    if (slotPattern.type === 'bind') {
+      variables.add(requireNonBlank(slotPattern.variable, 'SPARC fact slot bind variable'));
+    }
+  }
+}
+
+function collectBoundVariablesFromCondition(
+  condition: SparcProductionRuleCondition,
+): Set<string> {
+  const variables = new Set<string>();
+  if (isNegatedPattern(condition)) {
+    return variables;
+  }
+  if (isAnyCondition(condition)) {
+    for (const branch of condition.conditions) {
+      for (const variable of collectBoundVariablesFromCondition(branch)) {
+        variables.add(variable);
+      }
+    }
+    return variables;
+  }
+  collectBoundVariablesFromFactPattern(condition, variables);
+  return variables;
+}
+
+function addVariablesFromTemplate(template: string | undefined, variables: Set<string>): void {
+  if (!template) {
+    return;
+  }
+  for (const match of template.matchAll(/\{([A-Za-z_][A-Za-z0-9_]*)\}/g)) {
+    const variableName = match[1];
+    if (variableName) {
+      variables.add(variableName);
+    }
+  }
+}
+
+function collectReferencedVariablesFromExpression(
+  expression: unknown,
+  variables: Set<string>,
+): void {
+  if (!isRuleExpression(expression)) {
+    return;
+  }
+  if (expression.type === 'variable') {
+    variables.add(requireNonBlank(expression.name, 'SPARC rule expression variable name'));
+    return;
+  }
+  if (expression.type === 'function') {
+    for (const arg of expression.args) {
+      collectReferencedVariablesFromExpression(arg, variables);
+    }
+  }
+}
+
+function collectReferencedVariablesFromTemplateValue(
+  value: string | SparcRuleExpression | undefined,
+  variables: Set<string>,
+): void {
+  if (typeof value === 'string') {
+    addVariablesFromTemplate(value, variables);
+    return;
+  }
+  collectReferencedVariablesFromExpression(value, variables);
+}
+
+function collectReferencedVariablesFromUnknownTemplate(
+  value: unknown,
+  variables: Set<string>,
+): void {
+  if (isRuleExpression(value)) {
+    collectReferencedVariablesFromExpression(value, variables);
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      collectReferencedVariablesFromUnknownTemplate(entry, variables);
+    }
+    return;
+  }
+  if (value && typeof value === 'object') {
+    for (const entry of Object.values(value)) {
+      collectReferencedVariablesFromUnknownTemplate(entry, variables);
+    }
+  }
+}
+
+function collectReferencedVariablesFromFactPattern(
+  pattern: SparcFactPattern,
+  variables: Set<string>,
+): void {
+  for (const slotPattern of Object.values(pattern.slots ?? {})) {
+    if (slotPattern.type === 'bind' || slotPattern.type === 'bound') {
+      variables.add(requireNonBlank(slotPattern.variable, 'SPARC fact slot variable'));
+    } else if (slotPattern.type === 'range') {
+      collectReferencedVariablesFromExpression(slotPattern.min, variables);
+      collectReferencedVariablesFromExpression(slotPattern.max, variables);
+    }
+  }
+}
+
+function collectReferencedVariablesFromCondition(
+  condition: SparcProductionRuleCondition,
+  variables: Set<string>,
+): void {
+  if (isNegatedPattern(condition)) {
+    collectReferencedVariablesFromFactPattern(condition.pattern, variables);
+    return;
+  }
+  if (isAnyCondition(condition)) {
+    for (const branch of condition.conditions ?? []) {
+      collectReferencedVariablesFromCondition(branch, variables);
+    }
+    return;
+  }
+  collectReferencedVariablesFromFactPattern(condition, variables);
+}
+
+function collectReferencedVariablesFromTest(
+  test: SparcProductionRuleTest,
+  variables: Set<string>,
+): void {
+  collectReferencedVariablesFromExpression(test.left, variables);
+  collectReferencedVariablesFromExpression(test.right, variables);
+}
+
+function collectReferencedVariablesFromEffect(
+  effect: SparcProductionRuleEffect,
+  variables: Set<string>,
+): void {
+  switch (effect.type) {
+    case 'assert-fact':
+      addVariablesFromTemplate(effect.fact.factId, variables);
+      for (const expression of Object.values(effect.fact.slots ?? {})) {
+        collectReferencedVariablesFromExpression(expression, variables);
+      }
+      break;
+    case 'write-state':
+      collectReferencedVariablesFromTemplateValue(effect.write.target.documentId, variables);
+      collectReferencedVariablesFromTemplateValue(effect.write.target.nodeId, variables);
+      collectReferencedVariablesFromExpression(effect.write.value, variables);
+      break;
+    case 'message':
+      addVariablesFromTemplate(effect.template, variables);
+      collectReferencedVariablesFromTemplateValue(effect.target?.documentId, variables);
+      collectReferencedVariablesFromTemplateValue(effect.target?.nodeId, variables);
+      break;
+    case 'credit':
+      addVariablesFromTemplate(effect.kc, variables);
+      break;
+    case 'model-practice':
+      collectReferencedVariablesFromExpression(effect.clusterIndex, variables);
+      collectReferencedVariablesFromTemplateValue(effect.nodeId, variables);
+      collectReferencedVariablesFromExpression(effect.responseValue, variables);
+      collectReferencedVariablesFromExpression(effect.input, variables);
+      break;
+    case 'append-node':
+    case 'append-node-if-missing':
+    case 'insert-node':
+    case 'append-text':
+      collectReferencedVariablesFromUnknownTemplate(effect, variables);
+      break;
+    case 'classify':
+    case 'terminate-production-phase':
+      break;
+  }
+}
+
+function collectVariablesReferencedOutsideCondition(
+  rule: SparcProductionRule,
+  conditionIndex: number,
+): Set<string> {
+  const variables = new Set<string>();
+  for (const condition of rule.when.slice(conditionIndex + 1)) {
+    collectReferencedVariablesFromCondition(condition, variables);
+  }
+  for (const test of rule.tests ?? []) {
+    collectReferencedVariablesFromTest(test, variables);
+  }
+  for (const effect of rule.then) {
+    collectReferencedVariablesFromEffect(effect, variables);
+  }
+  return variables;
+}
+
+function validateAnyConditionBindings(
+  condition: SparcProductionRuleCondition,
+  ruleId: string,
+  referencedOutside = new Set<string>(),
+): void {
+  if (isNegatedPattern(condition)) {
+    return;
+  }
+  if (!isAnyCondition(condition)) {
+    return;
+  }
+  if (!Array.isArray(condition.conditions) || condition.conditions.length === 0) {
+    throw new Error(`SPARC production rule "${ruleId}" any condition requires at least one branch condition`);
+  }
+  const branchVariableSets = condition.conditions.map((branch) => {
+    validateAnyConditionBindings(branch, ruleId, referencedOutside);
+    return collectBoundVariablesFromCondition(branch);
+  });
+  const unsafeVariables = new Set<string>();
+  for (const variables of branchVariableSets) {
+    for (const variable of variables) {
+      if (
+        branchVariableSets.some((branchVariables) => !branchVariables.has(variable))
+        && referencedOutside.has(variable)
+      ) {
+        unsafeVariables.add(variable);
+      }
+    }
+  }
+  if (unsafeVariables.size > 0) {
+    throw new Error(
+      `SPARC production rule "${ruleId}" any condition branch-local bindings are referenced outside the any condition: ${[...unsafeVariables].sort().join(', ')}`,
+    );
+  }
+}
+
+function validateRangeBound(value: unknown, label: string): void {
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) {
+      throw new Error(`${label} must be a finite number`);
+    }
+    return;
+  }
+  if (!isRuleExpression(value)) {
+    throw new Error(`${label} must be a number or SPARC rule expression`);
+  }
+}
+
+function validateRangePatternsInFactPattern(
+  pattern: SparcFactPattern,
+  ruleId: string,
+): void {
+  for (const [slotName, slotPattern] of Object.entries(pattern.slots ?? {})) {
+    if (slotPattern.type !== 'range') {
+      continue;
+    }
+    const label = `SPARC production rule "${ruleId}" fact "${pattern.factType}" slot "${slotName}" range`;
+    if (slotPattern.min === undefined && slotPattern.max === undefined) {
+      throw new Error(`${label} requires min or max`);
+    }
+    if (slotPattern.min !== undefined) {
+      validateRangeBound(slotPattern.min, `${label} min`);
+    }
+    if (slotPattern.max !== undefined) {
+      validateRangeBound(slotPattern.max, `${label} max`);
+    }
+  }
+}
+
+function validateConditionShape(
+  condition: SparcProductionRuleCondition,
+  ruleId: string,
+): void {
+  if (isNegatedPattern(condition)) {
+    validateRangePatternsInFactPattern(condition.pattern, ruleId);
+    return;
+  }
+  if (isAnyCondition(condition)) {
+    for (const branch of condition.conditions) {
+      validateConditionShape(branch, ruleId);
+    }
+    return;
+  }
+  validateRangePatternsInFactPattern(condition, ruleId);
+}
+
 function findPatternMatches(
   factIndex: SparcFactIndex,
   patterns: readonly SparcProductionRuleCondition[],
@@ -286,6 +610,14 @@ function findPatternMatches(
     const hasMatch = candidateFactsForPattern(head.pattern, factIndex)
       .some((fact) => matchFactPattern(head.pattern, fact, bindings));
     return hasMatch ? [] : findPatternMatches(factIndex, tail, bindings);
+  }
+  if (isAnyCondition(head)) {
+    if (!Array.isArray(head.conditions) || head.conditions.length === 0) {
+      throw new Error('SPARC any production-rule condition requires at least one branch condition');
+    }
+    return head.conditions.flatMap((condition) => (
+      findPatternMatches(factIndex, [condition, ...tail], bindings)
+    ));
   }
   const matches: SparcRuleBindings[] = [];
   for (const fact of candidateFactsForPattern(head, factIndex)) {
@@ -311,6 +643,27 @@ function instantiateFact(
     factType: requireNonBlank(effect.fact.factType, 'SPARC asserted fact factType'),
     ...(Object.keys(slots).length > 0 ? { slots } : {}),
   };
+}
+
+function instantiateFactIdentitySlots(
+  effect: Extract<SparcProductionRuleEffect, { type: 'assert-fact' }>,
+  fact: SparcWorkingMemoryFact,
+): Readonly<Record<string, unknown>> | undefined {
+  if (!Array.isArray(effect.identitySlots)) {
+    return undefined;
+  }
+  const identitySlots: Record<string, unknown> = {};
+  const slots = fact.slots ?? {};
+  for (const slotName of effect.identitySlots) {
+    const normalizedSlotName = requireNonBlank(slotName, 'SPARC assert-fact identitySlots entry');
+    if (!(normalizedSlotName in slots)) {
+      throw new Error(
+        `SPARC assert-fact identity slot "${normalizedSlotName}" is missing from fact "${fact.factType}"`,
+      );
+    }
+    identitySlots[normalizedSlotName] = slots[normalizedSlotName];
+  }
+  return identitySlots;
 }
 
 function evaluateStringTemplateValue(
@@ -397,6 +750,7 @@ function instantiateFiring(
 ): SparcProductionRuleFiring {
   const assertedFacts: SparcWorkingMemoryFact[] = [];
   const persistentAssertedFacts: SparcWorkingMemoryFact[] = [];
+  const persistentAssertedFactIdentitySlots: (Readonly<Record<string, unknown>> | undefined)[] = [];
   const writes: SparcStateWrite[] = [];
   const messages: {
     readonly messageType: 'hint' | 'buggy' | 'success' | 'feedback';
@@ -412,6 +766,8 @@ function instantiateFiring(
   }[] = [];
   const classifications: (SparcProductionRuleFiring['classifications'][number])[] = [];
   const credits: string[] = [];
+  let terminatesProductionPhase = false;
+  let terminalReason: string | undefined;
 
   for (const effect of rule.then) {
     switch (effect.type) {
@@ -421,6 +777,7 @@ function instantiateFiring(
         assertedFacts.push(fact);
         if (effect.persist !== false) {
           persistentAssertedFacts.push(fact);
+          persistentAssertedFactIdentitySlots.push(instantiateFactIdentitySlots(effect, fact));
         }
         break;
         }
@@ -493,6 +850,12 @@ function instantiateFiring(
             : {}),
         });
         break;
+      case 'terminate-production-phase':
+        terminatesProductionPhase = true;
+        terminalReason = typeof effect.reason === 'string' && effect.reason.trim()
+          ? effect.reason.trim()
+          : undefined;
+        break;
       case 'append-node':
       case 'append-node-if-missing':
       case 'insert-node':
@@ -507,11 +870,14 @@ function instantiateFiring(
     bindings,
     assertedFacts,
     persistentAssertedFacts,
+    persistentAssertedFactIdentitySlots,
     writes,
     messages,
     modelPracticeObservations,
     classifications,
     credits,
+    terminatesProductionPhase,
+    ...(terminalReason ? { terminalReason } : {}),
   };
 }
 
@@ -545,6 +911,14 @@ export function compileSparcProductionRulePlan(
     requireNonBlank(rule.id, 'SPARC production rule id');
     if (!Array.isArray(rule.when) || rule.when.length === 0) {
       throw new Error(`SPARC production rule "${rule.id}" requires at least one fact pattern`);
+    }
+    for (const [conditionIndex, condition] of rule.when.entries()) {
+      validateConditionShape(condition, rule.id);
+      validateAnyConditionBindings(
+        condition,
+        rule.id,
+        collectVariablesReferencedOutsideCondition(rule, conditionIndex),
+      );
     }
     if (!Array.isArray(rule.then)) {
       throw new Error(`SPARC production rule "${rule.id}" then must be an array`);
@@ -599,6 +973,13 @@ export function runSparcProductionRules(params: {
       }
       factKeys.add(factKey);
       facts.push(fact);
+    }
+    if (nextFiring.terminatesProductionPhase) {
+      return {
+        facts,
+        firings,
+        cycles: cycle,
+      };
     }
   }
 

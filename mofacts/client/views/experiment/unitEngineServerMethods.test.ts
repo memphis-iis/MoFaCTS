@@ -29,7 +29,7 @@ describe('unitEngineServerMethods', function() {
 
     await serverMethods.getResponseKCMapForTdf('tdf-1');
     await serverMethods.getStimulusCrowdStatsForDeck('tdf-1', ['kc-1']);
-    await serverMethods.getLearningHistoryForUnit('user-1', 'tdf-1', 0, false, { clusterKCs: ['cluster-1'] });
+    await serverMethods.getLearningHistoryForUnit('user-1', 'tdf-1', 0, false);
 
     expect(calls).to.deep.equal([{
       name: 'getResponseKCMapForTdf',
@@ -39,7 +39,7 @@ describe('unitEngineServerMethods', function() {
       args: ['tdf-1', ['kc-1'], { courseAssignment }],
     }, {
       name: 'getLearningHistoryForUnit',
-      args: ['user-1', 'tdf-1', 0, false, { clusterKCs: ['cluster-1'], courseAssignment }],
+      args: ['user-1', 'tdf-1', 0, false, { courseAssignment }],
     }]);
   });
 
@@ -52,11 +52,11 @@ describe('unitEngineServerMethods', function() {
       },
     });
 
-    await serverMethods.getLearningHistoryForUnit('user-1', 'tdf-1', 0, false, { clusterKCs: ['kc-1'] });
+    await serverMethods.getLearningHistoryForUnit('user-1', 'tdf-1', 0, false);
 
     expect(calls).to.deep.equal([{
       name: 'getLearningHistoryForUnit',
-      args: ['user-1', 'tdf-1', 0, false, { clusterKCs: ['kc-1'] }],
+      args: ['user-1', 'tdf-1', 0, false, {}],
     }]);
   });
 });

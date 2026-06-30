@@ -20,6 +20,11 @@ const PWA_ICON_ROUTE_PREFIX = '/theme-install-icon/';
 const APPLE_TOUCH_ICON_ROUTE = '/apple-touch-icon.png';
 const APPLE_TOUCH_ICON_PRECOMPOSED_ROUTE = '/apple-touch-icon-precomposed.png';
 const DEFAULT_BACKGROUND_COLOR = '#F2F2F2';
+const WebAppAny = WebApp as unknown as {
+  handlers: {
+    use: (handler: (req: IncomingMessage, res: ServerResponse, next: () => void) => void) => void;
+  };
+};
 
 function asNonEmptyString(value: unknown): string | null {
   if (typeof value !== 'string') {
@@ -230,7 +235,7 @@ async function resolveThemeIconContent(theme: ThemeLike, propertyName: string) {
   return await readThemeAssetFromUrl(propertyValue);
 }
 
-WebApp.connectHandlers.use(async function(req: IncomingMessage, res: ServerResponse, next: () => void) {
+WebAppAny.handlers.use(async function(req: IncomingMessage, res: ServerResponse, next: () => void) {
   const method = req.method || 'GET';
   if (method !== 'GET' && method !== 'HEAD') {
     next();

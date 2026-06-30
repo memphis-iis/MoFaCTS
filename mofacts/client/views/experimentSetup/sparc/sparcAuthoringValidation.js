@@ -97,6 +97,180 @@ function validateRuleExpression(expression, label) {
   throw new Error(`${label} has unsupported expression type "${String(expression.type)}".`);
 }
 
+function validateNumericRuleExpression(value, label) {
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) {
+      throw new Error(`${label} must be a finite number.`);
+    }
+    return;
+  }
+  validateRuleExpression(value, label);
+}
+
+function collectBoundVariablesFromFactPattern(pattern) {
+  const variables = new Set();
+  for (const slot of Object.values(pattern?.slots || {})) {
+    if (slot?.type === 'bind') {
+      requireNonBlankString(slot.variable, 'SPARC any condition bind variable');
+      variables.add(slot.variable);
+    }
+  }
+  return variables;
+}
+
+function collectBoundVariablesFromCondition(condition) {
+  if (condition?.type === 'not') {
+    return new Set();
+  }
+  if (condition?.type === 'any') {
+    const variables = new Set();
+    for (const branch of condition.conditions || []) {
+      for (const variable of collectBoundVariablesFromCondition(branch)) {
+        variables.add(variable);
+      }
+    }
+    return variables;
+  }
+  return collectBoundVariablesFromFactPattern(condition);
+}
+
+function addVariablesFromTemplate(template, variables) {
+  if (typeof template !== 'string') {
+    return;
+  }
+  for (const match of template.matchAll(/\{([A-Za-z_][A-Za-z0-9_]*)\}/g)) {
+    if (match[1]) {
+      variables.add(match[1]);
+    }
+  }
+}
+
+function isRuleExpression(value) {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    && ['literal', 'variable', 'function'].includes(value.type);
+}
+
+function collectReferencedVariablesFromExpression(expression, variables) {
+  if (!isRuleExpression(expression)) {
+    return;
+  }
+  if (expression.type === 'variable') {
+    requireNonBlankString(expression.name, 'SPARC rule expression variable name');
+    variables.add(expression.name);
+    return;
+  }
+  if (expression.type === 'function') {
+    for (const arg of expression.args || []) {
+      collectReferencedVariablesFromExpression(arg, variables);
+    }
+  }
+}
+
+function collectReferencedVariablesFromTemplateValue(value, variables) {
+  if (typeof value === 'string') {
+    addVariablesFromTemplate(value, variables);
+    return;
+  }
+  collectReferencedVariablesFromExpression(value, variables);
+}
+
+function collectReferencedVariablesFromUnknownTemplate(value, variables) {
+  if (isRuleExpression(value)) {
+    collectReferencedVariablesFromExpression(value, variables);
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      collectReferencedVariablesFromUnknownTemplate(entry, variables);
+    }
+    return;
+  }
+  if (value && typeof value === 'object') {
+    for (const entry of Object.values(value)) {
+      collectReferencedVariablesFromUnknownTemplate(entry, variables);
+    }
+  }
+}
+
+function collectReferencedVariablesFromFactPattern(pattern, variables) {
+  for (const slot of Object.values(pattern?.slots || {})) {
+    if (slot?.type === 'bind' || slot?.type === 'bound') {
+      requireNonBlankString(slot.variable, 'SPARC fact slot variable');
+      variables.add(slot.variable);
+    } else if (slot?.type === 'range') {
+      collectReferencedVariablesFromExpression(slot.min, variables);
+      collectReferencedVariablesFromExpression(slot.max, variables);
+    }
+  }
+}
+
+function collectReferencedVariablesFromCondition(condition, variables) {
+  if (condition?.type === 'not') {
+    collectReferencedVariablesFromFactPattern(condition.pattern, variables);
+    return;
+  }
+  if (condition?.type === 'any') {
+    for (const branch of condition.conditions || []) {
+      collectReferencedVariablesFromCondition(branch, variables);
+    }
+    return;
+  }
+  collectReferencedVariablesFromFactPattern(condition, variables);
+}
+
+function collectReferencedVariablesFromEffect(effect, variables) {
+  switch (effect?.type) {
+    case 'assert-fact':
+      addVariablesFromTemplate(effect.fact?.factId, variables);
+      for (const expression of Object.values(effect.fact?.slots || {})) {
+        collectReferencedVariablesFromExpression(expression, variables);
+      }
+      break;
+    case 'write-state':
+      collectReferencedVariablesFromTemplateValue(effect.write?.target?.documentId, variables);
+      collectReferencedVariablesFromTemplateValue(effect.write?.target?.nodeId, variables);
+      collectReferencedVariablesFromExpression(effect.write?.value, variables);
+      break;
+    case 'message':
+      addVariablesFromTemplate(effect.template, variables);
+      collectReferencedVariablesFromTemplateValue(effect.target?.documentId, variables);
+      collectReferencedVariablesFromTemplateValue(effect.target?.nodeId, variables);
+      break;
+    case 'credit':
+      addVariablesFromTemplate(effect.kc, variables);
+      break;
+    case 'model-practice':
+      collectReferencedVariablesFromExpression(effect.clusterIndex, variables);
+      collectReferencedVariablesFromTemplateValue(effect.nodeId, variables);
+      collectReferencedVariablesFromExpression(effect.responseValue, variables);
+      collectReferencedVariablesFromExpression(effect.input, variables);
+      break;
+    case 'append-node':
+    case 'append-node-if-missing':
+    case 'insert-node':
+    case 'append-text':
+      collectReferencedVariablesFromUnknownTemplate(effect, variables);
+      break;
+    default:
+      break;
+  }
+}
+
+function collectVariablesReferencedOutsideCondition(rule, conditionIndex) {
+  const variables = new Set();
+  for (const condition of (rule.when || []).slice(conditionIndex + 1)) {
+    collectReferencedVariablesFromCondition(condition, variables);
+  }
+  for (const test of rule.tests || []) {
+    collectReferencedVariablesFromExpression(test.left, variables);
+    collectReferencedVariablesFromExpression(test.right, variables);
+  }
+  for (const effect of rule.then || []) {
+    collectReferencedVariablesFromEffect(effect, variables);
+  }
+  return variables;
+}
+
 function validateFactPattern(pattern, label) {
   requireNonBlankString(pattern?.factType, `${label} factType`);
   for (const [slotName, slot] of Object.entries(pattern.slots || {})) {
@@ -108,8 +282,48 @@ function validateFactPattern(pattern, label) {
       requireNonBlankString(slot.variable, `${label} slot "${slotName}" variable`);
       continue;
     }
+    if (slot?.type === 'range') {
+      if (slot.min === undefined && slot.max === undefined) {
+        throw new Error(`${label} slot "${slotName}" range requires min or max.`);
+      }
+      if (slot.min !== undefined) validateNumericRuleExpression(slot.min, `${label} slot "${slotName}" range min`);
+      if (slot.max !== undefined) validateNumericRuleExpression(slot.max, `${label} slot "${slotName}" range max`);
+      continue;
+    }
     throw new Error(`${label} slot "${slotName}" has unsupported pattern type "${String(slot?.type)}".`);
   }
+}
+
+function validateProductionCondition(condition, label, referencedOutside = new Set()) {
+  if (condition?.type === 'not') {
+    validateFactPattern(condition.pattern, `${label}.not`);
+    return;
+  }
+  if (condition?.type === 'any') {
+    if (!Array.isArray(condition.conditions) || condition.conditions.length === 0) {
+      throw new Error(`${label}.any requires at least one condition.`);
+    }
+    condition.conditions.forEach((branch, branchIndex) => (
+      validateProductionCondition(branch, `${label}.any[${branchIndex}]`, referencedOutside)
+    ));
+    const branchVariableSets = condition.conditions.map((branch) => collectBoundVariablesFromCondition(branch));
+    const unsafeVariables = new Set();
+    for (const variables of branchVariableSets) {
+      for (const variable of variables) {
+        if (
+          branchVariableSets.some((branchVariables) => !branchVariables.has(variable))
+          && referencedOutside.has(variable)
+        ) {
+          unsafeVariables.add(variable);
+        }
+      }
+    }
+    if (unsafeVariables.size > 0) {
+      throw new Error(`${label}.any branch-local bindings are referenced outside the any condition: ${[...unsafeVariables].sort().join(', ')}.`);
+    }
+    return;
+  }
+  validateFactPattern(condition, label);
 }
 
 function validateAddressTemplate(target, label) {
@@ -130,6 +344,14 @@ function validateProductionEffect(effect, label) {
   switch (effect?.type) {
     case 'assert-fact':
       requireNonBlankString(effect.fact?.factType, `${label} asserted factType`);
+      if (effect.identitySlots !== undefined) {
+        if (!Array.isArray(effect.identitySlots)) {
+          throw new Error(`${label} identitySlots must be an array.`);
+        }
+        effect.identitySlots.forEach((slotName, index) => {
+          requireNonBlankString(slotName, `${label} identitySlots[${index}]`);
+        });
+      }
       for (const [slotName, expression] of Object.entries(effect.fact?.slots || {})) {
         requireNonBlankString(slotName, `${label} asserted slot name`);
         validateRuleExpression(expression, `${label} asserted slot "${slotName}"`);
@@ -159,6 +381,9 @@ function validateProductionEffect(effect, label) {
       if (effect.nodeId && typeof effect.nodeId === 'object') validateRuleExpression(effect.nodeId, `${label} nodeId`);
       if (effect.responseValue !== undefined) validateRuleExpression(effect.responseValue, `${label} responseValue`);
       if (effect.input !== undefined) validateRuleExpression(effect.input, `${label} input`);
+      break;
+    case 'terminate-production-phase':
+      if (effect.reason !== undefined) requireNonBlankString(effect.reason, `${label} reason`);
       break;
     case 'append-node':
     case 'append-node-if-missing':
@@ -193,13 +418,13 @@ function validateRulesBeforeSave(display, label, validClusterIndices) {
     if (!Array.isArray(rule.when) || rule.when.length === 0) {
       throw new Error(`${label} productionRules[${index}] requires at least one when condition.`);
     }
-    rule.when.forEach((condition, conditionIndex) => {
-      if (condition?.type === 'not') {
-        validateFactPattern(condition.pattern, `${label} productionRules[${index}].when[${conditionIndex}].not`);
-      } else {
-        validateFactPattern(condition, `${label} productionRules[${index}].when[${conditionIndex}]`);
-      }
-    });
+    rule.when.forEach((condition, conditionIndex) => (
+      validateProductionCondition(
+        condition,
+        `${label} productionRules[${index}].when[${conditionIndex}]`,
+        collectVariablesReferencedOutsideCondition(rule, conditionIndex),
+      )
+    ));
     for (const [testIndex, test] of (rule.tests || []).entries()) {
       requireNonBlankString(test.op, `${label} productionRules[${index}].tests[${testIndex}] op`);
       validateRuleExpression(test.left, `${label} productionRules[${index}].tests[${testIndex}] left`);

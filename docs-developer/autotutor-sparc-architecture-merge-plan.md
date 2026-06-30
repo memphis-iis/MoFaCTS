@@ -72,7 +72,7 @@ Disallowed sharing:
 - modifying original AutoTutor behavior to make the SPARC version easier
 - deleting or replacing original AutoTutor routes, unit-engine registration, or TDF compatibility
 
-Equivalence tests may call original AutoTutor as an oracle during development, but production behavior must not use the original implementation as a fallback.
+Development comparisons may inspect original AutoTutor output for orientation, but SPARC-backed AutoTutor is not expected to be internally equivalent to the current original implementation. Production behavior must not use the original implementation as a fallback.
 
 Original AutoTutor code should be treated as read-only for this work, except for test additions that prove it still runs unchanged. Any real bug fix to original AutoTutor should be a separate, explicitly approved change with its own verification.
 
@@ -167,6 +167,21 @@ Possible shared location:
 
 The exact names can be decided during implementation. The invariant is more important than the folder name: shared infrastructure must be outside both AutoTutor implementations.
 
+## BRD Graph Conversion Correction
+
+CTAT `.brd` files are not only production-rule source. In example-tracing tutors, the graph edges define branch membership, ordering, and completion reachability, while each edge's rule label supplies KC / production attribution. A converter that reads only the `<rule>` labels loses tutoring behavior.
+
+For BRD-to-SPARC conversion, treat the graph as authored behavior:
+
+- divergent outgoing edges from the same source state define branch selectors
+- edge SAI triples define learner actions
+- edge rule labels define KC / production attribution
+- downstream edges reachable only through a branch must become production conditions over explicit branch facts
+- done-state edges must become completion productions gated by the branch facts that precede the done edge
+- branch-specific visibility, enablement, or progressive reveal must be driven by the same branch facts instead of relying on the example-tracing graph to hide invalid paths
+
+For the SPARC Fractions `1416.brd` case, `firstDenConv=12` selects the LCD branch and `firstDenConv=24` selects the product-denominator branch. The active denominator/path fact must replace prior active-path state, not accumulate alongside stale branch facts; later numerator, answer, simplification, and Done productions must be sensitive to that active branch.
+
 ## What Generated AutoTutor Content Owns
 
 Generated AutoTutor content should use the ordinary SPARC document/session contract. Any needed controller, target-selection, production-phase, or replay behavior must be added as a general SPARC runtime capability and exercised by the generated content, not owned as a SPARC-backed AutoTutor subsystem.
@@ -183,7 +198,7 @@ The implementation should use general SPARC/pedagogical-session infrastructure f
 
 - working-memory facts
 - controller target selection and selected-action state
-- production-rule evaluation and terminal production phases
+- production-rule evaluation and terminal rule stops
 - state write application
 - runtime address types
 - history envelope writing and replay
@@ -232,15 +247,11 @@ This first slice may support a narrow subset of AutoTutor behavior, but it must 
 
 Do not migrate existing AutoTutor lessons automatically at runtime.
 
-Instead, support side-by-side content:
+Instead, use a repeatable config conversion step. The original AutoTutor runtime remains available in the application, but canonical converted config content should replace the AutoTutor package content in place. Do not save duplicate original AutoTutor packages beside the converted SPARC packages in the canonical config repository. Source provenance belongs in the conversion report and generated metadata, and the pre-conversion source remains recoverable through version control.
 
-- Existing AutoTutor lessons continue to use original AutoTutor.
-- New or explicitly opted-in lessons can use SPARC-backed AutoTutor.
-- Every existing authored AutoTutor lesson in `C:\dev\mofacts_config` should eventually have an explicit SPARC-backed AutoTutor counterpart in the config repository.
+This keeps runtime regression safety without turning the config repository into two parallel lesson sets.
 
-This preserves regression safety and allows research comparison between the original and SPARC-backed implementations.
-
-The config repository is part of the migration, not an afterthought. The app-runtime work is incomplete until the canonical AutoTutor lessons can be translated into SPARC-backed AutoTutor lessons and run side by side with their originals.
+The config repository is part of the migration, not an afterthought. The app-runtime work is incomplete until the canonical AutoTutor lessons can be translated into SPARC-backed AutoTutor lessons in place and loaded through ordinary `sparcsession`.
 
 ## Config Content Translation
 
@@ -280,7 +291,7 @@ The translation must preserve:
 - max-turn policy
 - graduation policy
 - model override fields
-- lesson identity, with clear generated-package naming
+- lesson identity, preserving the canonical package identity unless a deliberate rename is part of the migration
 
 The translation must also add SPARC-backed runtime material:
 
@@ -295,14 +306,7 @@ The translation must also add SPARC-backed runtime material:
 - ordinary SPARC history/replay content, with no generated AutoTutor-specific replay identity fields
 - enough conversion-report provenance to identify the original AutoTutor source package
 
-Translated packages must not overwrite the originals. They should live beside the originals with clear names, for example:
-
-```text
-AutoTutor Nonviolent Communication
-SPARC Session Nonviolent Communication
-```
-
-or another naming convention selected during implementation. The important invariant is that a human and a test can tell which package is original AutoTutor and which package is SPARC-backed AutoTutor.
+Translated packages replace the original AutoTutor package content in the canonical config repository. The important invariant is that a human and a test can tell the package was generated from an original AutoTutor source through the conversion report, generated provenance, and ordinary git history, not by keeping a second saved original package beside it.
 
 ## Config Translation Tooling
 
@@ -317,10 +321,18 @@ The translator should:
 5. Preserve source provenance in generated files.
 6. Fail clearly on unsupported source shapes instead of silently dropping fields.
 7. Support a dry-run mode that reports intended file changes.
-8. Support an overwrite/update mode only for generated SPARC-backed outputs, never for original AutoTutor packages.
+8. Support write/update mode only for deliberate canonical conversion, with provenance/report output and collision checks that prevent accidental writes to unrelated packages.
 9. Produce a conversion report listing converted packages, skipped packages, warnings, and blocking errors.
 
 The converter should live in this app repository under `scripts/`, because it depends on the app's SPARC session contract and validation expectations. It must still write only to the canonical config path when explicitly invoked.
+
+Current entrypoints:
+
+- `npm run check:autotutor-sparc-converter`
+- `npm run convert:autotutor-sparc -- --config-dir C:\dev\mofacts_config`
+- direct script path: `mofacts/scripts/convertAutoTutorToSparc.cjs`
+
+The converter is CommonJS for compatibility with the current Node script tooling and uses `jiti` only to consume TypeScript contract/template helpers from the app tree. Dry-run is the default. Writing converted package content requires `--write` and an original AutoTutor source package; re-converting an already converted package requires restoring or otherwise supplying the original source content. Writing a conversion report requires explicit `--report-file`.
 
 The translator should become part of the implementation plan before broad content migration. Manual conversion is acceptable for one prototype fixture only, not for the full set of existing AutoTutor lessons.
 
@@ -390,9 +402,9 @@ The referenced stimulus file uses this pattern:
 
 ### Generated SPARC-Backed Package Shape
 
-The generated package should be a separate package. It must not overwrite the original TDF or stimulus file.
+The generated SPARC-backed content replaces the original package content in place only during explicit migration write mode. Dry-run mode may build a generated draft and report the source paths it would replace, but the canonical config repository should not keep a side-by-side original AutoTutor package beside the converted SPARC package.
 
-The generated TDF should use the existing `sparcsession` unit selector. The generated version is an ordinary SPARC session whose authored display, facts, rules, and initial state implement the adapted AutoTutor behavior. Do not add another unit selector.
+The converted TDF should use the existing `sparcsession` unit selector. The converted version is an ordinary SPARC session whose authored display, facts, rules, and initial state implement the adapted AutoTutor behavior. Do not add another unit selector.
 
 ```json
 {
@@ -415,7 +427,7 @@ The generated TDF should use the existing `sparcsession` unit selector. The gene
 }
 ```
 
-The generated TDF should select the generated SPARC page with `sparcsession.pageId` when the stimulus file has one or more named SPARC pages. SPARC-backed AutoTutor still has a real SPARC session cluster list/model scope: source AutoTutor expectation function is merged into ordinary generated clusterKCs, and the active SPARC session cluster list must include exactly those generated clusterKCs that the selected SPARC page uses. Current `sparcsession` runtime derives that active model cluster scope from cluster references in the selected SPARC page; if a generated or authored `sparcsession.clusterlist` is also present for tooling compatibility, it must be validated against the page-derived cluster list and must not become a divergent second source of truth.
+The converted TDF should select the generated SPARC page with `sparcsession.pageId` when the stimulus file has one or more named SPARC pages. SPARC-backed AutoTutor still has a real SPARC session cluster list/model scope: source AutoTutor expectation function is merged into ordinary generated clusterKCs, and the active SPARC session cluster list must include exactly those generated clusterKCs that the selected SPARC page uses. Current `sparcsession` runtime derives that active model cluster scope from cluster references in the selected SPARC page; if a generated or authored `sparcsession.clusterlist` is also present for tooling compatibility, it must be validated against the page-derived cluster list and must not become a divergent second source of truth.
 
 The generated stimulus file should include a SPARC document using the existing SPARC display schema, `tutorscript-sparc/1.0`, in the current SPARC package location: `setspec.sparcPages[].display`. Do not put the runnable SPARC document only in `setspec.clusters[].stims[].display`; current `sparcsession` runtime resolves pages from the active TDF's `rawStimuliFile.setspec.sparcPages`.
 
@@ -521,13 +533,12 @@ function translateAutoTutorPackage(sourcePackagePath: string): TranslationResult
   validateGeneratedTdf(generatedTdf);
   validateGeneratedStimulus(generatedStimulus);
   validateGeneratedSparcDocument(sparcDialogueDocument);
-  assertGeneratedPackageDoesNotOverwriteSource(sourcePackagePath, generatedIds);
 
   return {
-    generatedPackagePath: generatedIds.packagePath,
+    convertedPackagePath: sourcePackagePath,
     files: [
-      { path: generatedIds.tdfPath, json: generatedTdf },
-      { path: generatedIds.stimulusPath, json: generatedStimulus }
+      { path: sourceTdfPath, json: generatedTdf },
+      { path: sourceStimulusPath, json: generatedStimulus }
     ],
     report: buildTranslationReport()
   };
@@ -607,7 +618,7 @@ Relationship generation must happen before generated clusterKC identities are fi
 - generated cluster index as a non-negative integer
 - generated `clusterKC` as the canonical learning-target identity, with first-stimulus `stimulusKC` preserved for the existing SPARC cluster target path
 - generated relationship graph source and target ids as `clusterKC` identities
-- source expectation id to generated `clusterKC` provenance for diagnostics and equivalence tests only, not as runtime identity
+- source expectation id to generated `clusterKC` provenance for diagnostics and migration audit only, not as runtime identity
 
 The conversion report must include the relationship provenance, the source expectation id to generated `clusterKC` provenance, and a validation result proving every relationship source and target resolves to exactly one generated clusterKC.
 
@@ -677,7 +688,7 @@ The translator must fail clearly when:
 - source expectation relationship graph entries reference unknown source expectation ids
 - source expectation relationships are absent when the selected target-selection policy requires relationship weights and the converter cannot generate them through the neutral cluster-KC relationship engine
 - misconception ids are duplicated
-- generated ids would collide with source ids in a way that could overwrite originals
+- generated ids would collide with unrelated existing package ids or history-stable canonical ids
 - generated SPARC display validation fails
 
 The translator may warn, but should still translate, when:
@@ -695,28 +706,28 @@ Dry run should:
 
 - inventory packages
 - validate sources
-- compute generated paths and ids
-- show which files would be created or updated
+- compute generated ids and the existing source paths that explicit write mode would replace
+- show which files would be updated
 - show warnings and blockers
 - write no files
 
 Update mode should:
 
-- write only generated SPARC-backed packages
-- refuse to overwrite original AutoTutor files
-- overwrite previously generated files only when provenance shows they came from the same source package and translator family
+- write converted SPARC-backed package content in place only when explicitly requested
+- refuse to overwrite unrelated packages or files whose provenance does not match the selected source package and translator family
+- preserve source provenance in generated metadata and the conversion report
 - write a conversion report
 
-### Generated Package Report
+### Converted Package Report
 
 The conversion report should include:
 
 - source package path
-- generated package path
+- converted package path
 - source TDF path
-- generated TDF path
+- converted TDF path
 - source stimulus path
-- generated stimulus path
+- converted stimulus path
 - source AutoTutor script id
 - generated SPARC document id
 - translator version
@@ -729,13 +740,19 @@ The conversion report should include:
 
 The conversion report is human diagnostic/provenance output only. Runtime identity, cluster references, graph facts, and policy facts must be read from the generated SPARC package, not from the report.
 
+Canonical authored content versus refreshable generated detail:
+
+- Canonical content after migration: lesson identity, prompt, source-derived clusterKC identities, generated first-stimulus `stimulusKC` values, learner-facing expectation/proposition text, misconceptions, hints/prompts/assertions, summary text, authored thresholds, graduation/max-turn policy, model/provider settings, SPARC page id/document id, node ids that history/replay depends on, and source provenance.
+- Refreshable generated implementation detail: production-rule object ordering when semantically equivalent, generated rule ids that are explicitly versioned by the converter, layout scaffolding that has no history identity, derived KC graph metric values when source descriptions or relationship generation settings change, conversion report formatting, and generated comments/diagnostic metadata.
+- A field becomes canonical once learner history, authored references, external research analysis, or stable package identity depends on it. The converter may refresh implementation details automatically, but it must not silently rename canonical ids, rewrite learner-facing content, change thresholds, or alter policy semantics without reporting that as a migration change.
+
 ## Production Rule Scope
 
 Production rules are still central, but they are no longer the whole story.
 
 SPARC-backed AutoTutor uses the four-step AutoTutor controller structure inside SPARC.
 
-The first SPARC-backed AutoTutor move-selection policy should use the paper-derived AutoTutor fuzzy production-rule policy as its baseline for Production Rule Move Selection, not the current MoFaCTS original-AutoTutor planner branch logic. Target selection should be implemented as a general SPARC controller target-selection capability that can reproduce the comparable original AutoTutor policy for mirrored cases, while move selection should be authored from the AutoTutor dialog-move production-rule literature.
+The first SPARC-backed AutoTutor move-selection policy should use the paper-derived AutoTutor fuzzy production-rule policy as its baseline for Production Rule Move Selection, not the current MoFaCTS original-AutoTutor planner branch logic. Target selection should be implemented as a general SPARC controller target-selection capability that gives coherent next-target choices from generated KC graph facts, while move selection should be authored from the AutoTutor dialog-move production-rule literature.
 
 That baseline matters for two reasons:
 
@@ -745,7 +762,7 @@ That baseline matters for two reasons:
 The four steps are:
 
 1. LLM scoring/evaluation after the learner submits a response.
-2. Target selection using the general SPARC controller target-selection procedure, parameterized to reproduce original AutoTutor target choices for mirrored cases.
+2. Target selection using the general SPARC controller target-selection procedure, parameterized to produce coherent next-target choices from generated KC graph facts.
 3. Production Rule Move Selection against the current state from steps 1 and 2.
 4. LLM utterance generation using the selected target and the selected action.
 
@@ -768,7 +785,7 @@ Initial move-selection productions should choose among:
 - `summary`
 - short feedback moves from the paper-derived 15-rule catalogue
 
-Dialogue-controller procedures such as learner-question handling, misconception repair, and final-answer prompts are general SPARC/model-practice behavior. Represent them as neutral authored policy rules or general controller procedures, separate from the paper-derived 15-rule move-selection baseline. Do not smuggle those extensions into the baseline rule catalogue as if they came from the paper.
+Dialogue-controller procedures such as learner-question handling and misconception repair are general SPARC/model-practice behavior. Represent them as neutral authored policy rules or general controller procedures, separate from the paper-derived 15-rule move-selection baseline. Do not smuggle those extensions into the baseline rule catalogue as if they came from the paper.
 
 These move rules must initially follow the paper-derived 15-rule catalogue. Production behavior must not call the original AutoTutor planner as a fallback.
 
@@ -778,9 +795,9 @@ Future policy changes can improve beyond the paper-derived baseline, but they sh
 
 SPARC-backed AutoTutor should use salience-ordered production execution with explicit terminal productions for Production Rule Move Selection.
 
-Current SPARC production rules already have `when`, `tests`, `then`, and optional `salience`. `when` declares the working-memory fact patterns that must match, `tests` applies additional expression checks to each match, and `then` declares the effects to fire. The existing general SPARC production-rule runner is a forward-chaining evaluator: it sorts by salience, fires one activation, adds asserted facts, then continues until quiescence. That behavior is useful for page mutation and for nonterminal controller setup rules, but dialogue/controller action commitment needs a way to stop the active production phase once a production has transferred control to the learner-facing turn.
+Current SPARC production rules already have `when`, `tests`, `then`, and optional `salience`. `when` declares the working-memory fact patterns that must match, `tests` applies additional expression checks to each match, and `then` declares the effects to fire. The existing general SPARC production-rule runner is a forward-chaining evaluator: it sorts by salience, fires one activation, adds asserted facts, then continues until quiescence. That behavior is useful for page mutation and for nonterminal controller setup rules, but dialogue/controller action commitment needs a way to stop the current salience-ranked rule run once a production has transferred control to the learner-facing turn.
 
-For the first SPARC-backed AutoTutor implementation, add a general SPARC terminal-production mechanism. After scoring/evaluation and target selection, SPARC evaluates move-selection production rules in salience order. Nonterminal rules may assert intermediate facts and allow lower-salience rules to continue matching. A terminal move-selection rule commits the selected instructional action, writes neutral controller selected-action fact/state such as `controller.selectedAction`, records that control has transferred out of move selection, and prevents any further move-selection productions from firing in that phase. The LLM receives the selected target and selected action and may realize them in natural language, but it must not choose a different target or action.
+For the first SPARC-backed AutoTutor implementation, add a general SPARC terminal-production mechanism. After scoring/evaluation and target selection, SPARC evaluates move-selection production rules in salience order. Nonterminal rules may assert intermediate facts and allow lower-salience rules to continue matching. A terminal move-selection rule commits the selected instructional action, writes neutral controller selected-action fact/state such as `controller.selectedAction`, records that control has transferred out of move selection, and prevents any further productions in the current move-selection run from firing. The LLM receives the selected target and selected action and may realize them in natural language, but it must not choose a different target or action.
 
 This is a resolution, not a placeholder for a separate utility field. Do not add a new `utility` production-rule field in the first implementation. If later research requires pedagogical utility to diverge from execution salience, add a separate utility field then with an explicit schema migration.
 
@@ -792,7 +809,7 @@ The rule system should support offline counterfactual simulation:
 Given the same selected target, logged facts, and matched move production rules, what action would another salience set have selected?
 ```
 
-Move-selection production rules should declare their salience and whether their effects terminate the current neutral production phase:
+Move-selection production rules should declare their salience and whether their effects stop the current salience-ranked rule run:
 
 ```ts
 {
@@ -802,7 +819,7 @@ Move-selection production rules should declare their salience and whether their 
   tests: [/* ordinary SPARC tests */],
   then: [
     /* writes/assertions for controller.selectedAction */,
-    { type: 'terminate-production-phase', phase: 'dialogue.move-selection' }
+    { type: 'terminate-production-phase', reason: 'move-selected' }
   ]
 }
 ```
@@ -815,7 +832,7 @@ Required selection semantics:
 2. Evaluate candidate activations in descending numeric `salience`, with exact salience ties broken deterministically by production rule id.
 3. Allow explicitly nonterminal setup productions to fire and assert intermediate facts.
 4. Reject matched terminal rules whose selected action would be invalid for the selected target or current authored script/state.
-5. When the first valid terminal move rule fires, commit its selected action and stop the `dialogue.move-selection` production phase.
+5. When the first valid terminal move rule fires, commit its selected action and stop the current move-selection production-rule run.
 6. Persist the selected action, the terminal rule that committed it, and all matched/rejected move rules considered before termination.
 7. Fail clearly if the phase quiesces without a valid terminal selected-action rule.
 
@@ -830,7 +847,7 @@ Required logging:
 - rejected matched rule ids and rejection reasons
 - final selected target
 - final selected action
-- terminal production phase and termination reason
+- terminal rule-stop flag and termination reason
 
 Disallowed mechanisms:
 
@@ -853,7 +870,7 @@ Before authoring the AutoTutor move catalogue, add these general production-rule
 
 1. a numeric `range` slot pattern
 2. an `any` condition for OR
-3. a terminal production-phase effect, `terminate-production-phase`
+3. a terminal rule-stop effect, serialized as `terminate-production-phase`
 
 ```ts
 {
@@ -924,7 +941,7 @@ Range condition requirements:
 - `minInclusive` defaults to `true`.
 - `maxInclusive` defaults to `false`, except authored rules may set it to `true` for closed upper bounds such as `very high`.
 - The evaluator must reject non-numeric fact-slot values for range matches.
-- `terminate-production-phase` is a general SPARC effect. It stops only the named production phase and must not change existing page-mutation behavior outside that phase.
+- `terminate-production-phase` is a general SPARC effect. It stops the current salience-ranked production-rule run after the firing rule's effects are instantiated; it does not require or create a named phase field.
 - Validation and authoring catalog tests must cover range matches, inclusive/exclusive boundaries, missing bounds, non-numeric slots, `any` matching, `any` non-matching, `any` branch variable-binding rejection, terminal phase termination, terminal phase non-interference with existing rule execution, and replay from persisted history.
 
 ## Initial Move Production Rule Catalogue
@@ -983,7 +1000,7 @@ Recommended fact families:
 { factType: 'dialogue.completionSelected' }
 { factType: 'policy.threshold', slots: { name, value } }
 { factType: 'learningTarget.required', slots: { clusterKC } }
-{ factType: 'controller.completionState', slots: { requiredCovered, requireFinalAnswerPrompt, lastTargetType } }
+{ factType: 'controller.completionState', slots: { requiredCovered, lastTargetType } }
 ```
 
 ### Move-Selection Rules
@@ -1082,7 +1099,7 @@ The generated SPARC page should contain the concrete load-time `display.producti
     ],
     "then": [
       { "type": "assert-fact", "persist": true, "fact": { "factType": "controller.selectedAction", "slots": { "action": { "type": "literal", "value": "summary" }, "sourceRuleId": { "type": "literal", "value": "paper-rule-08" } } } },
-      { "type": "terminate-production-phase", "phase": "dialogue.move-selection" }
+      { "type": "terminate-production-phase", "reason": "move-selected" }
     ]
   },
   {
@@ -1097,7 +1114,7 @@ The generated SPARC page should contain the concrete load-time `display.producti
     ],
     "then": [
       { "type": "assert-fact", "persist": true, "fact": { "factType": "controller.selectedAction", "slots": { "action": { "type": "literal", "value": "splice" }, "sourceRuleId": { "type": "literal", "value": "paper-rule-04" } } } },
-      { "type": "terminate-production-phase", "phase": "dialogue.move-selection" }
+      { "type": "terminate-production-phase", "reason": "move-selected" }
     ]
   },
   {
@@ -1110,13 +1127,13 @@ The generated SPARC page should contain the concrete load-time `display.producti
     ],
     "then": [
       { "type": "assert-fact", "persist": true, "fact": { "factType": "controller.selectedAction", "slots": { "action": { "type": "literal", "value": "hint" }, "sourceRuleId": { "type": "literal", "value": "paper-rule-06" } } } },
-      { "type": "terminate-production-phase", "phase": "dialogue.move-selection" }
+      { "type": "terminate-production-phase", "reason": "move-selected" }
     ]
   }
 ]
 ```
 
-All 15 transcribed rules should follow this neutral pattern: no selected-action guard used as a fake phase stop, neutral fact families for matching, `controller.selectedAction` for the committed action, and `terminate-production-phase` for phase control.
+All 15 transcribed rules should follow this neutral pattern: no selected-action guard used as a fake stop condition, neutral fact families for matching, `controller.selectedAction` for the committed action, and `terminate-production-phase` to stop the current salience-ranked move-rule run.
 
 The fake branch-policy table that previously lived here has been removed. Adding or revising move rules beyond the transcribed paper-derived 15-rule catalogue requires an explicit source check.
 
@@ -1293,7 +1310,7 @@ The compatibility check needs an explicit data source. Generated dialogue packag
 
 This is not an AutoTutor utterance schema. It is the authored content lookup used by any generated SPARC dialogue move. The utterance adapter validates `(selected target, selected action)` against these authored facts before calling the LLM. Missing authored content for a selected action is a blocking package error, not a prompt-engineering decision delegated to the LLM.
 
-Completion also needs a normal controller fact producer. Before target selection, the controller derives `controller.completionState` from durable required-target coverage, the generated coverage threshold, turn count/max-turn policy, active misconception state, and final-answer-prompt policy. Target selection may then write `dialogue.completionSelected`, and move selection may choose `summary` or `final_answer_prompt` from ordinary rules/facts. Do not store a separate AutoTutor completion object for SPARC-backed sessions.
+Completion also needs a normal controller fact producer. Before target selection, the controller derives `controller.completionState` from durable required-target coverage, the generated coverage threshold, turn count/max-turn policy, and active misconception state. Target selection may then write `dialogue.completionSelected`, and generated SPARC dialogue policy may choose a summary from ordinary rules/facts. Do not store a separate AutoTutor completion object for SPARC-backed sessions.
 
 ## History And Replay
 
@@ -1310,13 +1327,15 @@ History should record only what ordinary SPARC replay and analysis need:
 - stable-key SPARC state cells for mutable current values: merged learning-target coverage, misconception scores, selected target, selected action, completion state, turn/focus counters, and any other controller value that must survive reload
 - the generated tutor utterance as the appended tutor-message node, not as a separate transcript payload
 
-Reload/resume is a first-class invariant, not a debugging convenience. After ordinary SPARC history replay, a resumed SPARC-backed AutoTutor session must have the same visible dialogue, learner submissions, generated tutor utterances, merged target scores, misconception state, selected/focused target, selected action, completion/final-answer state, turn counters, and derived word-count basis as the pre-reload session. Completed turns must not call the scoring LLM or utterance LLM again. The next learner turn may call those services for the new submission, using only the replayed SPARC state and displayed progressive nodes as its prior context.
+Production-rule firings are research-relevant SPARC trace events. Record rule firings through ordinary SPARC trace/history records for both learner-triggered and controller/system-triggered production runs. Learner-triggered records may point back to the submitted learner event. Controller/system firings, such as target selection, derived-fact generation, move selection, visibility/reveal rules, and generated tutor utterance commits, should still write trace records, but they must not fabricate a student action or response payload. Their source should identify the controller/run context and include the fired rule id, salience when applicable, matched/selected action fields when applicable, clusterKC or other target identity when applicable, and whether the rule stopped the current salience-ranked run.
+
+Reload/resume is a first-class invariant, not a debugging convenience. After ordinary SPARC history replay, a resumed SPARC-backed AutoTutor session must have the same visible dialogue, learner submissions, generated tutor utterances, merged target scores, misconception state, selected/focused target, selected action, completion state, turn counters, and derived word-count basis as the pre-reload session. Completed turns must not call the scoring LLM or utterance LLM again. The next learner turn may call those services for the new submission, using only the replayed SPARC state and displayed progressive nodes as its prior context.
 
 Use existing SPARC mechanics for this. Learner and tutor messages are progressive node operations. Durable mutable values are ordinary SPARC state-transition writes with stable addresses/keys so replay keeps the latest value for each controller cell. The working-memory facts consumed by target selection and production rules are then projected from those replayed cells, generated static `display.workingMemoryFacts`, and deterministic derived facts. Do not add an AutoTutor-specific reload record, session subtype, transcript store, or planner-state blob for SPARC-backed sessions.
 
 If a completed turn is missing the required replay state for its generated tutor utterance, merged scores, selected target/action, or completion state, reload must fail clearly. It must not silently recompute completed LLM scoring or utterance generation, and it must not fall back to original AutoTutor planner state.
 
-Do not add utterance-generation prompt payloads, duplicate transcript fields, or AutoTutor-specific planning-history blobs to the baseline history contract. If later research/debugging needs LLM prompts or rejected candidate traces, add a separate general SPARC trace/debug facility rather than expanding the canonical replay payload.
+Do not add utterance-generation prompt payloads, duplicate transcript fields, or AutoTutor-specific planning-history blobs to the replay payload. If later research/debugging needs LLM prompts or richer rejected-candidate traces, add them through the same general SPARC trace/debug channel rather than expanding canonical replay state.
 
 Replay must reconstruct the SPARC-backed AutoTutor state without consulting original AutoTutor planner state.
 
@@ -1328,20 +1347,21 @@ Required verification:
 - SPARC page/session tests still pass.
 - SPARC-backed AutoTutor tests prove its independent runtime path.
 - Side-by-side tests prove the two AutoTutor implementations can be selected separately.
-- Equivalence tests compare original AutoTutor and SPARC-backed AutoTutor for intentionally mirrored cases.
+- Walkthrough tests drive the SPARC-backed AutoTutor through representative learner turns and verify it gives intelligent tutor responses, makes progress, and does not get stuck in target selection, move selection, scoring, utterance generation, history, or replay.
 - Failure tests prove no silent fallback from one AutoTutor implementation to the other.
 - Salience-ranked move-selection production rule tests prove highest-salience valid selection, deterministic tie-breaking, invalid match rejection, missing match failure, and persisted selection logging.
+- Production-rule history tests prove learner-triggered and controller/system-triggered rule firings write ordinary SPARC trace history, and that controller/system records do not include fabricated student action payloads.
 - Counterfactual simulation tests prove a logged planning state can be replayed against another salience set without calling original AutoTutor or the utterance LLM.
 - Reload/resume tests prove a completed turn reloads without calling the scoring LLM or utterance LLM, reconstructs learner/tutor progressive message nodes, projects the same current working-memory facts, and lets the next turn continue from replayed SPARC state.
 - Stable-state tests prove mutable coverage, selected-target, selected-action, completion, turn-count, and focus values have latest-value replay semantics and do not leave stale prior coverage/action facts available for rule matching.
 - Missing-replay-state failure tests prove reload fails clearly when required generated tutor utterance, merged score, selected target/action, or completion state is absent.
 - UI tests or Playwright smoke tests prove SPARC-backed AutoTutor renders through the SPARC surface with sequential left/right conversation nodes.
 - Converter dry-run tests inventory every current `autotutorsession` package in `C:\dev\mofacts_config`, including the current set of 10 packages, and report generated paths without writing files.
-- Converter update-mode tests prove generated outputs use `setspec.sparcPages[].display` plus ordinary `sparcsession`, leave original AutoTutor packages unchanged, and refuse source overwrite/collision cases.
-- Generated-package load tests prove at least one converted package can be loaded by the current `sparcsession` page resolution path from `rawStimuliFile.setspec.sparcPages`.
-- Generated-package clusterKC tests prove every source AutoTutor expectation is converted to exactly one generated cluster with `clusterKC`/`stimulusKC`, every generated clusterKC is referenced by the generated SPARC page, and the current SPARC cluster-target resolution loads those KCs.
+- Converter update-mode tests prove converted outputs use `setspec.sparcPages[].display` plus ordinary `sparcsession`, replace canonical AutoTutor config package content only during deliberate write mode, preserve source provenance in reports/generated metadata, and refuse unrelated overwrite/collision cases.
+- Converted-package load tests prove at least one converted package can be loaded by the current `sparcsession` page resolution path from `rawStimuliFile.setspec.sparcPages`.
+- Converted-package clusterKC tests prove every source AutoTutor expectation is converted to exactly one generated cluster with `clusterKC`/`stimulusKC`, every generated clusterKC is referenced by the converted SPARC page, and the current SPARC cluster-target resolution loads those KCs.
 - Relationship-generation translation tests prove packages without authored `expectationRelationships` are converted by the neutral cluster-KC relationship engine, preserve relationship provenance, and keep every graph source/target id aligned with exactly one generated clusterKC.
-- Target-selection equivalence tests prove SPARC-backed target selection reads precomputed KC graph centrality, looks up pairwise coherence, computes frontier/priority/focused clusterKC from generated KC graph facts, and matches original AutoTutor for mirrored cases.
+- Target-selection tests prove SPARC-backed target selection reads precomputed KC graph centrality, looks up pairwise coherence, computes frontier/priority/focused clusterKC from generated KC graph facts, and produces coherent non-stuck target choices for representative dialogue states.
 - Schema and authoring-catalog tests cover any new SPARC public contract fields or node/layout primitives, including `message-row` if implemented as a cataloged group type. The first move-selection implementation should use existing production-rule `salience`; it should not require a new rule `utility` field.
 - Backward-compatibility tests prove existing SPARC tutors do not need migration for the new `range` slot pattern or `any` condition syntax. Existing fact-pattern conditions, `not` conditions, and `tests` with `left`/`right` comparisons must keep loading and evaluating unchanged.
 - Existing-package smoke tests load at least one current SPARC package from `C:\dev\mofacts_config` after the `range`/`any` evaluator and validation changes. The smoke test must verify the package still reaches the current `sparcsession` display path and does not require generated-file edits.
@@ -1382,6 +1402,8 @@ Then inspect generated schema diffs deliberately. Current `sparcsession` schema 
 
 Do not turn the first SPARC-backed AutoTutor slice into a broad SPARC refactor. Extract or wrap only the reusable SPARC pieces needed to make the first end-to-end generated dialogue turn coherent in ordinary `sparcsession`, and keep existing SPARC page behavior unchanged.
 
+Here "neutral" means reusable SPARC/session/controller code that is neither original AutoTutor runtime code nor generated-AutoTutor-specific glue. Examples include the production-rule evaluator, state replay, target-selection helpers, working-memory fact projection, trace/history helpers, and cluster-KC relationship generation. It does not mean an extra runtime beside `sparcsession`.
+
 The goal of this step is not to move original AutoTutor onto shared infrastructure. Original AutoTutor remains independently runnable and may serve as a reference implementation or test oracle while SPARC-backed AutoTutor is being built. Production SPARC-backed AutoTutor code must not call original AutoTutor runtime modules such as the original planner, state machine, unit engine, runtime config, or learner-facing client orchestration.
 
 Candidate shared SPARC pieces, extracted only when needed by the first slice:
@@ -1389,7 +1411,7 @@ Candidate shared SPARC pieces, extracted only when needed by the first slice:
 - working-memory fact types
 - rule expression and rule evaluator types
 - production-rule evaluator helpers
-- general SPARC salience-ranked production phase termination/logging primitives
+- general SPARC salience-ranked rule-stop/logging primitives
 - general SPARC message alignment support, adding `message-row` only if existing layout policy is insufficient
 - state write primitives
 - runtime address primitives
@@ -1420,7 +1442,6 @@ It should represent:
 - misconceptions
 - authored hints/prompts/assertions
 - summary
-- final-answer policy
 - thresholds
 - dialogue policy
 - runtime facts and state
@@ -1435,7 +1456,7 @@ This includes:
 
 - source package discovery rules in `C:\dev\mofacts_config`
 - source TDF and stimulus validation rules
-- generated package naming rules
+- in-place converted package identity rules
 - generated TDF fields
 - generated stimulus fields
 - expectation-cluster generation rules
@@ -1500,7 +1521,7 @@ The first version must preserve current original AutoTutor target-selection beha
 - prior selected-target and focus state from replayed SPARC state
 - required learning-target and threshold facts from generated dialogue settings
 - ordinary SPARC cluster references so the selected learning target remains tied to its generated `clusterKC`
-- generated KC graph facts so centrality, pairwise coherence, frontier, and priority match the original AutoTutor planner for mirrored cases
+- generated KC graph facts so centrality, pairwise coherence, frontier, and priority produce coherent target choices for representative dialogue states
 - derived `controller.completionState` so completion can be selected through `dialogue.completionSelected`
 
 Target selection reads precomputed centrality from generated KC graph facts, looks up pairwise coherence from the current anchor `clusterKC` to each candidate `clusterKC`, then computes frontier and priority before choosing the next uncovered clusterKC. Missing KC graph facts are a blocking invariant failure for the baseline policy, not an optional degraded mode. Target selection writes the relevant selected fact, such as `learningTarget.selected`, for move selection and later controller phases.
@@ -1523,13 +1544,13 @@ Add the general SPARC production-rule syntax needed by the generated move catalo
 
 - numeric `range` slot patterns
 - `any` conditions for OR
-- `terminate-production-phase` as a general terminal production-phase effect
+- `terminate-production-phase` as a general terminal rule-stop effect
 
 This is a SPARC public contract change, not an AutoTutor-only converter shorthand. It must update the TypeScript contract, evaluator, validation/schema surface, authoring catalog, generated schemas, and focused regression tests before generated SPARC-backed AutoTutor move rules depend on it. Existing SPARC packages must continue to load and execute without migration.
 
 ### Step 8: Add Move-Selection Productions
 
-Implement Production Rule Move Selection as SPARC-style salience-ranked production rules in the SPARC-backed AutoTutor system using general terminal production-phase semantics, not the existing forward-chaining page-mutation runner without a stop condition.
+Implement Production Rule Move Selection as SPARC-style salience-ranked production rules in the SPARC-backed AutoTutor system using general terminal rule-stop semantics, not the existing forward-chaining page-mutation runner without a stop condition.
 
 The first version must be based on the source-checked 15-rule AutoTutor fuzzy production-rule catalogue from the dialog-move paper. It must not use the current MoFaCTS original-AutoTutor planner branch logic as the move-selection baseline.
 
@@ -1570,34 +1591,35 @@ Add focused reload/resume tests for one-turn and multi-turn conversations. They 
 
 ### Step 12: Add Repeatable Config Translator
 
-Add or wire the translator that converts original AutoTutor packages in `C:\dev\mofacts_config` into generated SPARC session packages.
+Add or wire the translator that converts original AutoTutor packages in `C:\dev\mofacts_config` into SPARC session package content in place.
 
 The first full migration pass should:
 
 - inventory all original AutoTutor packages
-- generate SPARC-backed counterparts
-- leave original packages unchanged
+- generate SPARC-backed package content for each package
+- replace canonical AutoTutor config content only in explicit write mode
 - write a conversion report
 - validate generated JSON
-- verify that each generated package uses `sparcsession` and generated SPARC session content rather than `autotutorsession`
-- verify that each generated runnable SPARC display lives under `setspec.sparcPages[].display`
-- verify that generated `sparcsession.pageId`, when present, resolves to exactly one generated `setspec.sparcPages[].pageId`
-- verify that each generated clusterKC has first-stimulus `stimulusKC`
-- verify that the generated SPARC page references every generated clusterKC so current SPARC cluster-target resolution loads all learning-target KCs
-- verify that generated KC graph facts cover every clusterKC required by baseline target selection
+- verify that each converted package uses `sparcsession` and SPARC session content rather than `autotutorsession`
+- verify that each converted runnable SPARC display lives under `setspec.sparcPages[].display`
+- verify that converted `sparcsession.pageId`, when present, resolves to exactly one `setspec.sparcPages[].pageId`
+- verify that each converted clusterKC has first-stimulus `stimulusKC`
+- verify that the converted SPARC page references every converted clusterKC so current SPARC cluster-target resolution loads all learning-target KCs
+- verify that converted KC graph facts cover every clusterKC required by baseline target selection
 - run the converter in dry-run mode across every current original AutoTutor package and fail on unreported skips
 
-### Step 13: Run Side-By-Side Verification
+### Step 13: Run Runtime And Migration Verification
 
 Verify:
 
 - original AutoTutor can still run
 - SPARC-backed AutoTutor can run
-- both can be selected intentionally
+- both runtime paths can be selected intentionally in tests/fixtures
 - neither silently falls back to the other
-- mirrored behavior matches where equivalence is expected
-- original and SPARC-backed config packages both load from `C:\dev\mofacts_config`
-- every generated SPARC session package has source provenance in the conversion report pointing to the original package
+- SPARC-backed walkthrough behavior gives intelligent answers and does not get stuck
+- the SPARC-backed UI looks fairly similar to original AutoTutor, with the same major components and generally the same layout
+- converted SPARC session config packages load from `C:\dev\mofacts_config`
+- every converted SPARC session package has source provenance in the conversion report pointing to the original package source
 - SPARC-backed AutoTutor uses sequential SPARC message nodes for the visible conversation
 
 ## Functional Requirements
@@ -1612,8 +1634,8 @@ Verify:
 8. The utterance LLM must not select targets or moves.
 9. Runtime selection between original AutoTutor and SPARC-backed AutoTutor is explicit.
 10. Missing or mismatched runtime configuration fails clearly.
-11. Existing AutoTutor packages in `C:\dev\mofacts_config` have a repeatable translation path into generated SPARC session packages.
-12. Generated SPARC session packages preserve source provenance in the conversion report and do not overwrite original packages.
+11. Existing AutoTutor packages in `C:\dev\mofacts_config` have a repeatable translation path into converted SPARC session package content.
+12. Converted SPARC session packages preserve source provenance in the conversion report and replace canonical AutoTutor config content only during explicit migration write mode.
 13. The first SPARC-backed AutoTutor move-selection policy uses the source-checked paper-derived 15-rule AutoTutor fuzzy production-rule catalogue as its baseline.
 14. Original AutoTutor runtime code is not modified as part of the SPARC-backed implementation.
 15. Rule conflict handling uses general SPARC salience-ranked production rules with provisional, versioned numeric salience values.
@@ -1639,12 +1661,7 @@ Verify:
 
 ## Open Design Questions
 
-1. How much current SPARC session code should move into neutral runtime modules before the first SPARC-backed AutoTutor slice?
-2. Should equivalence tests compare only selected targets/moves, or also state writes and history records?
-3. How should rule firings be surfaced for research/debugging in the SPARC UI?
-4. Should generated SPARC session packages live next to each original package or in a bulk migration folder?
-5. What should the exact `scripts/` entrypoint be for the config converter, and should it be TypeScript or JavaScript?
-6. Which generated fields are canonical authored content, and which are generated implementation details that should be refreshed by the translator?
+No open design questions are currently known. Continue implementation until a new ambiguity or unforeseen problem appears.
 
 ## Working Summary
 

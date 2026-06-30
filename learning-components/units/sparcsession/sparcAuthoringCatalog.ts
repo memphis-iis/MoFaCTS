@@ -99,6 +99,16 @@ const factSlotPatternSchema: SparcAuthoringSchema = {
       type: { const: 'bound' },
       variable: { type: 'string' },
     },
+  }, {
+    type: 'object',
+    required: ['type'],
+    properties: {
+      type: { const: 'range' },
+      min: { anyOf: [{ type: 'number' }, ruleExpressionSchema] },
+      max: { anyOf: [{ type: 'number' }, ruleExpressionSchema] },
+      minInclusive: { type: 'boolean' },
+      maxInclusive: { type: 'boolean' },
+    },
   }],
 };
 
@@ -221,6 +231,27 @@ export const SPARC_ATOMIC_NODE_CATALOG: readonly SparcAuthoringCatalogEntry[] = 
     defaultValue: { nodeType: 'atomic', atomType: 'message-box', value: '' },
     renderedBy: ['SparcNode.svelte', 'sparcProductionRuleActionCommit.ts'],
     generatedBy: ['OLI activity feedback nodes', 'semantic multiple-choice feedback nodes'],
+  }),
+  atomicEntry({
+    atomType: 'dialogue-utterance',
+    label: 'Dialogue utterance',
+    description: 'Sequential learner or tutor message rendered in a SPARC dialogue thread.',
+    properties: {
+      speaker: { enum: ['learner', 'tutor'] },
+      value: { type: 'string' },
+      turnEventId: { type: 'string' },
+      action: { type: 'string' },
+      targetType: { type: 'string' },
+      targetId: { type: 'string' },
+    },
+    defaultValue: {
+      nodeType: 'atomic',
+      atomType: 'dialogue-utterance',
+      speaker: 'tutor',
+      value: '',
+    },
+    renderedBy: ['SparcNode.svelte'],
+    generatedBy: ['SPARC controller dialogue turns', 'AutoTutor-to-SPARC converter'],
   }),
   atomicEntry({
     atomType: 'button',
@@ -350,6 +381,23 @@ export const SPARC_ATOMIC_NODE_CATALOG: readonly SparcAuthoringCatalogEntry[] = 
 ] as const;
 
 export const SPARC_GROUP_NODE_CATALOG: readonly SparcAuthoringCatalogEntry[] = [
+  groupEntry({
+    groupType: 'dialogue-thread',
+    label: 'Dialogue thread',
+    description: 'Sequential SPARC dialogue transcript container with tutor and learner utterance children.',
+    defaultValue: {
+      nodeType: 'group',
+      groupType: 'dialogue-thread',
+      children: [{
+        id: 'opening-tutor-message',
+        nodeType: 'atomic',
+        atomType: 'dialogue-utterance',
+        speaker: 'tutor',
+        value: '',
+      }],
+    },
+    generatedBy: ['SPARC controller dialogue turns', 'AutoTutor-to-SPARC converter'],
+  }),
   groupEntry({
     groupType: 'section',
     label: 'Section',
@@ -878,15 +926,31 @@ export const SPARC_RULE_CATALOG: readonly SparcAuthoringCatalogEntry[] = [{
     },
   },
 }, {
+  id: 'rule.condition.any',
+  label: 'Any condition',
+  category: 'production-rule-condition',
+  description: 'OR condition that matches when any nested production-rule condition matches.',
+  schema: {
+    type: 'object',
+    required: ['type', 'conditions'],
+    properties: {
+      type: { const: 'any' },
+      conditions: {
+        type: 'array',
+        items: { description: 'Nested fact-pattern, negated fact-pattern, or any condition.' },
+      },
+    },
+  },
+}, {
   id: 'rule.test.comparison',
   label: 'Bound-variable comparison test',
   category: 'production-rule-test',
   description: 'Post-match comparison over rule expressions.',
   schema: {
     type: 'object',
-    required: ['op', 'left', 'right'],
+    required: ['op', 'left'],
     properties: {
-      op: { enum: ['eq', 'neq', 'gt', 'gte', 'lt', 'lte'] },
+      op: { enum: ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'truthy', 'falsy'] },
       left: ruleExpressionSchema,
       right: ruleExpressionSchema,
     },
@@ -908,6 +972,10 @@ export const SPARC_RULE_CATALOG: readonly SparcAuthoringCatalogEntry[] = [{
     properties: {
       type: { const: 'assert-fact' },
       persist: { type: 'boolean' },
+      identitySlots: {
+        type: 'array',
+        items: { type: 'string' },
+      },
       fact: {
         type: 'object',
         required: ['factType'],
@@ -996,6 +1064,19 @@ export const SPARC_RULE_CATALOG: readonly SparcAuthoringCatalogEntry[] = [{
       nodeId: { anyOf: [{ type: 'string' }, ruleExpressionSchema] },
       responseValue: ruleExpressionSchema,
       input: ruleExpressionSchema,
+    },
+  },
+}, {
+  id: 'rule.effect.terminate-production-phase',
+  label: 'Stop production rules',
+  category: 'production-rule-effect',
+  description: 'Stop the current salience-ranked production-rule run after this rule fires.',
+  schema: {
+    type: 'object',
+    required: ['type'],
+    properties: {
+      type: { const: 'terminate-production-phase' },
+      reason: { type: 'string' },
     },
   },
 }, {

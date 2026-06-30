@@ -124,8 +124,14 @@
                     <option value="literal">literal</option>
                     <option value="bind">bind</option>
                     <option value="bound">bound</option>
+                    <option value="range">range</option>
                   </select>
-                  <input value={slot.type === 'literal' ? stringifyLooseValue(slot.value) : slot.variable || ''} on:input={(event) => onUpdateFactSlotValue(slot, event.currentTarget.value)} aria-label="slot value" />
+                  {#if slot.type === 'range'}
+                    <input value={stringifyLooseValue(slot.min?.value ?? '')} on:input={(event) => { slot.min = { type: 'literal', value: Number(event.currentTarget.value) }; onMarkChanged(); }} aria-label="slot minimum" />
+                    <input value={stringifyLooseValue(slot.max?.value ?? '')} on:input={(event) => { slot.max = { type: 'literal', value: Number(event.currentTarget.value) }; onMarkChanged(); }} aria-label="slot maximum" />
+                  {:else}
+                    <input value={slot.type === 'literal' ? stringifyLooseValue(slot.value) : slot.variable || ''} on:input={(event) => onUpdateFactSlotValue(slot, event.currentTarget.value)} aria-label="slot value" />
+                  {/if}
                   <button type="button" class="btn btn-outline-danger btn-sm" on:click={() => onRemoveFactSlot(condition, slotKey)}>Remove</button>
                 </div>
               {/each}
@@ -340,6 +346,11 @@
                     />
                   </label>
                 </div>
+              {:else if effect.type === 'terminate-production-phase'}
+                <label>
+                  Reason
+                  <input value={effect.reason || ''} on:input={(event) => onUpdateEffectField(effect, 'reason', event.currentTarget.value)} />
+                </label>
               {:else if effect.type === 'append-text'}
                 <label>
                   Node ID

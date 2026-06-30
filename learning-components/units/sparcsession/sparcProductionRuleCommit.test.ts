@@ -175,11 +175,111 @@ describe('sparcProductionRuleCommit', function() {
     });
 
     assert.equal(committed.historyRecord?.action, 'sparc-production-rule');
-    assert.deepEqual(writtenRecords, [committed.historyRecord]);
+    assert.equal(committed.traceHistoryRecords?.length, 1);
+    assert.deepEqual(writtenRecords, [
+      committed.traceHistoryRecords?.[0],
+      committed.historyRecord,
+    ]);
+    assert.equal(committed.traceHistoryRecords?.[0]?.action, 'sparc-production-rule-trace');
+    assert.equal(committed.traceHistoryRecords?.[0]?.sparc.traceStep?.productionRuleId, 'fractions.determine-lcd');
 
-    const replayed = replaySparcHistory([committed.historyRecord!], replayState);
+    const replayed = replaySparcHistory([
+      committed.traceHistoryRecords![0]!,
+      committed.historyRecord!,
+    ], replayState);
     assert.equal(replayed.cells[createSparcStateCellKey(sourceAddress, 'correctness')]?.value, 'correct');
     assert.equal(replayed.cells[createSparcStateCellKey(sourceAddress, 'value')]?.value, 12);
+    assert.equal(replayed.traceSteps.length, 1);
+  });
+
+  it('writes production-rule trace history for system events without student input', async function() {
+    const writtenRecords: unknown[] = [];
+    const controllerDocument: SparcAuthoredDocument = {
+      id: 'controller-doc',
+      schemaVersion: 1,
+      workingMemoryFacts: [{
+        factType: 'learningTarget.selected',
+        slots: {
+          clusterKC: 'kc-1',
+        },
+      }],
+      productionRules: [{
+        id: 'controller.select-hint',
+        module: 'autotutor-controller',
+        salience: 25,
+        when: [{
+          factType: 'interface-event',
+          slots: {
+            eventType: { type: 'literal', value: 'condition-evaluated' },
+          },
+        }, {
+          factType: 'learningTarget.selected',
+          slots: {
+            clusterKC: { type: 'bind', variable: 'targetClusterKC' },
+          },
+        }],
+        then: [{
+          type: 'assert-fact',
+          persist: true,
+          fact: {
+            factType: 'controller.selectedAction',
+            slots: {
+              action: literal('hint'),
+              targetType: literal('learningTarget'),
+              clusterKC: variable('targetClusterKC'),
+            },
+          },
+        }, {
+          type: 'terminate-production-phase',
+          reason: 'move-selected',
+        }],
+      }],
+      root: {
+        id: 'root',
+        kind: 'document',
+      },
+    };
+
+    const committed = await commitSparcAuthoredProductionRuleEvent({
+      core,
+      document: controllerDocument,
+      event: {
+        eventId: 'event-controller',
+        type: 'condition-evaluated',
+        source: {
+          documentId: 'controller-doc',
+          nodeId: 'root',
+        },
+        time: 2500,
+        payload: {
+          triggeredBy: 'controller',
+        },
+      },
+      runtime: {
+        history: {
+          async writeCanonicalHistory(record) {
+            writtenRecords.push(record);
+          },
+        },
+      },
+    });
+
+    assert.equal(committed.execution.firings.length, 1);
+    assert.equal(committed.traceHistoryRecords?.length, 1);
+    assert.equal(committed.historyRecord?.action, 'sparc-production-rule');
+    assert.equal(writtenRecords.length, 2);
+    const traceRecord = committed.traceHistoryRecords?.[0];
+    assert.equal(traceRecord?.responseValue, '');
+    assert.equal(traceRecord?.input, '');
+    assert.equal(traceRecord?.sparc.traceStep?.productionRuleId, 'controller.select-hint');
+    assert.equal(traceRecord?.sparc.traceStep?.actionId, 'hint');
+    assert.deepEqual(traceRecord?.sparc.traceStep?.details?.selectedAction, {
+      action: 'hint',
+      targetType: 'learningTarget',
+      clusterKC: 'kc-1',
+    });
+    assert.equal(traceRecord?.sparc.traceStep?.details?.salience, 25);
+    assert.equal(traceRecord?.sparc.traceStep?.details?.terminatesProductionPhase, true);
   });
 
   it('rehydrates asserted working-memory facts for later production-rule events', async function() {
@@ -329,7 +429,208 @@ describe('sparcProductionRuleCommit', function() {
     assert.equal(numeratorEvaluation.transition?.writes[0]?.value, 3);
   });
 
-  it('does not write history when production rules produce no state writes', async function() {
+  it('uses asserted fact identity slots to replace stale branch state before later rules fire', async function() {
+    const branchDocument: SparcAuthoredDocument = {
+      id: 'fractions-doc',
+      schemaVersion: 1,
+      workingMemoryFacts: [{
+        factType: 'problem',
+        slots: {
+          type: 'fraction-addition',
+          firstNumerator: 1,
+          firstDenominator: 4,
+          secondDenominator: 6,
+        },
+      }, {
+        factType: 'node-role',
+        slots: {
+          node: 'firstNumConv',
+          selection: 'firstNumConv',
+          role: 'converted-numerator',
+          fraction: 'first',
+        },
+      }],
+      productionRules: [{
+        id: 'fractions.choose-lcd',
+        when: [{
+          factType: 'interface-event',
+          slots: {
+            selection: { type: 'literal', value: 'firstDenConv' },
+            action: { type: 'literal', value: 'UpdateTextArea' },
+            input: { type: 'literal', value: 12 },
+          },
+        }],
+        then: [{
+          type: 'assert-fact',
+          identitySlots: ['name'],
+          fact: {
+            factType: 'model',
+            slots: {
+              name: literal('active-common-denominator'),
+              value: literal(12),
+              path: literal('lcd-12'),
+            },
+          },
+        }],
+      }, {
+        id: 'fractions.choose-product',
+        when: [{
+          factType: 'interface-event',
+          slots: {
+            selection: { type: 'literal', value: 'firstDenConv' },
+            action: { type: 'literal', value: 'UpdateTextArea' },
+            input: { type: 'literal', value: 24 },
+          },
+        }],
+        then: [{
+          type: 'assert-fact',
+          identitySlots: ['name'],
+          fact: {
+            factType: 'model',
+            slots: {
+              name: literal('active-common-denominator'),
+              value: literal(24),
+              path: literal('common-denominator-24'),
+            },
+          },
+        }],
+      }, {
+        id: 'fractions.convert-first-numerator',
+        when: [{
+          factType: 'problem',
+          slots: {
+            type: { type: 'literal', value: 'fraction-addition' },
+            firstNumerator: { type: 'bind', variable: 'n' },
+            firstDenominator: { type: 'bind', variable: 'd' },
+          },
+        }, {
+          factType: 'model',
+          slots: {
+            name: { type: 'literal', value: 'active-common-denominator' },
+            value: { type: 'bind', variable: 'D' },
+          },
+        }, {
+          factType: 'interface-event',
+          slots: {
+            selection: { type: 'literal', value: 'firstNumConv' },
+            action: { type: 'literal', value: 'UpdateTextArea' },
+            input: { type: 'bind', variable: 'convertedNumerator' },
+          },
+        }, {
+          factType: 'node-role',
+          slots: {
+            selection: { type: 'literal', value: 'firstNumConv' },
+            role: { type: 'literal', value: 'converted-numerator' },
+            fraction: { type: 'literal', value: 'first' },
+          },
+        }],
+        tests: [{
+          op: 'eq',
+          left: variable('convertedNumerator'),
+          right: fn('multiply', [
+            variable('n'),
+            fn('divide', [variable('D'), variable('d')]),
+          ]),
+        }],
+        then: [{
+          type: 'classify',
+          outcome: 'correct',
+        }],
+      }],
+      root: {
+        id: 'root',
+        kind: 'document',
+      },
+    };
+    const replayState = createSparcAuthoredInitialReplayState(branchDocument);
+    const writtenRecords: unknown[] = [];
+    const history = {
+      async writeCanonicalHistory(record: unknown) {
+        writtenRecords.push(record);
+      },
+    };
+    const product = await commitSparcAuthoredProductionRuleEvent({
+      core,
+      document: branchDocument,
+      replayState,
+      event: {
+        eventId: 'event-product',
+        type: 'response-submitted',
+        source: sourceAddress,
+        time: 1000,
+        payload: {
+          selection: 'firstDenConv',
+          action: 'UpdateTextArea',
+          input: 24,
+        },
+      },
+      runtime: { history },
+    });
+    const afterProduct = replaySparcHistory([product.historyRecord!], replayState);
+    const lcd = await commitSparcAuthoredProductionRuleEvent({
+      core,
+      document: branchDocument,
+      replayState: afterProduct,
+      event: {
+        eventId: 'event-lcd',
+        type: 'response-submitted',
+        source: sourceAddress,
+        time: 2000,
+        payload: {
+          selection: 'firstDenConv',
+          action: 'UpdateTextArea',
+          input: 12,
+        },
+      },
+      runtime: { history },
+    });
+    const afterLcd = replaySparcHistory([lcd.historyRecord!], afterProduct);
+
+    const staleProductNumerator = evaluateSparcAuthoredProductionRules({
+      document: branchDocument,
+      replayState: afterLcd,
+      event: {
+        eventId: 'event-numerator-stale',
+        type: 'response-submitted',
+        source: {
+          documentId: 'fractions-doc',
+          nodeId: 'firstNumConv',
+        },
+        time: 3000,
+        payload: {
+          selection: 'firstNumConv',
+          action: 'UpdateTextArea',
+          input: 6,
+        },
+      },
+    });
+    const lcdNumerator = evaluateSparcAuthoredProductionRules({
+      document: branchDocument,
+      replayState: afterLcd,
+      event: {
+        eventId: 'event-numerator-lcd',
+        type: 'response-submitted',
+        source: {
+          documentId: 'fractions-doc',
+          nodeId: 'firstNumConv',
+        },
+        time: 4000,
+        payload: {
+          selection: 'firstNumConv',
+          action: 'UpdateTextArea',
+          input: 3,
+        },
+      },
+    });
+
+    assert.deepEqual(staleProductNumerator.execution.firings.map((firing) => firing.ruleId), []);
+    assert.deepEqual(lcdNumerator.execution.firings.map((firing) => firing.ruleId), [
+      'fractions.convert-first-numerator',
+    ]);
+    assert.equal(writtenRecords.length, 4);
+  });
+
+  it('writes trace history when production rules produce no state writes', async function() {
     const writtenRecords: unknown[] = [];
     const noWriteDocument: SparcAuthoredDocument = {
       ...document,
@@ -369,7 +670,9 @@ describe('sparcProductionRuleCommit', function() {
     assert.equal(committed.historyRecord, undefined);
     assert.equal(committed.transition, undefined);
     assert.equal(committed.execution.firings.length, 1);
-    assert.deepEqual(writtenRecords, []);
+    assert.equal(committed.traceHistoryRecords?.length, 1);
+    assert.deepEqual(writtenRecords, [committed.traceHistoryRecords?.[0]]);
+    assert.equal(committed.traceHistoryRecords?.[0]?.sparc.traceStep?.productionRuleId, 'fractions.determine-lcd');
   });
 
   it('clears stale default feedback when a submitted answer is classified correct', function() {

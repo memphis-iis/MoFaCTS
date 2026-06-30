@@ -265,11 +265,11 @@ Course-assigned model-practice history writes must include course context, prefe
 
 Course-scoped history reads should query stamped course context rather than infer course membership from unstamped historical TDF rows.
 
-The implementation should keep the existing learning-session reconstruction pipeline and extend its history read contract with resolved model context and current-unit `clusterKCs`. Course context changes which rows feed reconstruction; it does not introduce a second hydration pipeline.
+The implementation should keep the existing learning-session reconstruction pipeline and extend its history read contract with resolved model context. Course context changes which rows are available to reconstruction; it does not introduce a second hydration pipeline.
 
-For a course context, this read filters by `userId`, `courseAssignment.courseId`, `levelUnitType: "model"`, and `clusterKC in clusterKCs`. It does not filter by `TDFId`, `levelUnit`, `stimuliSetId`, `stimulusKC`, `KCId`, or `KCDefault`.
+For a course context, the server read filters by `userId`, `courseAssignment.courseId`, and `levelUnitType: "model"`. The client/unit engine then derives active cluster scope from the launched unit and filters returned model-practice rows by `clusterKC` before reconstruction. The server does not filter by `TDFId`, `levelUnit`, `stimuliSetId`, `stimulusKC`, `KCId`, `KCDefault`, or caller-supplied current-unit cluster lists.
 
-For a TDF-local context, this implementation preserves the existing cumulative TDF/unit model-history read. It may carry the same `clusterKCs` option for a later exact cluster-scope tightening, but this migration should not change direct-launch progress semantics while introducing course-scoped sharing.
+For a TDF-local context, this implementation preserves the existing cumulative TDF/unit model-history read. Direct launches use the same client-side active-cluster filtering before reconstruction, preserving local progress semantics while introducing course-scoped sharing.
 
 Existing unit-history reads such as SPARC interface-state replay, assessment position counting, dashboard progress, hidden-item tracking, and crowd statistics should keep their current item/session scoping unless a specific call site is deliberately moved to course-scoped cluster history. SPARC history rows can replay SPARC document/interface state because they carry SPARC-specific event fields. Non-SPARC model-practice rows do not imply SPARC document state; they only feed the shared cluster model through `levelUnitType: "model"` evidence. Learning-session resume/model hydration is deliberately moved to the shared scoped history set in course context so model state and progress move together for matching `clusterKC` values.
 

@@ -163,7 +163,7 @@ describe('sparcResponseOutcomePipeline', function() {
     assert.equal(result.responseCommit.usedAdaptiveModel, false);
     assert.deepEqual(result.productionCommit.execution.firings.map((firing) => firing.ruleId), ['show-feedback']);
     assert.equal(result.productionCommit.historyRecord?.action, 'sparc-production-rule');
-    assert.equal(writtenRecords.length, 2);
+    assert.equal(writtenRecords.length, 3);
     assert.equal(result.replayStateAfterResponse.cells[createSparcStateCellKey(sourceAddress, 'lastOutcome')]?.value, 'correct');
     assert.equal(result.finalReplayState.cells[createSparcStateCellKey(feedbackAddress, 'visible')]?.value, true);
   });
@@ -205,7 +205,7 @@ describe('sparcResponseOutcomePipeline', function() {
     assert.equal(result.responseCommit.usedAdaptiveModel, true);
     assert.deepEqual(result.productionCommit.execution.firings.map((firing) => firing.ruleId), ['show-feedback-from-priorCorrect']);
     assert.equal(result.finalReplayState.cells[createSparcStateCellKey(feedbackAddress, 'visible')]?.value, true);
-    assert.equal(writtenRecords.length, 2);
+    assert.equal(writtenRecords.length, 3);
   });
 
   it('uses the live adaptive model for probability model-state facts', async function() {

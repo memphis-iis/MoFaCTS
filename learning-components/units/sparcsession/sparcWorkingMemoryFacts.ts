@@ -6,6 +6,7 @@ import type {
 } from './sparcSessionContracts';
 import type { SparcReplayState } from './sparcStateReplay';
 import {
+  SPARC_STABLE_WORKING_MEMORY_FACT_STATE_KEY_PREFIX,
   SPARC_WORKING_MEMORY_FACT_STATE_KEY_PREFIX,
   stateValueToSparcWorkingMemoryFact,
 } from './sparcWorkingMemoryState';
@@ -120,7 +121,10 @@ function replayStateFacts(replayState: SparcReplayState): readonly SparcWorkingM
       },
     }];
 
-    if (cell.key.startsWith(SPARC_WORKING_MEMORY_FACT_STATE_KEY_PREFIX)) {
+    if (
+      cell.key.startsWith(SPARC_WORKING_MEMORY_FACT_STATE_KEY_PREFIX)
+      || cell.key.startsWith(SPARC_STABLE_WORKING_MEMORY_FACT_STATE_KEY_PREFIX)
+    ) {
       const workingMemoryFact = stateValueToSparcWorkingMemoryFact(cell.value);
       if (workingMemoryFact) {
         facts.push(workingMemoryFact);

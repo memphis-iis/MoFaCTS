@@ -28,6 +28,12 @@ export interface SparcTraceExpectation {
   responseKC?: string | number;
 }
 
+export interface SparcCompletionConfig {
+  type?: string;
+  doneSelection?: string;
+  doneAction?: string;
+}
+
 export interface SparcLayoutZone {
   id: string;
   role?: string;
@@ -60,6 +66,7 @@ export interface SparcTrialDisplay {
     zones?: SparcLayoutZone[];
     [key: string]: unknown;
   };
+  initialState?: unknown[];
   nodes: unknown[];
   workingMemoryFacts?: unknown[];
   productionRules?: unknown[];
@@ -72,6 +79,7 @@ export interface SparcTrialDisplay {
     intentByPath?: SparcPathIntentExpectation[];
     traceByNode?: SparcTraceExpectation[];
     evaluation?: Record<string, unknown>;
+    completion?: SparcCompletionConfig;
   };
   [key: string]: unknown;
 }

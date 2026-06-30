@@ -55,6 +55,23 @@
     };
   }
 
+  function applyInitialStateNodeValues(values = {}, initialState = []) {
+    const nextValues = { ...values };
+    for (const write of initialState || []) {
+      const nodeId = typeof write?.target?.nodeId === 'string' ? write.target.nodeId.trim() : '';
+      const key = typeof write?.key === 'string' ? write.key.trim() : '';
+      if (!nodeId || !key) {
+        continue;
+      }
+      if (key === 'value' || key === 'message' || key === 'text') {
+        nextValues[nodeId] = write.value;
+      } else if (key === 'correctness' || key === 'visible') {
+        nextValues[`${nodeId}::${key}`] = write.value;
+      }
+    }
+    return nextValues;
+  }
+
   function isSubmitButton(node) {
     const label = String(node?.label || node?.value || '').trim().toLowerCase();
     return /done|submit|check/.test(label);
@@ -82,6 +99,17 @@
       }
     }
     return values;
+  }
+
+  function collectAnswerSubmissionValues(values = {}) {
+    const answerValues = {};
+    for (const [key, value] of Object.entries(values || {})) {
+      if (key.includes('::') || key === SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY) {
+        continue;
+      }
+      answerValues[key] = value;
+    }
+    return answerValues;
   }
 
   function handleNodeValueChange(nodeId, value) {
@@ -138,13 +166,13 @@
       submittedNodes: hasProductionRules()
         ? {
             ...collectDefaultSubmissionValues(sparcDisplay?.nodes),
-            ...nodeValues,
+            ...collectAnswerSubmissionValues(nodeValues),
             ...buttonSubmission,
           }
         : {
-            ...nodeValues,
-          ...buttonSubmission,
-        },
+            ...collectAnswerSubmissionValues(nodeValues),
+            ...buttonSubmission,
+          },
       triggeredBy: node?.id,
       focusedNodeId: activeNodeId || undefined,
       timestamp: Date.now(),
@@ -191,7 +219,10 @@
     ? buildSparcBoxedNodeGroups(realizedSparcDisplay).filter((group) => group.nodes.length > 0)
     : [];
   $: usesBoxLayout = boxedNodeGroups.length > 0;
-  $: authoredNodeValues = buildInitialNodeValues(topLevelNodes, {});
+  $: authoredNodeValues = applyInitialStateNodeValues(
+    buildInitialNodeValues(topLevelNodes, {}),
+    sparcDisplay?.initialState || [],
+  );
   $: nodeValues = mergeRuntimeNodeValues(authoredNodeValues, runtimeNodeValues);
 </script>
 

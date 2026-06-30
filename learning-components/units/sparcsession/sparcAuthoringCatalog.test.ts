@@ -16,6 +16,7 @@ describe('sparcAuthoringCatalog', function() {
       'html-block',
       'text-block',
       'message-box',
+      'dialogue-utterance',
       'button',
       'text-input',
       'dropdown',
@@ -38,11 +39,14 @@ describe('sparcAuthoringCatalog', function() {
 
     const skillBar = entriesByAtomType.get('skill-bar');
     const learningProgress = entriesByAtomType.get('learning-progress');
+    const dialogueUtterance = entriesByAtomType.get('dialogue-utterance');
 
     assert.match(skillBar?.description ?? '', /Static authored/);
     assert.match(skillBar?.description ?? '', /does not read or update adaptive model probabilities/);
     assert.match(learningProgress?.description ?? '', /Model-backed adaptive progress reporter/);
     assert.match(learningProgress?.description ?? '', /shared sidebar progress panel/);
+    assert.match(dialogueUtterance?.description ?? '', /Sequential learner or tutor message/);
+    assert.deepEqual(dialogueUtterance?.schema.properties?.speaker?.enum, ['learner', 'tutor']);
   });
 
   it('catalogs the OLI-generated SPARC group patterns', function() {
@@ -52,6 +56,7 @@ describe('sparcAuthoringCatalog', function() {
 
     for (const groupType of [
       'section',
+      'dialogue-thread',
       'multiple-choice',
       'answer-list',
       'targeted-cata',
@@ -84,6 +89,7 @@ describe('sparcAuthoringCatalog', function() {
     for (const id of [
       'rule.condition.fact-pattern',
       'rule.condition.not-fact-pattern',
+      'rule.condition.any',
       'rule.test.comparison',
       'rule.expression',
       'rule.effect.assert-fact',
@@ -92,6 +98,7 @@ describe('sparcAuthoringCatalog', function() {
       'rule.effect.classify',
       'rule.effect.credit',
       'rule.effect.model-practice',
+      'rule.effect.terminate-production-phase',
       'rule.effect.progressive-node-operation',
     ]) {
       assert.equal(ruleIds.has(id), true, `missing rule catalog entry for ${id}`);

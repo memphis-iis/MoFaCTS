@@ -405,6 +405,8 @@ function extractSparcNodeValuesFromEvaluation(
         nodeValues[write.target.nodeId] = write.value;
       } else if (write.key === 'correctness') {
         nodeValues[`${write.target.nodeId}::correctness`] = write.value;
+      } else if (write.key === 'visible') {
+        nodeValues[`${write.target.nodeId}::visible`] = write.value;
       }
     }
   }

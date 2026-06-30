@@ -11,6 +11,11 @@ import {
   evaluateSparcAuthoredProductionRules,
   type SparcCommittedProductionRuleEvaluation,
 } from './sparcProductionRuleCommit';
+import {
+  commitSparcControllerDialogueTurn,
+  type SparcControllerDialogueTurnResult,
+  type SparcUtteranceGenerator,
+} from './sparcControllerDialogueTurn';
 import { replaySparcDocumentHistory } from './sparcDocumentReplay';
 import {
   applySparcStateTransition,
@@ -18,6 +23,7 @@ import {
   type SparcReplayState,
 } from './sparcStateReplay';
 import type { SparcPracticeHistoryCore } from './sparcPracticeHistoryBridge';
+import type { SparcLearnerResponseScoringResult } from './sparcLearnerResponseScoring';
 import type {
   SparcAuthoredDocument,
   SparcOutcome,
@@ -25,8 +31,10 @@ import type {
   SparcClusterModelTarget,
   SparcProductionRule,
   SparcInterfaceEvent,
+  SparcStateWrite,
   SparcWorkingMemoryFact,
 } from './sparcSessionContracts';
+import type { SparcLearningTargetSelectionOptions } from './sparcTargetSelection';
 
 type DisplayNodeRecord = {
   readonly id?: unknown;
@@ -66,6 +74,22 @@ export type SparcTrialDisplayProductionRuleEvaluationResult = {
     readonly text: string;
   }[];
   readonly credits: readonly string[];
+};
+
+export type SparcTrialDisplayDialogueTurnScorer = (params: {
+  readonly document: SparcAuthoredDocument;
+  readonly display: SparcTrialDisplay;
+  readonly result: SparcTrialResult;
+  readonly event: SparcInterfaceEvent;
+  readonly learnerText: string;
+  readonly replayState: SparcReplayState;
+}) => Promise<SparcLearnerResponseScoringResult> | SparcLearnerResponseScoringResult;
+
+export type SparcTrialDisplayControllerDialogueTurnCommitResult = {
+  readonly document: SparcAuthoredDocument;
+  readonly event: SparcInterfaceEvent;
+  readonly learnerText: string;
+  readonly dialogueTurn: SparcControllerDialogueTurnResult;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -178,6 +202,9 @@ export function createSparcAuthoredDocumentFromTrialDisplay(params: {
   const directProductionRules = Array.isArray(display.productionRules)
     ? display.productionRules as readonly SparcProductionRule[]
     : [];
+  const initialState = Array.isArray(display.initialState)
+    ? display.initialState as readonly SparcStateWrite[]
+    : [];
   return {
     id: requireNonBlank(params.documentId, 'SPARC document id'),
     schemaVersion: 1,
@@ -186,6 +213,7 @@ export function createSparcAuthoredDocumentFromTrialDisplay(params: {
       layoutMode: 'document',
     },
     clusterTargets: normalizeClusterTargets(display),
+    ...(initialState.length > 0 ? { initialState } : {}),
     workingMemoryFacts: authoredFacts,
     productionRules: directProductionRules,
     root: {
@@ -296,6 +324,22 @@ function nodeIsAnswerable(node: DisplayNodeRecord | undefined): boolean {
     default:
       return false;
   }
+}
+
+function isCompletionButtonAction(
+  display: SparcTrialDisplay,
+  selection: string | undefined,
+  action: string | undefined,
+): boolean {
+  if (!selection || !action || !isRecord(display.response)) {
+    return false;
+  }
+  const completion = display.response.completion;
+  if (!isRecord(completion)) {
+    return false;
+  }
+  return completion.doneSelection === selection
+    && (completion.doneAction ?? 'ButtonPressed') === action;
 }
 
 function collectFirstMessageBoxId(nodes: readonly unknown[] | undefined): string | undefined {
@@ -411,7 +455,10 @@ export function createSparcProductionRuleEventsFromTrialResult(params: {
     const directAction = response ? undefined : directSparcActionForNode(node!, submittedValue);
     const selection = stringOrUndefined(response?.selection) ?? directAction?.selection;
     const action = stringOrUndefined(response?.action) ?? directAction?.action;
-    const input = response ? submittedValue : directAction?.input;
+    const mappedAction = stringOrUndefined(response?.action);
+    const input = response && mappedAction === 'ButtonPressed'
+      ? response.input
+      : (response ? submittedValue : directAction?.input);
     if (!selection || !action) {
       continue;
     }
@@ -429,7 +476,7 @@ export function createSparcProductionRuleEventsFromTrialResult(params: {
         input,
         triggeredBy: params.result.triggeredBy ?? null,
         ...focusPayload,
-        sparcAnswerable: nodeIsAnswerable(node),
+        sparcAnswerable: nodeIsAnswerable(node) || isCompletionButtonAction(params.display, selection, action),
         sparcDefaultIncorrectMessage: 'No, this is not correct.',
         ...(defaultIncorrectFeedbackNodeId ? { sparcDefaultIncorrectFeedbackNodeId: defaultIncorrectFeedbackNodeId } : {}),
       },
@@ -437,6 +484,97 @@ export function createSparcProductionRuleEventsFromTrialResult(params: {
     index += 1;
   }
   return events;
+}
+
+function createSparcDialogueEventFromTrialResult(params: {
+  readonly documentId: string;
+  readonly display: SparcTrialDisplay;
+  readonly result: SparcTrialResult;
+}): { readonly event: SparcInterfaceEvent; readonly learnerText: string } {
+  const nodesById = collectDisplayNodesById(params.display.nodes);
+  const answerEntries = Object.entries(params.result.submittedNodes)
+    .map(([nodeId, submittedValue]) => ({
+      nodeId,
+      submittedValue,
+      node: nodesById.get(nodeId),
+      text: typeof submittedValue === 'string' ? submittedValue.trim() : String(submittedValue ?? '').trim(),
+    }))
+    .filter((entry) => entry.text && nodeIsAnswerable(entry.node));
+  if (answerEntries.length !== 1) {
+    throw new Error(`SPARC dialogue submit requires exactly one answerable submitted node; found ${answerEntries.length}`);
+  }
+  const entry = answerEntries[0]!;
+  return {
+    learnerText: entry.text,
+    event: {
+      eventId: `${params.documentId}:${entry.nodeId}:dialogue:${params.result.timestamp}`,
+      type: 'response-submitted',
+      source: {
+        documentId: params.documentId,
+        nodeId: entry.nodeId,
+      },
+      time: params.result.timestamp,
+      payload: {
+        selection: entry.nodeId,
+        action: 'SubmitDialogueResponse',
+        input: entry.text,
+        triggeredBy: params.result.triggeredBy ?? null,
+      },
+    },
+  };
+}
+
+export async function commitSparcTrialDisplayControllerDialogueTurn(params: {
+  readonly core: SparcPracticeHistoryCore;
+  readonly documentId: string;
+  readonly display: SparcTrialDisplay;
+  readonly result: SparcTrialResult;
+  readonly priorHistoryRecords: readonly CanonicalHistoryRecord[];
+  readonly document?: SparcAuthoredDocument;
+  readonly replayState?: SparcReplayState;
+  readonly scoreLearnerResponse: SparcTrialDisplayDialogueTurnScorer;
+  readonly generateTutorUtterance: SparcUtteranceGenerator;
+  readonly targetSelectionOptions?: SparcLearningTargetSelectionOptions;
+  readonly maxProductionRuleCycles?: number;
+  readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory'>;
+}): Promise<SparcTrialDisplayControllerDialogueTurnCommitResult> {
+  const document = params.document ?? createSparcAuthoredDocumentFromTrialDisplay({
+    documentId: params.documentId,
+    display: params.display,
+  });
+  const replayState = params.replayState ?? replaySparcDocumentHistory(document, params.priorHistoryRecords);
+  const { event, learnerText } = createSparcDialogueEventFromTrialResult({
+    documentId: params.documentId,
+    display: params.display,
+    result: params.result,
+  });
+  const learnerResponseScore = await params.scoreLearnerResponse({
+    document,
+    display: params.display,
+    result: params.result,
+    event,
+    learnerText,
+    replayState,
+  });
+  const dialogueTurn = await commitSparcControllerDialogueTurn({
+    core: params.core,
+    document,
+    replayState,
+    event,
+    learnerResponseScore,
+    ...(params.targetSelectionOptions ? { targetSelectionOptions: params.targetSelectionOptions } : {}),
+    ...(params.maxProductionRuleCycles !== undefined ? { maxProductionRuleCycles: params.maxProductionRuleCycles } : {}),
+    generateTutorUtterance: params.generateTutorUtterance,
+    runtime: {
+      history: params.history,
+    },
+  });
+  return {
+    document,
+    event,
+    learnerText,
+    dialogueTurn,
+  };
 }
 
 export async function commitSparcTrialDisplayProductionRuleEvents(params: {

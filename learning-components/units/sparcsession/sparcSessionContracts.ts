@@ -197,6 +197,8 @@ export type SparcRuleExpression =
       readonly args: readonly SparcRuleExpression[];
     };
 
+export type SparcRuleNumericExpression = number | SparcRuleExpression;
+
 export type SparcFactSlotPattern =
   | {
       readonly type: 'literal';
@@ -209,6 +211,13 @@ export type SparcFactSlotPattern =
   | {
       readonly type: 'bound';
       readonly variable: string;
+    }
+  | {
+      readonly type: 'range';
+      readonly min?: SparcRuleNumericExpression;
+      readonly max?: SparcRuleNumericExpression;
+      readonly minInclusive?: boolean;
+      readonly maxInclusive?: boolean;
     };
 
 export type SparcFactPattern = {
@@ -221,6 +230,10 @@ export type SparcProductionRuleCondition =
   | {
       readonly type: 'not';
       readonly pattern: SparcFactPattern;
+    }
+  | {
+      readonly type: 'any';
+      readonly conditions: readonly SparcProductionRuleCondition[];
     };
 
 export type SparcProductionRuleTest = {
@@ -234,6 +247,7 @@ export type SparcProductionRuleEffect =
       readonly type: 'assert-fact';
       readonly fact: SparcWorkingMemoryFactTemplate;
       readonly persist?: boolean;
+      readonly identitySlots?: readonly string[];
     }
   | {
       readonly type: 'write-state';
@@ -260,6 +274,10 @@ export type SparcProductionRuleEffect =
       readonly nodeId?: string | SparcRuleExpression;
       readonly responseValue?: SparcRuleExpression;
       readonly input?: SparcRuleExpression;
+    }
+  | {
+      readonly type: 'terminate-production-phase';
+      readonly reason?: string;
     }
   | SparcProgressiveNodeOperationTemplate;
 
@@ -325,6 +343,7 @@ export type SparcProductionRuleFiring = {
   readonly bindings: Readonly<Record<string, unknown>>;
   readonly assertedFacts: readonly SparcWorkingMemoryFact[];
   readonly persistentAssertedFacts: readonly SparcWorkingMemoryFact[];
+  readonly persistentAssertedFactIdentitySlots: readonly (Readonly<Record<string, unknown>> | undefined)[];
   readonly writes: readonly SparcStateWrite[];
   readonly messages: readonly {
     readonly messageType: 'hint' | 'buggy' | 'success' | 'feedback';
@@ -340,6 +359,8 @@ export type SparcProductionRuleFiring = {
   }[];
   readonly classifications: readonly (SparcOutcome | 'buggy')[];
   readonly credits: readonly string[];
+  readonly terminatesProductionPhase: boolean;
+  readonly terminalReason?: string;
 };
 
 export type SparcProductionRuleExecution = {
