@@ -64,21 +64,6 @@ describe('sparcLearnerResponseScoring', function() {
           id: 'm1',
           confidence: 0.7,
         }],
-        bagMatchScores: [{
-          kind: 'goodAnswer',
-          score: 0.72,
-          band: 'HIGH',
-          bagText: 'Expected answer.',
-          model: 'test-embedding-model',
-          metric: 'cosine_similarity_normalized_vectors',
-        }, {
-          kind: 'badAnswer',
-          score: 0.18,
-          band: 'NONE',
-          bagText: 'Bad answer.',
-          model: 'test-embedding-model',
-          metric: 'cosine_similarity_normalized_vectors',
-        }],
         learnerContribution: {
           type: 'assertion',
           confidence: 0.8,
@@ -104,17 +89,7 @@ describe('sparcLearnerResponseScoring', function() {
       && entry.slots.confidence === 0.7
     )));
     assert.ok(facts.some((entry) => entry.factType === 'learnerResponse.contribution'));
-    assert.ok(facts.some((entry) => (
-      entry.factType === 'selector.goodAnswerMatch'
-      && entry.slots?.value === 0.72
-      && entry.slots.band === 'HIGH'
-      && entry.slots.model === 'test-embedding-model'
-    )));
-    assert.ok(facts.some((entry) => (
-      entry.factType === 'selector.badAnswerMatch'
-      && entry.slots?.value === 0.18
-      && entry.slots.band === 'NONE'
-    )));
+    assert.equal(facts.some((entry) => entry.factType.startsWith('selector.')), false);
     assert.equal(facts.some((entry) => entry.factType === 'dialogue.learnerQuestion'), false);
   });
 

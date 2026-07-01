@@ -1,7 +1,6 @@
 import { strict as assert } from 'node:assert';
 import type { SparcWorkingMemoryFact } from './sparcSessionContracts';
 import {
-  bandSparcBagMatch,
   bandSparcCurrentExpectationCoverage,
   bandSparcStudentAbility,
   bandSparcStudentVerbosity,
@@ -13,15 +12,6 @@ function fact(factType: string, slots: Record<string, unknown>): SparcWorkingMem
 }
 
 describe('SPARC selector signals', function() {
-  it('bands bag-match cosine scores with non-overlapping defaults', function() {
-    assert.equal(bandSparcBagMatch(0), 'NONE');
-    assert.equal(bandSparcBagMatch(0.2), 'LOW');
-    assert.equal(bandSparcBagMatch(0.4), 'MEDIUM');
-    assert.equal(bandSparcBagMatch(0.6), 'HIGH');
-    assert.equal(bandSparcBagMatch(0.8), 'VERY_HIGH');
-    assert.equal(bandSparcBagMatch(1), 'VERY_HIGH');
-  });
-
   it('bands current expectation coverage, derived ability, and verbosity', function() {
     assert.equal(bandSparcCurrentExpectationCoverage(0.29), 'LOW');
     assert.equal(bandSparcCurrentExpectationCoverage(0.3), 'MEDIUM');

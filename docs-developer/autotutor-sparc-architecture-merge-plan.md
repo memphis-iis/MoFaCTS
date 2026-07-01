@@ -326,17 +326,7 @@ The translator should:
 8. Support write/update mode only for deliberate canonical conversion, with provenance/report output and collision checks that prevent accidental writes to unrelated packages.
 9. Produce a conversion report listing converted packages, skipped packages, warnings, and blocking errors.
 
-The converter should live in this app repository under `scripts/`, because it depends on the app's SPARC session contract and validation expectations. It must still write only to the canonical config path when explicitly invoked.
-
-Current entrypoints:
-
-- `npm run check:autotutor-sparc-converter`
-- `npm run convert:autotutor-sparc -- --config-dir C:\dev\mofacts_config`
-- direct script path: `mofacts/scripts/convertAutoTutorToSparc.cjs`
-
-The converter is CommonJS for compatibility with the current Node script tooling and uses `jiti` only to consume TypeScript contract/template helpers from the app tree. Dry-run is the default. Writing converted package content requires `--write` and an original AutoTutor source package; re-converting an already converted package requires restoring or otherwise supplying the original source content. Writing a conversion report requires explicit `--report-file`.
-
-The translator should become part of the implementation plan before broad content migration. Manual conversion is acceptable for one prototype fixture only, not for the full set of existing AutoTutor lessons.
+The legacy one-shot converter has been removed from the app repository. Current AutoTutor SPARC packages in `C:\dev\mofacts_config` are maintained as authored runtime content. Future migration tooling, if needed, should be introduced as a deliberate content-maintenance workflow with explicit provenance and tests, not as a runtime dependency or an implied source of truth.
 
 ## Translation Procedure
 
@@ -991,7 +981,6 @@ Recommended fact families:
 ```ts
 { factType: 'learnerResponse.contribution', slots: { type, confidence, streakCount } }
 { factType: 'dialogue.learnerQuestion', slots: { answerableFromAuthoredContent } }
-{ factType: 'learnerResponse.answerQuality', slots: { value } }
 { factType: 'dialogue.learnerWordCount', slots: { cumulative } }
 { factType: 'learningTarget.coverageMean', slots: { scope, value } }
 { factType: 'learningTarget.score', slots: { clusterKC, coverage, evidence, missing } }
@@ -1049,7 +1038,6 @@ The current minimum expected fact families for move-rule matching are:
 ```ts
 { factType: 'learningTarget.selected', slots: { clusterKC } }
 { factType: 'learningTarget.score', slots: { clusterKC, coverage } }
-{ factType: 'learnerResponse.answerQuality', slots: { value } }
 { factType: 'dialogue.learnerWordCount', slots: { cumulative } }
 { factType: 'learningTarget.coverageMean', slots: { scope, value } }
 { factType: 'session.turnState', slots: { turnCount } }
@@ -1489,10 +1477,9 @@ Step 1 scoring/evaluation writes or updates learner-response, learning-target co
 { factType: 'diagnostic.misconceptionScore', slots: { id: 'm1', confidence: 0.8, repaired: false } }
 { factType: 'learnerResponse.contribution', slots: { type: 'question', confidence: 0.9, streakCount: 1 } }
 { factType: 'dialogue.learnerQuestion', slots: { answerableFromAuthoredContent: false } }
-{ factType: 'learnerResponse.answerQuality', slots: { value: 'partial' } }
 ```
 
-`dialogue.learnerQuestion` is present when `learnerResponse.contribution.type` is `question`; question presence is not stored again on the question fact. If a downstream rule or analysis needs per-turn contribution, compute it transiently from prior replayed SPARC state and the new score; do not store a separate "current coverage" or coverage-delta concept. Target selection, move-selection productions, utterance-generation input assembly, persisted history, replay, and analysis must all read the canonical `learningTarget.score`, `learnerResponse.answerQuality`, and `diagnostic.misconceptionScore` facts. Do not create downstream-only aliases for paper terms such as topic coverage, good-answer-bag match, or bad-answer-bag match.
+`dialogue.learnerQuestion` is present when `learnerResponse.contribution.type` is `question`; question presence is not stored again on the question fact. If a downstream rule or analysis needs per-turn contribution, compute it transiently from prior replayed SPARC state and the new score; do not store a separate "current coverage" or coverage-delta concept. Target selection, move-selection productions, utterance-generation input assembly, persisted history, replay, and analysis must all read the canonical `learningTarget.score`, `learnerResponse.contribution`, and `diagnostic.misconceptionScore` facts. Do not create downstream-only aliases for paper terms such as topic coverage, good-answer-bag match, or bad-answer-bag match.
 
 The generated package provides authored/static model and policy facts before target selection runs. Each source expectation is converted to exactly one generated clusterKC. Generated SPARC pages and runtime facts reference the learning target by that `clusterKC` through existing cluster-reference mechanisms such as `clusterTargets[]` and `clusterIndices`; source expectation ids remain provenance only.
 

@@ -1,20 +1,8 @@
 import type { SparcWorkingMemoryFact } from './sparcSessionContracts';
 
-export type SparcMatchBand = 'NONE' | 'LOW' | 'MEDIUM' | 'HIGH' | 'VERY_HIGH';
 export type SparcCoverageBand = 'LOW' | 'MEDIUM' | 'HIGH';
 export type SparcStudentAbilityBand = 'VERY_LOW' | 'LOW' | 'MEDIUM' | 'HIGH';
 export type SparcStudentVerbosityBand = 'LOW' | 'MEDIUM' | 'HIGH';
-
-export function bandSparcBagMatch(score: number): SparcMatchBand {
-  if (!Number.isFinite(score) || score < 0 || score > 1) {
-    throw new Error('SPARC bag-match score must be a finite number from 0 to 1');
-  }
-  if (score < 0.2) return 'NONE';
-  if (score < 0.4) return 'LOW';
-  if (score < 0.6) return 'MEDIUM';
-  if (score < 0.8) return 'HIGH';
-  return 'VERY_HIGH';
-}
 
 export function bandSparcCurrentExpectationCoverage(score: number): SparcCoverageBand {
   if (!Number.isFinite(score) || score < 0 || score > 1) {

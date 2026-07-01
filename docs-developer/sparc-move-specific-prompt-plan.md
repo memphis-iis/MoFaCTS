@@ -77,7 +77,6 @@ Current AutoTutor-to-SPARC conversion represents `THEN select MOVE` as an assert
       clusterKC: variable('targetClusterKC'),
       action: literal('neutral_feedback'),
       sourceRuleId: literal('paper-rule-15-neutral-feedback'),
-      templateVersion: literal('paper-dialogue-move-v1'),
     },
   },
 }
@@ -214,7 +213,7 @@ Active instructional moves:
 | `prompt` | Ask for a specific missing piece. Use code-owned constrained question wording grounded in the current expectation/domain facts. |
 | `hint` | Provide a clue or content cue that points toward the missing idea while preserving learner work. |
 | `elaborate` | Add substantive domain information from the current expectation/target facts to extend the answer; may ask the learner to connect it back to the question. |
-| `splice` | Correct or insert specific content after an error/misconception, then ask the learner to repair or apply the corrected idea. |
+| `splice` | Use the authored splice content for a detected error/misconception and ask the learner to examine or repair the misconception. Do not split splice into hidden submoves. |
 | `summary` | Recap covered expectations concisely and end or transition according to the controller state. |
 
 Legacy feedback policies, not active selectors:
@@ -297,46 +296,22 @@ The current converter maps several original paper conditions imperfectly:
 
 In the current implementation, this means the move selector may select broad default moves, especially `paper-rule-15-neutral-feedback`, even when other moves would be pedagogically plausible. In the target implementation, feedback-labeled legacy rules should be disabled for active selection, and selector fidelity should be audited after the fact model is faithful.
 
-Working decision: restore the paper's good-answer and bad-answer bag concepts as explicit scoring facts. Answer aspects are the same practical object as expectations in the current MoFaCTS/SPARC vocabulary. The good answer bag should be represented by concatenating the expectation texts for the current target/topic into one bag text. The bad answer bag should be represented by concatenating authored misconception texts into one bag text.
-
-Use embeddings for current-turn bag matching:
-
-1. Generate or cache one embedding for the good answer bag from the concatenated expectation/aspect text.
-2. Generate or cache one embedding for the bad answer bag from the concatenated authored misconception text.
-3. Generate an embedding for the learner's current contribution at scoring time.
-4. Compute cosine similarity from the current contribution to the good answer bag embedding.
-5. Compute cosine similarity from the current contribution to the bad answer bag embedding.
-6. Store those two similarities as current-turn good-answer match and bad-answer match facts.
-7. Apply fixed, non-overlapping thresholds to classify NONE, LOW, MEDIUM, HIGH, and VERY HIGH.
-
-Reasonable initial threshold defaults:
-
-| Band | Cosine range |
-| --- | --- |
-| `NONE` | `0.00 <= score < 0.20` |
-| `LOW` | `0.20 <= score < 0.40` |
-| `MEDIUM` | `0.40 <= score < 0.60` |
-| `HIGH` | `0.60 <= score < 0.80` |
-| `VERY_HIGH` | `0.80 <= score <= 1.00` |
-
-These are deliberately simple and non-overlapping. They should be treated as tuning defaults, not as a claim about the final psychometric cut points.
-
-These current-turn bag-match facts should be separate from expectation coverage. Good-answer and bad-answer match represent the quality and direction of the latest learner contribution; expectation coverage represents the learner's demonstrated progress on authored expectations.
+Working decision: do not restore the paper's good-answer and bad-answer bag concepts as explicit SPARC facts. In the current MoFaCTS/SPARC vocabulary, good-answer progress is represented by expectation coverage and bad-answer/repair pressure is represented by misconception confidence. The paper terms remain useful for interpreting the source rule catalogue, but they are not a separate runtime scoring layer.
 
 Distinguish paper-style topic coverage from active SPARC selector signals:
 
 - Paper-style `topic coverage` considers content that has appeared in the dialogue, including tutor and learner contributions, against the Ideal Answer bag. The paper uses this as a production-rule parameter, but it is not learner-owned because tutor contributions can increase it.
-- SPARC should not treat tutor/LLM statements as learner progress. For active move selection, prefer learner-owned signals: current expectation coverage, current-turn good-answer match, current-turn bad-answer match, and derived student ability.
+- SPARC should not treat tutor/LLM statements as learner progress. For active move selection, prefer learner-owned signals: current expectation coverage, selected misconception confidence, learner contribution, student verbosity, and derived student ability.
 - Current expectation coverage should drive local moves such as prompting, pumping, hinting, splicing, and elaborating for the expectation currently under attention.
 - Derived student ability should drive global readiness decisions such as summary, completion, or advancement.
 - Paper-style topic coverage may remain as a legacy/reference concept for understanding the original paper rules, but it should not be an active selector input in the first SPARC implementation unless explicitly reintroduced.
 
-The concatenated good-answer and bad-answer bag embeddings are only for production-rule match variables: "match with good answer bag" and "match with bad answer bag." They must not replace existing scoring that estimates per-expectation coverage or per-misconception confidence. Current code already carries those as separate facts:
+The paper production-rule variables "match with good answer bag" and "match with bad answer bag" are represented by the canonical scoring facts already produced by response evaluation:
 
 - `learningTarget.score` with `coverage` per expectation/clusterKC.
 - `diagnostic.misconceptionScore` with `confidence` per misconception id.
 
-Keep those procedures separate. The bag-match facts are additional current-turn selector inputs.
+Do not add `selector.goodAnswerMatch` or `selector.badAnswerMatch`. Move-selection rules should join against the selected expectation or selected misconception and read the corresponding coverage or confidence.
 
 When an active rule needs student ability, compute it as a transient derived score rather than storing a separate independent construct:
 
@@ -364,16 +339,13 @@ For the first SPARC implementation, active production rules should use these lea
 | Selector fact | Source | Default bands | Primary use |
 | --- | --- | --- | --- |
 | `currentExpectationCoverage` | `learningTarget.score.coverage` for the selected/attended expectation. Missing coverage is `0`. | LOW `<0.30`; MEDIUM `0.30-0.80`; HIGH `>=0.80`. | Local expectation moves: prompt, pump, hint, splice, elaborate. |
-| `goodAnswerMatch` | Cosine similarity between current learner contribution and concatenated expectation bag. | NONE `<0.20`; LOW `0.20-0.40`; MEDIUM `0.40-0.60`; HIGH `0.60-0.80`; VERY_HIGH `>=0.80`. | Current-turn good-answer quality. |
-| `badAnswerMatch` | Cosine similarity between current learner contribution and concatenated misconception bag. | NONE `<0.20`; LOW `0.20-0.40`; MEDIUM `0.40-0.60`; HIGH `0.60-0.80`; VERY_HIGH `>=0.80`. | Current-turn misconception/correction pressure. |
+| selected misconception confidence | `diagnostic.misconceptionScore.confidence` for `diagnostic.misconceptionSelected.id`. Missing confidence is `0`. | Repair-active `>=0.20`; strong `>=0.67`. | Misconception repair, splice, and negative feedback moves. |
 | `studentAbility` | `mean(expectation coverage) - mean(misconception confidence)`. Missing scores are `0`. | VERY_LOW `<0.00`; LOW `0.00-0.30`; MEDIUM `0.30-0.80`; HIGH `>=0.80`. | Global readiness moves: summary, completion, advancement. |
 | `studentVerbosity` | Learner word count for the current contribution. | LOW `<12`; MEDIUM `12-30`; HIGH `>=30`. | Tie-breaker/input for prompt versus pump behavior. |
 
 Do not use paper-style tutor-plus-learner topic coverage as an active selector fact in this first implementation.
 
-The repo already has embedding/cosine infrastructure for expectation relationship graphs (`autoTutorRelationshipEngine`, `clusterKcRelationshipEngine`, and OpenRouter embedding calls). The new scoring path should reuse those normalization/cosine patterns where possible, while keeping provenance and model/version metadata explicit.
-
-Do not make the bag-scoring path depend sideways on feature-specific relationship modules. If useful functions currently live in feature-specific files, extract the general pieces into shared code first, such as vector normalization, cosine scoring, threshold banding, embedding request orchestration, cache-key construction, and provenance shaping. Feature modules should then compose the shared utilities.
+Embedding/cosine infrastructure remains available for relationship graphs and other authored-content analysis, but it is not part of SPARC AutoTutor dialogue move selection unless a future design explicitly reintroduces it.
 
 ## Diagnostics Needed
 

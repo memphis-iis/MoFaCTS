@@ -70,7 +70,7 @@ function collectClusterKcRelationshipNodes(facts: readonly unknown[]): ClusterKc
   return nodes;
 }
 
-async function ensureConvertedAutoTutorSparcGraph(args: {
+async function ensureAutoTutorSparcGraph(args: {
   tdf: any;
   deps: ProcessPackageUploadDeps;
   state: PackageUploadRuntimeState;
@@ -78,10 +78,10 @@ async function ensureConvertedAutoTutorSparcGraph(args: {
   const { tdf, deps, state } = args;
   const stimuli = tdf?.rawStimuliFile;
   const setspec = isRecord(stimuli?.setspec) ? stimuli.setspec : null;
-  const conversion = isRecord(setspec?.sourceAutoTutorConversion)
-    ? setspec.sourceAutoTutorConversion
+  const packageMetadata = isRecord(setspec?.sourceAutoTutorSparcPackage)
+    ? setspec.sourceAutoTutorSparcPackage
     : null;
-  if (!conversion || !Array.isArray(setspec?.sparcPages)) {
+  if (!packageMetadata || !Array.isArray(setspec?.sparcPages)) {
     return;
   }
 
@@ -103,7 +103,7 @@ async function ensureConvertedAutoTutorSparcGraph(args: {
       kind: 'openrouter',
     });
     if (!keyResolution.apiKey) {
-      throw new Error('Converted AutoTutor SPARC upload requires an OpenRouter key alternative to generate the KC relationship graph.');
+      throw new Error('AutoTutor SPARC upload requires an OpenRouter key alternative to generate the KC relationship graph.');
     }
 
     const attemptedModels: string[] = [];
@@ -129,7 +129,7 @@ async function ensureConvertedAutoTutorSparcGraph(args: {
       }
     }
     if (!embeddingResult) {
-      throw new Error(`Converted AutoTutor SPARC graph generation failed: ${lastError instanceof Error ? lastError.message : String(lastError)}`);
+      throw new Error(`AutoTutor SPARC graph generation failed: ${lastError instanceof Error ? lastError.message : String(lastError)}`);
     }
 
     const relationships = computeClusterKcRelationshipsFromEmbeddings({
@@ -142,8 +142,8 @@ async function ensureConvertedAutoTutorSparcGraph(args: {
       ...graphFacts,
     ];
     generatedPageCount += 1;
-    conversion.relationshipValidation = {
-      ...(isRecord(conversion.relationshipValidation) ? conversion.relationshipValidation : {}),
+    packageMetadata.relationshipValidation = {
+      ...(isRecord(packageMetadata.relationshipValidation) ? packageMetadata.relationshipValidation : {}),
       valid: true,
       sourceShape: 'generated-at-upload',
       relationshipGenerationRequired: false,
@@ -164,7 +164,7 @@ async function ensureConvertedAutoTutorSparcGraph(args: {
   }
 
   if (generatedPageCount > 0) {
-    deps.serverConsole('Generated SPARC KC relationship graph facts for converted AutoTutor package:', tdf.tdfFileName || tdf.fileName || tdf._id, 'pages=', generatedPageCount);
+    deps.serverConsole('Generated SPARC KC relationship graph facts for AutoTutor SPARC package:', tdf.tdfFileName || tdf.fileName || tdf._id, 'pages=', generatedPageCount);
   }
 }
 
@@ -270,7 +270,7 @@ export async function postProcessUploadedTdfs(args: {
       const scopedStimuliSetId = tdf.stimuliSetId ?? state.stimSetId;
       const uploadedMediaPathMap = state.uploadedMediaPathMapsByStimSetId.get(String(scopedStimuliSetId ?? '').trim());
       await upsertReferencedH5PContent({ tdf, h5pFilesByName, deps, scopedStimuliSetId });
-      await ensureConvertedAutoTutorSparcGraph({ tdf, deps, state });
+      await ensureAutoTutorSparcGraph({ tdf, deps, state });
       const processedTdf = await deps.processAudioFilesForTDF(tdf.content.tdfs, scopedStimuliSetId, {
         rejectUnresolved: true,
         allowFilenameLookup: false,

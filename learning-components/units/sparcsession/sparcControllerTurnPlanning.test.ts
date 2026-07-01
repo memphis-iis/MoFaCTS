@@ -153,7 +153,7 @@ function completedDocument(): SparcAuthoredDocument {
   };
 }
 
-function misconceptionDocument(): SparcAuthoredDocument {
+function misconceptionDocument(confidence = 0.25): SparcAuthoredDocument {
   return {
     id: 'sparc-doc',
     schemaVersion: 1,
@@ -165,8 +165,8 @@ function misconceptionDocument(): SparcAuthoredDocument {
       fact('learningTarget.source', { clusterKC: 'kc-a' }),
       fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.4 }),
       fact('kcGraph.node', { clusterKC: 'kc-a', centrality: 0.5, description: 'A' }),
-      fact('diagnostic.misconceptionSource', { id: 'm-strong' }),
-      fact('diagnostic.misconceptionScore', { id: 'm-strong', confidence: 0.7 }),
+      fact('diagnostic.misconceptionSource', { id: 'm-active' }),
+      fact('diagnostic.misconceptionScore', { id: 'm-active', confidence }),
       fact('dialogue.learnerWordCount', { cumulative: 5 }),
       fact('session.turnState', { turnCount: 1 }),
     ],
@@ -194,7 +194,7 @@ function misconceptionDocument(): SparcAuthoredDocument {
           slots: {
             targetType: literal('misconception'),
             id: variable('misconceptionId'),
-            action: literal('negative_feedback'),
+            action: literal('splice'),
           },
         },
       }, {
@@ -241,6 +241,18 @@ function misconceptionDocument(): SparcAuthoredDocument {
         kind: 'input',
       }],
     },
+  };
+}
+
+function mediumExpectationDocument(): SparcAuthoredDocument {
+  const base = misconceptionDocument(0.05);
+  return {
+    ...base,
+    workingMemoryFacts: (base.workingMemoryFacts ?? []).filter((entry) => (
+      entry.factType !== 'diagnostic.misconceptionSource'
+      && entry.factType !== 'diagnostic.misconceptionScore'
+    )),
+    productionRules: (base.productionRules ?? []).filter((entry) => entry.id === 'dialogue.move.paper-rule-09-elaborate'),
   };
 }
 
@@ -323,24 +335,44 @@ describe('evaluateSparcControllerTurnPlanning', function() {
     )));
   });
 
-  it('selects misconception repair before paper-rule-09 elaborate when a misconception is active', function() {
+  it('selects low-confidence misconception repair before paper-rule-09 elaborate when a misconception is active', function() {
     const result = evaluateSparcControllerTurnPlanning({
       document: misconceptionDocument(),
       event,
     });
 
     assert.equal(result.targetSelection.selectedTargetType, 'misconception');
-    assert.equal(result.targetSelection.selectedMisconceptionId, 'm-strong');
+    assert.equal(result.targetSelection.selectedMisconceptionId, 'm-active');
     assert.ok(result.targetSelection.facts.some((entry) => (
       entry.factType === 'diagnostic.misconceptionSelected'
-      && entry.slots?.id === 'm-strong'
+      && entry.slots?.id === 'm-active'
     )));
     assert.equal(result.productionRuleEvaluation.execution.firings[0]?.ruleId, 'dialogue.move.test-repair');
     assert.ok(result.productionRuleEvaluation.execution.facts.some((entry) => (
       entry.factType === 'controller.selectedAction'
       && entry.slots?.targetType === 'misconception'
-      && entry.slots?.id === 'm-strong'
-      && entry.slots?.action === 'negative_feedback'
+      && entry.slots?.id === 'm-active'
+      && entry.slots?.action === 'splice'
+    )));
+  });
+
+  it('uses medium expectation coverage for paper-rule-09 elaborate without bag-match selector facts', function() {
+    const result = evaluateSparcControllerTurnPlanning({
+      document: mediumExpectationDocument(),
+      event,
+    });
+
+    assert.equal(result.targetSelection.selectedTargetType, 'learningTarget');
+    assert.equal(result.productionRuleEvaluation.execution.firings[0]?.ruleId, 'dialogue.move.paper-rule-09-elaborate');
+    assert.equal(result.productionRuleEvaluation.execution.facts.some((entry) => (
+      entry.factType === 'selector.goodAnswerMatch'
+      || entry.factType === 'selector.badAnswerMatch'
+    )), false);
+    assert.ok(result.productionRuleEvaluation.execution.facts.some((entry) => (
+      entry.factType === 'controller.selectedAction'
+      && entry.slots?.targetType === 'learningTarget'
+      && entry.slots?.clusterKC === 'kc-a'
+      && entry.slots?.action === 'elaborate'
     )));
   });
 });

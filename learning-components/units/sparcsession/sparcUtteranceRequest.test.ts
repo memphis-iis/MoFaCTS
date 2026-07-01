@@ -14,7 +14,6 @@ describe('createSparcUtteranceRequestFromFacts', function() {
         clusterKC: 'kc-a',
         action: 'hint',
         sourceRuleId: 'paper-rule-06-hint',
-        templateVersion: 'paper-dialogue-move-v1',
       }),
       fact('dialogue.moveContent', {
         targetType: 'learningTarget',
@@ -39,12 +38,10 @@ describe('createSparcUtteranceRequestFromFacts', function() {
       clusterKC: 'kc-a',
       action: 'hint',
       sourceRuleId: 'paper-rule-06-hint',
-      templateVersion: 'paper-dialogue-move-v1',
     });
     assert.equal(request.moveDefinition.moveId, 'hint');
     assert.equal(request.moveDefinition.promptId, 'autotutor.hint');
     assert.equal(request.sourceRuleId, 'paper-rule-06-hint');
-    assert.equal(request.templateVersion, 'paper-dialogue-move-v1');
   });
 
   it('matches misconception move content by misconception id', function() {

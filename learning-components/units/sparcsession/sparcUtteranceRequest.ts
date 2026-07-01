@@ -12,7 +12,6 @@ export type SparcUtteranceRequest = {
   readonly selectedAction: Readonly<Record<string, unknown>>;
   readonly moveDefinition: SparcMoveDefinition;
   readonly sourceRuleId?: string;
-  readonly templateVersion?: string;
   readonly learnerText?: string;
   readonly learnerContribution?: Readonly<Record<string, unknown>>;
   readonly pedagogicalState?: Readonly<Record<string, unknown>>;
@@ -196,7 +195,6 @@ export function createSparcUtteranceRequestFromFacts(
     throw new Error(`SPARC utterance request missing dialogue.moveContent for ${targetType} "${targetId}" action "${action}"`);
   }
   const sourceRuleId = stringSlot(selectedAction, 'sourceRuleId');
-  const templateVersion = stringSlot(selectedAction, 'templateVersion');
   const contribution = latestFact(facts, 'learnerResponse.contribution')?.slots;
 
   return {
@@ -213,6 +211,5 @@ export function createSparcUtteranceRequestFromFacts(
     plannerState: plannerState(facts),
     dialogueHistory: dialogueHistory(facts),
     ...(sourceRuleId ? { sourceRuleId } : {}),
-    ...(templateVersion ? { templateVersion } : {}),
   };
 }
