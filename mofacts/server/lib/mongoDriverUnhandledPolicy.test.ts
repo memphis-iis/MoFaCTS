@@ -82,8 +82,9 @@ describe('mongo driver unhandled policy', function() {
 
     fakeProcess.emit('unhandledRejection', poolMonitorTimeoutError());
     fakeProcess.emit('uncaughtException', poolMonitorTimeoutError(), 'unhandledRejection');
+    fakeProcess.emit('uncaughtException', poolMonitorTimeoutError(), 'uncaughtException');
 
-    expect(logs).to.have.length(2);
+    expect(logs).to.have.length(3);
     expect(fatals).to.deep.equal([]);
     uninstall();
     expect(fakeProcess.count('unhandledRejection')).to.equal(0);

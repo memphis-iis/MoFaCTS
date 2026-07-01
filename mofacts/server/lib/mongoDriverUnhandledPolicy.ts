@@ -102,10 +102,7 @@ export function installMongoDriverUnhandledPolicy({
   }
 
   function handleUncaughtException(error: unknown, origin: unknown): void {
-    if (
-      origin === 'unhandledRejection' &&
-      handleRecoverable(error, 'uncaughtException')
-    ) {
+    if (handleRecoverable(error, `uncaughtException:${String(origin || 'unknown')}`)) {
       return;
     }
     fatal(error);
