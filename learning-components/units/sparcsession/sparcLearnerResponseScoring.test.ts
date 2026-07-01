@@ -82,7 +82,7 @@ describe('sparcLearnerResponseScoring', function() {
         }],
         answerQuality: 'partial',
         learnerContribution: {
-          type: 'answer',
+          type: 'assertion',
           confidence: 0.8,
           streakCount: 1,
         },

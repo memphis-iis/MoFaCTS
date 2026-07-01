@@ -29,7 +29,7 @@ export type SparcLearnerResponseScoringResult = {
   readonly bagMatchScores?: readonly SparcBagMatchScore[];
   readonly answerQuality?: 'low' | 'partial' | 'high';
   readonly learnerContribution?: {
-    readonly type: 'answer' | 'question' | 'off-task' | 'other';
+    readonly type: 'assertion' | 'question' | 'off-task' | 'other';
     readonly confidence?: number;
     readonly streakCount?: number;
   };

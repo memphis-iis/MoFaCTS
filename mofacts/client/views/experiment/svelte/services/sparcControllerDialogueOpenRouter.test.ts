@@ -50,7 +50,7 @@ const utteranceRequest: SparcUtteranceRequest = {
   },
   learnerText: 'I think A matters.',
   learnerContribution: {
-    type: 'answer',
+    type: 'assertion',
     confidence: 0.8,
   },
   pedagogicalState: {
@@ -96,7 +96,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
             }],
             answerQuality: 'partial',
             learnerContribution: {
-              type: 'answer',
+              type: 'assertion',
               confidence: 0.8,
             },
             learnerQuestion: {
@@ -119,7 +119,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
       missingElements: ['detail'],
     }]);
     expect(score.answerQuality).to.equal('partial');
-    expect(score.learnerContribution?.type).to.equal('answer');
+    expect(score.learnerContribution?.type).to.equal('assertion');
     expect(score.learnerQuestion).to.equal(undefined);
     expect(calls).to.have.length(1);
     expect(calls[0]).to.have.nested.property('intent.schemaName', 'mofacts_sparc_dialogue_score');
@@ -149,7 +149,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
             learningTargetScores: [],
             answerQuality: 'partial',
             learnerContribution: {
-              type: 'answer',
+              type: 'assertion',
             },
           },
         };

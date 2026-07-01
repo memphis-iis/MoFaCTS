@@ -238,6 +238,41 @@
     }
   }
 
+  function handleNodeEnter(nodeId, value) {
+    if (
+      !isAutoTutorDialogueDisplay(sparcDisplay)
+      || nodeId !== 'learner-response-input'
+      || authoringSelectOnly
+    ) {
+      return false;
+    }
+    const learnerText = String(value ?? '').trim();
+    if (!learnerText) {
+      return true;
+    }
+    nodeValues = {
+      ...nodeValues,
+      [nodeId]: learnerText,
+    };
+    dispatch('sparcsubmit', {
+      submittedNodes: {
+        ...collectDefaultSubmissionValues(sparcDisplay?.nodes),
+        ...collectAnswerSubmissionValues({
+          ...nodeValues,
+          [nodeId]: learnerText,
+        }),
+        ...(autoTutorDialogueSubmitNode?.id
+          ? { [autoTutorDialogueSubmitNode.id]: autoTutorDialogueSubmitNode.value ?? autoTutorDialogueSubmitNode.submitValue ?? buttonLabel(autoTutorDialogueSubmitNode) }
+          : {}),
+      },
+      triggeredBy: autoTutorDialogueSubmitNode?.id || nodeId,
+      focusedNodeId: activeNodeId || undefined,
+      timestamp: Date.now(),
+    });
+    pendingDialogueClearInputIds = dialogueInputNodes(realizedSparcDisplay?.nodes).map((inputNode) => inputNode.id);
+    return true;
+  }
+
   function handleNodeFocus(nodeId) {
     if (!nodeId || activeNodeId === nodeId) {
       return;
@@ -355,6 +390,7 @@
             {authoringSelectOnly}
             onNodeValueChange={handleNodeValueChange}
             onNodeCommit={handleNodeValueCommit}
+            onNodeEnter={handleNodeEnter}
             onNodeFocus={handleNodeFocus}
             onButtonActivate={handleButtonActivate}
           />

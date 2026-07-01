@@ -11,6 +11,7 @@
   export let authoringSelectOnly = false;
   export let onNodeValueChange = () => {};
   export let onNodeCommit = () => {};
+  export let onNodeEnter = () => {};
   export let onNodeFocus = () => {};
   export let onButtonActivate = () => {};
 
@@ -488,6 +489,10 @@
       on:blur={(event) => commitNodeValue(node, event.currentTarget.value)}
       on:keydown={(event) => {
         if (event.key === 'Enter') {
+          event.preventDefault();
+          if (onNodeEnter(node.id, event.currentTarget.value, event) === true) {
+            return;
+          }
           commitNodeValue(node, event.currentTarget.value);
         }
       }}

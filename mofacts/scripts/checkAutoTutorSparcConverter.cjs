@@ -1669,7 +1669,7 @@ async function assertNeutralSparcDialogueOpenRouterProvider() {
             }],
             answerQuality: 'partial',
             learnerContribution: {
-              type: 'answer',
+              type: 'assertion',
               confidence: 0.8,
             },
           },
@@ -1715,7 +1715,7 @@ async function assertNeutralSparcDialogueOpenRouterProvider() {
     coverage: 0.65,
     evidence: 'mentions A',
   }]);
-  assert.equal(score.learnerContribution.type, 'answer');
+  assert.equal(score.learnerContribution.type, 'assertion');
   assert.equal(score.learnerQuestion, undefined);
   const questionProvider = dialogueOpenRouter.createSparcDialogueOpenRouterProvider({
     async callResolvedOpenRouterJson() {
@@ -1750,7 +1750,7 @@ async function assertNeutralSparcDialogueOpenRouterProvider() {
     },
     learnerText: 'A matters.',
     learnerContribution: {
-      type: 'answer',
+      type: 'assertion',
       confidence: 0.8,
     },
     pedagogicalState: {

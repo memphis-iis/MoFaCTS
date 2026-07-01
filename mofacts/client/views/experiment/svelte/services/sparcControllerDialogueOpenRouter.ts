@@ -100,7 +100,7 @@ const SPARC_DIALOGUE_SCORE_JSON_SCHEMA: OpenRouterJsonSchema = {
       type: 'object',
       additionalProperties: false,
       properties: {
-        type: { type: 'string', enum: ['answer', 'question', 'off-task', 'other'] },
+        type: { type: 'string', enum: ['assertion', 'question', 'off-task', 'other'] },
         confidence: { type: 'number' },
         streakCount: { type: 'number' },
       },
@@ -292,7 +292,7 @@ function parseScoreEnvelope(value: unknown): SparcLearnerResponseScoringResult {
   }
   const contribution = isRecord(value.learnerContribution) ? value.learnerContribution : {};
   const contributionType = nonBlankString(contribution.type);
-  if (!['answer', 'question', 'off-task', 'other'].includes(contributionType)) {
+  if (!['assertion', 'question', 'off-task', 'other'].includes(contributionType)) {
     throw new Error('SPARC dialogue scoring learnerContribution.type is invalid');
   }
   const learnerQuestion = isRecord(value.learnerQuestion) && typeof value.learnerQuestion.answerableFromAuthoredContent === 'boolean'
@@ -306,7 +306,7 @@ function parseScoreEnvelope(value: unknown): SparcLearnerResponseScoringResult {
     ...(diagnosticMisconceptionScores.length > 0 ? { diagnosticMisconceptionScores } : {}),
     answerQuality,
     learnerContribution: {
-      type: contributionType as 'answer' | 'question' | 'off-task' | 'other',
+      type: contributionType as 'assertion' | 'question' | 'off-task' | 'other',
       ...(contribution.confidence !== undefined ? { confidence: unitScore(contribution.confidence, 'SPARC dialogue learner contribution confidence') } : {}),
       ...(Number.isFinite(Number(contribution.streakCount)) ? { streakCount: Number(contribution.streakCount) } : {}),
     },
@@ -492,6 +492,7 @@ export function createSparcDialogueOpenRouterProvider(
               'Return only JSON matching the schema.',
               'Use the provided clusterKC identifiers exactly.',
               'Coverage is 0 to 1 for how well the learner addressed each target in this turn.',
+              'Use learnerContribution.type "assertion" for ordinary learner answers or explanations.',
               'Include learnerQuestion only when learnerContribution.type is question.',
             ].join(' '),
           }, {
