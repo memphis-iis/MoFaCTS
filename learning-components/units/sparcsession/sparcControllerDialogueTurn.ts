@@ -134,7 +134,6 @@ function assertCompletedDialogueReplayState(replayState: SparcReplayState | unde
     const factTypes = transitionFactTypes(transition);
     const requiredFacts = [
       'learningTarget.score',
-      'learningTarget.selected',
       'controller.selectedAction',
       'controller.completionState',
     ];
@@ -145,6 +144,9 @@ function assertCompletedDialogueReplayState(replayState: SparcReplayState | unde
       if (!factTypes.has(factType)) {
         throw new Error(`SPARC dialogue replay state for transition "${transition.transitionId}" is missing required ${factType} state`);
       }
+    }
+    if (!factTypes.has('learningTarget.selected') && !factTypes.has('diagnostic.misconceptionSelected')) {
+      throw new Error(`SPARC dialogue replay state for transition "${transition.transitionId}" is missing required selected instructional target state`);
     }
   }
 }

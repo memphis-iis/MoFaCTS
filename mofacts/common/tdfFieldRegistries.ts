@@ -113,9 +113,9 @@ export const SETSPEC_FIELD_REGISTRY: SectionFieldRegistry = {
     brief: 'Alternate OpenRouter API key.',
     verbose: 'Provider-supplied OpenRouter key available to AutoTutor lessons when the current user has no saved profile OpenRouter key. User profile keys take precedence over this TDF key.'
   }),
-  openRouterModel: simpleField(stringField('openai/gpt-4.1-mini', 12), {
-    brief: 'Default OpenRouter model.',
-    verbose: 'Default OpenRouter model identifier used by AutoTutor units unless a unit overrides it.'
+  openRouterModel: simpleField(stringField('', 12), {
+    brief: 'OpenRouter model.',
+    verbose: 'Explicit OpenRouter model identifier used by AutoTutor units unless a unit overrides it.'
   }),
   audioInputEnabled: simpleField(legacyBooleanField('false'), {
     brief: 'Enable speech recognition.',

@@ -11,9 +11,20 @@ export type SparcLearningTargetCandidate = {
   readonly eligible: boolean;
 };
 
+export type SparcMisconceptionCandidate = {
+  readonly id: string;
+  readonly confidence: number;
+  readonly eligible: boolean;
+};
+
+export type SparcSelectedTargetType = 'learningTarget' | 'misconception';
+
 export type SparcLearningTargetSelection = {
+  readonly selectedTargetType: SparcSelectedTargetType;
   readonly selectedClusterKC: string;
+  readonly selectedMisconceptionId?: string;
   readonly candidates: readonly SparcLearningTargetCandidate[];
+  readonly misconceptionCandidates: readonly SparcMisconceptionCandidate[];
   readonly facts: readonly SparcWorkingMemoryFact[];
 };
 
@@ -143,6 +154,14 @@ function findTargetSelectionPolicy(facts: readonly SparcWorkingMemoryFact[]): Re
   return policies[0]?.slots as Record<string, unknown> | undefined;
 }
 
+function findThresholds(facts: readonly SparcWorkingMemoryFact[]): Record<string, unknown> | undefined {
+  const thresholds = facts.filter((fact) => fact.factType === 'dialogue.thresholds');
+  if (thresholds.length > 1) {
+    throw new Error('SPARC target selection requires at most one dialogue.thresholds fact');
+  }
+  return thresholds[0]?.slots as Record<string, unknown> | undefined;
+}
+
 function relationshipStrength(
   relationships: Map<string, Map<string, number>>,
   sourceClusterKC: string,
@@ -207,6 +226,14 @@ function previousSelectedTarget(facts: readonly SparcWorkingMemoryFact[]): Sparc
   return selectedFacts.at(-1);
 }
 
+function previousSelectedMisconception(facts: readonly SparcWorkingMemoryFact[]): string | undefined {
+  return facts
+    .filter((fact) => fact.factType === 'diagnostic.misconceptionSelected')
+    .map((fact) => stringSlot(fact, 'id'))
+    .filter(Boolean)
+    .at(-1);
+}
+
 function selectedTargetFact(
   clusterKC: string,
   facts: readonly SparcWorkingMemoryFact[],
@@ -232,6 +259,59 @@ function selectedTargetFact(
   };
 }
 
+function misconceptionIds(facts: readonly SparcWorkingMemoryFact[]): readonly string[] {
+  return [...new Set(facts
+    .filter((fact) => fact.factType === 'diagnostic.misconceptionSource')
+    .map((fact) => stringSlot(fact, 'id'))
+    .filter(Boolean) as string[])];
+}
+
+function collectMisconceptionConfidenceById(facts: readonly SparcWorkingMemoryFact[]): Map<string, number> {
+  const confidenceById = new Map<string, number>();
+  for (const fact of facts) {
+    if (fact.factType !== 'diagnostic.misconceptionScore') {
+      continue;
+    }
+    const id = stringSlot(fact, 'id');
+    if (!id) {
+      throw new Error('SPARC diagnostic.misconceptionScore fact requires id');
+    }
+    confidenceById.set(id, numberSlot(fact, 'confidence', `SPARC diagnostic.misconceptionScore "${id}" confidence`));
+  }
+  return confidenceById;
+}
+
+function selectedMisconceptionFact(id: string): SparcWorkingMemoryFact {
+  return {
+    factType: 'diagnostic.misconceptionSelected',
+    slots: {
+      id,
+    },
+  };
+}
+
+function selectMisconceptionCandidate(
+  candidates: readonly SparcMisconceptionCandidate[],
+  previousId: string | undefined,
+): SparcMisconceptionCandidate | undefined {
+  const active = candidates.filter((candidate) => candidate.eligible);
+  if (active.length === 0) {
+    return undefined;
+  }
+  const previous = previousId
+    ? active.find((candidate) => candidate.id === previousId)
+    : undefined;
+  if (previous) {
+    return previous;
+  }
+  return active
+    .map((candidate, index) => ({ candidate, index }))
+    .sort((left, right) => (
+      right.candidate.confidence - left.candidate.confidence
+      || left.index - right.index
+    ))[0]?.candidate;
+}
+
 export function selectSparcLearningTargetFromFacts(
   facts: readonly SparcWorkingMemoryFact[],
   options: SparcLearningTargetSelectionOptions = {},
@@ -242,11 +322,13 @@ export function selectSparcLearningTargetFromFacts(
   const centralityByClusterKC = collectCentralityByClusterKC(facts);
   const relationships = collectRelationships(facts);
   const policy = findTargetSelectionPolicy(facts);
+  const thresholds = findThresholds(facts);
   const coverageThreshold = finiteOption(
-    options.coverageThreshold ?? policy?.coverageThreshold,
+    options.coverageThreshold ?? thresholds?.coverageThreshold ?? policy?.coverageThreshold,
     'SPARC target selection coverageThreshold',
     DEFAULT_COVERAGE_THRESHOLD,
   );
+  const repairThreshold = Math.max(0, Math.min(1, 1 - coverageThreshold));
   const weights = mergeWeights(policyWeights(options, policy));
   const anchorClusterKC = typeof options.anchorClusterKC === 'string' && options.anchorClusterKC.trim()
     ? options.anchorClusterKC.trim()
@@ -265,7 +347,10 @@ export function selectSparcLearningTargetFromFacts(
     }
     const coverage = coverageByClusterKC.get(clusterKC) ?? 0;
     const coherenceToAnchor = anchorClusterKC ? relationshipStrength(relationships, anchorClusterKC, clusterKC) : 0;
-    const frontierScore = anchorClusterKC ? (1 - coverage) * coherenceToAnchor : 0;
+    const coverageGap = coverageThreshold > 0
+      ? Math.max(0, coverageThreshold - coverage) / coverageThreshold
+      : 0;
+    const frontierScore = anchorClusterKC ? coverageGap * coherenceToAnchor : 0;
     const centralityScore = centralityByClusterKC.get(clusterKC) ?? 0;
     const priorityScore =
       weights.frontierWeight * frontierScore +
@@ -282,6 +367,19 @@ export function selectSparcLearningTargetFromFacts(
       eligible: clusterKC !== excludeClusterKC && coverage < coverageThreshold,
     };
   });
+  const confidenceById = collectMisconceptionConfidenceById(facts);
+  const misconceptionCandidates = misconceptionIds(facts).map((id) => {
+    const confidence = confidenceById.get(id) ?? 0;
+    return {
+      id,
+      confidence,
+      eligible: confidence >= repairThreshold,
+    };
+  });
+  const selectedMisconception = selectMisconceptionCandidate(
+    misconceptionCandidates,
+    previousSelectedMisconception(facts),
+  );
 
   const selected = candidates
     .filter((candidate) => candidate.eligible)
@@ -290,16 +388,28 @@ export function selectSparcLearningTargetFromFacts(
       || left.clusterKC.localeCompare(right.clusterKC)
     ))[0];
 
-  if (!selected) {
+  if (!selected && !selectedMisconception) {
     throw new Error('SPARC target selection could not select an uncovered required learning target');
   }
+  const selectedClusterKC = selected?.clusterKC
+    ?? [...candidates]
+      .sort((left, right) => (
+        right.coverage - left.coverage
+        || left.clusterKC.localeCompare(right.clusterKC)
+      ))[0]!.clusterKC;
+  const selectedTargetType = selectedMisconception ? 'misconception' : 'learningTarget';
 
   return {
-    selectedClusterKC: selected.clusterKC,
+    selectedTargetType,
+    selectedClusterKC,
+    ...(selectedMisconception ? { selectedMisconceptionId: selectedMisconception.id } : {}),
     candidates,
+    misconceptionCandidates,
     facts: [
       ...candidates.map(candidateToFact),
-      selectedTargetFact(selected.clusterKC, facts),
+      selectedTargetType === 'misconception'
+        ? selectedMisconceptionFact(selectedMisconception!.id)
+        : selectedTargetFact(selected!.clusterKC, facts),
     ],
   };
 }

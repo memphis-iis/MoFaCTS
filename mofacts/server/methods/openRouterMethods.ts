@@ -89,9 +89,55 @@ async function resolveOpenRouterModel(deps: ApiKeyResolutionDeps, params: {
   return '';
 }
 
-function redactProviderError(error: unknown): Error {
-  const message = error instanceof Error ? error.message : String(error);
-  return new Error(redactOpenRouterSecretText(message));
+function sanitizeProviderText(value: unknown): string {
+  return redactOpenRouterSecretText(String(value || '').trim());
+}
+
+function summarizeProviderError(error: unknown): UnknownRecord {
+  const summary: UnknownRecord = {};
+  if (error instanceof Error) {
+    summary.name = sanitizeProviderText(error.name || 'Error');
+    summary.message = sanitizeProviderText(error.message);
+    const cause = (error as Error & { cause?: unknown }).cause;
+    if (cause instanceof Error) {
+      summary.causeName = sanitizeProviderText(cause.name || 'Error');
+      summary.causeMessage = sanitizeProviderText(cause.message);
+      if (isRecord(cause) && typeof cause.code === 'string') {
+        summary.causeCode = sanitizeProviderText(cause.code);
+      }
+    } else if (cause !== undefined) {
+      summary.cause = sanitizeProviderText(cause);
+    }
+  } else {
+    summary.message = sanitizeProviderText(error);
+  }
+  return summary;
+}
+
+function providerReason(summary: UnknownRecord) {
+  const message = normalizeString(summary.message);
+  if (!message) {
+    return 'OpenRouter request failed';
+  }
+  if (message === 'fetch failed') {
+    const causeMessage = normalizeString(summary.causeMessage);
+    const causeCode = normalizeString(summary.causeCode);
+    if (causeMessage || causeCode) {
+      return `OpenRouter network request failed${causeCode ? ` (${causeCode})` : ''}${causeMessage ? `: ${causeMessage}` : ''}`;
+    }
+    return 'OpenRouter network request failed before receiving a response';
+  }
+  return message;
+}
+
+function redactProviderError(deps: OpenRouterMethodsDeps, operation: string, error: unknown): Meteor.Error {
+  const summary = summarizeProviderError(error);
+  const reason = providerReason(summary);
+  deps.serverConsole('[OpenRouter] request failed', {
+    operation,
+    ...summary,
+  });
+  return new Meteor.Error('openrouter-request-failed', reason);
 }
 
 export function createOpenRouterMethods(deps: OpenRouterMethodsDeps) {
@@ -183,7 +229,7 @@ export function createOpenRouterMethods(deps: OpenRouterMethodsDeps) {
           model,
         };
       } catch (error) {
-        throw redactProviderError(error);
+        throw redactProviderError(deps, 'json', error);
       }
     },
 
@@ -223,7 +269,7 @@ export function createOpenRouterMethods(deps: OpenRouterMethodsDeps) {
           model,
         };
       } catch (error) {
-        throw redactProviderError(error);
+        throw redactProviderError(deps, 'embeddings', error);
       }
     },
   };

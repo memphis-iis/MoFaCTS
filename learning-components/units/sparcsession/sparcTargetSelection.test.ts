@@ -21,6 +21,25 @@ function score(clusterKC: string, coverage: number): SparcWorkingMemoryFact {
   };
 }
 
+function misconceptionSource(id: string): SparcWorkingMemoryFact {
+  return {
+    factType: 'diagnostic.misconceptionSource',
+    slots: {
+      id,
+    },
+  };
+}
+
+function misconceptionScore(id: string, confidence: number): SparcWorkingMemoryFact {
+  return {
+    factType: 'diagnostic.misconceptionScore',
+    slots: {
+      id,
+      confidence,
+    },
+  };
+}
+
 function node(clusterKC: string, centrality: number): SparcWorkingMemoryFact {
   return {
     factType: 'kcGraph.node',
@@ -79,15 +98,15 @@ describe('selectSparcLearningTargetFromFacts', function() {
     const candidate = result.candidates.find((entry) => entry.clusterKC === 'kc-b');
     assert.ok(candidate);
     assert.equal(candidate.coherenceToAnchor, 0.9);
-    assert.equal(candidate.frontierScore, 0.81);
+    assert.equal(candidate.frontierScore, 0.7875);
     assert.equal(candidate.centralityScore, 0.8);
-    assert.equal(candidate.priorityScore, 0.835);
+    assert.equal(candidate.priorityScore, 0.82375);
     assert.equal(candidate.eligible, true);
     const anchorCandidate = result.candidates.find((entry) => entry.clusterKC === 'kc-a');
     assert.ok(anchorCandidate);
     assert.equal(anchorCandidate.coherenceToAnchor, 1);
-    assert.equal(anchorCandidate.frontierScore, 0.8);
-    assert.equal(anchorCandidate.priorityScore, 0.72);
+    assert.equal(anchorCandidate.frontierScore, 0.75);
+    assert.equal(anchorCandidate.priorityScore, 0.695);
   });
 
   it('emits candidate facts for counterfactual/replay inspection', function() {
@@ -98,7 +117,7 @@ describe('selectSparcLearningTargetFromFacts', function() {
     const candidateFacts = result.facts.filter((fact) => fact.factType === 'learningTarget.candidate');
     assert.equal(candidateFacts.length, 3);
     assert.deepEqual(candidateFacts.map((fact) => fact.slots?.clusterKC), ['kc-a', 'kc-b', 'kc-c']);
-    assert.equal(candidateFacts.find((fact) => fact.slots?.clusterKC === 'kc-b')?.slots?.priorityScore, 0.835);
+    assert.equal(candidateFacts.find((fact) => fact.slots?.clusterKC === 'kc-b')?.slots?.priorityScore, 0.82375);
   });
 
   it('fails clearly when required graph facts are missing', function() {
@@ -200,5 +219,64 @@ describe('selectSparcLearningTargetFromFacts', function() {
 
     assert.equal(result.selectedClusterKC, 'kc-b');
     assert.equal(result.candidates.find((candidate) => candidate.clusterKC === 'kc-b')?.priorityScore, 0.8);
+  });
+
+  it('selects the strongest repair-active misconception before expectation candidates', function() {
+    const result = selectSparcLearningTargetFromFacts([
+      ...baseFacts(),
+      misconceptionSource('m-low'),
+      misconceptionSource('m-high'),
+      misconceptionScore('m-low', 0.4),
+      misconceptionScore('m-high', 0.75),
+    ], {
+      anchorClusterKC: 'kc-a',
+    });
+
+    assert.equal(result.selectedTargetType, 'misconception');
+    assert.equal(result.selectedMisconceptionId, 'm-high');
+    assert.deepEqual(result.facts.at(-1), {
+      factType: 'diagnostic.misconceptionSelected',
+      slots: {
+        id: 'm-high',
+      },
+    });
+  });
+
+  it('keeps a repair-active selected misconception focused until confidence drops below threshold', function() {
+    const result = selectSparcLearningTargetFromFacts([
+      ...baseFacts(),
+      misconceptionSource('m-prior'),
+      misconceptionSource('m-stronger'),
+      misconceptionScore('m-prior', 0.3),
+      misconceptionScore('m-stronger', 0.9),
+      {
+        factType: 'diagnostic.misconceptionSelected',
+        slots: {
+          id: 'm-prior',
+        },
+      },
+    ], {
+      anchorClusterKC: 'kc-a',
+    });
+
+    assert.equal(result.selectedTargetType, 'misconception');
+    assert.equal(result.selectedMisconceptionId, 'm-prior');
+
+    const repaired = selectSparcLearningTargetFromFacts([
+      ...baseFacts(),
+      misconceptionSource('m-prior'),
+      misconceptionScore('m-prior', 0.19),
+      {
+        factType: 'diagnostic.misconceptionSelected',
+        slots: {
+          id: 'm-prior',
+        },
+      },
+    ], {
+      anchorClusterKC: 'kc-a',
+    });
+
+    assert.equal(repaired.selectedTargetType, 'learningTarget');
+    assert.equal(repaired.selectedMisconceptionId, undefined);
   });
 });

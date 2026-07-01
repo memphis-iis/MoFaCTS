@@ -421,9 +421,9 @@ describe('sparcProductionRuleEvaluator', function() {
             type: { type: 'literal', value: 'question' },
           },
         }, {
-          factType: 'learnerResponse.answerQuality',
+          factType: 'dialogue.testLowAgency',
           slots: {
-            value: { type: 'literal', value: 'low-agency' },
+            value: { type: 'literal', value: true },
           },
         }],
       }],
@@ -461,9 +461,9 @@ describe('sparcProductionRuleEvaluator', function() {
             type: { type: 'literal', value: 'question' },
           },
         }, {
-          factType: 'learnerResponse.answerQuality',
+          factType: 'dialogue.testLowAgency',
           slots: {
-            value: { type: 'literal', value: 'low-agency' },
+            value: { type: 'literal', value: true },
           },
         }],
       }],
@@ -594,9 +594,9 @@ describe('sparcProductionRuleEvaluator', function() {
       when: [{
         type: 'any',
         conditions: [{
-          factType: 'learnerResponse.answerQuality',
+          factType: 'dialogue.testHighQuality',
           slots: {
-            value: { type: 'literal', value: 'high' },
+            value: { type: 'literal', value: true },
           },
         }, {
           type: 'not',
@@ -615,7 +615,7 @@ describe('sparcProductionRuleEvaluator', function() {
     assert.doesNotThrow(() => compileSparcProductionRulePlan([safeNestedRule]));
     assert.equal(
       evaluateSparcProductionRules({
-        facts: [{ factType: 'learnerResponse.answerQuality', slots: { value: 'low' } }],
+        facts: [{ factType: 'dialogue.testHighQuality', slots: { value: true } }],
         rules: [safeNestedRule],
       }).length,
       1,

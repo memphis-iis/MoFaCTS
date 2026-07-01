@@ -31,6 +31,10 @@ The application source tree lives under `mofacts/`.
 
 ## Operational Rules
 
+### Collaboration And Question Handling
+
+- When the user asks a question, answer the question directly and do not infer permission to edit files, run commands, test, commit, or push. If a change seems needed, recommend it separately and wait for explicit approval before acting.
+
 ### Change Discipline
 
 - Silent fallbacks are not allowed; fail clearly when invariants break.

@@ -88,14 +88,11 @@ const SPARC_DIALOGUE_SCORE_JSON_SCHEMA: OpenRouterJsonSchema = {
         properties: {
           id: { type: 'string' },
           confidence: { type: 'number' },
-          current: { type: 'boolean' },
-          repaired: { type: 'boolean' },
           evidence: { type: 'string' },
         },
         required: ['id', 'confidence'],
       },
     },
-    answerQuality: { type: 'string', enum: ['low', 'partial', 'high'] },
     learnerContribution: {
       type: 'object',
       additionalProperties: false,
@@ -115,7 +112,7 @@ const SPARC_DIALOGUE_SCORE_JSON_SCHEMA: OpenRouterJsonSchema = {
       required: ['answerableFromAuthoredContent'],
     },
   },
-  required: ['learningTargetScores', 'answerQuality', 'learnerContribution'],
+  required: ['learningTargetScores', 'learnerContribution'],
 };
 
 const SPARC_DIALOGUE_UTTERANCE_JSON_SCHEMA: OpenRouterJsonSchema = {
@@ -127,7 +124,7 @@ const SPARC_DIALOGUE_UTTERANCE_JSON_SCHEMA: OpenRouterJsonSchema = {
     selectedMove: { type: 'string' },
     tutorMessage: { type: 'string' },
   },
-  required: ['targetType', 'selectedMove', 'tutorMessage'],
+  required: ['targetType', 'targetId', 'selectedMove', 'tutorMessage'],
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -190,24 +187,39 @@ function targetSummaries(display: SparcTrialDisplay): readonly Record<string, un
 }
 
 function misconceptionSummaries(display: SparcTrialDisplay): readonly Record<string, unknown>[] {
-  const ids = new Map<string, Set<string>>();
+  const summaries = new Map<string, Record<string, unknown> & { authoredContent: string[] }>();
   for (const fact of displayFacts(display)) {
-    if (fact.factType !== 'dialogue.moveContent' || factSlot(fact, 'targetType') !== 'misconception') {
-      continue;
+    if (fact.factType === 'diagnostic.misconceptionSource') {
+      const id = nonBlankString(factSlot(fact, 'id'));
+      if (!id) {
+        continue;
+      }
+      const existing = summaries.get(id) ?? { id, authoredContent: [] };
+      summaries.set(id, {
+        ...existing,
+        id,
+        label: nonBlankString(factSlot(fact, 'label')) || existing.label,
+        description: nonBlankString(factSlot(fact, 'description')) || existing.description,
+        repair: nonBlankString(factSlot(fact, 'repair')) || existing.repair,
+        repairQuestion: nonBlankString(factSlot(fact, 'repairQuestion')) || existing.repairQuestion,
+        repairCriteria: nonBlankString(factSlot(fact, 'repairCriteria')) || existing.repairCriteria,
+        authoredContent: existing.authoredContent,
+      });
     }
-    const id = nonBlankString(factSlot(fact, 'id'));
-    const text = nonBlankString(factSlot(fact, 'text'));
-    if (!id || !text) {
-      continue;
+    if (fact.factType === 'dialogue.moveContent' && factSlot(fact, 'targetType') === 'misconception') {
+      const id = nonBlankString(factSlot(fact, 'id'));
+      const text = nonBlankString(factSlot(fact, 'text'));
+      if (!id || !text) {
+        continue;
+      }
+      const existing = summaries.get(id) ?? { id, authoredContent: [] };
+      if (!existing.authoredContent.includes(text)) {
+        existing.authoredContent.push(text);
+      }
+      summaries.set(id, existing);
     }
-    const texts = ids.get(id) ?? new Set<string>();
-    texts.add(text);
-    ids.set(id, texts);
   }
-  return Array.from(ids.entries()).map(([id, texts]) => ({
-    id,
-    authoredContent: Array.from(texts),
-  }));
+  return Array.from(summaries.values());
 }
 
 async function scoreCurrentTurnBagMatches(params: {
@@ -281,15 +293,9 @@ function parseScoreEnvelope(value: unknown): SparcLearnerResponseScoringResult {
     .map((entry) => ({
       id: nonBlankString(entry.id),
       confidence: unitScore(entry.confidence, `SPARC dialogue misconception confidence for "${String(entry.id)}"`),
-      current: entry.current === true,
-      repaired: entry.repaired === true,
       ...(nonBlankString(entry.evidence) ? { evidence: nonBlankString(entry.evidence) } : {}),
     }))
     .filter((entry) => entry.id);
-  const answerQuality = nonBlankString(value.answerQuality);
-  if (answerQuality !== 'low' && answerQuality !== 'partial' && answerQuality !== 'high') {
-    throw new Error('SPARC dialogue scoring answerQuality must be low, partial, or high');
-  }
   const contribution = isRecord(value.learnerContribution) ? value.learnerContribution : {};
   const contributionType = nonBlankString(contribution.type);
   if (!['assertion', 'question', 'off-task', 'other'].includes(contributionType)) {
@@ -304,7 +310,6 @@ function parseScoreEnvelope(value: unknown): SparcLearnerResponseScoringResult {
   return {
     learningTargetScores,
     ...(diagnosticMisconceptionScores.length > 0 ? { diagnosticMisconceptionScores } : {}),
-    answerQuality,
     learnerContribution: {
       type: contributionType as 'assertion' | 'question' | 'off-task' | 'other',
       ...(contribution.confidence !== undefined ? { confidence: unitScore(contribution.confidence, 'SPARC dialogue learner contribution confidence') } : {}),
@@ -363,7 +368,7 @@ function buildSparcUtteranceSystemPrompt(request: SparcUtteranceRequest): string
     'Use the selected move policy to decide whether the tutorMessage should ask a follow-up question. Do not add a generic follow-up when the selected policy does not call for one.',
     'When the learner has made progress on or covered a prior expectation, briefly acknowledge that progress only when it supports the selected move policy.',
     'Use learnerContribution metadata to shape tone without changing the selected plan. For idk or help_request, be supportive and give the selected hint, prompt, or assertion. For uncertainty, validate the tentative attempt briefly before continuing. For affect, briefly acknowledge the feeling without analyzing it, then continue the selected instructional move. For meta, answer the procedural concern briefly if possible, then resume the selected instructional move. For off_task, redirect briefly into the selected move without scolding.',
-    'The user prompt includes transition metadata. When targetChanged is true, begin tutorMessage with a brief acknowledgement of the learner contribution or repaired understanding that allowed the transition, then name the new focus before asking the next hint, prompt, pump, or correction.',
+    'The user prompt includes transition metadata. When targetChanged is true, begin tutorMessage with a brief acknowledgement of the learner contribution or improved understanding that allowed the transition, then name the new focus before asking the next hint, prompt, pump, or correction.',
     'Use the full dialogue history to avoid repeating failed attempts. When a hint, prompt, assertion, or correction has not helped the learner make progress, take a new pathway or perspective toward the unspoken expectation or unresolved misconception.',
     'If the latest learner answer is abusive, profane, hostile, playful, or otherwise off-task, do not scold or analyze the behavior. Re-prompt from a new angle for the app-selected target and move.',
     'Correction moves include an app-selected correctionStage. Treat the authored repairQuestion as the repair goal, not as a required verbatim line.',
@@ -426,7 +431,7 @@ function buildSparcUtteranceUserPrompt(request: SparcUtteranceRequest): string {
     'Correction-stage guidance:',
     correctionStageGuidance(request),
     '',
-    'Transition metadata. If targetChanged is true, begin tutorMessage with a brief acknowledgement of the learner contribution or repaired understanding that allowed the transition, then name the new focus before asking the selected move:',
+    'Transition metadata. If targetChanged is true, begin tutorMessage with a brief acknowledgement of the learner contribution or improved understanding that allowed the transition, then name the new focus before asking the selected move:',
     JSON.stringify(request.transitionMetadata ?? null, null, 2),
     '',
     'Tutor-message boundary: do not expose IDs or internal labels from the app-selected plan, transition metadata, scored planner state, or authored script. Talk about the underlying lesson idea in ordinary English.',
@@ -488,12 +493,17 @@ export function createSparcDialogueOpenRouterProvider(
           messages: [{
             role: 'system',
             content: [
-              'You score learner dialogue responses for a SPARC tutoring session.',
+              'You score a learner answer against authored expectations and misconceptions.',
               'Return only JSON matching the schema.',
-              'Use the provided clusterKC identifiers exactly.',
-              'Coverage is 0 to 1 for how well the learner addressed each target in this turn.',
-              'Use learnerContribution.type "assertion" for ordinary learner answers or explanations.',
-              'Include learnerQuestion only when learnerContribution.type is question.',
+              'For every object in learningTargets, write one object in learningTargetScores, copying learningTargets[i].clusterKC exactly to learningTargetScores[i].clusterKC.',
+              'For every object in misconceptions, write one object in diagnosticMisconceptionScores, copying misconceptions[i].id exactly to diagnosticMisconceptionScores[i].id.',
+              'Compare meanings, not keyword overlap, and score 1 for identical meaning and 0 for no meaning match.',
+              'Intermediate match should range between 0 and 1.',
+              'For learning targets, compare the learner’s claim to learningTargets[i].assertion and learningTargets[i].proposition, and put the similarity score in coverage.',
+              'For misconceptions, compare the learner’s claim to misconceptions[i].description, and put the similarity score in confidence.',
+              'Use low or zero scores when the learner uses similar words but states a different relation, wrong object, wrong condition, or wrong procedure.',
+              'Set learnerContribution.type to "assertion" for ordinary answers or explanations, "question" for learner questions, "off-task" for unrelated responses, and "other" only when none of those fit.',
+              'Include learnerQuestion only for learnerContribution.type "question"; set learnerQuestion.answerableFromAuthoredContent true only if the question can be answered from the provided learning targets or misconceptions.',
             ].join(' '),
           }, {
             role: 'user',

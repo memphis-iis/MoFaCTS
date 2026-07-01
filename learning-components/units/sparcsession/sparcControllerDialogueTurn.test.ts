@@ -133,7 +133,6 @@ describe('evaluateSparcControllerDialogueTurn', function() {
           clusterKC: 'kc-b',
           coverage: 0.6,
         }],
-        answerQuality: 'partial',
       },
       targetSelectionOptions: {
         anchorClusterKC: 'kc-a',
@@ -185,7 +184,6 @@ describe('evaluateSparcControllerDialogueTurn', function() {
           clusterKC: 'kc-b',
           coverage: 0.6,
         }],
-        answerQuality: 'partial',
       },
       targetSelectionOptions: {
         anchorClusterKC: 'kc-a',
@@ -227,10 +225,6 @@ describe('evaluateSparcControllerDialogueTurn', function() {
       entry.factType === 'session.turnState'
       && entry.slots?.turnCount === 2
     )));
-    assert.ok(facts.some((entry) => (
-      entry.factType === 'learnerResponse.answerQuality'
-      && entry.slots?.value === 'partial'
-    )));
     assert.equal(facts.some((entry) => entry.factType === 'controller.moveSelectionAudit'), false);
   });
 
@@ -265,7 +259,6 @@ describe('evaluateSparcControllerDialogueTurn', function() {
           clusterKC: 'kc-b',
           coverage: 0.6,
         }],
-        answerQuality: 'partial',
       },
       targetSelectionOptions: {
         anchorClusterKC: 'kc-a',
@@ -291,7 +284,6 @@ describe('evaluateSparcControllerDialogueTurn', function() {
           clusterKC: 'kc-b',
           coverage: 0.7,
         }],
-        answerQuality: 'partial',
       },
       targetSelectionOptions: {
         anchorClusterKC: 'kc-b',

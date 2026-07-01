@@ -18,8 +18,6 @@ export type SparcLearningTargetScoreInput = {
 export type SparcDiagnosticMisconceptionScoreInput = {
   readonly id: string;
   readonly confidence: number;
-  readonly current?: boolean;
-  readonly repaired?: boolean;
   readonly evidence?: string;
 };
 
@@ -27,7 +25,6 @@ export type SparcLearnerResponseScoringResult = {
   readonly learningTargetScores?: readonly SparcLearningTargetScoreInput[];
   readonly diagnosticMisconceptionScores?: readonly SparcDiagnosticMisconceptionScoreInput[];
   readonly bagMatchScores?: readonly SparcBagMatchScore[];
-  readonly answerQuality?: 'low' | 'partial' | 'high';
   readonly learnerContribution?: {
     readonly type: 'assertion' | 'question' | 'off-task' | 'other';
     readonly confidence?: number;
@@ -112,8 +109,6 @@ function misconceptionScoreFact(input: SparcDiagnosticMisconceptionScoreInput): 
     slots: {
       id,
       confidence: requireUnitScore(input.confidence, `SPARC diagnostic misconception score "${id}" confidence`),
-      current: input.current === true,
-      repaired: input.repaired === true,
       ...(input.evidence ? { evidence: input.evidence } : {}),
     },
   };
@@ -157,14 +152,6 @@ export function createSparcLearnerResponseScoreFacts(params: {
   }
   for (const input of params.score.bagMatchScores ?? []) {
     scoredFacts.push(bagMatchScoreFact(input));
-  }
-  if (params.score.answerQuality) {
-    scoredFacts.push({
-      factType: 'learnerResponse.answerQuality',
-      slots: {
-        value: params.score.answerQuality,
-      },
-    });
   }
   if (params.score.learnerContribution) {
     scoredFacts.push({

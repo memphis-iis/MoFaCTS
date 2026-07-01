@@ -85,7 +85,7 @@ export async function commitSparcTargetSelection(params: {
     transition: evaluated.transition,
     action: 'sparc-target-selection',
     outcome: 'selected',
-    responseValue: evaluated.selection.selectedClusterKC,
+    responseValue: evaluated.selection.selectedMisconceptionId ?? evaluated.selection.selectedClusterKC,
   });
   if (params.runtime.history) {
     await params.runtime.history.writeCanonicalHistory(historyRecord);

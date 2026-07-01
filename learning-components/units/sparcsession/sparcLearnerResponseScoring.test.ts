@@ -63,7 +63,6 @@ describe('sparcLearnerResponseScoring', function() {
         diagnosticMisconceptionScores: [{
           id: 'm1',
           confidence: 0.7,
-          current: true,
         }],
         bagMatchScores: [{
           kind: 'goodAnswer',
@@ -80,7 +79,6 @@ describe('sparcLearnerResponseScoring', function() {
           model: 'test-embedding-model',
           metric: 'cosine_similarity_normalized_vectors',
         }],
-        answerQuality: 'partial',
         learnerContribution: {
           type: 'assertion',
           confidence: 0.8,
@@ -104,9 +102,7 @@ describe('sparcLearnerResponseScoring', function() {
       entry.factType === 'diagnostic.misconceptionScore'
       && entry.slots?.id === 'm1'
       && entry.slots.confidence === 0.7
-      && entry.slots.current === true
     )));
-    assert.ok(facts.some((entry) => entry.factType === 'learnerResponse.answerQuality'));
     assert.ok(facts.some((entry) => entry.factType === 'learnerResponse.contribution'));
     assert.ok(facts.some((entry) => (
       entry.factType === 'selector.goodAnswerMatch'
@@ -126,7 +122,6 @@ describe('sparcLearnerResponseScoring', function() {
     const facts = createSparcLearnerResponseScoreFacts({
       facts: document.workingMemoryFacts ?? [],
       score: {
-        answerQuality: 'low',
         learnerContribution: {
           type: 'question',
           confidence: 0.9,
@@ -148,7 +143,6 @@ describe('sparcLearnerResponseScoring', function() {
       () => createSparcLearnerResponseScoreFacts({
         facts: document.workingMemoryFacts ?? [],
         score: {
-          answerQuality: 'low',
           learnerContribution: {
             type: 'question',
           },
@@ -168,7 +162,6 @@ describe('sparcLearnerResponseScoring', function() {
           clusterKC: 'kc-b',
           coverage: 0.6,
         }],
-        answerQuality: 'high',
       },
     });
     const replayState = applySparcStateTransition(createEmptySparcReplayState(), transition);
@@ -181,10 +174,6 @@ describe('sparcLearnerResponseScoring', function() {
       entry.factType === 'learningTarget.score'
       && entry.slots?.clusterKC === 'kc-b'
       && entry.slots.coverage === 0.6
-    )));
-    assert.ok(facts.some((entry) => (
-      entry.factType === 'learnerResponse.answerQuality'
-      && entry.slots?.value === 'high'
     )));
   });
 

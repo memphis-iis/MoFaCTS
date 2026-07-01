@@ -153,6 +153,97 @@ function completedDocument(): SparcAuthoredDocument {
   };
 }
 
+function misconceptionDocument(): SparcAuthoredDocument {
+  return {
+    id: 'sparc-doc',
+    schemaVersion: 1,
+    workingMemoryFacts: [
+      fact('controller.targetSelectionPolicy', {
+        policy: 'kc-graph-priority',
+        coverageThreshold: 0.8,
+      }),
+      fact('learningTarget.source', { clusterKC: 'kc-a' }),
+      fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.4 }),
+      fact('kcGraph.node', { clusterKC: 'kc-a', centrality: 0.5, description: 'A' }),
+      fact('diagnostic.misconceptionSource', { id: 'm-strong' }),
+      fact('diagnostic.misconceptionScore', { id: 'm-strong', confidence: 0.7 }),
+      fact('dialogue.learnerWordCount', { cumulative: 5 }),
+      fact('session.turnState', { turnCount: 1 }),
+    ],
+    productionRules: [{
+      id: 'dialogue.move.test-repair',
+      module: 'dialogue.move-selection',
+      salience: 80,
+      when: [{
+        factType: 'diagnostic.misconceptionSelected',
+        slots: {
+          id: { type: 'bind', variable: 'misconceptionId' },
+        },
+      }, {
+        factType: 'diagnostic.misconceptionScore',
+        slots: {
+          id: { type: 'bound', variable: 'misconceptionId' },
+          confidence: { type: 'range', min: 0.2, max: 1, maxInclusive: true },
+        },
+      }],
+      then: [{
+        type: 'assert-fact',
+        persist: true,
+        fact: {
+          factType: 'controller.selectedAction',
+          slots: {
+            targetType: literal('misconception'),
+            id: variable('misconceptionId'),
+            action: literal('negative_feedback'),
+          },
+        },
+      }, {
+        type: 'terminate-production-phase',
+        reason: 'move-selected',
+      }],
+    }, {
+      id: 'dialogue.move.paper-rule-09-elaborate',
+      module: 'dialogue.move-selection',
+      salience: 70,
+      when: [{
+        factType: 'learningTarget.selected',
+        slots: {
+          clusterKC: { type: 'bind', variable: 'targetClusterKC' },
+        },
+      }, {
+        factType: 'selector.currentExpectationCoverage',
+        slots: {
+          clusterKC: { type: 'bound', variable: 'targetClusterKC' },
+          band: literal('MEDIUM'),
+        },
+      }],
+      then: [{
+        type: 'assert-fact',
+        persist: true,
+        fact: {
+          factType: 'controller.selectedAction',
+          slots: {
+            targetType: literal('learningTarget'),
+            clusterKC: variable('targetClusterKC'),
+            action: literal('elaborate'),
+          },
+        },
+      }, {
+        type: 'terminate-production-phase',
+        reason: 'move-selected',
+      }],
+    }],
+    root: {
+      id: 'root',
+      kind: 'document',
+      children: [{
+        id: 'learner-input',
+        kind: 'input',
+      }],
+    },
+  };
+}
+
 const event: SparcInterfaceEvent = {
   eventId: 'event-plan-turn',
   type: 'response-submitted',
@@ -229,6 +320,27 @@ describe('evaluateSparcControllerTurnPlanning', function() {
       entry.factType === 'controller.selectedAction'
       && entry.slots?.clusterKC === 'kc-a'
       && entry.slots?.action === 'summary'
+    )));
+  });
+
+  it('selects misconception repair before paper-rule-09 elaborate when a misconception is active', function() {
+    const result = evaluateSparcControllerTurnPlanning({
+      document: misconceptionDocument(),
+      event,
+    });
+
+    assert.equal(result.targetSelection.selectedTargetType, 'misconception');
+    assert.equal(result.targetSelection.selectedMisconceptionId, 'm-strong');
+    assert.ok(result.targetSelection.facts.some((entry) => (
+      entry.factType === 'diagnostic.misconceptionSelected'
+      && entry.slots?.id === 'm-strong'
+    )));
+    assert.equal(result.productionRuleEvaluation.execution.firings[0]?.ruleId, 'dialogue.move.test-repair');
+    assert.ok(result.productionRuleEvaluation.execution.facts.some((entry) => (
+      entry.factType === 'controller.selectedAction'
+      && entry.slots?.targetType === 'misconception'
+      && entry.slots?.id === 'm-strong'
+      && entry.slots?.action === 'negative_feedback'
     )));
   });
 });

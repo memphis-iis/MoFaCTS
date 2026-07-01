@@ -2,7 +2,6 @@ import type { SparcTrialDisplay } from '../../../../../../learning-components/tr
 
 export const SPARC_DIALOGUE_PROGRESS_FACTS_VALUE_KEY = '__sparcDialogueProgressFacts';
 const DEFAULT_COVERAGE_THRESHOLD = 0.8;
-const DEFAULT_MISCONCEPTION_THRESHOLD = 0.65;
 
 type SparcFact = {
   readonly factType?: unknown;
@@ -21,7 +20,6 @@ export type SparcAutoTutorProgressMisconception = {
   readonly label: string;
   readonly confidence: number;
   readonly active: boolean;
-  readonly repaired: boolean;
 };
 
 export type SparcAutoTutorProgressSnapshot = {
@@ -55,10 +53,6 @@ function numberSlot(fact: SparcFact, slotName: string, fallback: number): number
 function unitSlot(fact: SparcFact, slotName: string): number {
   const value = numberSlot(fact, slotName, 0);
   return Math.max(0, Math.min(1, value));
-}
-
-function booleanSlot(fact: SparcFact, slotName: string): boolean {
-  return fact.slots?.[slotName] === true;
 }
 
 function displayFacts(display: SparcTrialDisplay | null | undefined): SparcFact[] {
@@ -104,7 +98,7 @@ function progressPolicy(facts: readonly SparcFact[], targetCount: number): {
   const graduation = factsByType(facts, 'dialogue.graduation').at(-1);
   const policy = factsByType(facts, 'controller.targetSelectionPolicy').at(-1);
   const coverageThreshold = numberSlot(thresholds ?? policy ?? {}, 'coverageThreshold', DEFAULT_COVERAGE_THRESHOLD);
-  const misconceptionThreshold = numberSlot(thresholds ?? {}, 'misconceptionThreshold', DEFAULT_MISCONCEPTION_THRESHOLD);
+  const boundedCoverageThreshold = Math.max(0, Math.min(1, coverageThreshold));
   const requiredTargetCount = Math.max(0, Math.min(
     targetCount,
     Math.ceil(numberSlot(graduation ?? {}, 'requiredTargetCount', targetCount)),
@@ -113,8 +107,8 @@ function progressPolicy(facts: readonly SparcFact[], targetCount: number): {
     numberSlot(graduation ?? {}, 'maxActiveMisconceptions', 0),
   ));
   return {
-    coverageThreshold: Math.max(0, Math.min(1, coverageThreshold)),
-    misconceptionThreshold: Math.max(0, Math.min(1, misconceptionThreshold)),
+    coverageThreshold: boundedCoverageThreshold,
+    misconceptionThreshold: Math.max(0, Math.min(1, 1 - boundedCoverageThreshold)),
     requiredTargetCount,
     maxActiveMisconceptions,
   };
@@ -154,8 +148,7 @@ export function buildSparcAutoTutorProgressSnapshot(params: {
       id,
       label: stringSlot(fact, 'label') || stringSlot(fact, 'description') || `Misconception ${index + 1}`,
       confidence,
-      active: score ? booleanSlot(score, 'current') && confidence >= policy.misconceptionThreshold : false,
-      repaired: score ? booleanSlot(score, 'repaired') : false,
+      active: confidence >= policy.misconceptionThreshold,
     };
   });
   const completionState = factsByType(currentFacts, 'controller.completionState').at(-1);

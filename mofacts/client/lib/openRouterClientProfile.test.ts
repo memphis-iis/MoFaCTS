@@ -38,7 +38,7 @@ describe('openRouterClientProfile', function() {
     });
     expect(await testOpenRouterClientConfig('key', '')).to.deep.equal({
       success: false,
-      message: 'Default OpenRouter model is required',
+      message: 'OpenRouter model is required',
     });
     expect(fetchStub.called).to.equal(false);
   });

@@ -40,6 +40,21 @@ function numericSlot(fact: SparcWorkingMemoryFact, slotName: string): number {
   return Number.isFinite(value) ? value : 0;
 }
 
+function optionalNumericSlot(fact: SparcWorkingMemoryFact | undefined, slotName: string): number | undefined {
+  if (!fact) {
+    return undefined;
+  }
+  const rawValue = fact.slots?.[slotName];
+  if (rawValue === undefined || rawValue === null || rawValue === '') {
+    return undefined;
+  }
+  const value = Number(rawValue);
+  if (!Number.isFinite(value)) {
+    throw new Error(`SPARC fact "${fact.factType}" slot "${slotName}" must be a finite number`);
+  }
+  return value;
+}
+
 function nonNegativeIntegerSlot(fact: SparcWorkingMemoryFact, slotName: string, fallback: number): number {
   const value = Number(fact.slots?.[slotName]);
   if (!Number.isFinite(value) || value < 0) {
@@ -50,6 +65,34 @@ function nonNegativeIntegerSlot(fact: SparcWorkingMemoryFact, slotName: string, 
 
 function completionState(facts: readonly SparcWorkingMemoryFact[]): SparcWorkingMemoryFact | undefined {
   return facts.find((fact) => fact.factType === 'controller.completionState');
+}
+
+function coverageThreshold(facts: readonly SparcWorkingMemoryFact[]): number {
+  return optionalNumericSlot(facts.find((fact) => fact.factType === 'dialogue.thresholds'), 'coverageThreshold')
+    ?? optionalNumericSlot(facts.find((fact) => fact.factType === 'controller.targetSelectionPolicy'), 'coverageThreshold')
+    ?? 0.8;
+}
+
+function hasRepairActiveMisconception(facts: readonly SparcWorkingMemoryFact[]): boolean {
+  const repairThreshold = Math.max(0, Math.min(1, 1 - coverageThreshold(facts)));
+  const authoredIds = new Set(facts
+    .filter((fact) => fact.factType === 'diagnostic.misconceptionSource')
+    .map((fact) => stringSlot(fact, 'id'))
+    .filter(Boolean) as string[]);
+  if (authoredIds.size === 0) {
+    return false;
+  }
+  const latestConfidence = new Map<string, number>();
+  for (const fact of facts) {
+    if (fact.factType !== 'diagnostic.misconceptionScore') {
+      continue;
+    }
+    const id = stringSlot(fact, 'id');
+    if (id && authoredIds.has(id)) {
+      latestConfidence.set(id, numericSlot(fact, 'confidence'));
+    }
+  }
+  return [...latestConfidence.values()].some((confidence) => confidence >= repairThreshold);
 }
 
 function currentTurnCount(facts: readonly SparcWorkingMemoryFact[]): number {
@@ -115,7 +158,9 @@ function selectCompletionSummaryTarget(facts: readonly SparcWorkingMemoryFact[])
     ));
   const selected = candidates[0]!;
   return {
+    selectedTargetType: 'learningTarget',
     selectedClusterKC: selected.clusterKC,
+    misconceptionCandidates: [],
     candidates,
     facts: [
       ...candidates.map((candidate) => ({
@@ -145,7 +190,7 @@ function selectControllerTarget(params: {
   readonly facts: readonly SparcWorkingMemoryFact[];
   readonly targetSelectionOptions?: SparcLearningTargetSelectionOptions;
 }): SparcLearningTargetSelection {
-  if (completionState(params.facts)?.slots?.completed === true) {
+  if (completionState(params.facts)?.slots?.completed === true && !hasRepairActiveMisconception(params.facts)) {
     return selectCompletionSummaryTarget(params.facts);
   }
   return selectSparcLearningTargetFromFacts(params.facts, params.targetSelectionOptions);

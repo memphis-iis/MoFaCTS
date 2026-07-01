@@ -150,7 +150,6 @@ describe('SPARC trial display controller dialogue bridge', function() {
             clusterKC: 'kc-b',
             coverage: 0.1,
           }],
-          answerQuality: 'partial',
         };
       },
       generateTutorUtterance: (request) => {
@@ -215,7 +214,6 @@ describe('SPARC trial display controller dialogue bridge', function() {
           clusterKC: 'kc-b',
           coverage: 0.1,
         }],
-        answerQuality: 'partial',
       }),
       generateTutorUtterance: (request) => request.contentTexts[0]!,
       history: {
@@ -257,7 +255,6 @@ describe('SPARC trial display controller dialogue bridge', function() {
             clusterKC: 'kc-b',
             coverage: 0.9,
           }],
-          answerQuality: 'partial',
         };
       },
       generateTutorUtterance: (request) => {
@@ -297,7 +294,7 @@ describe('SPARC trial display controller dialogue bridge', function() {
           timestamp: 1234,
         },
         priorHistoryRecords: [],
-        scoreLearnerResponse: () => ({ answerQuality: 'partial' }),
+        scoreLearnerResponse: () => ({}),
         generateTutorUtterance: () => 'Tutor message.',
         history: {
           async writeCanonicalHistory() {},

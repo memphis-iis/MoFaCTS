@@ -3,7 +3,7 @@ import { legacyTrim } from '../../common/underscoreCompat';
 /**
  * TDF (Training Definition File) Utilities
  *
- * Pure functions for parsing and manipulating TDF data structures.
+ * Pure functions for parsing TDF data structures.
  * Extracted from card.js as part of C1.3 refactoring.
  *
  * @module client/lib/tdfUtils
@@ -42,26 +42,6 @@ export function parseSchedItemCondition(cond: string | undefined | null): string
   }
 
   return prefix + '_' + (num + 1).toString();
-}
-
-/**
- *
- * Some older TDFs store `tdfs.tutor.unit` as a single object instead of an array.
- * This helper canonicalizes the structure so downstream code can safely assume
- * an array-based unit list when units are present.
- *
- * @param {any} tdfContent - Parsed TDF content object
- * @returns {void}
- */
-export function normalizeTutorUnits(tdfContent: any): void {
-  const tutor = tdfContent?.tdfs?.tutor;
-  if (!tutor) {
-    return;
-  }
-
-  if (tutor.unit && !Array.isArray(tutor.unit) && typeof tutor.unit === 'object') {
-    tutor.unit = [tutor.unit];
-  }
 }
 
 /**

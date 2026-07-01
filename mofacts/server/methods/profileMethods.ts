@@ -66,14 +66,14 @@ function normalizeOpenRouterModel(value: unknown): string {
     return '';
   }
   if (typeof value !== 'string') {
-    throw new Meteor.Error('invalid-openrouter-model', 'Default OpenRouter model must be text');
+    throw new Meteor.Error('invalid-openrouter-model', 'OpenRouter model must be text');
   }
   const trimmed = value.trim();
   if (trimmed.length > OPENROUTER_MODEL_MAX_LENGTH) {
-    throw new Meteor.Error('invalid-openrouter-model', `Default OpenRouter model must be ${OPENROUTER_MODEL_MAX_LENGTH} characters or fewer`);
+    throw new Meteor.Error('invalid-openrouter-model', `OpenRouter model must be ${OPENROUTER_MODEL_MAX_LENGTH} characters or fewer`);
   }
   if (hasControlCharacters(trimmed) || /[<>\s]/.test(trimmed)) {
-    throw new Meteor.Error('invalid-openrouter-model', 'Default OpenRouter model contains unsupported characters');
+    throw new Meteor.Error('invalid-openrouter-model', 'OpenRouter model contains unsupported characters');
   }
   return trimmed;
 }

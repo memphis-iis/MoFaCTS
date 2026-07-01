@@ -7,7 +7,6 @@ import type { CourseAssignmentHistoryContext } from '../../common/courseAssignme
 import {
   hasLaunchReadyTutorUnits,
   isConditionRootWithoutUnitArray,
-  normalizeTutorUnits,
 } from './tdfUtils';
 
 declare const Tdfs: any;
@@ -115,7 +114,6 @@ export async function loadLaunchReadyTdf(
   }
 
   let content = tdfDoc?.content;
-  normalizeTutorUnits(content);
 
   if (!isLaunchReadyContent(content, allowConditionRoot) || !hasAutoTutorLaunchModel(content)) {
     clientConsole(1, `[${source}] TDF content is not launch-ready after subscription; fetching full TDF by id`, {
@@ -123,7 +121,6 @@ export async function loadLaunchReadyTdf(
     });
     tdfDoc = await meteorCallAsync('getTdfById', currentTdfId, { courseAssignment });
     content = tdfDoc?.content;
-    normalizeTutorUnits(content);
   }
 
   const isConditionRoot = isConditionRootWithoutUnitArray(content);

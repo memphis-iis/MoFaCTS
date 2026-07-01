@@ -23,7 +23,6 @@ import { unlockAppleMobileAudioForUserGesture } from '../../lib/audioUnlock';
 import { shouldLockMultiTdfLaunchToCurrentUnit } from '../../lib/lessonLaunchLockPolicy';
 import { resolveLessonLaunchEntryRoute } from '../../lib/lessonLaunchEntryRoute';
 import { CARD_ENTRY_INTENT, setCardEntryIntent, type CardEntryIntent } from '../../lib/cardEntryIntent';
-import { normalizeTutorUnits } from '../../lib/tdfUtils';
 import { prepareLessonLaunchContext } from '../../lib/lessonLaunchInitializer';
 import {
   LEARNER_TDF_FIELD_DEFINITIONS,
@@ -1200,7 +1199,6 @@ Template.learningDashboard.events({
     try {
       const tdfDoc = await meteorCallAsync('getTdfById', tdfId) as any;
       const content = tdfDoc?.content;
-      normalizeTutorUnits(content);
       if (!Array.isArray(content?.tdfs?.tutor?.unit)) {
         instance.learnerConfigState.set({
           ...EMPTY_CONFIG_STATE,

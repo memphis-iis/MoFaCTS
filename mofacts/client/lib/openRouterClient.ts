@@ -124,7 +124,21 @@ function optionalOpenRouterCost(responseBody: unknown): number | undefined {
 
 function openRouterErrorMessage(responseBody: unknown, status: number): string {
   if (isRecord(responseBody) && isRecord(responseBody.error) && typeof responseBody.error.message === 'string') {
-    return responseBody.error.message;
+    const details = [`OpenRouter request failed with HTTP ${status}: ${responseBody.error.message}`];
+    if (typeof responseBody.error.code === 'number' || typeof responseBody.error.code === 'string') {
+      details.push(`code ${String(responseBody.error.code)}`);
+    }
+    const metadata = isRecord(responseBody.error.metadata) ? responseBody.error.metadata : null;
+    if (metadata) {
+      if (typeof metadata.provider_name === 'string' && metadata.provider_name.trim()) {
+        details.push(`provider ${metadata.provider_name.trim()}`);
+      }
+      const raw = typeof metadata.raw === 'string' ? metadata.raw.trim() : '';
+      if (raw) {
+        details.push(raw.slice(0, 500));
+      }
+    }
+    return details.join('; ');
   }
   return `OpenRouter request failed with HTTP ${status}`;
 }
@@ -375,7 +389,7 @@ export async function testOpenRouterConnection(apiKey: string, model: string): P
     return { success: false, message: 'OpenRouter API key is required' };
   }
   if (!trimmedModel) {
-    return { success: false, message: 'Default OpenRouter model is required' };
+    return { success: false, message: 'OpenRouter model is required' };
   }
 
   try {

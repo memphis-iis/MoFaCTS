@@ -27,11 +27,14 @@ function dialogueDisplay(): SparcTrialDisplay {
         assertion: 'A assertion',
       },
     }, {
-      factType: 'dialogue.moveContent',
+      factType: 'diagnostic.misconceptionSource',
       slots: {
-        targetType: 'misconception',
         id: 'mis-1',
-        text: 'Repair the misconception.',
+        label: 'Misconception A',
+        description: 'The learner thinks the wrong thing.',
+        repair: 'Repair the misconception.',
+        repairQuestion: 'What should replace the wrong idea?',
+        repairCriteria: 'The learner rejects the wrong idea.',
       },
     }],
   };
@@ -94,7 +97,6 @@ describe('SPARC dialogue OpenRouter provider', function() {
               evidence: 'mentions A',
               missingElements: ['detail'],
             }],
-            answerQuality: 'partial',
             learnerContribution: {
               type: 'assertion',
               confidence: 0.8,
@@ -118,7 +120,6 @@ describe('SPARC dialogue OpenRouter provider', function() {
       evidence: 'mentions A',
       missingElements: ['detail'],
     }]);
-    expect(score.answerQuality).to.equal('partial');
     expect(score.learnerContribution?.type).to.equal('assertion');
     expect(score.learnerQuestion).to.equal(undefined);
     expect(calls).to.have.length(1);
@@ -137,6 +138,12 @@ describe('SPARC dialogue OpenRouter provider', function() {
       clusterKC: 'kc-a',
       label: 'Expectation A',
     });
+    expect(JSON.parse(userMessage.content).misconceptions[0]).to.deep.include({
+      id: 'mis-1',
+      label: 'Misconception A',
+      description: 'The learner thinks the wrong thing.',
+      repairCriteria: 'The learner rejects the wrong idea.',
+    });
   });
 
   it('adds current-turn good-answer and bad-answer bag matches from embeddings when available', async function() {
@@ -147,7 +154,6 @@ describe('SPARC dialogue OpenRouter provider', function() {
         return {
           parsedContent: {
             learningTargetScores: [],
-            answerQuality: 'partial',
             learnerContribution: {
               type: 'assertion',
             },
@@ -176,6 +182,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
     expect(embeddingCalls[0]).to.have.property('model', 'google/gemini-embedding-001');
     expect(embeddingCalls[0]).to.have.nested.property('telemetry.operation', 'score-current-turn-bag-match');
     expect((embeddingCalls[0] as { input: string[] }).input[0]).to.contain('Expectation A');
+    expect((embeddingCalls[0] as { input: string[] }).input[1]).to.contain('Misconception A');
     expect((embeddingCalls[0] as { input: string[] }).input[1]).to.contain('Repair the misconception.');
     expect((embeddingCalls[0] as { input: string[] }).input[2]).to.equal('A proposition');
     expect(score.bagMatchScores).to.deep.equal([{
@@ -194,7 +201,11 @@ describe('SPARC dialogue OpenRouter provider', function() {
       kind: 'badAnswer',
       score: 0.6,
       band: 'HIGH',
-      bagText: 'Repair the misconception.',
+      bagText: [
+        'Misconception A',
+        'The learner thinks the wrong thing.',
+        'Repair the misconception.',
+      ].join('\n'),
       model: 'google/gemini-embedding-001',
       metric: 'cosine_similarity_normalized_vectors',
     }]);
@@ -206,7 +217,6 @@ describe('SPARC dialogue OpenRouter provider', function() {
         return {
           parsedContent: {
             learningTargetScores: [],
-            answerQuality: 'low',
             learnerContribution: {
               type: 'question',
             },

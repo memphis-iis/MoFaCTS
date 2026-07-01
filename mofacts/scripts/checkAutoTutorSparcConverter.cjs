@@ -423,10 +423,12 @@ function assertTargetSelectionMatchesOriginalAutoTutorPlanner() {
   for (const [sourceId, originalScore] of Object.entries(originalPriorities)) {
     const candidate = sparcSelection.candidates.find((entry) => entry.clusterKC === sourceToClusterKC[sourceId]);
     assert.ok(candidate, `missing SPARC target candidate for ${sourceId}`);
-    assert.equal(candidate.frontierScore, originalScore.frontier);
+    const expectedFrontier = ((0.8 - originalScore.coverage) / 0.8) * originalScore.coherence;
+    const expectedPriority = 0.5 * expectedFrontier + 0.3 * originalScore.coherence + 0.2 * originalScore.centrality;
+    assert.equal(candidate.frontierScore, expectedFrontier);
     assert.equal(candidate.coherenceToAnchor, originalScore.coherence);
     assert.equal(candidate.centralityScore, originalScore.centrality);
-    assert.equal(candidate.priorityScore, originalScore.priority);
+    assert.equal(candidate.priorityScore, expectedPriority);
   }
 }
 
@@ -1815,7 +1817,7 @@ function assertSparcAutoTutorProgressMatchesOriginalCredit() {
     display: {
       type: 'sparc',
       workingMemoryFacts: [
-        { factType: 'dialogue.thresholds', slots: { coverageThreshold: 0.8, misconceptionThreshold: 0.65 } },
+        { factType: 'dialogue.thresholds', slots: { coverageThreshold: 0.8 } },
         { factType: 'dialogue.graduation', slots: { requiredTargetCount: 2, maxActiveMisconceptions: 0 } },
         { factType: 'learningTarget.source', slots: { clusterKC: 'kc-a', label: 'A' } },
         { factType: 'learningTarget.source', slots: { clusterKC: 'kc-b', label: 'B' } },
@@ -1837,7 +1839,7 @@ function assertSparcAutoTutorProgressMatchesOriginalCredit() {
   });
   assert.equal(snapshot.coveredExpectations, 1.6);
   assert.equal(snapshot.requiredExpectations, 4);
-  assert.equal(snapshot.activeMisconceptions, 1);
+  assert.equal(snapshot.activeMisconceptions, 2);
   assert.equal(snapshot.turnCount, 1);
 }
 

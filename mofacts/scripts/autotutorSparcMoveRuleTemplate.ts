@@ -196,7 +196,6 @@ function misconceptionConfidence(bounds: Parameters<typeof range>[0]): SparcProd
     slots: {
       id: { type: 'bound', variable: 'misconceptionId' },
       confidence: range(bounds),
-      repaired: { type: 'literal', value: false },
     },
   };
 }
