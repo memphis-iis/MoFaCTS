@@ -209,6 +209,7 @@ export async function processPackageUploadWorkflow(
   const state: PackageUploadRuntimeState = {
     fileName: '',
     filePath: '',
+    uploadActorUserId: context.userId,
     stimSetId: undefined,
     uploadedMediaPathMapsByStimSetId: new Map<string, Map<string, string>>()
   };

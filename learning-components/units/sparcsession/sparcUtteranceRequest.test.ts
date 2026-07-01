@@ -30,21 +30,21 @@ describe('createSparcUtteranceRequestFromFacts', function() {
       }),
     ]);
 
-    assert.deepEqual(request, {
+    assert.equal(request.targetType, 'learningTarget');
+    assert.equal(request.targetId, 'kc-a');
+    assert.equal(request.action, 'hint');
+    assert.deepEqual(request.contentTexts, ['Think about the first idea.']);
+    assert.deepEqual(request.selectedAction, {
       targetType: 'learningTarget',
-      targetId: 'kc-a',
+      clusterKC: 'kc-a',
       action: 'hint',
-      contentTexts: ['Think about the first idea.'],
-      selectedAction: {
-        targetType: 'learningTarget',
-        clusterKC: 'kc-a',
-        action: 'hint',
-        sourceRuleId: 'paper-rule-06-hint',
-        templateVersion: 'paper-dialogue-move-v1',
-      },
       sourceRuleId: 'paper-rule-06-hint',
       templateVersion: 'paper-dialogue-move-v1',
     });
+    assert.equal(request.moveDefinition.moveId, 'hint');
+    assert.equal(request.moveDefinition.promptId, 'autotutor.hint');
+    assert.equal(request.sourceRuleId, 'paper-rule-06-hint');
+    assert.equal(request.templateVersion, 'paper-dialogue-move-v1');
   });
 
   it('matches misconception move content by misconception id', function() {
@@ -98,16 +98,34 @@ describe('createSparcUtteranceRequestFromFacts', function() {
       }),
     ]);
 
-    assert.deepEqual(request, {
+    assert.equal(request.targetType, 'completion');
+    assert.equal(request.targetId, 'completion');
+    assert.equal(request.action, 'summary');
+    assert.deepEqual(request.contentTexts, ['Summarize the lesson.']);
+    assert.deepEqual(request.selectedAction, {
       targetType: 'completion',
-      targetId: 'completion',
       action: 'summary',
-      contentTexts: ['Summarize the lesson.'],
-      selectedAction: {
-        targetType: 'completion',
-        action: 'summary',
-      },
     });
+    assert.equal(request.moveDefinition.moveId, 'summary');
+  });
+
+  it('fails clearly when the selected move has no active registered definition', function() {
+    assert.throws(
+      () => createSparcUtteranceRequestFromFacts([
+        fact('controller.selectedAction', {
+          targetType: 'learningTarget',
+          clusterKC: 'kc-a',
+          action: 'neutral_feedback',
+        }),
+        fact('dialogue.moveContent', {
+          targetType: 'learningTarget',
+          clusterKC: 'kc-a',
+          action: 'neutral_feedback',
+          text: 'Legacy feedback content.',
+        }),
+      ]),
+      /selected move "neutral_feedback" is registered as legacy-disabled/,
+    );
   });
 
   it('fails clearly when completion selected action content is missing', function() {

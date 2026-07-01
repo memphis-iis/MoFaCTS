@@ -192,6 +192,88 @@ describe('sparcProductionRuleCommit', function() {
     assert.equal(replayed.traceSteps.length, 1);
   });
 
+  it('traces derived-rule executions before rules that consume their produced facts', async function() {
+    const writtenRecords: unknown[] = [];
+    const documentWithDerivedRule: SparcAuthoredDocument = {
+      ...document,
+      derivedFacts: [{
+        id: 'select-lcd-path',
+        when: [{
+          factType: 'interface-event',
+          slots: {
+            selection: { type: 'literal', value: 'firstDenConv' },
+            input: { type: 'bind', variable: 'selectedDenominator' },
+          },
+        }],
+        tests: [{
+          op: 'eq',
+          left: variable('selectedDenominator'),
+          right: literal(12),
+        }],
+        fact: {
+          factType: 'fraction.activePath',
+          slots: {
+            path: literal('lcd'),
+          },
+        },
+      }],
+      productionRules: [{
+        id: 'fractions.consume-derived-path',
+        module: 'fraction-addition',
+        when: [{
+          factType: 'fraction.activePath',
+          slots: {
+            path: { type: 'literal', value: 'lcd' },
+          },
+        }, {
+          factType: 'interface-event',
+          slots: {
+            selection: { type: 'literal', value: 'firstDenConv' },
+          },
+        }],
+        then: [{
+          type: 'classify',
+          outcome: 'correct',
+        }],
+      }],
+    };
+
+    const committed = await commitSparcAuthoredProductionRuleEvent({
+      core,
+      document: documentWithDerivedRule,
+      replayState: createSparcAuthoredInitialReplayState(documentWithDerivedRule),
+      event: {
+        eventId: 'event-derived',
+        type: 'value-changed',
+        source: sourceAddress,
+        time: 2500,
+        payload: {
+          selection: 'firstDenConv',
+          action: 'UpdateTextArea',
+          input: 12,
+        },
+      },
+      runtime: {
+        history: {
+          async writeCanonicalHistory(record) {
+            writtenRecords.push(record);
+          },
+        },
+      },
+    });
+
+    assert.deepEqual(
+      committed.traceHistoryRecords?.map((record) => record.sparc.traceStep?.productionRuleId),
+      [
+        'derived-fact:select-lcd-path',
+        'fractions.consume-derived-path',
+      ],
+    );
+    assert.equal(committed.traceHistoryRecords?.[0]?.sparc.traceStep?.details?.derivedFactId, 'select-lcd-path');
+    assert.equal(committed.traceHistoryRecords?.[0]?.sparc.traceStep?.details?.salience, 0);
+    assert.deepEqual(writtenRecords, committed.traceHistoryRecords);
+  });
+
   it('writes production-rule trace history for system events without student input', async function() {
     const writtenRecords: unknown[] = [];
     const controllerDocument: SparcAuthoredDocument = {

@@ -6,6 +6,7 @@ import type { PackageUploadIntegrity } from '../lib/packageUploadShared';
 import type { createStorageBoundary } from '../lib/storageBoundary';
 import { validateAutoTutorContent } from '../../common/lib/autoTutorContract';
 import { createPackageGeneratedContentMethods } from './packageGeneratedContentMethods';
+import type { ApiKeyResolutionDeps } from '../lib/apiKeyResolution';
 
 type UnknownRecord = Record<string, unknown>;
 type MethodContext = {
@@ -106,6 +107,7 @@ type PackageMethodsDeps = {
   getNewItemFormat: (oldStimFormat: any, fileName: string, stimuliSetId: any, responseKCMap: Record<string, unknown>) => any[];
   legacyTrim: (value: unknown) => string;
   encryptData: (value: string) => string;
+  getApiKeyResolutionDeps: () => ApiKeyResolutionDeps;
   updateStimDisplayTypeMap: (stimuliSetIds: unknown[] | null) => Promise<unknown>;
   rebuildStimDisplayTypeMapSnapshot: (deps: any) => Promise<unknown>;
   getStimDisplayTypeMapDeps: () => any;
@@ -190,6 +192,7 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       normalizeCanonicalId: deps.normalizeCanonicalId,
       serverConsole: deps.serverConsole,
       encryptData: deps.encryptData,
+      getApiKeyResolutionDeps: deps.getApiKeyResolutionDeps,
       legacyTrim: deps.legacyTrim,
       upsertPackage,
       updateStimDisplayTypeMap: deps.updateStimDisplayTypeMap,

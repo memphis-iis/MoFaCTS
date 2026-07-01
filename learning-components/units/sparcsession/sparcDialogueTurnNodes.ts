@@ -43,6 +43,14 @@ function utteranceNode(params: {
   readonly action?: string;
   readonly targetType?: string;
   readonly targetId?: string;
+  readonly productionRuleId?: string;
+  readonly productionRuleName?: string;
+  readonly promptId?: string;
+  readonly promptVersion?: string;
+  readonly outputSchemaId?: string;
+  readonly outputSchemaVersion?: string;
+  readonly renderer?: string;
+  readonly historyAction?: string;
 }): Record<string, unknown> {
   return {
     id: params.id,
@@ -54,6 +62,14 @@ function utteranceNode(params: {
     ...(params.action ? { action: params.action } : {}),
     ...(params.targetType ? { targetType: params.targetType } : {}),
     ...(params.targetId ? { targetId: params.targetId } : {}),
+    ...(params.productionRuleId ? { productionRuleId: params.productionRuleId } : {}),
+    ...(params.productionRuleName ? { productionRuleName: params.productionRuleName } : {}),
+    ...(params.promptId ? { promptId: params.promptId } : {}),
+    ...(params.promptVersion ? { promptVersion: params.promptVersion } : {}),
+    ...(params.outputSchemaId ? { outputSchemaId: params.outputSchemaId } : {}),
+    ...(params.outputSchemaVersion ? { outputSchemaVersion: params.outputSchemaVersion } : {}),
+    ...(params.renderer ? { renderer: params.renderer } : {}),
+    ...(params.historyAction ? { historyAction: params.historyAction } : {}),
   };
 }
 
@@ -86,6 +102,14 @@ function dialogueUtteranceFact(params: {
   readonly action?: string;
   readonly targetType?: string;
   readonly targetId?: string;
+  readonly productionRuleId?: string;
+  readonly productionRuleName?: string;
+  readonly promptId?: string;
+  readonly promptVersion?: string;
+  readonly outputSchemaId?: string;
+  readonly outputSchemaVersion?: string;
+  readonly renderer?: string;
+  readonly historyAction?: string;
 }): SparcWorkingMemoryFact {
   return {
     factId: params.id,
@@ -101,6 +125,14 @@ function dialogueUtteranceFact(params: {
       ...(params.action ? { action: params.action } : {}),
       ...(params.targetType ? { targetType: params.targetType } : {}),
       ...(params.targetId ? { targetId: params.targetId } : {}),
+      ...(params.productionRuleId ? { productionRuleId: params.productionRuleId } : {}),
+      ...(params.productionRuleName ? { productionRuleName: params.productionRuleName } : {}),
+      ...(params.promptId ? { promptId: params.promptId } : {}),
+      ...(params.promptVersion ? { promptVersion: params.promptVersion } : {}),
+      ...(params.outputSchemaId ? { outputSchemaId: params.outputSchemaId } : {}),
+      ...(params.outputSchemaVersion ? { outputSchemaVersion: params.outputSchemaVersion } : {}),
+      ...(params.renderer ? { renderer: params.renderer } : {}),
+      ...(params.historyAction ? { historyAction: params.historyAction } : {}),
     },
   };
 }
@@ -123,6 +155,20 @@ export function createSparcDialogueTurnTransition(params: {
   const learnerText = requireNonBlank(params.learnerText, 'SPARC learner dialogue text');
   const tutorText = requireNonBlank(params.tutorText, 'SPARC tutor dialogue text');
   const boxId = requireNonBlank(params.options?.boxId ?? 'dialogue-flow', 'SPARC dialogue boxId');
+  const productionRuleId = params.utteranceRequest.sourceRuleId;
+  const productionRuleName = params.utteranceRequest.sourceRuleId;
+  const moveDefinitionMetadata = {
+    promptId: params.utteranceRequest.moveDefinition.promptId,
+    promptVersion: params.utteranceRequest.moveDefinition.promptVersion,
+    outputSchemaId: params.utteranceRequest.moveDefinition.outputSchemaId,
+    outputSchemaVersion: params.utteranceRequest.moveDefinition.outputSchemaVersion,
+    renderer: params.utteranceRequest.moveDefinition.renderer,
+    historyAction: params.utteranceRequest.moveDefinition.historyAction,
+  };
+  const productionRuleMetadata = {
+    ...(productionRuleId ? { productionRuleId } : {}),
+    ...(productionRuleName ? { productionRuleName } : {}),
+  };
   const learnerNodeId = `${eventId}:learner`;
   const tutorNodeId = `${eventId}:tutor`;
   const learnerFact = dialogueUtteranceFact({
@@ -139,6 +185,8 @@ export function createSparcDialogueTurnTransition(params: {
     action: params.utteranceRequest.action,
     targetType: params.utteranceRequest.targetType,
     targetId: params.utteranceRequest.targetId,
+    ...productionRuleMetadata,
+    ...moveDefinitionMetadata,
   });
   const rootTarget = {
     documentId,
@@ -172,6 +220,8 @@ export function createSparcDialogueTurnTransition(params: {
           action: params.utteranceRequest.action,
           targetType: params.utteranceRequest.targetType,
           targetId: params.utteranceRequest.targetId,
+          ...productionRuleMetadata,
+          ...moveDefinitionMetadata,
         }),
       }),
       createSparcWorkingMemoryFactStateWrite({

@@ -1,4 +1,8 @@
 import type { SparcWorkingMemoryFact } from './sparcSessionContracts';
+import {
+  requireActiveSparcMoveDefinition,
+  type SparcMoveDefinition,
+} from './sparcMoveDefinitions';
 
 export type SparcUtteranceRequest = {
   readonly targetType: 'learningTarget' | 'misconception' | 'completion';
@@ -6,8 +10,16 @@ export type SparcUtteranceRequest = {
   readonly targetId: string;
   readonly contentTexts: readonly string[];
   readonly selectedAction: Readonly<Record<string, unknown>>;
+  readonly moveDefinition: SparcMoveDefinition;
   readonly sourceRuleId?: string;
   readonly templateVersion?: string;
+  readonly learnerText?: string;
+  readonly learnerContribution?: Readonly<Record<string, unknown>>;
+  readonly pedagogicalState?: Readonly<Record<string, unknown>>;
+  readonly transitionMetadata?: Readonly<Record<string, unknown>>;
+  readonly targetContent?: unknown;
+  readonly plannerState?: unknown;
+  readonly dialogueHistory?: readonly Readonly<Record<string, unknown>>[];
 };
 
 function stringSlot(fact: SparcWorkingMemoryFact, slotName: string): string | undefined {
@@ -73,6 +85,90 @@ function moveContentMatches(params: {
   return stringSlot(params.fact, 'id') === params.targetId;
 }
 
+function factsByType(facts: readonly SparcWorkingMemoryFact[], factType: string): readonly SparcWorkingMemoryFact[] {
+  return facts.filter((fact) => fact.factType === factType);
+}
+
+function latestFact(facts: readonly SparcWorkingMemoryFact[], factType: string): SparcWorkingMemoryFact | undefined {
+  return factsByType(facts, factType).at(-1);
+}
+
+function dialogueHistory(facts: readonly SparcWorkingMemoryFact[]): readonly Readonly<Record<string, unknown>>[] {
+  return factsByType(facts, 'dialogue.utterance')
+    .map((fact) => ({
+      role: fact.slots?.speaker === 'learner' ? 'student' : 'tutor',
+      text: stringSlot(fact, 'text') ?? '',
+    }))
+    .filter((entry) => entry.text);
+}
+
+function learningTargetContent(facts: readonly SparcWorkingMemoryFact[], clusterKC: string): unknown {
+  const source = factsByType(facts, 'learningTarget.source')
+    .find((fact) => stringSlot(fact, 'clusterKC') === clusterKC);
+  return source?.slots ?? { authoredContent: [] };
+}
+
+function misconceptionContent(facts: readonly SparcWorkingMemoryFact[], id: string, contentTexts: readonly string[]): unknown {
+  const source = factsByType(facts, 'diagnostic.misconceptionSource')
+    .find((fact) => stringSlot(fact, 'id') === id);
+  return {
+    ...(source?.slots ?? { id }),
+    authoredContent: contentTexts,
+  };
+}
+
+function targetContent(params: {
+  readonly facts: readonly SparcWorkingMemoryFact[];
+  readonly targetType: string;
+  readonly targetId: string;
+  readonly contentTexts: readonly string[];
+}): unknown {
+  if (params.targetType === 'learningTarget') {
+    return learningTargetContent(params.facts, params.targetId);
+  }
+  if (params.targetType === 'misconception') {
+    return misconceptionContent(params.facts, params.targetId, params.contentTexts);
+  }
+  return { summary: params.contentTexts.join('\n') };
+}
+
+function plannerState(facts: readonly SparcWorkingMemoryFact[]): unknown {
+  return {
+    expectations: factsByType(facts, 'learningTarget.score').map((fact) => fact.slots ?? {}),
+    misconceptions: factsByType(facts, 'diagnostic.misconceptionScore').map((fact) => fact.slots ?? {}),
+    selectedTarget: latestFact(facts, 'learningTarget.selected')?.slots ?? null,
+    selectedMisconception: latestFact(facts, 'diagnostic.misconceptionSelected')?.slots ?? null,
+    completionState: latestFact(facts, 'controller.completionState')?.slots ?? null,
+    candidates: factsByType(facts, 'learningTarget.candidate').map((fact) => fact.slots ?? {}),
+  };
+}
+
+function pedagogicalState(selectedAction: SparcWorkingMemoryFact): Readonly<Record<string, unknown>> {
+  const slots = selectedAction.slots ?? {};
+  return {
+    targetType: slots.targetType,
+    targetId: slots.clusterKC ?? slots.id ?? null,
+    selectedMove: slots.action,
+  };
+}
+
+function transitionMetadata(selectedAction: SparcWorkingMemoryFact, facts: readonly SparcWorkingMemoryFact[]): Readonly<Record<string, unknown>> {
+  const currentTargetType = stringSlot(selectedAction, 'targetType') ?? null;
+  const currentTargetId = stringSlot(selectedAction, 'clusterKC') ?? stringSlot(selectedAction, 'id') ?? null;
+  const previous = factsByType(facts, 'controller.selectedAction')
+    .filter((fact) => fact !== selectedAction)
+    .at(-1);
+  const previousTargetType = previous ? stringSlot(previous, 'targetType') ?? null : null;
+  const previousTargetId = previous ? stringSlot(previous, 'clusterKC') ?? stringSlot(previous, 'id') ?? null : null;
+  return {
+    previousTargetType,
+    previousTargetId,
+    currentTargetType,
+    currentTargetId,
+    targetChanged: previousTargetType !== currentTargetType || previousTargetId !== currentTargetId,
+  };
+}
+
 export function createSparcUtteranceRequestFromFacts(
   facts: readonly SparcWorkingMemoryFact[],
 ): SparcUtteranceRequest {
@@ -85,6 +181,7 @@ export function createSparcUtteranceRequestFromFacts(
   if (targetType !== 'learningTarget' && targetType !== 'misconception' && targetType !== 'completion') {
     throw new Error(`SPARC selected action targetType "${targetType}" is not supported for utterance generation`);
   }
+  const moveDefinition = requireActiveSparcMoveDefinition(action);
   const targetId = selectedTargetId(selectedAction, targetType);
   const matchingContent = facts.filter((fact) => moveContentMatches({
     fact,
@@ -100,6 +197,7 @@ export function createSparcUtteranceRequestFromFacts(
   }
   const sourceRuleId = stringSlot(selectedAction, 'sourceRuleId');
   const templateVersion = stringSlot(selectedAction, 'templateVersion');
+  const contribution = latestFact(facts, 'learnerResponse.contribution')?.slots;
 
   return {
     targetType,
@@ -107,6 +205,13 @@ export function createSparcUtteranceRequestFromFacts(
     targetId,
     contentTexts,
     selectedAction: selectedAction.slots ?? {},
+    moveDefinition,
+    ...(contribution ? { learnerContribution: contribution } : {}),
+    pedagogicalState: pedagogicalState(selectedAction),
+    transitionMetadata: transitionMetadata(selectedAction, facts),
+    targetContent: targetContent({ facts, targetType, targetId, contentTexts }),
+    plannerState: plannerState(facts),
+    dialogueHistory: dialogueHistory(facts),
     ...(sourceRuleId ? { sourceRuleId } : {}),
     ...(templateVersion ? { templateVersion } : {}),
   };

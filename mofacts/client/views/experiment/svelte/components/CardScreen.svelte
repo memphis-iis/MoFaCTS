@@ -79,6 +79,9 @@
     isSparcControllerDialogueDisplay,
   } from '../services/sparcControllerDialogueCommit';
   import {
+    SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY,
+  } from '../../../../../../learning-components/trial-displays/sparc/sparcProgressiveNodes';
+  import {
     createSparcDialogueOpenRouterProvider,
   } from '../services/sparcControllerDialogueOpenRouter';
   import { commitSparcProductionRuleAction } from '../services/sparcProductionRuleActionCommit';
@@ -251,6 +254,49 @@
     return `${source}; displayType=${displayType}; documentId=${documentId}; tdfId=${context.tdfId || 'missing'}; unit=${context.unitId ?? 'missing'}; hasSessionId=${Boolean(context.sessionId)}`;
   }
 
+  function adminDiagnosticModeEnabled() {
+    return currentUserHasRole('admin');
+  }
+
+  function currentSparcProgressiveNodeOperations() {
+    const operations = context.sparcNodeValues?.[SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY];
+    return Array.isArray(operations) ? operations : [];
+  }
+
+  function buildOptimisticDialogueLearnerOperations(display, sparcResult) {
+    if (!isSparcControllerDialogueDisplay(display)) {
+      return [];
+    }
+    const learnerText = String(sparcResult?.submittedNodes?.['learner-response-input'] ?? '').trim();
+    if (!learnerText) {
+      return [];
+    }
+    const eventId = `optimistic:${sparcResult.timestamp}:${sparcResult.triggeredBy || 'submit'}`;
+    return [{
+      type: 'append-node-if-missing',
+      boxId: 'dialogue-flow',
+      node: {
+        id: `${eventId}:learner`,
+        nodeType: 'atomic',
+        atomType: 'dialogue-utterance',
+        speaker: 'learner',
+        value: learnerText,
+        turnEventId: eventId,
+        optimistic: true,
+      },
+    }];
+  }
+
+  function sendSparcProgressiveNodeOperations(operations, timestamp) {
+    send({
+      type: EVENTS.SPARC_ACTION,
+      timestamp,
+      sparcNodeValues: {
+        [SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY]: operations,
+      },
+    });
+  }
+
   async function handleSparcAction(event) {
     const display = context.currentDisplay;
     if (!sparcOwnsResponse || !display || display.type !== 'sparc') {
@@ -300,16 +346,32 @@
       const provider = createSparcDialogueOpenRouterProvider({
         tdfId: typeof context.tdfId === 'string' ? context.tdfId : null,
       });
-      const result = await commitSparcControllerDialogueSubmit({
-        engine: context.engine,
-        currentDisplay: display,
-        sparcResult,
-        tdfId: context.tdfId,
-        sessionId: context.sessionId,
-        levelUnit: context.unitId,
-        scoreLearnerResponse: provider.scoreLearnerResponse,
-        generateTutorUtterance: provider.generateTutorUtterance,
-      });
+      const priorProgressiveOperations = currentSparcProgressiveNodeOperations();
+      const optimisticOperations = buildOptimisticDialogueLearnerOperations(display, sparcResult);
+      if (optimisticOperations.length > 0) {
+        sendSparcProgressiveNodeOperations([
+          ...priorProgressiveOperations,
+          ...optimisticOperations,
+        ], sparcResult.timestamp);
+      }
+      let result;
+      try {
+        result = await commitSparcControllerDialogueSubmit({
+          engine: context.engine,
+          currentDisplay: display,
+          sparcResult,
+          tdfId: context.tdfId,
+          sessionId: context.sessionId,
+          levelUnit: context.unitId,
+          scoreLearnerResponse: provider.scoreLearnerResponse,
+          generateTutorUtterance: provider.generateTutorUtterance,
+        });
+      } catch (error) {
+        if (optimisticOperations.length > 0) {
+          sendSparcProgressiveNodeOperations(priorProgressiveOperations, sparcResult.timestamp);
+        }
+        throw error;
+      }
       sparcProgressRefreshVersion += 1;
       if (Object.keys(result.sparcNodeValues).length > 0) {
         send({
@@ -638,6 +700,7 @@
     srAttempt: audioState.srAttempts,
     srMaxAttempts: audioState.maxSrAttempts,
     srStatus,
+    adminDiagnosticMode: adminDiagnosticModeEnabled(),
     sparcNodeValues: context.sparcNodeValues,
     learningProgressSnapshot,
     subset: trialSubset,

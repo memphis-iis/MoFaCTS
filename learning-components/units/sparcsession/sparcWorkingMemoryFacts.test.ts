@@ -2,11 +2,18 @@ import assert from 'node:assert/strict';
 import { applySparcStateTransition, createEmptySparcReplayState } from './sparcStateReplay';
 import { createSparcStableWorkingMemoryFactStateWrite } from './sparcWorkingMemoryState';
 import { createSparcAuthoredInitialReplayState } from './sparcAuthoredInitialState';
-import { buildSparcWorkingMemoryFacts } from './sparcWorkingMemoryFacts';
+import {
+  buildSparcWorkingMemoryFacts,
+  buildSparcWorkingMemoryFactsWithDerivations,
+} from './sparcWorkingMemoryFacts';
 import type {
   SparcAuthoredDocument,
   SparcInterfaceEvent,
+  SparcRuleExpression,
 } from './sparcSessionContracts';
+
+const literal = (value: unknown): SparcRuleExpression => ({ type: 'literal', value });
+const variable = (name: string): SparcRuleExpression => ({ type: 'variable', name });
 
 const document: SparcAuthoredDocument = {
   id: 'fractions-doc',
@@ -121,6 +128,69 @@ describe('sparcWorkingMemoryFacts', function() {
       && fact.slots.action === 'UpdateTextArea'
       && fact.slots.input === 12
     )));
+  });
+
+  it('derives transient working-memory facts from authored conditions', function() {
+    const event: SparcInterfaceEvent = {
+      eventId: 'event-branch',
+      type: 'value-changed',
+      source: {
+        documentId: 'fractions-doc',
+        nodeId: 'firstDenConv',
+      },
+      time: 1000,
+      payload: {
+        input: 12,
+      },
+    };
+    const documentWithDerivedFacts: SparcAuthoredDocument = {
+      ...document,
+      derivedFacts: [{
+        id: 'select-lcd-denominator-path',
+        when: [{
+          factType: 'interface-event',
+          slots: {
+            sourceNode: { type: 'literal', value: 'firstDenConv' },
+            input: {
+              type: 'bind',
+              variable: 'selectedDenominator',
+            },
+          },
+        }],
+        tests: [{
+          op: 'eq',
+          left: variable('selectedDenominator'),
+          right: literal(12),
+        }],
+        fact: {
+          factType: 'fraction.activeDenominatorPath',
+          slots: {
+            denominator: variable('selectedDenominator'),
+            path: literal('lcd'),
+          },
+        },
+      }],
+    };
+
+    const facts = buildSparcWorkingMemoryFacts({
+      document: documentWithDerivedFacts,
+      replayState: createSparcAuthoredInitialReplayState(documentWithDerivedFacts),
+      event,
+    });
+
+    assert.ok(facts.some((fact) => (
+      fact.factType === 'fraction.activeDenominatorPath'
+      && fact.slots?.denominator === 12
+      && fact.slots.path === 'lcd'
+    )));
+
+    const result = buildSparcWorkingMemoryFactsWithDerivations({
+      document: documentWithDerivedFacts,
+      replayState: createSparcAuthoredInitialReplayState(documentWithDerivedFacts),
+      event,
+    });
+    assert.equal(result.derivedRuleExecution?.firings.length, 1);
+    assert.equal(result.derivedRuleExecution?.firings[0]?.ruleId, 'derived-fact:select-lcd-denominator-path');
   });
 
   it('adds practice observations when a reactive event carries one', function() {

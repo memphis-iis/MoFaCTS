@@ -8,7 +8,6 @@ const { createJiti } = require('jiti');
 const jiti = createJiti(__filename, { interopDefault: true });
 const moveRuleTemplate = jiti(path.join(__dirname, 'autotutorSparcMoveRuleTemplate.ts'));
 const clusterKcRelationships = jiti(path.join(__dirname, '../../learning-components/runtime/clusterKcRelationshipEngine.ts'));
-const autoTutorRelationships = jiti(path.join(__dirname, '../client/lib/autoTutorRelationshipEngine.ts'));
 
 const CANONICAL_CONFIG_DIR = path.resolve('C:/dev/mofacts_config');
 const GENERATED_PREFIX = 'SPARC Session';
@@ -20,7 +19,7 @@ function parseArgs(argv) {
     write: false,
     overwriteGenerated: false,
     generateRelationships: false,
-    openRouterApiKey: process.env.OPENROUTER_API_KEY || '',
+    openRouterApiKey: '',
     embeddingModels: [],
     json: false,
     reportFile: '',
@@ -66,9 +65,9 @@ function printHelp() {
     '  --package <name>          Convert one package directory by exact name.',
     '  --write                   Replace the source package JSON files with converted SPARC content. Dry-run is the default.',
     '  --overwrite-generated     Reserved for repeat conversion tooling; current write mode requires an AutoTutor source package.',
-    '  --generate-relationships  Generate missing expectationRelationships with embeddings.',
-    '  --openrouter-api-key <key> OpenRouter key for --generate-relationships. OPENROUTER_API_KEY also works.',
-    '  --embedding-model <model>  Embedding model for generation. May be passed more than once.',
+    '  --generate-relationships  Deprecated compatibility flag; upload/load generates missing KC graph relationships.',
+    '  --openrouter-api-key <key> Deprecated compatibility flag; the converter does not call OpenRouter.',
+    '  --embedding-model <model>  Deprecated compatibility flag; upload/load chooses embedding models.',
     '  --json                    Print the conversion report as JSON.',
     '  --report-file <path>       Write the conversion report JSON to an explicit path.',
     '  --overwrite-report         Allow replacing an existing --report-file output.',
@@ -216,7 +215,7 @@ function requireAutoTutorScript(sourceStimulus, autoTutorUnit) {
   };
 }
 
-function validateAutoTutorScript(script, options = {}) {
+function validateAutoTutorScript(script) {
   requireNonBlank(script.id, 'autoTutor.id');
   requireNonBlank(script.topic, 'autoTutor.topic');
   if (!Array.isArray(script.expectations) || script.expectations.length === 0) {
@@ -232,9 +231,6 @@ function validateAutoTutorScript(script, options = {}) {
     expectationIds.add(id);
   }
   const relationships = normalizeExpectationRelationships(script.expectationRelationships, (sourceId) => sourceId);
-  if (relationships.length === 0 && !options.allowMissingRelationships) {
-    throw new Error('unsupported-source: autoTutor.expectationRelationships must be present for SPARC conversion');
-  }
   for (const [index, relationship] of relationships.entries()) {
     const sourceId = requireNonBlank(relationship.sourceClusterKC, `autoTutor.expectationRelationships[${index}].sourceId`);
     const targetId = requireNonBlank(relationship.targetClusterKC, `autoTutor.expectationRelationships[${index}].targetId`);
@@ -245,55 +241,6 @@ function validateAutoTutorScript(script, options = {}) {
       throw new Error(`autoTutor.expectationRelationships[${index}] references an unknown expectation id`);
     }
   }
-}
-
-function hasExpectationRelationships(script) {
-  return normalizeExpectationRelationships(script.expectationRelationships, (sourceId) => sourceId).length > 0;
-}
-
-async function ensureAutoTutorRelationships(script, options = {}) {
-  if (hasExpectationRelationships(script)) {
-    return {
-      script,
-      generated: false,
-    };
-  }
-  if (!options.generateRelationships) {
-    return {
-      script,
-      generated: false,
-    };
-  }
-  const apiKey = String(options.openRouterApiKey || '').trim();
-  if (!apiKey) {
-    throw new Error('unsupported-source: autoTutor.expectationRelationships are missing; pass --generate-relationships with --openrouter-api-key or OPENROUTER_API_KEY');
-  }
-  const result = await autoTutorRelationships.generateAutoTutorExpectationRelationships({
-    expectations: script.expectations,
-  }, {
-    apiKey,
-    sourceKeyType: 'admin',
-    ...(Array.isArray(options.embeddingModels) && options.embeddingModels.length > 0
-      ? { embeddingModels: options.embeddingModels }
-      : {}),
-    ...(options.callEmbeddings ? { callEmbeddings: options.callEmbeddings } : {}),
-  });
-  return {
-    script: {
-      ...script,
-      expectationRelationships: result.expectationRelationships,
-      expectationRelationshipProvenance: {
-        ...result.expectationRelationshipProvenance,
-        generatedFor: 'autotutor-sparc-converter',
-      },
-    },
-    generated: true,
-    generationResult: {
-      model: result.model,
-      attemptedModels: result.attemptedModels,
-      ...(result.costUsd !== undefined ? { costUsd: result.costUsd } : {}),
-    },
-  };
 }
 
 function normalizeExpectationRelationships(value, resolveClusterKC = (sourceId) => sourceId) {
@@ -527,8 +474,10 @@ function createScriptFacts(params) {
     facts.push(fact('diagnostic.misconceptionSource', {
       id,
       label: misconception.label || id,
-      description: misconception.description || misconception.text || '',
-      repair: misconception.repair || misconception.feedback || '',
+      description: misconception.description || misconception.misconception || misconception.text || '',
+      repair: misconception.repair || misconception.correction || misconception.feedback || '',
+      repairQuestion: misconception.repairQuestion || '',
+      repairCriteria: misconception.repairCriteria || '',
     }));
     if (misconception.repair || misconception.feedback) {
       addMoveContent(facts, {
@@ -694,9 +643,12 @@ function validateGeneratedPackage(generated) {
   if (!Array.isArray(display.productionRules)) {
     throw new Error('generated SPARC display must include authored move-selection production rules');
   }
-  const paperMoveRules = display.productionRules.filter((rule) => String(rule.id || '').startsWith('dialogue.move.paper-rule-'));
-  if (paperMoveRules.length !== 15) {
-    throw new Error('generated SPARC display must include the 15 paper-derived move-selection production rules');
+  const ruleIds = new Set(display.productionRules.map((rule) => String(rule.id || '').trim()).filter(Boolean));
+  const missingAddedRuleIds = moveRuleTemplate.buildAutoTutorSparcMoveProductionRules()
+    .map((rule) => rule.id)
+    .filter((ruleId) => !ruleIds.has(ruleId));
+  if (missingAddedRuleIds.length > 0) {
+    throw new Error(`generated SPARC display is missing added AutoTutor move-selection rules: ${missingAddedRuleIds.join(', ')}`);
   }
   if (!display.productionRules.some((rule) => rule.id === 'dialogue.move.generated-completion-summary')) {
     throw new Error('generated SPARC display must include a completion-summary move-selection production rule');
@@ -750,6 +702,9 @@ function validateGeneratedPackage(generated) {
       throw new Error(`generated SPARC graph facts are missing kcGraph.node for clusterKC "${clusterKC}"`);
     }
   }
+  if (generated.stimulus?.setspec?.sourceAutoTutorConversion?.relationshipValidation?.relationshipGenerationRequired) {
+    return;
+  }
   for (const sourceClusterKC of clusterKCs) {
     for (const targetClusterKC of clusterKCs) {
       if (sourceClusterKC === targetClusterKC) {
@@ -773,17 +728,15 @@ function collectClusterIndices(node, output) {
   }
 }
 
-async function translatePackage(configDir, sourcePackageName, options = {}) {
+async function translatePackage(configDir, sourcePackageName) {
   const sourcePackageDir = path.join(configDir, sourcePackageName);
   const sourceTdfPath = findTdfPath(sourcePackageDir);
   const sourceTdf = readJson(sourceTdfPath);
   const sourceUnit = findAutoTutorUnit(sourceTdf);
   const { stimulusPath: sourceStimulusPath, stimulus } = requireSourceStimulus(sourcePackageDir, sourceTdf);
   const { firstStim, script: rawScript } = requireAutoTutorScript(stimulus, sourceUnit);
-  validateAutoTutorScript(rawScript, { allowMissingRelationships: options.generateRelationships === true });
-  const relationshipResolution = await ensureAutoTutorRelationships(rawScript, options);
-  const script = relationshipResolution.script;
-  validateAutoTutorScript(script);
+  validateAutoTutorScript(rawScript);
+  const script = rawScript;
 
   const ids = deriveIds(sourceTdf, script);
   const clusters = script.expectations.map((expectation, index) =>
@@ -800,17 +753,18 @@ async function translatePackage(configDir, sourcePackageName, options = {}) {
     script.expectationRelationships,
     (sourceId) => clustersByExpectationId.get(sourceId)?.clusterKC,
   );
+  const relationshipGenerationRequired = resolvedRelationships.length === 0 && clusters.length > 1;
   const relationshipValidation = {
     valid: true,
-    sourceShape: relationshipResolution.generated
-      ? 'generated-matrix'
+    sourceShape: relationshipGenerationRequired
+      ? 'generated-at-upload'
       : (Array.isArray(script.expectationRelationships) ? 'list' : 'matrix'),
     sourceRelationshipCount: normalizeExpectationRelationships(script.expectationRelationships, (sourceId) => sourceId).length,
     resolvedRelationshipCount: resolvedRelationships.length,
     generatedClusterCount: clusters.length,
     relationshipProvenance: script.expectationRelationshipProvenance ?? null,
-    generatedRelationships: relationshipResolution.generated,
-    ...(relationshipResolution.generationResult ? { generationResult: relationshipResolution.generationResult } : {}),
+    generatedRelationships: false,
+    relationshipGenerationRequired,
   };
   const scriptFacts = createScriptFacts({
     sourceTdf,
@@ -916,7 +870,6 @@ async function buildConversionReport(configDir, options = {}) {
     packageFilter: '',
     write: false,
     overwriteGenerated: false,
-    generateRelationships: false,
     openRouterApiKey: '',
     embeddingModels: [],
     reportFile: '',
@@ -924,9 +877,6 @@ async function buildConversionReport(configDir, options = {}) {
     ...options,
   };
   options.embeddingModels = options.embeddingModels.map((model) => String(model || '').trim()).filter(Boolean);
-  if (options.generateRelationships && !String(options.openRouterApiKey || '').trim()) {
-    throw new Error('--generate-relationships requires --openrouter-api-key or OPENROUTER_API_KEY');
-  }
   const inventory = inventoryAutoTutorPackages(configDir, options.packageFilter);
   const packageNames = inventory.packageNames;
   const converted = [];

@@ -301,13 +301,6 @@ export function validateAutoTutorContent(context: AutoTutorValidationContext): A
       errors.push(`${unitPrefix}.utteranceTemperature must be a number between 0 and 2`);
     }
 
-    if (
-      session.requireFinalAnswerPrompt !== undefined &&
-      typeof session.requireFinalAnswerPrompt !== 'boolean'
-    ) {
-      errors.push(`${unitPrefix}.requireFinalAnswerPrompt must be boolean`);
-    }
-
     const firstStim = getClusterFirstStim(context.stimuli, Number(session.cluster));
     const stimPrefix = `setspec.clusters[${Number(session.cluster)}].stims[0]`;
     if (!firstStim) {

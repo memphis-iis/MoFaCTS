@@ -196,6 +196,9 @@ export function createSparcAuthoredDocumentFromTrialDisplay(params: {
   const authoredFacts = Array.isArray(display.workingMemoryFacts)
     ? display.workingMemoryFacts as readonly SparcWorkingMemoryFact[]
     : [];
+  const derivedFacts: NonNullable<SparcAuthoredDocument['derivedFacts']> = Array.isArray(display.derivedFacts)
+    ? display.derivedFacts as NonNullable<SparcAuthoredDocument['derivedFacts']>
+    : [];
   if (isRecord(display.behavior) && Array.isArray(display.behavior.authoredProductionRules)) {
     throw new Error('SPARC behavior.authoredProductionRules is not executable; use top-level productionRules');
   }
@@ -215,6 +218,7 @@ export function createSparcAuthoredDocumentFromTrialDisplay(params: {
     clusterTargets: normalizeClusterTargets(display),
     ...(initialState.length > 0 ? { initialState } : {}),
     workingMemoryFacts: authoredFacts,
+    ...(derivedFacts.length > 0 ? { derivedFacts } : {}),
     productionRules: directProductionRules,
     root: {
       id: 'root',

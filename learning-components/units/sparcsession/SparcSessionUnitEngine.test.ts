@@ -873,10 +873,8 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
     });
 
     assert.equal(result.historyRecord?.action, 'sparc-dialogue-turn');
-    assert.equal(result.traceHistoryRecords?.length, 1);
-    assert.equal(writtenRecords.length, 2);
-    assert.equal(writtenRecords[0]?.action, 'sparc-production-rule-trace');
-    assert.equal(result.traceHistoryRecords?.[0]?.sparc.traceStep?.productionRuleId, 'dialogue.move.hint');
+    assert.equal(writtenRecords.length, 1);
+    assert.equal(writtenRecords[0]?.action, 'sparc-dialogue-turn');
     assert.equal(result.utteranceRequest.action, 'hint');
     assert.equal(result.utteranceRequest.targetId, 'kc-b');
     assert.ok(result.transition.writes.some((write: { value?: unknown }) => (

@@ -80,6 +80,7 @@ export interface TrialContentPropsBuildResult {
 }
 
 export interface TrialContentPropsFromSubsetInput {
+  readonly adminDiagnosticMode?: unknown;
   readonly buttonList: unknown;
   readonly correctAnswer: unknown;
   readonly correctAnswerImageSrc: unknown;
@@ -194,6 +195,7 @@ export function buildTrialContentPropsFromSubset(
       ? String(correctAnswerImageSrc || '')
       : '',
     props: {
+      adminDiagnosticMode: Boolean(input.adminDiagnosticMode),
       layoutMode: input.layoutMode,
       subsetKind: input.subset.kind,
       displayVisible: input.subset.displayVisible,

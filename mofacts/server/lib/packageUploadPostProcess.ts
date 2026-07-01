@@ -1,11 +1,172 @@
 import type { UploadedPackageFile } from './packageParser';
 import type { PackageUploadRuntimeState, ProcessPackageUploadDeps } from './packageUploadShared';
+import { resolvePreferredApiKey } from './apiKeyResolution';
+import { callOpenRouterEmbeddings } from '../../client/lib/openRouterClient';
+import {
+  AUTO_TUTOR_PRIMARY_EMBEDDING_MODEL,
+  AUTO_TUTOR_SECONDARY_EMBEDDING_MODEL,
+} from '../../client/lib/autoTutorRelationshipEngine';
+import {
+  computeClusterKcRelationshipsFromEmbeddings,
+  createClusterKcGraphFacts,
+  type ClusterKcRelationshipNode,
+} from '../../../learning-components/runtime/clusterKcRelationshipEngine';
 import {
   extractH5PContentReferences,
   getMissingH5PLibraryFolders,
   storeH5PLibrariesFromPackage,
   storeH5PPackageFile,
 } from './h5pPackage';
+
+function isRecord(value: unknown): value is Record<string, any> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function nonBlankString(value: unknown) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function getWorkingMemoryFacts(display: unknown) {
+  return isRecord(display) && Array.isArray(display.workingMemoryFacts)
+    ? display.workingMemoryFacts
+    : null;
+}
+
+function hasKcGraphRelationships(facts: readonly unknown[]) {
+  return facts.some((fact) => isRecord(fact) && fact.factType === 'kcGraph.relationship');
+}
+
+function collectClusterKcRelationshipNodes(facts: readonly unknown[]): ClusterKcRelationshipNode[] {
+  const nodes: ClusterKcRelationshipNode[] = [];
+  const seen = new Set<string>();
+  for (const fact of facts) {
+    if (!isRecord(fact) || fact.factType !== 'learningTarget.source' || !isRecord(fact.slots)) {
+      continue;
+    }
+    const clusterKC = nonBlankString(fact.slots.clusterKC);
+    if (!clusterKC || seen.has(clusterKC)) {
+      continue;
+    }
+    const proposition = nonBlankString(fact.slots.proposition);
+    const assertion = nonBlankString(fact.slots.assertion);
+    const label = nonBlankString(fact.slots.label);
+    const description = [
+      label ? `Label: ${label}` : '',
+      proposition ? `Proposition: ${proposition}` : '',
+      assertion ? `Assertion: ${assertion}` : '',
+    ].filter(Boolean).join('\n') || clusterKC;
+    const node: ClusterKcRelationshipNode = {
+      clusterKC,
+      description,
+    };
+    const sourceId = nonBlankString(fact.slots.sourceId);
+    if (sourceId) {
+      nodes.push({ ...node, sourceId });
+    } else {
+      nodes.push(node);
+    }
+    seen.add(clusterKC);
+  }
+  return nodes;
+}
+
+async function ensureConvertedAutoTutorSparcGraph(args: {
+  tdf: any;
+  deps: ProcessPackageUploadDeps;
+  state: PackageUploadRuntimeState;
+}) {
+  const { tdf, deps, state } = args;
+  const stimuli = tdf?.rawStimuliFile;
+  const setspec = isRecord(stimuli?.setspec) ? stimuli.setspec : null;
+  const conversion = isRecord(setspec?.sourceAutoTutorConversion)
+    ? setspec.sourceAutoTutorConversion
+    : null;
+  if (!conversion || !Array.isArray(setspec?.sparcPages)) {
+    return;
+  }
+
+  let generatedPageCount = 0;
+  for (const page of setspec.sparcPages) {
+    const display = isRecord(page) ? page.display : null;
+    const facts = getWorkingMemoryFacts(display);
+    if (!facts || hasKcGraphRelationships(facts)) {
+      continue;
+    }
+    const nodes = collectClusterKcRelationshipNodes(facts);
+    if (nodes.length < 2) {
+      continue;
+    }
+
+    const keyResolution = await resolvePreferredApiKey(deps.getApiKeyResolutionDeps(), {
+      userId: state.uploadActorUserId,
+      tdfId: tdf?._id,
+      kind: 'openrouter',
+    });
+    if (!keyResolution.apiKey) {
+      throw new Error('Converted AutoTutor SPARC upload requires an OpenRouter key alternative to generate the KC relationship graph.');
+    }
+
+    const attemptedModels: string[] = [];
+    let embeddingResult: Awaited<ReturnType<typeof callOpenRouterEmbeddings>> | null = null;
+    let model = '';
+    let lastError: unknown;
+    for (const candidateModel of [AUTO_TUTOR_PRIMARY_EMBEDDING_MODEL, AUTO_TUTOR_SECONDARY_EMBEDDING_MODEL]) {
+      model = candidateModel;
+      attemptedModels.push(candidateModel);
+      try {
+        embeddingResult = await callOpenRouterEmbeddings({
+          apiKey: keyResolution.apiKey,
+          model: candidateModel,
+          input: nodes.map((node) => node.description),
+          telemetry: {
+            surface: 'package-upload',
+            operation: 'sparc-kc-relationship-embedding',
+          },
+        });
+        break;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    if (!embeddingResult) {
+      throw new Error(`Converted AutoTutor SPARC graph generation failed: ${lastError instanceof Error ? lastError.message : String(lastError)}`);
+    }
+
+    const relationships = computeClusterKcRelationshipsFromEmbeddings({
+      nodes,
+      embeddings: embeddingResult.embeddings,
+    });
+    const graphFacts = createClusterKcGraphFacts({ nodes, relationships });
+    display.workingMemoryFacts = [
+      ...facts.filter((fact) => !isRecord(fact) || (fact.factType !== 'kcGraph.node' && fact.factType !== 'kcGraph.relationship')),
+      ...graphFacts,
+    ];
+    generatedPageCount += 1;
+    conversion.relationshipValidation = {
+      ...(isRecord(conversion.relationshipValidation) ? conversion.relationshipValidation : {}),
+      valid: true,
+      sourceShape: 'generated-at-upload',
+      relationshipGenerationRequired: false,
+      resolvedRelationshipCount: relationships.length,
+      generatedClusterCount: nodes.length,
+      generatedRelationships: true,
+      relationshipProvenance: {
+        graphVersion: 'sparc-kc-relationships-v1',
+        generatedAt: new Date().toISOString(),
+        model,
+        attemptedModels,
+        metric: 'cosine_similarity_normalized_vectors',
+        scoreTransform: 'clamp_negative_to_zero',
+        sourceKeyType: keyResolution.source,
+      },
+      ...(embeddingResult.costUsd !== undefined ? { generationResult: { model, attemptedModels, costUsd: embeddingResult.costUsd } } : { generationResult: { model, attemptedModels } }),
+    };
+  }
+
+  if (generatedPageCount > 0) {
+    deps.serverConsole('Generated SPARC KC relationship graph facts for converted AutoTutor package:', tdf.tdfFileName || tdf.fileName || tdf._id, 'pages=', generatedPageCount);
+  }
+}
 
 async function upsertReferencedH5PContent(args: {
   tdf: any;
@@ -109,6 +270,7 @@ export async function postProcessUploadedTdfs(args: {
       const scopedStimuliSetId = tdf.stimuliSetId ?? state.stimSetId;
       const uploadedMediaPathMap = state.uploadedMediaPathMapsByStimSetId.get(String(scopedStimuliSetId ?? '').trim());
       await upsertReferencedH5PContent({ tdf, h5pFilesByName, deps, scopedStimuliSetId });
+      await ensureConvertedAutoTutorSparcGraph({ tdf, deps, state });
       const processedTdf = await deps.processAudioFilesForTDF(tdf.content.tdfs, scopedStimuliSetId, {
         rejectUnresolved: true,
         allowFilenameLookup: false,

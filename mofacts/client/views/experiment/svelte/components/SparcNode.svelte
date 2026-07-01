@@ -4,6 +4,7 @@
   import { sanitizeSparcRichHtml } from '../services/sparcRichHtml';
 
   export let node;
+  export let adminDiagnosticMode = false;
   export let nodeValues = {};
   export let learningProgressSnapshot = null;
   export let authoringSelectedNodeId = '';
@@ -133,6 +134,15 @@
     return dialogueSpeaker(candidate) === 'learner' ? 'Learner' : 'Tutor';
   }
 
+  function dialogueProductionRuleLabel(candidate) {
+    if (!adminDiagnosticMode || dialogueSpeaker(candidate) !== 'tutor') {
+      return '';
+    }
+    const productionRuleName = String(candidate?.productionRuleName || '').trim();
+    const productionRuleId = String(candidate?.productionRuleId || '').trim();
+    return productionRuleName || productionRuleId;
+  }
+
   function skillBarFill(candidate) {
     const fill = Number(candidate?.fill ?? 0);
     if (!Number.isFinite(fill)) {
@@ -220,6 +230,7 @@
           <div class="sparc-fraction-top">
             <svelte:self
               node={fractionNumerator}
+              {adminDiagnosticMode}
               {nodeValues}
               {learningProgressSnapshot}
               {authoringSelectedNodeId}
@@ -234,6 +245,7 @@
           <div class="sparc-fraction-bottom">
             <svelte:self
               node={fractionDenominator}
+              {adminDiagnosticMode}
               {nodeValues}
               {learningProgressSnapshot}
               {authoringSelectedNodeId}
@@ -253,6 +265,7 @@
         <div class="sparc-group-header-feedback">
           <svelte:self
             node={headerFeedbackNode}
+            {adminDiagnosticMode}
             {nodeValues}
             {learningProgressSnapshot}
             {authoringSelectedNodeId}
@@ -288,6 +301,7 @@
           <div class="sparc-choice-tab-panel" role="tabpanel">
             <svelte:self
               node={activeTabNode}
+              {adminDiagnosticMode}
               {nodeValues}
               {learningProgressSnapshot}
               {authoringSelectedNodeId}
@@ -303,6 +317,7 @@
         {#each renderItems as item (item.key)}
           <svelte:self
             node={item.node}
+            {adminDiagnosticMode}
             {nodeValues}
             {learningProgressSnapshot}
             {authoringSelectedNodeId}
@@ -382,6 +397,7 @@
           {#each activePanelItems as item (item.key)}
             <svelte:self
               node={item.node}
+              {adminDiagnosticMode}
               {nodeValues}
               {learningProgressSnapshot}
               {authoringSelectedNodeId}
@@ -424,7 +440,12 @@
       data-sparc-speaker={dialogueSpeaker(node)}
     >
       <div class="sparc-dialogue-speaker">{dialogueSpeakerLabel(node)}</div>
-      <div class="sparc-dialogue-bubble">{getNodeValue(node)}</div>
+      <div class="sparc-dialogue-bubble">
+        <div>{getNodeValue(node)}</div>
+        {#if dialogueProductionRuleLabel(node)}
+          <div class="sparc-dialogue-diagnostic">production: {dialogueProductionRuleLabel(node)}</div>
+        {/if}
+      </div>
     </div>
   {:else if node.atomType === 'skill-bar'}
     <div class="sparc-atom sparc-skill-bar" class:sparc-authoring-selected={node.id === authoringSelectedNodeId} data-node-id={node.id} aria-label={node.label || ''}>
@@ -1080,6 +1101,17 @@
   .sparc-dialogue-utterance-learner .sparc-dialogue-bubble {
     background: color-mix(in srgb, var(--sparc-primary-action-surface-color) 18%, var(--sparc-control-surface-color));
     border-color: color-mix(in srgb, var(--sparc-primary-action-surface-color) 42%, var(--sparc-border-color));
+  }
+
+  .sparc-dialogue-diagnostic {
+    margin-top: var(--sparc-space-2);
+    padding-top: var(--sparc-space-1);
+    border-top: var(--sparc-border-width) solid var(--sparc-border-color);
+    color: var(--sparc-muted-text-color);
+    font-family: var(--sparc-monospace-font-family);
+    font-size: calc(var(--sparc-font-size-small) * 0.86);
+    line-height: 1.25;
+    overflow-wrap: anywhere;
   }
 
   :global(.sparc-html-block .oli-definition),

@@ -196,4 +196,86 @@ describe('sparcDisplayContentReadiness', function() {
       'invalid-production-rule',
     ]);
   });
+
+  it('accepts executable derived fact rules', function() {
+    const display = sparcTrialDisplayAdapter.normalizeDisplay({
+      type: 'sparc',
+      nodes: [{
+        id: 'node-answer',
+        nodeType: 'atomic',
+      }],
+      derivedFacts: [{
+        id: 'answer-branch',
+        when: [{
+          factType: 'interface-event',
+          slots: {
+            sourceNode: { type: 'literal', value: 'node-answer' },
+            input: { type: 'bind', variable: 'answerValue' },
+          },
+        }],
+        fact: {
+          factType: 'answer.branch',
+          slots: {
+            value: { type: 'variable', name: 'answerValue' },
+          },
+        },
+      }],
+    });
+
+    assert.deepEqual(validateSparcDisplayContentReadiness(display), {
+      ready: true,
+      issues: [],
+    });
+  });
+
+  it('rejects malformed derived fact rules before runtime', function() {
+    const display = sparcTrialDisplayAdapter.normalizeDisplay({
+      type: 'sparc',
+      nodes: [{
+        id: 'node-answer',
+        nodeType: 'atomic',
+      }],
+      derivedFacts: [{
+        id: '',
+        when: [],
+        fact: {
+          factType: '',
+        },
+      }, {
+        id: 'unsafe-any-binding',
+        when: [{
+          type: 'any',
+          conditions: [{
+            factType: 'interface-event',
+            slots: {
+              input: { type: 'bind', variable: 'leftOnly' },
+            },
+          }, {
+            factType: 'interface-event',
+            slots: {
+              input: { type: 'bind', variable: 'rightOnly' },
+            },
+          }],
+        }],
+        fact: {
+          factType: 'answer.branch',
+          slots: {
+            value: { type: 'variable', name: 'leftOnly' },
+          },
+        },
+      }],
+    });
+
+    const issues = validateSparcDisplayContentReadiness(display).issues;
+
+    assert.deepEqual(issues.map((issue) => issue.kind), [
+      'invalid-derived-fact-rule',
+      'invalid-derived-fact-rule',
+      'invalid-derived-fact-rule',
+    ]);
+    assert.match(
+      issues.map((issue) => issue.message).join('; '),
+      /derivedFacts\[0\]\.id is required.*fact\.factType.*unsafe-any-binding.*any/,
+    );
+  });
 });

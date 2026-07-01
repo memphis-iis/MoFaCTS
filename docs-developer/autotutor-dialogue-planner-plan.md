@@ -49,10 +49,9 @@ The planner should distinguish the following move categories:
 - `correction`: brief correction of an active misconception, followed by a repair question.
 - `answer_question`: answer a learner question.
 - `question_prompt`: ask whether the learner has questions.
-- `final_answer_prompt`: ask the learner to restate the answer after coverage work.
 - `summary`: recap the ideal answer at completion.
 
-The current contract has `answer_question` but not `question_prompt` or `final_answer_prompt`. It also has `summary`, but summary is currently forced by completion rather than being a normal planner step.
+The current contract has `answer_question` but not `question_prompt`. It also has `summary`, and completion selects `summary` directly.
 
 ## Scoring Layer
 
@@ -214,8 +213,7 @@ If target is a misconception:
 
 If target is `completion`:
 
-- choose `final_answer_prompt` if the learner has not yet given a final integrated answer and the policy requires one;
-- otherwise choose `summary`.
+- choose `summary`.
 
 If the product decision is to continue summarizing immediately at completion, the planner should represent that as an explicit `summary` move rather than as hidden completion behavior.
 
@@ -307,7 +305,7 @@ Do not stop after drafting a partial design, adding only types, or implementing 
 
 - Add planner-state types.
 - Add score types.
-- Add move names `question_prompt` and `final_answer_prompt`, or explicitly defer them and document why.
+- Add move name `question_prompt`, or explicitly defer it and document why.
 - Preserve existing package compatibility.
 
 ### Step 2: Add Scoring Call

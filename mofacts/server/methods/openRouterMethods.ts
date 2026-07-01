@@ -8,6 +8,7 @@ import {
   type OpenRouterMessage,
 } from '../../client/lib/openRouterClient';
 import {
+  type ApiKeySource,
   getAdminOpenRouterModel,
   getTdfOpenRouterModel,
   getUserOpenRouterModel,
@@ -59,32 +60,30 @@ async function resolveOpenRouterModel(deps: ApiKeyResolutionDeps, params: {
   userId: string;
   tdfId?: string | null;
   requestedModel?: unknown;
+  keySource?: ApiKeySource;
 }) {
-  const requestedModel = normalizeString(params.requestedModel);
-  if (requestedModel) {
-    return requestedModel;
+  if (params.keySource === 'tdf') {
+    if (params.tdfId) {
+      const tdf = await deps.getTdfById(params.tdfId);
+      return getTdfOpenRouterModel(tdf);
+    }
+    return '';
   }
 
-  let tdfModel = '';
-  if (params.tdfId) {
-    const tdf = await deps.getTdfById(params.tdfId);
-    tdfModel = getTdfOpenRouterModel(tdf);
-  }
-  if (tdfModel) {
-    return tdfModel;
+  if (params.keySource === 'user') {
+    const user = await deps.getUserById(params.userId);
+    return getUserOpenRouterModel(user);
   }
 
-  const user = await deps.getUserById(params.userId);
-  const userModel = getUserOpenRouterModel(user);
-  if (userModel) {
-    return userModel;
-  }
-
-  if (deps.getAdminApiKeySettings) {
+  if (params.keySource === 'admin' && deps.getAdminApiKeySettings) {
     const adminModel = getAdminOpenRouterModel(await deps.getAdminApiKeySettings());
     if (adminModel) {
       return adminModel;
     }
+  }
+
+  if (params.keySource === 'provided') {
+    return normalizeString(params.requestedModel);
   }
 
   return '';
@@ -108,6 +107,7 @@ export function createOpenRouterMethods(deps: OpenRouterMethodsDeps) {
       const model = await resolveOpenRouterModel(resolverDeps, {
         userId,
         tdfId: normalizeString(tdfId) || null,
+        keySource: keyResolution.source,
       });
       return {
         configured: Boolean(keyResolution.apiKey && model),
@@ -137,6 +137,7 @@ export function createOpenRouterMethods(deps: OpenRouterMethodsDeps) {
         userId,
         tdfId,
         requestedModel: data.model,
+        keySource: keyResolution.source,
       });
       if (!model) {
         throw new Meteor.Error('no-openrouter-model', 'No configured OpenRouter model is available');

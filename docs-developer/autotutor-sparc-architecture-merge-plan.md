@@ -182,6 +182,8 @@ For BRD-to-SPARC conversion, treat the graph as authored behavior:
 
 For the SPARC Fractions `1416.brd` case, `firstDenConv=12` selects the LCD branch and `firstDenConv=24` selects the product-denominator branch. The active denominator/path fact must replace prior active-path state, not accumulate alongside stale branch facts; later numerator, answer, simplification, and Done productions must be sensitive to that active branch.
 
+When graph conversion needs reusable transient facts, generated SPARC pages may author `display.derivedFacts`: a load-time/runtime list of production-rule-shaped derivations that assert non-persistent working-memory facts from authored facts, replayed state, and the current interface event before ordinary production rules run. Use this for deterministic branch lookup facts such as the valid converted numerator for each denominator path. Do not use it for durable current-path state; active branch/path selection that must survive reload remains a stable SPARC state write projected back into working memory.
+
 ## What Generated AutoTutor Content Owns
 
 Generated AutoTutor content should use the ordinary SPARC document/session contract. Any needed controller, target-selection, production-phase, or replay behavior must be added as a general SPARC runtime capability and exercised by the generated content, not owned as a SPARC-backed AutoTutor subsystem.
@@ -1327,7 +1329,7 @@ History should record only what ordinary SPARC replay and analysis need:
 - stable-key SPARC state cells for mutable current values: merged learning-target coverage, misconception scores, selected target, selected action, completion state, turn/focus counters, and any other controller value that must survive reload
 - the generated tutor utterance as the appended tutor-message node, not as a separate transcript payload
 
-Production-rule firings are research-relevant SPARC trace events. Record rule firings through ordinary SPARC trace/history records for both learner-triggered and controller/system-triggered production runs. Learner-triggered records may point back to the submitted learner event. Controller/system firings, such as target selection, derived-fact generation, move selection, visibility/reveal rules, and generated tutor utterance commits, should still write trace records, but they must not fabricate a student action or response payload. Their source should identify the controller/run context and include the fired rule id, salience when applicable, matched/selected action fields when applicable, clusterKC or other target identity when applicable, and whether the rule stopped the current salience-ranked run.
+Production-rule firings are research-relevant SPARC trace events. Record rule firings through ordinary SPARC trace/history records for both learner-triggered and controller/system-triggered production runs. Learner-triggered records may point back to the submitted learner event. Controller/system rule executions, such as target selection, derived-rule execution that produces facts, move selection, visibility/reveal rules, and generated tutor utterance commits, should still write trace records, but they must not fabricate a student action or response payload. Their source should identify the controller/run context and include the fired rule id, salience when applicable, matched/selected action fields when applicable, clusterKC or other target identity when applicable, and whether the rule stopped the current salience-ranked run.
 
 Reload/resume is a first-class invariant, not a debugging convenience. After ordinary SPARC history replay, a resumed SPARC-backed AutoTutor session must have the same visible dialogue, learner submissions, generated tutor utterances, merged target scores, misconception state, selected/focused target, selected action, completion state, turn counters, and derived word-count basis as the pre-reload session. Completed turns must not call the scoring LLM or utterance LLM again. The next learner turn may call those services for the new submission, using only the replayed SPARC state and displayed progressive nodes as its prior context.
 
@@ -1366,6 +1368,7 @@ Required verification:
 - Backward-compatibility tests prove existing SPARC tutors do not need migration for the new `range` slot pattern or `any` condition syntax. Existing fact-pattern conditions, `not` conditions, and `tests` with `left`/`right` comparisons must keep loading and evaluating unchanged.
 - Existing-package smoke tests load at least one current SPARC package from `C:\dev\mofacts_config` after the `range`/`any` evaluator and validation changes. The smoke test must verify the package still reaches the current `sparcsession` display path and does not require generated-file edits.
 - Production-rule regression tests run the existing evaluator fixtures unchanged, then add focused coverage for `range` matches, inclusive/exclusive range boundaries, non-numeric range rejection, `any` matching, `any` non-matching, nested `any`/`not` validation, and rejected ambiguous variable binding across `any` branches.
+- Derived-rule tests prove `setspec.sparcPages[].display.derivedFacts` survives display-to-document conversion, validates with the same production-rule condition/test rules including unsafe `any` branch-binding rejection, and produces transient working-memory facts visible to subsequent production rules without persisting them as stale replay state.
 
 For TypeScript-bearing changes in `mofacts/`, run:
 
@@ -1537,6 +1540,8 @@ Add a general SPARC controller fact-derivation pass that runs after scoring and 
 ```
 
 This pass extends the existing SPARC working-memory build with deterministic `extraFacts`. Persist mutable current values as stable-key SPARC state cells when later phases or replay need them; do not create a second controller-state store.
+
+For authored deterministic facts that are part of a SPARC page rather than a controller phase, use top-level `setspec.sparcPages[].display.derivedFacts`. These rules share the normal production-rule condition/test/fact-template syntax, are validated by SPARC display readiness, and produce transient non-persistent working-memory facts. They are suitable for BRD graph-derived helper facts and path-specific lookup facts, not for mutable controller state that must have latest-value replay semantics.
 
 ### Step 7B: Add SPARC Production-Rule Contract Extensions
 

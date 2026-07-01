@@ -412,6 +412,7 @@ const packageMethods = createPackageMethods({
   getNewItemFormat,
   legacyTrim,
   encryptData,
+  getApiKeyResolutionDeps,
   updateStimDisplayTypeMap,
   rebuildStimDisplayTypeMapSnapshot,
   getStimDisplayTypeMapDeps,

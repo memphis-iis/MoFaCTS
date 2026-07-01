@@ -1,5 +1,6 @@
 import { buildSparcWorkingMemoryFacts } from './sparcWorkingMemoryFacts';
 import { deriveSparcControllerFacts } from './sparcControllerDerivedFacts';
+import { deriveSparcActiveSelectorSignalFacts } from './sparcSelectorSignals';
 import { evaluateSparcAuthoredProductionRules, type SparcCommittedProductionRuleEvaluation } from './sparcProductionRuleCommit';
 import {
   selectSparcLearningTargetFromFacts,
@@ -170,11 +171,17 @@ export function evaluateSparcControllerTurnPlanning(params: {
       ...baseFacts,
       ...derivedFacts,
     ],
-    ...(params.targetSelectionOptions ? { targetSelectionOptions: params.targetSelectionOptions } : {}),
+      ...(params.targetSelectionOptions ? { targetSelectionOptions: params.targetSelectionOptions } : {}),
   });
+  const selectorSignalFacts = deriveSparcActiveSelectorSignalFacts([
+    ...baseFacts,
+    ...derivedFacts,
+    ...targetSelection.facts,
+  ]);
   const productionRuleFacts = [
     ...targetSelection.facts,
     ...derivedFacts,
+    ...selectorSignalFacts,
   ];
   const productionRuleEvaluation = evaluateSparcAuthoredProductionRules({
     document: params.document,

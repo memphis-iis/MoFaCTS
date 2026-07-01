@@ -32,7 +32,6 @@ function buildConfig(overrides: Partial<AutoTutorConfig> = {}): AutoTutorConfig 
     turnLimit: {
       maxTurns: 10,
     },
-    requireFinalAnswerPrompt: false,
     prompt: 'Explain confidence intervals.',
     unitName: 'AutoTutor Test',
     clusterIndex: 0,
@@ -327,9 +326,9 @@ describe('AutoTutor state machine', function() {
     expect(prompt.plan.selectedMove).to.equal('prompt');
   });
 
-  it('distinguishes final-answer prompt, summary mastery, max turns, and cost cap', function() {
-    const finalPromptConfig = buildConfig({ requireFinalAnswerPrompt: true });
-    let state = createInitialAutoTutorState(finalPromptConfig.script);
+  it('distinguishes summary mastery, max turns, and cost cap', function() {
+    const summaryConfig = buildConfig();
+    const state = createInitialAutoTutorState(summaryConfig.script);
     const completeScores = scoreEnvelope(state, {
       expectationScores: {
         E1: { ...state.expectations.E1!, current: true, coverage: 0.9 },
@@ -338,21 +337,14 @@ describe('AutoTutor state machine', function() {
       answerQuality: 'high',
     });
 
-    const finalPrompt = planWithScore(finalPromptConfig, state, completeScores);
-    expect(finalPrompt.plan.selectedMove).to.equal('final_answer_prompt');
-    expect(finalPrompt.nextState.completed).to.equal(false);
-    expect(finalPrompt.nextState.pedagogicalState).to.include({
-      targetType: 'completion',
-      selectedMove: 'final_answer_prompt',
-      completionStage: 'requesting_final_answer',
-    });
-
-    state = finalPrompt.nextState;
-    const summaryEnvelope = scoreEnvelope(state, { answerQuality: 'high' });
-    summaryEnvelope.expectationScores = {};
-    const summary = planWithScore(finalPromptConfig, state, summaryEnvelope);
+    const summary = planWithScore(summaryConfig, state, completeScores);
     expect(summary.plan.selectedMove).to.equal('summary');
     expect(summary.nextState.endReason).to.equal('mastery');
+    expect(summary.nextState.pedagogicalState).to.include({
+      targetType: 'completion',
+      selectedMove: 'summary',
+      completionStage: 'mastered',
+    });
 
     const maxTurnConfig = buildConfig({ turnLimit: { maxTurns: 1 } });
     const maxTurnState = createInitialAutoTutorState(maxTurnConfig.script);

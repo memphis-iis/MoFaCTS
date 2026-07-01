@@ -16,6 +16,9 @@ type AssignmentEditorRow = CourseAssignmentSummary & {
   fileName: string;
   tags: string[];
 };
+type InstructorCourseOption = {
+  _id: string;
+};
 
 Session.set('courses', []);
 Session.set('courseAssignmentRows', []);
@@ -96,8 +99,8 @@ async function loadCourseSnapshot(courseId: string) {
   }
 }
 
-Template.tdfAssignmentEdit.onCreated(function() {
-  const instance = this as any;
+Template.tdfAssignmentEdit.onCreated(function(this: any) {
+  const instance = this;
   instance.courseSelectionAutorun = instance.autorun(() => {
     const selectedCourseId = String(Session.get('courseAssignmentSelectedCourseId') || '');
     if (!selectedCourseId) return;
@@ -142,7 +145,7 @@ Template.tdfAssignmentEdit.onRendered(async function() {
   Session.set('courseAssignmentSearch', '');
   Session.set('courseAssignmentLoading', true);
   try {
-    const courses = await meteorCallAsync('getAllCoursesForInstructor', Meteor.userId());
+    const courses = await meteorCallAsync('getAllCoursesForInstructor', Meteor.userId()) as InstructorCourseOption[];
     Session.set('courses', courses);
 
     const previousCourseId = String(Session.get('courseAssignmentSelectedCourseId') || '');
@@ -166,8 +169,8 @@ Template.tdfAssignmentEdit.onRendered(async function() {
   }
 });
 
-Template.tdfAssignmentEdit.onDestroyed(function() {
-  const instance = this as any;
+Template.tdfAssignmentEdit.onDestroyed(function(this: any) {
+  const instance = this;
   instance.courseSelectionAutorun?.stop();
 });
 

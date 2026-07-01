@@ -100,6 +100,7 @@ export type SparcAuthoredDocument = {
   readonly clusterTargets?: readonly SparcClusterModelTarget[];
   readonly initialState?: readonly SparcStateWrite[];
   readonly workingMemoryFacts?: readonly SparcWorkingMemoryFact[];
+  readonly derivedFacts?: readonly SparcDerivedFactRule[];
   readonly productionRules?: readonly SparcProductionRule[];
   readonly root: SparcAuthoredNode;
 };
@@ -285,6 +286,13 @@ export type SparcWorkingMemoryFactTemplate = {
   readonly factId?: string;
   readonly factType: string;
   readonly slots?: Readonly<Record<string, SparcRuleExpression>>;
+};
+
+export type SparcDerivedFactRule = {
+  readonly id: string;
+  readonly when: readonly SparcProductionRuleCondition[];
+  readonly tests?: readonly SparcProductionRuleTest[];
+  readonly fact: SparcWorkingMemoryFactTemplate;
 };
 
 export type SparcStateWriteAddressTemplate = {

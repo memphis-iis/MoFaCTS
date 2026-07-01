@@ -46,7 +46,7 @@ Refactor objectives:
    * expectation target with moves such as `pump`, `hint`, `prompt`, `assertion`
    * misconception target with correction stages `hint`, `prompt`, `assertion`
    * learner question target, preferably distinguishing in-scope vs out-of-scope if already supported by scorer metadata
-   * completion target with `final_answer_prompt` and `summary`
+   * completion target with `summary`
 
 2. Introduce explicit types for the operational phase and pedagogical state. Suggested names:
 
@@ -65,7 +65,7 @@ Refactor objectives:
    * expectation cycle remains `hint -> prompt -> assertion`
    * misconception correction cycle remains `hint -> prompt -> assertion`
    * repeated `idk` / help request escalation remains `hint -> prompt -> assertion`
-   * `final_answer_prompt` remains the first completion move when required, followed by `summary`
+   * completion selects `summary` directly
 
 4. Make learner-question handling clearer:
 
@@ -76,9 +76,8 @@ Refactor objectives:
 
 5. Make completion handling clearer:
 
-   * Consolidate or clarify the relationship among planner completion target, final-answer prompt requirement, graduation rules, and end-state flags.
-   * Keep the current behavior unless there is a clear inconsistency.
-   * Make it easy to understand when the system is “ready for final answer,” “requesting final answer,” “summarizing,” and “completed/mastered.”
+   * Consolidate or clarify the relationship among planner completion target, graduation rules, and end-state flags.
+   * Make it easy to understand when the system is summarizing and when it is completed/mastered.
 
 6. Move reusable AutoTutor runtime/state-machine logic toward `learning-components/units/autotutor/`.
 
@@ -105,8 +104,7 @@ Refactor objectives:
    * repeated `idk` / help request escalates hint -> prompt -> assertion
    * low answer quality on first focus turn gives pump
    * near-threshold coverage gives prompt
-   * completion routes to final-answer prompt when required
-   * completion routes to summary after final-answer prompt
+   * completion routes to summary
    * mastery, max-turns, and cost-cap termination are distinct and testable
    * saved history resume restores operational and pedagogical state correctly
 

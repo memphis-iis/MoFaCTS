@@ -1,9 +1,13 @@
 import type {
   SparcAuthoredDocument,
   SparcAuthoredNode,
+  SparcDerivedFactRule,
   SparcInterfaceEvent,
+  SparcProductionRule,
+  SparcProductionRuleExecution,
   SparcWorkingMemoryFact,
 } from './sparcSessionContracts';
+import { runSparcProductionRules } from './sparcProductionRuleEvaluator';
 import type { SparcReplayState } from './sparcStateReplay';
 import {
   SPARC_STABLE_WORKING_MEMORY_FACT_STATE_KEY_PREFIX,
@@ -16,6 +20,11 @@ export type SparcWorkingMemoryFactBuildInput = {
   readonly replayState?: SparcReplayState;
   readonly event?: SparcInterfaceEvent;
   readonly extraFacts?: readonly SparcWorkingMemoryFact[];
+};
+
+export type SparcWorkingMemoryFactBuildResult = {
+  readonly facts: readonly SparcWorkingMemoryFact[];
+  readonly derivedRuleExecution?: SparcProductionRuleExecution;
 };
 
 function requireNonBlank(value: unknown, label: string): string {
@@ -170,9 +179,48 @@ function eventFacts(event: SparcInterfaceEvent): readonly SparcWorkingMemoryFact
   return facts;
 }
 
-export function buildSparcWorkingMemoryFacts(
+function derivedFactProductionRule(rule: SparcDerivedFactRule): SparcProductionRule {
+  return {
+    id: `derived-fact:${rule.id}`,
+    salience: 0,
+    when: rule.when,
+    ...(rule.tests ? { tests: rule.tests } : {}),
+    then: [{
+      type: 'assert-fact',
+      persist: false,
+      fact: rule.fact,
+    }],
+  };
+}
+
+function appendDerivedFacts(
+  facts: SparcWorkingMemoryFact[],
+  derivedFacts: readonly SparcDerivedFactRule[] | undefined,
+): SparcProductionRuleExecution | undefined {
+  if (!derivedFacts?.length) {
+    return undefined;
+  }
+  const existingFactKeys = new Set(facts.map((fact) => JSON.stringify(fact)));
+  const execution = runSparcProductionRules({
+    facts,
+    rules: derivedFacts.map(derivedFactProductionRule),
+  });
+  for (const firing of execution.firings) {
+    for (const fact of firing.assertedFacts) {
+      const key = JSON.stringify(fact);
+      if (existingFactKeys.has(key)) {
+        continue;
+      }
+      existingFactKeys.add(key);
+      facts.push(fact);
+    }
+  }
+  return execution;
+}
+
+export function buildSparcWorkingMemoryFactsWithDerivations(
   input: SparcWorkingMemoryFactBuildInput,
-): readonly SparcWorkingMemoryFact[] {
+): SparcWorkingMemoryFactBuildResult {
   requireNonBlank(input.document.id, 'SPARC authored document id');
   const facts: SparcWorkingMemoryFact[] = [
     ...((input.document.workingMemoryFacts ?? []).map(authoredFactWithId)),
@@ -191,6 +239,16 @@ export function buildSparcWorkingMemoryFacts(
     facts.push(...eventFacts(input.event));
   }
   facts.push(...(input.extraFacts ?? []));
+  const derivedRuleExecution = appendDerivedFacts(facts, input.document.derivedFacts);
 
-  return facts;
+  return {
+    facts,
+    ...(derivedRuleExecution ? { derivedRuleExecution } : {}),
+  };
+}
+
+export function buildSparcWorkingMemoryFacts(
+  input: SparcWorkingMemoryFactBuildInput,
+): readonly SparcWorkingMemoryFact[] {
+  return buildSparcWorkingMemoryFactsWithDerivations(input).facts;
 }

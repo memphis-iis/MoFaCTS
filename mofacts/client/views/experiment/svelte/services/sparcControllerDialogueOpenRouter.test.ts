@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import type { SparcTrialDisplay } from '../../../../../../learning-components/trial-displays/sparc/SparcTrialDisplayAdapter';
 import type { SparcUtteranceRequest } from '../../../../../../learning-components/units/sparcsession/sparcUtteranceRequest';
+import { requireActiveSparcMoveDefinition } from '../../../../../../learning-components/units/sparcsession/sparcMoveDefinitions';
 import { createSparcDialogueOpenRouterProvider } from './sparcControllerDialogueOpenRouter.ts';
 
 function dialogueDisplay(): SparcTrialDisplay {
@@ -41,11 +42,41 @@ const utteranceRequest: SparcUtteranceRequest = {
   targetId: 'kc-a',
   action: 'hint',
   contentTexts: ['Use the authored hint.'],
+  moveDefinition: requireActiveSparcMoveDefinition('hint'),
   selectedAction: {
     targetType: 'learningTarget',
     clusterKC: 'kc-a',
     action: 'hint',
   },
+  learnerText: 'I think A matters.',
+  learnerContribution: {
+    type: 'answer',
+    confidence: 0.8,
+  },
+  pedagogicalState: {
+    targetType: 'learningTarget',
+    targetId: 'kc-a',
+    selectedMove: 'hint',
+  },
+  transitionMetadata: {
+    previousTargetType: null,
+    previousTargetId: null,
+    currentTargetType: 'learningTarget',
+    currentTargetId: 'kc-a',
+    targetChanged: true,
+  },
+  targetContent: {
+    clusterKC: 'kc-a',
+    label: 'Expectation A',
+    proposition: 'A proposition',
+  },
+  plannerState: {
+    expectations: [{ clusterKC: 'kc-a', coverage: 0.6 }],
+  },
+  dialogueHistory: [{
+    role: 'student',
+    text: 'Earlier answer.',
+  }],
 };
 
 describe('SPARC dialogue OpenRouter provider', function() {
@@ -92,6 +123,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
     expect(score.learnerQuestion).to.equal(undefined);
     expect(calls).to.have.length(1);
     expect(calls[0]).to.have.nested.property('intent.schemaName', 'mofacts_sparc_dialogue_score');
+    expect(calls[0]).to.not.have.nested.property('intent.strictSchema', true);
     expect(calls[0]).to.have.property('tdfId', 'tdf-1');
     const userMessage = (calls[0] as { messages: Array<{ role: string; content: string }> }).messages[1];
     expect(userMessage).to.not.equal(undefined);
@@ -105,6 +137,67 @@ describe('SPARC dialogue OpenRouter provider', function() {
       clusterKC: 'kc-a',
       label: 'Expectation A',
     });
+  });
+
+  it('adds current-turn good-answer and bad-answer bag matches from embeddings when available', async function() {
+    const embeddingCalls: unknown[] = [];
+    const provider = createSparcDialogueOpenRouterProvider({
+      tdfId: 'tdf-1',
+      async callResolvedOpenRouterJson() {
+        return {
+          parsedContent: {
+            learningTargetScores: [],
+            answerQuality: 'partial',
+            learnerContribution: {
+              type: 'answer',
+            },
+          },
+        };
+      },
+      async callResolvedOpenRouterEmbeddings(params) {
+        embeddingCalls.push(params);
+        return {
+          model: params.model,
+          embeddings: [
+            [1, 0],
+            [0, 1],
+            [0.8, 0.6],
+          ],
+        };
+      },
+    });
+
+    const score = await provider.scoreLearnerResponse({
+      display: dialogueDisplay(),
+      learnerText: 'A proposition',
+    } as Parameters<typeof provider.scoreLearnerResponse>[0]);
+
+    expect(embeddingCalls).to.have.length(1);
+    expect(embeddingCalls[0]).to.have.property('model', 'google/gemini-embedding-001');
+    expect(embeddingCalls[0]).to.have.nested.property('telemetry.operation', 'score-current-turn-bag-match');
+    expect((embeddingCalls[0] as { input: string[] }).input[0]).to.contain('Expectation A');
+    expect((embeddingCalls[0] as { input: string[] }).input[1]).to.contain('Repair the misconception.');
+    expect((embeddingCalls[0] as { input: string[] }).input[2]).to.equal('A proposition');
+    expect(score.bagMatchScores).to.deep.equal([{
+      kind: 'goodAnswer',
+      score: 0.8,
+      band: 'VERY_HIGH',
+      bagText: [
+        'Expectation A',
+        'A proposition',
+        'A assertion',
+        'Target B',
+      ].join('\n'),
+      model: 'google/gemini-embedding-001',
+      metric: 'cosine_similarity_normalized_vectors',
+    }, {
+      kind: 'badAnswer',
+      score: 0.6,
+      band: 'HIGH',
+      bagText: 'Repair the misconception.',
+      model: 'google/gemini-embedding-001',
+      metric: 'cosine_similarity_normalized_vectors',
+    }]);
   });
 
   it('requires learner question metadata for question contributions', async function() {
@@ -137,14 +230,14 @@ describe('SPARC dialogue OpenRouter provider', function() {
     );
   });
 
-  it('rejects utterance responses that change the selected target or action', async function() {
+  it('fails clearly when the model echoes tutor metadata that does not match the selected action', async function() {
     const provider = createSparcDialogueOpenRouterProvider({
       async callResolvedOpenRouterJson() {
         return {
           parsedContent: {
             targetType: 'learningTarget',
             targetId: 'kc-b',
-            action: 'hint',
+            selectedMove: 'hint',
             tutorMessage: 'Changed target.',
           },
         };
@@ -157,9 +250,10 @@ describe('SPARC dialogue OpenRouter provider', function() {
     } catch (caught) {
       error = caught;
     }
+
     expect(error).to.be.instanceOf(Error);
     expect((error as Error).message).to.equal(
-      'SPARC dialogue utterance response changed the selected target or action',
+      'SPARC dialogue utterance response targetId "kc-b" did not match selected targetId "kc-a"',
     );
   });
 
@@ -167,11 +261,28 @@ describe('SPARC dialogue OpenRouter provider', function() {
     const provider = createSparcDialogueOpenRouterProvider({
       async callResolvedOpenRouterJson(params) {
         expect(params).to.have.nested.property('intent.schemaName', 'mofacts_sparc_dialogue_utterance');
+        expect(params).to.not.have.nested.property('intent.strictSchema', true);
+        const userMessage = params.messages[1];
+        expect(userMessage).to.not.equal(undefined);
+        if (!userMessage) {
+          throw new Error('SPARC dialogue utterance call did not include a user message');
+        }
+        expect(params.messages[0]?.content).to.contain('Prompt contract: autotutor.hint v1.');
+        expect(params.messages[0]?.content).to.contain('Move-specific prompt policy:');
+        expect(params.messages[0]?.content).to.contain('Use the selected move policy to decide whether the tutorMessage should ask a follow-up question.');
+        expect(userMessage.content).to.contain('Latest student answer:');
+        expect(userMessage.content).to.contain('App-selected plan. Echo targetType, targetId, and selectedMove exactly in the response.');
+        expect(userMessage.content).to.contain('Registered move definition:');
+        expect(userMessage.content).to.contain('"targetType": "learningTarget"');
+        expect(userMessage.content).to.contain('"targetId": "kc-a"');
+        expect(userMessage.content).to.contain('"selectedMove": "hint"');
+        expect(params).to.have.nested.property('intent.strictSchema', true);
+        expect(userMessage.content).to.contain('Full dialogue history:');
         return {
           parsedContent: {
             targetType: 'learningTarget',
             targetId: 'kc-a',
-            action: 'hint',
+            selectedMove: 'hint',
             tutorMessage: 'Try using the authored hint.',
           },
         };

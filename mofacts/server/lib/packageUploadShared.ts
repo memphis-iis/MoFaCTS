@@ -45,6 +45,7 @@ export type UploadedMediaPathMapsByStimSetId = Map<string, Map<string, string>>;
 export type PackageUploadRuntimeState = {
   fileName: string;
   filePath: string;
+  uploadActorUserId: string | null;
   stimSetId: string | number | undefined;
   uploadedMediaPathMapsByStimSetId: UploadedMediaPathMapsByStimSetId;
 };
@@ -63,6 +64,7 @@ export type ProcessPackageUploadDeps = {
   normalizeCanonicalId: (value: unknown) => string | null;
   serverConsole: (...args: unknown[]) => void;
   encryptData: (value: string) => string;
+  getApiKeyResolutionDeps: () => import('./apiKeyResolution').ApiKeyResolutionDeps;
   legacyTrim: (value: unknown) => string;
   upsertPackage: (record: any, owner: string) => Promise<any>;
   updateStimDisplayTypeMap: (stimuliSetIds: Array<string | number>) => Promise<unknown>;

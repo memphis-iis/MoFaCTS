@@ -185,9 +185,7 @@ Initial rule set:
    - Correction stage may remain handled by existing misconception cycle at first, or be represented as productions in the same pass if simple.
 
 3. Completion target
-   - If target type is completion and final answer prompt is not required, select `summary`.
-   - If target type is completion and final answer prompt is required on the first completion pass, select `final_answer_prompt`.
-   - If target type is completion after the final answer prompt has already happened, select `summary`.
+   - If target type is completion, select `summary`.
 
 4. First repeated `idk` or `help_request`
    - If target is expectation and contribution type is `idk` or `help_request` and same-type streak is 1, select `hint`.
@@ -302,7 +300,7 @@ Required cases:
 
 - learner question target selects `answer_question`
 - misconception target selects `correction`
-- completion target selects `summary` or `final_answer_prompt`
+- completion target selects `summary`
 - first `idk` selects `hint`
 - second `idk` selects `prompt`
 - third `idk` selects `assertion`

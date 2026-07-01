@@ -30,7 +30,6 @@ The authored unit also supplies parameters that vary by lesson:
 - `autotutorsession.maxTurns`: the maximum turn count before `endReason: "max_turns"`.
 - `autotutorsession.graduation.requiredExpectationCount`: how many required expectations must count as covered for graduation.
 - `autotutorsession.graduation.maxActiveMisconceptions`: how many active misconceptions are allowed at graduation.
-- `autotutorsession.requireFinalAnswerPrompt`: whether completion first asks for a final answer before summary.
 - `autoTutor.dialogPolicy.requiredExpectations`: the expectation IDs that count toward required coverage.
 
 ## First Thing Shown
@@ -57,7 +56,7 @@ The authored model comes from the AutoTutor script and session config:
 - Misconceptions, with IDs, labels, misconception text, detection cues, expectation contrasts, corrections, repair questions, repair criteria, and acceptable repair answers.
 - A dialog policy, especially `requiredExpectations`.
 - Graduation settings: required expectation count and max active misconceptions.
-- Turn limit and final-answer prompt policy.
+- Turn limit.
 - An expectation relationship graph, either authored or generated and persisted, with 0..1 relationship scores between expectation IDs.
 
 The runtime model is the evolving AutoTutor state:
@@ -122,7 +121,7 @@ Move selection then follows the selected target. For expectation targets, the cu
 
 - Learner question: `answer_question`.
 - Misconception: `correction`, with correction stage cycling `hint -> prompt -> assertion`.
-- Completion: `summary`, or `final_answer_prompt` first and `summary` next when `requireFinalAnswerPrompt` is enabled.
+- Completion: `summary`.
 - Expectation: `pump`, `hint`, `prompt`, or `assertion` according to contribution type, contribution streak, answer quality on the first focus turn, the near-threshold prompt exception, and the move-cycle counter.
 
 For expectation moves, repeated `idk` or help requests escalate from hint to prompt to assertion: first same-type low-agency contribution gets `hint`, second gets `prompt`, third and later get `assertion`. `uncertainty`, `affect`, `meta`, or `off_task` contributions get `hint`. A low-quality answer on the first turn of a new focus gets `pump`. Near-threshold coverage means `coverage >= 0.6` and `coverage < 0.8`; that gets `prompt`. Otherwise, expectation tutoring cycles through `hint`, `prompt`, and `assertion` using `moveCycleIndex`, with the first focus turn starting at cycle index `0` and therefore `hint`. Assertions are marked in planner state, but tutor assertions themselves do not count as learner coverage; the learner must later restate or apply the idea.
@@ -222,7 +221,7 @@ on learner submit:
   move = choose from target:
     learner_question -> answer_question
     misconception -> correction
-    completion -> final_answer_prompt or summary
+    completion -> summary
     expectation:
       if learnerContribution.type is idk or help_request:
         same-type streak 1 -> hint

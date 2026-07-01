@@ -18,7 +18,6 @@ import {
   createSparcDialogueTurnTransition,
   type SparcDialogueTurnNodeOptions,
 } from './sparcDialogueTurnNodes';
-import { createSparcProductionRuleTraceHistoryRecords } from './sparcProductionRuleTraceHistory';
 import { createSparcStateTransitionHistoryRecord } from './sparcStateTransitionHistory';
 import type { SparcReplayState } from './sparcStateReplay';
 import type { SparcLearningTargetSelectionOptions } from './sparcTargetSelection';
@@ -53,7 +52,6 @@ export type SparcControllerDialogueTurnResult = {
   readonly tutorText: string;
   readonly transition: SparcStateTransition;
   readonly historyRecord?: SparcCanonicalHistoryRecord;
-  readonly traceHistoryRecords?: readonly SparcCanonicalHistoryRecord[];
 };
 
 export type SparcControllerDialogueTurnRuntime = {
@@ -213,17 +211,6 @@ function createStableControllerStateWrites(params: {
   }));
 }
 
-function createMoveSelectionAuditFact(audit: SparcMoveSelectionAudit): SparcWorkingMemoryFact {
-  return {
-    factType: 'controller.moveSelectionAudit',
-    slots: {
-      selectedRuleId: audit.selected?.ruleId ?? null,
-      selectedAction: audit.selected?.selectedAction ?? null,
-      candidates: audit.candidates,
-    },
-  };
-}
-
 function completedState(planning: SparcControllerTurnPlanningResult): boolean {
   return planning.derivedFacts.some((fact) => (
     fact.factType === 'controller.completionState'
@@ -267,26 +254,6 @@ function createCompletedDialogueControlWrites(params: {
       },
     },
   }];
-}
-
-function createMoveSelectionTraceEvent(params: {
-  readonly document: SparcAuthoredDocument;
-  readonly event: SparcInterfaceEvent;
-}): SparcInterfaceEvent {
-  return {
-    eventId: `${params.event.eventId}:move-selection`,
-    type: 'condition-evaluated',
-    source: {
-      documentId: params.event.source.documentId,
-      nodeId: params.document.root.id,
-    },
-    time: params.event.time,
-    payload: {
-      triggeredBy: 'controller.move-selection',
-      sourceEventId: params.event.eventId,
-      sourceEventType: params.event.type,
-    },
-  };
 }
 
 function createLearnerResponseScoreFacts(params: {
@@ -339,10 +306,14 @@ export async function evaluateSparcControllerDialogueTurn(params: {
     facts: planning.productionRuleEvaluation.execution.facts,
     rules: params.document.productionRules ?? [],
   });
-  const utteranceRequest = moveSelectionAudit.utteranceRequest
+  const selectedUtteranceRequest = moveSelectionAudit.utteranceRequest
     ?? createSparcUtteranceRequestFromFacts(
       planning.productionRuleEvaluation.execution.facts,
     );
+  const utteranceRequest = {
+    ...selectedUtteranceRequest,
+    learnerText: learnerTextFromEvent(params.event),
+  };
   const tutorText = tutorTextFromGeneratedUtterance(
     await params.generateTutorUtterance(utteranceRequest),
   );
@@ -376,13 +347,6 @@ export async function evaluateSparcControllerDialogueTurn(params: {
             event: params.event,
           })
         : []),
-      createSparcStableWorkingMemoryFactStateWrite({
-        target: {
-          documentId: params.event.source.documentId,
-          nodeId: params.document.root.id,
-        },
-        fact: createMoveSelectionAuditFact(moveSelectionAudit),
-      }),
     ],
   };
 
@@ -410,15 +374,6 @@ export async function commitSparcControllerDialogueTurn(params: {
   readonly runtime: SparcControllerDialogueTurnRuntime;
 }): Promise<SparcControllerDialogueTurnResult> {
   const evaluated = await evaluateSparcControllerDialogueTurn(params);
-  const traceHistoryRecords = createSparcProductionRuleTraceHistoryRecords({
-    core: params.core,
-    document: params.document,
-    event: createMoveSelectionTraceEvent({
-      document: params.document,
-      event: params.event,
-    }),
-    execution: evaluated.planning.productionRuleEvaluation.execution,
-  });
   const historyRecord = createSparcStateTransitionHistoryRecord({
     core: params.core,
     transition: evaluated.transition,
@@ -427,14 +382,10 @@ export async function commitSparcControllerDialogueTurn(params: {
     responseValue: learnerTextFromEvent(params.event),
   });
   if (params.runtime.history) {
-    for (const traceHistoryRecord of traceHistoryRecords) {
-      await params.runtime.history.writeCanonicalHistory(traceHistoryRecord);
-    }
     await params.runtime.history.writeCanonicalHistory(historyRecord);
   }
   return {
     ...evaluated,
     historyRecord,
-    ...(traceHistoryRecords.length > 0 ? { traceHistoryRecords } : {}),
   };
 }

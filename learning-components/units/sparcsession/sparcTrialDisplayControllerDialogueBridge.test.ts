@@ -169,12 +169,8 @@ describe('SPARC trial display controller dialogue bridge', function() {
     assert.equal(result.event.source.nodeId, 'learner-response-input');
     assert.equal(generatorTargetId, 'kc-b');
     assert.equal(result.dialogueTurn.utteranceRequest.action, 'hint');
-    assert.equal(result.dialogueTurn.traceHistoryRecords?.length, 1);
-    assert.equal(historyRecords.length, 2);
-    assert.equal(historyRecords[0]?.action, 'sparc-production-rule-trace');
-    assert.equal(historyRecords[0]?.input, '');
-    assert.equal(result.dialogueTurn.traceHistoryRecords?.[0]?.sparc.traceStep?.productionRuleId, 'dialogue.move.test-hint');
-    assert.equal(historyRecords[1]?.action, 'sparc-dialogue-turn');
+    assert.equal(historyRecords.length, 1);
+    assert.equal(historyRecords[0]?.action, 'sparc-dialogue-turn');
 
     const operations = collectSparcProgressiveNodeOperations([
       result.dialogueTurn.transition,
@@ -231,7 +227,7 @@ describe('SPARC trial display controller dialogue bridge', function() {
 
     let secondScorerCalls = 0;
     let secondGeneratorCalls = 0;
-    const secondTurn = await commitSparcTrialDisplayControllerDialogueTurn({
+    const _secondTurn = await commitSparcTrialDisplayControllerDialogueTurn({
       core: {
         TDFId: 'tdf-1',
         sessionID: 'session-1',
@@ -255,7 +251,7 @@ describe('SPARC trial display controller dialogue bridge', function() {
       scoreLearnerResponse: ({ replayState }) => {
         secondScorerCalls += 1;
         assert.equal(replayState.transitions.some((transition) => transition.transitionId.endsWith(':dialogue-turn')), true);
-        assert.equal(replayState.traceSteps.some((traceStep) => traceStep.productionRuleId === 'dialogue.move.test-hint'), true);
+        assert.equal(replayState.traceSteps.length, 0);
         return {
           learningTargetScores: [{
             clusterKC: 'kc-b',
@@ -277,10 +273,9 @@ describe('SPARC trial display controller dialogue bridge', function() {
 
     assert.equal(secondScorerCalls, 1);
     assert.equal(secondGeneratorCalls, 1);
-    assert.equal(secondTurn.dialogueTurn.traceHistoryRecords?.length, 1);
-    assert.equal(historyRecords.length, 4);
+    assert.equal(historyRecords.length, 2);
     assert.equal(historyRecords.filter((record) => record.action === 'sparc-dialogue-turn').length, 2);
-    assert.equal(historyRecords.filter((record) => record.action === 'sparc-production-rule-trace').length, 2);
+    assert.equal(historyRecords.filter((record) => record.action === 'sparc-production-rule-trace').length, 0);
   });
 
   it('rejects ambiguous dialogue submits instead of guessing a learner response', async function() {

@@ -91,6 +91,7 @@ function document(): SparcAuthoredDocument {
             targetType: literal('learningTarget'),
             clusterKC: variable('targetClusterKC'),
             action: literal('hint'),
+            sourceRuleId: literal('paper-rule-test-hint'),
           },
         },
       }, {
@@ -163,6 +164,7 @@ describe('evaluateSparcControllerDialogueTurn', function() {
     );
     assert.deepEqual(nodes.map((node) => (node as { speaker?: string }).speaker), ['learner', 'tutor']);
     assert.equal((nodes[1] as { value?: string }).value, 'Think about how B depends on A.');
+    assert.equal((nodes[1] as { productionRuleName?: string }).productionRuleName, 'paper-rule-test-hint');
   });
 
   it('commits the planned dialogue turn through canonical SPARC history', async function() {
@@ -199,15 +201,8 @@ describe('evaluateSparcControllerDialogueTurn', function() {
     });
 
     assert.equal(result.historyRecord?.action, 'sparc-dialogue-turn');
-    assert.equal(result.traceHistoryRecords?.length, 1);
-    assert.equal(writtenRecords.length, 2);
-    assert.equal(result.traceHistoryRecords?.[0]?.action, 'sparc-production-rule-trace');
-    assert.equal(result.traceHistoryRecords?.[0]?.input, '');
-    assert.equal(result.traceHistoryRecords?.[0]?.responseValue, '');
-    assert.equal(result.traceHistoryRecords?.[0]?.sparc.sourceAddress.nodeId, 'root');
-    assert.equal(result.traceHistoryRecords?.[0]?.sparc.traceStep?.productionRuleId, 'dialogue.move.test-hint');
-    assert.equal(result.traceHistoryRecords?.[0]?.sparc.traceStep?.details?.sourceEventId, 'event-dialogue-controller:move-selection');
-    assert.equal(result.traceHistoryRecords?.[0]?.sparc.traceStep?.details?.sourceEventType, 'condition-evaluated');
+    assert.equal(writtenRecords.length, 1);
+    assert.equal((writtenRecords[0] as { action?: string })?.action, 'sparc-dialogue-turn');
 
     const replayState = applySparcHistoryRecord(createEmptySparcReplayState(), result.historyRecord!);
     const facts = buildSparcWorkingMemoryFacts({
@@ -236,10 +231,7 @@ describe('evaluateSparcControllerDialogueTurn', function() {
       entry.factType === 'learnerResponse.answerQuality'
       && entry.slots?.value === 'partial'
     )));
-    assert.ok(facts.some((entry) => (
-      entry.factType === 'controller.moveSelectionAudit'
-      && entry.slots?.selectedRuleId === 'dialogue.move.test-hint'
-    )));
+    assert.equal(facts.some((entry) => entry.factType === 'controller.moveSelectionAudit'), false);
   });
 
   it('fails clearly when the utterance generator returns blank text', async function() {

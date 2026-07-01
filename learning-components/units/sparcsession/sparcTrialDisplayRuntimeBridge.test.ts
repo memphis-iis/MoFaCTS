@@ -56,6 +56,21 @@ function display(): SparcTrialDisplay {
         targetUnit: 'g',
       },
     }],
+    derivedFacts: [{
+      id: 'target-unit-label',
+      when: [{
+        factType: 'problem',
+        slots: {
+          targetUnit: { type: 'bind', variable: 'targetUnit' },
+        },
+      }],
+      fact: {
+        factType: 'problem.targetUnitLabel',
+        slots: {
+          value: variable('targetUnit'),
+        },
+      },
+    }],
     productionRules: [{
       id: 'stoich.set-result-unit',
       when: [{
@@ -161,6 +176,7 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
     assert.equal(document.root.children?.[1]?.kind, 'input');
     assert.equal(document.root.children?.[2]?.kind, 'output');
     assert.equal(document.workingMemoryFacts?.[0]?.factType, 'problem');
+    assert.equal(document.derivedFacts?.[0]?.id, 'target-unit-label');
     assert.equal(document.productionRules?.[0]?.id, 'stoich.set-result-unit');
   });
 

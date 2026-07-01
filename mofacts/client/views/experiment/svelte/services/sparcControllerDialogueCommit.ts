@@ -27,6 +27,16 @@ import {
 import {
   getSparcTrialDisplayRuntimeContext,
 } from './sparcTrialDisplayRuntimeContextCache';
+import {
+  buildSparcWorkingMemoryFacts,
+} from '../../../../../../learning-components/units/sparcsession/sparcWorkingMemoryFacts';
+import {
+  applySparcStateTransition,
+  replaySparcHistory,
+} from '../../../../../../learning-components/units/sparcsession/sparcStateReplay';
+import {
+  SPARC_DIALOGUE_PROGRESS_FACTS_VALUE_KEY,
+} from './sparcAutoTutorProgress';
 
 type SparcControllerDialogueDisplay = SparcTrialDisplay & {
   readonly documentId: string;
@@ -37,8 +47,9 @@ type SparcControllerDialogueEngine = UnitEngineLike & {
   readonly commitSparcTrialDisplayControllerDialogueTurn?: (
     params: SparcTrialDisplayControllerDialogueTurnRuntimeParams
   ) => Promise<{
+    readonly document?: unknown;
     readonly dialogueTurn?: {
-      readonly transition?: { readonly writes?: readonly { readonly key?: string; readonly value?: unknown }[] };
+      readonly transition?: Parameters<typeof applySparcStateTransition>[1];
       readonly historyRecord?: CanonicalHistoryRecord;
     };
   }>;
@@ -88,7 +99,8 @@ function requireSparcControllerDialogueDisplay(display: unknown): SparcControlle
 
 function extractDialogueNodeValues(params: {
   readonly historyRecords: readonly CanonicalHistoryRecord[];
-  readonly transition?: { readonly writes?: readonly { readonly key?: string; readonly value?: unknown }[] };
+  readonly transition?: Parameters<typeof applySparcStateTransition>[1];
+  readonly document?: unknown;
 }): Record<string, unknown> {
   const progressiveOperations = collectSparcProgressiveNodeOperations([
     ...params.historyRecords.map((record) => (
@@ -98,9 +110,29 @@ function extractDialogueNodeValues(params: {
     )),
     params.transition ?? {},
   ]);
-  return progressiveOperations.length > 0
-    ? { [SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY]: progressiveOperations }
-    : {};
+  const values: Record<string, unknown> = {};
+  if (progressiveOperations.length > 0) {
+    values[SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY] = progressiveOperations;
+    values['learner-response-input'] = '';
+  }
+  if (isRecord(params.document)) {
+    const replayedState = replaySparcHistory(params.historyRecords);
+    const currentState = params.transition
+      ? applySparcStateTransition(replayedState, params.transition)
+      : replayedState;
+    values[SPARC_DIALOGUE_PROGRESS_FACTS_VALUE_KEY] = buildSparcWorkingMemoryFacts({
+      document: params.document as Parameters<typeof buildSparcWorkingMemoryFacts>[0]['document'],
+      replayState: currentState,
+    }).filter((fact) => (
+      fact.factType === 'learningTarget.score'
+      || fact.factType === 'diagnostic.misconceptionScore'
+      || fact.factType === 'session.turnState'
+      || fact.factType === 'controller.completionState'
+      || fact.factType === 'learningTarget.selected'
+      || fact.factType === 'diagnostic.misconceptionSelected'
+    ));
+  }
+  return values;
 }
 
 export async function commitSparcControllerDialogueSubmit(params: {
@@ -203,6 +235,7 @@ export async function commitSparcControllerDialogueSubmit(params: {
     sparcNodeValues: extractDialogueNodeValues({
       historyRecords: priorHistoryRecords,
       ...(result.dialogueTurn?.transition ? { transition: result.dialogueTurn.transition } : {}),
+      document: result.document,
     }),
   };
 }

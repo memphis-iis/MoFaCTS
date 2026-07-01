@@ -13,6 +13,7 @@ import {
   commitSparcDialogueTurnTransition,
   createSparcDialogueTurnTransition,
 } from './sparcDialogueTurnNodes';
+import { requireActiveSparcMoveDefinition } from './sparcMoveDefinitions';
 import type { SparcAuthoredDocument, SparcInterfaceEvent } from './sparcSessionContracts';
 
 function document(): SparcAuthoredDocument {
@@ -48,11 +49,14 @@ const utteranceRequest = {
   action: 'hint',
   targetId: 'kc-evaporation',
   contentTexts: ['Evaporation is the target.'],
+  moveDefinition: requireActiveSparcMoveDefinition('hint'),
   selectedAction: {
     targetType: 'learningTarget',
     clusterKC: 'kc-evaporation',
     action: 'hint',
+    sourceRuleId: 'paper-rule-06-hint',
   },
+  sourceRuleId: 'paper-rule-06-hint',
 };
 
 describe('createSparcDialogueTurnTransition', function() {
@@ -77,6 +81,13 @@ describe('createSparcDialogueTurnTransition', function() {
     assert.equal((nodes[1] as { speaker?: string }).speaker, 'tutor');
     assert.equal((nodes[1] as { action?: string }).action, 'hint');
     assert.equal((nodes[1] as { targetId?: string }).targetId, 'kc-evaporation');
+    assert.equal((nodes[1] as { productionRuleName?: string }).productionRuleName, 'paper-rule-06-hint');
+    assert.equal((nodes[1] as { promptId?: string }).promptId, 'autotutor.hint');
+    assert.equal((nodes[1] as { promptVersion?: string }).promptVersion, 'v1');
+    assert.equal((nodes[1] as { outputSchemaId?: string }).outputSchemaId, 'autotutor.chat_utterance');
+    assert.equal((nodes[1] as { outputSchemaVersion?: string }).outputSchemaVersion, 'v1');
+    assert.equal((nodes[1] as { renderer?: string }).renderer, 'sparc.dialogue_utterance');
+    assert.equal((nodes[1] as { historyAction?: string }).historyAction, 'sparc-dialogue-turn');
   });
 
   it('persists dialogue utterance facts through ordinary SPARC replay', function() {
@@ -100,6 +111,13 @@ describe('createSparcDialogueTurnTransition', function() {
     assert.equal(facts[1]?.slots?.action, 'hint');
     assert.equal(facts[1]?.slots?.targetType, 'learningTarget');
     assert.equal(facts[1]?.slots?.targetId, 'kc-evaporation');
+    assert.equal(facts[1]?.slots?.productionRuleName, 'paper-rule-06-hint');
+    assert.equal(facts[1]?.slots?.promptId, 'autotutor.hint');
+    assert.equal(facts[1]?.slots?.promptVersion, 'v1');
+    assert.equal(facts[1]?.slots?.outputSchemaId, 'autotutor.chat_utterance');
+    assert.equal(facts[1]?.slots?.outputSchemaVersion, 'v1');
+    assert.equal(facts[1]?.slots?.renderer, 'sparc.dialogue_utterance');
+    assert.equal(facts[1]?.slots?.historyAction, 'sparc-dialogue-turn');
   });
 
   it('fails clearly when the event belongs to another SPARC document', function() {

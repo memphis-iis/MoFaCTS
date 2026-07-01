@@ -1,5 +1,4 @@
 import {
-  booleanField,
   integerField,
   simpleField,
   stringField,
@@ -30,10 +29,6 @@ export const AUTOTUTOR_SESSION_FIELD_REGISTRY: SectionFieldRegistry = {
       coerce: 'number',
       validation: { kind: 'numberRange', min: 0, max: 2 },
     },
-  }),
-  requireFinalAnswerPrompt: simpleField(booleanField(false, 4), {
-    brief: 'Require final answer prompt.',
-    verbose: 'When enabled, AutoTutor asks the learner for one final integrated answer before giving the summary. Disabled by default.'
   }),
   maxTurns: simpleField(integerField(20, 4), {
     brief: 'Maximum AutoTutor turns.',
@@ -67,6 +62,5 @@ export const AUTOTUTOR_SESSION_DIRECT_RUNTIME_KEYS = Object.freeze([
   'graduation',
   'maxTurns',
   'openRouterModel',
-  'requireFinalAnswerPrompt',
   'utteranceTemperature',
 ]);

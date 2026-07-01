@@ -1,4 +1,9 @@
 import type { SparcTrialDisplay } from './SparcTrialDisplayAdapter';
+import type {
+  SparcProductionRule,
+  SparcWorkingMemoryFactTemplate,
+} from '../../units/sparcsession/sparcSessionContracts';
+import { compileSparcProductionRulePlan } from '../../units/sparcsession/sparcProductionRuleEvaluator';
 
 export type SparcDisplayContentReadinessIssue = {
   readonly kind:
@@ -10,6 +15,7 @@ export type SparcDisplayContentReadinessIssue = {
     | 'missing-path-intent-node'
     | 'missing-layout-zone'
     | 'unsupported-authored-production-rules'
+    | 'invalid-derived-fact-rule'
     | 'invalid-production-rule'
     | 'missing-production-rule-target-node';
   readonly message: string;
@@ -302,6 +308,65 @@ function validateProductionRules(
   }
 }
 
+function validateDerivedFacts(
+  display: SparcTrialDisplay,
+  issues: SparcDisplayContentReadinessIssue[],
+): void {
+  if (display.derivedFacts === undefined) {
+    return;
+  }
+  if (!Array.isArray(display.derivedFacts)) {
+    issues.push({
+      kind: 'invalid-derived-fact-rule',
+      message: 'SPARC derivedFacts must be an array when declared',
+    });
+    return;
+  }
+  for (const [index, rule] of display.derivedFacts.entries()) {
+    if (!isRecord(rule)) {
+      issues.push({
+        kind: 'invalid-derived-fact-rule',
+        message: `SPARC derivedFacts[${index}] must be an object`,
+      });
+      continue;
+    }
+    const ruleId = typeof rule.id === 'string' && rule.id.trim() ? rule.id.trim() : `derivedFacts[${index}]`;
+    if (ruleId === `derivedFacts[${index}]`) {
+      issues.push({
+        kind: 'invalid-derived-fact-rule',
+        message: `SPARC derivedFacts[${index}].id is required`,
+      });
+    }
+    if (!isRecord(rule.fact) || typeof rule.fact.factType !== 'string' || !rule.fact.factType.trim()) {
+      issues.push({
+        kind: 'invalid-derived-fact-rule',
+        message: `SPARC derived fact rule "${ruleId}" requires fact.factType`,
+      });
+      continue;
+    }
+    const productionRule: SparcProductionRule = {
+      id: `derived-fact:${ruleId}`,
+      when: rule.when as SparcProductionRule['when'],
+      then: [{
+        type: 'assert-fact',
+        persist: false,
+        fact: rule.fact as SparcWorkingMemoryFactTemplate,
+      }],
+    };
+    const validatedRule: SparcProductionRule = Array.isArray(rule.tests)
+      ? { ...productionRule, tests: rule.tests as NonNullable<SparcProductionRule['tests']> }
+      : productionRule;
+    try {
+      compileSparcProductionRulePlan([validatedRule]);
+    } catch (error) {
+      issues.push({
+        kind: 'invalid-derived-fact-rule',
+        message: `SPARC derived fact rule "${ruleId}" is invalid: ${error instanceof Error ? error.message : String(error)}`,
+      });
+    }
+  }
+}
+
 export function validateSparcDisplayContentReadiness(
   display: SparcTrialDisplay,
 ): SparcDisplayContentReadinessResult {
@@ -332,6 +397,7 @@ export function validateSparcDisplayContentReadiness(
   validateBehaviorRefs(display, nodeIds, issues);
   validatePlacements(display.nodes, collectLayoutZoneIds(display), issues);
   validateProductionRules(display, nodeIds, issues);
+  validateDerivedFacts(display, issues);
 
   return {
     ready: issues.length === 0,

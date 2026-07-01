@@ -1,4 +1,5 @@
 import { createSparcStableWorkingMemoryFactStateWrite } from './sparcWorkingMemoryState';
+import type { SparcBagMatchScore } from './sparcBagMatchScoring';
 import type {
   SparcAuthoredDocument,
   SparcInterfaceEvent,
@@ -25,6 +26,7 @@ export type SparcDiagnosticMisconceptionScoreInput = {
 export type SparcLearnerResponseScoringResult = {
   readonly learningTargetScores?: readonly SparcLearningTargetScoreInput[];
   readonly diagnosticMisconceptionScores?: readonly SparcDiagnosticMisconceptionScoreInput[];
+  readonly bagMatchScores?: readonly SparcBagMatchScore[];
   readonly answerQuality?: 'low' | 'partial' | 'high';
   readonly learnerContribution?: {
     readonly type: 'answer' | 'question' | 'off-task' | 'other';
@@ -117,6 +119,21 @@ function misconceptionScoreFact(input: SparcDiagnosticMisconceptionScoreInput): 
   };
 }
 
+function bagMatchScoreFact(input: SparcBagMatchScore): SparcWorkingMemoryFact {
+  const factType = input.kind === 'goodAnswer'
+    ? 'selector.goodAnswerMatch'
+    : 'selector.badAnswerMatch';
+  return {
+    factType,
+    slots: {
+      value: requireUnitScore(input.score, `SPARC ${input.kind} bag-match score`),
+      band: input.band,
+      metric: input.metric,
+      ...(input.model ? { model: input.model } : {}),
+    },
+  };
+}
+
 export function createSparcLearnerResponseScoreFacts(params: {
   readonly facts: readonly SparcWorkingMemoryFact[];
   readonly score: SparcLearnerResponseScoringResult;
@@ -137,6 +154,9 @@ export function createSparcLearnerResponseScoreFacts(params: {
   }
   for (const input of params.score.diagnosticMisconceptionScores ?? []) {
     scoredFacts.push(misconceptionScoreFact(input));
+  }
+  for (const input of params.score.bagMatchScores ?? []) {
+    scoredFacts.push(bagMatchScoreFact(input));
   }
   if (params.score.answerQuality) {
     scoredFacts.push({
@@ -189,6 +209,9 @@ function stableIdentitySlots(fact: SparcWorkingMemoryFact): Readonly<Record<stri
   }
   if (fact.factType === 'learningTarget.coverageMean') {
     return { scope: slots.scope };
+  }
+  if (fact.factType === 'selector.goodAnswerMatch' || fact.factType === 'selector.badAnswerMatch') {
+    return { metric: slots.metric };
   }
   return {};
 }

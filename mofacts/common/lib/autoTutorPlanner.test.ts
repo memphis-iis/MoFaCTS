@@ -324,9 +324,9 @@ describe('AutoTutor planner', function() {
     expect(summaryPlan.selectedMove).to.equal('summary');
   });
 
-  it('prompts for a final integrated answer before summary completion when enabled', function() {
+  it('selects summary directly for completion', function() {
     const script = buildScript();
-    let plannerState = createInitialAutoTutorPlannerState(script);
+    const plannerState = createInitialAutoTutorPlannerState(script);
     plannerState.expectationScores = recomputeExpectationPriorities(script, {
       ...plannerState.expectationScores,
       E1: { ...plannerState.expectationScores.E1!, current: true, coverage: 0.9, coherence: 0.5, centrality: 0.5 },
@@ -338,23 +338,10 @@ describe('AutoTutor planner', function() {
       plannerState,
       learnerQuestion: { current: false, answerableFromAuthoredContent: false },
       answerQuality: 'high',
-      requireFinalAnswerPrompt: true,
     });
 
     expect(finalPromptPlan.target).to.deep.equal({ type: 'completion' });
-    expect(finalPromptPlan.selectedMove).to.equal('final_answer_prompt');
-
-    plannerState = finalPromptPlan.nextPlannerState;
-    const summaryPlan = planAutoTutorTurn({
-      script,
-      plannerState,
-      learnerQuestion: { current: false, answerableFromAuthoredContent: false },
-      answerQuality: 'high',
-      requireFinalAnswerPrompt: true,
-    });
-
-    expect(summaryPlan.target).to.deep.equal({ type: 'completion' });
-    expect(summaryPlan.selectedMove).to.equal('summary');
+    expect(finalPromptPlan.selectedMove).to.equal('summary');
   });
 
   it('uses a bounded hint-prompt-assertion cycle without counting assertion as learner coverage', function() {

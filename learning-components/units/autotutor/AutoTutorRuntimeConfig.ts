@@ -64,7 +64,6 @@ export type AutoTutorConfig = {
   utteranceTemperature: number;
   graduation: AutoTutorGraduation;
   turnLimit: AutoTutorTurnLimit;
-  requireFinalAnswerPrompt: boolean;
   prompt: string;
   script: AutoTutorScript;
   unitName: string;
@@ -203,7 +202,6 @@ export function readAutoTutorConfigWithOptions(
     ),
     graduation: readGraduation(session),
     turnLimit: readTurnLimit(session),
-    requireFinalAnswerPrompt: session.requireFinalAnswerPrompt === true,
     prompt: requiredString(display.text, `cluster ${clusterIndex} display.text`),
     script: cloneJson(script as AutoTutorScript),
     unitName: typeof unit.unitname === 'string' ? unit.unitname : 'AutoTutor',

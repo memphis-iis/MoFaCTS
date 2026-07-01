@@ -44,6 +44,9 @@
   /** @type {Object} Current display data */
   export let display = {};
 
+  /** @type {boolean} Show admin-only per-turn diagnostics */
+  export let adminDiagnosticMode = false;
+
   /** @type {boolean} Whether the outer trial container is currently visible */
   export let parentVisible = true;
 
@@ -330,6 +333,7 @@
       <div class="h5p-owned-surface">
         <SparcTrialSurface
           {display}
+          {adminDiagnosticMode}
           runtimeNodeValues={sparcNodeValues}
           {learningProgressSnapshot}
           {showQuestionNumber}

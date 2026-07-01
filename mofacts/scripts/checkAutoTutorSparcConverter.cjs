@@ -13,12 +13,15 @@ const controllerDialogueTurn = jiti(path.join(repoRoot, 'learning-components/uni
 const turnPlanning = jiti(path.join(repoRoot, 'learning-components/units/sparcsession/sparcControllerTurnPlanning.ts'));
 const targetSelection = jiti(path.join(repoRoot, 'learning-components/units/sparcsession/sparcTargetSelection.ts'));
 const utteranceRequest = jiti(path.join(repoRoot, 'learning-components/units/sparcsession/sparcUtteranceRequest.ts'));
+const selectorSignals = jiti(path.join(repoRoot, 'learning-components/units/sparcsession/sparcSelectorSignals.ts'));
+const moveDefinitions = jiti(path.join(repoRoot, 'learning-components/units/sparcsession/sparcMoveDefinitions.ts'));
 const moveSelectionAudit = jiti(path.join(repoRoot, 'learning-components/units/sparcsession/sparcMoveSelectionAudit.ts'));
 const dialogueTurnNodes = jiti(path.join(repoRoot, 'learning-components/units/sparcsession/sparcDialogueTurnNodes.ts'));
 const progressiveNodes = jiti(path.join(repoRoot, 'learning-components/trial-displays/sparc/sparcProgressiveNodes.ts'));
 const sparcSessionUnitEngine = jiti(path.join(repoRoot, 'learning-components/units/sparcsession/SparcSessionUnitEngine.ts'));
 const sparcStateReplay = jiti(path.join(repoRoot, 'learning-components/units/sparcsession/sparcStateReplay.ts'));
 const dialogueOpenRouter = jiti(path.join(repoRoot, 'mofacts/client/views/experiment/svelte/services/sparcControllerDialogueOpenRouter.ts'));
+const sparcAutoTutorProgress = jiti(path.join(repoRoot, 'mofacts/client/views/experiment/svelte/services/sparcAutoTutorProgress.ts'));
 const template = jiti(path.join(repoRoot, 'mofacts/scripts/autotutorSparcMoveRuleTemplate.ts'));
 const converter = require('./convertAutoTutorToSparc.cjs');
 
@@ -75,7 +78,9 @@ function runMoveRules(facts) {
   return selectedAction(result.facts);
 }
 
-function baseLearningTargetFacts(coverage) {
+function baseLearningTargetFacts(coverage, options = {}) {
+  const wordCount = options.wordCount ?? 20;
+  const turnCount = options.turnCount ?? 1;
   const facts = [{
     factType: 'learningTarget.source',
     slots: {
@@ -105,10 +110,10 @@ function baseLearningTargetFacts(coverage) {
     },
   }, {
     factType: 'dialogue.learnerWordCount',
-    slots: { cumulative: 97 },
+    slots: { cumulative: wordCount },
   }, {
     factType: 'session.turnState',
-    slots: { turnCount: 1 },
+    slots: { turnCount },
   }, {
     factType: 'interface-event',
     slots: {
@@ -116,15 +121,35 @@ function baseLearningTargetFacts(coverage) {
       input: 'three more words',
     },
   }];
-  return [
+  const withDerivedFacts = [
     ...facts,
     ...derivedFacts.deriveSparcControllerFacts(facts),
+  ];
+  return [
+    ...withDerivedFacts,
+    ...selectorSignals.deriveSparcActiveSelectorSignalFacts(withDerivedFacts),
+    {
+      factType: 'selector.goodAnswerMatch',
+      slots: {
+        value: options.goodAnswerMatch ?? 0.45,
+        band: options.goodAnswerMatchBand ?? 'MEDIUM',
+        metric: 'cosine_similarity_normalized_vectors',
+      },
+    },
+    {
+      factType: 'selector.badAnswerMatch',
+      slots: {
+        value: options.badAnswerMatch ?? 0.05,
+        band: options.badAnswerMatchBand ?? 'NONE',
+        metric: 'cosine_similarity_normalized_vectors',
+      },
+    },
   ];
 }
 
 function assertRuleTemplateShape(rules) {
-  assert.equal(rules.length, 15, 'converter must emit the 15 paper-derived move rules');
-  assert.equal(new Set(rules.map((rule) => rule.id)).size, 15, 'generated rule ids must be unique');
+  assert.equal(rules.length, 9, 'converter must emit the 9 active paper-derived instructional move rules');
+  assert.equal(new Set(rules.map((rule) => rule.id)).size, 9, 'generated rule ids must be unique');
   assert.equal(rules.every((rule) => rule.module === 'dialogue.move-selection'), true);
   assert.equal(rules.every((rule) => rule.then.some((effect) => effect.type === 'terminate-production-phase')), true);
   assert.equal(rules.every((rule) => rule.then.some((effect) => (
@@ -141,6 +166,11 @@ function assertRuleTemplateShape(rules) {
     'dialogue.move.paper-rule-07-hint',
     'dialogue.move.paper-rule-08-summary',
     'dialogue.move.paper-rule-09-elaborate',
+  ]);
+
+  const legacyRules = template.buildAutoTutorSparcLegacyFeedbackMoveProductionRules();
+  assert.equal(legacyRules.length, 6, 'feedback-labeled paper rules must remain available as legacy disabled definitions');
+  assert.deepEqual(legacyRules.map((rule) => rule.id).sort(), [
     'dialogue.move.paper-rule-10-positive-feedback',
     'dialogue.move.paper-rule-11-negative-feedback',
     'dialogue.move.paper-rule-12-positive-neutral-feedback',
@@ -155,17 +185,23 @@ function assertGeneratedRulesCompile() {
 }
 
 function assertGeneratedRulesSelectMoves() {
-  const summary = runMoveRules(baseLearningTargetFacts(0.72));
+  const summary = runMoveRules(baseLearningTargetFacts(0.72, { turnCount: 8 }));
   assert.equal(summary.action, 'summary');
   assert.equal(summary.sourceRuleId, 'paper-rule-08-summary');
   assert.equal(summary.templateVersion, template.AUTOTUTOR_SPARC_MOVE_RULE_TEMPLATE_VERSION);
 
-  const hint = runMoveRules(baseLearningTargetFacts(0.2));
+  const hint = runMoveRules(baseLearningTargetFacts(0.2, {
+    goodAnswerMatch: 0.45,
+    goodAnswerMatchBand: 'MEDIUM',
+  }));
   assert.equal(hint.action, 'hint');
   assert.equal(hint.sourceRuleId, 'paper-rule-06-hint');
 
   const splice = runMoveRules([
-    ...baseLearningTargetFacts(0.2),
+    ...baseLearningTargetFacts(0.2, {
+      badAnswerMatch: 0.75,
+      badAnswerMatchBand: 'HIGH',
+    }),
     {
       factType: 'diagnostic.misconceptionSelected',
       slots: {
@@ -688,6 +724,60 @@ function createSparcEngineDeps({ tdf, stimulus, unit, tdfId, userId }) {
   };
 }
 
+const CANONICAL_AUTOTUTOR_PACKAGE_NAMES = [
+  'AutoTutor Compound Interest',
+  'AutoTutor Confidence Interval',
+  'AutoTutor Correlation Causation',
+  'AutoTutor Natural Selection',
+  'AutoTutor Nonviolent Communication',
+  'AutoTutor Reinforcement Punishment',
+  'AutoTutor Special Relativity',
+  'AutoTutor Statistical Power',
+  'AutoTutor Stock Shorting',
+  'AutoTutor Working Memory Long Term Memory',
+];
+
+function packageJsonFiles(packageDir, suffix) {
+  return fs.readdirSync(packageDir)
+    .filter((entry) => entry.endsWith(suffix))
+    .map((entry) => path.join(packageDir, entry));
+}
+
+function assertConvertedAutoTutorPackage(packageDir, packageName) {
+  const tdfFiles = packageJsonFiles(packageDir, '_TDF.json');
+  const stimFiles = packageJsonFiles(packageDir, '_stims.json');
+  assert.equal(tdfFiles.length, 1, `${packageName} should have one converted TDF JSON`);
+  assert.equal(stimFiles.length, 1, `${packageName} should have one converted stimulus JSON`);
+  const tdf = JSON.parse(fs.readFileSync(tdfFiles[0], 'utf8'));
+  const stimulus = JSON.parse(fs.readFileSync(stimFiles[0], 'utf8'));
+  const units = Array.isArray(tdf.tutor?.unit) ? tdf.tutor.unit : [];
+  assert.equal(units.filter((unit) => unit?.autotutorsession).length, 0, `${packageName} should not retain autotutorsession runtime units after conversion`);
+  const sparcUnits = units.filter((unit) => unit?.sparcsession);
+  assert.equal(sparcUnits.length, 1, `${packageName} should contain one sparcsession unit after conversion`);
+  const pageId = sparcUnits[0].sparcsession.pageId;
+  assert.equal(typeof pageId, 'string', `${packageName} converted sparcsession unit should declare pageId`);
+  const pages = Array.isArray(stimulus.setspec?.sparcPages) ? stimulus.setspec.sparcPages : [];
+  const page = pages.find((candidate) => candidate.pageId === pageId);
+  assert.ok(page, `${packageName} converted stimulus should contain sparcPage ${pageId}`);
+  const rules = page.display?.productionRules;
+  assert.equal(Array.isArray(rules), true, `${packageName} converted SPARC display should contain productionRules`);
+  const ruleIds = rules.map((rule) => String(rule.id || '').trim()).filter(Boolean);
+  for (const expectedRuleId of [
+    'dialogue.move.paper-rule-01-pump',
+    'dialogue.move.paper-rule-02-pump',
+    'dialogue.move.paper-rule-03-positive-pump',
+    'dialogue.move.paper-rule-04-splice',
+    'dialogue.move.paper-rule-05-prompt',
+    'dialogue.move.paper-rule-06-hint',
+    'dialogue.move.paper-rule-07-hint',
+    'dialogue.move.paper-rule-08-summary',
+    'dialogue.move.paper-rule-09-elaborate',
+    'dialogue.move.generated-completion-summary',
+  ]) {
+    assert.equal(ruleIds.includes(expectedRuleId), true, `${packageName} missing materialized production rule ${expectedRuleId}`);
+  }
+}
+
 async function assertExistingCanonicalSparcPackageLoad() {
   const packageDir = path.join('C:', 'dev', 'mofacts_config', 'SPARC Fractions Addition');
   const tdfPath = path.join(packageDir, 'SPARC Fractions Addition_TDF.json');
@@ -726,32 +816,29 @@ async function assertExistingCanonicalSparcPackageLoad() {
   );
 }
 
-async function assertCanonicalAutoTutorDryRunInventory() {
+async function assertCanonicalAutoTutorConfigInventory() {
   const configDir = path.join('C:', 'dev', 'mofacts_config');
   assert.equal(fs.existsSync(configDir), true, `canonical config repo is missing: ${configDir}`);
   const report = await converter.buildConversionReport(configDir);
   assert.equal(report.mode, 'dry-run');
   assert.equal(report.configDir, path.resolve(configDir));
-  assert.equal(report.packageCount, 10);
-  assert.equal(report.convertedCount, 0);
-  assert.equal(report.failureCount, 10);
+  assert.equal(report.failureCount, 0);
   assert.deepEqual(report.warnings, []);
-  assert.deepEqual(report.failures.map((item) => item.sourcePackageName).sort(), [
-    'AutoTutor Compound Interest',
-    'AutoTutor Confidence Interval',
-    'AutoTutor Correlation Causation',
-    'AutoTutor Natural Selection',
-    'AutoTutor Nonviolent Communication',
-    'AutoTutor Reinforcement Punishment',
-    'AutoTutor Special Relativity',
-    'AutoTutor Statistical Power',
-    'AutoTutor Stock Shorting',
-    'AutoTutor Working Memory Long Term Memory',
-  ]);
-  assert.equal(report.failures.every((item) => (
-    /unsupported-source: autoTutor\.expectationRelationships must be present/.test(item.error)
-  )), true);
-  assert.equal(report.skipped.every((item) => !/^AutoTutor /.test(item.sourcePackageName)), true);
+  if (report.convertedCount === 10) {
+    assert.equal(report.packageCount, 10);
+    assert.deepEqual(report.converted.map((item) => item.sourcePackageName).sort(), CANONICAL_AUTOTUTOR_PACKAGE_NAMES);
+    assert.equal(report.converted.every((item) => item.relationshipValidation.relationshipGenerationRequired === true), true);
+    assert.equal(report.skipped.every((item) => !/^AutoTutor /.test(item.sourcePackageName)), true);
+    return;
+  }
+
+  assert.equal(report.packageCount, 0, 'canonical AutoTutor content should either be fully pre-conversion or fully converted');
+  assert.equal(report.convertedCount, 0);
+  for (const packageName of CANONICAL_AUTOTUTOR_PACKAGE_NAMES) {
+    const packageDir = path.join(configDir, packageName);
+    assert.equal(fs.existsSync(packageDir), true, `canonical converted package is missing: ${packageDir}`);
+    assertConvertedAutoTutorPackage(packageDir, packageName);
+  }
 }
 
 async function withFixtureConfig(options, callback) {
@@ -898,7 +985,7 @@ async function assertConverterFixtureOutput() {
     assert.equal(result.generated.tdf.tutor.unit[0].sparcsession.pageId, stimulus.setspec.sparcPages[0].pageId);
     assert.equal(stimulus.setspec.sourceAutoTutorConversion.relationshipValidation.valid, true);
     const display = stimulus.setspec.sparcPages[0].display;
-    assert.equal(display.productionRules.filter((rule) => rule.id.startsWith('dialogue.move.paper-rule-')).length, 15);
+    assert.equal(display.productionRules.filter((rule) => rule.id.startsWith('dialogue.move.paper-rule-')).length, 9);
     assert.ok(display.productionRules.some((rule) => (
       rule.id === 'dialogue.move.generated-completion-summary'
       && rule.then.some((effect) => effect.type === 'terminate-production-phase')
@@ -1130,6 +1217,20 @@ async function assertConverterFixtureOutput() {
           clusterKC: 'autotutor.fixture-script.kc.e2',
           coverage: 0.1,
         },
+      }, {
+        factType: 'selector.goodAnswerMatch',
+        slots: {
+          value: 0.25,
+          band: 'LOW',
+          metric: 'cosine_similarity_normalized_vectors',
+        },
+      }, {
+        factType: 'selector.badAnswerMatch',
+        slots: {
+          value: 0.05,
+          band: 'NONE',
+          metric: 'cosine_similarity_normalized_vectors',
+        },
       }],
       targetSelectionOptions: {
         anchorClusterKC: 'autotutor.fixture-script.kc.e1',
@@ -1215,6 +1316,19 @@ async function assertConverterFixtureOutput() {
         }, {
           clusterKC: 'autotutor.fixture-script.kc.e2',
           coverage: 0.1,
+        }],
+        bagMatchScores: [{
+          kind: 'goodAnswer',
+          score: 0.25,
+          band: 'LOW',
+          bagText: 'The first fixture idea matters.\nThe second fixture idea relates to the first.',
+          metric: 'cosine_similarity_normalized_vectors',
+        }, {
+          kind: 'badAnswer',
+          score: 0.05,
+          band: 'NONE',
+          bagText: 'A wrong fixture idea.\nRepair the fixture misconception.',
+          metric: 'cosine_similarity_normalized_vectors',
         }],
         answerQuality: 'partial',
       },
@@ -1391,67 +1505,27 @@ async function assertConverterFixtureOutput() {
   });
 }
 
-async function assertConverterCanGenerateMissingRelationships() {
+async function assertConverterDefersGraphGenerationToUpload() {
   await withFixtureConfig({ withRelationships: false }, async (configDir) => {
-    const result = await converter.translatePackage(configDir, 'AutoTutor Fixture', {
-      generateRelationships: true,
-      openRouterApiKey: 'test-openrouter-key',
-      embeddingModels: ['test-embedding-model'],
-      callEmbeddings: async (model, input) => {
-        assert.equal(model, 'test-embedding-model');
-        assert.equal(input.length, 2);
-        return {
-          embeddings: [
-            [1, 0],
-            [0.5, 0.5],
-          ],
-          responseBody: {},
-        };
-      },
-    });
-    assert.equal(result.relationshipValidation.sourceShape, 'generated-matrix');
-    assert.equal(result.relationshipValidation.generatedRelationships, true);
-    assert.equal(result.relationshipValidation.resolvedRelationshipCount, 2);
-    assert.equal(result.relationshipValidation.generationResult.model, 'test-embedding-model');
-    assert.equal(result.relationshipValidation.relationshipProvenance.generatedFor, 'autotutor-sparc-converter');
-    assert.equal(result.relationshipValidation.relationshipProvenance.model, 'test-embedding-model');
-    const generatedClusterKCs = new Set(result.expectationClusterMappings.map((entry) => entry.clusterKC));
+    const result = await converter.translatePackage(configDir, 'AutoTutor Fixture');
+    assert.equal(result.relationshipValidation.sourceShape, 'generated-at-upload');
+    assert.equal(result.relationshipValidation.generatedRelationships, false);
+    assert.equal(result.relationshipValidation.relationshipGenerationRequired, true);
+    assert.equal(result.relationshipValidation.resolvedRelationshipCount, 0);
     const display = result.generated.stimulus.setspec.sparcPages[0].display;
     const graphRelationships = display.workingMemoryFacts.filter((fact) => fact.factType === 'kcGraph.relationship');
-    assert.deepEqual(graphRelationships.map((fact) => ({
-      sourceClusterKC: fact.slots.sourceClusterKC,
-      targetClusterKC: fact.slots.targetClusterKC,
-      strength: fact.slots.strength,
-    })).sort((left, right) => `${left.sourceClusterKC}->${left.targetClusterKC}`.localeCompare(`${right.sourceClusterKC}->${right.targetClusterKC}`)), [{
-      sourceClusterKC: 'autotutor.fixture-script.kc.e1',
-      targetClusterKC: 'autotutor.fixture-script.kc.e2',
-      strength: 0.707107,
-    }, {
-      sourceClusterKC: 'autotutor.fixture-script.kc.e2',
-      targetClusterKC: 'autotutor.fixture-script.kc.e1',
-      strength: 0.707107,
-    }]);
-    assert.equal(graphRelationships.every((fact) => (
-      generatedClusterKCs.has(fact.slots.sourceClusterKC)
-      && generatedClusterKCs.has(fact.slots.targetClusterKC)
-    )), true);
+    assert.equal(graphRelationships.length, 0);
+    const sourceFacts = display.workingMemoryFacts.filter((fact) => fact.factType === 'learningTarget.source');
+    assert.equal(sourceFacts.length, 2);
+    assert.deepEqual(sourceFacts.map((fact) => fact.slots.clusterKC), [
+      'autotutor.fixture-script.kc.e1',
+      'autotutor.fixture-script.kc.e2',
+    ]);
 
-    const report = await converter.buildConversionReport(configDir, {
-      generateRelationships: true,
-      openRouterApiKey: 'test-openrouter-key',
-      embeddingModels: ['test-embedding-model'],
-      callEmbeddings: async () => ({
-        embeddings: [
-          [1, 0],
-          [0.5, 0.5],
-        ],
-        responseBody: {},
-      }),
-    });
+    const report = await converter.buildConversionReport(configDir);
     assert.equal(report.convertedCount, 1);
-    assert.equal(report.converted[0].relationshipProvenance.generatedFor, 'autotutor-sparc-converter');
-    assert.equal(report.converted[0].relationshipProvenance.model, 'test-embedding-model');
-    assert.equal(report.converted[0].relationshipValidation.relationshipProvenance.cacheKey, report.converted[0].relationshipProvenance.cacheKey);
+    assert.equal(report.converted[0].relationshipProvenance, null);
+    assert.equal(report.converted[0].relationshipValidation.relationshipGenerationRequired, true);
   });
 }
 
@@ -1507,18 +1581,17 @@ async function assertConversionReportFileOutput() {
   });
 
   await withFixtureConfig({ withRelationships: false }, async (configDir) => {
-    const reportFile = path.join(configDir, 'reports', 'autotutor-sparc-failure-report.json');
+    const reportFile = path.join(configDir, 'reports', 'autotutor-sparc-upload-generation-report.json');
     const report = await converter.buildConversionReport(configDir, {
       reportFile,
     });
-    assert.equal(report.convertedCount, 0);
+    assert.equal(report.convertedCount, 1);
     assert.equal(report.warningCount, 0);
-    assert.equal(report.failureCount, 1);
-    assert.equal(report.failures[0].sourcePackageName, 'AutoTutor Fixture');
-    assert.match(report.failures[0].error, /expectationRelationships must be present/);
+    assert.equal(report.failureCount, 0);
+    assert.equal(report.converted[0].relationshipValidation.relationshipGenerationRequired, true);
     const persisted = JSON.parse(fs.readFileSync(reportFile, 'utf8'));
-    assert.equal(persisted.failureCount, 1);
-    assert.match(persisted.failures[0].error, /unsupported-source/);
+    assert.equal(persisted.failureCount, 0);
+    assert.equal(persisted.converted[0].relationshipValidation.relationshipGenerationRequired, true);
   });
 }
 
@@ -1602,11 +1675,16 @@ async function assertNeutralSparcDialogueOpenRouterProvider() {
           },
         };
       }
+      assert.match(params.messages[0].content, /Prompt contract: autotutor\.hint v1/);
+      assert.match(params.messages[0].content, /Move-specific prompt policy:/);
+      assert.match(params.messages[1].content, /Latest student answer:/);
+      assert.match(params.messages[1].content, /App-selected plan\. Echo targetType, targetId, and selectedMove exactly/);
+      assert.match(params.messages[1].content, /Registered move definition:/);
       return {
         parsedContent: {
           targetType: 'learningTarget',
           targetId: 'kc-a',
-          action: 'hint',
+          selectedMove: 'hint',
           tutorMessage: 'Use the authored hint.',
         },
       };
@@ -1664,11 +1742,38 @@ async function assertNeutralSparcDialogueOpenRouterProvider() {
     targetId: 'kc-a',
     action: 'hint',
     contentTexts: ['Use the authored hint.'],
+    moveDefinition: moveDefinitions.requireActiveSparcMoveDefinition('hint'),
     selectedAction: {
       targetType: 'learningTarget',
       clusterKC: 'kc-a',
       action: 'hint',
     },
+    learnerText: 'A matters.',
+    learnerContribution: {
+      type: 'answer',
+      confidence: 0.8,
+    },
+    pedagogicalState: {
+      targetType: 'learningTarget',
+      targetId: 'kc-a',
+      selectedMove: 'hint',
+    },
+    transitionMetadata: {
+      previousTargetType: null,
+      previousTargetId: null,
+      currentTargetType: 'learningTarget',
+      currentTargetId: 'kc-a',
+      targetChanged: true,
+    },
+    targetContent: {
+      clusterKC: 'kc-a',
+      label: 'Expectation A',
+      proposition: 'A proposition',
+    },
+    plannerState: {
+      expectations: [{ clusterKC: 'kc-a', coverage: 0.65 }],
+    },
+    dialogueHistory: [],
   });
   assert.equal(utterance, 'Use the authored hint.');
   assert.deepEqual(calls.map((call) => call.intent.schemaName), [
@@ -1676,32 +1781,64 @@ async function assertNeutralSparcDialogueOpenRouterProvider() {
     'mofacts_sparc_dialogue_utterance',
   ]);
 
-  const rejectingProvider = dialogueOpenRouter.createSparcDialogueOpenRouterProvider({
+  const metadataAgnosticProvider = dialogueOpenRouter.createSparcDialogueOpenRouterProvider({
     async callResolvedOpenRouterJson() {
       return {
         parsedContent: {
           targetType: 'learningTarget',
           targetId: 'kc-b',
-          action: 'hint',
+          selectedMove: 'hint',
           tutorMessage: 'Changed target.',
         },
       };
     },
   });
   await assert.rejects(
-    () => rejectingProvider.generateTutorUtterance({
+    () => metadataAgnosticProvider.generateTutorUtterance({
       targetType: 'learningTarget',
       targetId: 'kc-a',
       action: 'hint',
       contentTexts: ['Use the authored hint.'],
+      moveDefinition: moveDefinitions.requireActiveSparcMoveDefinition('hint'),
       selectedAction: {
         targetType: 'learningTarget',
         clusterKC: 'kc-a',
         action: 'hint',
       },
     }),
-    /SPARC dialogue utterance response changed the selected target or action/,
+    /targetId "kc-b" did not match selected targetId "kc-a"/,
   );
+}
+
+function assertSparcAutoTutorProgressMatchesOriginalCredit() {
+  const snapshot = sparcAutoTutorProgress.buildSparcAutoTutorProgressSnapshot({
+    display: {
+      type: 'sparc',
+      workingMemoryFacts: [
+        { factType: 'dialogue.thresholds', slots: { coverageThreshold: 0.8, misconceptionThreshold: 0.65 } },
+        { factType: 'dialogue.graduation', slots: { requiredTargetCount: 2, maxActiveMisconceptions: 0 } },
+        { factType: 'learningTarget.source', slots: { clusterKC: 'kc-a', label: 'A' } },
+        { factType: 'learningTarget.source', slots: { clusterKC: 'kc-b', label: 'B' } },
+        { factType: 'learningTarget.source', slots: { clusterKC: 'kc-c', label: 'C' } },
+        { factType: 'learningTarget.source', slots: { clusterKC: 'kc-d', label: 'D' } },
+        { factType: 'diagnostic.misconceptionSource', slots: { id: 'm-low', label: 'Low misconception' } },
+        { factType: 'diagnostic.misconceptionSource', slots: { id: 'm-high', label: 'High misconception' } },
+      ],
+    },
+    runtimeNodeValues: {
+      [sparcAutoTutorProgress.SPARC_DIALOGUE_PROGRESS_FACTS_VALUE_KEY]: [
+        { factType: 'learningTarget.score', slots: { clusterKC: 'kc-a', coverage: 0.6 } },
+        { factType: 'learningTarget.score', slots: { clusterKC: 'kc-b', coverage: 0.82 } },
+        { factType: 'diagnostic.misconceptionScore', slots: { id: 'm-low', current: true, confidence: 0.4 } },
+        { factType: 'diagnostic.misconceptionScore', slots: { id: 'm-high', current: true, confidence: 0.7 } },
+        { factType: 'session.turnState', slots: { turnCount: 1 } },
+      ],
+    },
+  });
+  assert.equal(snapshot.coveredExpectations, 1.6);
+  assert.equal(snapshot.requiredExpectations, 4);
+  assert.equal(snapshot.activeMisconceptions, 1);
+  assert.equal(snapshot.turnCount, 1);
 }
 
 async function main() {
@@ -1715,12 +1852,13 @@ async function main() {
   assertMoveSelectionCounterfactualAudit();
   await assertControllerCompletionPlanning();
   await assertConverterFixtureOutput();
-  await assertConverterCanGenerateMissingRelationships();
+  await assertConverterDefersGraphGenerationToUpload();
   await assertConversionReportFileOutput();
   await assertConverterWriteModeOutput();
   await assertNeutralSparcDialogueOpenRouterProvider();
+  assertSparcAutoTutorProgressMatchesOriginalCredit();
   await assertExistingCanonicalSparcPackageLoad();
-  await assertCanonicalAutoTutorDryRunInventory();
+  await assertCanonicalAutoTutorConfigInventory();
 
   console.log(JSON.stringify({
     autoTutorSparcConverterCheck: true,
@@ -1731,12 +1869,12 @@ async function main() {
     targetSelectionEquivalenceFixture: true,
     moveSelectionCounterfactualFixture: true,
     converterFixture: true,
-    converterRelationshipGenerationFixture: true,
+    converterUploadRelationshipGenerationFixture: true,
     conversionReportFileFixture: true,
     converterWriteModeFixture: true,
     dialogueOpenRouterProviderFixture: true,
     existingCanonicalSparcPackageLoad: true,
-    canonicalAutoTutorDryRunInventory: true,
+    canonicalAutoTutorConfigInventory: true,
   }));
 }
 

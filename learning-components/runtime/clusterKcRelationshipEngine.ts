@@ -1,4 +1,9 @@
 import type { SparcWorkingMemoryFact } from '../units/sparcsession/sparcSessionContracts';
+import {
+  cosineSimilarityScore,
+  normalizeEmbeddingVector,
+  roundUnitSimilarityScore,
+} from './vectorSimilarity';
 
 export type ClusterKcRelationship = {
   readonly sourceClusterKC: string;
@@ -23,16 +28,8 @@ function nonBlankString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-function roundedScore(value: number): number {
-  return Math.round(value * 1_000_000) / 1_000_000;
-}
-
 export function normalizeClusterKcEmbeddingVector(vector: readonly number[]): number[] {
-  const magnitude = Math.sqrt(vector.reduce((sum, value) => sum + value * value, 0));
-  if (!Number.isFinite(magnitude) || magnitude === 0) {
-    throw new Error('clusterKC relationship embedding vector has zero magnitude');
-  }
-  return vector.map((value) => value / magnitude);
+  return normalizeEmbeddingVector(vector, 'clusterKC relationship embedding vector');
 }
 
 export function cosineClusterKcRelationshipScore(
@@ -42,8 +39,11 @@ export function cosineClusterKcRelationshipScore(
   if (normalizedA.length !== normalizedB.length) {
     throw new Error('clusterKC relationship embedding dimensions do not match');
   }
-  const cosine = normalizedA.reduce((sum, value, index) => sum + value * (normalizedB[index] || 0), 0);
-  return roundedScore(Math.max(0, Math.min(1, cosine)));
+  return cosineSimilarityScore({
+    normalizedA,
+    normalizedB,
+    label: 'clusterKC relationship embedding',
+  });
 }
 
 export function computeClusterKcRelationshipsFromEmbeddings(params: {
@@ -160,7 +160,7 @@ export function computeClusterKcCentrality(params: {
   const centrality = new Map<string, number>();
   for (const clusterKC of params.clusterKCs) {
     const count = counts.get(clusterKC) ?? 0;
-    centrality.set(clusterKC, count > 0 ? roundedScore((totals.get(clusterKC) ?? 0) / count) : 0);
+    centrality.set(clusterKC, count > 0 ? roundUnitSimilarityScore((totals.get(clusterKC) ?? 0) / count) : 0);
   }
   return centrality;
 }

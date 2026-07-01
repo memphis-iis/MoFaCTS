@@ -214,7 +214,6 @@ function learnerQuestionScope(learnerQuestion: AutoTutorLearnerQuestionScore): A
 
 function completionStageForPlan(
   plan: AutoTutorPlan,
-  requireFinalAnswerPrompt: boolean,
   endReason: AutoTutorEndReason,
 ): AutoTutorCompletionStage {
   if (endReason === 'mastery') {
@@ -229,14 +228,13 @@ function completionStageForPlan(
   if (plan.selectedMove === 'final_answer_prompt') {
     return 'requesting_final_answer';
   }
-  return requireFinalAnswerPrompt ? 'ready_for_final_answer' : 'summarizing';
+  return 'summarizing';
 }
 
 export function createPedagogicalStateFromPlan(
   plan: AutoTutorPlan,
   plannerState: AutoTutorPlannerState,
   learnerQuestion: AutoTutorLearnerQuestionScore,
-  requireFinalAnswerPrompt: boolean,
   endReason: AutoTutorEndReason = 'in_progress',
 ): AutoTutorPedagogicalState {
   if (plan.target.type === 'expectation') {
@@ -270,7 +268,7 @@ export function createPedagogicalStateFromPlan(
   return {
     targetType: 'completion',
     selectedMove: plan.selectedMove as Extract<AutoTutorMove, 'final_answer_prompt' | 'summary'>,
-    completionStage: completionStageForPlan(plan, requireFinalAnswerPrompt, endReason),
+    completionStage: completionStageForPlan(plan, endReason),
   };
 }
 
@@ -416,7 +414,6 @@ export function scoreAndPlanAutoTutorTurn(
     learnerQuestion: scoreEnvelope.learnerQuestion,
     learnerContribution: scoreEnvelope.learnerContribution,
     answerQuality: scoreEnvelope.answerQuality,
-    requireFinalAnswerPrompt: context.config.requireFinalAnswerPrompt,
   });
   nextState.planner = plan.nextPlannerState;
   nextState.selectedMove = plan.selectedMove;
@@ -424,7 +421,6 @@ export function scoreAndPlanAutoTutorTurn(
     plan,
     nextState.planner,
     scoreEnvelope.learnerQuestion,
-    context.config.requireFinalAnswerPrompt,
   );
   nextState.turnCount += 1;
   nextState.dialogue.push({ role: 'student', text: context.studentAnswer });
@@ -433,7 +429,7 @@ export function scoreAndPlanAutoTutorTurn(
   if (nextState.pedagogicalState.targetType === 'completion') {
     nextState.pedagogicalState = {
       ...nextState.pedagogicalState,
-      completionStage: completionStageForPlan(plan, context.config.requireFinalAnswerPrompt, nextState.endReason),
+      completionStage: completionStageForPlan(plan, nextState.endReason),
     };
   }
   pushTransition(nextState, 'generating_tutor_response', 'app-selected plan ready');

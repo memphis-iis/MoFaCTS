@@ -52,6 +52,14 @@ function outcomeForFiring(firing: SparcProductionRuleFiring): SparcOutcome {
 
 function ruleMetadata(document: SparcAuthoredDocument, ruleId: string): Record<string, unknown> {
   const rule = document.productionRules?.find((candidate) => candidate.id === ruleId);
+  if (!rule && ruleId.startsWith('derived-fact:')) {
+    const derivedFactId = ruleId.slice('derived-fact:'.length);
+    const derivedFact = document.derivedFacts?.find((candidate) => candidate.id === derivedFactId);
+    return {
+      ...(derivedFact ? { derivedFactId } : {}),
+      salience: 0,
+    };
+  }
   return {
     ...(rule?.module !== undefined ? { module: rule.module } : {}),
     ...(rule?.salience !== undefined ? { salience: rule.salience } : {}),

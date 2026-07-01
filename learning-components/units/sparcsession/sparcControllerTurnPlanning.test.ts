@@ -181,6 +181,28 @@ describe('evaluateSparcControllerTurnPlanning', function() {
     assert.equal(result.derivedFacts.find((entry) => entry.factType === 'learningTarget.coverageMean')?.slots?.value, 0.15);
     assert.equal(result.derivedFacts.find((entry) => entry.factType === 'session.turnState')?.slots?.turnCount, 2);
     assert.equal(result.derivedFacts.find((entry) => entry.factType === 'controller.completionState')?.slots?.completed, false);
+    assert.deepEqual(result.productionRuleFacts.filter((entry) => entry.factType.startsWith('selector.')), [{
+      factType: 'selector.currentExpectationCoverage',
+      slots: {
+        clusterKC: 'kc-b',
+        value: 0.1,
+        band: 'LOW',
+      },
+    }, {
+      factType: 'selector.studentAbility',
+      slots: {
+        value: 0.15,
+        band: 'LOW',
+        expectationCoverageMean: 0.15,
+        misconceptionConfidenceMean: 0,
+      },
+    }, {
+      factType: 'selector.studentVerbosity',
+      slots: {
+        wordCount: 5,
+        band: 'LOW',
+      },
+    }]);
     assert.equal(result.productionRuleEvaluation.execution.firings.length, 1);
     assert.equal(result.productionRuleEvaluation.execution.firings[0]?.ruleId, 'dialogue.move.test-hint');
     assert.ok(result.productionRuleEvaluation.execution.facts.some((entry) => (

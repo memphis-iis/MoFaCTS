@@ -7,10 +7,12 @@
     applySparcProgressiveNodeOperations,
   } from '../../../../../../learning-components/trial-displays/sparc/sparcProgressiveNodes';
   import SparcNode from './SparcNode.svelte';
+  import SparcAutoTutorProgress from './SparcAutoTutorProgress.svelte';
 
   const dispatch = createEventDispatcher();
 
   export let display = {};
+  export let adminDiagnosticMode = false;
   export let runtimeNodeValues = {};
   export let learningProgressSnapshot = null;
   export let showQuestionNumber = false;
@@ -21,6 +23,9 @@
   export let authoringSelectOnly = false;
 
   let activeNodeId = '';
+  let pendingDialogueClearInputIds = [];
+  let observedDialogueOperationCount = 0;
+  let dialogueInputResetVersion = 0;
 
   function buildInitialNodeValues(nodes = [], values = {}) {
     for (const node of nodes) {
@@ -112,6 +117,57 @@
     return answerValues;
   }
 
+  function isAutoTutorDialogueDisplay(candidate) {
+    return candidate?.unitType === 'sparc-autotutor-dialogue';
+  }
+
+  function flattenNodes(nodes = [], collected = []) {
+    for (const node of nodes || []) {
+      if (!node || typeof node !== 'object') {
+        continue;
+      }
+      collected.push(node);
+      if (Array.isArray(node.children)) {
+        flattenNodes(node.children, collected);
+      }
+      if (Array.isArray(node.panels)) {
+        for (const panel of node.panels) {
+          flattenNodes(panel?.children || [], collected);
+        }
+      }
+    }
+    return collected;
+  }
+
+  function dialogueNodes(nodes = [], options = {}) {
+    const includeOpening = options.includeOpening === true;
+    return flattenNodes(nodes).filter((node) => (
+      node?.atomType === 'dialogue-utterance'
+      && (includeOpening || node.id !== 'opening-tutor-message')
+    ));
+  }
+
+  function firstNodeById(nodes = [], id) {
+    return flattenNodes(nodes).find((node) => node?.id === id) || null;
+  }
+
+  function firstNodeByAtomType(nodes = [], atomType) {
+    return flattenNodes(nodes).find((node) => node?.atomType === atomType) || null;
+  }
+
+  function dialoguePrompt(nodes = []) {
+    const opening = firstNodeById(nodes, 'opening-tutor-message') || firstNodeByAtomType(nodes, 'dialogue-utterance');
+    const value = opening?.value;
+    return typeof value === 'string' && value.trim() ? value.trim() : '';
+  }
+
+  function dialogueInputNodes(nodes = []) {
+    return flattenNodes(nodes).filter((node) => (
+      node?.atomType === 'text-input'
+      && node.id === 'learner-response-input'
+    ));
+  }
+
   function handleNodeValueChange(nodeId, value) {
     nodeValues = {
       ...nodeValues,
@@ -177,6 +233,9 @@
       focusedNodeId: activeNodeId || undefined,
       timestamp: Date.now(),
     });
+    if (isAutoTutorDialogueDisplay(sparcDisplay)) {
+      pendingDialogueClearInputIds = dialogueInputNodes(realizedSparcDisplay?.nodes).map((inputNode) => inputNode.id);
+    }
   }
 
   function handleNodeFocus(nodeId) {
@@ -207,6 +266,10 @@
     return Array.isArray(operations) ? operations : [];
   }
 
+  function isOptimisticProgressiveOperation(operation) {
+    return operation?.node?.optimistic === true;
+  }
+
   $: sparcDisplay = resolveSparcTrialDisplay(display, '[SparcTrialSurface]');
   $: progressiveNodeOperations = getProgressiveNodeOperations(runtimeNodeValues);
   $: topLevelNodes = sparcDisplay
@@ -224,14 +287,98 @@
     sparcDisplay?.initialState || [],
   );
   $: nodeValues = mergeRuntimeNodeValues(authoredNodeValues, runtimeNodeValues);
+  $: autoTutorDialogueMode = isAutoTutorDialogueDisplay(sparcDisplay);
+  $: autoTutorDialoguePrompt = autoTutorDialogueMode ? dialoguePrompt(topLevelNodes) : '';
+  $: autoTutorDialogueMessages = autoTutorDialogueMode ? dialogueNodes(topLevelNodes) : [];
+  $: autoTutorDialogueInputNode = autoTutorDialogueMode ? firstNodeById(topLevelNodes, 'learner-response-input') : null;
+  $: autoTutorDialogueSubmitNode = autoTutorDialogueMode ? firstNodeById(topLevelNodes, 'learner-response-submit') : null;
+  $: dialogueOperationCount = progressiveNodeOperations
+    .filter((operation) => !isOptimisticProgressiveOperation(operation))
+    .length;
+  $: if (dialogueOperationCount !== observedDialogueOperationCount) {
+    if (
+      autoTutorDialogueMode
+      && pendingDialogueClearInputIds.length > 0
+      && dialogueOperationCount > observedDialogueOperationCount
+    ) {
+      nodeValues = pendingDialogueClearInputIds.reduce((values, inputNodeId) => ({
+        ...values,
+        [inputNodeId]: '',
+      }), nodeValues);
+      dialogueInputResetVersion += 1;
+      pendingDialogueClearInputIds = [];
+    }
+    observedDialogueOperationCount = dialogueOperationCount;
+  }
 </script>
 
-<div class="sparc-surface">
+<div class="sparc-surface" class:sparc-auto-tutor-dialogue-surface={autoTutorDialogueMode}>
   {#if showQuestionNumber}
     <div class="sparc-question-number">Question {questionNumber}</div>
   {/if}
 
-  {#if sparcDisplay?.topbar?.title}
+  {#if autoTutorDialogueMode}
+    <header class="sparc-auto-tutor-header">
+      <div class="sparc-auto-tutor-question">
+        <h1>{autoTutorDialoguePrompt}</h1>
+      </div>
+      <SparcAutoTutorProgress display={sparcDisplay} runtimeNodeValues={nodeValues} />
+    </header>
+
+    <section class="sparc-auto-tutor-chat" aria-label="AutoTutor conversation">
+      {#each autoTutorDialogueMessages as node (node.id)}
+        <SparcNode
+          {node}
+          {adminDiagnosticMode}
+          {nodeValues}
+          {learningProgressSnapshot}
+          {authoringSelectedNodeId}
+          {authoringSelectOnly}
+          onNodeValueChange={handleNodeValueChange}
+          onNodeCommit={handleNodeValueCommit}
+          onNodeFocus={handleNodeFocus}
+          onButtonActivate={handleButtonActivate}
+        />
+      {/each}
+    </section>
+
+    <footer class="sparc-auto-tutor-input-bar">
+      {#if autoTutorDialogueInputNode}
+        <div class="sparc-auto-tutor-input">
+          {#key `${autoTutorDialogueInputNode.id}:${dialogueInputResetVersion}`}
+          <SparcNode
+            node={autoTutorDialogueInputNode}
+            {adminDiagnosticMode}
+            {nodeValues}
+            {learningProgressSnapshot}
+            {authoringSelectedNodeId}
+            {authoringSelectOnly}
+            onNodeValueChange={handleNodeValueChange}
+            onNodeCommit={handleNodeValueCommit}
+            onNodeFocus={handleNodeFocus}
+            onButtonActivate={handleButtonActivate}
+          />
+          {/key}
+        </div>
+      {/if}
+      {#if autoTutorDialogueSubmitNode}
+        <div class="sparc-auto-tutor-submit">
+          <SparcNode
+            node={autoTutorDialogueSubmitNode}
+            {adminDiagnosticMode}
+            {nodeValues}
+            {learningProgressSnapshot}
+            {authoringSelectedNodeId}
+            {authoringSelectOnly}
+            onNodeValueChange={handleNodeValueChange}
+            onNodeCommit={handleNodeValueCommit}
+            onNodeFocus={handleNodeFocus}
+            onButtonActivate={handleButtonActivate}
+          />
+        </div>
+      {/if}
+    </footer>
+  {:else if sparcDisplay?.topbar?.title}
     <div class="sparc-topbar">
       <div class="sparc-topbar-title">{sparcDisplay.topbar.title}</div>
       {#if sparcDisplay.topbar.helpLabel}
@@ -240,6 +387,7 @@
     </div>
   {/if}
 
+  {#if !autoTutorDialogueMode}
   <div class:sparc-surface-body={!usesBoxLayout} class:sparc-box-layout={usesBoxLayout}>
     {#if usesBoxLayout}
       {#each boxedNodeGroups as group (group.box.id)}
@@ -252,6 +400,7 @@
           {#each group.nodes as node (node.id)}
             <SparcNode
               {node}
+              {adminDiagnosticMode}
               {nodeValues}
               {learningProgressSnapshot}
               {authoringSelectedNodeId}
@@ -268,6 +417,7 @@
       {#each topLevelNodes as node (node.id)}
         <SparcNode
           {node}
+          {adminDiagnosticMode}
           {nodeValues}
           {learningProgressSnapshot}
           {authoringSelectedNodeId}
@@ -280,6 +430,7 @@
       {/each}
     {/if}
   </div>
+  {/if}
 </div>
 
 <style>
@@ -429,5 +580,95 @@
 
   .sparc-box[data-sparc-box-region="bottom"] {
     flex: 1 1 100%;
+  }
+
+  .sparc-auto-tutor-dialogue-surface {
+    gap: var(--sparc-space-3);
+    padding: clamp(var(--app-space-3), 2vw, var(--app-space-5));
+    overflow: hidden;
+  }
+
+  .sparc-auto-tutor-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem);
+    gap: var(--sparc-space-3);
+    align-items: start;
+    flex: 0 0 auto;
+  }
+
+  .sparc-auto-tutor-question {
+    min-width: 0;
+  }
+
+  .sparc-auto-tutor-question h1 {
+    margin: 0;
+    color: var(--sparc-text-color);
+    font-size: calc(var(--app-font-size-base) * 1.25);
+    line-height: 1.35;
+    font-weight: 700;
+    letter-spacing: 0;
+  }
+
+  .sparc-auto-tutor-chat {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sparc-space-3);
+    padding: var(--sparc-space-3);
+    border: 1px solid var(--sparc-border-color);
+    border-radius: var(--sparc-border-radius-sm);
+    background: var(--sparc-surface-color);
+    overflow-y: auto;
+    box-sizing: border-box;
+  }
+
+  .sparc-auto-tutor-input-bar {
+    flex: 0 0 auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(7.5rem, 12rem);
+    gap: var(--sparc-space-2);
+    align-items: stretch;
+    padding-top: var(--sparc-space-1);
+    box-sizing: border-box;
+  }
+
+  .sparc-auto-tutor-input,
+  .sparc-auto-tutor-submit {
+    min-width: 0;
+  }
+
+  .sparc-auto-tutor-input :global(.sparc-input),
+  .sparc-auto-tutor-submit :global(.sparc-button) {
+    width: 100%;
+  }
+
+  .sparc-auto-tutor-submit :global(.sparc-button) {
+    text-align: center;
+  }
+
+  @media (max-width: 768px) {
+    .sparc-auto-tutor-dialogue-surface {
+      padding: calc(0.625rem * var(--app-density-scale));
+      gap: var(--sparc-space-2);
+    }
+
+    .sparc-auto-tutor-header {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--sparc-space-2);
+    }
+
+    .sparc-auto-tutor-question h1 {
+      font-size: calc(var(--app-font-size-base) * 1.05);
+    }
+
+    .sparc-auto-tutor-chat {
+      padding: var(--sparc-space-2);
+      gap: var(--sparc-space-2);
+    }
+
+    .sparc-auto-tutor-input-bar {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
 </style>

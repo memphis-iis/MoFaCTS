@@ -3171,15 +3171,6 @@
                           "grid_columns": 4
                         }
                       },
-                      "requireFinalAnswerPrompt": {
-                        "title": "Require final answer prompt.",
-                        "description": "When enabled, AutoTutor asks the learner for one final integrated answer before giving the summary. Disabled by default.",
-                        "type": "boolean",
-                        "default": false,
-                        "options": {
-                          "grid_columns": 4
-                        }
-                      },
                       "maxTurns": {
                         "title": "Maximum AutoTutor turns.",
                         "description": "Maximum learner turns before the AutoTutor session ends. This is a session limit, not a graduation criterion.",
@@ -5525,15 +5516,6 @@
                     "minimum": 0,
                     "maximum": 2,
                     "default": 0.45,
-                    "options": {
-                      "grid_columns": 4
-                    }
-                  },
-                  "requireFinalAnswerPrompt": {
-                    "title": "Require final answer prompt.",
-                    "description": "When enabled, AutoTutor asks the learner for one final integrated answer before giving the summary. Disabled by default.",
-                    "type": "boolean",
-                    "default": false,
                     "options": {
                       "grid_columns": 4
                     }

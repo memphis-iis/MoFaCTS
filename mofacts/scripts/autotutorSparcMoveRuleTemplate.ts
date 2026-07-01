@@ -25,13 +25,25 @@ export const AUTOTUTOR_SPARC_MOVE_ACTIONS = [
 
 export type AutoTutorSparcMoveAction = typeof AUTOTUTOR_SPARC_MOVE_ACTIONS[number];
 
+const LEGACY_FEEDBACK_MOVE_ACTIONS = new Set<AutoTutorSparcMoveAction>([
+  'positive_feedback',
+  'negative_feedback',
+  'positive_neutral_feedback',
+  'negative_neutral_feedback',
+  'neutral_feedback',
+]);
+
 const LOW = { min: 0, max: 0.33 } as const;
 const LOW_OR_MEDIUM = { min: 0, max: 0.67 } as const;
 const MEDIUM = { min: 0.33, max: 0.67 } as const;
-const MEDIUM_OR_HIGH = { min: 0.33, max: 1, maxInclusive: true } as const;
 const SOMEWHAT_HIGH = { min: 0.6, max: 0.8 } as const;
 const HIGH = { min: 0.67, max: 0.9 } as const;
 const HIGH_OR_VERY_HIGH = { min: 0.67, max: 1, maxInclusive: true } as const;
+
+type BagMatchBand = 'NONE' | 'LOW' | 'MEDIUM' | 'HIGH' | 'VERY_HIGH';
+type CoverageBand = 'LOW' | 'MEDIUM' | 'HIGH';
+type StudentAbilityBand = 'VERY_LOW' | 'LOW' | 'MEDIUM' | 'HIGH';
+type VerbosityBand = 'LOW' | 'MEDIUM' | 'HIGH';
 
 function literal(value: unknown) {
   return { type: 'literal' as const, value };
@@ -72,22 +84,84 @@ function selectedTargetCoverage(bounds: Parameters<typeof range>[0]): SparcProdu
   };
 }
 
-function meanCoverage(bounds: Parameters<typeof range>[0]): SparcProductionRuleCondition {
+function currentExpectationCoverageBand(band: CoverageBand): SparcProductionRuleCondition {
   return {
-    factType: 'learningTarget.coverageMean',
+    factType: 'selector.currentExpectationCoverage',
     slots: {
-      scope: { type: 'literal', value: 'required' },
-      value: range(bounds),
+      clusterKC: { type: 'bound', variable: 'targetClusterKC' },
+      band: literal(band),
     },
   };
 }
 
-function learnerWordCount(bounds: Parameters<typeof range>[0]): SparcProductionRuleCondition {
+function currentExpectationCoverageAny(bands: readonly CoverageBand[]): SparcProductionRuleCondition {
   return {
-    factType: 'dialogue.learnerWordCount',
+    type: 'any',
+    conditions: bands.map(currentExpectationCoverageBand),
+  };
+}
+
+function goodAnswerMatchBand(band: BagMatchBand): SparcProductionRuleCondition {
+  return {
+    factType: 'selector.goodAnswerMatch',
     slots: {
-      cumulative: range(bounds),
+      band: literal(band),
     },
+  };
+}
+
+function goodAnswerMatchAny(bands: readonly BagMatchBand[]): SparcProductionRuleCondition {
+  return {
+    type: 'any',
+    conditions: bands.map(goodAnswerMatchBand),
+  };
+}
+
+function badAnswerMatchBand(band: BagMatchBand): SparcProductionRuleCondition {
+  return {
+    factType: 'selector.badAnswerMatch',
+    slots: {
+      band: literal(band),
+    },
+  };
+}
+
+function badAnswerMatchAny(bands: readonly BagMatchBand[]): SparcProductionRuleCondition {
+  return {
+    type: 'any',
+    conditions: bands.map(badAnswerMatchBand),
+  };
+}
+
+function studentAbilityBand(band: StudentAbilityBand): SparcProductionRuleCondition {
+  return {
+    factType: 'selector.studentAbility',
+    slots: {
+      band: literal(band),
+    },
+  };
+}
+
+function studentAbilityAny(bands: readonly StudentAbilityBand[]): SparcProductionRuleCondition {
+  return {
+    type: 'any',
+    conditions: bands.map(studentAbilityBand),
+  };
+}
+
+function studentVerbosityBand(band: VerbosityBand): SparcProductionRuleCondition {
+  return {
+    factType: 'selector.studentVerbosity',
+    slots: {
+      band: literal(band),
+    },
+  };
+}
+
+function studentVerbosityAny(bands: readonly VerbosityBand[]): SparcProductionRuleCondition {
+  return {
+    type: 'any',
+    conditions: bands.map(studentVerbosityBand),
   };
 }
 
@@ -186,7 +260,29 @@ function rule(params: {
   };
 }
 
-function buildRules(): readonly SparcProductionRule[] {
+function selectedActionMoveId(rule: SparcProductionRule): AutoTutorSparcMoveAction | undefined {
+  const selectedAction = rule.then.find((effect) => (
+    effect.type === 'assert-fact'
+    && effect.fact.factType === 'controller.selectedAction'
+  ));
+  if (!selectedAction || selectedAction.type !== 'assert-fact') {
+    return undefined;
+  }
+  const action = selectedAction.fact.slots?.action;
+  if (!action || action.type !== 'literal' || typeof action.value !== 'string') {
+    return undefined;
+  }
+  return AUTOTUTOR_SPARC_MOVE_ACTIONS.includes(action.value as AutoTutorSparcMoveAction)
+    ? action.value as AutoTutorSparcMoveAction
+    : undefined;
+}
+
+function isLegacyFeedbackRule(rule: SparcProductionRule): boolean {
+  const moveId = selectedActionMoveId(rule);
+  return !!moveId && LEGACY_FEEDBACK_MOVE_ACTIONS.has(moveId);
+}
+
+function buildAllRules(): readonly SparcProductionRule[] {
   return [
     rule({
       paperRule: '08-summary',
@@ -197,7 +293,7 @@ function buildRules(): readonly SparcProductionRule[] {
         {
           type: 'any',
           conditions: [
-            selectedTargetCoverage(HIGH_OR_VERY_HIGH),
+            studentAbilityBand('HIGH'),
             turnCount({ min: 8 }),
           ],
         },
@@ -210,10 +306,10 @@ function buildRules(): readonly SparcProductionRule[] {
       when: [
         selectedLearningTarget(),
         selectedMisconception(),
-        selectedTargetCoverage(LOW_OR_MEDIUM),
-        meanCoverage(LOW_OR_MEDIUM),
-        learnerWordCount({ min: 0, max: 160 }),
-        misconceptionConfidence(HIGH),
+        currentExpectationCoverageAny(['LOW', 'MEDIUM']),
+        studentAbilityAny(['VERY_LOW', 'LOW', 'MEDIUM']),
+        studentVerbosityAny(['LOW', 'MEDIUM']),
+        badAnswerMatchAny(['HIGH', 'VERY_HIGH']),
       ],
     }),
     rule({
@@ -222,8 +318,9 @@ function buildRules(): readonly SparcProductionRule[] {
       salience: 90,
       when: [
         selectedLearningTarget(),
-        meanCoverage(MEDIUM_OR_HIGH),
-        selectedTargetCoverage(LOW),
+        studentAbilityAny(['MEDIUM', 'HIGH']),
+        currentExpectationCoverageBand('LOW'),
+        goodAnswerMatchAny(['LOW', 'MEDIUM']),
       ],
     }),
     rule({
@@ -232,9 +329,10 @@ function buildRules(): readonly SparcProductionRule[] {
       salience: 88,
       when: [
         selectedLearningTarget(),
-        meanCoverage(LOW),
-        learnerWordCount({ min: 160 }),
-        selectedTargetCoverage(LOW),
+        studentAbilityAny(['VERY_LOW', 'LOW']),
+        studentVerbosityBand('HIGH'),
+        currentExpectationCoverageBand('LOW'),
+        goodAnswerMatchAny(['LOW', 'MEDIUM']),
       ],
     }),
     rule({
@@ -311,8 +409,8 @@ function buildRules(): readonly SparcProductionRule[] {
         {
           type: 'any',
           conditions: [
-            selectedTargetCoverage(MEDIUM),
-            selectedTargetCoverage(SOMEWHAT_HIGH),
+            currentExpectationCoverageBand('MEDIUM'),
+            goodAnswerMatchAny(['HIGH', 'VERY_HIGH']),
           ],
         },
       ],
@@ -327,7 +425,8 @@ function buildRules(): readonly SparcProductionRule[] {
           type: { type: 'literal', value: 'assertion' },
           streakCount: { type: 'literal', value: 1 },
         }),
-        selectedTargetCoverage(HIGH),
+        goodAnswerMatchAny(['HIGH', 'VERY_HIGH']),
+        currentExpectationCoverageAny(['MEDIUM', 'HIGH']),
       ],
     }),
     rule({
@@ -336,8 +435,9 @@ function buildRules(): readonly SparcProductionRule[] {
       salience: 66,
       when: [
         selectedLearningTarget(),
-        learnerWordCount({ min: 0, max: 80 }),
-        selectedTargetCoverage(LOW_OR_MEDIUM),
+        studentVerbosityBand('LOW'),
+        currentExpectationCoverageAny(['LOW', 'MEDIUM']),
+        goodAnswerMatchAny(['NONE', 'LOW']),
       ],
     }),
     rule({
@@ -350,7 +450,8 @@ function buildRules(): readonly SparcProductionRule[] {
           type: { type: 'literal', value: 'assertion' },
           streakCount: { type: 'literal', value: 1 },
         }),
-        selectedTargetCoverage(LOW_OR_MEDIUM),
+        currentExpectationCoverageAny(['LOW', 'MEDIUM']),
+        goodAnswerMatchAny(['NONE', 'LOW', 'MEDIUM']),
       ],
     }),
     rule({
@@ -362,10 +463,19 @@ function buildRules(): readonly SparcProductionRule[] {
         learnerContribution({
           type: { type: 'literal', value: 'assertion' },
         }),
-        selectedTargetCoverage(LOW_OR_MEDIUM),
+        currentExpectationCoverageAny(['LOW', 'MEDIUM']),
+        goodAnswerMatchAny(['NONE', 'LOW', 'MEDIUM']),
       ],
     }),
   ] as const;
+}
+
+function buildActiveRules(): readonly SparcProductionRule[] {
+  return buildAllRules().filter((rule) => !isLegacyFeedbackRule(rule));
+}
+
+function buildLegacyFeedbackRules(): readonly SparcProductionRule[] {
+  return buildAllRules().filter(isLegacyFeedbackRule);
 }
 
 function cloneRules(rules: readonly SparcProductionRule[]): SparcProductionRule[] {
@@ -373,6 +483,9 @@ function cloneRules(rules: readonly SparcProductionRule[]): SparcProductionRule[
 }
 
 export function buildAutoTutorSparcMoveProductionRules(): SparcProductionRule[] {
-  return cloneRules(buildRules());
+  return cloneRules(buildActiveRules());
 }
 
+export function buildAutoTutorSparcLegacyFeedbackMoveProductionRules(): SparcProductionRule[] {
+  return cloneRules(buildLegacyFeedbackRules());
+}

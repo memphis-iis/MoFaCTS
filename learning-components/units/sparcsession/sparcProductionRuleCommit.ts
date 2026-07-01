@@ -14,7 +14,7 @@ import { commitSparcProcessedResponseOutcome } from './sparcResponseOutcomeCommi
 import { runSparcProductionRules } from './sparcProductionRuleEvaluator';
 import { createSparcStateTransitionHistoryRecord } from './sparcStateTransitionHistory';
 import { createSparcProductionRuleTraceHistoryRecords } from './sparcProductionRuleTraceHistory';
-import { buildSparcWorkingMemoryFacts } from './sparcWorkingMemoryFacts';
+import { buildSparcWorkingMemoryFactsWithDerivations } from './sparcWorkingMemoryFacts';
 import {
   createSparcStableWorkingMemoryFactStateWrite,
   createSparcWorkingMemoryFactStateWrite,
@@ -45,6 +45,7 @@ export type SparcProductionRuleCommitRuntime = {
 
 export type SparcCommittedProductionRuleEvaluation = {
   readonly execution: SparcProductionRuleExecution;
+  readonly derivedRuleExecution?: SparcProductionRuleExecution;
   readonly transition?: SparcStateTransition;
   readonly historyRecord?: SparcCanonicalHistoryRecord;
   readonly traceHistoryRecords?: readonly SparcCanonicalHistoryRecord[];
@@ -392,11 +393,12 @@ export function evaluateSparcAuthoredProductionRules(params: {
   readonly maxCycles?: number;
   readonly factFilter?: (fact: SparcWorkingMemoryFact) => boolean;
 }): SparcCommittedProductionRuleEvaluation {
-  const baseFacts = buildSparcWorkingMemoryFacts({
+  const builtFacts = buildSparcWorkingMemoryFactsWithDerivations({
     document: params.document,
     event: params.event,
     ...(params.replayState ? { replayState: params.replayState } : {}),
-  }).filter((fact) => (params.factFilter ? params.factFilter(fact) : true));
+  });
+  const baseFacts = builtFacts.facts.filter((fact) => (params.factFilter ? params.factFilter(fact) : true));
   const facts = [
     ...baseFacts,
     ...(params.extraFacts ?? []),
@@ -413,6 +415,7 @@ export function evaluateSparcAuthoredProductionRules(params: {
   });
   return {
     execution,
+    ...(builtFacts.derivedRuleExecution ? { derivedRuleExecution: builtFacts.derivedRuleExecution } : {}),
     ...(transition ? { transition } : {}),
   };
 }
@@ -486,15 +489,19 @@ async function commitProductionRuleTraceHistory(
   },
   evaluation: SparcCommittedProductionRuleEvaluation,
 ): Promise<SparcCanonicalHistoryRecord[]> {
-  if (evaluation.execution.firings.length === 0) {
+  const traceExecutions = [
+    evaluation.derivedRuleExecution,
+    evaluation.execution,
+  ].filter((execution): execution is SparcProductionRuleExecution => Boolean(execution?.firings.length));
+  if (traceExecutions.length === 0) {
     return [];
   }
-  const records = createSparcProductionRuleTraceHistoryRecords({
+  const records = traceExecutions.flatMap((execution) => createSparcProductionRuleTraceHistoryRecords({
     core: params.core,
     document: params.document,
     event: params.event,
-    execution: evaluation.execution,
-  });
+    execution,
+  }));
   for (const record of records) {
     await params.runtime.history.writeCanonicalHistory(record);
   }

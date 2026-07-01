@@ -46,7 +46,7 @@ Every phase change is recorded as an `AutoTutorTransition` with `from`, `to`, `r
 | `expectation` | `targetId`, `selectedMove`, `focusTurnCount`, `moveCycleIndex` | The tutor is working on an authored expectation. Moves are `pump`, `hint`, `prompt`, or `assertion`. |
 | `misconception` | `targetId`, `selectedMove: "correction"`, `correctionStage` | The tutor is repairing an active misconception. Stages cycle `hint -> prompt -> assertion`. |
 | `learner_question` | `selectedMove: "answer_question"`, `questionScope`, `answerableFromAuthoredContent` | The learner asked a substantive question. `questionScope` is `in_scope` or `out_of_scope` based on scorer metadata. |
-| `completion` | `selectedMove`, `completionStage` | Required expectations are covered. Stages distinguish `ready_for_final_answer`, `requesting_final_answer`, `summarizing`, and `mastered`. |
+| `completion` | `selectedMove`, `completionStage` | Required expectations are covered. New plans select `summary`; historic saved states may still contain older final-answer prompt stages for replay compatibility. |
 
 The pedagogical state is derived from the deterministic `AutoTutorPlan`; the utterance LLM must echo the selected `targetType`, `targetId`, and `selectedMove` exactly and must not change them.
 
@@ -65,9 +65,8 @@ The pedagogical state is derived from the deterministic `AutoTutorPlan`; the utt
 | Repeated `idk` or help request | Moves escalate `hint -> prompt -> assertion`. |
 | Near-threshold expectation coverage | Move is `prompt`. |
 | Normal expectation tutoring | Moves cycle `hint -> prompt -> assertion`; tutor assertions do not count as learner coverage. |
-| Required expectations are covered and final-answer prompt is not required | Pedagogical state becomes `completion`; move is `summary`; mastery can be applied. |
-| Required expectations are covered and final-answer prompt is required | First completion move is `final_answer_prompt`; the next completion move is `summary`; mastery waits for summary. |
-| Graduation met after final-answer gate | End reason becomes `mastery`. |
+| Required expectations are covered | Pedagogical state becomes `completion`; move is `summary`; mastery can be applied. |
+| Graduation met | End reason becomes `mastery`. |
 | Turn count reaches authored `maxTurns` before mastery | End reason becomes `max_turns`. |
 | Runtime cost cap is reached | End reason becomes `cost_cap`; the current cap is `AUTO_TUTOR_COST_CAP_USD`. |
 
