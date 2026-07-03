@@ -580,6 +580,100 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
     assert.equal(writtenRecords.length, 0);
   });
 
+  it('loads clean SPARC AutoTutor targets with clusterKC-only authored clusterTargets', function() {
+    const document = createSparcAuthoredDocumentFromTrialDisplay({
+      documentId: 'sparc-autotutor-clean',
+      display: {
+        type: 'sparc',
+        documentId: 'sparc-autotutor-clean',
+        unitType: 'sparc-autotutor-dialogue',
+        nodes: [{
+          id: 'learner-response-input',
+          nodeType: 'atomic',
+          atomType: 'text-input',
+        }],
+        clusterTargets: [{
+          clusterIndex: 0,
+          clusterKC: 'kc-a',
+        }],
+        autoTutorTargets: {
+          expectations: [{
+            clusterKC: 'kc-a',
+            text: 'Expectation A clean text.',
+          }],
+          misconceptions: [{
+            id: 'm-a',
+            text: 'Misconception A clean text.',
+          }],
+        },
+        workingMemoryFacts: [{
+          factType: 'kcGraph.node',
+          slots: {
+            clusterKC: 'kc-a',
+            description: 'Expectation A clean text.',
+            centrality: 0,
+          },
+        }],
+      },
+    });
+
+    assert.deepEqual(document.autoTutorTargets, {
+      expectations: [{
+        clusterKC: 'kc-a',
+        text: 'Expectation A clean text.',
+      }],
+      misconceptions: [{
+        id: 'm-a',
+        text: 'Misconception A clean text.',
+      }],
+    });
+    assert.deepEqual(document.clusterTargets?.[0], {
+      clusterIndex: 0,
+      stimuliSetId: 'sparc:kc-a',
+      stimulusKC: 'kc-a',
+      clusterKC: 'kc-a',
+      KCId: 'kc-a',
+      KCDefault: 'kc-a',
+      KCCluster: 'kc-a',
+    });
+  });
+
+  it('rejects deleted SPARC AutoTutor target-source facts', function() {
+    assert.throws(
+      () => createSparcAuthoredDocumentFromTrialDisplay({
+        documentId: 'sparc-autotutor-legacy',
+        display: {
+          type: 'sparc',
+          documentId: 'sparc-autotutor-legacy',
+          unitType: 'sparc-autotutor-dialogue',
+          nodes: [{
+            id: 'learner-response-input',
+            nodeType: 'atomic',
+            atomType: 'text-input',
+          }],
+          clusterTargets: [{
+            clusterIndex: 0,
+            clusterKC: 'kc-a',
+          }],
+          autoTutorTargets: {
+            expectations: [{
+              clusterKC: 'kc-a',
+              text: 'Expectation A clean text.',
+            }],
+            misconceptions: [],
+          },
+          workingMemoryFacts: [{
+            factType: 'learningTarget.source',
+            slots: {
+              clusterKC: 'kc-a',
+            },
+          }],
+        },
+      }),
+      /forbidden target-schema fact type learningTarget\.source/,
+    );
+  });
+
   it('commits a correct LCD action as model practice for the fractions LCD stimulus', async function() {
     const modelPracticeRequests: unknown[] = [];
     const writtenRecords: unknown[] = [];

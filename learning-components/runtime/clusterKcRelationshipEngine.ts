@@ -15,7 +15,6 @@ export type ClusterKcRelationship = {
 export type ClusterKcRelationshipNode = {
   readonly clusterKC: string;
   readonly description: string;
-  readonly sourceId?: string;
 };
 
 export type ClusterKcRelationshipMatrix = Record<string, Record<string, number>>;
@@ -78,14 +77,14 @@ export function computeClusterKcRelationshipsFromEmbeddings(params: {
 
 export function normalizeClusterKcRelationshipMatrix(
   matrix: unknown,
-  resolveClusterKC: (sourceId: string) => string | undefined,
+  resolveClusterKC: (matrixKey: string) => string | undefined,
 ): ClusterKcRelationship[] {
   if (!isRecord(matrix)) {
     return [];
   }
   const relationships: ClusterKcRelationship[] = [];
-  for (const [sourceId, rawTargets] of Object.entries(matrix)) {
-    const sourceClusterKC = resolveClusterKC(sourceId);
+  for (const [fromKey, rawTargets] of Object.entries(matrix)) {
+    const sourceClusterKC = resolveClusterKC(fromKey);
     if (!sourceClusterKC || !isRecord(rawTargets)) {
       continue;
     }
@@ -181,7 +180,6 @@ export function createClusterKcGraphFacts(params: {
         clusterKC: node.clusterKC,
         description: node.description,
         centrality: centralityByClusterKC.get(node.clusterKC) ?? 0,
-        ...(node.sourceId ? { sourceId: node.sourceId } : {}),
       },
     })),
     ...params.relationships.map((relationship) => ({

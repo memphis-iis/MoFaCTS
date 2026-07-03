@@ -179,6 +179,16 @@ function sampleDialogueControllerDocument(): SparcAuthoredDocument {
   return {
     id: 'dialogue-doc',
     schemaVersion: 1,
+    autoTutorTargets: {
+      expectations: [{
+        clusterKC: 'kc-a',
+        text: 'Use A.',
+      }, {
+        clusterKC: 'kc-b',
+        text: 'Use B.',
+      }],
+      misconceptions: [],
+    },
     workingMemoryFacts: [{
       factType: 'controller.targetSelectionPolicy',
       slots: {
@@ -188,12 +198,6 @@ function sampleDialogueControllerDocument(): SparcAuthoredDocument {
         coherenceWeight: 0.3,
         centralityWeight: 0.2,
       },
-    }, {
-      factType: 'learningTarget.source',
-      slots: { clusterKC: 'kc-a' },
-    }, {
-      factType: 'learningTarget.source',
-      slots: { clusterKC: 'kc-b' },
     }, {
       factType: 'learningTarget.score',
       slots: { clusterKC: 'kc-a', coverage: 0.2 },
@@ -212,14 +216,6 @@ function sampleDialogueControllerDocument(): SparcAuthoredDocument {
     }, {
       factType: 'kcGraph.relationship',
       slots: { sourceClusterKC: 'kc-b', targetClusterKC: 'kc-a', strength: 0.9 },
-    }, {
-      factType: 'dialogue.moveContent',
-      slots: {
-        targetType: 'learningTarget',
-        clusterKC: 'kc-b',
-        action: 'hint',
-        text: 'Use B.',
-      },
     }, {
       factType: 'dialogue.learnerWordCount',
       slots: { cumulative: 2 },
@@ -639,6 +635,79 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
         clusterKC: 'cluster-1',
       }],
     );
+  });
+
+  it('renders SPARC AutoTutor target rows flattened from package upload', async function() {
+    const engine = await createSparcSessionUnitEngine(createPageRuntimeDeps({
+      getStimCount: () => 1,
+      getStimCluster: () => ({
+        clusterKC: 'autotutor.stats-confidence-interval-001.kc.e1',
+        stims: [{
+          stimuliSetId: 'stim-set-1',
+          clusterKC: 'autotutor.stats-confidence-interval-001.kc.e1',
+          stimulusKC: 300000,
+          responseKC: 1,
+          correctResponse: '__SPARC_AUTOTUTOR_TARGET__',
+          params: '0,.7',
+          textStimulus: 'Flattened target text from uploaded package.',
+        }],
+      }),
+      findTdfById: () => ({
+        rawStimuliFile: {
+          setspec: {
+            sparcPages: [{
+              pageId: 'page-1',
+              display: {
+                type: 'sparc',
+                documentId: 'doc-1',
+                unitType: 'sparc-autotutor-dialogue',
+                clusterTargets: [
+                  {
+                    clusterIndex: 0,
+                    clusterKC: 'autotutor.stats-confidence-interval-001.kc.e1',
+                  },
+                ],
+                autoTutorTargets: {
+                  expectations: [{
+                    clusterKC: 'autotutor.stats-confidence-interval-001.kc.e1',
+                    text: 'Clean authored expectation text.',
+                  }],
+                },
+                workingMemoryFacts: [{
+                  factType: 'controller.targetSelectionPolicy',
+                  slots: {
+                    policy: 'kc-graph-priority',
+                  },
+                }],
+                nodes: [{
+                  id: 'opening-tutor-message',
+                  nodeType: 'atomic',
+                  atomType: 'dialogue-utterance',
+                  clusterIndex: 0,
+                }],
+              },
+            }],
+          },
+        },
+      }),
+    }));
+
+    const preparedState = await engine.buildPreparedCardQuestionAndAnswerGlobals(0, 0, [0, 0.8]);
+
+    assert.deepEqual(preparedState.currentDisplay.clusterTargets, [{
+      clusterIndex: 0,
+      clusterKC: 'autotutor.stats-confidence-interval-001.kc.e1',
+    }]);
+    assert.deepEqual(preparedState.currentDisplay.autoTutorTargets.expectations, [{
+      clusterKC: 'autotutor.stats-confidence-interval-001.kc.e1',
+      text: 'Clean authored expectation text.',
+    }]);
+    assert.deepEqual(preparedState.currentDisplay.workingMemoryFacts, [{
+      factType: 'controller.targetSelectionPolicy',
+      slots: {
+        policy: 'kc-graph-priority',
+      },
+    }]);
   });
 
   it('renders the only authored SPARC page when sparcsession.pageId is omitted', async function() {

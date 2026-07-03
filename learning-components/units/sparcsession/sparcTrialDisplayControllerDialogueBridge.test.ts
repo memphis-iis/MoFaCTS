@@ -49,25 +49,21 @@ function dialogueDisplay(): SparcTrialDisplay {
         policy: 'kc-graph-priority',
         coverageThreshold: 0.8,
       }),
-      fact('learningTarget.source', { clusterKC: 'kc-a' }),
-      fact('learningTarget.source', { clusterKC: 'kc-b' }),
       fact('kcGraph.node', { clusterKC: 'kc-a', centrality: 0.1 }),
       fact('kcGraph.node', { clusterKC: 'kc-b', centrality: 0.8 }),
       fact('kcGraph.relationship', { sourceClusterKC: 'kc-a', targetClusterKC: 'kc-b', strength: 0.9 }),
       fact('kcGraph.relationship', { sourceClusterKC: 'kc-b', targetClusterKC: 'kc-a', strength: 0.9 }),
-      fact('dialogue.moveContent', {
-        targetType: 'learningTarget',
-        clusterKC: 'kc-b',
-        action: 'hint',
-        text: 'Use the second idea.',
-      }),
-      fact('dialogue.moveContent', {
-        targetType: 'learningTarget',
-        clusterKC: 'kc-a',
-        action: 'hint',
-        text: 'Return to the first idea.',
-      }),
     ],
+    autoTutorTargets: {
+      expectations: [{
+        clusterKC: 'kc-a',
+        text: 'Return to the first idea.',
+      }, {
+        clusterKC: 'kc-b',
+        text: 'Use the second idea.',
+      }],
+      misconceptions: [],
+    },
     productionRules: [{
       id: 'dialogue.move.test-hint',
       module: 'dialogue.move-selection',
@@ -96,18 +92,10 @@ function dialogueDisplay(): SparcTrialDisplay {
     }],
     clusterTargets: [{
       clusterIndex: 0,
-      stimulusKC: 'stim-a',
       clusterKC: 'kc-a',
-      KCId: 'stim-a',
-      KCDefault: 'stim-a',
-      KCCluster: 'kc-a',
     }, {
       clusterIndex: 1,
-      stimulusKC: 'stim-b',
       clusterKC: 'kc-b',
-      KCId: 'stim-b',
-      KCDefault: 'stim-b',
-      KCCluster: 'kc-b',
     }],
   };
 }

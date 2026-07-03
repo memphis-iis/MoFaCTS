@@ -69,6 +69,13 @@ export interface SparcTrialDisplay {
   initialState?: unknown[];
   nodes: unknown[];
   workingMemoryFacts?: unknown[];
+  autoTutorTargets?: {
+    expectations?: readonly unknown[];
+    misconceptions?: readonly unknown[];
+  };
+  misconceptionTable?: {
+    misconceptions?: readonly unknown[];
+  };
   derivedFacts?: unknown[];
   productionRules?: unknown[];
   clusterTargets?: unknown[];

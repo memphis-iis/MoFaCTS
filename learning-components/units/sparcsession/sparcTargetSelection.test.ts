@@ -4,7 +4,7 @@ import { selectSparcLearningTargetFromFacts } from './sparcTargetSelection';
 
 function source(clusterKC: string): SparcWorkingMemoryFact {
   return {
-    factType: 'learningTarget.source',
+    factType: 'autotutor.expectation',
     slots: {
       clusterKC,
     },
@@ -23,7 +23,7 @@ function score(clusterKC: string, coverage: number): SparcWorkingMemoryFact {
 
 function misconceptionSource(id: string): SparcWorkingMemoryFact {
   return {
-    factType: 'diagnostic.misconceptionSource',
+    factType: 'autotutor.misconception',
     slots: {
       id,
     },

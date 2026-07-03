@@ -73,6 +73,23 @@ function factsByType(facts: readonly SparcFact[], factType: string): SparcFact[]
   return facts.filter((fact) => fact.factType === factType);
 }
 
+function cleanExpectations(display: SparcTrialDisplay | null | undefined): Record<string, unknown>[] {
+  const targets = isRecord(display) && isRecord(display.autoTutorTargets) && Array.isArray(display.autoTutorTargets.expectations)
+    ? display.autoTutorTargets.expectations
+    : [];
+  return targets.filter(isRecord);
+}
+
+function cleanMisconceptions(display: SparcTrialDisplay | null | undefined): Record<string, unknown>[] {
+  if (isRecord(display) && isRecord(display.autoTutorTargets) && Array.isArray(display.autoTutorTargets.misconceptions)) {
+    return display.autoTutorTargets.misconceptions.filter(isRecord);
+  }
+  const table = isRecord(display) && isRecord(display.misconceptionTable) && Array.isArray(display.misconceptionTable.misconceptions)
+    ? display.misconceptionTable.misconceptions
+    : [];
+  return table.filter(isRecord);
+}
+
 function latestFactById(
   facts: readonly SparcFact[],
   factType: string,
@@ -126,27 +143,35 @@ export function buildSparcAutoTutorProgressSnapshot(params: {
   const currentFacts = [...authoredFacts, ...runtimeFacts(params.runtimeNodeValues)];
   const scoreByClusterKC = latestFactById(currentFacts, 'learningTarget.score', 'clusterKC');
   const misconceptionScoreById = latestFactById(currentFacts, 'diagnostic.misconceptionScore', 'id');
-  const sourceTargets = factsByType(authoredFacts, 'learningTarget.source');
-  const sourceMisconceptions = factsByType(authoredFacts, 'diagnostic.misconceptionSource');
-  const policy = progressPolicy(currentFacts, sourceTargets.length);
-  const targets = sourceTargets.map((fact, index) => {
-    const clusterKC = stringSlot(fact, 'clusterKC') || `target-${index + 1}`;
+  const expectations = cleanExpectations(params.display);
+  const misconceptionEntries = cleanMisconceptions(params.display);
+  const policy = progressPolicy(currentFacts, expectations.length);
+  const targets = expectations.map((expectation, index) => {
+    const clusterKC = typeof expectation.clusterKC === 'string' && expectation.clusterKC.trim()
+      ? expectation.clusterKC.trim()
+      : `target-${index + 1}`;
     const score = scoreByClusterKC.get(clusterKC);
     const coverage = score ? unitSlot(score, 'coverage') : 0;
     return {
       id: clusterKC,
-      label: stringSlot(fact, 'label') || stringSlot(fact, 'proposition') || `Expectation ${index + 1}`,
+      label: typeof expectation.text === 'string' && expectation.text.trim()
+        ? expectation.text.trim()
+        : `Expectation ${index + 1}`,
       coverage,
       covered: coverage >= policy.coverageThreshold,
     };
   });
-  const misconceptions = sourceMisconceptions.map((fact, index) => {
-    const id = stringSlot(fact, 'id') || `misconception-${index + 1}`;
+  const misconceptions = misconceptionEntries.map((misconception, index) => {
+    const id = typeof misconception.id === 'string' && misconception.id.trim()
+      ? misconception.id.trim()
+      : `misconception-${index + 1}`;
     const score = misconceptionScoreById.get(id);
     const confidence = score ? unitSlot(score, 'confidence') : 0;
     return {
       id,
-      label: stringSlot(fact, 'label') || stringSlot(fact, 'description') || `Misconception ${index + 1}`,
+      label: typeof misconception.text === 'string' && misconception.text.trim()
+        ? misconception.text.trim()
+        : `Misconception ${index + 1}`,
       confidence,
       active: confidence >= policy.misconceptionThreshold,
     };

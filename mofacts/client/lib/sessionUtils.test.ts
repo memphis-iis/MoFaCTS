@@ -7,6 +7,17 @@ import {
   LEGACY_SUBMISSION_LOCK_KEY,
   USER_ADMIN_DEFAULT_FILTER,
 } from './sessionCleanupRegistry';
+import {
+  clearSparcProductionRuleHistoryCache,
+  readSparcProductionRuleHistoryRecords,
+  rememberSparcProductionRuleHistoryRecord,
+} from '../views/experiment/svelte/services/sparcProductionRuleHistoryCache';
+import {
+  clearSparcTrialDisplayRuntimeContextCache,
+  getSparcTrialDisplayRuntimeContext,
+} from '../views/experiment/svelte/services/sparcTrialDisplayRuntimeContextCache';
+import type { SparcTrialDisplay } from '../../../learning-components/trial-displays/sparc/SparcTrialDisplayAdapter';
+import { createEmptySparcReplayState } from '../../../learning-components/units/sparcsession/sparcStateReplay';
 
 describe('sessionUtils mapping cleanup', function() {
   beforeEach(function() {
@@ -28,6 +39,8 @@ describe('sessionUtils mapping cleanup', function() {
     Session.set('cardEntryIntent', undefined);
     Session.set('courseAssignmentLaunchContext', null);
     Session.set(LEGACY_SUBMISSION_LOCK_KEY, false);
+    clearSparcProductionRuleHistoryCache();
+    clearSparcTrialDisplayRuntimeContextCache();
   });
 
   it('clears mapping and signature session keys via cleanup helper', function() {
@@ -141,5 +154,68 @@ describe('sessionUtils mapping cleanup', function() {
     expect(Session.get('currentScore')).to.equal(0);
     expect(Session.get('curUnitInstructionsSeen')).to.equal(false);
     expect(Session.get('courseAssignmentLaunchContext')).to.equal(null);
+  });
+
+  it('clears SPARC replay caches during full cleanup', function() {
+    const historyRecord = {
+      eventType: 'sparc',
+      TDFId: 'tdf-a',
+      sessionID: 'session-a',
+      sparc: {
+        documentId: 'doc-a',
+        sourceAddress: {
+          documentId: 'doc-a',
+          nodeId: 'source-node',
+        },
+      },
+    };
+    rememberSparcProductionRuleHistoryRecord(historyRecord);
+    const display: SparcTrialDisplay = {
+      type: 'sparc',
+      documentId: 'doc-a',
+      nodes: [],
+    };
+    const firstContext = getSparcTrialDisplayRuntimeContext({
+      TDFId: 'tdf-a',
+      sessionID: 'session-a',
+      documentId: 'doc-a',
+      display,
+      replaySession: {
+        TDFId: 'tdf-a',
+        sessionID: 'session-a',
+        documentId: 'doc-a',
+        replayState: createEmptySparcReplayState(),
+        retainedHistoryRecords: [historyRecord],
+      },
+    });
+    Session.set('fromInstructions', false);
+    Object.defineProperty(document, 'location', {
+      value: { pathname: '/experimentList' },
+      writable: true,
+      configurable: true,
+    });
+
+    sessionCleanUp();
+
+    expect(readSparcProductionRuleHistoryRecords({
+      TDFId: 'tdf-a',
+      sessionID: 'session-a',
+      documentId: 'doc-a',
+    })).to.deep.equal([]);
+    const rebuiltContext = getSparcTrialDisplayRuntimeContext({
+      TDFId: 'tdf-a',
+      sessionID: 'session-a',
+      documentId: 'doc-a',
+      display,
+      replaySession: {
+        TDFId: 'tdf-a',
+        sessionID: 'session-a',
+        documentId: 'doc-a',
+        replayState: createEmptySparcReplayState(),
+        retainedHistoryRecords: [],
+      },
+    });
+    expect(rebuiltContext.document).not.to.equal(firstContext.document);
+    expect(rebuiltContext.appliedRecordCount).to.equal(0);
   });
 });

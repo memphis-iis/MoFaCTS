@@ -130,7 +130,6 @@ export function computeAutoTutorExpectationRelationshipsFromEmbeddings(
   const clusterKcRelationships = computeClusterKcRelationshipsFromEmbeddings({
     nodes: normalizedExpectations.map((expectation) => ({
       clusterKC: expectation.id,
-      sourceId: expectation.id,
       description: expectationEmbeddingText(expectation),
     })),
     embeddings,

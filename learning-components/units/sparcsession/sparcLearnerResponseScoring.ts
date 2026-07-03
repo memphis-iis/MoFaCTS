@@ -24,7 +24,7 @@ export type SparcLearnerResponseScoringResult = {
   readonly learningTargetScores?: readonly SparcLearningTargetScoreInput[];
   readonly diagnosticMisconceptionScores?: readonly SparcDiagnosticMisconceptionScoreInput[];
   readonly learnerContribution?: {
-    readonly type: 'assertion' | 'question' | 'off-task' | 'other';
+    readonly type: 'answer' | 'question' | 'off-task' | 'other';
     readonly confidence?: number;
     readonly streakCount?: number;
   };
@@ -56,7 +56,7 @@ function stringSlot(fact: SparcWorkingMemoryFact, slotName: string): string {
 
 function knownLearningTargetClusterKcs(facts: readonly SparcWorkingMemoryFact[]): Set<string> {
   return new Set(facts.flatMap((fact) => {
-    if (fact.factType !== 'learningTarget.source' && fact.factType !== 'learningTarget.score') {
+    if (fact.factType !== 'autotutor.expectation' && fact.factType !== 'learningTarget.score') {
       return [];
     }
     const clusterKC = stringSlot(fact, 'clusterKC');

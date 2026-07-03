@@ -9,8 +9,8 @@ function fact(factType: string, slots: Record<string, unknown>): SparcWorkingMem
 describe('deriveSparcControllerFacts', function() {
   it('derives learner word count, required coverage mean, and turn state', function() {
     const result = deriveSparcControllerFacts([
-      fact('learningTarget.source', { clusterKC: 'kc-a' }),
-      fact('learningTarget.source', { clusterKC: 'kc-b' }),
+      fact('autotutor.expectation', { clusterKC: 'kc-a' }),
+      fact('autotutor.expectation', { clusterKC: 'kc-b' }),
       fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.25 }),
       fact('learningTarget.score', { clusterKC: 'kc-b', coverage: 0.75 }),
       fact('dialogue.learnerWordCount', { cumulative: 4 }),
@@ -53,8 +53,8 @@ describe('deriveSparcControllerFacts', function() {
 
   it('treats missing learning-target coverage as zero', function() {
     const result = deriveSparcControllerFacts([
-      fact('learningTarget.source', { clusterKC: 'kc-a' }),
-      fact('learningTarget.source', { clusterKC: 'kc-b' }),
+      fact('autotutor.expectation', { clusterKC: 'kc-a' }),
+      fact('autotutor.expectation', { clusterKC: 'kc-b' }),
       fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.5 }),
     ], {
       includeCurrentTurn: false,
@@ -67,7 +67,7 @@ describe('deriveSparcControllerFacts', function() {
 
   it('does not increment the turn count for blank submitted input', function() {
     const result = deriveSparcControllerFacts([
-      fact('learningTarget.source', { clusterKC: 'kc-a' }),
+      fact('autotutor.expectation', { clusterKC: 'kc-a' }),
       fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0 }),
       fact('session.turnState', { turnCount: 2 }),
       fact('interface-event', {
@@ -83,9 +83,9 @@ describe('deriveSparcControllerFacts', function() {
     const result = deriveSparcControllerFacts([
       fact('dialogue.thresholds', { coverageThreshold: 0.75 }),
       fact('dialogue.graduation', { requiredTargetCount: 2 }),
-      fact('learningTarget.source', { clusterKC: 'kc-a' }),
-      fact('learningTarget.source', { clusterKC: 'kc-b' }),
-      fact('learningTarget.source', { clusterKC: 'kc-c' }),
+      fact('autotutor.expectation', { clusterKC: 'kc-a' }),
+      fact('autotutor.expectation', { clusterKC: 'kc-b' }),
+      fact('autotutor.expectation', { clusterKC: 'kc-c' }),
       fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.8 }),
       fact('learningTarget.score', { clusterKC: 'kc-b', coverage: 0.75 }),
       fact('learningTarget.score', { clusterKC: 'kc-c', coverage: 0.1 }),
@@ -107,7 +107,7 @@ describe('deriveSparcControllerFacts', function() {
   it('marks completion when the max turn policy is reached', function() {
     const result = deriveSparcControllerFacts([
       fact('dialogue.graduation', { requiredTargetCount: 1, maxTurns: 3 }),
-      fact('learningTarget.source', { clusterKC: 'kc-a' }),
+      fact('autotutor.expectation', { clusterKC: 'kc-a' }),
       fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.2 }),
       fact('session.turnState', { turnCount: 2 }),
       fact('interface-event', {

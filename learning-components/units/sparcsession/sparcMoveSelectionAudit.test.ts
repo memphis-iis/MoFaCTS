@@ -19,20 +19,12 @@ function fact(factType: string, slots: Record<string, unknown>): SparcWorkingMem
 }
 
 const facts: readonly SparcWorkingMemoryFact[] = [
+  fact('autotutor.expectation', {
+    clusterKC: 'kc-a',
+    text: 'Use a clean target.',
+  }),
   fact('learningTarget.selected', { clusterKC: 'kc-a' }),
   fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.4 }),
-  fact('dialogue.moveContent', {
-    targetType: 'learningTarget',
-    clusterKC: 'kc-a',
-    action: 'hint',
-    text: 'Use a hint.',
-  }),
-  fact('dialogue.moveContent', {
-    targetType: 'learningTarget',
-    clusterKC: 'kc-a',
-    action: 'prompt',
-    text: 'Use a prompt.',
-  }),
 ];
 
 const rules: readonly SparcProductionRule[] = [{
@@ -115,16 +107,16 @@ describe('auditSparcMoveSelection', function() {
     assert.equal(audit.utteranceRequest?.action, 'prompt');
   });
 
-  it('rejects matched selected actions that have no authored move content', function() {
+  it('rejects matched selected actions that have no clean target text', function() {
     const audit = auditSparcMoveSelection({
-      facts: facts.filter((entry) => !(entry.factType === 'dialogue.moveContent' && entry.slots?.action === 'hint')),
+      facts: facts.filter((entry) => entry.factType !== 'autotutor.expectation'),
       rules,
     });
 
     assert.equal(audit.candidates[0]?.ruleId, 'dialogue.move.hint');
     assert.equal(audit.candidates[0]?.valid, false);
-    assert.match(audit.candidates[0]?.rejectionReason ?? '', /missing dialogue\.moveContent/);
-    assert.equal(audit.selected?.ruleId, 'dialogue.move.prompt');
-    assert.equal(audit.utteranceRequest?.action, 'prompt');
+    assert.match(audit.candidates[0]?.rejectionReason ?? '', /missing clean expectation text/);
+    assert.equal(audit.selected, undefined);
+    assert.equal(audit.utteranceRequest, undefined);
   });
 });

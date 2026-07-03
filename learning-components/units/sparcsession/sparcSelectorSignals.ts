@@ -78,18 +78,18 @@ function coverageByClusterKC(facts: readonly SparcWorkingMemoryFact[]): Map<stri
 
 function requiredClusterKCs(facts: readonly SparcWorkingMemoryFact[]): readonly string[] {
   return [...new Set(facts
-    .filter((fact) => fact.factType === 'learningTarget.source')
+    .filter((fact) => fact.factType === 'autotutor.expectation')
     .map((fact) => stringSlot(fact, 'clusterKC'))
     .filter(Boolean) as string[])];
 }
 
 function misconceptionIds(facts: readonly SparcWorkingMemoryFact[]): readonly string[] {
-  const sourceIds = facts
-    .filter((fact) => fact.factType === 'diagnostic.misconceptionSource')
+  const cleanIds = facts
+    .filter((fact) => fact.factType === 'autotutor.misconception')
     .map((fact) => stringSlot(fact, 'id'))
     .filter(Boolean) as string[];
-  if (sourceIds.length > 0) {
-    return [...new Set(sourceIds)];
+  if (cleanIds.length > 0) {
+    return [...new Set(cleanIds)];
   }
   return [...new Set(facts
     .filter((fact) => fact.factType === 'diagnostic.misconceptionScore')

@@ -33,6 +33,8 @@ import {
 } from './sparcDocumentValidation';
 import type { SparcPracticeHistoryCore } from './sparcPracticeHistoryBridge';
 import type {
+  SparcAutoTutorExpectation,
+  SparcAutoTutorMisconception,
   SparcAuthoredDocument,
   SparcInterfaceEvent,
   SparcWorkingMemoryFact,
@@ -61,6 +63,10 @@ type SparcPageRecord = {
   readonly pageId?: unknown;
   readonly display?: unknown;
 };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
 
 function cloneRecord<T>(value: T): T {
   return JSON.parse(JSON.stringify(value));
@@ -108,6 +114,90 @@ function createClusterTargetFromFirstStim(params: {
         }
       : {}),
   };
+}
+
+function createAutoTutorExpectationFromCluster(params: {
+  readonly deps: CreateSparcSessionUnitEngineDeps;
+  readonly clusterIndex: number;
+  readonly pageDisplay?: SparcTrialDisplay;
+}): SparcAutoTutorExpectation {
+  const cluster = params.deps.getStimCluster(params.clusterIndex);
+  const firstStim = Array.isArray(cluster?.stims) ? cluster.stims[0] : null;
+  if (!firstStim || typeof firstStim !== 'object') {
+    throw new Error(`SPARC AutoTutor page references cluster ${params.clusterIndex}, but that cluster has no expectation stim`);
+  }
+  const stim = firstStim as Record<string, unknown>;
+  const clusterKC = cluster.clusterKC ?? stim.clusterKC;
+  if (clusterKC === undefined || clusterKC === null || clusterKC === '') {
+    throw new Error(`SPARC AutoTutor page references cluster ${params.clusterIndex}, but that cluster is missing clusterKC`);
+  }
+  const normalizedClusterKC = normalizeClusterKC(clusterKC);
+  const authoredExpectation = cleanExpectationsFromDisplay(params.pageDisplay).find(
+    (expectation) => expectation.clusterKC === normalizedClusterKC,
+  );
+  const text = authoredExpectation?.text ||
+    (typeof stim.text === 'string' && stim.text.trim() ? stim.text.trim() : '') ||
+    (typeof stim.textStimulus === 'string' && stim.textStimulus.trim() ? stim.textStimulus.trim() : '');
+  if (!text) {
+    throw new Error(`SPARC AutoTutor page references cluster ${params.clusterIndex}, but that cluster is missing expectation text`);
+  }
+  return {
+    clusterKC: normalizedClusterKC,
+    text,
+  };
+}
+
+function createCleanAutoTutorClusterTarget(params: {
+  readonly deps: CreateSparcSessionUnitEngineDeps;
+  readonly clusterIndex: number;
+}): Record<string, unknown> {
+  const cluster = params.deps.getStimCluster(params.clusterIndex);
+  const firstStim = Array.isArray(cluster?.stims) ? cluster.stims[0] : null;
+  const stimClusterKC = firstStim && typeof firstStim === 'object'
+    ? (firstStim as Record<string, unknown>).clusterKC
+    : undefined;
+  const clusterKC = cluster.clusterKC ?? stimClusterKC;
+  if (clusterKC === undefined || clusterKC === null || clusterKC === '') {
+    throw new Error(`SPARC AutoTutor page references cluster ${params.clusterIndex}, but that cluster is missing clusterKC`);
+  }
+  return {
+    clusterIndex: params.clusterIndex,
+    clusterKC: normalizeClusterKC(clusterKC),
+  };
+}
+
+function cleanMisconceptionsFromDisplay(display: SparcTrialDisplay): readonly SparcAutoTutorMisconception[] {
+  const table = isRecord(display.misconceptionTable) ? display.misconceptionTable : {};
+  const misconceptions = Array.isArray(table.misconceptions) ? table.misconceptions : [];
+  return misconceptions.map((entry, index) => {
+    if (!isRecord(entry)) {
+      throw new Error(`SPARC AutoTutor misconceptionTable.misconceptions[${index}] must be an object`);
+    }
+    const id = typeof entry.id === 'string' && entry.id.trim() ? entry.id.trim() : '';
+    const text = typeof entry.text === 'string' && entry.text.trim() ? entry.text.trim() : '';
+    if (!id || !text) {
+      throw new Error(`SPARC AutoTutor misconceptionTable.misconceptions[${index}] requires id and text`);
+    }
+    return { id, text };
+  });
+}
+
+function cleanExpectationsFromDisplay(display?: SparcTrialDisplay): readonly SparcAutoTutorExpectation[] {
+  const targets = isRecord(display?.autoTutorTargets) ? display.autoTutorTargets : {};
+  const expectations = Array.isArray(targets.expectations) ? targets.expectations : [];
+  return expectations.map((entry, index) => {
+    if (!isRecord(entry)) {
+      throw new Error(`SPARC AutoTutor autoTutorTargets.expectations[${index}] must be an object`);
+    }
+    const clusterKC = typeof entry.clusterKC === 'string' && entry.clusterKC.trim()
+      ? normalizeClusterKC(entry.clusterKC)
+      : '';
+    const text = typeof entry.text === 'string' && entry.text.trim() ? entry.text.trim() : '';
+    if (!clusterKC || !text) {
+      throw new Error(`SPARC AutoTutor autoTutorTargets.expectations[${index}] requires clusterKC and text`);
+    }
+    return { clusterKC, text };
+  });
 }
 
 function collectNodeClusterReferences(node: unknown, references: Set<number>): void {
@@ -247,14 +337,27 @@ function resolveSparcPageDisplay(
 ): SparcTrialDisplay {
   const { pageId, documentId, pageDisplay } = resolveSparcPage(deps, unit);
   const clusterListIndices = collectSparcPageClusterIndices({ ...pageDisplay, pageId, documentId });
+  const isAutoTutor = pageDisplay.unitType === 'sparc-autotutor-dialogue';
   return {
     ...pageDisplay,
     type: 'sparc',
     pageId,
     documentId,
     clusterTargets: clusterListIndices.map((clusterIndex) =>
-      createClusterTargetFromFirstStim({ deps, clusterIndex }),
+      isAutoTutor
+        ? createCleanAutoTutorClusterTarget({ deps, clusterIndex })
+        : createClusterTargetFromFirstStim({ deps, clusterIndex }),
     ),
+    ...(isAutoTutor
+      ? {
+          autoTutorTargets: {
+            expectations: clusterListIndices.map((clusterIndex) =>
+              createAutoTutorExpectationFromCluster({ deps, clusterIndex, pageDisplay }),
+            ),
+            misconceptions: cleanMisconceptionsFromDisplay(pageDisplay),
+          },
+        }
+      : {}),
   };
 }
 

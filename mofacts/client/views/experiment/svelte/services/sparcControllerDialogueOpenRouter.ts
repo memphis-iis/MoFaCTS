@@ -76,7 +76,7 @@ const SPARC_DIALOGUE_SCORE_JSON_SCHEMA: OpenRouterJsonSchema = {
       type: 'object',
       additionalProperties: false,
       properties: {
-        type: { type: 'string', enum: ['assertion', 'question', 'off-task', 'other'] },
+        type: { type: 'string', enum: ['answer', 'question', 'off-task', 'other'] },
         confidence: { type: 'number' },
         streakCount: { type: 'number' },
       },
@@ -140,65 +140,89 @@ function factSlot(fact: Record<string, unknown>, slotName: string): unknown {
   return isRecord(fact.slots) ? fact.slots[slotName] : undefined;
 }
 
-function targetSummaries(display: SparcTrialDisplay): readonly Record<string, unknown>[] {
-  const sourceFacts = new Map<string, Record<string, unknown>>();
+function priorCoverageByClusterKC(display: SparcTrialDisplay): Map<string, number> {
+  const coverage = new Map<string, number>();
   for (const fact of displayFacts(display)) {
-    if (fact.factType === 'learningTarget.source') {
-      const clusterKC = nonBlankString(factSlot(fact, 'clusterKC'));
-      if (clusterKC) {
-        sourceFacts.set(clusterKC, fact.slots as Record<string, unknown>);
-      }
+    if (fact.factType !== 'learningTarget.score') {
+      continue;
     }
+    const clusterKC = nonBlankString(factSlot(fact, 'clusterKC'));
+    if (!clusterKC) {
+      continue;
+    }
+    coverage.set(clusterKC, Math.max(
+      coverage.get(clusterKC) ?? 0,
+      unitScore(factSlot(fact, 'coverage'), `SPARC prior learning target coverage for "${clusterKC}"`),
+    ));
   }
-  return (Array.isArray(display.clusterTargets) ? display.clusterTargets : [])
+  return coverage;
+}
+
+function priorMisconceptionConfidenceById(display: SparcTrialDisplay): Map<string, number> {
+  const confidence = new Map<string, number>();
+  for (const fact of displayFacts(display)) {
+    if (fact.factType !== 'diagnostic.misconceptionScore') {
+      continue;
+    }
+    const id = nonBlankString(factSlot(fact, 'id'));
+    if (!id) {
+      continue;
+    }
+    confidence.set(id, unitScore(factSlot(fact, 'confidence'), `SPARC prior misconception confidence for "${id}"`));
+  }
+  return confidence;
+}
+
+function targetSummaries(display: SparcTrialDisplay): readonly Record<string, unknown>[] {
+  const priorCoverage = priorCoverageByClusterKC(display);
+  const cleanTargets = isRecord(display.autoTutorTargets) && Array.isArray(display.autoTutorTargets.expectations)
+    ? display.autoTutorTargets.expectations
+    : [];
+  if (cleanTargets.length === 0) {
+    throw new Error('SPARC AutoTutor scoring requires clean autoTutorTargets.expectations');
+  }
+  return cleanTargets
     .filter(isRecord)
-    .map((target) => {
-      const clusterKC = nonBlankString(target.clusterKC);
-      const source = sourceFacts.get(clusterKC) ?? {};
+    .map((entry) => {
+      const clusterKC = nonBlankString(entry.clusterKC);
+      const text = nonBlankString(entry.text);
+      if (!clusterKC || !text) {
+        throw new Error('SPARC AutoTutor scoring requires each expectation to include clusterKC and text');
+      }
       return {
         clusterKC,
-        label: nonBlankString(source.label) || nonBlankString(target.label),
-        proposition: nonBlankString(source.proposition),
-        assertion: nonBlankString(source.assertion),
+        text,
+        priorCoverage: priorCoverage.get(clusterKC) ?? 0,
       };
-    })
-    .filter((target) => target.clusterKC);
+    });
+}
+
+function cleanMisconceptionEntries(display: SparcTrialDisplay): readonly unknown[] {
+  if (isRecord(display.autoTutorTargets) && Array.isArray(display.autoTutorTargets.misconceptions)) {
+    return display.autoTutorTargets.misconceptions;
+  }
+  if (isRecord(display.misconceptionTable) && Array.isArray(display.misconceptionTable.misconceptions)) {
+    return display.misconceptionTable.misconceptions;
+  }
+  return [];
 }
 
 function misconceptionSummaries(display: SparcTrialDisplay): readonly Record<string, unknown>[] {
-  const summaries = new Map<string, Record<string, unknown> & { authoredContent: string[] }>();
-  for (const fact of displayFacts(display)) {
-    if (fact.factType === 'diagnostic.misconceptionSource') {
-      const id = nonBlankString(factSlot(fact, 'id'));
-      if (!id) {
-        continue;
-      }
-      const existing = summaries.get(id) ?? { id, authoredContent: [] };
-      summaries.set(id, {
-        ...existing,
-        id,
-        label: nonBlankString(factSlot(fact, 'label')) || existing.label,
-        description: nonBlankString(factSlot(fact, 'description')) || existing.description,
-        repair: nonBlankString(factSlot(fact, 'repair')) || existing.repair,
-        repairQuestion: nonBlankString(factSlot(fact, 'repairQuestion')) || existing.repairQuestion,
-        repairCriteria: nonBlankString(factSlot(fact, 'repairCriteria')) || existing.repairCriteria,
-        authoredContent: existing.authoredContent,
-      });
-    }
-    if (fact.factType === 'dialogue.moveContent' && factSlot(fact, 'targetType') === 'misconception') {
-      const id = nonBlankString(factSlot(fact, 'id'));
-      const text = nonBlankString(factSlot(fact, 'text'));
+  const priorConfidence = priorMisconceptionConfidenceById(display);
+  return cleanMisconceptionEntries(display)
+    .filter(isRecord)
+    .map((entry) => {
+      const id = nonBlankString(entry.id);
+      const text = nonBlankString(entry.text);
       if (!id || !text) {
-        continue;
+        throw new Error('SPARC AutoTutor scoring requires each misconception to include id and text');
       }
-      const existing = summaries.get(id) ?? { id, authoredContent: [] };
-      if (!existing.authoredContent.includes(text)) {
-        existing.authoredContent.push(text);
-      }
-      summaries.set(id, existing);
-    }
-  }
-  return Array.from(summaries.values());
+      return {
+        id,
+        text,
+        priorConfidence: priorConfidence.get(id) ?? 0,
+      };
+    });
 }
 
 function parseScoreEnvelope(value: unknown): SparcLearnerResponseScoringResult {
@@ -230,7 +254,7 @@ function parseScoreEnvelope(value: unknown): SparcLearnerResponseScoringResult {
     .filter((entry) => entry.id);
   const contribution = isRecord(value.learnerContribution) ? value.learnerContribution : {};
   const contributionType = nonBlankString(contribution.type);
-  if (!['assertion', 'question', 'off-task', 'other'].includes(contributionType)) {
+  if (!['answer', 'question', 'off-task', 'other'].includes(contributionType)) {
     throw new Error('SPARC dialogue scoring learnerContribution.type is invalid');
   }
   const learnerQuestion = isRecord(value.learnerQuestion) && typeof value.learnerQuestion.answerableFromAuthoredContent === 'boolean'
@@ -243,7 +267,7 @@ function parseScoreEnvelope(value: unknown): SparcLearnerResponseScoringResult {
     learningTargetScores,
     ...(diagnosticMisconceptionScores.length > 0 ? { diagnosticMisconceptionScores } : {}),
     learnerContribution: {
-      type: contributionType as 'assertion' | 'question' | 'off-task' | 'other',
+      type: contributionType as 'answer' | 'question' | 'off-task' | 'other',
       ...(contribution.confidence !== undefined ? { confidence: unitScore(contribution.confidence, 'SPARC dialogue learner contribution confidence') } : {}),
       ...(Number.isFinite(Number(contribution.streakCount)) ? { streakCount: Number(contribution.streakCount) } : {}),
     },
@@ -372,12 +396,17 @@ export function createSparcDialogueOpenRouterProvider(
             'Return only JSON matching the schema.',
             'For every object in learningTargets, write one object in learningTargetScores, copying learningTargets[i].clusterKC exactly to learningTargetScores[i].clusterKC.',
             'For every object in misconceptions, write one object in diagnosticMisconceptionScores, copying misconceptions[i].id exactly to diagnosticMisconceptionScores[i].id.',
-            'Compare meanings, not keyword overlap, and score 1 for identical meaning and 0 for no meaning match.',
-            'Intermediate match should range between 0 and 1.',
-            'For learning targets, compare the learner’s claim to learningTargets[i].assertion and learningTargets[i].proposition, and put the similarity score in coverage.',
-            'For misconceptions, compare the learner’s claim to misconceptions[i].description, and put the similarity score in confidence.',
-            'Use low or zero scores when the learner uses similar words but states a different relation, wrong object, wrong condition, or wrong procedure.',
-            'Set learnerContribution.type to "assertion" for ordinary answers or explanations, "question" for learner questions, "off-task" for unrelated responses, and "other" only when none of those fit.',
+            'Do not score the latest response from scratch.',
+            'Compare meanings, not keyword overlap, and use continuous scores between 0 and 1 only when the latest learner response refers to the target meaning.',
+            'Treat priorCoverage and priorConfidence as the current learner model; for each learning target or misconception, return its prior value unchanged unless the learner’s latest response refers to that target’s meaning and provides semantic evidence that the value should change.',
+            'Scores may increase or decrease only when the latest learner response refers to that target and gives semantic evidence for that change.',
+            'Resolve learner references using the current problem statement and dialogue context. Do not switch a learner’s reference to a different object unless the learner explicitly names that object or the immediately preceding tutor question clearly establishes it.',
+            'For learning targets, compare the learner’s claim to learningTargets[i].text; return the updated learner-model value in coverage.',
+            'For misconceptions, compare the learner’s claim to misconceptions[i].text; return the updated learner-model value in confidence.',
+            'For misconception confidence, use a continuous 0 to 1 active-misconception score: 1 means the learner is clearly expressing that misconception; 0 means there is no prior evidence or the learner explicitly repaired or rejected it; if the latest response merely omits the misconception, asks a clarification question, or makes a meta/off-task comment, copy priorConfidence unchanged.',
+            'A high misconception confidence is not a good score; it means stronger evidence of the misconception. Do not assign high misconception confidence because the learner gave a good or correct answer.',
+            'When the latest learner response refers to a target but uses similar words with a different relation, wrong object, wrong condition, or wrong procedure, use low or zero scores for that target.',
+            'Set learnerContribution.type to "answer" for ordinary answers or explanations, "question" for learner questions, "off-task" for unrelated responses, and "other" only when none of those fit.',
             'Include learnerQuestion only for learnerContribution.type "question"; set learnerQuestion.answerableFromAuthoredContent true only if the question can be answered from the provided learning targets or misconceptions.',
           ].join(' '),
         }, {

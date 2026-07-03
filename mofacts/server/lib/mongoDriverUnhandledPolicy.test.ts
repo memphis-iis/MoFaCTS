@@ -48,6 +48,17 @@ function poolMonitorTimeoutError() {
   return error;
 }
 
+function wrappedPoolClearedError() {
+  const error = new Error(
+    'Connection pool for 127.0.0.1:27017 was cleared because another operation failed with: "connection <monitor> to 127.0.0.1:27017 timed out"',
+  ) as Error & {
+    address: string;
+  };
+  error.name = 'MongoPoolClearedError';
+  error.address = '127.0.0.1:27017';
+  return error;
+}
+
 describe('mongo driver unhandled policy', function() {
   it('recognizes the Mongo pool monitor timeout shape from the driver', function() {
     const error = poolMonitorTimeoutError();
@@ -62,11 +73,20 @@ describe('mongo driver unhandled policy', function() {
     });
   });
 
+  it('recognizes the wrapped pool-cleared timeout shape emitted by Meteor Mongo', function() {
+    expect(isMongoPoolMonitorInterruption(wrappedPoolClearedError())).to.equal(true);
+  });
+
   it('does not classify unrelated Mongo or application errors as recoverable', function() {
     const networkError = new Error('connection failed');
     networkError.name = 'MongoNetworkError';
+    const poolClearedForOtherReason = new Error(
+      'Connection pool for 127.0.0.1:27017 was cleared because another operation failed with: "connection failed"',
+    );
+    poolClearedForOtherReason.name = 'MongoPoolClearedError';
 
     expect(isMongoPoolMonitorInterruption(networkError)).to.equal(false);
+    expect(isMongoPoolMonitorInterruption(poolClearedForOtherReason)).to.equal(false);
     expect(isMongoPoolMonitorInterruption(new Error('boom'))).to.equal(false);
   });
 
@@ -81,10 +101,11 @@ describe('mongo driver unhandled policy', function() {
     });
 
     fakeProcess.emit('unhandledRejection', poolMonitorTimeoutError());
+    fakeProcess.emit('unhandledRejection', wrappedPoolClearedError());
     fakeProcess.emit('uncaughtException', poolMonitorTimeoutError(), 'unhandledRejection');
     fakeProcess.emit('uncaughtException', poolMonitorTimeoutError(), 'uncaughtException');
 
-    expect(logs).to.have.length(3);
+    expect(logs).to.have.length(4);
     expect(fatals).to.deep.equal([]);
     uninstall();
     expect(fakeProcess.count('unhandledRejection')).to.equal(0);

@@ -207,10 +207,10 @@
               }
             },
             "openRouterModel": {
-              "title": "Default OpenRouter model.",
-              "description": "Default OpenRouter model identifier used by AutoTutor units unless a unit overrides it.",
+              "title": "OpenRouter model.",
+              "description": "Explicit OpenRouter model identifier used by AutoTutor units unless a unit overrides it.",
               "type": "string",
-              "default": "openai/gpt-4.1-mini",
+              "default": "",
               "options": {
                 "grid_columns": 12
               }

@@ -93,11 +93,27 @@ export type SparcClusterModelTarget = ModelPracticeHistoryIdentity & {
   readonly label?: string;
 };
 
+export type SparcAutoTutorExpectation = {
+  readonly clusterKC: string;
+  readonly text: string;
+};
+
+export type SparcAutoTutorMisconception = {
+  readonly id: string;
+  readonly text: string;
+};
+
+export type SparcAutoTutorTargets = {
+  readonly expectations: readonly SparcAutoTutorExpectation[];
+  readonly misconceptions: readonly SparcAutoTutorMisconception[];
+};
+
 export type SparcAuthoredDocument = {
   readonly id: string;
   readonly schemaVersion: number;
   readonly layout?: SparcLayoutPolicy;
   readonly clusterTargets?: readonly SparcClusterModelTarget[];
+  readonly autoTutorTargets?: SparcAutoTutorTargets;
   readonly initialState?: readonly SparcStateWrite[];
   readonly workingMemoryFacts?: readonly SparcWorkingMemoryFact[];
   readonly derivedFacts?: readonly SparcDerivedFactRule[];

@@ -59,31 +59,6 @@ function selectedTargetId(selectedAction: SparcWorkingMemoryFact, targetType: st
   throw new Error(`SPARC selected action targetType "${targetType}" is not supported for utterance generation`);
 }
 
-function moveContentMatches(params: {
-  readonly fact: SparcWorkingMemoryFact;
-  readonly targetType: string;
-  readonly targetId: string;
-  readonly action: string;
-}): boolean {
-  if (params.fact.factType !== 'dialogue.moveContent') {
-    return false;
-  }
-  if (stringSlot(params.fact, 'targetType') !== params.targetType) {
-    return false;
-  }
-  if (stringSlot(params.fact, 'action') !== params.action) {
-    return false;
-  }
-  if (params.targetType === 'learningTarget') {
-    return stringSlot(params.fact, 'clusterKC') === params.targetId;
-  }
-  if (params.targetType === 'completion') {
-    const id = stringSlot(params.fact, 'id');
-    return !id || id === params.targetId;
-  }
-  return stringSlot(params.fact, 'id') === params.targetId;
-}
-
 function factsByType(facts: readonly SparcWorkingMemoryFact[], factType: string): readonly SparcWorkingMemoryFact[] {
   return facts.filter((fact) => fact.factType === factType);
 }
@@ -102,18 +77,15 @@ function dialogueHistory(facts: readonly SparcWorkingMemoryFact[]): readonly Rea
 }
 
 function learningTargetContent(facts: readonly SparcWorkingMemoryFact[], clusterKC: string): unknown {
-  const source = factsByType(facts, 'learningTarget.source')
+  const source = factsByType(facts, 'autotutor.expectation')
     .find((fact) => stringSlot(fact, 'clusterKC') === clusterKC);
-  return source?.slots ?? { authoredContent: [] };
+  return source?.slots ?? { clusterKC, text: '' };
 }
 
-function misconceptionContent(facts: readonly SparcWorkingMemoryFact[], id: string, contentTexts: readonly string[]): unknown {
-  const source = factsByType(facts, 'diagnostic.misconceptionSource')
+function misconceptionContent(facts: readonly SparcWorkingMemoryFact[], id: string): unknown {
+  const source = factsByType(facts, 'autotutor.misconception')
     .find((fact) => stringSlot(fact, 'id') === id);
-  return {
-    ...(source?.slots ?? { id }),
-    authoredContent: contentTexts,
-  };
+  return source?.slots ?? { id, text: '' };
 }
 
 function targetContent(params: {
@@ -126,9 +98,41 @@ function targetContent(params: {
     return learningTargetContent(params.facts, params.targetId);
   }
   if (params.targetType === 'misconception') {
-    return misconceptionContent(params.facts, params.targetId, params.contentTexts);
+    return misconceptionContent(params.facts, params.targetId);
   }
   return { summary: params.contentTexts.join('\n') };
+}
+
+function cleanContentTextForTarget(params: {
+  readonly facts: readonly SparcWorkingMemoryFact[];
+  readonly targetType: string;
+  readonly targetId: string;
+}): readonly string[] {
+  if (params.targetType === 'learningTarget') {
+    const target = factsByType(params.facts, 'autotutor.expectation')
+      .find((fact) => stringSlot(fact, 'clusterKC') === params.targetId);
+    const text = target ? stringSlot(target, 'text') : undefined;
+    if (!text) {
+      throw new Error(`SPARC utterance request missing clean expectation text for clusterKC "${params.targetId}"`);
+    }
+    return [text];
+  }
+  if (params.targetType === 'misconception') {
+    const misconception = factsByType(params.facts, 'autotutor.misconception')
+      .find((fact) => stringSlot(fact, 'id') === params.targetId);
+    const text = misconception ? stringSlot(misconception, 'text') : undefined;
+    if (!text) {
+      throw new Error(`SPARC utterance request missing clean misconception text for id "${params.targetId}"`);
+    }
+    return [text];
+  }
+  const expectationTexts = factsByType(params.facts, 'autotutor.expectation')
+    .map((fact) => stringSlot(fact, 'text'))
+    .filter(Boolean) as string[];
+  if (expectationTexts.length === 0) {
+    throw new Error('SPARC utterance request missing clean expectation text for completion summary');
+  }
+  return expectationTexts;
 }
 
 function plannerState(facts: readonly SparcWorkingMemoryFact[]): unknown {
@@ -182,18 +186,11 @@ export function createSparcUtteranceRequestFromFacts(
   }
   const moveDefinition = requireActiveSparcMoveDefinition(action);
   const targetId = selectedTargetId(selectedAction, targetType);
-  const matchingContent = facts.filter((fact) => moveContentMatches({
-    fact,
+  const contentTexts = cleanContentTextForTarget({
+    facts,
     targetType,
     targetId,
-    action,
-  }));
-  const contentTexts = matchingContent
-    .map((fact) => stringSlot(fact, 'text'))
-    .filter(Boolean) as string[];
-  if (contentTexts.length === 0) {
-    throw new Error(`SPARC utterance request missing dialogue.moveContent for ${targetType} "${targetId}" action "${action}"`);
-  }
+  });
   const sourceRuleId = stringSlot(selectedAction, 'sourceRuleId');
   const contribution = latestFact(facts, 'learnerResponse.contribution')?.slots;
 

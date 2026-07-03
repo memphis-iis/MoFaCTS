@@ -121,6 +121,44 @@ describe('stimuli response Unicode handling', function() {
     });
   });
 
+  it('accepts SPARC AutoTutor target stims owned by setspec.sparcPages', function() {
+    const formatted = getNewItemFormat({
+      stimuli: {
+        setspec: {
+          sparcPages: [
+            {
+              display: {
+                unitType: 'sparc-autotutor-dialogue',
+                clusterTargets: [
+                  { clusterIndex: 0, clusterKC: 'expectation-a' },
+                ],
+                autoTutorTargets: {
+                  expectations: [
+                    { clusterKC: 'expectation-a', text: 'Confidence intervals estimate a population parameter.' },
+                  ],
+                },
+              },
+            },
+          ],
+          clusters: [
+            {
+              stims: [
+                {
+                  clusterKC: 'expectation-a',
+                  text: 'Confidence intervals estimate a population parameter.',
+                },
+              ],
+            },
+          ],
+        },
+      },
+    }, 'sparc-autotutor.json', 92, {});
+
+    expect(formatted).to.have.length(1);
+    expect(formatted[0].correctResponse).to.equal('__SPARC_AUTOTUTOR_TARGET__');
+    expect(formatted[0].textStimulus).to.equal('Confidence intervals estimate a population parameter.');
+  });
+
   it('repairs flattened stored stimuli from the raw stimuli file', function() {
     const repaired = repairFormattedStimuliResponsesFromRaw(
       [

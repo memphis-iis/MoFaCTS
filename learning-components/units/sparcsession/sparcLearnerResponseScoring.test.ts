@@ -19,8 +19,8 @@ const document: SparcAuthoredDocument = {
   id: 'score-doc',
   schemaVersion: 1,
   workingMemoryFacts: [
-    fact('learningTarget.source', { clusterKC: 'kc-a' }),
-    fact('learningTarget.source', { clusterKC: 'kc-b' }),
+    fact('autotutor.expectation', { clusterKC: 'kc-a' }),
+    fact('autotutor.expectation', { clusterKC: 'kc-b' }),
     fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.4 }),
     fact('learningTarget.score', { clusterKC: 'kc-b', coverage: 0.1 }),
   ],
@@ -65,7 +65,7 @@ describe('sparcLearnerResponseScoring', function() {
           confidence: 0.7,
         }],
         learnerContribution: {
-          type: 'assertion',
+          type: 'answer',
           confidence: 0.8,
           streakCount: 1,
         },

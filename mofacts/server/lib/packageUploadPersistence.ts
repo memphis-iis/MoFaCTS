@@ -146,7 +146,12 @@ export async function processParsedPackageTdfs(args: {
           packageAssetId
         };
         const ret = await deps.upsertPackage(record, owner);
-        if (ret && (ret as { res?: string }).res === 'awaitClientTDF') {
+        if (ret && (ret as { result?: unknown }).result === false) {
+          packageResult.result = false;
+          packageResult.errmsg = typeof (ret as { errmsg?: unknown }).errmsg === 'string'
+            ? (ret as { errmsg: string }).errmsg
+            : 'Package processing failed';
+        } else if (ret && (ret as { res?: string }).res === 'awaitClientTDF') {
           deps.serverConsole('awaitClientTDF', ret);
           packageResult.result = false;
         } else {
@@ -165,7 +170,11 @@ export async function processParsedPackageTdfs(args: {
       if (resultStimuliSetId !== undefined && resultStimuliSetId !== null) {
         touchedStimuliSetIds.add(resultStimuliSetId);
       }
-      deps.serverConsole('packageResult success:', packageResult?.tdfFileName || 'unknown');
+      deps.serverConsole(
+        packageResult.result ? 'packageResult success:' : 'packageResult failed:',
+        packageResult?.tdfFileName || 'unknown',
+        packageResult.result ? '' : packageResult.errmsg
+      );
     }
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);

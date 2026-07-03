@@ -39,19 +39,27 @@ function asErrorLike(value: unknown): MongoDriverErrorLike {
 
 export function isMongoPoolMonitorInterruption(value: unknown): boolean {
   const error = asErrorLike(value);
-  if (error.name !== 'PoolClearedOnNetworkError') {
-    return false;
-  }
-
   const message = String(error.message || '');
-  if (!message.includes('interrupted due to server monitor timeout')) {
-    return false;
+
+  if (error.name === 'MongoPoolClearedError') {
+    return message.includes('Connection pool for ') &&
+      message.includes('was cleared because another operation failed with') &&
+      message.includes('connection <monitor>') &&
+      message.includes('timed out');
   }
 
-  const cause = asErrorLike(error.cause);
-  return cause.name === 'MongoNetworkTimeoutError' ||
-    hasMongoErrorLabel(cause, 'ResetPool') ||
-    hasMongoErrorLabel(cause, 'InterruptInUseConnections');
+  if (error.name === 'PoolClearedOnNetworkError') {
+    if (!message.includes('interrupted due to server monitor timeout')) {
+      return false;
+    }
+
+    const cause = asErrorLike(error.cause);
+    return cause.name === 'MongoNetworkTimeoutError' ||
+      hasMongoErrorLabel(cause, 'ResetPool') ||
+      hasMongoErrorLabel(cause, 'InterruptInUseConnections');
+  }
+
+  return false;
 }
 
 export function summarizeMongoPoolInterruption(value: unknown): Record<string, unknown> {

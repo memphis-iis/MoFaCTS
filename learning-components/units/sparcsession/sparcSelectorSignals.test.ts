@@ -29,10 +29,10 @@ describe('SPARC selector signals', function() {
 
   it('derives learner-owned selector facts from selected target, coverage, misconception confidence, and word count', function() {
     const result = deriveSparcActiveSelectorSignalFacts([
-      fact('learningTarget.source', { clusterKC: 'kc-a' }),
-      fact('learningTarget.source', { clusterKC: 'kc-b' }),
-      fact('diagnostic.misconceptionSource', { id: 'm-a' }),
-      fact('diagnostic.misconceptionSource', { id: 'm-b' }),
+      fact('autotutor.expectation', { clusterKC: 'kc-a' }),
+      fact('autotutor.expectation', { clusterKC: 'kc-b' }),
+      fact('autotutor.misconception', { id: 'm-a' }),
+      fact('autotutor.misconception', { id: 'm-b' }),
       fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.2 }),
       fact('learningTarget.score', { clusterKC: 'kc-b', coverage: 0.8 }),
       fact('diagnostic.misconceptionScore', { id: 'm-a', confidence: 0.6 }),

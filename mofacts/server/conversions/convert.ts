@@ -63,6 +63,21 @@ function cloneDisplayObject(display: unknown) {
   return JSON.parse(JSON.stringify(display));
 }
 
+function hasSparcAutoTutorPage(setspec: any) {
+  const sparcPages = setspec?.sparcPages;
+  return Array.isArray(sparcPages) && sparcPages.some((page) => page?.display?.unitType === 'sparc-autotutor-dialogue');
+}
+
+function isSparcAutoTutorTargetStim(stim: any, setspecHasSparcAutoTutorPage: boolean) {
+  return (
+    setspecHasSparcAutoTutorPage &&
+    typeof stim?.clusterKC === 'string' &&
+    stim.clusterKC.trim().length > 0 &&
+    typeof stim?.text === 'string' &&
+    stim.text.trim().length > 0
+  );
+}
+
 function getNewItemFormat(stimFile: any, stimulusFileName: string, stimuliSetId: number, responseKCMap: Record<string, any>) {
   const items: any[] = [];
   const responseKCs = Object.values(responseKCMap);
@@ -85,7 +100,10 @@ function getNewItemFormat(stimFile: any, stimulusFileName: string, stimuliSetId:
     throw new Error(`Stimulus file "${stimulusFileName}" is missing or malformed (no clusters array).`);
   }
 
-  stimFile.stimuli.setspec.clusters.forEach((cluster: any, clusterIdx: number) => {
+  const setspec = stimFile.stimuli.setspec;
+  const setspecHasSparcAutoTutorPage = hasSparcAutoTutorPage(setspec);
+
+  setspec.clusters.forEach((cluster: any, clusterIdx: number) => {
     if (!cluster || !Array.isArray(cluster.stims)) {
       throw new Error(`Cluster ${clusterIdx} in "${stimulusFileName}" is missing or has no stims array.`);
     }
@@ -96,6 +114,7 @@ function getNewItemFormat(stimFile: any, stimulusFileName: string, stimuliSetId:
       const h5pOwnsResponse = stim.display?.h5p?.sourceType === 'self-hosted';
       const autoTutorOwnsResponse = Boolean(stim.autoTutor);
       const sparcOwnsResponse = stim.display?.type === 'sparc' && stim.display?.response && typeof stim.display.response === 'object';
+      const sparcAutoTutorTargetOwnsResponse = isSparcAutoTutorTargetStim(stim, setspecHasSparcAutoTutorPage);
       if (!stim.response || typeof stim.response !== 'object') {
         if (h5pOwnsResponse) {
           stim.response = { correctResponse: '__H5P_COMPLETED__' };
@@ -103,6 +122,8 @@ function getNewItemFormat(stimFile: any, stimulusFileName: string, stimuliSetId:
           stim.response = { correctResponse: '__AUTOTUTOR_SESSION__' };
         } else if (sparcOwnsResponse) {
           stim.response = { correctResponse: '__SPARC_COMPLETED__' };
+        } else if (sparcAutoTutorTargetOwnsResponse) {
+          stim.response = { correctResponse: '__SPARC_AUTOTUTOR_TARGET__' };
         } else {
         throw new Error(`Stim ${stimIdx} in cluster ${clusterIdx} of "${stimulusFileName}" missing 'response' property.`);
         }
@@ -114,6 +135,8 @@ function getNewItemFormat(stimFile: any, stimulusFileName: string, stimuliSetId:
           stim.response.correctResponse = '__AUTOTUTOR_SESSION__';
         } else if (sparcOwnsResponse) {
           stim.response.correctResponse = '__SPARC_COMPLETED__';
+        } else if (sparcAutoTutorTargetOwnsResponse) {
+          stim.response.correctResponse = '__SPARC_AUTOTUTOR_TARGET__';
         } else {
           throw new Error(`Stim ${stimIdx} in cluster ${clusterIdx} of "${stimulusFileName}" missing 'correctResponse' property in 'response'.`);
         }
@@ -150,7 +173,7 @@ function getNewItemFormat(stimFile: any, stimulusFileName: string, stimuliSetId:
         // NOTE: itemResponseType removed - image detection now automatic via isImagePath()
         speechHintExclusionList: stim.speechHintExclusionList,
         clozeStimulus: stim.display?.clozeText || stim.display?.clozeStimulus,
-        textStimulus: stim.display?.text || stim.display?.textStimulus || "",
+        textStimulus: stim.display?.text || stim.display?.textStimulus || stim.text || "",
         audioStimulus: stim.display?.audioSrc,
         imageStimulus: stim.display?.imgSrc,
         videoStimulus: stim.display?.videoSrc,

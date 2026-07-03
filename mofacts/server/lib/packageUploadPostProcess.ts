@@ -36,35 +36,26 @@ function hasKcGraphRelationships(facts: readonly unknown[]) {
   return facts.some((fact) => isRecord(fact) && fact.factType === 'kcGraph.relationship');
 }
 
-function collectClusterKcRelationshipNodes(facts: readonly unknown[]): ClusterKcRelationshipNode[] {
+function collectClusterKcRelationshipNodesFromClusters(clusters: unknown): ClusterKcRelationshipNode[] {
   const nodes: ClusterKcRelationshipNode[] = [];
   const seen = new Set<string>();
-  for (const fact of facts) {
-    if (!isRecord(fact) || fact.factType !== 'learningTarget.source' || !isRecord(fact.slots)) {
+  for (const cluster of Array.isArray(clusters) ? clusters : []) {
+    if (!isRecord(cluster)) {
       continue;
     }
-    const clusterKC = nonBlankString(fact.slots.clusterKC);
+    const clusterKC = nonBlankString(cluster.clusterKC);
     if (!clusterKC || seen.has(clusterKC)) {
       continue;
     }
-    const proposition = nonBlankString(fact.slots.proposition);
-    const assertion = nonBlankString(fact.slots.assertion);
-    const label = nonBlankString(fact.slots.label);
-    const description = [
-      label ? `Label: ${label}` : '',
-      proposition ? `Proposition: ${proposition}` : '',
-      assertion ? `Assertion: ${assertion}` : '',
-    ].filter(Boolean).join('\n') || clusterKC;
-    const node: ClusterKcRelationshipNode = {
-      clusterKC,
-      description,
-    };
-    const sourceId = nonBlankString(fact.slots.sourceId);
-    if (sourceId) {
-      nodes.push({ ...node, sourceId });
-    } else {
-      nodes.push(node);
+    const firstStim = Array.isArray(cluster.stims) ? cluster.stims.find(isRecord) : null;
+    const text = nonBlankString(firstStim?.text);
+    if (!text) {
+      continue;
     }
+    nodes.push({
+      clusterKC,
+      description: text,
+    });
     seen.add(clusterKC);
   }
   return nodes;
@@ -78,21 +69,21 @@ async function ensureAutoTutorSparcGraph(args: {
   const { tdf, deps, state } = args;
   const stimuli = tdf?.rawStimuliFile;
   const setspec = isRecord(stimuli?.setspec) ? stimuli.setspec : null;
-  const packageMetadata = isRecord(setspec?.sourceAutoTutorSparcPackage)
-    ? setspec.sourceAutoTutorSparcPackage
-    : null;
-  if (!packageMetadata || !Array.isArray(setspec?.sparcPages)) {
+  if (!Array.isArray(setspec?.sparcPages)) {
     return;
   }
 
   let generatedPageCount = 0;
   for (const page of setspec.sparcPages) {
     const display = isRecord(page) ? page.display : null;
+    if (!isRecord(display) || display.unitType !== 'sparc-autotutor-dialogue') {
+      continue;
+    }
     const facts = getWorkingMemoryFacts(display);
     if (!facts || hasKcGraphRelationships(facts)) {
       continue;
     }
-    const nodes = collectClusterKcRelationshipNodes(facts);
+    const nodes = collectClusterKcRelationshipNodesFromClusters(setspec.clusters);
     if (nodes.length < 2) {
       continue;
     }
@@ -108,10 +99,8 @@ async function ensureAutoTutorSparcGraph(args: {
 
     const attemptedModels: string[] = [];
     let embeddingResult: Awaited<ReturnType<typeof callOpenRouterEmbeddings>> | null = null;
-    let model = '';
     let lastError: unknown;
     for (const candidateModel of [AUTO_TUTOR_PRIMARY_EMBEDDING_MODEL, AUTO_TUTOR_SECONDARY_EMBEDDING_MODEL]) {
-      model = candidateModel;
       attemptedModels.push(candidateModel);
       try {
         embeddingResult = await callOpenRouterEmbeddings({
@@ -142,25 +131,6 @@ async function ensureAutoTutorSparcGraph(args: {
       ...graphFacts,
     ];
     generatedPageCount += 1;
-    packageMetadata.relationshipValidation = {
-      ...(isRecord(packageMetadata.relationshipValidation) ? packageMetadata.relationshipValidation : {}),
-      valid: true,
-      sourceShape: 'generated-at-upload',
-      relationshipGenerationRequired: false,
-      resolvedRelationshipCount: relationships.length,
-      generatedClusterCount: nodes.length,
-      generatedRelationships: true,
-      relationshipProvenance: {
-        graphVersion: 'sparc-kc-relationships-v1',
-        generatedAt: new Date().toISOString(),
-        model,
-        attemptedModels,
-        metric: 'cosine_similarity_normalized_vectors',
-        scoreTransform: 'clamp_negative_to_zero',
-        sourceKeyType: keyResolution.source,
-      },
-      ...(embeddingResult.costUsd !== undefined ? { generationResult: { model, attemptedModels, costUsd: embeddingResult.costUsd } } : { generationResult: { model, attemptedModels } }),
-    };
   }
 
   if (generatedPageCount > 0) {

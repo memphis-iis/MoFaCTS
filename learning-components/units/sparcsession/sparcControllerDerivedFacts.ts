@@ -90,12 +90,12 @@ function hasCurrentLearnerTurn(facts: readonly SparcWorkingMemoryFact[]): boolea
 
 function requiredClusterKCs(facts: readonly SparcWorkingMemoryFact[]): string[] {
   const values = facts
-    .filter((fact) => fact.factType === 'learningTarget.source')
+    .filter((fact) => fact.factType === 'autotutor.expectation')
     .map((fact) => stringSlot(fact, 'clusterKC'))
     .filter(Boolean) as string[];
   const uniqueValues = [...new Set(values)];
   if (uniqueValues.length === 0) {
-    throw new Error('SPARC controller derived facts require at least one learningTarget.source fact');
+    throw new Error('SPARC controller derived facts require at least one clean autotutor.expectation fact');
   }
   return uniqueValues;
 }

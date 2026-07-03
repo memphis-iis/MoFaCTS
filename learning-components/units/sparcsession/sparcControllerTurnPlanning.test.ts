@@ -26,8 +26,8 @@ function document(): SparcAuthoredDocument {
         coherenceWeight: 0.3,
         centralityWeight: 0.2,
       }),
-      fact('learningTarget.source', { clusterKC: 'kc-a' }),
-      fact('learningTarget.source', { clusterKC: 'kc-b' }),
+      fact('autotutor.expectation', { clusterKC: 'kc-a' }),
+      fact('autotutor.expectation', { clusterKC: 'kc-b' }),
       fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.2 }),
       fact('learningTarget.score', { clusterKC: 'kc-b', coverage: 0.1 }),
       fact('kcGraph.node', { clusterKC: 'kc-a', centrality: 0.1, description: 'A' }),
@@ -96,8 +96,8 @@ function completedDocument(): SparcAuthoredDocument {
         policy: 'kc-graph-priority',
         coverageThreshold: 0.8,
       }),
-      fact('learningTarget.source', { clusterKC: 'kc-a' }),
-      fact('learningTarget.source', { clusterKC: 'kc-b' }),
+      fact('autotutor.expectation', { clusterKC: 'kc-a' }),
+      fact('autotutor.expectation', { clusterKC: 'kc-b' }),
       fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.9 }),
       fact('learningTarget.score', { clusterKC: 'kc-b', coverage: 0.85 }),
       fact('kcGraph.node', { clusterKC: 'kc-a', centrality: 0.1, description: 'A' }),
@@ -162,10 +162,10 @@ function misconceptionDocument(confidence = 0.25): SparcAuthoredDocument {
         policy: 'kc-graph-priority',
         coverageThreshold: 0.8,
       }),
-      fact('learningTarget.source', { clusterKC: 'kc-a' }),
+      fact('autotutor.expectation', { clusterKC: 'kc-a' }),
       fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.4 }),
       fact('kcGraph.node', { clusterKC: 'kc-a', centrality: 0.5, description: 'A' }),
-      fact('diagnostic.misconceptionSource', { id: 'm-active' }),
+      fact('autotutor.misconception', { id: 'm-active' }),
       fact('diagnostic.misconceptionScore', { id: 'm-active', confidence }),
       fact('dialogue.learnerWordCount', { cumulative: 5 }),
       fact('session.turnState', { turnCount: 1 }),
@@ -249,7 +249,7 @@ function mediumExpectationDocument(): SparcAuthoredDocument {
   return {
     ...base,
     workingMemoryFacts: (base.workingMemoryFacts ?? []).filter((entry) => (
-      entry.factType !== 'diagnostic.misconceptionSource'
+      entry.factType !== 'autotutor.misconception'
       && entry.factType !== 'diagnostic.misconceptionScore'
     )),
     productionRules: (base.productionRules ?? []).filter((entry) => entry.id === 'dialogue.move.paper-rule-09-elaborate'),

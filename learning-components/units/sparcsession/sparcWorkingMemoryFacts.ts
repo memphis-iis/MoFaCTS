@@ -193,6 +193,29 @@ function derivedFactProductionRule(rule: SparcDerivedFactRule): SparcProductionR
   };
 }
 
+function autoTutorTargetFacts(document: SparcAuthoredDocument): readonly SparcWorkingMemoryFact[] {
+  const targets = document.autoTutorTargets;
+  if (!targets) {
+    return [];
+  }
+  return [
+    ...targets.expectations.map((expectation) => ({
+      factType: 'autotutor.expectation',
+      slots: {
+        clusterKC: expectation.clusterKC,
+        text: expectation.text,
+      },
+    })),
+    ...targets.misconceptions.map((misconception) => ({
+      factType: 'autotutor.misconception',
+      slots: {
+        id: misconception.id,
+        text: misconception.text,
+      },
+    })),
+  ];
+}
+
 function appendDerivedFacts(
   facts: SparcWorkingMemoryFact[],
   derivedFacts: readonly SparcDerivedFactRule[] | undefined,
@@ -223,6 +246,7 @@ export function buildSparcWorkingMemoryFactsWithDerivations(
 ): SparcWorkingMemoryFactBuildResult {
   requireNonBlank(input.document.id, 'SPARC authored document id');
   const facts: SparcWorkingMemoryFact[] = [
+    ...autoTutorTargetFacts(input.document),
     ...((input.document.workingMemoryFacts ?? []).map(authoredFactWithId)),
   ];
 

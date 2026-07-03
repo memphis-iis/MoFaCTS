@@ -82,15 +82,15 @@ function nonNegativeIntegerSlot(fact: SparcWorkingMemoryFact, slotName: string, 
 
 function collectRequiredTargets(facts: readonly SparcWorkingMemoryFact[]): string[] {
   const targets = facts
-    .filter((fact) => fact.factType === 'learningTarget.source')
+    .filter((fact) => fact.factType === 'autotutor.expectation')
     .map((fact) => stringSlot(fact, 'clusterKC'))
     .filter(Boolean) as string[];
   if (targets.length === 0) {
-    throw new Error('SPARC target selection requires at least one learningTarget.source fact');
+    throw new Error('SPARC target selection requires at least one clean autotutor.expectation fact');
   }
   const uniqueTargets = new Set(targets);
   if (uniqueTargets.size !== targets.length) {
-    throw new Error('SPARC target selection requires unique learningTarget.source clusterKC values');
+    throw new Error('SPARC target selection requires unique autotutor.expectation clusterKC values');
   }
   return targets;
 }
@@ -261,7 +261,7 @@ function selectedTargetFact(
 
 function misconceptionIds(facts: readonly SparcWorkingMemoryFact[]): readonly string[] {
   return [...new Set(facts
-    .filter((fact) => fact.factType === 'diagnostic.misconceptionSource')
+    .filter((fact) => fact.factType === 'autotutor.misconception')
     .map((fact) => stringSlot(fact, 'id'))
     .filter(Boolean) as string[])];
 }

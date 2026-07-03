@@ -448,7 +448,7 @@ describe('sparcProductionRuleEvaluator', function() {
     const facts: SparcWorkingMemoryFact[] = [{
       factType: 'learnerResponse.contribution',
       slots: {
-        type: 'assertion',
+        type: 'answer',
       },
     }];
     const rules: SparcProductionRule[] = [{

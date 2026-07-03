@@ -76,7 +76,7 @@ function coverageThreshold(facts: readonly SparcWorkingMemoryFact[]): number {
 function hasRepairActiveMisconception(facts: readonly SparcWorkingMemoryFact[]): boolean {
   const repairThreshold = Math.max(0, Math.min(1, 1 - coverageThreshold(facts)));
   const authoredIds = new Set(facts
-    .filter((fact) => fact.factType === 'diagnostic.misconceptionSource')
+    .filter((fact) => fact.factType === 'autotutor.misconception')
     .map((fact) => stringSlot(fact, 'id'))
     .filter(Boolean) as string[]);
   if (authoredIds.size === 0) {
@@ -125,12 +125,12 @@ function selectedLearningTargetFact(clusterKC: string, facts: readonly SparcWork
 
 function selectCompletionSummaryTarget(facts: readonly SparcWorkingMemoryFact[]): SparcLearningTargetSelection {
   const targets = facts
-    .filter((fact) => fact.factType === 'learningTarget.source')
+    .filter((fact) => fact.factType === 'autotutor.expectation')
     .map((fact) => stringSlot(fact, 'clusterKC'))
     .filter(Boolean) as string[];
   const uniqueTargets = [...new Set(targets)];
   if (uniqueTargets.length === 0) {
-    throw new Error('SPARC completion target selection requires at least one learningTarget.source fact');
+    throw new Error('SPARC completion target selection requires at least one clean autotutor.expectation fact');
   }
   const coverageByClusterKC = new Map<string, number>();
   for (const fact of facts) {

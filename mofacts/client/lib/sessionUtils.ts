@@ -8,6 +8,8 @@ import { CardStore } from "../views/experiment/modules/cardStore";
 import { deliverySettingsStore } from "./state/deliverySettingsStore";
 import { ExperimentStateStore } from "./state/experimentStateStore";
 import { clearMappingRecordFromSession } from "../views/experiment/svelte/services/mappingRecordService";
+import { clearSparcProductionRuleHistoryCache } from "../views/experiment/svelte/services/sparcProductionRuleHistoryCache";
+import { clearSparcTrialDisplayRuntimeContextCache } from "../views/experiment/svelte/services/sparcTrialDisplayRuntimeContextCache";
 import {
   applySessionCleanupEntries,
   CARD_RUNTIME_SESSION_DEFAULTS,
@@ -93,6 +95,11 @@ function resetSharedCardRuntimeState(options: { preserveCardEntryContext?: boole
   audioManager.cleanup();
 }
 
+function clearSparcReplayCachesForCleanup() {
+  clearSparcProductionRuleHistoryCache();
+  clearSparcTrialDisplayRuntimeContextCache();
+}
+
 function shouldPreserveUnitStateForCard() {
   const fromInstructions = Session.get('fromInstructions');
   const cardBootstrapInProgress = Session.get('cardBootstrapInProgress') === true;
@@ -116,6 +123,7 @@ function sessionCleanUp() {
   }
 
   resetSharedCardRuntimeState();
+  clearSparcReplayCachesForCleanup();
 
   clientConsole(1, '[Session] Clearing currentTdfUnit during session cleanup', {
     path: document?.location?.pathname,

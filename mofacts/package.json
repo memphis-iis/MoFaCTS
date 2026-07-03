@@ -161,6 +161,8 @@
     "audit:fields": "node --experimental-strip-types scripts/auditFields.ts",
     "audit:menu-theme": "node scripts/auditMenuTheme.mjs",
     "convert:config-delivery-settings": "node --experimental-strip-types scripts/convertConfigDeliverySettings.ts",
+    "convert:sparc-autotutor-target-schema": "node --experimental-strip-types scripts/convertSparcAutoTutorTargetSchema.ts",
+    "check:sparc-autotutor-runtime-cleanup": "node scripts/checkSparcAutoTutorRuntimeCleanup.cjs",
     "prepare": "node scripts/prepare-husky.cjs",
     "precommit:lint-staged": "lint-staged",
     "secret:scan:staged": "node scripts/scan-staged-secrets.cjs",

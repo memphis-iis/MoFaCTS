@@ -25,6 +25,8 @@ import {
 import type { SparcPracticeHistoryCore } from './sparcPracticeHistoryBridge';
 import type { SparcLearnerResponseScoringResult } from './sparcLearnerResponseScoring';
 import type {
+  SparcAutoTutorExpectation,
+  SparcAutoTutorMisconception,
   SparcAuthoredDocument,
   SparcOutcome,
   SparcAuthoredNode,
@@ -116,6 +118,81 @@ function requireNonBlank(value: unknown, label: string): string {
   return normalized;
 }
 
+function normalizeCleanAutoTutorTargets(display: SparcTrialDisplay): SparcAuthoredDocument['autoTutorTargets'] | undefined {
+  const cleanTargets = (display as Record<string, unknown>).autoTutorTargets;
+  const expectationEntries = isRecord(cleanTargets) && Array.isArray(cleanTargets.expectations)
+    ? cleanTargets.expectations
+    : [];
+  const table = isRecord((display as Record<string, unknown>).misconceptionTable)
+    ? (display as Record<string, unknown>).misconceptionTable as Record<string, unknown>
+    : {};
+  const misconceptionEntries = isRecord(cleanTargets) && Array.isArray(cleanTargets.misconceptions)
+    ? cleanTargets.misconceptions
+    : (Array.isArray(table.misconceptions) ? table.misconceptions : []);
+
+  if (expectationEntries.length === 0 && misconceptionEntries.length === 0) {
+    return undefined;
+  }
+
+  const expectations: SparcAutoTutorExpectation[] = expectationEntries.map((entry, index) => {
+    if (!isRecord(entry)) {
+      throw new Error(`SPARC AutoTutor autoTutorTargets.expectations[${index}] must be an object`);
+    }
+    return {
+      clusterKC: requireNonBlank(entry.clusterKC, `SPARC AutoTutor autoTutorTargets.expectations[${index}].clusterKC`),
+      text: requireNonBlank(entry.text, `SPARC AutoTutor autoTutorTargets.expectations[${index}].text`),
+    };
+  });
+  const misconceptions: SparcAutoTutorMisconception[] = misconceptionEntries.map((entry, index) => {
+    if (!isRecord(entry)) {
+      throw new Error(`SPARC AutoTutor autoTutorTargets.misconceptions[${index}] must be an object`);
+    }
+    return {
+      id: requireNonBlank(entry.id, `SPARC AutoTutor autoTutorTargets.misconceptions[${index}].id`),
+      text: requireNonBlank(entry.text, `SPARC AutoTutor autoTutorTargets.misconceptions[${index}].text`),
+    };
+  });
+  return { expectations, misconceptions };
+}
+
+const FORBIDDEN_AUTOTUTOR_FACT_TYPES = new Set([
+  'learningTarget.source',
+  'diagnostic.misconceptionSource',
+  'dialogue.moveContent',
+]);
+
+const FORBIDDEN_AUTOTUTOR_FIELD_NAMES = new Set([
+  'sourceId',
+  'sourceAutoTutor',
+  'stimulusKC',
+  'KCId',
+  'KCDefault',
+  'KCCluster',
+  'repair',
+  'repairQuestion',
+  'repairCriteria',
+]);
+
+function assertNoForbiddenAutoTutorTargetSchema(value: unknown, pathParts: readonly string[] = []): void {
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => assertNoForbiddenAutoTutorTargetSchema(entry, [...pathParts, String(index)]));
+    return;
+  }
+  if (!isRecord(value)) {
+    return;
+  }
+  for (const [key, entry] of Object.entries(value)) {
+    const fieldPath = [...pathParts, key].join('.');
+    if (FORBIDDEN_AUTOTUTOR_FIELD_NAMES.has(key)) {
+      throw new Error(`SPARC AutoTutor content still contains forbidden target-schema field ${fieldPath}`);
+    }
+    if (key === 'factType' && typeof entry === 'string' && FORBIDDEN_AUTOTUTOR_FACT_TYPES.has(entry)) {
+      throw new Error(`SPARC AutoTutor content still contains forbidden target-schema fact type ${entry}`);
+    }
+    assertNoForbiddenAutoTutorTargetSchema(entry, [...pathParts, key]);
+  }
+}
+
 function nodeKind(node: DisplayNodeRecord): SparcAuthoredNode['kind'] {
   if (node.nodeType === 'group') {
     return 'panel';
@@ -165,27 +242,32 @@ function normalizeClusterTargets(display: SparcTrialDisplay): readonly SparcClus
   }
   return ((display as Record<string, unknown>).clusterTargets as unknown[])
     .filter(isRecord)
-    .map((entry, index) => ({
-      clusterIndex: requireOptionalClusterIndex(entry.clusterIndex, `SPARC clusterTargets[${index}].clusterIndex`),
-      ...(typeof entry.label === 'string' && entry.label.trim() ? { label: entry.label.trim() } : {}),
-      stimuliSetId: entry.stimuliSetId as string | number,
-      stimulusKC: entry.stimulusKC as string | number,
-      clusterKC: entry.clusterKC as string | number,
-      KCId: entry.KCId as string | number,
-      KCDefault: entry.KCDefault as string | number,
-      KCCluster: entry.KCCluster as string | number,
-      ...(isRecord(entry.response)
-        ? {
-            response: {
-              responseKC: entry.response.responseKC as string | number,
-              responseKey: String(entry.response.responseKey ?? ''),
-            },
-          }
-        : {}),
-      ...(typeof entry.stimulusRecordId === 'string' && entry.stimulusRecordId.trim()
-        ? { stimulusRecordId: entry.stimulusRecordId.trim() }
-        : {}),
-    }));
+    .map((entry, index) => {
+      const clusterKC = requireNonBlank(entry.clusterKC, `SPARC clusterTargets[${index}].clusterKC`);
+      const stimulusKC = entry.stimulusKC ?? clusterKC;
+      const stimuliSetId = entry.stimuliSetId ?? `sparc:${clusterKC}`;
+      return {
+        clusterIndex: requireOptionalClusterIndex(entry.clusterIndex, `SPARC clusterTargets[${index}].clusterIndex`),
+        ...(typeof entry.label === 'string' && entry.label.trim() ? { label: entry.label.trim() } : {}),
+        stimuliSetId: stimuliSetId as string | number,
+        stimulusKC: stimulusKC as string | number,
+        clusterKC,
+        KCId: (entry.KCId ?? stimulusKC) as string | number,
+        KCDefault: (entry.KCDefault ?? stimulusKC) as string | number,
+        KCCluster: (entry.KCCluster ?? clusterKC) as string | number,
+        ...(isRecord(entry.response)
+          ? {
+              response: {
+                responseKC: entry.response.responseKC as string | number,
+                responseKey: String(entry.response.responseKey ?? ''),
+              },
+            }
+          : {}),
+        ...(typeof entry.stimulusRecordId === 'string' && entry.stimulusRecordId.trim()
+          ? { stimulusRecordId: entry.stimulusRecordId.trim() }
+          : {}),
+      };
+    });
 }
 
 export function createSparcAuthoredDocumentFromTrialDisplay(params: {
@@ -193,6 +275,18 @@ export function createSparcAuthoredDocumentFromTrialDisplay(params: {
   readonly display: SparcTrialDisplay;
 }): SparcAuthoredDocument {
   const display = sparcTrialDisplayAdapter.normalizeDisplay(params.display);
+  const autoTutorTargets = normalizeCleanAutoTutorTargets(display);
+  if (display.unitType === 'sparc-autotutor-dialogue' || autoTutorTargets) {
+    assertNoForbiddenAutoTutorTargetSchema({
+      workingMemoryFacts: display.workingMemoryFacts,
+      clusterTargets: display.clusterTargets,
+      autoTutorTargets,
+      misconceptionTable: display.misconceptionTable,
+    });
+    if (!autoTutorTargets || autoTutorTargets.expectations.length === 0) {
+      throw new Error('SPARC AutoTutor content requires clean expectation targets');
+    }
+  }
   const authoredFacts = Array.isArray(display.workingMemoryFacts)
     ? display.workingMemoryFacts as readonly SparcWorkingMemoryFact[]
     : [];
@@ -216,6 +310,7 @@ export function createSparcAuthoredDocumentFromTrialDisplay(params: {
       layoutMode: 'document',
     },
     clusterTargets: normalizeClusterTargets(display),
+    ...(autoTutorTargets ? { autoTutorTargets } : {}),
     ...(initialState.length > 0 ? { initialState } : {}),
     workingMemoryFacts: authoredFacts,
     ...(derivedFacts.length > 0 ? { derivedFacts } : {}),

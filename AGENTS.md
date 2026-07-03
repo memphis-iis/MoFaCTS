@@ -1,154 +1,163 @@
 # MoFaCTS Agent Guide
 
-## Purpose
+This repository contains MoFaCTS, the Mobile Fact and Concept Training System. MoFaCTS is a web-based adaptive learning system. The executable application source tree lives under `mofacts/`.
 
-This repository contains the MoFaCTS application. MoFaCTS is the Mobile Fact and Concept Training System, a web-based adaptive learning system.
+This file is intentionally root-level and self-contained. Do not rely on nested agent files for critical behavior unless the user explicitly asks to introduce them.
 
-The application source tree lives under `mofacts/`.
-
-## Repo Selection
+## Critical Invariants
 
 - For runtime behavior, UI rendering, themes, transitions, Svelte components, state machines, or application logic, work in this repository and prefer `mofacts/`.
-- For TDF/config content or sync scripts, use the canonical project configuration/content repository at `C:\dev\mofacts_config` and inspect this repository only for compatibility checks.
-- For product and developer documentation that is too long for the public repo docs, use the canonical project wiki at `C:\dev\MoFaCTS.wiki`.
-- `MOFACTS_CONFIG_REPO`, when present, must resolve to the canonical configuration/content path above. If it is missing or points elsewhere, do not use a fallback path; report the mismatch clearly before proceeding.
-- `MOFACTS_WIKI_REPO`, when present, must resolve to `C:\dev\MoFaCTS.wiki`. If it is missing, use `C:\dev\MoFaCTS.wiki` after verifying that path exists; if it points elsewhere, report the mismatch clearly before proceeding.
-- Treat the configuration/content repository and wiki repository as critical MoFaCTS project components, not optional adjacent references.
-- Do not clone, create, copy, or substitute replacement config or wiki repositories unless explicitly instructed.
+- For TDF/config content or sync scripts, use `C:\dev\mofacts_config`; inspect this repository only for compatibility checks.
+- For product and developer documentation too long for public repo docs, use `C:\dev\MoFaCTS.wiki`.
+- `MOFACTS_CONFIG_REPO`, when present, must resolve to `C:\dev\mofacts_config`. If it is missing, verify and use `C:\dev\mofacts_config`. If it points elsewhere, stop and report the mismatch.
+- `MOFACTS_WIKI_REPO`, when present, must resolve to `C:\dev\MoFaCTS.wiki`. If it is missing, verify and use `C:\dev\MoFaCTS.wiki`. If it points elsewhere, stop and report the mismatch.
+- Treat the config/content repo and wiki repo as critical MoFaCTS project components. Do not clone, create, copy, or substitute replacements unless explicitly instructed.
+- If user-facing behavior changes in `mofacts/`, check whether the wiki needs an update.
+- If code changes alter required TDF fields, config names, structures, schemas, payloads, interfaces, or field names, verify compatibility with dependent repositories.
+- Silent fallbacks are not allowed. Fail clearly when invariants break.
+- Do not add compatibility fallback paths unless explicitly requested.
+- Do not run Docker build, push, deploy, or production-affecting commands unless explicitly requested.
+- Do not use local Meteor CLI workflows as release-confidence substitutes for the supported Docker Compose workflow.
 
-## Subtree Roles
+## User Intent And Permissions
 
-- `mofacts/`: application source.
-- `deploy/`: canonical Docker Compose build and deploy workflow.
-- `docs/`: concise public repository documentation.
-- `.github/`: GitHub workflow, issue, and pull request metadata.
-
-## Cross-Repo Coordination
-
-- If user-facing behavior changes in `mofacts/`, check whether wiki documentation in `C:\dev\MoFaCTS.wiki` needs an update.
-- If code changes alter required TDF fields, config names, structures, or expectations, verify compatibility with the configuration/content repository at `C:\dev\mofacts_config`.
-- If schemas, payloads, interfaces, or field names change, inspect dependent repositories for compatibility.
-
-## Operational Rules
-
-### Collaboration And Question Handling
-
-- When the user asks a question, answer the question directly and do not infer permission to edit files, run commands, test, commit, or push. If a change seems needed, recommend it separately and wait for explicit approval before acting.
-
-### Change Discipline
-
-- Silent fallbacks are not allowed; fail clearly when invariants break.
-- Do not make "patch" fixes that leave broken or rickety wiring in place and merely make the immediate symptom appear to work. When a subsystem boundary or flow is wrong, analyze the whole flow, name the invariants, and rebuild the subsystem or integration point so it is coherent and durable.
-- When a plan and its invariants make sense, work toward it incrementally using hill climbing: make the smallest coherent move, verify whether it improved the system, and continue. Stop and re-analyze only when the plan or invariants no longer make sense.
-- Do not fix a new behavior by changing unrelated working behavior. Existing working paths, especially explicitly identified reference paths, must be treated as regression-sensitive and preserved unless the user explicitly asks to redesign them.
-
-### Git And Branch Hygiene
-
-- Stay on the current branch for local commits and pushes unless the user explicitly asks to create or switch branches.
+- When the user asks a question, answer it directly. Do not infer permission to edit files, run commands, test, commit, or push.
+- If a change seems needed after a question, recommend it separately and wait for explicit approval.
+- When the user asks for a change, implement it end to end when feasible, then report what changed and what was verified.
+- Stay on the current branch unless the user explicitly asks to create or switch branches.
 - Do not create `codex/*` or other work branches automatically.
 - This repository normally expects agent commits to be made on `main` when the checkout is on `main`.
-- Do not add compatibility fallback paths unless explicitly requested.
+- Never revert user or unrelated working-tree changes unless the user explicitly requests it.
+- Do not commit or push unless the user explicitly asks.
+- When committing, include only intentional files and mention verification performed.
 
-### Generated Files And Public Repo Hygiene
+## Common Commands
 
-- Do not commit root `outputs/`, root `tmp/`, one-off inventory JSON, working-copy notes, generated slide decks, screenshots, local analysis dumps, or other ad hoc artifacts.
-- Curated examples must live under an intentional public path such as `examples/`, `docs/`, or a documented asset folder, with enough provenance for license and source review.
-- If an artifact is only useful locally, keep it ignored rather than tracked. Update `.gitignore` when a repeatable tool produces new local output.
-- If public setup, local run, admin bootstrap, test, deployment, TDF schema, or unit-extension behavior changes, update the concise public docs in the same change. Do not leave private/local knowledge as the only working path.
-- Do not point contributors at scaffold packages as implementation entry points when an active source root exists. For unit behavior, point to `learning-components/` unless the scaffold package has become the real contract.
-- Do not generate, edit, or keep side-by-side emitted `.js` files next to `.ts` source files in `mofacts/client/`, `mofacts/server/`, or `mofacts/common/`.
-- Treat untracked `.js` twins beside `.ts` files in `mofacts/` as build spill unless proven otherwise.
+- App directory: `cd mofacts`
+- Typecheck from `mofacts/`: `npm run typecheck`
+- Lint from `mofacts/`: `npm run lint`
+- Generate schemas from `mofacts/`: `npm run generate:schemas`
+- Start native hotfix dev app from `deploy/`: `.\hotfix-dev.ps1 start -SettingsPath "$env:USERPROFILE\OneDrive\Desktop\settings.local.json"`
 
-### Logging And UI Hygiene
+## Repo Map
 
-- Never add raw client `console.*` for routine logging; use `mofacts/client/lib/clientLogger.ts`.
-- Preserve admin-controlled client verbosity behavior.
-- Use inline UI patterns instead of modal popups unless explicitly requested.
-
-### Runtime And Deployment Hygiene
-
-- Never run `meteor run` in automation except through the native hotfix dev loop documented below.
-- Do not use local Meteor CLI workflows as release-confidence substitutes for the supported Docker Compose workflow.
-- Do not run Docker build, push, or deploy commands unless explicitly requested.
+- `mofacts/`: application source.
+- `learning-components/`: pedagogical extension logic such as unit engines, trial behavior, adaptive model logic, TDF/stimulus interpretation, response normalization, and external learning adapters.
+- `deploy/`: canonical Docker Compose build and deploy workflow, plus local hotfix scripts.
+- `docs/`: concise public repository documentation.
+- `.github/`: GitHub workflow, issue, and pull request metadata.
+- Root `app/`, `tests/`, and `packages/` are architectural scaffolds unless local README and build/test wiring prove the relevant runner is active.
 
 ## Architecture Boundaries
 
-- Executable application code currently lives under `mofacts/`. Root `app/`, `tests/`, and `packages/` are architectural scaffolds unless the local README and build/test wiring say the relevant runner is active.
-- Put pedagogical extension logic in `learning-components/`: unit engines, trial behavior, adaptive model logic, TDF/stimulus interpretation, response normalization, and external learning adapters.
 - Put Meteor routing, collections, publications, server methods, app shell UI, persistence, logging, and migrations in `mofacts/`.
-- New unit types should go through the unit-engine registry and expose explicit lifecycle methods. Do not duplicate legacy behavior in the old `mofacts/client/views/experiment/unitEngine.ts` path; keep that path as an app dependency facade.
-- Learning components should depend on explicit runtime context/dependency interfaces. Avoid reaching from `learning-components/` into deep Meteor client/server paths unless a temporary facade is already documented and behavior-preserving.
-- If an alternate runtime path is intentional, name it by the domain behavior it provides. Do not call a deliberate path a fallback, and do not add recovery behavior that masks a broken invariant.
+- Put unit engines and pedagogical extension behavior in `learning-components/`.
+- New unit types should go through the unit-engine registry and expose explicit lifecycle methods.
+- Do not duplicate legacy behavior in `mofacts/client/views/experiment/unitEngine.ts`; keep that path as an app dependency facade.
+- Learning components should depend on explicit runtime context/dependency interfaces.
+- Avoid reaching from `learning-components/` into deep Meteor client/server paths unless a temporary facade is already documented and behavior-preserving.
+- If an alternate runtime path is intentional, name it by the domain behavior it provides. Do not call a deliberate path a fallback.
+- Do not add recovery behavior that masks a broken invariant.
 
-## Real Hotfix Dev Loop
+## Legacy And Alternative Paths
 
-For fast UI/application hot fixes on Windows, use the native local hotfix dev server. This is the intended 10-20 second observe/edit/reload loop after the first startup has warmed caches.
+- MoFaCTS does not yet have a large user base that requires preserving every historical behavior. Prefer maintainable, coherent code over keeping obsolete paths alive by default.
+- "Legacy" means code, configuration, data paths, or behavior kept only to support past approaches that are not intended for the final system.
+- Do not call something legacy merely because it is older, unfamiliar, or different from another path. If it is an intentional current alternative path, name the domain behavior it provides.
+- When apparently unnecessary legacy code is discovered, pause before building on it or deleting it. Ask the user whether it is still needed, describe what depends on it, and recommend whether to remove, replace, or preserve it.
+- Usually delete or collapse confirmed legacy paths instead of adding compatibility layers around them.
+- If preserving a legacy path is explicitly chosen, document the invariant, owner, expected lifetime, and verification needed to keep it from becoming hidden maintenance debt.
 
-- Start the dev service from `deploy/` with `.\hotfix-dev.ps1 start -SettingsPath <local-settings-json>`.
-- On this developer setup, the current local settings path is defined by `C:\dev\mofacts_config\deploy and build.txt`: `$LocalSettingsPath = "$env:USERPROFILE\OneDrive\Desktop\settings.local.json"`. Use that explicit `-SettingsPath`; do not guess a settings file under `C:\dev\MoFaCTS\deploy`.
-- The dev app runs at `http://localhost:3200` and uses the same local MongoDB database, `MoFACT-meteor3`.
-- The dev server runs Meteor natively from the Windows checkout and uses Docker only for MongoDB.
-- The script publishes MongoDB on `127.0.0.1:27017` with `docker-compose.hotfix-native.yml`.
-- Local dev logs and PID files belong under ignored local state in `deploy/local-dev/`.
-- The dev launcher maintains an ignored `.meteor/local/build/package.json` CommonJS marker required by native Meteor dev on this `"type": "module"` app.
-- Rspack dev-server host checking explicitly allows `host.docker.internal` so Playwright MCP can inspect the native dev app from its container.
-- Agents may run this hotfix dev server even though it starts Meteor in watch mode; this is the only automation exception to "Never run `meteor run`", and it is limited to local interactive UI observation.
-- Do not use the hotfix dev service as release confidence, deploy confidence, or a substitute for `npm run typecheck`.
-- For UI work, use the MoFaCTS sidecar Playwright MCP server from `mofacts-mcp-sidecar/`, not the bundled Browser or Chrome extension registry. In this Codex environment the correct tool namespace is `mcp__mofacts_playwright__`; do not diagnose MoFaCTS sidecar availability by checking bundled `iab` or Chrome-extension browser registries.
-- The hotfix sidecar endpoint is `http://localhost:8931/mcp`, and its Docker target for the native hotfix app is `http://host.docker.internal:3200`. Start or restart it from `mofacts-mcp-sidecar/` with `docker compose -f docker-compose.yml -f docker-compose.hotfix-dev.yml up --build`.
-- When asked to check UI with MCP/Playwright, do this first: verify/start the hotfix dev app, verify/start the sidecar from `mofacts-mcp-sidecar/`, then use the `mcp__mofacts_playwright__` tools. Do not stop merely because the current turn's exposed tool list or `tool_search` results do not show `mcp__mofacts_playwright__`; that only indicates a Codex tool-exposure/session issue after the sidecar has been checked. Report that distinction clearly.
-- The MCP namespace is not discovered by inspecting bundled browser tool registries, using `tool_search`, or assuming absent tools in the prompt mean the sidecar is unavailable. The sidecar health path is the Docker/HTTP setup above, especially `http://localhost:8931/mcp`.
-- Codex may expose only a partial subset of the Playwright MCP tools on the first pass. If expected tools such as `browser_snapshot`, `browser_click`, `browser_fill_form`, `browser_type`, `browser_take_screenshot`, `browser_wait_for`, or network inspection tools are missing from the callable namespace, do not switch to ad hoc Playwright or raw MCP JSON-RPC. First verify the server-advertised tool list from `http://localhost:8931/mcp`, then explicitly search for the missing names with `tool_search` so Codex loads them into the turn. In this environment the same server can initially expose only `browser_navigate`, `browser_evaluate`, `browser_hover`, `browser_tabs`, and `browser_run_code_unsafe`, while the MCP server itself still advertises the full browser interaction tool set.
-- To distinguish sidecar regression from Codex deferred tool exposure, run this probe from `mofacts-mcp-sidecar\services\mongo-mcp` after the sidecar is up:
+## Change Discipline
 
-```powershell
-node --input-type=module -e "import { Client } from '@modelcontextprotocol/sdk/client/index.js'; import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'; const client = new Client({ name: 'probe', version: '1.0.0' }); const transport = new StreamableHTTPClientTransport(new URL('http://localhost:8931/mcp')); await client.connect(transport); const result = await client.listTools(); console.log(JSON.stringify(result.tools.map(t => t.name).sort(), null, 2)); await client.close();"
-```
+- Do not make patch fixes that leave broken wiring in place. When a subsystem boundary or flow is wrong, analyze the whole flow, name the invariants, and make the integration coherent.
+- Before editing, inspect the surrounding implementation and existing patterns; do not assume architecture from filenames alone.
+- Prefer existing local helpers, conventions, and abstractions over introducing new ones.
+- Keep edits scoped to the requested behavior and the owning module boundary.
+- If a task seems to require a broad refactor, explain why before expanding scope.
+- Before adding a new variable, field, id, schema property, fact slot, config key, or similarly named concept, search the relevant and adjacent modules for existing concepts to reuse, rename, or collapse.
+- For TDF fields, config keys, schema properties, and unit identifiers, search both `mofacts/` and `C:\dev\mofacts_config` before introducing or renaming concepts.
+- Redundancy is a top design risk. Do not create parallel names or representations for the same concept unless the distinction is explicit, necessary, and documented at the boundary.
+- If pre-existing redundancy appears while working, stop before building on it and inform the user. Describe the duplicate concepts, locations, and whether the current task depends on resolving them.
+- Preserve current intentional working paths, especially explicitly identified reference paths, unless the user asks to redesign them. Do not preserve obsolete legacy paths by default.
+- When a plan and its invariants make sense, make the smallest coherent move, verify whether it improved the system, and continue.
+- Do not add new npm, Meteor, Docker, or system dependencies without explicit approval.
+- Before adding a dependency, search for existing packages or helpers that already solve the problem.
+- If a dependency is necessary, explain why the existing stack is insufficient.
+- Prefer source files over generated, bundled, cached, or compiled files. If unsure whether a file is generated, check before editing.
 
-  If the probe lists the missing tools, the sidecar is healthy and Codex needs an explicit `tool_search` query for those tool names. If the probe does not list them, inspect the sidecar Docker image and upstream Playwright MCP version before changing application code.
-- To make this check explicit, run `mofacts-mcp-sidecar\scripts\check-hotfix-sidecar.ps1` for status, or add `-Start` / `-Restart` to start the hotfix sidecar before checking. This script prints the hotfix app status, sidecar compose status, MCP endpoint status, and the namespace/tool-exposure distinction.
-- For UI work, point the MoFaCTS Playwright MCP sidecar at the hotfix dev app, make the smallest coherent source change, let Meteor/Rspack rebuild, refresh the page, and observe again.
-- If a dependency or Meteor package changes, run the required install/update step deliberately and restart the hotfix dev service.
+## Verification Matrix
 
-## Local Hotfix Loop
+Use the verification path that matches the change. Say clearly when a check could not be run locally.
 
-The repository also supports a local-only bundle loop under `deploy/` for production-shaped app-code verification without creating a deployable Docker image. This is slower than the real hotfix dev loop.
+| Change type | Required verification |
+| --- | --- |
+| TypeScript-bearing app changes | Run `npm run typecheck` from `mofacts/`. |
+| Lintable TypeScript, JavaScript, or Svelte changes | Run `npm run lint` from `mofacts/`. |
+| TDF field registry or schema changes | Run `npm run generate:schemas` from `mofacts/` and inspect generated schema diffs. |
+| UI/runtime behavior changes | Use the native hotfix dev server plus MoFaCTS Playwright sidecar smoke testing against `http://localhost:3200` / `http://host.docker.internal:3200`. |
+| Meteor integration or client contract coverage | Use CI or another supported Meteor test environment. Do not run `npm run test:ci` routinely on local Windows. |
+| Docker build, push, deploy, or release confidence | Run only when explicitly requested. |
 
-- Code hot fixes still require a Meteor bundle rebuild. Do not monkey-patch compiled files inside a running container.
-- The local hotfix loop may rebuild the bundle and restart the local app container without running a Docker image build.
-- Use `docker-compose.hotfix-local.yml` together with `docker-compose.yml` and `docker-compose.local.yml`.
-- On Windows, `deploy/hotfix-local.ps1` runs the standard local loop: typecheck, compose config validation, hotfix bundle build, bundle dependency install, and app restart.
-- Generated hotfix output belongs in the Docker volume `deploy_hotfix_bundle`; do not run the generated bundle from a Windows bind mount.
-- For TypeScript-bearing app changes, run `npm run typecheck` from `mofacts/` before rebuilding the hotfix bundle.
-- After rebuilding, either tell the user the local app is ready for manual testing or continue with local browser/MCP testing when the task calls for production-shaped verification.
-- For UI work, prefer the native hotfix dev loop first. Use the bundle loop afterward when a production-shaped verification pass is needed.
-- This local hotfix loop is not release confidence and must not replace the canonical Docker Compose image build for release or deployment validation.
-
-## TypeScript Verification
-
-When TypeScript-bearing app code changes, run the full app check from `mofacts/`:
+For TypeScript-bearing app changes, the full app check is:
 
 ```bash
 npm run typecheck
 ```
 
-Do not treat per-file checks or targeted `tsc` invocations as a substitute for full-app TypeScript verification.
+Run it from `mofacts/`. Do not substitute per-file checks or targeted `tsc` invocations for full-app TypeScript verification.
 
-## Verification Strategy
+- When a required check fails, report the failing command, the relevant error summary, and whether the failure appears related to the change.
+- When a required check cannot run locally, report the reason and the next-best supported verification path.
 
-Use the verification path that matches the change, and say clearly when a check could not be run in the local environment.
+## UI, Logging, And Client Behavior
 
-- TypeScript-bearing app changes: run `npm run typecheck` from `mofacts/`.
-- Lintable TypeScript, JavaScript, or Svelte changes: run `npm run lint` from `mofacts/`.
-- TDF field registry or schema changes: run `npm run generate:schemas` from `mofacts/` and inspect generated schema diffs.
-- UI/runtime behavior changes: use the native hotfix dev server plus browser smoke testing through the MoFaCTS Playwright sidecar (`mcp__mofacts_playwright__`) against `http://host.docker.internal:3200` / host `http://localhost:3200`.
-- Meteor integration or client contract coverage: use CI or another supported Meteor test environment. Do not run `npm run test:ci` as routine local Windows verification; the script refuses local Windows execution unless `MOFACTS_ALLOW_WINDOWS_METEOR_TESTS=1` is set for deliberate harness debugging. If Meteor coverage is needed but unavailable locally, document that explicitly instead of substituting a narrower check.
-- Docker build, push, or deploy verification: run only when explicitly requested.
+- Never add raw client `console.*` for routine logging; use `mofacts/client/lib/clientLogger.ts`.
+- Preserve admin-controlled client verbosity behavior.
+- Use inline UI patterns instead of modal popups unless explicitly requested.
+- For UI work, use the native hotfix dev loop first and the MoFaCTS Playwright sidecar for browser smoke testing.
+- Do not use the hotfix dev service as release confidence, deploy confidence, or a substitute for `npm run typecheck`.
+- For UI smoke tests, report the route tested, browser-visible result, and any console/network errors observed through the sidecar.
+
+## Native Hotfix Dev Loop
+
+For fast UI/application hot fixes on Windows, use the native local hotfix dev server. This is the intended observe/edit/reload loop after startup has warmed caches.
+
+- Start the dev service from `deploy/` with `.\hotfix-dev.ps1 start -SettingsPath <local-settings-json>`.
+- On this setup, the settings path is defined by `C:\dev\mofacts_config\deploy and build.txt`: `$LocalSettingsPath = "$env:USERPROFILE\OneDrive\Desktop\settings.local.json"`.
+- Use that explicit `-SettingsPath`; do not guess a settings file under `C:\dev\MoFaCTS\deploy`.
+- The dev app runs at `http://localhost:3200` and uses local MongoDB database `MoFACT-meteor3`.
+- The dev server runs Meteor natively from the Windows checkout and uses Docker only for MongoDB.
+- Agents may run this hotfix dev server even though it starts Meteor in watch mode. This is the only automation exception to "never run `meteor run`".
+- Local dev logs and PID files belong under ignored local state in `deploy/local-dev/`.
+- If a dependency or Meteor package changes, run the required install/update step deliberately and restart the hotfix dev service.
+
+## MoFaCTS Playwright Sidecar
+
+For UI work, use the MoFaCTS sidecar Playwright MCP server from `mofacts-mcp-sidecar/`, not the bundled Browser or Chrome extension registry.
+
+- Correct MCP namespace in this environment: `mcp__mofacts_playwright__`.
+- Sidecar endpoint: `http://localhost:8931/mcp`.
+- Docker target for the native hotfix app: `http://host.docker.internal:3200`.
+- Start or restart from `mofacts-mcp-sidecar/` with `docker compose -f docker-compose.yml -f docker-compose.hotfix-dev.yml up --build`.
+- To check status, run `mofacts-mcp-sidecar\scripts\check-hotfix-sidecar.ps1`; add `-Start` or `-Restart` when appropriate.
+- When asked to check UI with MCP/Playwright, first verify/start the hotfix dev app, then verify/start the sidecar, then use the `mcp__mofacts_playwright__` tools.
+- If expected MCP tools are not exposed in the current turn, do not switch to ad hoc Playwright or raw MCP JSON-RPC. Verify the sidecar health and explicitly search for the missing tool names with `tool_search`.
+- Missing tool exposure in Codex is distinct from sidecar health. Report that distinction clearly before changing application code.
+
+## Local Hotfix Bundle Loop
+
+The local-only bundle loop under `deploy/` is for production-shaped app-code verification without creating a deployable Docker image. It is slower than the native hotfix dev loop.
+
+- Code hot fixes still require a Meteor bundle rebuild. Do not monkey-patch compiled files inside a running container.
+- Use `docker-compose.hotfix-local.yml` together with `docker-compose.yml` and `docker-compose.local.yml`.
+- On Windows, `deploy/hotfix-local.ps1` runs typecheck, compose config validation, hotfix bundle build, bundle dependency install, and app restart.
+- Generated hotfix output belongs in Docker volume `deploy_hotfix_bundle`; do not run the generated bundle from a Windows bind mount.
+- Use this loop only when production-shaped verification is needed. It is not release confidence and must not replace the canonical Docker Compose image build.
 
 ## Server Method Design
 
-The server should stay minimized; the client should do as much processor work as safely possible.
-
+- Keep the server minimized; the client should do as much processor work as safely possible.
 - Add server methods only for database access, authentication or authorization enforcement, encryption, secrets, or external API calls that cannot safely run on the client.
 - Do not add pure-compute methods to `mofacts/server/methods.ts`.
 - Minimize database round-trips. Prefer batched queries or aggregation pipelines over N+1 loops.
@@ -159,8 +168,40 @@ The server should stay minimized; the client should do as much processor work as
 
 ## Scalability-Sensitive Surfaces
 
-- Do not publish broad full TDF documents reactively. Keep listing publications field-limited and reserve full TDF content for exact-ID runtime, launch, or edit publications.
+- Do not publish broad full TDF documents reactively.
+- Keep listing publications field-limited and reserve full TDF content for exact-ID runtime, launch, or edit publications.
 - Avoid full collection scans, unbounded `find({})` publications, and full-document payloads on dashboard, admin, or learner startup paths.
 - Cache rebuilds, admin refreshes, and migration-style jobs must use supporting indexes, bounded concurrency, and progress logging when they can touch many users or history rows.
 - Prefer child-to-root or explicit reference indexes over scanning every TDF/root document to reconstruct lesson families.
-- When a broad or expensive path is intentionally retained for compatibility, document the invariant, limit the returned fields, and verify the relevant index or bound in the same change.
+- When a broad or expensive path is intentionally retained for compatibility, document the invariant, expected lifetime, limit returned fields, and verify the relevant index or bound in the same change.
+
+## Generated Files And Public Repo Hygiene
+
+- Do not commit root `outputs/`, root `tmp/`, one-off inventory JSON, working-copy notes, generated slide decks, screenshots, local analysis dumps, or ad hoc artifacts.
+- Curated examples must live under an intentional public path such as `examples/`, `docs/`, or a documented asset folder, with enough provenance for license and source review.
+- If an artifact is only useful locally, keep it ignored rather than tracked. Update `.gitignore` when a repeatable tool produces new local output.
+- If public setup, local run, admin bootstrap, test, deployment, TDF schema, or unit-extension behavior changes, update concise public docs in the same change.
+- Do not update public docs for purely internal refactors unless behavior, setup, schema, workflow, or contributor expectations change.
+- If user-facing behavior changes but docs do not need updates, say why.
+- Do not leave private/local knowledge as the only working path.
+- Do not point contributors at scaffold packages as implementation entry points when an active source root exists.
+- For unit behavior, point to `learning-components/` unless the scaffold package has become the real contract.
+- Do not generate, edit, or keep side-by-side emitted `.js` files next to `.ts` source files in `mofacts/client/`, `mofacts/server/`, or `mofacts/common/`.
+- Treat untracked `.js` twins beside `.ts` files in `mofacts/` as build spill unless proven otherwise.
+
+## Never Without Explicit Request
+
+- Do not clone, create, copy, or substitute replacement config or wiki repositories.
+- Do not create or switch branches.
+- Do not run Docker build, push, deploy, or release workflows.
+- Do not run production-affecting commands.
+- Do not add compatibility fallback paths.
+- Do not add new npm, Meteor, Docker, or system dependencies.
+- Do not modify unrelated working behavior to fix a new behavior.
+- Do not commit generated local artifacts or one-off analysis outputs.
+
+## Maintenance Rule
+
+- Treat this file as part of the codebase. When build, test, dev, deployment, documentation, architecture, or verification workflows change, update `AGENTS.md` or the appropriate public documentation in the same change.
+- Keep this file lean enough that critical instructions remain visible. Prefer root-level concise guidance over nested agent files when the rule is essential.
+- When a rule becomes long, procedural, or rare, move the detail to public docs and keep only the decision rule here.

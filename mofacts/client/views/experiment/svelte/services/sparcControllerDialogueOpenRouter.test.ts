@@ -12,29 +12,31 @@ function dialogueDisplay(): SparcTrialDisplay {
     clusterTargets: [{
       clusterIndex: 0,
       clusterKC: 'kc-a',
-      label: 'Target A',
     }, {
       clusterIndex: 1,
       clusterKC: 'kc-b',
-      label: 'Target B',
     }],
+    autoTutorTargets: {
+      expectations: [{
+        clusterKC: 'kc-a',
+        text: 'A target text',
+      }],
+      misconceptions: [{
+        id: 'mis-1',
+        text: 'The learner thinks the wrong thing.',
+      }],
+    },
     workingMemoryFacts: [{
-      factType: 'learningTarget.source',
+      factType: 'learningTarget.score',
       slots: {
         clusterKC: 'kc-a',
-        label: 'Expectation A',
-        proposition: 'A proposition',
-        assertion: 'A assertion',
+        coverage: 0.4,
       },
     }, {
-      factType: 'diagnostic.misconceptionSource',
+      factType: 'diagnostic.misconceptionScore',
       slots: {
         id: 'mis-1',
-        label: 'Misconception A',
-        description: 'The learner thinks the wrong thing.',
-        repair: 'Repair the misconception.',
-        repairQuestion: 'What should replace the wrong idea?',
-        repairCriteria: 'The learner rejects the wrong idea.',
+        confidence: 0.7,
       },
     }],
   };
@@ -53,7 +55,7 @@ const utteranceRequest: SparcUtteranceRequest = {
   },
   learnerText: 'I think A matters.',
   learnerContribution: {
-    type: 'assertion',
+    type: 'answer',
     confidence: 0.8,
   },
   pedagogicalState: {
@@ -70,8 +72,7 @@ const utteranceRequest: SparcUtteranceRequest = {
   },
   targetContent: {
     clusterKC: 'kc-a',
-    label: 'Expectation A',
-    proposition: 'A proposition',
+    text: 'A target text',
   },
   plannerState: {
     expectations: [{ clusterKC: 'kc-a', coverage: 0.6 }],
@@ -98,7 +99,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
               missingElements: ['detail'],
             }],
             learnerContribution: {
-              type: 'assertion',
+              type: 'answer',
               confidence: 0.8,
             },
             learnerQuestion: {
@@ -120,7 +121,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
       evidence: 'mentions A',
       missingElements: ['detail'],
     }]);
-    expect(score.learnerContribution?.type).to.equal('assertion');
+    expect(score.learnerContribution?.type).to.equal('answer');
     expect(score.learnerQuestion).to.equal(undefined);
     expect(calls).to.have.length(1);
     expect(calls[0]).to.have.nested.property('intent.schemaName', 'mofacts_sparc_dialogue_score');
@@ -136,14 +137,26 @@ describe('SPARC dialogue OpenRouter provider', function() {
     });
     expect(JSON.parse(userMessage.content).learningTargets[0]).to.deep.include({
       clusterKC: 'kc-a',
-      label: 'Expectation A',
+      text: 'A target text',
+      priorCoverage: 0.4,
     });
     expect(JSON.parse(userMessage.content).misconceptions[0]).to.deep.include({
       id: 'mis-1',
-      label: 'Misconception A',
-      description: 'The learner thinks the wrong thing.',
-      repairCriteria: 'The learner rejects the wrong idea.',
+      text: 'The learner thinks the wrong thing.',
+      priorConfidence: 0.7,
     });
+    expect(userMessage.content).to.not.contain('assertion');
+    expect(userMessage.content).to.not.contain('proposition');
+    expect(userMessage.content).to.not.contain('repairCriteria');
+    expect(userMessage.content).to.not.contain('dialogue.moveContent');
+    expect(calls[0]).to.have.nested.property('messages[0].content')
+      .that.contains('Do not score the latest response from scratch');
+    expect(calls[0]).to.have.nested.property('messages[0].content')
+      .that.contains('return its prior value unchanged unless the learner’s latest response refers to that target’s meaning');
+    expect(calls[0]).to.have.nested.property('messages[0].content')
+      .that.contains('Resolve learner references using the current problem statement and dialogue context');
+    expect(calls[0]).to.have.nested.property('messages[0].content')
+      .that.contains('A high misconception confidence is not a good score');
   });
 
   it('requires learner question metadata for question contributions', async function() {
@@ -212,9 +225,9 @@ describe('SPARC dialogue OpenRouter provider', function() {
         if (!userMessage) {
           throw new Error('SPARC dialogue utterance call did not include a user message');
         }
-        expect(params.messages[0]?.content).to.contain('Prompt contract: autotutor.hint v1.');
-        expect(params.messages[0]?.content).to.contain('Move-specific prompt policy:');
-        expect(params.messages[0]?.content).to.contain('Use the selected move policy to decide whether the tutorMessage should ask a follow-up question.');
+        expect(params.messages[0]?.content).to.contain('Selected move: hint.');
+        expect(params.messages[0]?.content).to.contain('Move prompt:');
+        expect(params.messages[0]?.content).to.contain('The JSON object must exactly follow this envelope shape:');
         expect(userMessage.content).to.contain('Latest student answer:');
         expect(userMessage.content).to.contain('App-selected plan. Echo targetType, targetId, and selectedMove exactly in the response.');
         expect(userMessage.content).to.contain('Registered move definition:');
