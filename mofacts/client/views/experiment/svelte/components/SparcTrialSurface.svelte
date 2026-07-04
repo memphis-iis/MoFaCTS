@@ -1,5 +1,5 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, tick } from 'svelte';
   import { resolveSparcTrialDisplay } from '../services/sparcTrialDisplay';
   import { buildSparcBoxedNodeGroups } from '../../../../../../learning-components/trial-displays/sparc/sparcBoxLayout';
   import {
@@ -23,9 +23,9 @@
   export let authoringSelectOnly = false;
 
   let activeNodeId = '';
-  let pendingDialogueClearInputIds = [];
-  let observedDialogueOperationCount = 0;
   let dialogueInputResetVersion = 0;
+  let surfaceElement;
+  let observedProgressiveNodeOperationCount = 0;
 
   function buildInitialNodeValues(nodes = [], values = {}) {
     for (const node of nodes) {
@@ -201,6 +201,18 @@
     });
   }
 
+  function clearDialogueInputs() {
+    const inputIds = dialogueInputNodes(realizedSparcDisplay?.nodes).map((inputNode) => inputNode.id);
+    if (inputIds.length === 0) {
+      return;
+    }
+    nodeValues = inputIds.reduce((values, inputNodeId) => ({
+      ...values,
+      [inputNodeId]: '',
+    }), nodeValues);
+    dialogueInputResetVersion += 1;
+  }
+
   function handleButtonActivate(node) {
     if (authoringSelectOnly) {
       handleNodeFocus(node?.id);
@@ -234,7 +246,7 @@
       timestamp: Date.now(),
     });
     if (isAutoTutorDialogueDisplay(sparcDisplay)) {
-      pendingDialogueClearInputIds = dialogueInputNodes(realizedSparcDisplay?.nodes).map((inputNode) => inputNode.id);
+      clearDialogueInputs();
     }
   }
 
@@ -269,7 +281,7 @@
       focusedNodeId: activeNodeId || undefined,
       timestamp: Date.now(),
     });
-    pendingDialogueClearInputIds = dialogueInputNodes(realizedSparcDisplay?.nodes).map((inputNode) => inputNode.id);
+    clearDialogueInputs();
     return true;
   }
 
@@ -301,8 +313,37 @@
     return Array.isArray(operations) ? operations : [];
   }
 
-  function isOptimisticProgressiveOperation(operation) {
-    return operation?.node?.optimistic === true;
+  function isVerticallyScrollable(element) {
+    if (!element) {
+      return false;
+    }
+    const style = window.getComputedStyle(element);
+    return (
+      (style.overflowY === 'auto' || style.overflowY === 'scroll')
+      && element.scrollHeight > element.clientHeight
+    );
+  }
+
+  function scrollSparcScrollableNodesToBottom() {
+    if (!surfaceElement || typeof window === 'undefined') {
+      return;
+    }
+    const candidates = [surfaceElement, ...surfaceElement.querySelectorAll('*')];
+    for (const element of candidates) {
+      if (isVerticallyScrollable(element)) {
+        element.scrollTop = element.scrollHeight;
+      }
+    }
+  }
+
+  async function scrollAfterProgressiveNodeAdditions() {
+    await tick();
+    if (typeof window === 'undefined') {
+      return;
+    }
+    window.requestAnimationFrame(() => {
+      scrollSparcScrollableNodesToBottom();
+    });
   }
 
   $: sparcDisplay = resolveSparcTrialDisplay(display, '[SparcTrialSurface]');
@@ -327,27 +368,14 @@
   $: autoTutorDialogueMessages = autoTutorDialogueMode ? dialogueNodes(topLevelNodes) : [];
   $: autoTutorDialogueInputNode = autoTutorDialogueMode ? firstNodeById(topLevelNodes, 'learner-response-input') : null;
   $: autoTutorDialogueSubmitNode = autoTutorDialogueMode ? firstNodeById(topLevelNodes, 'learner-response-submit') : null;
-  $: dialogueOperationCount = progressiveNodeOperations
-    .filter((operation) => !isOptimisticProgressiveOperation(operation))
-    .length;
-  $: if (dialogueOperationCount !== observedDialogueOperationCount) {
-    if (
-      autoTutorDialogueMode
-      && pendingDialogueClearInputIds.length > 0
-      && dialogueOperationCount > observedDialogueOperationCount
-    ) {
-      nodeValues = pendingDialogueClearInputIds.reduce((values, inputNodeId) => ({
-        ...values,
-        [inputNodeId]: '',
-      }), nodeValues);
-      dialogueInputResetVersion += 1;
-      pendingDialogueClearInputIds = [];
-    }
-    observedDialogueOperationCount = dialogueOperationCount;
+  $: progressiveNodeOperationCount = progressiveNodeOperations.length;
+  $: if (progressiveNodeOperationCount > observedProgressiveNodeOperationCount) {
+    scrollAfterProgressiveNodeAdditions();
   }
+  $: observedProgressiveNodeOperationCount = progressiveNodeOperationCount;
 </script>
 
-<div class="sparc-surface" class:sparc-auto-tutor-dialogue-surface={autoTutorDialogueMode}>
+<div bind:this={surfaceElement} class="sparc-surface" class:sparc-auto-tutor-dialogue-surface={autoTutorDialogueMode}>
   {#if showQuestionNumber}
     <div class="sparc-question-number">Question {questionNumber}</div>
   {/if}

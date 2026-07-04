@@ -58,19 +58,19 @@
   <div class="sparc-auto-tutor-meter-row">
     <div class="sparc-auto-tutor-meter-copy">
       <span>Misconceptions</span>
-      <strong>{snapshot.activeMisconceptions}/{snapshot.totalMisconceptions}</strong>
+      <strong>{formatProgressCount(snapshot.misconceptionScore)}/{snapshot.totalMisconceptions}</strong>
     </div>
     <div
       class="sparc-auto-tutor-progress-track sparc-auto-tutor-progress-track-misconceptions"
       role="meter"
-      aria-label="Active misconceptions"
+      aria-label="Misconception score"
       aria-valuemin="0"
       aria-valuemax={snapshot.totalMisconceptions}
-      aria-valuenow={snapshot.activeMisconceptions}
+      aria-valuenow={snapshot.misconceptionScore}
     >
       <div
         class="sparc-auto-tutor-progress-fill sparc-auto-tutor-progress-fill-misconceptions"
-        style={`width: ${barWidth(snapshot.activeMisconceptions, snapshot.totalMisconceptions)}%;`}
+        style={`width: ${barWidth(snapshot.misconceptionScore, snapshot.totalMisconceptions)}%;`}
       ></div>
       <div
         class="sparc-auto-tutor-progress-marker"

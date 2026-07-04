@@ -28,7 +28,7 @@ export type SparcAutoTutorProgressSnapshot = {
   readonly coveredExpectations: number;
   readonly requiredExpectations: number;
   readonly neededExpectations: number;
-  readonly activeMisconceptions: number;
+  readonly misconceptionScore: number;
   readonly totalMisconceptions: number;
   readonly maxActiveMisconceptions: number;
   readonly turnCount: number;
@@ -135,6 +135,10 @@ function expectationCredit(coverage: number, coverageThreshold: number): number 
   return coverage >= coverageThreshold ? 1 : coverage;
 }
 
+function misconceptionCredit(confidence: number, misconceptionThreshold: number): number {
+  return confidence >= misconceptionThreshold ? confidence : 0;
+}
+
 export function buildSparcAutoTutorProgressSnapshot(params: {
   readonly display: SparcTrialDisplay | null | undefined;
   readonly runtimeNodeValues?: Record<string, unknown> | null;
@@ -187,7 +191,10 @@ export function buildSparcAutoTutorProgressSnapshot(params: {
     ),
     requiredExpectations: targets.length,
     neededExpectations: policy.requiredTargetCount,
-    activeMisconceptions: misconceptions.filter((misconception) => misconception.active).length,
+    misconceptionScore: misconceptions.reduce(
+      (sum, misconception) => sum + misconceptionCredit(misconception.confidence, policy.misconceptionThreshold),
+      0,
+    ),
     totalMisconceptions: misconceptions.length,
     maxActiveMisconceptions: policy.maxActiveMisconceptions,
     turnCount: Math.max(0, Math.floor(numberSlot(completionState ?? turnState ?? {}, 'turnCount', 0))),
