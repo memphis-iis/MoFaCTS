@@ -14,6 +14,11 @@ import {
 } from './dashboardCacheShared';
 import { createDashboardLearnerConfigMethods } from './dashboardLearnerConfigMethods';
 import { createDashboardPracticeSnapshotMethods } from './dashboardPracticeSnapshotMethods';
+import {
+  createLessonFamilyResolver,
+  getLessonFamilySetspec,
+  LESSON_FAMILY_RESET_FIELDS,
+} from '../lib/tdfLessonFamilyResolver';
 
 const DASHBOARD_ADMIN_REFRESH_CONCURRENCY = 4;
 const DASHBOARD_ADMIN_REFRESH_PROGRESS_INTERVAL = 10;
@@ -211,6 +216,8 @@ export function createDashboardCacheMethods({
   canViewDashboardTdf,
   redisBoundary
 }: DashboardCacheDeps) {
+  const lessonFamilies = createLessonFamilyResolver({ tdfs: Tdfs });
+
   function addNonEmptyString(target: Set<string>, value: unknown) {
     if (typeof value !== 'string') {
       return;
@@ -219,37 +226,6 @@ export function createDashboardCacheMethods({
     if (trimmed) {
       target.add(trimmed);
     }
-  }
-
-  function uniqueNonEmptyStrings(values: unknown[]) {
-    return [...new Set(values
-      .filter((value): value is string => typeof value === 'string')
-      .map((value) => value.trim())
-      .filter((value) => value.length > 0))];
-  }
-
-  async function findRootTdfsForAttemptedTdfs(attemptedTdfs: any[]) {
-    const attemptedTdfIds = uniqueNonEmptyStrings(attemptedTdfs.map((tdf) => tdf?._id));
-    const attemptedFileNames = uniqueNonEmptyStrings(attemptedTdfs.map((tdf) => tdf?.content?.fileName));
-    const childRefCandidates = [...new Set([...attemptedTdfIds, ...attemptedFileNames])];
-
-    if (childRefCandidates.length === 0) {
-      return [];
-    }
-
-    return await Tdfs.find({
-      $or: [
-        { 'content.tdfs.tutor.setspec.condition': { $in: childRefCandidates } },
-        { 'content.tdfs.tutor.setspec.conditionTdfIds': { $in: attemptedTdfIds } }
-      ]
-    }, {
-      fields: {
-        _id: 1,
-        'content.tdfs.tutor.setspec.lessonname': 1,
-        'content.tdfs.tutor.setspec.condition': 1,
-        'content.tdfs.tutor.setspec.conditionTdfIds': 1
-      }
-    }).fetchAsync();
   }
 
   async function mapWithBoundedConcurrency<T>(
@@ -293,82 +269,34 @@ export function createDashboardCacheMethods({
       }
     }
 
-    const target = await Tdfs.findOneAsync(
-      { _id: tdfId },
-      {
-        fields: {
-          _id: 1,
-          'content.fileName': 1,
-          'content.tdfs.tutor.setspec.stimulusfile': 1,
-          'content.tdfs.tutor.setspec.condition': 1,
-          'content.tdfs.tutor.setspec.conditionTdfIds': 1
-        }
-      }
-    );
-    if (!target) {
+    const family = await lessonFamilies.resolveLessonFamilyForTdf(tdfId, LESSON_FAMILY_RESET_FIELDS);
+    if (!family) {
       throw new Meteor.Error('not-found', 'TDF not found');
     }
 
     const tdfIds = new Set<string>();
     const tdfKeys = new Set<string>();
     const cacheTdfIds = new Set<string>();
-    addTdfDocumentToResetScope(target, { cache: true });
 
-    const targetFileName = String(target.content?.fileName || '').trim();
-    const parentRoots = await Tdfs.find({
-      $or: [
-        { 'content.tdfs.tutor.setspec.condition': tdfId },
-        ...(targetFileName ? [{ 'content.tdfs.tutor.setspec.condition': targetFileName }] : []),
-        { 'content.tdfs.tutor.setspec.conditionTdfIds': tdfId }
-      ]
-    }, {
-      fields: {
-        _id: 1,
-        'content.fileName': 1,
-        'content.tdfs.tutor.setspec.stimulusfile': 1,
-        'content.tdfs.tutor.setspec.condition': 1,
-        'content.tdfs.tutor.setspec.conditionTdfIds': 1
-      }
-    }).fetchAsync();
-
-    const roots = [target, ...parentRoots];
-    const childRefs = new Set<string>();
-    for (const root of roots) {
+    for (const root of family.roots) {
       addTdfDocumentToResetScope(root, { cache: true });
 
-      const setspec = root.content?.tdfs?.tutor?.setspec || {};
+      const setspec = getLessonFamilySetspec(root);
       if (Array.isArray(setspec.condition)) {
         for (const conditionRef of setspec.condition) {
-          addNonEmptyString(childRefs, conditionRef);
           addNonEmptyString(tdfKeys, conditionRef);
         }
       }
       if (Array.isArray(setspec.conditionTdfIds)) {
         for (const conditionTdfId of setspec.conditionTdfIds) {
-          addNonEmptyString(childRefs, conditionTdfId);
           addNonEmptyString(tdfIds, conditionTdfId);
           addNonEmptyString(tdfKeys, conditionTdfId);
         }
       }
     }
 
-    if (childRefs.size > 0) {
-      const children = await Tdfs.find({
-        $or: [
-          { _id: { $in: Array.from(childRefs) } },
-          { 'content.fileName': { $in: Array.from(childRefs) } }
-        ]
-      }, {
-        fields: {
-          _id: 1,
-          'content.fileName': 1,
-          'content.tdfs.tutor.setspec.stimulusfile': 1
-        }
-      }).fetchAsync();
-
-      for (const child of children) {
-        addTdfDocumentToResetScope(child, { cache: false });
-      }
+    for (const child of family.children) {
+      addTdfDocumentToResetScope(child, { cache: false });
     }
 
     return {
@@ -564,38 +492,17 @@ export function createDashboardCacheMethods({
         }
       }).fetchAsync();
 
-      const attemptedTdfIdsByFileName = new Map<string, string>();
-      for (const tdf of attemptedTdfs as any[]) {
-        const fileName = tdf.content?.fileName;
-        if (fileName) {
-          attemptedTdfIdsByFileName.set(fileName, tdf._id);
-        }
-      }
+      const rootTdfs = await lessonFamilies.findRootsForChildTdfs(attemptedTdfs as any[], {
+        _id: 1,
+        'content.tdfs.tutor.setspec.lessonname': 1,
+        'content.tdfs.tutor.setspec.condition': 1,
+        'content.tdfs.tutor.setspec.conditionTdfIds': 1
+      });
 
-      const rootTdfs = await findRootTdfsForAttemptedTdfs(attemptedTdfs as any[]);
-
-      const childToRootMap = new Map<string, string>();
+      const childToRootMap = lessonFamilies.buildChildToRootMap(rootTdfs as any[], attemptedTdfs as any[]);
       const rootTdfMap: Map<any, any> = new Map();
       for (const rootTdf of rootTdfs as any[]) {
         rootTdfMap.set(rootTdf._id, rootTdf);
-        const conditions: string[] = rootTdf.content?.tdfs?.tutor?.setspec?.condition || [];
-        for (const childRef of conditions) {
-          if (!childRef) {
-            continue;
-          }
-          childToRootMap.set(childRef, rootTdf._id);
-          const childTdfId = attemptedTdfIdsByFileName.get(childRef);
-          if (childTdfId) {
-            childToRootMap.set(childTdfId, rootTdf._id);
-          }
-        }
-        const conditionTdfIds: string[] = rootTdf.content?.tdfs?.tutor?.setspec?.conditionTdfIds || [];
-        for (const conditionTdfId of conditionTdfIds) {
-          if (!conditionTdfId) {
-            continue;
-          }
-          childToRootMap.set(conditionTdfId, rootTdf._id);
-        }
       }
 
       const allHistory: DashboardHistoryRecord[] = await Histories.find({

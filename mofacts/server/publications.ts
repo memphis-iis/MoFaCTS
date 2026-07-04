@@ -10,6 +10,7 @@ import {
     normalizeIdList,
     normalizeOptionalStringId,
 } from './lib/tdfPublicationAccess';
+import { createLessonFamilyResolver } from './lib/tdfLessonFamilyResolver';
 import { DynamicSettings } from '../common/Collections';
 import { themeRegistry } from './lib/themeRegistry';
 
@@ -348,62 +349,10 @@ async function publishRuntimeTdfsByIds(publication: any, tdfIdOrIds: any) {
         return publication.ready();
     }
 
-    const assignedRootIds = new Set(await resolveAssignedRootTdfIdsForUser(publication.userId as string));
-    const assignedConditionIdsPromise = (async () => {
-        const assignedConditionIds = new Set<string>();
-        if (assignedRootIds.size === 0) {
-            return assignedConditionIds;
-        }
-        const rootTdfs = await Tdfs.find(
-            { _id: { $in: Array.from(assignedRootIds) } },
-            {
-                fields: {
-                    _id: 1,
-                    'content.tdfs.tutor.setspec.condition': 1,
-                    'content.tdfs.tutor.setspec.conditionTdfIds': 1
-                }
-            }
-        ).fetchAsync();
-        const conditionFileNames = new Set<string>();
-        for (const rootTdf of rootTdfs) {
-            const setspec = rootTdf?.content?.tdfs?.tutor?.setspec || {};
-            const conditionTdfIds = Array.isArray(setspec.conditionTdfIds) ? setspec.conditionTdfIds : [];
-            for (const conditionTdfId of conditionTdfIds) {
-                const normalized = normalizeOptionalStringId(conditionTdfId);
-                if (normalized) {
-                    assignedConditionIds.add(normalized);
-                }
-            }
-
-            const conditions = Array.isArray(setspec.condition) ? setspec.condition : [];
-            for (const condition of conditions) {
-                const normalized = normalizeOptionalStringId(condition);
-                if (normalized) {
-                    conditionFileNames.add(normalized);
-                }
-            }
-        }
-
-        if (conditionFileNames.size === 0) {
-            return assignedConditionIds;
-        }
-        const conditionTdfs = await Tdfs.find(
-            {
-                $or: [
-                    { _id: { $in: Array.from(conditionFileNames) } },
-                    { 'content.fileName': { $in: Array.from(conditionFileNames) } }
-                ]
-            },
-            { fields: { _id: 1 } }
-        ).fetchAsync();
-        for (const tdf of conditionTdfs) {
-            const normalized = normalizeOptionalStringId(tdf?._id);
-            if (normalized) {
-                assignedConditionIds.add(normalized);
-            }
-        }
-        return assignedConditionIds;
-    })();
+    const assignedRootIds = new Set<string>(await resolveAssignedRootTdfIdsForUser(publication.userId as string));
+    const assignedConditionIdsPromise = lessonFamilyResolver
+        .resolveConditionChildIdsForRootIds(Array.from(assignedRootIds))
+        .then((ids: string[]) => new Set(ids));
     const requestedTdfRequiresCourseContext = async (requestedId: string) => {
         if (assignedRootIds.has(requestedId)) {
             return true;
@@ -610,6 +559,7 @@ const tdfPublicationAccess = createTdfPublicationAccessResolver({
     roles: Roles,
     resolveAssignedRootTdfIdsForUser
 });
+const lessonFamilyResolver = createLessonFamilyResolver({ tdfs: Tdfs as any });
 
 Meteor.publish('allTdfsListing', async function() {
     // Security: Filter TDFs based on user role and access permissions
@@ -783,30 +733,15 @@ Meteor.publish('tdfByExperimentTarget', async function(experimentTarget: any, ex
     // Students: resolve canonical root+condition ids and verify participant access to target.
     const rootTdf = await Tdfs.findOneAsync(
         targetQuery,
-        { fields: { _id: 1, 'content.tdfs.tutor.setspec.condition': 1 } }
+        { fields: { _id: 1, 'content.tdfs.tutor.setspec.condition': 1, 'content.tdfs.tutor.setspec.conditionTdfIds': 1 } }
     );
     if (!rootTdf?._id) {
         return this.ready();
     }
 
-    const conditionRefs = Array.isArray(rootTdf?.content?.tdfs?.tutor?.setspec?.condition)
-        ? rootTdf.content.tdfs.tutor.setspec.condition
-        : [];
-    const normalizedConditionRefs = normalizeIdList(conditionRefs);
-    const conditionDocs = normalizedConditionRefs.length > 0
-        ? await Tdfs.find(
-            {
-                $or: [
-                    { _id: { $in: normalizedConditionRefs } },
-                    { 'content.fileName': { $in: normalizedConditionRefs } }
-                ]
-            },
-            { fields: { _id: 1 } }
-        ).fetchAsync()
-        : [];
     const allowedIds = Array.from(new Set<string>([
         String(rootTdf._id),
-        ...conditionDocs.map((doc: any) => String(doc._id)),
+        ...await lessonFamilyResolver.resolveConditionChildIdsForRoots([rootTdf]),
     ]));
 
     const user = await (Meteor.users as any).findOneAsync(

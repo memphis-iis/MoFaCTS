@@ -1,3 +1,9 @@
+import {
+    buildConditionChildSelector,
+    buildConditionVisibilityTerms,
+    createLessonFamilyResolver,
+} from './tdfLessonFamilyResolver';
+
 export type PublicationSelector = Record<string, any>;
 
 type AsyncCursor<T> = {
@@ -115,13 +121,12 @@ async function conditionStimSetIdsForRefs(
     if (conditionRefs.length === 0) {
         return [];
     }
+    const selector = buildConditionChildSelector(conditionRefs);
+    if (!selector) {
+        return [];
+    }
     return (await tdfs.find(
-        {
-            $or: [
-                { _id: { $in: conditionRefs } },
-                { 'content.fileName': { $in: conditionRefs } }
-            ]
-        },
+        selector,
         { fields: { stimuliSetId: 1 } }
     ).fetchAsync()).map((tdf: any) => tdf.stimuliSetId);
 }
@@ -134,6 +139,7 @@ export function createTdfPublicationAccessResolver(
     const maxCacheEntries = options.maxCacheEntries ?? 200;
     const now = options.now ?? (() => Date.now());
     const cache = new Map<string, CacheEntry<any>>();
+    const lessonFamilies = createLessonFamilyResolver({ tdfs: deps.tdfs });
 
     function pruneCache() {
         const current = now();
@@ -226,32 +232,7 @@ export function createTdfPublicationAccessResolver(
             }
         ).fetchAsync();
 
-        const conditionFileNames = new Set<string>();
-        const conditionTdfIds = new Set<string>();
-        for (const root of accessibleRoots) {
-            const setspec = root?.content?.tdfs?.tutor?.setspec || {};
-            const conditions = Array.isArray(setspec.condition) ? setspec.condition : [];
-            const resolvedIds = Array.isArray(setspec.conditionTdfIds) ? setspec.conditionTdfIds : [];
-            for (const condition of conditions) {
-                const normalized = normalizeOptionalStringId(condition);
-                if (normalized) {
-                    conditionFileNames.add(normalized);
-                }
-            }
-            for (const conditionTdfId of resolvedIds) {
-                const normalized = normalizeOptionalStringId(conditionTdfId);
-                if (normalized) {
-                    conditionTdfIds.add(normalized);
-                }
-            }
-        }
-
-        if (conditionFileNames.size > 0) {
-            visibilityTerms.push({ 'content.fileName': { $in: Array.from(conditionFileNames) } });
-        }
-        if (conditionTdfIds.size > 0) {
-            visibilityTerms.push({ _id: { $in: Array.from(conditionTdfIds) } });
-        }
+        visibilityTerms.push(...buildConditionVisibilityTerms(accessibleRoots));
 
         return { $or: visibilityTerms };
     }
@@ -296,23 +277,11 @@ export function createTdfPublicationAccessResolver(
             }
         ).fetchAsync();
 
-        const conditionRefs = new Set<string>();
-        for (const tdf of accessibleTdfs) {
-            const refs = tdf?.content?.tdfs?.tutor?.setspec?.condition;
-            if (Array.isArray(refs)) {
-                for (const ref of refs) {
-                    const normalized = normalizeOptionalStringId(ref);
-                    if (normalized) {
-                        conditionRefs.add(normalized);
-                    }
-                }
-            }
-        }
-
-        const conditionStimSetIds = await conditionStimSetIdsForRefs(
-            deps.tdfs,
-            Array.from(conditionRefs)
+        const conditionTdfs = await lessonFamilies.findConditionChildrenForRoots(
+            accessibleTdfs,
+            { stimuliSetId: 1 }
         );
+        const conditionStimSetIds = conditionTdfs.map((tdf: any) => tdf.stimuliSetId);
         const participantExperimentTarget = experimentTargetFromUser(user);
 
         let participantExperimentStimSetIds: any[] = [];

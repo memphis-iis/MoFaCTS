@@ -15,6 +15,7 @@ import { createAnalyticsConditionCountMethods } from './analyticsConditionCountM
 import { createAnalyticsDownloadMethods } from './analyticsDownloadMethods';
 import type { LearningHistoryReadOptions } from '../../../learning-components/units/UnitEngineServerMethods';
 import { curSemester } from '../../common/Definitions';
+import { collectLessonFamilyRefs, createLessonFamilyResolver } from '../lib/tdfLessonFamilyResolver';
 
 type UnknownRecord = Record<string, unknown>;
 type Logger = (...args: unknown[]) => void;
@@ -114,6 +115,8 @@ function buildLearningHistoryScopeMatch(
 }
 
 export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
+  const lessonFamilies = createLessonFamilyResolver({ tdfs: deps.Tdfs });
+
   async function validateCourseEnrollmentForUser(userId: string, courseId: string) {
     const activeCourses = await deps.Courses.find(
       { _id: courseId, semester: curSemester },
@@ -161,30 +164,11 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
         },
       }
     );
-    const rootSetspec = rootTdf?.content?.tdfs?.tutor?.setspec || {};
-    const resolvedConditionTdfIds = await deps.resolveConditionTdfIds(rootSetspec);
-    if (resolvedConditionTdfIds.some((id: unknown) => deps.normalizeCanonicalId(id) === historyTdfId)) {
-      return true;
+    if (!rootTdf) {
+      return false;
     }
-
-    const conditionTdfIds = Array.isArray(rootSetspec.conditionTdfIds) ? rootSetspec.conditionTdfIds : [];
-    if (conditionTdfIds.some((id: unknown) => deps.normalizeCanonicalId(id) === historyTdfId)) {
-      return true;
-    }
-
-    const conditionRefs = Array.isArray(rootSetspec.condition) ? rootSetspec.condition : [];
-    if (conditionRefs.some((ref: unknown) => deps.normalizeCanonicalId(ref) === historyTdfId)) {
-      return true;
-    }
-
-    const historyTdf = await deps.Tdfs.findOneAsync(
-      { _id: historyTdfId },
-      { fields: { _id: 1, 'content.fileName': 1 } }
-    );
-    const historyFileName = deps.normalizeOptionalString(historyTdf?.content?.fileName);
-    return Boolean(historyFileName && conditionRefs.some((ref: unknown) =>
-      deps.normalizeOptionalString(ref) === historyFileName
-    ));
+    const conditionChildIds = await lessonFamilies.resolveConditionChildIdsForRoots([rootTdf]);
+    return conditionChildIds.includes(historyTdfId);
   }
 
   async function validateCourseAssignmentHistoryContext(historyRecord: UnknownRecord, tdfId: string, userId: string) {
@@ -347,34 +331,23 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     }
 
     if (conditionTdfId) {
-      const conditionRefs = Array.isArray((rootTdf as any)?.content?.tdfs?.tutor?.setspec?.condition)
-        ? (rootTdf as any).content.tdfs.tutor.setspec.condition
-        : [];
-      const normalizedConditionRefs = conditionRefs
-        .map((ref: unknown) => deps.normalizeCanonicalId(ref))
-        .filter((ref: string | null): ref is string => typeof ref === 'string');
-      const normalizedResolvedConditionIds = Array.isArray((rootTdf as any)?.content?.tdfs?.tutor?.setspec?.conditionTdfIds)
-        ? (rootTdf as any).content.tdfs.tutor.setspec.conditionTdfIds
-          .map((ref: unknown) => deps.normalizeCanonicalId(ref))
-          .filter((ref: string | null): ref is string => typeof ref === 'string')
-        : [];
       const conditionDoc = await deps.Tdfs.findOneAsync(
         { _id: conditionTdfId },
         { fields: { _id: 1, 'content.fileName': 1 } }
       );
-      const isAllowedCondition = !!conditionDoc && (
-        normalizedConditionRefs.includes(conditionTdfId) ||
-        normalizedConditionRefs.includes(deps.normalizeCanonicalId((conditionDoc as any)?.content?.fileName)) ||
-        normalizedResolvedConditionIds.includes(conditionTdfId)
-      );
+      const conditionChildToRootMap = conditionDoc
+        ? lessonFamilies.buildChildToRootMap([rootTdf], [conditionDoc])
+        : new Map<string, string>();
+      const isAllowedCondition = conditionChildToRootMap.get(conditionTdfId) === normalizedRootTdfId;
       if (!isAllowedCondition) {
+        const conditionRefs = collectLessonFamilyRefs([rootTdf]);
         deps.serverConsole('validateExperimentStateMutation DENY condition', {
           where,
           userId: normalizedActorUserId,
           rootTdfId: normalizedRootTdfId,
           conditionTdfId,
-          normalizedConditionRefs,
-          normalizedResolvedConditionIds,
+          normalizedConditionRefs: conditionRefs.conditionFileNames,
+          normalizedResolvedConditionIds: conditionRefs.conditionTdfIds,
           conditionFileName: deps.normalizeCanonicalId((conditionDoc as any)?.content?.fileName),
         });
         throw new Meteor.Error(403, 'conditionTdfId is not valid for current root TDF');
