@@ -8,6 +8,7 @@ type ProcessLike = {
 
 type MongoDriverErrorLike = {
   address?: unknown;
+  beforeHandshake?: unknown;
   cause?: unknown;
   errorLabelSet?: unknown;
   message?: unknown;
@@ -37,15 +38,36 @@ function asErrorLike(value: unknown): MongoDriverErrorLike {
     : {};
 }
 
+function isMongoConnectionTimeoutMessage(message: string): boolean {
+  return /connection (?:<monitor>|\d+) to .+:\d+ timed out/.test(message);
+}
+
+function isMongoNetworkTimeoutCause(value: unknown): boolean {
+  const error = asErrorLike(value);
+  const message = String(error.message || '');
+  return error.name === 'MongoNetworkTimeoutError' ||
+    hasMongoErrorLabel(error, 'ResetPool') ||
+    hasMongoErrorLabel(error, 'InterruptInUseConnections') ||
+    (error.beforeHandshake === true && isMongoConnectionTimeoutMessage(message));
+}
+
 export function isMongoPoolMonitorInterruption(value: unknown): boolean {
   const error = asErrorLike(value);
   const message = String(error.message || '');
 
   if (error.name === 'MongoPoolClearedError') {
-    return message.includes('Connection pool for ') &&
+    if (!(message.includes('Connection pool for ') &&
       message.includes('was cleared because another operation failed with') &&
-      message.includes('connection <monitor>') &&
-      message.includes('timed out');
+      isMongoConnectionTimeoutMessage(message))) {
+      return false;
+    }
+
+    const cause = asErrorLike(error.cause);
+    return !error.cause || isMongoNetworkTimeoutCause(cause);
+  }
+
+  if (error.name === 'MongoNetworkTimeoutError') {
+    return isMongoNetworkTimeoutCause(error) && isMongoConnectionTimeoutMessage(message);
   }
 
   if (error.name === 'PoolClearedOnNetworkError') {
@@ -53,10 +75,7 @@ export function isMongoPoolMonitorInterruption(value: unknown): boolean {
       return false;
     }
 
-    const cause = asErrorLike(error.cause);
-    return cause.name === 'MongoNetworkTimeoutError' ||
-      hasMongoErrorLabel(cause, 'ResetPool') ||
-      hasMongoErrorLabel(cause, 'InterruptInUseConnections');
+    return isMongoNetworkTimeoutCause(error.cause);
   }
 
   return false;

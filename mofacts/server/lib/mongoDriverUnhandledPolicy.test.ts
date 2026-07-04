@@ -59,6 +59,39 @@ function wrappedPoolClearedError() {
   return error;
 }
 
+function numberedConnectionPoolClearedError() {
+  const cause = new Error('connection 31 to 127.0.0.1:27017 timed out') as Error & {
+    beforeHandshake: boolean;
+    errorLabelSet: Set<string>;
+  };
+  cause.name = 'MongoNetworkTimeoutError';
+  cause.beforeHandshake = true;
+  cause.errorLabelSet = new Set(['HandshakeError', 'ResetPool']);
+  const error = new Error(
+    'Connection pool for 127.0.0.1:27017 was cleared because another operation failed with: "connection 31 to 127.0.0.1:27017 timed out"',
+  ) as Error & {
+    address: string;
+    cause: Error;
+    errorLabelSet: Set<string>;
+  };
+  error.name = 'MongoPoolClearedError';
+  error.address = '127.0.0.1:27017';
+  error.cause = cause;
+  error.errorLabelSet = new Set(['PoolRequstedRetry']);
+  return error;
+}
+
+function directNumberedConnectionTimeoutError() {
+  const error = new Error('connection 31 to 127.0.0.1:27017 timed out') as Error & {
+    beforeHandshake: boolean;
+    errorLabelSet: Set<string>;
+  };
+  error.name = 'MongoNetworkTimeoutError';
+  error.beforeHandshake = true;
+  error.errorLabelSet = new Set(['HandshakeError', 'ResetPool']);
+  return error;
+}
+
 describe('mongo driver unhandled policy', function() {
   it('recognizes the Mongo pool monitor timeout shape from the driver', function() {
     const error = poolMonitorTimeoutError();
@@ -75,6 +108,11 @@ describe('mongo driver unhandled policy', function() {
 
   it('recognizes the wrapped pool-cleared timeout shape emitted by Meteor Mongo', function() {
     expect(isMongoPoolMonitorInterruption(wrappedPoolClearedError())).to.equal(true);
+  });
+
+  it('recognizes numbered connection timeout shapes emitted by Meteor Mongo startup', function() {
+    expect(isMongoPoolMonitorInterruption(numberedConnectionPoolClearedError())).to.equal(true);
+    expect(isMongoPoolMonitorInterruption(directNumberedConnectionTimeoutError())).to.equal(true);
   });
 
   it('does not classify unrelated Mongo or application errors as recoverable', function() {
