@@ -17,6 +17,7 @@ import {
   type ThemeLibraryEntry,
 } from '../../lib/userThemeSelection';
 import { findProfileAvatarIcon, normalizeProfileAvatarType } from '../../../common/profileAvatar';
+import { hydrateHomePracticeStateFromDashboardCache } from './homePracticeState';
 import './home.html';
 import './home.css';
 
@@ -858,10 +859,7 @@ function startMainMenuTour(templateInstance: any, options: { manual?: boolean } 
 
 async function hydrateHomePracticeState(): Promise<void> {
   try {
-    const result = await Meteor.callAsync('initializeDashboardCache', null);
-    const practicedSystemCount = Number(result?.tdfCount || 0);
-    const hasPracticeRecords = practicedSystemCount > 0;
-    Session.set('homeHasPracticeRecords', hasPracticeRecords);
+    await hydrateHomePracticeStateFromDashboardCache(Meteor, Session);
   } catch (error: unknown) {
     clientConsole(1, '[HOME] Failed to hydrate practice state for welcome/tour:', error);
   }

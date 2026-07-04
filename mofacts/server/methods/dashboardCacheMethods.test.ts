@@ -833,6 +833,142 @@ describe('dashboardCacheMethods', function() {
     expect(cacheDoc.learnerTdfConfigs.tdfA.overrides.setspec.audioPromptMode).to.equal('feedback');
   });
 
+  it('ensureDashboardCacheCurrent does not rebuild when the cache is current', async function() {
+    const userId = 'learner-1';
+    const cacheDoc: any = {
+      userId,
+      version: 3,
+      tdfStats: {
+        tdfA: {},
+        tdfB: {}
+      },
+      lastUpdated: new Date('2026-05-01T00:01:00.000Z')
+    };
+    const lockKeys: string[] = [];
+
+    const methods = createDashboardCacheMethods({
+      Meteor: {
+        Error: class MeteorError extends Error {
+          error: string;
+          constructor(error: string, reason?: string) {
+            super(reason || error);
+            this.error = error;
+          }
+        }
+      },
+      Roles: { userIsInRoleAsync: async () => false },
+      Histories: {
+        findOneAsync: async () => ({
+          recordedServerTime: new Date('2026-05-01T00:00:00.000Z')
+        }),
+        find: () => ({
+          fetchAsync: async () => {
+            throw new Error('current cache should not fetch history for rebuild');
+          }
+        }),
+        rawCollection: () => ({
+          distinct: async () => {
+            throw new Error('current cache should not scan attempted TDFs for rebuild');
+          }
+        })
+      },
+      Tdfs: {
+        findOneAsync: async () => null,
+        find: () => ({ fetchAsync: async () => [] })
+      },
+      UserDashboardCache: {
+        findOneAsync: async () => cacheDoc,
+        upsertAsync: async () => {
+          throw new Error('current cache should not be rewritten');
+        }
+      },
+      usersCollection: { findOneAsync: async () => ({ _id: userId }) },
+      DynamicSettings: { findOneAsync: async () => null },
+      serverConsole: () => undefined,
+      computePracticeTimeMs: (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0),
+      canViewDashboardTdf: () => true,
+      redisBoundary: {
+        enabled: true,
+        async withLock<T>(key: string, _ttlMs: number, work: () => Promise<T>) {
+          lockKeys.push(key);
+          return await work();
+        }
+      }
+    });
+
+    const result = await methods.ensureDashboardCacheCurrent.call({ userId });
+
+    expect(result).to.deep.equal({
+      success: true,
+      action: 'current',
+      tdfCount: 2
+    });
+    expect(lockKeys).to.deep.equal(['dashboard-cache:ensure:learner-1']);
+  });
+
+  it('ensureDashboardCacheCurrent rebuilds when the cache is missing', async function() {
+    const userId = 'learner-1';
+    let cacheDoc: any = null;
+    const lockKeys: string[] = [];
+
+    const methods = createDashboardCacheMethods({
+      Meteor: {
+        Error: class MeteorError extends Error {
+          error: string;
+          constructor(error: string, reason?: string) {
+            super(reason || error);
+            this.error = error;
+          }
+        }
+      },
+      Roles: { userIsInRoleAsync: async () => false },
+      Histories: {
+        findOneAsync: async () => null,
+        find: () => ({ fetchAsync: async () => [] }),
+        rawCollection: () => ({ distinct: async () => [] })
+      },
+      Tdfs: {
+        findOneAsync: async () => null,
+        find: () => ({ fetchAsync: async () => [] })
+      },
+      UserDashboardCache: {
+        findOneAsync: async () => cacheDoc,
+        upsertAsync: async (_selector: any, modifier: any) => {
+          cacheDoc = {
+            ...(modifier.$set || {})
+          };
+        }
+      },
+      usersCollection: { findOneAsync: async () => ({ _id: userId }) },
+      DynamicSettings: { findOneAsync: async () => null },
+      serverConsole: () => undefined,
+      computePracticeTimeMs: (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0),
+      canViewDashboardTdf: () => true,
+      redisBoundary: {
+        enabled: true,
+        async withLock<T>(key: string, _ttlMs: number, work: () => Promise<T>) {
+          lockKeys.push(key);
+          return await work();
+        }
+      }
+    });
+
+    const result = await methods.ensureDashboardCacheCurrent.call({ userId });
+
+    expect(result).to.deep.include({
+      success: true,
+      action: 'refreshed',
+      reason: 'missing',
+      tdfCount: 0
+    });
+    expect(lockKeys).to.deep.equal([
+      'dashboard-cache:ensure:learner-1',
+      'dashboard-cache:initialize:learner-1'
+    ]);
+    expect(cacheDoc.tdfStats).to.deep.equal({});
+    expect(cacheDoc.summary.totalTdfsAttempted).to.equal(0);
+  });
+
   it('ensureDashboardCacheCurrent rebuilds a current-version cache when newer history exists', async function() {
     const userId = 'learner-1';
     let cacheDoc: any = {
