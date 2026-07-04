@@ -315,9 +315,14 @@ function Wait-ForMongo {
 
         $command = @($DockerComposeBinary) + $ComposeArgs + @("exec", "-T", "mongodb", "mongosh", "--quiet", "--username", $Username, "--password", $Password, "--authenticationDatabase", $AuthDb, "--eval", $Evaluate)
         $commandArgs = $command[1..($command.Length - 1)]
-        $result = & $command[0] @commandArgs 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            return $false
+        Push-Location $deployDir
+        try {
+            $result = & $command[0] @commandArgs 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                return $false
+            }
+        } finally {
+            Pop-Location
         }
 
         return (([string]$result).Trim() -eq "1")

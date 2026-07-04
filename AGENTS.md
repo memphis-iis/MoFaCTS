@@ -9,8 +9,8 @@ This file is intentionally root-level and self-contained. Do not rely on nested 
 - For runtime behavior, UI rendering, themes, transitions, Svelte components, state machines, or application logic, work in this repository and prefer `mofacts/`.
 - For TDF/config content or sync scripts, use `C:\dev\mofacts_config`; inspect this repository only for compatibility checks.
 - For product and developer documentation too long for public repo docs, use `C:\dev\MoFaCTS.wiki`.
-- `MOFACTS_CONFIG_REPO`, when present, must resolve to `C:\dev\mofacts_config`. If it is missing, verify and use `C:\dev\mofacts_config`. If it points elsewhere, stop and report the mismatch.
-- `MOFACTS_WIKI_REPO`, when present, must resolve to `C:\dev\MoFaCTS.wiki`. If it is missing, verify and use `C:\dev\MoFaCTS.wiki`. If it points elsewhere, stop and report the mismatch.
+- `MOFACTS_CONFIG_REPO`, when present, must resolve to `C:\dev\mofacts_config`. If it points elsewhere, stop and report the mismatch. If it is missing, verify `C:\dev\mofacts_config` exists, use that path, and do not report missingness as a problem.
+- `MOFACTS_WIKI_REPO`, when present, must resolve to `C:\dev\MoFaCTS.wiki`. If it points elsewhere, stop and report the mismatch. If it is missing, verify `C:\dev\MoFaCTS.wiki` exists, use that path, and do not report missingness as a problem.
 - Treat the config/content repo and wiki repo as critical MoFaCTS project components. Do not clone, create, copy, or substitute replacements unless explicitly instructed.
 - If user-facing behavior changes in `mofacts/`, check whether the wiki needs an update.
 - If code changes alter required TDF fields, config names, structures, schemas, payloads, interfaces, or field names, verify compatibility with dependent repositories.
