@@ -2,6 +2,13 @@
     <div class="container admin-page">
         <h3 class="page-header-title">Download Data</h3>
 
+    {{#if downloadMessage}}
+    <div class="admin-status admin-status-{{downloadMessage.level}} admin-message" role="status" aria-live="polite">
+        <i class="fa {{downloadMessage.icon}}" aria-hidden="true"></i>
+        <div class="admin-status-text">{{downloadMessage.text}}</div>
+    </div>
+    {{/if}}
+
     <div class="admin-section">
         <div class="card admin-card">
             <div class="card-body">

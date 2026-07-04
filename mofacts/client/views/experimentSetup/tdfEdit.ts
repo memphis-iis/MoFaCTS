@@ -26,6 +26,19 @@ import { installSchemaApplicabilityControls, sortPropertiesModal } from '../../l
 let cachedSchema: any = null;
 const SAVE_SUCCESS_REDIRECT_DELAY_MS = 1000;
 
+function setEditorMessage(instance: any, type: string, title: string, text: string) {
+    instance.editorMessage.set({
+        type,
+        title,
+        text,
+        icon: type === 'success' ? 'fa-check-circle' : type === 'warning' ? 'fa-exclamation-triangle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'
+    });
+}
+
+function clearEditorMessage(instance: any) {
+    instance.editorMessage.set(null);
+}
+
 function showSaveFeedbackAndRedirect(instance: any, message: string) {
     if (instance._saveRedirectTimer) {
         Meteor.clearTimeout(instance._saveRedirectTimer);
@@ -51,6 +64,7 @@ Template.tdfEdit.onCreated(function(this: any) {
     instance.saving = new ReactiveVar(false);
     instance.schemaLoaded = new ReactiveVar(false);
     instance.saveFeedback = new ReactiveVar('');
+    instance.editorMessage = new ReactiveVar(null);
     instance.tooltipMode = new ReactiveVar(getTooltipMode());
     instance.editor = null;
     instance.originalTdf = null;
@@ -172,6 +186,10 @@ Template.tdfEdit.helpers({
         return (Template.instance() as any).saveFeedback.get();
     },
 
+    editorMessage() {
+        return (Template.instance() as any).editorMessage.get();
+    },
+
     saveDisabled() {
         return (Template.instance() as any).hasChanges.get() ? null : 'disabled';
     },
@@ -216,8 +234,8 @@ Template.tdfEdit.events({
         // Run json-editor schema validation
         const schemaErrors = instance.editor.validate();
         if (schemaErrors.length > 0) {
-            const errorMessages = schemaErrors.map((e: any) => `${e.path}: ${e.message}`).join('\n');
-            alert('Schema validation errors:\n' + errorMessages);
+            const errorMessages = schemaErrors.map((e: any) => `${e.path}: ${e.message}`).join('; ');
+            setEditorMessage(instance, 'error', 'Schema validation errors', errorMessages);
             return;
         }
 
@@ -230,11 +248,12 @@ Template.tdfEdit.events({
                 if (summaryEl) {
                     summaryEl.scrollIntoView({ behavior: 'smooth' });
                 }
-                alert('Please fix the validation errors before saving.');
+                setEditorMessage(instance, 'warning', 'Validation errors need attention', 'Please fix the validation errors before saving.');
                 return;
             }
         }
 
+        clearEditorMessage(instance);
         instance.saving.set(true);
 
         try {
@@ -269,7 +288,7 @@ Template.tdfEdit.events({
 
         } catch (error: any) {
             clientConsole(1, '[TDF Edit] Error saving TDF:', error);
-            alert('Error saving TDF: ' + (error.reason || error.message));
+            setEditorMessage(instance, 'error', 'Error saving TDF', error.reason || error.message);
         } finally {
             instance.saving.set(false);
         }
@@ -295,7 +314,7 @@ async function loadSchema(instance: any) {
         instance.schemaLoaded.set(true);
     } catch (error: any) {
         clientConsole(1, '[TDF Edit] Error loading TDF schema:', error);
-        alert('Error loading TDF schema. Please refresh the page.');
+        setEditorMessage(instance, 'error', 'Error loading TDF schema', 'Please refresh the page.');
     }
 }
 
@@ -689,7 +708,7 @@ function initEditor(instance: any, tdf: any) {
     // JSONEditor is loaded via CDN and available globally
     if (typeof JSONEditorAny === 'undefined') {
         clientConsole(1, '[TDF Edit] JSONEditor not loaded. Make sure json-editor CDN is included.');
-        alert('Editor library not loaded. Please refresh the page.');
+        setEditorMessage(instance, 'error', 'Editor library not loaded', 'Please refresh the page.');
         return;
     }
 

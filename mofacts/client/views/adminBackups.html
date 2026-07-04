@@ -3,8 +3,9 @@
     <h3 class="page-header-title">Backups</h3>
 
     {{#if backupMessage}}
-      <div class="alert {{backupMessage.className}} admin-message" role="status" aria-live="polite">
-        {{backupMessage.text}}
+      <div class="admin-status admin-status-{{backupMessage.level}} admin-message" role="status" aria-live="polite">
+        <i class="fa {{backupMessage.icon}}" aria-hidden="true"></i>
+        <div class="admin-status-text">{{backupMessage.text}}</div>
       </div>
     {{/if}}
 
@@ -61,7 +62,9 @@
                     <div class="backup-history-main">
                       <div class="backup-history-title">{{archiveFileName}}</div>
                       <div class="backup-history-meta">
-                        {{jobType}} · {{status}} · {{formatDate createdAt}} · {{formatBytes archiveSizeBytes}}
+                        {{jobType}}
+                        <span class="admin-badge admin-badge-{{statusLevel status}}">{{status}}</span>
+                        {{formatDate createdAt}} · {{formatBytes archiveSizeBytes}}
                       </div>
                       {{#if error}}
                         <div class="backup-history-error">{{error.phase}}: {{error.message}}</div>
@@ -120,9 +123,12 @@
                 <i class="fa fa-warning admin-section-icon"></i>
                 <h5>Confirm Restore</h5>
               </div>
-              <p>
+              <p class="admin-status admin-status-error">
+                <i class="fa fa-warning" aria-hidden="true"></i>
+                <span class="admin-status-text">
                 Restore is destructive. The app verifies the selected archive first and creates a pre-restore backup when configured.
                 Type RESTORE to continue.
+                </span>
               </p>
               <div class="backup-restore-controls">
                 <input type="text" id="restoreConfirmationInput" class="form-control" autocomplete="off" aria-label="Restore confirmation phrase">
@@ -146,9 +152,12 @@
                 <i class="fa fa-trash admin-section-icon"></i>
                 <h5>Confirm Delete</h5>
               </div>
-              <p>
+              <p class="admin-status admin-status-warning">
+                <i class="fa fa-exclamation-triangle" aria-hidden="true"></i>
+                <span class="admin-status-text">
                 Delete removes the local backup archive from the configured backup destination. Backup history and audit records remain.
                 Type DELETE to continue.
+                </span>
               </p>
               <div class="backup-restore-controls">
                 <input type="text" id="deleteConfirmationInput" class="form-control" autocomplete="off" aria-label="Delete confirmation phrase">
@@ -164,7 +173,10 @@
         </div>
       {{/if}}
     {{else}}
-      <div class="alert alert-danger">Admin access is required.</div>
+      <div class="admin-status admin-status-error" role="alert">
+        <i class="fa fa-times-circle" aria-hidden="true"></i>
+        <div class="admin-status-text">Admin access is required.</div>
+      </div>
     {{/if}}
   </div>
 </template>

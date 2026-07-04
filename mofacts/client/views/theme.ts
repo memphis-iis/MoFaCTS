@@ -2,6 +2,7 @@ import { Meteor } from 'meteor/meteor';
 import { Template } from 'meteor/templating';
 import { Session } from 'meteor/session';
 import { Tracker } from 'meteor/tracker';
+import { ReactiveVar } from 'meteor/reactive-var';
 import {
     isThemeLengthProperty,
     isThemeDensityScaleProperty,
@@ -241,7 +242,42 @@ function themeExportFilename(themeName: unknown, fallbackId: unknown) {
     return `${safeName || 'theme'}.json`;
 }
 
-async function downloadThemeJson(themeId: any, filenameFallback = 'theme.json') {
+function setThemeMessage(template: any, level: string, text: string) {
+    template?.themeMessage?.set?.({
+        level,
+        text,
+        icon: level === 'success' ? 'fa-check-circle' : level === 'warning' ? 'fa-exclamation-triangle' : level === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'
+    });
+}
+
+function clearThemeMessage(template: any) {
+    template?.themeMessage?.set?.(null);
+}
+
+function clearThemeConfirmation(template: any) {
+    const pending = template?.themeConfirmation?.get?.();
+    if (pending?.resolve) {
+        pending.resolve(false);
+    }
+    template?.themeConfirmation?.set?.(null);
+}
+
+function requestThemeConfirmation(template: any, options: any): Promise<boolean> {
+    clearThemeConfirmation(template);
+    clearThemeMessage(template);
+
+    return new Promise(resolve => {
+        template.themeConfirmation.set({
+            title: options.title,
+            message: options.message,
+            confirmLabel: options.confirmLabel || 'Continue',
+            confirmClass: options.confirmClass || 'btn-danger',
+            resolve
+        });
+    });
+}
+
+async function downloadThemeJson(template: any, themeId: any, filenameFallback = 'theme.json') {
     try {
         const json = await (Meteor as any).callAsync('exportThemeFile', themeId);
         const blob = new Blob([json], {type: 'application/json'});
@@ -254,7 +290,7 @@ async function downloadThemeJson(themeId: any, filenameFallback = 'theme.json') 
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
     } catch (err: any) {
-        alert('Error exporting theme: ' + (err?.message || err));
+        setThemeMessage(template, 'error', 'Error exporting theme: ' + (err?.message || err));
     }
 }
 
@@ -267,6 +303,8 @@ Template.theme.onCreated(function(this: any) {
     // Memoization cache for contrast calculations
     // Key: "fg-bg", Value: result object
     this.contrastCache = new Map();
+    this.themeMessage = new ReactiveVar(null);
+    this.themeConfirmation = new ReactiveVar(null);
 });
 
 Template.theme.onRendered(function(this: any) {
@@ -390,6 +428,12 @@ Template.theme.helpers({
         instance.contrastCache.set(cacheKey, result);
 
         return result;
+    },
+    'themeMessage': function() {
+        return (Template.instance() as any).themeMessage.get();
+    },
+    'themeConfirmation': function() {
+        return (Template.instance() as any).themeConfirmation.get();
     }
 });
 
@@ -556,7 +600,7 @@ async function saveThemeProperty(property: string, value: unknown) {
     await (Meteor as any).callAsync('setCustomThemeProperty', property, value);
 }
 
-function commitThemePropInput(inputEl: HTMLInputElement | HTMLTextAreaElement) {
+function commitThemePropInput(inputEl: HTMLInputElement | HTMLTextAreaElement, template?: any) {
     const dataId = inputEl.getAttribute('data-id');
     if (!dataId) {
         throw new Error('[Theme] Editable theme field is missing data-id');
@@ -579,7 +623,7 @@ function commitThemePropInput(inputEl: HTMLInputElement | HTMLTextAreaElement) {
             await saveThemeProperty(dataId, value);
         } catch (err: any) {
             clientConsole(1, `[Theme] Error auto-saving ${dataId}:`, err);
-            alert(`Error saving ${dataId}: ${err}`);
+            setThemeMessage(template, 'error', `Error saving ${dataId}: ${err}`);
         }
     })();
 }
@@ -644,7 +688,7 @@ function createPngDataUrlFromImage(
 }
 
 Template.theme.events({
-    'click .set-active-theme': async function(event: any) {
+    'click .set-active-theme': async function(event: any, template: any) {
         event.preventDefault();
         const themeId = event.currentTarget.getAttribute('data-id');
         if (!themeId) {
@@ -654,10 +698,10 @@ Template.theme.events({
             const activeTheme = await (Meteor as any).callAsync('setActiveTheme', themeId);
             applyThemeState(activeTheme);
         } catch (err: any) {
-            alert('Error activating theme: ' + (err?.message || err));
+            setThemeMessage(template, 'error', 'Error activating theme: ' + (err?.message || err));
         }
     },
-    'click .duplicate-theme': async function(event: any) {
+    'click .duplicate-theme': async function(event: any, template: any) {
         event.preventDefault();
         const themeId = event.currentTarget.getAttribute('data-id');
         const themeName = event.currentTarget.getAttribute('data-name') || 'New Theme';
@@ -672,10 +716,10 @@ Template.theme.events({
                 name: newName
             });
         } catch (err: any) {
-            alert('Error duplicating theme: ' + (err?.message || err));
+            setThemeMessage(template, 'error', 'Error duplicating theme: ' + (err?.message || err));
         }
     },
-    'click .rename-theme': async function(event: any) {
+    'click .rename-theme': async function(event: any, template: any) {
         event.preventDefault();
         const themeId = event.currentTarget.getAttribute('data-id');
         const currentName = event.currentTarget.getAttribute('data-name') || 'this theme';
@@ -692,70 +736,78 @@ Template.theme.events({
                 newName: newName
             });
         } catch (err: any) {
-            alert('Error renaming theme: ' + (err?.message || err));
+            setThemeMessage(template, 'error', 'Error renaming theme: ' + (err?.message || err));
         }
     },
-    'click .delete-theme': async function(event: any) {
+    'click .delete-theme': async function(event: any, template: any) {
         event.preventDefault();
         const themeId = event.currentTarget.getAttribute('data-id');
         const themeName = event.currentTarget.getAttribute('data-name') || 'this theme';
         if (!themeId) {
             return;
         }
-        if (!confirm(`Delete ${themeName}? This cannot be undone.`)) {
+        const confirmed = await requestThemeConfirmation(template, {
+            title: `Delete ${themeName}?`,
+            message: 'This cannot be undone.',
+            confirmLabel: 'Delete theme'
+        });
+        if (!confirmed) {
             return;
         }
         try {
             await (Meteor as any).callAsync('deleteTheme', themeId);
+            setThemeMessage(template, 'success', `${themeName} deleted.`);
         } catch (err: any) {
-            alert('Error deleting theme: ' + (err?.message || err));
+            setThemeMessage(template, 'error', 'Error deleting theme: ' + (err?.message || err));
         }
     },
-    'click .export-theme': async function(event: any) {
+    'click .export-theme': async function(event: any, template: any) {
         event.preventDefault();
         const themeId = event.currentTarget.getAttribute('data-id');
         const themeName = event.currentTarget.getAttribute('data-name');
         if (!themeId) {
             return;
         }
-        await downloadThemeJson(themeId, themeExportFilename(themeName, themeId));
+        await downloadThemeJson(template, themeId, themeExportFilename(themeName, themeId));
     },
-    'click #exportActiveTheme': async function() {
+    'click #exportActiveTheme': async function(event: any, template: any) {
         const activeId = getActiveThemeId();
         if (!activeId) {
-            alert('No active theme selected.');
+            setThemeMessage(template, 'warning', 'No active theme selected.');
             return;
         }
         const theme = getServerActiveTheme();
         const filename = themeExportFilename(theme?.metadata?.name || theme?.properties?.themeName, activeId);
-        await downloadThemeJson(activeId, filename);
+        await downloadThemeJson(template, activeId, filename);
     },
     'click #themeImportButton': async function(event: any, template: any) {
         event.preventDefault();
         const fileInput = template.find('#themeImportInput');
         const file = fileInput?.files?.[0];
         if (!file) {
-            alert('Select a theme JSON file to import.');
+            setThemeMessage(template, 'warning', 'Select a theme JSON file to import.');
             return;
         }
         if (file.size > THEME_IMPORT_MAX_FILE_BYTES) {
-            alert('Theme files must be smaller than 10MB.');
+            setThemeMessage(template, 'warning', 'Theme files must be smaller than 10MB.');
             return;
         }
         try {
             const text = await file.text();
             await (Meteor as any).callAsync('importThemeFile', text, true);
             fileInput.value = '';
+            setThemeMessage(template, 'success', 'Theme imported.');
         } catch (err: any) {
-            alert('Error importing theme: ' + (err?.message || err));
+            setThemeMessage(template, 'error', 'Error importing theme: ' + (err?.message || err));
         }
     },
-    'click #themeResetButton': async function() {
+    'click #themeResetButton': async function(event: any, template: any) {
         try {
             const activeTheme = await (Meteor as any).callAsync('initializeCustomTheme', 'MoFaCTS');
             applyThemeState(activeTheme);
+            setThemeMessage(template, 'success', 'Theme reset to default.');
         } catch (err: any) {
-            alert('Error resetting theme: ' + (err?.message || err));
+            setThemeMessage(template, 'error', 'Error resetting theme: ' + (err?.message || err));
         }
     },
     'input .currentThemeProp': function(event: any) {
@@ -768,13 +820,13 @@ Template.theme.events({
             applyThemePropertyPreview(dataId, value);
         }
     },
-    'keydown .currentThemeProp': function(event: KeyboardEvent) {
+    'keydown .currentThemeProp': function(event: KeyboardEvent, template: any) {
         if (event.key !== 'Enter' || event.shiftKey || event.currentTarget instanceof HTMLTextAreaElement) {
             return;
         }
 
         event.preventDefault();
-        commitThemePropInput(event.currentTarget as HTMLInputElement);
+        commitThemePropInput(event.currentTarget as HTMLInputElement, template);
     },
     // Native mobile color pickers can open before focus has synchronized the value.
     'pointerdown .currentThemePropColor, focus .currentThemePropColor': function(event: any) {
@@ -826,14 +878,14 @@ Template.theme.events({
                 
             } catch (err: any) {
                 clientConsole(1, `[Theme] Error auto-saving ${data_id}:`, err);
-                alert(`Error saving ${data_id}: ${err}`);
+                setThemeMessage(instance, 'error', `Error saving ${data_id}: ${err}`);
             }
         }, 300);
     },
-    'change .currentThemeProp': function(event: any) {
-        commitThemePropInput(event.currentTarget);
+    'change .currentThemeProp': function(event: any, template: any) {
+        commitThemePropInput(event.currentTarget, template);
     },
-    'change #homeUnderlayUpload': function(event: any) {
+    'change #homeUnderlayUpload': function(event: any, template: any) {
         const fileInput = event.target;
         const file = fileInput.files?.[0];
         if (!file) {
@@ -841,13 +893,13 @@ Template.theme.events({
         }
 
         if (!file.type.startsWith('image/')) {
-            alert('Please select an image file');
+            setThemeMessage(template, 'warning', 'Please select an image file.');
             fileInput.value = '';
             return;
         }
 
         if (file.size > HOME_UNDERLAY_MAX_FILE_BYTES) {
-            alert('Underlay image file size must be less than 5MB');
+            setThemeMessage(template, 'warning', 'Underlay image file size must be less than 5MB.');
             fileInput.value = '';
             return;
         }
@@ -859,37 +911,39 @@ Template.theme.events({
                 updateServerActiveThemeSessionProperty('practice_menu_underlay_image_url', base64Data);
                 await saveThemeProperty('practice_menu_underlay_image_url', base64Data);
                 fileInput.value = '';
+                setThemeMessage(template, 'success', 'Home underlay image uploaded.');
             } catch (err: any) {
-                alert('Error uploading home underlay image: ' + (err?.message || err));
+                setThemeMessage(template, 'error', 'Error uploading home underlay image: ' + (err?.message || err));
             }
         };
         reader.onerror = function() {
-            alert('Error reading home underlay image');
+            setThemeMessage(template, 'error', 'Error reading home underlay image.');
             fileInput.value = '';
         };
         reader.readAsDataURL(file);
     },
-    'click #clearHomeUnderlay': async function() {
+    'click #clearHomeUnderlay': async function(event: any, template: any) {
         try {
             updateServerActiveThemeSessionProperty('practice_menu_underlay_image_url', '');
             await saveThemeProperty('practice_menu_underlay_image_url', '');
             $('#homeUnderlayUpload').val('');
             $('.currentThemeProp[data-id=practice_menu_underlay_image_url]').val('');
+            setThemeMessage(template, 'success', 'Home underlay image cleared.');
         } catch (err: any) {
-            alert('Error clearing home underlay image: ' + (err?.message || err));
+            setThemeMessage(template, 'error', 'Error clearing home underlay image: ' + (err?.message || err));
         }
     },
-    'change #logoUpload': function(event: any) {
+    'change #logoUpload': function(event: any, template: any) {
         const file = event.target.files[0];
         if (file) {
             // Validate file type
             if (!file.type.startsWith('image/')) {
-                alert('Please select an image file');
+                setThemeMessage(template, 'warning', 'Please select an image file.');
                 return;
             }
             // Validate file size (max 2MB)
             if (file.size > 2 * 1024 * 1024) {
-                alert('File size must be less than 2MB');
+                setThemeMessage(template, 'warning', 'File size must be less than 2MB.');
                 return;
             }
 
@@ -940,8 +994,9 @@ Template.theme.events({
 
                         
                         // PHASE 1.5: No need to call getCurrentTheme() - reactive subscription handles it
+                        setThemeMessage(template, 'success', 'Logo uploaded.');
                     } catch (err: any) {
-                        alert("Error uploading logo: " + err);
+                        setThemeMessage(template, 'error', "Error uploading logo: " + err);
                     }
                 };
                 img.src = base64Data;
@@ -949,15 +1004,21 @@ Template.theme.events({
             reader.readAsDataURL(file);
         }
     },
-    'click #clearLogo': async function() {
-        if (confirm('Are you sure you want to clear the logo?')) {
+    'click #clearLogo': async function(event: any, template: any) {
+        const confirmed = await requestThemeConfirmation(template, {
+            title: 'Clear logo?',
+            message: 'The active theme logo will be removed.',
+            confirmLabel: 'Clear logo'
+        });
+        if (confirmed) {
             try {
                 await (Meteor as any).callAsync('setCustomThemeProperty', 'brand_logo_url', '');
                 
                 $('#logoUpload').val('');
                 // PHASE 1.5: No need to call getCurrentTheme() - reactive subscription handles it
+                setThemeMessage(template, 'success', 'Logo cleared.');
             } catch (err: any) {
-                alert("Error clearing logo: " + err);
+                setThemeMessage(template, 'error', "Error clearing logo: " + err);
             }
         }
     },
@@ -1015,8 +1076,13 @@ Template.theme.events({
         reader.readAsText(file);
     },
 
-    'click #removeHelpFileButton': async function() {
-        if (confirm('Are you sure you want to remove the custom help page and revert to the wiki?')) {
+    'click #removeHelpFileButton': async function(event: any, template: any) {
+        const confirmed = await requestThemeConfirmation(template, {
+            title: 'Remove custom help page?',
+            message: 'The app will revert to the wiki help page.',
+            confirmLabel: 'Remove help page'
+        });
+        if (confirmed) {
             const statusSpan = document.getElementById('helpFileUploadStatus') as any;
             statusSpan.textContent = 'Removing...';
             statusSpan.className = 'text-info';
@@ -1030,6 +1096,20 @@ Template.theme.events({
                 statusSpan.className = 'text-danger';
             }
         }
+    },
+
+    'click #cancel-theme-confirmation': function(event: any, template: any) {
+        event.preventDefault();
+        clearThemeConfirmation(template);
+    },
+
+    'click #confirm-theme-confirmation': function(event: any, template: any) {
+        event.preventDefault();
+        const pending = template.themeConfirmation.get();
+        if (pending?.resolve) {
+            pending.resolve(true);
+        }
+        template.themeConfirmation.set(null);
     }
 });
 

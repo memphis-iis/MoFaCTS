@@ -515,11 +515,21 @@
         </div>
         {{else}}
         {{#if noData}}
-        <div class="alert alert-warning">
+        <div class="admin-status admin-status-warning">
             <i class="fa fa-exclamation-triangle"></i>
-            TDF not found or you don't have permission to edit it.
+            <div class="admin-status-text">TDF not found or you don't have permission to edit it.</div>
         </div>
         {{else}}
+
+        {{#if editorMessage}}
+        <div class="admin-status admin-status-{{editorMessage.type}} admin-form-row">
+            <i class="fa {{editorMessage.icon}}"></i>
+            <div class="admin-status-text">
+                <div class="admin-status-title">{{editorMessage.title}}</div>
+                <div>{{editorMessage.text}}</div>
+            </div>
+        </div>
+        {{/if}}
 
         <!-- Tooltip toggle + unsaved state (mobile-friendly) -->
         <div class="editor-topbar admin-form-row">

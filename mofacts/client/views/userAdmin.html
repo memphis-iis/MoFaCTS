@@ -5,6 +5,13 @@
     <div class="container admin-page">
         <h3 class="page-header-title">User Admin</h3>
 
+        {{#if adminMessage}}
+        <div class="admin-status admin-status-{{adminMessageClass}} admin-message" role="status" aria-live="polite">
+            <i class="fa {{adminMessageIcon}}" aria-hidden="true"></i>
+            <div class="admin-status-text">{{adminMessage}}</div>
+        </div>
+        {{/if}}
+
         <div class="admin-section">
             <div class="card admin-card">
                 <div class="card-body">
@@ -13,8 +20,9 @@
                         <h5>API Key Alternatives</h5>
                     </div>
                     {{#if apiKeyMessage}}
-                    <div class="alert {{apiKeyAlertClass}} admin-alert-compact" role="alert">
-                        {{apiKeyMessage}}
+                    <div class="admin-status admin-status-{{apiKeyAlertClass}} admin-status-small admin-form-row-sm" role="status" aria-live="polite">
+                        <i class="fa {{apiKeyIcon}}" aria-hidden="true"></i>
+                        <div class="admin-status-text">{{apiKeyMessage}}</div>
                     </div>
                     {{/if}}
                     <div class="admin-api-key-grid">
@@ -122,13 +130,15 @@
                         </div>
                     </div>
                     {{#if usageRefreshMessage}}
-                    <div class="alert {{usageRefreshAlertClass}} admin-alert-compact" role="alert">
-                        {{usageRefreshMessage}}
+                    <div class="admin-status admin-status-{{usageRefreshAlertClass}} admin-status-small admin-form-row-sm" role="status" aria-live="polite">
+                        <i class="fa {{usageRefreshIcon}}" aria-hidden="true"></i>
+                        <div class="admin-status-text">{{usageRefreshMessage}}</div>
                     </div>
                     {{/if}}
                     {{#if newsEmailMessage}}
-                    <div class="alert {{newsEmailAlertClass}} admin-alert-compact" role="alert">
-                        {{newsEmailMessage}}
+                    <div class="admin-status admin-status-{{newsEmailAlertClass}} admin-status-small admin-form-row-sm" role="status" aria-live="polite">
+                        <i class="fa {{newsEmailIcon}}" aria-hidden="true"></i>
+                        <div class="admin-status-text">{{newsEmailMessage}}</div>
                     </div>
                     {{/if}}
                     <div class="admin-table-wrapper">
@@ -197,6 +207,18 @@
                                             <i class="fa fa-trash"></i>
                                             Delete
                                         </button>
+                                        {{#if deleteUserConfirmationOpen _id}}
+                                        <div class="admin-inline-confirmation admin-form-row-top" role="alert">
+                                            <div class="admin-inline-confirmation-title">Delete User</div>
+                                            <div class="admin-inline-confirmation-message">
+                                                Delete {{displayIdentifier}}? This only works for accounts that do not own lessons, uploaded assets, themes, or teacher-owned courses.
+                                            </div>
+                                            <div class="admin-inline-confirmation-actions">
+                                                <button type="button" class="btn btn-danger btn-sm btn-user-delete-confirm" data-userid="{{_id}}">Delete User</button>
+                                                <button type="button" class="btn btn-outline-secondary btn-sm btn-user-delete-cancel">Cancel</button>
+                                            </div>
+                                        </div>
+                                        {{/if}}
                                     </td>
                                     {{/if}}
                                 </tr>
@@ -237,9 +259,9 @@
 {{else}}
     <div class="container admin-page">
         <h3 class="page-header-title">User Admin</h3>
-        <div class="alert alert-warning admin-denied-alert" role="alert">
-            <i class="fa fa-exclamation-triangle"></i>
-            <strong>Access Denied:</strong> You do not have permission to access this function.
+        <div class="admin-status admin-status-warning admin-denied-alert" role="alert">
+            <i class="fa fa-exclamation-triangle" aria-hidden="true"></i>
+            <div class="admin-status-text"><strong>Access Denied:</strong> You do not have permission to access this function.</div>
         </div>
     </div>
 {{/if}}

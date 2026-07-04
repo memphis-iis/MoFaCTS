@@ -48,11 +48,29 @@
         </div>
 
         {{#if draftPersistenceMessage}}
-        <div class="alert {{draftPersistenceMessageClass}} admin-form-row">
+        <div class="admin-status admin-status-{{draftPersistenceMessageClass}} admin-form-row" role="status" aria-live="polite">
             {{#if draftPersistenceBusy}}
             <i class="fa fa-refresh fa-spin"></i>
+            {{else}}
+            <i class="fa {{draftPersistenceMessageIcon}}"></i>
             {{/if}}
-            {{draftPersistenceMessage}}
+            <div class="admin-status-text">{{draftPersistenceMessage}}</div>
+        </div>
+        {{/if}}
+
+        {{#if manualConfirmation}}
+        <div class="admin-inline-confirmation admin-form-row" role="alert">
+            <i class="fa {{manualConfirmation.icon}}" aria-hidden="true"></i>
+            <div>
+                <div class="admin-inline-confirmation-title">{{manualConfirmation.title}}</div>
+                <div class="admin-inline-confirmation-message">{{manualConfirmation.message}}</div>
+            </div>
+            <div class="admin-inline-confirmation-actions">
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="cancel-manual-confirmation">Cancel</button>
+                <button type="button" class="btn btn-sm {{manualConfirmation.confirmClass}}" id="confirm-manual-confirmation">
+                    {{manualConfirmation.confirmLabel}}
+                </button>
+            </div>
         </div>
         {{/if}}
 
@@ -70,12 +88,15 @@
                 <div class="card">
                     <div class="card-body admin-form-row">
                         {{#if stepHasErrors}}
-                        <div class="alert alert-warning admin-form-row">
-                            <ul class="manual-alert-list">
-                                {{#each stepErrors}}
-                                <li>{{this}}</li>
-                                {{/each}}
-                            </ul>
+                        <div class="admin-status admin-status-warning admin-form-row">
+                            <i class="fa fa-exclamation-triangle"></i>
+                            <div class="admin-status-text">
+                                <ul class="manual-alert-list">
+                                    {{#each stepErrors}}
+                                    <li>{{this}}</li>
+                                    {{/each}}
+                                </ul>
+                            </div>
                         </div>
                         {{/if}}
 
@@ -332,8 +353,12 @@
 
                         {{#if isStep 5}}
                             {{#if packageError}}
-                            <div class="alert alert-danger admin-form-row">
-                                <strong>Finalize error:</strong> {{packageError}}
+                            <div class="admin-status admin-status-error admin-form-row">
+                                <i class="fa fa-exclamation-circle"></i>
+                                <div class="admin-status-text">
+                                    <div class="admin-status-title">Finalize error</div>
+                                    <div>{{packageError}}</div>
+                                </div>
                             </div>
                             {{/if}}
 
@@ -363,26 +388,33 @@
                             </div>
 
                             {{#if uploadStatus}}
-                            <div class="alert alert-info admin-form-row-top">
-                                <i class="fa fa-spinner fa-spin"></i> {{uploadStatus.message}}
-                                <div class="progress admin-form-row-top">
-                                    <div class="progress-bar progress-bar-striped progress-bar-animated"
-                                         style="width: {{uploadStatus.progress}}%">
-                                        {{uploadStatus.progress}}%
+                            <div class="admin-status admin-form-row-top">
+                                <i class="fa fa-spinner fa-spin"></i>
+                                <div class="admin-status-text">
+                                    <div class="admin-status-title">{{uploadStatus.message}}</div>
+                                    <div class="admin-progress-row admin-form-row-top">
+                                        <div class="admin-progress-track">
+                                            <div class="admin-progress-bar progress-bar-striped progress-bar-animated"
+                                                 style="width: {{uploadStatus.progress}}%">
+                                                {{uploadStatus.progress}}%
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                             {{/if}}
 
                             {{#if uploadError}}
-                            <div class="alert alert-danger admin-form-row-top">
-                                <i class="fa fa-exclamation-triangle"></i> {{uploadError}}
+                            <div class="admin-status admin-status-error admin-form-row-top">
+                                <i class="fa fa-exclamation-triangle"></i>
+                                <div class="admin-status-text">{{uploadError}}</div>
                             </div>
                             {{/if}}
 
                             {{#if uploadComplete}}
-                            <div class="alert alert-success admin-form-row-top">
-                                <i class="fa fa-check"></i> Lesson uploaded successfully.
+                            <div class="admin-status admin-status-success admin-form-row-top">
+                                <i class="fa fa-check"></i>
+                                <div class="admin-status-text">Lesson uploaded successfully.</div>
                             </div>
                             {{/if}}
 

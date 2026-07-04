@@ -41,26 +41,39 @@
         </div>
 
         {{#if selectedFileName}}
-        <div class="alert alert-secondary wizard-card">
-          <strong>Selected:</strong> {{selectedFileName}}
+        <div class="admin-status wizard-card">
+          <i class="fa fa-file-archive-o"></i>
+          <div class="admin-status-text">
+            <div class="admin-status-title">Selected</div>
+            <div>{{selectedFileName}}</div>
+          </div>
         </div>
         {{/if}}
 
         {{#if analyzing}}
-        <div class="alert alert-info">
-          <i class="fa fa-spinner fa-spin"></i> Analyzing IMSCC package...
-          <div class="progress wizard-status-detail">
-            <div class="progress-bar progress-bar-striped progress-bar-animated"
+        <div class="admin-status">
+          <i class="fa fa-spinner fa-spin"></i>
+          <div class="admin-status-text">
+            <div class="admin-status-title">Analyzing IMSCC package...</div>
+            <div class="admin-progress-row wizard-status-detail">
+              <div class="admin-progress-track">
+                <div class="admin-progress-bar progress-bar-striped progress-bar-animated"
                  style="width: {{analyzeProgress}}%">
-              {{analyzeProgress}}%
+                  {{analyzeProgress}}%
+                </div>
+              </div>
             </div>
           </div>
         </div>
         {{/if}}
 
         {{#if analyzeError}}
-        <div class="alert alert-danger">
-          <strong>Error:</strong> {{analyzeError}}
+        <div class="admin-status admin-status-error">
+          <i class="fa fa-exclamation-circle"></i>
+          <div class="admin-status-text">
+            <div class="admin-status-title">Error</div>
+            <div>{{analyzeError}}</div>
+          </div>
         </div>
         {{/if}}
 
@@ -189,8 +202,9 @@
               <textarea class="form-control" id="imscc-joined-instructions" rows="3">{{joinedConfig.instructions}}</textarea>
             </div>
             {{#if joinedConfig.validationError}}
-            <div class="alert alert-warning imscc-alert-flush">
-              {{joinedConfig.validationError}}
+            <div class="admin-status admin-status-warning admin-status-small imscc-alert-flush">
+              <i class="fa fa-exclamation-triangle"></i>
+              <div class="admin-status-text">{{joinedConfig.validationError}}</div>
             </div>
             {{/if}}
           </div>
@@ -225,8 +239,9 @@
                           data-ident="{{ident}}">{{instructions}}</textarea>
               </div>
               {{#if validationError}}
-              <div class="alert alert-warning imscc-alert-flush">
-                {{validationError}}
+              <div class="admin-status admin-status-warning admin-status-small imscc-alert-flush">
+                <i class="fa fa-exclamation-triangle"></i>
+                <div class="admin-status-text">{{validationError}}</div>
               </div>
               {{/if}}
             </div>
@@ -235,27 +250,37 @@
         {{/each}}
 
         {{#if hasValidationError}}
-        <div class="alert alert-danger">
-          Fix validation errors before opening the draft editor.
+        <div class="admin-status admin-status-error">
+          <i class="fa fa-exclamation-circle"></i>
+          <div class="admin-status-text">Fix validation errors before opening the draft editor.</div>
         </div>
         {{/if}}
         {{/if}}
 
         {{#if generating}}
-        <div class="alert alert-info">
-          <i class="fa fa-spinner fa-spin"></i> Preparing editable draft...
-          <div class="progress wizard-status-detail">
-            <div class="progress-bar progress-bar-striped progress-bar-animated"
+        <div class="admin-status">
+          <i class="fa fa-spinner fa-spin"></i>
+          <div class="admin-status-text">
+            <div class="admin-status-title">Preparing editable draft...</div>
+            <div class="admin-progress-row wizard-status-detail">
+              <div class="admin-progress-track">
+                <div class="admin-progress-bar progress-bar-striped progress-bar-animated"
                  style="width: {{generateProgress}}%">
-              {{generateProgress}}%
+                  {{generateProgress}}%
+                </div>
+              </div>
             </div>
           </div>
         </div>
         {{/if}}
 
         {{#if generateError}}
-        <div class="alert alert-danger">
-          <strong>Error:</strong> {{generateError}}
+        <div class="admin-status admin-status-error">
+          <i class="fa fa-exclamation-circle"></i>
+          <div class="admin-status-text">
+            <div class="admin-status-title">Error</div>
+            <div>{{generateError}}</div>
+          </div>
         </div>
         {{/if}}
 
@@ -271,8 +296,12 @@
       {{#if isStep 3}}
       <div class="wizard-step">
         {{#if generateError}}
-        <div class="alert alert-danger">
-          <strong>Packaging error:</strong> {{generateError}}
+        <div class="admin-status admin-status-error">
+          <i class="fa fa-exclamation-circle"></i>
+          <div class="admin-status-text">
+            <div class="admin-status-title">Packaging error</div>
+            <div>{{generateError}}</div>
+          </div>
         </div>
         {{/if}}
         {{> draftEditorWorkspace
@@ -288,26 +317,38 @@
         <h4>Step 4: Package Summary</h4>
 
         {{#if generating}}
-        <div class="alert alert-info">
-          <i class="fa fa-spinner fa-spin"></i> Generating package...
-          <div class="progress wizard-status-detail">
-            <div class="progress-bar progress-bar-striped progress-bar-animated"
+        <div class="admin-status">
+          <i class="fa fa-spinner fa-spin"></i>
+          <div class="admin-status-text">
+            <div class="admin-status-title">Generating package...</div>
+            <div class="admin-progress-row wizard-status-detail">
+              <div class="admin-progress-track">
+                <div class="admin-progress-bar progress-bar-striped progress-bar-animated"
                  style="width: {{generateProgress}}%">
-              {{generateProgress}}%
+                  {{generateProgress}}%
+                </div>
+              </div>
             </div>
           </div>
         </div>
         {{/if}}
 
         {{#if generateError}}
-        <div class="alert alert-danger">
-          <strong>Error:</strong> {{generateError}}
+        <div class="admin-status admin-status-error">
+          <i class="fa fa-exclamation-circle"></i>
+          <div class="admin-status-text">
+            <div class="admin-status-title">Error</div>
+            <div>{{generateError}}</div>
+          </div>
         </div>
         {{/if}}
 
         {{#if generationResult}}
-        <div class="alert alert-success">
-          Package generated successfully.
+        <div class="admin-status admin-status-success">
+          <i class="fa fa-check"></i>
+          <div class="admin-status-text">
+            <div class="admin-status-title">Package generated successfully.</div>
+          </div>
         </div>
 
         <div class="card wizard-card">
@@ -332,26 +373,33 @@
         {{/if}}
 
         {{#if uploadStatus}}
-        <div class="alert alert-info">
-          <i class="fa fa-spinner fa-spin"></i> {{uploadStatus.message}}
-          <div class="progress wizard-status-detail">
-            <div class="progress-bar progress-bar-striped progress-bar-animated"
+        <div class="admin-status">
+          <i class="fa fa-spinner fa-spin"></i>
+          <div class="admin-status-text">
+            <div class="admin-status-title">{{uploadStatus.message}}</div>
+            <div class="admin-progress-row wizard-status-detail">
+              <div class="admin-progress-track">
+                <div class="admin-progress-bar progress-bar-striped progress-bar-animated"
                  style="width: {{uploadStatus.progress}}%">
-              {{uploadStatus.progress}}%
+                  {{uploadStatus.progress}}%
+                </div>
+              </div>
             </div>
           </div>
         </div>
         {{/if}}
 
         {{#if uploadError}}
-        <div class="alert alert-danger">
-          {{uploadError}}
+        <div class="admin-status admin-status-error">
+          <i class="fa fa-exclamation-circle"></i>
+          <div class="admin-status-text">{{uploadError}}</div>
         </div>
         {{/if}}
 
         {{#if uploadComplete}}
-        <div class="alert alert-success">
-          Upload complete. The lesson list has been refreshed.
+        <div class="admin-status admin-status-success">
+          <i class="fa fa-check"></i>
+          <div class="admin-status-text">Upload complete. The lesson list has been refreshed.</div>
         </div>
         {{/if}}
 

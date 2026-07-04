@@ -26,6 +26,13 @@
   <div class="container admin-page">
     <h3 class="page-header-title">Instructor Reporting</h3>
 
+    {{#if reportingMessage}}
+    <div class="admin-status admin-status-{{reportingMessage.level}} admin-message" role="status" aria-live="polite">
+      <i class="fa {{reportingMessage.icon}}" aria-hidden="true"></i>
+      <div class="admin-status-text">{{reportingMessage.text}}</div>
+    </div>
+    {{/if}}
+
     <div id="mainContent">
       <!-- Class Selection Section -->
       <div class="admin-section">

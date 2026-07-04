@@ -31,11 +31,51 @@ async function getApkgProcessor() {
   return apkgProcessorPromise;
 }
 
+function setWizardMessage(template: any, type: string, title: string, text: string) {
+  template.wizardMessage.set({
+    type,
+    title,
+    text,
+    icon: type === 'success' ? 'fa-check-circle' : type === 'warning' ? 'fa-exclamation-triangle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'
+  });
+}
+
+function clearWizardMessage(template: any) {
+  template.wizardMessage.set(null);
+}
+
+function clearInlineConfirmation(template: any) {
+  const pending = template.inlineConfirmation?.get?.();
+  if (pending?.resolve) {
+    pending.resolve(false);
+  }
+  template.inlineConfirmation?.set?.(null);
+}
+
+function requestInlineConfirmation(template: any, options: any): Promise<boolean> {
+  clearInlineConfirmation(template);
+  clearWizardMessage(template);
+
+  return new Promise(resolve => {
+    template.inlineConfirmation.set({
+      id: options.id,
+      title: options.title,
+      message: options.message,
+      confirmLabel: options.confirmLabel || 'Continue',
+      confirmClass: options.confirmClass || 'btn-danger',
+      icon: options.icon || 'fa-exclamation-triangle',
+      resolve
+    });
+  });
+}
+
 // Template created hook - initialize reactive state
 Template.apkgWizard.onCreated(function(this: any) {
   // Wizard state
   this.wizardStep = new ReactiveVar(1);
   this.completedSteps = new ReactiveVar([]);
+  this.wizardMessage = new ReactiveVar(null);
+  this.inlineConfirmation = new ReactiveVar(null);
 
   // File and metadata
   this.selectedFile = new ReactiveVar(null);
@@ -309,6 +349,14 @@ Template.apkgWizard.helpers({
     return (Template.instance() as any).uploadError.get();
   },
 
+  wizardMessage() {
+    return (Template.instance() as any).wizardMessage.get();
+  },
+
+  inlineConfirmation() {
+    return (Template.instance() as any).inlineConfirmation.get();
+  },
+
   analyzeDisabled() {
     return !(Template.instance() as any).selectedFileName.get();
   }
@@ -320,6 +368,8 @@ Template.apkgWizard.events({
   'change #apkg-file-input': function(event: any, template: any) {
     const file = event.target.files[0];
     if (file) {
+      clearWizardMessage(template);
+      clearInlineConfirmation(template);
       template.selectedFile.set(file);
       template.selectedFileName.set(file.name);
       template.analyzeError.set(null);
@@ -362,14 +412,23 @@ Template.apkgWizard.events({
     }
   },
 
-  'click #cancel-wizard': function(event: any, template: any) {
-    if (confirm('Cancel import? All progress will be lost.')) {
+  'click #cancel-wizard': async function(event: any, template: any) {
+    event.preventDefault();
+    const confirmed = await requestInlineConfirmation(template, {
+      id: 'cancel-wizard',
+      title: 'Cancel import?',
+      message: 'All progress in this import wizard will be lost.',
+      confirmLabel: 'Cancel import'
+    });
+
+    if (confirmed) {
       // Reset wizard
       template.wizardStep.set(1);
       template.completedSteps.set([]);
       template.selectedFile.set(null);
       template.selectedFileName.set(null);
       template.deckMetadata.set(null);
+      clearInlineConfirmation(template);
     }
   },
 
@@ -439,6 +498,8 @@ Template.apkgWizard.events({
   },
 
   'click #add-tdf-config': function(event: any, template: any) {
+    clearWizardMessage(template);
+    clearInlineConfirmation(template);
     const configs = template.tdfConfigs.get();
     const newConfig = {
       name: '',
@@ -452,18 +513,26 @@ Template.apkgWizard.events({
     template.tdfConfigs.set(configs);
   },
 
-  'click .remove-config': function(event: any, template: any) {
+  'click .remove-config': async function(event: any, template: any) {
     const index = parseInt(event.currentTarget.dataset.index);
     const configs = template.tdfConfigs.get();
 
     if (configs.length === 1) {
-      alert('You must have at least one TDF configuration');
+      setWizardMessage(template, 'warning', 'Configuration required', 'You must have at least one TDF configuration.');
       return;
     }
 
-    if (confirm('Remove this TDF configuration?')) {
+    const confirmed = await requestInlineConfirmation(template, {
+      id: `remove-config-${index}`,
+      title: 'Remove this TDF configuration?',
+      message: 'This lesson source configuration will be removed from the import setup.',
+      confirmLabel: 'Remove configuration'
+    });
+
+    if (confirmed) {
       configs.splice(index, 1);
       template.tdfConfigs.set(configs);
+      clearInlineConfirmation(template);
     }
   },
 
@@ -547,7 +616,7 @@ Template.apkgWizard.events({
 
     } catch (error: unknown) {
       clientConsole(1, 'Error downloading package:', error);
-      alert('Error creating download: ' + getErrorMessage(error));
+      setWizardMessage(template, 'error', 'Error creating download', getErrorMessage(error));
     }
   },
 
@@ -570,9 +639,16 @@ Template.apkgWizard.events({
       // Upload using DynamicAssets (same pattern as doPackageUpload)
       const existingFile = await DynamicAssets.findOne({ name: file.name, userId: Meteor.userId() });
       if (existingFile) {
-        if (confirm(`Uploading this file will overwrite existing data. Continue?`)) {
-          
+        const confirmed = await requestInlineConfirmation(template, {
+          id: 'overwrite-package',
+          title: 'Overwrite existing package?',
+          message: 'Uploading this file will overwrite existing data.',
+          confirmLabel: 'Overwrite and upload'
+        });
+
+        if (confirmed) {
           await (Meteor as any).callAsync('removeAssetById', existingFile._id);
+          clearInlineConfirmation(template);
         } else {
           return;
         }
@@ -637,18 +713,30 @@ Template.apkgWizard.events({
               for (const res of processResult.results) {
                 if (res.data && res.data.res === 'awaitClientTDF') {
                   const reasons = Array.isArray(res.data.reason) ? res.data.reason : [];
-                  let reason = [];
-                  if (res.data.reason.includes('prevTDFExists'))
+                  const reason: string[] = [];
+                  if (reasons.includes('prevTDFExists'))
                     reason.push(`Previous ${res.data.TDF.content.fileName} already exists, continuing the upload will overwrite the old file. Continue?`);
-                  if (res.data.reason.includes('prevStimExists'))
+                  if (reasons.includes('prevStimExists'))
                     reason.push(`Previous ${res.data.TDF.content.tdfs.tutor.setspec.stimulusfile} already exists, continuing the upload will overwrite the old file. Continue?`);
 
-                  if (confirm(reason.join('\n'))) {
+                  const confirmed = await requestInlineConfirmation(template, {
+                    id: `overwrite-tdf-${res.data.TDF._id || res.data.TDF.content.fileName}`,
+                    title: 'Overwrite existing TDF content?',
+                    message: reason.join(' '),
+                    confirmLabel: 'Overwrite content'
+                  });
+
+                  if (confirmed) {
                     template.uploadStatus.set({
                       message: 'Confirming TDF update...',
                       progress: 95
                     });
                     await (Meteor as any).callAsync('tdfUpdateConfirmed', res.data.TDF, false, reasons);
+                    clearInlineConfirmation(template);
+                  } else {
+                    template.uploadStatus.set(null);
+                    template.uploadError.set('Package upload was stopped before overwriting existing TDF content.');
+                    return;
                   }
                 } else if (!res.result) {
                   template.uploadStatus.set(null);
@@ -678,11 +766,35 @@ Template.apkgWizard.events({
     }
   },
 
-  'click #close-wizard': function() {
+  'click #close-wizard': async function(event: any, template: any) {
+    event.preventDefault();
     // Reset wizard and close
-    if (confirm('Close wizard? You can find your uploaded files in the content list.')) {
+    const confirmed = await requestInlineConfirmation(template, {
+      id: 'close-wizard',
+      title: 'Close wizard?',
+      message: 'You can find your uploaded files in the content list.',
+      confirmLabel: 'Close wizard',
+      confirmClass: 'btn-primary',
+      icon: 'fa-check-circle'
+    });
+
+    if (confirmed) {
       location.reload();
     }
+  },
+
+  'click #cancel-inline-confirmation': function(event: any, template: any) {
+    event.preventDefault();
+    clearInlineConfirmation(template);
+  },
+
+  'click #confirm-inline-confirmation': function(event: any, template: any) {
+    event.preventDefault();
+    const pending = template.inlineConfirmation.get();
+    if (pending?.resolve) {
+      pending.resolve(true);
+    }
+    template.inlineConfirmation.set(null);
   }
 });
 

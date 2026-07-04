@@ -3,6 +3,13 @@
     <div class="container admin-page">
       <h3 class="page-header-title class-edit-heading">Course Management</h3>
 
+      {{#if classEditMessage}}
+      <div class="admin-status admin-status-{{classEditMessage.level}} admin-message" role="status" aria-live="polite">
+        <i class="fa {{classEditMessage.icon}}"></i>
+        <div class="admin-status-text">{{classEditMessage.text}}</div>
+      </div>
+      {{/if}}
+
       {{#if isLoading}}
       <div class="text-center admin-loading-block">
         <div class="spinner-border text-primary" role="status">
@@ -61,9 +68,20 @@
                 <label for="sectionNames" class="form-label">Section names (one per line)</label>
                 <textarea class="form-control" rows="5" id="sectionNames" placeholder="Default: 001"></textarea>
               </div>
-              {{#if classEditError}}
+              {{#if classEditConfirmation}}
                 <div class="col-12">
-                  <div class="alert alert-danger" role="alert">{{classEditError}}</div>
+                  <div class="admin-inline-confirmation" role="alert">
+                    <div>
+                      <div class="admin-inline-confirmation-title">{{classEditConfirmation.title}}</div>
+                      <div class="admin-inline-confirmation-message">{{classEditConfirmation.message}}</div>
+                    </div>
+                    <div class="admin-inline-confirmation-actions">
+                      <button type="button" class="btn btn-sm btn-outline-secondary" id="cancelCourseDelete">Cancel</button>
+                      <button type="button" class="btn btn-sm btn-danger" id="confirmCourseDelete">
+                        <i class="fa fa-trash"></i> Delete
+                      </button>
+                    </div>
+                  </div>
                 </div>
               {{/if}}
               <div class="col-12 text-center">

@@ -1,6 +1,7 @@
 import { Meteor } from 'meteor/meteor';
 import { Template } from 'meteor/templating';
 import { Session } from 'meteor/session';
+import { ReactiveVar } from 'meteor/reactive-var';
 import './audioSettings.html';
 import {
   setTtsWarmedUp,
@@ -24,9 +25,18 @@ declare const $: any;
 
 // Cache success color to avoid repeated getComputedStyle calls during slider drag
 let cachedSuccessColor: string | null = null;
+let cachedTrackColor: string | null = null;
 const AUDIO_INPUT_SENSITIVITY_MIN = 20;
 const AUDIO_INPUT_SENSITIVITY_MAX = 80;
 const AUDIO_INPUT_SENSITIVITY_DEFAULT = 60;
+
+function setAudioSettingsMessage(template: any, level: string, text: string) {
+  template?.audioSettingsMessage?.set?.({
+    level,
+    text,
+    icon: level === 'success' ? 'fa-check-circle' : level === 'warning' ? 'fa-exclamation-triangle' : level === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'
+  });
+}
 
 function normalizeAudioInputSensitivity(value: unknown): number {
   const parsed = parseInt(String(value), 10);
@@ -51,9 +61,12 @@ function updateRangeSliderFill(slider: any) {
 
   // Cache the success color on first call (avoid layout thrashing on every input event)
   if (!cachedSuccessColor) {
-    cachedSuccessColor = getComputedStyle(document.documentElement).getPropertyValue('--feedback-correct-color').trim() || '#28a745';
+    cachedSuccessColor = getComputedStyle(document.documentElement).getPropertyValue('--feedback-correct-color').trim() || 'var(--feedback-correct-color)';
   }
-  slider.style.background = `linear-gradient(to right, ${cachedSuccessColor} 0%, ${cachedSuccessColor} ${percentage}%, #ddd ${percentage}%, #ddd 100%)`;
+  if (!cachedTrackColor) {
+    cachedTrackColor = getComputedStyle(document.documentElement).getPropertyValue('--app-muted-surface-color').trim() || 'var(--app-muted-surface-color)';
+  }
+  slider.style.background = `linear-gradient(to right, ${cachedSuccessColor} 0%, ${cachedSuccessColor} ${percentage}%, ${cachedTrackColor} ${percentage}%, ${cachedTrackColor} 100%)`;
 }
 
 // Default audio settings
@@ -82,7 +95,7 @@ function getUserAudioSettings() {
 }
 
 // Save a single audio setting to database (updates entire audioSettings object)
-async function saveAudioSettingToDatabase(settingKey: any, settingValue: any) {
+async function saveAudioSettingToDatabase(settingKey: any, settingValue: any, template?: any) {
   try {
     // Get current settings
     const currentSettings = getUserAudioSettings();
@@ -94,7 +107,7 @@ async function saveAudioSettingToDatabase(settingKey: any, settingValue: any) {
     await (Meteor as any).callAsync('saveAudioSettings', currentSettings);
   } catch (error: unknown) {
     clientConsole(1, '[Audio Settings] Error saving audio setting:', error);
-    alert('Failed to save audio settings: ' + getErrorMessage(error));
+    setAudioSettingsMessage(template, 'error', 'Failed to save audio settings: ' + getErrorMessage(error));
   }
 }
 
@@ -254,21 +267,26 @@ Template.audioSettings.onRendered(async function(this: any) {
 
 });
 
+Template.audioSettings.onCreated(function(this: any) {
+  this.audioSettingsMessage = new ReactiveVar(null);
+});
+
 Template.audioSettings.onDestroyed(function(this: any) {
   // Reset cached color so it's recalculated if theme changes
   cachedSuccessColor = null;
+  cachedTrackColor = null;
 });
 
 Template.audioSettings.events({
-  'click #audioPromptQuestionOn': function(event: any) {
-    updateAudioPromptMode(event);
+  'click #audioPromptQuestionOn': function(event: any, template: any) {
+    updateAudioPromptMode(event, template);
   },
 
-  'click #audioPromptFeedbackOn': function(event: any) {
-    updateAudioPromptMode(event);
+  'click #audioPromptFeedbackOn': function(event: any, template: any) {
+    updateAudioPromptMode(event, template);
   },
 
-  'click #audioInputOn': async function(_event: any) {
+  'click #audioInputOn': async function(_event: any, template: any) {
     const audioInputEnabled = getAudioInputFromPage();
 
     const showHeadphonesSuggestedDiv = (getAudioPromptModeFromPage() != 'silent') && audioInputEnabled;
@@ -284,10 +302,10 @@ Template.audioSettings.events({
     }
 
     //save the audio input mode to the user profile using unified settings
-    await saveAudioSettingToDatabase('audioInputMode', audioInputEnabled);
+    await saveAudioSettingToDatabase('audioInputMode', audioInputEnabled, template);
   },
 
-  'click #speechAPISubmit': async function(_e: any) {
+  'click #speechAPISubmit': async function(_e: any, template: any) {
     const key = $('#speechAPIKey').val();
     try {
       await (Meteor as any).callAsync('saveUserSpeechAPIKey', key);
@@ -296,18 +314,18 @@ Template.audioSettings.events({
       checkAndSetSpeechAPIKeyIsSetup();
 
       
-      alert('Speech API key has been saved');
+      setAudioSettingsMessage(template, 'success', 'Speech API key has been saved.');
     } catch (error) {
       // Make sure to update our reactive session variable so the api key is
       // setup indicator updates
       checkAndSetSpeechAPIKeyIsSetup();
 
       
-      alert('Your changes were not saved! ' + error);
+      setAudioSettingsMessage(template, 'error', 'Your changes were not saved. ' + getErrorMessage(error));
     }
   },
 
-  'click #speechAPIDelete': async function(_e: any) {
+  'click #speechAPIDelete': async function(_e: any, template: any) {
     try {
       await (Meteor as any).callAsync('deleteUserSpeechAPIKey');
       // Make sure to update our reactive session variable so the api key is
@@ -315,13 +333,13 @@ Template.audioSettings.events({
       checkAndSetSpeechAPIKeyIsSetup();
       $('#speechAPIKey').val('');
       
-      alert('Speech API key has been deleted');
+      setAudioSettingsMessage(template, 'success', 'Speech API key has been deleted.');
     } catch (error) {
       // Make sure to update our reactive session variable so the api key is
       // setup indicator updates
       checkAndSetSpeechAPIKeyIsSetup();
       
-      alert('Your changes were not saved! ' + error);
+      setAudioSettingsMessage(template, 'error', 'Your changes were not saved. ' + getErrorMessage(error));
     }
   },
 
@@ -381,7 +399,7 @@ Template.audioSettings.events({
     updateRangeSliderFill(event.currentTarget);
   },
 
-  'change #audioInputSensitivity': async function(event: any) {
+  'change #audioInputSensitivity': async function(event: any, template: any) {
     const value = normalizeAudioInputSensitivity(event.currentTarget.value);
     event.currentTarget.value = value;
     updateAudioInputSensitivityLabel(value);
@@ -389,7 +407,7 @@ Template.audioSettings.events({
 
     setAudioInputSensitivity(value);
     setAudioInputSensitivityView(value);
-    await saveAudioSettingToDatabase('audioInputSensitivity', value);
+    await saveAudioSettingToDatabase('audioInputSensitivity', value, template);
   },
 
   'click #audioPromptVoiceTest': function(event: any) {
@@ -401,6 +419,10 @@ Template.audioSettings.events({
 });
 
 Template.audioSettings.helpers({
+  audioSettingsMessage: function() {
+    return (Template.instance() as any).audioSettingsMessage.get();
+  },
+
   showSpeechAPISetup: function() {
     //check if Session variable useEmbeddedAPIKey is set
     if(Session.get('useEmbeddedAPIKeys')){
@@ -424,7 +446,7 @@ async function checkAndSetSpeechAPIKeyIsSetup() {
   }
 }
 
-async function updateAudioPromptMode(e: any){
+async function updateAudioPromptMode(e: any, template?: any){
   const audioPromptMode = getAudioPromptModeFromPage();
 
   (setAudioPromptFeedbackView as any)(audioPromptMode);
@@ -441,7 +463,7 @@ async function updateAudioPromptMode(e: any){
   showHideAudioPromptGroupDependingOnAudioPromptMode(audioPromptMode);
 
   //save the audio prompt mode to the user profile using unified settings
-  await saveAudioSettingToDatabase('audioPromptMode', audioPromptMode);
+  await saveAudioSettingToDatabase('audioPromptMode', audioPromptMode, template);
 }
 
 export async function warmupGoogleTTS() {

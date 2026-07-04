@@ -11,6 +11,22 @@ Session.set('classes', null);
 
 let isNewClass = true;
 
+function setClassEditMessage(level: string, text: string) {
+  Session.set('classEditMessage', {
+    level,
+    text,
+    icon: level === 'success' ? 'fa-check-circle' : level === 'warning' ? 'fa-exclamation-triangle' : level === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'
+  });
+}
+
+function clearClassEditMessage() {
+  Session.set('classEditMessage', null);
+}
+
+function clearClassEditConfirmation() {
+  Session.set('classEditConfirmation', null);
+}
+
 interface EditableClass {
   courseId: string | undefined;
   courseName: string;
@@ -127,7 +143,8 @@ function classSelectedSetup(courseId: string) {
   $('#courseBeginDate').val(toDatetimeLocalValue(foundClass.beginDate, courseTimezone));
   $('#courseEndDate').val(toDatetimeLocalValue(foundClass.endDate, courseTimezone));
   setTimezoneSelection(courseTimezone);
-  Session.set('classEditError', null);
+  clearClassEditMessage();
+  clearClassEditConfirmation();
   Session.set('classEditMode', 'edit');
   isNewClass = false;
 }
@@ -139,7 +156,8 @@ function noClassSelectedSetup() {
   $('#courseBeginDate').val('');
   $('#courseEndDate').val('');
   setTimezoneSelection(defaultTimezone());
-  Session.set('classEditError', null);
+  clearClassEditMessage();
+  clearClassEditConfirmation();
   Session.set('classEditMode', 'new');
   isNewClass = true;
 }
@@ -193,6 +211,8 @@ Template.classEdit.onCreated(function() {
   // Reset to loading state when entering the page
   Session.set('classes', null);
   Session.set('sectionsByInstructorId', null);
+  Session.set('classEditMessage', null);
+  Session.set('classEditConfirmation', null);
 });
 
 Template.classEdit.onRendered(async function () {
@@ -202,7 +222,8 @@ Template.classEdit.onRendered(async function () {
 
 Template.classEdit.helpers({
   isLoading: () => Session.get('classes') === null,
-  classEditError: () => Session.get('classEditError'),
+  classEditMessage: () => Session.get('classEditMessage'),
+  classEditConfirmation: () => Session.get('classEditConfirmation'),
   isEditingCourse: () => Session.get('classEditMode') === 'edit',
 
   classes: () => Session.get('classes'),
@@ -246,12 +267,13 @@ Template.classEdit.events({
   },
 
   'click #saveClass': function(_event: Event) {
-    Session.set('classEditError', null);
+    clearClassEditMessage();
+    clearClassEditConfirmation();
     const classes = (Session.get('classes') || []) as EditableClass[];
     if (isNewClass) {
       const curClassName = String($('#newClassName').val() || '');
       if(curClassName == ""){
-        alert("Course cannot be blank.");
+        setClassEditMessage('warning', 'Course cannot be blank.');
         return false;
       }
       curClass = {
@@ -270,7 +292,7 @@ Template.classEdit.events({
       const courseId = String($('#class-select').val() || '');
       const foundClass = classes.find((course) => course.courseId === courseId);
       if (!foundClass) {
-        alert('Selected course was not found.');
+        setClassEditMessage('error', 'Selected course was not found.');
         return false;
       }
       curClass = foundClass;
@@ -284,22 +306,22 @@ Template.classEdit.events({
     curClass.endDate = readOptionalDateInput('#courseEndDate');
     curClass.timezone = String($('#courseTimezone').val() || '').trim();
     if (!curClass.timezone) {
-      Session.set('classEditError', 'Choose a course timezone.');
+      setClassEditMessage('warning', 'Choose a course timezone.');
       return false;
     }
 
     function handleSuccess(res: unknown) {
       curClass.courseId = res as string;
-      Session.set('classEditSaved', true);
 
       void loadCourseManagementData().then(function() {
         classSelectedSetup(String(curClass.courseId || ''));
+        setClassEditMessage('success', 'Course saved.');
       });
     }
 
     function handleError(err: unknown) {
       const message = (err as any)?.reason || (err as any)?.message || String(err);
-      Session.set('classEditError', 'Error saving course: ' + message);
+      setClassEditMessage('error', 'Error saving course: ' + message);
     }
 
     if (isNewClass) {
@@ -314,28 +336,50 @@ Template.classEdit.events({
   },
 
   'click #deleteCourse': function(_event: Event) {
-    Session.set('classEditError', null);
+    clearClassEditMessage();
     const courseId = String($('#class-select').val() || '');
     const classes = (Session.get('classes') || []) as EditableClass[];
     const foundClass = classes.find((course) => course.courseId === courseId);
     if (!courseId || !foundClass) {
-      Session.set('classEditError', 'Select a course to delete.');
+      setClassEditMessage('warning', 'Select a course to delete.');
       return false;
     }
-    const confirmed = window.confirm(
-      `Delete "${foundClass.courseName}"?\n\nThis removes the course, section links, enrollments, and assignment rows. Learner history is kept.`
-    );
-    if (!confirmed) return false;
+
+    Session.set('classEditConfirmation', {
+      courseId,
+      title: `Delete "${foundClass.courseName}"?`,
+      message: 'This removes the course, section links, enrollments, and assignment rows. Learner history is kept.'
+    });
+    return false;
+  },
+
+  'click #cancelCourseDelete': function(event: Event) {
+    event.preventDefault();
+    clearClassEditConfirmation();
+    return false;
+  },
+
+  'click #confirmCourseDelete': function(event: Event) {
+    event.preventDefault();
+    const confirmation = Session.get('classEditConfirmation') as { courseId?: string } | null;
+    const courseId = String(confirmation?.courseId || '');
+    if (!courseId) {
+      setClassEditMessage('warning', 'Select a course to delete.');
+      clearClassEditConfirmation();
+      return false;
+    }
 
     meteorCallAsync('deleteCourse', courseId)
       .then(async function() {
         await loadCourseManagementData();
         noClassSelectedSetup();
+        setClassEditMessage('success', 'Course deleted.');
       })
       .catch(function(err: unknown) {
         const message = (err as any)?.reason || (err as any)?.message || String(err);
-        Session.set('classEditError', 'Error deleting course: ' + message);
+        setClassEditMessage('error', 'Error deleting course: ' + message);
       });
+    clearClassEditConfirmation();
     return false;
   },
 });

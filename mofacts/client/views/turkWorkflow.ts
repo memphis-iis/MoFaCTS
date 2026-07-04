@@ -18,6 +18,22 @@ const turkExperimentLog = new Mongo.Collection(null); // local-only - no databas
 const TURK_LOG_SELECTED_EXPERIMENT_KEY = 'turkLogSelectedExperiment';
 const PROFILE_INLINE_STATUS_KEY = 'profileInlineStatus';
 const PROFILE_INLINE_STATUS_CLASS_KEY = 'profileInlineStatusClass';
+const TURK_WORKFLOW_MESSAGE_KEY = 'turkWorkflowMessage';
+
+function messageIcon(level: string) {
+  if (level === 'success') return 'fa-check-circle';
+  if (level === 'warning') return 'fa-exclamation-triangle';
+  if (level === 'error') return 'fa-exclamation-circle';
+  return 'fa-info-circle';
+}
+
+function setTurkWorkflowMessage(level: string, text: string) {
+  Session.set(TURK_WORKFLOW_MESSAGE_KEY, {
+    level,
+    text,
+    icon: messageIcon(level)
+  });
+}
 
 function buildAwsProfileSummary() {
   const haveId = !!getProfileField('have_aws_id');
@@ -43,7 +59,7 @@ function setInlineProfileStatus(message: string, statusClass: string) {
 async function saveAndValidateAwsProfile(showModal: boolean) {
   Session.set('saveComplete', false);
   Session.set('profileWorkModalMessage', 'Please wait while we save your information and contact Mechanical Turk.');
-  setInlineProfileStatus('', 'alert-info');
+  setInlineProfileStatus('', 'info');
   const data = collectAwsProfileFormData();
 
   if (showModal) {
@@ -64,7 +80,7 @@ async function saveAndValidateAwsProfile(showModal: boolean) {
       `Selected mode: ${mode}.`,
       `Reason: ${errMessage}`,
     ].join('\n');
-    setInlineProfileStatus(failureText, 'alert-danger');
+    setInlineProfileStatus(failureText, 'error');
     Session.set('profileWorkModalMessage', 'Your changes were not saved! The server said: ' + errMessage);
     Session.set('saveComplete', true);
     return;
@@ -79,7 +95,7 @@ async function saveAndValidateAwsProfile(showModal: boolean) {
     `Reported AvailableBalance: ${typeof acctBal === 'undefined' ? 'Unavailable' : acctBal}`,
     'Credentials are stored encrypted and are never shown back in full.',
   ].join('\n');
-  setInlineProfileStatus(successText, 'alert-success');
+  setInlineProfileStatus(successText, 'success');
   Session.set('profileWorkModalMessage', 'Your profile changes have been saved. Save details follow: ' + JSON.stringify(saveResult, null, 2));
   Session.set('saveComplete', true);
 }
@@ -135,7 +151,7 @@ function turkLogInsert(newRec: any) {
   turkExperimentLog.insert(newRec);
 }
 
-function dismissTurkModalThenAlert(message: string) {
+function dismissTurkModalThenAlert(message: string, level = 'info') {
   const el = document.getElementById('turkModal');
   if (el) {
     const instance = (window as any).bootstrap?.Modal?.getInstance(el);
@@ -154,7 +170,7 @@ function dismissTurkModalThenAlert(message: string) {
   document.body.classList.remove('modal-open');
   document.body.style.removeProperty('overflow');
   document.body.style.removeProperty('padding-right');
-  alert(message);
+  setTurkWorkflowMessage(level, message);
 }
 
 async function turkLogRefresh(exp: any) {
@@ -175,8 +191,7 @@ async function turkLogRefresh(exp: any) {
     });
   } catch (error: unknown) {
     const disp = 'Failed to retrieve log entries. Error:' + getErrorMessage(error);
-    
-    alert(disp);
+    setTurkWorkflowMessage('error', disp);
   }
 }
 
@@ -244,7 +259,13 @@ Template.turkWorkflow.helpers({
     return Session.get(PROFILE_INLINE_STATUS_KEY);
   },
   profileInlineStatusClass: function() {
-    return Session.get(PROFILE_INLINE_STATUS_CLASS_KEY) || 'alert-info';
+    return Session.get(PROFILE_INLINE_STATUS_CLASS_KEY) || 'info';
+  },
+  profileInlineStatusIcon: function() {
+    return messageIcon(String(Session.get(PROFILE_INLINE_STATUS_CLASS_KEY) || 'info'));
+  },
+  turkWorkflowMessage: function() {
+    return Session.get(TURK_WORKFLOW_MESSAGE_KEY);
   },
   turkIds: () => Session.get('turkIds')
 });
@@ -257,7 +278,8 @@ Template.turkWorkflow.onCreated(function(this: any) {
   (this as any).turkLogExperiments = new ReactiveVar([]);
   Session.setDefault(TURK_LOG_SELECTED_EXPERIMENT_KEY, '');
   Session.setDefault(PROFILE_INLINE_STATUS_KEY, '');
-  Session.setDefault(PROFILE_INLINE_STATUS_CLASS_KEY, 'alert-info');
+  Session.setDefault(PROFILE_INLINE_STATUS_CLASS_KEY, 'info');
+  Session.setDefault(TURK_WORKFLOW_MESSAGE_KEY, null);
 });
 
 Template.turkWorkflow.rendered = async function(this: any) {
@@ -392,13 +414,11 @@ Template.turkWorkflow.events({
       const result = await (Meteor as any).callAsync('turkSendMessage', workerid, msgtext);
       $('#turkModal').modal('hide');
       const disp = 'Server returned:' + JSON.stringify(result, null, 2);
-      
-      alert(disp);
+      setTurkWorkflowMessage('success', disp);
     } catch (error: unknown) {
       $('#turkModal').modal('hide');
       const disp = 'Failed to handle turk approval. Error:' + getErrorMessage(error);
-      
-      alert(disp);
+      setTurkWorkflowMessage('error', disp);
     }
   },
 
@@ -435,13 +455,13 @@ Template.turkWorkflow.events({
 
     const rec: any = turkLogButtonToRec(event.currentTarget);
     if (!rec) {
-      alert('Cannot find record for that table entry?!');
+      setTurkWorkflowMessage('error', 'Cannot find record for that table entry.');
       return;
     }
     const experimentFileName = rec.experimentFileName || rec.experiment;
     const exp: any = await meteorCallAsync('getTdfByFileName', experimentFileName)
     if (!exp || !exp._id) {
-      alert('Could not determine the experiment name for this entry?!');
+      setTurkWorkflowMessage('error', 'Could not determine the experiment name for this entry.');
       return;
     }
     const expId = exp._id
@@ -473,7 +493,7 @@ Template.turkWorkflow.events({
       turkExperimentLog.remove({'idx': rec.idx});
       turkLogInsert(rec);
 
-      dismissTurkModalThenAlert(payMsg);
+      dismissTurkModalThenAlert(payMsg, result ? 'error' : 'success');
     } catch (error: unknown) {
       rec.turkpayDetails = {
         msg: 'Refresh the view to see details on server',
@@ -486,7 +506,7 @@ Template.turkWorkflow.events({
       turkExperimentLog.remove({'idx': rec.idx});
       turkLogInsert(rec);
 
-      dismissTurkModalThenAlert(errMsg);
+      dismissTurkModalThenAlert(errMsg, 'error');
     }
   },
 
@@ -496,14 +516,14 @@ Template.turkWorkflow.events({
 
     const rec: any = turkLogButtonToRec(event.currentTarget);
     if (!rec) {
-      alert('Cannot find record for that table entry?!');
+      setTurkWorkflowMessage('error', 'Cannot find record for that table entry.');
       return;
     }
 
     const experimentFileName = rec.experimentFileName || rec.experiment;
     const exp: any = await meteorCallAsync('getTdfByFileName', experimentFileName)
     if (!exp || !exp._id) {
-      alert('Could not determine the experiment name for this entry?!');
+      setTurkWorkflowMessage('error', 'Could not determine the experiment name for this entry.');
       return;
     }
     const expId = exp._id
@@ -535,7 +555,7 @@ Template.turkWorkflow.events({
       turkExperimentLog.remove({'idx': rec.idx});
       turkLogInsert(rec);
 
-      dismissTurkModalThenAlert(bonusMsg);
+      dismissTurkModalThenAlert(bonusMsg, result ? 'error' : 'success');
     } catch (error: unknown) {
       rec.turkbonusDetails = {
         msg: 'Refresh the view to see details on server',
@@ -548,7 +568,7 @@ Template.turkWorkflow.events({
       turkExperimentLog.remove({'idx': rec.idx});
       turkLogInsert(rec);
 
-      dismissTurkModalThenAlert(errMsg);
+      dismissTurkModalThenAlert(errMsg, 'error');
     }
   },
 

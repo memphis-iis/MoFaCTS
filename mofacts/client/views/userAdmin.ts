@@ -43,6 +43,13 @@ type UserAdminRoleChangeResult = {
   targetRoles?: Partial<Record<RoleName, unknown>>;
 };
 
+function messageIcon(messageType: string): string {
+  if (messageType === 'success') return 'fa-check-circle';
+  if (messageType === 'warning') return 'fa-exclamation-triangle';
+  if (messageType === 'danger' || messageType === 'error') return 'fa-times-circle';
+  return 'fa-info-circle';
+}
+
 function getPagedUserIds(): string[] {
   return FilteredUserPageIds.find({}, { sort: { userId: 1 } })
     .fetch()
@@ -278,6 +285,9 @@ Template.userAdmin.onCreated(function(this: any) {
   this.isPreparingNewsEmail = new ReactiveVar(false);
   this.newsEmailMessage = new ReactiveVar('');
   this.newsEmailMessageType = new ReactiveVar('info');
+  this.adminMessage = new ReactiveVar('');
+  this.adminMessageType = new ReactiveVar('info');
+  this.selectedDeleteUser = new ReactiveVar(null);
   this.apiKeyMetadata = new ReactiveVar(null);
   this.apiKeyBusy = new ReactiveVar(false);
   this.apiKeyMessage = new ReactiveVar('');
@@ -437,11 +447,11 @@ Template.userAdmin.helpers({
   },
 
   usageRefreshAlertClass: function() {
-    const messageType = (Template.instance() as any).usageRefreshMessageType.get();
-    if (messageType === 'success') return 'alert-success';
-    if (messageType === 'warning') return 'alert-warning';
-    if (messageType === 'danger') return 'alert-danger';
-    return 'alert-info';
+    return (Template.instance() as any).usageRefreshMessageType.get();
+  },
+
+  usageRefreshIcon: function() {
+    return messageIcon((Template.instance() as any).usageRefreshMessageType.get());
   },
 
   refreshUsageAttrs: function() {
@@ -458,11 +468,11 @@ Template.userAdmin.helpers({
   },
 
   newsEmailAlertClass: function() {
-    const messageType = (Template.instance() as any).newsEmailMessageType.get();
-    if (messageType === 'success') return 'alert-success';
-    if (messageType === 'warning') return 'alert-warning';
-    if (messageType === 'danger') return 'alert-danger';
-    return 'alert-info';
+    return (Template.instance() as any).newsEmailMessageType.get();
+  },
+
+  newsEmailIcon: function() {
+    return messageIcon((Template.instance() as any).newsEmailMessageType.get());
   },
 
   newsEmailAttrs: function() {
@@ -475,11 +485,31 @@ Template.userAdmin.helpers({
   },
 
   apiKeyAlertClass: function() {
-    const messageType = (Template.instance() as any).apiKeyMessageType.get();
-    if (messageType === 'success') return 'alert-success';
-    if (messageType === 'warning') return 'alert-warning';
-    if (messageType === 'danger') return 'alert-danger';
-    return 'alert-info';
+    return (Template.instance() as any).apiKeyMessageType.get();
+  },
+
+  apiKeyIcon: function() {
+    return messageIcon((Template.instance() as any).apiKeyMessageType.get());
+  },
+
+  adminMessage: function() {
+    return (Template.instance() as any).adminMessage.get();
+  },
+
+  adminMessageClass: function() {
+    return (Template.instance() as any).adminMessageType.get();
+  },
+
+  adminMessageIcon: function() {
+    return messageIcon((Template.instance() as any).adminMessageType.get());
+  },
+
+  selectedDeleteUser: function() {
+    return (Template.instance() as any).selectedDeleteUser.get();
+  },
+
+  deleteUserConfirmationOpen: function(userId: string) {
+    return (Template.instance() as any).selectedDeleteUser.get()?.userId === userId;
   },
 
   apiKeyActionAttrs: function() {
@@ -788,7 +818,7 @@ Template.userAdmin.events({
 
   'click #doUploadUsers': function(event: any) {
     event.preventDefault();
-    doFileUpload('#upload-users', 'USERS');
+    doFileUpload('#upload-users', 'USERS', Template.instance());
   },
 
   'change #upload-users': function(event: any) {
@@ -810,39 +840,51 @@ Template.userAdmin.events({
     try {
       const result = await MeteorCompat.callAsync('userAdminRoleChange', userId, roleAction, roleName);
       applyConfirmedRoleState(Template.instance(), result as UserAdminRoleChangeResult);
+      const instance = Template.instance() as any;
+      instance.adminMessageType.set('success');
+      instance.adminMessage.set(`Updated ${roleName} role for user.`);
     } catch (error: unknown) {
-      const disp = 'Failed to handle request. Error:' + getErrorMessage(error);
-      
-      alert(disp);
+      const instance = Template.instance() as any;
+      instance.adminMessageType.set('danger');
+      instance.adminMessage.set('Failed to handle request. Error: ' + getErrorMessage(error));
     }
   },
 
-  'click .btn-user-delete': async function(event: any) {
+  'click .btn-user-delete': function(event: any, instance: any) {
     event.preventDefault();
 
     const btnTarget = $(event.currentTarget);
     const userId = legacyTrim(btnTarget.data('userid'));
     const displayIdentifier = legacyTrim(btnTarget.data('displayidentifier'));
-    const confirmed = confirm(
-      `Delete user "${displayIdentifier || userId}"?\n\nThis only works for accounts that do not own any lessons, uploaded assets, themes, or teacher-owned courses.`
-    );
+    instance.selectedDeleteUser.set({ userId, displayIdentifier });
+  },
 
-    if (!confirmed) {
-      return;
-    }
+  'click .btn-user-delete-cancel': function(event: any, instance: any) {
+    event.preventDefault();
+    instance.selectedDeleteUser.set(null);
+  },
+
+  'click .btn-user-delete-confirm': async function(event: any, instance: any) {
+    event.preventDefault();
+
+    const btnTarget = $(event.currentTarget);
+    const userId = legacyTrim(btnTarget.data('userid'));
 
     try {
       await MeteorCompat.callAsync('userAdminDeleteUser', userId);
+      instance.selectedDeleteUser.set(null);
+      instance.adminMessageType.set('success');
+      instance.adminMessage.set('User deleted.');
     } catch (error: unknown) {
-      const disp = 'Failed to delete user. Error: ' + getErrorMessage(error);
-      alert(disp);
+      instance.adminMessageType.set('danger');
+      instance.adminMessage.set('Failed to delete user. Error: ' + getErrorMessage(error));
     }
   },
 
     
   });
 
-async function doFileUpload(fileElementSelector: string, fileDescrip: string): Promise<void> {
+async function doFileUpload(fileElementSelector: string, fileDescrip: string, instance: any): Promise<void> {
   _.each($(fileElementSelector).prop('files'), function(file: any) {
     const name = file.name;
     const fileReader = new FileReader();
@@ -854,19 +896,19 @@ async function doFileUpload(fileElementSelector: string, fileDescrip: string): P
         const result = await MeteorCompat.callAsync('insertNewUsers', name, fileReader.result);
         
         if (result.length > 0) {
-          
-          alert('The ' + fileDescrip + ' file was not saved: ' + JSON.stringify(result));
+          instance.adminMessageType.set('danger');
+          instance.adminMessage.set('The ' + fileDescrip + ' file was not saved: ' + JSON.stringify(result));
         } else {
-          
-          alert('Your ' + fileDescrip + ' file was saved');
+          instance.adminMessageType.set('success');
+          instance.adminMessage.set('Your ' + fileDescrip + ' file was saved');
           // Now we can clear the selected file
           $(fileElementSelector).val('');
           $(fileElementSelector).parent().find('.file-info').html('');
           // No need to manually refresh - Meteor reactivity handles it automatically!
         }
       } catch (error: unknown) {
-        
-        alert('There was a critical failure saving your ' + fileDescrip + ' file:' + getErrorMessage(error));
+        instance.adminMessageType.set('danger');
+        instance.adminMessage.set('There was a critical failure saving your ' + fileDescrip + ' file: ' + getErrorMessage(error));
       }
     };
 

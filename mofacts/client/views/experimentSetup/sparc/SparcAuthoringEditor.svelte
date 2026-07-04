@@ -144,6 +144,7 @@
   let activeEditorTab = 'visual';
   let showAdvancedEditors = false;
   let showNodeHierarchy = false;
+  let deleteConfirmation = null;
   let activeProductionRuleIndex = 0;
   let activeScopedProductionRuleIndex = -1;
   let draggedPaletteEntryId = '';
@@ -587,13 +588,30 @@
 
   function removeActiveNode() {
     if (!activeDisplay || !activeNode) return;
-    if (!confirm(`Delete "${activeNode.id}"?`)) return;
+    deleteConfirmation = {
+      nodeId: activeNode.id,
+      title: `Delete "${activeNode.id}"?`,
+      message: 'This removes the selected SPARC display node from the authored page.'
+    };
+  }
+
+  function cancelDeleteConfirmation() {
+    deleteConfirmation = null;
+  }
+
+  function confirmDeleteNode() {
+    if (!activeDisplay || !deleteConfirmation?.nodeId) {
+      deleteConfirmation = null;
+      return;
+    }
+    const removedNodeId = deleteConfirmation.nodeId;
     const nextPreferredNodeId = activeParentNode?.id || '';
     const nextNodeId = nextActiveNodeIdAfterRemoval({
       activeDisplay,
-      removedNodeId: activeNode.id,
+      removedNodeId,
       preferredNodeId: nextPreferredNodeId,
     });
+    deleteConfirmation = null;
     if (nextNodeId !== null) {
       activeNodeId = nextNodeId;
       markChanged();
@@ -601,6 +619,7 @@
   }
 
   function markChanged() {
+    deleteConfirmation = null;
     rawStimuliFile = rawStimuliFile;
     clusters = clusters;
     sparcPages = rawStimuliFile?.setspec?.sparcPages || [];
@@ -657,6 +676,22 @@
     {onCancel}
     onSave={handleSave}
   />
+
+  {#if deleteConfirmation}
+    <div class="admin-inline-confirmation admin-form-row" role="alert">
+      <i class="fa fa-exclamation-triangle" aria-hidden="true"></i>
+      <div>
+        <div class="admin-inline-confirmation-title">{deleteConfirmation.title}</div>
+        <div class="admin-inline-confirmation-message">{deleteConfirmation.message}</div>
+      </div>
+      <div class="admin-inline-confirmation-actions">
+        <button type="button" class="btn btn-sm btn-outline-secondary" on:click={cancelDeleteConfirmation}>Cancel</button>
+        <button type="button" class="btn btn-sm btn-danger" on:click={confirmDeleteNode}>
+          <i class="fa fa-trash" aria-hidden="true"></i> Delete
+        </button>
+      </div>
+    </div>
+  {/if}
 
   {#if activeEditorTab === 'visual'}
     <SparcVisualEditorTab

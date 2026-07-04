@@ -1091,16 +1091,188 @@ input[type="range"]::-moz-range-progress,
     color: var(--app-primary-action-text-color);
 }
 
+.btn-primary {
+    background-color: var(--app-primary-action-surface-color);
+    border-color: var(--btn-border-color);
+    color: var(--app-primary-action-text-color);
+}
+
 .btn-secondary{
     background-color: var(--app-secondary-surface-color);
     border-color: var(--btn-secondary-border);
     color: var(--app-secondary-text-color);
 }
 
+.btn-success {
+    background-color: var(--app-state-success-color);
+    border-color: color-mix(in srgb, var(--app-state-success-color) calc((100 - var(--app-button-border-darkness, 20)) * 1%), var(--app-text-color) calc(var(--app-button-border-darkness, 20) * 1%));
+    color: var(--learning-card-primary-action-text-color);
+}
+
+.btn-warning {
+    background-color: var(--app-state-warning-color);
+    border-color: color-mix(in srgb, var(--app-state-warning-color) calc((100 - var(--app-button-border-darkness, 20)) * 1%), var(--app-text-color) calc(var(--app-button-border-darkness, 20) * 1%));
+    color: var(--app-text-color);
+}
+
+.btn-danger {
+    background-color: var(--app-state-error-color);
+    border-color: color-mix(in srgb, var(--app-state-error-color) calc((100 - var(--app-button-border-darkness, 20)) * 1%), var(--app-text-color) calc(var(--app-button-border-darkness, 20) * 1%));
+    color: var(--learning-card-primary-action-text-color);
+}
+
+.btn-outline-secondary {
+    background-color: transparent;
+    border-color: var(--btn-secondary-border);
+    color: var(--app-secondary-text-color);
+}
+
+.btn-outline-danger {
+    background-color: transparent;
+    border-color: var(--app-state-error-color);
+    color: var(--app-state-error-color);
+}
+
 .btn:hover, .btn-icon:hover{
     background-color: var(--btn-hover-bg);
     border-color: var(--btn-hover-border);
     color: var(--app-text-color);
+}
+
+.btn-primary:hover {
+    background-color: var(--btn-hover-bg);
+    border-color: var(--btn-hover-border);
+    color: var(--app-text-color);
+}
+
+.btn-success:hover {
+    background-color: color-mix(in srgb, var(--app-state-success-color) calc((100 - var(--app-button-hover-darkness, 15)) * 1%), var(--app-text-color) calc(var(--app-button-hover-darkness, 15) * 1%));
+    border-color: var(--app-state-success-color);
+    color: var(--learning-card-primary-action-text-color);
+}
+
+.btn-warning:hover {
+    background-color: color-mix(in srgb, var(--app-state-warning-color) calc((100 - var(--app-button-hover-darkness, 15)) * 1%), var(--app-text-color) calc(var(--app-button-hover-darkness, 15) * 1%));
+    border-color: var(--app-state-warning-color);
+    color: var(--app-text-color);
+}
+
+.btn-danger:hover,
+.btn-outline-danger:hover {
+    background-color: color-mix(in srgb, var(--app-state-error-color) calc((100 - var(--app-button-hover-darkness, 15)) * 1%), var(--app-text-color) calc(var(--app-button-hover-darkness, 15) * 1%));
+    border-color: var(--app-state-error-color);
+    color: var(--learning-card-primary-action-text-color);
+}
+
+.btn-outline-secondary:hover {
+    background-color: var(--btn-secondary-hover-bg);
+    border-color: var(--btn-secondary-border);
+    color: var(--app-text-color);
+}
+
+body .btn-primary {
+    --bs-btn-bg: var(--app-primary-action-surface-color);
+    --bs-btn-border-color: var(--btn-border-color);
+    --bs-btn-color: var(--app-primary-action-text-color);
+    --bs-btn-hover-bg: var(--btn-hover-bg);
+    --bs-btn-hover-border-color: var(--btn-hover-border);
+    --bs-btn-hover-color: var(--app-text-color);
+    --bs-btn-disabled-bg: color-mix(in srgb, var(--app-primary-action-surface-color) 56%, var(--app-muted-surface-color));
+    --bs-btn-disabled-border-color: color-mix(in srgb, var(--btn-border-color) 56%, var(--border-color));
+    --bs-btn-disabled-color: color-mix(in srgb, var(--app-primary-action-text-color) 72%, var(--app-text-color));
+    background-color: var(--app-primary-action-surface-color);
+    border-color: var(--btn-border-color);
+    color: var(--app-primary-action-text-color);
+}
+
+body .btn-secondary {
+    --bs-btn-bg: var(--app-secondary-surface-color);
+    --bs-btn-border-color: var(--btn-secondary-border);
+    --bs-btn-color: var(--app-secondary-text-color);
+    --bs-btn-hover-bg: var(--btn-secondary-hover-bg);
+    --bs-btn-hover-border-color: var(--btn-secondary-border);
+    --bs-btn-hover-color: var(--app-text-color);
+    --bs-btn-disabled-bg: color-mix(in srgb, var(--app-secondary-surface-color) 56%, var(--app-muted-surface-color));
+    --bs-btn-disabled-border-color: color-mix(in srgb, var(--btn-secondary-border) 56%, var(--border-color));
+    --bs-btn-disabled-color: color-mix(in srgb, var(--app-secondary-text-color) 72%, var(--app-text-color));
+    background-color: var(--app-secondary-surface-color);
+    border-color: var(--btn-secondary-border);
+    color: var(--app-secondary-text-color);
+}
+
+body .btn-success {
+    --bs-btn-bg: var(--app-state-success-color);
+    --bs-btn-border-color: color-mix(in srgb, var(--app-state-success-color) calc((100 - var(--app-button-border-darkness, 20)) * 1%), var(--app-text-color) calc(var(--app-button-border-darkness, 20) * 1%));
+    --bs-btn-color: var(--learning-card-primary-action-text-color);
+    --bs-btn-hover-bg: color-mix(in srgb, var(--app-state-success-color) calc((100 - var(--app-button-hover-darkness, 15)) * 1%), var(--app-text-color) calc(var(--app-button-hover-darkness, 15) * 1%));
+    --bs-btn-hover-border-color: var(--app-state-success-color);
+    --bs-btn-hover-color: var(--learning-card-primary-action-text-color);
+    --bs-btn-disabled-bg: color-mix(in srgb, var(--app-state-success-color) 56%, var(--app-muted-surface-color));
+    --bs-btn-disabled-border-color: color-mix(in srgb, var(--app-state-success-color) 56%, var(--border-color));
+    --bs-btn-disabled-color: color-mix(in srgb, var(--learning-card-primary-action-text-color) 72%, var(--app-text-color));
+    background-color: var(--app-state-success-color);
+    border-color: var(--bs-btn-border-color);
+    color: var(--learning-card-primary-action-text-color);
+}
+
+body .btn-warning {
+    --bs-btn-bg: var(--app-state-warning-color);
+    --bs-btn-border-color: color-mix(in srgb, var(--app-state-warning-color) calc((100 - var(--app-button-border-darkness, 20)) * 1%), var(--app-text-color) calc(var(--app-button-border-darkness, 20) * 1%));
+    --bs-btn-color: var(--app-text-color);
+    --bs-btn-hover-bg: color-mix(in srgb, var(--app-state-warning-color) calc((100 - var(--app-button-hover-darkness, 15)) * 1%), var(--app-text-color) calc(var(--app-button-hover-darkness, 15) * 1%));
+    --bs-btn-hover-border-color: var(--app-state-warning-color);
+    --bs-btn-hover-color: var(--app-text-color);
+    --bs-btn-disabled-bg: color-mix(in srgb, var(--app-state-warning-color) 56%, var(--app-muted-surface-color));
+    --bs-btn-disabled-border-color: color-mix(in srgb, var(--app-state-warning-color) 56%, var(--border-color));
+    --bs-btn-disabled-color: color-mix(in srgb, var(--app-text-color) 72%, var(--app-muted-surface-color));
+    background-color: var(--app-state-warning-color);
+    border-color: var(--bs-btn-border-color);
+    color: var(--app-text-color);
+}
+
+body .btn-danger {
+    --bs-btn-bg: var(--app-state-error-color);
+    --bs-btn-border-color: color-mix(in srgb, var(--app-state-error-color) calc((100 - var(--app-button-border-darkness, 20)) * 1%), var(--app-text-color) calc(var(--app-button-border-darkness, 20) * 1%));
+    --bs-btn-color: var(--learning-card-primary-action-text-color);
+    --bs-btn-hover-bg: color-mix(in srgb, var(--app-state-error-color) calc((100 - var(--app-button-hover-darkness, 15)) * 1%), var(--app-text-color) calc(var(--app-button-hover-darkness, 15) * 1%));
+    --bs-btn-hover-border-color: var(--app-state-error-color);
+    --bs-btn-hover-color: var(--learning-card-primary-action-text-color);
+    --bs-btn-disabled-bg: color-mix(in srgb, var(--app-state-error-color) 56%, var(--app-muted-surface-color));
+    --bs-btn-disabled-border-color: color-mix(in srgb, var(--app-state-error-color) 56%, var(--border-color));
+    --bs-btn-disabled-color: color-mix(in srgb, var(--learning-card-primary-action-text-color) 72%, var(--app-text-color));
+    background-color: var(--app-state-error-color);
+    border-color: var(--bs-btn-border-color);
+    color: var(--learning-card-primary-action-text-color);
+}
+
+body .btn-outline-secondary {
+    --bs-btn-bg: transparent;
+    --bs-btn-border-color: var(--btn-secondary-border);
+    --bs-btn-color: var(--app-secondary-text-color);
+    --bs-btn-hover-bg: var(--btn-secondary-hover-bg);
+    --bs-btn-hover-border-color: var(--btn-secondary-border);
+    --bs-btn-hover-color: var(--app-text-color);
+    --bs-btn-disabled-bg: transparent;
+    --bs-btn-disabled-border-color: color-mix(in srgb, var(--btn-secondary-border) 56%, var(--border-color));
+    --bs-btn-disabled-color: color-mix(in srgb, var(--app-secondary-text-color) 72%, var(--app-muted-surface-color));
+    background-color: transparent;
+    border-color: var(--btn-secondary-border);
+    color: var(--app-secondary-text-color);
+}
+
+body .btn-outline-danger {
+    --bs-btn-bg: transparent;
+    --bs-btn-border-color: var(--app-state-error-color);
+    --bs-btn-color: var(--app-state-error-color);
+    --bs-btn-hover-bg: color-mix(in srgb, var(--app-state-error-color) calc((100 - var(--app-button-hover-darkness, 15)) * 1%), var(--app-text-color) calc(var(--app-button-hover-darkness, 15) * 1%));
+    --bs-btn-hover-border-color: var(--app-state-error-color);
+    --bs-btn-hover-color: var(--learning-card-primary-action-text-color);
+    --bs-btn-disabled-bg: transparent;
+    --bs-btn-disabled-border-color: color-mix(in srgb, var(--app-state-error-color) 56%, var(--border-color));
+    --bs-btn-disabled-color: color-mix(in srgb, var(--app-state-error-color) 72%, var(--app-muted-surface-color));
+    background-color: transparent;
+    border-color: var(--app-state-error-color);
+    color: var(--app-state-error-color);
 }
 
 .btn-fixed{
@@ -1202,7 +1374,10 @@ input[type="range"]::-moz-range-progress,
     font-size: var(--app-font-size-base);
     line-height: 1;
     cursor: pointer;
-    transition: all var(--app-transition-fast) ease-in-out;
+    transition: background-color var(--app-transition-fast) ease-in-out,
+                border-color var(--app-transition-fast) ease-in-out,
+                color var(--app-transition-fast) ease-in-out,
+                transform var(--app-transition-fast) ease-in-out;
     min-width: 32px;
     min-height: var(--app-button-height);
     vertical-align: middle;
@@ -1466,6 +1641,7 @@ body:has(.instructions-container) {
 .card {
     border-radius: var(--app-border-radius-lg);
     background-color: var(--learning-card-surface-color);
+    border: 1px solid var(--border-color);
     color: var(--app-text-color);
 }
 
@@ -1565,11 +1741,11 @@ body:has(.instructions-container) {
 }
 
 .admin-backups-page .backup-warning-card {
-    border-color: #9a6a00;
+    border-color: var(--app-warning-color);
 }
 
 .admin-backups-page .backup-warning-card .admin-section-icon {
-    color: #8a5a00;
+    color: var(--app-warning-color);
 }
 
 .backup-config-grid {
@@ -1586,8 +1762,8 @@ body:has(.instructions-container) {
 
 .backup-history-row {
     align-items: center;
-    border: 1px solid var(--app-border-color);
-    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--app-border-radius-sm);
     display: flex;
     gap: var(--app-space-4);
     justify-content: space-between;
@@ -1600,12 +1776,16 @@ body:has(.instructions-container) {
 }
 
 .backup-history-meta {
-    color: var(--app-muted-text-color);
+    align-items: center;
+    color: var(--app-secondary-text-color);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--app-space-1);
     font-size: calc(var(--app-font-size-base) * 0.9);
 }
 
 .backup-history-error {
-    color: #9f1d1d;
+    color: var(--app-error-color);
     font-size: calc(var(--app-font-size-base) * 0.9);
     margin-top: var(--app-space-1);
 }
@@ -1619,8 +1799,8 @@ body:has(.instructions-container) {
 
 .backup-manifest-view {
     background: var(--app-background-color);
-    border: 1px solid var(--app-border-color);
-    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--app-border-radius-sm);
     max-height: 420px;
     overflow: auto;
     padding: var(--app-space-3);
@@ -1779,6 +1959,275 @@ body:has(.instructions-container) {
     padding: var(--app-space-1) var(--app-space-2);
 }
 
+.admin-status {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--app-space-2);
+    border: 1px solid var(--border-color);
+    border-left: calc(4px * var(--app-density-scale)) solid var(--app-state-info-color);
+    border-radius: var(--app-border-radius-sm);
+    padding: var(--app-space-2) var(--app-space-3);
+    background: var(--app-state-info-surface-color);
+    color: var(--app-text-color);
+    line-height: var(--app-line-height-normal);
+}
+
+.admin-status .fa {
+    width: 1rem;
+    min-width: 1rem;
+    margin-top: 0.15em;
+    color: var(--app-state-info-color);
+    text-align: center;
+}
+
+.admin-status-title {
+    font-weight: var(--app-font-weight-semibold);
+}
+
+.admin-status-text {
+    min-width: 0;
+}
+
+.admin-status-small {
+    font-size: calc(var(--app-font-size-base) * 0.875);
+}
+
+.admin-status-inline {
+    margin-top: var(--app-space-2);
+}
+
+.admin-status-success {
+    border-left-color: var(--app-state-success-color);
+    background: var(--app-state-success-surface-color);
+}
+
+.admin-status-success .fa {
+    color: var(--app-state-success-color);
+}
+
+.admin-status-warning {
+    border-left-color: var(--app-state-warning-color);
+    background: var(--app-state-warning-surface-color);
+}
+
+.admin-status-warning .fa {
+    color: var(--app-state-warning-color);
+}
+
+.admin-status-error,
+.admin-status-danger {
+    border-left-color: var(--app-state-error-color);
+    background: var(--app-state-error-surface-color);
+}
+
+.admin-status-error .fa,
+.admin-status-danger .fa {
+    color: var(--app-state-error-color);
+}
+
+.admin-progress-row {
+    display: grid;
+    gap: var(--app-space-1);
+    min-height: calc(2.35rem * var(--app-density-scale));
+}
+
+.admin-progress-track,
+.admin-progress-row .progress {
+    height: calc(8px * var(--app-density-scale));
+    min-height: 6px;
+    border-radius: var(--border-radius-pill);
+    background: var(--app-muted-surface-color);
+    overflow: hidden;
+}
+
+.admin-progress-bar,
+.admin-progress-row .progress-bar {
+    height: 100%;
+    background-color: var(--app-info-color);
+    color: var(--app-primary-action-text-color);
+    transition: width var(--app-transition-smooth) ease;
+}
+
+.admin-progress-row.admin-progress-success .admin-progress-bar,
+.admin-progress-row.admin-progress-success .progress-bar {
+    background-color: var(--app-success-color);
+}
+
+.admin-progress-row.admin-progress-warning .admin-progress-bar,
+.admin-progress-row.admin-progress-warning .progress-bar {
+    background-color: var(--app-warning-color);
+}
+
+.admin-progress-row.admin-progress-error .admin-progress-bar,
+.admin-progress-row.admin-progress-error .progress-bar {
+    background-color: var(--app-error-color);
+}
+
+.admin-progress-note {
+    min-height: calc(1.1em * var(--app-density-scale));
+    color: var(--app-secondary-text-color);
+    font-size: calc(var(--app-font-size-base) * 0.82);
+    line-height: 1.2;
+}
+
+.admin-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--app-space-1);
+    min-height: calc(1.5rem * var(--app-density-scale));
+    padding: calc(0.18rem * var(--app-density-scale)) calc(0.45rem * var(--app-density-scale));
+    border: 1px solid currentColor;
+    border-radius: var(--border-radius-pill);
+    background: var(--app-state-info-surface-color);
+    color: var(--app-state-info-color);
+    font-size: calc(var(--app-font-size-base) * 0.75);
+    font-weight: var(--app-font-weight-semibold);
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.admin-badge .fa {
+    margin: 0;
+}
+
+.admin-badge-success {
+    background: var(--app-state-success-surface-color);
+    color: var(--app-state-success-color);
+}
+
+.admin-badge-warning {
+    background: var(--app-state-warning-surface-color);
+    color: var(--app-state-warning-color);
+}
+
+.admin-badge-error,
+.admin-badge-danger {
+    background: var(--app-state-error-surface-color);
+    color: var(--app-state-error-color);
+}
+
+.admin-page .bg-light,
+.admin-card .bg-light,
+.theme-settings-container .bg-light {
+    background-color: var(--app-muted-surface-color) !important;
+    color: var(--app-text-color) !important;
+}
+
+.admin-page .text-bg-light,
+.admin-card .text-bg-light,
+.theme-settings-container .text-bg-light {
+    background-color: var(--app-muted-surface-color) !important;
+    color: var(--app-text-color) !important;
+    border-color: var(--border-color) !important;
+}
+
+.admin-page .badge,
+.theme-settings-container .badge {
+    border-radius: var(--border-radius-pill);
+    font-weight: var(--app-font-weight-semibold);
+}
+
+.admin-page .badge.bg-light,
+.theme-settings-container .badge.bg-light {
+    background-color: var(--app-muted-surface-color) !important;
+    color: var(--app-text-color) !important;
+    border: 1px solid var(--border-color);
+}
+
+.admin-page .badge.bg-success,
+.theme-settings-container .badge.bg-success {
+    background-color: var(--app-state-success-surface-color) !important;
+    color: var(--app-state-success-color) !important;
+    border: 1px solid var(--app-state-success-color);
+}
+
+.admin-page .badge.bg-warning,
+.theme-settings-container .badge.bg-warning {
+    background-color: var(--app-state-warning-surface-color) !important;
+    color: var(--app-state-warning-color) !important;
+    border: 1px solid var(--app-state-warning-color);
+}
+
+.admin-page .badge.bg-danger,
+.theme-settings-container .badge.bg-danger {
+    background-color: var(--app-state-error-surface-color) !important;
+    color: var(--app-state-error-color) !important;
+    border: 1px solid var(--app-state-error-color);
+}
+
+.admin-page .badge.bg-info,
+.admin-page .badge.bg-primary,
+.admin-page .badge.bg-secondary,
+.theme-settings-container .badge.bg-info,
+.theme-settings-container .badge.bg-primary,
+.theme-settings-container .badge.bg-secondary {
+    background-color: var(--app-state-info-surface-color) !important;
+    color: var(--app-state-info-color) !important;
+    border: 1px solid var(--app-state-info-color);
+}
+
+.admin-icon-button-group {
+    display: flex;
+    align-items: center;
+    gap: calc(0.2rem * var(--app-density-scale));
+    flex-wrap: wrap;
+}
+
+.admin-icon-button-group .btn-icon {
+    width: calc(30px * var(--app-density-scale));
+    height: calc(30px * var(--app-density-scale));
+    padding: var(--app-space-0);
+    margin: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.admin-inline-confirmation {
+    display: grid;
+    gap: var(--app-space-2);
+    border: 1px solid var(--app-warning-color);
+    border-radius: var(--app-border-radius-sm);
+    padding: var(--app-space-3);
+    background: var(--app-warning-surface-color);
+    color: var(--app-text-color);
+}
+
+.admin-inline-confirmation-title {
+    font-weight: var(--app-font-weight-semibold);
+}
+
+.admin-inline-confirmation-message {
+    color: var(--app-secondary-text-color);
+    font-size: calc(var(--app-font-size-base) * 0.9);
+    line-height: var(--app-line-height-normal);
+}
+
+.admin-inline-confirmation-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--app-space-2);
+}
+
+.admin-skeleton-row {
+    position: relative;
+    min-height: calc(3.5rem * var(--app-density-scale));
+    overflow: hidden;
+}
+
+.admin-skeleton-row::before {
+    content: "";
+    display: block;
+    width: min(100%, 34rem);
+    height: calc(0.85rem * var(--app-density-scale));
+    margin-bottom: var(--app-space-2);
+    border-radius: var(--border-radius-pill);
+    background: var(--app-muted-surface-color);
+    box-shadow:
+        0 calc(1.3rem * var(--app-density-scale)) 0 color-mix(in srgb, var(--app-muted-surface-color) 76%, transparent),
+        0 calc(2.6rem * var(--app-density-scale)) 0 color-mix(in srgb, var(--app-muted-surface-color) 54%, transparent);
+}
+
 .admin-denied-alert {
     margin-top: var(--app-space-4);
 }
@@ -1839,7 +2288,7 @@ body:has(.instructions-container) {
 }
 
 .admin-maintenance-description {
-    color: var(--app-muted-text-color);
+    color: var(--app-secondary-text-color);
     font-size: calc(var(--app-font-size-base) * 0.92);
     line-height: 1.35;
     margin: 0;
@@ -1879,7 +2328,7 @@ body:has(.instructions-container) {
 }
 
 .admin-verbosity-intro {
-    color: var(--app-muted-text-color);
+    color: var(--app-secondary-text-color);
     font-size: calc(var(--app-font-size-base) * 0.92);
     line-height: 1.35;
     margin: 0;
@@ -1895,24 +2344,24 @@ body:has(.instructions-container) {
 .admin-verbosity-option {
     align-items: flex-start;
     background: var(--app-subtle-surface-color);
-    border: 1px solid var(--app-border-color);
-    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--app-border-radius-sm);
     cursor: pointer;
     display: flex;
     gap: var(--app-space-2);
     padding: var(--app-space-3);
-    transition: background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+    transition: background-color var(--app-transition-fast) ease, border-color var(--app-transition-fast) ease, box-shadow var(--app-transition-fast) ease;
 }
 
 .admin-verbosity-option:hover,
 .admin-verbosity-option:focus-within {
     background: color-mix(in srgb, var(--app-accent-color) 8%, var(--app-subtle-surface-color));
-    border-color: color-mix(in srgb, var(--app-accent-color) 48%, var(--app-border-color));
+    border-color: color-mix(in srgb, var(--app-accent-color) 48%, var(--border-color));
 }
 
 .admin-verbosity-option:has(.form-check-input:checked) {
     background: color-mix(in srgb, var(--app-accent-color) 12%, var(--app-secondary-surface-color));
-    border-color: color-mix(in srgb, var(--app-accent-color) 68%, var(--app-border-color));
+    border-color: color-mix(in srgb, var(--app-accent-color) 68%, var(--border-color));
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--app-accent-color) 28%, transparent);
 }
 
@@ -1938,7 +2387,7 @@ body:has(.instructions-container) {
 }
 
 .admin-verbosity-option-description {
-    color: var(--app-muted-text-color);
+    color: var(--app-secondary-text-color);
     font-size: calc(var(--app-font-size-base) * 0.88);
     line-height: 1.35;
 }

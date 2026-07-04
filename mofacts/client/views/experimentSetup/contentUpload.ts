@@ -8,6 +8,7 @@ import { meteorCallAsync, clientConsole } from '../..';
 import { ReactiveVar } from 'meteor/reactive-var';
 import { ReactiveDict } from 'meteor/reactive-dict';
 import { Tracker } from 'meteor/tracker';
+import { Random } from 'meteor/random';
 import { currentUserHasRole } from '../../lib/roleUtils';
 import { buildStimuliFromNormalizedItems, buildTutorFromNormalizedItems, getImportFileNames } from '../../lib/importCompositionBuilder';
 import type { NormalizedImportItem } from '../../lib/normalizedImportTypes';
@@ -44,8 +45,26 @@ const assetsRefreshTrigger = new ReactiveVar(0);
 const assetRowRefreshTrigger = new ReactiveVar(0);
 const pendingPackageDeletes = new ReactiveDict();
 const ACCESS_MESSAGE_TIMEOUT_MS = 6000;
+const UPLOAD_MESSAGE_TIMEOUT_MS = 8000;
 const CDN_ASSET_REF_REGEX = /^\/?cdn\/storage\/Assets\/([^/]+)\/original\/([^/?#]+)$/i;
 const DYNAMIC_ASSET_REF_REGEX = /^\/?dynamic-assets\/([A-Za-z0-9_-]+)(?:\/|$)/i;
+
+type UploadMessageLevel = 'info' | 'success' | 'warning' | 'error';
+type InlineConfirmation = {
+  placement: string;
+  title: string;
+  message: string;
+  confirmLabel: string;
+  cancelLabel: string;
+  level: UploadMessageLevel;
+};
+
+function uploadMessageIcon(level: UploadMessageLevel) {
+  if (level === 'success') return 'fa-check-circle';
+  if (level === 'warning') return 'fa-exclamation-triangle';
+  if (level === 'error') return 'fa-times-circle';
+  return 'fa-info-circle';
+}
 
 function contentUploadRefreshToken(): string {
   return `${assetsRefreshTrigger.get()}-${Session.get('assetsRefreshTrigger') || 0}`;
@@ -88,6 +107,74 @@ function buildAccessMessageClass(level: any) {
   if (level === 'warning') return 'alert-warning';
   if (level === 'error') return 'alert-danger';
   return 'alert-info';
+}
+
+function setUploadMessage(template: any, text: string, level: UploadMessageLevel = 'info') {
+  if (!template?.uploadMessage) {
+    return;
+  }
+  const message = {
+    text,
+    level,
+    icon: uploadMessageIcon(level)
+  };
+  template.uploadMessage.set(message);
+  if (template.uploadMessageTimer) {
+    Meteor.clearTimeout(template.uploadMessageTimer);
+  }
+  template.uploadMessageTimer = Meteor.setTimeout(() => {
+    const latest = template.uploadMessage.get();
+    if (latest?.text === text && latest?.level === level) {
+      template.uploadMessage.set(null);
+    }
+    template.uploadMessageTimer = null;
+  }, UPLOAD_MESSAGE_TIMEOUT_MS);
+}
+
+function clearUploadMessage(template: any) {
+  if (!template?.uploadMessage) {
+    return;
+  }
+  if (template.uploadMessageTimer) {
+    Meteor.clearTimeout(template.uploadMessageTimer);
+    template.uploadMessageTimer = null;
+  }
+  template.uploadMessage.set(null);
+}
+
+function clearInlineConfirmation(template: any, result = false) {
+  if (!template?.inlineConfirmation) {
+    return;
+  }
+  const resolve = template.inlineConfirmationResolve;
+  template.inlineConfirmationResolve = null;
+  template.inlineConfirmation.set(null);
+  if (resolve) {
+    resolve(result);
+  }
+}
+
+function requestInlineConfirmation(template: any, confirmation: InlineConfirmation): Promise<boolean> {
+  if (!template?.inlineConfirmation) {
+    return Promise.resolve(false);
+  }
+  clearInlineConfirmation(template, false);
+  template.inlineConfirmation.set(confirmation);
+  return new Promise((resolve) => {
+    template.inlineConfirmationResolve = resolve;
+  });
+}
+
+function inlineConfirmationPlacement(template: any) {
+  return template?.inlineConfirmation?.get()?.placement || '';
+}
+
+function assetActionPlacement(tdfId: string) {
+  return `asset:${tdfId}:actions`;
+}
+
+function mediaPlacement(tdfId: string) {
+  return `media:${tdfId}`;
 }
 
 function isSparcStimulusDisplay(display: any) {
@@ -209,6 +296,42 @@ Template.contentUpload.helpers({
   },
   currentUpload() {
     return (Template.instance() as any).currentUpload.get();
+  },
+  uploadMessageText() {
+    return (Template.instance() as any).uploadMessage?.get()?.text || '';
+  },
+  uploadMessageLevel() {
+    return (Template.instance() as any).uploadMessage?.get()?.level || 'info';
+  },
+  uploadMessageIcon() {
+    return (Template.instance() as any).uploadMessage?.get()?.icon || 'fa-info-circle';
+  },
+  inlineConfirmationTitle() {
+    return (Template.instance() as any).inlineConfirmation?.get()?.title || '';
+  },
+  inlineConfirmationMessage() {
+    return (Template.instance() as any).inlineConfirmation?.get()?.message || '';
+  },
+  inlineConfirmationLevel() {
+    return (Template.instance() as any).inlineConfirmation?.get()?.level || 'warning';
+  },
+  inlineConfirmationConfirmLabel() {
+    return (Template.instance() as any).inlineConfirmation?.get()?.confirmLabel || 'Continue';
+  },
+  inlineConfirmationCancelLabel() {
+    return (Template.instance() as any).inlineConfirmation?.get()?.cancelLabel || 'Cancel';
+  },
+  assetActionConfirmationOpen(tdfId: any) {
+    return inlineConfirmationPlacement(Template.instance()) === assetActionPlacement(String(tdfId || ''));
+  },
+  mediaConfirmationOpen(tdfId: any) {
+    return inlineConfirmationPlacement(Template.instance()) === mediaPlacement(String(tdfId || ''));
+  },
+  uploadConfirmationOpen() {
+    return inlineConfirmationPlacement(Template.instance()) === 'upload-package';
+  },
+  adminDangerConfirmationOpen() {
+    return inlineConfirmationPlacement(Template.instance()) === 'admin-danger';
   },
   quotaStatus() {
     return (Template.instance() as any).quotaStatus.get();
@@ -571,6 +694,10 @@ Template.contentUpload.helpers({
     this.currentUpload = new ReactiveVar(false);
     this.curFilesToUpload = new ReactiveVar([]);
     this.quotaStatus = new ReactiveVar({ unlimited: true }); // Default to unlimited until loaded
+    this.uploadMessage = new ReactiveVar(null);
+    this.uploadMessageTimer = null;
+    this.inlineConfirmation = new ReactiveVar(null);
+    this.inlineConfirmationResolve = null;
     this.pendingUploads = new ReactiveDict(); // Track pending package uploads
     this.autoruns = [];
     this.detailSubs = new Map();
@@ -796,6 +923,11 @@ Template.contentUpload.onDestroyed(function(this: any) {
     clearInterval(this.pendingUploadTickInterval);
     this.pendingUploadTickInterval = null;
   }
+  if (this.uploadMessageTimer) {
+    Meteor.clearTimeout(this.uploadMessageTimer);
+    this.uploadMessageTimer = null;
+  }
+  clearInlineConfirmation(this, false);
 
   if (this.detailSubs) {
     this.detailSubs.forEach((sub: any) => sub.stop());
@@ -821,8 +953,17 @@ Template.contentUpload.onDestroyed(function(this: any) {
 // Template events
 
 Template.contentUpload.events({
+  'click .inline-confirm-accept': function(event: any, template: any) {
+    event.preventDefault();
+    clearInlineConfirmation(template, true);
+  },
+  'click .inline-confirm-cancel': function(event: any, template: any) {
+    event.preventDefault();
+    clearInlineConfirmation(template, false);
+  },
+
   // Toggle TDF public/private setting
-  'change .public-private-toggle': async function(event: any, _template: any) {
+  'change .public-private-toggle': async function(event: any, template: any) {
     const tdfId = event.currentTarget.getAttribute('data-tdfid');
     const isPublic = event.currentTarget.checked;
 
@@ -834,7 +975,7 @@ Template.contentUpload.events({
       assetsRefreshTrigger.set(assetsRefreshTrigger.get() + 1);
     } catch (err: any) {
       clientConsole(1, '[PUBLIC/PRIVATE] Error toggling public/private setting:', err);
-      alert('Error changing public/private setting: ' + err.message);
+      setUploadMessage(template, 'Error changing public/private setting: ' + err.message, 'error');
       // Revert the checkbox state
       event.currentTarget.checked = !isPublic;
     }
@@ -901,7 +1042,7 @@ Template.contentUpload.events({
         run.stop();
         button.disabled = false;
         button.removeAttribute('aria-busy');
-        alert('Content details could not be loaded for this TDF.');
+        setUploadMessage(template, 'Content details could not be loaded for this TDF.', 'error');
       }
     });
 
@@ -910,7 +1051,7 @@ Template.contentUpload.events({
         computation.stop();
         button.disabled = false;
         button.removeAttribute('aria-busy');
-        alert('Content details are still loading. Please try again after the row finishes loading.');
+        setUploadMessage(template, 'Content details are still loading. Please try again after the row finishes loading.', 'warning');
       }
     }, 10000);
   },
@@ -961,21 +1102,29 @@ Template.contentUpload.events({
   },
 
   // Copy TDF to create a private copy
-  'click #copy-tdf-btn': async function(event: any, _template: any) {
+  'click #copy-tdf-btn': async function(event: any, template: any) {
     event.preventDefault();
     const tdfId = event.currentTarget.value;
 
-    if (!confirm('Create a private copy of this lesson?\n\nThe copy will be set to private and you will be the owner.')) {
+    const confirmed = await requestInlineConfirmation(template, {
+      placement: assetActionPlacement(String(tdfId || '')),
+      title: 'Create Private Copy',
+      message: 'The copy will be set to private and you will be the owner.',
+      confirmLabel: 'Create Copy',
+      cancelLabel: 'Cancel',
+      level: 'warning'
+    });
+    if (!confirmed) {
       return;
     }
 
     try {
       const result = await MeteorAny.callAsync('copyTdf', tdfId);
-      alert(`Copy created: "${result.newName}"`);
+      setUploadMessage(template, `Copy created: "${result.newName}"`, 'success');
       assetsRefreshTrigger.set(assetsRefreshTrigger.get() + 1);
     } catch (error: any) {
       clientConsole(1, 'Error copying TDF:', error);
-      alert('Error creating copy: ' + (error.reason || error.message));
+      setUploadMessage(template, 'Error creating copy: ' + (error.reason || error.message), 'error');
     }
   },
 
@@ -1010,11 +1159,13 @@ Template.contentUpload.events({
 
   // Admin/Teachers - upload a TDF file
   'change #upload-file': function(_event: any) {
+    const template = (Template.instance() as any);
+    clearUploadMessage(template);
     //get files array from reactive var
-    const _files = (Template.instance() as any).curFilesToUpload.get();
+    const _files = template.curFilesToUpload.get();
     //add new files to array, appending the current file type from the dropdown
     for (const file of Array.from($('#upload-file').prop('files'))) {
-      doPackageUpload(file, (Template.instance() as any));
+      doPackageUpload(file, template);
     }
     //update reactive var with new array
     
@@ -1143,7 +1294,7 @@ Template.contentUpload.events({
     } catch (error: any) {
       clientConsole(1, '[APKG] Conversion error:', error);
       $('#apkg-status').hide();
-      alert('Failed to convert .apkg file: ' + error.message);
+      setUploadMessage(template, 'Failed to convert .apkg file: ' + error.message, 'error');
     } finally {
       // Clear file input
       $('#upload-apkg').val('');
@@ -1179,30 +1330,45 @@ Template.contentUpload.events({
       await doPackageUpload(file, (Template.instance() as any));
     }
   },
-    'click #tdf-download-btn': async function(event: any){
+    'click #tdf-download-btn': async function(event: any, template: any){
       event.preventDefault();
       const tdfId = event.currentTarget.getAttribute('data-tdfid');
       if (!tdfId) {
-        alert('Package download failed: lesson ID not found.');
+        setUploadMessage(template, 'Package download failed: lesson ID not found.', 'error');
         return;
       }
 
       try {
         const result = await MeteorAny.callAsync('getPackageDownloadLink', tdfId);
         if (!result || !result.link) {
-          alert('Package download failed: link not available.');
+          setUploadMessage(template, 'Package download failed: link not available.', 'error');
           return;
         }
         window.open(result.link);
       } catch (error: any) {
         clientConsole(1, '[DOWNLOAD] Package download failed:', error);
-        alert('Error downloading package: ' + (error.reason || error.message));
+        setUploadMessage(template, 'Error downloading package: ' + (error.reason || error.message), 'error');
       }
     },
-  'click #package-delete-btn': function(event: any){
+  'click #package-delete-btn': async function(event: any, template: any){
+      event.preventDefault();
       const packageAssetId = event.currentTarget.getAttribute('value');
       const packageFile = event.currentTarget.getAttribute('data-package-file');
-      const _fileName = event.currentTarget.getAttribute('data-filename');
+      const fileName = event.currentTarget.getAttribute('data-filename') || 'this package';
+      const row = $(event.currentTarget).closest('tr');
+      const tdfId = row.find('#content-edit-btn').attr('value') || packageAssetId || fileName;
+
+      const confirmed = await requestInlineConfirmation(template, {
+        placement: assetActionPlacement(String(tdfId || '')),
+        title: 'Delete Package',
+        message: `Delete "${fileName}"? This removes the uploaded package and cannot be undone.`,
+        confirmLabel: 'Delete Package',
+        cancelLabel: 'Cancel',
+        level: 'error'
+      });
+      if (!confirmed) {
+        return;
+      }
       
       const packageFileName = packageFile ? packageFile.split('/').pop() : null;
       const pendingKey = packageAssetId || Random.id();
@@ -1223,9 +1389,10 @@ Template.contentUpload.events({
           assetsHelperLastRun = 0;
           assetsHelperCachedResult = [];
           assetsRefreshTrigger.set(assetsRefreshTrigger.get() + 1);
+          setUploadMessage(template, `Deleted package "${fileName}".`, 'success');
         } catch (error: any) {
           clientConsole(1, 'Delete error:', error);
-          alert('Error deleting package: ' + error.message);
+          setUploadMessage(template, 'Error deleting package: ' + error.message, 'error');
         } finally {
           pendingPackageDeletes.set(pendingKey, undefined);
         }
@@ -1241,18 +1408,18 @@ Template.contentUpload.events({
     MeteorAny.callAsync('removeAssetById', assetId);
   },
 
-  'click #stim-download-btn': async function(event: any){
+  'click #stim-download-btn': async function(event: any, template: any){
     event.preventDefault();
     const tdfId = event.currentTarget.getAttribute('data-tdfid');
     if (!tdfId) {
-      alert('Stimulus download failed: lesson ID not found.');
+      setUploadMessage(template, 'Stimulus download failed: lesson ID not found.', 'error');
       return;
     }
 
     try {
       const result = await MeteorAny.callAsync('getStimuliFileForTdf', tdfId);
       if (!result || !result.stimFile) {
-        alert('Stimulus download failed: file not available.');
+        setUploadMessage(template, 'Stimulus download failed: file not available.', 'error');
         return;
       }
 
@@ -1269,35 +1436,41 @@ Template.contentUpload.events({
       window.URL.revokeObjectURL(url);
     } catch (error: any) {
       clientConsole(1, '[DOWNLOAD] Stimulus download failed:', error);
-      alert('Error downloading stimulus file: ' + (error.reason || error.message));
+      setUploadMessage(template, 'Error downloading stimulus file: ' + (error.reason || error.message), 'error');
     }
   },
-  'click #deleteAllAssetsConfirm': async function(e: any, _template: any) {
+  'click #deleteAllAssetsConfirm': async function(e: any, template: any) {
     e.preventDefault();
-    if (!confirm('This will delete all files, remove all lessons, and remove all stimuli. This is not recoverable. Are you sure?')) {
+    const confirmed = await requestInlineConfirmation(template, {
+      placement: 'admin-danger',
+      title: 'Delete All Uploaded Files',
+      message: 'This will delete all files, remove all lessons, and remove all stimuli. This action is not recoverable.',
+      confirmLabel: 'Delete Everything',
+      cancelLabel: 'Cancel',
+      level: 'error'
+    });
+    if (!confirmed) {
       return;
     }
     
     MeteorAny.callAsync('deleteAllFiles',
       function(error: any, result: any) {
         if (error) {
-          
-          alert('Error deleting files: ' + error);
+          setUploadMessage(template, 'Error deleting files: ' + error, 'error');
         } else {
-          
-          alert('Successfully deleted ' + result + ' files');
+          setUploadMessage(template, 'Successfully deleted ' + result + ' files', 'success');
         }
       }
     );
   },
-  'click .imageLink'(e: any) {
+  'click .imageLink'(e: any, template: any) {
     const url = $(e.currentTarget).data('link');
 
     // MO8: Use DOM createElement for security and proper image optimization
     // SECURITY: Prevents XSS via proper DOM API instead of HTML string concatenation
     const popup = window.open();
     if (!popup) {
-      alert('Popup was blocked by your browser.');
+      setUploadMessage(template, 'Popup was blocked by your browser.', 'warning');
       return;
     }
 
@@ -1498,19 +1671,29 @@ Template.contentUpload.events({
   },
 
   // Single file delete
-  'click .btn-delete-media': async function(event: any) {
+  'click .btn-delete-media': async function(event: any, template: any) {
     event.preventDefault();
     event.stopPropagation();
 
     const assetId = event.currentTarget.getAttribute('data-assetid');
     const filename = event.currentTarget.getAttribute('data-filename');
+    const panel = $(event.currentTarget).closest('.media-manager-panel');
+    const tdfId = (panel.attr('id') || '').replace('media-manager-', '');
 
     if (!assetId) {
-      alert('Cannot delete: Asset ID not found');
+      setUploadMessage(template, 'Cannot delete: Asset ID not found.', 'error');
       return;
     }
 
-    if (!confirm(`Delete "${filename}"?\n\nThis action cannot be undone.`)) {
+    const confirmed = await requestInlineConfirmation(template, {
+      placement: mediaPlacement(String(tdfId || '')),
+      title: 'Delete Media File',
+      message: `Delete "${filename}"? This action cannot be undone.`,
+      confirmLabel: 'Delete File',
+      cancelLabel: 'Cancel',
+      level: 'error'
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -1522,19 +1705,19 @@ Template.contentUpload.events({
       assetsRefreshTrigger.set(assetsRefreshTrigger.get() + 1);
     } catch (error: any) {
       clientConsole(1, '[MEDIA] Delete error:', error);
-      alert('Error deleting file: ' + (error.reason || error.message));
+      setUploadMessage(template, 'Error deleting file: ' + (error.reason || error.message), 'error');
     }
   },
 
   // Delete selected files (batch delete)
-  'click .delete-selected-media': async function(event: any) {
+  'click .delete-selected-media': async function(event: any, template: any) {
     event.preventDefault();
     const tdfId = event.currentTarget.getAttribute('data-tdfid');
     const panel = $(`#media-manager-${tdfId}`);
     const selectedCheckboxes = panel.find('.media-select-checkbox:checked');
 
     if (selectedCheckboxes.length === 0) {
-      alert('No files selected');
+      setUploadMessage(template, 'No files selected.', 'warning');
       return;
     }
 
@@ -1551,15 +1734,23 @@ Template.contentUpload.events({
     });
 
     if (assetIds.length === 0) {
-      alert('No valid files selected for deletion');
+      setUploadMessage(template, 'No valid files selected for deletion.', 'warning');
       return;
     }
 
     const confirmMsg = assetIds.length === 1
-      ? `Delete "${filenames[0]}"?\n\nThis action cannot be undone.`
-      : `Delete ${assetIds.length} files?\n\n${filenames.slice(0, 5).join('\n')}${filenames.length > 5 ? '\n...' : ''}\n\nThis action cannot be undone.`;
+      ? `Delete "${filenames[0]}"? This action cannot be undone.`
+      : `Delete ${assetIds.length} files? ${filenames.slice(0, 5).join(', ')}${filenames.length > 5 ? ', ...' : ''}. This action cannot be undone.`;
 
-    if (!confirm(confirmMsg)) {
+    const confirmed = await requestInlineConfirmation(template, {
+      placement: mediaPlacement(String(tdfId || '')),
+      title: 'Delete Selected Media',
+      message: confirmMsg,
+      confirmLabel: assetIds.length === 1 ? 'Delete File' : 'Delete Files',
+      cancelLabel: 'Cancel',
+      level: 'error'
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -1572,7 +1763,7 @@ Template.contentUpload.events({
       assetsRefreshTrigger.set(assetsRefreshTrigger.get() + 1);
     } catch (error: any) {
       clientConsole(1, '[MEDIA] Batch delete error:', error);
-      alert('Error deleting files: ' + (error.reason || error.message));
+      setUploadMessage(template, 'Error deleting files: ' + (error.reason || error.message), 'error');
     }
   }
 });
@@ -1597,7 +1788,7 @@ async function uploadMediaFiles(files: any, tdfId: any, stimSetId: any, template
 
   const assetSub = template.assetSubs ? template.assetSubs.get(tdfId) : null;
   if (!assetSub || !assetSub.ready()) {
-    alert('Media list is still loading. Please wait and try again.');
+    setUploadMessage(template, 'Media list is still loading. Please wait and try again.', 'warning');
     return;
   }
 
@@ -1608,13 +1799,13 @@ async function uploadMediaFiles(files: any, tdfId: any, stimSetId: any, template
   );
 
   if (validFiles.length === 0) {
-    alert('No valid media files selected. Please select image, audio, or video files.');
+    setUploadMessage(template, 'No valid media files selected. Please select image, audio, or video files.', 'warning');
     return;
   }
 
   if (validFiles.length !== files.length) {
     const skipped = files.length - validFiles.length;
-    alert(`${skipped} file(s) skipped: only image, audio, and video files are allowed.`);
+    setUploadMessage(template, `${skipped} file(s) skipped: only image, audio, and video files are allowed.`, 'warning');
   }
 
   progressContainer.show();
@@ -1628,7 +1819,15 @@ async function uploadMediaFiles(files: any, tdfId: any, stimSetId: any, template
       // Check if file already exists
       const existingFile = DynamicAssetsCollection.findOne({ name: file.name, 'meta.stimuliSetId': stimSetId });
       if (existingFile) {
-        if (!confirm(`File "${file.name}" already exists. Overwrite?`)) {
+        const confirmed = await requestInlineConfirmation(template, {
+          placement: mediaPlacement(String(tdfId || '')),
+          title: 'Overwrite Media File',
+          message: `File "${file.name}" already exists. Overwrite it?`,
+          confirmLabel: 'Overwrite File',
+          cancelLabel: 'Skip',
+          level: 'warning'
+        });
+        if (!confirmed) {
           completed++;
           continue;
         }
@@ -1668,7 +1867,7 @@ async function uploadMediaFiles(files: any, tdfId: any, stimSetId: any, template
       progressBar.css('width', (completed / total) * 100 + '%');
     } catch (error: any) {
       clientConsole(1, '[MEDIA] Upload error for', file.name, ':', error);
-      alert(`Error uploading ${file.name}: ${error.message || error}`);
+      setUploadMessage(template, `Error uploading ${file.name}: ${error.message || error}`, 'error');
     }
   }
 
@@ -1676,6 +1875,9 @@ async function uploadMediaFiles(files: any, tdfId: any, stimSetId: any, template
   progressContainer.hide();
   progressBar.css('width', '0%');
   statusText.text('Upload complete!');
+  if (completed === total) {
+    setUploadMessage(template, `Uploaded ${completed} media file${completed === 1 ? '' : 's'}.`, 'success');
+  }
 
   // Refresh the assets list after a short delay to ensure UI updates
   setTimeout(() => {
@@ -1690,6 +1892,7 @@ async function uploadMediaFiles(files: any, tdfId: any, stimSetId: any, template
 // Our main logic for uploading files
 
 async function doFileUpload(fileArray: any) {
+  const template = (Template.instance() as any);
   //reorder fileArray so that packages are uploaded first, then stimuli, then TdfsCollection
   fileArray.sort((a: any, b: any) => {
     if (a.fileType == 'package') {
@@ -1717,7 +1920,7 @@ async function doFileUpload(fileArray: any) {
       existingFile = await MeteorAny.callAsync('getUserAssetByName', file.name);
     } catch (error: any) {
       clientConsole(1, '[UPLOAD] Failed to check existing package:', error);
-      alert('Error checking for existing package: ' + (error.reason || error.message));
+      setUploadMessage(template, 'Error checking for existing package: ' + (error.reason || error.message), 'error');
       continue;
     }
     if (existingFile) {
@@ -1727,7 +1930,7 @@ async function doFileUpload(fileArray: any) {
         MeteorAny.callAsync('removeAssetById', existingFile._id);
       } catch (e) {
         
-        alert('Error deleting existing file. Please try again. If this error persists, please file a bug report.');
+        setUploadMessage(template, 'Error deleting existing file. Please try again. If this error persists, please file a bug report.', 'error');
       }
     } else {
       doPackageUpload(file, (Template.instance() as any));
@@ -1739,7 +1942,7 @@ async function doFileUpload(fileArray: any) {
       if (name.indexOf('<') != -1 || name.indexOf('>') != -1 || name.indexOf(':') != -1 ||
         name.indexOf('"') != -1 || name.indexOf('/') != -1 || name.indexOf('|') != -1 ||
         name.indexOf('?') != -1 || name.indexOf('*') != -1) {
-        alert('Please remove the following characters from your filename: < > : " / | ? *');
+        setUploadMessage(template, 'Please remove the following characters from your filename: < > : " / | ? *', 'warning');
       } else {
         const fileData = await readFileAsDataURL(file);
         
@@ -1749,11 +1952,19 @@ async function doFileUpload(fileArray: any) {
           if (!result.result) {
             if(result.data && result.data.res == 'awaitClientTDF'){
               const reasons = Array.isArray(result.data.reason) ? result.data.reason : [];
-              if(confirm(`A previous file exists and will be overwritten. Continue?\nFile Name: ${result.data.TDF.content.fileName}`)){
+              const confirmed = await requestInlineConfirmation(template, {
+                placement: 'upload-package',
+                title: 'Overwrite Existing Content',
+                message: `A previous file exists and will be overwritten. File name: ${result.data.TDF.content.fileName}`,
+                confirmLabel: 'Overwrite Content',
+                cancelLabel: 'Cancel',
+                level: 'warning'
+              });
+              if(confirmed){
                 try {
                   await MeteorAny.callAsync('tdfUpdateConfirmed', result.data.TDF, false, reasons);
                 } catch (err: any) {
-                  alert(err);
+                  setUploadMessage(template, String(err), 'error');
                 }
               }
             } else {
@@ -1771,9 +1982,9 @@ async function doFileUpload(fileArray: any) {
     $('#stimUploadLoadingSymbol').hide()
     
     if (errorStack.length == 0) {
-      alert("Files saved successfully. It may take a few minutes for the changes to take effect.");
+      setUploadMessage(template, 'Files saved successfully. It may take a few minutes for the changes to take effect.', 'success');
     } else {
-      alert('There were ' + errorStack.length + ' errors uploading files: ' + errorStack.join('\n'));
+      setUploadMessage(template, 'There were ' + errorStack.length + ' errors uploading files: ' + errorStack.join('; '), 'error');
     }
 
     //force the stimDisplayTypeMap to refresh on next card load
@@ -1785,9 +1996,6 @@ async function doFileUpload(fileArray: any) {
      // Now we can clear the selected file
     $('#upload-file').val('');
     $('#upload-file').parent().find('.file-info').html('');
-    
-    
-    //alert('Upload complete');
     }
   }
 
@@ -1799,15 +2007,24 @@ async function doPackageUpload(file: any, template: any){
     existingFile = await MeteorAny.callAsync('getUserAssetByName', file.name);
   } catch (error: any) {
     clientConsole(1, '[UPLOAD] Failed to check existing package:', error);
-    alert('Error checking for existing package: ' + (error.reason || error.message));
+    setUploadMessage(template, 'Error checking for existing package: ' + (error.reason || error.message), 'error');
     return;
   }
 
   if (existingFile) {
-    if (confirm(`Uploading this file will overwrite existing data. Continue?`)) {
+    const confirmed = await requestInlineConfirmation(template, {
+      placement: 'upload-package',
+      title: 'Overwrite Existing Package',
+      message: `Uploading "${file.name}" will overwrite existing data. Continue?`,
+      confirmLabel: 'Overwrite Package',
+      cancelLabel: 'Cancel',
+      level: 'warning'
+    });
+    if (confirmed) {
       // Security: Use server method instead of direct client remove
       MeteorAny.callAsync('removeAssetById', existingFile._id);
     } else {
+      setUploadMessage(template, `Upload canceled. Existing package "${file.name}" was not changed.`, 'warning');
       return;
     }
   }
@@ -1824,6 +2041,7 @@ async function doPackageUpload(file: any, template: any){
     startedAt: new Date(),
     startedAtMs: Date.now()
   });
+  setUploadMessage(template, `Uploading ${file.name}...`, 'info');
 
   // Force immediate UI refresh
   assetsHelperLastRun = 0;
@@ -1895,6 +2113,7 @@ async function doPackageUpload(file: any, template: any){
           error: `Upload failed: ${error}`,
           progress: 0
         });
+        setUploadMessage(template, `Upload failed for ${file.name}: ${error}`, 'error');
         assetsHelperLastRun = 0;
         assetsHelperCachedResult = [];
       }
@@ -1930,6 +2149,7 @@ async function doPackageUpload(file: any, template: any){
               packageAssetId: packageAssetId,
               error: "Processing disabled for debugging (upload stored only)"
             });
+            setUploadMessage(template, 'Processing is disabled for debugging. Upload was stored only.', 'warning');
             assetsHelperLastRun = 0;
             assetsHelperCachedResult = [];
           }
@@ -1949,7 +2169,15 @@ async function doPackageUpload(file: any, template: any){
                 if(reasons.includes(`prevStimExists`))
                   reason.push(`Previous ${res.data.TDF.content.tdfs.tutor.setspec.stimulusfile} already exists, continuing the upload will overwrite the old file. Continue?`)
                 
-                if(confirm(reason.join('\n'))){
+                const confirmed = await requestInlineConfirmation(template, {
+                  placement: 'upload-package',
+                  title: 'Overwrite Existing Content',
+                  message: reason.join(' '),
+                  confirmLabel: 'Overwrite Content',
+                  cancelLabel: 'Cancel',
+                  level: 'warning'
+                });
+                if(confirmed){
                   try {
                     await MeteorAny.callAsync('tdfUpdateConfirmed', res.data.TDF, false, reasons);
                   } catch (err: any) {
@@ -1962,6 +2190,7 @@ async function doPackageUpload(file: any, template: any){
                         packageAssetId: packageAssetId,
                         error: `Confirmation failed: ${err}`
                       });
+                      setUploadMessage(template, `Confirmation failed: ${err}`, 'error');
                       assetsHelperLastRun = 0;
                       assetsHelperCachedResult = [];
                     }
@@ -1980,6 +2209,7 @@ async function doPackageUpload(file: any, template: any){
                     packageAssetId: packageAssetId,
                     error: res.errmsg || "Package processing failed"
                   });
+                  setUploadMessage(template, res.errmsg || 'Package processing failed.', 'error');
                   assetsHelperLastRun = 0;
                   assetsHelperCachedResult = [];
                 }
@@ -1997,6 +2227,7 @@ async function doPackageUpload(file: any, template: any){
                 packageAssetId: packageAssetId,
                 stimuliSetId: result?.stimSetId ?? uploadData.stimuliSetId ?? null
               });
+              setUploadMessage(template, `Uploaded ${file.name}. The lesson list is refreshing.`, 'success');
             }
 
             // Invalidate cache and trigger reactive refresh after successful upload
@@ -2013,6 +2244,7 @@ async function doPackageUpload(file: any, template: any){
                 packageAssetId: packageAssetId,
                 error: err.reason || err.message || err.toString()
               });
+              setUploadMessage(template, 'Package processing failed: ' + (err.reason || err.message || err.toString()), 'error');
               assetsHelperLastRun = 0;
               assetsHelperCachedResult = [];
             }
@@ -2027,6 +2259,7 @@ async function doPackageUpload(file: any, template: any){
             status: "completed",
             progress: 100
           });
+          setUploadMessage(template, `Uploaded ${file.name}.`, 'success');
         }
         assetsHelperLastRun = 0;
         assetsHelperCachedResult = [];

@@ -9,9 +9,21 @@ const MeteorCompat = Meteor as typeof Meteor & { callAsync: (name: string, ...ar
 Template.dataDownload.onCreated(function(this: any) {
   this.accessableFiles = new ReactiveVar([]);
   this.isLoading = new ReactiveVar(true);
+  this.downloadMessage = new ReactiveVar(null);
   this.subscriptions = [];
   this.autoruns = [];
 });
+
+function setDownloadMessage(instance: any, text: string, level = 'info'): void {
+  const icon = level === 'success'
+    ? 'fa-check-circle'
+    : level === 'error'
+      ? 'fa-times-circle'
+      : level === 'warning'
+        ? 'fa-exclamation-triangle'
+        : 'fa-info-circle';
+  instance.downloadMessage.set({ text, level, icon });
+}
 
 function getConditionRefs(tdf: any): string[] {
   const raw = tdf?.content?.tdfs?.tutor?.setspec?.condition;
@@ -41,6 +53,7 @@ Template.dataDownload.onRendered(async function(this: any) {
   } catch (err) {
     clientConsole(1, '[DataDownload] Failed to load data:', err);
     instance.accessableFiles.set([]);
+    setDownloadMessage(instance, 'Could not load downloadable data. Please try again later.', 'error');
   } finally {
     instance.isLoading.set(false);
   }
@@ -69,6 +82,9 @@ Template.dataDownload.helpers({
   'accessableFiles': function() {
     return (Template.instance() as any).accessableFiles.get();
   },
+  downloadMessage() {
+    return (Template.instance() as any).downloadMessage.get();
+  },
 });
 
 Template.dataDownload.events({
@@ -77,9 +93,9 @@ Template.dataDownload.events({
     const fileName = event.currentTarget.getAttribute('data-fileName');
     const fileId = event.currentTarget.getAttribute('data-fileId');
     if (fileName) {
-      makeDataDownloadMethodCall('downloadDataByFile', fileName);
+      makeDataDownloadMethodCall(Template.instance(), 'downloadDataByFile', fileName);
     } else {
-      makeDataDownloadMethodCall('downloadDataById', fileId);
+      makeDataDownloadMethodCall(Template.instance(), 'downloadDataById', fileId);
     }
   },
   'click .root-omnibus-download-link': function(event: any) {
@@ -88,26 +104,29 @@ Template.dataDownload.events({
     if (!fileName) {
       return;
     }
-    makeDataDownloadMethodCall('downloadDataByFile', fileName);
+    makeDataDownloadMethodCall(Template.instance(), 'downloadDataByFile', fileName);
   },
 
   'click #userDataDownloadLink': function(event: any) {
     event.preventDefault();
-    makeDataDownloadMethodCall('downloadDataByTeacher', Meteor.userId());
+    makeDataDownloadMethodCall(Template.instance(), 'downloadDataByTeacher', Meteor.userId());
   },
   'click #ownHistoryDownloadButton': function(event: any) {
     event.preventDefault();
-    makeDataDownloadMethodCall('downloadOwnHistoryAcrossTdfs');
+    makeDataDownloadMethodCall(Template.instance(), 'downloadOwnHistoryAcrossTdfs');
   },
 });
 
-async function makeDataDownloadMethodCall(methodName: string, ...args: any[]): Promise<void> {
+async function makeDataDownloadMethodCall(instance: any, methodName: string, ...args: any[]): Promise<void> {
   try {
+    setDownloadMessage(instance, 'Preparing download...', 'info');
     const response = await MeteorCompat.callAsync(methodName, ...args);
     createData(response);
+    setDownloadMessage(instance, 'Download started.', 'success');
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     clientConsole(1, '[DataDownload] Download failed:', message);
+    setDownloadMessage(instance, `Download failed: ${message}`, 'error');
   }
 }
 

@@ -111,10 +111,40 @@ function clearSuccessDraftMessage(instance: any) {
 }
 
 function getDraftMessageClass(level: DraftMessageLevel) {
-  if (level === 'success') return 'alert-success';
-  if (level === 'warning') return 'alert-warning';
-  if (level === 'error') return 'alert-danger';
-  return 'alert-info';
+  if (level === 'success') return 'success';
+  if (level === 'warning') return 'warning';
+  if (level === 'error') return 'error';
+  return 'info';
+}
+
+function getDraftMessageIcon(level: DraftMessageLevel) {
+  if (level === 'success') return 'fa-check-circle';
+  if (level === 'warning') return 'fa-exclamation-triangle';
+  if (level === 'error') return 'fa-exclamation-circle';
+  return 'fa-info-circle';
+}
+
+function clearManualConfirmation(instance: any) {
+  const pending = instance.manualConfirmation?.get?.();
+  if (pending?.resolve) {
+    pending.resolve(false);
+  }
+  instance.manualConfirmation?.set?.(null);
+}
+
+function requestManualConfirmation(instance: any, options: any): Promise<boolean> {
+  clearManualConfirmation(instance);
+
+  return new Promise((resolve) => {
+    instance.manualConfirmation.set({
+      title: options.title,
+      message: options.message,
+      confirmLabel: options.confirmLabel || 'Continue',
+      confirmClass: options.confirmClass || 'btn-danger',
+      icon: options.icon || 'fa-exclamation-triangle',
+      resolve
+    });
+  });
 }
 
 function normalizeLoadedState(rawState: Partial<ManualCreatorState> | undefined): ManualCreatorState {
@@ -317,6 +347,7 @@ Template.manualContentCreator.onCreated(function(this: any) {
   this.draftPersistenceMessage = new ReactiveVar(null);
   this.draftPersistenceLevel = new ReactiveVar('info');
   this.draftPersistenceBusy = new ReactiveVar(false);
+  this.manualConfirmation = new ReactiveVar(null);
 
   const routeDraftId = this.currentDraftId.get();
   if (routeDraftId) {
@@ -388,8 +419,17 @@ Template.manualContentCreator.helpers({
     return getDraftMessageClass(instance.draftPersistenceLevel.get());
   },
 
+  draftPersistenceMessageIcon() {
+    const instance = Template.instance() as any;
+    return getDraftMessageIcon(instance.draftPersistenceLevel.get());
+  },
+
   draftPersistenceBusy() {
     return !!(Template.instance() as any).draftPersistenceBusy.get();
+  },
+
+  manualConfirmation() {
+    return (Template.instance() as any).manualConfirmation.get();
   },
 
   draftPersistenceAttrs() {
@@ -589,10 +629,15 @@ Template.manualContentCreator.events({
     void saveCurrentDraft(instance);
   },
 
-  'click #manual-delete-draft'(event: any, instance: any) {
+  async 'click #manual-delete-draft'(event: any, instance: any) {
     event.preventDefault();
     const lessonName = String(instance.state.get()?.lessonName || 'this draft').trim() || 'this draft';
-    if (!confirm(`Delete saved draft "${lessonName}" and leave the creator?`)) {
+    const confirmed = await requestManualConfirmation(instance, {
+      title: `Delete saved draft "${lessonName}"?`,
+      message: 'The draft will be deleted and you will return to the content manager.',
+      confirmLabel: 'Delete draft'
+    });
+    if (!confirmed) {
       return;
     }
     void deleteCurrentDraft(instance, { redirectToContent: true });
@@ -603,6 +648,7 @@ Template.manualContentCreator.events({
     const currentStep = instance.wizardStep.get();
     if (currentStep <= 1) return;
     instance.stepErrors.set([]);
+    clearManualConfirmation(instance);
     clearSuccessDraftMessage(instance);
     instance.wizardStep.set(currentStep - 1);
   },
@@ -691,6 +737,7 @@ Template.manualContentCreator.events({
     }
 
     instance.stepErrors.set([]);
+    clearManualConfirmation(instance);
     clearGeneratedArtifacts(instance);
     clearSuccessDraftMessage(instance);
   },
@@ -702,6 +749,7 @@ Template.manualContentCreator.events({
       rows: [...state.rows, createStarterRow(Random.id())]
     }));
     instance.stepErrors.set([]);
+    clearManualConfirmation(instance);
     clearGeneratedArtifacts(instance);
     clearSuccessDraftMessage(instance);
   },
@@ -728,6 +776,7 @@ Template.manualContentCreator.events({
       };
     });
     instance.stepErrors.set([]);
+    clearManualConfirmation(instance);
     clearGeneratedArtifacts(instance);
     clearSuccessDraftMessage(instance);
   },
@@ -742,6 +791,7 @@ Template.manualContentCreator.events({
       rows: state.rows.filter((row) => row.id !== rowId)
     }));
     instance.stepErrors.set([]);
+    clearManualConfirmation(instance);
     clearGeneratedArtifacts(instance);
     clearSuccessDraftMessage(instance);
   },
@@ -760,6 +810,7 @@ Template.manualContentCreator.events({
       ))
     }));
     instance.stepErrors.set([]);
+    clearManualConfirmation(instance);
     clearGeneratedArtifacts(instance);
     clearSuccessDraftMessage(instance);
   },
@@ -828,7 +879,12 @@ Template.manualContentCreator.events({
       try {
         const existingFile = await (Meteor as any).callAsync('getUserAssetByName', fileName);
         if (existingFile) {
-          if (!confirm('Uploading this file will overwrite existing data. Continue?')) {
+          const confirmed = await requestManualConfirmation(instance, {
+            title: 'Overwrite existing package?',
+            message: 'Uploading this file will overwrite existing data.',
+            confirmLabel: 'Overwrite and upload'
+          });
+          if (!confirmed) {
             return;
           }
           await (Meteor as any).callAsync('removeAssetById', existingFile._id);
@@ -889,7 +945,12 @@ Template.manualContentCreator.events({
                   prompts.push(`Previous ${res.data.TDF.content.tdfs.tutor.setspec.stimulusfile} already exists and will be overwritten. Continue?`);
                 }
 
-                if (prompts.length === 0 || confirm(prompts.join('\n'))) {
+                const confirmed = prompts.length === 0 || await requestManualConfirmation(instance, {
+                  title: 'Overwrite existing TDF content?',
+                  message: prompts.join(' '),
+                  confirmLabel: 'Overwrite content'
+                });
+                if (confirmed) {
                   instance.uploadStatus.set({
                     message: 'Confirming TDF update...',
                     progress: 92
@@ -934,5 +995,19 @@ Template.manualContentCreator.events({
   'click #manual-return-to-content'(event: any, _instance: any) {
     event.preventDefault();
     FlowRouter.go('/contentUpload');
+  },
+
+  'click #cancel-manual-confirmation'(event: any, instance: any) {
+    event.preventDefault();
+    clearManualConfirmation(instance);
+  },
+
+  'click #confirm-manual-confirmation'(event: any, instance: any) {
+    event.preventDefault();
+    const pending = instance.manualConfirmation.get();
+    if (pending?.resolve) {
+      pending.resolve(true);
+    }
+    instance.manualConfirmation.set(null);
   }
 });

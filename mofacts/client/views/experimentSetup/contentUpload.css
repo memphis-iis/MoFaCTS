@@ -78,7 +78,7 @@
 
 .asset-title-row {
     display: grid;
-    grid-template-columns: max-content max-content;
+    grid-template-columns: minmax(0, max-content) max-content;
     align-items: center;
     column-gap: calc(40px * var(--app-density-scale));
     row-gap: calc(0.3rem * var(--app-density-scale));
@@ -141,6 +141,31 @@
 
 .asset-error {
     color: var(--feedback-error-color);
+}
+
+.pending-upload-row {
+    background-color: var(--app-state-info-surface-color);
+    border-left: calc(4px * var(--app-density-scale)) solid var(--app-info-color);
+}
+
+.pending-upload-row.pending-checking,
+.pending-upload-row.pending-uploading,
+.pending-upload-row.pending-processing {
+    min-height: calc(5rem * var(--app-density-scale));
+}
+
+.pending-upload-row.pending-completed {
+    background-color: var(--app-state-success-surface-color);
+    border-left-color: var(--app-success-color);
+}
+
+.pending-upload-row.pending-error {
+    background-color: var(--app-state-error-surface-color);
+    border-left-color: var(--app-error-color);
+}
+
+.pending-upload-row .asset-cell-content {
+    min-height: calc(4.35rem * var(--app-density-scale));
 }
 
 .asset-accessors-list {
@@ -223,12 +248,8 @@
 }
 
 .content-upload-progress {
-    height: calc(8px * var(--app-density-scale));
     margin-top: var(--app-space-2-px);
-}
-
-.content-upload-progress-note {
-    margin-top: var(--app-space-1-px);
+    max-width: 34rem;
 }
 
 .content-upload-empty-text {
@@ -273,6 +294,10 @@
     justify-content: center;
     max-width: 220px;
     margin: 0 auto;
+}
+
+.action-buttons-row.admin-icon-button-group {
+    width: fit-content;
 }
 
 .action-buttons-row .btn-icon {

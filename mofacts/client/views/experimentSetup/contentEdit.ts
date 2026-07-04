@@ -32,6 +32,19 @@ const clone = (obj: any) => JSON.parse(JSON.stringify(obj));
 let cachedStimSchema: any = null;
 const SAVE_SUCCESS_REDIRECT_DELAY_MS = 1000;
 
+function setEditorMessage(instance: any, type: string, title: string, text: string) {
+    instance.editorMessage.set({
+        type,
+        title,
+        text,
+        icon: type === 'success' ? 'fa-check-circle' : type === 'warning' ? 'fa-exclamation-triangle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'
+    });
+}
+
+function clearEditorMessage(instance: any) {
+    instance.editorMessage.set(null);
+}
+
 function showSaveFeedbackAndRedirect(instance: any, message: string) {
     if (instance._saveRedirectTimer) {
         Meteor.clearTimeout(instance._saveRedirectTimer);
@@ -59,6 +72,8 @@ Template.contentEdit.onCreated(function(this: any) {
     instance.schemaLoaded = new ReactiveVar(false);
     instance.editorReady = new ReactiveVar(false);  // Track when editor has finished initializing
     instance.saveFeedback = new ReactiveVar('');
+    instance.editorMessage = new ReactiveVar(null);
+    instance.removeIncorrectConfirmation = new ReactiveVar(false);
     instance.tooltipMode = new ReactiveVar(getTooltipMode());
     instance.currentClusterIndex = new ReactiveVar(0); // window start index
     instance.clusterWindowSize = new ReactiveVar(1);   // how many clusters shown at once
@@ -205,6 +220,14 @@ Template.contentEdit.helpers({
         return (Template.instance() as any).saveFeedback.get();
     },
 
+    editorMessage() {
+        return (Template.instance() as any).editorMessage.get();
+    },
+
+    removeIncorrectConfirmation() {
+        return (Template.instance() as any).removeIncorrectConfirmation.get();
+    },
+
     clustersCount() {
         const instance = Template.instance() as any as any;
         const count = instance.clustersCount?.get?.();
@@ -332,8 +355,13 @@ Template.contentEdit.events({
         const modal = (globalThis as any).bootstrap.Modal.getInstance(document.getElementById('generateIncorrectModal') as any);
         if (modal) modal.hide();
 
-        // Show result
-        alert(`Generated ${count} incorrect response(s) for each of ${result.generated} stims (from pool of ${result.totalStims} total answers).`);
+        instance.removeIncorrectConfirmation.set(false);
+        setEditorMessage(
+            instance,
+            'success',
+            'Incorrect responses generated',
+            `Generated ${count} incorrect response(s) for each of ${result.generated} stims from a pool of ${result.totalStims} total answers.`
+        );
     },
 
     // Remove All Incorrect Responses
@@ -341,12 +369,22 @@ Template.contentEdit.events({
         event.preventDefault();
         if (!instance.editor) return;
 
-        if (!confirm('Remove all incorrect responses from all stims?\n\nThis will convert MC questions back to text input mode.')) {
-            return;
-        }
+        instance.removeIncorrectConfirmation.set(true);
+        clearEditorMessage(instance);
+    },
+
+    'click #cancelRemoveIncorrectBtn'(event: any, instance: any) {
+        event.preventDefault();
+        instance.removeIncorrectConfirmation.set(false);
+    },
+
+    'click #confirmRemoveIncorrectBtn'(event: any, instance: any) {
+        event.preventDefault();
+        if (!instance.editor) return;
 
         const result = removeAllIncorrectResponses(instance);
-        alert(`Removed incorrect responses from ${result.removed} stims.`);
+        instance.removeIncorrectConfirmation.set(false);
+        setEditorMessage(instance, 'success', 'Incorrect responses removed', `Removed incorrect responses from ${result.removed} stims.`);
     },
 
     async 'click .save-btn'(event: any, instance: any) {
@@ -363,8 +401,8 @@ Template.contentEdit.events({
         // Run json-editor schema validation
         const schemaErrors = instance.editor.validate();
         if (schemaErrors.length > 0) {
-            const errorMessages = schemaErrors.map((e: any) => `${e.path}: ${e.message}`).join('\n');
-            alert('Schema validation errors:\n' + errorMessages);
+            const errorMessages = schemaErrors.map((e: any) => `${e.path}: ${e.message}`).join('; ');
+            setEditorMessage(instance, 'error', 'Schema validation errors', errorMessages);
             return;
         }
 
@@ -377,11 +415,12 @@ Template.contentEdit.events({
                 if (summaryEl) {
                     summaryEl.scrollIntoView({ behavior: 'smooth' });
                 }
-                alert('Please fix the validation errors before saving.');
+                setEditorMessage(instance, 'warning', 'Validation errors need attention', 'Please fix the validation errors before saving.');
                 return;
             }
         }
 
+        clearEditorMessage(instance);
         instance.saving.set(true);
 
         try {
@@ -406,7 +445,7 @@ Template.contentEdit.events({
 
         } catch (error: any) {
             clientConsole(1, '[Content Edit] Error saving stimuli:', error);
-            alert('Error saving stimuli: ' + (error.reason || error.message));
+            setEditorMessage(instance, 'error', 'Error saving stimuli', error.reason || error.message);
         } finally {
             instance.saving.set(false);
         }
@@ -432,7 +471,7 @@ async function loadStimSchema(instance: any) {
         instance.schemaLoaded.set(true);
     } catch (error: any) {
         clientConsole(1, '[Content Edit] Error loading stim schema:', error);
-        alert('Error loading stimulus schema. Please refresh the page.');
+        setEditorMessage(instance, 'error', 'Error loading stimulus schema', 'Please refresh the page.');
     }
 }
 
@@ -986,7 +1025,7 @@ function getAcceptType(mediaType: any) {
 /**
  * Handle media file upload using (globalThis as any).DynamicAssets (ostrio:files)
  */
-async function handleMediaUpload(file: any, mediaType: any, input: any, preview: any, _instance?: any) {
+async function handleMediaUpload(file: any, mediaType: any, input: any, preview: any, instance?: any) {
     // Validate file type
     const validTypes: Record<string, string[]> = {
         image: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'],
@@ -995,7 +1034,9 @@ async function handleMediaUpload(file: any, mediaType: any, input: any, preview:
     };
 
     if (!validTypes[mediaType]?.some(type => file.type.startsWith(type.split('/')[0]))) {
-        alert(`Please select a valid ${mediaType} file.`);
+        if (instance?.editorMessage) {
+            setEditorMessage(instance, 'warning', 'Invalid media file', `Please select a valid ${mediaType} file.`);
+        }
         return;
     }
 
@@ -1197,7 +1238,7 @@ function renderClusterEditor(instance: any, clusterIndex: any) {
 
     if (typeof (globalThis as any).JSONEditor === 'undefined') {
         clientConsole(1, '[Content Edit] JSONEditor not loaded. Make sure json-editor CDN is included.');
-        alert('Editor library not loaded. Please refresh the page.');
+        setEditorMessage(instance, 'error', 'Editor library not loaded', 'Please refresh the page.');
         return;
     }
 

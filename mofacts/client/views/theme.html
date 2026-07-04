@@ -5,6 +5,28 @@
         <div class="container theme-settings-container">
             <h3 class="page-header-title">Theme Settings</h3>
 
+            {{#if themeMessage}}
+                <div class="admin-status admin-status-{{themeMessage.level}} admin-message" role="status" aria-live="polite">
+                    <i class="fa {{themeMessage.icon}}"></i>
+                    <div class="admin-status-text">{{themeMessage.text}}</div>
+                </div>
+            {{/if}}
+
+            {{#if themeConfirmation}}
+                <div class="admin-inline-confirmation admin-form-row" role="alert">
+                    <div>
+                        <div class="admin-inline-confirmation-title">{{themeConfirmation.title}}</div>
+                        <div class="admin-inline-confirmation-message">{{themeConfirmation.message}}</div>
+                    </div>
+                    <div class="admin-inline-confirmation-actions">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="cancel-theme-confirmation">Cancel</button>
+                        <button type="button" class="btn btn-sm {{themeConfirmation.confirmClass}}" id="confirm-theme-confirmation">
+                            {{themeConfirmation.confirmLabel}}
+                        </button>
+                    </div>
+                </div>
+            {{/if}}
+
             <div class="admin-section">
                 <div class="card admin-card">
                     <div class="card-body">
@@ -41,8 +63,9 @@
                                     </div>
                                 {{/each}}
                             {{else}}
-                                <div class="alert alert-info admin-empty-text">
-                                    No themes have been registered yet. Import a theme below or duplicate an existing one.
+                                <div class="admin-status admin-empty-text">
+                                    <i class="fa fa-info-circle"></i>
+                                    <div class="admin-status-text">No themes have been registered yet. Import a theme below or duplicate an existing one.</div>
                                 </div>
                             {{/if}}
                         </div>

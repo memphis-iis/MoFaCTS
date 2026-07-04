@@ -31,6 +31,31 @@
 
     <!-- Wizard Content -->
     <div class="wizard-content">
+      {{#if wizardMessage}}
+      <div class="admin-status admin-status-{{wizardMessage.type}} wizard-card">
+        <i class="fa {{wizardMessage.icon}}"></i>
+        <div class="admin-status-text">
+          <div class="admin-status-title">{{wizardMessage.title}}</div>
+          <div>{{wizardMessage.text}}</div>
+        </div>
+      </div>
+      {{/if}}
+
+      {{#if inlineConfirmation}}
+      <div class="admin-inline-confirmation wizard-card">
+        <i class="fa {{inlineConfirmation.icon}}" aria-hidden="true"></i>
+        <div>
+          <div class="admin-inline-confirmation-title">{{inlineConfirmation.title}}</div>
+          <div class="admin-inline-confirmation-message">{{inlineConfirmation.message}}</div>
+        </div>
+        <div class="admin-inline-confirmation-actions">
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="cancel-inline-confirmation">Cancel</button>
+          <button type="button" class="btn btn-sm {{inlineConfirmation.confirmClass}}" id="confirm-inline-confirmation">
+            {{inlineConfirmation.confirmLabel}}
+          </button>
+        </div>
+      </div>
+      {{/if}}
 
       <!-- Step 1: Upload & Analyze -->
       {{#if isStep 1}}
@@ -47,19 +72,26 @@
 
 
         {{#if analyzing}}
-        <div class="alert alert-info">
-          <i class="fa fa-spinner fa-spin"></i> Analyzing deck structure...
-          <div class="wizard-status-detail">
-            <small>• Parsing SQLite database</small><br>
-            <small>• Extracting fields and card templates</small><br>
-            <small>• Analyzing media files</small>
+        <div class="admin-status">
+          <i class="fa fa-spinner fa-spin"></i>
+          <div class="admin-status-text">
+            <div class="admin-status-title">Analyzing deck structure...</div>
+            <div class="wizard-status-detail">
+              <small>Parsing SQLite database</small><br>
+              <small>Extracting fields and card templates</small><br>
+              <small>Analyzing media files</small>
+            </div>
           </div>
         </div>
         {{/if}}
 
         {{#if analyzeError}}
-        <div class="alert alert-danger">
-          <strong>Error:</strong> {{analyzeError}}
+        <div class="admin-status admin-status-error">
+          <i class="fa fa-exclamation-circle"></i>
+          <div class="admin-status-text">
+            <div class="admin-status-title">Error</div>
+            <div>{{analyzeError}}</div>
+          </div>
         </div>
         {{/if}}
 
@@ -211,14 +243,16 @@
               </div>
 
               {{#if validationError}}
-              <div class="alert alert-warning">
-                <i class="fa fa-exclamation-triangle"></i> {{validationError}}
+              <div class="admin-status admin-status-warning admin-status-small">
+                <i class="fa fa-exclamation-triangle"></i>
+                <div class="admin-status-text">{{validationError}}</div>
               </div>
               {{/if}}
 
               {{#if isValid}}
-              <div class="alert alert-success">
-                <i class="fa fa-check"></i> Configuration looks good.
+              <div class="admin-status admin-status-success admin-status-small">
+                <i class="fa fa-check"></i>
+                <div class="admin-status-text">Configuration looks good.</div>
               </div>
               {{/if}}
 
@@ -273,8 +307,12 @@
       {{#if isStep 3}}
       <div class="wizard-step step-draft-editor">
         {{#if generateError}}
-        <div class="alert alert-danger">
-          <strong>Packaging error:</strong> {{generateError}}
+        <div class="admin-status admin-status-error">
+          <i class="fa fa-exclamation-circle"></i>
+          <div class="admin-status-text">
+            <div class="admin-status-title">Packaging error</div>
+            <div>{{generateError}}</div>
+          </div>
         </div>
         {{/if}}
         {{> draftEditorWorkspace
@@ -292,40 +330,50 @@
         <h4>Step 4: {{#if generationComplete}}Package Ready{{else}}Generating...{{/if}}</h4>
 
         {{#if generating}}
-        <div class="alert alert-info">
-          <i class="fa fa-spinner fa-spin"></i> Generating TDF{{#if isMultipleMode}}s{{/if}}...
-          <div class="progress wizard-status-detail">
-            <div class="progress-bar progress-bar-striped progress-bar-animated"
+        <div class="admin-status">
+          <i class="fa fa-spinner fa-spin"></i>
+          <div class="admin-status-text">
+            <div class="admin-status-title">Generating TDF{{#if isMultipleMode}}s{{/if}}...</div>
+            <div class="admin-progress-row wizard-status-detail">
+              <div class="admin-progress-track">
+                <div class="admin-progress-bar progress-bar-striped progress-bar-animated"
                  style="width: {{generationProgress}}%">
-              {{generationProgress}}%
+                  {{generationProgress}}%
+                </div>
+              </div>
             </div>
-          </div>
-          <div class="wizard-status-detail">
             {{#if currentGenerationStep}}
-            <small>{{currentGenerationStep}}</small>
+            <div class="admin-progress-note">{{currentGenerationStep}}</div>
             {{/if}}
           </div>
         </div>
         {{/if}}
 
         {{#if generateError}}
-        <div class="alert alert-danger">
-          <strong>Error:</strong> {{generateError}}
+        <div class="admin-status admin-status-error">
+          <i class="fa fa-exclamation-circle"></i>
+          <div class="admin-status-text">
+            <div class="admin-status-title">Error</div>
+            <div>{{generateError}}</div>
           <button class="btn btn-sm btn-secondary wizard-status-detail" id="back-to-config-error">
             ← Back to Configuration
           </button>
+          </div>
         </div>
         {{/if}}
 
         {{#if generationComplete}}
-        <div class="alert alert-success">
-          <i class="fa fa-check"></i> <strong>Generation Complete!</strong>
+        <div class="admin-status admin-status-success">
+          <i class="fa fa-check"></i>
+          <div class="admin-status-text">
+            <div class="admin-status-title">Generation Complete!</div>
+          </div>
         </div>
 
         {{#if generationResult.totalSkipped}}
-        <div class="alert alert-warning">
+        <div class="admin-status admin-status-warning">
           <i class="fa fa-exclamation-triangle"></i>
-          Skipped {{generationResult.totalSkipped}} cards while preparing the imported lessons.
+          <div class="admin-status-text">Skipped {{generationResult.totalSkipped}} cards while preparing the imported lessons.</div>
         </div>
         {{/if}}
 
@@ -352,25 +400,31 @@
         </div>
 
         {{#if uploadStatus}}
-        <div class="alert alert-info wizard-card">
-          <i class="fa fa-spinner fa-spin"></i> {{uploadStatus.message}}
-          <div class="progress wizard-status-detail">
-            <div class="progress-bar progress-bar-striped progress-bar-animated"
+        <div class="admin-status wizard-card">
+          <i class="fa fa-spinner fa-spin"></i>
+          <div class="admin-status-text">
+            <div class="admin-status-title">{{uploadStatus.message}}</div>
+            <div class="admin-progress-row wizard-status-detail">
+              <div class="admin-progress-track">
+                <div class="admin-progress-bar progress-bar-striped progress-bar-animated"
                  style="width: {{uploadStatus.progress}}%">
-              {{uploadStatus.progress}}%
+                  {{uploadStatus.progress}}%
+                </div>
+              </div>
             </div>
-          </div>
           {{#if uploadStatus.hint}}
-          <small class="text-muted wizard-status-detail d-block">
+          <small class="admin-progress-note wizard-status-detail d-block">
             {{uploadStatus.hint}}
           </small>
           {{/if}}
+          </div>
         </div>
         {{/if}}
 
         {{#if uploadError}}
-        <div class="alert alert-danger wizard-card">
-          <i class="fa fa-exclamation-triangle"></i> {{uploadError}}
+        <div class="admin-status admin-status-error wizard-card">
+          <i class="fa fa-exclamation-triangle"></i>
+          <div class="admin-status-text">{{uploadError}}</div>
         </div>
         {{/if}}
 
@@ -393,11 +447,14 @@
         </div>
 
         {{#if uploadComplete}}
-        <div class="alert alert-success wizard-card">
-          <i class="fa fa-check"></i> Successfully uploaded to MoFaCTS!
-          <button class="btn btn-sm btn-primary wizard-status-detail" id="close-wizard">
-            Close Wizard
-          </button>
+        <div class="admin-status admin-status-success wizard-card">
+          <i class="fa fa-check"></i>
+          <div class="admin-status-text">
+            <div class="admin-status-title">Successfully uploaded to MoFaCTS!</div>
+            <button class="btn btn-sm btn-primary wizard-status-detail" id="close-wizard">
+              Close Wizard
+            </button>
+          </div>
         </div>
         {{/if}}
 

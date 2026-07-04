@@ -2,6 +2,13 @@
   <div class="container admin-page">
     <h3 class="page-header-title">Audio Settings</h3>
 
+    {{#if audioSettingsMessage}}
+      <div class="admin-status admin-status-{{audioSettingsMessage.level}} admin-message" role="status" aria-live="polite">
+        <i class="fa {{audioSettingsMessage.icon}}"></i>
+        <div class="admin-status-text">{{audioSettingsMessage.text}}</div>
+      </div>
+    {{/if}}
+
     <!-- Text-to-Speech Section -->
     <div class="admin-section">
       <div class="card admin-card">
@@ -190,8 +197,9 @@
                     </p>
 
                     {{#if speechAPIKeyIsSetup}}
-                      <div class="alert alert-success border-success admin-form-row-sm" role="alert">
-                        <i class="fa fa-check-circle"></i> Speech API key is configured
+                      <div class="admin-status admin-status-success admin-status-small admin-form-row-sm" role="status">
+                        <i class="fa fa-check-circle"></i>
+                        <div class="admin-status-text">Speech API key is configured</div>
                       </div>
                     {{/if}}
 

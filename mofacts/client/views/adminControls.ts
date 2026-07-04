@@ -28,14 +28,13 @@ function setAdminMessage(text: string | null, level = 'info'): void {
         return;
     }
 
-    let className = 'alert-info';
-    if (level === 'error') {
-        className = 'alert-danger';
-    } else if (level === 'success') {
-        className = 'alert-success';
-    }
+    const icon = level === 'error'
+        ? 'fa-times-circle'
+        : level === 'success'
+            ? 'fa-check-circle'
+            : 'fa-info-circle';
 
-    Session.set(ADMIN_MESSAGE_KEY, { text, className });
+    Session.set(ADMIN_MESSAGE_KEY, { text, level, icon });
 }
 
 Template.adminControls.onCreated(async function (this: { autoruns: Array<{ stop(): void }>; subscribe(name: string): void }) {

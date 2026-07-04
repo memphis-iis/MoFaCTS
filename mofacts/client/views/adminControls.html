@@ -5,8 +5,9 @@
         <h3 class="page-header-title">Admin Control Panel</h3>
 
         {{#if adminMessage}}
-        <div class="alert {{adminMessage.className}} admin-message" role="status" aria-live="polite">
-            {{adminMessage.text}}
+        <div class="admin-status admin-status-{{adminMessage.level}} admin-message" role="status" aria-live="polite">
+            <i class="fa {{adminMessage.icon}}" aria-hidden="true"></i>
+            <div class="admin-status-text">{{adminMessage.text}}</div>
         </div>
         {{/if}}
 
@@ -25,7 +26,7 @@
                         </div>
                         <div class="col-md-6">
                             {{#if serverStatus.error}}
-                            <span class="text-danger">{{serverStatus.error}}</span>
+                            <span class="admin-badge admin-badge-error">{{serverStatus.error}}</span>
                             {{else}}
                             Used {{serverStatus.diskSpacePercent}}%, Remaining {{serverStatus.remainingSpace}} of {{serverStatus.diskSpace}} GB
                             {{/if}}

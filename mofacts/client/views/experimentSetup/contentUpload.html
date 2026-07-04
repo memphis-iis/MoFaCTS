@@ -8,7 +8,7 @@
             background: var(--app-subtle-surface-color);
             color: var(--app-text-color);
             border: 1px solid var(--border-color);
-            border-radius: 4px;
+            border-radius: var(--app-border-radius-sm);
             padding: var(--app-space-3);
             margin-top: 0.75rem;
         }
@@ -16,13 +16,13 @@
         /* Drop Zone */
         .media-drop-zone {
             border: 2px dashed var(--border-color);
-            border-radius: 4px;
+            border-radius: var(--app-border-radius-sm);
             padding: var(--app-space-3);
             text-align: center;
             background: var(--learning-card-surface-color);
             color: var(--app-secondary-text-color);
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: border-color var(--app-transition-fast) ease, background-color var(--app-transition-fast) ease, color var(--app-transition-fast) ease;
             margin-bottom: 1rem;
         }
 
@@ -60,10 +60,6 @@
         /* Upload Progress */
         .media-upload-progress {
             margin-bottom: 1rem;
-        }
-
-        .media-upload-progress .progress {
-            height: 8px;
         }
 
         .media-upload-item {
@@ -164,56 +160,6 @@
             margin-bottom: 0.5rem;
         }
 
-        /* Optimistic UI - Pending Upload Row Styles */
-        .pending-upload-row {
-            background-color: var(--app-subtle-surface-color);
-            opacity: 0.95;
-            border-left: 4px solid var(--app-info-color);
-        }
-
-        .pending-upload-row.pending-error {
-            border-left-color: var(--feedback-error-color);
-            background-color: var(--app-error-surface-color);
-        }
-
-        /* Pulse animation for processing state */
-        @keyframes pulse-subtle {
-            0%, 100% { opacity: 0.95; }
-            50% { opacity: 1; }
-        }
-
-        .pending-upload-row.pending-processing {
-            animation: pulse-subtle 2s ease-in-out infinite;
-        }
-
-        /* Badge styling improvements */
-        .badge {
-            font-size: calc(var(--app-font-size-base) * 0.75);
-            font-weight: 500;
-            padding: var(--app-space-1) var(--app-space-2);
-            vertical-align: middle;
-        }
-
-        .badge .fa {
-            margin-right: 0.25rem;
-        }
-
-        /* Progress bar enhancements */
-        .progress {
-            background-color: var(--app-muted-surface-color);
-            border-radius: 4px;
-            overflow: hidden;
-        }
-
-        .progress-bar-animated {
-            animation: progress-bar-stripes 1s linear infinite;
-        }
-
-        @keyframes progress-bar-stripes {
-            0% { background-position: 1rem 0; }
-            100% { background-position: 0 0; }
-        }
-
     </style>
     <div class="container admin-page">
         <h3 class="page-header-title">Content Manager</h3>
@@ -284,23 +230,28 @@
                                                     {{/if}}
                                                 {{/unless}}
                                                 {{#if isPending}}
+                                                    {{#if (equals pendingStatus 'checking')}}
+                                                    <span class="admin-badge">
+                                                        <i class="fa fa-shield"></i> Checking
+                                                    </span>
+                                                    {{/if}}
                                                     {{#if (equals pendingStatus 'uploading')}}
-                                                    <span class="badge bg-primary">
+                                                    <span class="admin-badge">
                                                         <i class="fa fa-cloud-upload"></i> Uploading {{pendingProgress}}%
                                                     </span>
                                                     {{/if}}
                                                     {{#if (equals pendingStatus 'processing')}}
-                                                    <span class="badge bg-info">
-                                                        <i class="fa fa-cog fa-spin"></i> Processing...
+                                                    <span class="admin-badge">
+                                                        <i class="fa fa-cog fa-spin"></i> Processing
                                                     </span>
                                                     {{/if}}
                                                     {{#if (equals pendingStatus 'completed')}}
-                                                    <span class="badge bg-success">
+                                                    <span class="admin-badge admin-badge-success">
                                                         <i class="fa fa-check"></i> Complete
                                                     </span>
                                                     {{/if}}
                                                     {{#if (equals pendingStatus 'error')}}
-                                                    <span class="badge bg-danger">
+                                                    <span class="admin-badge admin-badge-error">
                                                         <i class="fa fa-exclamation-triangle"></i> Failed
                                                     </span>
                                                     {{/if}}
@@ -338,8 +289,8 @@
                                         <!-- Progress bar for pending upload/processing state -->
                                         {{#if isPending}}
                                             {{#if (equals pendingStatus 'uploading')}}
-                                            <div class="asset-info-block">
-                                                <div class="progress content-upload-progress">
+                                            <div class="asset-info-block admin-progress-row content-upload-progress">
+                                                <div class="progress">
                                                     <div class="progress-bar progress-bar-striped progress-bar-animated"
                                                          role="progressbar"
                                                          style="width: {{pendingProgress}}%"
@@ -349,14 +300,14 @@
                                                     </div>
                                                 </div>
                                                 <!-- Minimal metadata for pending uploads -->
-                                                <div class="text-muted content-upload-progress-note">
-                                                    <small>Upload started: {{fileName}}</small>
+                                                <div class="admin-progress-note">
+                                                    Upload started: {{fileName}}
                                                 </div>
                                             </div>
                                             {{/if}}
                                             {{#if (equals pendingStatus 'processing')}}
-                                            <div class="asset-info-block">
-                                                <div class="progress content-upload-progress">
+                                            <div class="asset-info-block admin-progress-row content-upload-progress">
+                                                <div class="progress">
                                                     <div class="progress-bar progress-bar-striped progress-bar-animated"
                                                          role="progressbar"
                                                          style="width: {{pendingProgress}}%"
@@ -365,8 +316,24 @@
                                                          aria-valuemax="100">
                                                     </div>
                                                 </div>
-                                                <div class="text-muted content-upload-progress-note">
-                                                    <small>Processing package and refreshing lesson list...</small>
+                                                <div class="admin-progress-note">
+                                                    Processing package and refreshing lesson list...
+                                                </div>
+                                            </div>
+                                            {{/if}}
+                                            {{#if (equals pendingStatus 'checking')}}
+                                            <div class="asset-info-block admin-progress-row content-upload-progress">
+                                                <div class="progress">
+                                                    <div class="progress-bar progress-bar-striped progress-bar-animated"
+                                                         role="progressbar"
+                                                         style="width: 8%"
+                                                         aria-valuenow="8"
+                                                         aria-valuemin="0"
+                                                         aria-valuemax="100">
+                                                    </div>
+                                                </div>
+                                                <div class="admin-progress-note">
+                                                    Checking package integrity before upload...
                                                 </div>
                                             </div>
                                             {{/if}}
@@ -411,11 +378,11 @@
                                                 </div>
 
                                                 <!-- Upload Progress (shown during uploads) -->
-                                                <div class="media-upload-progress" id="upload-progress-{{this._id}}" style="display: none;">
+                                                <div class="media-upload-progress admin-progress-row" id="upload-progress-{{this._id}}" style="display: none;">
                                                     <div class="progress">
                                                         <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
                                                     </div>
-                                                    <div class="upload-status small text-muted admin-form-row-sm">Uploading...</div>
+                                                    <div class="upload-status admin-progress-note">Uploading...</div>
                                                 </div>
 
                                                 <!-- Action Bar -->
@@ -428,6 +395,16 @@
                                                         <i class="fa fa-trash"></i> Delete Selected (<span class="selected-count">0</span>)
                                                     </button>
                                                 </div>
+                                                {{#if mediaConfirmationOpen _id}}
+                                                <div class="admin-inline-confirmation admin-form-row-sm" role="alert">
+                                                    <div class="admin-inline-confirmation-title">{{inlineConfirmationTitle}}</div>
+                                                    <div class="admin-inline-confirmation-message">{{inlineConfirmationMessage}}</div>
+                                                    <div class="admin-inline-confirmation-actions">
+                                                        <button type="button" class="btn btn-danger btn-sm inline-confirm-accept">{{inlineConfirmationConfirmLabel}}</button>
+                                                        <button type="button" class="btn btn-outline-secondary btn-sm inline-confirm-cancel">{{inlineConfirmationCancelLabel}}</button>
+                                                    </div>
+                                                </div>
+                                                {{/if}}
 
                                                 <!-- File List -->
                                                 {{#if assetsReady}}
@@ -600,7 +577,7 @@
                                     <!-- Regular TDF action buttons -->
                                     <div class="content-upload-actions">
                                         <!-- Edit buttons - read from selectors if present -->
-                                        <div class="action-buttons-row">
+                                        <div class="action-buttons-row admin-icon-button-group">
                                             <button id="content-edit-btn"
                                                     value="{{_id}}"
                                                     {{selectorDataAttr conditions}}
@@ -622,6 +599,16 @@
                                                 <button id="reset-conditions-btn" value="{{_id}}" class="btn-icon" title="Reset conditions"><span class="fa fa-refresh" aria-hidden="true"></span></button>
                                             {{/if}}
                                         </div>
+                                        {{#if assetActionConfirmationOpen _id}}
+                                        <div class="admin-inline-confirmation admin-form-row-top" role="alert">
+                                            <div class="admin-inline-confirmation-title">{{inlineConfirmationTitle}}</div>
+                                            <div class="admin-inline-confirmation-message">{{inlineConfirmationMessage}}</div>
+                                            <div class="admin-inline-confirmation-actions">
+                                                <button type="button" class="btn btn-danger btn-sm inline-confirm-accept">{{inlineConfirmationConfirmLabel}}</button>
+                                                <button type="button" class="btn btn-outline-secondary btn-sm inline-confirm-cancel">{{inlineConfirmationCancelLabel}}</button>
+                                            </div>
+                                        </div>
+                                        {{/if}}
                                     </div>
                                     {{/unless}}
                                 </td>
@@ -673,6 +660,22 @@
                             <input type="file" class="form-control" name="upload-file" id="upload-file" value="" accept=".zip">
                         </div>
                     </div>
+                    {{#if uploadMessageText}}
+                    <div class="admin-status admin-status-{{uploadMessageLevel}} admin-status-inline" role="status" aria-live="polite">
+                        <i class="fa {{uploadMessageIcon}}" aria-hidden="true"></i>
+                        <div class="admin-status-text">{{uploadMessageText}}</div>
+                    </div>
+                    {{/if}}
+                    {{#if uploadConfirmationOpen}}
+                    <div class="admin-inline-confirmation admin-form-row-top" role="alert">
+                        <div class="admin-inline-confirmation-title">{{inlineConfirmationTitle}}</div>
+                        <div class="admin-inline-confirmation-message">{{inlineConfirmationMessage}}</div>
+                        <div class="admin-inline-confirmation-actions">
+                            <button type="button" class="btn btn-danger btn-sm inline-confirm-accept">{{inlineConfirmationConfirmLabel}}</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm inline-confirm-cancel">{{inlineConfirmationCancelLabel}}</button>
+                        </div>
+                    </div>
+                    {{/if}}
                 </div>
             </div>
         </div>
@@ -751,6 +754,16 @@
                             <i class="fa fa-trash"></i> Delete All Uploaded Files
                         </button>
                     </div>
+                    {{#if adminDangerConfirmationOpen}}
+                    <div class="admin-inline-confirmation admin-form-row-top" role="alert">
+                        <div class="admin-inline-confirmation-title">{{inlineConfirmationTitle}}</div>
+                        <div class="admin-inline-confirmation-message">{{inlineConfirmationMessage}}</div>
+                        <div class="admin-inline-confirmation-actions">
+                            <button type="button" class="btn btn-danger btn-sm inline-confirm-accept">{{inlineConfirmationConfirmLabel}}</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm inline-confirm-cancel">{{inlineConfirmationCancelLabel}}</button>
+                        </div>
+                    </div>
+                    {{/if}}
                 </div>
             </div>
         </div>

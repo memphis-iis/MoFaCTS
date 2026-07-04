@@ -22,6 +22,15 @@
     <div class="container admin-page">
         <h3 class="page-header-title">Mechanical Turk</h3>
 
+        {{#if turkWorkflowMessage}}
+        <div class="admin-status admin-status-{{turkWorkflowMessage.level}} admin-message" role="status" aria-live="polite">
+            <i class="fa {{turkWorkflowMessage.icon}}"></i>
+            <div class="admin-status-text">
+                <pre class="admin-scroll-output admin-empty-text">{{turkWorkflowMessage.text}}</pre>
+            </div>
+        </div>
+        {{/if}}
+
     <!-- AWS Login Data -->
     <div class="admin-section">
         <div class="card admin-card">
@@ -68,8 +77,11 @@
                         <strong>Saved profile state:</strong> {{savedAwsProfileSummary}}
                     </div>
                     {{#if profileInlineStatus}}
-                    <div class="alert {{profileInlineStatusClass}} admin-form-row-top admin-alert-flush" role="alert">
-                        <pre class="admin-scroll-output admin-empty-text">{{profileInlineStatus}}</pre>
+                    <div class="admin-status admin-status-{{profileInlineStatusClass}} admin-form-row-top admin-alert-flush" role="status">
+                        <i class="fa {{profileInlineStatusIcon}}"></i>
+                        <div class="admin-status-text">
+                            <pre class="admin-scroll-output admin-empty-text">{{profileInlineStatus}}</pre>
+                        </div>
                     </div>
                     {{/if}}
                 </div>

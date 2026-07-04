@@ -705,11 +705,21 @@
         </div>
         {{else}}
         {{#if noData}}
-        <div class="alert alert-warning">
+        <div class="admin-status admin-status-warning">
             <i class="fa fa-exclamation-triangle"></i>
-            No stimulus data found for this TDF, or you don't have permission to edit it.
+            <div class="admin-status-text">No stimulus data found for this TDF, or you don't have permission to edit it.</div>
         </div>
         {{else}}
+
+        {{#if editorMessage}}
+        <div class="admin-status admin-status-{{editorMessage.type}} admin-form-row">
+            <i class="fa {{editorMessage.icon}}"></i>
+            <div class="admin-status-text">
+                <div class="admin-status-title">{{editorMessage.title}}</div>
+                <div>{{editorMessage.text}}</div>
+            </div>
+        </div>
+        {{/if}}
 
         {{#unless editorReady}}
         <!-- Show initializing message while editor loads -->
@@ -753,6 +763,20 @@
                 <i class="fa fa-trash"></i> Remove All Incorrect Responses
             </button>
         </div>
+        {{#if removeIncorrectConfirmation}}
+        <div class="admin-inline-confirmation admin-form-row-sm">
+            <div>
+                <div class="admin-inline-confirmation-title">Remove all incorrect responses?</div>
+                <div class="admin-inline-confirmation-message">This will convert multiple-choice questions back to text input mode.</div>
+            </div>
+            <div class="admin-inline-confirmation-actions">
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="cancelRemoveIncorrectBtn">Cancel</button>
+                <button type="button" class="btn btn-sm btn-danger" id="confirmRemoveIncorrectBtn">
+                    <i class="fa fa-trash"></i> Remove
+                </button>
+            </div>
+        </div>
+        {{/if}}
         {{/if}}
 
         <!-- Generate Incorrect Responses Modal -->
@@ -768,10 +792,12 @@
                             <label for="distractorCount" class="form-label">Number of distractors per question:</label>
                             <input type="number" class="form-control" id="distractorCount" value="3" min="1" max="20">
                         </div>
-                        <div class="alert alert-info small content-upload-empty-text">
+                        <div class="admin-status admin-status-small content-upload-empty-text">
                             <i class="fa fa-info-circle"></i>
-                            Distractors will be randomly selected from all other correct answers across all stims.
-                            Existing incorrect responses will be replaced.
+                            <div class="admin-status-text">
+                                Distractors will be randomly selected from all other correct answers across all stims.
+                                Existing incorrect responses will be replaced.
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">

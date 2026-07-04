@@ -37,7 +37,12 @@ function setBackupMessage(text: string | null, level = 'info'): void {
   }
   Session.set(BACKUP_MESSAGE_KEY, {
     text,
-    className: level === 'error' ? 'alert-danger' : (level === 'success' ? 'alert-success' : 'alert-info'),
+    level,
+    icon: level === 'error'
+      ? 'fa-times-circle'
+      : level === 'success'
+        ? 'fa-check-circle'
+        : 'fa-info-circle',
   });
 }
 
@@ -126,6 +131,18 @@ Template.adminBackups.helpers({
       return `${(bytes / 1024).toFixed(1)} KB`;
     }
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  },
+  statusLevel(status: string | undefined) {
+    if (status === 'complete' || status === 'verified') {
+      return 'success';
+    }
+    if (status === 'failed') {
+      return 'error';
+    }
+    if (status === 'running') {
+      return 'warning';
+    }
+    return '';
   },
   canVerify(status: string | undefined) {
     return status === 'complete' || status === 'verified' || status === 'failed';
