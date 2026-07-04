@@ -148,7 +148,18 @@ describe('analyticsMethods', function() {
     return createAnalyticsDeps({
       resolveAssignedRootTdfIdsForUser: async () => ['root-tdf'],
       Tdfs: {
-        find: () => ({ fetchAsync: async () => [] }),
+        find: (selector: Record<string, any>) => ({
+          fetchAsync: async () => {
+            const refs = selector.$or
+              ?.flatMap((term: Record<string, any>) => [
+                ...(term._id?.$in || []),
+                ...(term['content.fileName']?.$in || []),
+              ]) || [];
+            return refs.includes('child.json') || refs.includes('child-tdf')
+              ? [{ _id: 'child-tdf', content: { fileName: 'child.json' } }]
+              : [];
+          },
+        }),
         findOneAsync: async (selector: Record<string, unknown>) => {
           if (selector._id === 'root-tdf') {
             return {
@@ -366,7 +377,18 @@ describe('analyticsMethods', function() {
   it('insertHistory accepts course history for a resolved child of the assigned root TDF', async function() {
     const { deps, insertedHistory } = createAnalyticsDeps({
       Tdfs: {
-        find: () => ({ fetchAsync: async () => [] }),
+        find: (selector: Record<string, any>) => ({
+          fetchAsync: async () => {
+            const refs = selector.$or
+              ?.flatMap((term: Record<string, any>) => [
+                ...(term._id?.$in || []),
+                ...(term['content.fileName']?.$in || []),
+              ]) || [];
+            return refs.includes('child.json') || refs.includes('child-tdf')
+              ? [{ _id: 'child-tdf', content: { fileName: 'child.json' } }]
+              : [];
+          },
+        }),
         findOneAsync: async (selector: Record<string, unknown>) => {
           if (selector._id === 'root-tdf') {
             return {

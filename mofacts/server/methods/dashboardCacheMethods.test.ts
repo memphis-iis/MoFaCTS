@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import { computeCacheStats, computeSummaryStats, computeUsageSummary, createDashboardCacheMethods } from './dashboardCacheMethods';
+import { DASHBOARD_CACHE_VERSION } from './dashboardCacheShared';
 
 const disabledRedisBoundary = {
   enabled: false,
@@ -837,7 +838,7 @@ describe('dashboardCacheMethods', function() {
     const userId = 'learner-1';
     const cacheDoc: any = {
       userId,
-      version: 3,
+      version: DASHBOARD_CACHE_VERSION,
       tdfStats: {
         tdfA: {},
         tdfB: {}
@@ -973,7 +974,7 @@ describe('dashboardCacheMethods', function() {
     const userId = 'learner-1';
     let cacheDoc: any = {
       userId,
-      version: 3,
+      version: DASHBOARD_CACHE_VERSION,
       tdfStats: {},
       lastUpdated: new Date('2026-05-01T00:00:00.000Z')
     };
