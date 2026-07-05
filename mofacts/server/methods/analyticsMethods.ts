@@ -167,8 +167,21 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     if (!rootTdf) {
       return false;
     }
-    const conditionChildIds = await lessonFamilies.resolveConditionChildIdsForRoots([rootTdf]);
-    return conditionChildIds.includes(historyTdfId);
+    const setspec = rootTdf.content?.tdfs?.tutor?.setspec;
+    const childIds = new Set(
+      (await lessonFamilies.resolveConditionChildIdsForRoots([rootTdf]))
+        .map((id) => deps.normalizeCanonicalId(id))
+        .filter((id): id is string => typeof id === 'string')
+    );
+    if (Array.isArray(setspec?.condition)) {
+      for (const conditionId of await deps.resolveConditionTdfIds(setspec)) {
+        const normalizedConditionId = deps.normalizeCanonicalId(conditionId);
+        if (normalizedConditionId) {
+          childIds.add(normalizedConditionId);
+        }
+      }
+    }
+    return childIds.has(historyTdfId);
   }
 
   async function validateCourseAssignmentHistoryContext(historyRecord: UnknownRecord, tdfId: string, userId: string) {
