@@ -2,9 +2,9 @@
 
 ## Purpose
 
-This is a pre-implementation planning document. It does not claim that any remediation has been completed.
+This is an implementation-ready remediation plan. It does not claim that any remediation has been completed.
 
-The immediate goal is to decide whether the remediation plan is complete enough to implement safely. Implementation verification belongs after code changes are made and must not be treated as part of the plan-readiness review.
+Status: ready for implementation. The next task is to implement the remediation phases below, then run the post-implementation verification checklist against the resulting code. Implementation verification belongs after code changes are made and must not be treated as proof until the remediation is actually implemented and checked.
 
 Production was reported not loading on restrictive in-flight internet while other sites worked. The main suspected risks are:
 
@@ -24,21 +24,20 @@ The reliability target is: public startup routes should render a visible same-or
 - Keep route-specific internet features, such as help links, YouTube embeds, Wikipedia/Commons enrichment, Google Cloud sample audio, and user-authored remote media, outside this startup remediation unless they block public first paint.
 - Allow theme-provided remote `app_font_stylesheet_url` values only as non-blocking post-shell styling. A delayed or failed remote theme font must not block public first paint, `themeReady`, sign-in visibility, or home visibility.
 
-## Review Modes
+## Work Modes
 
-### Plan-Readiness Review
+### Implementation
 
-Use this before implementation. The reviewer should inspect the plan and relevant code only enough to confirm the plan is complete, coherent, and compatible with `AGENTS.md`.
+Use this plan as the implementation task. Make the code, asset, and documentation changes described in the phases below, preserving the repository invariants in `AGENTS.md`.
 
-Do not report implementation acceptance failures during this review unless the plan falsely claims the work is already done.
+Implementation should proceed phase by phase, but the final result must satisfy the full reliability target: public startup routes render a visible same-origin app shell, and users see a clear non-modal status when realtime startup data is delayed.
 
-Expected output:
+Implementation output should include:
 
-- Missing plan coverage.
-- Ambiguous or risky implementation guidance.
-- Any plan step that conflicts with `AGENTS.md`.
-- Any dependency, docs, TDF/config, or wiki implication that is not accounted for.
-- A readiness verdict: `Ready`, `Ready with plan follow-ups`, or `Not ready`.
+- Code and vendored-asset changes needed by the phases below.
+- Provenance notes for vendored assets.
+- Any required concise public-doc or wiki update, or a clear statement that no docs/wiki update was needed.
+- Verification results from the post-implementation checklist.
 
 ### Post-Implementation Verification
 
@@ -66,7 +65,7 @@ The plan must account for every external asset currently loaded by the global sh
 | External startup hints | `dns-prefetch` / `preconnect` for `cdn.jsdelivr.net`, `cdnjs.cloudflare.com`, `fonts.googleapis.com`, `fonts.gstatic.com` | Hint third-party startup domains before the app shell paints. | Remove from global first load. |
 | Google Font preconnect/link | `fonts.googleapis.com`, `fonts.gstatic.com`, `League Spartan` | No known required startup usage. | Remove from global first load unless usage is found and documented. Theme-provided font URLs may load later only as non-blocking styling. |
 | Plyr CSS | `https://cdnjs.cloudflare.com/ajax/libs/plyr/3.7.8/plyr.min.css` | Video-session styling only. | Move out of global startup; load from package or same-origin route asset. |
-| JSONEditor CSS/JS | `https://cdn.jsdelivr.net/npm/@json-editor/json-editor@2.15.2/...` | TDF/content/draft editor routes only. The JS is blocking in the document head. | Remove from global startup; lazy-load pinned same-origin vendored assets. |
+| JSONEditor JS | `https://cdn.jsdelivr.net/npm/@json-editor/json-editor@2.15.2/dist/jsoneditor.min.js` | TDF/content/draft editor routes only. The JS is blocking in the document head. | Remove from global startup; lazy-load the pinned same-origin vendored JS asset. The package/version does not ship a separate `dist/css/jsoneditor.min.css`; editor styling comes from same-origin Bootstrap 5, Font Awesome 4, and app CSS. |
 | Bootstrap JS bundle | `https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js` | Modal/collapse behavior. | Same-origin vendor asset, exact version first. |
 | Commented eruda script | `https://cdn.jsdelivr.net/npm/eruda` | Commented mobile debug aid. | Leave commented or remove in cleanup; it must not become an active startup dependency. |
 
@@ -88,10 +87,11 @@ Other intentional external URLs, such as help links, Wikipedia/Commons enrichmen
 
 - Remove JSONEditor CSS and JS from `mofacts/client/index.html`.
 - Remove the global `window.module` / `window.exports` shim from `mofacts/client/index.html` unless implementation proves another active same-origin startup asset still requires it.
-- Vendor the currently used JSONEditor browser assets as same-origin files:
+- Vendor the currently used JSONEditor browser asset as a same-origin file:
   - Package/version: `@json-editor/json-editor@2.15.2`.
   - Target location: `mofacts/public/vendor/json-editor/2.15.2/`.
-  - Required files: the minified JS and CSS currently loaded from jsDelivr.
+  - Required file: `dist/jsoneditor.min.js`.
+  - Do not vendor or load `dist/css/jsoneditor.min.css`; manual CDN/package verification showed that file does not exist for `@json-editor/json-editor@2.15.2`.
   - No npm dependency will be added for JSONEditor in this remediation.
   - No CDN fallback is allowed.
 - Add an editor-only loader, for example `ensureJsonEditor()`, used by:
@@ -99,7 +99,7 @@ Other intentional external URLs, such as help links, Wikipedia/Commons enrichmen
   - `mofacts/client/views/experimentSetup/contentEdit.ts`
   - `mofacts/client/views/experimentSetup/contentDraftEditor.ts`
   - `mofacts/client/views/experimentSetup/tdfDraftEditor.ts`
-- `ensureJsonEditor()` must load the same-origin CSS/JS once, resolve only after `window.JSONEditor` is available, and reject clearly if the asset fails to load.
+- `ensureJsonEditor()` must load the same-origin JS once, resolve only after `window.JSONEditor` is available, and reject clearly if the asset fails to load.
 - Editor routes must show a clear inline error if JSONEditor cannot load.
 - Include vendor provenance notes with exact version, original source URLs, license, update process, and reason for vendoring.
 
@@ -201,9 +201,9 @@ Acceptance criteria after implementation:
 - Home does not look blank when realtime, auth, role, or theme startup readiness is delayed.
 - Users can distinguish “page loaded, startup data pending” from a full page-load failure.
 
-## Plan-Readiness Checklist
+## Implementation-Readiness Checklist
 
-Before implementation, confirm:
+The readiness review has confirmed these requirements are explicit enough to implement:
 
 - Every external first-load asset in `mofacts/client/index.html` is inventoried above.
 - Every route-specific external script or WASM load in `mofacts/client/` is inventoried above.
