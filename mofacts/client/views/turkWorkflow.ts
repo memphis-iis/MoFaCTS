@@ -7,6 +7,12 @@ import { Mongo } from 'meteor/mongo';
 import { meteorCallAsync } from '..';
 import { displayify } from '../../common/globalHelpers';
 import { getErrorMessage } from '../lib/errorUtils';
+import {
+  cleanupBootstrapModalState,
+  getBootstrapModal,
+  hideBootstrapModal,
+  showBootstrapModal,
+} from '../lib/bootstrapModal';
 
 import { legacyInt, legacyTrim } from '../../common/underscoreCompat';
 
@@ -63,7 +69,7 @@ async function saveAndValidateAwsProfile(showModal: boolean) {
   const data = collectAwsProfileFormData();
 
   if (showModal) {
-    $('#profileWorkModal').modal('show');
+    showBootstrapModal('profileWorkModal', { backdrop: 'static', keyboard: false });
   }
 
   const result: any = await meteorCallAsync('saveUserAWSData', data);
@@ -154,7 +160,7 @@ function turkLogInsert(newRec: any) {
 function dismissTurkModalThenAlert(message: string, level = 'info') {
   const el = document.getElementById('turkModal');
   if (el) {
-    const instance = (window as any).bootstrap?.Modal?.getInstance(el);
+    const instance = getBootstrapModal(el);
     if (instance) {
       instance.hide();
       instance.dispose();
@@ -165,11 +171,7 @@ function dismissTurkModalThenAlert(message: string, level = 'info') {
     el.setAttribute('aria-hidden', 'true');
     el.style.display = 'none';
   }
-  // Remove any leftover backdrop
-  document.querySelectorAll('.modal-backdrop').forEach((b) => b.remove());
-  document.body.classList.remove('modal-open');
-  document.body.style.removeProperty('overflow');
-  document.body.style.removeProperty('padding-right');
+  cleanupBootstrapModalState();
   setTurkWorkflowMessage(level, message);
 }
 
@@ -285,20 +287,9 @@ Template.turkWorkflow.onCreated(function(this: any) {
 Template.turkWorkflow.rendered = async function(this: any) {
   const instance = this;
   // Init the modal dialogs
-  $('#turkModal').modal({
-    'backdrop': 'static',
-    'keyboard': false,
-    'show': false,
-  });
-  $('#profileWorkModal').modal({
-    'backdrop': 'static',
-    'keyboard': false,
-    'show': false,
-  });
-
-  $('#detailsModal').modal({
-    'show': false,
-  });
+  getBootstrapModal('turkModal', { backdrop: 'static', keyboard: false });
+  getBootstrapModal('profileWorkModal', { backdrop: 'static', keyboard: false });
+  getBootstrapModal('detailsModal');
 
   const allTdfs = (await meteorCallAsync('getTurkWorkflowExperiments')) as any[];
   const logExperiments: {
@@ -360,14 +351,14 @@ Template.turkWorkflow.events({
     const assignid = $('#turk-assignid').val();
     $('#turk-assign-results').text('Working on ' + assignid);
     $('#turkModalMessage').text('Looking up assignment\u2026');
-    $('#turkModal').modal('show');
+    showBootstrapModal('turkModal', { backdrop: 'static', keyboard: false });
     try {
       const result = await (Meteor as any).callAsync('turkGetAssignment', assignid);
-      $('#turkModal').modal('hide');
+      hideBootstrapModal('turkModal');
       const disp = 'Server returned:' + JSON.stringify(result, null, 2);
       $('#turk-assign-results').text(disp);
     } catch (error: unknown) {
-      $('#turkModal').modal('hide');
+      hideBootstrapModal('turkModal');
       const disp = 'Failed to handle turk approval. Error:' + getErrorMessage(error);
       $('#turk-assign-results').text(disp);
     }
@@ -375,7 +366,7 @@ Template.turkWorkflow.events({
 
   'click #profileWorkModalDissmiss': function(event: any) {
     event.preventDefault();
-    $('#profileWorkModal').modal('hide');
+    hideBootstrapModal('profileWorkModal');
   },
 
   'click #saveProfile': async function(event: any) {
@@ -409,14 +400,14 @@ Template.turkWorkflow.events({
     const msgtext = $('#turk-msg').val();
     
     $('#turkModalMessage').text('Sending message via Mechanical Turk\u2026');
-    $('#turkModal').modal('show');
+    showBootstrapModal('turkModal', { backdrop: 'static', keyboard: false });
     try {
       const result = await (Meteor as any).callAsync('turkSendMessage', workerid, msgtext);
-      $('#turkModal').modal('hide');
+      hideBootstrapModal('turkModal');
       const disp = 'Server returned:' + JSON.stringify(result, null, 2);
       setTurkWorkflowMessage('success', disp);
     } catch (error: unknown) {
-      $('#turkModal').modal('hide');
+      hideBootstrapModal('turkModal');
       const disp = 'Failed to handle turk approval. Error:' + getErrorMessage(error);
       setTurkWorkflowMessage('error', disp);
     }
@@ -469,7 +460,7 @@ Template.turkWorkflow.events({
     const msg = 'Thank you for participating';
 
     $('#turkModalMessage').text('Approving assignment via Mechanical Turk\u2026');
-    $('#turkModal').modal('show');
+    showBootstrapModal('turkModal', { backdrop: 'static', keyboard: false });
     try {
       const result = await (Meteor as any).callAsync('turkPay', rec.userId, expId, msg);
 
@@ -530,7 +521,7 @@ Template.turkWorkflow.events({
     const expFile =  legacyTrim(experimentFileName).replace(/\./g, '_');
 
     $('#turkModalMessage').text('Sending bonus via Mechanical Turk\u2026');
-    $('#turkModal').modal('show');
+    showBootstrapModal('turkModal', { backdrop: 'static', keyboard: false });
 
     try {
       const result = await (Meteor as any).callAsync('turkBonus', rec.userId, expFile, expId);
@@ -576,7 +567,7 @@ Template.turkWorkflow.events({
   'click .btn-pay-detail': function(event: any) {
     event.preventDefault();
 
-    $('#detailsModal').modal('hide');
+    hideBootstrapModal('detailsModal');
 
     let disp;
     try {
@@ -586,14 +577,14 @@ Template.turkWorkflow.events({
     }
 
     $('#detailsModalListing').text(disp);
-    $('#detailsModal').modal('show');
+    showBootstrapModal('detailsModal');
   },
 
   // Admin/Teachers - show previous bonus for a user in the Turk log view
   'click .btn-bonus-detail': function(event: any) {
     event.preventDefault();
 
-    $('#detailsModal').modal('hide');
+    hideBootstrapModal('detailsModal');
 
     let disp;
     try {
@@ -603,14 +594,14 @@ Template.turkWorkflow.events({
     }
 
     $('#detailsModalListing').text(disp);
-    $('#detailsModal').modal('show');
+    showBootstrapModal('detailsModal');
   },
 
   // Admin/Teachers - show previous email sched detail
   'click .btn-sched-detail': function(event: any) {
     event.preventDefault();
 
-    $('#detailsModal').modal('hide');
+    hideBootstrapModal('detailsModal');
 
     let disp;
     try {
@@ -620,14 +611,14 @@ Template.turkWorkflow.events({
     }
 
     $('#detailsModalListing').text(disp);
-    $('#detailsModal').modal('show');
+    showBootstrapModal('detailsModal');
   },
 
   // Admin/Teachers - show previous email send detail
   'click .btn-send-detail': function(event: any) {
     event.preventDefault();
 
-    $('#detailsModal').modal('hide');
+    hideBootstrapModal('detailsModal');
 
     let disp;
     try {
@@ -637,14 +628,14 @@ Template.turkWorkflow.events({
     }
 
     $('#detailsModalListing').text(disp);
-    $('#detailsModal').modal('show');
+    showBootstrapModal('detailsModal');
   },
 
   // Admin/Teachers - show delivery status details from scheduled message state
   'click .btn-delivery-detail': function(event: any) {
     event.preventDefault();
 
-    $('#detailsModal').modal('hide');
+    hideBootstrapModal('detailsModal');
 
     let disp;
     try {
@@ -654,7 +645,7 @@ Template.turkWorkflow.events({
     }
 
     $('#detailsModalListing').text(disp);
-    $('#detailsModal').modal('show');
+    showBootstrapModal('detailsModal');
   },
 });
 

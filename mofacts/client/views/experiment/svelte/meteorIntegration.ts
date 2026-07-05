@@ -39,9 +39,14 @@ function mountSvelteComponent(
 
   let component: unknown = null;
   let computation: { stop(): void } | null = null;
+  let destroyed = false;
   const propsStore = writable(props || {});
 
   function mountBridge() {
+    if (destroyed) {
+      return;
+    }
+
     component = mount(ComponentMountBridge, {
       target,
       props: {
@@ -54,6 +59,10 @@ function mountSvelteComponent(
   // If reactive props are provided, set up Tracker autorun
   if (getReactiveProps && typeof getReactiveProps === 'function') {
     computation = Tracker.autorun(() => {
+      if (destroyed) {
+        return;
+      }
+
       const reactiveProps = getReactiveProps();
       const allProps = { ...props, ...reactiveProps };
 
@@ -71,8 +80,10 @@ function mountSvelteComponent(
   // Return cleanup function
   return {
     cleanup() {
+      destroyed = true;
       if (computation) {
         computation.stop();
+        computation = null;
       }
       if (component) {
         unmount(component);

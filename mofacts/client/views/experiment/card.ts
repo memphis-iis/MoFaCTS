@@ -34,11 +34,12 @@ type CardTemplateInstance = {
 
 Template.card.onRendered(function (this: CardTemplateInstance) {
   const template = this;
+  template.isDestroyed = false;
   setLaunchLoadingMessage('Loading content...');
   markLaunchLoadingTiming('cardRoute:entered');
 
   Tracker.afterFlush(() => {
-    if (template.svelteMount) {
+    if (template.isDestroyed || template.svelteMount) {
       return;
     }
 
@@ -62,7 +63,7 @@ Template.card.onRendered(function (this: CardTemplateInstance) {
     markLaunchLoadingTiming('cardRoute:loadCardScreen:start');
     loadCardScreen().then((CardScreen) => {
       markLaunchLoadingTiming('cardRoute:loadCardScreen:complete');
-      if (template.isDestroyed || template.svelteMount) return;
+      if (template.isDestroyed || template.svelteMount || !target.isConnected) return;
       try {
         template.svelteMount = createBlazeMount(target, CardScreen, {}, getReactiveProps);
       } catch (error) {
@@ -79,6 +80,7 @@ Template.card.onRendered(function (this: CardTemplateInstance) {
 });
 
 Template.card.onDestroyed(function (this: CardTemplateInstance) {
+  this.isDestroyed = true;
   if (this.svelteMount) {
     this.svelteMount.cleanup();
     this.svelteMount = null;

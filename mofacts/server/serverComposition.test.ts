@@ -2155,6 +2155,8 @@ describe('condition count method authorization', function() {
 describe('course method authorization', function() {
   beforeEach(async function() {
     await clearServerCompositionCollections();
+    await Roles.createRoleAsync('admin', { unlessExists: true });
+    await Roles.createRoleAsync('teacher', { unlessExists: true });
   });
 
   it('denies course creation by non-teachers', async function() {
