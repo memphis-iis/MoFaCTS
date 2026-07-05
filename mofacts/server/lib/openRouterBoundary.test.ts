@@ -40,6 +40,22 @@ function findSourceServerRoot(): string {
 }
 
 describe('OpenRouter server boundary', function() {
+  it('keeps server OpenRouter code from importing client modules', function() {
+    const serverRoot = findSourceServerRoot();
+    const forbiddenClientImports = [
+      ['..', '..', 'client', 'lib', 'openRouterClient'].join('/'),
+      ['..', '..', 'client', 'lib', 'aiFlowLogger'].join('/'),
+      ['..', '..', 'client', 'lib', 'jsonExtraction'].join('/'),
+      ['..', '..', 'client', 'lib', 'autoTutorRelationshipEngine'].join('/'),
+    ];
+    const offenders = collectTypeScriptFiles(serverRoot).filter((filePath) => {
+      const source = fs.readFileSync(filePath, 'utf8');
+      return forbiddenClientImports.some((importPath) => source.includes(importPath));
+    });
+
+    expect(offenders.map((filePath) => path.relative(serverRoot, filePath))).to.deep.equal([]);
+  });
+
   it('keeps provider chat-completion calls out of server code', function() {
     const serverRoot = findSourceServerRoot();
     const openRouterChatCompletionsUrl = [

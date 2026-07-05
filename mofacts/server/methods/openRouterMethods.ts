@@ -1,12 +1,12 @@
 import { Meteor } from 'meteor/meteor';
 import { check, Match } from 'meteor/check';
-import { extractJsonObject } from '../../client/lib/jsonExtraction';
+import { extractJsonObject } from '../../common/lib/jsonExtraction';
 import {
   callOpenRouterEmbeddings,
   callOpenRouterJson,
   redactOpenRouterSecretText,
   type OpenRouterMessage,
-} from '../../client/lib/openRouterClient';
+} from '../../common/lib/openRouterClient';
 import {
   type ApiKeySource,
   getAdminOpenRouterModel,

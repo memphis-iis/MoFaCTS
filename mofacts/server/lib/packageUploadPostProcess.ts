@@ -1,11 +1,11 @@
 import type { UploadedPackageFile } from './packageParser';
 import type { PackageUploadRuntimeState, ProcessPackageUploadDeps } from './packageUploadShared';
 import { resolvePreferredApiKey } from './apiKeyResolution';
-import { callOpenRouterEmbeddings } from '../../client/lib/openRouterClient';
+import { callOpenRouterEmbeddings } from '../../common/lib/openRouterClient';
 import {
   AUTO_TUTOR_PRIMARY_EMBEDDING_MODEL,
   AUTO_TUTOR_SECONDARY_EMBEDDING_MODEL,
-} from '../../client/lib/autoTutorRelationshipEngine';
+} from '../../common/lib/autoTutorRelationshipConstants';
 import {
   computeClusterKcRelationshipsFromEmbeddings,
   createClusterKcGraphFacts,

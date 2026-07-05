@@ -10,10 +10,16 @@ import type {
 import {
   computeClusterKcRelationshipsFromEmbeddings,
 } from '../../../learning-components/runtime/clusterKcRelationshipEngine';
-
-export const AUTO_TUTOR_RELATIONSHIP_GRAPH_VERSION = 'autotutor-expectation-relationships-v1';
-export const AUTO_TUTOR_PRIMARY_EMBEDDING_MODEL = 'google/gemini-embedding-001';
-export const AUTO_TUTOR_SECONDARY_EMBEDDING_MODEL = 'openai/text-embedding-3-large';
+import {
+  AUTO_TUTOR_RELATIONSHIP_GRAPH_VERSION,
+  AUTO_TUTOR_PRIMARY_EMBEDDING_MODEL,
+  AUTO_TUTOR_SECONDARY_EMBEDDING_MODEL,
+} from '../../common/lib/autoTutorRelationshipConstants';
+export {
+  AUTO_TUTOR_RELATIONSHIP_GRAPH_VERSION,
+  AUTO_TUTOR_PRIMARY_EMBEDDING_MODEL,
+  AUTO_TUTOR_SECONDARY_EMBEDDING_MODEL,
+} from '../../common/lib/autoTutorRelationshipConstants';
 
 type NormalizedExpectation = Required<Pick<AiAutoTutorExpectation, 'id' | 'label' | 'proposition' | 'assertion'>>;
 
