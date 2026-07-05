@@ -1,7 +1,6 @@
 import { clientConsole } from '../../lib/clientLogger';
 import { installSchemaApplicabilityControls } from '../../lib/schemaApplicabilityEditor';
-
-const JSONEditorAny = (globalThis as any).JSONEditor;
+import { ensureJsonEditor } from '../../lib/jsonEditorLoader';
 
 let cachedSchema: any = null;
 
@@ -146,9 +145,7 @@ export async function createTdfDraftEditor(
   initialValue: Record<string, unknown>,
   onChange: (value: Record<string, unknown>) => void
 ): Promise<DraftEditorHandle> {
-  if (!JSONEditorAny) {
-    throw new Error('JSONEditor is not loaded.');
-  }
+  const JSONEditorAny = await ensureJsonEditor();
 
   const schema = await loadTdfSchema();
   const editorValue = removeEmptyProperties(initialValue);

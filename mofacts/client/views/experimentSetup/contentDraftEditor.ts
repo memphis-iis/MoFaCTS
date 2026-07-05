@@ -1,7 +1,6 @@
 import { clientConsole } from '../../lib/clientLogger';
 import { sortPropertiesModal } from '../../lib/schemaApplicabilityEditor';
-
-const JSONEditorAny = (globalThis as any).JSONEditor;
+import { ensureJsonEditor } from '../../lib/jsonEditorLoader';
 
 let cachedSchema: any = null;
 
@@ -169,9 +168,7 @@ export async function createContentDraftEditor(
   initialValue: Record<string, unknown>,
   _onChange: (value: Record<string, unknown>) => void
 ): Promise<DraftEditorHandle> {
-  if (!JSONEditorAny) {
-    throw new Error('JSONEditor is not loaded.');
-  }
+  const JSONEditorAny = await ensureJsonEditor();
 
   const schema = await loadStimSchema();
   const clusterSchema = extractClustersSchema(schema);

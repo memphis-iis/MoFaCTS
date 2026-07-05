@@ -14,6 +14,7 @@ export default [
       'mofacts/_build/**',
       'mofacts/coverage/**',
       'mofacts/public/h5p-standalone/**',
+      'mofacts/public/vendor/**',
       'deploy/local-data/**',
       'deploy/local-dev/**',
       'deploy/local-build/**',

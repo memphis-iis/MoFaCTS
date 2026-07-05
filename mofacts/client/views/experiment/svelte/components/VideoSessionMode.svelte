@@ -13,6 +13,7 @@
   import { legacyTrim } from '../../../../../common/underscoreCompat';
   import { parseYouTubeVideoUrl } from '../../../../lib/youtubeUrl';
   import { insertCompressedHistory } from '../../../../lib/historyWire';
+  import { ensureStylesheet } from '../../../../lib/cssAssetLoader';
 
   const dispatch = createEventDispatcher();
 
@@ -322,6 +323,7 @@
 
   onMount(() => {
     mounted = true;
+    ensureStylesheet('/vendor/plyr/3.8.4/plyr.css');
     // Use tick() to ensure DOM is fully rendered before first init
     tick().then(() => initializePlayer());
   });

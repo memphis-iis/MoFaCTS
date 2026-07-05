@@ -10,7 +10,7 @@ import { buildImportLessonDraft } from './importCompositionBuilder';
 import { parseImportIndexSpec } from './importRangeUtils';
 import { buildImportPackageFromDraftLessons } from './importPackageBuilder';
 import type { ImportDraftLesson } from './normalizedImportTypes';
-const initSqlJs: any = require('sql.js');
+import { ensureSqlJs } from './sqlJsLoader';
 
 const US = '\x1f'; // Anki field separator
 
@@ -22,10 +22,7 @@ let SQL: any = null;
  */
 async function initSQL(): Promise<any> {
   if (!SQL) {
-    SQL = await initSqlJs({
-      // Load sql.js WASM from CDN
-      locateFile: (file: any) => `https://sql.js.org/dist/${file}`
-    });
+    SQL = await ensureSqlJs();
   }
   return SQL;
 }

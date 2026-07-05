@@ -6,13 +6,13 @@ import { Tracker } from 'meteor/tracker';
 
 const FlowRouter = (globalThis as any).FlowRouter;
 const TdfsCollection = (globalThis as any).Tdfs;
-const JSONEditorAny = (globalThis as any).JSONEditor;
 import { meteorCallAsync } from '../..';
 import { clientConsole } from '../../lib/clientLogger';
 import { TDF_TOOLTIPS, getTooltipMode, setTooltipMode, injectDescriptions, updateDescriptionsInPlace, buildDescriptionCache } from '../../lib/tooltipContent';
 import { ValidatorEngine, ValidationContext } from '../../lib/validatorCore';
 import { createValidationSummary, applyFieldErrors, initValidationUI } from '../../lib/validatorUI';
 import { installSchemaApplicabilityControls, sortPropertiesModal } from '../../lib/schemaApplicabilityEditor';
+import { ensureJsonEditor } from '../../lib/jsonEditorLoader';
 
 /**
  * TDF Editor - Schema-driven editor using json-editor library
@@ -637,7 +637,7 @@ function injectLabelsForInputs(container: any, editor: any, rootArg?: any) {
 /**
  * Initialize the json-editor
  */
-function initEditor(instance: any, tdf: any) {
+async function initEditor(instance: any, tdf: any) {
     const container = document.getElementById('tdf-editor-container');
     if (!container || !cachedSchema) return;
 
@@ -704,11 +704,12 @@ function initEditor(instance: any, tdf: any) {
         keep_oneof_values: false  // Don't keep values when switching types
     };
 
-    // Initialize the editor
-    // JSONEditor is loaded via CDN and available globally
-    if (typeof JSONEditorAny === 'undefined') {
-        clientConsole(1, '[TDF Edit] JSONEditor not loaded. Make sure json-editor CDN is included.');
-        setEditorMessage(instance, 'error', 'Editor library not loaded', 'Please refresh the page.');
+    let JSONEditorAny;
+    try {
+        JSONEditorAny = await ensureJsonEditor();
+    } catch (error: any) {
+        clientConsole(1, '[TDF Edit] JSONEditor failed to load:', error);
+        setEditorMessage(instance, 'error', 'Editor library not loaded', 'Please refresh the page. If this keeps happening, contact support.');
         return;
     }
 

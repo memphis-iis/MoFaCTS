@@ -9,6 +9,7 @@ import { clientConsole } from '../../lib/clientLogger';
 import { ValidatorEngine, ValidationContext } from '../../lib/validatorCore';
 import { createValidationSummary, applyFieldErrors, initValidationUI } from '../../lib/validatorUI';
 import { sortPropertiesModal } from '../../lib/schemaApplicabilityEditor';
+import { ensureJsonEditor } from '../../lib/jsonEditorLoader';
 
 const FlowRouter = (globalThis as any).FlowRouter;
 const TdfsCollection = (globalThis as any).Tdfs || (globalThis as any).TdfsCollection;
@@ -1112,7 +1113,7 @@ async function handleMediaUpload(file: any, mediaType: any, input: any, preview:
 /**
  * Initialize the json-editor for stimuli
  */
-function initStimEditor(instance: any, tdf: any) {
+async function initStimEditor(instance: any, tdf: any) {
     const container = document.getElementById('stim-editor-container');
     if (!container || !cachedStimSchema) return;
 
@@ -1156,6 +1157,14 @@ function initStimEditor(instance: any, tdf: any) {
 
     // Inject tooltip descriptions based on current mode (brief or verbose)
     instance.clusterSchema = injectDescriptions(singleClusterSchema, STIM_TOOLTIPS, tooltipMode);
+
+    try {
+        await ensureJsonEditor();
+    } catch (error: any) {
+        clientConsole(1, '[Content Edit] JSONEditor failed to load:', error);
+        setEditorMessage(instance, 'error', 'Editor library not loaded', 'Please refresh the page. If this keeps happening, contact support.');
+        return;
+    }
 
     renderClusterEditor(instance, instance.currentClusterIndex.get());
 }
@@ -1236,13 +1245,14 @@ function renderClusterEditor(instance: any, clusterIndex: any) {
         keep_oneof_values: false
     };
 
-    if (typeof (globalThis as any).JSONEditor === 'undefined') {
-        clientConsole(1, '[Content Edit] JSONEditor not loaded. Make sure json-editor CDN is included.');
+    const JSONEditorAny = (globalThis as any).JSONEditor;
+    if (typeof JSONEditorAny === 'undefined') {
+        clientConsole(1, '[Content Edit] JSONEditor not loaded after route asset initialization.');
         setEditorMessage(instance, 'error', 'Editor library not loaded', 'Please refresh the page.');
         return;
     }
 
-    instance.editor = new (globalThis as any).JSONEditor(container, options);
+    instance.editor = new JSONEditorAny(container, options);
 
     let isInitializing = true;
     let modalObserverTimer: ReturnType<typeof setTimeout> | null = null;

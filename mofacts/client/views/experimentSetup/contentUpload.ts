@@ -13,6 +13,7 @@ import { currentUserHasRole } from '../../lib/roleUtils';
 import { buildStimuliFromNormalizedItems, buildTutorFromNormalizedItems, getImportFileNames } from '../../lib/importCompositionBuilder';
 import type { NormalizedImportItem } from '../../lib/normalizedImportTypes';
 import { getUploadIntegrity } from '../../lib/uploadIntegrity';
+import { ensureSqlJs } from '../../lib/sqlJsLoader';
 import './apkgWizard';
 import './imsccWizard';
 export {doFileUpload};
@@ -21,13 +22,6 @@ const FlowRouter = (globalThis as any).FlowRouter;
 const MeteorAny = Meteor as any;
 const TdfsCollection = (globalThis as any).Tdfs;
 const DynamicAssetsCollection = (globalThis as any).DynamicAssets;
-
-declare global {
-  interface Window {
-    initSqlJs?: any;
-  }
-}
-
 
 // Throttle assets helper to prevent reactive loops during processPackageUpload
 let assetsHelperLastRun = 0;
@@ -1187,20 +1181,6 @@ Template.contentUpload.events({
       // Import JSZip dynamically
       const JSZip = (await import('jszip')).default;
 
-      // Load sql.js from CDN (includes WASM properly configured)
-      const initSqlJs = window.initSqlJs || await new Promise((resolve: any, reject: any) => {
-        // Check if already loading
-        if (window.initSqlJs) {
-          resolve(window.initSqlJs);
-          return;
-        }
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm';
-        script.onload = () => resolve(window.initSqlJs);
-        script.onerror = () => reject(new Error('Failed to load sql.js from CDN'));
-        document.head.appendChild(script);
-      });
-
       // Read .apkg file
       const arrayBuffer = await file.arrayBuffer();
       const zip = await JSZip.loadAsync(arrayBuffer);
@@ -1230,10 +1210,7 @@ Template.contentUpload.events({
 
       
 
-      // Open SQLite database with CDN-loaded sql.js (WASM properly configured)
-      const SQL = await initSqlJs({
-        locateFile: (file: any) => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${file}`
-      });
+      const SQL = await ensureSqlJs();
       const db = new SQL.Database(new Uint8Array(sqliteBytes));
 
       // Extract data (using simplified version of our converter)
