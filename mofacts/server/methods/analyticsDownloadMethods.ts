@@ -5,6 +5,7 @@ import {
   requireUserMatchesOrHasRole,
   type MethodAuthorizationDeps,
 } from '../lib/methodAuthorization';
+import { createOwnHistoryDownloadToken } from '../lib/ownHistoryDownloadTokens';
 
 type UnknownRecord = Record<string, unknown>;
 type MethodContext = {
@@ -14,6 +15,7 @@ type MethodContext = {
 type AnalyticsDownloadDeps = {
   Histories: {
     find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]> };
+    findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
   };
   Tdfs: {
     find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]> };
@@ -78,8 +80,8 @@ export function createAnalyticsDownloadMethods(deps: AnalyticsDownloadDeps) {
     downloadOwnHistoryAcrossTdfs: async function(this: MethodContext) {
       const actingUserId = requireAuthenticatedUser(this.userId, 'Must be logged in', 401);
 
-      const histories = await deps.Histories.find({ userId: actingUserId }).fetchAsync();
-      if (histories.length === 0) {
+      const history = await deps.Histories.findOneAsync({ userId: actingUserId }, { fields: { _id: 1 } });
+      if (!history) {
         throw new Meteor.Error(404, 'No history found for current user');
       }
 
@@ -90,8 +92,11 @@ export function createAnalyticsDownloadMethods(deps: AnalyticsDownloadDeps) {
 
       const userName = sanitizeFileNameSegment(user.username || user.emails?.[0]?.address || actingUserId, actingUserId);
       const fileName = `mofacts_${userName}_own_history_all_tdfs.tsv`;
-      const tsvContent = await deps.createExperimentExportFromHistories(histories);
-      return { fileName, contentType: 'text/tab-separated-values', content: tsvContent };
+      return {
+        fileName,
+        contentType: 'text/tab-separated-values',
+        downloadUrl: createOwnHistoryDownloadToken(actingUserId, fileName).url,
+      };
     },
 
     downloadDataByClass: async function(this: MethodContext, classId: string) {

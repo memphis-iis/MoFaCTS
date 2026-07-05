@@ -35,7 +35,12 @@ import _ from 'underscore';
 
 import { legacyTrim } from '../common/underscoreCompat';
 
-export {createExperimentExport, createExperimentExportByTdfIds, createExperimentExportFromHistories};
+export {
+  createExperimentExport,
+  createExperimentExportByTdfIds,
+  createExperimentExportFromHistories,
+  writeExperimentExportFromHistoryIterable,
+};
 
 let FIELDSDS = JSON.parse(JSON.stringify(outputFields));
 
@@ -172,6 +177,17 @@ async function createExperimentExportByTdfIds(tdfIds: any[], _requestingUserId: 
 
 async function createExperimentExportFromHistories(histories: any[]) {
   let record = '';
+  await writeExperimentExportFromHistoryIterable(sortHistoriesByStudentThenTime(histories), (chunk) => {
+    record += chunk;
+  });
+
+  return record;
+}
+
+async function writeExperimentExportFromHistoryIterable(
+  histories: Iterable<any> | AsyncIterable<any>,
+  writeRecord: (chunk: string) => void | Promise<void>
+) {
   const header: Record<string, string> = {};
   const listOfDynamicStimTags: any[] = [];
 
@@ -190,16 +206,14 @@ async function createExperimentExportFromHistories(histories: any[]) {
     header[f] = t;
   });
 
-  record += await delimitedRecord(header, listOfDynamicStimTags, true);
+  await writeRecord(await delimitedRecord(header, listOfDynamicStimTags, true));
 
-  for (let history of sortHistoriesByStudentThenTime(histories)) {
+  for await (let history of histories) {
       try {
         history = getHistory(history);
-        record += await delimitedRecord(history, listOfDynamicStimTags, false);
+        await writeRecord(await delimitedRecord(history, listOfDynamicStimTags, false));
       } catch (e: any) {
         serverConsole('There was an error populating the record - it will be skipped', e, e.stack);
       }
   }
-
-  return record;
 }

@@ -230,6 +230,37 @@ describe('analyticsMethods', function() {
     expect(logEntries.some((entry) => String(entry[0]).includes('Dashboard cache update failed'))).to.equal(true);
   });
 
+  it('downloadOwnHistoryAcrossTdfs returns a streaming download URL without building the TSV payload', async function() {
+    let exportBuilderCalled = false;
+    const { deps } = createAnalyticsDeps({
+      Histories: {
+        find: () => ({ fetchAsync: async () => [], countAsync: async () => 0 }),
+        findOneAsync: async () => ({ _id: 'history-1' }),
+        insertAsync: async () => 'history-id',
+        rawCollection: () => ({ aggregate: () => ({ toArray: async () => [] }) }),
+      },
+      usersCollection: {
+        find: () => ({ fetchAsync: async () => [] }),
+        findOneAsync: async () => ({ _id: 'learner-1', username: 'learner@example.edu' }),
+      },
+      createExperimentExportFromHistories: async () => {
+        exportBuilderCalled = true;
+        return 'unexpected payload';
+      },
+    });
+    const methods = createAnalyticsMethods(deps as any) as Record<string, any>;
+
+    const result = await methods.downloadOwnHistoryAcrossTdfs.call({ userId: 'learner-1' });
+
+    expect(exportBuilderCalled).to.equal(false);
+    expect(result).to.include({
+      fileName: 'mofacts_learner@example.edu_own_history_all_tdfs.tsv',
+      contentType: 'text/tab-separated-values',
+    });
+    expect(result.downloadUrl).to.match(/^\/data-download\/own-history\/[^/]+\/mofacts_learner%40example.edu_own_history_all_tdfs.tsv$/);
+    expect(result.content).to.equal(undefined);
+  });
+
   it('insertHistory rejects assigned-root history without course context', async function() {
     const { deps, insertedHistory } = createAssignedRootDeps();
     const methods = createAnalyticsMethods(deps as any) as Record<string, any>;

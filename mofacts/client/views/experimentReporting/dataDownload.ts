@@ -121,13 +121,26 @@ async function makeDataDownloadMethodCall(instance: any, methodName: string, ...
   try {
     setDownloadMessage(instance, 'Preparing download...', 'info');
     const response = await MeteorCompat.callAsync(methodName, ...args);
-    createData(response);
+    if (response?.downloadUrl) {
+      startDownloadFromUrl(response.downloadUrl);
+    } else {
+      createData(response);
+    }
     setDownloadMessage(instance, 'Download started.', 'success');
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     clientConsole(1, '[DataDownload] Download failed:', message);
     setDownloadMessage(instance, `Download failed: ${message}`, 'error');
   }
+}
+
+function startDownloadFromUrl(url: string): void {
+  const a = document.createElement("a");
+  document.body.appendChild(a);
+  a.style = "display: none";
+  a.href = url;
+  a.click();
+  document.body.removeChild(a);
 }
 
 function encodeUtf16Le(str: string): ArrayBuffer {

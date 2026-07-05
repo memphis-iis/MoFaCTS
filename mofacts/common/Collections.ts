@@ -144,7 +144,7 @@ Object.assign(globalThis, {
   DynamicAssets,
 });
 
-export { Tdfs, GlobalExperimentStates, DynamicSettings, UserDashboardCache, CourseLearnerSnapshotCache, H5PContents, StimulusCrowdStats, BackupJobs };
+export { Tdfs, GlobalExperimentStates, Histories, DynamicSettings, UserDashboardCache, CourseLearnerSnapshotCache, H5PContents, StimulusCrowdStats, BackupJobs };
 
 GlobalExperimentStates.allow({
   update: function(userId: string, doc: unknown, _fieldNames: string[], _modifier: any) {
