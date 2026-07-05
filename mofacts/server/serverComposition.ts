@@ -554,8 +554,8 @@ Meteor.publish(null, function() {
   // Only valid way to get the user ID for publications
   const userId = this.userId;
 
-  // The default data published to everyone - all TDF's and stims, and the
-  // user data (user times log and user record) for them
+  // The default data published to every connected client: selected fields
+  // from the current user's account document.
   const defaultData = [
     MeteorAny.users.find({_id: userId}, {
       fields: {
