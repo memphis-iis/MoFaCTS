@@ -10,6 +10,7 @@ import { loadSessionMappingRecord, resolveOriginalClusterIndex } from '../views/
 import { createStimClusterMapping as createStimClusterMappingCore } from './clusterMappingUtils';
 import { normalizeThemePropertyValue } from '../../common/themePropertyNormalization';
 import { resolveThemeBrandLabel } from '../../common/themeBranding';
+import defaultTheme from '../../public/themes/mofacts-default.json';
 import {
   clearSavedUserThemeSelection,
   findAvailableUserTheme,
@@ -405,6 +406,16 @@ function applyThemeCSSProperties(themeData: ThemeData | null | undefined, option
   Session.set('themeReady', true);
 }
 
+function applyTemporaryStartupTheme() {
+  const temporaryTheme = {
+    ...(defaultTheme as ThemeData),
+    activeThemeId: 'mofacts-startup-temporary',
+    themeName: 'MoFaCTS',
+  };
+  Session.set('startupThemeTemporary', true);
+  applyThemeCSSProperties(temporaryTheme, { cache: false });
+}
+
 // Subscribe to theme and set up reactive autorun
 // This function should be called once on app startup
 function getCurrentTheme() {
@@ -413,6 +424,8 @@ function getCurrentTheme() {
   const savedThemeIdAtStartup = getSavedUserThemeId();
   if (cachedTheme && !savedThemeIdAtStartup) {
     applyThemeCSSProperties(cachedTheme);
+  } else {
+    applyTemporaryStartupTheme();
   }
 
   // Subscribe to theme publication and track when ready
@@ -441,14 +454,12 @@ function getCurrentTheme() {
     } else {
       // No custom theme; use MoFaCTS default theme
       clientConsole(2, 'getCurrentTheme - no custom theme found, using MoFaCTS default');
-      const defaultTheme = {
+      themeData = {
+        ...(defaultTheme as ThemeData),
+        activeThemeId: 'mofacts-default',
         themeName: 'MoFaCTS',
-        primaryColor: '#007bff',
-        accentColor: '#28a745',
-        logoUrl: '/images/MoFaCTS_Logo.png'
       };
-      Session.set('serverActiveTheme', defaultTheme);
-      themeData = defaultTheme;
+      Session.set('serverActiveTheme', themeData);
     }
 
     const savedThemeId = getSavedUserThemeId();
@@ -464,6 +475,7 @@ function getCurrentTheme() {
         clientConsole(1, `[ThemeToggle] Saved theme "${savedThemeId}" is no longer configured.`);
       } else {
         Session.set('userThemeOverrideActive', true);
+        Session.set('startupThemeTemporary', false);
         applyThemeCSSProperties(serializeThemeSelection(selectedTheme), { cache: false });
         return;
       }
@@ -474,6 +486,7 @@ function getCurrentTheme() {
       return;
     }
 
+    Session.set('startupThemeTemporary', false);
     applyThemeCSSProperties(themeData);
   });
 }

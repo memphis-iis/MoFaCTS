@@ -24,6 +24,7 @@ import {
 import {Cookie} from './lib/cookies';
 import {currentUserHasRole, hasRoleFromAuthFlags} from './lib/roleUtils';
 import { getErrorMessage } from './lib/errorUtils';
+import { hideBootstrapModal } from './lib/bootstrapModal';
 import './index.html';
 
 // =============================================================================
@@ -285,9 +286,11 @@ Session.setDefault('authRoles', { admin: false, teacher: false });
 Session.setDefault('authRolesHydrated', false);
 Session.setDefault('authRolesSyncedUserId', null);
 const AUTH_ROLE_CACHE_KEY = 'mofacts.authRoles.v1';
+const STARTUP_DIAGNOSTIC_GRACE_MS = 2500;
 
 let authSyncSeq = 0;
 let lastAuthSyncedUserId: string | null = null;
+let startupDiagnosticsStartedAt = Date.now();
 
 function loadCachedAuthRoles() {
   try {
@@ -563,6 +566,7 @@ function hasStoredLoginToken(): boolean {
 Meteor.startup(function() {
 
   Session.set('debugging', true);
+  startupDiagnosticsStartedAt = Date.now();
   sessionCleanUp();
   loadCachedAuthRoles();
 
@@ -704,11 +708,15 @@ Template.DefaultLayout.onRendered(function(this: any) {
     };
     document.addEventListener('click', instance._appShellDocumentClickHandler);
   }
-  $('#errorReportingModal').on('hidden.bs.modal', function() {
+  document.getElementById('errorReportingModal')?.addEventListener('hidden.bs.modal', function() {
     clientConsole(2, 'error reporting modal hidden');
   });
+
+  Meteor.setInterval(() => {
+    Session.set('startupDiagnosticTick', Date.now());
+  }, 1000);
   //load css into head based on user's preferences
-  $('#helpModal').on('hidden.bs.modal', function() {
+  document.getElementById('helpModal')?.addEventListener('hidden.bs.modal', function() {
     const currentAudio = audioManager.getCurrentAudio();
     if (currentAudio) {
       currentAudio.play();
@@ -761,7 +769,7 @@ Template.DefaultLayout.events({
   },
   'click #helpCloseButton': function(event: JQuery.TriggeredEvent) {
     event.preventDefault();
-    ($('#errorReportingModal') as any).modal('hide');
+    hideBootstrapModal('errorReportingModal');
   },
 
   'click #errorReportButton': function(event: JQuery.TriggeredEvent) {
@@ -800,7 +808,7 @@ Template.DefaultLayout.events({
     const currentExperimentState = ExperimentStateStore.get();
     MeteorAny.callAsync('sendUserErrorReport', curUser, errorDescription, curPage, sessionVars,
         userAgent, logs, currentExperimentState);
-    ($('#errorReportingModal') as any).modal('hide');
+    hideBootstrapModal('errorReportingModal');
     $('#errorDescription').val('');
   },
 
@@ -945,5 +953,51 @@ Template.registerHelper('uiMessage', function() {
   };
 });
 
+Template.registerHelper('startupDiagnostic', function() {
+  Session.get('startupDiagnosticTick');
+  const elapsed = Date.now() - startupDiagnosticsStartedAt;
+  if (elapsed < STARTUP_DIAGNOSTIC_GRACE_MS) {
+    return null;
+  }
+
+  const connected = Meteor.status?.().connected ?? true;
+  if (!connected) {
+    return {
+      variant: 'warning',
+      text: 'Page loaded. Waiting for the realtime connection to finish starting...'
+    };
+  }
+
+  if (Session.get('themeReady') !== true) {
+    return {
+      variant: 'info',
+      text: 'Page loaded. Loading site appearance...'
+    };
+  }
+
+  if (Session.get('authReady') !== true || Meteor.loggingIn()) {
+    return {
+      variant: 'info',
+      text: 'Page loaded. Checking sign-in status...'
+    };
+  }
+
+  const userId = Meteor.userId();
+  if (userId && Session.get('authRolesHydrated') !== true) {
+    return {
+      variant: 'info',
+      text: 'Page loaded. Loading account permissions...'
+    };
+  }
+
+  if (userId && Session.get('authRolesSyncedUserId') !== userId) {
+    return {
+      variant: 'info',
+      text: 'Page loaded. Refreshing account permissions...'
+    };
+  }
+
+  return null;
+});
 
 

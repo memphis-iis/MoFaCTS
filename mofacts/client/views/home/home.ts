@@ -958,8 +958,6 @@ Template.home.onRendered(async function(this: any) {
     if (!Session.get('authReady')) return;
     const userId = Meteor.userId();
     if (!userId) return;
-    if (!Session.get('authRolesHydrated')) return;
-    if (Session.get('authRolesSyncedUserId') !== userId) return;
     clientConsole(2, '[HOME] Theme ready, waiting for CSS paint before fade-in');
 
     // Ensure DOM is ready before attempting to show

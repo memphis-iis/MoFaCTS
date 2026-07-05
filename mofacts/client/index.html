@@ -24,48 +24,23 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/images/themes/brain-16.png">
     <link rel="icon" type="image/png" href="/images/themes/brain-logo.png">
 
-    <!-- DNS prefetch for external resources -->
-    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
-    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
-    <link rel="dns-prefetch" href="https://fonts.googleapis.com">
-    <link rel="dns-prefetch" href="https://fonts.gstatic.com">
-
     <!-- Critical CSS - Inlined for instant first paint (prevents FOUC) -->
     <style>
-    /* Keep page hidden until theme loads */
-    body{margin:0;padding:0;}.page-loading{opacity:0!important;visibility:hidden!important;}.page-loaded{opacity:1;visibility:visible;transition:opacity 0.15s ease-in;}
+    body{margin:0;padding:0;background:#F2F2F2;color:#000;}.page-loading{opacity:1;visibility:visible;}.page-loaded{opacity:1;visibility:visible;transition:opacity 0.15s ease-in;}
     </style>
 
-  <!-- External CDN resources - Bootstrap loaded first -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-rbsA2VBKQhggwzxH7pPCaAqO46MgnOM80zW1RWuH61DGLwZJEdK2Kadq2F9CUG65" crossorigin="anonymous">
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.6-rc.0/css/select2.min.css" rel="stylesheet" />
-  <!-- Font Awesome 4.7.0 - Using cdnjs (no CORS issues) -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/plyr/3.7.8/plyr.min.css" />
-
-  <!-- JSON Editor for TDF editing (schema-driven form generation) -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@json-editor/json-editor@2.15.2/dist/css/jsoneditor.min.css" />
-  <script src="https://cdn.jsdelivr.net/npm/@json-editor/json-editor@2.15.2/dist/jsoneditor.min.js"></script>
-  <script>
-    window.module = window.module || { exports: {} };
-    window.exports = window.exports || window.module.exports;
-  </script>
+  <!-- Same-origin vendor resources - Bootstrap loaded first -->
+  <link href="/vendor/bootstrap/5.2.3/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/vendor/font-awesome/4.7.0/css/font-awesome.min.css">
 
   <!-- Local CSS loaded last to override Bootstrap defaults -->
   <link href="/styles/classic.css" rel="stylesheet">
 </head>
 
 <body>
-  <!-- Mobile Debug Console - eruda provides DevTools-like interface on mobile -->
-  <!-- <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
-  <script>if (typeof eruda !== 'undefined') eruda.init();</script> -->
-
   <!-- MO9: Performance - Scripts moved to end of body to prevent render blocking -->
   <!-- Defer attribute ensures scripts execute after DOM is parsed but maintain dependency order -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-kenU1KFdBIe4zVF0s0G1M5b4hcpxyD9F7jL+jjXkk+Q2h455rYXK/7HAuoJl+0I4" crossorigin="anonymous" defer></script>
+  <script src="/vendor/bootstrap/5.2.3/js/bootstrap.bundle.min.js" defer></script>
 </body>
 
 
@@ -123,6 +98,13 @@
             </div>
           </div>
           {{/if}}
+          {{#if startupDiagnostic}}
+          <div class="container app-ui-message-container">
+            <div class="alert alert-{{startupDiagnostic.variant}}" role="status" aria-live="polite">
+              {{startupDiagnostic.text}}
+            </div>
+          </div>
+          {{/if}}
           {{#if currentTemplate}}
             {{> Template.dynamic template=currentTemplate}}
           {{else}}
@@ -150,6 +132,13 @@
       <div class="alert alert-{{uiMessage.variant}} d-flex align-items-center justify-content-between" role="alert">
         <div>{{uiMessage.text}}</div>
         <button type="button" class="btn-close" aria-label="Close" data-ui-message-clear="true"></button>
+      </div>
+    </div>
+    {{/if}}
+    {{#if startupDiagnostic}}
+    <div class="container app-ui-message-container">
+      <div class="alert alert-{{startupDiagnostic.variant}}" role="status" aria-live="polite">
+        {{startupDiagnostic.text}}
       </div>
     </div>
     {{/if}}
