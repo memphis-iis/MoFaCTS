@@ -318,7 +318,7 @@ export const cardMachinePresentingState = {
         },
 
         mainTimeout: {
-          initial: 'running',
+          initial: 'waitingForReveal',
           on: {
             [EVENTS.INPUT_ACTIVITY]: {
               target: '.running',
@@ -334,6 +334,20 @@ export const cardMachinePresentingState = {
             },
           },
           states: {
+            waitingForReveal: {
+              on: {
+                [EVENTS.TRIAL_REVEAL_STARTED]: {
+                  target: 'running',
+                  actions: ['markTrialRevealStart', 'logStateTransition'],
+                },
+              },
+              always: [
+                {
+                  target: 'running',
+                  guard: 'trialRevealStarted',
+                },
+              ],
+            },
             running: {
               invoke: {
                 id: 'mainCardTimeout',
@@ -347,7 +361,7 @@ export const cardMachinePresentingState = {
               always: [
                 {
                   target: 'disabled',
-                  guard: 'trialDisplayOwnsInteraction',
+                  guard: 'trialDisplaySuppressesStandardTimeout',
                 },
                 {
                   target: 'paused',

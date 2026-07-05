@@ -10,7 +10,6 @@ import { getFeedbackTimeoutMs } from '../utils/timeoutUtils';
 import { evaluateSrAvailability } from '../../../../lib/audioAvailability';
 import { getAudioPromptMode } from '../../../../lib/state/audioState';
 import { selfHostedH5PTrialDisplayOwnsInteraction } from '../services/h5pTrialDisplay';
-import { sparcTrialDisplayOwnsInteraction } from '../services/sparcTrialDisplay';
 import { resolveSessionSurfaceState } from '../services/sessionSurfaceMode';
 import {
   getIsVideoSessionFlag,
@@ -50,6 +49,9 @@ type CardMachineActorArgs = {
     };
     consecutiveTimeouts?: number | undefined;
     isTimeout?: boolean | undefined;
+    timestamps?: {
+      trialStart?: number | undefined;
+    };
     feedbackText?: string | undefined;
     feedbackRevealStarted?: boolean | undefined;
     feedbackSuppressed?: boolean | undefined;
@@ -405,6 +407,10 @@ export function didNotTimeout({ context }: CardMachineActorArgs): boolean {
   return context.isTimeout === false;
 }
 
+export function trialRevealStarted({ context }: CardMachineActorArgs): boolean {
+  return Number(context.timestamps?.trialStart) > 0;
+}
+
 /**
  * Check if consecutive timeout threshold has been reached
  * @param {CardMachineContext} context
@@ -436,9 +442,8 @@ export function notWaitingForTranscription(args: CardMachineActorArgs): boolean 
   return !waitingForTranscription(args);
 }
 
-export function trialDisplayOwnsInteraction({ context }: CardMachineActorArgs): boolean {
-  return selfHostedH5PTrialDisplayOwnsInteraction(context.currentDisplay) ||
-    sparcTrialDisplayOwnsInteraction(context.currentDisplay);
+export function trialDisplaySuppressesStandardTimeout({ context }: CardMachineActorArgs): boolean {
+  return selfHostedH5PTrialDisplayOwnsInteraction(context.currentDisplay);
 }
 
 // =============================================================================

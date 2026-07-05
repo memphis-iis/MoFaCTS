@@ -176,15 +176,38 @@
   let interactionVisible = false;
   let interactionTransitionToken = 0;
   let interactionTransitionInFlight = false;
+  let lastReviewRevealSignature = '';
 
   $: mountedFeedbackVisible = displayedInteractionKind === 'feedback';
   $: mountedResponseVisible = displayedInteractionKind === 'response';
+
+  $: reviewRevealSignature = [
+    subsetKind,
+    feedbackMessage,
+    correctAnswer,
+    feedbackUserAnswer,
+    isCorrect ? 'correct' : 'incorrect',
+    isTimeout ? 'timeout' : 'answered',
+  ].join('::');
+
+  function dispatchReviewRevealStarted(durationMs) {
+    lastReviewRevealSignature = reviewRevealSignature;
+    dispatch('reviewrevealstarted', {
+      subsetKind,
+      transitionDurationMs: durationMs,
+      timestamp: Date.now(),
+    });
+  }
 
   $: if (!parentVisible) {
     interactionTransitionToken += 1;
     interactionTransitionInFlight = false;
     displayedInteractionKind = requestedInteractionKind;
     interactionVisible = requestedInteractionKind !== 'none';
+  }
+
+  $: if (requestedInteractionKind !== 'feedback') {
+    lastReviewRevealSignature = '';
   }
 
   $: if (
@@ -217,6 +240,16 @@
   ) {
     displayedInteractionKind = requestedInteractionKind;
     interactionVisible = requestedInteractionKind !== 'none';
+  }
+
+  $: if (
+    parentVisible &&
+    requestedInteractionKind === 'feedback' &&
+    mountedFeedbackVisible &&
+    interactionVisible &&
+    lastReviewRevealSignature !== reviewRevealSignature
+  ) {
+    dispatchReviewRevealStarted(0);
   }
 
   function getInteractionTransitionDurationMs() {
@@ -298,11 +331,7 @@
       subsetKind,
     });
 
-    dispatch('reviewrevealstarted', {
-      subsetKind,
-      transitionDurationMs: durationMs,
-      timestamp: Date.now(),
-    });
+    dispatchReviewRevealStarted(durationMs);
 
     interactionVisible = true;
     await waitForTransition(durationMs);

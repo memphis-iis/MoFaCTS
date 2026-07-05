@@ -15,6 +15,8 @@ import {
   isHardError,
   hasQuestionAudio,
   isVideoSession,
+  trialDisplaySuppressesStandardTimeout,
+  trialRevealStarted,
 } from './guards';
 
 function makeArgs(overrides: { context?: Record<string, unknown>; event?: Record<string, unknown> } = {}) {
@@ -110,6 +112,33 @@ describe('machine guard contracts', function() {
     expect(noFeedback(h5pDrill)).to.equal(true);
   });
 
+  it('suppresses the standard response timeout for H5P but not SPARC displays', function() {
+    const h5pDisplay = makeArgs({
+      context: {
+        currentDisplay: {
+          h5p: {
+            sourceType: 'self-hosted',
+            contentId: 'h5p-tester-multichoice-001',
+            packageAssetId: 'multiple-choice-713.h5p',
+            library: 'H5P.MultiChoice 1.16',
+          },
+        },
+      },
+    });
+    const sparcDisplay = makeArgs({
+      context: {
+        currentDisplay: {
+          type: 'sparc',
+          documentId: 'sparc-fractions-addition',
+          nodes: [],
+        },
+      },
+    });
+
+    expect(trialDisplaySuppressesStandardTimeout(h5pDisplay)).to.equal(true);
+    expect(trialDisplaySuppressesStandardTimeout(sparcDisplay)).to.equal(false);
+  });
+
   it('treats CARD_SELECTED unitFinished payload as authoritative', function() {
     const doneFromEvent = makeArgs({
       context: { unitFinished: false },
@@ -133,6 +162,11 @@ describe('machine guard contracts', function() {
   it('detects question-audio payload', function() {
     expect(hasQuestionAudio(makeArgs({ context: { currentDisplay: { audioSrc: '/audio/test.mp3' } } }))).to.equal(true);
     expect(hasQuestionAudio(makeArgs({ context: { currentDisplay: { text: 'no-audio' } } }))).to.equal(false);
+  });
+
+  it('treats a positive trialStart as the response-timeout reveal gate', function() {
+    expect(trialRevealStarted(makeArgs({ context: { timestamps: { trialStart: 0 } } }))).to.equal(false);
+    expect(trialRevealStarted(makeArgs({ context: { timestamps: { trialStart: 1234 } } }))).to.equal(true);
   });
 
   it('allows prepared advance for schedule and model card sessions', function() {

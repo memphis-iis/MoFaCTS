@@ -66,13 +66,26 @@ describe('card machine presenting state', function() {
     expect(transitions[2]!.actions).to.deep.equal(['logStateTransition']);
   });
 
-  it('keeps awaiting input submit and timeout routed to validation', function() {
+  it('keeps awaiting input submit and response timeout routed to validation after reveal', function() {
     const awaiting = states[STATES.AWAITING]!;
     const inputReady = awaiting.states!.inputMode!.states!.ready!;
-    const mainTimeoutRunning = awaiting.states!.mainTimeout!.states!.running!;
+    const mainTimeout = awaiting.states!.mainTimeout!;
+    const mainTimeoutWaitingForReveal = mainTimeout.states!.waitingForReveal!;
+    const mainTimeoutRunning = mainTimeout.states!.running!;
 
     expect(awaiting.type).to.equal('parallel');
     expect(awaiting.entry).to.include('enableInput');
+    expect(mainTimeout.initial).to.equal('waitingForReveal');
+    expect(mainTimeoutWaitingForReveal.on![EVENTS.TRIAL_REVEAL_STARTED]).to.deep.equal({
+      target: 'running',
+      actions: ['markTrialRevealStart', 'logStateTransition'],
+    });
+    expect(mainTimeoutWaitingForReveal.always).to.deep.equal([
+      {
+        target: 'running',
+        guard: 'trialRevealStarted',
+      },
+    ]);
     expect(inputReady.on![EVENTS.SUBMIT]).to.deep.equal({
       target: '#cardMachine.presenting.validating',
       actions: ['captureAnswer', 'logStateTransition'],
@@ -84,7 +97,7 @@ describe('card machine presenting state', function() {
     expect(mainTimeoutRunning.always).to.deep.equal([
       {
         target: 'disabled',
-        guard: 'trialDisplayOwnsInteraction',
+        guard: 'trialDisplaySuppressesStandardTimeout',
       },
       {
         target: 'paused',

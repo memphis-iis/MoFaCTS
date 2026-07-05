@@ -75,9 +75,10 @@ export const cardMachineOptions = {
     didTimeout: guards.didTimeout,
     didNotTimeout: guards.didNotTimeout,
     hitTimeoutThreshold: guards.hitTimeoutThreshold,
+    trialRevealStarted: guards.trialRevealStarted,
     waitingForTranscription: guards.waitingForTranscription,
     notWaitingForTranscription: guards.notWaitingForTranscription,
-    trialDisplayOwnsInteraction: guards.trialDisplayOwnsInteraction,
+    trialDisplaySuppressesStandardTimeout: guards.trialDisplaySuppressesStandardTimeout,
 
     // Unit/session guards
     unitFinished: guards.unitFinished,
