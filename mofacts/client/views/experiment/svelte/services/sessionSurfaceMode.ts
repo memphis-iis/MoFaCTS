@@ -1,4 +1,4 @@
-export type SessionSurfaceMode = 'autotutor' | 'video' | 'sparc' | 'card';
+export type SessionSurfaceMode = 'autotutor' | 'video' | 'sparc' | 'flashcard';
 
 type SessionUnitLike = {
   assessmentsession?: unknown;
@@ -28,7 +28,7 @@ export type SessionContentSurface = {
   showAutoTutorSession: boolean;
   showVideoSession: boolean;
   showSparcSession: boolean;
-  showStandardCardSession: boolean;
+  showFlashcardSession: boolean;
 };
 
 export type SessionSurfaceShell = {
@@ -108,7 +108,7 @@ export function resolveSessionSurfaceState(input: SessionSurfaceStateInput): Ses
   return {
     isAutoTutorSession,
     isVideoSession,
-    mode: isAutoTutorSession ? 'autotutor' : (isSparcSession ? 'sparc' : (isVideoSession ? 'video' : 'card')),
+    mode: isAutoTutorSession ? 'autotutor' : (isSparcSession ? 'sparc' : (isVideoSession ? 'video' : 'flashcard')),
   };
 }
 
@@ -135,7 +135,7 @@ export function resolveSessionSurfaceDiagnostic(
 }
 
 export function resolveSessionContentSurface(surfaceState: SessionSurfaceState): SessionContentSurface {
-  if (!['autotutor', 'video', 'sparc', 'card'].includes(surfaceState.mode)) {
+  if (!['autotutor', 'video', 'sparc', 'flashcard'].includes(surfaceState.mode)) {
     throw new Error(`resolveSessionContentSurface received an unknown session surface mode "${String(surfaceState.mode)}"`);
   }
 
@@ -144,7 +144,7 @@ export function resolveSessionContentSurface(surfaceState: SessionSurfaceState):
     showAutoTutorSession: surfaceState.mode === 'autotutor',
     showVideoSession: surfaceState.mode === 'video',
     showSparcSession: surfaceState.mode === 'sparc',
-    showStandardCardSession: surfaceState.mode === 'card',
+    showFlashcardSession: surfaceState.mode === 'flashcard',
   };
 }
 
@@ -153,13 +153,13 @@ function assertValidSessionContentSurface(contentSurface: SessionContentSurface,
     contentSurface.showAutoTutorSession,
     contentSurface.showVideoSession,
     contentSurface.showSparcSession,
-    contentSurface.showStandardCardSession,
+    contentSurface.showFlashcardSession,
   ].filter(Boolean).length;
   const modeMatches =
     (contentSurface.mode === 'autotutor' && contentSurface.showAutoTutorSession) ||
     (contentSurface.mode === 'video' && contentSurface.showVideoSession) ||
     (contentSurface.mode === 'sparc' && contentSurface.showSparcSession) ||
-    (contentSurface.mode === 'card' && contentSurface.showStandardCardSession);
+    (contentSurface.mode === 'flashcard' && contentSurface.showFlashcardSession);
 
   if (activeSurfaceCount !== 1 || !modeMatches) {
     throw new Error(`${prefix} received an invalid session content surface for mode "${String(contentSurface.mode)}"`);
@@ -179,7 +179,7 @@ export function resolveSessionSurfaceShell(input: SessionSurfaceShellInput): Ses
       autoTutorMode: mode === 'autotutor',
     },
     showLearningProgressPanel:
-      (mode === 'card' || mode === 'sparc') &&
+      (mode === 'flashcard' || mode === 'sparc') &&
       !input.progressPanelDisabled &&
       input.learningProgressAvailable,
   };

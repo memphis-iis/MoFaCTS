@@ -17,7 +17,7 @@ type SendEvent =
       timestamp: number;
     };
 
-export function createCardReviewEventController({
+export function createFlashcardReviewEventController({
   getSubsetKind,
   isTestMode,
   log,

@@ -2,14 +2,14 @@ type MachineStateLike = {
   matches: (path: string) => boolean;
 };
 
-type CardTextInputContextLike = {
+type FlashcardTextInputContextLike = {
   timestamps?: {
     trialStart?: unknown;
   };
   userAnswer?: unknown;
 };
 
-export function createCardTextInputController({
+export function createFlashcardTextInputController({
   getContext,
   getState,
   now,
@@ -17,7 +17,7 @@ export function createCardTextInputController({
   setContextUserAnswer,
   setTextAnswer,
 }: {
-  getContext: () => CardTextInputContextLike;
+  getContext: () => FlashcardTextInputContextLike;
   getState: () => MachineStateLike;
   now: () => number;
   send: (event: { type: 'INPUT_ACTIVITY'; timestamp: number }) => void;

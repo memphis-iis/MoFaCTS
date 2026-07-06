@@ -2,9 +2,13 @@
 
 ## Status
 
-Planning document. This describes a target architecture and migration sequence; it does not describe the current implementation as complete.
+Implemented for the learner-runtime surface boundary. This document now records the target shape, the migration that was performed, and the remaining work that is deliberately outside this pass.
 
-Implementation note: `CardStore` remains deliberately out of scope for this pass. It is a broad shared learner-runtime store, not a flashcard-only store, and needs a separate store-boundary audit before renaming or splitting. Lower-level SPARC adapter and unit-engine APIs that still use `SparcTrialDisplay*` names are also implementation-contract debt; this pass contains that terminology behind learner-runtime `SparcController` names rather than rewriting `learning-components/`.
+Explicit exclusions:
+
+- `CardStore` remains deliberately out of scope. It is a broad shared learner-runtime store, not a flashcard-only store, and needs a separate store-boundary audit before renaming or splitting.
+- Low-level trial-object contracts remain deliberately out of scope. `learning-components/` still exposes trial-display adapter and unit-engine API names such as `SparcTrialDisplay*`; this pass contains that terminology behind learner-runtime `SparcController` names rather than rewriting the lower-level implementation contracts.
+- Broader flashcard helper names such as `activeTrial*`, `incomingTrial*`, and generic `trialDisplay*` remain implementation debt where they still describe low-level trial handoff or display-state objects. They are not allowed to route SPARC or decide session ownership.
 
 ## Problem
 
@@ -154,7 +158,7 @@ Rules:
 
 ## Current To Target Map
 
-This table is the removal checklist. Each implementation phase should update it if inventory proves a row inaccurate.
+This table is the source-to-target audit for the learner-runtime surface pass. Rows are retained for traceability even after the source file has been renamed or removed.
 
 | Current name/path | Current role | Target owner/name | Action | Removal condition |
 | --- | --- | --- | --- | --- |
@@ -199,11 +203,11 @@ Evidence checked before implementation:
 - `learning-components/units/sparcsession/` reads unit-level `sparcsession` configuration, including `pageId`.
 - `C:\dev\mofacts_config` scan found 56 TDF JSON files with `sparcsession` and 56 stimulus JSON files with `setspec.sparcPages`; SPARC page display payloads are selected by the unit/session path, not a display discriminator.
 
-Current gap:
+Implemented state:
 
-- `mofacts/client/views/experiment/svelte/services/sessionSurfaceMode.ts` currently selects only `autotutor | video | card`; it does not yet expose a `sparc` session surface mode.
-- Phase 4 should add `sparc` session surface selection from `currentTdfUnit.sparcsession`.
-- SPARC page displays must not carry or depend on a `type: "sparc"` discriminator.
+- `mofacts/client/views/experiment/svelte/services/sessionSurfaceMode.ts` resolves `autotutor | video | sparc | flashcard`.
+- SPARC session surface selection comes from `currentTdfUnit.sparcsession`.
+- SPARC page displays do not carry or depend on a `type: "sparc"` discriminator.
 
 ## Migration Plan
 
@@ -236,7 +240,7 @@ Use this glossary as the source of truth for planned names.
 | 0 | `trialDisplayOwnsInteraction` used as timer policy | `trialDisplaySuppressesStandardTimeout` or equivalent timer-specific name | Submission ownership and timer policy stay separate. |
 | 1 | `CardScreen.svelte` | `ContentSurface.svelte` | Route-mounted runtime shell. |
 | 1 | `cardRoute:*` log labels | keep temporarily | Only rename labels when they describe runtime internals rather than the legacy route. |
-| 1 | `cardMachine` | keep temporarily | Rename later after session surfaces are stable. |
+| 1/5 | `cardMachine*` state-machine core | `contentRuntimeMachine*` | Completed after the session surfaces were stable. |
 | 2 | `TrialContent.svelte` and `trial*` flashcard helpers | `FlashcardController`-owned runtime pieces | Normal stimulus/response/feedback behavior. Must not route to SPARC. |
 | 3 | `StandardCardSessionSurface.svelte` | `FlashcardSessionSurface.svelte` | Used by learning and assessment unit types that share `FlashcardController`. |
 | 3 | `VideoCardSessionSurface.svelte` | `VideoSessionSurface.svelte` | Video session/checkpoint shell. |
@@ -244,7 +248,6 @@ Use this glossary as the source of truth for planned names.
 | 4 | SPARC branch inside `TrialContent` / flashcard runtime | `SparcSessionSurface.svelte` | Selected by `unit.sparcsession`; not embedded inside flashcard routing. |
 | 4 | `SparcTrialSurface.svelte` runtime role | `SparcSessionSurface.svelte` | Remove the SPARC trial concept; keep only genuinely non-runtime editor helpers separate if needed. |
 | 4 | SPARC session service concept | `SparcController` | Controller/coordinator name for SPARC runtime state and events. |
-| 5 | `cardMachine*` state-machine core | `contentRuntimeMachine*` or `sessionRuntimeMachine*` | Decide after Phase 4. |
 
 ### Phase 0: Lock Timer Policy Boundary
 
@@ -582,12 +585,21 @@ Use this checklist in the PR or commit notes for each phase:
 - Do not make SPARC editor/authoring operational in this pass.
 - Do not plan flashcard/video/SPARC authoring-preview reuse in this pass.
 
-## Open Questions
+## Future Work Outside This Pass
 
-- What current SPARC runtime coordination code should become `SparcController`, and what can be deleted instead of renamed?
-- What separate future plan should make the SPARC editor operational, including how it should reach `/sparcEdit/:tdfId` and whether it reuses `SparcSessionSurface` without `SparcController`?
-- Does H5P truly provide an equivalent response clock, or is it only suppressing the standard timer because completion is activity-owned?
-- Which `card*` service names are route-compatibility names, and which are runtime-boundary names that should be renamed after `ContentSurface` lands?
+- `CardStore` needs a separate store-boundary audit before any rename, split, or ownership change.
+- Low-level trial-object contracts in `learning-components/` need a separate API-boundary cleanup before removing names such as `SparcTrialDisplay*`.
+- SPARC editor operability needs its own plan, including how `/sparcEdit/:tdfId` should be reached and whether authoring preview should reuse `SparcSessionSurface` without learner-runtime `SparcController` behavior.
+- H5P removal or timer-policy redesign needs its own plan. This pass preserves H5P behavior while keeping timer policy explicit.
+- Remaining app-side helper names such as `activeTrial*`, `incomingTrial*`, and generic `trialDisplay*` should be classified before future renames; they currently describe low-level flashcard handoff/display objects, not session routing.
+
+## Implementation Evidence
+
+- `ContentSurface.svelte`, `FlashcardSessionSurface.svelte`, `VideoSessionSurface.svelte`, and `SparcSessionSurface.svelte` are the learner-runtime surface components.
+- `sessionSurfaceMode.ts` resolves session mode as `autotutor | video | sparc | flashcard`; the legacy `/card` route remains only as the route entrypoint.
+- `SparcSessionSurface` is selected from `currentTdfUnit.sparcsession`.
+- App-owned learner runtime no longer carries the former SPARC display discriminator.
+- App-owned learner runtime no longer has `CardScreen`, `TrialContent`, `StandardCardSessionSurface`, `VideoCardSessionSurface`, `SparcTrialSurface`, `cardMachine*`, `videoCard*`, or `cardVideo*` source files.
 
 ## Acceptance Criteria
 

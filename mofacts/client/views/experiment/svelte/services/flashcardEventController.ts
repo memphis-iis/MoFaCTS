@@ -1,4 +1,4 @@
-export type CardTrialMachineEvent =
+export type FlashcardMachineEvent =
   | {
       type: 'SUBMIT';
       userAnswer: unknown;
@@ -13,10 +13,10 @@ export type CardTrialMachineEvent =
       type: 'SKIP_STUDY';
     };
 
-export type CardTrialReplayContext = Record<string, unknown>;
+export type FlashcardReplayContext = Record<string, unknown>;
 
-export type CardTrialTtsPlayback = (
-  context: CardTrialReplayContext,
+export type FlashcardTtsPlayback = (
+  context: FlashcardReplayContext,
   options: {
     audioSrc: string;
     isQuestion: boolean;
@@ -24,10 +24,10 @@ export type CardTrialTtsPlayback = (
   },
 ) => void | Promise<void>;
 
-export interface CardTrialEventControllerOptions {
-  readonly getContext: () => CardTrialReplayContext;
-  readonly loadTtsPlayback: () => Promise<CardTrialTtsPlayback>;
-  readonly send: (event: CardTrialMachineEvent) => void;
+export interface FlashcardEventControllerOptions {
+  readonly getContext: () => FlashcardReplayContext;
+  readonly loadTtsPlayback: () => Promise<FlashcardTtsPlayback>;
+  readonly send: (event: FlashcardMachineEvent) => void;
 }
 
 function eventDetail(event: { detail?: unknown } | null | undefined): Record<string, unknown> {
@@ -36,11 +36,11 @@ function eventDetail(event: { detail?: unknown } | null | undefined): Record<str
     : {};
 }
 
-export function createCardTrialEventController({
+export function createFlashcardEventController({
   getContext,
   loadTtsPlayback,
   send,
-}: CardTrialEventControllerOptions) {
+}: FlashcardEventControllerOptions) {
   return {
     handleSubmit(event: { detail?: unknown } | null | undefined): void {
       const detail = eventDetail(event);

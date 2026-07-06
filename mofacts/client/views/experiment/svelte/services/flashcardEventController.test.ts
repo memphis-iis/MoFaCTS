@@ -1,10 +1,10 @@
 import { expect } from 'chai';
-import { createCardTrialEventController, type CardTrialMachineEvent } from './cardTrialEventController';
+import { createFlashcardEventController, type FlashcardMachineEvent } from './flashcardEventController';
 
-describe('cardTrialEventController', () => {
+describe('flashcardEventController', () => {
   it('translates submit and choice UI events into machine submit events', () => {
-    const sent: CardTrialMachineEvent[] = [];
-    const controller = createCardTrialEventController({
+    const sent: FlashcardMachineEvent[] = [];
+    const controller = createFlashcardEventController({
       getContext: () => ({}),
       loadTtsPlayback: async () => () => undefined,
       send: (event) => sent.push(event),
@@ -30,8 +30,8 @@ describe('cardTrialEventController', () => {
   });
 
   it('translates first-keypress and skip-study events', () => {
-    const sent: CardTrialMachineEvent[] = [];
-    const controller = createCardTrialEventController({
+    const sent: FlashcardMachineEvent[] = [];
+    const controller = createFlashcardEventController({
       getContext: () => ({}),
       loadTtsPlayback: async () => () => undefined,
       send: (event) => sent.push(event),
@@ -54,7 +54,7 @@ describe('cardTrialEventController', () => {
   it('plays replay audio with question SR restart options', async () => {
     const calls: unknown[] = [];
     const context = { currentAnswer: 'A' };
-    const controller = createCardTrialEventController({
+    const controller = createFlashcardEventController({
       getContext: () => context,
       loadTtsPlayback: async () => (playContext, options) => {
         calls.push({ playContext, options });
@@ -78,7 +78,7 @@ describe('cardTrialEventController', () => {
 
   it('ignores replay events without an audio source', async () => {
     let loadCount = 0;
-    const controller = createCardTrialEventController({
+    const controller = createFlashcardEventController({
       getContext: () => ({}),
       loadTtsPlayback: async () => {
         loadCount += 1;

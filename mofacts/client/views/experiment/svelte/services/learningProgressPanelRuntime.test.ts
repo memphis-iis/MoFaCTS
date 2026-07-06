@@ -2,10 +2,10 @@ import { expect } from 'chai';
 import { createLearningProgressRuntimeController } from './learningProgressPanelRuntime';
 import type { SessionSurfaceState } from './sessionSurfaceMode';
 
-const cardSurface: SessionSurfaceState = {
+const flashcardSurface: SessionSurfaceState = {
   isAutoTutorSession: false,
   isVideoSession: false,
-  mode: 'card',
+  mode: 'flashcard',
 };
 
 function modelEngine(probabilityEstimate = 0.7) {
@@ -91,7 +91,7 @@ describe('learning progress panel runtime', function() {
       deliverySettings: { optimalThreshold: 0.8 },
       engine: sparcSessionEngine(),
       feedbackEnd: 0,
-      surfaceState: cardSurface,
+    surfaceState: flashcardSurface,
     });
 
     expect(runtime.snapshot.available).to.equal(true);
@@ -115,7 +115,7 @@ describe('learning progress panel runtime', function() {
       deliverySettings: {},
       engine: legacyModelEngine(),
       feedbackEnd: 0,
-      surfaceState: cardSurface,
+    surfaceState: flashcardSurface,
     });
 
     expect(runtime.snapshot.available).to.equal(false);
@@ -135,7 +135,7 @@ describe('learning progress panel runtime', function() {
       deliverySettings: {},
       engine: modelEngine(probability),
       feedbackEnd: 10,
-      surfaceState: cardSurface,
+      surfaceState: flashcardSurface,
     });
     expect(controller.getSnapshot().rows[0]?.probability).to.equal(0.6);
 
@@ -144,7 +144,7 @@ describe('learning progress panel runtime', function() {
       deliverySettings: {},
       engine: modelEngine(probability),
       feedbackEnd: 10,
-      surfaceState: cardSurface,
+      surfaceState: flashcardSurface,
     });
     expect(controller.getSnapshot().rows[0]?.probability).to.equal(0.6);
 
@@ -152,7 +152,7 @@ describe('learning progress panel runtime', function() {
       deliverySettings: {},
       engine: modelEngine(probability),
       feedbackEnd: 20,
-      surfaceState: cardSurface,
+      surfaceState: flashcardSurface,
     });
     expect(controller.getSnapshot().rows[0]?.probability).to.equal(0.9);
     expect(controller.getLastFeedbackEnd()).to.equal(20);
@@ -171,7 +171,7 @@ describe('learning progress panel runtime', function() {
       engine: sparcSessionEngine(probability),
       feedbackEnd: 0,
       refreshSignal: 'sparc-action-1',
-      surfaceState: cardSurface,
+      surfaceState: flashcardSurface,
     });
     expect(controller.getSnapshot().rows[0]?.probability).to.equal(0.6);
 
@@ -181,7 +181,7 @@ describe('learning progress panel runtime', function() {
       engine: sparcSessionEngine(probability),
       feedbackEnd: 0,
       refreshSignal: 'sparc-action-1',
-      surfaceState: cardSurface,
+      surfaceState: flashcardSurface,
     });
     expect(controller.getSnapshot().rows[0]?.probability).to.equal(0.6);
 
@@ -190,7 +190,7 @@ describe('learning progress panel runtime', function() {
       engine: sparcSessionEngine(probability),
       feedbackEnd: 0,
       refreshSignal: 'sparc-action-2',
-      surfaceState: cardSurface,
+      surfaceState: flashcardSurface,
     });
     expect(controller.getSnapshot().rows[0]?.probability).to.equal(0.9);
   });
@@ -208,13 +208,13 @@ describe('learning progress panel runtime', function() {
       deliverySettings: {},
       engine: modelEngine(),
       feedbackEnd: 0,
-      surfaceState: cardSurface,
+      surfaceState: flashcardSurface,
     });
     const runtime = controller.buildRuntimeSnapshot({
       deliverySettings: { disableProgressReport: true },
       engine: modelEngine(),
       feedbackEnd: 0,
-      surfaceState: cardSurface,
+      surfaceState: flashcardSurface,
     });
 
     expect(runtime.showPanel).to.equal(false);
@@ -239,7 +239,7 @@ describe('learning progress panel runtime', function() {
       deliverySettings: {},
       engine: modelEngine(),
       feedbackEnd: 0,
-      surfaceState: cardSurface,
+      surfaceState: flashcardSurface,
     });
     controller.closeViewport();
 

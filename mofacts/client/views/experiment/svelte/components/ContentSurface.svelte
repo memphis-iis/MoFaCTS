@@ -95,9 +95,9 @@
     resolveSessionSurfaceLaunchCompletion,
   } from '../services/sessionSurfaceMode';
   import {
-    buildCardSessionRuntimeSnapshot,
+    buildContentSurfaceRuntimeSnapshot,
     startVideoInstructionTimer,
-  } from '../services/cardSessionRuntime';
+  } from '../services/contentSurfaceRuntime';
   import {
     createCardWakeLockController,
     shouldHoldScreenWakeLock,
@@ -125,9 +125,9 @@
     buildCardPerformanceData,
     buildCardPerformanceDisplaySnapshot,
   } from '../services/cardPerformanceDisplay';
-  import { createCardTextInputController } from '../services/cardTextInputController';
-  import { createCardTrialEventController } from '../services/cardTrialEventController';
-  import { createCardReviewEventController } from '../services/cardReviewEventController';
+  import { createFlashcardTextInputController } from '../services/flashcardTextInputController';
+  import { createFlashcardEventController } from '../services/flashcardEventController';
+  import { createFlashcardReviewEventController } from '../services/flashcardReviewEventController';
   import { sanitizeCardInstructionHtml } from '../services/cardInstructionSanitizer';
   import { createCardBlockingAssetController } from '../services/cardBlockingAssetState';
   import {
@@ -443,7 +443,7 @@
   $: preparedTrial = context.preparedTrial || null;
   $: deliverySettings = { ...DEFAULT_DELIVERY_SETTINGS, ...(context.deliverySettings || {}) };
   $: audioState = context.audio || { waitingForTranscription: false, srAttempts: 0, maxSrAttempts: 0 };
-  $: cardSessionRuntimeSnapshot = (sessionUnitModeVersion, buildCardSessionRuntimeSnapshot({
+  $: contentSurfaceRuntimeSnapshot = (sessionUnitModeVersion, buildContentSurfaceRuntimeSnapshot({
     currentTdfUnit: Session.get('currentTdfUnit'),
     deliverySettings,
     sessionIsVideoSession: getIsVideoSessionFlag(),
@@ -452,13 +452,13 @@
     videoInstructionDismissed,
     sanitizeInstructionHtml: sanitizeCardInstructionHtml,
   }));
-  $: currentTdfUnit = cardSessionRuntimeSnapshot.currentTdfUnit;
-  $: sessionSurfaceState = cardSessionRuntimeSnapshot.sessionSurfaceState;
-  $: sessionContentSurface = cardSessionRuntimeSnapshot.sessionContentSurface;
-  $: rawVideoInstructionText = cardSessionRuntimeSnapshot.rawVideoInstructionText;
-  $: sanitizedVideoInstructionText = cardSessionRuntimeSnapshot.sanitizedVideoInstructionText;
-  $: videoInstructionsSeen = cardSessionRuntimeSnapshot.videoInstructionsSeen;
-  $: showVideoInstructionOverlay = cardSessionRuntimeSnapshot.showVideoInstructionOverlay;
+  $: currentTdfUnit = contentSurfaceRuntimeSnapshot.currentTdfUnit;
+  $: sessionSurfaceState = contentSurfaceRuntimeSnapshot.sessionSurfaceState;
+  $: sessionContentSurface = contentSurfaceRuntimeSnapshot.sessionContentSurface;
+  $: rawVideoInstructionText = contentSurfaceRuntimeSnapshot.rawVideoInstructionText;
+  $: sanitizedVideoInstructionText = contentSurfaceRuntimeSnapshot.sanitizedVideoInstructionText;
+  $: videoInstructionsSeen = contentSurfaceRuntimeSnapshot.videoInstructionsSeen;
+  $: showVideoInstructionOverlay = contentSurfaceRuntimeSnapshot.showVideoInstructionOverlay;
   $: videoInstructionsShownAt = startVideoInstructionTimer({
     showVideoInstructionOverlay,
     videoInstructionsShownAt,
@@ -736,18 +736,18 @@
   $: videoEnded = state.matches('videoEnded');
   $: videoEndOverlayController.syncVideoEnded(videoEnded);
 
-  let standardCardLaunchFinishKey = '';
+  let flashcardLaunchFinishKey = '';
   $: if (
     !testMode &&
     initializedForRender &&
-    (sessionContentSurface.showStandardCardSession ? trialContentVisible : sessionContentSurface.showSparcSession) &&
+    (sessionContentSurface.showFlashcardSession ? trialContentVisible : sessionContentSurface.showSparcSession) &&
     isLaunchLoadingActive() &&
     trialSubsetKey &&
     trialSubsetKey !== 'none' &&
-    standardCardLaunchFinishKey !== trialSubsetKey
+    flashcardLaunchFinishKey !== trialSubsetKey
   ) {
-    standardCardLaunchFinishKey = trialSubsetKey;
-    const timingName = sessionContentSurface.showSparcSession ? 'sparc:firstTrialVisible' : 'standardCard:firstTrialVisible';
+    flashcardLaunchFinishKey = trialSubsetKey;
+    const timingName = sessionContentSurface.showSparcSession ? 'sparc:firstTrialVisible' : 'flashcard:firstTrialVisible';
     const finishReason = sessionContentSurface.showSparcSession ? 'sparc-first-trial-visible' : 'standard-card-first-trial-visible';
     void (async (key, subsetKind, launchTimingName, launchFinishReason) => {
       await tick();
@@ -781,7 +781,7 @@
   });
 
   $: if (
-    sessionContentSurface.showStandardCardSession &&
+    sessionContentSurface.showFlashcardSession &&
     state.matches('presenting.awaiting') &&
     activeSlotMounted &&
     !activeSlotVisible &&
@@ -898,7 +898,7 @@
   let timeoutDuration = 0;
   let textAnswer = '';
   let timeoutModeState = 'none';
-  const cardTextInputController = createCardTextInputController({
+  const flashcardTextInputController = createFlashcardTextInputController({
     getContext: () => context,
     getState: () => state,
     now: () => Date.now(),
@@ -910,7 +910,7 @@
       textAnswer = value;
     },
   });
-  const cardTrialEventController = createCardTrialEventController({
+  const flashcardEventController = createFlashcardEventController({
     getContext: () => context,
     loadTtsPlayback: async () => {
       const { ttsPlaybackService } = await import('../services/ttsService');
@@ -918,7 +918,7 @@
     },
     send,
   });
-  const cardReviewEventController = createCardReviewEventController({
+  const flashcardReviewEventController = createFlashcardReviewEventController({
     getSubsetKind: () => trialSubset.kind,
     isTestMode: () => testMode,
     log: clientConsole,
@@ -967,8 +967,8 @@
     getFeedbackTimeoutMs,
   });
 
-  $: cardTextInputController.resetForRuntimeState(state);
-  $: cardTextInputController.syncTrialStart(context.timestamps?.trialStart);
+  $: flashcardTextInputController.resetForRuntimeState(state);
+  $: flashcardTextInputController.syncTrialStart(context.timestamps?.trialStart);
   $: timeoutMode = timeoutCountdownSyncController.sync({
     testMode,
     testTimeout,
@@ -995,11 +995,11 @@
 
   // Event handlers
   function handleSubmit(event) {
-    cardTrialEventController.handleSubmit(event);
+    flashcardEventController.handleSubmit(event);
   }
 
   function handleChoice(event) {
-    cardTrialEventController.handleChoice(event);
+    flashcardEventController.handleChoice(event);
   }
 
   function handleH5PResult(event) {
@@ -1020,11 +1020,11 @@
   }
 
   function handleInput(event) {
-    cardTextInputController.handleInput(event.detail);
+    flashcardTextInputController.handleInput(event.detail);
   }
 
   function handleInputActivity(event) {
-    cardTextInputController.handleInputActivity(event.detail);
+    flashcardTextInputController.handleInputActivity(event.detail);
   }
 
   function handleBlockingAssetState(event, slot = 'active') {
@@ -1032,11 +1032,11 @@
   }
 
   function handleFeedbackContent(event) {
-    cardReviewEventController.handleFeedbackContent(event.detail);
+    flashcardReviewEventController.handleFeedbackContent(event.detail);
   }
 
   function handleReviewRevealStarted(event) {
-    cardReviewEventController.handleReviewRevealStarted(event.detail);
+    flashcardReviewEventController.handleReviewRevealStarted(event.detail);
   }
 
   function primeFlashcardControllerFadeStart() {
@@ -1061,15 +1061,15 @@
   }
 
   function handleFirstKeypress(event) {
-    cardTrialEventController.handleFirstKeypress(event);
+    flashcardEventController.handleFirstKeypress(event);
   }
 
   function handleSkipStudy() {
-    cardTrialEventController.handleSkipStudy();
+    flashcardEventController.handleSkipStudy();
   }
 
   async function handleReplay(event) {
-    await cardTrialEventController.handleReplay(event);
+    await flashcardEventController.handleReplay(event);
   }
 
   const completedVideoQuestionsStore = createCompletedVideoQuestionsStore();
@@ -1417,7 +1417,7 @@
       on:sparcsubmit={handleSparcSubmit}
       on:sparcaction={handleSparcAction}
     />
-  {:else if sessionContentSurface.showStandardCardSession}
+  {:else if sessionContentSurface.showFlashcardSession}
     <FlashcardSessionSurface
       bind:trialContentFadeElement={trialContentFadeElement}
       {deliverySettings}

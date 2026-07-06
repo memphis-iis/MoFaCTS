@@ -14,7 +14,7 @@ type UnitWithInstructions = {
   autotutorsession?: unknown;
 };
 
-export interface CardSessionRuntimeSnapshot {
+export interface ContentSurfaceRuntimeSnapshot {
   currentTdfUnit: UnitWithInstructions;
   rawVideoInstructionText: string;
   sanitizedVideoInstructionText: string;
@@ -24,7 +24,7 @@ export interface CardSessionRuntimeSnapshot {
   videoInstructionsSeen: boolean;
 }
 
-export function buildCardSessionRuntimeSnapshot(params: {
+export function buildContentSurfaceRuntimeSnapshot(params: {
   currentTdfUnit: UnitWithInstructions | null | undefined;
   deliverySettings: { isVideoSession?: boolean | undefined };
   sessionIsVideoSession: unknown;
@@ -32,7 +32,7 @@ export function buildCardSessionRuntimeSnapshot(params: {
   curUnitInstructionsSeen: unknown;
   videoInstructionDismissed: boolean;
   sanitizeInstructionHtml: (dirty: string) => string;
-}): CardSessionRuntimeSnapshot {
+}): ContentSurfaceRuntimeSnapshot {
   const currentTdfUnit = params.currentTdfUnit || {};
   const sessionSurfaceState = resolveSessionSurfaceState({
     deliverySettings: params.deliverySettings,

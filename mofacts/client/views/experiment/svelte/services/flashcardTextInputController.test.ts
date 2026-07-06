@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { createCardTextInputController } from './cardTextInputController';
+import { createFlashcardTextInputController } from './flashcardTextInputController';
 
 function createHarness() {
   let statePath = 'presenting.awaiting';
@@ -10,7 +10,7 @@ function createHarness() {
   };
   let textAnswer = 'initial';
   const sent: Array<{ type: 'INPUT_ACTIVITY'; timestamp: number }> = [];
-  const controller = createCardTextInputController({
+  const controller = createFlashcardTextInputController({
     getContext: () => context,
     getState: () => ({
       matches: (path) => path === statePath,

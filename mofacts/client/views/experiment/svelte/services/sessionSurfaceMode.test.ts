@@ -13,11 +13,11 @@ import {
 } from './sessionSurfaceMode';
 
 describe('session surface mode', function() {
-  it('uses the standard card surface when no specialized session is active', function() {
+  it('uses the flashcard surface when no specialized session is active', function() {
     expect(resolveSessionSurfaceState({})).to.deep.equal({
       isAutoTutorSession: false,
       isVideoSession: false,
-      mode: 'card',
+      mode: 'flashcard',
     });
   });
 
@@ -36,7 +36,7 @@ describe('session surface mode', function() {
       showAutoTutorSession: false,
       showVideoSession: false,
       showSparcSession: true,
-      showStandardCardSession: false,
+      showFlashcardSession: false,
     });
   });
 
@@ -79,11 +79,11 @@ describe('session surface mode', function() {
 
   it('describes the content surface that owns the render branch', function() {
     expect(resolveSessionContentSurface(resolveSessionSurfaceState({}))).to.deep.equal({
-      mode: 'card',
+      mode: 'flashcard',
       showAutoTutorSession: false,
       showVideoSession: false,
       showSparcSession: false,
-      showStandardCardSession: true,
+      showFlashcardSession: true,
     });
     expect(resolveSessionContentSurface(resolveSessionSurfaceState({
       currentTdfUnit: { videosession: {} },
@@ -92,7 +92,7 @@ describe('session surface mode', function() {
       showAutoTutorSession: false,
       showVideoSession: true,
       showSparcSession: false,
-      showStandardCardSession: false,
+      showFlashcardSession: false,
     });
     expect(resolveSessionContentSurface(resolveSessionSurfaceState({
       currentTdfUnit: {
@@ -104,7 +104,7 @@ describe('session surface mode', function() {
       showAutoTutorSession: true,
       showVideoSession: false,
       showSparcSession: false,
-      showStandardCardSession: false,
+      showFlashcardSession: false,
     });
   });
 
@@ -120,7 +120,7 @@ describe('session surface mode', function() {
         surface.showAutoTutorSession,
         surface.showVideoSession,
         surface.showSparcSession,
-        surface.showStandardCardSession,
+        surface.showFlashcardSession,
       ].filter(Boolean).length;
 
       expect(activeSurfaceCount).to.equal(1);
@@ -133,7 +133,7 @@ describe('session surface mode', function() {
       showAutoTutorSession: false,
       showVideoSession: false,
       showSparcSession: false,
-      showStandardCardSession: false,
+      showFlashcardSession: false,
     };
 
     expect(() => shouldShowSessionVideoInstructionOverlay({
@@ -168,7 +168,7 @@ describe('session surface mode', function() {
     );
   });
 
-  it('does not complete launch loading for the standard card surface', function() {
+  it('does not complete launch loading for the flashcard surface', function() {
     expect(resolveSessionSurfaceLaunchCompletion({
       contentSurface: resolveSessionContentSurface(resolveSessionSurfaceState({})),
       isLaunchLoadingActive: true,
@@ -216,7 +216,7 @@ describe('session surface mode', function() {
     const videoSurface = resolveSessionContentSurface(resolveSessionSurfaceState({
       currentTdfUnit: { videosession: {} },
     }));
-    const cardSurface = resolveSessionContentSurface(resolveSessionSurfaceState({}));
+    const flashcardSurface = resolveSessionContentSurface(resolveSessionSurfaceState({}));
 
     expect(shouldShowSessionVideoInstructionOverlay({
       contentSurface: videoSurface,
@@ -234,7 +234,7 @@ describe('session surface mode', function() {
       instructionsSeen: false,
     })).to.equal(false);
     expect(shouldShowSessionVideoInstructionOverlay({
-      contentSurface: cardSurface,
+      contentSurface: flashcardSurface,
       instructionText: 'Watch the video before answering.',
       instructionsSeen: false,
     })).to.equal(false);
@@ -244,7 +244,7 @@ describe('session surface mode', function() {
     const videoSurface = resolveSessionContentSurface(resolveSessionSurfaceState({
       currentTdfUnit: { videosession: {} },
     }));
-    const cardSurface = resolveSessionContentSurface(resolveSessionSurfaceState({}));
+    const flashcardSurface = resolveSessionContentSurface(resolveSessionSurfaceState({}));
 
     expect(shouldInlineSessionVideoInstructions({
       contentSurface: videoSurface,
@@ -275,7 +275,7 @@ describe('session surface mode', function() {
       hasUnitQuestion: true,
     })).to.equal(false);
     expect(shouldInlineSessionVideoInstructions({
-      contentSurface: cardSurface,
+      contentSurface: flashcardSurface,
       lockoutMinutes: 0,
       hasUnitText: true,
       hasUnitImage: false,
@@ -310,21 +310,21 @@ describe('session surface mode', function() {
     )).to.equal(false);
   });
 
-  it('describes standard card shell behavior with learning progress enabled', function() {
+  it('describes flashcard shell behavior with learning progress enabled', function() {
     expect(resolveSessionSurfaceShell({
       surfaceState: resolveSessionSurfaceState({}),
       progressPanelDisabled: false,
       learningProgressAvailable: true,
     })).to.deep.equal({
-      mode: 'card',
+      mode: 'flashcard',
       isAutoTutorSession: false,
       isVideoSession: false,
       contentSurface: {
-        mode: 'card',
+        mode: 'flashcard',
         showAutoTutorSession: false,
         showVideoSession: false,
         showSparcSession: false,
-        showStandardCardSession: true,
+        showFlashcardSession: true,
       },
       contentSurfaceClasses: {
         videoMode: false,
@@ -352,7 +352,7 @@ describe('session surface mode', function() {
       showAutoTutorSession: false,
       showVideoSession: true,
       showSparcSession: false,
-      showStandardCardSession: false,
+      showFlashcardSession: false,
     });
     expect(resolveSessionSurfaceShell({
       surfaceState: resolveSessionSurfaceState({ currentTdfUnit: { sparcsession: {} } }),
@@ -371,7 +371,7 @@ describe('session surface mode', function() {
       showAutoTutorSession: false,
       showVideoSession: false,
       showSparcSession: true,
-      showStandardCardSession: false,
+      showFlashcardSession: false,
     });
     expect(resolveSessionSurfaceShell({
       surfaceState: resolveSessionSurfaceState({ sessionUnitType: 'autotutor' }),
@@ -390,7 +390,7 @@ describe('session surface mode', function() {
       showAutoTutorSession: true,
       showVideoSession: false,
       showSparcSession: false,
-      showStandardCardSession: false,
+      showFlashcardSession: false,
     });
   });
 

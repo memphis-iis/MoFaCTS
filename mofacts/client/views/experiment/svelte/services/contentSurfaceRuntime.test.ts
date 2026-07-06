@@ -1,12 +1,12 @@
 import { expect } from 'chai';
 import {
-  buildCardSessionRuntimeSnapshot,
+  buildContentSurfaceRuntimeSnapshot,
   startVideoInstructionTimer,
-} from './cardSessionRuntime';
+} from './contentSurfaceRuntime';
 
-describe('card session runtime', function() {
-  it('builds a standard card snapshot from explicit session inputs', function() {
-    const snapshot = buildCardSessionRuntimeSnapshot({
+describe('content surface runtime', function() {
+  it('builds a flashcard snapshot from explicit session inputs', function() {
+    const snapshot = buildContentSurfaceRuntimeSnapshot({
       currentTdfUnit: { learningsession: {} },
       deliverySettings: {},
       sessionIsVideoSession: false,
@@ -16,14 +16,14 @@ describe('card session runtime', function() {
       sanitizeInstructionHtml: (value) => `safe:${value}`,
     });
 
-    expect(snapshot.sessionContentSurface.showStandardCardSession).to.equal(true);
+    expect(snapshot.sessionContentSurface.showFlashcardSession).to.equal(true);
     expect(snapshot.rawVideoInstructionText).to.equal('');
     expect(snapshot.sanitizedVideoInstructionText).to.equal('safe:');
     expect(snapshot.showVideoInstructionOverlay).to.equal(false);
   });
 
   it('derives video instruction overlay state and sanitized copy for video sessions', function() {
-    const snapshot = buildCardSessionRuntimeSnapshot({
+    const snapshot = buildContentSurfaceRuntimeSnapshot({
       currentTdfUnit: {
         videosession: {},
         unitinstructions: '  <p>Watch first</p>  ',
@@ -48,7 +48,7 @@ describe('card session runtime', function() {
       { curUnitInstructionsSeen: true, videoInstructionDismissed: false },
       { curUnitInstructionsSeen: false, videoInstructionDismissed: true },
     ]) {
-      const snapshot = buildCardSessionRuntimeSnapshot({
+      const snapshot = buildContentSurfaceRuntimeSnapshot({
         currentTdfUnit: {
           videosession: {},
           unitinstructions: 'Watch first',

@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import { EVENTS } from '../machine/constants';
-import { createCardReviewEventController } from './cardReviewEventController';
+import { createFlashcardReviewEventController } from './flashcardReviewEventController';
 
 function createHarness(options: {
   testMode?: boolean;
@@ -9,7 +9,7 @@ function createHarness(options: {
 } = {}) {
   const sent: unknown[] = [];
   const logs: Array<{ level: number; message: string; details?: unknown }> = [];
-  const controller = createCardReviewEventController({
+  const controller = createFlashcardReviewEventController({
     getSubsetKind: () => options.subsetKind || 'feedback',
     isTestMode: () => options.testMode === true,
     log: (level, message, details) => {
