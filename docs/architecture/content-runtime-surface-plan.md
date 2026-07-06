@@ -97,7 +97,7 @@ Rename the runtime shell:
 
 - `CardScreen.svelte` -> `ContentSurface.svelte`
 - `cardRoute:*` launch timing labels may remain temporarily if they refer to the legacy route, but new runtime labels should use `contentRuntime:*`.
-- `cardMachine` can remain temporarily during the first rename if changing it would expand scope too much. The long-term name should be `contentRuntimeMachine` or `sessionRuntimeMachine`.
+- `cardMachine` was renamed after the session surfaces were stable. The app-owned state-machine core is now `contentRuntimeMachine`.
 
 Clarify session surfaces:
 
@@ -608,7 +608,7 @@ Use this checklist in the PR or commit notes for each phase:
 - SPARC session behavior is reachable through `SparcSessionSurface`.
 - SPARC runtime coordination is named `SparcController`.
 - `FlashcardController` / flashcard runtime does not route to SPARC.
-- Learner runtime no longer uses `SparcTrial*` names or a SPARC trial concept.
+- Learner-runtime surface and controller ownership no longer uses `SparcTrial*` names or a SPARC trial concept; excluded lower-level trial-object contracts may still expose `SparcTrialDisplay*` names behind the `SparcController` boundary.
 - The former SPARC display discriminator does not select the top-level session surface.
 - Standard response timer policy is explicit and separately tested from display submission ownership.
 - Attributed-image flashcards and normal flashcards start response timing only after visible reveal.
