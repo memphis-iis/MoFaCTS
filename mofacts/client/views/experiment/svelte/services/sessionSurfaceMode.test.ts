@@ -27,6 +27,19 @@ describe('session surface mode', function() {
     expect(resolveSessionSurfaceState({ currentTdfUnit: { videosession: {} } }).mode).to.equal('video');
   });
 
+  it('detects SPARC sessions from unit-level sparcsession content', function() {
+    expect(resolveSessionSurfaceState({ currentTdfUnit: { sparcsession: {} } }).mode).to.equal('sparc');
+    expect(resolveSessionContentSurface(resolveSessionSurfaceState({
+      currentTdfUnit: { sparcsession: {} },
+    }))).to.deep.equal({
+      mode: 'sparc',
+      showAutoTutorSession: false,
+      showVideoSession: false,
+      showSparcSession: true,
+      showStandardCardSession: false,
+    });
+  });
+
   it('detects AutoTutor sessions and preserves their priority over video rendering', function() {
     expect(resolveSessionSurfaceState({ sessionUnitType: 'autotutor' })).to.deep.equal({
       isAutoTutorSession: true,
@@ -69,6 +82,7 @@ describe('session surface mode', function() {
       mode: 'card',
       showAutoTutorSession: false,
       showVideoSession: false,
+      showSparcSession: false,
       showStandardCardSession: true,
     });
     expect(resolveSessionContentSurface(resolveSessionSurfaceState({
@@ -77,6 +91,7 @@ describe('session surface mode', function() {
       mode: 'video',
       showAutoTutorSession: false,
       showVideoSession: true,
+      showSparcSession: false,
       showStandardCardSession: false,
     });
     expect(resolveSessionContentSurface(resolveSessionSurfaceState({
@@ -88,6 +103,7 @@ describe('session surface mode', function() {
       mode: 'autotutor',
       showAutoTutorSession: true,
       showVideoSession: false,
+      showSparcSession: false,
       showStandardCardSession: false,
     });
   });
@@ -96,12 +112,14 @@ describe('session surface mode', function() {
     for (const surfaceState of [
       resolveSessionSurfaceState({}),
       resolveSessionSurfaceState({ currentTdfUnit: { videosession: {} } }),
+      resolveSessionSurfaceState({ currentTdfUnit: { sparcsession: {} } }),
       resolveSessionSurfaceState({ sessionUnitType: 'autotutor' }),
     ]) {
       const surface = resolveSessionContentSurface(surfaceState);
       const activeSurfaceCount = [
         surface.showAutoTutorSession,
         surface.showVideoSession,
+        surface.showSparcSession,
         surface.showStandardCardSession,
       ].filter(Boolean).length;
 
@@ -114,6 +132,7 @@ describe('session surface mode', function() {
       mode: 'video' as const,
       showAutoTutorSession: false,
       showVideoSession: false,
+      showSparcSession: false,
       showStandardCardSession: false,
     };
 
@@ -272,6 +291,9 @@ describe('session surface mode', function() {
       resolveSessionContentSurface(resolveSessionSurfaceState({ currentTdfUnit: { videosession: {} } })),
     )).to.equal('/card');
     expect(resolveSessionSurfaceUnitEntryRoute(
+      resolveSessionContentSurface(resolveSessionSurfaceState({ currentTdfUnit: { sparcsession: {} } })),
+    )).to.equal('/card');
+    expect(resolveSessionSurfaceUnitEntryRoute(
       resolveSessionContentSurface(resolveSessionSurfaceState({ sessionUnitType: 'autotutor' })),
     )).to.equal('/card');
   });
@@ -301,9 +323,10 @@ describe('session surface mode', function() {
         mode: 'card',
         showAutoTutorSession: false,
         showVideoSession: false,
+        showSparcSession: false,
         showStandardCardSession: true,
       },
-      cardScreenClasses: {
+      contentSurfaceClasses: {
         videoMode: false,
         autoTutorMode: false,
       },
@@ -328,6 +351,26 @@ describe('session surface mode', function() {
       mode: 'video',
       showAutoTutorSession: false,
       showVideoSession: true,
+      showSparcSession: false,
+      showStandardCardSession: false,
+    });
+    expect(resolveSessionSurfaceShell({
+      surfaceState: resolveSessionSurfaceState({ currentTdfUnit: { sparcsession: {} } }),
+      progressPanelDisabled: false,
+      learningProgressAvailable: true,
+    })).to.deep.include({
+      mode: 'sparc',
+      showLearningProgressPanel: true,
+    });
+    expect(resolveSessionSurfaceShell({
+      surfaceState: resolveSessionSurfaceState({ currentTdfUnit: { sparcsession: {} } }),
+      progressPanelDisabled: false,
+      learningProgressAvailable: true,
+    }).contentSurface).to.deep.equal({
+      mode: 'sparc',
+      showAutoTutorSession: false,
+      showVideoSession: false,
+      showSparcSession: true,
       showStandardCardSession: false,
     });
     expect(resolveSessionSurfaceShell({
@@ -346,6 +389,7 @@ describe('session surface mode', function() {
       mode: 'autotutor',
       showAutoTutorSession: true,
       showVideoSession: false,
+      showSparcSession: false,
       showStandardCardSession: false,
     });
   });

@@ -315,7 +315,6 @@ function createPageRuntimeDeps(overrides: Record<string, unknown> = {}): any {
           sparcPages: [{
             pageId: 'page-1',
             display: {
-              type: 'sparc',
               documentId: 'doc-1',
               clusterTargets: [
                 { clusterIndex: 0 },
@@ -658,7 +657,6 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
             sparcPages: [{
               pageId: 'page-1',
               display: {
-                type: 'sparc',
                 documentId: 'doc-1',
                 unitType: 'sparc-autotutor-dialogue',
                 clusterTargets: [
@@ -767,14 +765,12 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
             sparcPages: [{
               pageId: 'page-1',
               display: {
-                type: 'sparc',
                 documentId: 'doc-1',
                 nodes: [{ id: 'first', clusterIndex: 0 }],
               },
             }, {
               pageId: 'page-2',
               display: {
-                type: 'sparc',
                 documentId: 'doc-2',
                 nodes: [{ id: 'second', clusterIndex: 1 }],
               },
@@ -834,7 +830,6 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
             sparcPages: [{
               pageId: 'page-1',
               display: {
-                type: 'sparc',
                 documentId: 'doc-1',
                 nodes: [{
                   id: 'bad-node',
@@ -965,7 +960,6 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
       },
       documentId: 'doc-1',
       display: {
-        type: 'sparc',
         nodes: [{
           id: 'answer-node',
           nodeType: 'atomic',
@@ -1045,7 +1039,6 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
     const result = engine.evaluateSparcTrialDisplayProductionRuleEvents({
       documentId: 'doc-1',
       display: {
-        type: 'sparc',
         nodes: [{
           id: 'answer-node',
           nodeType: 'atomic',

@@ -12,13 +12,13 @@ The card state machine coordinates learner trial lifecycle for the Svelte card r
 
 ## Files
 
-- `cardMachine.ts`: main state machine.
-- `cardMachineTypes.ts`: machine and trial-flow types.
-- `cardMachineServiceInputs.ts`: input builders for invoked service contracts.
-- `cardMachineTransitionGuards.ts`: transition-specific guard helpers.
+- `contentRuntimeMachine.ts`: main state machine.
+- `contentRuntimeMachineTypes.ts`: machine and trial-flow types.
+- `contentRuntimeMachineServiceInputs.ts`: input builders for invoked service contracts.
+- `contentRuntimeMachineTransitionGuards.ts`: transition-specific guard helpers.
 - `constants.ts`: timing values, trial codes, and defaults.
 - `guards.ts`: transition predicates.
-- `cardMachineActions.ts`: composed action map used by the machine.
+- `contentRuntimeMachineActions.ts`: composed action map used by the machine.
 - `*Actions.ts`: domain-scoped state assignment and side-effect dispatch.
 - `*Machine.ts`: domain-scoped context defaults and state fragments.
 - `services.ts`: invoked runtime services.
@@ -26,9 +26,9 @@ The card state machine coordinates learner trial lifecycle for the Svelte card r
 
 ## Boundary Rules
 
-- Put state shape and trial lifecycle transitions in `cardMachine.ts` and `cardMachineTypes.ts`.
-- Put transition predicates in `guards.ts` or `cardMachineTransitionGuards.ts`.
-- Put context assignment and side-effect dispatch in the relevant `*Actions.ts` file, then expose it through `cardMachineActions.ts`.
+- Put state shape and trial lifecycle transitions in `contentRuntimeMachine.ts` and `contentRuntimeMachineTypes.ts`.
+- Put transition predicates in `guards.ts` or `contentRuntimeMachineTransitionGuards.ts`.
+- Put context assignment and side-effect dispatch in the relevant `*Actions.ts` file, then expose it through `contentRuntimeMachineActions.ts`.
 - Put invoked service wiring in `services.ts` and keep the concrete effectful implementation in `../services/`.
 - Put video-session state-machine behavior in `videoSessionMachine.ts`; keep DOM/player integration in `../services/videoMachineBridge.ts` or `../components/VideoSessionMode.svelte`.
 - Do not add AutoTutor, H5P, or video runtime branches directly to the standard card lifecycle unless the behavior truly changes shared trial lifecycle semantics.

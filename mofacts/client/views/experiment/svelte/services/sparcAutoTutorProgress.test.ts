@@ -1,13 +1,12 @@
 import { expect } from 'chai';
-import type { SparcTrialDisplay } from '../../../../../../learning-components/trial-displays/sparc/SparcTrialDisplayAdapter';
+import type { SparcControllerDisplay } from './sparcController';
 import {
   buildSparcAutoTutorProgressSnapshot,
   SPARC_DIALOGUE_PROGRESS_FACTS_VALUE_KEY,
 } from './sparcAutoTutorProgress';
 
-function displayWithMisconceptions(): SparcTrialDisplay {
+function displayWithMisconceptions(): SparcControllerDisplay {
   return {
-    type: 'sparc',
     nodes: [],
     autoTutorTargets: {
       expectations: [],
@@ -22,7 +21,7 @@ function displayWithMisconceptions(): SparcTrialDisplay {
         text: 'High-confidence misconception B.',
       }],
     },
-  } as unknown as SparcTrialDisplay;
+  } as unknown as SparcControllerDisplay;
 }
 
 describe('sparcAutoTutorProgress', function() {

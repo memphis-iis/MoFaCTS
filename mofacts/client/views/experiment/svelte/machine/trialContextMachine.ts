@@ -1,13 +1,13 @@
 import { assign as xAssign } from 'xstate';
 import { DEFAULT_DELIVERY_SETTINGS } from './constants';
-import type { CardSelectionDoneArgs, MachineArgs } from './cardMachineTypes';
+import type { CardSelectionDoneArgs, MachineArgs } from './contentRuntimeMachineTypes';
 import {
   getPreparedTrial,
   resolvePreparedQuestionIndex,
   resolveSelectedQuestionIndex,
 } from './preparedAdvanceMachine';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Matches cardMachine's XState v5 assign typing workaround.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Matches contentRuntimeMachine's XState v5 assign typing workaround.
 const assign: any = xAssign;
 
 function resetTrialResponseState() {

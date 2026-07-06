@@ -96,7 +96,7 @@ describe('video session bridge', function() {
 
     expect(harness.events).to.deep.equal([]);
     expect(harness.playerState?.recovered).to.equal(true);
-    expect(harness.logs[0]?.message).to.equal('[CardScreen] Rejected video checkpoint outside videoWaiting');
+    expect(harness.logs[0]?.message).to.equal('[ContentSurface] Rejected video checkpoint outside videoWaiting');
   });
 
   it('fails clearly when accepted checkpoint data is incomplete', function() {

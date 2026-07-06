@@ -5,7 +5,7 @@ import {
   commitPreparedTrialRuntime as commitPreparedTrialRuntimeService,
   startEarlyLockForCurrentTrial as startEarlyLockForCurrentTrialService,
 } from '../services/unitEngineService';
-import type { ActionArgs } from './cardMachineActionTypes';
+import type { ActionArgs } from './contentRuntimeMachineActionTypes';
 
 export function startEarlyLockForCurrentTrial({ context }: ActionArgs) {
   startEarlyLockForCurrentTrialService(context as unknown as Parameters<typeof startEarlyLockForCurrentTrialService>[0]);
@@ -29,17 +29,17 @@ export function notifyVideoAnswer({ context }: ActionArgs) {
     return;
   }
   if (!Number.isFinite(context.videoSession.currentCheckpointIndex)) {
-    throw new Error('[CardMachine] Video answer completion missing active checkpoint index');
+    throw new Error('[ContentRuntimeMachine] Video answer completion missing active checkpoint index');
   }
 
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('cardMachine:videoAnswer', {
+    window.dispatchEvent(new CustomEvent('contentRuntimeMachine:videoAnswer', {
       detail: {
         isCorrect: context.isCorrect,
         checkpointIndex: context.videoSession.currentCheckpointIndex,
       },
     }));
-    clientConsole(2, '[VIDEO-REWIND-DEBUG] cardMachine:videoAnswer event dispatched');
+    clientConsole(2, '[VIDEO-REWIND-DEBUG] contentRuntimeMachine:videoAnswer event dispatched');
   }
 }
 
@@ -68,7 +68,7 @@ export function maybeSpeakQuestion({ context }: ActionArgs) {
 
 export function playTTS({ context, event: _event }: ActionArgs) {
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('cardMachine:playTTS', {
+    window.dispatchEvent(new CustomEvent('contentRuntimeMachine:playTTS', {
       detail: { text: context.currentDisplay.text },
     }));
   }
@@ -78,12 +78,12 @@ export function stopTTS({ context: _context, event: _event }: ActionArgs) {
   stopTtsPlayback('machine-stop');
 
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('cardMachine:stopTTS'));
+    window.dispatchEvent(new CustomEvent('contentRuntimeMachine:stopTTS'));
   }
 }
 
 export function resumeVideoPlayback() {
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('cardMachine:resumeVideo'));
+    window.dispatchEvent(new CustomEvent('contentRuntimeMachine:resumeVideo'));
   }
 }

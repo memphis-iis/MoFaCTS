@@ -1,7 +1,7 @@
 import { assign as xAssign } from 'xstate';
-import type { MachineArgs } from './cardMachineTypes';
+import type { MachineArgs } from './contentRuntimeMachineTypes';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Matches cardMachine's XState v5 assign typing workaround.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Matches contentRuntimeMachine's XState v5 assign typing workaround.
 const assign: any = xAssign;
 
 export const setUnsupportedTrialTypeError = assign({
@@ -14,13 +14,13 @@ export const setFadeOutStallError = assign({
 
 export const setInvalidVideoCheckpointError = assign({
   errorMessage: ({ event }: MachineArgs) => (
-    `[CardMachine] Invalid video checkpoint event: checkpointIndex=${String(event.checkpointIndex)}, questionIndex=${String(event.questionIndex)}`
+    `[ContentRuntimeMachine] Invalid video checkpoint event: checkpointIndex=${String(event.checkpointIndex)}, questionIndex=${String(event.questionIndex)}`
   ),
 });
 
 export const setUnexpectedVideoCheckpointError = assign({
   errorMessage: ({ event }: MachineArgs) => (
-    `[CardMachine] VIDEO_CHECKPOINT received outside videoWaiting: checkpointIndex=${String(event.checkpointIndex)}, questionIndex=${String(event.questionIndex)}`
+    `[ContentRuntimeMachine] VIDEO_CHECKPOINT received outside videoWaiting: checkpointIndex=${String(event.checkpointIndex)}, questionIndex=${String(event.questionIndex)}`
   ),
 });
 

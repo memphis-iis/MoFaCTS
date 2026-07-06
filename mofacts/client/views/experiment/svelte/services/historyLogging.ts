@@ -39,8 +39,15 @@ import {
   rememberSparcProductionRuleHistoryRecord,
 } from './sparcProductionRuleHistoryCache';
 import {
-  getSparcTrialDisplayRuntimeContext,
-} from './sparcTrialDisplayRuntimeContextCache';
+  getSparcControllerRuntimeContext,
+} from './sparcControllerRuntimeContextCache';
+import type {
+  SparcControllerDisplay,
+  SparcControllerResult,
+} from './sparcController';
+import {
+  resolveSparcControllerDisplay,
+} from './sparcController';
 import { resolveH5PModelOutcomes } from '../../../../../common/lib/h5pTrialResult';
 import type {
   HistoryLoggingEvent,
@@ -52,10 +59,6 @@ import type {
 } from '../../../../../common/types';
 import type { CanonicalHistoryRecord } from '../../../../../../learning-components/runtime/historyEnvelope';
 import { normalizeClusterKC } from '../../../../../../learning-components/runtime/sharedModelPracticeIdentity';
-import type {
-  SparcTrialDisplay,
-  SparcTrialResult,
-} from '../../../../../../learning-components/trial-displays/sparc/SparcTrialDisplayAdapter';
 import type {
   SparcTrialDisplayProductionRuleRuntimeParams,
 } from '../../../../../../learning-components/units/sparcsession/SparcSessionUnitEngine';
@@ -90,7 +93,7 @@ type HistoryLoggingServiceContext = {
   feedbackText?: string;
   feedbackSuppressed?: boolean;
   h5pResult?: H5PTrialResult | null;
-  sparcResult?: SparcTrialResult | null;
+  sparcResult?: SparcControllerResult | null;
 };
 type HistoryAnswerContext = {
   originalDisplay?: unknown;
@@ -109,7 +112,7 @@ type SparcProductionRuleHistoryEngineLike = UnitEngineLike & {
     params: SparcTrialDisplayProductionRuleRuntimeParams
   ) => Promise<unknown>;
 };
-type SparcDisplayWithProductionRuleSource = SparcTrialDisplay & {
+type SparcDisplayWithProductionRuleSource = SparcControllerDisplay & {
   documentId: string;
 };
 type HistoryStimLike = {
@@ -234,23 +237,27 @@ function hasSparcProductionRuleSource(display: Record<string, unknown>): boolean
 function resolveSparcDisplayWithProductionRuleSource(
   display: unknown,
 ): SparcDisplayWithProductionRuleSource | null {
-  if (!isRecord(display) || display.type !== 'sparc' || !hasSparcProductionRuleSource(display)) {
+  if (!isRecord(display) || !Array.isArray(display.nodes)) {
     return null;
   }
-  const documentId = typeof display.documentId === 'string' ? display.documentId.trim() : '';
+  const sparcDisplay = resolveSparcControllerDisplay(display, '[History Logging] SPARC production-rule');
+  if (!sparcDisplay || !hasSparcProductionRuleSource(sparcDisplay)) {
+    return null;
+  }
+  const documentId = typeof sparcDisplay.documentId === 'string' ? sparcDisplay.documentId.trim() : '';
   if (!documentId) {
     throw new Error('[History Logging] SPARC production-rule display requires documentId');
   }
-  if (!Array.isArray(display.nodes)) {
+  if (!Array.isArray(sparcDisplay.nodes)) {
     throw new Error('[History Logging] SPARC production-rule display requires nodes array');
   }
-  return display as SparcDisplayWithProductionRuleSource;
+  return sparcDisplay as SparcDisplayWithProductionRuleSource;
 }
 
 export async function commitSparcProductionRulesForHistory(params: {
   engine: UnitEngineLike | null | undefined;
   currentDisplay: unknown;
-  sparcResult: SparcTrialResult | null | undefined;
+  sparcResult: SparcControllerResult | null | undefined;
   record: HistoryRecord;
 }): Promise<void> {
   const sparcDisplay = resolveSparcDisplayWithProductionRuleSource(params.currentDisplay);
@@ -282,7 +289,7 @@ export async function commitSparcProductionRulesForHistory(params: {
     sessionID: params.record.sessionID,
     documentId: sparcDisplay.documentId,
   });
-  const sparcRuntimeContext = getSparcTrialDisplayRuntimeContext({
+  const sparcRuntimeContext = getSparcControllerRuntimeContext({
     TDFId: String(params.record.TDFId),
     sessionID: String(params.record.sessionID),
     documentId: sparcDisplay.documentId,
@@ -828,7 +835,7 @@ async function insertHistoryRecord(answerLogRecord: HistoryRecord): Promise<void
  * XState service for logging trial completion.
  * Invoked when transitioning out of feedback or test trial.
  *
- * Usage in cardMachine.js:
+ * Usage in contentRuntimeMachine.js:
  * ```
  * invoke: {
  *   src: 'historyLoggingService',

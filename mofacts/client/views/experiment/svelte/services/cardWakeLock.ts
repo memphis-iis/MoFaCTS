@@ -73,14 +73,14 @@ export function createCardWakeLockController(deps: CardWakeLockControllerDeps): 
           screenWakeLock = null;
         }
         screenWakeLockReleaseHandler = null;
-        deps.log(2, `[CardScreen] Screen wake lock released (${reason})`);
+        deps.log(2, `[ContentSurface] Screen wake lock released (${reason})`);
       };
       if (typeof nextWakeLock.addEventListener === 'function') {
         nextWakeLock.addEventListener('release', screenWakeLockReleaseHandler);
       }
-      deps.log(2, `[CardScreen] Screen wake lock acquired (${reason})`);
+      deps.log(2, `[ContentSurface] Screen wake lock acquired (${reason})`);
     } catch (error) {
-      deps.log(2, `[CardScreen] Screen wake lock request skipped (${reason})`, error);
+      deps.log(2, `[ContentSurface] Screen wake lock request skipped (${reason})`, error);
     }
   }
 
@@ -97,9 +97,9 @@ export function createCardWakeLockController(deps: CardWakeLockControllerDeps): 
       if (!wakeLockToRelease.released && typeof wakeLockToRelease.release === 'function') {
         await wakeLockToRelease.release();
       }
-      deps.log(2, `[CardScreen] Screen wake lock released by app (${reason})`);
+      deps.log(2, `[ContentSurface] Screen wake lock released by app (${reason})`);
     } catch (error) {
-      deps.log(2, `[CardScreen] Screen wake lock release failed (${reason})`, error);
+      deps.log(2, `[ContentSurface] Screen wake lock release failed (${reason})`, error);
     }
   }
 

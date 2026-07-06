@@ -1,8 +1,9 @@
-export type SessionSurfaceMode = 'autotutor' | 'video' | 'card';
+export type SessionSurfaceMode = 'autotutor' | 'video' | 'sparc' | 'card';
 
 type SessionUnitLike = {
   assessmentsession?: unknown;
   learningsession?: unknown;
+  sparcsession?: unknown;
   videosession?: unknown;
   autotutorsession?: unknown;
 };
@@ -26,6 +27,7 @@ export type SessionContentSurface = {
   mode: SessionSurfaceMode;
   showAutoTutorSession: boolean;
   showVideoSession: boolean;
+  showSparcSession: boolean;
   showStandardCardSession: boolean;
 };
 
@@ -34,7 +36,7 @@ export type SessionSurfaceShell = {
   isAutoTutorSession: boolean;
   isVideoSession: boolean;
   contentSurface: SessionContentSurface;
-  cardScreenClasses: {
+  contentSurfaceClasses: {
     videoMode: boolean;
     autoTutorMode: boolean;
   };
@@ -101,11 +103,12 @@ export function resolveSessionSurfaceState(input: SessionSurfaceStateInput): Ses
     input.deliverySettings?.isVideoSession === true ||
     input.sessionIsVideoSession === true ||
     Boolean(currentTdfUnit.videosession);
+  const isSparcSession = Boolean(currentTdfUnit.sparcsession);
 
   return {
     isAutoTutorSession,
     isVideoSession,
-    mode: isAutoTutorSession ? 'autotutor' : (isVideoSession ? 'video' : 'card'),
+    mode: isAutoTutorSession ? 'autotutor' : (isSparcSession ? 'sparc' : (isVideoSession ? 'video' : 'card')),
   };
 }
 
@@ -132,7 +135,7 @@ export function resolveSessionSurfaceDiagnostic(
 }
 
 export function resolveSessionContentSurface(surfaceState: SessionSurfaceState): SessionContentSurface {
-  if (!['autotutor', 'video', 'card'].includes(surfaceState.mode)) {
+  if (!['autotutor', 'video', 'sparc', 'card'].includes(surfaceState.mode)) {
     throw new Error(`resolveSessionContentSurface received an unknown session surface mode "${String(surfaceState.mode)}"`);
   }
 
@@ -140,6 +143,7 @@ export function resolveSessionContentSurface(surfaceState: SessionSurfaceState):
     mode: surfaceState.mode,
     showAutoTutorSession: surfaceState.mode === 'autotutor',
     showVideoSession: surfaceState.mode === 'video',
+    showSparcSession: surfaceState.mode === 'sparc',
     showStandardCardSession: surfaceState.mode === 'card',
   };
 }
@@ -148,11 +152,13 @@ function assertValidSessionContentSurface(contentSurface: SessionContentSurface,
   const activeSurfaceCount = [
     contentSurface.showAutoTutorSession,
     contentSurface.showVideoSession,
+    contentSurface.showSparcSession,
     contentSurface.showStandardCardSession,
   ].filter(Boolean).length;
   const modeMatches =
     (contentSurface.mode === 'autotutor' && contentSurface.showAutoTutorSession) ||
     (contentSurface.mode === 'video' && contentSurface.showVideoSession) ||
+    (contentSurface.mode === 'sparc' && contentSurface.showSparcSession) ||
     (contentSurface.mode === 'card' && contentSurface.showStandardCardSession);
 
   if (activeSurfaceCount !== 1 || !modeMatches) {
@@ -168,12 +174,12 @@ export function resolveSessionSurfaceShell(input: SessionSurfaceShellInput): Ses
     isAutoTutorSession: input.surfaceState.isAutoTutorSession,
     isVideoSession: input.surfaceState.isVideoSession,
     contentSurface,
-    cardScreenClasses: {
+    contentSurfaceClasses: {
       videoMode: mode === 'video',
       autoTutorMode: mode === 'autotutor',
     },
     showLearningProgressPanel:
-      mode === 'card' &&
+      (mode === 'card' || mode === 'sparc') &&
       !input.progressPanelDisabled &&
       input.learningProgressAvailable,
   };
@@ -222,7 +228,7 @@ export function resolveSessionSurfaceUnitEntryRoute(
 ): SessionSurfaceUnitEntryRoute {
   assertValidSessionContentSurface(contentSurface, 'resolveSessionSurfaceUnitEntryRoute');
 
-  return contentSurface.showAutoTutorSession || contentSurface.showVideoSession
+  return contentSurface.showAutoTutorSession || contentSurface.showVideoSession || contentSurface.showSparcSession
     ? '/card'
     : '/instructions';
 }

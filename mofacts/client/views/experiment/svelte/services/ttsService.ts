@@ -756,7 +756,7 @@ async function playAudioFile(
  * XState service for TTS playback.
  * Plays text-to-speech or audio file, resolves when complete.
  *
- * Usage in cardMachine.js:
+ * Usage in contentRuntimeMachine.js:
  * ```
  * invoke: {
  *   src: 'ttsPlaybackService',

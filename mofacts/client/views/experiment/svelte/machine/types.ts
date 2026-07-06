@@ -164,7 +164,7 @@
 // =============================================================================
 
 /**
- * @typedef {Object} CardMachineContext
+ * @typedef {Object} ContentRuntimeMachineContext
  * XState machine context (state data)
  * @property {CurrentDisplay} currentDisplay - Content to display
  * @property {CurrentDisplay} [questionDisplay] - Stored question display for prestimulus swap
@@ -375,14 +375,14 @@
  *   VideoEndedEvent |
  *   VideoContinueEvent |
  *   ResumeVideoEvent
- * )} CardMachineEvent
+ * )} ContentRuntimeMachineEvent
  * Union type of all possible machine events
  */
 
 /**
- * @typedef {Object} CardMachineActorArgs
- * @property {CardMachineContext} context
- * @property {CardMachineEvent} event
+ * @typedef {Object} ContentRuntimeMachineActorArgs
+ * @property {ContentRuntimeMachineContext} context
+ * @property {ContentRuntimeMachineEvent} event
  * @property {{ getSnapshot?: () => { value?: unknown, matches?: (stateValue: string) => boolean } }} [self]
  */
 

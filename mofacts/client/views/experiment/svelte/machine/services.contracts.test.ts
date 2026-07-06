@@ -18,7 +18,7 @@ describe('machine services contracts', function() {
     clearSparcProductionRuleHistoryCache();
   });
 
-  it('exposes the expected actor map keys used by cardMachine', function() {
+  it('exposes the expected actor map keys used by contentRuntimeMachine', function() {
     const services = createServices();
 
     expect(services).to.have.property('historyLoggingService');
@@ -175,7 +175,6 @@ describe('machine services contracts', function() {
         },
       },
       currentDisplay: {
-        type: 'sparc',
         documentId: 'sparc-fractions-addition',
         nodes: [],
         productionRules: [{
@@ -211,7 +210,6 @@ describe('machine services contracts', function() {
       await evaluateAnswerService({
         engine: {},
         currentDisplay: {
-          type: 'sparc',
           documentId: 'sparc-fractions-addition',
           nodes: [],
           productionRules: [{

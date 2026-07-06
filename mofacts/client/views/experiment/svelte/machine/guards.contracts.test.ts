@@ -128,7 +128,6 @@ describe('machine guard contracts', function() {
     const sparcDisplay = makeArgs({
       context: {
         currentDisplay: {
-          type: 'sparc',
           documentId: 'sparc-fractions-addition',
           nodes: [],
         },

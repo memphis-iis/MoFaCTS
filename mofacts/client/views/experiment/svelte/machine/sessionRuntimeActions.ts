@@ -9,7 +9,7 @@ import {
   setCurrentDeliverySettings,
   setEngineIndices,
 } from '../services/cardRuntimeState';
-import { assign, type ActionArgs } from './cardMachineActionTypes';
+import { assign, type ActionArgs } from './contentRuntimeMachineActionTypes';
 
 export const initializeSession = assign({
   sessionId: ({ event }: ActionArgs) => event?.sessionId,

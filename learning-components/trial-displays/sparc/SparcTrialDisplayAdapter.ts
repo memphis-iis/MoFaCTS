@@ -58,7 +58,6 @@ export interface SparcBoxedNodeGroup {
 }
 
 export interface SparcTrialDisplay {
-  type: 'sparc';
   documentId?: string;
   pageId?: string;
   schema?: string;
@@ -111,6 +110,10 @@ function normalizeSubmittedNodes(value: unknown): Record<string, unknown> {
   return value;
 }
 
+function isSparcDisplayShape(display: unknown): display is Record<string, unknown> {
+  return isPlainObject(display) && Array.isArray(display.nodes);
+}
+
 export function normalizeSparcProgressReporter(value: unknown): SparcProgressReporterConfig | null {
   if (value === undefined || value === null) {
     return null;
@@ -136,14 +139,11 @@ export const sparcTrialDisplayAdapter: TrialDisplayAdapter<SparcTrialDisplay, Sp
   displayType: SPARC_TRIAL_DISPLAY_TYPE,
   requiredCapabilities: ['media', 'history'],
   ownsInteraction(display) {
-    return isPlainObject(display) && display.type === SPARC_TRIAL_DISPLAY_TYPE;
+    return isSparcDisplayShape(display);
   },
   normalizeDisplay(display) {
     if (!isPlainObject(display)) {
       throw new Error('SPARC trial display must be an object');
-    }
-    if (display.type !== SPARC_TRIAL_DISPLAY_TYPE) {
-      throw new Error('SPARC trial display requires type "sparc"');
     }
     if (!Array.isArray(display.nodes)) {
       throw new Error('SPARC trial display requires a nodes array');
@@ -208,7 +208,6 @@ export const sparcTrialDisplayAdapter: TrialDisplayAdapter<SparcTrialDisplay, Sp
       : null;
     return {
       ...display,
-      type: SPARC_TRIAL_DISPLAY_TYPE,
       nodes: normalizeSparcFractionGroups(expandSparcSemanticNodes(display.nodes)),
       ...(normalizedProgressReporter ? { progressReporter: normalizedProgressReporter } : {}),
       ...(normalizedResponse ? { response: normalizedResponse } : {}),

@@ -129,6 +129,7 @@ For fast UI/application hot fixes on Windows, use the native local hotfix dev se
 - The dev app runs at `http://localhost:3200` and uses local MongoDB database `MoFACT-meteor3`.
 - The dev server runs Meteor natively from the Windows checkout and uses Docker only for MongoDB.
 - Agents may run this hotfix dev server even though it starts Meteor in watch mode. This is the only automation exception to "never run `meteor run`".
+- The hotfix script treats the app port `3200` and Rspack HMR port `8082` as required readiness endpoints. If `start` finds an existing hotfix process with either port unreachable, it stops the process, removes generated `mofacts/_build/main-dev` output, and starts cleanly. `restart` also removes that generated dev bundle directory before starting.
 - Local dev logs and PID files belong under ignored local state in `deploy/local-dev/`.
 - If a dependency or Meteor package changes, run the required install/update step deliberately and restart the hotfix dev service.
 

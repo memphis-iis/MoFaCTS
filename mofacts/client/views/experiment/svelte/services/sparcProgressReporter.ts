@@ -1,8 +1,10 @@
 import {
   type SparcProgressReporterConfig,
-  type SparcTrialDisplay,
 } from '../../../../../../learning-components/trial-displays/sparc/SparcTrialDisplayAdapter';
-import { resolveSparcTrialDisplay } from './sparcTrialDisplay';
+import {
+  resolveSparcControllerDisplay,
+  type SparcControllerDisplay,
+} from './sparcController';
 
 type DeliverySettingsLike = Record<string, unknown> | null | undefined;
 
@@ -42,7 +44,7 @@ function isLearningProgressNode(node: unknown): boolean {
   return false;
 }
 
-export function sparcDisplayHasDocumentProgress(display: SparcTrialDisplay): boolean {
+export function sparcDisplayHasDocumentProgress(display: SparcControllerDisplay): boolean {
   return Array.isArray(display.nodes) && display.nodes.some(isLearningProgressNode);
 }
 
@@ -51,7 +53,7 @@ export function resolveSparcProgressReporterState(params: {
   readonly deliverySettings: DeliverySettingsLike;
 }): SparcProgressReporterState {
   const baseDeliverySettings = params.deliverySettings || {};
-  const display = resolveSparcTrialDisplay(params.display, '[SPARC Progress Reporter]');
+  const display = resolveSparcControllerDisplay(params.display, '[SPARC Progress Reporter]');
   if (!display) {
     return {
       isSparcDisplay: false,

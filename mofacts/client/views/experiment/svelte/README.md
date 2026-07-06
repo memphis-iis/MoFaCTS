@@ -8,7 +8,7 @@ The card runtime presents trials, manages learner response UI, coordinates speec
 
 ## Structure
 
-- `components/`: Svelte components for the card screen, stimulus display, response controls, feedback, video session mode, and supporting UI.
+- `components/`: Svelte components for the content runtime surface, flashcard and video session surfaces, stimulus display, response controls, feedback, video session mode, and supporting UI.
 - `machine/`: state-machine logic for trial lifecycle, response handling, feedback, timing, and transitions.
 - `services/`: runtime services for initialization, resume behavior, history logging, media, speech recognition, and unit-engine integration.
 - `utils/`: local helpers and validators.
@@ -21,8 +21,8 @@ The card runtime presents trials, manages learner response UI, coordinates speec
 - `services/cardReadiness.ts` owns card display readiness predicates and diagnostics.
 - `services/sessionSurfaceMode.ts` owns shared AutoTutor/video/card surface selection, shell classes, learning-progress-panel visibility, video instruction overlay eligibility, video-readiness requirements, and specialized launch-completion decisions.
 - `machine/` owns trial lifecycle state, transition guards, actions, invoked service contracts, and fail-clear machine errors.
-- `components/CardScreen.svelte` coordinates UI composition and wires Svelte state to services and the machine; new domain behavior should move into a service or machine file before the component grows new business logic.
-- `services/videoMachineBridge.ts`, `services/videoCardInit.ts`, and `components/VideoSessionMode.svelte` own video-session bridge behavior until a stable unit-runtime adapter boundary exists.
+- `components/ContentSurface.svelte` coordinates UI composition and wires Svelte state to services and the machine; new domain behavior should move into a service or machine file before the component grows new business logic.
+- `services/videoMachineBridge.ts`, `services/videoSessionInit.ts`, and `components/VideoSessionMode.svelte` own video-session bridge behavior until a stable unit-runtime adapter boundary exists.
 - `components/AutoTutorSession.svelte` and `services/autoTutorClient.ts` own current AutoTutor client integration. H5P display behavior belongs in the H5P components, H5P utilities, and `services/unitEngineService.ts` integration points.
 
 ## Supported Interaction Patterns

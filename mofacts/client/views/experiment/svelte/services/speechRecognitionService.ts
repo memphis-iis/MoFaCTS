@@ -1566,7 +1566,7 @@ export function resetSrAttempts(): void {
  * XState service for speech recognition.
  * Manages recording, transcription, and phonetic matching.
  *
- * Usage in cardMachine.js:
+ * Usage in contentRuntimeMachine.js:
  * ```
  * invoke: {
  *   src: 'speechRecognitionService',

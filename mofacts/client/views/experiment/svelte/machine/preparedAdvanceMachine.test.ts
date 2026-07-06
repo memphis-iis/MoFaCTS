@@ -4,7 +4,7 @@ import {
   resolvePreparedQuestionIndexRoute,
   resolveSelectedQuestionIndex,
 } from './preparedAdvanceMachine';
-import type { CardMachineContext, CardSelectionDoneArgs } from './cardMachineTypes';
+import type { ContentRuntimeMachineContext, CardSelectionDoneArgs } from './contentRuntimeMachineTypes';
 
 describe('prepared advance machine helpers', function() {
   it('names question-index routing by transition behavior', function() {
@@ -16,19 +16,19 @@ describe('prepared advance machine helpers', function() {
 
   it('requires live selected question index for schedule card selection', function() {
     expect(resolveSelectedQuestionIndex(
-      { questionIndex: 2, engine: { unitType: 'schedule' } } as CardMachineContext,
+      { questionIndex: 2, engine: { unitType: 'schedule' } } as ContentRuntimeMachineContext,
       { output: { questionIndex: 7 } } as CardSelectionDoneArgs['event'],
     )).to.equal(7);
 
     expect(() => resolveSelectedQuestionIndex(
-      { questionIndex: 2, engine: { unitType: 'schedule' } } as CardMachineContext,
+      { questionIndex: 2, engine: { unitType: 'schedule' } } as ContentRuntimeMachineContext,
       { output: {} } as CardSelectionDoneArgs['event'],
     )).to.throw(/live questionIndex/);
   });
 
   it('uses the context counter when selected non-schedule output omits question index', function() {
     expect(resolveSelectedQuestionIndex(
-      { questionIndex: 3, engine: { unitType: 'model' } } as CardMachineContext,
+      { questionIndex: 3, engine: { unitType: 'model' } } as ContentRuntimeMachineContext,
       { output: {} } as CardSelectionDoneArgs['event'],
     )).to.equal(3);
   });
@@ -41,7 +41,7 @@ describe('prepared advance machine helpers', function() {
         questionIndex: 9,
         engine: { unitType: 'schedule' },
       },
-    } as CardMachineContext)).to.equal(9);
+    } as ContentRuntimeMachineContext)).to.equal(9);
 
     expect(() => resolvePreparedQuestionIndex({
       questionIndex: 2,
@@ -49,6 +49,6 @@ describe('prepared advance machine helpers', function() {
       preparedTrial: {
         engine: { unitType: 'schedule' },
       },
-    } as CardMachineContext)).to.throw(/Prepared schedule transition/);
+    } as ContentRuntimeMachineContext)).to.throw(/Prepared schedule transition/);
   });
 });

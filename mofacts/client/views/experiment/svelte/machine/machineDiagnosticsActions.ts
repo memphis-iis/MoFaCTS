@@ -1,6 +1,6 @@
 import { LOG_PREFIXES } from './constants';
 import { clientConsole } from '../../../../lib/clientLogger';
-import { assign, type ActionArgs } from './cardMachineActionTypes';
+import { assign, type ActionArgs } from './contentRuntimeMachineActionTypes';
 import { disableInput } from './trialDisplayActions';
 import { stopRecording } from './speechRuntimeActions';
 import { stopTTS } from './mediaRuntimeActions';
@@ -29,7 +29,7 @@ export function logStateTransition({ context: _context, event, self }: ActionArg
     typeof stateValue === 'string' ||
     (typeof stateValue === 'object' && stateValue !== null)
   ) {
-    clientConsole(2, '[CardMachine][State]', {
+    clientConsole(2, '[ContentRuntimeMachine][State]', {
       eventType,
       state: stateValue,
     });

@@ -93,23 +93,23 @@ describe('card runtime window events', function() {
     const harness = createHarness();
     harness.controller.start();
 
-    harness.windowTarget.dispatch('cardMachine:startRecording');
-    harness.windowTarget.dispatch('cardMachine:stopRecording');
-    harness.windowTarget.dispatch('cardMachine:displayAnswer', { detail: { answer: '  ATP  ' } } as Partial<Event>);
-    harness.windowTarget.dispatch('cardMachine:resumeVideo');
-    harness.windowTarget.dispatch('cardMachine:videoAnswer', { detail: { isCorrect: true } } as Partial<Event>);
+    harness.windowTarget.dispatch('contentRuntimeMachine:startRecording');
+    harness.windowTarget.dispatch('contentRuntimeMachine:stopRecording');
+    harness.windowTarget.dispatch('contentRuntimeMachine:displayAnswer', { detail: { answer: '  ATP  ' } } as Partial<Event>);
+    harness.windowTarget.dispatch('contentRuntimeMachine:resumeVideo');
+    harness.windowTarget.dispatch('contentRuntimeMachine:videoAnswer', { detail: { isCorrect: true } } as Partial<Event>);
 
     expect(harness.calls).to.deep.equal([
       'start-recording',
       'stop-recording',
-      'resume:cardMachine:resumeVideo',
+      'resume:contentRuntimeMachine:resumeVideo',
       'video-answer:{"isCorrect":true}',
     ]);
     expect(harness.getStudyInteractionText()).to.equal('ATP');
-    expect(harness.windowTarget.listenerCount('cardMachine:startRecording')).to.equal(1);
+    expect(harness.windowTarget.listenerCount('contentRuntimeMachine:startRecording')).to.equal(1);
 
     harness.controller.stop();
-    expect(harness.windowTarget.listenerCount('cardMachine:startRecording')).to.equal(0);
+    expect(harness.windowTarget.listenerCount('contentRuntimeMachine:startRecording')).to.equal(0);
     expect(harness.calls).to.include('release-wake:card destroy');
   });
 
@@ -133,7 +133,7 @@ describe('card runtime window events', function() {
     ]);
     expect(harness.logs).to.deep.include({
       level: 2,
-      message: '[CardScreen] visibilitychange visible; preserving card flow for mobile interruption recovery',
+      message: '[ContentSurface] visibilitychange visible; preserving content runtime flow for mobile interruption recovery',
     });
   });
 
@@ -159,7 +159,7 @@ describe('card runtime window events', function() {
     });
 
     controller.start();
-    windowTarget.dispatch('cardMachine:startRecording');
+    windowTarget.dispatch('contentRuntimeMachine:startRecording');
 
     expect(logs).to.have.length(1);
     expect(logs[0]!.level).to.equal(1);
@@ -198,11 +198,11 @@ describe('card runtime window events', function() {
 
     harness.controller.start();
     harness.controller.start();
-    expect(harness.windowTarget.listenerCount('cardMachine:startRecording')).to.equal(1);
+    expect(harness.windowTarget.listenerCount('contentRuntimeMachine:startRecording')).to.equal(1);
 
     harness.controller.stop();
     harness.controller.stop();
-    expect(harness.windowTarget.listenerCount('cardMachine:startRecording')).to.equal(0);
+    expect(harness.windowTarget.listenerCount('contentRuntimeMachine:startRecording')).to.equal(0);
     expect(harness.calls.filter((call) => call === 'release-wake:card destroy')).to.have.length(1);
   });
 });

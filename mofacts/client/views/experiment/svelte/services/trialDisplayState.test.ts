@@ -75,7 +75,6 @@ describe('trial display state', function() {
 
   it('preserves structured SPARC display payloads during cloning', function() {
     const original = {
-      type: 'sparc',
       schema: 'tutorscript-sparc/1.0',
       layout: { zones: [{ id: 'main' }] },
       nodes: [{ id: 'node-1', nodeType: 'atomic', atomType: 'text-input', value: '' }],
@@ -85,7 +84,6 @@ describe('trial display state', function() {
     const cloned = cloneDisplay(original);
 
     expect(cloned).to.deep.include({
-      type: 'sparc',
       schema: 'tutorscript-sparc/1.0',
       text: '',
       clozeText: '',

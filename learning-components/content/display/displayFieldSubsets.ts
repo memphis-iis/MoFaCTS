@@ -14,7 +14,7 @@ const SUPPORTED_DISPLAY_FIELD_SET = new Set<string>(SUPPORTED_DISPLAY_FIELDS);
 type DisplaySubsetParams = Record<string, unknown> | null | undefined;
 
 function isStructuredOwnedDisplay(display: Record<string, unknown>): boolean {
-  return display.type === "sparc";
+  return Array.isArray(display.nodes);
 }
 
 function parseDisplayFields(value: unknown, paramName: string): string[] | null {

@@ -171,20 +171,18 @@ function mediaPlacement(tdfId: string) {
   return `media:${tdfId}`;
 }
 
-function isSparcStimulusDisplay(display: any) {
+function isSparcPageDisplay(display: any) {
   return display
     && typeof display === 'object'
-    && display.type === 'sparc'
     && Array.isArray(display.nodes);
 }
 
-function tdfHasSparcStimuli(tdf: any) {
-  const clusters = tdf?.rawStimuliFile?.setspec?.clusters;
-  if (!Array.isArray(clusters)) {
+function tdfHasSparcPages(tdf: any) {
+  const sparcPages = tdf?.rawStimuliFile?.setspec?.sparcPages;
+  if (!Array.isArray(sparcPages)) {
     return false;
   }
-  return clusters.some((cluster: any) => Array.isArray(cluster?.stims)
-    && cluster.stims.some((stim: any) => isSparcStimulusDisplay(stim?.display)));
+  return sparcPages.some((page: any) => isSparcPageDisplay(page?.display));
 }
 
 function setAccessMessage(template: any, tdfId: any, text: any, level: any = 'info') {
@@ -1008,7 +1006,7 @@ Template.contentUpload.events({
     }
 
     const routeToEditor = (selectedTdf: any) => {
-      const editorRoute = tdfHasSparcStimuli(selectedTdf) ? '/sparcEdit/' : '/contentEdit/';
+      const editorRoute = tdfHasSparcPages(selectedTdf) ? '/sparcEdit/' : '/contentEdit/';
       FlowRouter.go(editorRoute + tdfId + stimFileParam);
     };
 

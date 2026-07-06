@@ -2,9 +2,12 @@ import { Meteor } from 'meteor/meteor';
 import { clientConsole } from '../../../../lib/clientLogger';
 import type { CanonicalHistoryRecord } from '../../../../../../learning-components/runtime/historyEnvelope';
 import type {
-  SparcTrialDisplay,
-  SparcTrialResult,
-} from '../../../../../../learning-components/trial-displays/sparc/SparcTrialDisplayAdapter';
+  SparcControllerDisplay,
+  SparcControllerResult,
+} from './sparcController';
+import {
+  resolveSparcControllerDisplay,
+} from './sparcController';
 import type {
   SparcCommittedProductionRuleEvaluation,
 } from '../../../../../../learning-components/units/sparcsession/sparcProductionRuleCommit';
@@ -23,10 +26,10 @@ import {
   rememberSparcProductionRuleHistoryRecord,
 } from './sparcProductionRuleHistoryCache';
 import {
-  getSparcTrialDisplayRuntimeContext,
-} from './sparcTrialDisplayRuntimeContextCache';
+  getSparcControllerRuntimeContext,
+} from './sparcControllerRuntimeContextCache';
 
-type SparcActionDisplay = SparcTrialDisplay & {
+type SparcActionDisplay = SparcControllerDisplay & {
   documentId: string;
 };
 
@@ -53,17 +56,21 @@ function hasSparcProductionRuleSource(display: Record<string, unknown>): boolean
 }
 
 function resolveSparcActionDisplay(display: unknown): SparcActionDisplay | null {
-  if (!isRecord(display) || display.type !== 'sparc' || !hasSparcProductionRuleSource(display)) {
+  const sparcDisplay = resolveSparcControllerDisplay(
+    isRecord(display) ? display : undefined,
+    '[SPARC] Production-rule action',
+  );
+  if (!sparcDisplay || !hasSparcProductionRuleSource(sparcDisplay)) {
     return null;
   }
-  const documentId = nonBlankString(display.documentId);
+  const documentId = nonBlankString(sparcDisplay.documentId);
   if (!documentId) {
     throw new Error('[SPARC] Production-rule action display requires documentId');
   }
-  if (!Array.isArray(display.nodes)) {
+  if (!Array.isArray(sparcDisplay.nodes)) {
     throw new Error('[SPARC] Production-rule action display requires nodes array');
   }
-  return display as unknown as SparcActionDisplay;
+  return sparcDisplay as unknown as SparcActionDisplay;
 }
 
 function collectMessageNodeIds(nodes: readonly unknown[] | undefined, ids = new Set<string>()): Set<string> {
@@ -184,7 +191,7 @@ function sparcEvaluationCounts(
 export async function commitSparcProductionRuleAction(params: {
   readonly engine: UnitEngineLike | null | undefined;
   readonly currentDisplay: unknown;
-  readonly sparcResult: SparcTrialResult;
+  readonly sparcResult: SparcControllerResult;
   readonly tdfId: unknown;
   readonly sessionId: unknown;
   readonly levelUnit: unknown;
@@ -225,7 +232,7 @@ export async function commitSparcProductionRuleAction(params: {
     sessionID: sessionId,
     documentId: sparcDisplay.documentId,
   });
-  const sparcRuntimeContext = getSparcTrialDisplayRuntimeContext({
+  const sparcRuntimeContext = getSparcControllerRuntimeContext({
     TDFId: tdfId,
     sessionID: sessionId,
     documentId: sparcDisplay.documentId,

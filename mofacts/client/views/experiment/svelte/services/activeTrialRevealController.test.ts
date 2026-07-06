@@ -181,7 +181,7 @@ describe('active trial reveal controller', function() {
     await flushMicrotasks();
 
     expect(harness.fadeContexts).to.deep.equal([]);
-    expect(harness.logs.some((entry) => entry.message === '[CardScreen][Reveal] queued reveal skipped')).to.equal(true);
+    expect(harness.logs.some((entry) => entry.message === '[ContentSurface][Reveal] queued reveal skipped')).to.equal(true);
   });
 
   it('reveals a mounted ready trial when the async reveal was missed', function() {

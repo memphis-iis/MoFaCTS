@@ -61,7 +61,7 @@ export function createCardReviewEventController({
     const transitionDurationMs = detail?.transitionDurationMs ?? null;
 
     if (stateMatches('study.preparing')) {
-      log(2, '[CardScreen][StudyReveal] started', {
+      log(2, '[ContentSurface][StudyReveal] started', {
         subsetKind,
         transitionDurationMs,
       });
@@ -78,7 +78,7 @@ export function createCardReviewEventController({
       return;
     }
 
-    log(2, '[CardScreen][ReviewReveal] started', {
+    log(2, '[ContentSurface][ReviewReveal] started', {
       subsetKind,
       transitionDurationMs,
     });

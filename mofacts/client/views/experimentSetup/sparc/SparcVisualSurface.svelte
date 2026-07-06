@@ -1,5 +1,5 @@
 <script>
-  import SparcTrialSurface from '../../experiment/svelte/components/SparcTrialSurface.svelte';
+  import SparcSessionSurface from '../../experiment/svelte/components/SparcSessionSurface.svelte';
 
   export let activeDisplay = null;
   export let activeNodeId = '';
@@ -44,7 +44,7 @@
     <div class="sparc-drop-label" aria-live="polite">Drop into {dropTarget.label}</div>
   {/if}
   {#if activeDisplay}
-    <SparcTrialSurface
+    <SparcSessionSurface
       display={activeDisplay}
       runtimeNodeValues={{}}
       authoringSelectedNodeId={activeNodeId}

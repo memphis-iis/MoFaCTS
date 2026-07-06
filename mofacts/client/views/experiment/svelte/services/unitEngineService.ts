@@ -613,7 +613,7 @@ export function commitPreparedTrialRuntime(
 
 /**
  * XState service for selecting next card (Promise-based for invoke.onDone).
- * Used by cardMachine.js in presenting.loading state.
+ * Used by contentRuntimeMachine.js in presenting.loading state.
  *
  * Flow:
  * 1. Call engine.selectNextCard() to prepare next trial (sets internal state)
@@ -745,7 +745,7 @@ export async function selectCardService(
  * XState service for updating engine after trial completion.
  * Records performance and updates adaptive algorithm.
  *
- * Usage in cardMachine.js:
+ * Usage in contentRuntimeMachine.js:
  * ```
  * invoke: {
  *   src: 'updateEngineService',

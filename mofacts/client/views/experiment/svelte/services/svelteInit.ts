@@ -23,7 +23,7 @@ import { audioManager } from '../../../../lib/audioContextManager';
 import { setEngine } from '../../../../lib/engineManager';
 import { resolveUnitEngineTypeForUnit } from '../../engineConstructors';
 import { initializeEngine } from '../services/unitEngineService';
-import { initVideoSessionData } from '../services/videoCardInit';
+import { initVideoSessionData } from '../services/videoSessionInit';
 import { getExperimentState, createExperimentState } from '../services/experimentState';
 import { resumeFromExperimentState } from '../services/resumeService';
 import { createMappingSignature } from '../../../../lib/mappingSignature';

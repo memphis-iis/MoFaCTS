@@ -8,7 +8,6 @@ import { createSparcTraceFromTrialResult } from './sparcTraceFromTrialResult';
 
 function display(): SparcTrialDisplay {
   return sparcTrialDisplayAdapter.normalizeDisplay({
-    type: 'sparc',
     schema: 'tutorscript-sparc/1.0',
     nodes: [{
       id: 'node-1',
@@ -80,7 +79,6 @@ describe('sparcTraceFromTrialResult', function() {
 
   it('selects among multiple authored trace links for the same node by submitted value', function() {
     const multiLinkDisplay = sparcTrialDisplayAdapter.normalizeDisplay({
-      type: 'sparc',
       schema: 'tutorscript-sparc/1.0',
       nodes: [{
         id: 'OV2',
@@ -126,7 +124,6 @@ describe('sparcTraceFromTrialResult', function() {
 
   it('fails clearly when scored nodes do not have authored production-rule metadata', function() {
     const incompleteDisplay = sparcTrialDisplayAdapter.normalizeDisplay({
-      type: 'sparc',
       nodes: [],
       response: {
         gradingMode: 'node-intent',
@@ -147,7 +144,6 @@ describe('sparcTraceFromTrialResult', function() {
 
   it('fails clearly when same-node trace links do not match the submitted value', function() {
     const multiLinkDisplay = sparcTrialDisplayAdapter.normalizeDisplay({
-      type: 'sparc',
       nodes: [],
       response: {
         gradingMode: 'node-intent',

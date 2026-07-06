@@ -1,7 +1,7 @@
 <script>
   /**
    * VideoSessionMode Component
-   * Video session wrapper with TrialContent overlaid (position: absolute)
+   * Video session wrapper with FlashcardController overlaid (position: absolute)
    * Supports question checkpoints at specific timestamps
    */
   import { onMount, onDestroy, createEventDispatcher, tick } from 'svelte';

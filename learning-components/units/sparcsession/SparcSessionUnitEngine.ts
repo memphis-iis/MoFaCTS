@@ -340,7 +340,6 @@ function resolveSparcPageDisplay(
   const isAutoTutor = pageDisplay.unitType === 'sparc-autotutor-dialogue';
   return {
     ...pageDisplay,
-    type: 'sparc',
     pageId,
     documentId,
     clusterTargets: clusterListIndices.map((clusterIndex) =>

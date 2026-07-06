@@ -1,7 +1,7 @@
 import { assign as xAssign } from 'xstate';
-import type { MachineArgs } from './cardMachineTypes';
+import type { MachineArgs } from './contentRuntimeMachineTypes';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Matches cardMachine's XState v5 assign typing workaround.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Matches contentRuntimeMachine's XState v5 assign typing workaround.
 const assign: any = xAssign;
 
 export const resetFeedbackRevealState = assign({

@@ -4,6 +4,8 @@
 
 Planning document. This describes a target architecture and migration sequence; it does not describe the current implementation as complete.
 
+Implementation note: `CardStore` remains deliberately out of scope for this pass. It is a broad shared learner-runtime store, not a flashcard-only store, and needs a separate store-boundary audit before renaming or splitting. Lower-level SPARC adapter and unit-engine APIs that still use `SparcTrialDisplay*` names are also implementation-contract debt; this pass contains that terminology behind learner-runtime `SparcController` names rather than rewriting `learning-components/`.
+
 ## Problem
 
 The learner runtime has outgrown the word "card". The current `CardScreen` boundary now owns launch, resume, timing, reveal, progress display, unit continuation, and session-surface selection for multiple content modes. Calling that boundary a card screen obscures its actual role and encourages card-specific assumptions to leak into SPARC, video, and future session types.
@@ -119,7 +121,7 @@ Clarify SPARC runtime naming:
 - The learner-facing replacement is `SparcSessionSurface`.
 - The runtime coordinator formerly discussed as a SPARC session service should be named `SparcController`.
 - Existing SPARC editor/visual setup code is not the learner runtime surface. Editor operability and any authoring/runtime surface reuse belong in a future plan.
-- `display.type === "sparc"` is old display-adapter plumbing and must not select the top-level session surface.
+- The former SPARC display discriminator is obsolete plumbing and must not select the top-level session surface.
 
 Clarify policy names:
 
@@ -146,8 +148,8 @@ Rules:
 - Do not add a target object while leaving its obsolete predecessor as an active parallel path.
 - A rename phase must list what is being removed, renamed, or deliberately deferred.
 - If a current helper does not fit the target owner cleanly, stop and classify it before building on it.
-- `display.type === "sparc"` must not select the top-level session surface.
-- SPARC editor/authoring cleanup is deferred to a future plan. The current `sparcEdit` path appears gated by old `display.type === "sparc"` detection and should not drive the learner runtime architecture in this pass. When `SparcTrialSurface` is renamed to `SparcSessionSurface`, update editor imports/usages to the renamed surface so obsolete naming does not remain, but do not otherwise make the editor operational in this pass.
+- The former SPARC display discriminator must not select the top-level session surface.
+- SPARC editor/authoring cleanup is deferred to a future plan. The current `sparcEdit` path is gated by `rawStimuliFile.setspec.sparcPages` and should not drive the learner runtime architecture in this pass. When `SparcTrialSurface` is renamed to `SparcSessionSurface`, update editor imports/usages to the renamed surface so obsolete naming does not remain, but do not otherwise make the editor operational in this pass.
 - In theory, flashcard, video, and SPARC surfaces could later be reused in authoring/preview contexts. That is out of scope for this plan.
 
 ## Current To Target Map
@@ -178,13 +180,13 @@ This table is the removal checklist. Each implementation phase should update it 
 | `mofacts/client/views/experiment/svelte/services/cardVideoRuntime.ts` | Video runtime helper under card naming. | `VideoController` helper. | Rename/classify. | No `cardVideo*` name remains for current video runtime. |
 | `mofacts/client/views/experiment/svelte/services/cardVideoEventRuntime.ts` | Video event runtime helper under card naming. | `VideoController` helper. | Rename/classify. | No `cardVideo*` event runtime name remains for current video runtime. |
 | `mofacts/client/views/experiment/svelte/components/SparcTrialSurface.svelte` | Current SPARC learner visual runtime component name with an obsolete trial name. It is also referenced by inactive or not-yet-operational SPARC editor code. | Learner runtime role moves to `SparcSessionSurface.svelte`. | Rename/rework for learner runtime. Leave editor operability for a future plan. | Learner runtime no longer imports or renders `SparcTrialSurface`; no learner-runtime SPARC trial concept remains. |
-| `mofacts/client/views/experiment/svelte/services/sparcTrialDisplay.ts` | Resolves `display.type === "sparc"` display plumbing. | `SparcController` or deleted. | Remove from top-level session selection; rename only if still needed inside SPARC runtime. | `display.type === "sparc"` is not used to choose the session surface. |
+| `mofacts/client/views/experiment/svelte/services/sparcTrialDisplay.ts` | Former SPARC display-discriminator plumbing. | `SparcController` or deleted. | Remove from top-level session selection; rename only if still needed inside SPARC runtime. | The former SPARC display discriminator is not used to choose the session surface. |
 | `mofacts/client/views/experiment/svelte/services/sparcTrialDisplayRuntimeContextCache.ts` | SPARC display runtime context cache under trial-display naming. | `SparcController` helper or deleted. | Rename/classify with SPARC controller work. | No needed SPARC runtime cache uses `trialDisplay` naming. |
 | `mofacts/client/views/experiment/svelte/services/sparcControllerDialogueCommit.ts` | SPARC controller dialogue commit helper already near target naming. | `SparcController` helper. | Keep or fold. | Dialogue commit is exposed through `SparcController` naming. |
 | `mofacts/client/views/experiment/svelte/services/sparcControllerDialogueOpenRouter.ts` | SPARC dialogue routing helper already near target naming. | `SparcController` helper. | Keep or fold. | Dialogue routing is exposed through `SparcController` naming. |
 | `mofacts/client/views/experiment/svelte/services/sparcProductionRuleActionCommit.ts` | SPARC production-rule action commit helper. | `SparcController` helper. | Keep, fold, or rename under controller. | Production-rule actions are coordinated through `SparcController`. |
 | `mofacts/client/views/experiment/svelte/services/sparcProgressReporter.ts` | SPARC progress reporter helper. | `SparcController` helper or SPARC surface helper. | Classify during SPARC controller work. | Progress reporter ownership is explicit. |
-| `mofacts/client/views/experimentSetup/sparc/SparcVisualSurface.svelte` | SPARC content-file visual editing canvas mounted through `experimentSetup/sparcEdit.ts`, but current access appears tied to old `display.type === "sparc"` detection. | Future SPARC editor plan; during this plan only update its import/use from `SparcTrialSurface` to `SparcSessionSurface` after the rename. | Minimal rename cleanup only. Do not make the editor operational. | Visual-editor code no longer imports `SparcTrialSurface`; future editor plan decides operability and authoring behavior. |
+| `mofacts/client/views/experimentSetup/sparc/SparcVisualSurface.svelte` | SPARC content-file visual editing canvas mounted through `experimentSetup/sparcEdit.ts`, with access based on `rawStimuliFile.setspec.sparcPages`. | Future SPARC editor plan; during this plan only update its import/use from `SparcTrialSurface` to `SparcSessionSurface` after the rename. | Minimal rename cleanup only. Do not make the editor operational. | Visual-editor code no longer imports `SparcTrialSurface`; future editor plan decides operability and authoring behavior. |
 
 ## Verified SPARC Selection Invariant
 
@@ -195,13 +197,13 @@ Evidence checked before implementation:
 - `mofacts/client/views/experiment/engineConstructors.ts` maps a unit with `sparcsession` to `SPARC_UNIT`.
 - `mofacts/client/views/experiment/engineConstructors.contracts.test.ts` asserts `{ sparcsession: {} } -> 'sparc'`.
 - `learning-components/units/sparcsession/` reads unit-level `sparcsession` configuration, including `pageId`.
-- `C:\dev\mofacts_config` scan found 56 TDF JSON files with `sparcsession`, 56 stimulus JSON files with `setspec.sparcPages`, and no current config files using cluster `stim.display.type === "sparc"`.
+- `C:\dev\mofacts_config` scan found 56 TDF JSON files with `sparcsession` and 56 stimulus JSON files with `setspec.sparcPages`; SPARC page display payloads are selected by the unit/session path, not a display discriminator.
 
 Current gap:
 
 - `mofacts/client/views/experiment/svelte/services/sessionSurfaceMode.ts` currently selects only `autotutor | video | card`; it does not yet expose a `sparc` session surface mode.
 - Phase 4 should add `sparc` session surface selection from `currentTdfUnit.sparcsession`.
-- `display.type === "sparc"` must not be used as the top-level session selector.
+- SPARC page displays must not carry or depend on a `type: "sparc"` discriminator.
 
 ## Migration Plan
 
@@ -469,7 +471,7 @@ Steps:
 - Introduce `SparcController` as the SPARC runtime coordinator name.
 - Keep canonical learner event forwarding through `ContentSurface`.
 - Remove the SPARC routing branch from the flashcard runtime.
-- Remove learner-runtime dependence on `display.type === "sparc"` as the top-level session selector.
+- Remove learner-runtime dependence on the former SPARC display discriminator as the top-level session selector.
 - Remove or rename `SparcTrialSurface` for learner runtime. There is no SPARC trial concept.
 - Do not create a SPARC-within-SPARC structure.
 - Do not preserve embedded SPARC-as-flashcard behavior as a compatibility path.
@@ -595,7 +597,7 @@ Use this checklist in the PR or commit notes for each phase:
 - SPARC runtime coordination is named `SparcController`.
 - `FlashcardController` / flashcard runtime does not route to SPARC.
 - Learner runtime no longer uses `SparcTrial*` names or a SPARC trial concept.
-- `display.type === "sparc"` does not select the top-level session surface.
+- The former SPARC display discriminator does not select the top-level session surface.
 - Standard response timer policy is explicit and separately tested from display submission ownership.
 - Attributed-image flashcards and normal flashcards start response timing only after visible reveal.
 - SPARC runtime timing behavior is explicit and not controlled by obsolete display-ownership names.

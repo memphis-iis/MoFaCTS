@@ -28,6 +28,7 @@ $meteorReleasePath = Join-Path $appDir ".meteor\release"
 $expectedMongoDbName = "MoFACT-meteor3"
 $rootUrl = "http://localhost:3200"
 $port = "3200"
+$rspackDevServerPort = "8082"
 $defaultLocalAdminPassword = "local-admin-2026"
 
 $composeArgs = @(
@@ -454,7 +455,7 @@ function Wait-HotfixDevReady {
 
         if (Test-Path $stdoutPath) {
             $stdout = Get-Content -Path $stdoutPath -Raw -ErrorAction SilentlyContinue
-            if ($stdout -match "=> App running at") {
+            if (($stdout -match "=> App running at") -and (Test-HotfixDevEndpoints)) {
                 return
             }
 
@@ -596,6 +597,50 @@ function Remove-StaleLocalBuild {
     Remove-Item -LiteralPath $resolvedLocalBuildDir -Recurse -Force
 }
 
+function Test-TcpPortOpen {
+    param(
+        [string]$HostName,
+        [int]$PortNumber,
+        [int]$TimeoutMilliseconds = 1000
+    )
+
+    $client = [System.Net.Sockets.TcpClient]::new()
+    try {
+        $connect = $client.BeginConnect($HostName, $PortNumber, $null, $null)
+        if (-not $connect.AsyncWaitHandle.WaitOne($TimeoutMilliseconds)) {
+            return $false
+        }
+
+        $client.EndConnect($connect)
+        return $true
+    } catch {
+        return $false
+    } finally {
+        $client.Close()
+    }
+}
+
+function Test-HotfixDevEndpoints {
+    return (Test-TcpPortOpen -HostName "127.0.0.1" -PortNumber ([int]$port)) -and
+        (Test-TcpPortOpen -HostName "127.0.0.1" -PortNumber ([int]$rspackDevServerPort))
+}
+
+function Remove-RspackDevBuild {
+    $mainDevDir = Join-Path $appDir "_build\main-dev"
+    if (-not (Test-Path $mainDevDir)) {
+        return
+    }
+
+    $resolvedAppDir = (Resolve-Path $appDir).Path
+    $resolvedMainDevDir = (Resolve-Path $mainDevDir).Path
+    if (-not $resolvedMainDevDir.StartsWith($resolvedAppDir, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing to remove Rspack dev build outside app directory: $resolvedMainDevDir"
+    }
+
+    Write-Host "Removing generated Rspack dev bundle directory: $resolvedMainDevDir"
+    Remove-Item -LiteralPath $resolvedMainDevDir -Recurse -Force
+}
+
 function Ensure-RspackDevBootstrap {
     $mainDevDir = Join-Path $appDir "_build\main-dev"
     if (-not (Test-Path $mainDevDir)) {
@@ -622,15 +667,22 @@ function Ensure-RspackDevBootstrap {
 function Start-HotfixDev {
     Assert-RequiredFiles
     Remove-StaleLocalBuild
-    Ensure-RspackDevBootstrap
-    Ensure-CommonJsBuildMarker
 
     $existing = Get-HotfixDevProcess
     if ($null -ne $existing) {
-        Write-Host "Hotfix dev server is already running with PID $($existing.Id)."
-        Write-Host "URL: $rootUrl"
-        return
+        if (Test-HotfixDevEndpoints) {
+            Write-Host "Hotfix dev server is already running with PID $($existing.Id)."
+            Write-Host "URL: $rootUrl"
+            return
+        }
+
+        Write-Host "Hotfix dev server PID $($existing.Id) is running but app/HMR ports are not both reachable; rebuilding generated dev bundles."
+        Stop-HotfixDev
     }
+
+    Remove-RspackDevBuild
+    Ensure-RspackDevBootstrap
+    Ensure-CommonJsBuildMarker
 
     if (-not (Test-Path $localDevDir)) {
         New-Item -ItemType Directory -Path $localDevDir | Out-Null
@@ -767,6 +819,8 @@ function Show-HotfixDevStatus {
 
     Write-Host "Hotfix dev server is running with PID $($existing.Id)."
     Write-Host "URL: $rootUrl"
+    Write-Host "App port $port reachable: $(Test-TcpPortOpen -HostName "127.0.0.1" -PortNumber ([int]$port))"
+    Write-Host "Rspack HMR port $rspackDevServerPort reachable: $(Test-TcpPortOpen -HostName "127.0.0.1" -PortNumber ([int]$rspackDevServerPort))"
     Write-Host "Stdout: $stdoutPath"
     Write-Host "Stderr: $stderrPath"
     if (Test-Path $watcherPidPath) {
@@ -799,6 +853,8 @@ switch ($Action) {
     }
     "restart" {
         Stop-HotfixDev
+        Assert-RequiredFiles
+        Remove-RspackDevBuild
         Start-HotfixDev
     }
     "stop" {

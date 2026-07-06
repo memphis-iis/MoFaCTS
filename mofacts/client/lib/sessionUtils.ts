@@ -9,7 +9,7 @@ import { deliverySettingsStore } from "./state/deliverySettingsStore";
 import { ExperimentStateStore } from "./state/experimentStateStore";
 import { clearMappingRecordFromSession } from "../views/experiment/svelte/services/mappingRecordService";
 import { clearSparcProductionRuleHistoryCache } from "../views/experiment/svelte/services/sparcProductionRuleHistoryCache";
-import { clearSparcTrialDisplayRuntimeContextCache } from "../views/experiment/svelte/services/sparcTrialDisplayRuntimeContextCache";
+import { clearSparcControllerRuntimeContextCache } from "../views/experiment/svelte/services/sparcControllerRuntimeContextCache";
 import {
   applySessionCleanupEntries,
   CARD_RUNTIME_SESSION_DEFAULTS,
@@ -97,7 +97,7 @@ function resetSharedCardRuntimeState(options: { preserveCardEntryContext?: boole
 
 function clearSparcReplayCachesForCleanup() {
   clearSparcProductionRuleHistoryCache();
-  clearSparcTrialDisplayRuntimeContextCache();
+  clearSparcControllerRuntimeContextCache();
 }
 
 function shouldPreserveUnitStateForCard() {

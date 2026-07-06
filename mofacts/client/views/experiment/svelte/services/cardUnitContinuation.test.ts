@@ -61,7 +61,7 @@ describe('card unit continuation controller', function() {
     expect(updates).to.deep.equal([true, false]);
     expect(logs[0]).to.deep.equal([
       1,
-      '[CardScreen] Failed to continue to next unit:',
+      '[ContentSurface] Failed to continue to next unit:',
       error,
     ]);
   });

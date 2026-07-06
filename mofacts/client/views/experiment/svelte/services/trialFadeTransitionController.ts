@@ -43,7 +43,7 @@ export function createTrialFadeTransitionController(
     const eventType = String(event.eventType || '');
     const runtime = deps.getRuntimeState();
     const fadeContext = deps.getFadeContext();
-    deps.log(2, '[CardScreen][FadeTiming]', {
+    deps.log(2, '[ContentSurface][FadeTiming]', {
       eventType,
       key: fadeContext.key,
       subsetKind: fadeContext.subsetKind,

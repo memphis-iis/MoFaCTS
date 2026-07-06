@@ -23,7 +23,6 @@ describe('modelStateFactory', function() {
         correctResponse: '__SPARC_COMPLETED__',
         params: '0,0.8',
         display: {
-          type: 'sparc',
           clusterTargets: [{
             clusterIndex: 0,
             stimulusKC: 'fractions.lcd',

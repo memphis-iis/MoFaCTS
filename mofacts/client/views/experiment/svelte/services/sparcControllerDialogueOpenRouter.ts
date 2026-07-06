@@ -2,7 +2,7 @@ import type {
   OpenRouterJsonSchema,
   OpenRouterMessage,
 } from '../../../../lib/openRouterClient';
-import type { SparcTrialDisplay } from '../../../../../../learning-components/trial-displays/sparc/SparcTrialDisplayAdapter';
+import type { SparcControllerDisplay } from './sparcController';
 import type {
   SparcLearnerResponseScoringResult,
 } from '../../../../../../learning-components/units/sparcsession/sparcLearnerResponseScoring';
@@ -130,7 +130,7 @@ function stringArray(value: unknown): string[] | undefined {
   return values.length > 0 ? values : undefined;
 }
 
-function displayFacts(display: SparcTrialDisplay): readonly Record<string, unknown>[] {
+function displayFacts(display: SparcControllerDisplay): readonly Record<string, unknown>[] {
   return Array.isArray(display.workingMemoryFacts)
     ? display.workingMemoryFacts.filter(isRecord)
     : [];
@@ -140,7 +140,7 @@ function factSlot(fact: Record<string, unknown>, slotName: string): unknown {
   return isRecord(fact.slots) ? fact.slots[slotName] : undefined;
 }
 
-function priorCoverageByClusterKC(display: SparcTrialDisplay): Map<string, number> {
+function priorCoverageByClusterKC(display: SparcControllerDisplay): Map<string, number> {
   const coverage = new Map<string, number>();
   for (const fact of displayFacts(display)) {
     if (fact.factType !== 'learningTarget.score') {
@@ -158,7 +158,7 @@ function priorCoverageByClusterKC(display: SparcTrialDisplay): Map<string, numbe
   return coverage;
 }
 
-function priorMisconceptionConfidenceById(display: SparcTrialDisplay): Map<string, number> {
+function priorMisconceptionConfidenceById(display: SparcControllerDisplay): Map<string, number> {
   const confidence = new Map<string, number>();
   for (const fact of displayFacts(display)) {
     if (fact.factType !== 'diagnostic.misconceptionScore') {
@@ -173,7 +173,7 @@ function priorMisconceptionConfidenceById(display: SparcTrialDisplay): Map<strin
   return confidence;
 }
 
-function targetSummaries(display: SparcTrialDisplay): readonly Record<string, unknown>[] {
+function targetSummaries(display: SparcControllerDisplay): readonly Record<string, unknown>[] {
   const priorCoverage = priorCoverageByClusterKC(display);
   const cleanTargets = isRecord(display.autoTutorTargets) && Array.isArray(display.autoTutorTargets.expectations)
     ? display.autoTutorTargets.expectations
@@ -197,7 +197,7 @@ function targetSummaries(display: SparcTrialDisplay): readonly Record<string, un
     });
 }
 
-function cleanMisconceptionEntries(display: SparcTrialDisplay): readonly unknown[] {
+function cleanMisconceptionEntries(display: SparcControllerDisplay): readonly unknown[] {
   if (isRecord(display.autoTutorTargets) && Array.isArray(display.autoTutorTargets.misconceptions)) {
     return display.autoTutorTargets.misconceptions;
   }
@@ -207,7 +207,7 @@ function cleanMisconceptionEntries(display: SparcTrialDisplay): readonly unknown
   return [];
 }
 
-function misconceptionSummaries(display: SparcTrialDisplay): readonly Record<string, unknown>[] {
+function misconceptionSummaries(display: SparcControllerDisplay): readonly Record<string, unknown>[] {
   const priorConfidence = priorMisconceptionConfidenceById(display);
   return cleanMisconceptionEntries(display)
     .filter(isRecord)

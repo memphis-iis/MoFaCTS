@@ -72,8 +72,11 @@ type ScheduleButtonTrialArtifact = {
   isButtonTrial?: unknown;
 };
 
-function isStructuredSparcDisplay(display: unknown): display is Record<string, unknown> & { type: 'sparc' } {
-  return Boolean(display) && typeof display === 'object' && !Array.isArray(display) && (display as Record<string, unknown>).type === 'sparc';
+function isStructuredSparcDisplay(display: unknown): boolean {
+  return Boolean(display) &&
+    typeof display === 'object' &&
+    !Array.isArray(display) &&
+    Array.isArray((display as Record<string, unknown>).nodes);
 }
 
 export function shouldUseScheduleButtonTrial(params: {

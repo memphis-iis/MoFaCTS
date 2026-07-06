@@ -104,7 +104,7 @@ export function createActiveTrialRevealController(
       key !== snapshot.stagedTrialSubsetKey ||
       runtime.isFadingOut
     ) {
-      deps.log(2, '[CardScreen][Reveal] prepared handoff reveal skipped', {
+      deps.log(2, '[ContentSurface][Reveal] prepared handoff reveal skipped', {
         testMode: runtime.isTestMode,
         preparedRevealSequence: sequence,
         revealSequence,
@@ -116,7 +116,7 @@ export function createActiveTrialRevealController(
       return;
     }
 
-    deps.log(2, '[CardScreen][Reveal] prepared handoff reveal started', {
+    deps.log(2, '[ContentSurface][Reveal] prepared handoff reveal started', {
       preparedRevealKey: key,
       subsetKind: runtime.subsetKind,
     });
@@ -135,7 +135,7 @@ export function createActiveTrialRevealController(
       runtime.isFadingOut ||
       !runtime.allBlockingAssetsReady
     ) {
-      deps.log(2, '[CardScreen][Reveal] queued reveal skipped', {
+      deps.log(2, '[ContentSurface][Reveal] queued reveal skipped', {
         key,
         stagedTrialSubsetKey: snapshot.stagedTrialSubsetKey,
         sequence,
@@ -147,7 +147,7 @@ export function createActiveTrialRevealController(
       return;
     }
 
-    deps.log(2, '[CardScreen][Reveal] visible', {
+    deps.log(2, '[ContentSurface][Reveal] visible', {
       key,
       sequence,
       subsetKind: runtime.subsetKind,
@@ -155,7 +155,7 @@ export function createActiveTrialRevealController(
       allBlockingAssetsReady: runtime.allBlockingAssetsReady,
     });
     const fadeContext = markVisible(key, runtime.subsetKind);
-    deps.log(2, '[CardScreen][FadeTiming] reveal-trigger', {
+    deps.log(2, '[ContentSurface][FadeTiming] reveal-trigger', {
       key,
       subsetKind: runtime.subsetKind,
       configuredDurationMs: fadeContext.configuredDurationMs,
@@ -243,12 +243,12 @@ export function createActiveTrialRevealController(
         return false;
       }
 
-      deps.log(2, '[CardScreen][Reveal] mounted ready reveal started', {
+      deps.log(2, '[ContentSurface][Reveal] mounted ready reveal started', {
         key,
         subsetKind: params.subsetKind,
       });
       const fadeContext = markVisible(key, params.subsetKind);
-      deps.log(2, '[CardScreen][FadeTiming] mounted-ready-reveal', {
+      deps.log(2, '[ContentSurface][FadeTiming] mounted-ready-reveal', {
         key,
         subsetKind: params.subsetKind,
         configuredDurationMs: fadeContext.configuredDurationMs,
@@ -299,7 +299,7 @@ export function createActiveTrialRevealController(
         input.expectedFeedbackBlockerSrc === snapshot.stagedFeedbackBlockerSrc &&
         snapshot.feedbackBlockingAssetReady;
 
-      deps.log(2, '[CardScreen][Reveal] stage-reset', {
+      deps.log(2, '[ContentSurface][Reveal] stage-reset', {
         trialSubsetKind: input.trialSubsetKind,
         trialSubsetKey: input.trialSubsetKey,
         stagedTrialSubsetKey: snapshot.stagedTrialSubsetKey,

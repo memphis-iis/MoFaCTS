@@ -1,7 +1,7 @@
 import { Session } from 'meteor/session';
 import { Answers } from '../../answerAssess';
 import { setDisplayReadyState, setInputReadyState } from '../services/cardRuntimeState';
-import { assign, type ActionArgs } from './cardMachineActionTypes';
+import { assign, type ActionArgs } from './contentRuntimeMachineActionTypes';
 
 export const setPrestimulusDisplay = assign({
   currentDisplay: ({ context }: ActionArgs) => {
@@ -19,7 +19,7 @@ export const restoreQuestionDisplay = assign({
 
 export function focusInput() {
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('cardMachine:focusInput'));
+    window.dispatchEvent(new CustomEvent('contentRuntimeMachine:focusInput'));
   }
 }
 
@@ -27,7 +27,7 @@ export function disableInput() {
   setInputReadyState(false);
 
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('cardMachine:disableInput'));
+    window.dispatchEvent(new CustomEvent('contentRuntimeMachine:disableInput'));
   }
 }
 
@@ -35,13 +35,13 @@ export function enableInput() {
   setInputReadyState(true);
 
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('cardMachine:enableInput'));
+    window.dispatchEvent(new CustomEvent('contentRuntimeMachine:enableInput'));
   }
 }
 
 export function clearFeedback() {
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('cardMachine:clearFeedback'));
+    window.dispatchEvent(new CustomEvent('contentRuntimeMachine:clearFeedback'));
   }
 }
 
@@ -57,7 +57,7 @@ export function announceToScreenReader({ context }: ActionArgs) {
   }
 
   if (message && typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('cardMachine:announce', {
+    window.dispatchEvent(new CustomEvent('contentRuntimeMachine:announce', {
       detail: { message },
     }));
   }
@@ -69,7 +69,7 @@ export function displayAnswer({ context }: ActionArgs) {
   ) || String(context.currentAnswer || '');
 
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('cardMachine:displayAnswer', {
+    window.dispatchEvent(new CustomEvent('contentRuntimeMachine:displayAnswer', {
       detail: { answer: displayAnswerText },
     }));
   }
@@ -81,7 +81,7 @@ export function displayFeedback({ context }: ActionArgs) {
   ) || String(context.currentAnswer || '');
 
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('cardMachine:displayFeedback', {
+    window.dispatchEvent(new CustomEvent('contentRuntimeMachine:displayFeedback', {
       detail: {
         isCorrect: context.isCorrect,
         correctAnswer: displayCorrectAnswerText,
@@ -95,7 +95,7 @@ export function setDisplayReady({ context: _context }: ActionArgs) {
   setDisplayReadyState(true);
 
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('cardMachine:displayReady'));
+    window.dispatchEvent(new CustomEvent('contentRuntimeMachine:displayReady'));
   }
 }
 

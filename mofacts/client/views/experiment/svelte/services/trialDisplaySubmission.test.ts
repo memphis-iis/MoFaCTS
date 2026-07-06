@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import type { H5PTrialResult } from '../../../../../common/types';
-import type { SparcTrialResult } from '../../../../../../learning-components/trial-displays/sparc/SparcTrialDisplayAdapter';
+import type { SparcControllerResult } from './sparcController';
 import {
   createTrialDisplaySubmissionController,
   type TrialDisplaySubmitEvent,
@@ -16,7 +16,7 @@ function createH5PResult(overrides: Partial<H5PTrialResult> = {}): H5PTrialResul
   };
 }
 
-function createSparcResult(overrides: Partial<SparcTrialResult> = {}): SparcTrialResult {
+function createSparcResult(overrides: Partial<SparcControllerResult> = {}): SparcControllerResult {
   return {
     submittedNodes: {
       'node-a': 'value-a',
@@ -29,20 +29,20 @@ function createSparcResult(overrides: Partial<SparcTrialResult> = {}): SparcTria
 
 function createHarness(options: {
   h5pOwnsResponse?: boolean;
-  sparcOwnsResponse?: boolean;
+  sparcSessionOwnsResponse?: boolean;
   h5pResult?: H5PTrialResult | null;
-  sparcResult?: SparcTrialResult | null;
+  sparcResult?: SparcControllerResult | null;
   timestamp?: number;
 } = {}) {
   let display: Record<string, unknown> | undefined = { id: 'display-a' };
   let h5pOwnsResponse = options.h5pOwnsResponse !== false;
-  let sparcOwnsResponse = options.sparcOwnsResponse !== false;
+  let sparcSessionOwnsResponse = options.sparcSessionOwnsResponse !== false;
   const submitted: TrialDisplaySubmitEvent[] = [];
   const resolvedDisplays: Array<Record<string, unknown> | undefined> = [];
   const controller = createTrialDisplaySubmissionController({
     getCurrentDisplay: () => display,
     h5pOwnsResponse: () => h5pOwnsResponse,
-    sparcOwnsResponse: () => sparcOwnsResponse,
+    sparcSessionOwnsResponse: () => sparcSessionOwnsResponse,
     resolveH5PResult: (currentDisplay) => {
       resolvedDisplays.push(currentDisplay);
       return options.h5pResult === undefined ? createH5PResult() : options.h5pResult;
@@ -67,7 +67,7 @@ function createHarness(options: {
       h5pOwnsResponse = value;
     },
     setSparcOwnership: (value: boolean) => {
-      sparcOwnsResponse = value;
+      sparcSessionOwnsResponse = value;
     },
   };
 }
@@ -102,11 +102,11 @@ describe('trial display submission controller', function() {
     const harness = createHarness({ h5pResult: null });
 
     expect(() => harness.controller.handleH5PResult({}))
-      .to.throw('[CardScreen] H5P result received for non-H5P display');
+      .to.throw('[ContentSurface] H5P result received for non-H5P display');
   });
 
   it('ignores SPARC submissions when the current display does not own the response', function() {
-    const harness = createHarness({ sparcOwnsResponse: false });
+    const harness = createHarness({ sparcSessionOwnsResponse: false });
 
     harness.controller.handleSparcSubmit({ submittedValue: 'value-a' });
 
@@ -134,7 +134,7 @@ describe('trial display submission controller', function() {
     const harness = createHarness({ sparcResult: null });
 
     expect(() => harness.controller.handleSparcSubmit({}))
-      .to.throw('[CardScreen] SPARC result received for non-SPARC display');
+      .to.throw('[ContentSurface] SPARC result received for non-SPARC display');
   });
 
   it('allows H5P and SPARC submissions again after the display changes', function() {

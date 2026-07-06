@@ -52,10 +52,10 @@ export function createVideoSessionRuntimeController(
 
     const currentUnitNumber = resolveUnitNumber(deps.getCurrentUnitNumber());
     void deps.recordInstructionContinue(deps.getVideoInstructionsShownAt() || deps.now()).catch((error) => {
-      deps.log(1, '[CardScreen] Failed to record video instructions continue:', error);
+      deps.log(1, '[ContentSurface] Failed to record video instructions continue:', error);
     });
     void deps.persistInstructionState({ currentUnitNumber }).catch((error) => {
-      deps.log(1, '[CardScreen] Failed to persist video instructions state:', error);
+      deps.log(1, '[ContentSurface] Failed to persist video instructions state:', error);
     });
   }
 
@@ -71,7 +71,7 @@ export function createVideoSessionRuntimeController(
     const videoPlayer = deps.getVideoPlayer();
     if (!videoPlayer || typeof videoPlayer.play !== 'function') {
       deps.setVideoInstructionStartBlocked(true);
-      deps.log(1, '[CardScreen] Video instructions continue clicked before player was ready');
+      deps.log(1, '[ContentSurface] Video instructions continue clicked before player was ready');
       return false;
     }
 
@@ -81,7 +81,7 @@ export function createVideoSessionRuntimeController(
       playResult = videoPlayer.play();
     } catch (error) {
       deps.setVideoInstructionStartBlocked(true);
-      deps.log(1, '[CardScreen] Video start from instructions threw:', errorMessage(error));
+      deps.log(1, '[ContentSurface] Video start from instructions threw:', errorMessage(error));
       return false;
     }
 
@@ -92,7 +92,7 @@ export function createVideoSessionRuntimeController(
         })
         .catch((error) => {
           deps.setVideoInstructionStartBlocked(true);
-          deps.log(1, '[CardScreen] Video start from instructions was blocked:', errorMessage(error));
+          deps.log(1, '[ContentSurface] Video start from instructions was blocked:', errorMessage(error));
         });
       return true;
     }

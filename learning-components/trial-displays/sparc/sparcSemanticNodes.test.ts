@@ -4,7 +4,6 @@ import { sparcTrialDisplayAdapter } from './SparcTrialDisplayAdapter';
 describe('sparc semantic nodes', function() {
   it('normalizes semantic multiple-choice nodes into prompt and vertical answer-list nodes', function() {
     const display = sparcTrialDisplayAdapter.normalizeDisplay({
-      type: 'sparc',
       nodes: [{
         id: 'mc-1',
         nodeType: 'semantic',
@@ -56,7 +55,6 @@ describe('sparc semantic nodes', function() {
 
   it('adds optional multiple-choice header feedback as a header-only message node', function() {
     const display = sparcTrialDisplayAdapter.normalizeDisplay({
-      type: 'sparc',
       nodes: [{
         id: 'mc-1',
         nodeType: 'semantic',

@@ -1,4 +1,4 @@
-import type { SparcTrialDisplay } from '../../../../../../learning-components/trial-displays/sparc/SparcTrialDisplayAdapter';
+import type { SparcControllerDisplay } from './sparcController';
 
 export const SPARC_DIALOGUE_PROGRESS_FACTS_VALUE_KEY = '__sparcDialogueProgressFacts';
 const DEFAULT_COVERAGE_THRESHOLD = 0.8;
@@ -55,7 +55,7 @@ function unitSlot(fact: SparcFact, slotName: string): number {
   return Math.max(0, Math.min(1, value));
 }
 
-function displayFacts(display: SparcTrialDisplay | null | undefined): SparcFact[] {
+function displayFacts(display: SparcControllerDisplay | null | undefined): SparcFact[] {
   const facts = isRecord(display) && Array.isArray(display.workingMemoryFacts)
     ? display.workingMemoryFacts
     : [];
@@ -73,14 +73,14 @@ function factsByType(facts: readonly SparcFact[], factType: string): SparcFact[]
   return facts.filter((fact) => fact.factType === factType);
 }
 
-function cleanExpectations(display: SparcTrialDisplay | null | undefined): Record<string, unknown>[] {
+function cleanExpectations(display: SparcControllerDisplay | null | undefined): Record<string, unknown>[] {
   const targets = isRecord(display) && isRecord(display.autoTutorTargets) && Array.isArray(display.autoTutorTargets.expectations)
     ? display.autoTutorTargets.expectations
     : [];
   return targets.filter(isRecord);
 }
 
-function cleanMisconceptions(display: SparcTrialDisplay | null | undefined): Record<string, unknown>[] {
+function cleanMisconceptions(display: SparcControllerDisplay | null | undefined): Record<string, unknown>[] {
   if (isRecord(display) && isRecord(display.autoTutorTargets) && Array.isArray(display.autoTutorTargets.misconceptions)) {
     return display.autoTutorTargets.misconceptions.filter(isRecord);
   }
@@ -140,7 +140,7 @@ function misconceptionCredit(confidence: number, misconceptionThreshold: number)
 }
 
 export function buildSparcAutoTutorProgressSnapshot(params: {
-  readonly display: SparcTrialDisplay | null | undefined;
+  readonly display: SparcControllerDisplay | null | undefined;
   readonly runtimeNodeValues?: Record<string, unknown> | null;
 }): SparcAutoTutorProgressSnapshot {
   const authoredFacts = displayFacts(params.display);

@@ -39,7 +39,7 @@ describe('active trial display state', function() {
       isStudyState: false,
       originalAnswer: '',
       skipStudyEnabled: true,
-      sparcOwnsResponse: false,
+      sparcSessionOwnsResponse: false,
       studyInteractionText: '',
       trialSubsetKind: 'question',
     })).to.deep.include({
@@ -68,7 +68,7 @@ describe('active trial display state', function() {
       isStudyState: false,
       originalAnswer: '',
       skipStudyEnabled: false,
-      sparcOwnsResponse: false,
+      sparcSessionOwnsResponse: false,
       studyInteractionText: '',
       trialSubsetKind: 'question',
     }).responseVisible).to.equal(false);
@@ -89,7 +89,7 @@ describe('active trial display state', function() {
       isStudyState: true,
       originalAnswer: 'B',
       skipStudyEnabled: true,
-      sparcOwnsResponse: false,
+      sparcSessionOwnsResponse: false,
       studyInteractionText: 'spoken',
       trialSubsetKind: 'study',
     })).to.deep.include({

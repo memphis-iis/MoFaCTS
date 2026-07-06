@@ -18,20 +18,18 @@ function findTdf(selector: any) {
   return TdfsCollection?.findOne ? TdfsCollection.findOne(selector) : null;
 }
 
-function isSparcDisplay(display: any): boolean {
+function isSparcPageDisplay(display: any): boolean {
   return display
     && typeof display === 'object'
-    && display.type === 'sparc'
     && Array.isArray(display.nodes);
 }
 
-function hasSparcStimuli(tdf: any): boolean {
-  const clusters = tdf?.rawStimuliFile?.setspec?.clusters;
-  if (!Array.isArray(clusters)) {
+function hasSparcPages(tdf: any): boolean {
+  const sparcPages = tdf?.rawStimuliFile?.setspec?.sparcPages;
+  if (!Array.isArray(sparcPages)) {
     return false;
   }
-  return clusters.some((cluster: any) => Array.isArray(cluster?.stims)
-    && cluster.stims.some((stim: any) => isSparcDisplay(stim?.display)));
+  return sparcPages.some((page: any) => isSparcPageDisplay(page?.display));
 }
 
 Template.sparcEdit.onCreated(function(this: any) {
@@ -51,7 +49,7 @@ Template.sparcEdit.onRendered(function(this: any) {
     }
 
     const tdf = findTdf({ _id: instance.tdfId });
-    if (!tdf || !hasSparcStimuli(tdf)) {
+    if (!tdf || !hasSparcPages(tdf)) {
       return;
     }
 
@@ -103,6 +101,6 @@ Template.sparcEdit.helpers({
       clientConsole(1, '[SPARC Edit] TDF not found for editor route', instance.tdfId);
       return true;
     }
-    return !hasSparcStimuli(tdf);
+    return !hasSparcPages(tdf);
   },
 });

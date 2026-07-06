@@ -21,7 +21,7 @@ import {
 type FeedbackTimeoutContext = Parameters<typeof getFeedbackTimeoutMs>[0];
 type PreparedAdvanceMode = 'none' | 'seamless' | 'direct';
 
-type CardMachineActorArgs = {
+type ContentRuntimeMachineActorArgs = {
   context: {
     testType?: string;
     feedbackTimeoutMs?: number | undefined;
@@ -69,7 +69,7 @@ type CardMachineActorArgs = {
   };
 };
 
-function resolveFeedbackTimeoutMs({ context, event }: CardMachineActorArgs): number {
+function resolveFeedbackTimeoutMs({ context, event }: ContentRuntimeMachineActorArgs): number {
   const validationResult = event?.output;
   const validationIsCorrect =
     validationResult && typeof validationResult === 'object' && 'isCorrect' in validationResult
@@ -97,57 +97,57 @@ type MeteorUserLike = {
 
 /**
  * Check if current trial is a study trial
- * @param {CardMachineContext} context
- * @param {CardMachineEvent} event
+ * @param {ContentRuntimeMachineContext} context
+ * @param {ContentRuntimeMachineEvent} event
  * @returns {boolean}
  */
-export function isStudyTrial({ context }: CardMachineActorArgs): boolean {
+export function isStudyTrial({ context }: ContentRuntimeMachineActorArgs): boolean {
   return context.testType === TRIAL_TYPES.STUDY;
 }
 
 /**
  * Check if current trial is a drill trial
- * @param {CardMachineContext} context
- * @param {CardMachineEvent} event
+ * @param {ContentRuntimeMachineContext} context
+ * @param {ContentRuntimeMachineEvent} event
  * @returns {boolean}
  */
-export function isDrillTrial({ context }: CardMachineActorArgs): boolean {
+export function isDrillTrial({ context }: ContentRuntimeMachineActorArgs): boolean {
   return [TRIAL_TYPES.DRILL, TRIAL_TYPES.FORCE_CORRECT, TRIAL_TYPES.TIMED_PROMPT].includes(context.testType || '');
 }
 
 /**
  * Check if current trial is a test trial
- * @param {CardMachineContext} context
- * @param {CardMachineEvent} event
+ * @param {ContentRuntimeMachineContext} context
+ * @param {ContentRuntimeMachineEvent} event
  * @returns {boolean}
  */
-export function isTestTrial({ context }: CardMachineActorArgs): boolean {
+export function isTestTrial({ context }: ContentRuntimeMachineActorArgs): boolean {
   return context.testType === TRIAL_TYPES.TEST || context.testType === TRIAL_TYPES.H5P;
 }
 
 /**
  * Check if current trial type is supported
- * @param {CardMachineContext} context
- * @param {CardMachineEvent} event
+ * @param {ContentRuntimeMachineContext} context
+ * @param {ContentRuntimeMachineEvent} event
  * @returns {boolean}
  */
-export function isSupportedTrialType({ context }: CardMachineActorArgs): boolean {
+export function isSupportedTrialType({ context }: ContentRuntimeMachineActorArgs): boolean {
   return SUPPORTED_TRIAL_TYPES.has(context.testType || '');
 }
 
 /**
  * Check if current trial type is unsupported (should error)
- * @param {CardMachineActorArgs} args
+ * @param {ContentRuntimeMachineActorArgs} args
  * @returns {boolean}
  */
-export function isUnsupportedTrialType(args: CardMachineActorArgs): boolean {
+export function isUnsupportedTrialType(args: ContentRuntimeMachineActorArgs): boolean {
   return !isSupportedTrialType(args);
 }
 
 /**
  * Check if current trial is a force correct trial and user was incorrect
  */
-export function isForceCorrectTrialAndIncorrect({ context }: CardMachineActorArgs): boolean {
+export function isForceCorrectTrialAndIncorrect({ context }: ContentRuntimeMachineActorArgs): boolean {
   const isForceCorrect = context.testType === TRIAL_TYPES.FORCE_CORRECT || 
                          context.testType === TRIAL_TYPES.TIMED_PROMPT ||
                          context.deliverySettings?.forceCorrection === true ||
@@ -155,21 +155,21 @@ export function isForceCorrectTrialAndIncorrect({ context }: CardMachineActorArg
   return isForceCorrect && !context.isCorrect;
 }
 
-export function needsForceCorrectPrompt(args: CardMachineActorArgs): boolean {
+export function needsForceCorrectPrompt(args: ContentRuntimeMachineActorArgs): boolean {
   return isForceCorrectTrialAndIncorrect(args) && String(args.context.reviewEntry || '').trim() === '';
 }
 
 /**
  * Check if current trial is a timed prompt trial
  */
-export function isTimedPromptTrial({ context }: CardMachineActorArgs): boolean {
+export function isTimedPromptTrial({ context }: ContentRuntimeMachineActorArgs): boolean {
   return context.testType === TRIAL_TYPES.TIMED_PROMPT;
 }
 
 /**
  * Check if force correction input matches correct answer
  */
-export function isCorrectForceCorrection({ context, event }: CardMachineActorArgs): boolean {
+export function isCorrectForceCorrection({ context, event }: ContentRuntimeMachineActorArgs): boolean {
   const userAnswer = (event && typeof event === 'object' && 'userAnswer' in event
     ? String(event.userAnswer ?? '')
     : '').trim().toLowerCase();
@@ -183,21 +183,21 @@ export function isCorrectForceCorrection({ context, event }: CardMachineActorArg
 
 /**
  * Check if current trial is a button (multiple choice) trial
- * @param {CardMachineContext} context
- * @param {CardMachineEvent} event
+ * @param {ContentRuntimeMachineContext} context
+ * @param {ContentRuntimeMachineEvent} event
  * @returns {boolean}
  */
-export function isButtonTrial({ context }: CardMachineActorArgs): boolean {
+export function isButtonTrial({ context }: ContentRuntimeMachineActorArgs): boolean {
   return context.buttonTrial === true;
 }
 
 /**
  * Check if current trial is a text entry trial
- * @param {CardMachineContext} context
- * @param {CardMachineEvent} event
+ * @param {ContentRuntimeMachineContext} context
+ * @param {ContentRuntimeMachineEvent} event
  * @returns {boolean}
  */
-export function isTextTrial({ context }: CardMachineActorArgs): boolean {
+export function isTextTrial({ context }: ContentRuntimeMachineActorArgs): boolean {
   return context.buttonTrial === false;
 }
 
@@ -208,10 +208,10 @@ export function isTextTrial({ context }: CardMachineActorArgs): boolean {
 /**
  * Check if speech recognition should be enabled for this trial
  * SR is only enabled for text entry trials when explicitly requested
- * @param {CardMachineActorArgs} args
+ * @param {ContentRuntimeMachineActorArgs} args
  * @returns {boolean}
  */
-export function srEnabled(args: CardMachineActorArgs): boolean {
+export function srEnabled(args: ContentRuntimeMachineActorArgs): boolean {
   const availability = evaluateSrAvailability({
     user: Meteor.user() as MeteorUserLike | null,
     tdfFile: Session.get('currentTdfFile'),
@@ -225,48 +225,48 @@ export function srEnabled(args: CardMachineActorArgs): boolean {
 
 /**
  * Check if SR is disabled
- * @param {CardMachineActorArgs} args
+ * @param {ContentRuntimeMachineActorArgs} args
  * @returns {boolean}
  */
-export function srDisabled(args: CardMachineActorArgs): boolean {
+export function srDisabled(args: ContentRuntimeMachineActorArgs): boolean {
   return !srEnabled(args);
 }
 
 /**
  * Check if recording is currently locked (e.g., during TTS playback)
- * @param {CardMachineContext} context
- * @param {CardMachineEvent} event
+ * @param {ContentRuntimeMachineContext} context
+ * @param {ContentRuntimeMachineEvent} event
  * @returns {boolean}
  */
-export function recordingLocked({ context }: CardMachineActorArgs): boolean {
+export function recordingLocked({ context }: ContentRuntimeMachineActorArgs): boolean {
   return context.audio?.recordingLocked === true;
 }
 
 /**
  * Check if recording is unlocked
- * @param {CardMachineActorArgs} args
+ * @param {ContentRuntimeMachineActorArgs} args
  * @returns {boolean}
  */
-export function recordingUnlocked(args: CardMachineActorArgs): boolean {
+export function recordingUnlocked(args: ContentRuntimeMachineActorArgs): boolean {
   return !recordingLocked(args);
 }
 
 /**
  * Check if SR has attempts remaining
- * @param {CardMachineContext} context
- * @param {CardMachineEvent} event
+ * @param {ContentRuntimeMachineContext} context
+ * @param {ContentRuntimeMachineEvent} event
  * @returns {boolean}
  */
-export function hasAttemptsRemaining({ context }: CardMachineActorArgs): boolean {
+export function hasAttemptsRemaining({ context }: ContentRuntimeMachineActorArgs): boolean {
   return (context.audio?.srAttempts ?? 0) < (context.audio?.maxSrAttempts ?? 0);
 }
 
 /**
  * Check if SR has exhausted all attempts
- * @param {CardMachineActorArgs} args
+ * @param {ContentRuntimeMachineActorArgs} args
  * @returns {boolean}
  */
-export function attemptsExhausted(args: CardMachineActorArgs): boolean {
+export function attemptsExhausted(args: ContentRuntimeMachineActorArgs): boolean {
   return !hasAttemptsRemaining(args);
 }
 
@@ -276,11 +276,11 @@ export function attemptsExhausted(args: CardMachineActorArgs): boolean {
 
 /**
  * Check if TTS is enabled for this trial
- * @param {CardMachineContext} context
- * @param {CardMachineEvent} event
+ * @param {ContentRuntimeMachineContext} context
+ * @param {ContentRuntimeMachineEvent} event
  * @returns {boolean}
  */
-export function ttsEnabled(_args: CardMachineActorArgs): boolean {
+export function ttsEnabled(_args: ContentRuntimeMachineActorArgs): boolean {
   const audioPromptMode = getAudioPromptMode();
   const questionTtsEnabled = !!audioPromptMode && audioPromptMode !== 'silent';
   const feedbackTtsEnabled = Session.get('enableAudioPromptAndFeedback') === true;
@@ -290,28 +290,28 @@ export function ttsEnabled(_args: CardMachineActorArgs): boolean {
 
 /**
  * Check if TTS is disabled
- * @param {CardMachineActorArgs} args
+ * @param {ContentRuntimeMachineActorArgs} args
  * @returns {boolean}
  */
-export function ttsDisabled(args: CardMachineActorArgs): boolean {
+export function ttsDisabled(args: ContentRuntimeMachineActorArgs): boolean {
   return !ttsEnabled(args);
 }
 
-function feedbackContentReady({ context }: CardMachineActorArgs): boolean {
+function feedbackContentReady({ context }: ContentRuntimeMachineActorArgs): boolean {
   if (context.feedbackSuppressed === true) {
     return true;
   }
   return typeof context.feedbackText === 'string' && context.feedbackText.trim() !== '';
 }
 
-export function feedbackReadyForTts(args: CardMachineActorArgs): boolean {
+export function feedbackReadyForTts(args: ContentRuntimeMachineActorArgs): boolean {
   return args.context.feedbackRevealStarted === true &&
     args.context.feedbackSuppressed !== true &&
     feedbackContentReady(args) &&
     ttsEnabled(args);
 }
 
-export function feedbackReadyWithoutTts(args: CardMachineActorArgs): boolean {
+export function feedbackReadyWithoutTts(args: ContentRuntimeMachineActorArgs): boolean {
   return args.context.feedbackRevealStarted === true &&
     feedbackContentReady(args) &&
     (args.context.feedbackSuppressed === true || ttsDisabled(args));
@@ -324,11 +324,11 @@ export function feedbackReadyWithoutTts(args: CardMachineActorArgs): boolean {
 /**
  * Check if feedback should be displayed
  * Feedback is shown for drill trials when feedback timeout is > 0ms
- * @param {CardMachineContext} context
- * @param {CardMachineEvent} event
+ * @param {ContentRuntimeMachineContext} context
+ * @param {ContentRuntimeMachineEvent} event
  * @returns {boolean}
  */
-export function needsFeedback(args: CardMachineActorArgs): boolean {
+export function needsFeedback(args: ContentRuntimeMachineActorArgs): boolean {
   if (selfHostedH5PTrialDisplayOwnsInteraction(args.context.currentDisplay)) {
     return false;
   }
@@ -342,44 +342,44 @@ export function needsFeedback(args: CardMachineActorArgs): boolean {
 
 /**
  * Check if feedback should NOT be displayed
- * @param {CardMachineActorArgs} args
+ * @param {ContentRuntimeMachineActorArgs} args
  * @returns {boolean}
  */
-export function noFeedback(args: CardMachineActorArgs): boolean {
+export function noFeedback(args: ContentRuntimeMachineActorArgs): boolean {
   return !needsFeedback(args);
 }
 
 /**
  * Check if feedback should be displayed and this is a video session.
  */
-export function needsFeedbackAndVideoSession(args: CardMachineActorArgs): boolean {
+export function needsFeedbackAndVideoSession(args: ContentRuntimeMachineActorArgs): boolean {
   return needsFeedback(args) && isVideoSession(args);
 }
 
 /**
  * Check if feedback is skipped and this is a video session.
  */
-export function noFeedbackAndVideoSession(args: CardMachineActorArgs): boolean {
+export function noFeedbackAndVideoSession(args: ContentRuntimeMachineActorArgs): boolean {
   return noFeedback(args) && isVideoSession(args);
 }
 
 /**
  * Check if answer was correct
- * @param {CardMachineContext} context
- * @param {CardMachineEvent} event
+ * @param {ContentRuntimeMachineContext} context
+ * @param {ContentRuntimeMachineEvent} event
  * @returns {boolean}
  */
-export function answerCorrect({ context }: CardMachineActorArgs): boolean {
+export function answerCorrect({ context }: ContentRuntimeMachineActorArgs): boolean {
   return context.isCorrect === true;
 }
 
 /**
  * Check if answer was incorrect
- * @param {CardMachineContext} context
- * @param {CardMachineEvent} event
+ * @param {ContentRuntimeMachineContext} context
+ * @param {ContentRuntimeMachineEvent} event
  * @returns {boolean}
  */
-export function answerIncorrect({ context }: CardMachineActorArgs): boolean {
+export function answerIncorrect({ context }: ContentRuntimeMachineActorArgs): boolean {
   return context.isCorrect === false;
 }
 
@@ -389,35 +389,35 @@ export function answerIncorrect({ context }: CardMachineActorArgs): boolean {
 
 /**
  * Check if trial timed out
- * @param {CardMachineContext} context
- * @param {CardMachineEvent} event
+ * @param {ContentRuntimeMachineContext} context
+ * @param {ContentRuntimeMachineEvent} event
  * @returns {boolean}
  */
-export function didTimeout({ context }: CardMachineActorArgs): boolean {
+export function didTimeout({ context }: ContentRuntimeMachineActorArgs): boolean {
   return context.isTimeout === true;
 }
 
 /**
  * Check if trial did NOT timeout
- * @param {CardMachineContext} context
- * @param {CardMachineEvent} event
+ * @param {ContentRuntimeMachineContext} context
+ * @param {ContentRuntimeMachineEvent} event
  * @returns {boolean}
  */
-export function didNotTimeout({ context }: CardMachineActorArgs): boolean {
+export function didNotTimeout({ context }: ContentRuntimeMachineActorArgs): boolean {
   return context.isTimeout === false;
 }
 
-export function trialRevealStarted({ context }: CardMachineActorArgs): boolean {
+export function trialRevealStarted({ context }: ContentRuntimeMachineActorArgs): boolean {
   return Number(context.timestamps?.trialStart) > 0;
 }
 
 /**
  * Check if consecutive timeout threshold has been reached
- * @param {CardMachineContext} context
- * @param {CardMachineEvent} event
+ * @param {ContentRuntimeMachineContext} context
+ * @param {ContentRuntimeMachineEvent} event
  * @returns {boolean}
  */
-export function hitTimeoutThreshold({ context }: CardMachineActorArgs): boolean {
+export function hitTimeoutThreshold({ context }: ContentRuntimeMachineActorArgs): boolean {
   const threshold = THRESHOLDS.CONSECUTIVE_TIMEOUT_WARNING;
   return (context.consecutiveTimeouts ?? 0) >= threshold;
 }
@@ -425,24 +425,24 @@ export function hitTimeoutThreshold({ context }: CardMachineActorArgs): boolean 
 /**
  * Check if still waiting for SR transcription
  * (main timeout should pause)
- * @param {CardMachineContext} context
- * @param {CardMachineEvent} event
+ * @param {ContentRuntimeMachineContext} context
+ * @param {ContentRuntimeMachineEvent} event
  * @returns {boolean}
  */
-export function waitingForTranscription({ context }: CardMachineActorArgs): boolean {
+export function waitingForTranscription({ context }: ContentRuntimeMachineActorArgs): boolean {
   return context.audio?.waitingForTranscription === true;
 }
 
 /**
  * Check if NOT waiting for transcription
- * @param {CardMachineActorArgs} args
+ * @param {ContentRuntimeMachineActorArgs} args
  * @returns {boolean}
  */
-export function notWaitingForTranscription(args: CardMachineActorArgs): boolean {
+export function notWaitingForTranscription(args: ContentRuntimeMachineActorArgs): boolean {
   return !waitingForTranscription(args);
 }
 
-export function trialDisplaySuppressesStandardTimeout({ context }: CardMachineActorArgs): boolean {
+export function trialDisplaySuppressesStandardTimeout({ context }: ContentRuntimeMachineActorArgs): boolean {
   return selfHostedH5PTrialDisplayOwnsInteraction(context.currentDisplay);
 }
 
@@ -452,11 +452,11 @@ export function trialDisplaySuppressesStandardTimeout({ context }: CardMachineAc
 
 /**
  * Check if the unit has finished
- * @param {CardMachineContext} context
- * @param {CardMachineEvent} event
+ * @param {ContentRuntimeMachineContext} context
+ * @param {ContentRuntimeMachineEvent} event
  * @returns {boolean}
  */
-export function unitFinished({ context, event }: CardMachineActorArgs): boolean {
+export function unitFinished({ context, event }: ContentRuntimeMachineActorArgs): boolean {
   // Check event payload if it's a CARD_SELECTED event
   if (event.type === 'CARD_SELECTED' && event.unitFinished) {
     return true;
@@ -467,10 +467,10 @@ export function unitFinished({ context, event }: CardMachineActorArgs): boolean 
 
 /**
  * Check if the unit has NOT finished
- * @param {CardMachineActorArgs} args
+ * @param {ContentRuntimeMachineActorArgs} args
  * @returns {boolean}
  */
-export function unitNotFinished(args: CardMachineActorArgs): boolean {
+export function unitNotFinished(args: ContentRuntimeMachineActorArgs): boolean {
   return !unitFinished(args);
 }
 
@@ -482,7 +482,7 @@ export function canEngineUsePreparedAdvance(engine: PreparedAdvanceEngineLike | 
   return engine?.unitType === 'model' || engine?.unitType === 'schedule';
 }
 
-export function canUsePreparedAdvance(args: CardMachineActorArgs): boolean {
+export function canUsePreparedAdvance(args: ContentRuntimeMachineActorArgs): boolean {
   const { context } = args;
   const engine = context.engine as { unitType?: string } | null | undefined;
   if (!canEngineUsePreparedAdvance(engine)) {
@@ -497,7 +497,7 @@ export function canUsePreparedAdvance(args: CardMachineActorArgs): boolean {
   return true;
 }
 
-export function hasPreparedTrial({ context }: CardMachineActorArgs): boolean {
+export function hasPreparedTrial({ context }: ContentRuntimeMachineActorArgs): boolean {
   return Boolean(context.preparedTrial && context.preparedTrial.currentDisplay);
 }
 
@@ -507,11 +507,11 @@ export function hasPreparedTrial({ context }: CardMachineActorArgs): boolean {
 
 /**
  * Check if error is hard (should stop machine)
- * @param {CardMachineContext} context
- * @param {CardMachineEvent} event
+ * @param {ContentRuntimeMachineContext} context
+ * @param {ContentRuntimeMachineEvent} event
  * @returns {boolean}
  */
-export function isHardError({ event }: CardMachineActorArgs): boolean {
+export function isHardError({ event }: ContentRuntimeMachineActorArgs): boolean {
   if (event.type !== 'ERROR') return false;
 
   const source = typeof event.source === 'string' ? event.source : 'unknown';
@@ -521,11 +521,11 @@ export function isHardError({ event }: CardMachineActorArgs): boolean {
 
 /**
  * Check if error is soft (should continue to next trial)
- * @param {CardMachineContext} context
- * @param {CardMachineEvent} event
+ * @param {ContentRuntimeMachineContext} context
+ * @param {ContentRuntimeMachineEvent} event
  * @returns {boolean}
  */
-export function isSoftError({ event }: CardMachineActorArgs): boolean {
+export function isSoftError({ event }: ContentRuntimeMachineActorArgs): boolean {
   if (event.type !== 'ERROR') return false;
 
   const source = typeof event.source === 'string' ? event.source : 'unknown';
@@ -539,11 +539,11 @@ export function isSoftError({ event }: CardMachineActorArgs): boolean {
 
 /**
  * Check if this is a video session
- * @param {CardMachineContext} context
- * @param {CardMachineEvent} event
+ * @param {ContentRuntimeMachineContext} context
+ * @param {ContentRuntimeMachineEvent} event
  * @returns {boolean}
  */
-export function isVideoSession({ context }: CardMachineActorArgs): boolean {
+export function isVideoSession({ context }: ContentRuntimeMachineActorArgs): boolean {
   return resolveSessionSurfaceState({
     deliverySettings: context.deliverySettings,
     sessionIsVideoSession: getIsVideoSessionFlag(),
@@ -552,17 +552,17 @@ export function isVideoSession({ context }: CardMachineActorArgs): boolean {
 
 /**
  * Check if this is NOT a video session
- * @param {CardMachineActorArgs} args
+ * @param {ContentRuntimeMachineActorArgs} args
  * @returns {boolean}
  */
-export function isNotVideoSession(args: CardMachineActorArgs): boolean {
+export function isNotVideoSession(args: ContentRuntimeMachineActorArgs): boolean {
   return !isVideoSession(args);
 }
 
 /**
  * Check that a concrete configured video checkpoint can be accepted.
  */
-export function canAcceptVideoCheckpoint(args: CardMachineActorArgs): boolean {
+export function canAcceptVideoCheckpoint(args: ContentRuntimeMachineActorArgs): boolean {
   if (!isVideoSession(args)) {
     return false;
   }
@@ -598,20 +598,20 @@ export function canAcceptVideoCheckpoint(args: CardMachineActorArgs): boolean {
 
 /**
  * Check if user has provided an answer
- * @param {CardMachineContext} context
- * @param {CardMachineEvent} event
+ * @param {ContentRuntimeMachineContext} context
+ * @param {ContentRuntimeMachineEvent} event
  * @returns {boolean}
  */
-export function hasUserAnswer({ context }: CardMachineActorArgs): boolean {
+export function hasUserAnswer({ context }: ContentRuntimeMachineActorArgs): boolean {
   return typeof context.userAnswer === 'string' && context.userAnswer.trim().length > 0;
 }
 
 /**
  * Check if user has NOT provided an answer
- * @param {CardMachineActorArgs} args
+ * @param {ContentRuntimeMachineActorArgs} args
  * @returns {boolean}
  */
-export function noUserAnswer(args: CardMachineActorArgs): boolean {
+export function noUserAnswer(args: ContentRuntimeMachineActorArgs): boolean {
   return !hasUserAnswer(args);
 }
 
@@ -630,7 +630,7 @@ export function hasPrestimulus(): boolean {
 /**
  * Check if question audio should gate input.
  */
-export function hasQuestionAudio({ context }: CardMachineActorArgs): boolean {
+export function hasQuestionAudio({ context }: ContentRuntimeMachineActorArgs): boolean {
   return !!context.currentDisplay?.audioSrc;
 }
 

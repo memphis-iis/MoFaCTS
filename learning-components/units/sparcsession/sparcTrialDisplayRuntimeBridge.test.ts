@@ -14,7 +14,6 @@ const variable = (name: string): SparcRuleExpression => ({ type: 'variable', nam
 
 function display(): SparcTrialDisplay {
   return {
-    type: 'sparc',
     schema: 'tutorscript-sparc/1.0',
     nodes: [{
       id: 'node-term-1-num-units',
@@ -115,7 +114,6 @@ function display(): SparcTrialDisplay {
 
 function unsupportedAuthoredRulesDisplay(): SparcTrialDisplay {
   return {
-    type: 'sparc',
     documentId: 'sparc-fractions-addition',
     schema: 'tutorscript-sparc/1.0',
     nodes: [{
@@ -184,7 +182,6 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
     const document = createSparcAuthoredDocumentFromTrialDisplay({
       documentId: 'fraction-doc',
       display: {
-        type: 'sparc',
         schema: 'tutorscript-sparc/1.0',
         nodes: [{
           id: 'fraction-one',
@@ -386,7 +383,6 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
     const [event] = createSparcProductionRuleEventsFromTrialResult({
       documentId: 'fraction-doc',
       display: {
-        type: 'sparc',
         schema: 'tutorscript-sparc/1.0',
         nodes: [{
           id: 'fraction-one',
@@ -430,7 +426,6 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
       () => createSparcAuthoredDocumentFromTrialDisplay({
         documentId: 'doc-1',
         display: {
-          type: 'sparc',
           schema: 'tutorscript-sparc/1.0',
           nodes: [{
             id: 'node-with-bad-attachment',
@@ -584,7 +579,6 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
     const document = createSparcAuthoredDocumentFromTrialDisplay({
       documentId: 'sparc-autotutor-clean',
       display: {
-        type: 'sparc',
         documentId: 'sparc-autotutor-clean',
         unitType: 'sparc-autotutor-dialogue',
         nodes: [{
@@ -643,7 +637,6 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
       () => createSparcAuthoredDocumentFromTrialDisplay({
         documentId: 'sparc-autotutor-legacy',
         display: {
-          type: 'sparc',
           documentId: 'sparc-autotutor-legacy',
           unitType: 'sparc-autotutor-dialogue',
           nodes: [{
@@ -678,7 +671,6 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
     const modelPracticeRequests: unknown[] = [];
     const writtenRecords: unknown[] = [];
     const lcdDisplay: SparcTrialDisplay = {
-      type: 'sparc',
       documentId: 'sparc-fractions-addition',
       schema: 'tutorscript-sparc/1.0',
       nodes: [{

@@ -1,5 +1,5 @@
 import { clientConsole } from '../../../../lib/clientLogger';
-import { assign, type ActionArgs } from './cardMachineActionTypes';
+import { assign, type ActionArgs } from './contentRuntimeMachineActionTypes';
 
 export const markInputEnabled = assign({
   timestamps: ({ context }: ActionArgs) => ({
@@ -35,7 +35,7 @@ export const markFirstKeypress = assign({
 export const markFeedbackStart = assign({
   timestamps: ({ context, event }: ActionArgs) => {
     const feedbackStart = event?.timestamp || Date.now();
-    clientConsole(2, '[CardMachine][FeedbackTiming] markFeedbackStart', {
+    clientConsole(2, '[ContentRuntimeMachine][FeedbackTiming] markFeedbackStart', {
       testType: context.testType,
       feedbackStart,
       existingFeedbackTimeoutMs: context.feedbackTimeoutMs,
@@ -58,7 +58,7 @@ export const markFeedbackEnd = assign({
 export const markTrialEnd = assign({
   timestamps: ({ context, event }: ActionArgs) => {
     if (!context.timestamps.trialEnd && context.testType !== 's') {
-      clientConsole(1, '[CardMachine] Missing submit timestamp before transition; using transition trialEnd timestamp', {
+      clientConsole(1, '[ContentRuntimeMachine] Missing submit timestamp before transition; using transition trialEnd timestamp', {
         testType: context.testType,
         source: context.source,
         trialStart: context.timestamps.trialStart,
@@ -75,6 +75,6 @@ export const markTrialEnd = assign({
 
 export function resetTimers({ context: _context }: ActionArgs) {
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('cardMachine:resetTimers'));
+    window.dispatchEvent(new CustomEvent('contentRuntimeMachine:resetTimers'));
   }
 }

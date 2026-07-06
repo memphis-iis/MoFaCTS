@@ -33,7 +33,6 @@ describe('history logging SPARC production-rule bridge', function() {
     };
     rememberSparcProductionRuleHistoryRecord(priorRecord);
     const display = {
-      type: 'sparc',
       documentId: 'sparc-fractions-addition',
       nodes: [],
       productionRules: [{ id: 'fractions.determine-lcd', when: [], then: [] }],
@@ -72,7 +71,6 @@ describe('history logging SPARC production-rule bridge', function() {
 
   it('remembers canonical SPARC records after successful production-rule history writes', async function() {
     const display = {
-      type: 'sparc',
       documentId: 'sparc-fractions-addition',
       nodes: [],
       productionRules: [{ id: 'fractions.determine-lcd', when: [], then: [] }],
@@ -347,7 +345,6 @@ describe('history logging SPARC production-rule bridge', function() {
           },
         } as unknown as UnitEngineLike,
         currentDisplay: {
-          type: 'sparc',
           nodes: [],
           productionRules: [{ id: 'fractions.determine-lcd', when: [], then: [] }],
         },

@@ -1,4 +1,4 @@
-import { assign, type ActionArgs } from './cardMachineActionTypes';
+import { assign, type ActionArgs } from './contentRuntimeMachineActionTypes';
 
 export const applySparcActionResult = assign({
   sparcNodeValues: ({ context, event }: ActionArgs) => ({

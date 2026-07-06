@@ -99,7 +99,7 @@ describe('trial fade transition controller', function() {
     expect(harness.firstRevealEvents).to.deep.equal([{ eventType: 'transitionstart' }]);
     expect(harness.logs[0]).to.deep.equal({
       level: 2,
-      message: '[CardScreen][FadeTiming]',
+      message: '[ContentSurface][FadeTiming]',
       details: {
         eventType: 'transitionstart',
         key: 'trial-a',

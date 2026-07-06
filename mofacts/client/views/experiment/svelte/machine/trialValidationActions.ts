@@ -1,6 +1,6 @@
 import { clientConsole } from '../../../../lib/clientLogger';
 import { getFeedbackTimeoutMs } from '../utils/timeoutUtils';
-import { assign, type ActionArgs } from './cardMachineActionTypes';
+import { assign, type ActionArgs } from './contentRuntimeMachineActionTypes';
 import { normalizeUserAnswerForFeedback } from './learnerResponseActions';
 
 export const applyValidationResult = assign({
@@ -30,7 +30,7 @@ export const applyValidationResult = assign({
 
     const timeoutMs = getFeedbackTimeoutMs(timeoutContext);
 
-    clientConsole(2, '[CardMachine][FeedbackTiming] applyValidationResult', {
+    clientConsole(2, '[ContentRuntimeMachine][FeedbackTiming] applyValidationResult', {
       testType: context.testType,
       isCorrect: timeoutContext.isCorrect,
       feedbackTimeoutMs: timeoutMs,

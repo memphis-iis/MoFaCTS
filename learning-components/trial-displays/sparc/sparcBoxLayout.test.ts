@@ -5,7 +5,6 @@ import type { SparcTrialDisplay } from './SparcTrialDisplayAdapter';
 describe('sparcBoxLayout', function() {
   it('groups top-level nodes into authored layout boxes by placement region and order', function() {
     const display: SparcTrialDisplay = {
-      type: 'sparc',
       layout: {
         zones: [
           { id: 'readingBox', role: 'reading' },
@@ -35,7 +34,6 @@ describe('sparcBoxLayout', function() {
 
   it('keeps unordered progressive nodes after authored ordered nodes in the same box', function() {
     const display: SparcTrialDisplay = {
-      type: 'sparc',
       layout: {
         zones: [
           { id: 'chapterFlowBox', role: 'reading' },
@@ -68,7 +66,6 @@ describe('sparcBoxLayout', function() {
 
   it('leaves document-flow displays without authored zones unboxed', function() {
     const display: SparcTrialDisplay = {
-      type: 'sparc',
       nodes: [{ id: 'node-1' }],
     };
 

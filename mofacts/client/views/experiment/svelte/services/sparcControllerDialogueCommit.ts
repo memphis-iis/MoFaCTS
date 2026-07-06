@@ -1,9 +1,12 @@
 import { clientConsole } from '../../../../lib/clientLogger';
 import type { CanonicalHistoryRecord } from '../../../../../../learning-components/runtime/historyEnvelope';
 import type {
-  SparcTrialDisplay,
-  SparcTrialResult,
-} from '../../../../../../learning-components/trial-displays/sparc/SparcTrialDisplayAdapter';
+  SparcControllerDisplay,
+  SparcControllerResult,
+} from './sparcController';
+import {
+  resolveSparcControllerDisplay,
+} from './sparcController';
 import {
   SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY,
   collectSparcProgressiveNodeOperations,
@@ -25,8 +28,8 @@ import {
   rememberSparcProductionRuleHistoryRecord,
 } from './sparcProductionRuleHistoryCache';
 import {
-  getSparcTrialDisplayRuntimeContext,
-} from './sparcTrialDisplayRuntimeContextCache';
+  getSparcControllerRuntimeContext,
+} from './sparcControllerRuntimeContextCache';
 import {
   buildSparcWorkingMemoryFacts,
 } from '../../../../../../learning-components/units/sparcsession/sparcWorkingMemoryFacts';
@@ -38,7 +41,7 @@ import {
   SPARC_DIALOGUE_PROGRESS_FACTS_VALUE_KEY,
 } from './sparcAutoTutorProgress';
 
-type SparcControllerDialogueDisplay = SparcTrialDisplay & {
+type SparcControllerDialogueDisplay = SparcControllerDisplay & {
   readonly documentId: string;
   readonly unitType: 'sparc-autotutor-dialogue';
 };
@@ -76,25 +79,34 @@ function defaultUserId(): string | null {
 }
 
 export function isSparcControllerDialogueDisplay(display: unknown): display is SparcControllerDialogueDisplay {
-  return isRecord(display)
-    && display.type === 'sparc'
-    && display.unitType === 'sparc-autotutor-dialogue'
-    && nonBlankString(display.documentId).length > 0
-    && Array.isArray(display.nodes);
+  const sparcDisplay = resolveSparcControllerDisplay(
+    isRecord(display) ? display : undefined,
+    '[SPARC][Dialogue]',
+  );
+  return Boolean(
+    sparcDisplay
+      && sparcDisplay.unitType === 'sparc-autotutor-dialogue'
+      && nonBlankString(sparcDisplay.documentId).length > 0
+      && Array.isArray(sparcDisplay.nodes),
+  );
 }
 
 function requireSparcControllerDialogueDisplay(display: unknown): SparcControllerDialogueDisplay | null {
-  if (!isRecord(display) || display.type !== 'sparc' || display.unitType !== 'sparc-autotutor-dialogue') {
+  const sparcDisplay = resolveSparcControllerDisplay(
+    isRecord(display) ? display : undefined,
+    '[SPARC][Dialogue]',
+  );
+  if (!sparcDisplay || sparcDisplay.unitType !== 'sparc-autotutor-dialogue') {
     return null;
   }
-  const documentId = nonBlankString(display.documentId);
+  const documentId = nonBlankString(sparcDisplay.documentId);
   if (!documentId) {
     throw new Error('[SPARC][Dialogue] Controller dialogue display requires documentId');
   }
-  if (!Array.isArray(display.nodes)) {
+  if (!Array.isArray(sparcDisplay.nodes)) {
     throw new Error('[SPARC][Dialogue] Controller dialogue display requires nodes array');
   }
-  return display as unknown as SparcControllerDialogueDisplay;
+  return sparcDisplay as unknown as SparcControllerDialogueDisplay;
 }
 
 function extractDialogueNodeValues(params: {
@@ -138,7 +150,7 @@ function extractDialogueNodeValues(params: {
 export async function commitSparcControllerDialogueSubmit(params: {
   readonly engine: UnitEngineLike | null | undefined;
   readonly currentDisplay: unknown;
-  readonly sparcResult: SparcTrialResult;
+  readonly sparcResult: SparcControllerResult;
   readonly tdfId: unknown;
   readonly sessionId: unknown;
   readonly levelUnit: unknown;
@@ -181,7 +193,7 @@ export async function commitSparcControllerDialogueSubmit(params: {
     sessionID: sessionId,
     documentId: sparcDisplay.documentId,
   });
-  const sparcRuntimeContext = getSparcTrialDisplayRuntimeContext({
+  const sparcRuntimeContext = getSparcControllerRuntimeContext({
     TDFId: tdfId,
     sessionID: sessionId,
     documentId: sparcDisplay.documentId,

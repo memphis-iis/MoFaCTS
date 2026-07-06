@@ -9,7 +9,6 @@ describe('sparcProgressReporter', function() {
     const state = resolveSparcProgressReporterState({
       deliverySettings: { optimalThreshold: 0.8 },
       display: {
-        type: 'sparc',
         nodes: [{
           id: 'group',
           nodeType: 'group',
@@ -33,7 +32,6 @@ describe('sparcProgressReporter', function() {
     const state = resolveSparcProgressReporterState({
       deliverySettings: { optimalThreshold: 0.8 },
       display: {
-        type: 'sparc',
         nodes: [],
         progressReporter: {
           placement: 'sidebar',
@@ -53,7 +51,6 @@ describe('sparcProgressReporter', function() {
         disableProgressReport: true,
       },
       display: {
-        type: 'sparc',
         nodes: [],
         progressReporter: {
           placement: 'sidebar',
@@ -68,7 +65,6 @@ describe('sparcProgressReporter', function() {
 
   it('detects nested panel-selector document progress nodes', function() {
     expect(sparcDisplayHasDocumentProgress({
-      type: 'sparc',
       nodes: [{
         id: 'selector',
         nodeType: 'atomic',

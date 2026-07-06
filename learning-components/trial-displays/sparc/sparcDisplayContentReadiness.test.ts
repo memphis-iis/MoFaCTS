@@ -8,7 +8,6 @@ import {
 describe('sparcDisplayContentReadiness', function() {
   it('accepts a node-authored SPARC display with layout zones and scored intents', function() {
     const display = sparcTrialDisplayAdapter.normalizeDisplay({
-      type: 'sparc',
       schema: 'tutorscript-sparc/1.0',
       layout: {
         zones: [{
@@ -46,7 +45,6 @@ describe('sparcDisplayContentReadiness', function() {
 
   it('reports content readiness issues without knowing any specific lesson', function() {
     const display = sparcTrialDisplayAdapter.normalizeDisplay({
-      type: 'sparc',
       nodes: [{
         id: 'node-group-work',
         nodeType: 'group',
@@ -85,7 +83,6 @@ describe('sparcDisplayContentReadiness', function() {
 
   it('accepts behavior refs and path-scoped intents that point at authored nodes', function() {
     const display = sparcTrialDisplayAdapter.normalizeDisplay({
-      type: 'sparc',
       nodes: [{
         id: 'node-answer',
         nodeType: 'atomic',
@@ -115,7 +112,6 @@ describe('sparcDisplayContentReadiness', function() {
 
   it('reports behavior refs and path intents that point at missing nodes', function() {
     const display = sparcTrialDisplayAdapter.normalizeDisplay({
-      type: 'sparc',
       nodes: [{
         id: 'node-answer',
         nodeType: 'atomic',
@@ -143,7 +139,6 @@ describe('sparcDisplayContentReadiness', function() {
 
   it('rejects unsupported authored production rules without requiring a larger schema', function() {
     const display = sparcTrialDisplayAdapter.normalizeDisplay({
-      type: 'sparc',
       nodes: [{
         id: 'node-answer',
         nodeType: 'atomic',
@@ -160,7 +155,6 @@ describe('sparcDisplayContentReadiness', function() {
 
   it('checks executable production rules for runnable structure and literal node targets', function() {
     const display = sparcTrialDisplayAdapter.normalizeDisplay({
-      type: 'sparc',
       nodes: [{
         id: 'node-answer',
         nodeType: 'atomic',
@@ -199,7 +193,6 @@ describe('sparcDisplayContentReadiness', function() {
 
   it('accepts executable derived fact rules', function() {
     const display = sparcTrialDisplayAdapter.normalizeDisplay({
-      type: 'sparc',
       nodes: [{
         id: 'node-answer',
         nodeType: 'atomic',
@@ -230,7 +223,6 @@ describe('sparcDisplayContentReadiness', function() {
 
   it('rejects malformed derived fact rules before runtime', function() {
     const display = sparcTrialDisplayAdapter.normalizeDisplay({
-      type: 'sparc',
       nodes: [{
         id: 'node-answer',
         nodeType: 'atomic',

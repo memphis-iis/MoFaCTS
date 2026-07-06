@@ -8,14 +8,14 @@ import { createBlazeMount } from './svelte/meteorIntegration';
 import { CardStore } from './modules/cardStore';
 import './card.html';
 
-let CardScreenModule: unknown = null;
+let ContentSurfaceModule: unknown = null;
 
-async function loadCardScreen() {
-  if (!CardScreenModule) {
-    const mod = await import('./svelte/components/CardScreen.svelte');
-    CardScreenModule = mod.default;
+async function loadContentSurface() {
+  if (!ContentSurfaceModule) {
+    const mod = await import('./svelte/components/ContentSurface.svelte');
+    ContentSurfaceModule = mod.default;
   }
-  return CardScreenModule;
+  return ContentSurfaceModule;
 }
 
 function getCardState(key: string) {
@@ -60,21 +60,22 @@ Template.card.onRendered(function (this: CardTemplateInstance) {
       };
     };
 
-    markLaunchLoadingTiming('cardRoute:loadCardScreen:start');
-    loadCardScreen().then((CardScreen) => {
-      markLaunchLoadingTiming('cardRoute:loadCardScreen:complete');
+    // The legacy card route mounts the app-owned content runtime surface.
+    markLaunchLoadingTiming('cardRoute:loadContentSurface:start');
+    loadContentSurface().then((ContentSurface) => {
+      markLaunchLoadingTiming('cardRoute:loadContentSurface:complete');
       if (template.isDestroyed || template.svelteMount || !target.isConnected) return;
       try {
-        template.svelteMount = createBlazeMount(target, CardScreen, {}, getReactiveProps);
+        template.svelteMount = createBlazeMount(target, ContentSurface, {}, getReactiveProps);
       } catch (error) {
         markLaunchLoadingTiming('cardRoute:mount:failed');
         finishLaunchLoading('card-mount-failed');
         clientConsole(1, '[Card Router] Error mounting Svelte component:', error);
       }
     }).catch((error) => {
-      markLaunchLoadingTiming('cardRoute:loadCardScreen:failed');
+      markLaunchLoadingTiming('cardRoute:loadContentSurface:failed');
       finishLaunchLoading('card-chunk-load-failed');
-      clientConsole(1, '[Card Router] Error loading CardScreen chunk:', error);
+      clientConsole(1, '[Card Router] Error loading ContentSurface chunk:', error);
     });
   });
 });

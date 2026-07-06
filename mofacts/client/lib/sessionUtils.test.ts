@@ -13,10 +13,10 @@ import {
   rememberSparcProductionRuleHistoryRecord,
 } from '../views/experiment/svelte/services/sparcProductionRuleHistoryCache';
 import {
-  clearSparcTrialDisplayRuntimeContextCache,
-  getSparcTrialDisplayRuntimeContext,
-} from '../views/experiment/svelte/services/sparcTrialDisplayRuntimeContextCache';
-import type { SparcTrialDisplay } from '../../../learning-components/trial-displays/sparc/SparcTrialDisplayAdapter';
+  clearSparcControllerRuntimeContextCache,
+  getSparcControllerRuntimeContext,
+} from '../views/experiment/svelte/services/sparcControllerRuntimeContextCache';
+import type { SparcControllerDisplay } from '../views/experiment/svelte/services/sparcController';
 import { createEmptySparcReplayState } from '../../../learning-components/units/sparcsession/sparcStateReplay';
 
 describe('sessionUtils mapping cleanup', function() {
@@ -40,7 +40,7 @@ describe('sessionUtils mapping cleanup', function() {
     Session.set('courseAssignmentLaunchContext', null);
     Session.set(LEGACY_SUBMISSION_LOCK_KEY, false);
     clearSparcProductionRuleHistoryCache();
-    clearSparcTrialDisplayRuntimeContextCache();
+    clearSparcControllerRuntimeContextCache();
   });
 
   it('clears mapping and signature session keys via cleanup helper', function() {
@@ -170,12 +170,11 @@ describe('sessionUtils mapping cleanup', function() {
       },
     };
     rememberSparcProductionRuleHistoryRecord(historyRecord);
-    const display: SparcTrialDisplay = {
-      type: 'sparc',
+    const display: SparcControllerDisplay = {
       documentId: 'doc-a',
       nodes: [],
     };
-    const firstContext = getSparcTrialDisplayRuntimeContext({
+    const firstContext = getSparcControllerRuntimeContext({
       TDFId: 'tdf-a',
       sessionID: 'session-a',
       documentId: 'doc-a',
@@ -202,7 +201,7 @@ describe('sessionUtils mapping cleanup', function() {
       sessionID: 'session-a',
       documentId: 'doc-a',
     })).to.deep.equal([]);
-    const rebuiltContext = getSparcTrialDisplayRuntimeContext({
+    const rebuiltContext = getSparcControllerRuntimeContext({
       TDFId: 'tdf-a',
       sessionID: 'session-a',
       documentId: 'doc-a',

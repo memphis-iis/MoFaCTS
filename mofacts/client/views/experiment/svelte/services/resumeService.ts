@@ -57,7 +57,7 @@ import {
 } from '../../../../../common/lib/learnerTdfConfig';
 import { ensureCurrentStimuliSetId } from './mediaResolver';
 import { hydrateSparcProductionRuleHistoryCache } from './sparcProductionRuleHistoryCache';
-import { clearSparcTrialDisplayRuntimeContextCache } from './sparcTrialDisplayRuntimeContextCache';
+import { clearSparcControllerRuntimeContextCache } from './sparcControllerRuntimeContextCache';
 import { isVideoResumeSession, resolveVideoResumeSource } from './videoResume';
 import {
   getEngineIndices,
@@ -1004,7 +1004,7 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
         }
       );
 
-      clearSparcTrialDisplayRuntimeContextCache();
+      clearSparcControllerRuntimeContextCache();
       hydrateSparcProductionRuleHistoryCache(sparcHistoryRows);
 
       clientConsole(2, '[Resume Service] SPARC history replay cache hydrated', {

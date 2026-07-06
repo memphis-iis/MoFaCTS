@@ -20,23 +20,22 @@ import {
   readSparcProductionRuleReplaySession,
 } from '../services/sparcProductionRuleHistoryCache';
 import {
-  getSparcTrialDisplayRuntimeContext,
-} from '../services/sparcTrialDisplayRuntimeContextCache';
+  getSparcControllerRuntimeContext,
+} from '../services/sparcControllerRuntimeContextCache';
+import {
+  evaluateSparcControllerResponse,
+  resolveSparcControllerDisplay,
+  type SparcControllerDisplay,
+  type SparcControllerResult,
+} from '../services/sparcController';
 import {
   SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY,
   collectSparcProgressiveNodeOperations,
 } from '../../../../../../learning-components/trial-displays/sparc/sparcProgressiveNodes';
-import {
-  evaluateSparcTrialDisplayResponse,
-} from '../../../../../../learning-components/trial-displays/sparc/sparcTrialDisplayEvaluation';
 import { CardStore } from '../../modules/cardStore';
 import { fromCallback, fromPromise, type AnyEventObject } from 'xstate';
 import { resolveH5PModelOutcomes } from '../../../../../common/lib/h5pTrialResult';
 import type { H5PTrialResult } from '../../../../../common/types';
-import type {
-  SparcTrialDisplay,
-  SparcTrialResult,
-} from '../../../../../../learning-components/trial-displays/sparc/SparcTrialDisplayAdapter';
 import type {
   SparcTrialDisplayProductionRuleEvaluationResult,
 } from '../../../../../../learning-components/units/sparcsession/sparcTrialDisplayRuntimeBridge';
@@ -67,7 +66,7 @@ interface AnswerEvaluationContext extends ServiceRecord {
   currentAnswer?: string;
   originalAnswer?: string;
   h5pResult?: H5PTrialResult | null;
-  sparcResult?: SparcTrialResult | null;
+  sparcResult?: SparcControllerResult | null;
   engine?: ServiceRecord | null;
   currentDisplay?: {
     type?: string;
@@ -109,18 +108,22 @@ type SparcProductionRuleEvaluationEngineLike = ServiceRecord & {
   ) => SparcTrialDisplayProductionRuleEvaluationResult;
 };
 
-function hasSparcProductionRuleSource(display: AnswerEvaluationContext['currentDisplay']): display is SparcTrialDisplay & {
+function hasSparcProductionRuleSource(display: AnswerEvaluationContext['currentDisplay']): display is SparcControllerDisplay & {
   documentId: string;
 } {
-  const hasDirectRules = Array.isArray(display?.productionRules);
-  if (!display || display.type !== 'sparc' || !hasDirectRules) {
+  if (!display || !Array.isArray(display.nodes)) {
     return false;
   }
-  const documentId = typeof display.documentId === 'string' ? display.documentId.trim() : '';
+  const sparcDisplay = resolveSparcControllerDisplay(display, '[SPARC] Production-rule evaluation');
+  const hasDirectRules = Array.isArray(sparcDisplay?.productionRules);
+  if (!sparcDisplay || !hasDirectRules) {
+    return false;
+  }
+  const documentId = typeof sparcDisplay.documentId === 'string' ? sparcDisplay.documentId.trim() : '';
   if (!documentId) {
     throw new Error('[SPARC] Production-rule display requires documentId');
   }
-  if (!Array.isArray(display.nodes)) {
+  if (!Array.isArray(sparcDisplay.nodes)) {
     throw new Error('[SPARC] Production-rule display requires nodes array');
   }
   return true;
@@ -228,7 +231,7 @@ function evaluateSparcProductionRuleOutcome(context: AnswerEvaluationContext) {
     sessionId: context.sessionId,
     documentId: display.documentId,
   });
-  const sparcRuntimeContext = getSparcTrialDisplayRuntimeContext({
+  const sparcRuntimeContext = getSparcControllerRuntimeContext({
     TDFId: String(context.tdfId),
     sessionID: String(context.sessionId),
     documentId: display.documentId,
@@ -268,8 +271,8 @@ function evaluateSparcNodeIntent(context: AnswerEvaluationContext) {
   if (!context.currentDisplay?.response || !sparcResult) {
     return null;
   }
-  return evaluateSparcTrialDisplayResponse({
-    display: context.currentDisplay,
+  return evaluateSparcControllerResponse({
+    display: context.currentDisplay as SparcControllerDisplay,
     result: sparcResult,
   });
 }
@@ -285,11 +288,11 @@ interface AudioGateContext extends TimedDisplayContext {
 }
 
 /**
- * @typedef {import('./types').CardMachineContext} CardMachineContext
- * @typedef {import('./types').CardMachineEvent} CardMachineEvent
+ * @typedef {import('./types').ContentRuntimeMachineContext} ContentRuntimeMachineContext
+ * @typedef {import('./types').ContentRuntimeMachineEvent} ContentRuntimeMachineEvent
  * @typedef {import('./types').CardSelectionResult} CardSelectionResult
  * @typedef {import('./types').SpeechRecognitionResult} SpeechRecognitionResult
- * @typedef {import('./types').CardMachineActorArgs} CardMachineActorArgs
+ * @typedef {import('./types').ContentRuntimeMachineActorArgs} ContentRuntimeMachineActorArgs
  */
 
 // =============================================================================
@@ -299,8 +302,8 @@ interface AudioGateContext extends TimedDisplayContext {
 /**
  * Select next card from unit engine
  * This is invoked by the machine; returns Promise
- * @param {CardMachineContext} context
- * @param {CardMachineEvent} event
+ * @param {ContentRuntimeMachineContext} context
+ * @param {ContentRuntimeMachineEvent} event
  * @returns {Promise<CardSelectionResult>}
  */
 async function selectNextCard(context: { deliverySettings?: unknown }, _event: unknown) {
@@ -345,8 +348,8 @@ async function selectNextCard(context: { deliverySettings?: unknown }, _event: u
 
 /**
  * Prefetch image to browser cache
- * @param {CardMachineContext} context
- * @param {CardMachineEvent} event
+ * @param {ContentRuntimeMachineContext} context
+ * @param {ContentRuntimeMachineEvent} event
  * @returns {Promise<void>}
  */
 async function prefetchImage(context: { currentDisplay?: { imgSrc?: string } }, _event: unknown) {
@@ -381,8 +384,8 @@ async function prefetchImage(context: { currentDisplay?: { imgSrc?: string } }, 
  * Main trial timeout service
  * Returns a promise that resolves after timeout duration
  * Machine should cancel this service if trial completes early
- * @param {CardMachineContext} context
- * @param {CardMachineEvent} event
+ * @param {ContentRuntimeMachineContext} context
+ * @param {ContentRuntimeMachineEvent} event
  * @returns {Promise<void>}
  */
 function mainCardTimeout(context: TimeoutContextLike, _event: unknown) {
@@ -426,8 +429,8 @@ function mainCardTimeout(context: TimeoutContextLike, _event: unknown) {
 /**
  * Feedback timeout service
  * Auto-advance after feedback display
- * @param {CardMachineContext} context
- * @param {CardMachineEvent} event
+ * @param {ContentRuntimeMachineContext} context
+ * @param {ContentRuntimeMachineEvent} event
  * @returns {Promise<void>}
  */
 function feedbackTimeout(context: TimeoutContextLike, _event: unknown) {
@@ -439,7 +442,7 @@ function feedbackTimeout(context: TimeoutContextLike, _event: unknown) {
   const remaining = getFeedbackTimeoutRemainingMs(context, elapsed, fadeOutDurationMs);
   const timeout = getFeedbackTimeoutDurationMs(context);
 
-  clientConsole(2, '[CardMachine][FeedbackTiming] feedbackTimeout:start', {
+  clientConsole(2, '[ContentRuntimeMachine][FeedbackTiming] feedbackTimeout:start', {
     testType: context.testType,
     isCorrect: context.isCorrect,
     feedbackTimeoutMs: context.feedbackTimeoutMs,
@@ -455,7 +458,7 @@ function feedbackTimeout(context: TimeoutContextLike, _event: unknown) {
 
   return new Promise<void>((resolve) => {
     const timeoutId = setTimeout(() => {
-      clientConsole(2, '[CardMachine][FeedbackTiming] feedbackTimeout:done', {
+      clientConsole(2, '[ContentRuntimeMachine][FeedbackTiming] feedbackTimeout:done', {
         resolvedTimeoutMs: timeout,
         fadeOutDurationMs,
         remainingAtStart: remaining,
@@ -507,8 +510,8 @@ export function getFeedbackTimeoutRemainingMs(
 /**
  * TTS playback service
  * Plays audio or TTS for the current trial
- * @param {CardMachineContext} context
- * @param {CardMachineEvent} event
+ * @param {ContentRuntimeMachineContext} context
+ * @param {ContentRuntimeMachineEvent} event
  * @returns {Promise<void>}
  */
 async function ttsPlayback(_context: unknown, _event: unknown) {
@@ -534,8 +537,8 @@ async function ttsPlayback(_context: unknown, _event: unknown) {
 /**
  * Video player service (for video sessions)
  * Manages video playback and checkpoint rewind
- * @param {CardMachineContext} context
- * @param {CardMachineEvent} event
+ * @param {ContentRuntimeMachineContext} context
+ * @param {ContentRuntimeMachineEvent} event
  * @returns {Promise<void>}
  */
 async function videoPlayer(_context: unknown, _event: unknown) {
@@ -596,7 +599,7 @@ function getFeedbackFadeOutDurationMs(): number {
  */
 export function createServices() {
   /**
-   * @param {(context: CardMachineContext, event: CardMachineEvent) => Promise<unknown>} serviceFn
+   * @param {(context: ContentRuntimeMachineContext, event: ContentRuntimeMachineEvent) => Promise<unknown>} serviceFn
    * @returns {ReturnType<typeof fromPromise>}
    */
   const wrapPromiseService = <TContext extends ServiceRecord, TEvent extends ServiceRecord>(
@@ -619,7 +622,7 @@ export function createServices() {
   });
 
   /**
-   * @param {(context: CardMachineContext, event: CardMachineEvent) => ((send: (event: Record<string, unknown>) => void, receive: (listener: (event: Record<string, unknown>) => void) => void) => (() => void) | void)} serviceFn
+   * @param {(context: ContentRuntimeMachineContext, event: ContentRuntimeMachineEvent) => ((send: (event: Record<string, unknown>) => void, receive: (listener: (event: Record<string, unknown>) => void) => void) => (() => void) | void)} serviceFn
    * @returns {ReturnType<typeof fromCallback>}
    */
   const wrapCallbackService = <TContext extends ServiceRecord, TEvent extends ServiceRecord>(

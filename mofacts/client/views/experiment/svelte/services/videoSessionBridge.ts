@@ -33,7 +33,7 @@ export function createVideoSessionBridge(deps: VideoSessionBridgeDependencies): 
   function handleCheckpoint(detail: { index?: unknown; questionIndex?: unknown }): boolean {
     const { index, questionIndex } = detail || {};
     if (!deps.stateMatches('videoWaiting')) {
-      deps.log(1, '[CardScreen] Rejected video checkpoint outside videoWaiting', {
+      deps.log(1, '[ContentSurface] Rejected video checkpoint outside videoWaiting', {
         state: deps.getCurrentState(),
         index,
         questionIndex,
@@ -45,12 +45,12 @@ export function createVideoSessionBridge(deps: VideoSessionBridgeDependencies): 
       return false;
     }
     if (!Number.isFinite(questionIndex)) {
-      throw new Error('[CardScreen] Video checkpoint missing question index');
+      throw new Error('[ContentSurface] Video checkpoint missing question index');
     }
     const videoCheckpoints = deps.getVideoCheckpoints();
     const checkpointTime = Number(videoCheckpoints?.times?.[index as number]);
     if (!Number.isFinite(checkpointTime)) {
-      throw new Error('[CardScreen] Video checkpoint missing checkpoint time');
+      throw new Error('[ContentSurface] Video checkpoint missing checkpoint time');
     }
 
     deps.setSessionValue('engineIndices', { clusterIndex: questionIndex, stimIndex: 0 });

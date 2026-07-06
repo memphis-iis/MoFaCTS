@@ -47,7 +47,7 @@ export const CARD_RUNTIME_SESSION_KEYS = Object.freeze({
   CURRENT_TDF_FILE: 'currentTdfFile',
   CURRENT_TDF_ID: 'currentTdfId',
 
-  // Owned by history logging; initialized here because the card flow appends to these arrays.
+  // Owned by history logging; initialized here because the content runtime flow appends to these arrays.
   OVERALL_OUTCOME_HISTORY: 'overallOutcomeHistory',
   OVERALL_STUDY_HISTORY: 'overallStudyHistory',
 

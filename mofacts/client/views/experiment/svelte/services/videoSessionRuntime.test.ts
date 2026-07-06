@@ -92,7 +92,7 @@ describe('video session runtime controller', function() {
     expect(harness.preventDefaultCalled).to.equal(true);
     expect(harness.startBlocked).to.equal(true);
     expect(harness.dismissed).to.equal(false);
-    expect(harness.logs[0]?.message).to.equal('[CardScreen] Video instructions continue clicked before player was ready');
+    expect(harness.logs[0]?.message).to.equal('[ContentSurface] Video instructions continue clicked before player was ready');
   });
 
   it('marks instructions continued after synchronous play starts', async function() {
@@ -142,7 +142,7 @@ describe('video session runtime controller', function() {
 
     expect(throwingHarness.controller.handleInstructionContinue()).to.equal(false);
     expect(throwingHarness.startBlocked).to.equal(true);
-    expect(throwingHarness.logs[0]?.message).to.equal('[CardScreen] Video start from instructions threw:');
+    expect(throwingHarness.logs[0]?.message).to.equal('[ContentSurface] Video start from instructions threw:');
     expect(throwingHarness.logs[0]?.details).to.equal('boom');
 
     const rejectingHarness = createHarness({
@@ -157,7 +157,7 @@ describe('video session runtime controller', function() {
 
     expect(rejectingHarness.startBlocked).to.equal(true);
     expect(rejectingHarness.dismissed).to.equal(false);
-    expect(rejectingHarness.logs[0]?.message).to.equal('[CardScreen] Video start from instructions was blocked:');
+    expect(rejectingHarness.logs[0]?.message).to.equal('[ContentSurface] Video start from instructions was blocked:');
     expect(rejectingHarness.logs[0]?.details).to.equal('blocked');
   });
 

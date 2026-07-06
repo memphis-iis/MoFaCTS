@@ -1,5 +1,5 @@
 import { resetSrAttempts as resetSrAttemptsService } from '../services/speechRecognitionService';
-import { assign, type ActionArgs } from './cardMachineActionTypes';
+import { assign, type ActionArgs } from './contentRuntimeMachineActionTypes';
 
 export const incrementSrAttempt = assign({
   audio: ({ context }: ActionArgs) => ({
@@ -51,12 +51,12 @@ export const clearWaitingForTranscription = assign({
 
 export function startRecording({ context: _context, event: _event }: ActionArgs) {
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('cardMachine:startRecording'));
+    window.dispatchEvent(new CustomEvent('contentRuntimeMachine:startRecording'));
   }
 }
 
 export function stopRecording({ context: _context, event: _event }: ActionArgs) {
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('cardMachine:stopRecording'));
+    window.dispatchEvent(new CustomEvent('contentRuntimeMachine:stopRecording'));
   }
 }

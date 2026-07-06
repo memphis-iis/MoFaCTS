@@ -46,14 +46,14 @@ export function getRewindCheckpointTimes(checkpoints: VideoCheckpoints | null | 
     : checkpoints?.times;
 
   if (!Array.isArray(source)) {
-    throw new Error('[CardScreen] Video checkpoints missing rewind times');
+    throw new Error('[ContentSurface] Video checkpoints missing rewind times');
   }
 
   return source
     .map((time, index) => {
       const parsed = Number(time);
       if (!Number.isFinite(parsed)) {
-        throw new Error(`[CardScreen] Video rewind checkpoint time at index ${index} is invalid`);
+        throw new Error(`[ContentSurface] Video rewind checkpoint time at index ${index} is invalid`);
       }
       return parsed;
     })
@@ -62,12 +62,12 @@ export function getRewindCheckpointTimes(checkpoints: VideoCheckpoints | null | 
 
 export function getCheckpointResetIndex(questionTimes: unknown[] | null | undefined, rewindTime: number): number {
   if (!Array.isArray(questionTimes)) {
-    throw new Error('[CardScreen] Video checkpoints missing question times');
+    throw new Error('[ContentSurface] Video checkpoints missing question times');
   }
   const normalizedTimes = questionTimes.map((time, index) => {
     const parsed = Number(time);
     if (!Number.isFinite(parsed)) {
-      throw new Error(`[CardScreen] Video question time at index ${index} is invalid`);
+      throw new Error(`[ContentSurface] Video question time at index ${index} is invalid`);
     }
     return parsed;
   });
@@ -125,7 +125,7 @@ export function createVideoMachineBridge(deps: VideoMachineBridgeDependencies): 
       return;
     }
     if (!deps.stateMatches('videoWaiting')) {
-      deps.log(1, '[CardScreen] Machine video resume command is pending outside videoWaiting', {
+      deps.log(1, '[ContentSurface] Machine video resume command is pending outside videoWaiting', {
         reason,
         state: deps.getCurrentState(),
       });
@@ -137,7 +137,7 @@ export function createVideoMachineBridge(deps: VideoMachineBridgeDependencies): 
 
     const videoPlayer = deps.getVideoPlayer();
     if (!videoPlayer || typeof videoPlayer.resumeAfterQuestion !== 'function') {
-      deps.log(1, '[CardScreen] Machine video resume command is pending before player is ready', {
+      deps.log(1, '[ContentSurface] Machine video resume command is pending before player is ready', {
         reason,
         hasVideoPlayer: !!videoPlayer,
       });
@@ -180,20 +180,20 @@ export function createVideoMachineBridge(deps: VideoMachineBridgeDependencies): 
       return;
     }
     if (!Number.isFinite(checkpointIndex)) {
-      throw new Error('[CardScreen] Video answer missing checkpoint index');
+      throw new Error('[ContentSurface] Video answer missing checkpoint index');
     }
     const numericCheckpointIndex = Number(checkpointIndex);
     if (!videoCheckpoints || !Array.isArray(videoCheckpoints.times)) {
-      throw new Error('[CardScreen] Video checkpoints not initialized');
+      throw new Error('[ContentSurface] Video checkpoints not initialized');
     }
     if (!videoPlayer) {
-      throw new Error('[CardScreen] Video player missing for rewind');
+      throw new Error('[ContentSurface] Video player missing for rewind');
     }
 
     const currentTime = videoPlayer.getCurrentTime?.() ?? 0;
     const currentQuestionTime = Number(videoCheckpoints.times[numericCheckpointIndex]);
     if (!Number.isFinite(currentQuestionTime)) {
-      throw new Error('[CardScreen] Video checkpoint time is invalid for rewind');
+      throw new Error('[ContentSurface] Video checkpoint time is invalid for rewind');
     }
 
     const checkpointTimes = [0, ...getRewindCheckpointTimes(videoCheckpoints)]

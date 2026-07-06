@@ -1,5 +1,5 @@
 import type { H5PTrialResult } from '../../../../../common/types';
-import type { SparcTrialResult } from '../../../../../../learning-components/trial-displays/sparc/SparcTrialDisplayAdapter';
+import type { SparcControllerResult } from './sparcController';
 
 export type TrialDisplaySubmitEvent =
   | {
@@ -14,7 +14,7 @@ export type TrialDisplaySubmitEvent =
       userAnswer: '__SPARC_COMPLETED__';
       timestamp: number;
       source: 'sparc';
-      sparcResult: SparcTrialResult;
+      sparcResult: SparcControllerResult;
     };
 
 type ResolveH5PResult = (
@@ -27,7 +27,7 @@ type ResolveSparcResult = (
   display: Record<string, unknown> | undefined,
   result: unknown,
   source: string,
-) => SparcTrialResult | null;
+) => SparcControllerResult | null;
 
 export type TrialDisplaySubmissionController = {
   handleH5PResult(detail: unknown): void;
@@ -38,7 +38,7 @@ export type TrialDisplaySubmissionController = {
 export function createTrialDisplaySubmissionController({
   getCurrentDisplay,
   h5pOwnsResponse,
-  sparcOwnsResponse,
+  sparcSessionOwnsResponse,
   resolveH5PResult,
   resolveSparcResult,
   now,
@@ -46,7 +46,7 @@ export function createTrialDisplaySubmissionController({
 }: {
   getCurrentDisplay: () => Record<string, unknown> | undefined;
   h5pOwnsResponse: () => boolean;
-  sparcOwnsResponse: () => boolean;
+  sparcSessionOwnsResponse: () => boolean;
   resolveH5PResult: ResolveH5PResult;
   resolveSparcResult: ResolveSparcResult;
   now: () => number;
@@ -72,9 +72,9 @@ export function createTrialDisplaySubmissionController({
     if (submittedH5PResultKey) {
       return;
     }
-    const h5pResult = resolveH5PResult(getCurrentDisplay(), detail || {}, '[CardScreen]');
+    const h5pResult = resolveH5PResult(getCurrentDisplay(), detail || {}, '[ContentSurface]');
     if (!h5pResult) {
-      throw new Error('[CardScreen] H5P result received for non-H5P display');
+      throw new Error('[ContentSurface] H5P result received for non-H5P display');
     }
     submittedH5PResultKey = h5pResult.batchId;
     submit({
@@ -87,12 +87,12 @@ export function createTrialDisplaySubmissionController({
   }
 
   function handleSparcSubmit(detail: unknown): void {
-    if (!sparcOwnsResponse()) {
+    if (!sparcSessionOwnsResponse()) {
       return;
     }
-    const sparcResult = resolveSparcResult(getCurrentDisplay(), detail || {}, '[CardScreen]');
+    const sparcResult = resolveSparcResult(getCurrentDisplay(), detail || {}, '[ContentSurface]');
     if (!sparcResult) {
-      throw new Error('[CardScreen] SPARC result received for non-SPARC display');
+      throw new Error('[ContentSurface] SPARC result received for non-SPARC display');
     }
     const resultKey = `${sparcResult.timestamp}:${sparcResult.triggeredBy || ''}`;
     if (submittedSparcResultKey === resultKey) {

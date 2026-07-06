@@ -1,18 +1,18 @@
 import { assign as xAssign } from 'xstate';
 import { clientConsole } from '../../../../lib/clientLogger';
 import type {
-  CardMachineContext,
+  ContentRuntimeMachineContext,
   CardSelectionDoneArgs,
   PreparedAdvanceDoneArgs,
   PreparedAdvanceResult,
-} from './cardMachineTypes';
+} from './contentRuntimeMachineTypes';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Matches cardMachine's XState v5 assign typing workaround.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Matches contentRuntimeMachine's XState v5 assign typing workaround.
 const assign: any = xAssign;
 
 export type PreparedQuestionIndexRoute = 'schedule-live-index' | 'context-counter';
 
-export function getPreparedTrial(context: CardMachineContext): PreparedAdvanceResult | null {
+export function getPreparedTrial(context: ContentRuntimeMachineContext): PreparedAdvanceResult | null {
   return context.preparedTrial || null;
 }
 
@@ -22,8 +22,8 @@ export function resolvePreparedQuestionIndexRoute(engine: { unitType?: string } 
     : 'context-counter';
 }
 
-export function isFeedbackAdvanceReady(context: CardMachineContext): boolean {
-  clientConsole(2, '[CardMachine][FeedbackAdvanceReady]', {
+export function isFeedbackAdvanceReady(context: ContentRuntimeMachineContext): boolean {
+  clientConsole(2, '[ContentRuntimeMachine][FeedbackAdvanceReady]', {
     incomingPreparationComplete: context.incomingPreparationComplete,
     unitFinished: context.unitFinished,
     hasPreparedTrial: !!context.preparedTrial,
@@ -70,7 +70,7 @@ export const markIncomingReady = assign({
 });
 
 export function resolveSelectedQuestionIndex(
-  context: CardMachineContext,
+  context: ContentRuntimeMachineContext,
   event: CardSelectionDoneArgs['event'],
 ): number {
   const outputQuestionIndex = event.output?.questionIndex;
@@ -90,7 +90,7 @@ export function resolveSelectedQuestionIndex(
     : (context.questionIndex || 1);
 }
 
-export function resolvePreparedQuestionIndex(context: CardMachineContext): number {
+export function resolvePreparedQuestionIndex(context: ContentRuntimeMachineContext): number {
   const preparedQuestionIndex = getPreparedTrial(context)?.questionIndex;
   const preparedEngine = getPreparedTrial(context)?.engine as { unitType?: string } | undefined;
   const contextEngine = context.engine as { unitType?: string } | undefined;

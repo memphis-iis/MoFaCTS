@@ -1,12 +1,11 @@
 import { expect } from 'chai';
-import type { SparcTrialDisplay } from '../../../../../../learning-components/trial-displays/sparc/SparcTrialDisplayAdapter';
+import type { SparcControllerDisplay } from './sparcController';
 import type { SparcUtteranceRequest } from '../../../../../../learning-components/units/sparcsession/sparcUtteranceRequest';
 import { requireActiveSparcMoveDefinition } from '../../../../../../learning-components/units/sparcsession/sparcMoveDefinitions';
 import { createSparcDialogueOpenRouterProvider } from './sparcControllerDialogueOpenRouter.ts';
 
-function dialogueDisplay(): SparcTrialDisplay {
+function dialogueDisplay(): SparcControllerDisplay {
   return {
-    type: 'sparc',
     documentId: 'dialogue-doc',
     nodes: [],
     clusterTargets: [{

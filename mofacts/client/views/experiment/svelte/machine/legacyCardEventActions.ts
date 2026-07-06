@@ -1,4 +1,4 @@
-import { assign, type ActionArgs } from './cardMachineActionTypes';
+import { assign, type ActionArgs } from './contentRuntimeMachineActionTypes';
 
 export const loadCardData = assign({
   currentDisplay: ({ event }: ActionArgs) => event?.display,

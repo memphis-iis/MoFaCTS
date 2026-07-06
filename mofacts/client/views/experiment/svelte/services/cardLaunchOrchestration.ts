@@ -107,7 +107,7 @@ export async function runCardLaunchOrchestration(
       errorMessage: errorMessage(error),
       errorStack: errorStack(error),
     });
-    deps.log(1, '[CardScreen] initializeSvelteCard failed', diagnostic);
+    deps.log(1, '[ContentSurface] initializeSvelteCard failed', diagnostic);
     deps.routeInitializationFailure();
     return { status: 'failed', stage: 'initializeSvelteCard' };
   }
@@ -122,7 +122,7 @@ export async function runCardLaunchOrchestration(
   if (!ready) {
     const diagnostic = deps.buildReadinessDiagnostic();
     deps.setFailureDiagnostic('cardReadinessTimeout', diagnostic);
-    deps.log(1, '[CardScreen] Readiness timeout before machine start', diagnostic);
+    deps.log(1, '[ContentSurface] Readiness timeout before machine start', diagnostic);
     deps.routeInitializationFailure();
     return { status: 'failed', stage: 'cardReadinessTimeout' };
   }

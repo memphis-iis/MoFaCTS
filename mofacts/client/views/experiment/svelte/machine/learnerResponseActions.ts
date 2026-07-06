@@ -1,24 +1,24 @@
 import type { H5PTrialResult } from '../../../../../common/types';
-import type { SparcTrialResult } from '../../../../../../learning-components/trial-displays/sparc/SparcTrialDisplayAdapter';
+import type { SparcControllerResult } from '../services/sparcController';
 import { getStimAnswerDisplayCase } from '../../../../lib/currentTestingHelpers';
-import { assign, type ActionArgs, type ActionEvent } from './cardMachineActionTypes';
+import { assign, type ActionArgs, type ActionEvent } from './contentRuntimeMachineActionTypes';
 
 function getH5PSubmitResult(event?: ActionEvent): H5PTrialResult | null {
   if (event?.source !== 'h5p') {
     return null;
   }
   if (!event.h5pResult) {
-    throw new Error('[CardMachine] H5P submit event missing h5pResult');
+    throw new Error('[ContentRuntimeMachine] H5P submit event missing h5pResult');
   }
   return event.h5pResult;
 }
 
-function getSparcSubmitResult(event?: ActionEvent): SparcTrialResult | null {
+function getSparcSubmitResult(event?: ActionEvent): SparcControllerResult | null {
   if (event?.source !== 'sparc') {
     return null;
   }
   if (!event.sparcResult) {
-    throw new Error('[CardMachine] SPARC submit event missing sparcResult');
+    throw new Error('[ContentRuntimeMachine] SPARC submit event missing sparcResult');
   }
   return event.sparcResult;
 }

@@ -4,7 +4,6 @@ import { sparcTrialDisplayAdapter } from './SparcTrialDisplayAdapter';
 describe('SparcTrialDisplayAdapter progress reporter', function() {
   it('normalizes sidebar progress reporter configuration', function() {
     const display = sparcTrialDisplayAdapter.normalizeDisplay({
-      type: 'sparc',
       nodes: [],
       progressReporter: {
         placement: 'sidebar',
@@ -28,7 +27,6 @@ describe('SparcTrialDisplayAdapter progress reporter', function() {
   it('rejects invalid progress reporter placement', function() {
     assert.throws(
       () => sparcTrialDisplayAdapter.normalizeDisplay({
-        type: 'sparc',
         nodes: [],
         progressReporter: {
           placement: 'skillRail',

@@ -53,7 +53,7 @@ export function createCardUnitContinuationController(
           continuing: false,
         };
         publish();
-        log(1, '[CardScreen] Failed to continue to next unit:', error);
+        log(1, '[ContentSurface] Failed to continue to next unit:', error);
         return false;
       }
     },

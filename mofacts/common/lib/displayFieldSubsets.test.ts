@@ -33,9 +33,8 @@ describe('display field subsets', function() {
     });
   });
 
-  it('does not strip structured SPARC displays through legacy subset settings', function() {
+  it('does not strip structured SPARC page displays through subset settings', function() {
     const sparcDisplay = {
-      type: 'sparc',
       schema: 'tutorscript-sparc/1.0',
       layout: { zones: [{ id: 'main' }] },
       nodes: [{ id: 'node-1', nodeType: 'atomic', atomType: 'text', value: 'Prompt' }],

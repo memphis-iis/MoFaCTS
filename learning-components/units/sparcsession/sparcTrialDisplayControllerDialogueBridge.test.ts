@@ -19,7 +19,6 @@ function fact(factType: string, slots: Record<string, unknown>): SparcWorkingMem
 
 function dialogueDisplay(): SparcTrialDisplay {
   return {
-    type: 'sparc',
     documentId: 'dialogue-doc',
     nodes: [{
       id: 'dialogue-thread',

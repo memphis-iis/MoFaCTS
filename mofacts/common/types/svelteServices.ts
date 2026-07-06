@@ -4,6 +4,8 @@
 import type { H5PTrialResult } from './h5p';
 import type { SparcTrialResult } from '../../../learning-components/trial-displays/sparc/SparcTrialDisplayAdapter';
 
+export type SparcControllerResult = SparcTrialResult;
+
 export type UnitType = 'schedule' | 'video' | 'model' | 'sparc' | 'autotutor' | 'instruction-only';
 
 export type VideoCheckpointBehavior = 'none' | 'pause' | 'all' | 'some' | 'adaptive';
@@ -238,7 +240,7 @@ export interface HistoryLoggingContext {
   feedbackText?: string;
   feedbackSuppressed?: boolean;
   h5pResult?: H5PTrialResult | null;
-  sparcResult?: SparcTrialResult | null;
+  sparcResult?: SparcControllerResult | null;
 }
 
 export interface HistoryLoggingEvent {

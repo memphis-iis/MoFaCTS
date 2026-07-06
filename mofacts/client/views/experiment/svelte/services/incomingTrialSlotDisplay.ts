@@ -1,26 +1,26 @@
 import { buildIncomingTrialSlotKey } from './incomingTrialSlotController';
 import {
-  buildTrialContentProps,
-  type TrialContentDeliverySettings,
-  type TrialContentPropsBuildResult,
-  type TrialLikeForContentProps,
-} from './trialContentProps';
+  buildFlashcardControllerProps,
+  type FlashcardControllerDeliverySettings,
+  type FlashcardControllerPropsBuildResult,
+  type TrialLikeForFlashcardControllerProps,
+} from './flashcardControllerProps';
 
 export interface IncomingTrialSlotDisplaySnapshot {
   readonly expectedFeedbackBlockerSrc: string;
   readonly expectedStimulusBlockerSrc: string;
   readonly preparedSubsetKind: 'none' | 'question' | 'study';
-  readonly slot: TrialContentPropsBuildResult | null;
+  readonly slot: FlashcardControllerPropsBuildResult | null;
   readonly slotKey: string;
 }
 
 export interface IncomingTrialSlotDisplayInput {
   readonly defaultInputMode: string;
-  readonly deliverySettings: TrialContentDeliverySettings;
+  readonly deliverySettings: FlashcardControllerDeliverySettings;
   readonly formatAnswerText: (answer: string) => string;
   readonly layoutMode: unknown;
   readonly performanceCurrentTrial: unknown;
-  readonly preparedTrial: (TrialLikeForContentProps & {
+  readonly preparedTrial: (TrialLikeForFlashcardControllerProps & {
     readonly testType?: unknown;
     readonly questionIndex?: unknown;
   }) | null | undefined;
@@ -43,7 +43,7 @@ export function buildIncomingTrialSlotDisplaySnapshot(
 ): IncomingTrialSlotDisplaySnapshot {
   const kind = preparedSubsetKind(input.preparedTrial);
   const slot = input.preparedTrial
-    ? buildTrialContentProps({
+    ? buildFlashcardControllerProps({
         defaultInputMode: input.defaultInputMode,
         deliverySettings: input.deliverySettings,
         formatAnswerText: input.formatAnswerText,

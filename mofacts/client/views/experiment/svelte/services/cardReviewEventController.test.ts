@@ -62,7 +62,7 @@ describe('card review event controller', function() {
     }]);
     expect(harness.logs[0]).to.deep.equal({
       level: 2,
-      message: '[CardScreen][StudyReveal] started',
+      message: '[ContentSurface][StudyReveal] started',
       details: {
         subsetKind: 'study',
         transitionDurationMs: 100,
@@ -81,7 +81,7 @@ describe('card review event controller', function() {
       type: EVENTS.REVIEW_REVEAL_STARTED,
       timestamp: 1234,
     }]);
-    expect(harness.logs[0]!.message).to.equal('[CardScreen][ReviewReveal] started');
+    expect(harness.logs[0]!.message).to.equal('[ContentSurface][ReviewReveal] started');
   });
 
   it('ignores reveal events outside preparing states and in test mode', function() {

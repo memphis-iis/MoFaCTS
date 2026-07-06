@@ -95,21 +95,21 @@ export function createCardRuntimeWindowEventController(
 
     add(
       deps.windowTarget,
-      'cardMachine:startRecording',
+      'contentRuntimeMachine:startRecording',
       createRecordingCommandHandler(deps.startRecording, deps.log, 'startRecording'),
     );
     add(
       deps.windowTarget,
-      'cardMachine:stopRecording',
+      'contentRuntimeMachine:stopRecording',
       createRecordingCommandHandler(deps.stopRecording, deps.log, 'stopRecording'),
     );
-    add(deps.windowTarget, 'cardMachine:displayAnswer', (event) => {
+    add(deps.windowTarget, 'contentRuntimeMachine:displayAnswer', (event) => {
       deps.setStudyInteractionText(String(eventDetail(event).answer || '').trim());
     });
-    add(deps.windowTarget, 'cardMachine:resumeVideo', () => {
-      deps.requestVideoResume('cardMachine:resumeVideo');
+    add(deps.windowTarget, 'contentRuntimeMachine:resumeVideo', () => {
+      deps.requestVideoResume('contentRuntimeMachine:resumeVideo');
     });
-    add(deps.windowTarget, 'cardMachine:videoAnswer', (event) => {
+    add(deps.windowTarget, 'contentRuntimeMachine:videoAnswer', (event) => {
       deps.handleVideoAnswer(eventDetail(event));
     });
     add(deps.windowTarget, 'pagehide', () => {
@@ -124,7 +124,7 @@ export function createCardRuntimeWindowEventController(
       if (deps.documentTarget?.visibilityState === 'hidden') {
         deps.cleanupAudioRecorder();
       } else if (deps.documentTarget?.visibilityState === 'visible') {
-        deps.log(2, '[CardScreen] visibilitychange visible; preserving card flow for mobile interruption recovery');
+        deps.log(2, '[ContentSurface] visibilitychange visible; preserving content runtime flow for mobile interruption recovery');
       }
       void deps.syncScreenWakeLock('visibilitychange');
     });
