@@ -237,7 +237,7 @@
 
   .learning-progress-bars {
     position: absolute;
-    inset: 0;
+    inset: 0 var(--progress-scrollbar-gutter) 0 0;
     z-index: 1;
     overflow-x: hidden;
     overflow-y: auto;

@@ -46,9 +46,9 @@ export function createTrialDisplaySubmissionController({
 }: {
   getCurrentDisplay: () => Record<string, unknown> | undefined;
   h5pOwnsResponse: () => boolean;
-  sparcSessionOwnsResponse: () => boolean;
+  sparcSessionOwnsResponse?: () => boolean;
   resolveH5PResult: ResolveH5PResult;
-  resolveSparcResult: ResolveSparcResult;
+  resolveSparcResult?: ResolveSparcResult;
   now: () => number;
   submit: (event: TrialDisplaySubmitEvent) => void;
 }): TrialDisplaySubmissionController {
@@ -87,7 +87,7 @@ export function createTrialDisplaySubmissionController({
   }
 
   function handleSparcSubmit(detail: unknown): void {
-    if (!sparcSessionOwnsResponse()) {
+    if (!sparcSessionOwnsResponse?.() || !resolveSparcResult) {
       return;
     }
     const sparcResult = resolveSparcResult(getCurrentDisplay(), detail || {}, '[ContentSurface]');

@@ -1,6 +1,17 @@
 <script>
   import { createEventDispatcher, tick } from 'svelte';
-  import { resolveSparcControllerDisplay } from '../services/sparcController';
+  import {
+    resolveSparcControllerDisplay,
+    resolveSparcControllerResult,
+  } from '../services/sparcController';
+  import {
+    commitSparcControllerDialogueSubmit,
+    isSparcControllerDialogueDisplay,
+  } from '../services/sparcControllerDialogueCommit';
+  import {
+    createSparcDialogueOpenRouterProvider,
+  } from '../services/sparcControllerDialogueOpenRouter';
+  import { commitSparcProductionRuleAction } from '../services/sparcProductionRuleActionCommit';
   import { buildSparcBoxedNodeGroups } from '../../../../../../learning-components/trial-displays/sparc/sparcBoxLayout';
   import {
     SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY,
@@ -14,6 +25,10 @@
 
   export let display = {};
   export let adminDiagnosticMode = false;
+  export let engine = null;
+  export let tdfId = '';
+  export let sessionId = '';
+  export let levelUnit = null;
   export let runtimeNodeValues = {};
   export let learningProgressSnapshot = null;
   export let showQuestionNumber = false;
@@ -216,7 +231,7 @@
     if (value === undefined || value === null || value === '') {
       return;
     }
-    dispatch('sparcaction', {
+    void handleSparcAction({
       submittedNodes: {
         [nodeId]: value,
       },
@@ -246,7 +261,7 @@
       ? { [node.id]: node.value ?? node.submitValue ?? buttonLabel(node) }
       : {};
     if (!isSubmitButton(node)) {
-      dispatch('sparcaction', {
+      void handleSparcAction({
         submittedNodes: buttonSubmission,
         triggeredBy: node?.id,
         focusedNodeId: activeNodeId || undefined,
@@ -254,7 +269,7 @@
       });
       return;
     }
-    dispatch('sparcsubmit', {
+    void handleSparcSubmit({
       submittedNodes: hasProductionRules()
         ? {
             ...collectDefaultSubmissionValues(sparcDisplay?.nodes),
@@ -290,7 +305,7 @@
       ...nodeValues,
       [nodeId]: learnerText,
     };
-    dispatch('sparcsubmit', {
+    void handleSparcSubmit({
       submittedNodes: {
         ...collectDefaultSubmissionValues(sparcDisplay?.nodes),
         ...collectAnswerSubmissionValues({
@@ -320,7 +335,7 @@
     if (authoringSelectOnly) {
       return;
     }
-    dispatch('sparcaction', {
+    void handleSparcAction({
       submittedNodes: {},
       triggeredBy: nodeId,
       eventType: 'focus-changed',
@@ -335,6 +350,201 @@
   function getProgressiveNodeOperations(values = {}) {
     const operations = values?.[SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY];
     return Array.isArray(operations) ? operations : [];
+  }
+
+  function describeSparcBoundaryContext(candidateDisplay, source) {
+    const displayRecord = candidateDisplay && typeof candidateDisplay === 'object' ? candidateDisplay : {};
+    const documentId = typeof displayRecord.documentId === 'string' && displayRecord.documentId.trim()
+      ? displayRecord.documentId.trim()
+      : 'missing';
+    return `${source}; documentId=${documentId}; tdfId=${tdfId || 'missing'}; unit=${levelUnit ?? 'missing'}; hasSessionId=${Boolean(sessionId)}`;
+  }
+
+  function currentSparcProgressiveNodeOperations() {
+    const operations = runtimeNodeValues?.[SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY];
+    return Array.isArray(operations) ? operations : [];
+  }
+
+  function buildOptimisticDialogueLearnerOperations(candidateDisplay, sparcResult) {
+    if (!isSparcControllerDialogueDisplay(candidateDisplay)) {
+      return [];
+    }
+    const learnerText = String(sparcResult?.submittedNodes?.['learner-response-input'] ?? '').trim();
+    if (!learnerText) {
+      return [];
+    }
+    const eventId = `optimistic:${sparcResult.timestamp}:${sparcResult.triggeredBy || 'submit'}`;
+    return [{
+      type: 'append-node-if-missing',
+      boxId: 'dialogue-flow',
+      node: {
+        id: `${eventId}:learner`,
+        nodeType: 'atomic',
+        atomType: 'dialogue-utterance',
+        speaker: 'learner',
+        value: learnerText,
+        turnEventId: eventId,
+        optimistic: true,
+      },
+    }];
+  }
+
+  function dispatchRuntimeEvent(event) {
+    dispatch('runtimeevent', event);
+  }
+
+  function dispatchSparcNodeValues(sparcNodeValues, timestamp) {
+    if (Object.keys(sparcNodeValues).length === 0) {
+      return;
+    }
+    dispatchRuntimeEvent({
+      type: 'SPARC_ACTION',
+      timestamp,
+      sparcNodeValues,
+    });
+  }
+
+  function sendSparcProgressiveNodeOperations(operations, timestamp) {
+    dispatchSparcNodeValues({
+      [SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY]: operations,
+    }, timestamp);
+  }
+
+  function currentSparcControllerDisplay(source) {
+    if (!display) {
+      throw new Error(describeSparcBoundaryContext(display, `${source} SPARC session is missing controller display`));
+    }
+    const resolvedDisplay = resolveSparcControllerDisplay(display, source);
+    if (!resolvedDisplay) {
+      throw new Error(describeSparcBoundaryContext(display, `${source} SPARC session has invalid controller display`));
+    }
+    return resolvedDisplay;
+  }
+
+  async function handleSparcAction(detail) {
+    if (subsetKind !== 'question') {
+      return;
+    }
+    const currentDisplay = currentSparcControllerDisplay('[SparcSessionSurface] SPARC action');
+    if (isSparcControllerDialogueDisplay(currentDisplay)) {
+      return;
+    }
+    const documentId = typeof currentDisplay.documentId === 'string' ? currentDisplay.documentId.trim() : '';
+    const hasProductionRuleSource = Array.isArray(currentDisplay.productionRules);
+    if (!documentId || !hasProductionRuleSource) {
+      return;
+    }
+    const sparcResult = resolveSparcControllerResult(currentDisplay, detail || {}, '[SparcSessionSurface]');
+    if (!sparcResult) {
+      throw new Error(describeSparcBoundaryContext(currentDisplay, '[SparcSessionSurface] SPARC action received for non-SPARC display'));
+    }
+    const { sparcNodeValues } = await commitSparcProductionRuleAction({
+      engine,
+      currentDisplay,
+      sparcResult,
+      tdfId,
+      sessionId,
+      levelUnit,
+    });
+    dispatch('runtimewatchedstatechanged');
+    dispatchSparcNodeValues(sparcNodeValues, sparcResult.timestamp);
+  }
+
+  async function commitSparcSubmitProductionRules(detail) {
+    if (subsetKind !== 'question') {
+      return { canSubmit: true };
+    }
+    const currentDisplay = currentSparcControllerDisplay('[SparcSessionSurface] SPARC submit');
+    if (isSparcControllerDialogueDisplay(currentDisplay)) {
+      const sparcResult = resolveSparcControllerResult(currentDisplay, detail || {}, '[SparcSessionSurface]');
+      if (!sparcResult) {
+        throw new Error(describeSparcBoundaryContext(currentDisplay, '[SparcSessionSurface] SPARC dialogue submit received for non-SPARC display'));
+      }
+      const provider = createSparcDialogueOpenRouterProvider({
+        tdfId: typeof tdfId === 'string' ? tdfId : null,
+      });
+      const priorProgressiveOperations = currentSparcProgressiveNodeOperations();
+      const optimisticOperations = buildOptimisticDialogueLearnerOperations(currentDisplay, sparcResult);
+      if (optimisticOperations.length > 0) {
+        sendSparcProgressiveNodeOperations([
+          ...priorProgressiveOperations,
+          ...optimisticOperations,
+        ], sparcResult.timestamp);
+      }
+      let result;
+      try {
+        result = await commitSparcControllerDialogueSubmit({
+          engine,
+          currentDisplay,
+          sparcResult,
+          tdfId,
+          sessionId,
+          levelUnit,
+          scoreLearnerResponse: provider.scoreLearnerResponse,
+          generateTutorUtterance: provider.generateTutorUtterance,
+        });
+      } catch (error) {
+        if (optimisticOperations.length > 0) {
+          sendSparcProgressiveNodeOperations(priorProgressiveOperations, sparcResult.timestamp);
+        }
+        throw error;
+      }
+      dispatch('runtimewatchedstatechanged');
+      dispatchSparcNodeValues(result.sparcNodeValues, sparcResult.timestamp);
+      return { canSubmit: false, dialogueSubmit: true };
+    }
+    const documentId = typeof currentDisplay.documentId === 'string' ? currentDisplay.documentId.trim() : '';
+    const hasProductionRuleSource = Array.isArray(currentDisplay.productionRules);
+    if (!documentId || !hasProductionRuleSource) {
+      return { canSubmit: true, productionRuleSubmit: false };
+    }
+    const sparcResult = resolveSparcControllerResult(currentDisplay, detail || {}, '[SparcSessionSurface]');
+    if (!sparcResult) {
+      throw new Error(describeSparcBoundaryContext(currentDisplay, '[SparcSessionSurface] SPARC submit received for non-SPARC display'));
+    }
+    const triggeredBy = typeof sparcResult.triggeredBy === 'string' ? sparcResult.triggeredBy : '';
+    const submittedNodes = triggeredBy && Object.prototype.hasOwnProperty.call(sparcResult.submittedNodes, triggeredBy)
+      ? { [triggeredBy]: sparcResult.submittedNodes[triggeredBy] }
+      : sparcResult.submittedNodes;
+    const result = await commitSparcProductionRuleAction({
+      engine,
+      currentDisplay,
+      sparcResult: {
+        ...sparcResult,
+        submittedNodes,
+      },
+      tdfId,
+      sessionId,
+      levelUnit,
+    });
+    dispatch('runtimewatchedstatechanged');
+    dispatchSparcNodeValues(result.sparcNodeValues, sparcResult.timestamp);
+    return {
+      canSubmit: result.classifications.includes('correct'),
+      productionRuleSubmit: true,
+    };
+  }
+
+  async function handleSparcSubmit(detail) {
+    const { canSubmit, productionRuleSubmit } = await commitSparcSubmitProductionRules(detail);
+    if (!canSubmit) {
+      return;
+    }
+    if (productionRuleSubmit) {
+      dispatch('forceadvance', { reason: 'SPARC Done' });
+      return;
+    }
+    const sparcResult = resolveSparcControllerResult(display, detail || {}, '[SparcSessionSurface]');
+    if (!sparcResult) {
+      throw new Error(describeSparcBoundaryContext(display, '[SparcSessionSurface] SPARC result received for non-SPARC display'));
+    }
+    dispatchRuntimeEvent({
+      type: 'SUBMIT',
+      userAnswer: '__SPARC_COMPLETED__',
+      timestamp: sparcResult.timestamp,
+      source: 'sparc',
+      sparcResult,
+    });
   }
 
   function isVerticallyScrollable(element) {

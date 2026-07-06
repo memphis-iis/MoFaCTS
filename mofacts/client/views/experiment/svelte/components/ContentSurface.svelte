@@ -70,24 +70,8 @@
     resolveH5PTrialDisplayResult,
     selfHostedH5PTrialDisplayOwnsInteraction,
   } from '../services/h5pTrialDisplay';
-  import {
-    resolveSparcControllerDisplay,
-    resolveSparcControllerResult,
-  } from '../services/sparcController';
-  import {
-    commitSparcControllerDialogueSubmit,
-    isSparcControllerDialogueDisplay,
-  } from '../services/sparcControllerDialogueCommit';
-  import {
-    SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY,
-  } from '../../../../../../learning-components/trial-displays/sparc/sparcProgressiveNodes';
-  import {
-    createSparcDialogueOpenRouterProvider,
-  } from '../services/sparcControllerDialogueOpenRouter';
-  import { commitSparcProductionRuleAction } from '../services/sparcProductionRuleActionCommit';
   import { createTrialDisplaySubmissionController } from '../services/trialDisplaySubmission';
   import { createLearningProgressRuntimeController } from '../services/learningProgressPanelRuntime';
-  import { resolveSparcProgressReporterState } from '../services/sparcProgressReporter';
   import {
     notifyLearningProgressLayoutChange,
   } from '../services/learningProgressPanelViewport';
@@ -237,200 +221,13 @@
   const trialDisplaySubmissionController = createTrialDisplaySubmissionController({
     getCurrentDisplay: () => context.currentDisplay,
     h5pOwnsResponse: () => h5pOwnsResponse,
-    sparcSessionOwnsResponse: () => sparcSessionOwnsCurrentResponse,
     resolveH5PResult: resolveH5PTrialDisplayResult,
-    resolveSparcResult: resolveSparcControllerResult,
     now: () => Date.now(),
     submit: send,
   });
 
-  function describeSparcBoundaryContext(display, source) {
-    const displayRecord = display && typeof display === 'object' ? display : {};
-    const documentId = typeof displayRecord.documentId === 'string' && displayRecord.documentId.trim()
-      ? displayRecord.documentId.trim()
-      : 'missing';
-    return `${source}; documentId=${documentId}; tdfId=${context.tdfId || 'missing'}; unit=${context.unitId ?? 'missing'}; hasSessionId=${Boolean(context.sessionId)}`;
-  }
-
   function adminDiagnosticModeEnabled() {
     return currentUserHasRole('admin');
-  }
-
-  function currentSparcProgressiveNodeOperations() {
-    const operations = context.sparcNodeValues?.[SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY];
-    return Array.isArray(operations) ? operations : [];
-  }
-
-  function buildOptimisticDialogueLearnerOperations(display, sparcResult) {
-    if (!isSparcControllerDialogueDisplay(display)) {
-      return [];
-    }
-    const learnerText = String(sparcResult?.submittedNodes?.['learner-response-input'] ?? '').trim();
-    if (!learnerText) {
-      return [];
-    }
-    const eventId = `optimistic:${sparcResult.timestamp}:${sparcResult.triggeredBy || 'submit'}`;
-    return [{
-      type: 'append-node-if-missing',
-      boxId: 'dialogue-flow',
-      node: {
-        id: `${eventId}:learner`,
-        nodeType: 'atomic',
-        atomType: 'dialogue-utterance',
-        speaker: 'learner',
-        value: learnerText,
-        turnEventId: eventId,
-        optimistic: true,
-      },
-    }];
-  }
-
-  function currentSparcControllerDisplay(source) {
-    const display = context.currentDisplay;
-    if (!sessionContentSurface.showSparcSession) {
-      return null;
-    }
-    if (!display) {
-      throw new Error(describeSparcBoundaryContext(display, `${source} SPARC session is missing controller display`));
-    }
-    const sparcDisplay = resolveSparcControllerDisplay(display, source);
-    if (!sparcDisplay) {
-      throw new Error(describeSparcBoundaryContext(display, `${source} SPARC session has invalid controller display`));
-    }
-    return sparcDisplay;
-  }
-
-  function sendSparcProgressiveNodeOperations(operations, timestamp) {
-    send({
-      type: EVENTS.SPARC_ACTION,
-      timestamp,
-      sparcNodeValues: {
-        [SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY]: operations,
-      },
-    });
-  }
-
-  async function handleSparcAction(event) {
-    if (!sparcSessionOwnsCurrentResponse) {
-      return;
-    }
-    const display = currentSparcControllerDisplay('[ContentSurface] SPARC action');
-    if (isSparcControllerDialogueDisplay(display)) {
-      return;
-    }
-    const documentId = typeof display.documentId === 'string' ? display.documentId.trim() : '';
-    const hasProductionRuleSource = Array.isArray(display.productionRules);
-    if (!documentId || !hasProductionRuleSource) {
-      return;
-    }
-    const sparcResult = resolveSparcControllerResult(display, event.detail || {}, '[ContentSurface]');
-    if (!sparcResult) {
-      throw new Error(describeSparcBoundaryContext(display, '[ContentSurface] SPARC action received for non-SPARC display'));
-    }
-    const { sparcNodeValues } = await commitSparcProductionRuleAction({
-      engine: context.engine,
-      currentDisplay: display,
-      sparcResult,
-      tdfId: context.tdfId,
-      sessionId: context.sessionId,
-      levelUnit: context.unitId,
-    });
-    sparcProgressRefreshVersion += 1;
-    if (Object.keys(sparcNodeValues).length === 0) {
-      return;
-    }
-    send({
-      type: EVENTS.SPARC_ACTION,
-      timestamp: sparcResult.timestamp,
-      sparcNodeValues,
-    });
-  }
-
-  async function commitSparcSubmitProductionRules(detail) {
-    if (!sparcSessionOwnsCurrentResponse) {
-      return { canSubmit: true };
-    }
-    const display = currentSparcControllerDisplay('[ContentSurface] SPARC submit');
-    if (isSparcControllerDialogueDisplay(display)) {
-      const sparcResult = resolveSparcControllerResult(display, detail || {}, '[ContentSurface]');
-      if (!sparcResult) {
-        throw new Error(describeSparcBoundaryContext(display, '[ContentSurface] SPARC dialogue submit received for non-SPARC display'));
-      }
-      const provider = createSparcDialogueOpenRouterProvider({
-        tdfId: typeof context.tdfId === 'string' ? context.tdfId : null,
-      });
-      const priorProgressiveOperations = currentSparcProgressiveNodeOperations();
-      const optimisticOperations = buildOptimisticDialogueLearnerOperations(display, sparcResult);
-      if (optimisticOperations.length > 0) {
-        sendSparcProgressiveNodeOperations([
-          ...priorProgressiveOperations,
-          ...optimisticOperations,
-        ], sparcResult.timestamp);
-      }
-      let result;
-      try {
-        result = await commitSparcControllerDialogueSubmit({
-          engine: context.engine,
-          currentDisplay: display,
-          sparcResult,
-          tdfId: context.tdfId,
-          sessionId: context.sessionId,
-          levelUnit: context.unitId,
-          scoreLearnerResponse: provider.scoreLearnerResponse,
-          generateTutorUtterance: provider.generateTutorUtterance,
-        });
-      } catch (error) {
-        if (optimisticOperations.length > 0) {
-          sendSparcProgressiveNodeOperations(priorProgressiveOperations, sparcResult.timestamp);
-        }
-        throw error;
-      }
-      sparcProgressRefreshVersion += 1;
-      if (Object.keys(result.sparcNodeValues).length > 0) {
-        send({
-          type: EVENTS.SPARC_ACTION,
-          timestamp: sparcResult.timestamp,
-          sparcNodeValues: result.sparcNodeValues,
-        });
-      }
-      return { canSubmit: false, dialogueSubmit: true };
-    }
-    const documentId = typeof display.documentId === 'string' ? display.documentId.trim() : '';
-    const hasProductionRuleSource = Array.isArray(display.productionRules);
-    if (!documentId || !hasProductionRuleSource) {
-      return { canSubmit: true, productionRuleSubmit: false };
-    }
-    const sparcResult = resolveSparcControllerResult(display, detail || {}, '[ContentSurface]');
-    if (!sparcResult) {
-      throw new Error(describeSparcBoundaryContext(display, '[ContentSurface] SPARC submit received for non-SPARC display'));
-    }
-    const triggeredBy = typeof sparcResult.triggeredBy === 'string' ? sparcResult.triggeredBy : '';
-    const submittedNodes = triggeredBy && Object.prototype.hasOwnProperty.call(sparcResult.submittedNodes, triggeredBy)
-      ? { [triggeredBy]: sparcResult.submittedNodes[triggeredBy] }
-      : sparcResult.submittedNodes;
-    const result = await commitSparcProductionRuleAction({
-      engine: context.engine,
-      currentDisplay: display,
-      sparcResult: {
-        ...sparcResult,
-        submittedNodes,
-      },
-      tdfId: context.tdfId,
-      sessionId: context.sessionId,
-      levelUnit: context.unitId,
-    });
-    sparcProgressRefreshVersion += 1;
-    if (Object.keys(result.sparcNodeValues).length > 0) {
-      send({
-        type: EVENTS.SPARC_ACTION,
-        timestamp: sparcResult.timestamp,
-        sparcNodeValues: result.sparcNodeValues,
-      });
-    }
-    return {
-      canSubmit: result.classifications.includes('correct'),
-      productionRuleSubmit: true,
-    };
   }
 
   $: if (testMode) {
@@ -868,22 +665,17 @@
 
   let performanceData = buildCardPerformanceData();
   let learningProgressRequestVersion = 0;
-  let sparcProgressRefreshVersion = 0;
+  let contentSurfaceRefreshVersion = 0;
   const learningProgressRuntimeController = createLearningProgressRuntimeController({
     defaultDeliverySettings: DEFAULT_DELIVERY_SETTINGS,
     documentRef: () => typeof document === 'undefined' ? null : document,
     getHiddenItems,
   });
-  $: sparcProgressReporterState = resolveSparcProgressReporterState({
-    display: context.currentDisplay,
-    deliverySettings,
-  });
-  $: learningProgressDeliverySettings = sparcProgressReporterState.deliverySettings;
   $: learningProgressRuntimeSnapshot = (learningProgressRequestVersion, learningProgressRuntimeController.buildRuntimeSnapshot({
-    deliverySettings: learningProgressDeliverySettings,
+    deliverySettings,
     engine: resolveLearningProgressEngine(context.engine),
     feedbackEnd: context.timestamps?.feedbackEnd || 0,
-    refreshSignal: context.h5pResult?.batchId || context.sparcResult?.observationId || context.sparcResult?.responseValue || sparcProgressRefreshVersion || '',
+    refreshSignal: context.h5pResult?.batchId || context.sparcResult?.observationId || context.sparcResult?.responseValue || contentSurfaceRefreshVersion || '',
     surfaceState: sessionSurfaceState,
   }));
   $: sessionSurfaceShell = learningProgressRuntimeSnapshot.sessionSurfaceShell;
@@ -1006,17 +798,16 @@
     trialDisplaySubmissionController.handleH5PResult(event.detail || {});
   }
 
-  async function handleSparcSubmit(event) {
-    const detail = event.detail || {};
-    const { canSubmit, productionRuleSubmit } = await commitSparcSubmitProductionRules(detail);
-    if (!canSubmit) {
-      return;
-    }
-    if (productionRuleSubmit) {
-      await forceAdvanceToNextUnit('SPARC Done');
-      return;
-    }
-    trialDisplaySubmissionController.handleSparcSubmit(detail);
+  function handleRuntimeEvent(event) {
+    send(event.detail);
+  }
+
+  function handleRuntimeRefresh() {
+    contentSurfaceRefreshVersion += 1;
+  }
+
+  async function handleForceAdvance(event) {
+    await forceAdvanceToNextUnit(event.detail?.reason || 'Session Done');
   }
 
   function handleInput(event) {
@@ -1390,6 +1181,10 @@
     <SparcSessionSurface
       display={flashcardControllerProps.display}
       adminDiagnosticMode={adminDiagnosticModeEnabled()}
+      engine={context.engine}
+      tdfId={context.tdfId}
+      sessionId={context.sessionId}
+      levelUnit={context.unitId}
       runtimeNodeValues={context.sparcNodeValues}
       {learningProgressSnapshot}
       showQuestionNumber={flashcardControllerProps.showQuestionNumber}
@@ -1414,8 +1209,9 @@
       on:feedbackcontent={handleFeedbackContent}
       on:blockingassetstate={handleBlockingAssetState}
       on:reviewrevealstarted={handleReviewRevealStarted}
-      on:sparcsubmit={handleSparcSubmit}
-      on:sparcaction={handleSparcAction}
+      on:runtimeevent={handleRuntimeEvent}
+      on:runtimewatchedstatechanged={handleRuntimeRefresh}
+      on:forceadvance={handleForceAdvance}
     />
   {:else if sessionContentSurface.showFlashcardSession}
     <FlashcardSessionSurface
