@@ -243,8 +243,16 @@
 
 .content-upload-actions {
     display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--app-space-2);
     width: 100%;
     justify-content: center;
+}
+
+.content-upload-actions > .admin-inline-confirmation {
+    width: 100%;
+    max-width: 220px;
 }
 
 .content-upload-progress {

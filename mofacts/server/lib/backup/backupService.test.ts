@@ -190,6 +190,73 @@ describe('backup restore service', function() {
     expect(jobs.get('delete-job')?.status).to.equal('complete');
   });
 
+  it('allows failed backup jobs to be deleted when they recorded an archive name', async function() {
+    const basePath = await fs.mkdtemp(path.join(os.tmpdir(), 'mofacts-failed-delete-test-'));
+    const archiveFileName = 'mofacts-backup-20260607-010203-faileddelete.tar.gz';
+    const jobs = new Map<string, BackupJobDocument>([
+      ['failed-backup', {
+        _id: 'failed-backup',
+        jobType: 'backup',
+        status: 'failed',
+        createdAt: new Date('2026-06-07T00:00:00.000Z'),
+        completedAt: new Date('2026-06-07T00:00:02.000Z'),
+        createdByUserId: 'admin-user',
+        archiveFileName,
+        destination: { backend: 'local', path: basePath },
+        error: {
+          phase: 'create',
+          message: 'Tar entry name is too long',
+        },
+      }],
+    ]);
+    const deps = {
+      settings: {
+        openCore: {
+          backups: {
+            enabled: true,
+            backend: 'local',
+            localBackupPath: basePath,
+          },
+        },
+      },
+      backupJobs: {
+        insert: async (doc: BackupJobDocument) => {
+          jobs.set('delete-job', { ...doc, _id: 'delete-job' });
+          return 'delete-job';
+        },
+        update: async (jobId: string, modifier: Record<string, any>) => {
+          const current = jobs.get(jobId);
+          if (current && modifier.$set) {
+            jobs.set(jobId, { ...current, ...modifier.$set });
+          }
+        },
+        find: () => ({ fetchAsync: async () => Array.from(jobs.values()) }),
+        findOne: async (selector: Record<string, unknown>) => jobs.get(String(selector._id)) || null,
+      },
+      rawDatabase: () => ({
+        databaseName: 'MoFACT-meteor3',
+        collections: async () => [],
+        collection: () => ({
+          deleteMany: async () => undefined,
+          insertMany: async () => undefined,
+        }),
+      }),
+      usersCollection: {
+        findOneAsync: async () => null,
+      },
+      auditLog: {
+        insertAsync: async () => undefined,
+      },
+    };
+
+    const result = await deleteBackupJob(deps, { userId: 'admin-user', connection: null }, 'failed-backup');
+
+    expect(result.status).to.equal('deleted');
+    expect(result.archiveSizeBytes).to.equal(0);
+    expect(jobs.get('delete-job')?.status).to.equal('complete');
+    expect(jobs.get('delete-job')?.restore?.readinessCheckResult).to.deep.equal({ archiveDeleted: false });
+  });
+
   it('marks queued and running backup jobs failed during startup reconciliation', async function() {
     const jobs = new Map<string, BackupJobDocument>([
       ['queued-job', {

@@ -34,6 +34,25 @@ function createDeps(overrides: Record<string, unknown> = {}) {
 }
 
 describe('backupMethods', function() {
+  it('lists visible primary backup jobs without verify operation or deleted rows', async function() {
+    let listSelector: Record<string, unknown> | undefined;
+    const methods = createBackupMethods(createDeps({
+      backupJobs: {
+        insert: async () => 'backup-job',
+        update: async () => undefined,
+        find: (selector: Record<string, unknown>) => {
+          listSelector = selector;
+          return { fetchAsync: async () => [] };
+        },
+        findOne: async () => null,
+      },
+    }) as any);
+
+    await methods['admin.backups.list'].call({ userId: 'admin-user' });
+
+    expect(listSelector).to.deep.equal({ jobType: 'backup', status: { $ne: 'deleted' } });
+  });
+
   it('requires admin access for backup configuration', async function() {
     const methods = createBackupMethods(createDeps({
       requireAdminUser: async () => {
@@ -72,6 +91,42 @@ describe('backupMethods', function() {
       expect(error).to.be.instanceOf(Meteor.Error);
       expect((error as Meteor.Error).error).to.equal('delete-confirmation-required');
     }
+  });
+
+  it('accepts delete confirmation case-insensitively with surrounding whitespace', async function() {
+    let deletedJobId = '';
+    const methods = createBackupMethods(createDeps({
+      settings: {
+        openCore: {
+          backups: {
+            enabled: true,
+            backend: 'local',
+            localBackupPath: '/tmp',
+          },
+        },
+      },
+      backupJobs: {
+        insert: async () => 'delete-job',
+        update: async () => undefined,
+        find: () => ({ fetchAsync: async () => [] }),
+        findOne: async (selector: Record<string, unknown>) => {
+          deletedJobId = String(selector._id || '');
+          return {
+            _id: selector._id,
+            jobType: 'backup',
+            status: 'failed',
+            createdAt: new Date('2026-06-07T00:00:00.000Z'),
+            createdByUserId: 'admin-user',
+            archiveFileName: 'mofacts-backup-20260607-010203-confirmtest.tar.gz',
+            destination: { backend: 'local', path: '/tmp' },
+          };
+        },
+      },
+    }) as any);
+
+    await methods['admin.backups.delete'].call({ userId: 'admin-user' }, 'backup-job', ' delete ');
+
+    expect(deletedJobId).to.equal('backup-job');
   });
 
   it('does not let non-admin callers mint backup download tokens', async function() {

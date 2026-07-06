@@ -73,7 +73,7 @@ export function createBackupMethods(deps: BackupMethodsDeps) {
     'admin.backups.list': async function(this: MethodContext) {
       await requireAdmin(deps, this);
       return await backupJobsCollection(deps)
-        .find({}, {
+        .find({ jobType: 'backup', status: { $ne: 'deleted' } }, {
           sort: { createdAt: -1 },
           limit: 50,
           fields: publicJobFields(),
@@ -125,7 +125,8 @@ export function createBackupMethods(deps: BackupMethodsDeps) {
       if (!normalizedJobId) {
         throw new Meteor.Error('invalid-backup-job', 'Backup job id is required');
       }
-      if (confirmation !== 'DELETE') {
+      const normalizedConfirmation = typeof confirmation === 'string' ? confirmation.trim().toUpperCase() : '';
+      if (normalizedConfirmation !== 'DELETE') {
         throw new Meteor.Error('delete-confirmation-required', 'Type DELETE to confirm backup archive deletion');
       }
       this.unblock?.();

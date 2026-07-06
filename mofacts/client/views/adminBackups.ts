@@ -144,11 +144,16 @@ Template.adminBackups.helpers({
     }
     return '';
   },
-  canVerify(status: string | undefined) {
-    return status === 'complete' || status === 'verified' || status === 'failed';
+  canVerify(jobType: string | undefined, status: string | undefined) {
+    return jobType === 'backup' && (status === 'complete' || status === 'verified' || status === 'failed');
   },
   canRestore(jobType: string | undefined, status: string | undefined) {
     return jobType === 'backup' && (status === 'complete' || status === 'verified');
+  },
+  canDelete(jobType: string | undefined, status: string | undefined, archiveFileName: string | undefined) {
+    return jobType === 'backup'
+      && Boolean(archiveFileName)
+      && (status === 'complete' || status === 'verified' || status === 'failed');
   },
 });
 
@@ -250,14 +255,15 @@ Template.adminBackups.events({
     if (!jobId) {
       return;
     }
-    if (confirmation !== 'DELETE') {
+    const normalizedConfirmation = confirmation.trim().toUpperCase();
+    if (normalizedConfirmation !== 'DELETE') {
       setBackupMessage('Delete cancelled. Confirmation phrase did not match DELETE.', 'info');
       return;
     }
     Session.set(BACKUP_BUSY_KEY, true);
     setBackupMessage('Deleting backup archive.', 'info');
     try {
-      await meteorCallAsync('admin.backups.delete', jobId, confirmation);
+      await meteorCallAsync('admin.backups.delete', jobId, normalizedConfirmation);
       Session.set(BACKUP_SELECTED_DELETE_JOB_KEY, null);
       await refreshBackups();
       setBackupMessage('Backup archive deleted. Registry history was preserved.', 'success');

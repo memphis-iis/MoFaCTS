@@ -147,6 +147,7 @@ async function writeAudit(deps: BackupServiceDeps, action: string, actor: Backup
 }
 
 type DownloadableBackupJob = BackupJobDocument & { archiveFileName: string };
+type DeletableBackupJob = BackupJobDocument & { archiveFileName: string };
 
 function assertDownloadableBackup(job: BackupJobDocument | null): DownloadableBackupJob {
   if (!job || job.jobType !== 'backup' || !job.archiveFileName) {
@@ -156,6 +157,16 @@ function assertDownloadableBackup(job: BackupJobDocument | null): DownloadableBa
     throw new Error('Only complete or verified backup archives can be downloaded');
   }
   return job as DownloadableBackupJob;
+}
+
+function assertDeletableBackup(job: BackupJobDocument | null): DeletableBackupJob {
+  if (!job || job.jobType !== 'backup' || !job.archiveFileName) {
+    throw new Error('Backup job not found');
+  }
+  if (job.status !== 'complete' && job.status !== 'verified' && job.status !== 'failed') {
+    throw new Error('Only complete, verified, or failed backup archives can be deleted');
+  }
+  return job as DeletableBackupJob;
 }
 
 async function updateFailed(deps: BackupServiceDeps, jobId: string, phase: string, error: unknown): Promise<void> {
@@ -524,7 +535,7 @@ export async function createBackupDownloadToken(deps: BackupServiceDeps, actor: 
 }
 
 export async function deleteBackupJob(deps: BackupServiceDeps, actor: BackupActor, backupJobId: string): Promise<BackupJobDocument> {
-  const sourceJob = assertDownloadableBackup(await deps.backupJobs.findOne({ _id: backupJobId }));
+  const sourceJob = assertDeletableBackup(await deps.backupJobs.findOne({ _id: backupJobId }));
   const config = readBackupConfig(deps.settings, deps.env || process.env);
   const createdAt = new Date();
   const deleteJobId = await deps.backupJobs.insert({
