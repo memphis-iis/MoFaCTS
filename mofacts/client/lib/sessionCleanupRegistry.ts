@@ -1,9 +1,5 @@
 export const USER_ADMIN_DEFAULT_FILTER = '@gmail.com';
 
-// Historical typo used by existing runtime code. Do not silently rename; add a
-// migration/alias plan first if this key is ever replaced with submissionLock.
-export const LEGACY_SUBMISSION_LOCK_KEY = 'submmissionLock';
-
 type SessionDefaultValue = unknown | (() => unknown);
 
 export type SessionCleanupEntry = {
@@ -21,7 +17,6 @@ export const CARD_RUNTIME_SESSION_DEFAULTS: readonly SessionCleanupEntry[] = [
   { key: 'wasReportedForRemoval', value: false, domain: 'card-display', reason: 'Reset per-card removal reporting flag.' },
   { key: 'numVisibleCards', value: 0, domain: 'card-display', reason: 'Reset card visibility count derived by runtime display code.' },
   { key: 'currentStimuliSet', value: undefined, domain: 'content', reason: 'Force unit bootstrap to resolve the active stimuli set.' },
-  { key: LEGACY_SUBMISSION_LOCK_KEY, value: false, domain: 'input', reason: 'Unlock answer submission for the next launch; key spelling is legacy.' },
   { key: 'clusterIndex', value: undefined, domain: 'mapping', reason: 'Clear active cluster cursor before engine selection.' },
   { key: 'displayReady', value: undefined, domain: 'card-readiness', reason: 'Card display readiness is owned by card runtime.' },
   { key: 'currentDisplay', value: undefined, domain: 'card-display', reason: 'Clear previous card display payload.' },

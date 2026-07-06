@@ -29,7 +29,6 @@ const CardKeys = Object.freeze({
   WAS_REPORTED_FOR_REMOVAL: 'wasReportedForRemoval',
   NUM_VISIBLE_CARDS: 'numVisibleCards',
   SCROLL_LIST_COUNT: 'scrollListCount',
-  SUBMISSION_LOCK: 'submmissionLock',
   PAUSED_LOCKS: 'pausedLocks',
   FEEDBACK_UNSET: 'feedbackUnset',
   BUTTON_ENTRIES_TEMP: 'buttonEntriesTemp',
@@ -88,7 +87,6 @@ const CARD_DEFAULTS = Object.freeze({
   [CardKeys.DISPLAY_FEEDBACK]: false,
   [CardKeys.DISPLAY_READY]: false,
   [CardKeys.INPUT_READY]: false,
-  [CardKeys.SUBMISSION_LOCK]: false,
   [CardKeys.PAUSED_LOCKS]: 0,
   [CardKeys.FEEDBACK_UNSET]: false,
   [CardKeys.BUTTON_ENTRIES_TEMP]: undefined,
@@ -377,16 +375,6 @@ const CardStore: any = {
   /** @param {unknown} value @returns {void} */
   setRecordingLocked(value: any) {
     cardStateDict.set(CardKeys.RECORDING_LOCKED, !!value);
-  },
-
-  /** @returns {boolean} */
-  isSubmissionLocked() {
-    return !!cardStateDict.get(CardKeys.SUBMISSION_LOCK);
-  },
-
-  /** @param {unknown} value @returns {void} */
-  setSubmissionLocked(value: any) {
-    cardStateDict.set(CardKeys.SUBMISSION_LOCK, !!value);
   },
 
   /** @returns {boolean} */

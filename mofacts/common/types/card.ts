@@ -35,7 +35,6 @@ export interface CardInteractionState {
   displayFeedback: boolean;
   recording: boolean;
   recordingLocked: boolean;
-  submissionLocked: boolean;
   enterKeyLock: boolean;
 }
 

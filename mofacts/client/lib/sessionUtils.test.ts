@@ -4,7 +4,6 @@ import { sessionCleanUp, clearMappingSessionStateForCleanup } from './sessionUti
 import { CARD_ENTRY_INTENT, getCardEntryIntent, setCardEntryIntent } from './cardEntryIntent';
 import {
   CARD_LAUNCH_PRESERVED_UNIT_KEYS,
-  LEGACY_SUBMISSION_LOCK_KEY,
   USER_ADMIN_DEFAULT_FILTER,
 } from './sessionCleanupRegistry';
 import {
@@ -38,7 +37,6 @@ describe('sessionUtils mapping cleanup', function() {
     Session.set('currentAnswer', undefined);
     Session.set('cardEntryIntent', undefined);
     Session.set('courseAssignmentLaunchContext', null);
-    Session.set(LEGACY_SUBMISSION_LOCK_KEY, false);
     clearSparcProductionRuleHistoryCache();
     clearSparcControllerRuntimeContextCache();
   });
@@ -97,7 +95,6 @@ describe('sessionUtils mapping cleanup', function() {
     Session.set('currentTdfUnit', { unitname: 'Unit 2' });
     Session.set('currentRootTdfId', 'root-a');
     Session.set('currentAnswer', 'stale answer');
-    Session.set(LEGACY_SUBMISSION_LOCK_KEY, true);
     setCardEntryIntent(CARD_ENTRY_INTENT.INSTRUCTION_CONTINUE, {
       source: 'session-utils-test',
       rootTdfId: 'root-a',
@@ -119,7 +116,6 @@ describe('sessionUtils mapping cleanup', function() {
     expect(Session.get('currentTdfUnit')).to.deep.equal({ unitname: 'Unit 2' });
     expect(Session.get('currentRootTdfId')).to.equal('root-a');
     expect(Session.get('currentAnswer')).to.equal(undefined);
-    expect(Session.get(LEGACY_SUBMISSION_LOCK_KEY)).to.equal(false);
     expect(Session.get('filter')).to.equal(USER_ADMIN_DEFAULT_FILTER);
     expect(getCardEntryIntent()).to.equal(CARD_ENTRY_INTENT.INSTRUCTION_CONTINUE);
   });

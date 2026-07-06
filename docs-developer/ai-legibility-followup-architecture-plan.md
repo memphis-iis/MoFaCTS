@@ -207,7 +207,7 @@ mofacts/client/lib/adminSessionState.ts
 
 - Replacing Meteor `Session`
 - Changing launch/resume behavior
-- Renaming session keys such as `submmissionLock`
+- Renaming existing session keys
 
 ## Phase 5: Assessment Golden Fixtures
 
