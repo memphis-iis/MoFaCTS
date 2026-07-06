@@ -135,6 +135,23 @@ Definition precision:
   enough to avoid accidental behavior changes while removing it. It does not
   mean creating a stable `CardStore` API.
 
+Ownership classification rule:
+
+- `trial` means the active learner interaction cycle: prepare/display one
+  prompt or activity step, gate input, accept or reject an answer/action, record
+  timing/history, show feedback when applicable, and advance. It is not
+  synonymous with flashcards and it is not a bucket for all runtime state.
+- `flashcard` means behavior that depends on the flashcard surface or flashcard
+  presentation model specifically. Do not use `flashcard` for generic prompt,
+  answer, timing, feedback, audio, progression, or model state just because the
+  current route or file name says "card".
+- `studentModel` means learner/model aggregates and model-facing operations
+  shared by unit types. It does not own active display state, readiness,
+  timing, feedback, audio, video, or UI locks.
+- `audioRuntimeState` means SR/TTS/recording/transcription/audio-lock
+  coordination. It can observe or affect the active trial, but it does not own
+  trial display, progression, timing, or learner-model aggregates.
+
 Target properties:
 
 - No final object or module is named `CardStore`.
@@ -157,20 +174,27 @@ Candidate final domain owners:
   operations after launch or resume. It is not a snapshot of the whole learner
   runtime.
 - `trialReadiness`: owns display/input readiness events and gates for the active
-  trial surface. It does not own audio recording state or feedback content.
+  learner interaction. It does not own audio recording state, feedback content,
+  or flashcard-specific presentation.
 - `trialDisplayState`: owns the prepared display payload, current answer,
-  original question, alternate display index, and button-choice display state.
-  It does not own progression counters or model aggregates.
+  original question, alternate display index, and choice-response display state
+  for the active learner interaction. It does not own progression counters,
+  model aggregates, or flashcard-specific presentation.
 - `trialProgressionState`: owns the active question/progression cursor and
-  progression reset behavior. It does not own display payloads.
+  progression reset behavior for the active learner interaction. It does not own
+  display payloads or learner-model aggregates.
 - `audioRuntimeState`: owns speech recognition, TTS request, recording,
   transcription wait state, sample rate, and audio lock coordination. If the
   content runtime machine also tracks audio context, one side must be named as
   authoritative and the other as derived or event-fed.
 - `trialTimingState`: owns trial timing, timeout identifiers, timeout handles,
-  and feedback timing markers. It does not own feedback content.
+  and feedback timing markers for the active learner interaction. It does not
+  own feedback content or audio recording timing.
 - `feedbackRuntimeState`: owns feedback lifecycle flags and feedback values.
   Scoring may be separate if score display and feedback semantics diverge.
+- `scoreRuntimeState`: owns score display and scoring flags if those semantics
+  diverge from feedback lifecycle. It does not own feedback content or learner
+  model aggregates.
 - `videoRuntimeState`: owns video source/checkpoint runtime state if the video
   flow still needs mutable app-owned state after resume.
 - `flashcardRuntimeState`: owns only behavior proven to be flashcard-specific,
@@ -184,6 +208,10 @@ Naming rule:
   `feedback`, `video`, `sparc`, or `flashcard` according to ownership.
 - Avoid generic `card` names unless the object is explicitly about flashcard
   behavior.
+- When in doubt between `trial` and `flashcard`, choose `trial` only for active
+  interaction mechanics that can apply to flashcard, assessment, video, SPARC,
+  or future unit surfaces; choose `flashcard` only after proving the behavior is
+  flashcard-specific.
 
 ## Implementation Plan
 
@@ -248,7 +276,8 @@ Recommended tests:
 - `ignoreOutOfGrammarResponses` default and explicit set behavior.
 - `setCurrentAnswer` / `getCurrentAnswer` behavior through the app adapter.
 - `setTrialEndTimestamp` / `getTrialEndTimestamp` behavior.
-- `resetReactiveDefaults()` behavior for card, SR, trial, and timeout state.
+- `resetReactiveDefaults()` behavior for the existing `cardState`,
+  `speechRecognition`, `trialStateMachine`, and `timeouts` dictionaries.
 - Defensive copying expectations for mutable values beyond `hiddenItems`, if
   those values are intended to be protected.
 
@@ -267,15 +296,19 @@ Recommended work:
 - Create domain modules over the existing runtime data first, then move callers
   incrementally.
 - Move reconstructed model state to `studentModel`.
-- Move display/input readiness to a trial-readiness module.
+- Move display/input readiness to a trial-readiness module for the active
+  learner interaction.
 - Move current display payload, answer state, alternate display index, original
-  question, and button-choice display state to a trial-display module.
-- Move question/progression cursor state to a trial-progression module.
-- Move speech/TTS/recording state to an audio-runtime module.
+  question, and choice-response display state to a trial-display module.
+- Move question/progression cursor state to a trial-progression module for the
+  active learner interaction.
+- Move speech/TTS/recording/transcription state to an audio-runtime module.
 - Move timeout identifiers, handles, and timing markers to a trial-timing module.
 - Move feedback lifecycle and feedback values to a feedback-runtime module.
 - Move video resume/source state to a video-runtime module if it remains needed.
-- Move truly flashcard-only state to a `flashcard`-named module.
+- Move truly flashcard-specific state to a `flashcard`-named module only after
+  proving it depends on the flashcard surface rather than generic active-trial
+  mechanics.
 - Avoid introducing parallel names for the same concept. If both `CardStore` and
   a new module exist temporarily, document the source of truth and the expected
   removal step in the same change.
@@ -362,7 +395,7 @@ card vocabulary without behavior loss.
 
    | Current state or method | Current callers | Target owner | Temporary bridge? | Tests required before or with move | Deletion condition |
    | --- | --- | --- | --- | --- | --- |
-   | `initialize()` / `destroy()` / `resetReactiveDefaults()`; backing dictionaries `cardState`, `speechRecognition`, `trialStateMachine`, and `timeouts` | `cardStore.test.ts`; `sessionUtils.ts` cleanup calls `resetReactiveDefaults()`; Svelte runtime tests initialize the store | Final domain reset/bootstrap functions owned by each runtime state module | Yes, only as the existing global reset coordinator until domain reset functions exist | Existing `cardStore.test.ts`; cleanup/reset tests covering card, SR, trial-state, and timeout dictionaries | No production caller imports `CardStore`; tests initialize/reset domain modules directly |
+   | `initialize()` / `destroy()` / `resetReactiveDefaults()`; backing dictionaries `cardState`, `speechRecognition`, `trialStateMachine`, and `timeouts` | `cardStore.test.ts`; `sessionUtils.ts` cleanup calls `resetReactiveDefaults()`; Svelte runtime tests initialize the store | Final domain reset/bootstrap functions owned by each runtime state module | Yes, only as the existing global reset coordinator until domain reset functions exist | Existing `cardStore.test.ts`; cleanup/reset tests covering the existing `cardState`, `speechRecognition`, `trialStateMachine`, and `timeouts` dictionaries | No production caller imports `CardStore`; tests initialize/reset domain modules directly |
    | `getCardValue(key)` / `setCardValue(key, value)` | Global layout wrappers in `mofacts/client/index.ts`; wrappers in `mofacts/client/views/experiment/card.ts`; unit-engine adapter currently exposes component-facing `setCardValue`; `interactionStepAssembly.ts` only writes `currentAnswer` | No final owner. Replace with named APIs in the owning domain for each key | Yes, app-internal only while `index.ts` and `card.ts` wrappers are moved | Layout/global helper tests or smoke coverage for `enterKeyLock`, `pausedLocks`, `displayFeedback`, and `currentScore`; prepared interaction test for `currentAnswer` | Zero component-facing generic runtime writes; no active app caller needs raw key access; wrappers in `card.ts` and `index.ts` removed or backed by named APIs |
    | `getSrValue(key)` / `setSrValue(key)` | `index.ts` reads `waitingForTranscription`; direct named SR methods are used by SR/TTS services and Svelte init | `audioRuntimeState` for named speech/audio state | Yes, app-internal read bridge only until `index.ts` moves | Resize/paused sensitivity or global busy-state test covering `recording`, `inputReady`, and `waitingForTranscription`; SR start/stop test | No caller uses string-key SR access; global busy-state reads named audio/readiness APIs |
    | `getTrialStateValue()` / `setTrialStateValue()` / `getCurrentTrialState()` / `setCurrentTrialState()` / `resetTrialStateDefaults()` | No active non-test caller found in current search, but methods seed `trialStateMachine.current` | Content runtime machine state or delete if proven unused | Maybe. Prefer deletion after proving no production caller exists | Search proof plus direct reset/default test if retained; content runtime state transition tests if moved | Either deleted as unused or replaced by a named content-runtime machine API with no `CardStore` trial-state dictionary |
@@ -371,12 +404,12 @@ card vocabulary without behavior loss.
    | Recording and TTS lock state: `isRecording()` / `setRecording()`, `isRecordingLocked()` / `setRecordingLocked()`, `isTtsRequested()` / `setTtsRequested()` | `speechRecognitionService.ts`; `ttsService.ts`; `mediaRuntimeActions.ts`; machine `services.ts`; `index.ts` reads recording | `audioRuntimeState` with explicit coordination to content runtime machine audio context | Yes, but source of truth must be named in the moving change | SR start/stop; TTS request and lock clear paths; machine guard for recording-locked/waiting state; global busy-state smoke | SR/TTS/machine callers use `audioRuntimeState` or machine events; any machine mirror is documented as derived or removed |
    | `getSampleRate()` / `setSampleRate()` | `speechRecognitionService.ts` stores stream sample rate and reads it when submitting audio | `audioRuntimeState` | Yes | SR recording submission test covering sampled audio payload metadata | SR service uses `audioRuntimeState.getSampleRate()`; no `CardStore` sample-rate key |
    | `getIgnoreOutOfGrammarResponses()` / `setIgnoreOutOfGrammarResponses()` | `lessonLaunchInitializer.ts`, `router.ts`, `speechRecognitionService.ts`; source field is `setspec.speechIgnoreOutOfGrammarResponses` in TDF/config | Resolved delivery/TDF settings cache in `audioRuntimeState`, seeded by launch/router from delivery settings | Yes, as a resolved boolean cache only | TDF/config true, false, and missing default tests; SR out-of-grammar rejection/acceptance test; reset/default test confirming no independent store setting | SR reads resolved config from audio runtime or delivery settings capability; no independent `CardStore` grammar-filter state |
-   | Button-choice state: `isButtonTrial()` / `setButtonTrial()`, `getButtonList()` / `setButtonList()`, `getButtonEntriesTemp()` / `setButtonEntriesTemp()` | `sessionRuntimeActions.ts`, `unitEngineService.ts`, `speechRecognitionService.ts`; `buttonEntriesTemp` has no active non-test caller found in current search | `trialDisplayState`; use `flashcardRuntimeState` only if the field is proven flashcard-specific | Yes | Button-choice trial display; SR behavior on button trials; prepared-trial application test; search proof for `buttonEntriesTemp` before delete | Non-flashcard surfaces no longer depend on button-named `CardStore` state; unused temp entry state deleted or moved to named display owner |
-   | Readiness and display gates: `isDisplayReady()` / `setDisplayReady()`, `isInputReady()` / `setInputReady()`, `getDisplayFeedback()` / `setDisplayFeedback()`, `isEnterKeyLocked()` / `setEnterKeyLock()` | `cardRuntimeState.ts` mirrors display/input readiness; tests assert readiness mirrors; `index.ts` reads input readiness and generic display feedback/enter-key values; `instructions.ts` clears enter-key lock | `trialReadiness` for display/input; `feedbackRuntimeState` for display feedback; `inputRuntimeState` or trial input gate for enter-key lock | Yes, but only as read/write mirrors while `Session` and global layout helpers still exist | Launch/resume display/input enable-disable; enter-key lock after instructions; feedback display toggle; `cardRuntimeState.test.ts` updated to target the new owner | No `CardStore` or `Session` mirror is needed for readiness, feedback-display, or enter-key lock |
-   | Pause/busy locks: `getPausedLocks()` / `setPausedLocks()` / `incrementPausedLocks()` / `decrementPausedLocks()` | `speechRecognitionService.ts` checks paused locks; `index.ts` generic wrapper may read/write; direct tests cover bounds | `inputRuntimeState` or `trialReadiness` lock counter, whichever owns pause gating after inventory of pause callers | Yes | Pause/resume lock bounds; SR does not record while paused; global helper behavior if still exposed | SR and layout callers use named pause-lock API; generic key access removed |
+   | Choice-response state: `isButtonTrial()` / `setButtonTrial()`, `getButtonList()` / `setButtonList()`, `getButtonEntriesTemp()` / `setButtonEntriesTemp()` | `sessionRuntimeActions.ts`, `unitEngineService.ts`, `speechRecognitionService.ts`; `buttonEntriesTemp` has no active non-test caller found in current search | `trialDisplayState` as choice-response display state for the active learner interaction; use `flashcardRuntimeState` only if a follow-up proves the behavior depends on the flashcard surface specifically | Yes | Choice-response display; SR behavior on choice-response trials; prepared-trial application test; search proof for `buttonEntriesTemp` before delete | Non-flashcard surfaces no longer depend on button-named `CardStore` state; unused temp entry state deleted or moved to named display owner |
+   | Readiness and display gates: `isDisplayReady()` / `setDisplayReady()`, `isInputReady()` / `setInputReady()`, `getDisplayFeedback()` / `setDisplayFeedback()`, `isEnterKeyLocked()` / `setEnterKeyLock()` | `cardRuntimeState.ts` mirrors display/input readiness; tests assert readiness mirrors; `index.ts` reads input readiness and generic display feedback/enter-key values; `instructions.ts` clears enter-key lock | `trialReadiness` for display/input and enter-key gating in the active learner interaction; `feedbackRuntimeState` for display feedback | Yes, but only as read/write mirrors while `Session` and global layout helpers still exist | Launch/resume display/input enable-disable; enter-key lock after instructions; feedback display toggle; `cardRuntimeState.test.ts` updated to target the new owner | No `CardStore` or `Session` mirror is needed for readiness, feedback-display, or enter-key lock |
+   | Pause/busy locks: `getPausedLocks()` / `setPausedLocks()` / `incrementPausedLocks()` / `decrementPausedLocks()` | `speechRecognitionService.ts` checks paused locks; `index.ts` generic wrapper may read/write; direct tests cover bounds | `trialReadiness` as an input-gating lock for the active learner interaction, with `audioRuntimeState` consuming the read-only paused/blocked signal when SR decides whether to record | Yes | Pause/resume lock bounds; SR does not record while paused; global helper behavior if still exposed | SR and layout callers use named pause-lock/readiness API; generic key access removed |
    | Feedback lifecycle flags: `isInFeedback()` / `setInFeedback()`, `isFeedbackUnset()` / `setFeedbackUnset()`, `getFeedbackTypeFromHistory()` / `setFeedbackTypeFromHistory()` | `resumeService.ts`; old and Svelte `unitProgression.ts`; history/resume paths | `feedbackRuntimeState` | Yes | Resume feedback state; feedback-after-history behavior; unit progression reset behavior | Resume and progression callers use `feedbackRuntimeState`; no `CardStore` feedback lifecycle keys |
    | Feedback answer/scoring values: `getFeedbackForAnswer()` / `setFeedbackForAnswer()`, `getIsCorrectAccumulator()` / `setIsCorrectAccumulator()`, `getCurrentScore()` / `setCurrentScore()`, `getScoringEnabled()` / `setScoringEnabled()` | `cardRuntimeState.ts` sets scoring enabled default; `resumeService.ts` sets scoring enabled; global `index.ts` wrappers may expose `currentScore`; no active non-test caller found for feedback-for-answer or correctness accumulator methods | `feedbackRuntimeState` for answer feedback; `scoreRuntimeState` for score/scoring-enabled | Maybe for unused feedback accumulator fields; yes for score while layout wrappers remain | Scoring-enabled launch/resume; score display/global helper behavior if active; search proof before deleting unused feedback accumulator fields | Score callers use score owner; unused feedback accumulator fields deleted, or feedback services own them by named API |
-   | Visibility/model selection: `getHiddenItems()` / `setHiddenItems()` / `addHiddenItem()` / `resetHiddenItems()`, `getNumVisibleCards()` / `setNumVisibleCards()` / `adjustNumVisibleCards()`, `wasReportedForRemoval()` / `setWasReportedForRemoval()` | Unit-engine adaptive model capability; `ContentSurface.svelte`; `svelteInit.ts`; `sessionUtils.ts`; direct tests cover hidden-item copying; no active non-test caller found for removal-reporting methods | `studentModel` for hidden items if model-owned; `trialVisibilityState` for visible count and removal-reporting UI state | Yes | Hidden-item defensive copy/reset; adaptive model selection; Svelte init/session cleanup; visible-card count; search proof before deleting removal-reporting | Adaptive model and UI callers use named model/visibility APIs; no `CardStore` visibility keys |
+   | Visibility/model selection: `getHiddenItems()` / `setHiddenItems()` / `addHiddenItem()` / `resetHiddenItems()`, `getNumVisibleCards()` / `setNumVisibleCards()` / `adjustNumVisibleCards()`, `wasReportedForRemoval()` / `setWasReportedForRemoval()` | Unit-engine adaptive model capability; `ContentSurface.svelte`; `svelteInit.ts`; `sessionUtils.ts`; direct tests cover hidden-item copying; no active non-test caller found for removal-reporting methods | `studentModel` for hidden items if they are model-selection exclusions; `trialDisplayState` for visible count and removal-reporting if they are active-surface display bookkeeping | Yes | Hidden-item defensive copy/reset; adaptive model selection; Svelte init/session cleanup; visible-card count; search proof before deleting removal-reporting | Adaptive model callers use `studentModel`; display-only callers use `trialDisplayState`; no `CardStore` visibility keys |
    | Progression cursor: `getQuestionIndex()` / `setQuestionIndex()` / `incrementQuestionIndex()` / `resetQuestionIndex()` | Old and Svelte `unitProgression.ts`; `unitEngineService.ts`; `sessionRuntimeActions.ts`; `resumeService.ts`; `historyLogging.ts`; resume/prepared-advance tests; `sessionUtils.ts` reset | `trialProgressionState` | Yes | Standard flashcard progression; assessment schedule progression; resume from history; history display-order logging; session cleanup reset | All progression, resume, history, and unit-engine callers use `trialProgressionState`; no `CardStore` question index |
    | Display payload and answer state: `getCurrentDisplay()` / `setCurrentDisplay()`, `getCurrentAnswer()` / `setCurrentAnswer()`, `getUserAnswer()` / `setUserAnswer()`, `getAlternateDisplayIndex()` / `setAlternateDisplayIndex()`, `getOriginalQuestion()` / `setOriginalQuestion()` | `cardRuntimeState.ts` owns current-answer helper; `unitEngineService.ts`; `unitEngineRuntimeContext.ts`; `interactionStepAssembly.ts`; `resumeService.ts`; `historyLogging.ts`; resume tests | `trialDisplayState`; component adapter exposes narrow methods such as `setCurrentAnswer`, `setAlternateDisplayIndex`, and `setOriginalQuestion` | Yes, but component-facing generic `setCardValue` should be removed first | Prepared interaction application; resume cleanup; alternate-display history logging; current-answer reset; unit-engine adapter contract test | Learning components no longer receive generic card-state writes; display/resume/history callers use `trialDisplayState` |
    | Trial timing and timeout identifiers: `getTrialStartTimestamp()` / `setTrialStartTimestamp()`, `getTrialEndTimestamp()` / `setTrialEndTimestamp()`, `getCardStartTimestamp()` / `setCardStartTimestamp()`, `getCurTimeoutId()` / `setCurTimeoutId()`, `getCurIntervalId()` / `setCurIntervalId()`, `getVarLenTimeoutName()` / `setVarLenTimeoutName()`, `getMainCardTimeoutStart()` / `setMainCardTimeoutStart()`, `getScrollListCount()` / `setScrollListCount()` | `resumeService.ts`; `historyLogging.ts` consumes trial timestamps from context; direct methods mostly appear in reset/resume paths; key `trialEndTimeStamp` is historic spelling | `trialTimingState`; timeout handles remain runtime-only and non-persisted | Yes | Trial start/end timing; timeout feedback; resume reset; history logging around `CFResponseTime`; preserve `trialEndTimeStamp` spelling unless separately migrated | Timing services and resume use `trialTimingState`; timeout handles are owned by timing service; no `CardStore` timing keys |
@@ -389,16 +422,16 @@ card vocabulary without behavior loss.
 
 3. The target domain owners need source-of-truth rules.
 
-   Blocker:
+   Risk:
 
    - The plan names candidate owners such as `studentModel`, `trialReadiness`,
      `trialDisplayState`, `trialProgressionState`, `audioRuntimeState`,
-     `trialTimingState`, `feedbackRuntimeState`, `videoRuntimeState`,
-     `flashcardRuntimeState`, and `debugRuntimeState`, but each implementation
-     change must still state which owner is authoritative for the values it
-     moves.
+     `trialTimingState`, `feedbackRuntimeState`, `scoreRuntimeState`,
+     `videoRuntimeState`, `flashcardRuntimeState`, and `debugRuntimeState`, but
+     each implementation change must still state which owner is authoritative
+     for the values it moves.
 
-   Required plan fix:
+   Plan requirement:
 
    - For each domain owner introduced in code, state whether it owns durable
      runtime state, state-machine context, `Session`, `ReactiveDict`, plain
@@ -415,6 +448,22 @@ card vocabulary without behavior loss.
      both track `waitingForTranscription`, one must be authoritative and the
      other must be derived, event-fed, or temporary.
    - The goal is not to add bureaucracy; it is to avoid hidden parallel state.
+
+   First-wave authority matrix:
+
+   | Owner | Authoritative for | May read or derive | Temporary mirrors allowed | Must not own | First removal gate |
+   | --- | --- | --- | --- | --- | --- |
+   | `trialDisplayState` | Prepared display payload, current answer, user answer, original question, alternate display index, and choice-response display state for the active learner interaction | Read active progression cursor only when building display-facing context; read `studentModel` only through explicit model capabilities | May mirror existing `Session`/`CardStore` current-answer and display payload keys only until component adapter and resume/history callers move | Question/progression cursor, learner-model aggregates, SR/TTS state, feedback lifecycle, timing handles, flashcard-only presentation | Component-facing `setCardValue('currentAnswer', value)` is replaced by narrow display-state methods and no learning component can write generic runtime keys |
+   | `trialReadiness` | Display/input readiness gates, enter-key gate, and pause/busy input locks for the active learner interaction | May read `audioRuntimeState` busy state or receive audio events when input should be blocked | May mirror `Session.displayReady` / `Session.inputReady` and `CardStore` readiness keys while global layout and old helpers still read them | Display payload, feedback values, audio recording state, model aggregates, progression cursor | Readiness callers use named readiness API; `CardStore` and `Session` readiness mirrors are removed or read-only and scheduled for deletion |
+   | `trialProgressionState` | Active question/progression cursor and progression reset behavior for the active learner interaction | May read `studentModel` or assessment state through explicit capabilities when selecting/advancing | May mirror `CardStore.questionIndex` while history logging, resume, and unit-engine service still read it | Display payload, answer text, timing handles, audio state, feedback values | History, resume, progression, and unit-engine callers use the progression owner; no `CardStore` question-index reads/writes remain |
+   | `trialTimingState` | Trial start/end timestamps, card/start timing while the name remains, timeout ids, active timeout handles, interval ids, timeout names, and feedback timing markers | May receive display/progression events to mark timing boundaries; may expose read-only timing snapshots to history logging | May mirror historic `trialEndTimeStamp` and timeout keys until resume/history/timeout callers move | Feedback content, display payload, audio sample rate, model aggregates | Timing services and resume/history logging use timing owner; no `CardStore` timing or timeout dictionary reads/writes remain |
+   | `feedbackRuntimeState` | Feedback lifecycle flags, display-feedback state, feedback type restored from history, feedback-for-answer values, and timeout feedback values if retained | May read trial timing snapshots and answer/correctness results through explicit parameters or capabilities | May mirror `CardStore` feedback flags while unit progression and resume callers move | Trial readiness gates, audio locks, progression cursor, learner-model aggregates | Resume/progression/feedback services use feedback owner; no `CardStore` feedback lifecycle/value keys remain |
+   | `scoreRuntimeState` | Current score, scoring-enabled flag, and correctness accumulator if retained as score behavior | May read feedback/result events; may expose display-ready score snapshots | May mirror `CardStore.currentScore` and `CardStore.scoringEnabled` while global layout and resume callers move | Feedback lifecycle, display payload, learner-model aggregates | Score display/resume callers use score owner; unused correctness accumulator fields are deleted or owned here by named API |
+   | `studentModel` | Reconstructed learner/model aggregates, hidden/model-exclusion items if they are model-selection exclusions, and model-facing operations shared by unit types | May read history reconstruction results on launch/resume; may expose compact model capabilities to unit engines | No broad `CardStore` bridge. If an existing path must stay live briefly, seed `studentModel` directly and document the old key removal | Active display state, readiness, timing, feedback, audio, video, flashcard presentation | Adaptive model callers use `studentModel`; no `CardStore` aggregate or model-exclusion keys remain |
+   | `audioRuntimeState` | SR/TTS request state, recording state, recording locks, transcription wait state, audio input mode, sample rate, grammar-filter resolved cache, and audio warmup flags if retained | May consume read-only trial readiness/input-blocked signals and active choice-response metadata needed by SR matching | May mirror content runtime machine audio context only if one side is named authoritative in the same change; may mirror old `CardStore` audio keys until SR/TTS/global busy callers move | Trial display payload, progression cursor, timing handles, learner-model aggregates, feedback content | SR/TTS/global busy callers use audio owner or documented machine events; no `CardStore` SR/audio dictionaries remain |
+   | `videoRuntimeState` | Video source/checkpoint runtime state if mutable app-owned state is still needed after resume | May read progression/display context through explicit capabilities | Maybe, only while resume writes the old `videoSource` key and a current read path is found | Generic display state, learner model, audio locks, flashcard presentation | Video resume/source flow uses video owner, or the old video key is deleted if no read path exists |
+   | `flashcardRuntimeState` | Only behavior proven to depend on the flashcard surface or flashcard presentation model specifically | May read generic trial display/readiness/progression through explicit capabilities | No broad bridge from old `CardStore`; add only for a proven flashcard-specific migration row | Generic prompt/answer/timing/feedback/audio/progression/model state | Every retained `flashcard*` value has a flashcard-specific caller and no generic `card` vocabulary remains |
+   | `debugRuntimeState` | Debug flags and developer toggles that remain active | May read domain snapshots for diagnostics without becoming their owner | Maybe, while profile debug UI moves from `CardStore.debugParms` | Runtime behavior state for trials, audio, model, feedback, or video | Debug UI uses debug owner, or obsolete debug state is deleted |
 
 4. `studentModel` needs a precise contract.
 
@@ -519,8 +568,10 @@ card vocabulary without behavior loss.
   Risk: the store is used by the broader learner runtime, including speech,
   media, video, feedback, and progression flows.
 
-  Mitigation: preserve the broad learner-runtime framing. Do not rename or split
-  based on flashcard assumptions.
+  Mitigation: classify each value by the ownership rule: active learner
+  interaction state goes to `trial*`; flashcard names are used only for behavior
+  proven to depend on the flashcard surface; learner-model aggregates go to
+  `studentModel`; SR/TTS/recording/transcription goes to `audioRuntimeState`.
 
 - Breaking speech-recognition behavior around
   `ignoreOutOfGrammarResponses`.
@@ -601,8 +652,9 @@ card vocabulary without behavior loss.
    Plan decision:
 
    - Treat TDF/config as the source of truth.
-   - Treat `CardStore.ignoreOutOfGrammarResponses` as a launch/trial cache of the
-     resolved boolean, not as an independent source of truth.
+   - Treat `CardStore.ignoreOutOfGrammarResponses` as a launch/audio-runtime
+     cache of the resolved boolean for SR grammar filtering, not as an
+     independent source of truth.
    - Do not add an "unset; go read the TDF" state to `CardStore`.
 
 2. `getCardValue` and `setCardValue` are generic app-runtime state accessors, and
@@ -675,8 +727,10 @@ card vocabulary without behavior loss.
 
    - Move this state toward an app-owned `studentModel` module/capability.
    - Keep it available to all unit types that access the adaptive model.
-   - Do not move it into a flashcard-only surface or controller.
-   - Treat it as shared learner model state rather than display state.
+   - Do not move it into `trial*`, `flashcard*`, display, readiness, timing, or
+     audio owners.
+   - Treat it as shared learner model state rather than active interaction or
+     presentation state.
 
 6. Readiness and lock state has multiple current owners; split by behavior, not
    by variable name.
@@ -702,8 +756,8 @@ card vocabulary without behavior loss.
    - Model readiness as explicit state-machine state or domain-specific runtime
      state, not as one global bag of booleans.
    - Keep ownership close to the behavior: display/input readiness belongs to the
-     trial surface/runtime; recording/TTS/transcription readiness belongs to the
-     audio runtime.
+     active learner interaction in `trialReadiness`;
+     recording/TTS/transcription readiness belongs to `audioRuntimeState`.
    - Coordinate domains through explicit events and guards rather than shared
      mutable flags where possible.
    - Keep derived/read-only mirrors only during migration, and remove them once
@@ -711,7 +765,9 @@ card vocabulary without behavior loss.
 
    Plan decision:
 
-   - Treat `displayReady` and `inputReady` as trial-display/runtime readiness.
+   - Treat `displayReady` and `inputReady` as active learner interaction
+     readiness in `trialReadiness`, with display-specific payloads kept in
+     `trialDisplayState`.
    - Treat `recording`, `recordingLocked`, `ttsRequested`, and
      `waitingForTranscription` as speech/audio runtime state.
    - Do not move all readiness flags into `FlashcardController`; that would hide
@@ -749,12 +805,17 @@ card vocabulary without behavior loss.
 
    Plan decision:
 
-   - Keep this type focused on current trial state while it exists.
+   - Treat this type as a transitional current-active-interaction shape while it
+     exists, not as evidence that audio, scoring, display, and timing should
+     remain in one final owner.
    - Do not expand it into a full replacement for `CardStore`.
    - Rename or replace it when the owning runtime domain is clearer; avoid
      preserving generic `Card` vocabulary as final architecture.
-   - Add smaller domain types for `studentModel`, audio/SR state, feedback
-     timing, and display state as those boundaries are tightened.
+   - Split by the ownership rule as boundaries are tightened: active
+     interaction display/readiness/progression/timing into `trial*`, SR/TTS and
+     recording into `audioRuntimeState`, learner aggregates into
+     `studentModel`, and flashcard-specific behavior into `flashcard*` only when
+     proven.
 
 ## Recommended First Change
 
