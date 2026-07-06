@@ -12,7 +12,10 @@ import {
 } from '../../lib/currentTestingHelpers';
 import { createExperimentState } from './svelte/services/experimentState';
 import { unitIsFinished } from './unitProgression';
-import { CardStore } from './modules/cardStore';
+import {
+  getHiddenItems,
+  setNumVisibleCards,
+} from './svelte/services/hiddenVisibilityRuntimeState';
 import { deliverySettingsStore } from '../../lib/state/deliverySettingsStore';
 import { ExperimentStateStore } from '../../lib/state/experimentStateStore';
 import { meteorCallAsync } from '../../index';
@@ -24,6 +27,12 @@ import { reconstructLearningStateFromHistory } from '../../lib/history/historyRe
 import { hasScheduleArtifactForUnit } from './svelte/services/assessmentResume';
 import { createUnitEngineServerMethods } from './unitEngineServerMethods';
 import { callOpenRouterJson } from '../../lib/openRouterClient';
+import { setQuestionIndex } from './svelte/services/trialProgressionState';
+import {
+  setAlternateDisplayIndex,
+  setCurrentAnswer,
+  setOriginalQuestion,
+} from './svelte/services/activeTrialDisplayRuntimeState';
 import type { CreateUnitEngineDeps } from '../../../../learning-components/units/createUnitEngine';
 import {
   UNIT_ENGINE_SESSION_READ_KEYS,
@@ -123,8 +132,8 @@ export function createAppUnitEngineRuntimeContext(): AppUnitEngineRuntimeContext
     },
     adaptiveModel: {
       createAdaptiveQuestionLogic: () => new AdaptiveQuestionLogic(),
-      getHiddenItems: () => CardStore.getHiddenItems(),
-      setNumVisibleCards: (numVisibleCards) => CardStore.setNumVisibleCards(numVisibleCards),
+      getHiddenItems,
+      setNumVisibleCards,
       updateCurStudentPerformance,
       updateCurStudedentPracticeTime,
     },
@@ -132,10 +141,10 @@ export function createAppUnitEngineRuntimeContext(): AppUnitEngineRuntimeContext
       reconstructLearningStateFromHistory,
     },
     cardState: {
-      setQuestionIndex: (questionIndex) => CardStore.setQuestionIndex(questionIndex),
-      setCardValue: (key, value) => CardStore.setCardValue(key, value),
-      setAlternateDisplayIndex: (value) => CardStore.setAlternateDisplayIndex(value),
-      setOriginalQuestion: (value) => CardStore.setOriginalQuestion(value),
+      setQuestionIndex,
+      setCurrentAnswer,
+      setAlternateDisplayIndex,
+      setOriginalQuestion,
     },
     serverMethods: createUnitEngineServerMethods({ meteorCallAsync }),
     user: {

@@ -13,7 +13,6 @@ import { deliverySettingsStore } from '../../../../lib/state/deliverySettingsSto
 import { computePracticeTimeMs } from '../../../../../lib/practiceTime';
 import { calculateTrialTimings } from './historyLogging';
 import { getExperimentState } from './experimentState';
-import { CardStore } from '../../modules/cardStore';
 import { assertIdInvariants, logIdInvariantBreachOnce } from '../../../../lib/idContext';
 import { resolveH5PModelOutcomes } from '../../../../../common/lib/h5pTrialResult';
 import { getPreparedCardDataFromSelection as buildPreparedCardDataFromSelection } from './cardPayloadBuilder';
@@ -34,6 +33,14 @@ import {
   setEngineIndices,
   setVideoEngineIndices,
 } from './cardRuntimeState';
+import {
+  setButtonList,
+  setButtonTrial,
+} from './activeTrialDisplayRuntimeState';
+import {
+  getQuestionIndex,
+  setQuestionIndex,
+} from './trialProgressionState';
 import type {
   EngineServiceResult,
   ExperimentState,
@@ -152,7 +159,7 @@ function requireScheduleDisplayQuestionIndex(selection: Record<string, unknown>)
 }
 
 function requireLiveScheduleDisplayQuestionIndex(): number {
-  const questionIndex = Number(CardStore.getQuestionIndex());
+  const questionIndex = Number(getQuestionIndex());
   if (!Number.isFinite(questionIndex) || questionIndex < 1) {
     throw new Error('Schedule selection must publish a live display question index');
   }
@@ -590,8 +597,8 @@ export function commitPreparedTrialRuntime(
     throw new Error(`Prepared trial commit failed for unit type "${engine?.unitType || 'unknown'}"`);
   }
 
-  CardStore.setButtonTrial(Boolean(preparedTrial.buttonTrial));
-  CardStore.setButtonList(Array.isArray(preparedTrial.buttonList) ? preparedTrial.buttonList : []);
+  setButtonTrial(Boolean(preparedTrial.buttonTrial));
+  setButtonList(Array.isArray(preparedTrial.buttonList) ? preparedTrial.buttonList : []);
   if (preparedTrial.deliverySettings) {
     setCurrentDeliverySettings(preparedTrial.deliverySettings);
   }
@@ -600,7 +607,7 @@ export function commitPreparedTrialRuntime(
   }
   const questionIndex = preparedTrial.questionIndex;
   if (typeof questionIndex === 'number') {
-    CardStore.setQuestionIndex(questionIndex);
+    setQuestionIndex(questionIndex);
   }
   setCurrentAnswer(preparedTrial.currentAnswer);
 
@@ -718,7 +725,7 @@ export async function selectCardService(
       await engine.selectNextCard(engineIndices, curExperimentState);
     }
 
-    // Schedule units maintain the live pointer in CardStore during selectNextCard().
+    // Schedule units maintain the live pointer during selectNextCard().
     // Use that runtime pointer as the exported question index so resume/start logic
     // cannot overwrite the fixed schedule position with a stale machine counter.
     const exportedQuestionIndex = resolveSelectedCardExportQuestionIndex(engine, questionIndex);

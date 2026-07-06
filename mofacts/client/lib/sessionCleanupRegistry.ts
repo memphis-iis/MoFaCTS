@@ -25,7 +25,6 @@ export const CARD_RUNTIME_SESSION_DEFAULTS: readonly SessionCleanupEntry[] = [
   { key: 'enableAudioPromptAndFeedback', value: false, domain: 'audio', reason: 'Disable prompt/feedback audio until delivery settings enable it.' },
   { key: 'errorReportStart', value: undefined, domain: 'diagnostics', reason: 'Reset per-launch error report timing.' },
   { key: 'mainCardTimeoutStart', value: undefined, domain: 'timing', reason: 'Reset per-card timeout timing.' },
-  { key: 'pausedLocks', value: 0, domain: 'timing', reason: 'Clear pause lock count for new card runtime.' },
   { key: 'experimentPasswordRequired', value: false, domain: 'launch-auth', reason: 'Password prompts are resolved per experiment launch.' },
   { key: 'filter', value: USER_ADMIN_DEFAULT_FILTER, domain: 'user-admin', reason: 'Legacy user admin default filter, preserved for behavior compatibility.' },
   { key: 'ignoreOutOfGrammarResponses', value: false, domain: 'speech', reason: 'Speech grammar filtering is reloaded from delivery settings.' },

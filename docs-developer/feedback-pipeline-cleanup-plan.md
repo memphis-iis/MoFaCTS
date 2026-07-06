@@ -939,7 +939,7 @@ The following pieces are done in code and should stay documented as completed:
 5. The machine stores canonical `feedbackText` in context and uses it for TTS.
 6. History logging reads the same canonical `feedbackText` from the machine flow.
 7. The old `CardStore.feedbackTtsText` transport bridge was removed.
-8. History display-order and alternate-display-index sourcing remain on their existing CardStore-backed path; this cleanup only changes feedback-text transport.
+8. History display-order and alternate-display-index sourcing remain on their existing runtime-state path; this cleanup only changes feedback-text transport.
 9. Non-image feedback composition now flows through display policy, semantic state, ordered segments, and separate plain-text/HTML projections.
 10. Feedback TTS/waiting transitions are gated on canonical feedback content arrival.
 

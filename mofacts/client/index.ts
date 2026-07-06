@@ -3,7 +3,18 @@ import '../common/Collections';
 import '../common/globalHelpers';
 import {sessionCleanUp} from './lib/sessionUtils';
 import './lib/authStorage';
-import { CardStore } from './views/experiment/modules/cardStore';
+import {
+  isRecording,
+  isWaitingForTranscription,
+} from './views/experiment/svelte/services/audioRuntimeState';
+import { getCurrentScore } from './views/experiment/svelte/services/scoreRuntimeState';
+import {
+  incrementPausedLocks,
+  isEnterKeyLocked,
+  isInputReady,
+  setEnterKeyLock,
+} from './views/experiment/svelte/services/trialReadinessState';
+import { setDisplayFeedback } from './views/experiment/svelte/services/feedbackRuntimeState';
 import { ExperimentStateStore } from './lib/state/experimentStateStore';
 import {instructContinue} from './views/experiment/instructions';
 import {routeToSignin} from './lib/router';
@@ -234,9 +245,9 @@ async function returnMobilePracticeDisplayToMenu(reason: string): Promise<void> 
 
 function isResizeSensitivePhase() {
   // SR/trial-active phases are sensitive to repeated resize work and can race SR callbacks.
-  return CardStore.isRecording() ||
-    CardStore.isInputReady() ||
-    CardStore.getSrValue('waitingForTranscription') === true;
+  return isRecording() ||
+    isInputReady() ||
+    isWaitingForTranscription();
 }
 
 function scheduleResizeWork(source: string) {
@@ -382,14 +393,6 @@ export { meteorCallAsync };
 const MeteorAny = Meteor as any;
 const SessionAny = Session as any;
 const windowAny = window as any;
-
-function getCardState(key: string) {
-  return CardStore.getCardValue(key);
-}
-
-function setCardState(key: string, value: unknown) {
-  CardStore.setCardValue(key, value);
-}
 
 // Make clientConsole globally available for Meteor packages
 window.clientConsole = clientConsole;
@@ -731,8 +734,8 @@ Template.DefaultLayout.onRendered(function(this: any) {
       const curPage = document.location.pathname;
       clientConsole(2, 'global enter key, curPage:', curPage);
 
-      if (!getCardState('enterKeyLock')) {
-        setCardState('enterKeyLock', true);
+      if (!isEnterKeyLocked()) {
+        setEnterKeyLock(true);
         clientConsole(2, 'grabbed enterKeyLock on global enter handler');
         switch (curPage) {
           case '/instructions':
@@ -763,7 +766,7 @@ Template.DefaultLayout.events({
   },
   'click #helpButton': function(event: JQuery.TriggeredEvent) {
     event.preventDefault();
-    setCardState('pausedLocks', getCardState('pausedLocks')+1);
+    incrementPausedLocks();
     Session.set('errorReportStart', new Date());
     audioManager.pauseCurrentAudio();
   },
@@ -774,7 +777,7 @@ Template.DefaultLayout.events({
 
   'click #errorReportButton': function(event: JQuery.TriggeredEvent) {
     event.preventDefault();
-    setCardState('pausedLocks', getCardState('pausedLocks')+1);
+    incrementPausedLocks();
     Session.set('errorReportStart', new Date());
     //set the modalTemplate session variable to the reportError template
     const templateObject = {
@@ -787,8 +790,8 @@ Template.DefaultLayout.events({
 
   'click #resetFeedbackSettingsButton': function(event: JQuery.TriggeredEvent) {
     event.preventDefault();
-    setCardState('pausedLocks', getCardState('pausedLocks')+1);
-    setCardState('displayFeedback', true);
+    incrementPausedLocks();
+    setDisplayFeedback(true);
     Session.set('resetFeedbackSettingsFromIndex', true);
   }, 
   'click #errorReportingSaveButton': function(event: JQuery.TriggeredEvent) {
@@ -892,7 +895,7 @@ Template.registerHelper('lastUnitNumber', function() {
   return 0;
 })
 Template.registerHelper('currentScore', function() {
-  return getCardState('currentScore');
+  return getCurrentScore();
 });
 
 Template.registerHelper('isNormal', function() {

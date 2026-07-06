@@ -132,7 +132,7 @@ const runtimeCapabilityFunctionRequirements: Partial<Record<
 >> = {
   session: ['getSessionValue', 'setSessionValue'],
   deliverySettings: ['getDeliverySettings'],
-  cardState: ['setQuestionIndex'],
+  cardState: ['setQuestionIndex', 'setCurrentAnswer'],
   adaptiveModel: ['applyModelPracticeUpdate', 'queryModelPracticeState'],
   media: ['resolveMediaUrl'],
   history: ['normalizeResult', 'writeResult', 'writeCanonicalHistory'],

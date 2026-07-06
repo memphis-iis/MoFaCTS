@@ -29,7 +29,7 @@ export interface PreparedInteractionStepState {
 
 export interface ApplyPreparedInteractionStepDependencies {
   readonly setSessionValue: (key: UnitEngineSessionWriteKey, value: unknown) => void;
-  readonly setCardValue: (key: string, value: unknown) => void;
+  readonly setCurrentAnswer: (value: string | undefined) => void;
   readonly setAlternateDisplayIndex: (value: number | undefined) => void;
   readonly setOriginalQuestion: (value: unknown) => void;
 }
@@ -155,7 +155,7 @@ export function applyPreparedInteractionStepState(
   }
   dependencies.setOriginalQuestion(newExperimentState.originalQuestion);
   dependencies.setSessionValue('currentAnswer', preparedState?.currentAnswer);
-  dependencies.setCardValue('currentAnswer', preparedState?.currentAnswer);
+  dependencies.setCurrentAnswer(preparedState?.currentAnswer);
   return newExperimentState;
 }
 

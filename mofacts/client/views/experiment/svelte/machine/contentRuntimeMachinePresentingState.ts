@@ -30,7 +30,7 @@ export const contentRuntimeMachinePresentingState = {
             actions: [
               loadSelectedTrialIntoActiveContext,
               'syncDeliverySettings',
-              'syncCardStore',
+              'syncActiveTrialChoiceState',
               'syncSessionIndices',
               'syncCurrentAnswer',
               'resetSrState',

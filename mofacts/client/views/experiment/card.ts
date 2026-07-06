@@ -5,7 +5,6 @@ import { Tracker } from 'meteor/tracker';
 import { clientConsole } from '../../lib/userSessionHelpers';
 import { finishLaunchLoading, markLaunchLoadingTiming, setLaunchLoadingMessage } from '../../lib/launchLoading';
 import { createBlazeMount } from './svelte/meteorIntegration';
-import { CardStore } from './modules/cardStore';
 import './card.html';
 
 let ContentSurfaceModule: unknown = null;
@@ -16,14 +15,6 @@ async function loadContentSurface() {
     ContentSurfaceModule = mod.default;
   }
   return ContentSurfaceModule;
-}
-
-function getCardState(key: string) {
-  return CardStore.getCardValue(key);
-}
-
-function setCardState(key: string, value: unknown) {
-  CardStore.setCardValue(key, value);
 }
 
 type CardTemplateInstance = {
@@ -88,13 +79,3 @@ Template.card.onDestroyed(function (this: CardTemplateInstance) {
   }
   Session.set('useNewCard', undefined);
 });
-
-export {
-  getCardState,
-  setCardState,
-};
-
-
-
-
-

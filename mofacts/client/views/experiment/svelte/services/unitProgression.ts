@@ -10,8 +10,8 @@ import { meteorCallAsync } from '../../../../index';
 import { clientConsole } from '../../../../lib/userSessionHelpers';
 import { refreshCurrentDeliverySettingsStore, setStudentPerformance } from '../../../../lib/currentTestingHelpers';
 import { deliverySettingsStore } from '../../../../lib/state/deliverySettingsStore';
-import { CardStore } from '../../modules/cardStore';
 import { getExperimentState, createExperimentState } from './experimentState';
+import { setFeedbackTypeFromHistory, setFeedbackUnset } from './feedbackRuntimeState';
 import {
   resolveSessionContentSurface,
   resolveSessionSurfaceState,
@@ -24,6 +24,7 @@ import { COMPLETED_LESSON_REDIRECT } from '../../../../lib/cardEntryIntent';
 import { getCourseAssignmentLaunchContext } from '../../../../lib/courseAssignmentLaunchContext';
 import { assertIdInvariants, logIdInvariantBreachOnce } from '../../../../lib/idContext';
 import { resolveRuntimeEngine } from './cardRuntimeState';
+import { resetQuestionIndex } from './trialProgressionState';
 
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra') as {
   FlowRouter: { go(path: string): void };
@@ -207,7 +208,7 @@ export async function unitIsFinished(_reason: string): Promise<void> {
   const currentTdfFileState = Session.get('currentTdfFile') as TdfFileState | null | undefined;
   const curTdfUnit = curTdf.tdfs.tutor.unit[newUnitNum];
 
-  CardStore.setQuestionIndex(0);
+  resetQuestionIndex();
   Session.set('clusterIndex', undefined);
   Session.set('schedule', undefined);
   Session.set('currentUnitNumber', newUnitNum);
@@ -215,8 +216,8 @@ export async function unitIsFinished(_reason: string): Promise<void> {
   Session.set('resetSchedule', true);
   refreshCurrentDeliverySettingsStore();
   Session.set('currentUnitStartTime', Date.now());
-  CardStore.setFeedbackUnset(true);
-  CardStore.setFeedbackTypeFromHistory(undefined);
+  setFeedbackUnset(true);
+  setFeedbackTypeFromHistory(undefined);
   Session.set('curUnitInstructionsSeen', false);
 
   const resetStudentPerformance = Boolean(

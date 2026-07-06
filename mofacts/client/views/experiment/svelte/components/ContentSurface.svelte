@@ -140,7 +140,7 @@
     buildFlashcardControllerPropsFromSubset,
     getCorrectAnswerImageSrc,
   } from '../services/flashcardControllerProps';
-  import { CardStore } from '../../modules/cardStore';
+  import { getHiddenItems } from '../services/hiddenVisibilityRuntimeState';
   import AutoTutorSession from './AutoTutorSession.svelte';
   import DisplayTimeoutFooter from './DisplayTimeoutFooter.svelte';
   import FlashcardSessionSurface from './FlashcardSessionSurface.svelte';
@@ -872,7 +872,7 @@
   const learningProgressRuntimeController = createLearningProgressRuntimeController({
     defaultDeliverySettings: DEFAULT_DELIVERY_SETTINGS,
     documentRef: () => typeof document === 'undefined' ? null : document,
-    getHiddenItems: () => CardStore.getHiddenItems(),
+    getHiddenItems,
   });
   $: sparcProgressReporterState = resolveSparcProgressReporterState({
     display: context.currentDisplay,

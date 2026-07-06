@@ -34,7 +34,11 @@ import {
   loadMappingRecord,
   validateMappingRecord,
 } from './mappingRecordService';
-import { CardStore } from '../../modules/cardStore';
+import { setAudioInputModeEnabled } from './audioRuntimeState';
+import {
+  resetHiddenItems,
+  setHiddenItems,
+} from './hiddenVisibilityRuntimeState';
 import { checkForFileImage, unitHasLockout } from '../../instructions';
 import { initializeAudioRecorder } from './speechRecognitionService';
 import { leavePage } from './navigationCleanup';
@@ -160,7 +164,7 @@ async function restoreHiddenItemsFromHistory(): Promise<void> {
   const userId = Meteor.userId();
   const currentTdfId = Session.get('currentTdfId');
   if (!userId || typeof currentTdfId !== 'string' || currentTdfId.trim() === '') {
-    CardStore.resetHiddenItems();
+    resetHiddenItems();
     return;
   }
 
@@ -171,13 +175,13 @@ async function restoreHiddenItemsFromHistory(): Promise<void> {
       userId,
       currentTdfId
     );
-    CardStore.setHiddenItems(Array.isArray(hiddenItems) ? hiddenItems : []);
+    setHiddenItems(Array.isArray(hiddenItems) ? hiddenItems : []);
     markLaunchLoadingTiming('restoreHiddenItemsFromHistory:complete', {
       count: Array.isArray(hiddenItems) ? hiddenItems.length : 0,
     });
   } catch (error) {
     clientConsole(1, '[Svelte Init] Failed to restore hidden items from history:', error);
-    CardStore.resetHiddenItems();
+    resetHiddenItems();
   }
 }
 
@@ -858,7 +862,7 @@ export async function initializeSvelteCard(): Promise<SvelteCardInitResult> {
   clearCardEntryContext();
   markRuntimeResumeInactive();
 
-  CardStore.resetHiddenItems();
+  resetHiddenItems();
   setLaunchLoadingMessage('Loading content...');
   await restoreHiddenItemsFromHistory();
   assertIdInvariants('svelteInit.before-media-resolution', {
@@ -874,7 +878,7 @@ export async function initializeSvelteCard(): Promise<SvelteCardInitResult> {
     serverSpeechConfigured: Session.get('speechAPIKeyConfigured'),
   });
   let audioInputEnabled = srAvailability.status === 'available';
-  CardStore.setAudioInputModeEnabled(audioInputEnabled);
+  setAudioInputModeEnabled(audioInputEnabled);
   clientConsole(2, '[Svelte Init] canonical SR availability', srAvailability);
 
   if (audioInputEnabled) {

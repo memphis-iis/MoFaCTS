@@ -5,12 +5,12 @@ import {
 } from './LearningComponentContext';
 
 describe('LearningComponentContext capabilities', function() {
-  it('requires card-state runtimes to expose question index updates', function() {
+  it('requires card-state runtimes to expose named trial-state updates', function() {
     assert.throws(
       () => getLearningComponentCapabilitySet({
         cardState: {} as never,
       }),
-      /Runtime capability "cardState" is missing required functions: setQuestionIndex/,
+      /Runtime capability "cardState" is missing required functions: setQuestionIndex, setCurrentAnswer/,
     );
   });
 
@@ -18,6 +18,7 @@ describe('LearningComponentContext capabilities', function() {
     const context = createLearningComponentRuntimeContext({
       cardState: {
         setQuestionIndex() {},
+        setCurrentAnswer() {},
       },
     });
 

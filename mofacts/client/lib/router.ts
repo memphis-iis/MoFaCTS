@@ -5,7 +5,7 @@ import {Cookie} from './cookies';
 import {displayify} from '../../common/globalHelpers';
 import {selectTdf} from './lessonLaunchRunner';
 import {clientConsole} from '../index';
-import {CardStore} from '../views/experiment/modules/cardStore';
+import { setIgnoreOutOfGrammarResponses } from '../views/experiment/svelte/services/audioRuntimeState';
 import { Tracker } from 'meteor/tracker';
 import {currentUserHasRole} from './roleUtils';
 import { clearMappingRecordFromSession } from '../views/experiment/svelte/services/mappingRecordService';
@@ -1207,12 +1207,12 @@ FlowRouter.route('/card', {
       const subsReady = subs.every((handle) => handle && handle.ready());
       if(subsReady){
         if (Meteor.user()) {
-          // Restore CardStore settings from TDF on page refresh (CardStore resets but Session persists)
+          // Restore SR grammar filtering from TDF on page refresh.
           const tdfFile = Session.get('currentTdfFile');
           if (tdfFile && tdfFile.tdfs && tdfFile.tdfs.tutor && tdfFile.tdfs.tutor.setspec) {
             const setspec = tdfFile.tdfs.tutor.setspec;
             const ignoreOutOfGrammarResponses = resolveSpeechIgnoreOutOfGrammarResponses(setspec);
-            CardStore.setIgnoreOutOfGrammarResponses(ignoreOutOfGrammarResponses);
+            setIgnoreOutOfGrammarResponses(ignoreOutOfGrammarResponses);
             clientConsole(2, '[Router] Restored ignoreOutOfGrammarResponses from TDF:', ignoreOutOfGrammarResponses);
           }
           if (refreshCardRequested) {

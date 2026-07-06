@@ -1,5 +1,5 @@
 import { clientConsole } from '../../../../lib/clientLogger';
-import { CardStore } from '../../modules/cardStore';
+import { isTtsRequested } from '../services/audioRuntimeState';
 import { shouldPlayAudioPrompt, stopTtsPlayback, ttsPlaybackService } from '../services/ttsService';
 import {
   commitPreparedTrialRuntime as commitPreparedTrialRuntimeService,
@@ -55,7 +55,7 @@ export function maybeSpeakQuestion({ context }: ActionArgs) {
     return;
   }
 
-  if (CardStore.isTtsRequested()) {
+  if (isTtsRequested()) {
     return;
   }
 

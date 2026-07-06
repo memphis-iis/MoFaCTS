@@ -4,7 +4,16 @@ import {audioManager} from "./audioContextManager";
 import { clientConsole } from "./clientLogger";
 import { clearEngine } from "./engineManager";
 import { clearCardEntryContext } from "./cardEntryIntent";
-import { CardStore } from "../views/experiment/modules/cardStore";
+import { resetQuestionIndex } from "../views/experiment/svelte/services/trialProgressionState";
+import { resetTrialReadinessState } from "../views/experiment/svelte/services/trialReadinessState";
+import { resetFeedbackRuntimeState } from "../views/experiment/svelte/services/feedbackRuntimeState";
+import { resetActiveTrialDisplayRuntimeState } from "../views/experiment/svelte/services/activeTrialDisplayRuntimeState";
+import { resetAudioRuntimeState } from "../views/experiment/svelte/services/audioRuntimeState";
+import { resetScoreRuntimeState } from "../views/experiment/svelte/services/scoreRuntimeState";
+import { resetDebugRuntimeState } from "../views/experiment/svelte/services/debugRuntimeState";
+import { resetHiddenVisibilityRuntimeState } from "../views/experiment/svelte/services/hiddenVisibilityRuntimeState";
+import { resetVideoRuntimeState } from "../views/experiment/svelte/services/videoRuntimeState";
+import { resetTrialTimingState } from "../views/experiment/svelte/services/trialTimingState";
 import { deliverySettingsStore } from "./state/deliverySettingsStore";
 import { ExperimentStateStore } from "./state/experimentStateStore";
 import { clearMappingRecordFromSession } from "../views/experiment/svelte/services/mappingRecordService";
@@ -82,15 +91,22 @@ function clearSessionTimersForCleanup() {
 function resetSharedCardRuntimeState(options: { preserveCardEntryContext?: boolean } = {}) {
   Session.set('currentAnswer', undefined);
   resetAudioState();
-  CardStore.resetHiddenItems();
   applySessionCleanupEntries(Session, CARD_RUNTIME_SESSION_DEFAULTS);
   clearMappingSessionStateForCleanup();
   if (!options.preserveCardEntryContext) {
     clearCardEntryContext();
   }
-  CardStore.resetQuestionIndex();
+  resetQuestionIndex();
+  resetTrialReadinessState();
+  resetFeedbackRuntimeState();
+  resetActiveTrialDisplayRuntimeState();
+  resetAudioRuntimeState();
+  resetScoreRuntimeState();
+  resetDebugRuntimeState();
+  resetHiddenVisibilityRuntimeState();
+  resetVideoRuntimeState();
+  resetTrialTimingState();
   clearSessionTimersForCleanup();
-  CardStore.resetReactiveDefaults();
 
   audioManager.cleanup();
 }

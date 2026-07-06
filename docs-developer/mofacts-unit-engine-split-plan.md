@@ -49,7 +49,7 @@ The file currently mixes all of these responsibilities:
 - Early-lock and prefetch mechanics.
 - Practice-time and answer-result updates.
 - Resume-state reconstruction.
-- Direct Meteor, Session, CardStore, delivery settings, and server-method calls.
+- Direct Meteor, Session, app runtime state, delivery settings, and server-method calls.
 
 The split should make those responsibilities visible as separate folders and files.
 

@@ -11,7 +11,6 @@ import _ from 'underscore';
 import DOMPurify from 'dompurify';
 import {audioManager} from '../../lib/audioContextManager';
 import { deliverySettingsStore } from '../../lib/state/deliverySettingsStore';
-import { CardStore } from './modules/cardStore';
 import { insertCompressedHistory } from '../../lib/historyWire';
 import { resolveDynamicAssetPath } from './svelte/services/mediaResolver';
 import { assertIdInvariants, logIdInvariantBreachOnce } from '../../lib/idContext';
@@ -24,6 +23,7 @@ import {
   markLaunchLoadingTiming,
   startLaunchLoading,
 } from '../../lib/launchLoading';
+import { setEnterKeyLock } from './svelte/services/trialReadinessState';
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra');
 
 declare const Meteor: any;
@@ -536,7 +536,7 @@ async function instructContinue() {
       finishLaunchLoading('instructions-complete-dashboard');
     }
     Session.set('fromInstructions', true);
-    CardStore.setEnterKeyLock(false);
+    setEnterKeyLock(false);
     clientConsole(2, 'releasing enterKeyLock in instructContinue');
     markLaunchLoadingTiming('instructionContinue:route', { navigationTarget });
     leavePage(navigationTarget);

@@ -18,7 +18,6 @@
 import { Meteor } from 'meteor/meteor';
 import { Session } from 'meteor/session';
 import { _ } from 'meteor/underscore';
-import { CardStore } from '../../modules/cardStore';
 import { deliverySettingsStore } from '../../../../lib/state/deliverySettingsStore';
 import { ExperimentStateStore } from '../../../../lib/state/experimentStateStore';
 import { getAudioInputSensitivity, setAudioRecorderInitialized } from '../../../../lib/state/audioState';
@@ -37,6 +36,18 @@ import {
   resolveSpeechApiKeyAvailability,
 } from '../../../../lib/audioAvailability';
 import { getCurrentAnswer } from './cardRuntimeState';
+import { isButtonTrial } from './activeTrialDisplayRuntimeState';
+import {
+  getIgnoreOutOfGrammarResponses,
+  getSampleRate,
+  isRecording,
+  isRecordingLocked,
+  setIgnoreOutOfGrammarResponses,
+  setRecording,
+  setSampleRate,
+  setWaitingForTranscription,
+} from './audioRuntimeState';
+import { getPausedLocks } from './trialReadinessState';
 import {
   buildPhoneticIndexForLanguage,
   findPhoneticConflictsWithCorrectAnswerForLanguage,
@@ -525,7 +536,7 @@ function buildTranscriptionFailureResult(
   error: unknown,
   options: { silence?: boolean; feedback?: string; transcript?: string } = {}
 ): SpeechRecognitionResult {
-  CardStore.setWaitingForTranscription(false);
+  setWaitingForTranscription(false);
   if (srSend) {
     srSend({
       type: 'TRANSCRIPTION_ERROR',
@@ -701,7 +712,7 @@ export async function initializeAudioRecorder(): Promise<SpeechRecognitionInitRe
     (window as RuntimeWindow).firefox_audio_hack = streamSource;
 
     // Capture sample rate for Google Speech API
-    CardStore.setSampleRate(streamSource.context.sampleRate);
+    setSampleRate(streamSource.context.sampleRate);
 
     // Initialize recorder
     const audioRecorderConfig = {
@@ -735,7 +746,7 @@ export async function initializeAudioRecorder(): Promise<SpeechRecognitionInitRe
 
     // CRITICAL: Set recording flag BEFORE setting up voice handlers to avoid race condition
     // where voice is detected before recording is flagged as active
-    CardStore.setRecording(true);
+    setRecording(true);
     recorder.record();
     
 
@@ -831,7 +842,7 @@ function setupVoiceEventHandlers(): void {
   speechEvents.on('speaking', function() {
     recordingStartTime = Date.now();
 
-    if (!CardStore.isRecording()) {
+    if (!isRecording()) {
       
       return;
     }
@@ -846,7 +857,7 @@ function setupVoiceEventHandlers(): void {
   });
 
   speechEvents.on('stopped_speaking', function() {
-    if (!CardStore.isRecording() || CardStore.getPausedLocks() > 0) {
+    if (!isRecording() || getPausedLocks() > 0) {
       
       return;
     }
@@ -875,10 +886,10 @@ function setupVoiceEventHandlers(): void {
       return;
     }
     recorder.stop();
-    CardStore.setRecording(false);
+    setRecording(false);
 
     // Set flag BEFORE exporting to prevent autorun from restarting
-    CardStore.setWaitingForTranscription(true);
+    setWaitingForTranscription(true);
     
 
     recorder.exportToProcessCallback();
@@ -892,27 +903,27 @@ function setupVoiceEventHandlers(): void {
  */
 export function startRecording(): void {
   // Skip if already recording
-  if (CardStore.isRecording()) {
+  if (isRecording()) {
     
     return;
   }
 
-  if (CardStore.isButtonTrial()) {
+  if (isButtonTrial()) {
     
     return;
   }
 
-  if (recorder && !CardStore.isRecordingLocked() && isSrEnabled()) {
-    CardStore.setRecording(true);
+  if (recorder && !isRecordingLocked() && isSrEnabled()) {
+    setRecording(true);
     recorder.record();
     
   } else {
-    if (!CardStore.isRecordingLocked() && isSrEnabled()) {
+    if (!isRecordingLocked() && isSrEnabled()) {
       void initializeAudioRecorderWithRetry('auto').then((result) => {
-        if (!result || !recorder || CardStore.isRecordingLocked()) {
+        if (!result || !recorder || isRecordingLocked()) {
           return;
         }
-        CardStore.setRecording(true);
+        setRecording(true);
         recorder.record();
       }).catch((error: unknown) => {
         clientConsole(1, '[SR] startRecording initialization failed', {
@@ -932,9 +943,9 @@ export function startRecording(): void {
  */
 export function stopRecording(): void {
   
-  if (recorder && CardStore.isRecording()) {
+  if (recorder && isRecording()) {
     recorder.stop();
-    CardStore.setRecording(false);
+    setRecording(false);
     recorder.clear();
     
   }
@@ -951,15 +962,15 @@ export function stopRecording(): void {
 async function processAudioData(audioData: ArrayBuffer | string): Promise<SpeechRecognitionResult> {
   
   // Set flag to prevent timeout during transcription
-  CardStore.setWaitingForTranscription(true);
+  setWaitingForTranscription(true);
 
   if (!recorder) {
-    CardStore.setWaitingForTranscription(false);
+    setWaitingForTranscription(false);
     return { transcript: '', phoneticMatch: null, isCorrect: false, maxAttemptsReached: false };
   }
   recorder.clear();
 
-  const isButtonTrial = CardStore.isButtonTrial();
+  const isButtonTrialValue = isButtonTrial();
   
 
   // Increment attempt counter
@@ -969,7 +980,7 @@ async function processAudioData(audioData: ArrayBuffer | string): Promise<Speech
 
   // Check if exceeded max attempts
   if (speechTranscriptionAttempts > maxAttempts) {
-    CardStore.setWaitingForTranscription(false);
+    setWaitingForTranscription(false);
     if (srSend) {
       srSend({ type: 'TRANSCRIPTION_ERROR', error: 'max-attempts' });
     }
@@ -977,7 +988,7 @@ async function processAudioData(audioData: ArrayBuffer | string): Promise<Speech
   }
 
   // Get configuration
-  const sampleRate = CardStore.getSampleRate();
+  const sampleRate = getSampleRate() as number;
   
   if (!Number.isFinite(sampleRate) || sampleRate <= 0) {
     clientConsole(1, '[SR] Invalid sample rate; speech API may reject audio');
@@ -1006,7 +1017,7 @@ async function processAudioData(audioData: ArrayBuffer | string): Promise<Speech
   let configuredSpeechTargets: string[] = [];
   let configuredExclusions: string[] = [];
 
-  if (isButtonTrial) {
+  if (isButtonTrialValue) {
     // Button trial: a-z
     let curChar = 'a';
     phraseHints.push(curChar);
@@ -1177,7 +1188,7 @@ async function processAudioData(audioData: ArrayBuffer | string): Promise<Speech
     
 
     // Clear waiting flag
-    CardStore.setWaitingForTranscription(false);
+    setWaitingForTranscription(false);
 
     // Parse result
     if (typedResponse && typedResponse.results && typedResponse.results.length > 0) {
@@ -1265,14 +1276,14 @@ async function processAudioData(audioData: ArrayBuffer | string): Promise<Speech
           normalizeSpeechGrammarLookupToken(entry) === normalizedCurrentAnswerLookup
         );
 
-      const cachedIgnore = CardStore.getIgnoreOutOfGrammarResponses();
+      const cachedIgnore = getIgnoreOutOfGrammarResponses();
       if (cachedIgnore !== ignoreOutOfGrammarResponses) {
         clientConsole(1, '[SR] Updating ignoreOutOfGrammarResponses from TDF:', {
           fromCache: cachedIgnore,
           fromTdf: ignoreOutOfGrammarResponses,
         });
       }
-      CardStore.setIgnoreOutOfGrammarResponses(ignoreOutOfGrammarResponses);
+      setIgnoreOutOfGrammarResponses(ignoreOutOfGrammarResponses);
 
       
 
@@ -1394,7 +1405,7 @@ async function processAudioData(audioData: ArrayBuffer | string): Promise<Speech
     }
   } catch (error: unknown) {
     clientConsole(1, '[SR] API error:', error);
-    CardStore.setWaitingForTranscription(false);
+    setWaitingForTranscription(false);
     return buildTranscriptionFailureResult(error);
   }
 }
@@ -1474,9 +1485,9 @@ export function cleanupAudioRecorder(): void {
   try {
 
     if (recorder) {
-      if (CardStore.isRecording()) {
+      if (isRecording()) {
         recorder.stop();
-        CardStore.setRecording(false);
+        setRecording(false);
       }
       recorder.clear();
       recorder = null;

@@ -48,7 +48,7 @@ Use explicit capability adapters instead of direct app access.
 Unit-engine components receive session state only through the typed key contract in
 `learning-components/units/UnitEngineSessionKeys.ts`. The app-owned compatibility
 facade in `mofacts/client/views/experiment/unitEngine.ts` must stay thin; raw
-Meteor `Session`, `CardStore`, `Tdfs`, browser globals, and user alerts are wired
+Meteor `Session`, `Tdfs`, browser globals, app runtime state owners, and user alerts are wired
 only by `mofacts/client/views/experiment/unitEngineRuntimeContext.ts`. If a unit
 requires a new app-state key, add it to the typed read/write list with a clear owner
 instead of passing arbitrary Session keys through the component adapter.

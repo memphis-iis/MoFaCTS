@@ -1,8 +1,16 @@
 import { Session } from 'meteor/session';
 import { getEngine } from '../../../../lib/engineManager';
 import { ExperimentStateStore } from '../../../../lib/state/experimentStateStore';
-import { CardStore } from '../../modules/cardStore';
 import type { ExperimentState, UnitEngineLike } from '../../../../../common/types';
+import {
+  setDisplayReady,
+  setInputReady,
+} from './trialReadinessState';
+import { setScoringEnabled } from './scoreRuntimeState';
+export {
+  getCurrentAnswer,
+  setCurrentAnswer,
+} from './activeTrialDisplayRuntimeState';
 
 export type EngineIndices = {
   clusterIndex?: number;
@@ -23,7 +31,7 @@ export type CardRuntimeInitSnapshot = {
 };
 
 export const CARD_RUNTIME_SESSION_KEYS = Object.freeze({
-  // Owned by card runtime init; mirrored into CardStore until legacy helpers stop reading Session.
+  // Owned by card runtime init; mirrored into Session until legacy helpers stop reading Session.
   DISPLAY_READY: 'displayReady',
   INPUT_READY: 'inputReady',
 
@@ -53,7 +61,6 @@ export const CARD_RUNTIME_SESSION_KEYS = Object.freeze({
 
   // Owned by delivery/trial services.
   CURRENT_DELIVERY_SETTINGS: 'currentDeliverySettings',
-  CURRENT_ANSWER: 'currentAnswer',
 } as const);
 
 function getFiniteNumber(value: unknown): number | undefined {
@@ -71,11 +78,9 @@ function ensureArraySessionValue(key: string): unknown[] {
 }
 
 export function resetCardRuntimeForInitialization(): CardRuntimeInitSnapshot {
-  CardStore.setScoringEnabled(undefined);
-  CardStore.setDisplayReady(false);
-  CardStore.setInputReady(false);
-  Session.set(CARD_RUNTIME_SESSION_KEYS.DISPLAY_READY, false);
-  Session.set(CARD_RUNTIME_SESSION_KEYS.INPUT_READY, false);
+  setScoringEnabled(undefined);
+  setDisplayReady(false);
+  setInputReady(false);
   Session.set(CARD_RUNTIME_SESSION_KEYS.IS_VIDEO_SESSION, false);
   Session.set(CARD_RUNTIME_SESSION_KEYS.VIDEO_CHECKPOINTS, null);
   Session.set(CARD_RUNTIME_SESSION_KEYS.VIDEO_RESUME_ANCHOR, null);
@@ -88,13 +93,11 @@ export function resetCardRuntimeForInitialization(): CardRuntimeInitSnapshot {
 }
 
 export function setDisplayReadyState(isReady: boolean): void {
-  CardStore.setDisplayReady(isReady);
-  Session.set(CARD_RUNTIME_SESSION_KEYS.DISPLAY_READY, isReady);
+  setDisplayReady(isReady);
 }
 
 export function setInputReadyState(isReady: boolean): void {
-  CardStore.setInputReady(isReady);
-  Session.set(CARD_RUNTIME_SESSION_KEYS.INPUT_READY, isReady);
+  setInputReady(isReady);
 }
 
 export function markRuntimeResumeInactive(): void {
@@ -208,14 +211,6 @@ export function publishEngineIndices(indices: EngineIndices): void {
 
 export function setCurrentDeliverySettings(value: unknown): void {
   Session.set(CARD_RUNTIME_SESSION_KEYS.CURRENT_DELIVERY_SETTINGS, value);
-}
-
-export function setCurrentAnswer(value: unknown): void {
-  Session.set(CARD_RUNTIME_SESSION_KEYS.CURRENT_ANSWER, value || '');
-}
-
-export function getCurrentAnswer(): unknown {
-  return Session.get(CARD_RUNTIME_SESSION_KEYS.CURRENT_ANSWER);
 }
 
 export function getSessionClusterIndex(defaultValue = 0): number {

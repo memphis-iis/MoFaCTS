@@ -2,7 +2,13 @@ import { expect } from 'chai';
 import { Session } from 'meteor/session';
 import { clearEngine, setEngine } from '../../../../lib/engineManager';
 import { ExperimentStateStore } from '../../../../lib/state/experimentStateStore';
-import { CardStore } from '../../modules/cardStore';
+import {
+  isDisplayReady,
+  isInputReady,
+  resetTrialReadinessState,
+  setDisplayReady,
+  setInputReady,
+} from './trialReadinessState';
 import {
   clearResumeToQuestion,
   clearVideoSessionState,
@@ -41,8 +47,8 @@ import {
 
 describe('cardRuntimeState', function() {
   beforeEach(function() {
-    CardStore.initialize();
     clearEngine();
+    resetTrialReadinessState();
     Session.set('currentTdfFile', undefined);
     Session.set('currentTdfId', undefined);
     Session.set('overallOutcomeHistory', undefined);
@@ -54,6 +60,7 @@ describe('cardRuntimeState', function() {
 
   afterEach(function() {
     clearEngine();
+    resetTrialReadinessState();
     ExperimentStateStore.clear();
   });
 
@@ -61,16 +68,16 @@ describe('cardRuntimeState', function() {
     const tdfFile = { tdfs: { tutor: {} } };
     Session.set('currentTdfFile', tdfFile);
     Session.set('overallOutcomeHistory', [{ correct: true }]);
-    CardStore.setDisplayReady(true);
-    CardStore.setInputReady(true);
+    setDisplayReady(true);
+    setInputReady(true);
 
     const snapshot = resetCardRuntimeForInitialization();
 
     expect(snapshot.currentTdfFile).to.equal(tdfFile);
     expect(snapshot.overallOutcomeHistory).to.deep.equal([{ correct: true }]);
     expect(snapshot.overallStudyHistory).to.deep.equal([]);
-    expect(CardStore.isDisplayReady()).to.equal(false);
-    expect(CardStore.isInputReady()).to.equal(false);
+    expect(isDisplayReady()).to.equal(false);
+    expect(isInputReady()).to.equal(false);
     expect(Session.get('displayReady')).to.equal(false);
     expect(Session.get('inputReady')).to.equal(false);
     expect(Session.get('isVideoSession')).to.equal(false);
@@ -82,16 +89,16 @@ describe('cardRuntimeState', function() {
     setDisplayReadyState(true);
     setInputReadyState(true);
 
-    expect(CardStore.isDisplayReady()).to.equal(true);
-    expect(CardStore.isInputReady()).to.equal(true);
+    expect(isDisplayReady()).to.equal(true);
+    expect(isInputReady()).to.equal(true);
     expect(Session.get('displayReady')).to.equal(true);
     expect(Session.get('inputReady')).to.equal(true);
 
     setDisplayReadyState(false);
     setInputReadyState(false);
 
-    expect(CardStore.isDisplayReady()).to.equal(false);
-    expect(CardStore.isInputReady()).to.equal(false);
+    expect(isDisplayReady()).to.equal(false);
+    expect(isInputReady()).to.equal(false);
     expect(Session.get('displayReady')).to.equal(false);
     expect(Session.get('inputReady')).to.equal(false);
   });

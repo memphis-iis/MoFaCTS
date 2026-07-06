@@ -15,7 +15,6 @@ import {
   getUnlockedAppleMobileAudioElement,
   warnIfAppleMobileAudioMayBeLocked,
 } from '../../../../lib/audioUnlock';
-import { CardStore } from '../../modules/cardStore';
 import { startRecording as startSrRecording } from './speechRecognitionService';
 import { clientConsole } from '../../../../lib/userSessionHelpers';
 import {
@@ -27,6 +26,12 @@ import {
   getAudioPromptFeedbackVoice,
   getAudioPromptMode
 } from '../../../../lib/state/audioState';
+import {
+  isRecordingLocked,
+  isTtsRequested,
+  setRecordingLocked,
+  setTtsRequested,
+} from './audioRuntimeState';
 import { resolveDynamicAssetPath } from './mediaResolver';
 import { logIdInvariantBreachOnce } from '../../../../lib/idContext';
 import type {
@@ -74,8 +79,8 @@ function clearTtsPlaybackState(): void {
   if (window.speechSynthesis) {
     window.speechSynthesis.cancel();
   }
-  CardStore.setRecordingLocked(false);
-  CardStore.setTtsRequested(false);
+  setRecordingLocked(false);
+  setTtsRequested(false);
 }
 
 export function stopTtsPlayback(reason = 'stopped'): void {
@@ -265,15 +270,15 @@ async function restartSrAfterTtsHandoff(): Promise<void> {
     window.speechSynthesis.cancel();
   }
   audioManager.clearCurrentAudio();
-  CardStore.setRecordingLocked(false);
-  CardStore.setTtsRequested(false);
+  setRecordingLocked(false);
+  setTtsRequested(false);
   if (isWebKitAudioEngine()) {
     await new Promise((resolve) => setTimeout(resolve, 120));
   }
   clientConsole(2, '[TTS] handoff timeline', {
     playbackEnded,
     ttsQueueActive,
-    lockCleared: !CardStore.isRecordingLocked(),
+    lockCleared: !isRecordingLocked(),
     currentAudioCleared: !audioManager.getCurrentAudio(),
     handoffDelayMs: Date.now() - handoffStart,
   });
@@ -565,7 +570,7 @@ async function speakText(
           throw new Error('TTS API returned empty audio');
         }
 
-        if (!CardStore.isTtsRequested()) {
+        if (!isTtsRequested()) {
           
           return;
         }
@@ -810,8 +815,8 @@ export async function ttsPlaybackService(_context: Record<string, unknown>, even
       : 1000;
 
     // Set recording lock to prevent SR from starting during TTS
-    CardStore.setTtsRequested(true);
-    CardStore.setRecordingLocked(true);
+    setTtsRequested(true);
+    setRecordingLocked(true);
     
     const playSegment = async (segmentText: string, segmentAudioSrc: string, segmentIsQuestion: boolean): Promise<boolean> => {
       const segmentCancellation = getCancellation();
@@ -870,8 +875,8 @@ export async function ttsPlaybackService(_context: Record<string, unknown>, even
         clientConsole(1, '[TTS] Failed to restart SR after playback', { error: String(error) });
       }
     } else {
-      CardStore.setRecordingLocked(false);
-      CardStore.setTtsRequested(false);
+      setRecordingLocked(false);
+      setTtsRequested(false);
     }
 
     return { status: 'completed' };
@@ -880,8 +885,8 @@ export async function ttsPlaybackService(_context: Record<string, unknown>, even
       if (activeTtsPlayback?.id === playbackId) {
         activeTtsPlayback = null;
       }
-      CardStore.setRecordingLocked(false);
-      CardStore.setTtsRequested(false);
+      setRecordingLocked(false);
+      setTtsRequested(false);
       audioManager.clearCurrentAudio();
       return { status: 'skipped' };
     }
@@ -889,8 +894,8 @@ export async function ttsPlaybackService(_context: Record<string, unknown>, even
     clientConsole(1, '[TTS] Service error:', error);
 
     // Unlock recording even on error
-    CardStore.setRecordingLocked(false);
-    CardStore.setTtsRequested(false);
+    setRecordingLocked(false);
+    setTtsRequested(false);
 
     if (event?.autoRestartSr === true) {
       try {

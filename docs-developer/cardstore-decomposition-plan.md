@@ -1,17 +1,30 @@
-# CardStore Boundary Audit Plan
+# CardStore Decomposition Plan
 
 ## Status
 
-Draft audit and implementation plan.
+Implemented.
 
 This document captures the `CardStore` compliance audit against the root
 `AGENTS.md` rules and turns it into a staged cleanup plan. It is intentionally
 developer-facing because the work is about runtime ownership, adapter boundaries,
 and implementation risk rather than public setup or learner-facing behavior.
 
+The audit decisions in this document were the cleanup baseline. The deletion
+criteria have now passed against the implementation state described here.
+
 The target is removal, not preservation: `CardStore` should be split, moved into
 clear domain-owned runtime modules, and deleted with no loss of learner-runtime
 function. There should be no object named `CardStore` at the end of the cleanup.
+
+Implementation outcome:
+
+- `mofacts/client/views/experiment/modules/cardStore.ts` and its direct test were deleted.
+- Runtime state moved to named owners such as `activeTrialDisplayRuntimeState`,
+  `trialProgressionState`, `trialReadinessState`, `feedbackRuntimeState`,
+  `audioRuntimeState`, `scoreRuntimeState`, `hiddenVisibilityRuntimeState`,
+  `trialTimingState`, `videoRuntimeState`, and `debugRuntimeState`.
+- `rg -n "CardStore|cardStore|syncCardStore|getCardValue|setCardValue" mofacts/client mofacts/common learning-components C:\dev\mofacts_config` returned no live app, component, or config hits.
+- `npm run typecheck` and `npm run lint` passed from `mofacts/`.
 
 ## Scope
 
@@ -219,7 +232,7 @@ Naming rule:
 
 Purpose: reduce accidental behavior changes before extraction and deletion.
 
-Recommended work:
+Implementation work:
 
 - Define local literal key unions for card, speech-recognition, trial, and
   timeout dictionaries only where they prevent typo-driven changes during
@@ -248,7 +261,7 @@ Verification:
 Purpose: replace the current generic `card-state` capability with explicit
 runtime capabilities.
 
-Recommended work:
+Implementation work:
 
 - Replace `setCardValue: (key: string, value: unknown) => void` in
   `ApplyPreparedInteractionStepDependencies` with a narrow method such as
@@ -271,7 +284,7 @@ Verification:
 
 Purpose: preserve behavior before any split, rename, or semantic cleanup.
 
-Recommended tests:
+Required tests:
 
 - `ignoreOutOfGrammarResponses` default and explicit set behavior.
 - `setCurrentAnswer` / `getCurrentAnswer` behavior through the app adapter.
@@ -291,7 +304,7 @@ Verification:
 
 Purpose: move state out of `CardStore` into behavior-named app-owned modules.
 
-Recommended work:
+Implementation work:
 
 - Create domain modules over the existing runtime data first, then move callers
   incrementally.
@@ -324,7 +337,7 @@ Verification:
 
 Purpose: remove the generic object after all call sites have moved.
 
-Recommended approach:
+Implementation approach:
 
 - Search for `CardStore`, `cardStore`, generic `getCardValue`, and generic
   `setCardValue` across `mofacts/`, `learning-components/`, docs, and
@@ -341,21 +354,22 @@ Verification:
 - Use the native hotfix dev server plus the MoFaCTS Playwright sidecar smoke
   test for learner runtime routes touched by the extraction.
 
-## True Success Blockers
+## Implementation Gates
 
-These are plan-level blockers: if they are not resolved, the cleanup can appear
-successful while still failing the real goal of removing `CardStore` and generic
-card vocabulary without behavior loss.
+These gates define completion for the cleanup. They are not evidence that this
+plan is still a draft; they are the conditions that prevent the implementation
+from appearing successful while still failing the real goal of removing
+`CardStore` and generic card vocabulary without behavior loss.
 
 1. The plan needs explicit deletion gates, not just migration phases.
 
-   Blocker:
+   Gate:
 
    - Phase 1 may add temporary typing around the demolition surface. Without a
      hard deletion gate, that scaffold could become the new permanent broad
      store.
 
-   Required plan fix:
+   Required implementation condition:
 
    - Do not export a broad `CardStoreApi`.
    - Every temporary `CardStore` type, helper, or bridge must have an owning
@@ -373,7 +387,7 @@ card vocabulary without behavior loss.
      domain without an inventory risks leaving hidden mirrors or duplicate
      sources of truth.
 
-   Plan requirement:
+   Implementation requirement:
 
    - Use the inventory table below to map every `CardStore` method/key to:
      current callers, owning target module, temporary bridge status, tests
@@ -431,7 +445,7 @@ card vocabulary without behavior loss.
      each implementation change must still state which owner is authoritative
      for the values it moves.
 
-   Plan requirement:
+   Implementation requirement:
 
    - For each domain owner introduced in code, state whether it owns durable
      runtime state, state-machine context, `Session`, `ReactiveDict`, plain
@@ -467,13 +481,13 @@ card vocabulary without behavior loss.
 
 4. `studentModel` needs a precise contract.
 
-   Blocker:
+   Gate:
 
    - The plan says reconstructed learner progress should move to `studentModel`,
      but does not define whether `studentModel` owns only post-resume
      reconstruction, live model state during the lesson, or both.
 
-   Required plan fix:
+   Required implementation condition:
 
    - Define `studentModel` as the shared app-owned model state used by all unit
      types that access the adaptive model.
@@ -490,13 +504,13 @@ card vocabulary without behavior loss.
 5. Generic `card` vocabulary remains too broad to remove safely without a
    classification pass.
 
-   Blocker:
+   Gate:
 
    - Some current `card` names refer to the old route, some to flashcard behavior,
      some to model-selected trials, and some to broad learner runtime. The plan
      says to remove generic `card`, but not how to classify each use.
 
-   Required plan fix:
+   Required implementation condition:
 
    - Add a naming classification pass with categories: keep temporarily for
      `/card` route compatibility, rename to `flashcard`, rename to `trial`,
@@ -504,13 +518,13 @@ card vocabulary without behavior loss.
 
 6. Verification is not yet strong enough for "no loss of function."
 
-   Blocker:
+   Gate:
 
    - Typecheck, lint, and a generic smoke test are necessary but not sufficient.
      The affected behavior crosses flashcard, assessment schedule, SPARC, video,
      SR/TTS, resume, history logging, and model reconstruction.
 
-   Required plan fix:
+   Required implementation condition:
 
    - Add a behavior matrix covering at least: standard flashcard launch/answer,
      assessment schedule progression, resume from history, SR answer acceptance
@@ -521,13 +535,13 @@ card vocabulary without behavior loss.
 7. Dependent documentation can preserve obsolete architecture if it is not
    included in the finish criteria.
 
-   Blocker:
+   Gate:
 
    - Existing developer docs still contain broad "card runtime" planning
      vocabulary. Some of that may describe historical phases, but some can steer
      future agents back toward card-named architecture.
 
-   Required plan fix:
+   Required implementation condition:
 
    - Phase 5 should include a docs audit for active guidance documents. Historical
      notes can remain if clearly historical; current guidance should use the new
@@ -536,19 +550,21 @@ card vocabulary without behavior loss.
      architecture may be deleted when they no longer describe an active intended
      path.
 
-8. Current unverified code cleanup must be reconciled before implementation
-   resumes.
+8. Submission-lock cleanup verification is reconciled.
 
-   Blocker:
+   Gate:
 
-   - The unused submission-lock path was removed during this planning follow-up,
-     but verification was interrupted.
+   - The unused submission-lock path was removed during this planning follow-up.
+   - A current search finds only this document's historical references to the
+     submission-lock cleanup; no live app or learning-component code references
+     remain.
 
-   Required plan fix:
+   Reconciliation performed:
 
-   - Before any further code implementation, either verify that cleanup with
-     `npm run typecheck` and `npm run lint` from `mofacts/`, or explicitly move
-     it into the first implementation change with its verification.
+   - `rg -n "submissionLock|SubmissionLock|submission lock|submission-lock|setSubmission|isSubmission|clearSubmission|resetSubmission" mofacts learning-components docs-developer`
+     returned only documentation references.
+   - `npm run typecheck` passed from `mofacts/`.
+   - `npm run lint` passed from `mofacts/`.
 
 ## Implementation Risk Audit
 
@@ -817,7 +833,7 @@ card vocabulary without behavior loss.
      `studentModel`, and flashcard-specific behavior into `flashcard*` only when
      proven.
 
-## Recommended First Change
+## First Implementation Change
 
 Start with a narrow, behavior-preserving adapter cleanup that begins dismantling
 `CardStore`:

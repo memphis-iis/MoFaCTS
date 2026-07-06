@@ -2,7 +2,8 @@ import { Meteor } from 'meteor/meteor';
 import { Session } from 'meteor/session';
 import { getEngine } from '../../lib/engineManager';
 import { deliverySettingsStore } from '../../lib/state/deliverySettingsStore';
-import { CardStore } from './modules/cardStore';
+import { setFeedbackTypeFromHistory, setFeedbackUnset } from './svelte/services/feedbackRuntimeState';
+import { resetQuestionIndex } from './svelte/services/trialProgressionState';
 import { refreshCurrentDeliverySettingsStore, setStudentPerformance } from '../../lib/currentTestingHelpers';
 import { clientConsole } from '../../lib/userSessionHelpers';
 import { meteorCallAsync } from '../../index';
@@ -148,15 +149,15 @@ export async function unitIsFinished(reason: string, options: { engine?: unknown
 
   let curTdfUnit = curTdf.tdfs.tutor.unit[newUnitNum];
 
-  CardStore.setQuestionIndex(0);
+  resetQuestionIndex();
   Session.set('clusterIndex', undefined);
   Session.set('currentUnitNumber', newUnitNum);
   Session.set('currentTdfUnit', curTdfUnit);
   Session.set('resetSchedule', true);
   refreshCurrentDeliverySettingsStore();
   Session.set('currentUnitStartTime', Date.now());
-  CardStore.setFeedbackUnset(true);
-  CardStore.setFeedbackTypeFromHistory(undefined);
+  setFeedbackUnset(true);
+  setFeedbackTypeFromHistory(undefined);
   Session.set('curUnitInstructionsSeen', false);
 
   const resetStudentPerformance = deliverySettingsStore.get().resetStudentPerformance;
@@ -277,15 +278,15 @@ export async function revisitUnit(unitNumber: string | number) {
     return;
   }
 
-  CardStore.setQuestionIndex(0);
+  resetQuestionIndex();
   Session.set('clusterIndex', undefined);
   Session.set('currentUnitNumber', newUnitNum);
   Session.set('currentTdfUnit', curTdfUnit);
   Session.set('resetSchedule', true);
   refreshCurrentDeliverySettingsStore();
   Session.set('currentUnitStartTime', Date.now());
-  CardStore.setFeedbackUnset(true);
-  CardStore.setFeedbackTypeFromHistory(undefined);
+  setFeedbackUnset(true);
+  setFeedbackTypeFromHistory(undefined);
   Session.set('curUnitInstructionsSeen', false);
 
   const oldExperimentState = await getExperimentState();

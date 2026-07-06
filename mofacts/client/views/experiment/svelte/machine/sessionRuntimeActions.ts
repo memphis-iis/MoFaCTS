@@ -1,7 +1,6 @@
 import { LOG_PREFIXES } from './constants';
 import { deliverySettingsStore } from '../../../../lib/state/deliverySettingsStore';
 import { clientConsole } from '../../../../lib/clientLogger';
-import { CardStore } from '../../modules/cardStore';
 import {
   type EngineIndices,
   publishEngineIndices,
@@ -9,6 +8,11 @@ import {
   setCurrentDeliverySettings,
   setEngineIndices,
 } from '../services/cardRuntimeState';
+import {
+  setButtonList,
+  setButtonTrial,
+} from '../services/activeTrialDisplayRuntimeState';
+import { setQuestionIndex } from '../services/trialProgressionState';
 import { assign, type ActionArgs } from './contentRuntimeMachineActionTypes';
 
 export const initializeSession = assign({
@@ -27,11 +31,11 @@ export const syncDeliverySettings = ({ context }: ActionArgs) => {
   }
 };
 
-export const syncCardStore = ({ context, event }: ActionArgs) => {
+export const syncActiveTrialChoiceState = ({ context, event }: ActionArgs) => {
   const buttonTrial = event?.output?.buttonTrial ?? context.buttonTrial;
   const buttonList = event?.output?.buttonList || context.buttonList || [];
-  CardStore.setButtonTrial(!!buttonTrial);
-  CardStore.setButtonList(buttonList);
+  setButtonTrial(!!buttonTrial);
+  setButtonList(buttonList);
 };
 
 export function syncSessionIndices({ context }: ActionArgs) {
@@ -51,7 +55,7 @@ export function syncSessionIndices({ context }: ActionArgs) {
       setEngineIndices(nextIndices);
     }
   }
-  CardStore.setQuestionIndex(context.questionIndex || 1);
+  setQuestionIndex(context.questionIndex || 1);
 }
 
 export const incrementQuestionIndex = assign({

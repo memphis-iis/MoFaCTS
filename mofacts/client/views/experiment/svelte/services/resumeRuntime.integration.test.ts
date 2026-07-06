@@ -1,12 +1,20 @@
 import { expect } from 'chai';
 import { Session } from 'meteor/session';
-import { CardStore } from '../../modules/cardStore';
 import { ExperimentStateStore } from '../../../../lib/state/experimentStateStore';
 import {
   resolveSelectedCardExportQuestionIndex,
   selectCardService,
 } from './unitEngineService';
 import { createAssessmentModelEvidenceRecord, createHistoryRecord, historyLoggingService } from './historyLogging';
+import {
+  getQuestionIndex,
+  resetQuestionIndex,
+  setQuestionIndex,
+} from './trialProgressionState';
+import {
+  resetActiveTrialDisplayRuntimeState,
+  setCurrentAnswer,
+} from './activeTrialDisplayRuntimeState';
 import type { HistoryLoggingContext } from '../../../../../common/types';
 
 type SelectCardResultLike = Record<string, unknown> & {
@@ -52,7 +60,12 @@ describe('resume runtime integration seams', function() {
   beforeEach(function() {
     primeMinimalSession();
     ExperimentStateStore.set({});
-    CardStore.setQuestionIndex(1);
+    setQuestionIndex(1);
+  });
+
+  afterEach(function() {
+    resetQuestionIndex();
+    resetActiveTrialDisplayRuntimeState();
   });
 
   it('selectCardService consumes resumeToQuestion with existing answer and advances engine selection', async function() {
@@ -73,7 +86,7 @@ describe('resume runtime integration seams', function() {
     };
 
     Session.set('resumeToQuestion', true);
-    CardStore.setCurrentAnswer('alpha');
+    setCurrentAnswer('alpha');
 
     const result = await selectCardService(
       { engineIndices: { clusterIndex: 0 }, questionIndex: 1, engine },
@@ -108,7 +121,7 @@ describe('resume runtime integration seams', function() {
     };
 
     Session.set('resumeToQuestion', true);
-    CardStore.setCurrentAnswer('');
+    setCurrentAnswer('');
 
     const result = await selectCardService(
       { engineIndices: { clusterIndex: 0 }, questionIndex: 1, engine },
@@ -129,7 +142,7 @@ describe('resume runtime integration seams', function() {
       unitFinished: async () => false,
       selectNextCard: async () => {
         selectNextCardCalls += 1;
-        CardStore.setQuestionIndex(6);
+        setQuestionIndex(6);
       },
       clearPrefetchedNextCard: () => undefined,
       findCurrentCardInfo: () => ({
@@ -141,8 +154,8 @@ describe('resume runtime integration seams', function() {
     };
 
     Session.set('resumeToQuestion', true);
-    CardStore.setCurrentAnswer('alpha');
-    CardStore.setQuestionIndex(5);
+    setCurrentAnswer('alpha');
+    setQuestionIndex(5);
 
     const result = await selectCardService(
       { engineIndices: { clusterIndex: 0 }, questionIndex: 1, engine },
@@ -151,7 +164,7 @@ describe('resume runtime integration seams', function() {
 
     expect(selectNextCardCalls).to.equal(1);
     expect(result.questionIndex).to.equal(6);
-    expect(CardStore.getQuestionIndex()).to.equal(6);
+    expect(getQuestionIndex()).to.equal(6);
   });
 
   it('resolves selected-card export index from the live schedule pointer only for schedule units', function() {
@@ -192,7 +205,7 @@ describe('resume runtime integration seams', function() {
     };
 
     Session.set('resumeToQuestion', true);
-    CardStore.setCurrentAnswer('');
+    setCurrentAnswer('');
 
     const result = await selectCardService(
       { engineIndices: { clusterIndex: 0 }, questionIndex: 1, engine },
@@ -240,7 +253,7 @@ describe('resume runtime integration seams', function() {
       clusterMapping: [0],
     });
     Session.set('clusterIndex', 0);
-    CardStore.setQuestionIndex(3);
+    setQuestionIndex(3);
 
     const record = createHistoryRecord({
       trialEndTimeStamp: 2000,
@@ -331,7 +344,7 @@ describe('resume runtime integration seams', function() {
     });
     Session.set('unitType', 'model');
     Session.set('clusterIndex', 0);
-    CardStore.setQuestionIndex(2);
+    setQuestionIndex(2);
 
     const record = createHistoryRecord({
       trialEndTimeStamp: 2000,

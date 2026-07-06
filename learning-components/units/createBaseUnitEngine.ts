@@ -12,7 +12,7 @@ export interface CreateBaseUnitEngineParams {
   readonly getDeliverySettings: () => Record<string, unknown> | null | undefined;
   readonly getStimAnswer: (clusterIndex: number, whichStim: number) => string;
   readonly setSessionValue: (key: UnitEngineSessionWriteKey, value: unknown) => void;
-  readonly setCardValue: (key: string, value: unknown) => void;
+  readonly setCurrentAnswer: (value: string | undefined) => void;
   readonly setAlternateDisplayIndex: (value: number | undefined) => void;
   readonly setOriginalQuestion: (value: unknown) => void;
   readonly log: (level: number, ...args: unknown[]) => void;
@@ -70,7 +70,7 @@ export function createBaseUnitEngine(params: CreateBaseUnitEngineParams): any {
     applyPreparedCardQuestionAndAnswerGlobals: function(preparedState: any) {
       return applyPreparedInteractionStepState(preparedState, {
         setSessionValue: params.setSessionValue,
-        setCardValue: params.setCardValue,
+        setCurrentAnswer: params.setCurrentAnswer,
         setAlternateDisplayIndex: params.setAlternateDisplayIndex,
         setOriginalQuestion: params.setOriginalQuestion,
       });

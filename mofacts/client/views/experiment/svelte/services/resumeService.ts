@@ -28,7 +28,21 @@ import {
   loadMappingRecord,
   validateMappingRecord,
 } from './mappingRecordService';
-import { CardStore } from '../../modules/cardStore';
+import {
+  isFeedbackUnset,
+  setFeedbackUnset,
+  setInFeedback,
+} from './feedbackRuntimeState';
+import { setScoringEnabled } from './scoreRuntimeState';
+import { setVideoSource } from './videoRuntimeState';
+import {
+  setCurIntervalId,
+  setCurTimeoutId,
+  setScrollListCount,
+  setTrialEndTimestamp,
+  setTrialStartTimestamp,
+  setVarLenTimeoutName,
+} from './trialTimingState';
 import { deliverySettingsStore } from '../../../../lib/state/deliverySettingsStore';
 import { ExperimentStateStore } from '../../../../lib/state/experimentStateStore';
 import { createUnitEngineForUnit } from '../../engineConstructors';
@@ -72,6 +86,11 @@ import {
   setResumeInProgress,
   setVideoSessionActive,
 } from './cardRuntimeState';
+import {
+  getQuestionIndex,
+  setQuestionIndex,
+} from './trialProgressionState';
+import { resetActiveTrialDisplayRuntimeState } from './activeTrialDisplayRuntimeState';
 import {
   assertIdInvariants,
   clearConditionResolutionContext,
@@ -432,7 +451,7 @@ function getConditionIndexOrThrow(conditions: string[], conditionFileName: unkno
 function preloadVideos(): void {
   const resolvedVideo = resolveVideoResumeSource(Session.get('currentTdfUnit'));
   if (resolvedVideo) {
-    CardStore.setVideoSource(resolvedVideo);
+    setVideoSource(resolvedVideo);
   }
 }
 
@@ -465,15 +484,15 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
   clientConsole(2, 'Resuming from canonical experiment state');
 
   try {
-    CardStore.setTrialStartTimestamp(0);
-    CardStore.setTrialEndTimestamp(0);
-    CardStore.setCurTimeoutId(undefined);
-    CardStore.setCurIntervalId(undefined);
-    CardStore.setVarLenTimeoutName(undefined);
-    CardStore.setScrollListCount(0);
+    setTrialStartTimestamp(0);
+    setTrialEndTimestamp(0);
+    setCurTimeoutId(undefined);
+    setCurIntervalId(undefined);
+    setVarLenTimeoutName(undefined);
+    setScrollListCount(0);
     setDisplayReadyState(false);
     setInputReadyState(false);
-    CardStore.setInFeedback(false);
+    setInFeedback(false);
 
     const feedbackDisplay = document.getElementById('feedbackDisplay');
     if (feedbackDisplay) feedbackDisplay.innerHTML = '';
@@ -750,7 +769,7 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
       'currentStimuliSet',
       repairFormattedStimuliResponsesFromRaw(stimuliSet, curTdf.rawStimuliFile)
     );
-    CardStore.setFeedbackUnset(Session.get('fromInstructions') || CardStore.isFeedbackUnset());
+    setFeedbackUnset(Session.get('fromInstructions') || isFeedbackUnset());
     Session.set('fromInstructions', false);
 
     if (setspec.randomizedDelivery && setspec.randomizedDelivery.length) {
@@ -1028,7 +1047,7 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
       
       // Assessment units use questionIndex as the authoritative pointer.
       // We set it to the count of completed trials.
-      CardStore.setQuestionIndex(completedAssessmentTrials);
+      setQuestionIndex(completedAssessmentTrials);
       
       clientConsole(2, '[Resume Service] Assessment position inferred', {
         completedTrialCount: completedAssessmentTrials,
@@ -1039,13 +1058,13 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
       resetRuntimeHistories();
     }
 
-    CardStore.setQuestionIndex(CardStore.getQuestionIndex() || 0);
+    setQuestionIndex(getQuestionIndex() || 0);
 
     // ====================
     // ====================
 
-    if (CardStore.isFeedbackUnset()){
-      CardStore.setFeedbackUnset(false);
+    if (isFeedbackUnset()){
+      setFeedbackUnset(false);
     }
 
     // ====================
@@ -1058,15 +1077,12 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
     // Progress state is now derived from history reconstruction above
     Session.set('clozeQuestionParts', undefined);
     Session.set('testType', undefined);
-    CardStore.setOriginalQuestion(undefined);
-    CardStore.setCurrentAnswer(undefined);
-    CardStore.setAlternateDisplayIndex(undefined);
+    resetActiveTrialDisplayRuntimeState();
     if (typeof curExperimentState.subTdfIndex === 'number' && Number.isInteger(curExperimentState.subTdfIndex)) {
       Session.set('subTdfIndex', curExperimentState.subTdfIndex);
     } else {
       Session.set('subTdfIndex', undefined);
     }
-    CardStore.setCurrentDisplay(undefined);
 
     let moduleCompleted = false;
 
@@ -1124,7 +1140,7 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
       Session.set('currentTdfUnit', curTdfUnit);
     }
     refreshCurrentDeliverySettingsStore();
-    CardStore.setScoringEnabled(Boolean((deliverySettingsStore.get() as Record<string, unknown>).scoringEnabled));
+    setScoringEnabled(Boolean((deliverySettingsStore.get() as Record<string, unknown>).scoringEnabled));
 
     await engine.loadResumeState();
 

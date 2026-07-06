@@ -5,12 +5,22 @@ import {
   UNIT_ENGINE_SESSION_READ_KEYS,
   UNIT_ENGINE_SESSION_WRITE_KEYS,
 } from './unitEngineRuntimeContext';
+import {
+  getQuestionIndex,
+  resetQuestionIndex,
+} from './svelte/services/trialProgressionState';
+import {
+  getCurrentAnswer,
+  resetActiveTrialDisplayRuntimeState,
+} from './svelte/services/activeTrialDisplayRuntimeState';
 
 describe('unitEngineRuntimeContext', function() {
   afterEach(function() {
     Session.set('currentTdfId', undefined);
     Session.set('currentTdfDoc', undefined);
     Session.set('testType', undefined);
+    resetQuestionIndex();
+    resetActiveTrialDisplayRuntimeState();
     delete (globalThis as any).Tdfs;
   });
 
@@ -58,5 +68,21 @@ describe('unitEngineRuntimeContext', function() {
 
     expect(context.stimuli.findTdfById('tdf-active')).to.equal(activeDoc);
     expect(collectionLookupCount).to.equal(0);
+  });
+
+  it('exposes current-answer updates as a named app runtime capability', function() {
+    const context = createAppUnitEngineRuntimeContext();
+
+    context.cardState.setCurrentAnswer('alpha');
+
+    expect(getCurrentAnswer()).to.equal('alpha');
+  });
+
+  it('exposes question-index updates through the trial progression owner', function() {
+    const context = createAppUnitEngineRuntimeContext();
+
+    context.cardState.setQuestionIndex(7);
+
+    expect(getQuestionIndex()).to.equal(7);
   });
 });

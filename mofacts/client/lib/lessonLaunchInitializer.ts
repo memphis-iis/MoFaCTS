@@ -1,7 +1,7 @@
 import { Session } from 'meteor/session';
-import { CardStore } from '../views/experiment/modules/cardStore';
 import { getExperimentState } from '../views/experiment/svelte/services/experimentState';
 import { ensureCurrentStimuliSetId } from '../views/experiment/svelte/services/mediaResolver';
+import { setIgnoreOutOfGrammarResponses } from '../views/experiment/svelte/services/audioRuntimeState';
 import { clearConditionResolutionContext, setActiveTdfContext } from './idContext';
 import { loadLaunchReadyTdf } from './launchReadyTdf';
 import { clientConsole } from './clientLogger';
@@ -86,7 +86,7 @@ export async function prepareLessonLaunchContext(params: PrepareLessonLaunchPara
     currentStimuliSetId,
   }, `${source}.loaded`);
   ensureCurrentStimuliSetId(currentStimuliSetId || tdfDoc?.stimuliSetId);
-  CardStore.setIgnoreOutOfGrammarResponses(ignoreOutOfGrammarResponses);
+  setIgnoreOutOfGrammarResponses(ignoreOutOfGrammarResponses);
   Session.set('speechOutOfGrammarFeedback', speechOutOfGrammarFeedback);
 
   const unitCount = Array.isArray(content?.tdfs?.tutor?.unit) ? content.tdfs.tutor.unit.length : 0;

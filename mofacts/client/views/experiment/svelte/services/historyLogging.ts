@@ -13,7 +13,6 @@ type UnderscoreLike = {
 };
 const _ = underscore as unknown as UnderscoreLike;
 import { ExperimentStateStore } from '../../../../lib/state/experimentStateStore';
-import { CardStore } from '../../modules/cardStore';
 import { getStimCluster, getStimCount } from '../../../../lib/currentTestingHelpers';
 import { evaluateSrAvailability } from '../../../../lib/audioAvailability';
 import { clientConsole } from '../../../../lib/clientLogger';
@@ -28,6 +27,8 @@ import {
   validateMappingRecord,
 } from './mappingRecordService';
 import { recordRuntimeOutcomeHistories } from './cardRuntimeState';
+import { getQuestionIndex } from './trialProgressionState';
+import { getAlternateDisplayIndex } from './activeTrialDisplayRuntimeState';
 import {
   applyH5PSummaryToRecord,
   insertH5PHistoryRows,
@@ -668,7 +669,7 @@ export function createHistoryRecord({
   // Determine indices based on unit type
   const isStudy = testType === 's';
   const rawClusterIndex = typeof cluster.clusterIndex === 'number' ? cluster.clusterIndex : clusterIndex;
-  const displayOrder = Number(CardStore.getQuestionIndex() || questionIndex);
+  const displayOrder = Number(getQuestionIndex() || questionIndex);
   const {
     shufIndex,
     stimFileIndex,
@@ -789,7 +790,7 @@ export function createHistoryRecord({
     'CFDisplayOrder': displayOrder,
     'CFStimFileIndex': stimFileIndex,
     'CFSetShuffledIndex': shufIndex,
-    'CFAlternateDisplayIndex': CardStore.getAlternateDisplayIndex() || alternateDisplayIndex || null,
+    'CFAlternateDisplayIndex': getAlternateDisplayIndex() || alternateDisplayIndex || null,
     'CFStimulusVersion': whichStim,
     'CFCorrectAnswer': correctAnswer,
     'CFOverlearning': false,

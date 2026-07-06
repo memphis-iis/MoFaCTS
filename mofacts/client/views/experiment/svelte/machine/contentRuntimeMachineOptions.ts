@@ -131,7 +131,7 @@ export const contentRuntimeMachineOptions = {
     applySparcActionResult: contentRuntimeMachineActions.applySparcActionResult,
     clearUserAnswer: contentRuntimeMachineActions.clearUserAnswer,
     syncDeliverySettings: contentRuntimeMachineActions.syncDeliverySettings,
-    syncCardStore: contentRuntimeMachineActions.syncCardStore,
+    syncActiveTrialChoiceState: contentRuntimeMachineActions.syncActiveTrialChoiceState,
     syncSessionIndices: contentRuntimeMachineActions.syncSessionIndices,
     syncCurrentAnswer: contentRuntimeMachineActions.syncCurrentAnswer,
     incrementQuestionIndex: contentRuntimeMachineActions.incrementQuestionIndex,

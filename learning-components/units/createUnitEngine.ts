@@ -70,7 +70,7 @@ export interface UnitEngineHistoryRuntime {
 
 export interface UnitEngineCardStateRuntime {
   readonly setQuestionIndex: (questionIndex: number) => void;
-  readonly setCardValue: (key: string, value: unknown) => void;
+  readonly setCurrentAnswer: (value: string | undefined) => void;
   readonly setAlternateDisplayIndex: (value: number | undefined) => void;
   readonly setOriginalQuestion: (value: unknown) => void;
 }
@@ -176,7 +176,7 @@ export function getCreateUnitEngineCapabilitySet(
   if (hasRuntimeFunctions(deps.stimuli, 'getStimCount', 'getStimCluster')) {
     capabilities.add('stimuli');
   }
-  if (hasRuntimeFunctions(deps.cardState, 'setQuestionIndex')) {
+  if (hasRuntimeFunctions(deps.cardState, 'setQuestionIndex', 'setCurrentAnswer')) {
     capabilities.add('card-state');
   }
   if (hasRuntimeFunctions(
@@ -232,7 +232,7 @@ export function createDefaultUnitEngine(deps: CreateUnitEngineDeps, curExperimen
     getDeliverySettings: deps.deliverySettings.getDeliverySettings,
     getStimAnswer: (clusterIndex, whichAnswer) => getStimAnswer(deps, clusterIndex, whichAnswer),
     setSessionValue: deps.session.setSessionValue,
-    setCardValue: deps.cardState.setCardValue,
+    setCurrentAnswer: deps.cardState.setCurrentAnswer,
     setAlternateDisplayIndex: deps.cardState.setAlternateDisplayIndex,
     setOriginalQuestion: deps.cardState.setOriginalQuestion,
     log: deps.logging.log,

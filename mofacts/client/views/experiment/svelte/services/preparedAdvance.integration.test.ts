@@ -1,6 +1,5 @@
 import { expect } from 'chai';
 import { Session } from 'meteor/session';
-import { CardStore } from '../../modules/cardStore';
 import { ExperimentStateStore } from '../../../../lib/state/experimentStateStore';
 import {
   canEngineUseSeamlessPreparedAdvance,
@@ -10,6 +9,11 @@ import {
   resolvePreparedIncomingTrialRoute,
   resolvePreparedTrialCommitRoute,
 } from './unitEngineService';
+import {
+  getQuestionIndex,
+  resetQuestionIndex,
+  setQuestionIndex,
+} from './trialProgressionState';
 
 function primeMinimalSession(): void {
   Session.set('clusterMapping', [0]);
@@ -45,7 +49,11 @@ describe('prepared advance integration seams', function() {
   beforeEach(function() {
     primeMinimalSession();
     ExperimentStateStore.set({});
-    CardStore.setQuestionIndex(1);
+    setQuestionIndex(1);
+  });
+
+  afterEach(function() {
+    resetQuestionIndex();
   });
 
   it('prepareIncomingTrialService materializes model locked-next payload without committing it', async function() {
@@ -245,6 +253,6 @@ describe('prepared advance integration seams', function() {
 
     expect(commitPreparedScheduledCardCalls).to.equal(1);
     expect(Session.get('currentAnswer')).to.equal('alpha');
-    expect(CardStore.getQuestionIndex()).to.equal(4);
+    expect(getQuestionIndex()).to.equal(4);
   });
 });

@@ -22,6 +22,7 @@ import {
 import {
   getSparcControllerRuntimeContext,
 } from '../services/sparcControllerRuntimeContextCache';
+import { isTtsRequested } from '../services/audioRuntimeState';
 import {
   evaluateSparcControllerResponse,
   resolveSparcControllerDisplay,
@@ -32,7 +33,6 @@ import {
   SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY,
   collectSparcProgressiveNodeOperations,
 } from '../../../../../../learning-components/trial-displays/sparc/sparcProgressiveNodes';
-import { CardStore } from '../../modules/cardStore';
 import { fromCallback, fromPromise, type AnyEventObject } from 'xstate';
 import { resolveH5PModelOutcomes } from '../../../../../common/lib/h5pTrialResult';
 import type { H5PTrialResult } from '../../../../../common/types';
@@ -394,13 +394,13 @@ function mainCardTimeout(context: TimeoutContextLike, _event: unknown) {
   return new Promise<void>((resolve) => {
     let ttsWaitIntervalId: ReturnType<typeof setInterval> | null = null;
     const resolveAfterTtsCompletes = () => {
-      if (!CardStore.isTtsRequested()) {
+      if (!isTtsRequested()) {
         resolve();
         return;
       }
 
       ttsWaitIntervalId = setInterval(() => {
-        if (CardStore.isTtsRequested()) {
+        if (isTtsRequested()) {
           return;
         }
         if (ttsWaitIntervalId) {

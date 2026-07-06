@@ -67,7 +67,7 @@ describe('Learning component catalog', function() {
       },
       cardState: {
         setQuestionIndex() {},
-        setCardValue() {},
+        setCurrentAnswer() {},
         setAlternateDisplayIndex() {},
         setOriginalQuestion() {},
       },

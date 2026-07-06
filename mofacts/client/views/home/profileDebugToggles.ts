@@ -1,4 +1,8 @@
-import { CardStore } from '../experiment/modules/cardStore';
+import {
+    getDebugParms,
+    setDebugParms,
+    type DebugParms,
+} from '../experiment/svelte/services/debugRuntimeState';
 import './profileDebugToggles.html';
 
 declare const Template: {
@@ -11,22 +15,22 @@ declare const Template: {
 declare const $: (selector: string) => { prop(name: string, value: unknown): void };
 
 Template.profileDebugToggles.rendered = function() {
-    const debugParms = CardStore.getDebugParms() as { probParmsDisplay?: boolean } | null;
+    const debugParms = getDebugParms();
     if(debugParms)
         $('#debugProbParmsDisplay').prop('checked', debugParms.probParmsDisplay);
 }
 Template.profileDebugToggles.helpers({
     debugParms: () => {
-        return CardStore.getDebugParms();
+        return getDebugParms();
     }
 });
 
 Template.profileDebugToggles.events({
     'click #debugProbParmsDisplay': function() {
-        const debugParms = (CardStore.getDebugParms() || {}) as { probParmsDisplay?: boolean };
+        const debugParms = (getDebugParms() || {}) as DebugParms;
         debugParms.probParmsDisplay = !debugParms.probParmsDisplay;
         $('#debugProbParmsDisplay').prop('checked', debugParms.probParmsDisplay);
-        CardStore.setDebugParms(debugParms);
+        setDebugParms(debugParms);
         
     },
 });

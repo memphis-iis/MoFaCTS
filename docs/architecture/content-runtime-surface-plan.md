@@ -2,11 +2,11 @@
 
 ## Status
 
-Implemented for the learner-runtime surface boundary. This document now records the target shape, the migration that was performed, and the remaining work that is deliberately outside this pass.
+Implemented for the learner-runtime surface boundary. This document now records the target shape, the migration that was performed, and historical work that was deliberately outside this pass.
 
 Explicit exclusions:
 
-- `CardStore` remains deliberately out of scope. It is a broad shared learner-runtime store, not a flashcard-only store, and needs a separate store-boundary audit before renaming or splitting.
+- Historical note: the broad shared learner-runtime store was deliberately out of scope for this surface pass and was handled by the separate store-boundary cleanup.
 - Low-level trial-object contracts remain deliberately out of scope. `learning-components/` still exposes trial-display adapter and unit-engine API names such as `SparcTrialDisplay*`; this pass contains that terminology behind learner-runtime `SparcController` names rather than rewriting the lower-level implementation contracts.
 - Broader flashcard helper names such as `activeTrial*`, `incomingTrial*`, and generic `trialDisplay*` remain implementation debt where they still describe low-level trial handoff or display-state objects. They are not allowed to route SPARC or decide session ownership.
 
@@ -318,7 +318,7 @@ Steps:
 - Keep route/template names unchanged unless the route itself changes later.
 - Add a small compatibility comment in `card.ts` explaining that the legacy `card` route mounts the content runtime surface.
 - Do not rename every `card*` helper in the same step.
-- Do not rename `cardMachine`, `CardStore`, or card runtime services in this phase.
+- Do not rename `cardMachine` or card runtime services in this phase.
 - Do not change component props in this phase.
 
 Suggested mechanical commands:
@@ -548,7 +548,7 @@ Implementation sequence:
    - trial-specific helpers
    - legacy compatibility names
 2. Rename only the state-machine core first if the classification is clean.
-3. Leave `CardStore` alone unless a separate store-boundary plan exists.
+3. Leave app-owned runtime state owners alone unless a separate state-boundary plan exists.
 4. Update logs only where they are runtime-boundary logs. Preserve historical log labels if dashboards or tests depend on them.
 
 Expected diff shape:
@@ -587,7 +587,7 @@ Use this checklist in the PR or commit notes for each phase:
 
 ## Future Work Outside This Pass
 
-- `CardStore` needs a separate store-boundary audit before any rename, split, or ownership change.
+- Low-level runtime state owners need their own boundary plans before future renames or ownership changes.
 - Low-level trial-object contracts in `learning-components/` need a separate API-boundary cleanup before removing names such as `SparcTrialDisplay*`.
 - SPARC editor operability needs its own plan, including how `/sparcEdit/:tdfId` should be reached and whether authoring preview should reuse `SparcSessionSurface` without learner-runtime `SparcController` behavior.
 - H5P removal or timer-policy redesign needs its own plan. This pass preserves H5P behavior while keeping timer policy explicit.
