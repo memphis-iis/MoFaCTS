@@ -31,9 +31,9 @@
         <div class="manual-page-header">
             <div class="editor-page-header content-upload-empty-text">
                 <a href="/contentUpload" class="btn btn-outline-secondary editor-back-button">
-                    <i class="fa fa-arrow-left"></i> Back
+                    <i class="fa fa-arrow-left"></i> {{manualText 'manualCreator.back'}}
                 </a>
-                <h3 class="page-header-text editor-page-title">Create New Content</h3>
+                <h3 class="page-header-text editor-page-title">{{manualText 'manualCreator.title'}}</h3>
             </div>
             <div class="theme-action-row">
                 <button type="button" class="btn btn-outline-primary" id="manual-save-draft" {{draftPersistenceAttrs}}>
@@ -41,7 +41,7 @@
                 </button>
                 {{#if hasSavedDraft}}
                 <button type="button" class="btn btn-outline-danger" id="manual-delete-draft" {{draftPersistenceAttrs}}>
-                    <i class="fa fa-trash"></i> Delete Draft
+                    <i class="fa fa-trash"></i> {{manualText 'manualCreator.deleteDraft'}}
                 </button>
                 {{/if}}
             </div>
@@ -66,7 +66,7 @@
                 <div class="admin-inline-confirmation-message">{{manualConfirmation.message}}</div>
             </div>
             <div class="admin-inline-confirmation-actions">
-                <button type="button" class="btn btn-sm btn-outline-secondary" id="cancel-manual-confirmation">Cancel</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="cancel-manual-confirmation">{{manualText 'manualCreator.cancel'}}</button>
                 <button type="button" class="btn btn-sm {{manualConfirmation.confirmClass}}" id="confirm-manual-confirmation">
                     {{manualConfirmation.confirmLabel}}
                 </button>
@@ -103,53 +103,53 @@
                         {{#with state}}
                         {{#if isStep 1}}
                         <div class="manual-step-intro">
-                            <h4>Lesson Basics</h4>
-                            <div class="text-muted">Name. Structure. Visibility. Link.</div>
+                                <h4>{{manualText 'manualCreator.lessonBasics'}}</h4>
+                            <div class="text-muted">{{manualText 'manualCreator.basicsIntro'}}</div>
                         </div>
                         <div class="manual-field-stack">
                             <div>
-                                <div class="manual-field-label">Lesson name</div>
-                                <input type="text" class="form-control" data-field="lessonName" value="{{lessonName}}" placeholder="My New Lesson">
+                                <div class="manual-field-label">{{manualText 'manualCreator.lessonName'}}</div>
+                                <input type="text" class="form-control" data-field="lessonName" value="{{lessonName}}" placeholder="{{manualText 'manualCreator.lessonNamePlaceholder'}}">
                             </div>
                             <div>
-                                <div class="manual-field-label">Structure</div>
+                                <div class="manual-field-label">{{manualText 'manualCreator.structure'}}</div>
                                 <select class="form-select" data-field="structure">
-                                    <option value="learning-only" selected="{{selectedIf structure 'learning-only'}}">Learning only</option>
-                                    <option value="instructions-learning" selected="{{selectedIf structure 'instructions-learning'}}">Instructions + Learning</option>
-                                    <option value="assessment-only" selected="{{selectedIf structure 'assessment-only'}}">Assessment only</option>
-                                    <option value="instructions-assessment" selected="{{selectedIf structure 'instructions-assessment'}}">Instructions + Assessment</option>
+                                    <option value="learning-only" selected="{{selectedIf structure 'learning-only'}}">{{manualText 'manualCreator.learningOnly'}}</option>
+                                    <option value="instructions-learning" selected="{{selectedIf structure 'instructions-learning'}}">{{manualText 'manualCreator.instructionsLearning'}}</option>
+                                    <option value="assessment-only" selected="{{selectedIf structure 'assessment-only'}}">{{manualText 'manualCreator.assessmentOnly'}}</option>
+                                    <option value="instructions-assessment" selected="{{selectedIf structure 'instructions-assessment'}}">{{manualText 'manualCreator.instructionsAssessment'}}</option>
                                 </select>
                             </div>
                             {{#if structureIncludesInstructions}}
                             <div>
-                                <div class="manual-field-label">Instruction text</div>
-                                <textarea class="form-control" rows="4" data-field="instructionText" placeholder="Add the text learners should see before they begin.">{{instructionText}}</textarea>
-                                <div class="manual-helper">Shown before the practice or assessment unit begins.</div>
+                                <div class="manual-field-label">{{manualText 'manualCreator.instructionText'}}</div>
+                                <textarea class="form-control" rows="4" data-field="instructionText" placeholder="{{manualText 'manualCreator.instructionTextPlaceholder'}}">{{instructionText}}</textarea>
+                                <div class="manual-helper">{{manualText 'manualCreator.instructionTextHelper'}}</div>
                             </div>
                             {{/if}}
                             <div>
-                                <div class="manual-field-label">Visibility</div>
+                                <div class="manual-field-label">{{manualText 'manualCreator.visibility'}}</div>
                                 <div class="manual-inline-options">
                                     <label class="form-check editor-inline-check">
                                         <input class="form-check-input" type="radio" name="manual-visibility" data-field="visibility" value="private" checked="{{checkedIf visibility 'private'}}">
-                                        <span class="form-check-label">Private</span>
+                                        <span class="form-check-label">{{manualText 'content.private'}}</span>
                                     </label>
                                     <label class="form-check editor-inline-check">
                                         <input class="form-check-input" type="radio" name="manual-visibility" data-field="visibility" value="public" checked="{{checkedIf visibility 'public'}}">
-                                        <span class="form-check-label">Public</span>
+                                        <span class="form-check-label">{{manualText 'content.public'}}</span>
                                     </label>
                                 </div>
                             </div>
                             <div>
                                 <label class="form-check editor-inline-check">
                                     <input class="form-check-input" type="checkbox" data-field="experimentLinkEnabled" checked="{{boolChecked experimentLinkEnabled}}">
-                                    <span class="form-check-label">Experiment link</span>
+                                    <span class="form-check-label">{{manualText 'manualCreator.experimentLink'}}</span>
                                 </label>
                                 {{#if experimentLinkEnabled}}
                                 <div class="admin-form-row-top">
-                                    <div class="manual-field-label">Link name</div>
-                                    <input type="text" class="form-control" data-field="experimentTarget" value="{{experimentTarget}}" placeholder="my-experiment">
-                                    <div class="manual-helper">Preview: {{experimentLinkPreview}}</div>
+                                    <div class="manual-field-label">{{manualText 'manualCreator.linkName'}}</div>
+                                    <input type="text" class="form-control" data-field="experimentTarget" value="{{experimentTarget}}" placeholder="{{manualText 'manualCreator.linkNamePlaceholder'}}">
+                                    <div class="manual-helper">{{experimentLinkPreviewText}}</div>
                                 </div>
                                 {{/if}}
                             </div>
@@ -158,46 +158,46 @@
 
                         {{#if isStep 2}}
                         <div class="manual-step-intro">
-                            <h4>Card Format</h4>
-                            <div class="text-muted">Prompt. Response. Cards. Shuffle.</div>
+                            <h4>{{manualText 'manualCreator.cardFormat'}}</h4>
+                            <div class="text-muted">{{manualText 'manualCreator.cardFormatIntro'}}</div>
                         </div>
                         <div class="manual-field-stack">
                             <div>
-                                <div class="manual-field-label">Prompt</div>
+                                <div class="manual-field-label">{{manualText 'manualCreator.prompt'}}</div>
                                 <select class="form-select" data-field="promptType">
-                                    <option value="text" selected="{{selectedIf promptType 'text'}}">Text</option>
-                                    <option value="image" selected="{{selectedIf promptType 'image'}}">Image</option>
-                                    <option value="audio" selected="{{selectedIf promptType 'audio'}}">Audio</option>
-                                    <option value="video" selected="{{selectedIf promptType 'video'}}">Video</option>
-                                    <option value="text-image" selected="{{selectedIf promptType 'text-image'}}">Text + Image</option>
+                                    <option value="text" selected="{{selectedIf promptType 'text'}}">{{manualText 'manualCreator.text'}}</option>
+                                    <option value="image" selected="{{selectedIf promptType 'image'}}">{{manualText 'manualCreator.image'}}</option>
+                                    <option value="audio" selected="{{selectedIf promptType 'audio'}}">{{manualText 'manualCreator.audio'}}</option>
+                                    <option value="video" selected="{{selectedIf promptType 'video'}}">{{manualText 'manualCreator.video'}}</option>
+                                    <option value="text-image" selected="{{selectedIf promptType 'text-image'}}">{{manualText 'manualCreator.textImage'}}</option>
                                 </select>
                             </div>
                             <div>
-                                <div class="manual-field-label">Response</div>
+                                <div class="manual-field-label">{{manualText 'manualCreator.response'}}</div>
                                 <select class="form-select" data-field="responseType">
-                                    <option value="typed" selected="{{selectedIf responseType 'typed'}}">Typed response</option>
-                                    <option value="multiple-choice" selected="{{selectedIf responseType 'multiple-choice'}}">Multiple choice</option>
+                                    <option value="typed" selected="{{selectedIf responseType 'typed'}}">{{manualText 'manualCreator.typedResponse'}}</option>
+                                    <option value="multiple-choice" selected="{{selectedIf responseType 'multiple-choice'}}">{{manualText 'manualCreator.multipleChoice'}}</option>
                                 </select>
                             </div>
                             <div class="row g-3">
                                 <div class="col-md-6">
-                                    <div class="manual-field-label">Cards</div>
+                                    <div class="manual-field-label">{{manualText 'manualCreator.cards'}}</div>
                                     <input type="number" min="1" class="form-control" data-field="cardCount" value="{{cardCount}}">
                                 </div>
                                 <div class="col-md-6">
-                                    <div class="manual-field-label">Shuffle</div>
+                                    <div class="manual-field-label">{{manualText 'manualCreator.shuffle'}}</div>
                                     <label class="form-check admin-form-row-top">
                                         <input class="form-check-input" type="checkbox" data-field="shuffle" checked="{{boolChecked shuffle}}">
-                                        <span class="form-check-label">Shuffle before learners begin</span>
+                                        <span class="form-check-label">{{manualText 'manualCreator.shuffleBeforeLearners'}}</span>
                                     </label>
                                 </div>
                             </div>
                             {{#if isMultipleChoice}}
                             <div>
-                                <div class="manual-field-label">Button order</div>
+                                <div class="manual-field-label">{{manualText 'manualCreator.buttonOrder'}}</div>
                                 <select class="form-select" data-field="buttonOrder">
-                                    <option value="random" selected="{{selectedIf buttonOrder 'random'}}">Random</option>
-                                    <option value="fixed" selected="{{selectedIf buttonOrder 'fixed'}}">Fixed</option>
+                                    <option value="random" selected="{{selectedIf buttonOrder 'random'}}">{{manualText 'manualCreator.random'}}</option>
+                                    <option value="fixed" selected="{{selectedIf buttonOrder 'fixed'}}">{{manualText 'manualCreator.fixed'}}</option>
                                 </select>
                             </div>
                             {{/if}}
@@ -206,107 +206,107 @@
 
                         {{#if isStep 3}}
                         <div class="manual-step-intro">
-                            <h4>Audio And Display</h4>
-                            <div class="text-muted">Speech. Voice. Top bar. Timing. Tags.</div>
+                            <h4>{{manualText 'manualCreator.audioAndDisplay'}}</h4>
+                            <div class="text-muted">{{manualText 'manualCreator.audioDisplayIntro'}}</div>
                         </div>
                         <div class="manual-field-stack">
                             <div>
                                 <label class="form-check editor-inline-check">
                                     <input class="form-check-input" type="checkbox" data-field="speechRecognitionEnabled" checked="{{boolChecked speechRecognitionEnabled}}">
-                                    <span class="form-check-label">Speech recognition</span>
+                                    <span class="form-check-label">{{manualText 'manualCreator.speechRecognition'}}</span>
                                 </label>
                                 {{#if speechRecognitionEnabled}}
                                 <div class="row g-3 admin-form-row-top">
                                     <div class="col-md-6">
-                                        <div class="manual-field-label">Speech language</div>
+                                        <div class="manual-field-label">{{manualText 'manualCreator.speechLanguage'}}</div>
                                         <input type="text" class="form-control" data-field="speechLanguage" value="{{speechLanguage}}" placeholder="en-US">
                                     </div>
                                     <div class="col-md-6">
-                                        <div class="manual-field-label">Out-of-grammar speech</div>
+                                        <div class="manual-field-label">{{manualText 'manualCreator.outOfGrammarSpeech'}}</div>
                                         <label class="form-check admin-form-row-top">
                                             <input class="form-check-input" type="checkbox" data-field="ignoreOutOfGrammar" checked="{{boolChecked ignoreOutOfGrammar}}">
-                                            <span class="form-check-label">Ignore responses outside answer set</span>
+                                            <span class="form-check-label">{{manualText 'manualCreator.ignoreOutOfGrammar'}}</span>
                                         </label>
                                     </div>
                                 </div>
                                 {{/if}}
                             </div>
                             <div>
-                                <div class="manual-field-label">Text-to-speech</div>
+                                <div class="manual-field-label">{{manualText 'manualCreator.textToSpeech'}}</div>
                                 <select class="form-select" data-field="textToSpeechMode">
-                                    <option value="none" selected="{{selectedIf textToSpeechMode 'none'}}">Neither</option>
-                                    <option value="prompts" selected="{{selectedIf textToSpeechMode 'prompts'}}">Prompts</option>
-                                    <option value="feedback" selected="{{selectedIf textToSpeechMode 'feedback'}}">Feedback</option>
-                                    <option value="both" selected="{{selectedIf textToSpeechMode 'both'}}">Both</option>
+                                    <option value="none" selected="{{selectedIf textToSpeechMode 'none'}}">{{manualText 'manualCreator.neither'}}</option>
+                                    <option value="prompts" selected="{{selectedIf textToSpeechMode 'prompts'}}">{{manualText 'manualCreator.prompts'}}</option>
+                                    <option value="feedback" selected="{{selectedIf textToSpeechMode 'feedback'}}">{{manualText 'manualCreator.feedback'}}</option>
+                                    <option value="both" selected="{{selectedIf textToSpeechMode 'both'}}">{{manualText 'manualCreator.both'}}</option>
                                 </select>
                             </div>
                             <div>
-                                <div class="manual-field-label">Top bar</div>
+                                <div class="manual-field-label">{{manualText 'manualCreator.topBar'}}</div>
                                 <select class="form-select" data-field="topBarMode">
-                                    <option value="time-score" selected="{{selectedIf topBarMode 'time-score'}}">Time + Score</option>
-                                    <option value="time" selected="{{selectedIf topBarMode 'time'}}">Time</option>
-                                    <option value="score" selected="{{selectedIf topBarMode 'score'}}">Score</option>
-                                    <option value="none" selected="{{selectedIf topBarMode 'none'}}">Neither</option>
+                                    <option value="time-score" selected="{{selectedIf topBarMode 'time-score'}}">{{manualText 'manualCreator.timeScore'}}</option>
+                                    <option value="time" selected="{{selectedIf topBarMode 'time'}}">{{manualText 'manualCreator.time'}}</option>
+                                    <option value="score" selected="{{selectedIf topBarMode 'score'}}">{{manualText 'manualCreator.score'}}</option>
+                                    <option value="none" selected="{{selectedIf topBarMode 'none'}}">{{manualText 'manualCreator.neither'}}</option>
                                 </select>
                             </div>
                             <div>
                                 <label class="form-check editor-inline-check">
                                     <input class="form-check-input" type="checkbox" data-field="practiceTimingEnabled" checked="{{boolChecked practiceTimingEnabled}}">
-                                    <span class="form-check-label">Practice timing limits</span>
+                                    <span class="form-check-label">{{manualText 'manualCreator.practiceTimingLimits'}}</span>
                                 </label>
-                                <div class="manual-helper">Large max value = effectively unlimited.</div>
+                                <div class="manual-helper">{{manualText 'manualCreator.largeMaxUnlimited'}}</div>
                                 {{#if practiceTimingEnabled}}
                                 <div class="row g-3 admin-form-row-top">
                                     <div class="col-md-6">
-                                        <div class="manual-field-label">Min practice time</div>
+                                        <div class="manual-field-label">{{manualText 'manualCreator.minPracticeTime'}}</div>
                                         <input type="text" class="form-control" data-field="minPracticeTime" value="{{minPracticeTime}}" placeholder="0">
                                     </div>
                                     <div class="col-md-6">
-                                        <div class="manual-field-label">Max practice time</div>
+                                        <div class="manual-field-label">{{manualText 'manualCreator.maxPracticeTime'}}</div>
                                         <input type="text" class="form-control" data-field="maxPracticeTime" value="{{maxPracticeTime}}" placeholder="1000000">
                                     </div>
                                 </div>
                                 {{/if}}
                             </div>
                             <div>
-                                <div class="manual-field-label">Tags</div>
-                                <input type="text" class="form-control" data-field="tags" value="{{tags}}" placeholder="biology, unit-1">
-                                <div class="manual-helper">Optional labels for finding lessons later.</div>
+                                <div class="manual-field-label">{{manualText 'manualCreator.tags'}}</div>
+                                <input type="text" class="form-control" data-field="tags" value="{{tags}}" placeholder="{{manualText 'manualCreator.tagsPlaceholder'}}">
+                                <div class="manual-helper">{{manualText 'manualCreator.tagsHelper'}}</div>
                             </div>
                         </div>
                         {{/if}}
 
                         {{#if isStep 4}}
                         <div class="manual-step-intro">
-                            <h4>Starter Content</h4>
-                            <div class="text-muted">Rows first. Full editor next.</div>
+                            <h4>{{manualText 'manualCreator.starterContent'}}</h4>
+                            <div class="text-muted">{{manualText 'manualCreator.starterContentIntro'}}</div>
                         </div>
                         <div class="manual-field-stack">
                             <div>
-                                <div class="manual-field-label">Starting mode</div>
+                                <div class="manual-field-label">{{manualText 'manualCreator.startingMode'}}</div>
                                 <select class="form-select" data-field="seedMode">
-                                    <option value="blank-rows" selected="{{selectedIf seedMode 'blank-rows'}}">Blank rows</option>
-                                    <option value="paste-table" selected="{{selectedIf seedMode 'paste-table'}}">Paste prompt / answer table</option>
-                                    <option value="example-duplicate" selected="{{selectedIf seedMode 'example-duplicate'}}">One example row + duplicate</option>
+                                    <option value="blank-rows" selected="{{selectedIf seedMode 'blank-rows'}}">{{manualText 'manualCreator.blankRows'}}</option>
+                                    <option value="paste-table" selected="{{selectedIf seedMode 'paste-table'}}">{{manualText 'manualCreator.pastePromptAnswerTable'}}</option>
+                                    <option value="example-duplicate" selected="{{selectedIf seedMode 'example-duplicate'}}">{{manualText 'manualCreator.oneExampleRowDuplicate'}}</option>
                                 </select>
                             </div>
                             {{#if isSeedMode 'blank-rows'}}
-                            <div class="manual-helper">Creates the requested number of empty rows so you can fill them in directly.</div>
+                            <div class="manual-helper">{{manualText 'manualCreator.blankRowsHelper'}}</div>
                             {{/if}}
                             {{#if isSeedMode 'example-duplicate'}}
-                            <div class="manual-helper">Starts with one row so you can model the pattern, then duplicate it as needed.</div>
+                            <div class="manual-helper">{{manualText 'manualCreator.exampleDuplicateHelper'}}</div>
                             {{/if}}
                             {{#if isSeedMode 'paste-table'}}
                             <div>
-                                <div class="manual-field-label">Paste table</div>
-                                <textarea id="manual-seed-table-text" class="form-control" rows="6" placeholder="Paste rows here using tabs, commas, or | separators.&#10;Columns: {{seedColumnHint}}">{{seedTableText}}</textarea>
-                                <div class="manual-helper">Expected columns: {{seedColumnHint}}</div>
+                                <div class="manual-field-label">{{manualText 'manualCreator.pasteTable'}}</div>
+                                <textarea id="manual-seed-table-text" class="form-control" rows="6" placeholder="{{seedTablePlaceholder}}">{{seedTableText}}</textarea>
+                                <div class="manual-helper">{{expectedColumnsText}}</div>
                             </div>
                             {{/if}}
                             <div class="manual-table-actions">
-                                <div class="small text-muted">Rows: {{rowsCount}} / Requested: {{cardCount}}</div>
+                                <div class="small text-muted">{{rowsRequestedText}}</div>
                                 <button type="button" class="btn btn-outline-primary btn-sm" id="add-starter-row">
-                                    <i class="fa fa-plus"></i> Add row
+                                    <i class="fa fa-plus"></i> {{manualText 'manualCreator.addRow'}}
                                 </button>
                             </div>
                             <div class="table-responsive">
@@ -316,9 +316,9 @@
                                             <th>#</th>
                                             {{#if showPromptTextColumn}}<th>{{promptTextLabel}}</th>{{/if}}
                                             {{#if showPromptMediaColumn}}<th>{{promptMediaLabel}}</th>{{/if}}
-                                            <th>Answer</th>
-                                            {{#if isMultipleChoice}}<th>Choice 2</th><th>Choice 3</th><th>Choice 4</th>{{/if}}
-                                            <th>Actions</th>
+                                            <th>{{manualText 'manualCreator.answer'}}</th>
+                                            {{#if isMultipleChoice}}<th>{{manualText 'manualCreator.choice2'}}</th><th>{{manualText 'manualCreator.choice3'}}</th><th>{{manualText 'manualCreator.choice4'}}</th>{{/if}}
+                                            <th>{{manualText 'manualCreator.actions'}}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -356,7 +356,7 @@
                             <div class="admin-status admin-status-error admin-form-row">
                                 <i class="fa fa-exclamation-circle"></i>
                                 <div class="admin-status-text">
-                                    <div class="admin-status-title">Finalize error</div>
+                                    <div class="admin-status-title">{{manualText 'manualCreator.finalizeError'}}</div>
                                     <div>{{packageError}}</div>
                                 </div>
                             </div>
@@ -364,22 +364,22 @@
 
                             {{#if packageReady}}
                             <div class="manual-step-intro">
-                                <h4>Validate And Finalize</h4>
-                                <div class="text-muted">Package the edited draft, then upload it like any other lesson.</div>
+                                <h4>{{manualText 'manualCreator.validateAndFinalizeTitle'}}</h4>
+                                <div class="text-muted">{{manualText 'manualCreator.finalizeIntro'}}</div>
                             </div>
 
                             <div class="card border-0 bg-light">
                                 <div class="card-body">
                                     <div class="manual-field-stack">
                                         <div>
-                                            <div class="manual-field-label">Package status</div>
-                                            <div>Draft packaged and ready for upload.</div>
+                                            <div class="manual-field-label">{{manualText 'manualCreator.packageStatus'}}</div>
+                                            <div>{{manualText 'manualCreator.packageReadyMessage'}}</div>
                                         </div>
                                         <div>
-                                            <div class="manual-field-label">Included lessons</div>
+                                            <div class="manual-field-label">{{manualText 'manualCreator.includedLessons'}}</div>
                                             <div>
                                                 {{#each generationResult.manifest}}
-                                                <div><strong>{{tdfName}}</strong>: {{cardCount}} cards{{#if mediaCount}}, {{mediaCount}} media{{/if}}{{#if skippedCount}}, {{skippedCount}} skipped{{/if}}</div>
+                                                <div><strong>{{tdfName}}</strong>: {{cardCount}} {{manualText 'manualCreator.cards'}}{{#if mediaCount}}, {{mediaCount}} {{manualText 'manualCreator.media'}}{{/if}}{{#if skippedCount}}, {{skippedCount}} {{manualText 'manualCreator.skipped'}}{{/if}}</div>
                                                 {{/each}}
                                             </div>
                                         </div>
@@ -414,37 +414,37 @@
                             {{#if uploadComplete}}
                             <div class="admin-status admin-status-success admin-form-row-top">
                                 <i class="fa fa-check"></i>
-                                <div class="admin-status-text">Lesson uploaded successfully.</div>
+                                <div class="admin-status-text">{{manualText 'manualCreator.lessonUploaded'}}</div>
                             </div>
                             {{/if}}
 
                             <div class="manual-actions">
-                                <button type="button" class="btn btn-outline-secondary" id="manual-edit-draft">Back To Draft</button>
+                                <button type="button" class="btn btn-outline-secondary" id="manual-edit-draft">{{manualText 'manualCreator.backToDraft'}}</button>
                                 <div class="manual-actions-right">
                                     {{#if uploadStatus}}
-                                    <button type="button" class="btn btn-outline-secondary" id="manual-download-package" disabled>Download Package</button>
-                                    <button type="button" class="btn btn-primary" id="manual-upload-package" disabled>Upload To MoFaCTS</button>
+                                    <button type="button" class="btn btn-outline-secondary" id="manual-download-package" disabled>{{manualText 'manualCreator.downloadPackage'}}</button>
+                                    <button type="button" class="btn btn-primary" id="manual-upload-package" disabled>{{manualText 'manualCreator.uploadToMofacts'}}</button>
                                     {{else}}
-                                    <button type="button" class="btn btn-outline-secondary" id="manual-download-package">Download Package</button>
-                                    <button type="button" class="btn btn-primary" id="manual-upload-package">Upload To MoFaCTS</button>
+                                    <button type="button" class="btn btn-outline-secondary" id="manual-download-package">{{manualText 'manualCreator.downloadPackage'}}</button>
+                                    <button type="button" class="btn btn-primary" id="manual-upload-package">{{manualText 'manualCreator.uploadToMofacts'}}</button>
                                     {{/if}}
                                     {{#if uploadComplete}}
-                                    <button type="button" class="btn btn-success" id="manual-return-to-content">Return To Content Manager</button>
+                                    <button type="button" class="btn btn-success" id="manual-return-to-content">{{manualText 'manualCreator.returnToContentManager'}}</button>
                                     {{/if}}
                                 </div>
                             </div>
                             {{else}}
                             <div class="manual-step-intro">
-                                <h4>Edit Draft</h4>
-                                <div class="text-muted">Refine the generated lesson, then validate and finalize it.</div>
+                                <h4>{{manualText 'manualCreator.editDraft'}}</h4>
+                                <div class="text-muted">{{manualText 'manualCreator.editDraftIntro'}}</div>
                             </div>
                             {{> draftEditorWorkspace
                                 lessons=draftLessons
                                 onLessonsUpdate=updateDraftLessons
                                 onBack=backToStarterContent
                                 onSaveContinue=saveDraftAndContinue
-                                heading='Step 5: Edit Draft And Finalize'
-                                saveContinueLabel='Validate and Finalize'
+                                heading=draftWorkspaceHeading
+                                saveContinueLabel=draftWorkspaceSaveContinueLabel
                             }}
                             {{/if}}
                         {{/if}}
@@ -452,10 +452,10 @@
 
                         {{#unless isStep 5}}
                         <div class="manual-actions">
-                            <button type="button" class="btn btn-outline-secondary" id="manual-content-cancel">Cancel</button>
+                            <button type="button" class="btn btn-outline-secondary" id="manual-content-cancel">{{manualText 'manualCreator.cancel'}}</button>
                             <div class="manual-actions-right">
                                 {{#if canGoBack}}
-                                <button type="button" class="btn btn-secondary" id="manual-content-back">Back</button>
+                                <button type="button" class="btn btn-secondary" id="manual-content-back">{{manualText 'manualCreator.back'}}</button>
                                 {{/if}}
                                 {{#unless isStep 5}}
                                 <button type="button" class="btn btn-primary" id="manual-content-next">{{nextButtonLabel}}</button>
@@ -470,18 +470,18 @@
             <div class="manual-summary-card">
                 <div class="card">
                     <div class="card-body">
-                        <div class="manual-field-label admin-form-row">Summary</div>
+                        <div class="manual-field-label admin-form-row">{{manualText 'manualCreator.summary'}}</div>
                         <div class="manual-summary-grid">
                             {{#with state}}
-                            <div class="manual-summary-item"><div class="manual-summary-label">Name</div><div class="manual-summary-value">{{#if lessonName}}{{lessonName}}{{else}}Untitled{{/if}}</div></div>
-                            <div class="manual-summary-item"><div class="manual-summary-label">Structure</div><div class="manual-summary-value">{{structureSummary}}</div></div>
-                            <div class="manual-summary-item"><div class="manual-summary-label">Prompt</div><div class="manual-summary-value">{{promptSummary}}</div></div>
-                            <div class="manual-summary-item"><div class="manual-summary-label">Response</div><div class="manual-summary-value">{{responseSummary}}</div></div>
-                            <div class="manual-summary-item"><div class="manual-summary-label">Cards</div><div class="manual-summary-value">{{cardCount}}</div></div>
-                            <div class="manual-summary-item"><div class="manual-summary-label">Visibility</div><div class="manual-summary-value">{{visibility}}</div></div>
-                            <div class="manual-summary-item"><div class="manual-summary-label">Link</div><div class="manual-summary-value">{{#if experimentLinkEnabled}}{{#if experimentLinkPreview}}{{experimentLinkPreview}}{{else}}Pending name{{/if}}{{else}}Off{{/if}}</div></div>
-                            <div class="manual-summary-item"><div class="manual-summary-label">Top bar</div><div class="manual-summary-value">{{topBarSummary}}</div></div>
-                            <div class="manual-summary-item"><div class="manual-summary-label">Status</div><div class="manual-summary-value">{{statusSummary}}</div></div>
+                            <div class="manual-summary-item"><div class="manual-summary-label">{{manualText 'manualCreator.name'}}</div><div class="manual-summary-value">{{#if lessonName}}{{lessonName}}{{else}}{{manualText 'manualCreator.untitled'}}{{/if}}</div></div>
+                            <div class="manual-summary-item"><div class="manual-summary-label">{{manualText 'manualCreator.structure'}}</div><div class="manual-summary-value">{{structureSummary}}</div></div>
+                            <div class="manual-summary-item"><div class="manual-summary-label">{{manualText 'manualCreator.prompt'}}</div><div class="manual-summary-value">{{promptSummary}}</div></div>
+                            <div class="manual-summary-item"><div class="manual-summary-label">{{manualText 'manualCreator.response'}}</div><div class="manual-summary-value">{{responseSummary}}</div></div>
+                            <div class="manual-summary-item"><div class="manual-summary-label">{{manualText 'manualCreator.cards'}}</div><div class="manual-summary-value">{{cardCount}}</div></div>
+                            <div class="manual-summary-item"><div class="manual-summary-label">{{manualText 'manualCreator.visibility'}}</div><div class="manual-summary-value">{{visibilitySummary}}</div></div>
+                            <div class="manual-summary-item"><div class="manual-summary-label">{{manualText 'manualCreator.link'}}</div><div class="manual-summary-value">{{#if experimentLinkEnabled}}{{#if experimentLinkPreview}}{{experimentLinkPreview}}{{else}}{{manualText 'manualCreator.pendingName'}}{{/if}}{{else}}{{manualText 'manualCreator.off'}}{{/if}}</div></div>
+                            <div class="manual-summary-item"><div class="manual-summary-label">{{manualText 'manualCreator.topBar'}}</div><div class="manual-summary-value">{{topBarSummary}}</div></div>
+                            <div class="manual-summary-item"><div class="manual-summary-label">{{manualText 'manualCreator.status'}}</div><div class="manual-summary-value">{{statusSummary}}</div></div>
                             {{/with}}
                         </div>
                     </div>

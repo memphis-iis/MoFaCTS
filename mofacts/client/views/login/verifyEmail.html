@@ -5,9 +5,9 @@
                 <div class="card-body auth-card-body">
                     <div class="auth-brand">
                         <h2 class="auth-system-name">{{systemName}}</h2>
-                        <h1 class="auth-title">Verify email</h1>
-                        <p class="auth-description">Verify your email address to finish activating your account.</p>
-                        <p class="auth-description auth-description-secondary">If the verification message does not arrive soon, check your spam folder.</p>
+                        <h1 class="auth-title">{{t 'auth.verifyEmailTitle'}}</h1>
+                        <p class="auth-description">{{t 'auth.verifyEmailDescription'}}</p>
+                        <p class="auth-description auth-description-secondary">{{t 'auth.verifyEmailSpamHelp'}}</p>
                     </div>
                     <p class="auth-message {{verificationStatusClass}}">{{verificationStatusMessage}}</p>
                     {{#if verificationErrorMessage}}
@@ -16,14 +16,14 @@
                     {{#if showVerificationResend}}
                     <div class="auth-form">
                         <div class="auth-field">
-                            <label class="form-label auth-label" for="verificationEmailAddress">Email</label>
+                            <label class="form-label auth-label" for="verificationEmailAddress">{{t 'auth.email'}}</label>
                             <input class="form-control" type="text" id="verificationEmailAddress" value="" placeholder="name@example.com" autocomplete="username email">
                         </div>
-                        <button type="button" id="resendVerificationEmailButton" class="btn auth-primary-btn w-100">Resend Verification Email</button>
+                        <button type="button" id="resendVerificationEmailButton" class="btn auth-primary-btn w-100">{{t 'auth.resendVerificationEmail'}}</button>
                     </div>
                     {{/if}}
                     <div class="auth-supporting-action">
-                        <a href="/auth/login" class="auth-link">Return to sign in</a>
+                        <a href="/auth/login" class="auth-link">{{t 'auth.returnToSignIn'}}</a>
                     </div>
                 </div>
             </div>

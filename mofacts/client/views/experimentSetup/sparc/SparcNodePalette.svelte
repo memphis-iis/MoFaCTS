@@ -1,14 +1,19 @@
 <script>
+  import { getActiveUiLocale } from '../../../lib/interfaceLocaleState';
+  import { translatePlatformString } from '../../../lib/interfaceI18n';
+
   export let paletteEntries = [];
   export let paletteIconClass = () => '';
   export let onAddNode = () => {};
   export let onStartPaletteDrag = () => {};
   export let onClearDropState = () => {};
+
+  const sparcText = (key) => translatePlatformString(getActiveUiLocale(), key);
 </script>
 
-<aside class="sparc-palette" aria-label="SPARC node palette">
+<aside class="sparc-palette" aria-label={sparcText('sparc.nodePalette')}>
   <div class="sparc-panel-header">
-    <h2>Palette</h2>
+    <h2>{sparcText('sparc.palette')}</h2>
   </div>
   <div class="sparc-palette-grid">
     {#each paletteEntries as entry}

@@ -2,6 +2,8 @@ import DOMPurify from 'dompurify';
 import {marked} from 'marked';
 import {Meteor} from 'meteor/meteor';
 import { clientConsole } from '../lib/clientLogger';
+import { getActiveUiLocale } from '../lib/interfaceLocaleState';
+import { translatePlatformString } from '../lib/interfaceI18n';
 import './help.html';
 
 declare const Template: {
@@ -18,6 +20,10 @@ type MeteorWithCallAsync = typeof Meteor & {
 const DEFAULT_ONLINE_HELP_URL = 'https://github.com/memphis-iis/mofacts/wiki/Student-Overview';
 const DEFAULT_ONLINE_HELP_MARKDOWN_URL = 'https://raw.githubusercontent.com/wiki/memphis-iis/mofacts/Student-Overview.md';
 const DEFAULT_ONLINE_HELP_WIKI_BASE_URL = 'https://github.com/memphis-iis/MoFaCTS/wiki';
+
+function helpText(key: Parameters<typeof translatePlatformString>[1], values?: Parameters<typeof translatePlatformString>[2]) {
+  return translatePlatformString(getActiveUiLocale(), key, values);
+}
 
 // Configure marked for secure rendering
 marked.setOptions({
@@ -147,8 +153,8 @@ Template.help.rendered = async function() {
     if (helpContent) {
       helpContent.innerHTML = `
       <div class="alert alert-warning">
-        <p>Unable to load help content. Please try again later or visit our
-        <a href="${DEFAULT_ONLINE_HELP_URL}" target="_blank" class="content-link">online help guide</a>.</p>
+        <p>${helpText('help.loadFailedPrefix')}
+        <a href="${DEFAULT_ONLINE_HELP_URL}" target="_blank" class="content-link">${helpText('help.onlineHelpGuide')}</a>.</p>
       </div>
     `;
     }

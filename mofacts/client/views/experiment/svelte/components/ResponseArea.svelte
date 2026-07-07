@@ -20,6 +20,12 @@
   /** @type {string} Placeholder text for text input */
   export let inputPlaceholder = 'Type your answer...';
 
+  /** @type {string} Authored content language for learner text input */
+  export let inputLanguage = '';
+
+  /** @type {'ltr' | 'rtl' | ''} Authored content text direction */
+  export let inputTextDirection = '';
+
   /** @type {boolean} Whether to show multiple choice buttons */
   export let showButtons = true;
 
@@ -59,6 +65,8 @@
         bind:value={userAnswer}
         enabled={enabled}
         placeholder="Type the correct answer..."
+        {inputLanguage}
+        {inputTextDirection}
         on:submit
         on:input
         on:activity
@@ -70,6 +78,8 @@
       bind:value={userAnswer}
       {enabled}
       placeholder={inputPlaceholder}
+      {inputLanguage}
+      {inputTextDirection}
       on:submit
       on:input
       on:activity

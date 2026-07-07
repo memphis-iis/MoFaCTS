@@ -54,7 +54,8 @@
   font-weight: var(--app-font-weight-semibold);
 }
 
-.profile-field input {
+.profile-field input,
+.profile-field select {
   width: 100%;
   min-height: var(--app-button-height);
   border: 1px solid var(--border-color);
@@ -65,7 +66,8 @@
   font: inherit;
 }
 
-.profile-field input:focus {
+.profile-field input:focus,
+.profile-field select:focus {
   border-color: var(--focus-ring-color);
   box-shadow: 0 0 0 3px var(--app-focus-shadow-color);
   outline: none;

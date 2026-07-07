@@ -2,7 +2,7 @@
 
 <template name="adminControls">
     <div class="container admin-page">
-        <h3 class="page-header-title">Admin Control Panel</h3>
+        <h3 class="page-header-title">{{t 'admin.controlPanel'}}</h3>
 
         {{#if adminMessage}}
         <div class="admin-status admin-status-{{adminMessage.level}} admin-message" role="status" aria-live="polite">
@@ -18,17 +18,17 @@
                 <div class="card-body">
                     <div class="admin-section-heading">
                         <i class="fa fa-server admin-section-icon"></i>
-                        <h5>Server Status</h5>
+                        <h5>{{t 'admin.serverStatus'}}</h5>
                     </div>
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <strong>Server Storage Space:</strong>
+                            <strong>{{t 'admin.serverStorageSpace'}}</strong>
                         </div>
                         <div class="col-md-6">
                             {{#if serverStatus.error}}
                             <span class="admin-badge admin-badge-error">{{serverStatus.error}}</span>
                             {{else}}
-                            Used {{serverStatus.diskSpacePercent}}%, Remaining {{serverStatus.remainingSpace}} of {{serverStatus.diskSpace}} GB
+                            {{serverStorageSummary}}
                             {{/if}}
                         </div>
                     </div>
@@ -44,15 +44,15 @@
                         <div class="admin-maintenance-copy">
                             <div class="admin-section-heading admin-section-heading-compact">
                                 <i class="fa fa-refresh admin-section-icon"></i>
-                                <h5>Stimulus Display Cache</h5>
+                                <h5>{{t 'admin.stimulusDisplayCache'}}</h5>
                             </div>
                             <p class="admin-maintenance-description">
-                                Rebuilds the server snapshot that tells lesson screens whether each stimulus set contains text, cloze, audio, image, or video content. Use after direct content repairs or imports if lesson display choices do not match the current content.
+                                {{t 'admin.stimulusDisplayCacheDescription'}}
                             </p>
                         </div>
                         <div class="admin-maintenance-action">
                             <button type="button" id="updateStimDisplayTypeMap" class="btn btn-primary">
-                                <i class="fa fa-refresh"></i> Rebuild Display Cache
+                                <i class="fa fa-refresh"></i> {{t 'admin.rebuildDisplayCache'}}
                             </button>
                         </div>
                     </div>
@@ -68,9 +68,9 @@
                         <div>
                             <div class="admin-section-heading">
                                 <i class="fa fa-cog admin-section-icon"></i>
-                                <h5>Server Logging</h5>
+                                <h5>{{t 'admin.serverLogging'}}</h5>
                             </div>
-                            <p class="admin-verbosity-intro">Controls server-side diagnostic output from MoFaCTS methods and startup/runtime services.</p>
+                            <p class="admin-verbosity-intro">{{t 'admin.serverLoggingDescription'}}</p>
                         </div>
                     </div>
                     <div class="admin-verbosity-options">
@@ -79,8 +79,8 @@
                                 <input class="form-check-input serverVerbosityRadio" type="radio" name="serverVerbosityRadio" id="verbosityRadio0">
                             </span>
                             <span class="admin-verbosity-option-copy">
-                                <span class="admin-verbosity-option-title">Routine Server Logs</span>
-                                <span class="admin-verbosity-option-description">Shows normal serverConsole messages. Use for general operational debugging.</span>
+                                <span class="admin-verbosity-option-title">{{t 'admin.routineServerLogs'}}</span>
+                                <span class="admin-verbosity-option-description">{{t 'admin.routineServerLogsDescription'}}</span>
                             </span>
                         </label>
                         <label class="admin-verbosity-option" for="verbosityRadio1">
@@ -88,8 +88,8 @@
                                 <input class="form-check-input serverVerbosityRadio" type="radio" name="serverVerbosityRadio" id="verbosityRadio1">
                             </span>
                             <span class="admin-verbosity-option-copy">
-                                <span class="admin-verbosity-option-title">Timing Instrumentation</span>
-                                <span class="admin-verbosity-option-description">Suppresses routine server logs and leaves timing-focused diagnostics for performance checks.</span>
+                                <span class="admin-verbosity-option-title">{{t 'admin.timingInstrumentation'}}</span>
+                                <span class="admin-verbosity-option-description">{{t 'admin.timingInstrumentationDescription'}}</span>
                             </span>
                         </label>
                         <label class="admin-verbosity-option" for="verbosityRadio2">
@@ -97,8 +97,8 @@
                                 <input class="form-check-input serverVerbosityRadio" type="radio" name="serverVerbosityRadio" id="verbosityRadio2">
                             </span>
                             <span class="admin-verbosity-option-copy">
-                                <span class="admin-verbosity-option-title">Server Logs and Timing</span>
-                                <span class="admin-verbosity-option-description">Most detailed server mode: combines routine diagnostics with timing instrumentation.</span>
+                                <span class="admin-verbosity-option-title">{{t 'admin.serverLogsAndTiming'}}</span>
+                                <span class="admin-verbosity-option-description">{{t 'admin.serverLogsAndTimingDescription'}}</span>
                             </span>
                         </label>
                     </div>
@@ -115,9 +115,9 @@
                         <div>
                             <div class="admin-section-heading">
                                 <i class="fa fa-desktop admin-section-icon"></i>
-                                <h5>Browser Console Logging</h5>
+                                <h5>{{t 'admin.browserConsoleLogging'}}</h5>
                             </div>
-                            <p class="admin-verbosity-intro">Controls MoFaCTS clientConsole output in learner/admin browsers after the setting is loaded.</p>
+                            <p class="admin-verbosity-intro">{{t 'admin.browserConsoleLoggingDescription'}}</p>
                         </div>
                     </div>
                     <div class="admin-verbosity-options">
@@ -126,8 +126,8 @@
                                 <input class="form-check-input clientVerbosityRadio" type="radio" name="clientVerbosityRadio" id="clientVerbosityRadio0">
                             </span>
                             <span class="admin-verbosity-option-copy">
-                                <span class="admin-verbosity-option-title">Off</span>
-                                <span class="admin-verbosity-option-description">No clientConsole output. Best default for normal use and learner sessions.</span>
+                                <span class="admin-verbosity-option-title">{{t 'admin.off'}}</span>
+                                <span class="admin-verbosity-option-description">{{t 'admin.clientOffDescription'}}</span>
                             </span>
                         </label>
                         <label class="admin-verbosity-option" for="clientVerbosityRadio1">
@@ -135,8 +135,8 @@
                                 <input class="form-check-input clientVerbosityRadio" type="radio" name="clientVerbosityRadio" id="clientVerbosityRadio1">
                             </span>
                             <span class="admin-verbosity-option-copy">
-                                <span class="admin-verbosity-option-title">Important Diagnostics</span>
-                                <span class="admin-verbosity-option-description">Shows level-1 client messages such as errors, blocked states, and major runtime decisions.</span>
+                                <span class="admin-verbosity-option-title">{{t 'admin.importantDiagnostics'}}</span>
+                                <span class="admin-verbosity-option-description">{{t 'admin.importantDiagnosticsDescription'}}</span>
                             </span>
                         </label>
                         <label class="admin-verbosity-option" for="clientVerbosityRadio2">
@@ -144,8 +144,8 @@
                                 <input class="form-check-input clientVerbosityRadio" type="radio" name="clientVerbosityRadio" id="clientVerbosityRadio2">
                             </span>
                             <span class="admin-verbosity-option-copy">
-                                <span class="admin-verbosity-option-title">Detailed Trace</span>
-                                <span class="admin-verbosity-option-description">Includes level-1 messages plus level-2 flow traces for deeper debugging.</span>
+                                <span class="admin-verbosity-option-title">{{t 'admin.detailedTrace'}}</span>
+                                <span class="admin-verbosity-option-description">{{t 'admin.detailedTraceDescription'}}</span>
                             </span>
                         </label>
                     </div>

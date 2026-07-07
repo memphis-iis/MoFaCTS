@@ -61,6 +61,12 @@
   /** @type {string} Input placeholder */
   export let inputPlaceholder = 'Type your answer...';
 
+  /** @type {string} Authored content language for learner text input */
+  export let inputLanguage = '';
+
+  /** @type {'ltr' | 'rtl' | ''} Authored content text direction */
+  export let inputTextDirection = '';
+
   /** @type {boolean} Show MC buttons */
   export let showButtons = true;
 
@@ -402,6 +408,8 @@
           {forceCorrectPrompt}
           {userAnswer}
           {inputPlaceholder}
+          {inputLanguage}
+          {inputTextDirection}
           {showButtons}
           {buttonList}
           {buttonColumns}

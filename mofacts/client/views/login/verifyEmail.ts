@@ -2,6 +2,8 @@ import { Meteor } from 'meteor/meteor';
 import { Accounts } from 'meteor/accounts-base';
 import { Session } from 'meteor/session';
 import { meteorCallAsync } from '../..';
+import { translatePlatformString } from '../../lib/interfaceI18n';
+import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 import './verifyEmail.html';
 
 declare const Template: {
@@ -28,6 +30,10 @@ function getVerificationEmailAddress(): string {
   return user?.email_canonical || user?.emails?.[0]?.address || '';
 }
 
+function authText(key: any) {
+  return translatePlatformString(getActiveUiLocale(), key);
+}
+
 function setVerificationStatus(message: string, tone: 'muted' | 'success' = 'muted') {
   Session.set('verificationStatusMessage', message);
   Session.set('verificationStatusTone', tone);
@@ -50,7 +56,7 @@ async function verifyEmailTokenOnClient(token: string): Promise<void> {
 }
 
 Template.verifyEmail.onRendered(function() {
-  Session.setDefault('verificationStatusMessage', 'Check your email for a verification link.');
+  Session.setDefault('verificationStatusMessage', authText('auth.checkEmailForVerification'));
   Session.setDefault('verificationStatusTone', 'muted');
   Session.setDefault('verificationErrorMessage', '');
   Session.setDefault('showVerificationResend', true);
@@ -63,27 +69,27 @@ Template.verifyEmail.onRendered(function() {
   }
 
   if (!token) {
-    setVerificationStatus('Check your email for a verification link, or request a new verification email below.');
+    setVerificationStatus(authText('auth.checkEmailOrRequestVerification'));
     setVerificationError('');
     Session.set('showVerificationResend', true);
     return;
   }
 
-  setVerificationStatus('Verifying your email now...');
+  setVerificationStatus(authText('auth.verifyingEmailNow'));
   setVerificationError('');
   Session.set('showVerificationResend', false);
   void verifyEmailTokenOnClient(token).then(() => {
-    setVerificationStatus('Your email has been verified. You can now sign in.', 'success');
+    setVerificationStatus(authText('auth.emailVerifiedSignIn'), 'success');
     setTimeout(() => {
       FlowRouter.go('/auth/login');
     }, 1200);
   }).catch((error: { error?: string; reason?: string }) => {
     if (error?.error === 'invalid-token') {
-      setVerificationStatus('That verification link is invalid or expired. Request a new verification email below.');
+      setVerificationStatus(authText('auth.invalidVerificationLink'));
       setVerificationError('');
     } else {
-      setVerificationStatus('We could not complete email verification.');
-      setVerificationError(error?.reason || 'Request a new verification email below.');
+      setVerificationStatus(authText('auth.emailVerificationFailed'));
+      setVerificationError(error?.reason || authText('auth.requestNewVerificationEmail'));
     }
     Session.set('showVerificationResend', true);
   });
@@ -94,20 +100,20 @@ Template.verifyEmail.events({
     event.preventDefault();
     const email = String($('#verificationEmailAddress').val() || '').trim().toLowerCase();
     if (!email) {
-      setVerificationError('Enter the email address for the account you want to verify.');
+      setVerificationError(authText('auth.enterVerificationEmail'));
       return;
     }
     setVerificationError('');
     try {
       await meteorCallAsync('resendVerificationEmail', email);
-      setVerificationStatus('If that account exists and still needs verification, a new verification email has been sent.', 'success');
+      setVerificationStatus(authText('auth.verificationEmailSentIfNeeded'), 'success');
       setVerificationError('');
     } catch (error: any) {
       if (error?.error === 'verification-rate-limit') {
-        setVerificationError(error?.reason || 'A verification email was sent recently. Please wait before trying again.');
+        setVerificationError(error?.reason || authText('auth.verificationEmailRateLimit'));
         return;
       }
-      setVerificationError('We could not send a verification email right now. Please try again.');
+      setVerificationError(authText('auth.verificationEmailSendFailed'));
     }
   }
 });

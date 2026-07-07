@@ -3,6 +3,8 @@ import { Session } from 'meteor/session';
 import './adminBackups.html';
 import { meteorCallAsync } from '..';
 import { clientConsole } from '../lib/userSessionHelpers';
+import { getActiveUiLocale } from '../lib/interfaceLocaleState';
+import { translatePlatformString } from '../lib/interfaceI18n';
 
 const BACKUP_MESSAGE_KEY = 'adminBackupsMessage';
 const BACKUP_CONFIG_KEY = 'adminBackupsConfig';
@@ -23,11 +25,15 @@ type BackupJob = {
   error?: { phase?: string; message?: string };
 };
 
+function backupText(key: Parameters<typeof translatePlatformString>[1], values?: Parameters<typeof translatePlatformString>[2]): string {
+  return translatePlatformString(getActiveUiLocale(), key, values);
+}
+
 function formatError(err: unknown): string {
   if (err instanceof Error && err.message) {
     return err.message;
   }
-  return err ? String(err) : 'Unknown error';
+  return err ? String(err) : backupText('admin.unknownError');
 }
 
 function setBackupMessage(text: string | null, level = 'info'): void {
@@ -64,7 +70,7 @@ Template.adminBackups.onCreated(async function() {
   try {
     await refreshBackups();
   } catch (error) {
-    setBackupMessage(`Failed to load backups: ${formatError(error)}`, 'error');
+    setBackupMessage(backupText('admin.failedLoadBackups', { error: formatError(error) }), 'error');
   }
 });
 
@@ -101,12 +107,15 @@ Template.adminBackups.helpers({
   selectedDeleteJob() {
     return Session.get(BACKUP_SELECTED_DELETE_JOB_KEY);
   },
+  backupText(key: Parameters<typeof translatePlatformString>[1]) {
+    return backupText(key);
+  },
   enabledLabel(value: unknown) {
-    return value ? 'enabled' : 'disabled';
+    return value ? backupText('admin.enabled') : backupText('admin.disabled');
   },
   destinationLabel(destination: { backend?: string; path?: string; bucket?: string; prefix?: string } | undefined) {
     if (!destination) {
-      return 'not configured';
+      return backupText('admin.notConfigured');
     }
     if (destination.backend === 's3') {
       return `s3://${destination.bucket || '<bucket>'}/${destination.prefix || ''}`;
@@ -160,15 +169,15 @@ Template.adminBackups.helpers({
 Template.adminBackups.events({
   'click #createBackupButton': async function() {
     Session.set(BACKUP_BUSY_KEY, true);
-    setBackupMessage('Creating backup. This can take several minutes; keep this page open for status.', 'info');
+    setBackupMessage(backupText('admin.creatingBackup'), 'info');
     try {
       await meteorCallAsync('admin.backups.create');
       await refreshBackups();
-      setBackupMessage('Backup completed.', 'success');
+      setBackupMessage(backupText('admin.backupCompleted'), 'success');
     } catch (error) {
       clientConsole(1, '[Backups] Create failed:', error);
       await refreshBackups().catch(() => undefined);
-      setBackupMessage(`Backup failed: ${formatError(error)}`, 'error');
+      setBackupMessage(backupText('admin.backupFailed', { error: formatError(error) }), 'error');
     } finally {
       Session.set(BACKUP_BUSY_KEY, false);
     }
@@ -179,14 +188,14 @@ Template.adminBackups.events({
       return;
     }
     Session.set(BACKUP_BUSY_KEY, true);
-    setBackupMessage('Verifying backup archive.', 'info');
+    setBackupMessage(backupText('admin.verifyingBackupArchive'), 'info');
     try {
       await meteorCallAsync('admin.backups.verify', jobId);
       await refreshBackups();
-      setBackupMessage('Backup verification finished.', 'success');
+      setBackupMessage(backupText('admin.backupVerificationFinished'), 'success');
     } catch (error) {
       await refreshBackups().catch(() => undefined);
-      setBackupMessage(`Verification failed: ${formatError(error)}`, 'error');
+      setBackupMessage(backupText('admin.verificationFailed', { error: formatError(error) }), 'error');
     } finally {
       Session.set(BACKUP_BUSY_KEY, false);
     }
@@ -200,7 +209,7 @@ Template.adminBackups.events({
       const job = await meteorCallAsync('admin.backups.get', jobId) as BackupJob;
       Session.set(BACKUP_SELECTED_MANIFEST_KEY, JSON.stringify(job.manifest || {}, null, 2));
     } catch (error) {
-      setBackupMessage(`Could not load manifest: ${formatError(error)}`, 'error');
+      setBackupMessage(backupText('admin.manifestLoadFailed', { error: formatError(error) }), 'error');
     }
   },
   'click .downloadBackupButton': async function(event: Event) {
@@ -209,16 +218,16 @@ Template.adminBackups.events({
       return;
     }
     Session.set(BACKUP_BUSY_KEY, true);
-    setBackupMessage('Preparing one-time download link.', 'info');
+    setBackupMessage(backupText('admin.preparingDownloadLink'), 'info');
     try {
       const result = await meteorCallAsync('admin.backups.downloadToken', jobId) as { url?: string };
       if (!result.url) {
-        throw new Error('Download URL was not returned');
+        throw new Error(backupText('admin.downloadUrlMissing'));
       }
-      setBackupMessage('Download starting. Backup archives may contain sensitive data.', 'success');
+      setBackupMessage(backupText('admin.downloadStartingSensitive'), 'success');
       window.location.assign(result.url);
     } catch (error) {
-      setBackupMessage(`Download failed: ${formatError(error)}`, 'error');
+      setBackupMessage(backupText('admin.downloadFailed', { error: formatError(error) }), 'error');
     } finally {
       Session.set(BACKUP_BUSY_KEY, false);
     }
@@ -230,11 +239,11 @@ Template.adminBackups.events({
     }
     const job = ((Session.get(BACKUP_JOBS_KEY) || []) as BackupJob[]).find((candidate) => candidate._id === jobId);
     Session.set(BACKUP_SELECTED_RESTORE_JOB_KEY, job || { _id: jobId });
-    setBackupMessage('Type RESTORE in the confirmation box to run the restore.', 'info');
+    setBackupMessage(backupText('admin.typeRestoreToRun'), 'info');
   },
   'click .cancelRestoreButton': function() {
     Session.set(BACKUP_SELECTED_RESTORE_JOB_KEY, null);
-    setBackupMessage('Restore cancelled.', 'info');
+    setBackupMessage(backupText('admin.restoreCancelled'), 'info');
   },
   'click .deleteBackupButton': function(event: Event) {
     const jobId = (event.currentTarget as HTMLElement | null)?.getAttribute('data-job-id') || '';
@@ -243,11 +252,11 @@ Template.adminBackups.events({
     }
     const job = ((Session.get(BACKUP_JOBS_KEY) || []) as BackupJob[]).find((candidate) => candidate._id === jobId);
     Session.set(BACKUP_SELECTED_DELETE_JOB_KEY, job || { _id: jobId });
-    setBackupMessage('Type DELETE in the confirmation box to remove the archive.', 'info');
+    setBackupMessage(backupText('admin.typeDeleteToRemove'), 'info');
   },
   'click .cancelDeleteButton': function() {
     Session.set(BACKUP_SELECTED_DELETE_JOB_KEY, null);
-    setBackupMessage('Delete cancelled.', 'info');
+    setBackupMessage(backupText('admin.deleteCancelled'), 'info');
   },
   'click .confirmDeleteButton': async function(event: Event) {
     const jobId = (event.currentTarget as HTMLElement | null)?.getAttribute('data-job-id') || '';
@@ -257,19 +266,19 @@ Template.adminBackups.events({
     }
     const normalizedConfirmation = confirmation.trim().toUpperCase();
     if (normalizedConfirmation !== 'DELETE') {
-      setBackupMessage('Delete cancelled. Confirmation phrase did not match DELETE.', 'info');
+      setBackupMessage(backupText('admin.deletePhraseMismatch'), 'info');
       return;
     }
     Session.set(BACKUP_BUSY_KEY, true);
-    setBackupMessage('Deleting backup archive.', 'info');
+    setBackupMessage(backupText('admin.deletingBackupArchive'), 'info');
     try {
       await meteorCallAsync('admin.backups.delete', jobId, normalizedConfirmation);
       Session.set(BACKUP_SELECTED_DELETE_JOB_KEY, null);
       await refreshBackups();
-      setBackupMessage('Backup archive deleted. Registry history was preserved.', 'success');
+      setBackupMessage(backupText('admin.backupArchiveDeleted'), 'success');
     } catch (error) {
       await refreshBackups().catch(() => undefined);
-      setBackupMessage(`Delete failed: ${formatError(error)}`, 'error');
+      setBackupMessage(backupText('admin.deleteFailed', { error: formatError(error) }), 'error');
     } finally {
       Session.set(BACKUP_BUSY_KEY, false);
     }
@@ -281,19 +290,19 @@ Template.adminBackups.events({
       return;
     }
     if (confirmation !== 'RESTORE') {
-      setBackupMessage('Restore cancelled. Confirmation phrase did not match RESTORE.', 'info');
+      setBackupMessage(backupText('admin.restorePhraseMismatch'), 'info');
       return;
     }
     Session.set(BACKUP_BUSY_KEY, true);
-    setBackupMessage('Restoring backup. This verifies the archive and can take several minutes.', 'info');
+    setBackupMessage(backupText('admin.restoringBackup'), 'info');
     try {
       await meteorCallAsync('admin.backups.restore', jobId, confirmation);
       Session.set(BACKUP_SELECTED_RESTORE_JOB_KEY, null);
       await refreshBackups();
-      setBackupMessage('Restore completed.', 'success');
+      setBackupMessage(backupText('admin.restoreCompleted'), 'success');
     } catch (error) {
       await refreshBackups().catch(() => undefined);
-      setBackupMessage(`Restore failed: ${formatError(error)}`, 'error');
+      setBackupMessage(backupText('admin.restoreFailed', { error: formatError(error) }), 'error');
     } finally {
       Session.set(BACKUP_BUSY_KEY, false);
     }

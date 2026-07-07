@@ -14,6 +14,9 @@ import { getUserDisplayName, getUserInitials } from '../../lib/userIdentity';
 import {
   userHasServerOpenRouterKey,
 } from '../../lib/openRouterClientProfile';
+import { TARGET_LOCALE_DEFINITIONS, TARGET_UI_LOCALES } from '../../../common/lib/interfaceLocales';
+import { getActiveUiLocale, setActiveUiLocale } from '../../lib/interfaceLocaleState';
+import { translatePlatformString } from '../../lib/interfaceI18n';
 
 const MeteorAny = Meteor as typeof Meteor & { callAsync: (name: string, ...args: any[]) => Promise<any> };
 
@@ -58,11 +61,15 @@ function getPreviewDisplayName(): string {
   return inputValue('profileDisplayName') || String(currentProfile().displayName || '') || getUserDisplayName(currentUser());
 }
 
+function profileText(key: Parameters<typeof translatePlatformString>[1], values?: Parameters<typeof translatePlatformString>[2]): string {
+  return translatePlatformString(getActiveUiLocale(), key, values);
+}
+
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result || ''));
-    reader.onerror = () => reject(new Error('Could not read avatar image'));
+    reader.onerror = () => reject(new Error(profileText('profile.couldNotReadAvatarImage')));
     reader.readAsDataURL(file);
   });
 }
@@ -71,14 +78,14 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();
     image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error('Could not load avatar image'));
+    image.onerror = () => reject(new Error(profileText('profile.couldNotLoadAvatarImage')));
     image.src = src;
   });
 }
 
 async function resizeAvatarImage(file: File): Promise<string> {
   if (!(PROFILE_AVATAR_IMAGE_MIME_TYPES as readonly string[]).includes(file.type)) {
-    throw new Error('Choose a JPEG, PNG, or WebP image.');
+    throw new Error(profileText('profile.chooseSupportedAvatarImage'));
   }
   const dataUrl = await readFileAsDataUrl(file);
   const image = await loadImage(dataUrl);
@@ -87,7 +94,7 @@ async function resizeAvatarImage(file: File): Promise<string> {
   canvas.height = AVATAR_IMAGE_SIZE;
   const context = canvas.getContext('2d');
   if (!context) {
-    throw new Error('Could not prepare avatar image.');
+    throw new Error(profileText('profile.couldNotPrepareAvatarImage'));
   }
   const sourceSize = Math.min(image.naturalWidth, image.naturalHeight);
   const sourceX = Math.max(0, (image.naturalWidth - sourceSize) / 2);
@@ -128,6 +135,7 @@ async function saveProfile(template: ProfileTemplateInstance): Promise<void> {
     await MeteorAny.callAsync('updateOwnProfile', {
       name: inputValue('profileName'),
       displayName: inputValue('profileDisplayName'),
+      uiLocale: inputValue('profileUiLocale'),
       avatarType: template.avatarType.get(),
       avatarIconId: template.avatarIconId.get(),
       avatarImageData: template.avatarImageData.get() || null,
@@ -138,7 +146,7 @@ async function saveProfile(template: ProfileTemplateInstance): Promise<void> {
     if (apiKeyInput) {
       apiKeyInput.value = '';
     }
-    setStatus(template, 'success', 'Profile saved');
+    setStatus(template, 'success', profileText('profile.profileSaved'));
   } catch (error: unknown) {
     setStatus(template, 'error', getErrorMessage(error));
   } finally {
@@ -174,6 +182,22 @@ Template.profile.helpers({
 
   displayName(): string {
     return String(currentProfile().displayName || '');
+  },
+
+  uiLocale(): string {
+    return getActiveUiLocale();
+  },
+
+  uiLocaleOptions(): Array<{ locale: string; label: string; selectedAttrs: Record<string, boolean> }> {
+    const activeLocale = getActiveUiLocale();
+    return TARGET_UI_LOCALES.map((locale) => {
+      const definition = TARGET_LOCALE_DEFINITIONS[locale];
+      return {
+        locale,
+        label: `${definition.englishName} (${definition.nativeName})`,
+        selectedAttrs: activeLocale === locale ? { selected: true } : {},
+      };
+    });
   },
 
   avatarOptions(): typeof PROFILE_AVATAR_ICONS {
@@ -256,6 +280,16 @@ Template.profile.events({
     template.avatarType.set(template.avatarType.get());
   },
 
+  'change #profileUiLocale'(event: Event, template: ProfileTemplateInstance) {
+    try {
+      const nextLocale = (event.currentTarget as HTMLSelectElement).value;
+      setActiveUiLocale(nextLocale);
+      template.statusMessage.set('');
+    } catch (error: unknown) {
+      setStatus(template, 'error', getErrorMessage(error));
+    }
+  },
+
   'click [data-avatar-type]'(event: Event, template: ProfileTemplateInstance) {
     event.preventDefault();
     const type = (event.currentTarget as HTMLElement).getAttribute('data-avatar-type');
@@ -272,7 +306,7 @@ Template.profile.events({
     const iconId = (event.currentTarget as HTMLElement).getAttribute('data-avatar-icon') || '';
     const icon = findProfileAvatarIcon(iconId);
     if (!icon) {
-      setStatus(template, 'error', 'Choose a supported avatar icon');
+      setStatus(template, 'error', profileText('profile.chooseSupportedAvatarIcon'));
       return;
     }
     template.avatarIconId.set(icon.id);
@@ -294,7 +328,7 @@ Template.profile.events({
       const resizedImage = await resizeAvatarImage(file);
       template.avatarImageData.set(resizedImage);
       template.avatarType.set('image');
-      setStatus(template, 'info', 'Avatar picture ready to save');
+      setStatus(template, 'info', profileText('profile.avatarPictureReady'));
     } catch (error: unknown) {
       setStatus(template, 'error', getErrorMessage(error));
     } finally {
@@ -306,7 +340,7 @@ Template.profile.events({
     event.preventDefault();
     template.avatarImageData.set('');
     template.avatarType.set('initials');
-    setStatus(template, 'info', 'Avatar picture removed. Save profile to apply.');
+    setStatus(template, 'info', profileText('profile.avatarPictureRemoved'));
   },
 
   'click #profileSave': async function(_event: Event, template: ProfileTemplateInstance) {
@@ -346,7 +380,7 @@ Template.profile.events({
       if (apiKeyInput) {
         apiKeyInput.value = '';
       }
-      setStatus(template, 'success', 'OpenRouter key deleted');
+      setStatus(template, 'success', profileText('profile.openRouterKeyDeleted'));
     } catch (error: unknown) {
       setStatus(template, 'error', getErrorMessage(error));
     } finally {

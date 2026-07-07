@@ -1,7 +1,9 @@
 <script>
   import { createEventDispatcher } from 'svelte';
+  import { getActiveUiLocale } from '../../../../lib/interfaceLocaleState';
+  import { translatePlatformString } from '../../../../lib/interfaceI18n';
 
-  export let continueButtonText = 'Continue';
+  export let continueButtonText = '';
   export let instructionHtml = '';
   export let instructionStartBlocked = false;
   export let showInstructionOverlay = false;
@@ -10,6 +12,10 @@
   export let videoPlayerReady = false;
 
   const dispatch = createEventDispatcher();
+
+  function platformText(key) {
+    return translatePlatformString(getActiveUiLocale(), key);
+  }
 
   function handleInstructionContinue(event) {
     dispatch('instructioncontinue', event);
@@ -28,7 +34,7 @@
       </div>
       {#if instructionStartBlocked}
         <p class="video-instruction-warning">
-          The browser blocked automatic video start. Press Continue again to start the video.
+          {platformText('video.autoStartBlocked')}
         </p>
       {/if}
       <button
@@ -37,7 +43,7 @@
         disabled={!videoPlayerReady}
         on:click={handleInstructionContinue}
       >
-        {videoPlayerReady ? (continueButtonText || 'Continue') : 'Loading video...'}
+        {videoPlayerReady ? (continueButtonText || platformText('common.continue')) : platformText('video.loading')}
       </button>
     </div>
   </div>
@@ -46,7 +52,7 @@
 {#if videoEndOverlayMounted}
   <div class="video-end-overlay" class:video-end-overlay-visible={videoEndOverlayVisible}>
     <button type="button" class="btn btn-primary video-continue-button" on:click={handleVideoContinue}>
-      {continueButtonText || 'Continue'}
+      {continueButtonText || platformText('common.continue')}
     </button>
   </div>
 {/if}

@@ -10,9 +10,16 @@ import { ValidatorEngine, ValidationContext } from '../../lib/validatorCore';
 import { createValidationSummary, applyFieldErrors, initValidationUI } from '../../lib/validatorUI';
 import { sortPropertiesModal } from '../../lib/schemaApplicabilityEditor';
 import { ensureJsonEditor } from '../../lib/jsonEditorLoader';
+import { translatePlatformString } from '../../lib/interfaceI18n';
+import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 
 const FlowRouter = (globalThis as any).FlowRouter;
 const TdfsCollection = (globalThis as any).Tdfs || (globalThis as any).TdfsCollection;
+type PlatformStringKey = Parameters<typeof translatePlatformString>[1];
+
+function contentEditorText(key: PlatformStringKey, values?: Parameters<typeof translatePlatformString>[2]): string {
+    return translatePlatformString(getActiveUiLocale(), key, values);
+}
 
 function findTdf(selector: any) {
     return TdfsCollection?.findOne ? TdfsCollection.findOne(selector) : null;
@@ -174,7 +181,29 @@ Template.contentEdit.helpers({
 
     lessonName() {
         const tdf = findTdf((Template.instance() as any).tdfId);
-        return tdf?.content?.tdfs?.tutor?.setspec?.lessonname || 'Unknown';
+        return tdf?.content?.tdfs?.tutor?.setspec?.lessonname || contentEditorText('tdfEditor.unknownLesson');
+    },
+
+    contentEditorText(key: PlatformStringKey, options?: { hash?: Parameters<typeof translatePlatformString>[2] }) {
+        return contentEditorText(key, options?.hash);
+    },
+
+    editTitle() {
+        const tdf = findTdf((Template.instance() as any).tdfId);
+        const lessonName = tdf?.content?.tdfs?.tutor?.setspec?.lessonname || contentEditorText('tdfEditor.unknownLesson');
+        return contentEditorText('contentEditor.editTitle', { lessonName });
+    },
+
+    conditionSummary(conditionInfo: any) {
+        return contentEditorText('tdfEditor.conditionInfo', {
+            fileName: conditionInfo?.fileName ?? '',
+            index: conditionInfo?.index ?? '',
+            total: conditionInfo?.total ?? ''
+        });
+    },
+
+    stimFileSummary(stimFileInfo: any) {
+        return contentEditorText('contentEditor.stimFileInfo', { filename: stimFileInfo?.filename ?? '' });
     },
 
     conditionInfo() {
@@ -242,9 +271,9 @@ Template.contentEdit.helpers({
         const start = instance.currentClusterIndex.get();
         const size = instance.clusterWindowSize.get();
         const total = instance.clustersCount?.get?.() ?? (instance.clusters || []).length;
-        if (total === 0) return 'No clusters';
+        if (total === 0) return contentEditorText('contentEditor.noClusters');
         const end = Math.min(start + size, total);
-        return `Clusters ${start + 1} - ${end}`;
+        return contentEditorText('contentEditor.clusterRange', { start: start + 1, end });
     },
 
     clusterWindowSize() {
@@ -261,6 +290,13 @@ Template.contentEdit.helpers({
         const total = instance.clustersCount?.get?.() ?? (instance.clusters || []).length;
         if (total === 0) return 0;
         return instance.currentClusterIndex.get() + 1;
+    },
+
+    clusterCounterText() {
+        const instance = Template.instance() as any as any;
+        const total = instance.clustersCount?.get?.() ?? (instance.clusters || []).length;
+        const current = total === 0 ? 0 : instance.currentClusterIndex.get() + 1;
+        return contentEditorText('contentEditor.clusterCounter', { current, total });
     },
 
     saveDisabled() {
@@ -360,8 +396,12 @@ Template.contentEdit.events({
         setEditorMessage(
             instance,
             'success',
-            'Incorrect responses generated',
-            `Generated ${count} incorrect response(s) for each of ${result.generated} stims from a pool of ${result.totalStims} total answers.`
+            contentEditorText('contentEditor.incorrectGeneratedTitle'),
+            contentEditorText('contentEditor.incorrectGeneratedText', {
+                count,
+                generated: result.generated,
+                totalStims: result.totalStims
+            })
         );
     },
 
@@ -385,7 +425,7 @@ Template.contentEdit.events({
 
         const result = removeAllIncorrectResponses(instance);
         instance.removeIncorrectConfirmation.set(false);
-        setEditorMessage(instance, 'success', 'Incorrect responses removed', `Removed incorrect responses from ${result.removed} stims.`);
+        setEditorMessage(instance, 'success', contentEditorText('contentEditor.incorrectRemovedTitle'), contentEditorText('contentEditor.incorrectRemovedText', { removed: result.removed }));
     },
 
     async 'click .save-btn'(event: any, instance: any) {
@@ -403,7 +443,7 @@ Template.contentEdit.events({
         const schemaErrors = instance.editor.validate();
         if (schemaErrors.length > 0) {
             const errorMessages = schemaErrors.map((e: any) => `${e.path}: ${e.message}`).join('; ');
-            setEditorMessage(instance, 'error', 'Schema validation errors', errorMessages);
+            setEditorMessage(instance, 'error', contentEditorText('tdfEditor.schemaValidationErrors'), errorMessages);
             return;
         }
 
@@ -416,7 +456,7 @@ Template.contentEdit.events({
                 if (summaryEl) {
                     summaryEl.scrollIntoView({ behavior: 'smooth' });
                 }
-                setEditorMessage(instance, 'warning', 'Validation errors need attention', 'Please fix the validation errors before saving.');
+                setEditorMessage(instance, 'warning', contentEditorText('tdfEditor.validationAttentionTitle'), contentEditorText('tdfEditor.validationAttentionText'));
                 return;
             }
         }
@@ -428,7 +468,7 @@ Template.contentEdit.events({
             // Get current TDF
             const tdf = findTdf(instance.tdfId);
             if (!tdf?.rawStimuliFile) {
-                throw new Error('TDF data is not available for saving.');
+                throw new Error(contentEditorText('contentEditor.tdfDataUnavailable'));
             }
 
             // Build updated rawStimuliFile - wrap clusters back into setspec
@@ -439,14 +479,14 @@ Template.contentEdit.events({
             // This is cleaner than trying to rebuild it client-side
             await meteorCallAsync('saveTdfStimuli', instance.tdfId, updatedRawStimuli, null);
 
-            showSaveFeedbackAndRedirect(instance, 'Saved. Returning to Content Manager...');
+            showSaveFeedbackAndRedirect(instance, contentEditorText('tdfEditor.savedReturning'));
             instance.hasChanges.set(false);
             instance._hasPendingChanges = false;
             instance.editedClusters = {};
 
         } catch (error: any) {
             clientConsole(1, '[Content Edit] Error saving stimuli:', error);
-            setEditorMessage(instance, 'error', 'Error saving stimuli', error.reason || error.message);
+            setEditorMessage(instance, 'error', contentEditorText('contentEditor.errorSavingStimuli'), error.reason || error.message);
         } finally {
             instance.saving.set(false);
         }
@@ -472,7 +512,7 @@ async function loadStimSchema(instance: any) {
         instance.schemaLoaded.set(true);
     } catch (error: any) {
         clientConsole(1, '[Content Edit] Error loading stim schema:', error);
-        setEditorMessage(instance, 'error', 'Error loading stimulus schema', 'Please refresh the page.');
+        setEditorMessage(instance, 'error', contentEditorText('contentEditor.errorLoadingSchema'), contentEditorText('tdfEditor.refreshPage'));
     }
 }
 
@@ -928,7 +968,7 @@ function enhanceMediaFields(container: any, editor: any, instance: any, rootArg?
         // Add compact drop zone (icon only with tooltip)
         const dropZone = document.createElement('div');
         dropZone.className = 'media-drop-zone';
-        dropZone.title = `Drop ${mediaType} or click to browse`;
+        dropZone.title = contentEditorText('contentEditor.invalidMediaFileText', { mediaType });
         dropZone.innerHTML = `<i class="fa fa-cloud-upload drop-icon"></i><input type="file" accept="${getAcceptType(mediaType)}">`;
         wrapper.appendChild(dropZone);
 
@@ -952,7 +992,8 @@ function enhanceMediaFields(container: any, editor: any, instance: any, rootArg?
             }
 
             if (mediaType === 'image') {
-                preview.innerHTML = `<img src="${resolvedUrl}" alt="Preview" onerror="this.outerHTML='<span class=\\'media-error\\'><i class=\\'fa fa-exclamation-triangle\\'></i> Image failed to load</span>'">`;
+                const imageFailedMessage = contentEditorText('contentEditor.imageFailedToLoad');
+                preview.innerHTML = `<img src="${resolvedUrl}" alt="${contentEditorText('contentEditor.previewAlt')}" onerror="this.outerHTML='<span class=\\'media-error\\'><i class=\\'fa fa-exclamation-triangle\\'></i> ${imageFailedMessage}</span>'">`;
             } else if (mediaType === 'audio') {
                 preview.innerHTML = `
                     <div class="audio-controls">
@@ -1036,7 +1077,7 @@ async function handleMediaUpload(file: any, mediaType: any, input: any, preview:
 
     if (!validTypes[mediaType]?.some(type => file.type.startsWith(type.split('/')[0]))) {
         if (instance?.editorMessage) {
-            setEditorMessage(instance, 'warning', 'Invalid media file', `Please select a valid ${mediaType} file.`);
+            setEditorMessage(instance, 'warning', contentEditorText('contentEditor.invalidMediaFile'), contentEditorText('contentEditor.invalidMediaFileText', { mediaType }));
         }
         return;
     }
@@ -1047,7 +1088,7 @@ async function handleMediaUpload(file: any, mediaType: any, input: any, preview:
         <div class="media-upload-status">
             <div class="media-upload-status-row">
                 <i class="fa fa-spinner fa-spin"></i>
-                <span>Uploading ${file.name}...</span>
+                <span>${contentEditorText('contentEditor.uploadingFile', { filename: file.name })}</span>
             </div>
             <div class="progress media-upload-progress">
                 <div class="progress-bar" role="progressbar" style="width: 0%"></div>
@@ -1079,7 +1120,7 @@ async function handleMediaUpload(file: any, mediaType: any, input: any, preview:
         upload.on('end', function(error: any, fileObj: any) {
             if (error) {
                 clientConsole(1, '[Content Edit] Media upload error:', error);
-                preview.innerHTML = `<span class="media-error"><i class="fa fa-exclamation-triangle"></i> Upload failed: ${error}</span>`;
+                preview.innerHTML = `<span class="media-error"><i class="fa fa-exclamation-triangle"></i> ${contentEditorText('contentEditor.uploadFailed', { error })}</span>`;
             } else {
                 // Success - update input with just the filename
                 const filePath = (globalThis as any).DynamicAssets.link({...fileObj});
@@ -1089,24 +1130,24 @@ async function handleMediaUpload(file: any, mediaType: any, input: any, preview:
                 // Update preview
                 preview.innerHTML = '';
                 if (mediaType === 'image') {
-                    preview.innerHTML = `<img src="${filePath}" alt="Preview"><span class="text-success media-upload-success"><i class="fa fa-check"></i> Uploaded</span>`;
+                    preview.innerHTML = `<img src="${filePath}" alt="${contentEditorText('contentEditor.previewAlt')}"><span class="text-success media-upload-success"><i class="fa fa-check"></i> ${contentEditorText('contentEditor.uploaded')}</span>`;
                 } else if (mediaType === 'audio') {
-                    preview.innerHTML = `<audio controls src="${filePath}"></audio><span class="text-success media-upload-success"><i class="fa fa-check"></i> Uploaded</span>`;
+                    preview.innerHTML = `<audio controls src="${filePath}"></audio><span class="text-success media-upload-success"><i class="fa fa-check"></i> ${contentEditorText('contentEditor.uploaded')}</span>`;
                 } else if (mediaType === 'video') {
-                    preview.innerHTML = `<video controls src="${filePath}"></video><span class="text-success media-upload-success"><i class="fa fa-check"></i> Uploaded</span>`;
+                    preview.innerHTML = `<video controls src="${filePath}"></video><span class="text-success media-upload-success"><i class="fa fa-check"></i> ${contentEditorText('contentEditor.uploaded')}</span>`;
                 }
             }
         });
 
         upload.on('error', function(error: any) {
             clientConsole(1, '[Content Edit] Media upload error:', error);
-            preview.innerHTML = `<span class="media-error"><i class="fa fa-exclamation-triangle"></i> Upload failed: ${error}</span>`;
+            preview.innerHTML = `<span class="media-error"><i class="fa fa-exclamation-triangle"></i> ${contentEditorText('contentEditor.uploadFailed', { error })}</span>`;
         });
 
         upload.start();
     } catch (error: any) {
         clientConsole(1, '[Content Edit] Media upload error:', error);
-        preview.innerHTML = `<span class="media-error"><i class="fa fa-exclamation-triangle"></i> Upload failed: ${error.message || error}</span>`;
+        preview.innerHTML = `<span class="media-error"><i class="fa fa-exclamation-triangle"></i> ${contentEditorText('contentEditor.uploadFailed', { error: error.message || error })}</span>`;
     }
 }
 
@@ -1162,7 +1203,7 @@ async function initStimEditor(instance: any, tdf: any) {
         await ensureJsonEditor();
     } catch (error: any) {
         clientConsole(1, '[Content Edit] JSONEditor failed to load:', error);
-        setEditorMessage(instance, 'error', 'Editor library not loaded', 'Please refresh the page. If this keeps happening, contact support.');
+        setEditorMessage(instance, 'error', contentEditorText('tdfEditor.editorLibraryNotLoaded'), contentEditorText('tdfEditor.refreshContactSupport'));
         return;
     }
 
@@ -1178,7 +1219,7 @@ function renderClusterEditor(instance: any, clusterIndex: any) {
 
     const total = instance.clusters.length;
     if (total === 0) {
-        container.innerHTML = '<div class="text-muted small">No clusters to edit.</div>';
+        container.innerHTML = `<div class="text-muted small">${contentEditorText('contentEditor.noClustersToEdit')}</div>`;
         return;
     }
     const windowSize = instance.clusterWindowSize.get();
@@ -1248,7 +1289,7 @@ function renderClusterEditor(instance: any, clusterIndex: any) {
     const JSONEditorAny = (globalThis as any).JSONEditor;
     if (typeof JSONEditorAny === 'undefined') {
         clientConsole(1, '[Content Edit] JSONEditor not loaded after route asset initialization.');
-        setEditorMessage(instance, 'error', 'Editor library not loaded', 'Please refresh the page.');
+        setEditorMessage(instance, 'error', contentEditorText('tdfEditor.editorLibraryNotLoaded'), contentEditorText('tdfEditor.refreshPage'));
         return;
     }
 

@@ -18,6 +18,8 @@ import { getErrorMessage } from '../lib/errorUtils';
 import { evaluateSrAvailability } from '../lib/audioAvailability';
 import { resolveSpeechRecognitionLanguage } from '../lib/speechRecognitionConfig';
 import { clientConsole } from '../lib/userSessionHelpers';
+import { getActiveUiLocale } from '../lib/interfaceLocaleState';
+import { translatePlatformString } from '../lib/interfaceI18n';
 
 declare const $: any;
 
@@ -29,6 +31,10 @@ let cachedTrackColor: string | null = null;
 const AUDIO_INPUT_SENSITIVITY_MIN = 20;
 const AUDIO_INPUT_SENSITIVITY_MAX = 80;
 const AUDIO_INPUT_SENSITIVITY_DEFAULT = 60;
+
+function audioText(key: Parameters<typeof translatePlatformString>[1], values?: Parameters<typeof translatePlatformString>[2]): string {
+  return translatePlatformString(getActiveUiLocale(), key, values);
+}
 
 function setAudioSettingsMessage(template: any, level: string, text: string) {
   template?.audioSettingsMessage?.set?.({
@@ -107,7 +113,7 @@ async function saveAudioSettingToDatabase(settingKey: any, settingValue: any, te
     await (Meteor as any).callAsync('saveAudioSettings', currentSettings);
   } catch (error: unknown) {
     clientConsole(1, '[Audio Settings] Error saving audio setting:', error);
-    setAudioSettingsMessage(template, 'error', 'Failed to save audio settings: ' + getErrorMessage(error));
+    setAudioSettingsMessage(template, 'error', audioText('audio.failedSaveAudioSettings', { error: getErrorMessage(error) }));
   }
 }
 
@@ -314,14 +320,14 @@ Template.audioSettings.events({
       checkAndSetSpeechAPIKeyIsSetup();
 
       
-      setAudioSettingsMessage(template, 'success', 'Speech API key has been saved.');
+      setAudioSettingsMessage(template, 'success', audioText('audio.speechApiKeySaved'));
     } catch (error) {
       // Make sure to update our reactive session variable so the api key is
       // setup indicator updates
       checkAndSetSpeechAPIKeyIsSetup();
 
       
-      setAudioSettingsMessage(template, 'error', 'Your changes were not saved. ' + getErrorMessage(error));
+      setAudioSettingsMessage(template, 'error', audioText('audio.changesNotSaved', { error: getErrorMessage(error) }));
     }
   },
 
@@ -333,13 +339,13 @@ Template.audioSettings.events({
       checkAndSetSpeechAPIKeyIsSetup();
       $('#speechAPIKey').val('');
       
-      setAudioSettingsMessage(template, 'success', 'Speech API key has been deleted.');
+      setAudioSettingsMessage(template, 'success', audioText('audio.speechApiKeyDeleted'));
     } catch (error) {
       // Make sure to update our reactive session variable so the api key is
       // setup indicator updates
       checkAndSetSpeechAPIKeyIsSetup();
       
-      setAudioSettingsMessage(template, 'error', 'Your changes were not saved. ' + getErrorMessage(error));
+      setAudioSettingsMessage(template, 'error', audioText('audio.changesNotSaved', { error: getErrorMessage(error) }));
     }
   },
 
@@ -419,6 +425,14 @@ Template.audioSettings.events({
 });
 
 Template.audioSettings.helpers({
+  audioText: function(key: Parameters<typeof translatePlatformString>[1], values?: Parameters<typeof translatePlatformString>[2]) {
+    return audioText(key, values);
+  },
+
+  audioVoiceLabel: function(gender: 'male' | 'female', number: number) {
+    return audioText(gender === 'female' ? 'audio.femaleVoice' : 'audio.maleVoice', { number });
+  },
+
   audioSettingsMessage: function() {
     return (Template.instance() as any).audioSettingsMessage.get();
   },
@@ -434,6 +448,12 @@ Template.audioSettings.helpers({
 
   speechAPIKeyIsSetup: function() {
     return Session.get('speechAPIKeyIsSetup');
+  },
+
+  speechAPIKeyPlaceholder: function() {
+    return Session.get('speechAPIKeyIsSetup')
+      ? audioText('audio.enterNewKeyReplaceSaved')
+      : audioText('audio.enterYourApiKey');
   },
 });
 

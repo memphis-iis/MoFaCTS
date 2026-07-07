@@ -22,7 +22,7 @@ Current evidence checked for this handoff:
 
 - `C:\dev\mofacts_config` and `C:\dev\MoFaCTS.wiki` both exist on this workstation.
 - Current config content already uses `speechRecognitionLanguage` and `textToSpeechLanguage` in at least one package.
-- No current config hit was found for proposed metadata names such as `content_language`, `contentLanguage`, `recommended_ui_locales`, or `translation_status`; implementation must still perform a fresh adjacent-concept search before introducing final field names.
+- No current config hit was found for adjacent metadata names before introducing the canonical TDF metadata fields `contentLanguage`, `recommendedUiLocales`, and `translationStatus`.
 - No existing app dependency hit was found for `i18next`, `FormatJS`, `react-intl`, `intl-messageformat`, or `@formatjs` in the checked package files.
 
 ## Product Position
@@ -69,11 +69,15 @@ In this plan, "platform-owned system prompts" means user-facing MoFaCTS system m
 
 Use BCP 47 language tags for both interface locales and content metadata. Examples include `en`, `es`, `zh-Hans`, `zh-Hant`, and `hi`.
 
-Do not introduce final field names until implementation searches both `mofacts/` and `C:\dev\mofacts_config` for adjacent concepts. The examples below are candidate shapes, not pre-approved schema names.
+Canonical TDF metadata fields:
+
+- `contentLanguage`: BCP 47 language tag for authored instructional content.
+- `recommendedUiLocales`: optional BCP 47 UI locale tags recommended for platform chrome.
+- `translationStatus`: author-declared review status for the authored content language variant.
 
 ## Initial Target Language Set
 
-The initial invariant target is the current top ten languages by total speakers:
+The initial invariant target is the top ten languages by total speakers using the Ethnologue 2026 list as the source of truth: https://www.ethnologue.com/insights/ethnologue200/
 
 | Language | UI locale target | Primary TTS code | Input/display target |
 | --- | --- | --- | --- |
@@ -116,7 +120,7 @@ Authored content should declare language metadata while keeping instructional te
 
 ```json
 {
-  "content_language": "es",
+  "contentLanguage": "es",
   "title": "Sistema esquelético",
   "author_declared_language": true
 }
@@ -126,9 +130,9 @@ Course or package-level metadata should summarize available authored languages a
 
 ```json
 {
-  "content_languages": ["es"],
-  "recommended_ui_locales": ["es", "en"],
-  "translation_status": "author-provided"
+  "contentLanguages": ["es"],
+  "recommendedUiLocales": ["es", "en"],
+  "translationStatus": "author-provided"
 }
 ```
 

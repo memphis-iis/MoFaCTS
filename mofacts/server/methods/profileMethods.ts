@@ -9,6 +9,7 @@ import {
   PROFILE_AVATAR_IMAGE_MAX_DATA_URL_LENGTH,
   type ProfileAvatarType,
 } from '../../common/profileAvatar';
+import { requireTargetUiLocale } from '../../common/lib/interfaceLocales';
 
 type UnknownRecord = Record<string, unknown>;
 type MethodContext = {
@@ -132,6 +133,7 @@ export function createProfileMethods(deps: ProfileMethodsDeps) {
       check(params, {
         name: Match.Maybe(String),
         displayName: Match.Maybe(String),
+        uiLocale: Match.Maybe(String),
         avatarType: Match.Maybe(Match.OneOf('initials', 'icon', 'image')),
         avatarIconId: Match.Maybe(Match.OneOf(String, null)),
         avatarImageData: Match.Maybe(Match.OneOf(String, null)),
@@ -140,6 +142,7 @@ export function createProfileMethods(deps: ProfileMethodsDeps) {
       const data = params as {
         name?: string;
         displayName?: string;
+        uiLocale?: string;
         avatarType?: ProfileAvatarType;
         avatarIconId?: string | null;
         avatarImageData?: string | null;
@@ -154,6 +157,10 @@ export function createProfileMethods(deps: ProfileMethodsDeps) {
         'profile.updatedAt': new Date(),
       };
       const unsetFields: UnknownRecord = {};
+
+      if (data.uiLocale !== undefined) {
+        setFields['profile.uiLocale'] = requireTargetUiLocale(data.uiLocale);
+      }
 
       if (avatarType === 'icon') {
         const icon = findProfileAvatarIcon(data.avatarIconId);

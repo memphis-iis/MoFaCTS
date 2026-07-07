@@ -34,6 +34,7 @@ import {
 } from './audioRuntimeState';
 import { resolveDynamicAssetPath } from './mediaResolver';
 import { logIdInvariantBreachOnce } from '../../../../lib/idContext';
+import { resolvePlatformPromptTtsLanguage } from '../../../../../common/lib/interfaceLocales';
 import type {
   AudioPromptSource,
   TtsPlaybackEvent,
@@ -205,7 +206,25 @@ function findMatchingBrowserVoice(voices: SpeechSynthesisVoice[], requestedVoice
   return null;
 }
 
-function resolveTtsLanguageCode(
+type TtsLanguageSource = 'authored-content' | 'platform-prompt';
+
+type TtsLanguageResolutionInput = {
+  setspec: { textToSpeechLanguage?: string | string[] } | null | undefined;
+  requestedVoice: string;
+  languageSource?: TtsLanguageSource | undefined;
+  uiLocale?: string | undefined;
+  voiceLocaleOverride?: string | null | undefined;
+  allowedVoiceLocaleOverrides?: readonly string[] | undefined;
+  availableVoiceLocales?: readonly string[] | undefined;
+};
+
+type TtsLanguageResolution = {
+  status: 'ok' | 'unsupported-locale' | 'disallowed-override' | 'missing-voice';
+  languageCode?: string;
+  reason?: string;
+};
+
+export function resolveAuthoredContentTtsLanguageCode(
   setspec: { textToSpeechLanguage?: string | string[] } | null | undefined,
   requestedVoice: string
 ): string {
@@ -223,6 +242,22 @@ function resolveTtsLanguageCode(
   }
 
   return 'en-US';
+}
+
+export function resolveTtsLanguageForSpeak(input: TtsLanguageResolutionInput): TtsLanguageResolution {
+  if (input.languageSource === 'platform-prompt') {
+    return resolvePlatformPromptTtsLanguage({
+      uiLocale: input.uiLocale || '',
+      voiceLocaleOverride: input.voiceLocaleOverride,
+      allowedVoiceLocaleOverrides: input.allowedVoiceLocaleOverrides,
+      availableVoiceLocales: input.availableVoiceLocales,
+    });
+  }
+
+  return {
+    status: 'ok',
+    languageCode: resolveAuthoredContentTtsLanguageCode(input.setspec, input.requestedVoice),
+  };
 }
 
 function voiceMatchesLanguageCode(requestedVoice: string, languageCode: string): boolean {
@@ -369,7 +404,19 @@ async function speakText(
       const currentTdf = Session.get('currentTdfFile');
       const hasTtsKey = !!currentTdf?.tdfs?.tutor?.setspec?.textToSpeechAPIKey ||
         Session.get('ttsAPIKeyConfigured') === true;
-      const ttsLanguage = resolveTtsLanguageCode(currentTdf?.tdfs?.tutor?.setspec, String(voice || ''));
+      const ttsLanguageResolution = resolveTtsLanguageForSpeak({
+        setspec: currentTdf?.tdfs?.tutor?.setspec,
+        requestedVoice: String(voice || ''),
+        languageSource: options.languageSource,
+        uiLocale: options.uiLocale,
+        voiceLocaleOverride: options.voiceLocaleOverride,
+        allowedVoiceLocaleOverrides: options.allowedVoiceLocaleOverrides,
+        availableVoiceLocales: options.availableVoiceLocales,
+      });
+      if (ttsLanguageResolution.status !== 'ok' || !ttsLanguageResolution.languageCode) {
+        throw new Error(ttsLanguageResolution.reason || `Unable to resolve TTS language (${ttsLanguageResolution.status})`);
+      }
+      const ttsLanguage = ttsLanguageResolution.languageCode;
 
       const speakWithSpeechSynthesis = () => new Promise<void>((speechResolve, speechReject) => {
         if (!window.speechSynthesis) {
@@ -837,7 +884,14 @@ export async function ttsPlaybackService(_context: Record<string, unknown>, even
         return false;
       }
 
-      await speakText(segmentText, { isQuestion: segmentIsQuestion }, getCancellation, playbackId);
+      await speakText(segmentText, {
+        isQuestion: segmentIsQuestion,
+        languageSource: event.languageSource,
+        uiLocale: event.uiLocale,
+        voiceLocaleOverride: event.voiceLocaleOverride,
+        allowedVoiceLocaleOverrides: event.allowedVoiceLocaleOverrides,
+        availableVoiceLocales: event.availableVoiceLocales,
+      }, getCancellation, playbackId);
       return true;
     };
 
@@ -858,7 +912,14 @@ export async function ttsPlaybackService(_context: Record<string, unknown>, even
     } else if (audioSrc) {
       await playAudioFile(audioSrc, getCancellation, playbackId);
     } else if (text) {
-      await speakText(text, { isQuestion }, getCancellation, playbackId);
+      await speakText(text, {
+        isQuestion,
+        languageSource: event.languageSource,
+        uiLocale: event.uiLocale,
+        voiceLocaleOverride: event.voiceLocaleOverride,
+        allowedVoiceLocaleOverrides: event.allowedVoiceLocaleOverrides,
+        availableVoiceLocales: event.availableVoiceLocales,
+      }, getCancellation, playbackId);
     } else {
       // No TTS/audio payload for this transition.
     }

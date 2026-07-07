@@ -2,6 +2,8 @@ import { expect } from 'chai';
 import {
   estimateSpeechSynthesisCompletionTimeoutMs,
   isAppleMobileSpeechSynthesisEnvironment,
+  resolveAuthoredContentTtsLanguageCode,
+  resolveTtsLanguageForSpeak,
 } from './ttsService';
 
 describe('ttsService Apple mobile recovery helpers', function() {
@@ -33,5 +35,55 @@ describe('ttsService Apple mobile recovery helpers', function() {
 
     expect(slowTimeout).to.be.greaterThan(fastTimeout);
     expect(fastTimeout).to.be.greaterThan(2500);
+  });
+
+  it('preserves authored content TTS language resolution', function() {
+    expect(resolveAuthoredContentTtsLanguageCode({ textToSpeechLanguage: 'es-ES' }, '')).to.equal('es-ES');
+    expect(resolveAuthoredContentTtsLanguageCode(null, 'fr-FR-Neural2-A')).to.equal('fr-FR');
+    expect(resolveAuthoredContentTtsLanguageCode(null, '')).to.equal('en-US');
+  });
+
+  it('resolves platform prompt TTS from UI locale instead of authored content settings', function() {
+    expect(resolveTtsLanguageForSpeak({
+      setspec: { textToSpeechLanguage: 'en-US' },
+      requestedVoice: '',
+      languageSource: 'platform-prompt',
+      uiLocale: 'hi',
+    })).to.deep.equal({
+      status: 'ok',
+      languageCode: 'hi-IN',
+    });
+  });
+
+  it('reports unsupported platform prompt locales without substituting English', function() {
+    expect(resolveTtsLanguageForSpeak({
+      setspec: { textToSpeechLanguage: 'en-US' },
+      requestedVoice: '',
+      languageSource: 'platform-prompt',
+      uiLocale: 'de-DE',
+    }).status).to.equal('unsupported-locale');
+  });
+
+  it('requires explicit reviewed platform prompt TTS voice overrides', function() {
+    expect(resolveTtsLanguageForSpeak({
+      setspec: null,
+      requestedVoice: '',
+      languageSource: 'platform-prompt',
+      uiLocale: 'pt',
+      voiceLocaleOverride: 'pt-PT',
+      allowedVoiceLocaleOverrides: ['pt-PT'],
+    })).to.deep.equal({
+      status: 'ok',
+      languageCode: 'pt-PT',
+    });
+
+    expect(resolveTtsLanguageForSpeak({
+      setspec: null,
+      requestedVoice: '',
+      languageSource: 'platform-prompt',
+      uiLocale: 'pt',
+      voiceLocaleOverride: 'pt-PT',
+      allowedVoiceLocaleOverrides: [],
+    }).status).to.equal('disallowed-override');
   });
 });

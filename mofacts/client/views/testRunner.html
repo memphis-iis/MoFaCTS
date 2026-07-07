@@ -1,6 +1,6 @@
 <template name="testRunner">
   <div class="container admin-page">
-    <h3 class="page-header-title">Admin Tests</h3>
+    <h3 class="page-header-title">{{testText 'home.adminTests'}}</h3>
 
     <div class="admin-section">
       <div class="card admin-card">
@@ -9,14 +9,14 @@
             <div>
               <div class="admin-section-heading admin-section-heading-compact">
                 <i class="fa fa-check-circle admin-section-icon"></i>
-                <h5>Deployment Readiness</h5>
+                <h5>{{testText 'adminTests.deploymentReadiness'}}</h5>
               </div>
               <div class="text-muted small">
-                Run admin-only readiness checks for the deployed MoFaCTS environment.
+                {{testText 'adminTests.description'}}
               </div>
             </div>
             <button type="button" class="btn btn-primary run-deployment-readiness">
-              <i class="fa fa-check-circle"></i> Run Readiness Checks
+              <i class="fa fa-check-circle"></i> {{testText 'adminTests.runReadinessChecks'}}
             </button>
           </div>
 

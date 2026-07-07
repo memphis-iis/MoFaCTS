@@ -9,6 +9,8 @@ import type {
   CourseAssignmentSummary,
   SaveCourseAssignmentsInput,
 } from '../../../common/courseAssignments.contracts';
+import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
+import { translatePlatformString } from '../../lib/interfaceI18n';
 declare const $: any;
 
 type AssignableTdf = CourseAssignmentEditorSnapshot['assignableTdfs'][number];
@@ -31,6 +33,10 @@ Session.set('courseAssignmentSelectedCourseId', '');
 Session.set('courseAssignmentTimezone', '');
 
 let activeSnapshotRequestId = 0;
+
+function assignmentText(key: Parameters<typeof translatePlatformString>[1], values?: Parameters<typeof translatePlatformString>[2]): string {
+  return translatePlatformString(getActiveUiLocale(), key, values);
+}
 
 function toDatetimeLocalValue(value: unknown, timezone?: string): string {
   if (!value) return '';
@@ -124,15 +130,15 @@ function validateRows(rows: AssignmentEditorRow[]) {
   const seen = new Set<string>();
   for (const row of rows) {
     if (seen.has(row.TDFId)) {
-      return `Duplicate lesson selected: ${row.title}`;
+      return assignmentText('courseAssignments.duplicateLesson', { title: row.title });
     }
     seen.add(row.TDFId);
     const releaseTime = row.releaseAt ? new Date(row.releaseAt).getTime() : null;
     const dueTime = row.dueAt ? new Date(row.dueAt).getTime() : null;
-    if (releaseTime !== null && !Number.isFinite(releaseTime)) return `Invalid visible date for ${row.title}`;
-    if (dueTime !== null && !Number.isFinite(dueTime)) return `Invalid due date for ${row.title}`;
+    if (releaseTime !== null && !Number.isFinite(releaseTime)) return assignmentText('courseAssignments.invalidVisibleDate', { title: row.title });
+    if (dueTime !== null && !Number.isFinite(dueTime)) return assignmentText('courseAssignments.invalidDueDate', { title: row.title });
     if (releaseTime !== null && dueTime !== null && dueTime < releaseTime) {
-      return `Due date must be after visible date for ${row.title}`;
+      return assignmentText('courseAssignments.dueAfterVisibleDate', { title: row.title });
     }
   }
   return null;
@@ -183,6 +189,9 @@ Template.tdfAssignmentEdit.helpers({
   isLoading: () => Session.get('courseAssignmentLoading'),
   isDirty: () => Session.get('courseAssignmentDirty'),
   editorError: () => Session.get('courseAssignmentError'),
+  assignmentText(key: Parameters<typeof translatePlatformString>[1]) {
+    return assignmentText(key);
+  },
   filteredAssignableTdfs: () => {
     const query = String(Session.get('courseAssignmentSearch') || '').toLowerCase();
     const selected = new Set(readRows().map((row) => row.TDFId));
@@ -296,7 +305,7 @@ Template.tdfAssignmentEdit.events({
   'click #saveAssignment': async function() {
     const courseId = String(Session.get('courseAssignmentSelectedCourseId') || '');
     if (!courseId) {
-      Session.set('courseAssignmentError', 'Please select a course.');
+      Session.set('courseAssignmentError', assignmentText('courseAssignments.pleaseSelectCourse'));
       return;
     }
     const rows = readRows();

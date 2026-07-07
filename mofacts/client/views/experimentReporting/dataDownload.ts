@@ -3,8 +3,14 @@ import { Template } from 'meteor/templating';
 import './dataDownload.html';
 import { ReactiveVar } from 'meteor/reactive-var';
 import { clientConsole } from '../..';
+import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
+import { translatePlatformString } from '../../lib/interfaceI18n';
 
 const MeteorCompat = Meteor as typeof Meteor & { callAsync: (name: string, ...args: any[]) => Promise<any> };
+
+function reportingText(key: Parameters<typeof translatePlatformString>[1], values?: Parameters<typeof translatePlatformString>[2]): string {
+  return translatePlatformString(getActiveUiLocale(), key, values);
+}
 
 Template.dataDownload.onCreated(function(this: any) {
   this.accessableFiles = new ReactiveVar([]);
@@ -53,7 +59,7 @@ Template.dataDownload.onRendered(async function(this: any) {
   } catch (err) {
     clientConsole(1, '[DataDownload] Failed to load data:', err);
     instance.accessableFiles.set([]);
-    setDownloadMessage(instance, 'Could not load downloadable data. Please try again later.', 'error');
+    setDownloadMessage(instance, reportingText('reporting.couldNotLoadDownloadableData'), 'error');
   } finally {
     instance.isLoading.set(false);
   }
@@ -84,6 +90,9 @@ Template.dataDownload.helpers({
   },
   downloadMessage() {
     return (Template.instance() as any).downloadMessage.get();
+  },
+  reportingText(key: Parameters<typeof translatePlatformString>[1], options?: { hash?: Parameters<typeof translatePlatformString>[2] }) {
+    return reportingText(key, options?.hash);
   },
 });
 
@@ -119,18 +128,18 @@ Template.dataDownload.events({
 
 async function makeDataDownloadMethodCall(instance: any, methodName: string, ...args: any[]): Promise<void> {
   try {
-    setDownloadMessage(instance, 'Preparing download...', 'info');
+    setDownloadMessage(instance, reportingText('reporting.preparingDownload'), 'info');
     const response = await MeteorCompat.callAsync(methodName, ...args);
     if (response?.downloadUrl) {
       startDownloadFromUrl(response.downloadUrl);
     } else {
       createData(response);
     }
-    setDownloadMessage(instance, 'Download started.', 'success');
+    setDownloadMessage(instance, reportingText('reporting.downloadStarted'), 'success');
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     clientConsole(1, '[DataDownload] Download failed:', message);
-    setDownloadMessage(instance, `Download failed: ${message}`, 'error');
+    setDownloadMessage(instance, reportingText('reporting.downloadFailed', { error: message }), 'error');
   }
 }
 

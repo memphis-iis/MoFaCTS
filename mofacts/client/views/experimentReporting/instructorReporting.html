@@ -24,7 +24,7 @@
   </style>
 {{#if isInRole 'admin, teacher'}}
   <div class="container admin-page">
-    <h3 class="page-header-title">Instructor Reporting</h3>
+    <h3 class="page-header-title">{{reportingText 'reporting.instructorReporting'}}</h3>
 
     {{#if reportingMessage}}
     <div class="admin-status admin-status-{{reportingMessage.level}} admin-message" role="status" aria-live="polite">
@@ -40,10 +40,10 @@
           <div class="card-body">
             <div class="admin-section-heading">
               <i class="fa fa-users admin-section-icon"></i>
-              <h5>Class Selection</h5>
+              <h5>{{reportingText 'reporting.classSelection'}}</h5>
             </div>
             <select id="class-select" class="form-select">
-              <option selected="selected" value="{{INVALID}}" disabled="true">Select a class</option>
+              <option selected="selected" value="{{INVALID}}" disabled="true">{{reportingText 'reporting.selectClass'}}</option>
               {{#each classes}}
                 <option value="{{this._id}}">{{this.courseName}}</option>
               {{/each}}
@@ -58,16 +58,16 @@
           <div class="card-body">
             <div class="admin-section-heading">
               <i class="fa fa-book admin-section-icon"></i>
-              <h5>Select Module</h5>
+              <h5>{{reportingText 'reporting.selectModule'}}</h5>
             </div>
             <select id="tdf-select" disabled="true" class="form-select">
-              <option selected="selected" value="{{INVALID}}" disabled="true">Select a module</option>
+              <option selected="selected" value="{{INVALID}}" disabled="true">{{reportingText 'reporting.selectModule'}}</option>
               {{#each curInstructorReportingTdfs}}
                 <option value="{{this.TDFId}}">{{this.displayName}}</option>
               {{/each}}
             </select>
             {{#if performanceLoading}}
-              <p class="text-muted text-center admin-loading-text">Loading reports...</p>
+              <p class="text-muted text-center admin-loading-text">{{reportingText 'reporting.loadingReports'}}</p>
             {{/if}}
           </div>
         </div>
@@ -80,7 +80,7 @@
           <div class="card-body">
             <div class="admin-section-heading">
               <i class="fa fa-calendar admin-section-icon"></i>
-              <h5>Practice Deadline</h5>
+              <h5>{{reportingText 'reporting.practiceDeadline'}}</h5>
             </div>
             <input type="date" id="practice-deadline-date" name="practice-deadline-date-select" disabled="true" class="form-control">
           </div>
@@ -93,19 +93,19 @@
           <div class="card-body">
             <div class="admin-section-heading">
               <i class="fa fa-filter admin-section-icon"></i>
-              <h5>Filter By Due Date ({{selectedTdfDueDate}})</h5>
+              <h5>{{reportingText 'reporting.filterByDueDate' date=selectedTdfDueDate}}</h5>
             </div>
             <div class="row g-3">
               <div class="col-12">
                 <div class="form-check">
                   <input type="checkbox" class="form-check-input" id="due-date-filter" name="due-date-filter-select">
                   <label class="form-check-label" for="due-date-filter">
-                    Enable due date filter
+                    {{reportingText 'reporting.enableDueDateFilter'}}
                   </label>
                 </div>
               </div>
               <div class="col-12">
-                <label for="exception-date" class="form-label">Exception Date</label>
+                <label for="exception-date" class="form-label">{{reportingText 'reporting.exceptionDate'}}</label>
                 <input type="date" id="exception-date" name="exception-date-select" class="form-control">
               </div>
             </div>
@@ -120,26 +120,26 @@
           <div class="card-body">
             <div class="admin-section-heading">
               <i class="fa fa-table admin-section-icon"></i>
-              <h5>Class Data</h5>
+              <h5>{{reportingText 'reporting.classData'}}</h5>
             </div>
             <div class="admin-table-wrapper">
               <div class="table-responsive">
                 <table class="table table-striped table-bordered">
             <thead>
               <tr>
-                <th class="table-col-medium">Student</th>
-                <th class="table-col-narrow text-center">% Correct</th>
-                <th class="table-col-narrow text-center">Count</th>
-                <th class="table-col-narrow text-center">Total Time (min)</th>
-                <th class="table-col-small">Exceptions</th>
-                <th class="table-col-small">Actions</th>
+                <th class="table-col-medium">{{reportingText 'reporting.student'}}</th>
+                <th class="table-col-narrow text-center">{{reportingText 'reporting.percentCorrect'}}</th>
+                <th class="table-col-narrow text-center">{{reportingText 'reporting.count'}}</th>
+                <th class="table-col-narrow text-center">{{reportingText 'reporting.totalTimeMin'}}</th>
+                <th class="table-col-small">{{reportingText 'reporting.exceptions'}}</th>
+                <th class="table-col-small">{{reportingText 'reporting.actions'}}</th>
               </tr>
             </thead>
             <tbody>
           {{#if dueDateFilter}}
           <tr>
             <td colspan="6" class="instructor-reporting-group-row">
-              Completed Before Due Date
+              {{reportingText 'reporting.completedBeforeDueDate'}}
             </td>
           </tr>
           {{/if}}
@@ -157,19 +157,19 @@
                 </td>
                 <td>
                 {{#if this.exception}}
-                  <a data-userid="{{this.userId}}" id="remove-exception">Remove Exception</a>
+                  <a data-userid="{{this.userId}}" id="remove-exception">{{reportingText 'reporting.removeException'}}</a>
                 {{else}}
                 {{/if}}
                 </td>
               </tr>
             {{/each}}
           {{else}}
-            <tr><td colspan="6">No data available</td></tr>
+            <tr><td colspan="6">{{reportingText 'reporting.noDataAvailable'}}</td></tr>
           {{/if}}
           {{#if dueDateFilter}}
           <tr>
             <td colspan="6" class="instructor-reporting-group-row">
-              Completed After Due Date
+              {{reportingText 'reporting.completedAfterDueDate'}}
             </td>
           </tr>
             {{#if curClassStudentPerformanceAfterFilter}}
@@ -186,21 +186,21 @@
                 </td>
                 <td>
                   {{#if this.exception}}
-                    <a data-userid="{{this.userId}}" id="remove-exception">Remove Exception</a>
+                    <a data-userid="{{this.userId}}" id="remove-exception">{{reportingText 'reporting.removeException'}}</a>
                   {{else}}
-                    <a data-userid="{{this.userId}}" id="add-exception">Add Exception</a>
+                    <a data-userid="{{this.userId}}" id="add-exception">{{reportingText 'reporting.addException'}}</a>
                   {{/if}}
                 </td>
               </tr>
               {{/each}}
             {{else}}
-              <tr><td colspan="6">No data available</td></tr>
+              <tr><td colspan="6">{{reportingText 'reporting.noDataAvailable'}}</td></tr>
             {{/if}}
           {{/if}}
             </tbody>
           <tfoot id="classReportingTotal">
             <tr>
-              <td>Totals</td>
+              <td>{{reportingText 'reporting.totals'}}</td>
               <td class="text-center">{{curClassPerformance.percentCorrect}}</td>
               <td class="text-center">{{curClassPerformance.count}}</td>
               <td class="text-center">{{curClassPerformance.totalTimeMins}}</td>

@@ -1,6 +1,8 @@
 import { clientConsole } from '../../lib/clientLogger';
 import { sortPropertiesModal } from '../../lib/schemaApplicabilityEditor';
 import { ensureJsonEditor } from '../../lib/jsonEditorLoader';
+import { translatePlatformString } from '../../lib/interfaceI18n';
+import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 
 let cachedSchema: any = null;
 
@@ -15,6 +17,10 @@ function formatSchemaKey(key: string) {
     .replace(/([A-Z])/g, ' $1')
     .replace(/^./, (str: string) => str.toUpperCase())
     .trim();
+}
+
+function contentDraftText(key: any, values?: Record<string, string | number>) {
+  return translatePlatformString(getActiveUiLocale(), key, values);
 }
 
 function isEmpty(value: any) {
@@ -71,7 +77,7 @@ function syncDraftEditorChrome(container: HTMLElement, editor: any, rootArg?: Pa
     btn.style.alignItems = 'center';
     const span = btn.querySelector('span');
     if (span) {
-      span.textContent = ' Edit Properties';
+      span.textContent = ` ${contentDraftText('contentEditor.editProperties')}`;
     }
   });
 
@@ -83,7 +89,7 @@ function syncDraftEditorChrome(container: HTMLElement, editor: any, rootArg?: Pa
     btn.style.alignItems = 'center';
     const span = btn.querySelector('span');
     if (span && !span.textContent.trim()) {
-      span.textContent = ' JSON';
+      span.textContent = ` ${contentDraftText('contentEditor.json')}`;
     }
   });
 
@@ -195,20 +201,20 @@ export async function createContentDraftEditor(
     <div class="draft-content-editor">
       <div class="draft-content-toolbar">
         <div class="draft-content-toolbar-group">
-          <button type="button" class="btn btn-outline-secondary btn-sm draft-content-prev">Previous</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm draft-content-prev">${contentDraftText('contentEditor.previousCluster')}</button>
           <div class="small text-muted draft-content-status"></div>
-          <button type="button" class="btn btn-outline-secondary btn-sm draft-content-next">Next</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm draft-content-next">${contentDraftText('contentEditor.nextCluster')}</button>
         </div>
         <div class="draft-content-toolbar-group">
-          <label class="small draft-content-window-label" for="draft-content-window-size">Show</label>
+          <label class="small draft-content-window-label" for="draft-content-window-size">${contentDraftText('contentEditor.show')}</label>
           <select class="form-control form-control-sm" id="draft-content-window-size" style="width:auto;">
             ${WINDOW_SIZE_OPTIONS.map((size) => `<option value="${size}">${size}</option>`).join('')}
           </select>
-          <span class="small text-muted">cluster(s) at a time</span>
+          <span class="small text-muted">${contentDraftText('contentEditor.clustersAtATime')}</span>
         </div>
       </div>
       <div class="alert alert-info small draft-content-info">
-        Editing is windowed for performance. The full lesson stays intact, but only the visible cluster range is rendered at one time.
+        ${contentDraftText('contentEditor.windowedEditingInfo')}
       </div>
       <div class="draft-content-editor-host"></div>
     </div>
@@ -221,7 +227,7 @@ export async function createContentDraftEditor(
   const sizeElement = container.querySelector('#draft-content-window-size') as HTMLSelectElement | null;
 
   if (!statusElement || !hostElement || !prevElement || !nextElement || !sizeElement) {
-    throw new Error('Failed to initialize draft content editor controls.');
+    throw new Error(contentDraftText('contentEditor.initDraftControlsFailed'));
   }
 
   const statusEl = statusElement;
@@ -253,7 +259,7 @@ export async function createContentDraftEditor(
   function updateToolbar() {
     const total = state.clusters.length;
     if (total === 0) {
-      statusEl.textContent = 'No clusters';
+      statusEl.textContent = contentDraftText('contentEditor.noClusters');
       prevButton.disabled = true;
       nextButton.disabled = true;
       return;
@@ -261,7 +267,7 @@ export async function createContentDraftEditor(
 
     const start = state.currentClusterIndex + 1;
     const end = Math.min(state.currentClusterIndex + state.windowSize, total);
-    statusEl.textContent = `Clusters ${start}-${end} of ${total}`;
+    statusEl.textContent = contentDraftText('contentEditor.clusterRangeStatus', { start, end, total });
     prevButton.disabled = total <= state.windowSize;
     nextButton.disabled = total <= state.windowSize;
     sizeSelect.value = String(state.windowSize);
@@ -325,7 +331,7 @@ export async function createContentDraftEditor(
     updateToolbar();
 
     if (state.clusters.length === 0) {
-      hostEl.innerHTML = '<div class="text-muted small">No clusters to edit.</div>';
+      hostEl.innerHTML = `<div class="text-muted small">${contentDraftText('contentEditor.noClustersToEdit')}</div>`;
       return;
     }
 

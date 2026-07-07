@@ -7,6 +7,9 @@ import './userAdmin.html';
 import { Mongo } from 'meteor/mongo';
 import { userHasRole } from '../lib/roleUtils';
 import { getErrorMessage } from '../lib/errorUtils';
+import { getActiveUiLocale } from '../lib/interfaceLocaleState';
+import { translatePlatformString } from '../lib/interfaceI18n';
+import { formatActiveInterfaceDateTime, formatActiveInterfaceNumber } from '../lib/interfaceFormatting';
 
 import { legacyTrim } from '../../common/underscoreCompat';
 
@@ -42,6 +45,10 @@ type UserAdminRoleChangeResult = {
   targetUserId?: unknown;
   targetRoles?: Partial<Record<RoleName, unknown>>;
 };
+
+function userAdminText(key: Parameters<typeof translatePlatformString>[1], values?: Parameters<typeof translatePlatformString>[2]): string {
+  return translatePlatformString(getActiveUiLocale(), key, values);
+}
 
 function messageIcon(messageType: string): string {
   if (messageType === 'success') return 'fa-check-circle';
@@ -84,40 +91,40 @@ function formatOneDecimal(value: unknown): string {
 
 function formatWholeNumber(value: unknown): string {
   const numeric = Number(value);
-  return Number.isFinite(numeric) ? String(Math.round(numeric)) : '0';
+  return Number.isFinite(numeric) ? formatActiveInterfaceNumber(Math.round(numeric)) : formatActiveInterfaceNumber(0);
 }
 
 function formatMinutes(value: unknown): string {
   const minutes = Number(value);
   if (!Number.isFinite(minutes) || minutes <= 0) {
-    return '0m';
+    return userAdminText('admin.minutesShort', { minutes: 0 });
   }
   const roundedMinutes = Math.round(minutes);
   const hours = Math.floor(roundedMinutes / 60);
   const remainingMinutes = roundedMinutes % 60;
   if (hours > 0 && remainingMinutes > 0) {
-    return `${hours}h ${remainingMinutes}m`;
+    return userAdminText('admin.hoursMinutesShort', { hours, minutes: remainingMinutes });
   }
   if (hours > 0) {
-    return `${hours}h`;
+    return userAdminText('admin.hoursShort', { hours });
   }
-  return `${remainingMinutes}m`;
+  return userAdminText('admin.minutesShort', { minutes: remainingMinutes });
 }
 
 function formatDate(value: unknown): string {
   if (!value) {
-    return 'None';
+    return userAdminText('admin.noDate');
   }
   const date = new Date(value as any);
   if (Number.isNaN(date.getTime())) {
-    return 'Invalid date';
+    return userAdminText('admin.invalidDate');
   }
-  return date.toLocaleDateString();
+  return formatActiveInterfaceDateTime(date, { dateStyle: 'medium' });
 }
 
 function formatStatusDate(value: unknown): string {
   if (!value) {
-    return 'never';
+    return userAdminText('admin.noDate');
   }
   return formatDate(value);
 }
@@ -192,7 +199,7 @@ async function refreshAdminApiKeyMetadata(instance: any): Promise<void> {
     instance.apiKeyMetadata.set(await MeteorCompat.callAsync('getAdminApiKeyAlternativeMetadata'));
   } catch (error: unknown) {
     instance.apiKeyMessageType.set('danger');
-    instance.apiKeyMessage.set('Failed to load API key alternatives: ' + getErrorMessage(error));
+    instance.apiKeyMessage.set(userAdminText('admin.apiKeysLoadFailed', { error: getErrorMessage(error) }));
   }
 }
 
@@ -206,17 +213,18 @@ function getTimeValue(value: unknown): number {
 
 function buildUsageDisplay(user: any) {
   const cache = UserDashboardCache.findOne({ userId: user._id }) as any;
+  const noCache = userAdminText('admin.noCache');
   if (!cache) {
     return {
       usageStatus: 'missing-cache',
       usageCellClass: 'text-muted',
-      totalTrialsDisplay: 'No cache',
-      accuracyDisplay: 'No cache',
-      totalTimeDisplay: 'No cache',
-      averageSessionDaysDisplay: 'No cache',
-      averageItemsPracticedDisplay: 'No cache',
-      lastActivityDisplay: 'No cache',
-      cacheUpdatedDisplay: 'No cache',
+      totalTrialsDisplay: noCache,
+      accuracyDisplay: noCache,
+      totalTimeDisplay: noCache,
+      averageSessionDaysDisplay: noCache,
+      averageItemsPracticedDisplay: noCache,
+      lastActivityDisplay: noCache,
+      cacheUpdatedDisplay: noCache,
       usageSort: {
         totalTrials: Number.NEGATIVE_INFINITY,
         weightedAccuracy: Number.NEGATIVE_INFINITY,
@@ -230,16 +238,17 @@ function buildUsageDisplay(user: any) {
   }
 
   const usageSummary = cache.usageSummary;
+  const refreshNeeded = userAdminText('admin.refreshNeeded');
   if (!usageSummary) {
     return {
       usageStatus: 'needs-refresh',
       usageCellClass: 'text-warning',
-      totalTrialsDisplay: 'Refresh needed',
-      accuracyDisplay: 'Refresh needed',
-      totalTimeDisplay: 'Refresh needed',
-      averageSessionDaysDisplay: 'Refresh needed',
-      averageItemsPracticedDisplay: 'Refresh needed',
-      lastActivityDisplay: 'Refresh needed',
+      totalTrialsDisplay: refreshNeeded,
+      accuracyDisplay: refreshNeeded,
+      totalTimeDisplay: refreshNeeded,
+      averageSessionDaysDisplay: refreshNeeded,
+      averageItemsPracticedDisplay: refreshNeeded,
+      lastActivityDisplay: refreshNeeded,
       cacheUpdatedDisplay: formatDate(cache.lastUpdated),
       usageSort: {
         totalTrials: Number.NEGATIVE_INFINITY,
@@ -345,6 +354,10 @@ Template.userAdmin.helpers({
     return userHasRole(currentUser, 'admin');
   },
 
+  userAdminText: function(key: Parameters<typeof translatePlatformString>[1]) {
+    return userAdminText(key);
+  },
+
   userRoleEditList: function() {
     // Establish reactive dependency on role-assignment collection so the helper
     // reruns on both add AND remove (not just remove).
@@ -435,7 +448,16 @@ Template.userAdmin.helpers({
       }
     }
 
-    return `${usersWithUsageCache}/${usersWithIdentifiers} users have cached usage summaries; ${totalTrials} cached trials; ${activeUsers} active users${usersNeedingRefresh > 0 ? `; ${usersNeedingRefresh} need refresh` : ''}.`;
+    const needsRefresh = usersNeedingRefresh > 0
+      ? userAdminText('admin.usageAggregateNeedsRefresh', { count: formatActiveInterfaceNumber(usersNeedingRefresh) })
+      : '';
+    return userAdminText('admin.usageAggregateSummary', {
+      cached: formatActiveInterfaceNumber(usersWithUsageCache),
+      total: formatActiveInterfaceNumber(usersWithIdentifiers),
+      trials: formatActiveInterfaceNumber(totalTrials),
+      active: formatActiveInterfaceNumber(activeUsers),
+      needsRefresh,
+    });
   },
 
   isRefreshingUsage: function() {
@@ -522,40 +544,54 @@ Template.userAdmin.helpers({
 
   openRouterKeyPlaceholder: function() {
     const data = apiKeyMetadata(Template.instance()).openRouter;
-    return data?.configured || data?.unusable ? 'Configured; enter to replace' : 'Enter OpenRouter key';
+    return data?.configured || data?.unusable
+      ? userAdminText('admin.configuredEnterToReplace')
+      : userAdminText('admin.enterOpenRouterKey');
   },
 
   openRouterKeyStatus: function() {
     const data = apiKeyMetadata(Template.instance()).openRouter;
-    if (data?.unusable) return 'Stored key cannot be decrypted; enter a new OpenRouter key to replace it';
-    return data?.configured ? `Configured; key updated ${formatStatusDate(data.keyUpdatedAt)}` : 'No admin-provided OpenRouter key configured';
+    if (data?.unusable) return userAdminText('admin.storedKeyCannotDecrypt', { label: 'OpenRouter' });
+    return data?.configured
+      ? userAdminText('admin.configuredKeyUpdated', { date: formatStatusDate(data.keyUpdatedAt) })
+      : userAdminText('admin.noAdminOpenRouterKey');
   },
 
   openRouterModelStatus: function() {
     const data = apiKeyMetadata(Template.instance()).openRouter;
-    return data?.model ? `Model updated ${formatStatusDate(data.modelUpdatedAt)}` : 'No admin OpenRouter model configured';
+    return data?.model
+      ? userAdminText('admin.modelUpdated', { date: formatStatusDate(data.modelUpdatedAt) })
+      : userAdminText('admin.noAdminOpenRouterModel');
   },
 
   googleTtsKeyPlaceholder: function() {
     const data = apiKeyMetadata(Template.instance()).googleTts;
-    return data?.configured || data?.unusable ? 'Configured; enter to replace' : 'Enter Google TTS key';
+    return data?.configured || data?.unusable
+      ? userAdminText('admin.configuredEnterToReplace')
+      : userAdminText('admin.enterGoogleTtsKey');
   },
 
   googleTtsKeyStatus: function() {
     const data = apiKeyMetadata(Template.instance()).googleTts;
-    if (data?.unusable) return 'Stored key cannot be decrypted; enter a new Google TTS key to replace it';
-    return data?.configured ? `Configured; key updated ${formatStatusDate(data.keyUpdatedAt)}` : 'No admin-provided Google TTS key configured';
+    if (data?.unusable) return userAdminText('admin.storedKeyCannotDecrypt', { label: 'Google TTS' });
+    return data?.configured
+      ? userAdminText('admin.configuredKeyUpdated', { date: formatStatusDate(data.keyUpdatedAt) })
+      : userAdminText('admin.noAdminGoogleTtsKey');
   },
 
   googleSpeechKeyPlaceholder: function() {
     const data = apiKeyMetadata(Template.instance()).googleSpeech;
-    return data?.configured || data?.unusable ? 'Configured; enter to replace' : 'Enter Google Speech Recognition key';
+    return data?.configured || data?.unusable
+      ? userAdminText('admin.configuredEnterToReplace')
+      : userAdminText('admin.enterGoogleSpeechKey');
   },
 
   googleSpeechKeyStatus: function() {
     const data = apiKeyMetadata(Template.instance()).googleSpeech;
-    if (data?.unusable) return 'Stored key cannot be decrypted; enter a new Google Speech Recognition key to replace it';
-    return data?.configured ? `Configured; key updated ${formatStatusDate(data.keyUpdatedAt)}` : 'No admin-provided Google SR key configured';
+    if (data?.unusable) return userAdminText('admin.storedKeyCannotDecrypt', { label: 'Google Speech Recognition' });
+    return data?.configured
+      ? userAdminText('admin.configuredKeyUpdated', { date: formatStatusDate(data.keyUpdatedAt) })
+      : userAdminText('admin.noAdminGoogleSrKey');
   },
 
   sortIndicator: function(field: string) {
@@ -624,6 +660,27 @@ Template.userAdmin.helpers({
     const end = Math.min((page + 1) * USERS_PER_PAGE, total);
 
     return `${start}-${end} of ${total}`;
+  },
+
+  showingUsersText: function() {
+    const instance = Template.instance() as any;
+    const page = instance.currentPage.get();
+    const countDoc = UserCounts.findOne('filtered') as any;
+    const total = countDoc ? countDoc.count : 0;
+    const start = page * USERS_PER_PAGE + 1;
+    const end = Math.min((page + 1) * USERS_PER_PAGE, total);
+    return userAdminText('admin.showingUsers', { range: `${start}-${end} of ${total}` });
+  },
+
+  pageOfText: function() {
+    const instance = Template.instance() as any;
+    const countDoc = UserCounts.findOne('filtered') as any;
+    const totalPages = countDoc ? Math.ceil(countDoc.count / USERS_PER_PAGE) || 1 : 1;
+    return userAdminText('admin.pageOf', { page: instance.currentPage.get() + 1, total: totalPages });
+  },
+
+  deleteUserMessageText: function(identifier: string) {
+    return userAdminText('admin.deleteUserMessage', { identifier });
   }
 });
 
@@ -688,7 +745,7 @@ Template.userAdmin.events({
     event.preventDefault();
     instance.isPreparingNewsEmail.set(true);
     instance.newsEmailMessageType.set('info');
-    instance.newsEmailMessage.set('Preparing MoFaCTS news email recipients...');
+    instance.newsEmailMessage.set(userAdminText('admin.preparingNewsEmailRecipients'));
 
     try {
       const result = await MeteorCompat.callAsync('userAdminNewsEmailRecipients');
@@ -698,16 +755,16 @@ Template.userAdmin.events({
 
       if (emails.length === 0) {
         instance.newsEmailMessageType.set('warning');
-        instance.newsEmailMessage.set('No user email addresses were found.');
+        instance.newsEmailMessage.set(userAdminText('admin.noUserEmailsFound'));
         return;
       }
 
       window.location.href = buildNewsEmailMailto(emails);
       instance.newsEmailMessageType.set('success');
-      instance.newsEmailMessage.set(`Opened MoFaCTS news email compose with ${emails.length} BCC recipient${emails.length === 1 ? '' : 's'}.`);
+      instance.newsEmailMessage.set(userAdminText('admin.openedNewsEmailCompose', { count: emails.length }));
     } catch (error: unknown) {
       instance.newsEmailMessageType.set('danger');
-      instance.newsEmailMessage.set('Failed to prepare news email recipients: ' + getErrorMessage(error));
+      instance.newsEmailMessage.set(userAdminText('admin.prepareNewsEmailFailed', { error: getErrorMessage(error) }));
     } finally {
       instance.isPreparingNewsEmail.set(false);
     }
@@ -718,13 +775,13 @@ Template.userAdmin.events({
     const userIds = getPagedUserIds();
     if (userIds.length === 0) {
       instance.usageRefreshMessageType.set('warning');
-      instance.usageRefreshMessage.set('No users are available on this page to refresh.');
+      instance.usageRefreshMessage.set(userAdminText('admin.noUsersToRefresh'));
       return;
     }
 
     instance.isRefreshingUsage.set(true);
     instance.usageRefreshMessageType.set('info');
-    instance.usageRefreshMessage.set(`Refreshing usage caches for ${userIds.length} users...`);
+    instance.usageRefreshMessage.set(userAdminText('admin.refreshingUsageCaches', { count: userIds.length }));
 
     try {
       const result = await MeteorCompat.callAsync('refreshUserAdminUsageCaches', userIds);
@@ -732,14 +789,19 @@ Template.userAdmin.events({
       const failedCount = Array.isArray(result?.failed) ? result.failed.length : 0;
       if (failedCount > 0) {
         instance.usageRefreshMessageType.set('warning');
-        instance.usageRefreshMessage.set(`Refreshed ${refreshedCount} users; ${failedCount} failed. First failure: ${result.failed[0].userId}: ${result.failed[0].error}`);
+        instance.usageRefreshMessage.set(userAdminText('admin.refreshedUsersSomeFailed', {
+          refreshed: refreshedCount,
+          failed: failedCount,
+          userId: result.failed[0].userId,
+          error: result.failed[0].error,
+        }));
       } else {
         instance.usageRefreshMessageType.set('success');
-        instance.usageRefreshMessage.set(`Refreshed usage caches for ${refreshedCount} users.`);
+        instance.usageRefreshMessage.set(userAdminText('admin.refreshedUsageCaches', { count: refreshedCount }));
       }
     } catch (error: unknown) {
       instance.usageRefreshMessageType.set('danger');
-      instance.usageRefreshMessage.set('Failed to refresh usage caches: ' + getErrorMessage(error));
+      instance.usageRefreshMessage.set(userAdminText('admin.refreshUsageCachesFailed', { error: getErrorMessage(error) }));
     } finally {
       instance.isRefreshingUsage.set(false);
     }
@@ -749,7 +811,7 @@ Template.userAdmin.events({
     event.preventDefault();
     instance.apiKeyBusy.set(true);
     instance.apiKeyMessageType.set('info');
-    instance.apiKeyMessage.set('Saving OpenRouter alternative...');
+    instance.apiKeyMessage.set(userAdminText('admin.savingOpenRouterAlternative'));
     try {
       const apiKeyInput = document.getElementById('adminOpenRouterKey') as HTMLInputElement | null;
       const modelInput = document.getElementById('adminOpenRouterModel') as HTMLInputElement | null;
@@ -760,10 +822,10 @@ Template.userAdmin.events({
       instance.apiKeyMetadata.set(result);
       if (apiKeyInput) apiKeyInput.value = '';
       instance.apiKeyMessageType.set('success');
-      instance.apiKeyMessage.set('Saved OpenRouter API key alternative metadata.');
+      instance.apiKeyMessage.set(userAdminText('admin.savedOpenRouterAlternative'));
     } catch (error: unknown) {
       instance.apiKeyMessageType.set('danger');
-      instance.apiKeyMessage.set('Failed to save OpenRouter alternative: ' + getErrorMessage(error));
+      instance.apiKeyMessage.set(userAdminText('admin.saveOpenRouterAlternativeFailed', { error: getErrorMessage(error) }));
     } finally {
       instance.apiKeyBusy.set(false);
     }
@@ -776,7 +838,7 @@ Template.userAdmin.events({
     const input = inputSelector ? document.querySelector(inputSelector) as HTMLInputElement | null : null;
     instance.apiKeyBusy.set(true);
     instance.apiKeyMessageType.set('info');
-    instance.apiKeyMessage.set('Saving API key alternative...');
+    instance.apiKeyMessage.set(userAdminText('admin.savingApiKeyAlternative'));
     try {
       const result = await MeteorCompat.callAsync('saveAdminApiKeyAlternative', provider, {
         apiKey: input?.value || '',
@@ -784,10 +846,10 @@ Template.userAdmin.events({
       instance.apiKeyMetadata.set(result);
       if (input) input.value = '';
       instance.apiKeyMessageType.set('success');
-      instance.apiKeyMessage.set('Saved API key alternative metadata.');
+      instance.apiKeyMessage.set(userAdminText('admin.savedApiKeyAlternative'));
     } catch (error: unknown) {
       instance.apiKeyMessageType.set('danger');
-      instance.apiKeyMessage.set('Failed to save API key alternative: ' + getErrorMessage(error));
+      instance.apiKeyMessage.set(userAdminText('admin.saveApiKeyAlternativeFailed', { error: getErrorMessage(error) }));
     } finally {
       instance.apiKeyBusy.set(false);
     }
@@ -798,7 +860,7 @@ Template.userAdmin.events({
     const provider = legacyTrim($(event.currentTarget).data('provider'));
     instance.apiKeyBusy.set(true);
     instance.apiKeyMessageType.set('info');
-    instance.apiKeyMessage.set('Deleting API key alternative...');
+    instance.apiKeyMessage.set(userAdminText('admin.deletingApiKeyAlternative'));
     try {
       const result = await MeteorCompat.callAsync('deleteAdminApiKeyAlternative', provider);
       instance.apiKeyMetadata.set(result);
@@ -807,10 +869,10 @@ Template.userAdmin.events({
         if (input) input.value = '';
       });
       instance.apiKeyMessageType.set('success');
-      instance.apiKeyMessage.set('Deleted API key alternative.');
+      instance.apiKeyMessage.set(userAdminText('admin.deletedApiKeyAlternative'));
     } catch (error: unknown) {
       instance.apiKeyMessageType.set('danger');
-      instance.apiKeyMessage.set('Failed to delete API key alternative: ' + getErrorMessage(error));
+      instance.apiKeyMessage.set(userAdminText('admin.deleteApiKeyAlternativeFailed', { error: getErrorMessage(error) }));
     } finally {
       instance.apiKeyBusy.set(false);
     }
@@ -842,11 +904,11 @@ Template.userAdmin.events({
       applyConfirmedRoleState(Template.instance(), result as UserAdminRoleChangeResult);
       const instance = Template.instance() as any;
       instance.adminMessageType.set('success');
-      instance.adminMessage.set(`Updated ${roleName} role for user.`);
+      instance.adminMessage.set(userAdminText('admin.updatedRoleForUser', { role: roleName }));
     } catch (error: unknown) {
       const instance = Template.instance() as any;
       instance.adminMessageType.set('danger');
-      instance.adminMessage.set('Failed to handle request. Error: ' + getErrorMessage(error));
+      instance.adminMessage.set(userAdminText('admin.requestFailed', { error: getErrorMessage(error) }));
     }
   },
 
@@ -874,10 +936,10 @@ Template.userAdmin.events({
       await MeteorCompat.callAsync('userAdminDeleteUser', userId);
       instance.selectedDeleteUser.set(null);
       instance.adminMessageType.set('success');
-      instance.adminMessage.set('User deleted.');
+      instance.adminMessage.set(userAdminText('admin.userDeleted'));
     } catch (error: unknown) {
       instance.adminMessageType.set('danger');
-      instance.adminMessage.set('Failed to delete user. Error: ' + getErrorMessage(error));
+      instance.adminMessage.set(userAdminText('admin.deleteUserFailed', { error: getErrorMessage(error) }));
     }
   },
 
@@ -897,10 +959,10 @@ async function doFileUpload(fileElementSelector: string, fileDescrip: string, in
         
         if (result.length > 0) {
           instance.adminMessageType.set('danger');
-          instance.adminMessage.set('The ' + fileDescrip + ' file was not saved: ' + JSON.stringify(result));
+          instance.adminMessage.set(userAdminText('admin.userFileNotSaved', { fileDescription: fileDescrip, error: JSON.stringify(result) }));
         } else {
           instance.adminMessageType.set('success');
-          instance.adminMessage.set('Your ' + fileDescrip + ' file was saved');
+          instance.adminMessage.set(userAdminText('admin.userFileSaved', { fileDescription: fileDescrip }));
           // Now we can clear the selected file
           $(fileElementSelector).val('');
           $(fileElementSelector).parent().find('.file-info').html('');
@@ -908,7 +970,7 @@ async function doFileUpload(fileElementSelector: string, fileDescrip: string, in
         }
       } catch (error: unknown) {
         instance.adminMessageType.set('danger');
-        instance.adminMessage.set('There was a critical failure saving your ' + fileDescrip + ' file: ' + getErrorMessage(error));
+        instance.adminMessage.set(userAdminText('admin.userFileCriticalSaveFailed', { fileDescription: fileDescrip, error: getErrorMessage(error) }));
       }
     };
 

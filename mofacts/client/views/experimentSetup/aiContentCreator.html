@@ -290,21 +290,21 @@
       }
     </style>
 
-    <section class="ai-create-card" role="region" aria-label="Create New Content">
+    <section class="ai-create-card" role="region" aria-label="{{aiText 'aiCreator.regionLabel'}}">
       <header class="ai-create-header">
         <div class="ai-create-icon" aria-hidden="true">
           <i class="fa fa-magic"></i>
         </div>
         <div>
-          <h1 class="ai-create-title">Create New Content</h1>
-          <p class="ai-create-subtitle">Drop your notes and we'll turn them into something learnable</p>
+          <h1 class="ai-create-title">{{aiText 'aiCreator.title'}}</h1>
+          <p class="ai-create-subtitle">{{aiText 'aiCreator.subtitle'}}</p>
         </div>
       </header>
 
       {{#unless hasOpenRouterConfig}}
       <div class="alert alert-warning ai-create-status">
-        AI content creation requires an OpenRouter key and default model. Add them in your Profile.
-        <a href="/profile" class="btn btn-outline-primary btn-sm admin-inline-action">Go to Profile</a>
+        {{aiText 'aiCreator.openRouterRequired'}}
+        <a href="/profile" class="btn btn-outline-primary btn-sm admin-inline-action">{{aiText 'aiCreator.goToProfile'}}</a>
       </div>
       {{/unless}}
 
@@ -316,16 +316,16 @@
       {{/if}}
 
       <div class="ai-input-wrap">
-        <textarea id="ai-source-text" class="ai-source-box" placeholder="Paste notes, learning objectives, quiz items, or a short topic. Add what learners should practice, any examples to preserve, and anything that should become flashcards, a quiz, or an AutoTutor conversation." aria-label="Content input">{{sourceText}}</textarea>
+        <textarea id="ai-source-text" class="ai-source-box" placeholder="{{aiText 'aiCreator.sourcePlaceholder'}}" aria-label="{{aiText 'aiCreator.sourceAriaLabel'}}">{{sourceText}}</textarea>
         <div class="ai-source-meta">
           <span class="ai-char-count">{{sourceLength}}</span>
         </div>
       </div>
 
-      <p class="ai-create-tip">Tip: the more context you add, the better your session will be</p>
+      <p class="ai-create-tip">{{aiText 'aiCreator.tip'}}</p>
 
-      <p class="ai-mode-label">Choose how you want to start</p>
-      <div class="ai-mode-selector" role="group" aria-label="Session type">
+      <p class="ai-mode-label">{{aiText 'aiCreator.modeLabel'}}</p>
+      <div class="ai-mode-selector" role="group" aria-label="{{aiText 'aiCreator.modeGroupLabel'}}">
         {{#each modules}}
         <button type="button" class="ai-mode-card {{selectedClass}}" aria-pressed="{{pressed}}" data-module-id="{{id}}">
           <div class="ai-mode-icon" aria-hidden="true">
@@ -343,15 +343,15 @@
       <footer class="ai-create-footer">
         <button type="button" class="ai-manual-link" id="ai-open-manual-creator">
           <i class="fa fa-plus" aria-hidden="true"></i>
-          Advanced: build manually <i class="fa fa-arrow-right" aria-hidden="true"></i>
+          {{aiText 'aiCreator.advancedManual'}} <i class="fa fa-arrow-right" aria-hidden="true"></i>
         </button>
         <button type="button" class="btn btn-primary ai-create-submit" id="ai-create-submit" {{createAttrs}}>
           {{#if creating}}
             <i class="fa fa-refresh fa-spin" aria-hidden="true"></i>
-            Creating...
+            {{aiText 'aiCreator.creating'}}
           {{else}}
             <i class="fa fa-magic" aria-hidden="true"></i>
-            Create
+            {{aiText 'aiCreator.create'}}
           {{/if}}
         </button>
       </footer>

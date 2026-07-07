@@ -223,6 +223,37 @@ export const VALIDATOR_TYPES = {
   },
 
   /**
+   * Validate a conservative BCP 47-style language tag.
+   */
+  bcp47LanguageTag: (value: any) => {
+    if (value === '' || value === null || value === undefined) {
+      return { valid: true };
+    }
+    const tag = String(value).trim();
+    return {
+      valid: /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/.test(tag)
+    };
+  },
+
+  /**
+   * Validate an array of conservative BCP 47-style language tags.
+   */
+  bcp47LanguageTagArray: (value: any) => {
+    if (value === '' || value === null || value === undefined) {
+      return { valid: true };
+    }
+    if (!Array.isArray(value)) {
+      return { valid: false };
+    }
+    return {
+      valid: value.every((item) => (
+        typeof item === 'string' &&
+        /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/.test(item.trim())
+      ))
+    };
+  },
+
+  /**
    * Validate parameter format: "number,number" like "0,.7"
    */
   parameterFormat: (value: any) => {

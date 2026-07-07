@@ -84,15 +84,15 @@
         <div class="text-muted small">
           <strong>{{currentLesson.title}}</strong>
           {{#if currentLesson.stats}}
-          · {{currentLesson.stats.totalItems}} items
-          {{#if currentLesson.stats.skippedItems}} · {{currentLesson.stats.skippedItems}} skipped{{/if}}
+          · {{currentLesson.stats.totalItems}} {{workspaceText 'manualCreator.items'}}
+          {{#if currentLesson.stats.skippedItems}} · {{currentLesson.stats.skippedItems}} {{workspaceText 'manualCreator.skipped'}}{{/if}}
           {{/if}}
         </div>
         {{/if}}
       </div>
       {{#if hasMultipleLessons}}
       <div class="draft-lesson-select">
-        <label class="small draft-workspace-label">Lesson</label>
+        <label class="small draft-workspace-label">{{workspaceText 'manualCreator.lesson'}}</label>
         <select class="form-control form-control-sm" id="draft-lesson-select">
           {{#each lessonOptions}}
           <option value="{{index}}" selected={{isSelected}}>{{label}}</option>
@@ -110,7 +110,7 @@
 
     <div class="draft-workspace-tabs btn-group" role="group">
       <button class="btn btn-outline-primary draft-tab {{#if isActiveTab 'tdf'}}active{{/if}}" data-tab="tdf">TDF</button>
-      <button class="btn btn-outline-primary draft-tab {{#if isActiveTab 'content'}}active{{/if}}" data-tab="content">Content</button>
+      <button class="btn btn-outline-primary draft-tab {{#if isActiveTab 'content'}}active{{/if}}" data-tab="content">{{workspaceText 'manualCreator.contentTab'}}</button>
     </div>
 
     <div class="draft-editor-panel {{#unless isActiveTab 'tdf'}}d-none{{/unless}}">
@@ -122,9 +122,9 @@
     </div>
 
     <div class="wizard-actions draft-workspace-actions-row">
-      <button class="btn btn-secondary" id="draft-workspace-back">← Back</button>
+      <button class="btn btn-secondary" id="draft-workspace-back">← {{workspaceText 'manualCreator.back'}}</button>
       <div class="draft-workspace-actions">
-        <button class="btn btn-outline-secondary" id="draft-reset-defaults">Reset to Generated Defaults</button>
+        <button class="btn btn-outline-secondary" id="draft-reset-defaults">{{workspaceText 'manualCreator.resetGeneratedDefaults'}}</button>
         <button class="btn btn-primary" id="draft-save-continue">{{saveContinueLabel}}</button>
       </div>
     </div>

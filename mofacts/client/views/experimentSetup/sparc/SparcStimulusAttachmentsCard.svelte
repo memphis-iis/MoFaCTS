@@ -1,4 +1,6 @@
 <script>
+  import { getActiveUiLocale } from '../../../lib/interfaceLocaleState';
+  import { translatePlatformString } from '../../../lib/interfaceI18n';
   import { nodeClusterIndices } from './sparcAuthoringTargets';
 
   export let activeNode = null;
@@ -6,11 +8,13 @@
   export let onToggleNodeCluster = () => {};
 
   $: activeNodeClusterIndices = activeNode ? nodeClusterIndices(activeNode) : [];
+
+  const sparcText = (key, values) => translatePlatformString(getActiveUiLocale(), key, values);
 </script>
 
 <div class="sparc-context-card sparc-stimulus-attachments-card">
   <div class="sparc-panel-header">
-    <h3>Cluster Attachments</h3>
+    <h3>{sparcText('sparc.clusterAttachments')}</h3>
   </div>
   <table class="sparc-stimulus-attachment-table">
     <tbody>
@@ -22,7 +26,7 @@
               checked={activeNodeClusterIndices.includes(cluster.clusterIndex)}
               disabled={!cluster.hasFirstStimulus}
               on:change={(event) => onToggleNodeCluster(cluster.clusterIndex, event.currentTarget.checked)}
-              aria-label={`Attach cluster ${cluster.clusterIndex}`}
+              aria-label={sparcText('sparc.attachCluster', { index: cluster.clusterIndex })}
             />
           </td>
           <td class="sparc-stimulus-definition-cell">

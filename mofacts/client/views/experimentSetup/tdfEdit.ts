@@ -13,6 +13,14 @@ import { ValidatorEngine, ValidationContext } from '../../lib/validatorCore';
 import { createValidationSummary, applyFieldErrors, initValidationUI } from '../../lib/validatorUI';
 import { installSchemaApplicabilityControls, sortPropertiesModal } from '../../lib/schemaApplicabilityEditor';
 import { ensureJsonEditor } from '../../lib/jsonEditorLoader';
+import { translatePlatformString } from '../../lib/interfaceI18n';
+import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
+
+type PlatformStringKey = Parameters<typeof translatePlatformString>[1];
+
+function tdfEditorText(key: PlatformStringKey, values?: Parameters<typeof translatePlatformString>[2]): string {
+    return translatePlatformString(getActiveUiLocale(), key, values);
+}
 
 /**
  * TDF Editor - Schema-driven editor using json-editor library
@@ -151,7 +159,25 @@ Template.tdfEdit.helpers({
 
     lessonName() {
         const tdf = TdfsCollection.findOne((Template.instance() as any).tdfId);
-        return tdf?.content?.tdfs?.tutor?.setspec?.lessonname || 'Unknown';
+        return tdf?.content?.tdfs?.tutor?.setspec?.lessonname || tdfEditorText('tdfEditor.unknownLesson');
+    },
+
+    tdfEditorText(key: PlatformStringKey, options?: { hash?: Parameters<typeof translatePlatformString>[2] }) {
+        return tdfEditorText(key, options?.hash);
+    },
+
+    editTitle() {
+        const tdf = TdfsCollection.findOne((Template.instance() as any).tdfId);
+        const lessonName = tdf?.content?.tdfs?.tutor?.setspec?.lessonname || tdfEditorText('tdfEditor.unknownLesson');
+        return tdfEditorText('tdfEditor.editTitle', { lessonName });
+    },
+
+    conditionSummary(conditionInfo: any) {
+        return tdfEditorText('tdfEditor.conditionInfo', {
+            fileName: conditionInfo?.fileName ?? '',
+            index: conditionInfo?.index ?? '',
+            total: conditionInfo?.total ?? ''
+        });
     },
 
     conditionInfo() {
@@ -235,7 +261,7 @@ Template.tdfEdit.events({
         const schemaErrors = instance.editor.validate();
         if (schemaErrors.length > 0) {
             const errorMessages = schemaErrors.map((e: any) => `${e.path}: ${e.message}`).join('; ');
-            setEditorMessage(instance, 'error', 'Schema validation errors', errorMessages);
+            setEditorMessage(instance, 'error', tdfEditorText('tdfEditor.schemaValidationErrors'), errorMessages);
             return;
         }
 
@@ -248,7 +274,7 @@ Template.tdfEdit.events({
                 if (summaryEl) {
                     summaryEl.scrollIntoView({ behavior: 'smooth' });
                 }
-                setEditorMessage(instance, 'warning', 'Validation errors need attention', 'Please fix the validation errors before saving.');
+                setEditorMessage(instance, 'warning', tdfEditorText('tdfEditor.validationAttentionTitle'), tdfEditorText('tdfEditor.validationAttentionText'));
                 return;
             }
         }
@@ -282,13 +308,13 @@ Template.tdfEdit.events({
             // Call server to save (server validates ownership, encrypts new API keys, and saves)
             await meteorCallAsync('saveTdfContent', instance.tdfId, tdfContent, apiKeyUpdates);
 
-            showSaveFeedbackAndRedirect(instance, 'Saved. Returning to Content Manager...');
+            showSaveFeedbackAndRedirect(instance, tdfEditorText('tdfEditor.savedReturning'));
             instance.hasChanges.set(false);
             instance._hasPendingChanges = false;
 
         } catch (error: any) {
             clientConsole(1, '[TDF Edit] Error saving TDF:', error);
-            setEditorMessage(instance, 'error', 'Error saving TDF', error.reason || error.message);
+            setEditorMessage(instance, 'error', tdfEditorText('tdfEditor.errorSavingTdf'), error.reason || error.message);
         } finally {
             instance.saving.set(false);
         }
@@ -314,7 +340,7 @@ async function loadSchema(instance: any) {
         instance.schemaLoaded.set(true);
     } catch (error: any) {
         clientConsole(1, '[TDF Edit] Error loading TDF schema:', error);
-        setEditorMessage(instance, 'error', 'Error loading TDF schema', 'Please refresh the page.');
+        setEditorMessage(instance, 'error', tdfEditorText('tdfEditor.errorLoadingSchema'), tdfEditorText('tdfEditor.refreshPage'));
     }
 }
 
@@ -709,7 +735,7 @@ async function initEditor(instance: any, tdf: any) {
         JSONEditorAny = await ensureJsonEditor();
     } catch (error: any) {
         clientConsole(1, '[TDF Edit] JSONEditor failed to load:', error);
-        setEditorMessage(instance, 'error', 'Editor library not loaded', 'Please refresh the page. If this keeps happening, contact support.');
+        setEditorMessage(instance, 'error', tdfEditorText('tdfEditor.editorLibraryNotLoaded'), tdfEditorText('tdfEditor.refreshContactSupport'));
         return;
     }
 

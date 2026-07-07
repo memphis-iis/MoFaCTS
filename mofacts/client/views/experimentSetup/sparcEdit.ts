@@ -6,6 +6,8 @@ import SparcAuthoringEditor from './sparc/SparcAuthoringEditor.svelte';
 import { createBlazeMount } from '../experiment/svelte/meteorIntegration';
 import { meteorCallAsync } from '../..';
 import { clientConsole } from '../../lib/clientLogger';
+import { translatePlatformString } from '../../lib/interfaceI18n';
+import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 
 const FlowRouter = (globalThis as any).FlowRouter;
 const TdfsCollection = (globalThis as any).Tdfs;
@@ -88,6 +90,9 @@ Template.sparcEdit.onDestroyed(function(this: any) {
 });
 
 Template.sparcEdit.helpers({
+  sparcText(key: any) {
+    return translatePlatformString(getActiveUiLocale(), key);
+  },
   loading() {
     return !(Template.instance() as any).subscriptionsReady();
   },

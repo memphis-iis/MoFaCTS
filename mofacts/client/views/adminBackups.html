@@ -1,6 +1,6 @@
 <template name="adminBackups">
   <div class="container admin-page admin-backups-page">
-    <h3 class="page-header-title">Backups</h3>
+    <h3 class="page-header-title">{{backupText 'admin.backups'}}</h3>
 
     {{#if backupMessage}}
       <div class="admin-status admin-status-{{backupMessage.level}} admin-message" role="status" aria-live="polite">
@@ -15,18 +15,17 @@
           <div class="card-body">
             <div class="admin-section-heading">
               <i class="fa fa-exclamation-triangle admin-section-icon"></i>
-              <h5>Same-server backup warning</h5>
+              <h5>{{backupText 'admin.backupWarningTitle'}}</h5>
             </div>
             <p>
-              Backups stored on this server do not protect against server loss, disk loss, hosting-account loss, or accidental deletion of the backup directory.
-              Copy completed archives off-server and periodically test restore on a separate instance.
+              {{backupText 'admin.backupWarningDescription'}}
             </p>
             {{#if backupConfig}}
               <div class="backup-config-grid">
-                <div><strong>Status:</strong> {{enabledLabel backupConfig.enabled}}</div>
-                <div><strong>Destination:</strong> {{destinationLabel backupConfig.destination}}</div>
-                <div><strong>Settings:</strong> {{enabledLabel backupConfig.includeSettings}}</div>
-                <div><strong>Key material:</strong> {{enabledLabel backupConfig.includeKeyMaterial}}</div>
+                <div><strong>{{backupText 'admin.statusLabel'}}</strong> {{enabledLabel backupConfig.enabled}}</div>
+                <div><strong>{{backupText 'admin.destinationLabel'}}</strong> {{destinationLabel backupConfig.destination}}</div>
+                <div><strong>{{backupText 'admin.settingsLabel'}}</strong> {{enabledLabel backupConfig.includeSettings}}</div>
+                <div><strong>{{backupText 'admin.keyMaterialLabel'}}</strong> {{enabledLabel backupConfig.includeKeyMaterial}}</div>
               </div>
             {{/if}}
           </div>
@@ -38,10 +37,10 @@
           <div class="card-body">
             <div class="admin-section-heading">
               <i class="fa fa-archive admin-section-icon"></i>
-              <h5>Create Backup</h5>
+              <h5>{{backupText 'admin.createBackup'}}</h5>
             </div>
             <button type="button" id="createBackupButton" class="btn btn-primary" disabled="{{isBusy}}">
-              <i class="fa fa-plus-circle"></i> Create Backup
+              <i class="fa fa-plus-circle"></i> {{backupText 'admin.createBackup'}}
             </button>
           </div>
         </div>
@@ -52,7 +51,7 @@
           <div class="card-body">
             <div class="admin-section-heading">
               <i class="fa fa-history admin-section-icon"></i>
-              <h5>Backup History</h5>
+              <h5>{{backupText 'admin.backupHistory'}}</h5>
             </div>
 
             {{#if hasBackupJobs}}
@@ -72,24 +71,24 @@
                     </div>
                     <div class="backup-history-actions">
                       <button type="button" class="btn btn-secondary btn-sm viewManifestButton" data-job-id="{{_id}}">
-                        <i class="fa fa-file-text-o"></i> Manifest
+                        <i class="fa fa-file-text-o"></i> {{backupText 'admin.manifest'}}
                       </button>
                       {{#if canVerify jobType status}}
                         <button type="button" class="btn btn-secondary btn-sm verifyBackupButton" data-job-id="{{_id}}" disabled="{{../isBusy}}">
-                          <i class="fa fa-check-circle-o"></i> Verify
+                          <i class="fa fa-check-circle-o"></i> {{backupText 'admin.verifyBackup'}}
                         </button>
                       {{/if}}
                       {{#if canRestore jobType status}}
                         <button type="button" class="btn btn-secondary btn-sm downloadBackupButton" data-job-id="{{_id}}" disabled="{{../isBusy}}">
-                          <i class="fa fa-download"></i> Download
+                          <i class="fa fa-download"></i> {{backupText 'admin.download'}}
                         </button>
                         <button type="button" class="btn btn-danger btn-sm restoreBackupButton" data-job-id="{{_id}}" disabled="{{../isBusy}}">
-                          <i class="fa fa-warning"></i> Restore
+                          <i class="fa fa-warning"></i> {{backupText 'admin.restore'}}
                         </button>
                       {{/if}}
                       {{#if canDelete jobType status archiveFileName}}
                         <button type="button" class="btn btn-danger btn-sm deleteBackupButton" data-job-id="{{_id}}" disabled="{{../isBusy}}">
-                          <i class="fa fa-trash"></i> Delete
+                          <i class="fa fa-trash"></i> {{backupText 'admin.delete'}}
                         </button>
                       {{/if}}
                     </div>
@@ -97,7 +96,7 @@
                 {{/each}}
               </div>
             {{else}}
-              <p class="text-muted">No backup jobs have been recorded yet.</p>
+              <p class="text-muted">{{backupText 'admin.noBackupJobs'}}</p>
             {{/if}}
           </div>
         </div>
@@ -109,7 +108,7 @@
             <div class="card-body">
               <div class="admin-section-heading">
                 <i class="fa fa-list-alt admin-section-icon"></i>
-                <h5>Selected Manifest</h5>
+                <h5>{{backupText 'admin.selectedManifest'}}</h5>
               </div>
               <pre class="backup-manifest-view">{{selectedManifest}}</pre>
             </div>
@@ -123,22 +122,21 @@
             <div class="card-body">
               <div class="admin-section-heading">
                 <i class="fa fa-warning admin-section-icon"></i>
-                <h5>Confirm Restore</h5>
+                <h5>{{backupText 'admin.confirmRestore'}}</h5>
               </div>
               <p class="admin-status admin-status-error">
                 <i class="fa fa-warning" aria-hidden="true"></i>
                 <span class="admin-status-text">
-                Restore is destructive. The app verifies the selected archive first and creates a pre-restore backup when configured.
-                Type RESTORE to continue.
+                {{backupText 'admin.restoreWarningDescription'}}
                 </span>
               </p>
               <div class="backup-restore-controls">
-                <input type="text" id="restoreConfirmationInput" class="form-control" autocomplete="off" aria-label="Restore confirmation phrase">
+                <input type="text" id="restoreConfirmationInput" class="form-control" autocomplete="off" aria-label="{{backupText 'admin.restoreConfirmationPhrase'}}">
                 <button type="button" class="btn btn-danger confirmRestoreButton" data-job-id="{{selectedRestoreJob._id}}" disabled="{{isBusy}}">
-                  <i class="fa fa-warning"></i> Restore
+                  <i class="fa fa-warning"></i> {{backupText 'admin.restore'}}
                 </button>
                 <button type="button" class="btn btn-secondary cancelRestoreButton" disabled="{{isBusy}}">
-                  Cancel
+                  {{backupText 'content.cancel'}}
                 </button>
               </div>
             </div>
@@ -152,22 +150,21 @@
             <div class="card-body">
               <div class="admin-section-heading">
                 <i class="fa fa-trash admin-section-icon"></i>
-                <h5>Confirm Delete</h5>
+                <h5>{{backupText 'admin.confirmDelete'}}</h5>
               </div>
               <p class="admin-status admin-status-warning">
                 <i class="fa fa-exclamation-triangle" aria-hidden="true"></i>
                 <span class="admin-status-text">
-                Delete removes the local backup archive from the configured backup destination. Backup history and audit records remain.
-                Type DELETE to continue.
+                {{backupText 'admin.deleteWarningDescription'}}
                 </span>
               </p>
               <div class="backup-restore-controls">
-                <input type="text" id="deleteConfirmationInput" class="form-control" autocomplete="off" aria-label="Delete confirmation phrase">
+                <input type="text" id="deleteConfirmationInput" class="form-control" autocomplete="off" aria-label="{{backupText 'admin.deleteConfirmationPhrase'}}">
                 <button type="button" class="btn btn-danger confirmDeleteButton" data-job-id="{{selectedDeleteJob._id}}" disabled="{{isBusy}}">
-                  <i class="fa fa-trash"></i> Confirm
+                  <i class="fa fa-trash"></i> {{backupText 'admin.confirm'}}
                 </button>
                 <button type="button" class="btn btn-secondary cancelDeleteButton" disabled="{{isBusy}}">
-                  Cancel
+                  {{backupText 'content.cancel'}}
                 </button>
               </div>
             </div>
@@ -177,7 +174,7 @@
     {{else}}
       <div class="admin-status admin-status-error" role="alert">
         <i class="fa fa-times-circle" aria-hidden="true"></i>
-        <div class="admin-status-text">Admin access is required.</div>
+        <div class="admin-status-text">{{backupText 'admin.adminAccessRequired'}}</div>
       </div>
     {{/if}}
   </div>

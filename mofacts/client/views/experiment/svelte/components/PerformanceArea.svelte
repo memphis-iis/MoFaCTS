@@ -1,4 +1,7 @@
 <script>
+  import { getActiveUiLocale } from '../../../../lib/interfaceLocaleState';
+  import { translatePlatformString } from '../../../../lib/interfaceI18n';
+
   /**
    * PerformanceArea Component
    * Time + Correct stats with shared timeout bar
@@ -31,6 +34,10 @@
 
   $: hasVisibleTimeout = (showTimeoutBar || showTimeoutCountdown) && timeoutMode !== 'none';
 
+  function platformText(key, values) {
+    return translatePlatformString(getActiveUiLocale(), key, values);
+  }
+
 </script>
 
 <div
@@ -39,18 +46,18 @@
   class:performance-area-timeout-only={!showPerformanceStats && (showTimeoutBar || showTimeoutCountdown)}
 >
   {#if showPerformanceStats}
-    <div class="performance-stats">
+    <div class="performance-stats" aria-label={platformText('performance.sessionStats')}>
       <div class="stat-item">
-        <span class="stat-label" id="card-stat-time-label">Time</span>
+        <span class="stat-label" id="card-stat-time-label">{platformText('performance.time')}</span>
         <span class="stat-value" aria-labelledby="card-stat-time-label">
-          {totalTimeDisplay}<span class="stat-unit">min</span>
+          {totalTimeDisplay}<span class="stat-unit">{platformText('performance.minutesAbbrev')}</span>
         </span>
       </div>
 
       <span class="stat-divider" aria-hidden="true"></span>
 
       <div class="stat-item">
-        <span class="stat-label" id="card-stat-accuracy-label">Correct</span>
+        <span class="stat-label" id="card-stat-accuracy-label">{platformText('performance.correct')}</span>
         <span class="stat-value" aria-labelledby="card-stat-accuracy-label">
           {percentCorrect}
         </span>
@@ -67,11 +74,11 @@
       {#if showTimeoutCountdown}
         <div class="timeout-label">
           {#if timeoutMode === 'question'}
-            Time remaining: {remainingTime}s
+            {platformText('performance.timeRemaining', { seconds: remainingTime })}
           {:else if timeoutMode === 'feedback'}
-            Continuing in: {remainingTime}s
+            {platformText('performance.continuingIn', { seconds: remainingTime })}
           {:else}
-            Time remaining: 0s
+            {platformText('performance.timeRemaining', { seconds: 0 })}
           {/if}
         </div>
       {/if}

@@ -12,8 +12,8 @@
                             {{/if}}
                             <span>{{systemName}}</span>
                         </h2>
-                        <h1 class="auth-title">Create account</h1>
-                        <p class="auth-description auth-description-primary">Create your account to access your practice menu and saved progress.</p>
+                        <h1 class="auth-title">{{t 'auth.createAccount'}}</h1>
+                        <p class="auth-description auth-description-primary">{{t 'auth.signUpDescription'}}</p>
                         <p class="auth-description auth-description-secondary">{{signUpInstructionCopy}}</p>
                     </div>
 
@@ -21,30 +21,30 @@
 
                     <form class="auth-form" novalidate>
                         <div class="auth-field">
-                            <label class="form-label auth-label" for="signUpUsername">Email</label>
+                            <label class="form-label auth-label" for="signUpUsername">{{t 'auth.email'}}</label>
                             <input type="text" id="signUpUsername" value="" placeholder="name@example.com" class="form-control" autocomplete="username email">
-                            <span id="usernameInvalid" class="auth-field-message" hidden>Enter a valid email address.</span>
+                            <span id="usernameInvalid" class="auth-field-message" hidden>{{t 'auth.enterValidEmail'}}</span>
                         </div>
 
                         <div class="auth-field">
-                            <label class="form-label auth-label" for="password1">Password</label>
-                            <input type="password" id="password1" value="" placeholder="Create a password" class="form-control" autocomplete="new-password">
-                            <div class="auth-helper-text">Use at least {{minPasswordLength}} characters.</div>
-                            <span id="passwordTooShort" class="auth-field-message" hidden>Password must be at least {{minPasswordLength}} characters long.</span>
+                            <label class="form-label auth-label" for="password1">{{t 'auth.password'}}</label>
+                            <input type="password" id="password1" value="" placeholder="{{t 'auth.createPassword'}}" class="form-control" autocomplete="new-password">
+                            <div class="auth-helper-text">{{t 'auth.passwordMinLength' min=minPasswordLength}}</div>
+                            <span id="passwordTooShort" class="auth-field-message" hidden>{{t 'auth.passwordTooShort' min=minPasswordLength}}</span>
                         </div>
 
                         <div class="auth-field">
-                            <label class="form-label auth-label" for="password2">Confirm password</label>
-                            <input type="password" id="password2" value="" placeholder="Re-enter your password" class="form-control" autocomplete="new-password">
-                            <span id="passwordMustMatch" class="auth-field-message" hidden>Passwords must match.</span>
+                            <label class="form-label auth-label" for="password2">{{t 'auth.confirmPassword'}}</label>
+                            <input type="password" id="password2" value="" placeholder="{{t 'auth.reenterPassword'}}" class="form-control" autocomplete="new-password">
+                            <span id="passwordMustMatch" class="auth-field-message" hidden>{{t 'auth.passwordsMustMatch'}}</span>
                         </div>
 
-                        <button type="button" id="signUpButton" class="btn auth-primary-btn w-100">Create Account</button>
+                        <button type="button" id="signUpButton" class="btn auth-primary-btn w-100">{{t 'auth.createAccount'}}</button>
                     </form>
 
                     <div class="auth-supporting-action">
-                        <span class="text-muted">Already have an account?</span>
-                        <a id="backkTosignInButton" href="/auth/login" class="auth-link">Sign in</a>
+                        <span class="text-muted">{{t 'auth.alreadyHaveAccount'}}</span>
+                        <a id="backkTosignInButton" href="/auth/login" class="auth-link">{{t 'auth.signIn'}}</a>
                     </div>
                 </div>
             </div>

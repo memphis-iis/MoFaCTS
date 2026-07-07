@@ -14,6 +14,31 @@ describe('answerAssess', function() {
     expect(result.isCorrect).to.equal(true);
   });
 
+  it('can require accent-sensitive matching when requested', async function() {
+    const result = await Answers.answerIsCorrect(
+      'corazon',
+      'corazón',
+      'corazón',
+      '',
+      { lfparameter: 0 },
+      { accentSensitive: true }
+    );
+
+    expect(result.isCorrect).to.equal(false);
+  });
+
+  it('matches non-Latin responses exactly after Unicode normalization', async function() {
+    const result = await Answers.answerIsCorrect(
+      'हृदय',
+      'हृदय',
+      'हृदय',
+      '',
+      { lfparameter: 0 }
+    );
+
+    expect(result.isCorrect).to.equal(true);
+  });
+
   it('does not include the correct answer in the default incorrect feedback message', async function() {
     const result = await Answers.answerIsCorrect(
       'Lyon',

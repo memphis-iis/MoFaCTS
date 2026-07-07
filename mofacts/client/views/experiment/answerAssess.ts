@@ -4,6 +4,10 @@ import {doubleMetaphone} from 'double-metaphone'
 import { deliverySettingsStore } from '../../lib/state/deliverySettingsStore';
 
 import { legacyTrim } from '../../../common/underscoreCompat';
+import {
+  type LearnerResponseNormalizationOptions,
+  normalizeLearnerResponseText,
+} from '../../../common/lib/learnerResponseNormalization';
 
 export {Answers};
 
@@ -89,19 +93,19 @@ function answerIsBranched(answer: string): boolean {
   return legacyTrim(answer).indexOf(';') >= 0 && branchingEnabled;
 }
 
-function normalizeAnswerValue(value: string, caseSensitive = false): string {
-  const trimmed = legacyTrim(value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
-  return caseSensitive ? trimmed : trimmed.toLowerCase();
+function normalizeAnswerValue(
+  value: string,
+  options: LearnerResponseNormalizationOptions = {}
+): string {
+  return normalizeLearnerResponseText(value, options);
 }
 
 function checkIfUserAnswerMatchesOtherAnswers(
   userAnswer: string,
   correctAnswer: string,
-  caseSensitive = false
+  normalizationOptions: LearnerResponseNormalizationOptions = {}
 ): boolean {
-  const normalizedUserAnswer = normalizeAnswerValue(userAnswer, caseSensitive);
+  const normalizedUserAnswer = normalizeAnswerValue(userAnswer, normalizationOptions);
   const allCurrentAnswers = (getAllCurrentStimAnswers as () => unknown[])();
   const otherQuestionAnswers = Array.from(allCurrentAnswers)
     .filter((x): x is string => typeof x === 'string' && x !== correctAnswer);
@@ -113,7 +117,7 @@ function checkIfUserAnswerMatchesOtherAnswers(
       if (check.length < 1) {
         continue;
       } // No blank checks
-      const checkValue = normalizeAnswerValue(check, caseSensitive);
+      const checkValue = normalizeAnswerValue(check, normalizationOptions);
       if (normalizedUserAnswer.localeCompare(checkValue) === 0) {
         return true;
       }
@@ -127,11 +131,11 @@ async function simpleStringMatch(
   correctAnswer: string,
   lfparameter: unknown,
   fullAnswerStr: string,
-  caseSensitive = false
+  normalizationOptions: LearnerResponseNormalizationOptions = {}
 ): Promise<number> {
-  const s1 = normalizeAnswerValue(userAnswer, caseSensitive);
-  const s2 = normalizeAnswerValue(correctAnswer, caseSensitive);
-  const fullAnswerText = normalizeAnswerValue(fullAnswerStr, caseSensitive);
+  const s1 = normalizeAnswerValue(userAnswer, normalizationOptions);
+  const s2 = normalizeAnswerValue(correctAnswer, normalizationOptions);
+  const fullAnswerText = normalizeAnswerValue(fullAnswerStr, normalizationOptions);
   const deliverySettings = deliverySettingsStore.get();
   const allowPhoneticMatching = deliverySettings.allowPhoneticMatching || false;
 
@@ -147,7 +151,7 @@ async function simpleStringMatch(
       // If not we'll do an edit distance calculation to determine if they were close enough to the correct answer
       let matchOther;
       if (checkOtherAnswers) {
-        matchOther = checkIfUserAnswerMatchesOtherAnswers(s1, fullAnswerText, caseSensitive);
+        matchOther = checkIfUserAnswerMatchesOtherAnswers(s1, fullAnswerText, normalizationOptions);
       }
       if (checkOtherAnswers && matchOther) {
         return 0;
@@ -201,7 +205,7 @@ async function stringMatch(
   userAnswer: string,
   lfparameter: unknown,
   userInput?: string,
-  caseSensitive = false
+  normalizationOptions: LearnerResponseNormalizationOptions = {}
 ): Promise<number> {
   if (userInput === '' || userAnswer === ''){
     //user didnt enter a response.
@@ -213,14 +217,14 @@ async function stringMatch(
       if (check.length < 1) {
         continue;
       } // No blank checks
-      const matched = await simpleStringMatch(userAnswer, check, lfparameter, stimStr, caseSensitive);
+      const matched = await simpleStringMatch(userAnswer, check, lfparameter, stimStr, normalizationOptions);
       if (matched !== 0) {
         return matched; // Match!
       }
     }
     return 0; // Nothing found
   } else {
-    return await simpleStringMatch(userAnswer, stimStr, lfparameter, stimStr, caseSensitive);
+    return await simpleStringMatch(userAnswer, stimStr, lfparameter, stimStr, normalizationOptions);
   }
 }
 
@@ -236,7 +240,7 @@ async function regExMatch(
   userAnswer: string,
   lfparameter: unknown,
   fullAnswer: string,
-  caseSensitive = false
+  normalizationOptions: LearnerResponseNormalizationOptions = {}
 ): Promise<number> {
   if (lfparameter && /^[\|A-Za-z0-9 -]+$/i.test(regExStr)) {
     // They have an edit distance parameter and the regex matching our
@@ -246,7 +250,7 @@ async function regExMatch(
       if (check.length < 1) {
         continue;
       } // No blank checks
-      const matched = await simpleStringMatch(userAnswer, check, lfparameter, fullAnswer, caseSensitive);
+      const matched = await simpleStringMatch(userAnswer, check, lfparameter, fullAnswer, normalizationOptions);
       if (matched !== 0) {
         return matched; // Match!
       }
@@ -265,11 +269,11 @@ async function matchBranching(
   answer: string,
   userAnswer: string,
   lfparameter: unknown,
-  caseSensitive = false
+  normalizationOptions: LearnerResponseNormalizationOptions = {}
 ): Promise<[boolean, string]> {
   let isCorrect = false;
   let matchText = '';
-  const userAnswerCheck = normalizeAnswerValue(userAnswer, caseSensitive);
+  const userAnswerCheck = normalizeAnswerValue(userAnswer, normalizationOptions);
 
   const branches = legacyTrim(answer).split(';');
   for (const [index, branch] of branches.entries()) {
@@ -278,8 +282,8 @@ async function matchBranching(
       continue;
     }
     const [rawRegEx = '', rawMatchText = ''] = flds;
-    const regExPart = normalizeAnswerValue(rawRegEx, caseSensitive);
-    const matched = await regExMatch(regExPart, userAnswerCheck, lfparameter, answer, caseSensitive);
+    const regExPart = normalizeAnswerValue(rawRegEx, normalizationOptions);
+    const matched = await regExMatch(regExPart, userAnswerCheck, lfparameter, answer, normalizationOptions);
     if (matched !== 0) {
       matchText = legacyTrim(rawMatchText);
       if (matched === 2) {
@@ -326,14 +330,14 @@ async function checkAnswer(
   originalAnswer: string,
   lfparameter: unknown,
   userInput?: string,
-  caseSensitive = false
+  normalizationOptions: LearnerResponseNormalizationOptions = {}
 ): Promise<{ isCorrect: boolean; matchText: string }> {
   const answerDisplay = originalAnswer;
   let match = 0;
   let isCorrect = false;
   let matchText = '';
   if (answerIsBranched(correctAnswer)) {
-    [isCorrect, matchText] = await matchBranching(correctAnswer, userAnswer, lfparameter, caseSensitive);
+    [isCorrect, matchText] = await matchBranching(correctAnswer, userAnswer, lfparameter, normalizationOptions);
   } else {
     let dispAnswer = legacyTrim(answerDisplay);
     if (dispAnswer.indexOf('|') >= 0) {
@@ -347,12 +351,12 @@ async function checkAnswer(
     const userAnswerWords = userAnswer.split(" ");
     const userFirstAnswer =  userAnswerWords.slice(0,answerWordsCount).join(" ");
     const userSecondAnswer = userAnswerWords.slice(answerWordsCount).join(" ");
-    match = await stringMatch(originalAnswer, userAnswer, lfparameter, userInput, caseSensitive);
+    match = await stringMatch(originalAnswer, userAnswer, lfparameter, userInput, normalizationOptions);
     if(match == 0){
-      match = await stringMatch(originalAnswer, userFirstAnswer, lfparameter, userInput, caseSensitive);
+      match = await stringMatch(originalAnswer, userFirstAnswer, lfparameter, userInput, normalizationOptions);
     }
     if(match == 0){
-      match = await stringMatch(originalAnswer, userSecondAnswer, lfparameter, userInput, caseSensitive);
+      match = await stringMatch(originalAnswer, userSecondAnswer, lfparameter, userInput, normalizationOptions);
     }
     if (match === 0) {
       isCorrect = false;
@@ -415,25 +419,28 @@ const Answers = {
     originalAnswer: string,
     displayedAnswer: string,
     setspec: Record<string, unknown>,
-    options: { caseSensitive?: boolean } | boolean = {}
+    options: LearnerResponseNormalizationOptions | boolean = {}
   ) {
     // Note that a missing or invalid lfparameter will result in a null value
     const setspecLf = setspec ? (setspec as { lfparameter?: unknown }).lfparameter : 0;
     const lfparameter = parseFloat(String(setspecLf || 0));
 
-    const caseSensitive = typeof options === 'boolean'
-      ? options === true
-      : options?.caseSensitive === true;
+    const normalizationOptions: LearnerResponseNormalizationOptions = typeof options === 'boolean'
+      ? { caseSensitive: options === true }
+      : {
+        caseSensitive: options?.caseSensitive === true,
+        accentSensitive: options?.accentSensitive === true,
+      };
 
-    let fullTextIsCorrect = await checkAnswer(userInput, answer, originalAnswer, lfparameter, undefined, caseSensitive);
+    let fullTextIsCorrect = await checkAnswer(userInput, answer, originalAnswer, lfparameter, undefined, normalizationOptions);
 
     // Try again with original answer in case we did a syllable answer and they input the full response
     if (!fullTextIsCorrect.isCorrect && !!originalAnswer) {
       let userInputWithAddedSylls = displayedAnswer + userInput;
-      fullTextIsCorrect = await checkAnswer(userInputWithAddedSylls, originalAnswer, originalAnswer, lfparameter, userInput, caseSensitive);
+      fullTextIsCorrect = await checkAnswer(userInputWithAddedSylls, originalAnswer, originalAnswer, lfparameter, userInput, normalizationOptions);
       if ((!fullTextIsCorrect.isCorrect && !!originalAnswer) || (fullTextIsCorrect.matchText.split(' ')[0] ?? '') == 'Close') {
         let userInputWithDelimitingSpace = displayedAnswer + ' ' + userInput;
-        fullTextIsCorrect = await checkAnswer(userInputWithDelimitingSpace, originalAnswer, originalAnswer, lfparameter, userInput, caseSensitive);
+        fullTextIsCorrect = await checkAnswer(userInputWithDelimitingSpace, originalAnswer, originalAnswer, lfparameter, userInput, normalizationOptions);
       }
     }
 

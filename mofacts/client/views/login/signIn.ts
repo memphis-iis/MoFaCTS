@@ -14,6 +14,8 @@ import '../footer.html';
 import { setExperimentParticipantContext } from '../../lib/idContext';
 import { resolveSpeechIgnoreOutOfGrammarResponses } from '../../lib/speechRecognitionConfig';
 import '../../lib/memphisSaml';
+import { translatePlatformString } from '../../lib/interfaceI18n';
+import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 
 
 import { legacyTrim } from '../../../common/underscoreCompat';
@@ -191,8 +193,6 @@ function showFieldSignInError(nextState: Partial<SignInState>, template?: any) {
 
 const EXPERIMENT_PORTAL_DESCRIPTION =
   'Welcome to the MoFaCTs experiment portal. This page is used to start a new experiment session or continue a previous one.';
-const DEFAULT_SIGNIN_DESCRIPTION =
-  'Sign in to access your practice menu, saved progress, and account tools.';
 
 function queueMainMenuReturnTour() {
   Session.set('showMainMenuReturnTour', true);
@@ -696,8 +696,16 @@ Template.signIn.helpers({
     if (Session.get('loginMode') === 'experiment') {
       return EXPERIMENT_PORTAL_DESCRIPTION;
     }
+    const activeLocale = getActiveUiLocale();
     const theme = Session.get('curTheme') as any;
-    return theme?.properties?.auth_sign_in_description || DEFAULT_SIGNIN_DESCRIPTION;
+    const localizedThemeDescription = theme?.properties?.auth_sign_in_description_i18n?.[activeLocale];
+    if (typeof localizedThemeDescription === 'string' && localizedThemeDescription.trim()) {
+      return localizedThemeDescription;
+    }
+    if (activeLocale === 'en' && typeof theme?.properties?.auth_sign_in_description === 'string' && theme.properties.auth_sign_in_description.trim()) {
+      return theme.properties.auth_sign_in_description;
+    }
+    return translatePlatformString(activeLocale, 'auth.defaultSignInDescription');
   },
 
   canShowSignUp: function() {

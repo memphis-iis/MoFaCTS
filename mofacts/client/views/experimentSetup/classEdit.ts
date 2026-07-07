@@ -4,12 +4,18 @@ import { Session } from 'meteor/session';
 import './classEdit.html';
 import { meteorCallAsync } from '../..';
 import { curSemester } from '../../../common/Definitions';
+import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
+import { translatePlatformString } from '../../lib/interfaceI18n';
 import $ from 'jquery';
 
 // Initialize to null to detect loading state ([] means loaded but empty)
 Session.set('classes', null);
 
 let isNewClass = true;
+
+function courseText(key: Parameters<typeof translatePlatformString>[1], values?: Parameters<typeof translatePlatformString>[2]): string {
+  return translatePlatformString(getActiveUiLocale(), key, values);
+}
 
 function setClassEditMessage(level: string, text: string) {
   Session.set('classEditMessage', {
@@ -56,13 +62,13 @@ type CourseSection = {
 };
 
 const COURSE_TIMEZONE_OPTIONS = [
-  { value: 'America/New_York', label: 'Eastern Time' },
-  { value: 'America/Chicago', label: 'Central Time' },
-  { value: 'America/Denver', label: 'Mountain Time' },
-  { value: 'America/Phoenix', label: 'Arizona Time' },
-  { value: 'America/Los_Angeles', label: 'Pacific Time' },
-  { value: 'America/Anchorage', label: 'Alaska Time' },
-  { value: 'Pacific/Honolulu', label: 'Hawaii Time' },
+  { value: 'America/New_York', labelKey: 'courseManagement.easternTime' },
+  { value: 'America/Chicago', labelKey: 'courseManagement.centralTime' },
+  { value: 'America/Denver', labelKey: 'courseManagement.mountainTime' },
+  { value: 'America/Phoenix', labelKey: 'courseManagement.arizonaTime' },
+  { value: 'America/Los_Angeles', labelKey: 'courseManagement.pacificTime' },
+  { value: 'America/Anchorage', labelKey: 'courseManagement.alaskaTime' },
+  { value: 'Pacific/Honolulu', labelKey: 'courseManagement.hawaiiTime' },
   { value: 'UTC', label: 'UTC' },
 ];
 
@@ -113,7 +119,7 @@ function defaultTimezone(): string {
 
 function timezoneLabel(timezone: string): string {
   const knownOption = COURSE_TIMEZONE_OPTIONS.find((option) => option.value === timezone);
-  if (knownOption) return knownOption.label;
+  if (knownOption) return knownOption.label || courseText(knownOption.labelKey as Parameters<typeof translatePlatformString>[1]);
   return timezone.replace(/_/g, ' ');
 }
 
@@ -244,13 +250,20 @@ Template.classEdit.helpers({
 
   courseTimezoneOptions: () => {
     const detectedTimezone = defaultTimezone();
-    if (!detectedTimezone || COURSE_TIMEZONE_OPTIONS.some((option) => option.value === detectedTimezone)) {
-      return COURSE_TIMEZONE_OPTIONS;
+    const localizedOptions = COURSE_TIMEZONE_OPTIONS.map((option) => ({
+      value: option.value,
+      label: option.label || courseText(option.labelKey as Parameters<typeof translatePlatformString>[1]),
+    }));
+    if (!detectedTimezone || localizedOptions.some((option) => option.value === detectedTimezone)) {
+      return localizedOptions;
     }
     return [
-      ...COURSE_TIMEZONE_OPTIONS,
+      ...localizedOptions,
       { value: detectedTimezone, label: timezoneLabel(detectedTimezone) },
     ];
+  },
+  courseText(key: Parameters<typeof translatePlatformString>[1], options?: { hash?: Parameters<typeof translatePlatformString>[2] }) {
+    return courseText(key, options?.hash);
   },
 
 });
@@ -273,7 +286,7 @@ Template.classEdit.events({
     if (isNewClass) {
       const curClassName = String($('#newClassName').val() || '');
       if(curClassName == ""){
-        setClassEditMessage('warning', 'Course cannot be blank.');
+        setClassEditMessage('warning', courseText('courseManagement.courseCannotBeBlank'));
         return false;
       }
       curClass = {
@@ -292,7 +305,7 @@ Template.classEdit.events({
       const courseId = String($('#class-select').val() || '');
       const foundClass = classes.find((course) => course.courseId === courseId);
       if (!foundClass) {
-        setClassEditMessage('error', 'Selected course was not found.');
+        setClassEditMessage('error', courseText('courseManagement.selectedCourseNotFound'));
         return false;
       }
       curClass = foundClass;
@@ -306,7 +319,7 @@ Template.classEdit.events({
     curClass.endDate = readOptionalDateInput('#courseEndDate');
     curClass.timezone = String($('#courseTimezone').val() || '').trim();
     if (!curClass.timezone) {
-      setClassEditMessage('warning', 'Choose a course timezone.');
+      setClassEditMessage('warning', courseText('courseManagement.chooseTimezone'));
       return false;
     }
 
@@ -315,13 +328,13 @@ Template.classEdit.events({
 
       void loadCourseManagementData().then(function() {
         classSelectedSetup(String(curClass.courseId || ''));
-        setClassEditMessage('success', 'Course saved.');
+        setClassEditMessage('success', courseText('courseManagement.courseSaved'));
       });
     }
 
     function handleError(err: unknown) {
       const message = (err as any)?.reason || (err as any)?.message || String(err);
-      setClassEditMessage('error', 'Error saving course: ' + message);
+      setClassEditMessage('error', courseText('courseManagement.errorSavingCourse', { error: message }));
     }
 
     if (isNewClass) {
@@ -341,14 +354,14 @@ Template.classEdit.events({
     const classes = (Session.get('classes') || []) as EditableClass[];
     const foundClass = classes.find((course) => course.courseId === courseId);
     if (!courseId || !foundClass) {
-      setClassEditMessage('warning', 'Select a course to delete.');
+      setClassEditMessage('warning', courseText('courseManagement.selectCourseToDelete'));
       return false;
     }
 
     Session.set('classEditConfirmation', {
       courseId,
-      title: `Delete "${foundClass.courseName}"?`,
-      message: 'This removes the course, section links, enrollments, and assignment rows. Learner history is kept.'
+      title: courseText('courseManagement.deleteCourseTitle', { courseName: foundClass.courseName }),
+      message: courseText('courseManagement.deleteCourseMessage')
     });
     return false;
   },
@@ -364,7 +377,7 @@ Template.classEdit.events({
     const confirmation = Session.get('classEditConfirmation') as { courseId?: string } | null;
     const courseId = String(confirmation?.courseId || '');
     if (!courseId) {
-      setClassEditMessage('warning', 'Select a course to delete.');
+      setClassEditMessage('warning', courseText('courseManagement.selectCourseToDelete'));
       clearClassEditConfirmation();
       return false;
     }
@@ -373,11 +386,11 @@ Template.classEdit.events({
       .then(async function() {
         await loadCourseManagementData();
         noClassSelectedSetup();
-        setClassEditMessage('success', 'Course deleted.');
+        setClassEditMessage('success', courseText('courseManagement.courseDeleted'));
       })
       .catch(function(err: unknown) {
         const message = (err as any)?.reason || (err as any)?.message || String(err);
-        setClassEditMessage('error', 'Error deleting course: ' + message);
+        setClassEditMessage('error', courseText('courseManagement.errorDeletingCourse', { error: message }));
       });
     clearClassEditConfirmation();
     return false;

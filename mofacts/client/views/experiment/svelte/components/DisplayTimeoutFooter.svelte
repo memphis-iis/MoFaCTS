@@ -1,12 +1,18 @@
 <script>
   import { createEventDispatcher } from 'svelte';
+  import { getActiveUiLocale } from '../../../../lib/interfaceLocaleState';
+  import { translatePlatformString } from '../../../../lib/interfaceI18n';
 
   export let canContinue = true;
-  export let continueButtonText = 'Continue';
+  export let continueButtonText = '';
   export let continuing = false;
   export let message = '';
 
   const dispatch = createEventDispatcher();
+
+  function platformText(key) {
+    return translatePlatformString(getActiveUiLocale(), key);
+  }
 
   function handleContinue(event) {
     dispatch('continue', event);
@@ -23,7 +29,7 @@
       disabled={continuing || !canContinue}
       aria-busy={continuing}
     >
-      {continueButtonText || 'Continue'}
+      {continueButtonText || platformText('common.continue')}
     </button>
   </div>
 </div>

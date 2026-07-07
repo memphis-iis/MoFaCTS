@@ -4,6 +4,8 @@ import { Session } from 'meteor/session';
 import './adminControls.html';
 import { clientConsole } from '../lib/userSessionHelpers';
 import { meteorCallAsync } from '..';
+import { getActiveUiLocale } from '../lib/interfaceLocaleState';
+import { translatePlatformString } from '../lib/interfaceI18n';
 
 declare const $: (selector: string) => { prop(name: string, value: unknown): void };
 declare const DynamicSettings: {
@@ -12,7 +14,11 @@ declare const DynamicSettings: {
 
 const ADMIN_MESSAGE_KEY = 'adminControlsMessage';
 
-function formatError(err: unknown, fallback = 'Unknown error.'): string {
+function adminText(key: Parameters<typeof translatePlatformString>[1], values?: Parameters<typeof translatePlatformString>[2]): string {
+    return translatePlatformString(getActiveUiLocale(), key, values);
+}
+
+function formatError(err: unknown, fallback = adminText('admin.unknownError')): string {
     if (err instanceof Error && typeof err.message === 'string' && err.message.trim().length > 0) {
         return err.message;
     }
@@ -68,10 +74,10 @@ Template.adminControls.onCreated(async function (this: { autoruns: Array<{ stop(
 
         Session.set('serverStatus', serverStatus);
         if (serverStatus?.error) {
-            setAdminMessage(`Server storage status is unavailable: ${serverStatus.error}`, 'error');
+            setAdminMessage(adminText('admin.storageStatusUnavailable', { error: serverStatus.error }), 'error');
         }
     } catch (err) {
-        setAdminMessage(`Failed to load admin controls: ${formatError(err)}`, 'error');
+        setAdminMessage(adminText('admin.loadControlsFailed', { error: formatError(err) }), 'error');
     }
 });
 
@@ -100,16 +106,25 @@ Template.adminControls.onDestroyed(function (this: { autoruns: Array<{ stop(): v
 
 Template.adminControls.helpers({
     'serverStatus': function() {
+        const loading = adminText('common.loading');
         return Session.get('serverStatus') || {
-            diskSpacePercent: 'Loading...',
-            remainingSpace: 'Loading...',
-            diskSpace: 'Loading...',
-            diskSpaceUsed: 'Loading...',
+            diskSpacePercent: loading,
+            remainingSpace: loading,
+            diskSpace: loading,
+            diskSpaceUsed: loading,
             error: null
         };
     },
     'adminMessage': function() {
         return Session.get(ADMIN_MESSAGE_KEY);
+    },
+    'serverStorageSummary': function() {
+        const status = Session.get('serverStatus') || {};
+        return adminText('admin.serverStorageSummary', {
+            usedPercent: status.diskSpacePercent || adminText('common.loading'),
+            remaining: status.remainingSpace || adminText('common.loading'),
+            total: status.diskSpace || adminText('common.loading'),
+        });
     }
 });
 
@@ -134,7 +149,7 @@ Template.adminControls.events({
             
         } catch (err) {
             clientConsole(1, 'Error setting client verbosity:', err);
-            setAdminMessage(`Failed to update client verbosity: ${formatError(err)}`, 'error');
+            setAdminMessage(adminText('admin.updateClientVerbosityFailed', { error: formatError(err) }), 'error');
             // Revert radio button on error
             const currentDoc = DynamicSettings.findOne({key: 'clientVerbosityLevel'});
             if (currentDoc && currentDoc.value !== undefined && currentDoc.value !== null) {
@@ -150,9 +165,9 @@ Template.adminControls.events({
     'click #updateStimDisplayTypeMap': async function() {
         try {
             await meteorCallAsync('updateStimDisplayTypeMap');
-            setAdminMessage('Stimulus display cache rebuilt.', 'success');
+            setAdminMessage(adminText('admin.displayCacheRebuilt'), 'success');
         } catch (err) {
-            setAdminMessage(`Failed to rebuild stimulus display cache: ${formatError(err)}`, 'error');
+            setAdminMessage(adminText('admin.displayCacheRebuildFailed', { error: formatError(err) }), 'error');
         }
     }
 });

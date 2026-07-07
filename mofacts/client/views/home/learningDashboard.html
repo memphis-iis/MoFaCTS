@@ -1,7 +1,7 @@
 <template name="learningDashboard">
   <div class="practice-menu-container" id="learningDashboardContainer">
     {{#with recentUsedTdf}}
-      <section class="resume-card" aria-label="Resume recent lesson">
+      <section class="resume-card" aria-label="{{t 'dashboard.resumeRecentLesson'}}">
         <div class="resume-bg" aria-hidden="true"></div>
         <div class="thumb" aria-hidden="true">
           <span class="fa fa-book"></span>
@@ -11,26 +11,26 @@
           <div class="resume-metrics">
             <div class="metric">
               <div class="metric-value">{{this.totalTrials}}</div>
-              <div class="metric-label">total trials</div>
+              <div class="metric-label">{{t 'dashboard.totalTrials'}}</div>
             </div>
             <div class="metric">
               <div class="metric-value">{{accuracyDisplay}}</div>
               {{#if this.isUsed}}
                 <div class="accuracy-bar resume-accuracy-bar"><div class="accuracy-fill" style="width:{{accuracyBarWidth}}"></div></div>
               {{/if}}
-              <div class="metric-label">overall accuracy</div>
+              <div class="metric-label">{{t 'dashboard.overallAccuracy'}}</div>
             </div>
             <div class="metric">
               <div class="metric-value">{{itemsPracticedDisplay}}</div>
-              <div class="metric-label">items practiced</div>
+              <div class="metric-label">{{t 'dashboard.itemsPracticed'}}</div>
             </div>
             <div class="metric">
               <div class="metric-value">{{this.totalSessions}}</div>
-              <div class="metric-label">days w/ sessions</div>
+              <div class="metric-label">{{t 'dashboard.daysWithSessions'}}</div>
             </div>
             <div class="metric">
               <div class="metric-value">{{this.totalTimeMinutes}}</div>
-              <div class="metric-label">time (min)</div>
+              <div class="metric-label">{{t 'dashboard.timeMinutes'}}</div>
             </div>
           </div>
         </div>
@@ -39,7 +39,7 @@
           data-lessonname="{{this.displayName}}"
           data-currentstimulisetid="{{this.currentStimuliSetId}}"
           data-ismultitdf="{{this.isMultiTdf}}">
-          Continue
+          {{t 'dashboard.continue'}}
         </button>
       </section>
     {{/with}}
@@ -48,9 +48,9 @@
       <div class="table-toolbar">
         <div class="toolbar-search">
           <span class="fa fa-search" aria-hidden="true"></span>
-          <input id="learningDashboardSearch" type="text" placeholder="Search your study sets..." value="{{searchQuery}}" disabled="{{#if isLoading}}disabled{{/if}}" aria-disabled="{{#if isLoading}}true{{else}}false{{/if}}">
+          <input id="learningDashboardSearch" type="text" placeholder="{{t 'dashboard.searchPlaceholder'}}" value="{{searchQuery}}" disabled="{{#if isLoading}}disabled{{/if}}" aria-disabled="{{#if isLoading}}true{{else}}false{{/if}}">
           {{#if hasSearchQuery}}
-            <button type="button" class="learning-dashboard-search-clear" aria-label="Clear search" title="Clear search" disabled="{{#if isLoading}}disabled{{/if}}">
+            <button type="button" class="learning-dashboard-search-clear" aria-label="{{t 'dashboard.clearSearch'}}" title="{{t 'dashboard.clearSearch'}}" disabled="{{#if isLoading}}disabled{{/if}}">
               <span class="fa fa-times" aria-hidden="true"></span>
             </button>
           {{/if}}
@@ -121,20 +121,20 @@
               </div>
             </div>
           </div>
-          <div class="sr-only" role="status" aria-live="polite">Loading lessons...</div>
+          <div class="sr-only" role="status" aria-live="polite">{{t 'dashboard.loadingLessons'}}</div>
         {{else}}
           {{#if hasTdfs}}
             <div class="learning-dashboard-sections learning-dashboard-content-ready">
               {{#if hasUsedTdfs}}
                 <div class="practice-section">
-                  <div class="practice-section-heading">Continue practicing</div>
+                  <div class="practice-section-heading">{{t 'dashboard.continuePracticing'}}</div>
                   {{> learningDashboardLessonTable tdfs=usedTdfsList learnerConfigState=learnerConfigState}}
                   {{> learningDashboardLessonCards tdfs=usedTdfsList learnerConfigState=learnerConfigState}}
                 </div>
               {{/if}}
               {{#if hasUnusedTdfs}}
                 <div class="practice-section">
-                  <div class="practice-section-heading">New lessons</div>
+                  <div class="practice-section-heading">{{t 'dashboard.newLessons'}}</div>
                   {{> learningDashboardLessonTable tdfs=unusedTdfsList learnerConfigState=learnerConfigState}}
                   {{> learningDashboardLessonCards tdfs=unusedTdfsList learnerConfigState=learnerConfigState}}
                 </div>
@@ -142,7 +142,7 @@
             </div>
           {{else}}
             <div class="practice-empty-state">
-              <p class="learning-dashboard-flush">No lessons found. Please contact your administrator.</p>
+              <p class="learning-dashboard-flush">{{t 'dashboard.noLessonsFound'}}</p>
             </div>
           {{/if}}
         {{/if}}
@@ -168,27 +168,27 @@
         </colgroup>
         <thead>
           <tr>
-            <th scope="col" class="actions-heading">Actions</th>
-            <th scope="col" class="features-heading">Features</th>
-            <th scope="col" class="study-set-heading">Study Set</th>
-            <th scope="col" class="num">Total Trials</th>
-            <th scope="col">Overall Accuracy</th>
-            <th scope="col" class="num">Items Practiced</th>
-            <th scope="col" class="num">Days w/ Sessions</th>
-            <th scope="col" class="num">Time (min)</th>
-            <th scope="col">Last Practice</th>
+            <th scope="col" class="actions-heading">{{t 'dashboard.actions'}}</th>
+            <th scope="col" class="features-heading">{{t 'dashboard.features'}}</th>
+            <th scope="col" class="study-set-heading">{{t 'dashboard.studySet'}}</th>
+            <th scope="col" class="num">{{t 'dashboard.totalTrials'}}</th>
+            <th scope="col">{{t 'dashboard.overallAccuracy'}}</th>
+            <th scope="col" class="num">{{t 'dashboard.itemsPracticed'}}</th>
+            <th scope="col" class="num">{{t 'dashboard.daysWithSessions'}}</th>
+            <th scope="col" class="num">{{t 'dashboard.timeMinutes'}}</th>
+            <th scope="col">{{t 'courses.lastPractice'}}</th>
           </tr>
         </thead>
         <tbody>
           {{#each tdfs}}
             <tr class="learning-dashboard-row {{#if this.isUsed}}learning-dashboard-row--used{{else}}learning-dashboard-row--unused{{/if}}">
-              <td class="learning-dashboard-cell learning-dashboard-cell--action" data-label="Action">
+              <td class="learning-dashboard-cell learning-dashboard-cell--action" data-label="{{t 'dashboard.action'}}">
                 <div class="learning-dashboard-cell__value learning-dashboard-action">
                   {{#if this.conditions}}
                     <div class="learning-dashboard-action-group">
-                      <button class="btn btn-sm btn-success learning-dashboard-action-button start-condition-root">Start</button>
+                      <button class="btn btn-sm btn-success learning-dashboard-action-button start-condition-root">{{t 'dashboard.start'}}</button>
                       {{#if showSettingsButton}}
-                        <button class="btn btn-sm btn-outline-secondary learning-dashboard-action-button configure-lesson" data-tdfid="{{this.TDFId}}">Settings</button>
+                        <button class="btn btn-sm btn-outline-secondary learning-dashboard-action-button configure-lesson" data-tdfid="{{this.TDFId}}">{{t 'dashboard.settings'}}</button>
                       {{/if}}
                     </div>
                   {{else if this.isUsed}}
@@ -197,9 +197,9 @@
                         data-tdfid="{{this.TDFId}}"
                         data-lessonname="{{this.displayName}}"
                         data-currentstimulisetid="{{this.currentStimuliSetId}}"
-                        data-ismultitdf="{{this.isMultiTdf}}">Continue</button>
+                        data-ismultitdf="{{this.isMultiTdf}}">{{t 'dashboard.continue'}}</button>
                       {{#if showSettingsButton}}
-                        <button class="btn btn-sm btn-outline-secondary learning-dashboard-action-button configure-lesson" data-tdfid="{{this.TDFId}}">Settings</button>
+                        <button class="btn btn-sm btn-outline-secondary learning-dashboard-action-button configure-lesson" data-tdfid="{{this.TDFId}}">{{t 'dashboard.settings'}}</button>
                       {{/if}}
                     </div>
                   {{else}}
@@ -208,16 +208,16 @@
                         data-tdfid="{{this.TDFId}}"
                         data-lessonname="{{this.displayName}}"
                         data-currentstimulisetid="{{this.currentStimuliSetId}}"
-                        data-ismultitdf="{{this.isMultiTdf}}">Start</button>
+                        data-ismultitdf="{{this.isMultiTdf}}">{{t 'dashboard.start'}}</button>
                       {{#if showSettingsButton}}
-                        <button class="btn btn-sm btn-outline-secondary learning-dashboard-action-button configure-lesson" data-tdfid="{{this.TDFId}}">Settings</button>
+                        <button class="btn btn-sm btn-outline-secondary learning-dashboard-action-button configure-lesson" data-tdfid="{{this.TDFId}}">{{t 'dashboard.settings'}}</button>
                       {{/if}}
                     </div>
                   {{/if}}
                 </div>
               </td>
-              <td class="learning-dashboard-cell practice-icon-cell" data-label="Features">
-                <span class="practice-feature-icons" aria-label="Lesson features">
+              <td class="learning-dashboard-cell practice-icon-cell" data-label="{{t 'dashboard.features'}}">
+                <span class="practice-feature-icons" aria-label="{{t 'dashboard.lessonFeatures'}}">
                   {{#if firstContentUnitIconClass}}
                     <span class="fa {{firstContentUnitIconClass}} content-unit-icon" title="{{firstContentUnitIconTitle}}"></span>
                   {{/if}}
@@ -229,14 +229,14 @@
                   {{/if}}
                 </span>
               </td>
-              <th scope="row" class="learning-dashboard-cell learning-dashboard-cell--lesson" data-label="Study Set">
+              <th scope="row" class="learning-dashboard-cell learning-dashboard-cell--lesson" data-label="{{t 'dashboard.studySet'}}">
                 <div class="learning-dashboard-cell__value learning-dashboard-lesson">
                   <div class="d-flex align-items-center gap-2 flex-wrap">
                     <span class="set-name" title="{{displayLabel}}">{{displayLabel}}</span>
                     {{#if this.conditions}}
                       <select class="form-select form-select-sm condition-tdf-selector learning-dashboard-condition-selector"
                         data-roottdfid="{{this.TDFId}}">
-                        <option value="{{this.TDFId}}">{{this.displayName}} (auto-assign)</option>
+                        <option value="{{this.TDFId}}">{{this.displayName}} ({{t 'dashboard.autoAssign'}})</option>
                         {{#each this.conditions}}
                           <option value="{{this.tdfId}}">{{this.fileName}} ({{this.count}})</option>
                         {{/each}}
@@ -245,25 +245,25 @@
                   </div>
                 </div>
               </th>
-              <td class="learning-dashboard-cell learning-dashboard-cell--stat num" data-label="Total Trials">
+              <td class="learning-dashboard-cell learning-dashboard-cell--stat num" data-label="{{t 'dashboard.totalTrials'}}">
                 <span class="learning-dashboard-cell__value">{{#if this.isUsed}}{{this.totalTrials}}{{else}}-{{/if}}</span>
               </td>
-              <td class="learning-dashboard-cell learning-dashboard-cell--stat accuracy-cell" data-label="Overall Accuracy">
+              <td class="learning-dashboard-cell learning-dashboard-cell--stat accuracy-cell" data-label="{{t 'dashboard.overallAccuracy'}}">
                 <div class="accuracy-pct">{{accuracyDisplay}}</div>
                 {{#if this.isUsed}}
                   <div class="accuracy-bar"><div class="accuracy-fill" style="width:{{accuracyBarWidth}}"></div></div>
                 {{/if}}
               </td>
-              <td class="learning-dashboard-cell learning-dashboard-cell--stat num" data-label="Items Practiced">
+              <td class="learning-dashboard-cell learning-dashboard-cell--stat num" data-label="{{t 'dashboard.itemsPracticed'}}">
                 <span class="learning-dashboard-cell__value">{{itemsPracticedDisplay}}</span>
               </td>
-              <td class="learning-dashboard-cell learning-dashboard-cell--stat num" data-label="Days with Sessions">
+              <td class="learning-dashboard-cell learning-dashboard-cell--stat num" data-label="{{t 'dashboard.daysWithSessions'}}">
                 <span class="learning-dashboard-cell__value">{{#if this.isUsed}}{{this.totalSessions}}{{else}}-{{/if}}</span>
               </td>
-              <td class="learning-dashboard-cell learning-dashboard-cell--stat num" data-label="Time (min)">
+              <td class="learning-dashboard-cell learning-dashboard-cell--stat num" data-label="{{t 'dashboard.timeMinutes'}}">
                 <span class="learning-dashboard-cell__value">{{#if this.isUsed}}{{this.totalTimeMinutes}}{{else}}-{{/if}}</span>
               </td>
-              <td class="learning-dashboard-cell learning-dashboard-cell--last-practice" data-label="Last Practice">
+              <td class="learning-dashboard-cell learning-dashboard-cell--last-practice" data-label="{{t 'courses.lastPractice'}}">
                 <span class="learning-dashboard-cell__value">{{#if this.isUsed}}{{this.lastPracticeDate}}{{else}}-{{/if}}</span>
               </td>
             </tr>
@@ -289,7 +289,7 @@
         {{#if this.conditions}}
           <select class="form-select form-select-sm condition-tdf-selector"
             data-roottdfid="{{this.TDFId}}">
-            <option value="{{this.TDFId}}">{{this.displayName}} (auto-assign)</option>
+            <option value="{{this.TDFId}}">{{this.displayName}} ({{t 'dashboard.autoAssign'}})</option>
             {{#each this.conditions}}
               <option value="{{this.tdfId}}">{{this.fileName}} ({{this.count}})</option>
             {{/each}}
@@ -311,7 +311,7 @@
           {{#unless showTtsIcon}}
             {{#unless showSrIcon}}
               {{#unless firstContentUnitIconClass}}
-                <span class="learning-dashboard-empty-value">None</span>
+                <span class="learning-dashboard-empty-value">{{t 'dashboard.none'}}</span>
               {{/unless}}
             {{/unless}}
           {{/unless}}
@@ -319,7 +319,7 @@
           {{#if this.isUsed}}
             <span class="badge {{accuracyBadgeClass}}"><span class="learning-dashboard-card-badge-text">{{accuracyBadgeLabel}}</span></span>
           {{else}}
-            <span class="badge bg-secondary"><span class="learning-dashboard-card-badge-text">New</span></span>
+            <span class="badge bg-secondary"><span class="learning-dashboard-card-badge-text">{{t 'dashboard.new'}}</span></span>
           {{/if}}
         </div>
       </div>
@@ -327,9 +327,9 @@
       {{#if this.conditions}}
         {{!-- Owner of a condition-pool root TDF: selector is in the card title; just show Start --}}
         <div class="learning-dashboard-card-actions">
-          <button class="btn btn-sm btn-success start-condition-root learning-dashboard-card-button">Start</button>
+          <button class="btn btn-sm btn-success start-condition-root learning-dashboard-card-button">{{t 'dashboard.start'}}</button>
           {{#if showSettingsButton}}
-            <button class="btn btn-sm btn-outline-secondary configure-lesson learning-dashboard-card-button" data-tdfid="{{this.TDFId}}">Settings</button>
+            <button class="btn btn-sm btn-outline-secondary configure-lesson learning-dashboard-card-button" data-tdfid="{{this.TDFId}}">{{t 'dashboard.settings'}}</button>
           {{/if}}
         </div>
       {{else if this.isUsed}}
@@ -339,7 +339,7 @@
             data-lessonname="{{this.displayName}}"
             data-currentstimulisetid="{{this.currentStimuliSetId}}"
             data-ismultitdf="{{this.isMultiTdf}}">
-            Continue
+            {{t 'dashboard.continue'}}
           </button>
           <button class="btn btn-sm btn-primary learning-dashboard-card-button"
             type="button"
@@ -347,12 +347,12 @@
             data-bs-target="#details-{{this.TDFId}}"
             aria-expanded="false"
             aria-controls="details-{{this.TDFId}}">
-            Details
+            {{t 'dashboard.details'}}
             <span class="fa fa-chevron-down card-expand-icon"></span>
           </button>
           {{#if showSettingsButton}}
             <button class="btn btn-sm btn-outline-secondary configure-lesson learning-dashboard-card-button" data-tdfid="{{this.TDFId}}">
-              Settings
+              {{t 'dashboard.settings'}}
             </button>
           {{/if}}
         </div>
@@ -363,11 +363,11 @@
             data-lessonname="{{this.displayName}}"
             data-currentstimulisetid="{{this.currentStimuliSetId}}"
             data-ismultitdf="{{this.isMultiTdf}}">
-            Start
+            {{t 'dashboard.start'}}
           </button>
           {{#if showSettingsButton}}
             <button class="btn btn-sm btn-outline-secondary configure-lesson learning-dashboard-card-button" data-tdfid="{{this.TDFId}}">
-              Settings
+              {{t 'dashboard.settings'}}
             </button>
           {{/if}}
         </div>
@@ -381,23 +381,23 @@
         <div id="details-{{this.TDFId}}" class="collapse">
           <div class="learning-dashboard-details border-top">
             <div class="learning-dashboard-detail-row border-bottom">
-              <span>Total Trials:</span>
+              <span>{{t 'dashboard.totalTrials'}}:</span>
               <span class="fw-bold">{{this.totalTrials}}</span>
             </div>
             <div class="learning-dashboard-detail-row border-bottom">
-              <span>Time Spent:</span>
-              <span class="fw-bold">{{this.totalTimeMinutes}} min</span>
+              <span>{{t 'dashboard.timeSpent'}}</span>
+              <span class="fw-bold">{{timeMinutesDisplay}}</span>
             </div>
             <div class="learning-dashboard-detail-row border-bottom">
-              <span>Items Practiced:</span>
+              <span>{{t 'dashboard.itemsPracticed'}}:</span>
               <span class="fw-bold">{{itemsPracticedDisplay}}</span>
             </div>
             <div class="learning-dashboard-detail-row border-bottom">
-              <span>Days with Sessions:</span>
+              <span>{{t 'dashboard.daysWithSessions'}}:</span>
               <span class="fw-bold">{{this.totalSessions}}</span>
             </div>
             <div class="learning-dashboard-detail-row">
-              <span>Last Practice:</span>
+              <span>{{t 'courses.lastPractice'}}:</span>
               <span class="fw-bold">{{this.lastPracticeDate}}</span>
             </div>
           </div>
@@ -412,7 +412,7 @@
     <div class="learner-config-panel-clip">
       <div class="learner-config-panel-card">
         {{#if this.loading}}
-          <div class="text-muted">Loading settings...</div>
+          <div class="text-muted">{{t 'dashboard.loadingSettings'}}</div>
         {{else}}
           {{#if this.error}}
             <div class="alert alert-warning learner-config-alert">{{this.error}}</div>
@@ -434,7 +434,7 @@
                         <button type="button" class="btn btn-sm btn-link learner-config-reset-field"
                           data-fieldid="{{this.id}}"
                           data-defaultvalue="{{this.defaultInputValue}}">
-                          Reset
+                          {{t 'dashboard.reset'}}
                         </button>
                       {{/if}}
                     </div>
@@ -479,7 +479,7 @@
                   <div class="learner-config-admin-reset">
                     {{#if this.resetConfirming}}
                       <button type="button" class="btn btn-sm btn-link learner-config-reset-progress-cancel" disabled="{{#if this.resettingProgress}}disabled{{/if}}">
-                        Cancel
+                        {{t 'dashboard.cancel'}}
                       </button>
                     {{/if}}
                     <button type="button" class="btn btn-sm btn-outline-danger learner-config-reset-progress" disabled="{{#if this.resettingProgress}}disabled{{/if}}">

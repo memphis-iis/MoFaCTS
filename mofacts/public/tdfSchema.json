@@ -30,6 +30,39 @@
                 "grid_columns": 12
               }
             },
+            "contentLanguage": {
+              "title": "Content language.",
+              "description": "BCP 47 language tag for authored instructional content, such as \"en\", \"es\", \"zh-Hans\", or \"hi\". This describes author-provided content and does not request translation.",
+              "type": "string",
+              "default": "",
+              "options": {
+                "grid_columns": 4
+              }
+            },
+            "recommendedUiLocales": {
+              "title": "Recommended UI locales",
+              "description": "Optional BCP 47 UI locale tags recommended for platform chrome when this content is used. These do not translate authored instructional content.",
+              "type": "array",
+              "items": {
+                "type": "string",
+                "title": "Locale"
+              }
+            },
+            "translationStatus": {
+              "title": "Content translation status.",
+              "description": "Author-declared status for the authored content language variant. This is metadata for review and packaging; MoFaCTS does not automatically translate course content.",
+              "type": "string",
+              "enum": [
+                "author-provided",
+                "not-translated",
+                "draft",
+                "reviewed"
+              ],
+              "default": "author-provided",
+              "options": {
+                "grid_columns": 4
+              }
+            },
             "stimulusfile": {
               "title": "Filename of the stimulus JSON file.",
               "description": "Stimulus/content filename paired with this TDF.",

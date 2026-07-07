@@ -1,4 +1,6 @@
 <script>
+  import { getActiveUiLocale } from '../../../lib/interfaceLocaleState';
+  import { translatePlatformString } from '../../../lib/interfaceI18n';
   import { stringifyLooseValue } from './sparcAuthoringEditPrimitives';
   import SparcRuleExpressionEditor from './SparcRuleExpressionEditor.svelte';
 
@@ -31,14 +33,20 @@
   export let onUpdateRuleExpression = () => {};
   export let onAddExpressionArg = () => {};
   export let onRemoveExpressionArg = () => {};
+
+  const sparcText = (key, values) => translatePlatformString(getActiveUiLocale(), key, values);
+  const ruleSummary = (rule) => sparcText('sparc.ruleSummary', {
+    when: rule.when?.length || 0,
+    then: rule.then?.length || 0
+  });
 </script>
 
 <div class="sparc-context-card sparc-production-rules-card">
   <div class="sparc-panel-header">
-    <h3>Production Rules</h3>
+    <h3>{sparcText('sparc.productionRules')}</h3>
   </div>
   <label>
-    Rule template
+    {sparcText('sparc.ruleTemplate')}
     <select bind:value={activeVisualRuleTemplateId}>
       {#each productionRuleCatalogEntries as entry}
         <option value={entry.id}>{entry.label} ({entry.category.replace('production-rule-', '')})</option>
@@ -46,7 +54,7 @@
     </select>
   </label>
   <button type="button" class="btn btn-primary btn-sm" on:click={() => onCreateScopedProductionRule(activeVisualRuleTemplateId)}>
-    Add Rule For Selection
+    {sparcText('sparc.addRuleForSelection')}
   </button>
   <div class="sparc-scoped-rule-list">
     {#each activeNodeProductionRuleEntries as entry}
@@ -57,38 +65,38 @@
         on:click={() => onSelectScopedProductionRule(entry.index)}
       >
         <span>{entry.rule.id}</span>
-        <small>{entry.rule.when?.length || 0} when / {entry.rule.then?.length || 0} then</small>
+        <small>{ruleSummary(entry.rule)}</small>
       </button>
     {/each}
     {#if activeNodeProductionRuleEntries.length === 0}
-      <p class="sparc-muted sparc-compact-empty-state">No production rules target this selection yet.</p>
+      <p class="sparc-muted sparc-compact-empty-state">{sparcText('sparc.noProductionRulesForSelection')}</p>
     {/if}
   </div>
 
   {#if activeNodeProductionRule}
     <label>
-      Selected Rule ID
+      {sparcText('sparc.selectedRuleId')}
       <input value={activeNodeProductionRule.id || ''} on:input={(event) => onUpdateScopedProductionRuleField('id', event.currentTarget.value)} />
     </label>
     <label>
-      Module
+      {sparcText('sparc.module')}
       <input value={activeNodeProductionRule.module || ''} on:input={(event) => onUpdateScopedProductionRuleField('module', event.currentTarget.value)} />
     </label>
     <label>
-      Add catalog part
+      {sparcText('sparc.addCatalogPart')}
       <select on:change={(event) => { onAddCatalogPartToActiveRule(event.currentTarget.value); event.currentTarget.value = ''; }}>
-        <option value="">Choose condition, test, or effect...</option>
-        <optgroup label="Conditions">
+        <option value="">{sparcText('sparc.chooseCatalogPart')}</option>
+        <optgroup label={sparcText('sparc.conditions')}>
           {#each productionConditionCatalogEntries as entry}
             <option value={entry.id}>{entry.label}</option>
           {/each}
         </optgroup>
-        <optgroup label="Tests">
+        <optgroup label={sparcText('sparc.tests')}>
           {#each productionTestCatalogEntries as entry}
             <option value={entry.id}>{entry.label}</option>
           {/each}
         </optgroup>
-        <optgroup label="Effects">
+        <optgroup label={sparcText('sparc.effects')}>
           {#each productionEffectCatalogEntries as entry}
             <option value={entry.id}>{entry.label}</option>
           {/each}
@@ -96,7 +104,7 @@
       </select>
     </label>
     <label>
-      Rule JSON
+      {sparcText('sparc.ruleJson')}
       <textarea
         class="sparc-rule-json-editor"
         rows="18"
@@ -117,7 +125,7 @@
         </div>
         {#if activeNodeRuleEffect.type === 'classify'}
           <label>
-            Outcome
+            {sparcText('sparc.outcome')}
             <select value={activeNodeRuleEffect.outcome} on:change={(event) => onUpdateEffectField(activeNodeRuleEffect, 'outcome', event.currentTarget.value)}>
               {#each classifyOutcomes as outcome}
                 <option value={outcome}>{outcome}</option>
@@ -126,7 +134,7 @@
           </label>
         {:else if activeNodeRuleEffect.type === 'message'}
           <label>
-            Message Type
+            {sparcText('sparc.messageType')}
             <select value={activeNodeRuleEffect.messageType} on:change={(event) => onUpdateEffectField(activeNodeRuleEffect, 'messageType', event.currentTarget.value)}>
               {#each messageTypes as type}
                 <option value={type}>{type}</option>
@@ -134,19 +142,19 @@
             </select>
           </label>
           <label>
-            Template
+            {sparcText('sparc.template')}
             <textarea rows="3" value={activeNodeRuleEffect.template || ''} on:input={(event) => onUpdateEffectField(activeNodeRuleEffect, 'template', event.currentTarget.value)}></textarea>
           </label>
         {:else if activeNodeRuleEffect.type === 'write-state'}
           <label>
-            State Key
+            {sparcText('sparc.stateKey')}
             <input value={activeNodeRuleEffect.write?.key || ''} on:input={(event) => onUpdateEffectField(activeNodeRuleEffect.write, 'key', event.currentTarget.value)} />
           </label>
           <label>
-            Value
+            {sparcText('sparc.value')}
             <SparcRuleExpressionEditor
               expression={activeNodeRuleEffect.write.value}
-              label="Value"
+              label={sparcText('sparc.value')}
               {ruleExpressionTypes}
               {functionNames}
               onUpdateRuleExpression={onUpdateRuleExpression}
@@ -161,7 +169,7 @@
           </label>
         {:else if activeNodeRuleEffect.type === 'model-practice'}
           <label>
-            Outcome
+            {sparcText('sparc.outcome')}
             <select value={activeNodeRuleEffect.outcome} on:change={(event) => onUpdateEffectField(activeNodeRuleEffect, 'outcome', event.currentTarget.value)}>
               {#each classifyOutcomes.filter((outcome) => outcome !== 'buggy') as outcome}
                 <option value={outcome}>{outcome}</option>
@@ -169,23 +177,23 @@
             </select>
           </label>
           <label>
-            Explicit Cluster
+            {sparcText('sparc.explicitCluster')}
             <select value={activeNodeRuleEffect.clusterIndex ?? ''} on:change={(event) => onUpdateOptionalEffectField(activeNodeRuleEffect, 'clusterIndex', event.currentTarget.value)}>
-              <option value="">Resolve from selected node attachment</option>
+              <option value="">{sparcText('sparc.resolveFromSelectedNodeAttachment')}</option>
               {#each clusterChoices as cluster}
                 <option value={cluster.clusterIndex} disabled={!cluster.hasFirstStimulus}>{cluster.clusterIndex}: {cluster.label}</option>
               {/each}
             </select>
           </label>
           <label>
-            Node ID
+            {sparcText('sparc.nodeId')}
             <input value={stringifyLooseValue(activeNodeRuleEffect.nodeId || '')} on:input={(event) => onUpdateOptionalEffectField(activeNodeRuleEffect, 'nodeId', event.currentTarget.value.startsWith('?') ? variableExpression(event.currentTarget.value.slice(1)) : event.currentTarget.value)} />
           </label>
           <label>
-            Response Value
+            {sparcText('sparc.responseValue')}
             <SparcRuleExpressionEditor
               expression={ensureEffectExpression(activeNodeRuleEffect, 'responseValue', '')}
-              label="Response Value"
+              label={sparcText('sparc.responseValue')}
               {ruleExpressionTypes}
               {functionNames}
               onUpdateRuleExpression={onUpdateRuleExpression}
@@ -194,7 +202,7 @@
             />
           </label>
         {:else}
-          <p class="sparc-muted">Use Rule JSON above to edit every field for this effect.</p>
+          <p class="sparc-muted">{sparcText('sparc.useRuleJsonForEffect')}</p>
         {/if}
       </div>
     {/if}

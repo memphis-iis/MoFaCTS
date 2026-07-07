@@ -681,18 +681,18 @@
         <!-- Header -->
         <div class="editor-page-header">
             <a href="/contentUpload" class="btn btn-outline-secondary editor-back-button">
-                <i class="fa fa-arrow-left"></i> Back
+                <i class="fa fa-arrow-left"></i> {{contentEditorText 'apkg.back'}}
             </a>
             <h3 class="page-header-text editor-page-title">
-                Edit Stimuli: {{lessonName}}
+                {{editTitle}}
                 {{#if conditionInfo}}
                     <small class="text-muted">
-                        (Editing: {{conditionInfo.fileName}} - Condition {{conditionInfo.index}} of {{conditionInfo.total}})
+                        {{conditionSummary conditionInfo}}
                     </small>
                 {{/if}}
                 {{#if stimFileInfo}}
                     <small class="text-muted">
-                        [Stim File: {{stimFileInfo.filename}}]
+                        {{stimFileSummary stimFileInfo}}
                     </small>
                 {{/if}}
             </h3>
@@ -701,13 +701,13 @@
         {{#if loading}}
         <div class="text-center editor-loading-state">
             <i class="fa fa-spinner fa-spin fa-2x"></i>
-            <p class="admin-form-row-top">Loading content...</p>
+            <p class="admin-form-row-top">{{contentEditorText 'contentEditor.loadingContent'}}</p>
         </div>
         {{else}}
         {{#if noData}}
         <div class="admin-status admin-status-warning">
             <i class="fa fa-exclamation-triangle"></i>
-            <div class="admin-status-text">No stimulus data found for this TDF, or you don't have permission to edit it.</div>
+            <div class="admin-status-text">{{contentEditorText 'contentEditor.noStimulusData'}}</div>
         </div>
         {{else}}
 
@@ -725,7 +725,7 @@
         <!-- Show initializing message while editor loads -->
         <div class="text-center admin-empty-state">
             <i class="fa fa-spinner fa-spin fa-2x text-primary"></i>
-            <p class="admin-form-row-top text-muted">Initializing editor...</p>
+            <p class="admin-form-row-top text-muted">{{contentEditorText 'contentEditor.initializingEditor'}}</p>
         </div>
         {{/unless}}
 
@@ -734,22 +734,22 @@
         <div class="editor-topbar admin-form-row">
             <div class="editor-status">
                 {{#if hasChanges}}
-                <span class="badge bg-warning text-dark unsaved-badge">Unsaved changes</span>
+                <span class="badge bg-warning text-dark unsaved-badge">{{contentEditorText 'tdfEditor.unsavedChanges'}}</span>
                 {{/if}}
             </div>
             <div class="editor-verbosity">
-                <span class="text-muted small">Descriptions:</span>
+                <span class="text-muted small">{{contentEditorText 'tdfEditor.descriptions'}}</span>
                 <div class="form-check form-check-inline editor-inline-check">
                     <input class="form-check-input" type="radio" name="tooltipMode" id="tooltipNone" value="none" checked="{{noneChecked}}">
-                    <label class="form-check-label small" for="tooltipNone">None</label>
+                    <label class="form-check-label small" for="tooltipNone">{{contentEditorText 'tdfEditor.none'}}</label>
                 </div>
                 <div class="form-check form-check-inline editor-inline-check">
                     <input class="form-check-input" type="radio" name="tooltipMode" id="tooltipBrief" value="brief" checked="{{briefChecked}}">
-                    <label class="form-check-label small" for="tooltipBrief">Brief</label>
+                    <label class="form-check-label small" for="tooltipBrief">{{contentEditorText 'tdfEditor.brief'}}</label>
                 </div>
                 <div class="form-check form-check-inline editor-inline-check">
                     <input class="form-check-input" type="radio" name="tooltipMode" id="tooltipVerbose" value="verbose" checked="{{verboseChecked}}">
-                    <label class="form-check-label small" for="tooltipVerbose">Verbose</label>
+                    <label class="form-check-label small" for="tooltipVerbose">{{contentEditorText 'tdfEditor.verbose'}}</label>
                 </div>
             </div>
         </div>
@@ -757,22 +757,22 @@
         <!-- MC Conversion Toolbar -->
         <div class="mc-toolbar admin-form-row">
             <button id="generateIncorrectBtn" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#generateIncorrectModal">
-                <i class="fa fa-random"></i> Generate Incorrect Responses
+                <i class="fa fa-random"></i> {{contentEditorText 'contentEditor.generateIncorrectResponses'}}
             </button>
             <button id="removeIncorrectBtn" class="btn btn-outline-danger btn-sm">
-                <i class="fa fa-trash"></i> Remove All Incorrect Responses
+                <i class="fa fa-trash"></i> {{contentEditorText 'contentEditor.removeAllIncorrectResponses'}}
             </button>
         </div>
         {{#if removeIncorrectConfirmation}}
         <div class="admin-inline-confirmation admin-form-row-sm">
             <div>
-                <div class="admin-inline-confirmation-title">Remove all incorrect responses?</div>
-                <div class="admin-inline-confirmation-message">This will convert multiple-choice questions back to text input mode.</div>
+                <div class="admin-inline-confirmation-title">{{contentEditorText 'contentEditor.removeIncorrectTitle'}}</div>
+                <div class="admin-inline-confirmation-message">{{contentEditorText 'contentEditor.removeIncorrectMessage'}}</div>
             </div>
             <div class="admin-inline-confirmation-actions">
-                <button type="button" class="btn btn-sm btn-outline-secondary" id="cancelRemoveIncorrectBtn">Cancel</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="cancelRemoveIncorrectBtn">{{contentEditorText 'content.cancel'}}</button>
                 <button type="button" class="btn btn-sm btn-danger" id="confirmRemoveIncorrectBtn">
-                    <i class="fa fa-trash"></i> Remove
+                    <i class="fa fa-trash"></i> {{contentEditorText 'contentEditor.remove'}}
                 </button>
             </div>
         </div>
@@ -784,25 +784,24 @@
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title" id="generateIncorrectModalLabel">Generate Incorrect Responses</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <h5 class="modal-title" id="generateIncorrectModalLabel">{{contentEditorText 'contentEditor.generateIncorrectResponses'}}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{contentEditorText 'app.closeMenu'}}"></button>
                     </div>
                     <div class="modal-body">
                         <div class="admin-form-row">
-                            <label for="distractorCount" class="form-label">Number of distractors per question:</label>
+                            <label for="distractorCount" class="form-label">{{contentEditorText 'contentEditor.distractorCountLabel'}}</label>
                             <input type="number" class="form-control" id="distractorCount" value="3" min="1" max="20">
                         </div>
                         <div class="admin-status admin-status-small content-upload-empty-text">
                             <i class="fa fa-info-circle"></i>
                             <div class="admin-status-text">
-                                Distractors will be randomly selected from all other correct answers across all stims.
-                                Existing incorrect responses will be replaced.
+                                {{contentEditorText 'contentEditor.distractorHelp'}}
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="button" class="btn btn-primary" id="confirmGenerateBtn">Generate</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{contentEditorText 'content.cancel'}}</button>
+                        <button type="button" class="btn btn-primary" id="confirmGenerateBtn">{{contentEditorText 'contentEditor.generate'}}</button>
                     </div>
                 </div>
             </div>
@@ -810,16 +809,16 @@
 
         <div class="cluster-navigation admin-form-row-sm">
             <div class="cluster-nav-controls">
-                <button class="btn btn-outline-secondary btn-sm cluster-nav" data-dir="prev" aria-label="Previous cluster">
-                    <i class="fa fa-chevron-left"></i><span class="nav-label"> Prev</span>
+                <button class="btn btn-outline-secondary btn-sm cluster-nav" data-dir="prev" aria-label="{{contentEditorText 'contentEditor.previousCluster'}}">
+                    <i class="fa fa-chevron-left"></i><span class="nav-label"> {{contentEditorText 'contentEditor.prev'}}</span>
                 </button>
-                <button class="btn btn-outline-secondary btn-sm cluster-nav" data-dir="next" aria-label="Next cluster">
-                    <span class="nav-label">Next </span><i class="fa fa-chevron-right"></i>
+                <button class="btn btn-outline-secondary btn-sm cluster-nav" data-dir="next" aria-label="{{contentEditorText 'contentEditor.nextCluster'}}">
+                    <span class="nav-label">{{contentEditorText 'contentEditor.next'}} </span><i class="fa fa-chevron-right"></i>
                 </button>
-                <span class="text-muted small cluster-counter">Cluster {{currentClusterNumber}} of {{clustersCount}}</span>
+                <span class="text-muted small cluster-counter">{{clusterCounterText}}</span>
             </div>
             <div class="cluster-window-controls">
-                <label for="cluster-window-size" class="small text-muted content-upload-empty-text">Show</label>
+                <label for="cluster-window-size" class="small text-muted content-upload-empty-text">{{contentEditorText 'contentEditor.show'}}</label>
                 <select id="cluster-window-size" class="form-select form-select-sm">
                     <option value="1" selected="{{windowSizeSelected 1}}">1</option>
                     <option value="5" selected="{{windowSizeSelected 5}}">5</option>
@@ -827,7 +826,7 @@
                     <option value="20" selected="{{windowSizeSelected 20}}">20</option>
                     <option value="50" selected="{{windowSizeSelected 50}}">50</option>
                 </select>
-                <span class="small text-muted">clusters at a time</span>
+                <span class="small text-muted">{{contentEditorText 'contentEditor.clustersAtATime'}}</span>
             </div>
             <div class="small text-muted text-truncate cluster-name">{{currentClusterName}}</div>
         </div>
@@ -852,10 +851,10 @@
                 {{/if}}
             </div>
             <a href="/contentUpload" class="btn btn-secondary">
-                <i class="fa fa-times"></i> Cancel
+                <i class="fa fa-times"></i> {{contentEditorText 'content.cancel'}}
             </a>
             <button class="btn btn-primary save-btn" disabled="{{saveDisabled}}">
-                <i class="fa fa-save"></i> Save All Clusters
+                <i class="fa fa-save"></i> {{contentEditorText 'tdfEditor.saveChanges'}}
             </button>
         </div>
         {{/if}}

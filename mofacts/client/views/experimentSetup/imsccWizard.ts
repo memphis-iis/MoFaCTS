@@ -13,9 +13,16 @@ import { buildImportPackageFromDraftLessons } from '../../lib/importPackageBuild
 import { sanitizeImportName } from '../../lib/importCompositionBuilder';
 import { clientConsole } from '../..';
 import { getUploadIntegrity } from '../../lib/uploadIntegrity';
+import { translatePlatformString } from '../../lib/interfaceI18n';
+import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 
 declare const $: any;
 declare const DynamicAssets: any;
+type PlatformStringKey = Parameters<typeof translatePlatformString>[1];
+
+function imsccText(key: PlatformStringKey, values?: Parameters<typeof translatePlatformString>[2]): string {
+  return translatePlatformString(getActiveUiLocale(), key, values);
+}
 
 // Lazy-load imsccProcessor (and its jszip dependency) only when the wizard is
 // actually used. Mirrors the dynamic-import pattern in apkgWizard.js.
@@ -48,7 +55,7 @@ function resetWizardState(template: any) {
   template.uploadError.set(null);
   template.uploadComplete.set(false);
   template.joinMode.set(false);
-  template.joinedConfig.set({ name: '', instructions: '<p>This lesson was imported from a Canvas IMSCC package.</p>', isValid: false, validationError: 'TDF name is required.' });
+  template.joinedConfig.set({ name: '', instructions: imsccText('imscc.defaultInstructions'), isValid: false, validationError: imsccText('imscc.tdfNameRequired') });
 }
 
 function seedJoinedConfigName(template: any) {
@@ -92,10 +99,14 @@ Template.imsccWizard.onCreated(function(this: any) {
   this.uploadComplete = new ReactiveVar(false);
 
   this.joinMode = new ReactiveVar(false);
-  this.joinedConfig = new ReactiveVar({ name: '', instructions: '<p>This lesson was imported from a Canvas IMSCC package.</p>', isValid: false, validationError: 'TDF name is required.' });
+  this.joinedConfig = new ReactiveVar({ name: '', instructions: imsccText('imscc.defaultInstructions'), isValid: false, validationError: imsccText('imscc.tdfNameRequired') });
 });
 
 Template.imsccWizard.helpers({
+  imsccText(key: PlatformStringKey, options?: { hash?: Parameters<typeof translatePlatformString>[2] }) {
+    return imsccText(key, options?.hash);
+  },
+
   isStep(num: any) {
     return (Template.instance() as any).wizardStep.get() === num;
   },
@@ -285,7 +296,7 @@ Template.imsccWizard.helpers({
 
   formatDueDate(rawDate: any) {
     if (!rawDate) {
-      return 'No due date';
+      return imsccText('imscc.noDueDate');
     }
     const date = new Date(rawDate);
     if (Number.isNaN(date.getTime())) {
@@ -300,9 +311,15 @@ Template.imsccWizard.helpers({
 
   unsupportedTypesLabel(types: any) {
     if (!Array.isArray(types) || !types.length) {
-      return 'None';
+      return imsccText('imscc.none');
     }
     return types.join(', ');
+  },
+
+  unsupportedTypesSummary(types: any) {
+    return imsccText('imscc.unsupportedTypes', {
+      types: Array.isArray(types) && types.length ? types.join(', ') : imsccText('imscc.none')
+    });
   },
 
   joinMode() {
@@ -315,8 +332,8 @@ Template.imsccWizard.helpers({
 
   joinModeLabel() {
     return (Template.instance() as any).joinMode.get()
-      ? 'Join into one system'
-      : 'Separate systems';
+      ? imsccText('imscc.joinModeJoined')
+      : imsccText('imscc.joinModeSeparate');
   },
 
   joinedConfig() {
@@ -327,6 +344,39 @@ Template.imsccWizard.helpers({
     return (Template.instance() as any).configs.get()
       .filter((config: any) => config.selected)
       .reduce((sum: any, config: any) => sum + (config.supportedCount || 0), 0);
+  },
+
+  joinedBadgeLabel() {
+    const template = Template.instance() as any;
+    return imsccText('imscc.combinedBadge', {
+      quizzes: template.configs.get().filter((config: any) => config.selected).length,
+      questions: template.configs.get()
+        .filter((config: any) => config.selected)
+        .reduce((sum: any, config: any) => sum + (config.supportedCount || 0), 0)
+    });
+  },
+
+  supportedCountLabel(count: any) {
+    return imsccText('imscc.supportedCount', { count });
+  },
+
+  conversionSummaryLabel(config: any) {
+    return imsccText('imscc.conversionSummaryCounts', {
+      supported: config?.supportedCount || 0,
+      unsupported: config?.unsupportedCount || 0
+    });
+  },
+
+  manifestCardsLabel(count: any) {
+    return imsccText('imscc.manifestCards', { count });
+  },
+
+  manifestSkippedLabel(count: any) {
+    return imsccText('imscc.manifestSkipped', { count });
+  },
+
+  manifestMediaFilesLabel(count: any) {
+    return imsccText('imscc.manifestMediaFiles', { count });
   }
 });
 
@@ -352,7 +402,7 @@ Template.imsccWizard.events({
     event.preventDefault();
     const file = template.selectedFile.get();
     if (!file) {
-      template.analyzeError.set('Please select an IMSCC file first.');
+      template.analyzeError.set(imsccText('imscc.selectFileFirst'));
       return;
     }
 
@@ -390,7 +440,7 @@ Template.imsccWizard.events({
       }
     } catch (error: any) {
       clientConsole(1, '[IMSCC WIZARD] Analyze failed:', error);
-      template.analyzeError.set(error.reason || error.message || 'Failed to analyze IMSCC package.');
+      template.analyzeError.set(error.reason || error.message || imsccText('imscc.analyzeFailed'));
     } finally {
       template.analyzing.set(false);
     }
@@ -419,8 +469,8 @@ Template.imsccWizard.events({
       const name = nextValue;
       const isValid = !!name.trim() && config.supportedCount > 0;
       const validationError = !name.trim()
-        ? 'TDF name is required.'
-        : (config.supportedCount <= 0 ? 'No v1-supported question types.' : null);
+        ? imsccText('imscc.tdfNameRequired')
+        : (config.supportedCount <= 0 ? imsccText('imscc.noSupportedQuestionTypes') : null);
 
       return {
         ...config,
@@ -467,7 +517,7 @@ Template.imsccWizard.events({
     const name = event.currentTarget.value;
     const current = template.joinedConfig.get();
     const isValid = !!name.trim();
-    template.joinedConfig.set({ ...current, name, isValid, validationError: isValid ? null : 'TDF name is required.' });
+    template.joinedConfig.set({ ...current, name, isValid, validationError: isValid ? null : imsccText('imscc.tdfNameRequired') });
   },
 
   'input #imscc-joined-instructions': function(event: any, template: any) {
@@ -483,23 +533,23 @@ Template.imsccWizard.events({
     const selectedConfigs = template.configs.get().filter((config: any) => config.selected);
 
     if (!metadata || !selectedConfigs.length) {
-      template.generateError.set('No quizzes selected for generation.');
+      template.generateError.set(imsccText('imscc.noQuizzesSelected'));
       return;
     }
 
     if (joinMode) {
       const joinedConfig = template.joinedConfig.get();
       if (!joinedConfig.isValid) {
-        template.generateError.set(joinedConfig.validationError || 'Fix validation errors before generation.');
+        template.generateError.set(joinedConfig.validationError || imsccText('imscc.fixValidationBeforeGeneration'));
         return;
       }
       if (!selectedConfigs.some((config: any) => config.supportedCount > 0)) {
-        template.generateError.set('No selected quizzes have supported questions.');
+        template.generateError.set(imsccText('imscc.noSelectedSupportedQuestions'));
         return;
       }
     } else {
       if (selectedConfigs.some((config: any) => !config.isValid)) {
-        template.generateError.set('Fix validation errors before generation.');
+        template.generateError.set(imsccText('imscc.fixValidationBeforeGeneration'));
         return;
       }
     }
@@ -553,7 +603,7 @@ Template.imsccWizard.events({
       }
     } catch (error: any) {
       clientConsole(1, '[IMSCC WIZARD] Generation failed:', error);
-      template.generateError.set(error.reason || error.message || 'Failed to prepare editable draft.');
+      template.generateError.set(error.reason || error.message || imsccText('imscc.prepareDraftFailed'));
     } finally {
       template.generating.set(false);
     }
@@ -601,14 +651,14 @@ Template.imsccWizard.events({
 
     const result = template.generationResult.get();
     if (!result?.zipBlob) {
-      template.uploadError.set('Nothing to upload. Generate a package first.');
+      template.uploadError.set(imsccText('imscc.nothingToUpload'));
       return;
     }
 
     template.uploading.set(true);
     template.uploadError.set(null);
     template.uploadStatus.set({
-      message: 'Preparing package upload...',
+      message: imsccText('imscc.preparingPackageUpload'),
       progress: 0
     });
 
@@ -634,14 +684,14 @@ Template.imsccWizard.events({
 
       upload.on('start', function() {
         template.uploadStatus.set({
-          message: 'Uploading package...',
+          message: imsccText('imscc.uploadingPackage'),
           progress: 5
         });
       });
 
       upload.on('progress', function(progress: any) {
         template.uploadStatus.set({
-          message: 'Uploading package...',
+          message: imsccText('imscc.uploadingPackage'),
           progress: Math.round(progress * 0.5)
         });
       });
@@ -649,14 +699,14 @@ Template.imsccWizard.events({
       upload.on('end', async function(error: any, fileObj: any) {
         if (error) {
           template.uploadStatus.set(null);
-          template.uploadError.set(`Upload failed: ${error}`);
+          template.uploadError.set(imsccText('imscc.uploadFailed', { error }));
           template.uploading.set(false);
           return;
         }
 
         try {
           template.uploadStatus.set({
-            message: 'Processing package...',
+            message: imsccText('imscc.processingPackage'),
             progress: 65
           });
 
@@ -674,15 +724,15 @@ Template.imsccWizard.events({
           for (const res of processResult.results) {
             if (res?.data?.res === 'awaitClientTDF') {
               template.uploadStatus.set(null);
-              template.uploadError.set(
-                'Upload requires overwrite confirmation. Use the regular package uploader if you intend to replace existing TDF/stim files.'
-              );
+              template.uploadError.set(imsccText('imscc.overwriteRequired'));
               template.uploading.set(false);
               return;
             }
             if (!res?.result) {
               template.uploadStatus.set(null);
-              template.uploadError.set(`Package upload failed: ${res.errmsg || 'unknown error'}`);
+              template.uploadError.set(imsccText('imscc.packageUploadFailed', {
+                error: res.errmsg || imsccText('imscc.unknownError')
+              }));
               template.uploading.set(false);
               return;
             }
@@ -695,7 +745,7 @@ Template.imsccWizard.events({
         } catch (processError: any) {
           clientConsole(1, '[IMSCC WIZARD] Package processing failed:', processError);
           template.uploadStatus.set(null);
-          template.uploadError.set(processError.reason || processError.message || 'Package processing failed.');
+          template.uploadError.set(processError.reason || processError.message || imsccText('imscc.packageProcessingFailed'));
           template.uploading.set(false);
         }
       });
@@ -704,7 +754,7 @@ Template.imsccWizard.events({
     } catch (error: any) {
       clientConsole(1, '[IMSCC WIZARD] Upload setup failed:', error);
       template.uploadStatus.set(null);
-      template.uploadError.set(error.reason || error.message || 'Upload failed.');
+      template.uploadError.set(error.reason || error.message || imsccText('imscc.packageProcessingFailed'));
       template.uploading.set(false);
     }
   },

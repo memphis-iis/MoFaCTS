@@ -3,7 +3,7 @@
 <template name="theme">
     {{#if isInRole 'admin'}}
         <div class="container theme-settings-container">
-            <h3 class="page-header-title">Theme Settings</h3>
+            <h3 class="page-header-title">{{themeText 'theme.settingsTitle'}}</h3>
 
             {{#if themeMessage}}
                 <div class="admin-status admin-status-{{themeMessage.level}} admin-message" role="status" aria-live="polite">
@@ -19,7 +19,7 @@
                         <div class="admin-inline-confirmation-message">{{themeConfirmation.message}}</div>
                     </div>
                     <div class="admin-inline-confirmation-actions">
-                        <button type="button" class="btn btn-sm btn-outline-secondary" id="cancel-theme-confirmation">Cancel</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="cancel-theme-confirmation">{{themeText 'theme.cancel'}}</button>
                         <button type="button" class="btn btn-sm {{themeConfirmation.confirmClass}}" id="confirm-theme-confirmation">
                             {{themeConfirmation.confirmLabel}}
                         </button>
@@ -32,14 +32,14 @@
                     <div class="card-body">
                         <div class="theme-library-header">
                             <div>
-                                <h5>Theme Library</h5>
+                                <h5>{{themeText 'theme.library'}}</h5>
                                 <div class="text-muted small">
-                                    Active Server Theme: {{currentTheme.properties.themeName}} {{#if currentTheme.metadata.name}}<span class="text-muted">({{currentTheme.metadata.name}})</span>{{/if}}
+                                    {{themeText 'theme.activeServerTheme' theme=currentTheme.properties.themeName}} {{#if currentTheme.metadata.name}}<span class="text-muted">({{currentTheme.metadata.name}})</span>{{/if}}
                                 </div>
                             </div>
                             <div class="theme-action-row">
-                                <button type="button" id="exportActiveTheme" class="btn btn-secondary">Export Active Theme</button>
-                                <button type="button" id="themeResetButton" class="btn">Reset to Default Theme</button>
+                                <button type="button" id="exportActiveTheme" class="btn btn-secondary">{{themeText 'theme.exportActiveTheme'}}</button>
+                                <button type="button" id="themeResetButton" class="btn">{{themeText 'theme.resetDefaultTheme'}}</button>
                             </div>
                         </div>
 
@@ -53,27 +53,27 @@
                                         </div>
                                         <div class="btn-group btn-group-sm flex-wrap">
                                             <button type="button" class="btn set-active-theme {{themeActivateButtonClass id}}" data-id="{{id}}" {{themeActivationAttrs id}}>{{themeActivateButtonLabel id}}</button>
-                                            <button type="button" class="btn btn-secondary duplicate-theme" data-id="{{id}}" data-name="{{metadata.name}}">Duplicate</button>
+                                            <button type="button" class="btn btn-secondary duplicate-theme" data-id="{{id}}" data-name="{{metadata.name}}">{{themeText 'theme.duplicate'}}</button>
                                             {{#unless (isSystemTheme metadata.origin)}}
-                                                <button type="button" class="btn btn-secondary rename-theme" data-id="{{id}}" data-name="{{metadata.name}}">Rename</button>
-                                                <button type="button" class="btn btn-secondary delete-theme" data-id="{{id}}" data-name="{{metadata.name}}">Delete</button>
+                                                <button type="button" class="btn btn-secondary rename-theme" data-id="{{id}}" data-name="{{metadata.name}}">{{themeText 'theme.rename'}}</button>
+                                                <button type="button" class="btn btn-secondary delete-theme" data-id="{{id}}" data-name="{{metadata.name}}">{{themeText 'theme.delete'}}</button>
                                             {{/unless}}
-                                            <button type="button" class="btn btn-secondary export-theme" data-id="{{id}}" data-name="{{metadata.name}}">Export</button>
+                                            <button type="button" class="btn btn-secondary export-theme" data-id="{{id}}" data-name="{{metadata.name}}">{{themeText 'theme.export'}}</button>
                                         </div>
                                     </div>
                                 {{/each}}
                             {{else}}
                                 <div class="admin-status admin-empty-text">
                                     <i class="fa fa-info-circle"></i>
-                                    <div class="admin-status-text">No themes have been registered yet. Import a theme below or duplicate an existing one.</div>
+                                    <div class="admin-status-text">{{themeText 'theme.noThemesRegistered'}}</div>
                                 </div>
                             {{/if}}
                         </div>
 
                         <div class="theme-import-row border-top">
-                            <span class="text-muted">Import theme (JSON):</span>
+                            <span class="text-muted">{{themeText 'theme.importThemeJson'}}</span>
                             <input type="file" class="form-control theme-import-input" id="themeImportInput" accept=".json,application/json">
-                            <button type="button" class="btn" id="themeImportButton">Import</button>
+                            <button type="button" class="btn" id="themeImportButton">{{themeText 'theme.import'}}</button>
                         </div>
 
                         {{> themeGenerationWizard}}
@@ -82,7 +82,7 @@
 
                 <div class="row theme-name-row align-items-center">
                     <div class="col-auto">
-                        <label for="themeName" class="form-label admin-empty-text">Theme Name:</label>
+                        <label for="themeName" class="form-label admin-empty-text">{{themeText 'theme.themeNameLabel'}}</label>
                     </div>
                     <div class="col-auto">
                         <input type="text" id="themeName" class="currentThemeProp form-control theme-name-input" value="{{currentTheme.properties.themeName}}" data-id="themeName">

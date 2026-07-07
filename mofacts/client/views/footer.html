@@ -1,9 +1,9 @@
 <template name="footer">
     <div class='footer app-footer text-center'>
         <span>
-            Copyright 2026 University of Memphis.
-            <a href="/terms-of-service">Terms of Service</a>
-            <a href="{{licenseSourceUrl}}" target="_blank" rel="noopener noreferrer">License / Source</a>
+            {{t 'footer.copyright'}}
+            <a href="/terms-of-service">{{t 'footer.termsOfService'}}</a>
+            <a href="{{licenseSourceUrl}}" target="_blank" rel="noopener noreferrer">{{t 'footer.licenseSource'}}</a>
         </span>
     </div>
 </template>

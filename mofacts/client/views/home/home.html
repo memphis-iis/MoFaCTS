@@ -4,10 +4,10 @@
 
     <div class="main" id="homeMain">
       <header class="top-header">
-        <button class="icon-btn mobile-sidebar-trigger" id="mobileSidebarToggle" type="button" aria-label="Open menu" title="Open menu">
+        <button class="icon-btn mobile-sidebar-trigger" id="mobileSidebarToggle" type="button" aria-label="{{t 'common.openMenu'}}" title="{{t 'common.openMenu'}}">
           <span class="header-action-icon header-action-icon-sidebar" aria-hidden="true"></span>
         </button>
-        <h1 class="page-title">Practice</h1>
+        <h1 class="page-title">{{t 'home.practice'}}</h1>
         <div class="header-right">
           {{> appAccountMenu}}
         </div>
@@ -25,12 +25,12 @@
 
   <div id="mainMenuReturnTour" class="main-menu-return-tour" role="status" aria-live="polite" hidden>
     <span class="main-menu-return-tour-arrow" aria-hidden="true"></span>
-    <span class="main-menu-return-tour-text">Start practice from this menu.</span>
+    <span class="main-menu-return-tour-text">{{t 'home.startPracticeFromMenu'}}</span>
   </div>
 </template>
 
 <template name="appSidebar">
-  <aside class="sidebar" id="sidebar" aria-label="Practice menu">
+  <aside class="sidebar" id="sidebar" aria-label="{{t 'home.practiceMenu'}}">
       <div class="sidebar-header">
         <div class="logo">
           {{#if currentTheme.properties.brand_logo_url}}
@@ -43,76 +43,76 @@
           {{/if}}
           <span>{{systemName}}</span>
         </div>
-        <button class="icon-btn" id="sidebarToggle" type="button" aria-label="Toggle sidebar" title="Collapse sidebar">
+        <button class="icon-btn" id="sidebarToggle" type="button" aria-label="{{t 'home.toggleSidebar'}}" title="{{t 'home.collapseSidebar'}}">
           <span class="header-action-icon header-action-icon-sidebar" aria-hidden="true"></span>
         </button>
       </div>
 
       <nav class="sidebar-nav">
         <div class="section">
-          <div class="section-title">Learn</div>
-          <button type="button" class="nav-item {{sidebarActiveClass 'home'}}" data-label="Practice" id="homePracticeButton">
+          <div class="section-title">{{t 'home.learn'}}</div>
+          <button type="button" class="nav-item {{sidebarActiveClass 'home'}}" data-label="{{t 'home.practice'}}" id="homePracticeButton">
             <span class="fa fa-play-circle" aria-hidden="true"></span>
-            <span>Practice</span>
+            <span>{{t 'home.practice'}}</span>
           </button>
-          <button type="button" class="nav-item {{sidebarActiveClass 'courses'}}" data-label="Courses" id="coursesButton">
+          <button type="button" class="nav-item {{sidebarActiveClass 'courses'}}" data-label="{{t 'home.courses'}}" id="coursesButton">
             <span class="fa fa-list-alt" aria-hidden="true"></span>
-            <span>Courses</span>
+            <span>{{t 'home.courses'}}</span>
           </button>
-          <button type="button" class="nav-item {{sidebarActiveClass 'content'}}" data-label="Content" id="contentUploadButton">
+          <button type="button" class="nav-item {{sidebarActiveClass 'content'}}" data-label="{{t 'home.content'}}" id="contentUploadButton">
             <span class="fa fa-folder-open" aria-hidden="true"></span>
-            <span>Content</span>
+            <span>{{t 'home.content'}}</span>
           </button>
-          <button type="button" class="nav-item {{sidebarActiveClass 'data'}}" data-label="Data" id="dataDownloadButton">
+          <button type="button" class="nav-item {{sidebarActiveClass 'data'}}" data-label="{{t 'home.data'}}" id="dataDownloadButton">
             <span class="fa fa-download" aria-hidden="true"></span>
-            <span>Data</span>
+            <span>{{t 'home.data'}}</span>
           </button>
         </div>
 
         {{#if isInRole 'teacher'}}
           <div class="section">
-            <div class="section-title">Teacher</div>
-            <button type="button" class="nav-item {{sidebarActiveClass 'classEdit'}}" data-label="Courses" id="classEditButton">
+            <div class="section-title">{{t 'home.teacher'}}</div>
+            <button type="button" class="nav-item {{sidebarActiveClass 'classEdit'}}" data-label="{{t 'home.courses'}}" id="classEditButton">
               <span class="fa fa-users" aria-hidden="true"></span>
-              <span>Courses</span>
+              <span>{{t 'home.courses'}}</span>
             </button>
-            <button type="button" class="nav-item {{sidebarActiveClass 'instructorReporting'}}" data-label="Grades" id="instructorReportingButton">
+            <button type="button" class="nav-item {{sidebarActiveClass 'instructorReporting'}}" data-label="{{t 'home.grades'}}" id="instructorReportingButton">
               <span class="fa fa-bar-chart" aria-hidden="true"></span>
-              <span>Grades</span>
+              <span>{{t 'home.grades'}}</span>
             </button>
-            <button type="button" class="nav-item {{sidebarActiveClass 'tdfAssignmentEdit'}}" data-label="Assignments" id="tdfAssignmentEditButton">
+            <button type="button" class="nav-item {{sidebarActiveClass 'tdfAssignmentEdit'}}" data-label="{{t 'home.assignments'}}" id="tdfAssignmentEditButton">
               <span class="fa fa-tasks" aria-hidden="true"></span>
-              <span>Assignments</span>
+              <span>{{t 'home.assignments'}}</span>
             </button>
           </div>
         {{/if}}
 
         {{#if isInRole 'admin'}}
           <div class="section">
-            <div class="section-title">Admin</div>
-            <button type="button" class="nav-item {{sidebarActiveClass 'adminControls'}}" data-label="Admin Control Panel" id="adminControlsBtn">
+            <div class="section-title">{{t 'home.admin'}}</div>
+            <button type="button" class="nav-item {{sidebarActiveClass 'adminControls'}}" data-label="{{t 'home.adminControlPanel'}}" id="adminControlsBtn">
               <span class="fa fa-cogs" aria-hidden="true"></span>
-              <span>Admin Control Panel</span>
+              <span>{{t 'home.adminControlPanel'}}</span>
             </button>
-            <button type="button" class="nav-item {{sidebarActiveClass 'userAdmin'}}" data-label="User Admin" id="userAdminButton">
+            <button type="button" class="nav-item {{sidebarActiveClass 'userAdmin'}}" data-label="{{t 'home.userAdmin'}}" id="userAdminButton">
               <span class="fa fa-user" aria-hidden="true"></span>
-              <span>User Admin</span>
+              <span>{{t 'home.userAdmin'}}</span>
             </button>
-            <button type="button" class="nav-item {{sidebarActiveClass 'turkWorkflow'}}" data-label="Mechanical Turk" id="mechTurkButton">
+            <button type="button" class="nav-item {{sidebarActiveClass 'turkWorkflow'}}" data-label="{{t 'home.mechanicalTurk'}}" id="mechTurkButton">
               <span class="fa fa-wrench" aria-hidden="true"></span>
-              <span>Mechanical Turk</span>
+              <span>{{t 'home.mechanicalTurk'}}</span>
             </button>
-            <button type="button" class="nav-item {{sidebarActiveClass 'theme'}}" data-label="Theme" id="themeButton">
+            <button type="button" class="nav-item {{sidebarActiveClass 'theme'}}" data-label="{{t 'home.theme'}}" id="themeButton">
               <span class="fa fa-paint-brush" aria-hidden="true"></span>
-              <span>Theme</span>
+              <span>{{t 'home.theme'}}</span>
             </button>
-            <button type="button" class="nav-item {{sidebarActiveClass 'adminTests'}}" data-label="Admin Tests" id="adminTestsButton">
+            <button type="button" class="nav-item {{sidebarActiveClass 'adminTests'}}" data-label="{{t 'home.adminTests'}}" id="adminTestsButton">
               <span class="fa fa-flask" aria-hidden="true"></span>
-              <span>Admin Tests</span>
+              <span>{{t 'home.adminTests'}}</span>
             </button>
-            <button type="button" class="nav-item {{sidebarActiveClass 'adminBackups'}}" data-label="Backups" id="adminBackupsButton">
+            <button type="button" class="nav-item {{sidebarActiveClass 'adminBackups'}}" data-label="{{t 'home.backups'}}" id="adminBackupsButton">
               <span class="fa fa-archive" aria-hidden="true"></span>
-              <span>Backups</span>
+              <span>{{t 'home.backups'}}</span>
             </button>
           </div>
         {{/if}}
@@ -149,10 +149,10 @@
     </div>
     <span class="fa fa-chevron-down caret" aria-hidden="true"></span>
     <div class="home-user-menu" id="userDropdown">
-      <button type="button" class="dropdown-item" data-home-action="profile">Profile</button>
-      <button type="button" class="dropdown-item" data-home-action="audioSettings">Audio settings</button>
+      <button type="button" class="dropdown-item" data-home-action="profile">{{t 'home.profile'}}</button>
+      <button type="button" class="dropdown-item" data-home-action="audioSettings">{{t 'home.audioSettings'}}</button>
       <button type="button" class="dropdown-item dropdown-item-with-caret" data-home-action="toggleTheme" aria-expanded="{{#if themeMenuOpen}}true{{else}}false{{/if}}" aria-controls="themeSelectionMenu">
-        <span>Toggle theme</span>
+        <span>{{t 'home.toggleTheme'}}</span>
         <span class="fa fa-chevron-right theme-menu-caret" aria-hidden="true"></span>
       </button>
       <div class="theme-selection-menu {{#if themeMenuOpen}}open{{/if}}" id="themeSelectionMenu">
@@ -166,43 +166,43 @@
             </button>
           {{/each}}
         {{else}}
-          <div class="theme-selection-empty">No themes configured</div>
+          <div class="theme-selection-empty">{{t 'home.noThemesConfigured'}}</div>
         {{/if}}
       </div>
-      <button type="button" class="dropdown-item" data-home-action="classSelection">Join Courses</button>
+      <button type="button" class="dropdown-item" data-home-action="classSelection">{{t 'home.joinCourses'}}</button>
       <div class="dropdown-divider"></div>
-      <button type="button" class="dropdown-item" data-home-action="help">Help</button>
-      <button type="button" class="dropdown-item" data-home-action="tour">Tour</button>
-      <button type="button" class="dropdown-item" data-home-action="documentation">Documentation</button>
+      <button type="button" class="dropdown-item" data-home-action="help">{{t 'home.help'}}</button>
+      <button type="button" class="dropdown-item" data-home-action="tour">{{t 'home.tour'}}</button>
+      <button type="button" class="dropdown-item" data-home-action="documentation">{{t 'home.documentation'}}</button>
       <div class="dropdown-divider"></div>
-      <button type="button" class="dropdown-item" data-home-action="logout">Log out</button>
+      <button type="button" class="dropdown-item" data-home-action="logout">{{t 'home.logOut'}}</button>
     </div>
   </div>
 </template>
 
 <template name="appPracticeMenu">
-  <aside class="app-practice-menu {{#if practiceMenuOpen}}is-open{{/if}}" aria-label="Practice tools">
+  <aside class="app-practice-menu {{#if practiceMenuOpen}}is-open{{/if}}" aria-label="{{t 'home.practiceTools'}}">
     <button type="button" class="app-practice-menu-toggle" id="practiceMenuToggle" aria-expanded="{{#if practiceMenuOpen}}true{{else}}false{{/if}}">
       <span class="app-practice-menu-toggle-icon" aria-hidden="true"></span>
-      <span class="app-practice-menu-toggle-text">Menu</span>
+      <span class="app-practice-menu-toggle-text">{{t 'home.menu'}}</span>
     </button>
     <div class="app-practice-menu-panel">
-      <button type="button" data-practice-menu-action="home"><span class="fa fa-play-circle" aria-hidden="true"></span> Practice</button>
-      <button type="button" data-practice-menu-action="courses"><span class="fa fa-list-alt" aria-hidden="true"></span> Courses</button>
-      <button type="button" data-practice-menu-action="contentUpload"><span class="fa fa-folder-open" aria-hidden="true"></span> Create Content</button>
-      <button type="button" data-practice-menu-action="dataDownload"><span class="fa fa-download" aria-hidden="true"></span> Detailed Data</button>
+      <button type="button" data-practice-menu-action="home"><span class="fa fa-play-circle" aria-hidden="true"></span> {{t 'home.practice'}}</button>
+      <button type="button" data-practice-menu-action="courses"><span class="fa fa-list-alt" aria-hidden="true"></span> {{t 'home.courses'}}</button>
+      <button type="button" data-practice-menu-action="contentUpload"><span class="fa fa-folder-open" aria-hidden="true"></span> {{t 'home.createContent'}}</button>
+      <button type="button" data-practice-menu-action="dataDownload"><span class="fa fa-download" aria-hidden="true"></span> {{t 'home.detailedData'}}</button>
       {{#if isInRole 'teacher'}}
-        <button type="button" data-practice-menu-action="classEdit"><span class="fa fa-users" aria-hidden="true"></span> Courses</button>
-        <button type="button" data-practice-menu-action="instructorReporting"><span class="fa fa-bar-chart" aria-hidden="true"></span> Grades</button>
-        <button type="button" data-practice-menu-action="tdfAssignmentEdit"><span class="fa fa-tasks" aria-hidden="true"></span> Assignments</button>
+        <button type="button" data-practice-menu-action="classEdit"><span class="fa fa-users" aria-hidden="true"></span> {{t 'home.courses'}}</button>
+        <button type="button" data-practice-menu-action="instructorReporting"><span class="fa fa-bar-chart" aria-hidden="true"></span> {{t 'home.grades'}}</button>
+        <button type="button" data-practice-menu-action="tdfAssignmentEdit"><span class="fa fa-tasks" aria-hidden="true"></span> {{t 'home.assignments'}}</button>
       {{/if}}
       {{#if isInRole 'admin'}}
-        <button type="button" data-practice-menu-action="adminControls"><span class="fa fa-cogs" aria-hidden="true"></span> Admin Control Panel</button>
-        <button type="button" data-practice-menu-action="userAdmin"><span class="fa fa-user" aria-hidden="true"></span> User Admin</button>
-        <button type="button" data-practice-menu-action="turkWorkflow"><span class="fa fa-wrench" aria-hidden="true"></span> Mechanical Turk</button>
-        <button type="button" data-practice-menu-action="theme"><span class="fa fa-paint-brush" aria-hidden="true"></span> Theme</button>
-        <button type="button" data-practice-menu-action="adminTests"><span class="fa fa-flask" aria-hidden="true"></span> Admin Tests</button>
-        <button type="button" data-practice-menu-action="adminBackups"><span class="fa fa-archive" aria-hidden="true"></span> Backups</button>
+        <button type="button" data-practice-menu-action="adminControls"><span class="fa fa-cogs" aria-hidden="true"></span> {{t 'home.adminControlPanel'}}</button>
+        <button type="button" data-practice-menu-action="userAdmin"><span class="fa fa-user" aria-hidden="true"></span> {{t 'home.userAdmin'}}</button>
+        <button type="button" data-practice-menu-action="turkWorkflow"><span class="fa fa-wrench" aria-hidden="true"></span> {{t 'home.mechanicalTurk'}}</button>
+        <button type="button" data-practice-menu-action="theme"><span class="fa fa-paint-brush" aria-hidden="true"></span> {{t 'home.theme'}}</button>
+        <button type="button" data-practice-menu-action="adminTests"><span class="fa fa-flask" aria-hidden="true"></span> {{t 'home.adminTests'}}</button>
+        <button type="button" data-practice-menu-action="adminBackups"><span class="fa fa-archive" aria-hidden="true"></span> {{t 'home.backups'}}</button>
       {{/if}}
     </div>
   </aside>

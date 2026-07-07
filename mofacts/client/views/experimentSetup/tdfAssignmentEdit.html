@@ -1,21 +1,21 @@
 <template name="tdfAssignmentEdit">
 {{#if isInRole 'admin, teacher'}}
   <div class="container admin-page">
-    <h3 class="page-header-title">Course Assignments</h3>
+    <h3 class="page-header-title">{{assignmentText 'courseAssignments.title'}}</h3>
 
     <div class="admin-section">
       <div class="card admin-card">
         <div class="card-body">
           <div class="admin-section-heading">
             <i class="fa fa-tasks admin-section-icon"></i>
-            <h5>Syllabus</h5>
+            <h5>{{assignmentText 'courseAssignments.syllabus'}}</h5>
           </div>
 
           <div class="row g-3">
             <div class="col-12">
-              <label for="class-select" class="form-label">Course</label>
+              <label for="class-select" class="form-label">{{assignmentText 'courseAssignments.course'}}</label>
               <select id="class-select" class="form-select">
-                <option selected="selected" value="" disabled="true">Select a course</option>
+                <option selected="selected" value="" disabled="true">{{assignmentText 'courseAssignments.selectCourse'}}</option>
                 {{#each courses}}
                   <option value="{{this._id}}" {{selectedCourseAttrs this._id}}>{{this.courseName}}</option>
                 {{/each}}
@@ -29,8 +29,8 @@
             {{/if}}
 
             <div class="col-lg-4 col-12">
-              <label for="assignmentSearch" class="form-label fw-bold">Add lesson</label>
-              <input id="assignmentSearch" class="form-control" type="search" placeholder="Search lessons, files, tags">
+              <label for="assignmentSearch" class="form-label fw-bold">{{assignmentText 'courseAssignments.addLesson'}}</label>
+              <input id="assignmentSearch" class="form-control" type="search" placeholder="{{assignmentText 'courseAssignments.searchPlaceholder'}}">
               <div class="assignment-picker-list">
                 {{#each filteredAssignableTdfs}}
                   <button type="button" class="assignment-picker-row add-assignment" data-tdfid="{{this.TDFId}}">
@@ -43,23 +43,23 @@
 
             <div class="col-lg-8 col-12">
               <div class="assignment-editor-header">
-                <span class="fw-bold">Selected assignments</span>
-                <span class="text-muted">{{#if isDirty}}Unsaved changes{{else}}Saved{{/if}}</span>
+                <span class="fw-bold">{{assignmentText 'courseAssignments.selectedAssignments'}}</span>
+                <span class="text-muted">{{#if isDirty}}{{assignmentText 'courseAssignments.unsavedChanges'}}{{else}}{{assignmentText 'courseAssignments.saved'}}{{/if}}</span>
               </div>
 
               {{#if isLoading}}
-                <div class="text-muted assignment-editor-empty">Loading assignments...</div>
+                <div class="text-muted assignment-editor-empty">{{assignmentText 'courseAssignments.loadingAssignments'}}</div>
               {{else}}
                 {{#if hasAssignmentRows}}
                   <div class="assignment-row-list">
                     {{#each assignmentRows}}
                       <div class="assignment-editor-row" data-assignment-index="{{@index}}">
                         <div class="assignment-row-order">
-                          <span class="fa fa-bars" title="Drag handle" aria-hidden="true"></span>
-                          <button type="button" class="btn btn-sm btn-outline-secondary move-assignment-up" title="Move up">
+                          <span class="fa fa-bars" title="{{assignmentText 'courseAssignments.dragHandle'}}" aria-hidden="true"></span>
+                          <button type="button" class="btn btn-sm btn-outline-secondary move-assignment-up" title="{{assignmentText 'courseAssignments.moveUp'}}">
                             <span class="fa fa-arrow-up" aria-hidden="true"></span>
                           </button>
-                          <button type="button" class="btn btn-sm btn-outline-secondary move-assignment-down" title="Move down">
+                          <button type="button" class="btn btn-sm btn-outline-secondary move-assignment-down" title="{{assignmentText 'courseAssignments.moveDown'}}">
                             <span class="fa fa-arrow-down" aria-hidden="true"></span>
                           </button>
                         </div>
@@ -69,38 +69,38 @@
                           <div class="assignment-row-controls">
                             <label class="form-check form-switch assignment-required-wrap">
                               <input class="form-check-input assignment-required" type="checkbox" checked="{{isRequiredChecked}}">
-                              <span class="form-check-label">Required</span>
+                              <span class="form-check-label">{{assignmentText 'courseAssignments.required'}}</span>
                             </label>
                             <label class="assignment-date-control">
-                              <span>Visible on</span>
+                              <span>{{assignmentText 'courseAssignments.visibleOn'}}</span>
                               <input class="form-control form-control-sm assignment-release" type="datetime-local" value="{{releaseInputValue}}">
-                              <button type="button" class="btn btn-sm btn-link clear-release">Clear</button>
+                              <button type="button" class="btn btn-sm btn-link clear-release">{{assignmentText 'courseAssignments.clear'}}</button>
                             </label>
                             <label class="assignment-date-control">
-                              <span>Due on</span>
+                              <span>{{assignmentText 'courseAssignments.dueOn'}}</span>
                               <input class="form-control form-control-sm assignment-due" type="datetime-local" value="{{dueInputValue}}">
-                              <button type="button" class="btn btn-sm btn-link clear-due">Clear</button>
+                              <button type="button" class="btn btn-sm btn-link clear-due">{{assignmentText 'courseAssignments.clear'}}</button>
                             </label>
                           </div>
                         </div>
-                        <button type="button" class="btn btn-sm btn-outline-danger remove-assignment" title="Remove">
+                        <button type="button" class="btn btn-sm btn-outline-danger remove-assignment" title="{{assignmentText 'courseAssignments.remove'}}">
                           <span class="fa fa-trash" aria-hidden="true"></span>
                         </button>
                       </div>
                     {{/each}}
                   </div>
                 {{else}}
-                  <div class="text-muted assignment-editor-empty">No assignments selected.</div>
+                  <div class="text-muted assignment-editor-empty">{{assignmentText 'courseAssignments.noAssignments'}}</div>
                 {{/if}}
               {{/if}}
             </div>
 
             <div class="col-12 assignment-save-bar">
               <button id="reloadAssignments" type="button" class="btn btn-outline-secondary">
-                <i class="fa fa-refresh"></i> Reset
+                <i class="fa fa-refresh"></i> {{assignmentText 'courseAssignments.reset'}}
               </button>
               <button id="saveAssignment" type="button" class="btn btn-primary" disabled="{{#if isLoading}}disabled{{/if}}">
-                <i class="fa fa-save"></i> Save Assignments
+                <i class="fa fa-save"></i> {{assignmentText 'courseAssignments.saveAssignments'}}
               </button>
             </div>
           </div>

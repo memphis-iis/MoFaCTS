@@ -19,10 +19,19 @@ import { ExperimentStateStore } from './lib/state/experimentStateStore';
 import {instructContinue} from './views/experiment/instructions';
 import {routeToSignin} from './lib/router';
 import { FlowRouter } from 'meteor/ostrio:flow-router-extra';
+import { Tracker } from 'meteor/tracker';
 import {
   getCurrentTheme
 } from './lib/currentTestingHelpers';
 import { resolveThemeBrandLabel } from '../common/themeBranding';
+import { translatePlatformString, getPlatformTextDirection } from './lib/interfaceI18n';
+import { applyActiveUiLocaleToDocument, getActiveUiLocale } from './lib/interfaceLocaleState';
+import {
+  formatActiveInterfaceDateTime,
+  formatActiveInterfaceNumber,
+  formatActiveInterfacePercent,
+} from './lib/interfaceFormatting';
+import type { PlatformStringKey } from './lib/interfaceI18nResources';
 import DOMPurify from 'dompurify';
 import {audioManager} from './lib/audioContextManager';
 import {
@@ -188,6 +197,9 @@ if (location.protocol !== 'https:' && forceSSL) {
 // PHASE 1.5: Initialize theme subscription after Meteor is ready
 Meteor.startup(() => {
   getCurrentTheme();
+  Tracker.autorun(() => {
+    applyActiveUiLocaleToDocument();
+  });
 
   // Modern browsers (Safari 15.4+, Chrome 108+, Firefox 101+) use native dvh/svh units
   // CSS has been updated to use modern viewport units (see classic.css)
@@ -827,6 +839,24 @@ Template.registerHelper('systemName', function() {
 Template.registerHelper('licenseSourceUrl', function() {
   return Meteor.settings.public?.sourceUrl || 'https://github.com/memphis-iis/MoFaCTS/tree/v0.1.0-alpha.1';
 });
+Template.registerHelper('uiLocale', function() {
+  return getActiveUiLocale();
+});
+Template.registerHelper('uiTextDirection', function() {
+  return getPlatformTextDirection(getActiveUiLocale());
+});
+Template.registerHelper('t', function(key: string, options?: { hash?: Record<string, string | number | boolean> }) {
+  return translatePlatformString(getActiveUiLocale(), key as PlatformStringKey, options?.hash);
+});
+Template.registerHelper('formatUiNumber', function(value: number) {
+  return formatActiveInterfaceNumber(Number(value));
+});
+Template.registerHelper('formatUiPercent', function(value: number) {
+  return formatActiveInterfacePercent(Number(value));
+});
+Template.registerHelper('formatUiDateTime', function(value: Date | number | string) {
+  return formatActiveInterfaceDateTime(value);
+});
 Template.registerHelper('currentTemplate', function() {
   return Session.get('currentTemplate');
 });
@@ -943,7 +973,7 @@ Template.registerHelper('appLoading', function() {
   return Session.get('appLoading');
 });
 Template.registerHelper('appLoadingMessage', function() {
-  return Session.get('appLoadingMessage') || 'Loading...';
+  return Session.get('appLoadingMessage') || translatePlatformString(getActiveUiLocale(), 'common.loading');
 });
 Template.registerHelper('uiMessage', function() {
   const uiMessage = Session.get('uiMessage');
@@ -967,21 +997,21 @@ Template.registerHelper('startupDiagnostic', function() {
   if (!connected) {
     return {
       variant: 'warning',
-      text: 'Page loaded. Waiting for the realtime connection to finish starting...'
+      text: translatePlatformString(getActiveUiLocale(), 'startup.waitingRealtimeConnection')
     };
   }
 
   if (Session.get('themeReady') !== true) {
     return {
       variant: 'info',
-      text: 'Page loaded. Loading site appearance...'
+      text: translatePlatformString(getActiveUiLocale(), 'startup.loadingSiteAppearance')
     };
   }
 
   if (Session.get('authReady') !== true || Meteor.loggingIn()) {
     return {
       variant: 'info',
-      text: 'Page loaded. Checking sign-in status...'
+      text: translatePlatformString(getActiveUiLocale(), 'startup.checkingSignInStatus')
     };
   }
 
@@ -989,14 +1019,14 @@ Template.registerHelper('startupDiagnostic', function() {
   if (userId && Session.get('authRolesHydrated') !== true) {
     return {
       variant: 'info',
-      text: 'Page loaded. Loading account permissions...'
+      text: translatePlatformString(getActiveUiLocale(), 'startup.loadingAccountPermissions')
     };
   }
 
   if (userId && Session.get('authRolesSyncedUserId') !== userId) {
     return {
       variant: 'info',
-      text: 'Page loaded. Refreshing account permissions...'
+      text: translatePlatformString(getActiveUiLocale(), 'startup.refreshingAccountPermissions')
     };
   }
 

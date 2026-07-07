@@ -4,6 +4,14 @@ import './draftEditorWorkspace.html';
 import { clientConsole } from '../../lib/clientLogger';
 import { createTdfDraftEditor } from './tdfDraftEditor';
 import { createContentDraftEditor } from './contentDraftEditor';
+import { translatePlatformString } from '../../lib/interfaceI18n';
+import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
+
+type PlatformStringKey = Parameters<typeof translatePlatformString>[1];
+
+function workspaceText(key: PlatformStringKey, values?: Parameters<typeof translatePlatformString>[2]): string {
+  return translatePlatformString(getActiveUiLocale(), key, values);
+}
 
 type LessonLike = {
   title: string;
@@ -105,7 +113,7 @@ Template.draftEditorWorkspace.onRendered(function(this: any) {
       }
     } catch (error: any) {
       clientConsole(1, '[Draft Workspace] Failed to initialize editors:', error);
-      instance.workspaceError.set(error?.message || 'Failed to initialize draft editors.');
+      instance.workspaceError.set(error?.message || workspaceText('manualCreator.failedInitializeDraftEditors'));
     }
   });
 });
@@ -192,11 +200,14 @@ function updateLessonPart(instance: any, part: 'tutor' | 'stimuli', value: Recor
 Template.draftEditorWorkspace.helpers({
   workspaceHeading() {
     const data = Template.currentData() || {};
-    return data.heading || 'Step 3: Edit Generated Draft';
+    return data.heading || workspaceText('manualCreator.draftWorkspaceDefaultHeading');
   },
   saveContinueLabel() {
     const data = Template.currentData() || {};
-    return data.saveContinueLabel || 'Save and Continue';
+    return data.saveContinueLabel || workspaceText('manualCreator.saveAndContinue');
+  },
+  workspaceText(key: PlatformStringKey, options?: { hash?: Parameters<typeof translatePlatformString>[2] }) {
+    return workspaceText(key, options?.hash);
   },
   currentLesson() {
     const instance = Template.instance() as any;
@@ -215,7 +226,7 @@ Template.draftEditorWorkspace.helpers({
     const currentIndex = instance.currentLessonIndex.get();
     return lessons.map((lesson: LessonLike, index: number) => ({
       index,
-      label: lesson.title || `Lesson ${index + 1}`,
+      label: lesson.title || `${workspaceText('manualCreator.lesson')} ${index + 1}`,
       isSelected: currentIndex === index
     }));
   },
@@ -273,7 +284,7 @@ Template.draftEditorWorkspace.events({
     const tdfErrors = instance.tdfEditorHandle ? instance.tdfEditorHandle.validate() : [];
     const contentErrors = instance.contentEditorHandle ? instance.contentEditorHandle.validate() : [];
     if ((tdfErrors && tdfErrors.length) || (contentErrors && contentErrors.length)) {
-      instance.workspaceError.set('Fix validation errors in the current draft before continuing.');
+      instance.workspaceError.set(workspaceText('manualCreator.fixValidationBeforeContinuing'));
       return;
     }
 

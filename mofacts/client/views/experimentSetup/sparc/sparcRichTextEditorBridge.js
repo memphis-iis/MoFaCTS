@@ -27,7 +27,15 @@ export function validHttpsUrl(value) {
   }
 }
 
-export function createSparcRichTextEditor({ element, content, onUpdate, onRevision }) {
+function requiredRichTextMessage(messages, key) {
+  const value = messages?.[key];
+  if (typeof value !== 'string' || !value) {
+    throw new Error(`Missing SPARC rich text message: ${key}`);
+  }
+  return value;
+}
+
+export function createSparcRichTextEditor({ element, content, onUpdate, onRevision, messages = {} }) {
   return new Editor({
     element,
     extensions: [
@@ -51,7 +59,7 @@ export function createSparcRichTextEditor({ element, content, onUpdate, onRevisi
       TaskList,
       TaskItem.configure({ nested: true }),
       Link.configure({ openOnClick: false }),
-      Placeholder.configure({ placeholder: 'Write formatted SPARC content...' }),
+      Placeholder.configure({ placeholder: requiredRichTextMessage(messages, 'richTextPlaceholder') }),
     ],
     content,
     onUpdate: ({ editor }) => {
@@ -72,6 +80,7 @@ export function createSparcRichTextController({
   isRichTextNode,
   markChanged,
   normalizeHtml,
+  messages = {},
   setErrorText,
   onRevision,
 }) {
@@ -136,6 +145,7 @@ export function createSparcRichTextController({
       command,
       value,
       colors,
+      messages,
     });
     if (!result.handled) {
       return false;
@@ -157,7 +167,7 @@ export function createSparcRichTextController({
     if (runVisualRichTextCommand(command, value)) {
       return;
     }
-    const result = runSparcRichTextEditorCommand(editor, command, value, colors);
+    const result = runSparcRichTextEditorCommand(editor, command, value, colors, messages);
     if (result.error) {
       setErrorText(result.error);
       return;
@@ -203,6 +213,7 @@ export function createSparcRichTextController({
     editor = createSparcRichTextEditor({
       element,
       content: normalizeHtml(getActiveNode()?.value || '<p></p>'),
+      messages,
       onUpdate: applyEditorHtmlUpdate,
       onRevision,
     });
@@ -238,7 +249,7 @@ export function createSparcRichTextController({
   };
 }
 
-export function runSparcRichTextEditorCommand(editor, command, value, colors) {
+export function runSparcRichTextEditorCommand(editor, command, value, colors, messages = {}) {
   const chain = editor.chain().focus();
   if (command === 'bold') {
     chain.toggleBold().run();
@@ -294,13 +305,13 @@ export function runSparcRichTextEditorCommand(editor, command, value, colors) {
   } else if (command === 'image') {
     const src = String(value?.src || '').trim();
     if (!validHttpsUrl(src)) {
-      return { error: 'Image URL must be a valid https URL.' };
+      return { error: requiredRichTextMessage(messages, 'imageHttpsRequired') };
     }
     chain.setImage({ src, alt: String(value?.alt || '') }).run();
   } else if (command === 'embed') {
     const src = String(value || '').trim();
     if (!validHttpsUrl(src)) {
-      return { error: 'Embed URL must be a valid https URL.' };
+      return { error: requiredRichTextMessage(messages, 'embedHttpsRequired') };
     }
     chain.insertContent(`<figure class="oli-embed"><iframe src="${src}" title="embed" width="100%" height="360" loading="lazy" allowfullscreen></iframe><figcaption></figcaption></figure>`).run();
   } else if (command === 'undo') {
@@ -421,7 +432,7 @@ function runVisualTableCommand(command) {
   return false;
 }
 
-export function runVisualRichTextCommandOnElement({ element, savedRange, command, value, colors }) {
+export function runVisualRichTextCommandOnElement({ element, savedRange, command, value, colors, messages = {} }) {
   if (!element || !restoreVisualRichTextSelection(element, savedRange)) {
     return { handled: false, error: '', updatedHtml: '' };
   }
@@ -477,13 +488,13 @@ export function runVisualRichTextCommandOnElement({ element, savedRange, command
   } else if (command === 'image') {
     const src = String(value?.src || '').trim();
     if (!validHttpsUrl(src)) {
-      return { handled: true, error: 'Image URL must be a valid https URL.', updatedHtml: '' };
+      return { handled: true, error: requiredRichTextMessage(messages, 'imageHttpsRequired'), updatedHtml: '' };
     }
     insertHtmlAtVisualSelection(`<img src="${src}" alt="${String(value?.alt || '').replace(/"/g, '&quot;')}">`);
   } else if (command === 'embed') {
     const src = String(value || '').trim();
     if (!validHttpsUrl(src)) {
-      return { handled: true, error: 'Embed URL must be a valid https URL.', updatedHtml: '' };
+      return { handled: true, error: requiredRichTextMessage(messages, 'embedHttpsRequired'), updatedHtml: '' };
     }
     insertHtmlAtVisualSelection(`<figure class="oli-embed"><iframe src="${src}" title="embed" width="100%" height="360" loading="lazy" allowfullscreen></iframe><figcaption></figcaption></figure>`);
   } else if (command === 'table') {

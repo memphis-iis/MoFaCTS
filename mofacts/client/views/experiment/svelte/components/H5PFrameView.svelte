@@ -1,7 +1,13 @@
 <script>
   import { createEventDispatcher } from 'svelte';
+  import { getActiveUiLocale } from '../../../../lib/interfaceLocaleState';
+  import { translatePlatformString } from '../../../../lib/interfaceI18n';
 
   const dispatch = createEventDispatcher();
+
+  function platformText(key) {
+    return translatePlatformString(getActiveUiLocale(), key);
+  }
 
   export let validation = { valid: false };
   export let embedUrl = '';
@@ -36,7 +42,7 @@
               bind:this={frameElement}
               class="h5p-frame"
               src={embedUrl}
-              title="H5P activity"
+              title={platformText('h5p.activityTitle')}
               style={frameStyle}
               loading="lazy"
               referrerpolicy="strict-origin-when-cross-origin"
@@ -54,20 +60,20 @@
       <div bind:this={continueBarElement} class="h5p-continue-bar" aria-hidden={!continueReady}>
         {#if continueReady}
           <button type="button" class="btn btn-primary h5p-continue-button" on:click={() => dispatch('continue')}>
-            Continue
+            {platformText('common.continue')}
           </button>
         {/if}
       </div>
     {:else if manualContinueVisible}
       <div bind:this={continueBarElement} class="h5p-continue-bar">
         <button type="button" class="btn btn-primary h5p-continue-button" on:click={() => dispatch('continue')}>
-          Continue
+          {platformText('common.continue')}
         </button>
       </div>
     {/if}
   {:else}
     <div class="h5p-frame-error" role="alert">
-      {validation.message || 'Invalid H5P display configuration'}
+      {validation.message || platformText('h5p.invalidDisplayConfiguration')}
     </div>
   {/if}
 </div>

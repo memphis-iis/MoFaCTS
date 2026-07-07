@@ -1,4 +1,6 @@
 <script>
+  import { getActiveUiLocale } from '../../../lib/interfaceLocaleState';
+  import { translatePlatformString } from '../../../lib/interfaceI18n';
   import SparcSessionSurface from '../../experiment/svelte/components/SparcSessionSurface.svelte';
 
   export let activeDisplay = null;
@@ -15,6 +17,8 @@
   export let onVisualDragLeave = () => {};
   export let onNodeAuthoredValueChange = () => {};
   export let onNodeFocus = () => {};
+
+  const sparcText = (key, values) => translatePlatformString(getActiveUiLocale(), key, values);
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -23,7 +27,7 @@
   class="sparc-visual-editor-surface"
   class:sparc-drop-active={dropTarget}
   class:sparc-hierarchy-visible={showNodeHierarchy}
-  aria-label="SPARC Visual Editor drop surface"
+  aria-label={sparcText('sparc.visualEditorDropSurface')}
   use:visualEditorValueBridge
   on:click={onEditorClick}
   on:keyup={onRememberRichTextSelection}
@@ -41,7 +45,7 @@
     ></div>
   {/if}
   {#if dropTarget?.position === 'inside'}
-    <div class="sparc-drop-label" aria-live="polite">Drop into {dropTarget.label}</div>
+    <div class="sparc-drop-label" aria-live="polite">{sparcText('sparc.dropInto', { target: dropTarget.label })}</div>
   {/if}
   {#if activeDisplay}
     <SparcSessionSurface
@@ -56,7 +60,7 @@
 </div>
 
 {#if showNodeHierarchy}
-  <div class="sparc-node-list sparc-node-list-bottom" aria-label="SPARC node hierarchy">
+  <div class="sparc-node-list sparc-node-list-bottom" aria-label={sparcText('sparc.nodeHierarchy')}>
     {#each flatNodes as entry}
       <button
         type="button"

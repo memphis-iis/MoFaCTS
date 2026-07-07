@@ -32,9 +32,13 @@ import {
 } from '../../lib/manualContentCreatorValidation';
 import { clientConsole } from '../..';
 import { getErrorMessage } from '../../lib/errorUtils';
+import { translatePlatformString } from '../../lib/interfaceI18n';
+import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 
 const FlowRouter = (globalThis as any).FlowRouter;
 declare const DynamicAssets: any;
+
+type PlatformStringKey = Parameters<typeof translatePlatformString>[1];
 
 type StepItem = {
   number: number;
@@ -54,13 +58,17 @@ type ManualContentDraftRecord = {
   updatedAt?: Date | string | null;
 };
 
-const STEP_LABELS = [
-  'Lesson Basics',
-  'Card Format',
-  'Audio And Display',
-  'Starter Content',
-  'Edit Draft'
+const STEP_LABEL_KEYS: PlatformStringKey[] = [
+  'manualCreator.lessonBasics',
+  'manualCreator.cardFormat',
+  'manualCreator.audioAndDisplay',
+  'manualCreator.starterContent',
+  'manualCreator.editDraft'
 ];
+
+function manualText(key: PlatformStringKey, values?: Parameters<typeof translatePlatformString>[2]): string {
+  return translatePlatformString(getActiveUiLocale(), key, values);
+}
 
 function cloneJson<T>(value: T): T {
   if (typeof structuredClone === 'function') {
@@ -139,7 +147,7 @@ function requestManualConfirmation(instance: any, options: any): Promise<boolean
     instance.manualConfirmation.set({
       title: options.title,
       message: options.message,
-      confirmLabel: options.confirmLabel || 'Continue',
+      confirmLabel: options.confirmLabel || manualText('common.continue'),
       confirmClass: options.confirmClass || 'btn-danger',
       icon: options.icon || 'fa-exclamation-triangle',
       resolve
@@ -169,7 +177,7 @@ function normalizeLoadedState(rawState: Partial<ManualCreatorState> | undefined)
 
 function normalizeLoadedStep(value: unknown) {
   const parsed = Number.parseInt(String(value ?? ''), 10);
-  if (Number.isFinite(parsed) && parsed >= 1 && parsed <= STEP_LABELS.length) {
+  if (Number.isFinite(parsed) && parsed >= 1 && parsed <= STEP_LABEL_KEYS.length) {
     return parsed;
   }
   return 1;
@@ -197,7 +205,7 @@ function applyLoadedDraft(instance: any, draft: ManualContentDraftRecord) {
   instance.currentDraftId.set(String(draft._id || ''));
   setDraftMessage(
     instance,
-    `Loaded saved draft "${draft.lessonName || normalizedState.lessonName || 'Untitled draft'}".`,
+    manualText('manualCreator.loadedDraft', { lessonName: draft.lessonName || normalizedState.lessonName || manualText('manualCreator.untitled') }),
     'info'
   );
 }
@@ -213,7 +221,7 @@ function buildDraftSavePayload(instance: any) {
 
 async function saveCurrentDraft(instance: any) {
   instance.draftPersistenceBusy.set(true);
-  setDraftMessage(instance, 'Saving draft...', 'info');
+  setDraftMessage(instance, manualText('manualCreator.savingDraft'), 'info');
 
   try {
     const result = await (Meteor as any).callAsync('saveManualContentDraft', buildDraftSavePayload(instance));
@@ -227,7 +235,7 @@ async function saveCurrentDraft(instance: any) {
     }
     setDraftMessage(
       instance,
-      `Saved draft "${result?.lessonName || instance.state.get().lessonName || 'Untitled draft'}".`,
+      manualText('manualCreator.savedDraft', { lessonName: result?.lessonName || instance.state.get().lessonName || manualText('manualCreator.untitled') }),
       'success'
     );
   } catch (error: unknown) {
@@ -251,7 +259,7 @@ async function deleteCurrentDraft(instance: any, options: { redirectToContent?: 
       window.history.replaceState({}, '', '/contentCreate');
     }
     if (!options.silent) {
-      setDraftMessage(instance, 'Saved draft deleted.', 'success');
+      setDraftMessage(instance, manualText('manualCreator.savedDraftDeleted'), 'success');
     }
     if (options.redirectToContent) {
       FlowRouter.go('/contentUpload');
@@ -267,50 +275,54 @@ async function deleteCurrentDraft(instance: any, options: { redirectToContent?: 
 function getPromptSummary(promptType: PromptType) {
   switch (promptType) {
     case 'text':
-      return 'Text';
+      return manualText('manualCreator.text');
     case 'image':
-      return 'Image';
+      return manualText('manualCreator.image');
     case 'audio':
-      return 'Audio';
+      return manualText('manualCreator.audio');
     case 'video':
-      return 'Video';
+      return manualText('manualCreator.video');
     case 'text-image':
-      return 'Text + Image';
+      return manualText('manualCreator.textImage');
     default:
-      return 'Text';
+      return manualText('manualCreator.text');
   }
 }
 
 function getResponseSummary(responseType: ResponseType) {
-  return responseType === 'multiple-choice' ? 'Multiple choice' : 'Typed response';
+  return responseType === 'multiple-choice' ? manualText('manualCreator.multipleChoice') : manualText('manualCreator.typedResponse');
 }
 
 function getStructureSummary(structure: ManualCreatorState['structure']) {
   switch (structure) {
     case 'learning-only':
-      return 'Learning only';
+      return manualText('manualCreator.learningOnly');
     case 'instructions-learning':
-      return 'Instructions + Learning';
+      return manualText('manualCreator.instructionsLearning');
     case 'assessment-only':
-      return 'Assessment only';
+      return manualText('manualCreator.assessmentOnly');
     case 'instructions-assessment':
-      return 'Instructions + Assessment';
+      return manualText('manualCreator.instructionsAssessment');
     default:
-      return 'Instructions + Learning';
+      return manualText('manualCreator.instructionsLearning');
   }
 }
 
 function getTopBarSummary(topBarMode: TopBarMode) {
   switch (topBarMode) {
     case 'time':
-      return 'Time';
+      return manualText('manualCreator.time');
     case 'score':
-      return 'Score';
+      return manualText('manualCreator.score');
     case 'time-score':
-      return 'Time + Score';
+      return manualText('manualCreator.timeScore');
     default:
-      return 'Neither';
+      return manualText('manualCreator.neither');
   }
+}
+
+function getVisibilitySummary(visibility: ManualCreatorState['visibility']) {
+  return visibility === 'public' ? manualText('content.public') : manualText('content.private');
 }
 
 function initializeRowsIfNeeded(instance: any) {
@@ -352,7 +364,7 @@ Template.manualContentCreator.onCreated(function(this: any) {
   const routeDraftId = this.currentDraftId.get();
   if (routeDraftId) {
     this.draftPersistenceBusy.set(true);
-    setDraftMessage(this, 'Loading saved draft...', 'info');
+    setDraftMessage(this, manualText('manualCreator.loadingDraft'), 'info');
     void (Meteor as any).callAsync('getManualContentDraft', routeDraftId)
       .then((draft: ManualContentDraftRecord) => {
         applyLoadedDraft(this, draft);
@@ -378,12 +390,16 @@ Template.manualContentCreator.helpers({
 
   stepItems() {
     const currentStep = (Template.instance() as any).wizardStep.get();
-    return STEP_LABELS.map((label, index) => ({
+    return STEP_LABEL_KEYS.map((labelKey, index) => ({
       number: index + 1,
-      label,
+      label: manualText(labelKey),
       isActive: currentStep === index + 1,
       isComplete: currentStep > index + 1
     })) as StepItem[];
+  },
+
+  manualText(key: PlatformStringKey, options?: { hash?: Parameters<typeof translatePlatformString>[2] }) {
+    return manualText(key, options?.hash);
   },
 
   isStep(stepNumber: number) {
@@ -407,7 +423,7 @@ Template.manualContentCreator.helpers({
   },
 
   saveDraftLabel() {
-    return (Template.instance() as any).currentDraftId.get() ? 'Update Draft' : 'Save Draft';
+    return (Template.instance() as any).currentDraftId.get() ? manualText('manualCreator.updateDraft') : manualText('manualCreator.saveDraft');
   },
 
   draftPersistenceMessage() {
@@ -451,8 +467,16 @@ Template.manualContentCreator.helpers({
 
   nextButtonLabel() {
     const currentStep = (Template.instance() as any).wizardStep.get();
-    if (currentStep === 4) return 'Open Draft';
-    return 'Next';
+    if (currentStep === 4) return manualText('manualCreator.openDraft');
+    return manualText('manualCreator.next');
+  },
+
+  draftWorkspaceHeading() {
+    return manualText('manualCreator.editDraftFinalize');
+  },
+
+  draftWorkspaceSaveContinueLabel() {
+    return manualText('manualCreator.validateAndFinalize');
   },
 
   promptSummary() {
@@ -475,6 +499,11 @@ Template.manualContentCreator.helpers({
     return getTopBarSummary(state.topBarMode);
   },
 
+  visibilitySummary() {
+    const state = (Template.instance() as any).state.get();
+    return getVisibilitySummary(state.visibility);
+  },
+
   showPromptTextColumn() {
     const state = (Template.instance() as any).state.get();
     return isPromptTextEnabled(state.promptType);
@@ -492,7 +521,7 @@ Template.manualContentCreator.helpers({
 
   promptTextLabel() {
     const state = (Template.instance() as any).state.get();
-    return state.promptType === 'text-image' ? 'Prompt text' : 'Prompt';
+    return state.promptType === 'text-image' ? manualText('manualCreator.promptText') : manualText('manualCreator.prompt');
   },
 
   structureIncludesInstructions() {
@@ -515,6 +544,22 @@ Template.manualContentCreator.helpers({
     return getSeedColumnLabels(state).join(' | ');
   },
 
+  seedTablePlaceholder() {
+    const state = (Template.instance() as any).state.get();
+    return manualText('manualCreator.pasteRowsPlaceholder', { columns: getSeedColumnLabels(state).join(' | ') });
+  },
+
+  expectedColumnsText() {
+    const state = (Template.instance() as any).state.get();
+    return manualText('manualCreator.expectedColumns', { columns: getSeedColumnLabels(state).join(' | ') });
+  },
+
+  rowsRequestedText() {
+    const state = (Template.instance() as any).state.get();
+    const rows = Array.isArray(state.rows) ? state.rows.length : 0;
+    return manualText('manualCreator.rowsRequested', { rows, requested: state.cardCount });
+  },
+
   rows() {
     const state = (Template.instance() as any).state.get();
     return state.rows.map((row: StarterRow, index: number) => ({
@@ -533,6 +578,13 @@ Template.manualContentCreator.helpers({
     const slug = String(state.experimentTarget || '').trim();
     if (!slug) return '';
     return `/experiment/${slug}`;
+  },
+
+  experimentLinkPreviewText() {
+    const state = (Template.instance() as any).state.get();
+    const slug = String(state.experimentTarget || '').trim();
+    const preview = slug ? `/experiment/${slug}` : manualText('manualCreator.pendingName');
+    return manualText('manualCreator.preview', { preview });
   },
 
   draftLessons() {
@@ -565,7 +617,7 @@ Template.manualContentCreator.helpers({
     return async () => {
       const lessons = instance.draftLessons.get();
       if (!Array.isArray(lessons) || lessons.length === 0) {
-        instance.packageError.set('Generate a draft before finalizing.');
+        instance.packageError.set(manualText('manualCreator.generateBeforeFinalizing'));
         return;
       }
 
@@ -610,16 +662,16 @@ Template.manualContentCreator.helpers({
 
   statusSummary() {
     const instance = Template.instance() as any;
-    if (instance.uploadComplete.get()) return 'Uploaded';
+    if (instance.uploadComplete.get()) return manualText('manualCreator.uploaded');
     const uploadStatus = instance.uploadStatus.get();
     if (uploadStatus?.message) return uploadStatus.message;
-    if (instance.generationResult.get()) return 'Package ready';
+    if (instance.generationResult.get()) return manualText('manualCreator.packageReady');
     const draftLessons = instance.draftLessons.get();
-    if (Array.isArray(draftLessons) && draftLessons.length > 0) return 'Draft ready';
+    if (Array.isArray(draftLessons) && draftLessons.length > 0) return manualText('manualCreator.draftReady');
     const currentStep = instance.wizardStep.get();
-    if (currentStep < 4) return 'Setup';
-    if (currentStep === 4) return 'Starter content';
-    return 'Edit draft';
+    if (currentStep < 4) return manualText('manualCreator.setup');
+    if (currentStep === 4) return manualText('manualCreator.starterContentStatus');
+    return manualText('manualCreator.editDraftStatus');
   }
 });
 
@@ -631,11 +683,11 @@ Template.manualContentCreator.events({
 
   async 'click #manual-delete-draft'(event: any, instance: any) {
     event.preventDefault();
-    const lessonName = String(instance.state.get()?.lessonName || 'this draft').trim() || 'this draft';
+    const lessonName = String(instance.state.get()?.lessonName || manualText('manualCreator.untitled')).trim() || manualText('manualCreator.untitled');
     const confirmed = await requestManualConfirmation(instance, {
-      title: `Delete saved draft "${lessonName}"?`,
-      message: 'The draft will be deleted and you will return to the content manager.',
-      confirmLabel: 'Delete draft'
+      title: manualText('manualCreator.deleteDraftTitle', { lessonName }),
+      message: manualText('manualCreator.deleteDraftMessage'),
+      confirmLabel: manualText('manualCreator.deleteDraftConfirm')
     });
     if (!confirmed) {
       return;
@@ -880,9 +932,9 @@ Template.manualContentCreator.events({
         const existingFile = await (Meteor as any).callAsync('getUserAssetByName', fileName);
         if (existingFile) {
           const confirmed = await requestManualConfirmation(instance, {
-            title: 'Overwrite existing package?',
-            message: 'Uploading this file will overwrite existing data.',
-            confirmLabel: 'Overwrite and upload'
+            title: manualText('content.overwriteExistingPackage'),
+            message: manualText('content.packageOverwriteMessage', { filename: fileName }),
+            confirmLabel: manualText('content.overwritePackage')
           });
           if (!confirmed) {
             return;
@@ -898,14 +950,14 @@ Template.manualContentCreator.events({
 
         upload.on('start', function() {
           instance.uploadStatus.set({
-            message: 'Uploading package...',
+            message: manualText('content.uploadingFile', { filename: fileName }),
             progress: 5
           });
         });
 
         upload.on('progress', function(progress: number) {
           instance.uploadStatus.set({
-            message: 'Uploading package...',
+            message: manualText('content.uploadingFile', { filename: fileName }),
             progress: Math.round(progress * 0.5)
           });
         });
@@ -913,13 +965,13 @@ Template.manualContentCreator.events({
         upload.on('end', async function(error: any, fileObj: any) {
           if (error) {
             instance.uploadStatus.set(null);
-            instance.uploadError.set(`Upload failed: ${error}`);
+            instance.uploadError.set(manualText('content.uploadFailedForFile', { filename: fileName, error: String(error) }));
             return;
           }
 
           try {
             instance.uploadStatus.set({
-              message: 'Processing package...',
+              message: manualText('content.processingPackage'),
               progress: 65
             });
 
@@ -939,31 +991,31 @@ Template.manualContentCreator.events({
                 const reasons = Array.isArray(res.data.reason) ? res.data.reason : [];
                 const prompts = [];
                 if (reasons.includes('prevTDFExists')) {
-                  prompts.push(`Previous ${res.data.TDF.content.fileName} already exists and will be overwritten. Continue?`);
+                  prompts.push(manualText('content.previousTdfOverwriteMessage', { filename: res.data.TDF.content.fileName }));
                 }
                 if (reasons.includes('prevStimExists')) {
-                  prompts.push(`Previous ${res.data.TDF.content.tdfs.tutor.setspec.stimulusfile} already exists and will be overwritten. Continue?`);
+                  prompts.push(manualText('content.previousStimOverwriteMessage', { filename: res.data.TDF.content.tdfs.tutor.setspec.stimulusfile }));
                 }
 
                 const confirmed = prompts.length === 0 || await requestManualConfirmation(instance, {
-                  title: 'Overwrite existing TDF content?',
+                  title: manualText('content.overwriteExistingContent'),
                   message: prompts.join(' '),
-                  confirmLabel: 'Overwrite content'
+                  confirmLabel: manualText('content.overwriteContent')
                 });
                 if (confirmed) {
                   instance.uploadStatus.set({
-                    message: 'Confirming TDF update...',
+                    message: manualText('content.processing'),
                     progress: 92
                   });
                   await (Meteor as any).callAsync('tdfUpdateConfirmed', res.data.TDF, false, reasons);
                 } else {
                   instance.uploadStatus.set(null);
-                  instance.uploadError.set('Upload canceled during overwrite confirmation.');
+                  instance.uploadError.set(manualText('content.uploadCanceledPackage', { filename: fileName }));
                   return;
                 }
               } else if (!res?.result) {
                 instance.uploadStatus.set(null);
-                instance.uploadError.set(`Package upload failed: ${res?.errmsg || 'unknown error'}`);
+                instance.uploadError.set(manualText('content.packageProcessingFailed', { error: res?.errmsg || 'unknown error' }));
                 return;
               }
             }

@@ -1,6 +1,6 @@
 <template name="dataDownload">
     <div class="container admin-page">
-        <h3 class="page-header-title">Download Data</h3>
+        <h3 class="page-header-title">{{reportingText 'reporting.downloadData'}}</h3>
 
     {{#if downloadMessage}}
     <div class="admin-status admin-status-{{downloadMessage.level}} admin-message" role="status" aria-live="polite">
@@ -14,11 +14,11 @@
             <div class="card-body">
                 <div class="admin-section-heading">
                     <i class="fa fa-history admin-section-icon"></i>
-                    <h5>Your Learning History</h5>
+                    <h5>{{reportingText 'reporting.yourLearningHistory'}}</h5>
                 </div>
                 <div class="admin-form-row text-center">
                     <button class="btn btn-primary" id="ownHistoryDownloadButton" type="button">
-                        <i class="fa fa-download"></i> Download your history across all TDFs
+                        <i class="fa fa-download"></i> {{reportingText 'reporting.downloadYourHistory'}}
                     </button>
                 </div>
             </div>
@@ -30,11 +30,11 @@
             <div class="card-body">
                 <div class="admin-section-heading">
                     <i class="fa fa-download admin-section-icon"></i>
-                    <h5>Data from TDFs You Own</h5>
+                    <h5>{{reportingText 'reporting.dataFromOwnedTdfs'}}</h5>
                 </div>
                 <div class="admin-form-row text-center">
                     <a class="btn btn-primary" id="userDataDownloadLink" target="_blank" href>
-                        <i class="fa fa-download"></i> Download all data for TDFs you own
+                        <i class="fa fa-download"></i> {{reportingText 'reporting.downloadOwnedTdfData'}}
                     </a>
                 </div>
                 <div class="admin-table-wrapper">
@@ -42,23 +42,23 @@
                         <table class="table table-striped table-bordered data-download-table">
                             <thead>
                                 <tr>
-                                    <th scope="col" class="table-col-icon text-center">Link</th>
-                                    <th scope="col" class="table-col-large">Lesson Name</th>
-                                    <th scope="col" class="table-col-medium">File Name</th>
+                                    <th scope="col" class="table-col-icon text-center">{{reportingText 'reporting.link'}}</th>
+                                    <th scope="col" class="table-col-large">{{reportingText 'reporting.lessonName'}}</th>
+                                    <th scope="col" class="table-col-medium">{{reportingText 'reporting.fileName'}}</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {{#if isLoading}}
                                 <tr>
                                     <td colspan="3" class="text-center admin-table-status-cell">
-                                        <i class="fa fa-spinner fa-spin"></i> Loading...
+                                        <i class="fa fa-spinner fa-spin"></i> {{reportingText 'reporting.loading'}}
                                     </td>
                                 </tr>
                                 {{else}}
                                 {{#each dataDownloads}}
                                 <tr>
                                     <td class="text-center">
-                                        <button class="btn-icon data-download-link" type="button" data-fileName="{{this.content.fileName}}" data-fileId="{{this._id}}" title="Download data file">
+                                        <button class="btn-icon data-download-link" type="button" data-fileName="{{this.content.fileName}}" data-fileId="{{this._id}}" title="{{reportingText 'reporting.downloadDataFile'}}">
                                             <span class="fa fa-download" aria-hidden="true"></span>
                                         </button>
                                         {{#if this.hasConditionChildren}}
@@ -66,7 +66,7 @@
                                           class="btn-icon root-omnibus-download-link"
                                           type="button"
                                           data-fileName="{{this.content.fileName}}"
-                                          title="Download omnibus data for this root (all conditions)"
+                                          title="{{reportingText 'reporting.downloadRootOmnibus'}}"
                                         >
                                             <span class="fa fa-sitemap" aria-hidden="true"></span>
                                         </button>
@@ -77,16 +77,16 @@
                                         {{#if this.content.fileName}}
                                             {{this.content.fileName}}
                                             {{#if this.hasConditionChildren}}
-                                            <span class="text-muted small"> (root, {{this.conditionCount}} conditions)</span>
+                                            <span class="text-muted small"> {{reportingText 'reporting.rootConditions' count=this.conditionCount}}</span>
                                             {{/if}}
                                         {{else}}
-                                            (missing)
+                                            {{reportingText 'reporting.missing'}}
                                         {{/if}}
                                     </td>
                                 </tr>
                                 {{else}}
                                 <tr>
-                                    <td colspan="3" class="text-center text-muted admin-table-status-cell">No data files available</td>
+                                    <td colspan="3" class="text-center text-muted admin-table-status-cell">{{reportingText 'reporting.noDataFiles'}}</td>
                                 </tr>
                                 {{/each}}
                                 {{/if}}

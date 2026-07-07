@@ -5,6 +5,8 @@ import { Session } from 'meteor/session';
 import { Template } from 'meteor/templating';
 import './aiContentCreator.html';
 import { clientConsole } from '../..';
+import { translatePlatformString } from '../../lib/interfaceI18n';
+import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 import { getUploadIntegrity } from '../../lib/uploadIntegrity';
 import { getErrorMessage } from '../../lib/errorUtils';
 import { getOpenRouterCapability, userHasServerOpenRouterKey, type OpenRouterCapability } from '../../lib/openRouterClientProfile';
@@ -28,6 +30,8 @@ import {
 const MeteorAny = Meteor as typeof Meteor & { callAsync: (name: string, ...args: any[]) => Promise<any> };
 const FlowRouter = (globalThis as any).FlowRouter;
 declare const DynamicAssets: any;
+
+type PlatformStringKey = Parameters<typeof translatePlatformString>[1];
 
 type StatusKind = 'info' | 'success' | 'warning' | 'error';
 
@@ -113,15 +117,33 @@ type AiCreatorInstance = Blaze.TemplateInstance & {
 
 const CREATION_MODULES: Array<{
   id: CreationModuleId;
-  label: string;
-  shortLabel: string;
-  description: string;
+  labelKey: PlatformStringKey;
+  shortLabelKey: PlatformStringKey;
+  descriptionKey: PlatformStringKey;
   icon: string;
   disabled?: boolean;
 }> = [
-  { id: 'learningSession', label: 'Learning session', shortLabel: 'Learn it', description: 'Learning session', icon: 'fa-book' },
-  { id: 'assessmentSession', label: 'Assessment session', shortLabel: 'Test me', description: 'Assessment session', icon: 'fa-check-square-o' },
-  { id: 'autoTutor', label: 'AutoTutor', shortLabel: 'Chat tutor', description: 'AutoTutor', icon: 'fa-star-o' },
+  {
+    id: 'learningSession',
+    labelKey: 'aiCreator.learningLabel',
+    shortLabelKey: 'aiCreator.learningShortLabel',
+    descriptionKey: 'aiCreator.learningDescription',
+    icon: 'fa-book',
+  },
+  {
+    id: 'assessmentSession',
+    labelKey: 'aiCreator.assessmentLabel',
+    shortLabelKey: 'aiCreator.assessmentShortLabel',
+    descriptionKey: 'aiCreator.assessmentDescription',
+    icon: 'fa-check-square-o',
+  },
+  {
+    id: 'autoTutor',
+    labelKey: 'aiCreator.autoTutorLabel',
+    shortLabelKey: 'aiCreator.autoTutorShortLabel',
+    descriptionKey: 'aiCreator.autoTutorDescription',
+    icon: 'fa-star-o',
+  },
 ];
 
 const CREATION_RECORDS_STORAGE_KEY = 'mofacts.aiContentCreation.records';
@@ -132,6 +154,10 @@ const COMPACT_SCHEMA_VERSION = 'ai-normalized-v1';
 const MAX_STORED_RECORDS = 50;
 const MAX_DEBUG_PAYLOAD_LENGTH = 20000;
 const MAX_ITEM_CUE_REPAIR_PASSES = 2;
+
+function aiText(key: PlatformStringKey, values?: Parameters<typeof translatePlatformString>[2]): string {
+  return translatePlatformString(getActiveUiLocale(), key, values);
+}
 
 function currentModel(): string {
   return String((Meteor.user() as any)?.profile?.openRouterDefaultModel || '').trim();
@@ -249,16 +275,20 @@ function orderedModules(moduleIds: CreationModuleId[]): CreationModuleId[] {
 function modeHelperText(moduleIds: CreationModuleId[]): string {
   const ordered = orderedModules(moduleIds);
   if (ordered.length === 0) {
-    return 'Select at least one mode to continue';
+    return aiText('aiCreator.selectMode');
   }
   if (ordered.length === 1) {
-    return CREATION_MODULES.find((module) => module.id === ordered[0])?.description || '';
+    const module = CREATION_MODULES.find((entry) => entry.id === ordered[0]);
+    return module ? aiText(module.descriptionKey) : '';
   }
   const labels = ordered
-    .map((moduleId) => CREATION_MODULES.find((module) => module.id === moduleId)?.shortLabel)
+    .map((moduleId) => {
+      const module = CREATION_MODULES.find((entry) => entry.id === moduleId);
+      return module ? aiText(module.shortLabelKey) : '';
+    })
     .filter(Boolean)
     .join(' + ');
-  return `Creates a combo: ${labels}`;
+  return aiText('aiCreator.comboMode', { labels });
 }
 
 async function generateAutoTutorFromAi(
@@ -382,7 +412,7 @@ async function generateItemsFromAi(sourceText: string, selectedModules: Creation
 function promptForReplacementName(conflict: GeneratedNameConflict): string | null {
   const suggested = suggestedReplacementName(conflict);
   const response = window.prompt(
-    `Content already exists under the name "${conflict.title}". Enter a different name for the generated system.`,
+    aiText('aiCreator.contentExistsPrompt', { title: conflict.title }),
     suggested,
   );
   const normalized = sanitizeImportName(response || '', '');
@@ -407,15 +437,15 @@ async function runCreation(instance: AiCreatorInstance): Promise<void> {
   };
 
   if (!sourceText) {
-    setStatus(instance, 'warning', 'Add source content before creating.');
+    setStatus(instance, 'warning', aiText('aiCreator.addSourceContent'));
     return;
   }
   if (selectedModules.length === 0) {
-    setStatus(instance, 'warning', 'Choose at least one creation target.');
+    setStatus(instance, 'warning', aiText('aiCreator.chooseTarget'));
     return;
   }
   if (!hasOpenRouterCapability(instance) || !model) {
-    setStatus(instance, 'warning', 'AI content creation requires a configured OpenRouter key and model.');
+    setStatus(instance, 'warning', aiText('aiCreator.requiresKeyAndModel'));
     return;
   }
 
@@ -425,8 +455,8 @@ async function runCreation(instance: AiCreatorInstance): Promise<void> {
     instance,
     'info',
     selectedModules.includes('autoTutor')
-      ? 'Creating content and generating a shared AutoTutor expectation graph for the authored lesson...'
-      : 'Creating content...',
+      ? aiText('aiCreator.creatingWithAutoTutor')
+      : aiText('aiCreator.creatingContent'),
   );
   try {
     const sourceTextHash = await hashSourceText(sourceText);
@@ -604,6 +634,9 @@ Template.aiContentCreator.onRendered(function(this: AiCreatorInstance) {
 });
 
 Template.aiContentCreator.helpers({
+  aiText(key: PlatformStringKey, options?: { hash?: Parameters<typeof translatePlatformString>[2] }) {
+    return aiText(key, options?.hash);
+  },
   embeddedClass() {
     return isEmbedded(Template.instance() as AiCreatorInstance) ? 'is-embedded' : '';
   },
@@ -615,12 +648,15 @@ Template.aiContentCreator.helpers({
   },
   sourceLength() {
     const length = (Template.instance() as AiCreatorInstance).sourceText.get().length;
-    return `${length} character${length === 1 ? '' : 's'}`;
+    return aiText('aiCreator.characterCount', { count: length, plural: length === 1 ? '' : 's' });
   },
   modules() {
     const selected = new Set((Template.instance() as AiCreatorInstance).selectedModules.get());
     return CREATION_MODULES.map((module) => ({
       ...module,
+      label: aiText(module.labelKey),
+      shortLabel: aiText(module.shortLabelKey),
+      description: aiText(module.descriptionKey),
       selectedClass: selected.has(module.id) ? 'is-selected' : '',
       pressed: selected.has(module.id) ? 'true' : 'false',
       disabled: module.disabled ? true : null,

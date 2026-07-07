@@ -7,6 +7,8 @@ import { meteorCallAsync, clientConsole } from '../..';
 import { selectTdf } from '../../lib/lessonLaunchRunner';
 import { setCourseAssignmentLaunchContext } from '../../lib/courseAssignmentLaunchContext';
 import { resolveSpeechIgnoreOutOfGrammarResponses } from '../../lib/speechRecognitionConfig';
+import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
+import { translatePlatformString } from '../../lib/interfaceI18n';
 import type {
   LearnerCourseSnapshotAssignment,
   LearnerCourseSnapshotCourse,
@@ -50,6 +52,10 @@ function formatDateOnly(value: unknown, timezone?: string | null) {
     dateStyle: 'medium',
     ...(timezone ? { timeZone: timezone } : {}),
   });
+}
+
+function courseText(key: Parameters<typeof translatePlatformString>[1], values?: Parameters<typeof translatePlatformString>[2]): string {
+  return translatePlatformString(getActiveUiLocale(), key, values);
 }
 
 function getExpandedCourseIds() {
@@ -137,9 +143,9 @@ const courseAssignmentDisplayHelpers = {
   },
   statusLabel(this: CourseAssignmentDisplayRow) {
     const row = this;
-    if (row.availability === 'scheduled') return 'Locked';
-    if (row.availability === 'unavailable') return 'Not enrolled';
-    return row.required ? 'Required' : 'Optional';
+    if (row.availability === 'scheduled') return courseText('courses.locked');
+    if (row.availability === 'unavailable') return courseText('courses.notEnrolled');
+    return row.required ? courseText('courses.required') : courseText('courses.optional');
   },
   statusClass(this: CourseAssignmentDisplayRow) {
     const row = this;
@@ -149,7 +155,8 @@ const courseAssignmentDisplayHelpers = {
   },
   releaseLabel(this: CourseAssignmentDisplayRow) {
     const row = this;
-    return row.releaseAt ? `Opens ${formatDate(row.releaseAt, row.timezone)}` : '';
+    const formatted = formatDate(row.releaseAt, row.timezone);
+    return formatted ? courseText('courses.opens', { date: formatted }) : '';
   },
   hasReleaseLabel(this: CourseAssignmentDisplayRow) {
     return Boolean(this.releaseAt);
@@ -161,8 +168,12 @@ const courseAssignmentDisplayHelpers = {
     const dueTime = new Date(dueAt).getTime();
     const now = Date.now();
     const formatted = formatDate(dueAt, row.timezone);
-    if (dueTime < now) return `Overdue ${formatted}`;
+    if (dueTime < now) return formatted ? courseText('courses.overdue', { date: formatted }) : '-';
     return formatted || '-';
+  },
+  dueWithDateLabel(this: CourseAssignmentDisplayRow) {
+    const dueLabel = courseAssignmentDisplayHelpers.dueLabel.call(this);
+    return dueLabel === '-' ? `${courseText('courses.due')} -` : courseText('courses.dueWithDate', { date: dueLabel });
   },
   trialsValue(this: CourseAssignmentDisplayRow) {
     return this.progress?.attempts || 0;
@@ -188,7 +199,7 @@ const courseAssignmentDisplayHelpers = {
     return this.progress?.sessionDays || 0;
   },
   timeValue(this: CourseAssignmentDisplayRow) {
-    return `${this.progress?.totalTimeMinutes || 0} min`;
+    return courseText('courses.minutes', { minutes: this.progress?.totalTimeMinutes || 0 });
   },
   lastPracticeValue(this: CourseAssignmentDisplayRow) {
     const row = this;
@@ -197,9 +208,9 @@ const courseAssignmentDisplayHelpers = {
   },
   actionLabel(this: CourseAssignmentDisplayRow) {
     const row = this;
-    if (row.availability === 'scheduled') return 'Locked';
-    if (row.availability === 'unavailable') return 'Unavailable';
-    return row.isUsed ? 'Continue' : 'Start';
+    if (row.availability === 'scheduled') return courseText('courses.locked');
+    if (row.availability === 'unavailable') return courseText('courses.unavailable');
+    return row.isUsed ? courseText('courses.continue') : courseText('courses.start');
   },
   actionButtonClass(this: CourseAssignmentDisplayRow) {
     return this.isUsed ? 'btn-primary' : 'btn-success';

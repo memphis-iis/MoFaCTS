@@ -16,11 +16,19 @@ import { clientConsole } from '../..';
 import { getErrorMessage } from '../../lib/errorUtils';
 import { getImportIndexSelectionCount, parseImportIndexSpec } from '../../lib/importRangeUtils';
 import { getUploadIntegrity } from '../../lib/uploadIntegrity';
+import { translatePlatformString } from '../../lib/interfaceI18n';
+import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 import './draftEditorWorkspace';
 import { buildImportPackageFromDraftLessons } from '../../lib/importPackageBuilder';
 
 declare const $: any;
 declare const DynamicAssets: any;
+
+type PlatformStringKey = Parameters<typeof translatePlatformString>[1];
+
+function apkgText(key: PlatformStringKey, values?: Parameters<typeof translatePlatformString>[2]): string {
+  return translatePlatformString(getActiveUiLocale(), key, values);
+}
 
 let apkgProcessorPromise: Promise<any> | null = null;
 
@@ -61,7 +69,7 @@ function requestInlineConfirmation(template: any, options: any): Promise<boolean
       id: options.id,
       title: options.title,
       message: options.message,
-      confirmLabel: options.confirmLabel || 'Continue',
+      confirmLabel: options.confirmLabel || apkgText('common.continue'),
       confirmClass: options.confirmClass || 'btn-danger',
       icon: options.icon || 'fa-exclamation-triangle',
       resolve
@@ -127,6 +135,10 @@ Template.apkgWizard.onRendered(function(this: any) {
 
 // Helper functions
 Template.apkgWizard.helpers({
+  apkgText(key: PlatformStringKey, options?: { hash?: Parameters<typeof translatePlatformString>[2] }) {
+    return apkgText(key, options?.hash);
+  },
+
   // Step navigation
   isStep(num: any) {
     return (Template.instance() as any).wizardStep.get() === num;
@@ -170,10 +182,11 @@ Template.apkgWizard.helpers({
   },
 
   joinSamples(samples: any) {
-    if (!samples || samples.length === 0) return '(no samples)';
-    return samples
+    if (!samples || samples.length === 0) return apkgText('apkg.noSamples');
+    const sampleText = samples
       .map((s: any) => s.replace(/<[^>]+>/g, '').substring(0, 50))
       .join(', ');
+    return apkgText('apkg.samples', { samples: sampleText });
   },
 
   eq(a: any, b: any) {
@@ -231,11 +244,6 @@ Template.apkgWizard.helpers({
     return metadata ? metadata.fields : [];
   },
 
-  generateButtonText() {
-    const count = (Template.instance() as any).tdfConfigs.get().length;
-    return count === 1 ? 'Generate TDF' : 'Generate Package';
-  },
-
   plusOne(index: any) {
     return index + 1;
   },
@@ -249,9 +257,46 @@ Template.apkgWizard.helpers({
     return metadata ? getConfigNoteCount(config, metadata) : 0;
   },
 
+  selectedNoteSummary(config: any) {
+    const metadata = (Template.instance() as any).deckMetadata.get();
+    const selected = metadata ? getConfigNoteCount(config, metadata) : 0;
+    const total = getImportableNoteCount(metadata);
+    const key = metadata && selected !== metadata.noteCount ? 'apkg.usesImportableNotesSubset' : 'apkg.usesImportableNotes';
+    return apkgText(key, { selected, total });
+  },
+
   usingSubset(config: any) {
     const metadata = (Template.instance() as any).deckMetadata.get();
     return metadata ? getConfigNoteCount(config, metadata) !== metadata.noteCount : false;
+  },
+
+  tdfConfiguredSummary() {
+    const count = (Template.instance() as any).tdfConfigs.get().length;
+    return apkgText('apkg.tdfConfigured', { count, plural: count === 1 ? '' : 's' });
+  },
+
+  totalCardsGeneratedSummary() {
+    const metadata = (Template.instance() as any).deckMetadata.get();
+    const configs = (Template.instance() as any).tdfConfigs.get();
+    const count = metadata ? configs.reduce((sum: number, config: any) => sum + getConfigNoteCount(config, metadata), 0) : 0;
+    return apkgText('apkg.totalCardsGenerated', { count });
+  },
+
+  mediaFilesIncludedSummary() {
+    const metadata = (Template.instance() as any).deckMetadata.get();
+    const configs = (Template.instance() as any).tdfConfigs.get();
+    let count = 0;
+    if (metadata) {
+      configs.forEach((config: any) => {
+        if (config.prompt.field !== null) {
+          const field = metadata.fields[config.prompt.field];
+          if (field && field.hasImages) {
+            count += getConfigNoteCount(config, metadata);
+          }
+        }
+      });
+    }
+    return apkgText('apkg.mediaFilesIncluded', { count });
   },
 
   // Step 4: Generate
@@ -277,6 +322,40 @@ Template.apkgWizard.helpers({
 
   generationResult() {
     return (Template.instance() as any).generationResult.get();
+  },
+
+  step4Title() {
+    const instance = Template.instance() as any;
+    return apkgText(instance.generationComplete.get() ? 'apkg.step4TitleReady' : 'apkg.step4TitleGenerating');
+  },
+
+  generatingTdfsLabel() {
+    const count = (Template.instance() as any).tdfConfigs.get().length;
+    return apkgText('apkg.generatingTdfs', { plural: count === 1 ? '' : 's' });
+  },
+
+  skippedCardsSummary() {
+    const result = (Template.instance() as any).generationResult.get();
+    return apkgText('apkg.skippedCards', { count: result?.totalSkipped ?? 0 });
+  },
+
+  generatedManifestLine(entry: any) {
+    const media = entry?.mediaCount ? apkgText('apkg.generatedFileMedia', { count: entry.mediaCount }) : '';
+    const skipped = entry?.skippedCount ? apkgText('apkg.generatedFileSkipped', { count: entry.skippedCount }) : '';
+    return apkgText('apkg.generatedFileLine', {
+      tdfName: entry?.tdfName ?? '',
+      cards: entry?.cardCount ?? 0
+    }) + media + skipped;
+  },
+
+  generatedTotalLine() {
+    const result = (Template.instance() as any).generationResult.get();
+    const skipped = result?.totalSkipped ? apkgText('apkg.generatedFileSkipped', { count: result.totalSkipped }) : '';
+    return apkgText('apkg.generatedTotal', {
+      cards: result?.totalCards ?? 0,
+      media: result?.totalMedia ?? 0,
+      skipped
+    });
   },
 
   draftLessons() {
@@ -308,12 +387,12 @@ Template.apkgWizard.helpers({
       instance.generating.set(true);
       instance.generateError.set(null);
       instance.generationProgress.set(0);
-      instance.currentGenerationStep.set('Packaging edited draft...');
+      instance.currentGenerationStep.set(apkgText('apkg.packagingEditedDraft'));
 
       try {
         const result = await buildImportPackageFromDraftLessons(lessons);
         instance.generationProgress.set(100);
-        instance.currentGenerationStep.set('Package ready.');
+        instance.currentGenerationStep.set(apkgText('apkg.packageReady'));
         instance.generationResult.set(result);
         instance.generationComplete.set(true);
         // Navigate only after the result is ready so Step 4 never shows an
@@ -518,15 +597,15 @@ Template.apkgWizard.events({
     const configs = template.tdfConfigs.get();
 
     if (configs.length === 1) {
-      setWizardMessage(template, 'warning', 'Configuration required', 'You must have at least one TDF configuration.');
+      setWizardMessage(template, 'warning', apkgText('apkg.configRequiredTitle'), apkgText('apkg.configRequiredMessage'));
       return;
     }
 
     const confirmed = await requestInlineConfirmation(template, {
       id: `remove-config-${index}`,
-      title: 'Remove this TDF configuration?',
-      message: 'This lesson source configuration will be removed from the import setup.',
-      confirmLabel: 'Remove configuration'
+      title: apkgText('apkg.removeConfigTitle'),
+      message: apkgText('apkg.removeConfigMessage'),
+      confirmLabel: apkgText('apkg.removeConfiguration')
     });
 
     if (confirmed) {
@@ -545,7 +624,7 @@ Template.apkgWizard.events({
     template.generating.set(true);
     template.generateError.set(null);
     template.generationProgress.set(0);
-    template.currentGenerationStep.set('Preparing generation...');
+    template.currentGenerationStep.set(apkgText('apkg.preparingGeneration'));
 
     try {
       // Prepare configs for processing
@@ -562,7 +641,7 @@ Template.apkgWizard.events({
         }
       }));
 
-      template.currentGenerationStep.set('Generating TDF(s)...');
+      template.currentGenerationStep.set(apkgText('apkg.generatingTdfsProgress'));
 
       const { buildDraftLessonsFromApkg } = await getApkgProcessor();
       const result = await buildDraftLessonsFromApkg(metadata, processConfigs, (progress: any) => {
@@ -570,7 +649,7 @@ Template.apkgWizard.events({
       });
 
       template.generationProgress.set(100);
-      template.currentGenerationStep.set('Draft ready.');
+      template.currentGenerationStep.set(apkgText('apkg.draftReady'));
 
       template.draftLessons.set(result);
 
@@ -616,7 +695,7 @@ Template.apkgWizard.events({
 
     } catch (error: unknown) {
       clientConsole(1, 'Error downloading package:', error);
-      setWizardMessage(template, 'error', 'Error creating download', getErrorMessage(error));
+      setWizardMessage(template, 'error', apkgText('apkg.errorCreatingDownload'), getErrorMessage(error));
     }
   },
 
@@ -641,9 +720,9 @@ Template.apkgWizard.events({
       if (existingFile) {
         const confirmed = await requestInlineConfirmation(template, {
           id: 'overwrite-package',
-          title: 'Overwrite existing package?',
-          message: 'Uploading this file will overwrite existing data.',
-          confirmLabel: 'Overwrite and upload'
+          title: apkgText('apkg.overwritePackageTitle'),
+          message: apkgText('apkg.overwritePackageMessage'),
+          confirmLabel: apkgText('apkg.overwriteAndUpload')
         });
 
         if (confirmed) {
@@ -661,7 +740,7 @@ Template.apkgWizard.events({
 
       upload.on('start', function () {
         template.uploadStatus.set({
-          message: 'Uploading package...',
+          message: apkgText('apkg.uploadingPackage'),
           progress: 0
         });
       });
@@ -669,7 +748,7 @@ Template.apkgWizard.events({
       upload.on('progress', function (progress: any) {
         // Upload is 0-50% of total progress
         template.uploadStatus.set({
-          message: 'Uploading package...',
+          message: apkgText('apkg.uploadingPackage'),
           progress: Math.round(progress * 0.5)
         });
       });
@@ -677,7 +756,7 @@ Template.apkgWizard.events({
       upload.on('end', async function (error: any, fileObj: any) {
         if (error) {
           template.uploadStatus.set(null);
-          template.uploadError.set(`Error during upload: ${error}`);
+          template.uploadError.set(apkgText('apkg.uploadError', { error }));
         } else {
           const link = DynamicAssets.link({...fileObj});
           if (fileObj.ext === "zip") {
@@ -686,17 +765,17 @@ Template.apkgWizard.events({
             try {
               // Processing is 50-100% of total progress
               template.uploadStatus.set({
-                message: 'Processing package...',
+                message: apkgText('apkg.processingPackage'),
                 progress: 55,
-                hint: 'This may take a moment for packages with many media files...'
+                hint: apkgText('apkg.largePackageHint')
               });
 
               const emailToggle = false; // Not using email notification for wizard uploads
 
               template.uploadStatus.set({
-                message: 'Extracting and validating TDFs...',
+                message: apkgText('apkg.extractingValidatingTdfs'),
                 progress: 65,
-                hint: 'This may take a moment for packages with many media files...'
+                hint: apkgText('apkg.largePackageHint')
               });
 
               const uploadIntegrity = await getUploadIntegrity(file);
@@ -705,7 +784,7 @@ Template.apkgWizard.events({
               
 
               template.uploadStatus.set({
-                message: 'Finalizing upload...',
+                message: apkgText('apkg.finalizingUpload'),
                 progress: 85
               });
 
@@ -715,32 +794,32 @@ Template.apkgWizard.events({
                   const reasons = Array.isArray(res.data.reason) ? res.data.reason : [];
                   const reason: string[] = [];
                   if (reasons.includes('prevTDFExists'))
-                    reason.push(`Previous ${res.data.TDF.content.fileName} already exists, continuing the upload will overwrite the old file. Continue?`);
+                    reason.push(apkgText('content.previousTdfOverwriteMessage', { filename: res.data.TDF.content.fileName }));
                   if (reasons.includes('prevStimExists'))
-                    reason.push(`Previous ${res.data.TDF.content.tdfs.tutor.setspec.stimulusfile} already exists, continuing the upload will overwrite the old file. Continue?`);
+                    reason.push(apkgText('content.previousStimOverwriteMessage', { filename: res.data.TDF.content.tdfs.tutor.setspec.stimulusfile }));
 
                   const confirmed = await requestInlineConfirmation(template, {
                     id: `overwrite-tdf-${res.data.TDF._id || res.data.TDF.content.fileName}`,
-                    title: 'Overwrite existing TDF content?',
+                    title: apkgText('apkg.overwriteTdfTitle'),
                     message: reason.join(' '),
-                    confirmLabel: 'Overwrite content'
+                    confirmLabel: apkgText('apkg.overwriteContent')
                   });
 
                   if (confirmed) {
                     template.uploadStatus.set({
-                      message: 'Confirming TDF update...',
+                      message: apkgText('apkg.confirmingTdfUpdate'),
                       progress: 95
                     });
                     await (Meteor as any).callAsync('tdfUpdateConfirmed', res.data.TDF, false, reasons);
                     clearInlineConfirmation(template);
                   } else {
                     template.uploadStatus.set(null);
-                    template.uploadError.set('Package upload was stopped before overwriting existing TDF content.');
+                    template.uploadError.set(apkgText('apkg.uploadStoppedBeforeOverwrite'));
                     return;
                   }
                 } else if (!res.result) {
                   template.uploadStatus.set(null);
-                  template.uploadError.set("Package upload failed: " + res.errmsg);
+                  template.uploadError.set(apkgText('apkg.packageUploadFailed', { error: res.errmsg }));
                   return;
                 }
               }
@@ -752,7 +831,7 @@ Template.apkgWizard.events({
 
             } catch (err: unknown) {
               template.uploadStatus.set(null);
-              template.uploadError.set('Error processing package: ' + getErrorMessage(err));
+              template.uploadError.set(apkgText('apkg.processingError', { error: getErrorMessage(err) }));
             }
           }
         }
@@ -762,7 +841,7 @@ Template.apkgWizard.events({
 
     } catch (error: unknown) {
       clientConsole(1, 'Error uploading package:', error);
-      template.uploadError.set('Error uploading package: ' + getErrorMessage(error));
+      template.uploadError.set(apkgText('apkg.uploadingError', { error: getErrorMessage(error) }));
     }
   },
 
@@ -771,9 +850,9 @@ Template.apkgWizard.events({
     // Reset wizard and close
     const confirmed = await requestInlineConfirmation(template, {
       id: 'close-wizard',
-      title: 'Close wizard?',
-      message: 'You can find your uploaded files in the content list.',
-      confirmLabel: 'Close wizard',
+      title: apkgText('apkg.closeWizardTitle'),
+      message: apkgText('apkg.closeWizardMessage'),
+      confirmLabel: apkgText('apkg.closeWizard'),
       confirmClass: 'btn-primary',
       icon: 'fa-check-circle'
     });
@@ -801,48 +880,48 @@ Template.apkgWizard.events({
 // Helper function to validate a config
 function validateConfig(config: any, metadata: any) {
   if (!metadata) {
-    config.validationError = 'Metadata not loaded';
+    config.validationError = apkgText('apkg.validationMetadataNotLoaded');
     config.isValid = false;
     return;
   }
 
   // Check name
   if (!config.name || config.name.trim() === '') {
-    config.validationError = 'TDF name is required';
+    config.validationError = apkgText('apkg.validationTdfNameRequired');
     config.isValid = false;
     return;
   }
 
   // Check prompt field
   if (config.prompt.field === null || config.prompt.field === undefined) {
-    config.validationError = 'Prompt field is required';
+    config.validationError = apkgText('apkg.validationPromptRequired');
     config.isValid = false;
     return;
   }
 
   // Check response field
   if (config.response.field === null || config.response.field === undefined) {
-    config.validationError = 'Response field is required';
+    config.validationError = apkgText('apkg.validationResponseRequired');
     config.isValid = false;
     return;
   }
 
   // Check they're different
   if (config.prompt.field === config.response.field) {
-    config.validationError = 'Prompt and response must use different fields';
+    config.validationError = apkgText('apkg.validationDifferentFields');
     config.isValid = false;
     return;
   }
 
   const parsedRange = parseImportIndexSpec(config.sourceRange, getImportableNoteCount(metadata));
   if (!parsedRange.valid) {
-    config.validationError = parsedRange.errorMessage || 'Invalid note range';
+    config.validationError = apkgText('apkg.validationInvalidNoteRange');
     config.isValid = false;
     return;
   }
 
   if (parsedRange.indexes && parsedRange.indexes.length === 0) {
-    config.validationError = 'Note range does not select any notes';
+    config.validationError = apkgText('apkg.validationEmptyNoteRange');
     config.isValid = false;
     return;
   }

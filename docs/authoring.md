@@ -15,6 +15,16 @@ A TDF can define:
 - media references,
 - learner-facing display settings.
 
+## Language Metadata
+
+TDF lesson metadata may declare:
+
+- `contentLanguage`: the BCP 47 language tag for authored instructional content.
+- `recommendedUiLocales`: optional BCP 47 UI locale tags recommended for platform chrome.
+- `translationStatus`: author-declared review status for the authored content language variant.
+
+These fields describe author-provided content. They do not ask MoFaCTS to translate prompts, answers, hints, feedback, rubrics, or KC labels.
+
 ## Supported Practice Patterns
 
 MoFaCTS supports multiple stimulus and response formats, including:

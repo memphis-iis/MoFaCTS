@@ -1,5 +1,7 @@
 import { clientConsole } from '../../lib/userSessionHelpers';
 import { Tracker } from 'meteor/tracker';
+import { translatePlatformString } from '../../lib/interfaceI18n';
+import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra');
 
 import './classSelection.html';
@@ -18,13 +20,17 @@ function classSelectionContext() {
   return Meteor.user()?.loginParams?.curClass || Session.get('curClass') || null;
 }
 
+function classSelectionText(key: any, values?: Record<string, string | number>) {
+  return translatePlatformString(getActiveUiLocale(), key, values);
+}
+
 function selectedClassDisplayLabel() {
   const curClass = classSelectionContext();
-  if (!curClass) return 'None';
+  if (!curClass) return classSelectionText('classSelection.none');
   const courseName = String(curClass.courseName || '').trim();
   const sectionName = String(curClass.sectionName || '').trim();
   if (courseName && sectionName) return `${courseName} - ${sectionName}`;
-  return courseName || sectionName || 'Selected';
+  return courseName || sectionName || classSelectionText('classSelection.selected');
 }
 
 function isSectionSelectable(section: any) {
@@ -77,6 +83,9 @@ Template.classSelection.helpers({
   },
   selectedClassDisplay: function() {
     return selectedClassDisplayLabel();
+  },
+  currentCourseText: function() {
+    return classSelectionText('classSelection.currentCourse', { course: selectedClassDisplayLabel() });
   }
 });
 
@@ -97,7 +106,7 @@ Template.classSelection.events({
     const teacherId = String(Session.get('classSelectionTeacherId') || '');
     const sectionId = String(Session.get('classSelectionSectionId') || '');
     if (!teacherId || !sectionId) {
-      alert('Please select both instructor and course.');
+      alert(classSelectionText('classSelection.selectBoth'));
       return;
     }
 
@@ -106,7 +115,7 @@ Template.classSelection.events({
     const teacher = teachers.find((row: any) => String(row?._id || '') === teacherId);
     const curClass = sections.find((row: any) => String(row?.sectionId || '') === sectionId);
     if (!teacher || !curClass) {
-      alert('Invalid instructor/course selection. Please try again.');
+      alert(classSelectionText('classSelection.invalidSelection'));
       return;
     }
 
@@ -123,11 +132,11 @@ Template.classSelection.events({
       );
       Session.set('curTeacher', teacher);
       Session.set('curClass', curClass);
-      alert('Course enrollment saved.');
+      alert(classSelectionText('classSelection.saved'));
       FlowRouter.go('/home');
     } catch (error: unknown) {
       clientConsole(1, '[CLASS_SELECTION] Failed saving class selection:', error);
-      alert('Could not save course enrollment. Please try again.');
+      alert(classSelectionText('classSelection.saveFailed'));
     }
   },
 

@@ -1,5 +1,7 @@
 <script>
   import { onDestroy, onMount, tick } from 'svelte';
+  import { getActiveUiLocale } from '../../../lib/interfaceLocaleState';
+  import { translatePlatformString } from '../../../lib/interfaceI18n';
   import {
     SPARC_RICH_TEXT_COLORS,
     normalizeSparcRichHtml,
@@ -98,6 +100,7 @@
   export let onCancel = () => {};
 
   const clone = (value) => JSON.parse(JSON.stringify(value));
+  const sparcText = (key, values) => translatePlatformString(getActiveUiLocale(), key, values);
   const paletteEntries = getRenderedSparcPaletteEntries();
   const ruleCatalogEntries = SPARC_RULE_CATALOG;
   const productionRuleCatalogEntries = ruleCatalogEntries.filter((entry) => entry.category.startsWith('production-rule-'));
@@ -234,6 +237,11 @@
     isRichTextNode,
     markChanged,
     normalizeHtml: normalizeSparcRichHtml,
+    messages: {
+      richTextPlaceholder: sparcText('sparc.richTextPlaceholder'),
+      imageHttpsRequired: sparcText('sparc.imageHttpsRequired'),
+      embedHttpsRequired: sparcText('sparc.embedHttpsRequired'),
+    },
     setErrorText: (value) => {
       errorText = value;
     },
@@ -495,7 +503,7 @@
   }
 
   function ensureProductionRules() {
-    if (!activeDisplay) throw new Error('No active SPARC display is selected.');
+    if (!activeDisplay) throw new Error(sparcText('sparc.noActiveDisplaySelected'));
     activeDisplay.productionRules = Array.isArray(activeDisplay.productionRules) ? activeDisplay.productionRules : [];
     return activeDisplay.productionRules;
   }
@@ -590,8 +598,8 @@
     if (!activeDisplay || !activeNode) return;
     deleteConfirmation = {
       nodeId: activeNode.id,
-      title: `Delete "${activeNode.id}"?`,
-      message: 'This removes the selected SPARC display node from the authored page.'
+      title: sparcText('sparc.deleteNodeTitle', { nodeId: activeNode.id }),
+      message: sparcText('sparc.deleteNodeMessage')
     };
   }
 
@@ -635,7 +643,7 @@
     try {
       validateBeforeSave();
       await onSave(clone(rawStimuliFile));
-      saveMessage = 'Saved.';
+      saveMessage = sparcText('sparc.saved');
     } catch (error) {
       errorText = error.reason || error.message || String(error);
     } finally {
@@ -685,9 +693,9 @@
         <div class="admin-inline-confirmation-message">{deleteConfirmation.message}</div>
       </div>
       <div class="admin-inline-confirmation-actions">
-        <button type="button" class="btn btn-sm btn-outline-secondary" on:click={cancelDeleteConfirmation}>Cancel</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" on:click={cancelDeleteConfirmation}>{sparcText('apkg.cancel')}</button>
         <button type="button" class="btn btn-sm btn-danger" on:click={confirmDeleteNode}>
-          <i class="fa fa-trash" aria-hidden="true"></i> Delete
+          <i class="fa fa-trash" aria-hidden="true"></i> {sparcText('admin.delete')}
         </button>
       </div>
     </div>

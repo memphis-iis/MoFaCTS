@@ -5,6 +5,9 @@ import DOMPurify from 'dompurify';
 import { Cookie } from '../../lib/cookies';
 import { currentUserHasRole } from '../../lib/roleUtils';
 import { getUserDisplayName, getUserInitials } from '../../lib/userIdentity';
+import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
+import { translatePlatformString } from '../../lib/interfaceI18n';
+import type { PlatformStringKey } from '../../lib/interfaceI18nResources';
 import { applyThemeCSSProperties } from '../../lib/currentTestingHelpers';
 import {
   clearSavedUserThemeSelection,
@@ -38,9 +41,9 @@ type HomeTourStepId =
   | 'download-data';
 type HomeTourStep = {
   id: HomeTourStepId;
-  text: string;
+  textKey: PlatformStringKey;
   targetSelector: string;
-  targetLabel: string;
+  targetLabelKey: PlatformStringKey;
   placement: 'sidebar' | 'lesson-action';
 };
 
@@ -94,30 +97,30 @@ const SIDEBAR_ACTIVE_MATCHERS: Record<string, string[]> = {
 const HOME_TOUR_STEPS: HomeTourStep[] = [
   {
     id: 'main-menu-return',
-    text: 'Use Practice to return to this page. Your prior practice is saved automatically.',
+    textKey: 'home.tourReturnToPractice',
     targetSelector: '#homePracticeButton',
-    targetLabel: 'Practice menu button',
+    targetLabelKey: 'home.tourPracticeMenuButton',
     placement: 'sidebar',
   },
   {
     id: 'learning-dashboard',
-    text: 'Start or continue a lesson from the practice menu.',
+    textKey: 'home.tourStartLesson',
     targetSelector: '.learning-dashboard-action-button.start-lesson, .learning-dashboard-action-button.continue-lesson, .learning-dashboard-action-button.start-condition-root',
-    targetLabel: 'first lesson action button',
+    targetLabelKey: 'home.tourFirstLessonActionButton',
     placement: 'lesson-action',
   },
   {
     id: 'content-manager',
-    text: 'Use Create Content to build or upload lessons.',
+    textKey: 'home.tourCreateContent',
     targetSelector: '#contentUploadButton',
-    targetLabel: 'Create Content menu button',
+    targetLabelKey: 'home.tourCreateContentMenuButton',
     placement: 'sidebar',
   },
   {
     id: 'download-data',
-    text: 'Use Detailed Data to review exported practice records.',
+    textKey: 'home.tourDetailedData',
     targetSelector: '#dataDownloadButton',
-    targetLabel: 'Detailed Data menu button',
+    targetLabelKey: 'home.tourDetailedDataMenuButton',
     placement: 'sidebar',
   },
 ];
@@ -342,9 +345,10 @@ Template.appAccountMenu.helpers({
   },
 
   userRoleLabel(): string {
-    if (currentUserHasRole('admin')) return 'Admin';
-    if (currentUserHasRole('teacher')) return 'Teacher';
-    return 'Learner';
+    const uiLocale = getActiveUiLocale();
+    if (currentUserHasRole('admin')) return translatePlatformString(uiLocale, 'home.admin');
+    if (currentUserHasRole('teacher')) return translatePlatformString(uiLocale, 'home.teacher');
+    return translatePlatformString(uiLocale, 'home.learner');
   },
 
   themeMenuOpen(): boolean {
@@ -714,13 +718,14 @@ function positionMainMenuReturnTour(overlay: HTMLElement, target: HTMLElement): 
 
 function resolveHomeTourTarget(step: HomeTourStep): HTMLElement {
   const target = document.querySelector<HTMLElement>(step.targetSelector);
+  const targetLabel = translatePlatformString(getActiveUiLocale(), step.targetLabelKey);
   if (!target) {
-    throw new Error(`[HOME] Tour step "${step.id}" requires ${step.targetLabel} (${step.targetSelector}), but it was not found.`);
+    throw new Error(`[HOME] Tour step "${step.id}" requires ${targetLabel} (${step.targetSelector}), but it was not found.`);
   }
 
   const targetRect = target.getBoundingClientRect();
   if (targetRect.width <= 0 || targetRect.height <= 0) {
-    throw new Error(`[HOME] Tour step "${step.id}" requires visible ${step.targetLabel} (${step.targetSelector}), but it has no rendered size.`);
+    throw new Error(`[HOME] Tour step "${step.id}" requires visible ${targetLabel} (${step.targetSelector}), but it has no rendered size.`);
   }
 
   return target;
@@ -792,7 +797,7 @@ function showCurrentMainMenuTourStep(templateInstance: any): void {
   overlay.dataset.tourStepId = step.id;
   const text = overlay.querySelector('.main-menu-return-tour-text');
   if (text) {
-    text.textContent = step.text;
+    text.textContent = translatePlatformString(getActiveUiLocale(), step.textKey);
   }
 
   document.querySelectorAll('.main-menu-return-tour-target')

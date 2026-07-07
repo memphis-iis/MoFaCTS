@@ -499,10 +499,10 @@
                 <i class="fa fa-arrow-left"></i> Back
             </a>
             <h3 class="page-header-text editor-page-title">
-                Edit TDF: {{lessonName}}
+                {{editTitle}}
                 {{#if conditionInfo}}
                     <small class="text-muted">
-                        (Editing: {{conditionInfo.fileName}} - Condition {{conditionInfo.index}} of {{conditionInfo.total}})
+                        {{conditionSummary conditionInfo}}
                     </small>
                 {{/if}}
             </h3>
@@ -511,13 +511,13 @@
         {{#if loading}}
         <div class="text-center editor-loading-state">
             <i class="fa fa-spinner fa-spin fa-2x"></i>
-            <p class="admin-form-row-top">Loading TDF...</p>
+            <p class="admin-form-row-top">{{tdfEditorText 'tdfEditor.loadingTdf'}}</p>
         </div>
         {{else}}
         {{#if noData}}
         <div class="admin-status admin-status-warning">
             <i class="fa fa-exclamation-triangle"></i>
-            <div class="admin-status-text">TDF not found or you don't have permission to edit it.</div>
+            <div class="admin-status-text">{{tdfEditorText 'tdfEditor.notFound'}}</div>
         </div>
         {{else}}
 
@@ -535,22 +535,22 @@
         <div class="editor-topbar admin-form-row">
             <div class="editor-status">
                 {{#if hasChanges}}
-                <span class="badge bg-warning text-dark unsaved-badge">Unsaved changes</span>
+                <span class="badge bg-warning text-dark unsaved-badge">{{tdfEditorText 'tdfEditor.unsavedChanges'}}</span>
                 {{/if}}
             </div>
             <div class="editor-verbosity">
-                <span class="text-muted small">Descriptions:</span>
+                <span class="text-muted small">{{tdfEditorText 'tdfEditor.descriptions'}}</span>
                 <div class="form-check form-check-inline editor-inline-check">
                     <input class="form-check-input" type="radio" name="tooltipMode" id="tooltipNone" value="none" checked="{{noneChecked}}">
-                    <label class="form-check-label small" for="tooltipNone">None</label>
+                    <label class="form-check-label small" for="tooltipNone">{{tdfEditorText 'tdfEditor.none'}}</label>
                 </div>
                 <div class="form-check form-check-inline editor-inline-check">
                     <input class="form-check-input" type="radio" name="tooltipMode" id="tooltipBrief" value="brief" checked="{{briefChecked}}">
-                    <label class="form-check-label small" for="tooltipBrief">Brief</label>
+                    <label class="form-check-label small" for="tooltipBrief">{{tdfEditorText 'tdfEditor.brief'}}</label>
                 </div>
                 <div class="form-check form-check-inline editor-inline-check">
                     <input class="form-check-input" type="radio" name="tooltipMode" id="tooltipVerbose" value="verbose" checked="{{verboseChecked}}">
-                    <label class="form-check-label small" for="tooltipVerbose">Verbose</label>
+                    <label class="form-check-label small" for="tooltipVerbose">{{tdfEditorText 'tdfEditor.verbose'}}</label>
                 </div>
             </div>
         </div>
@@ -574,10 +574,10 @@
                 {{/if}}
             </div>
             <a href="/contentUpload" class="btn btn-secondary">
-                <i class="fa fa-times"></i> Cancel
+                <i class="fa fa-times"></i> {{tdfEditorText 'content.cancel'}}
             </a>
             <button class="btn btn-primary save-btn" disabled="{{saveDisabled}}">
-                <i class="fa fa-save"></i> Save Changes
+                <i class="fa fa-save"></i> {{tdfEditorText 'tdfEditor.saveChanges'}}
             </button>
         </div>
 

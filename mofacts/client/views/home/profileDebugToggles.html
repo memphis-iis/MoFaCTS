@@ -1,12 +1,12 @@
 <template name="profileDebugToggles">
     <div class="padLeftAndRight row toggleSwitchContainer">
       <div class="debug-button-containers">
-        <p style="font-size: calc(var(--app-font-size-base) * 1.2);">Debug Menu</p>
+        <p style="font-size: calc(var(--app-font-size-base) * 1.2);">{{t 'debug.menu'}}</p>
           <div id="switch-probparams" class="switch-3 switch-candy">
             <input class="debugPromptRadio" id="debugProbParmsDisplay" name="state-db" type="checkbox" />
-            <label for="debugProbParmsDisplay" onclick="">Display Probability Function Input Parameters</label>
+            <label for="debugProbParmsDisplay" onclick="">{{t 'debug.displayProbabilityFunctionInputParameters'}}</label>
           </div>
       </div>
     </div>
     <br/>
-  </template> 
+  </template>

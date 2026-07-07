@@ -8,7 +8,7 @@
   const dispatch = createEventDispatcher();
 
   export let checkpointGateState = '';
-  export let continueButtonText = 'Continue';
+  export let continueButtonText = '';
   export let deliverySettings = {};
   export let fadingOut = false;
   export let instructionHtml = '';

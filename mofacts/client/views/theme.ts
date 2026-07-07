@@ -3,6 +3,8 @@ import { Template } from 'meteor/templating';
 import { Session } from 'meteor/session';
 import { Tracker } from 'meteor/tracker';
 import { ReactiveVar } from 'meteor/reactive-var';
+import { getActiveUiLocale } from '../lib/interfaceLocaleState';
+import { translatePlatformString } from '../lib/interfaceI18n';
 import {
     isThemeLengthProperty,
     isThemeDensityScaleProperty,
@@ -24,6 +26,10 @@ const THEME_FONT_STYLESHEET_LINK_ID = 'mofacts-theme-font-stylesheet';
 const THEME_IMPORT_MAX_FILE_BYTES = 10 * 1024 * 1024;
 const HOME_UNDERLAY_MAX_FILE_BYTES = 5 * 1024 * 1024;
 const MIN_ICON_CONTRAST_RATIO = 3;
+
+function themeText(key: Parameters<typeof translatePlatformString>[1], values?: Parameters<typeof translatePlatformString>[2]) {
+    return translatePlatformString(getActiveUiLocale(), key, values);
+}
 
 type RgbColor = {
     r: number;
@@ -365,13 +371,13 @@ Template.theme.helpers({
         return isThemeActive(themeId) ? 'theme-pill-active' : '';
     },
     'themeActivateButtonLabel': function(themeId: any) {
-        return isThemeActive(themeId) ? 'Active' : 'Activate';
+        return isThemeActive(themeId) ? themeText('theme.active') : themeText('theme.activate');
     },
     'themeActivateButtonClass': function(themeId: any) {
         return isThemeActive(themeId) ? 'btn-secondary' : '';
     },
     'themeOrigin': function(origin: any) {
-        return origin === 'system' ? 'System default' : 'Custom';
+        return origin === 'system' ? themeText('theme.systemDefault') : themeText('theme.custom');
     },
     'isSystemTheme': function(origin: any) {
         return origin === 'system';
@@ -434,6 +440,9 @@ Template.theme.helpers({
     },
     'themeConfirmation': function() {
         return (Template.instance() as any).themeConfirmation.get();
+    },
+    'themeText': function(key: Parameters<typeof translatePlatformString>[1], options?: { hash?: Parameters<typeof translatePlatformString>[2] }) {
+        return themeText(key, options?.hash);
     }
 });
 
@@ -747,9 +756,9 @@ Template.theme.events({
             return;
         }
         const confirmed = await requestThemeConfirmation(template, {
-            title: `Delete ${themeName}?`,
-            message: 'This cannot be undone.',
-            confirmLabel: 'Delete theme'
+            title: themeText('theme.deleteThemeTitle', { themeName }),
+            message: themeText('theme.deleteThemeMessage'),
+            confirmLabel: themeText('theme.deleteTheme')
         });
         if (!confirmed) {
             return;

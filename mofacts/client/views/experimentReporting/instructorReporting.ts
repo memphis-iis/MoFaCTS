@@ -7,6 +7,8 @@ import { ReactiveDict } from 'meteor/reactive-dict';
 import { meteorCallAsync } from '../..';
 import { INVALID } from '../../../common/Definitions';
 import { Tracker } from 'meteor/tracker';
+import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
+import { translatePlatformString } from '../../lib/interfaceI18n';
 declare const $: any;
 declare const Tdfs: any;
 
@@ -14,6 +16,10 @@ const _state = new ReactiveDict('instructorReportingState');
 
 let curTdf = INVALID;
 let curAssignmentId: string | null = null;
+
+function reportingText(key: Parameters<typeof translatePlatformString>[1], values?: Parameters<typeof translatePlatformString>[2]): string {
+  return translatePlatformString(getActiveUiLocale(), key, values);
+}
 
 function setReportingMessage(text: string, level = 'info'): void {
   const icon = level === 'success'
@@ -43,6 +49,9 @@ Template.instructorReporting.helpers({
   curClassPerformance: () => Session.get('curClassPerformance'),
   performanceLoading: () => Session.get('performanceLoading'),
   reportingMessage: () => Session.get('instructorReportingMessage'),
+  reportingText(key: Parameters<typeof translatePlatformString>[1], options?: { hash?: Parameters<typeof translatePlatformString>[2] }) {
+    return reportingText(key, options?.hash);
+  },
   replaceSpacesWithUnderscores: (value: string) => value.replace(' ', '_'),
   selectedTdfDueDate: () => Session.get('selectedTdfDueDate'),
   dueDateFilter: () => Session.get('dueDateFilter'),
@@ -84,7 +93,7 @@ Template.instructorReporting.events({
       
     } else {
       Session.set('selectedTdfDueDate', undefined);
-      setReportingMessage('Please select a class.', 'warning');
+      setReportingMessage(reportingText('reporting.pleaseSelectClass'), 'warning');
     }
     _state.set('userMetThresholdMap', undefined);
     $('#practice-deadline-date').prop('disabled', false);
@@ -127,7 +136,7 @@ Template.instructorReporting.events({
     const classId = Session.get('curClass')._id;
     
     await meteorCallAsync('addUserDueDateException', userId, curTdf, classId, dateInt, curAssignmentId);
-    setReportingMessage('Exception added.', 'success');
+    setReportingMessage(reportingText('reporting.exceptionAdded'), 'success');
     date = String(Session.get('selectedTdfDueDate') || '');
     dateInt = new Date(date).getTime();
     updateTables(curTdf, dateInt);
@@ -139,7 +148,7 @@ Template.instructorReporting.events({
     const classId = Session.get('curClass')._id;
     
     await meteorCallAsync('removeUserDueDateException', userId, curTdf, classId, curAssignmentId);
-    setReportingMessage('Exception removed.', 'success');
+    setReportingMessage(reportingText('reporting.exceptionRemoved'), 'success');
     const date = String(Session.get('selectedTdfDueDate') || '');
     const dateInt = new Date(date).getTime();
     updateTables(curTdf, dateInt);

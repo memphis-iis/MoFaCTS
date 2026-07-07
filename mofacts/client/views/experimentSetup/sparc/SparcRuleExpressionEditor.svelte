@@ -1,19 +1,24 @@
 <script>
+  import { getActiveUiLocale } from '../../../lib/interfaceLocaleState';
+  import { translatePlatformString } from '../../../lib/interfaceI18n';
   import { stringifyLooseValue } from './sparcAuthoringEditPrimitives';
 
   export let expression = null;
-  export let label = 'Expression';
+  export let label = '';
   export let ruleExpressionTypes = [];
   export let functionNames = [];
   export let onUpdateRuleExpression = () => {};
   export let onAddExpressionArg = () => {};
   export let onRemoveExpressionArg = () => {};
+
+  const sparcText = (key, values) => translatePlatformString(getActiveUiLocale(), key, values);
+  const argumentLabel = (index) => sparcText('sparc.argumentLabel', { index });
 </script>
 
 {#if expression}
   <div class="sparc-expression-editor">
     <div class="sparc-panel-header">
-      <h4>{label}</h4>
+      <h4>{label || sparcText('sparc.expression')}</h4>
       <select value={expression.type} on:change={(event) => onUpdateRuleExpression(expression, 'type', event.currentTarget.value)}>
         {#each ruleExpressionTypes as type}
           <option value={type}>{type}</option>
@@ -22,17 +27,17 @@
     </div>
     {#if expression.type === 'literal'}
       <label>
-        Literal Value
+        {sparcText('sparc.literalValue')}
         <input value={stringifyLooseValue(expression.value)} on:input={(event) => onUpdateRuleExpression(expression, 'value', event.currentTarget.value)} />
       </label>
     {:else if expression.type === 'variable'}
       <label>
-        Variable Name
+        {sparcText('sparc.variableName')}
         <input value={expression.name || ''} on:input={(event) => onUpdateRuleExpression(expression, 'name', event.currentTarget.value)} />
       </label>
     {:else if expression.type === 'function'}
       <label>
-        Function
+        {sparcText('sparc.function')}
         <select value={expression.name} on:change={(event) => onUpdateRuleExpression(expression, 'name', event.currentTarget.value)}>
           {#each functionNames as name}
             <option value={name}>{name}</option>
@@ -40,18 +45,18 @@
         </select>
       </label>
       <div class="sparc-panel-header">
-        <h4>Arguments</h4>
-        <button type="button" class="btn btn-outline-secondary btn-sm" on:click={() => onAddExpressionArg(expression)}>Add Argument</button>
+        <h4>{sparcText('sparc.arguments')}</h4>
+        <button type="button" class="btn btn-outline-secondary btn-sm" on:click={() => onAddExpressionArg(expression)}>{sparcText('sparc.addArgument')}</button>
       </div>
       {#each expression.args || [] as arg, argIndex}
         <div class="sparc-nested-rule-card">
           <div class="sparc-inline-actions">
-            <strong>Argument {argIndex + 1}</strong>
-            <button type="button" class="btn btn-outline-danger btn-sm" on:click={() => onRemoveExpressionArg(expression, argIndex)}>Remove</button>
+            <strong>{argumentLabel(argIndex + 1)}</strong>
+            <button type="button" class="btn btn-outline-danger btn-sm" on:click={() => onRemoveExpressionArg(expression, argIndex)}>{sparcText('sparc.remove')}</button>
           </div>
           <svelte:self
             expression={arg}
-            label={`Argument ${argIndex + 1}`}
+            label={argumentLabel(argIndex + 1)}
             {ruleExpressionTypes}
             {functionNames}
             {onUpdateRuleExpression}

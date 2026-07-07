@@ -1,4 +1,7 @@
 <script>
+  import { getActiveUiLocale } from '../../../lib/interfaceLocaleState';
+  import { translatePlatformString } from '../../../lib/interfaceI18n';
+
   export let colors = [];
   export let isRichTextSelected = false;
   export let showNodeHierarchy = false;
@@ -11,42 +14,44 @@
   export let alignmentActive = () => false;
   export let runCommand = () => {};
   export let onToolbarMouseDown = () => {};
+
+  const sparcText = (key) => translatePlatformString(getActiveUiLocale(), key);
 </script>
 
-<div class="sparc-rich-text-toolbar" role="toolbar" tabindex="-1" aria-label="SPARC visual editor tools" on:mousedown={onToolbarMouseDown}>
+<div class="sparc-rich-text-toolbar" role="toolbar" tabindex="-1" aria-label={sparcText('sparc.richTextToolbar')} on:mousedown={onToolbarMouseDown}>
   <label class="sparc-advanced-toggle sparc-toolbar-toggle">
     <input type="checkbox" bind:checked={showNodeHierarchy} />
-    Show node hierarchy
+    {sparcText('sparc.showNodeHierarchy')}
   </label>
   {#if isRichTextSelected}
     <div class="sparc-toolbar-divider" aria-hidden="true"></div>
-    <div class="sparc-toolbar-group" aria-label="Inline formatting">
-      <button type="button" class:active={commandActive('bold')} title="Bold" on:click={() => runCommand('bold')}>B</button>
-      <button type="button" class:active={commandActive('italic')} title="Italic" on:click={() => runCommand('italic')}>I</button>
-      <button type="button" class:active={commandActive('underline')} title="Underline" on:click={() => runCommand('underline')}>U</button>
-      <button type="button" class:active={commandActive('strike')} title="Strikethrough" on:click={() => runCommand('strike')}>S</button>
-      <button type="button" class:active={commandActive('highlight')} title="Highlight" on:click={() => runCommand('highlight')}>HL</button>
-      <button type="button" class:active={commandActive('subscript')} title="Subscript" on:click={() => runCommand('subscript')}>x2</button>
-      <button type="button" class:active={commandActive('superscript')} title="Superscript" on:click={() => runCommand('superscript')}>x^2</button>
+    <div class="sparc-toolbar-group" aria-label={sparcText('sparc.inlineFormatting')}>
+      <button type="button" class:active={commandActive('bold')} title={sparcText('sparc.bold')} on:click={() => runCommand('bold')}>B</button>
+      <button type="button" class:active={commandActive('italic')} title={sparcText('sparc.italic')} on:click={() => runCommand('italic')}>I</button>
+      <button type="button" class:active={commandActive('underline')} title={sparcText('sparc.underline')} on:click={() => runCommand('underline')}>U</button>
+      <button type="button" class:active={commandActive('strike')} title={sparcText('sparc.strikethrough')} on:click={() => runCommand('strike')}>S</button>
+      <button type="button" class:active={commandActive('highlight')} title={sparcText('sparc.highlight')} on:click={() => runCommand('highlight')}>HL</button>
+      <button type="button" class:active={commandActive('subscript')} title={sparcText('sparc.subscript')} on:click={() => runCommand('subscript')}>x2</button>
+      <button type="button" class:active={commandActive('superscript')} title={sparcText('sparc.superscript')} on:click={() => runCommand('superscript')}>x^2</button>
     </div>
-    <div class="sparc-toolbar-group" aria-label="Blocks and lists">
-      <button type="button" class:active={commandActive('paragraph')} on:click={() => runCommand('paragraph')}>Paragraph</button>
+    <div class="sparc-toolbar-group" aria-label={sparcText('sparc.blocksAndLists')}>
+      <button type="button" class:active={commandActive('paragraph')} on:click={() => runCommand('paragraph')}>{sparcText('sparc.paragraph')}</button>
       <button type="button" class:active={commandActive('heading', { level: 2 })} on:click={() => runCommand('heading', 2)}>H2</button>
       <button type="button" class:active={commandActive('heading', { level: 3 })} on:click={() => runCommand('heading', 3)}>H3</button>
-      <button type="button" class:active={commandActive('bulletList')} on:click={() => runCommand('bullet-list')}>Bullets</button>
-      <button type="button" class:active={commandActive('orderedList')} on:click={() => runCommand('ordered-list')}>Numbers</button>
-      <button type="button" class:active={commandActive('taskList')} on:click={() => runCommand('task-list')}>Tasks</button>
-      <button type="button" class:active={commandActive('blockquote')} on:click={() => runCommand('blockquote')}>Quote</button>
-      <button type="button" class:active={commandActive('codeBlock')} on:click={() => runCommand('code-block')}>Code</button>
-      <button type="button" on:click={() => runCommand('horizontal-rule')}>Rule</button>
+      <button type="button" class:active={commandActive('bulletList')} on:click={() => runCommand('bullet-list')}>{sparcText('sparc.bullets')}</button>
+      <button type="button" class:active={commandActive('orderedList')} on:click={() => runCommand('ordered-list')}>{sparcText('sparc.numbers')}</button>
+      <button type="button" class:active={commandActive('taskList')} on:click={() => runCommand('task-list')}>{sparcText('sparc.tasks')}</button>
+      <button type="button" class:active={commandActive('blockquote')} on:click={() => runCommand('blockquote')}>{sparcText('sparc.quote')}</button>
+      <button type="button" class:active={commandActive('codeBlock')} on:click={() => runCommand('code-block')}>{sparcText('sparc.code')}</button>
+      <button type="button" on:click={() => runCommand('horizontal-rule')}>{sparcText('sparc.rule')}</button>
     </div>
-    <div class="sparc-toolbar-group" aria-label="Alignment">
-      <button type="button" class:active={alignmentActive('left')} on:click={() => runCommand('align', 'left')}>Left</button>
-      <button type="button" class:active={alignmentActive('center')} on:click={() => runCommand('align', 'center')}>Center</button>
-      <button type="button" class:active={alignmentActive('right')} on:click={() => runCommand('align', 'right')}>Right</button>
-      <button type="button" class:active={alignmentActive('justify')} on:click={() => runCommand('align', 'justify')}>Justify</button>
+    <div class="sparc-toolbar-group" aria-label={sparcText('sparc.alignment')}>
+      <button type="button" class:active={alignmentActive('left')} on:click={() => runCommand('align', 'left')}>{sparcText('sparc.alignLeft')}</button>
+      <button type="button" class:active={alignmentActive('center')} on:click={() => runCommand('align', 'center')}>{sparcText('sparc.alignCenter')}</button>
+      <button type="button" class:active={alignmentActive('right')} on:click={() => runCommand('align', 'right')}>{sparcText('sparc.alignRight')}</button>
+      <button type="button" class:active={alignmentActive('justify')} on:click={() => runCommand('align', 'justify')}>{sparcText('sparc.alignJustify')}</button>
     </div>
-    <div class="sparc-toolbar-group" aria-label="Color">
+    <div class="sparc-toolbar-group" aria-label={sparcText('sparc.color')}>
       {#each colors as color}
         <button
           type="button"
@@ -58,29 +63,29 @@
           {color.label}
         </button>
       {/each}
-      <button type="button" on:click={() => runCommand('color', '')}>Clear</button>
+      <button type="button" on:click={() => runCommand('color', '')}>{sparcText('sparc.clear')}</button>
     </div>
-    <div class="sparc-toolbar-group" aria-label="Links and media">
-      <input class="sparc-link-input" placeholder="https://..." bind:value={richTextLinkHref} aria-label="Link URL" />
-      <button type="button" class:active={commandActive('link')} on:click={() => runCommand('link', richTextLinkHref)}>Link</button>
-      <button type="button" on:click={() => runCommand('link', '')}>Unlink</button>
-      <input class="sparc-link-input" placeholder="Image URL" bind:value={richTextImageSrc} aria-label="Image URL" />
-      <input class="sparc-short-input" placeholder="Alt" bind:value={richTextImageAlt} aria-label="Image alt text" />
-      <button type="button" on:click={() => runCommand('image', { src: richTextImageSrc, alt: richTextImageAlt })}>Image</button>
-      <input class="sparc-link-input" placeholder="Embed URL" bind:value={richTextEmbedSrc} aria-label="Embed URL" />
-      <button type="button" on:click={() => runCommand('embed', richTextEmbedSrc)}>Embed</button>
+    <div class="sparc-toolbar-group" aria-label={sparcText('sparc.linksAndMedia')}>
+      <input class="sparc-link-input" placeholder="https://..." bind:value={richTextLinkHref} aria-label={sparcText('sparc.linkUrl')} />
+      <button type="button" class:active={commandActive('link')} on:click={() => runCommand('link', richTextLinkHref)}>{sparcText('sparc.link')}</button>
+      <button type="button" on:click={() => runCommand('link', '')}>{sparcText('sparc.unlink')}</button>
+      <input class="sparc-link-input" placeholder={sparcText('sparc.imageUrl')} bind:value={richTextImageSrc} aria-label={sparcText('sparc.imageUrl')} />
+      <input class="sparc-short-input" placeholder="Alt" bind:value={richTextImageAlt} aria-label={sparcText('sparc.imageAltText')} />
+      <button type="button" on:click={() => runCommand('image', { src: richTextImageSrc, alt: richTextImageAlt })}>{sparcText('sparc.image')}</button>
+      <input class="sparc-link-input" placeholder={sparcText('sparc.embedUrl')} bind:value={richTextEmbedSrc} aria-label={sparcText('sparc.embedUrl')} />
+      <button type="button" on:click={() => runCommand('embed', richTextEmbedSrc)}>{sparcText('sparc.embed')}</button>
     </div>
-    <div class="sparc-toolbar-group" aria-label="Table controls">
-      <button type="button" on:click={() => runCommand('table')}>Table</button>
-      <button type="button" on:click={() => runCommand('table-add-row')}>Row+</button>
-      <button type="button" on:click={() => runCommand('table-add-column')}>Col+</button>
-      <button type="button" on:click={() => runCommand('table-delete-row')}>Row-</button>
-      <button type="button" on:click={() => runCommand('table-delete-column')}>Col-</button>
-      <button type="button" on:click={() => runCommand('table-delete')}>Delete Table</button>
+    <div class="sparc-toolbar-group" aria-label={sparcText('sparc.tableControls')}>
+      <button type="button" on:click={() => runCommand('table')}>{sparcText('sparc.table')}</button>
+      <button type="button" on:click={() => runCommand('table-add-row')}>{sparcText('sparc.addRow')}</button>
+      <button type="button" on:click={() => runCommand('table-add-column')}>{sparcText('sparc.addColumn')}</button>
+      <button type="button" on:click={() => runCommand('table-delete-row')}>{sparcText('sparc.deleteRow')}</button>
+      <button type="button" on:click={() => runCommand('table-delete-column')}>{sparcText('sparc.deleteColumn')}</button>
+      <button type="button" on:click={() => runCommand('table-delete')}>{sparcText('sparc.deleteTable')}</button>
     </div>
-    <div class="sparc-toolbar-group" aria-label="History and source">
-      <button type="button" on:click={() => runCommand('undo')}>Undo</button>
-      <button type="button" on:click={() => runCommand('redo')}>Redo</button>
+    <div class="sparc-toolbar-group" aria-label={sparcText('sparc.historyAndSource')}>
+      <button type="button" on:click={() => runCommand('undo')}>{sparcText('sparc.undo')}</button>
+      <button type="button" on:click={() => runCommand('redo')}>{sparcText('sparc.redo')}</button>
       <button type="button" class:active={showRichTextSource} on:click={() => showRichTextSource = !showRichTextSource}>HTML</button>
     </div>
   {/if}

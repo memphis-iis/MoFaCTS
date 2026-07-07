@@ -13,6 +13,8 @@
   export let forceCorrectPrompt = 'Please type the correct answer to continue';
   export let userAnswer = '';
   export let inputPlaceholder = 'Type your answer...';
+  export let inputLanguage = '';
+  export let inputTextDirection = '';
   export let showButtons = true;
   export let buttonList = [];
   export let buttonColumns = 2;
@@ -73,6 +75,8 @@
       {forceCorrectPrompt}
       {userAnswer}
       {inputPlaceholder}
+      {inputLanguage}
+      {inputTextDirection}
       {showButtons}
       {buttonList}
       {buttonColumns}

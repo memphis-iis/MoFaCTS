@@ -37,6 +37,8 @@ import {
   setLaunchLoadingMessage,
   startLaunchLoading,
 } from '../../lib/launchLoading';
+import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
+import { translatePlatformString } from '../../lib/interfaceI18n';
 
 declare const Template: any;
 declare const Meteor: any;
@@ -188,6 +190,10 @@ function formatSnapshotLesson(lesson: any) {
     tags: Array.isArray(lesson.tags) ? lesson.tags : [],
     conditions: Array.isArray(lesson.conditions) && lesson.conditions.length > 0 ? lesson.conditions : null,
   };
+}
+
+function dashboardText(key: Parameters<typeof translatePlatformString>[1], values?: Parameters<typeof translatePlatformString>[2]): string {
+  return translatePlatformString(getActiveUiLocale(), key, values);
 }
 
 function applyPracticeDashboardSnapshot(instance: any, snapshot: PracticeDashboardSnapshot) {
@@ -788,17 +794,17 @@ const lessonRowHelpers = {
   firstContentUnitIconTitle(this: any): string {
     switch (this.firstContentUnitType) {
       case 'video':
-        return 'First content unit is a video';
+        return dashboardText('dashboard.firstUnitVideo');
       case 'autotutor':
-        return 'First content unit is an AutoTutor';
+        return dashboardText('dashboard.firstUnitAutotutor');
       case 'assessment':
-        return 'First content unit is an assessment session';
+        return dashboardText('dashboard.firstUnitAssessment');
       case 'learning':
-        return 'First content unit is a learning session';
+        return dashboardText('dashboard.firstUnitLearning');
       case 'sparc':
-        return 'First content unit is a SPARC page';
+        return dashboardText('dashboard.firstUnitSparc');
       case 'conditionPool':
-        return 'Multiple condition TDFs';
+        return dashboardText('dashboard.multipleConditionTdfs');
       default:
         return '';
     }
@@ -818,18 +824,18 @@ const lessonRowHelpers = {
 
   ttsIconTitle(this: any): string {
     const state = getEffectiveTtsState(this);
-    if (state.active) return 'Text-to-Speech is enabled';
-    if (!state.keyAvailable) return 'Text-to-Speech needs an API key in Audio Settings';
-    if (!state.promptModeEnabled) return 'Text-to-Speech is turned off in your audio or lesson settings';
-    return 'Text-to-Speech is unavailable';
+    if (state.active) return dashboardText('dashboard.ttsEnabled');
+    if (!state.keyAvailable) return dashboardText('dashboard.ttsNeedsApiKey');
+    if (!state.promptModeEnabled) return dashboardText('dashboard.ttsTurnedOff');
+    return dashboardText('dashboard.ttsUnavailable');
   },
 
   srIconTitle(this: any): string {
     const state = getEffectiveSrState(this);
-    if (state.active) return 'Speech Recognition is enabled';
-    if (!state.keyAvailable) return 'Speech Recognition needs an API key in Audio Settings';
-    if (!state.userAudioEnabled) return 'Speech Recognition is turned off in your audio settings';
-    return 'Speech Recognition is unavailable';
+    if (state.active) return dashboardText('dashboard.srEnabled');
+    if (!state.keyAvailable) return dashboardText('dashboard.srNeedsApiKey');
+    if (!state.userAudioEnabled) return dashboardText('dashboard.srTurnedOff');
+    return dashboardText('dashboard.srUnavailable');
   },
 
   showTtsIcon(this: any): boolean {
@@ -869,12 +875,16 @@ const lessonRowHelpers = {
 
   accuracyBadgeLabel(this: any): string {
     if (!this.isUsed) {
-      return 'New';
+      return dashboardText('dashboard.new');
     }
     if (this.accuracyApplies === false || this.overallAccuracy === null || this.overallAccuracy === undefined) {
-      return 'Used';
+      return dashboardText('dashboard.used');
     }
     return `${this.overallAccuracy}%`;
+  },
+
+  timeMinutesDisplay(this: any): string {
+    return dashboardText('courses.minutes', { minutes: this.totalTimeMinutes || 0 });
   },
 
   accuracyBadgeClass(this: any): string {
@@ -927,9 +937,13 @@ Template.learningDashboard.helpers({
     const visible = getVisibleTdfs(Template.instance());
     const { used, unused } = splitTdfsByUsage(visible);
     if (!visible || visible.length === 0) {
-      return 'No lessons available';
+      return dashboardText('dashboard.noLessonsAvailable');
     }
-    return `${visible.length} lessons • ${used.length} in progress • ${unused.length} new`;
+    return dashboardText('dashboard.lessonSummary', {
+      total: visible.length,
+      inProgress: used.length,
+      newCount: unused.length,
+    });
   },
 
   hasTdfs: () => {
@@ -1005,9 +1019,9 @@ Template.learnerTdfConfigPanel.helpers({
   },
 
   learnerConfigSaveStatus() {
-    if (this.saving) return 'Saving...';
-    if (this.dirty) return 'Waiting to save...';
-    return 'Changes save automatically';
+    if (this.saving) return dashboardText('dashboard.saving');
+    if (this.dirty) return dashboardText('dashboard.waitingToSave');
+    return dashboardText('dashboard.changesSaveAutomatically');
   },
 
   isConfigStep(step: string) {
@@ -1015,7 +1029,7 @@ Template.learnerTdfConfigPanel.helpers({
   },
 
   selectedConfigLabel() {
-    return 'Lesson settings';
+    return dashboardText('dashboard.lessonSettings');
   },
 
   settingFields() {
@@ -1080,8 +1094,8 @@ Template.learnerTdfConfigPanel.helpers({
   },
 
   resetProgressButtonLabel() {
-    if (this.resettingProgress) return 'Resetting...';
-    return this.resetConfirming ? 'Confirm reset' : 'Reset test progress';
+    if (this.resettingProgress) return dashboardText('dashboard.resetting');
+    return this.resetConfirming ? dashboardText('dashboard.confirmReset') : dashboardText('dashboard.resetTestProgress');
   },
 });
 
@@ -1203,7 +1217,7 @@ Template.learningDashboard.events({
         instance.learnerConfigState.set({
           ...EMPTY_CONFIG_STATE,
           tdfId,
-          error: 'Configuration is available after choosing a concrete lesson condition.'
+          error: dashboardText('dashboard.chooseConcreteCondition')
         });
         return;
       }
@@ -1211,7 +1225,7 @@ Template.learningDashboard.events({
         instance.learnerConfigState.set({
           ...EMPTY_CONFIG_STATE,
           tdfId,
-          error: 'Settings are available for lessons with configurable runtime units.'
+          error: dashboardText('dashboard.settingsNeedConfigurableUnits')
         });
         return;
       }
@@ -1228,7 +1242,7 @@ Template.learningDashboard.events({
       instance.learnerConfigState.set({
         ...EMPTY_CONFIG_STATE,
         tdfId,
-        error: 'Unable to load lesson settings. Please try again.'
+        error: dashboardText('dashboard.unableToLoadSettings')
       });
     }
   },
@@ -1311,7 +1325,7 @@ Template.learningDashboard.events({
         error: null
       });
       Session.set('uiMessage', {
-        text: 'Practice history and experiment state were reset for this lesson.',
+        text: dashboardText('dashboard.progressResetComplete'),
         variant: 'success',
       });
     } catch (error: any) {
@@ -1321,7 +1335,7 @@ Template.learningDashboard.events({
         ...latest,
         resetConfirming: false,
         resettingProgress: false,
-        error: error?.reason || error?.message || 'Unable to reset lesson progress.'
+        error: error?.reason || error?.message || dashboardText('dashboard.unableToResetProgress')
       });
     }
   },
@@ -1519,7 +1533,7 @@ async function safeSelectTdf(...args: Parameters<typeof selectTdf>) {
     finishLaunchLoading('practice-launch-failed');
     clientConsole(1, '[LearningDashboard] Lesson launch failed:', error);
     Session.set('uiMessage', {
-      text: 'Lesson did not start correctly. Please try again from the practice menu.',
+      text: dashboardText('dashboard.lessonStartFailed'),
       variant: 'danger',
     });
   }
@@ -1528,7 +1542,7 @@ async function safeSelectTdf(...args: Parameters<typeof selectTdf>) {
 async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId: any, ignoreOutOfGrammarResponses: any,
   speechOutOfGrammarFeedback: any, how: any, isMultiTdf: any, setspec: any, isExperiment = false, isOwnerLaunch = false) {
 
-  startLaunchLoading('Preparing lesson...', 'practiceMenu');
+  startLaunchLoading(dashboardText('dashboard.preparingLesson'), 'practiceMenu');
   markLaunchLoadingTiming('practiceMenuClick', { currentTdfId, lessonName, how, isMultiTdf });
   const audioPromptFeedbackView = getAudioPromptFeedbackView();
 
@@ -1552,7 +1566,7 @@ async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId
   } catch (error) {
     clientConsole(1, '[LearningDashboard] Failed to load launch-ready TDF:', currentTdfId, error);
     finishLaunchLoading('tdf-subscription-missing-content');
-    alert('Unable to load the selected lesson. Please try again or contact support.');
+    alert(dashboardText('dashboard.unableToLoadSelectedLesson'));
     return;
   }
 
@@ -1569,7 +1583,7 @@ async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId
       lastUnitCompleted: launchProgress.lastUnitCompleted,
     });
     Session.set('uiMessage', {
-      text: 'This lesson has already been completed and cannot be reopened.',
+      text: dashboardText('dashboard.lessonAlreadyCompleted'),
       variant: 'warning',
     });
     finishLaunchLoading('module-completed');

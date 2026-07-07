@@ -8,6 +8,8 @@ import {
 } from '../lib/themeGenerator';
 import { parseThemeColor, parseThemeColorList } from '../lib/themeColorMetrics';
 import { getPaletteStats, parsePaletteSlotValues, type PaletteExpansionOptions } from '../lib/themePaletteExpansion';
+import { getActiveUiLocale } from '../lib/interfaceLocaleState';
+import { translatePlatformString } from '../lib/interfaceI18n';
 import './themeGenerationWizard.html';
 
 declare const DynamicSettings: any;
@@ -40,12 +42,18 @@ const DEFAULT_EXPANSION: PaletteExpansionOptions = {
   maxGeneratedPerColor: 3,
 };
 
-const DEFAULT_SLOTS: PaletteSlot[] = [
-  { value: '#7ED957', label: 'Accent' },
-  { value: '#F2F2F2', label: 'Surface' },
-  { value: '#000000', label: 'Text' },
-  { value: '#FF0000', label: 'Feedback' },
-];
+function themeWizardText(key: Parameters<typeof translatePlatformString>[1], values?: Parameters<typeof translatePlatformString>[2]): string {
+  return translatePlatformString(getActiveUiLocale(), key, values);
+}
+
+function defaultSlots(): PaletteSlot[] {
+  return [
+    { value: '#7ED957', label: themeWizardText('themeWizard.defaultSlotAccent') },
+    { value: '#F2F2F2', label: themeWizardText('themeWizard.defaultSlotSurface') },
+    { value: '#000000', label: themeWizardText('themeWizard.defaultSlotText') },
+    { value: '#FF0000', label: themeWizardText('themeWizard.defaultSlotFeedback') },
+  ];
+}
 
 function getThemeLibrary() {
   const library = DynamicSettings.findOne({ key: 'themeLibrary' });
@@ -63,7 +71,10 @@ function cloneSlots(slots: PaletteSlot[]): PaletteSlot[] {
 
 function defaultWizardName() {
   const date = new Date();
-  return `Generated Theme ${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  return themeWizardText('themeWizard.defaultName', {
+    date: date.toLocaleDateString(getActiveUiLocale()),
+    time: date.toLocaleTimeString(getActiveUiLocale(), { hour: '2-digit', minute: '2-digit' }),
+  });
 }
 
 function initialState(): WizardState {
@@ -71,7 +82,7 @@ function initialState(): WizardState {
     open: false,
     name: defaultWizardName(),
     baseThemeId: '',
-    slots: cloneSlots(DEFAULT_SLOTS),
+    slots: defaultSlots(),
     polarity: 'light',
     densityPercent: 100,
     contrastPriority: 0.5,
@@ -99,10 +110,10 @@ function setState(instance: ThemeWizardTemplateInstance, updater: (state: Wizard
 
 function slotsFromProperties(properties: Record<string, unknown>): PaletteSlot[] {
   const values = [
-    ['Accent', properties.app_accent_color],
-    ['Surface', properties.app_background_color],
-    ['Text', properties.app_text_color],
-    ['Feedback', properties.feedback_error_color],
+    [themeWizardText('themeWizard.defaultSlotAccent'), properties.app_accent_color],
+    [themeWizardText('themeWizard.defaultSlotSurface'), properties.app_background_color],
+    [themeWizardText('themeWizard.defaultSlotText'), properties.app_text_color],
+    [themeWizardText('themeWizard.defaultSlotFeedback'), properties.feedback_error_color],
   ];
   return values.map(([label, value]) => ({
     label: String(label),
@@ -115,7 +126,7 @@ function slotsFromProperties(properties: Record<string, unknown>): PaletteSlot[]
 function defaultThemeSlots(): PaletteSlot[] {
   const defaultTheme = getThemeLibrary().find((theme: any) => theme?.id === 'mofacts-default');
   if (!defaultTheme?.properties) {
-    throw new Error('MoFaCTS Default theme is not available in the theme library.');
+    throw new Error(themeWizardText('themeWizard.defaultThemeUnavailable'));
   }
   return slotsFromProperties(defaultTheme.properties);
 }
@@ -124,7 +135,7 @@ function getSelectedBaseTheme(state: WizardState) {
   const activeTheme = getServerActiveTheme();
   const baseThemeId = state.baseThemeId || activeTheme?.activeThemeId;
   if (!baseThemeId) {
-    throw new Error('A selected base theme is required for explicit inheritance.');
+    throw new Error(themeWizardText('themeWizard.baseThemeRequired'));
   }
 
   const selected = getThemeLibrary().find((theme: any) => theme?.id === baseThemeId);
@@ -136,7 +147,7 @@ function getSelectedBaseTheme(state: WizardState) {
     return activeTheme;
   }
 
-  throw new Error(`Selected base theme "${baseThemeId}" is not available.`);
+  throw new Error(themeWizardText('themeWizard.baseThemeUnavailable', { baseThemeId }));
 }
 
 function buildGeneratedTheme(instance: ThemeWizardTemplateInstance): GeneratedTheme {
@@ -165,7 +176,7 @@ function parsePaletteJson(text: string): PaletteSlot[] {
   try {
     parsed = JSON.parse(text);
   } catch (_error) {
-    throw new Error('Palette JSON is not valid JSON.');
+    throw new Error(themeWizardText('themeWizard.paletteJsonInvalid'));
   }
 
   const rawColors = Array.isArray(parsed)
@@ -174,7 +185,7 @@ function parsePaletteJson(text: string): PaletteSlot[] {
       ? (parsed as { colors: unknown[] }).colors
       : null;
   if (!rawColors) {
-    throw new Error('Palette JSON must be an array of colors or an object with a colors array.');
+    throw new Error(themeWizardText('themeWizard.paletteJsonShape'));
   }
 
   const slots = rawColors.map((entry, index): PaletteSlot => {
@@ -184,17 +195,17 @@ function parsePaletteJson(text: string): PaletteSlot[] {
     if (entry && typeof entry === 'object') {
       const record = entry as { color?: unknown; value?: unknown; hex?: unknown; label?: unknown; name?: unknown };
       const rawColor = record.color || record.value || record.hex;
-      const label = record.label || record.name || `Color ${index + 1}`;
+      const label = record.label || record.name || themeWizardText('themeWizard.colorNumber', { number: index + 1 });
       return {
         value: parseThemeColor(rawColor).hex,
-        label: typeof label === 'string' ? label : `Color ${index + 1}`,
+        label: typeof label === 'string' ? label : themeWizardText('themeWizard.colorNumber', { number: index + 1 }),
       };
     }
-    throw new Error(`Palette JSON color ${index + 1} is not a supported color entry.`);
+    throw new Error(themeWizardText('themeWizard.paletteJsonColorUnsupported', { number: index + 1 }));
   });
 
   if (slots.length < 2) {
-    throw new Error('Palette JSON must provide at least two valid colors.');
+    throw new Error(themeWizardText('themeWizard.paletteJsonNeedsTwo'));
   }
   return slots;
 }
@@ -240,7 +251,12 @@ Template.themeGenerationWizard.helpers({
     return getState(Template.instance() as ThemeWizardTemplateInstance).open;
   },
   wizardToggleLabel() {
-    return getState(Template.instance() as ThemeWizardTemplateInstance).open ? 'Hide' : 'Generate Theme';
+    return getState(Template.instance() as ThemeWizardTemplateInstance).open
+      ? themeWizardText('themeWizard.hide')
+      : themeWizardText('themeWizard.generateTheme');
+  },
+  themeWizardText(key: Parameters<typeof translatePlatformString>[1], options?: { hash?: Parameters<typeof translatePlatformString>[2] }) {
+    return themeWizardText(key, options?.hash);
   },
   wizardName() {
     return getState(Template.instance() as ThemeWizardTemplateInstance).name;
@@ -335,7 +351,7 @@ Template.themeGenerationWizard.events({
       ...state,
       slots: [...state.slots, { value: '#FFFFFF', label: '' }],
       generated: null,
-      status: state.slots.length >= 8 ? 'More than eight colors can make palette role assignment less predictable.' : '',
+      status: state.slots.length >= 8 ? themeWizardText('themeWizard.moreThanEightColors') : '',
     }));
   },
   'change .theme-wizard-base-theme'(event: Event, instance: ThemeWizardTemplateInstance) {
@@ -347,7 +363,7 @@ Template.themeGenerationWizard.events({
     const index = Number((event.currentTarget as HTMLElement).dataset.index);
     setState(instance, (state) => {
       if (state.slots.length <= 2) {
-        return { ...state, error: 'At least two palette colors are required.' };
+        return { ...state, error: themeWizardText('themeWizard.needsTwoColors') };
       }
       return { ...state, slots: state.slots.filter((_slot, slotIndex) => slotIndex !== index), generated: null, error: '' };
     });
@@ -356,7 +372,7 @@ Template.themeGenerationWizard.events({
     event.preventDefault();
     const activeTheme = getServerActiveTheme();
     if (!activeTheme?.properties) {
-      setState(instance, (state) => ({ ...state, error: 'No active theme is available to extract from.' }));
+      setState(instance, (state) => ({ ...state, error: themeWizardText('themeWizard.noActiveTheme') }));
       return;
     }
     setState(instance, (state) => ({ ...state, slots: slotsFromProperties(activeTheme.properties), error: '', generated: null }));
@@ -377,14 +393,21 @@ Template.themeGenerationWizard.events({
       return;
     }
     if (file.size > 1024 * 1024) {
-      setState(instance, (state) => ({ ...state, error: 'Palette JSON files must be smaller than 1MB.' }));
+      setState(instance, (state) => ({ ...state, error: themeWizardText('themeWizard.paletteJsonTooLarge') }));
       input.value = '';
       return;
     }
     file.text()
       .then((text) => {
         const slots = parsePaletteJson(text);
-        setState(instance, (state) => ({ ...state, slots, skippedCssValues: [], error: '', status: `Loaded ${slots.length} colors from palette JSON.`, generated: null }));
+        setState(instance, (state) => ({
+          ...state,
+          slots,
+          skippedCssValues: [],
+          error: '',
+          status: themeWizardText('themeWizard.loadedPaletteColors', { count: slots.length }),
+          generated: null,
+        }));
       })
       .catch((error: unknown) => {
         setState(instance, (state) => ({ ...state, error: error instanceof Error ? error.message : String(error), status: '' }));
@@ -401,8 +424,8 @@ Template.themeGenerationWizard.events({
       ...state,
       slots: parsed.colors.map((color) => ({ value: color.hex, label: '' })),
       skippedCssValues: parsed.skipped,
-      error: parsed.colors.length < 2 ? 'Paste at least two supported hex or rgb() colors.' : '',
-      status: parsed.skipped.length ? `Skipped unsupported CSS values: ${parsed.skipped.join(', ')}` : '',
+      error: parsed.colors.length < 2 ? themeWizardText('themeWizard.pasteNeedsTwo') : '',
+      status: parsed.skipped.length ? themeWizardText('themeWizard.skippedUnsupportedCss', { values: parsed.skipped.join(', ') }) : '',
       generated: null,
     }));
   },
@@ -436,7 +459,7 @@ Template.themeGenerationWizard.events({
     event.preventDefault();
     try {
       const generated = buildGeneratedTheme(instance);
-      setState(instance, (state) => ({ ...state, generated, error: '', status: 'Preview generated. No server changes made yet.' }));
+      setState(instance, (state) => ({ ...state, generated, error: '', status: themeWizardText('themeWizard.previewGenerated') }));
     } catch (error: unknown) {
       setState(instance, (state) => ({ ...state, generated: null, error: error instanceof Error ? error.message : String(error), status: '' }));
     }
@@ -457,7 +480,7 @@ Template.themeGenerationWizard.events({
         ...state,
         generated,
         error: '',
-        status: `Generated and activated ${activatedTheme?.metadata?.name || generated.properties.themeName}.`,
+        status: themeWizardText('themeWizard.generatedAndActivated', { name: activatedTheme?.metadata?.name || generated.properties.themeName }),
       }));
     } catch (error: unknown) {
       setState(instance, (state) => ({ ...state, error: error instanceof Error ? error.message : String(error), status: '' }));

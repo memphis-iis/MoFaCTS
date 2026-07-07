@@ -1,4 +1,7 @@
 <script>
+  import { getActiveUiLocale } from '../../../lib/interfaceLocaleState';
+  import { translatePlatformString } from '../../../lib/interfaceI18n';
+
   export let activeNode = null;
   export let activeParentNode = null;
   export let htmlEditorElement = null;
@@ -15,35 +18,37 @@
   export let onUpdateFirstHtmlMediaAttribute = () => {};
   export let onUpdateRichTextSource = () => {};
   export let onUpdateOptions = () => {};
+
+  const sparcText = (key) => translatePlatformString(getActiveUiLocale(), key);
 </script>
 
 <div class="sparc-context-card">
-  <h2>Selection</h2>
+  <h2>{sparcText('sparc.selection')}</h2>
   <div class="sparc-selection-summary">
     <strong>{activeNode.id}</strong>
   </div>
   <div class="sparc-node-action-row">
     {#if activeParentNode}
       <button type="button" class="btn btn-outline-secondary btn-sm" on:click={() => onSelectParentNode(activeParentNode)}>
-        Select Parent Node
+        {sparcText('sparc.selectParentNode')}
       </button>
     {/if}
     <button type="button" class="btn btn-outline-danger btn-sm" on:click={onRemoveActiveNode}>
-      Delete Node
+      {sparcText('sparc.deleteNode')}
     </button>
   </div>
   <label>
-    Node ID
+    {sparcText('sparc.nodeId')}
     <input value={activeNode.id || ''} on:input={(event) => onUpdateField('id', event.currentTarget.value)} />
   </label>
   {#if activeNode.nodeType === 'group'}
     <label>
-      Node Type
+      {sparcText('sparc.nodeType')}
       <input value={activeNode.groupType || ''} on:input={(event) => onUpdateField('groupType', event.currentTarget.value)} />
     </label>
   {:else}
     <label>
-      Node Type
+      {sparcText('sparc.nodeType')}
       <input value={activeNode.atomType || ''} readonly />
     </label>
     {#if isImageHtmlSelected}
@@ -52,15 +57,15 @@
           {@html activeNode.value || ''}
         </div>
         <label>
-          Image file or URL
+          {sparcText('sparc.imageFileOrUrl')}
           <input value={selectedImageSrc} on:input={(event) => onUpdateFirstImageAttribute('src', event.currentTarget.value)} />
         </label>
         <label>
-          Alt text
+          {sparcText('sparc.altText')}
           <input value={selectedImageAlt} on:input={(event) => onUpdateFirstImageAttribute('alt', event.currentTarget.value)} />
         </label>
         <label>
-          Title
+          {sparcText('sparc.titleField')}
           <input value={selectedImageTitle} on:input={(event) => onUpdateFirstImageAttribute('title', event.currentTarget.value)} />
         </label>
       </div>
@@ -68,30 +73,30 @@
       <div class="sparc-media-editor">
         <div class="sparc-selection-summary sparc-media-summary">
           <strong>{selectedHtmlMedia.tagName}</strong>
-          <small>{selectedHtmlMedia.src || 'No media URL'}</small>
+          <small>{selectedHtmlMedia.src || sparcText('sparc.noMediaUrl')}</small>
         </div>
         {#if selectedHtmlMedia.hasLocalhostUrl}
           <div class="sparc-media-warning">
-            This embed points at a local host URL. If the referenced service is not running on the same host and port, the frame will refuse to connect.
+            {sparcText('sparc.localhostEmbedWarning')}
           </div>
         {/if}
         <label>
-          Media URL
+          {sparcText('sparc.mediaUrl')}
           <input value={selectedHtmlMedia.src} on:input={(event) => onUpdateFirstHtmlMediaAttribute('src', event.currentTarget.value)} />
         </label>
         {#if selectedHtmlMedia.tagName === 'iframe'}
           <label>
-            Frame title
+            {sparcText('sparc.frameTitle')}
             <input value={selectedHtmlMedia.title} on:input={(event) => onUpdateFirstHtmlMediaAttribute('title', event.currentTarget.value)} />
           </label>
         {/if}
         <div class="sparc-media-size-fields">
           <label>
-            Width
+            {sparcText('sparc.width')}
             <input value={selectedHtmlMedia.width} on:input={(event) => onUpdateFirstHtmlMediaAttribute('width', event.currentTarget.value)} />
           </label>
           <label>
-            Height
+            {sparcText('sparc.height')}
             <input value={selectedHtmlMedia.height} on:input={(event) => onUpdateFirstHtmlMediaAttribute('height', event.currentTarget.value)} />
           </label>
         </div>
@@ -104,7 +109,7 @@
       <div class="sparc-rich-text-editor" bind:this={htmlEditorElement}></div>
       {#if showRichTextSource}
         <label>
-          HTML Source
+          {sparcText('sparc.htmlSource')}
           <textarea
             class="sparc-rich-text-source"
             rows="10"
@@ -115,39 +120,39 @@
       {/if}
     {:else if activeNode.atomType === 'dropdown'}
       <label>
-        Selected
+        {sparcText('sparc.selected')}
         <input value={activeNode.selected || ''} on:input={(event) => onUpdateField('selected', event.currentTarget.value)} />
       </label>
       <label>
-        Options
+        {sparcText('sparc.options')}
         <textarea rows="6" value={(activeNode.options || []).join('\n')} on:input={(event) => onUpdateOptions(event.currentTarget.value)}></textarea>
       </label>
     {:else if activeNode.atomType === 'button'}
       <label>
-        Label
+        {sparcText('sparc.label')}
         <input value={activeNode.label || ''} on:input={(event) => onUpdateField('label', event.currentTarget.value)} />
       </label>
       <label>
-        Value
+        {sparcText('sparc.value')}
         <input value={activeNode.value || ''} on:input={(event) => onUpdateField('value', event.currentTarget.value)} />
       </label>
     {:else if activeNode.atomType === 'learning-progress'}
       <label>
-        Label
+        {sparcText('sparc.label')}
         <input value={activeNode.label || ''} on:input={(event) => onUpdateField('label', event.currentTarget.value)} />
       </label>
     {:else if activeNode.atomType === 'panel-selector'}
       <label>
-        Label
+        {sparcText('sparc.label')}
         <input value={activeNode.label || ''} on:input={(event) => onUpdateField('label', event.currentTarget.value)} />
       </label>
       <label>
-        Selected Panel ID
+        {sparcText('sparc.selectedPanelId')}
         <input value={activeNode.selectedPanelId || ''} on:input={(event) => onUpdateField('selectedPanelId', event.currentTarget.value)} />
       </label>
     {:else}
       <label>
-        Value
+        {sparcText('sparc.value')}
         <textarea rows="5" value={activeNode.value || ''} on:input={(event) => onUpdateField('value', event.currentTarget.value)}></textarea>
       </label>
     {/if}

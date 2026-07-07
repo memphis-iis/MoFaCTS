@@ -2,10 +2,9 @@
   <div class="apkg-wizard" id="apkg-wizard-container">
     <!-- Wizard Header -->
     <div class="wizard-header">
-      <h3 class="page-header-title">Import from Anki (.apkg)</h3>
+      <h3 class="page-header-title">{{apkgText 'apkg.title'}}</h3>
       <p class="text-muted">
-        Convert Anki flashcard decks into MoFaCTS learning modules.
-        Choose which fields to use and create one or more targeted TDFs.
+        {{apkgText 'apkg.subtitle'}}
       </p>
     </div>
 
@@ -13,19 +12,19 @@
     <div class="wizard-steps">
       <div class="step {{#if isStep 1}}active{{/if}} {{#if stepCompleted 1}}completed{{/if}}">
         <span class="step-number">1</span>
-        <span class="step-label">Upload</span>
+        <span class="step-label">{{apkgText 'apkg.stepUpload'}}</span>
       </div>
       <div class="step {{#if isStep 2}}active{{/if}} {{#if stepCompleted 2}}completed{{/if}}">
         <span class="step-number">2</span>
-        <span class="step-label">Setup</span>
+        <span class="step-label">{{apkgText 'apkg.stepSetup'}}</span>
       </div>
       <div class="step {{#if isStep 3}}active{{/if}} {{#if stepCompleted 3}}completed{{/if}}">
         <span class="step-number">3</span>
-        <span class="step-label">Edit Draft</span>
+        <span class="step-label">{{apkgText 'apkg.stepEditDraft'}}</span>
       </div>
       <div class="step {{#if isStep 4}}active{{/if}} {{#if stepCompleted 4}}completed{{/if}}">
         <span class="step-number">4</span>
-        <span class="step-label">Package</span>
+        <span class="step-label">{{apkgText 'apkg.stepPackage'}}</span>
       </div>
     </div>
 
@@ -49,7 +48,7 @@
           <div class="admin-inline-confirmation-message">{{inlineConfirmation.message}}</div>
         </div>
         <div class="admin-inline-confirmation-actions">
-          <button type="button" class="btn btn-sm btn-outline-secondary" id="cancel-inline-confirmation">Cancel</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="cancel-inline-confirmation">{{apkgText 'apkg.cancel'}}</button>
           <button type="button" class="btn btn-sm {{inlineConfirmation.confirmClass}}" id="confirm-inline-confirmation">
             {{inlineConfirmation.confirmLabel}}
           </button>
@@ -60,13 +59,13 @@
       <!-- Step 1: Upload & Analyze -->
       {{#if isStep 1}}
       <div class="wizard-step step-upload">
-        <h4>Step 1: Select Anki Deck</h4>
+        <h4>{{apkgText 'apkg.step1Title'}}</h4>
 
         <div class="form-group">
-          <label for="apkg-file-input">Choose .apkg file:</label>
+          <label for="apkg-file-input">{{apkgText 'apkg.chooseFile'}}</label>
           <input type="file" class="form-control" id="apkg-file-input" accept=".apkg">
           <small class="form-text text-muted">
-            Select an Anki deck file (.apkg) from your computer
+            {{apkgText 'apkg.chooseFileHelp'}}
           </small>
         </div>
 
@@ -75,11 +74,11 @@
         <div class="admin-status">
           <i class="fa fa-spinner fa-spin"></i>
           <div class="admin-status-text">
-            <div class="admin-status-title">Analyzing deck structure...</div>
+            <div class="admin-status-title">{{apkgText 'apkg.analyzingDeck'}}</div>
             <div class="wizard-status-detail">
-              <small>Parsing SQLite database</small><br>
-              <small>Extracting fields and card templates</small><br>
-              <small>Analyzing media files</small>
+              <small>{{apkgText 'apkg.parsingSqlite'}}</small><br>
+              <small>{{apkgText 'apkg.extractingFields'}}</small><br>
+              <small>{{apkgText 'apkg.analyzingMedia'}}</small>
             </div>
           </div>
         </div>
@@ -89,21 +88,21 @@
         <div class="admin-status admin-status-error">
           <i class="fa fa-exclamation-circle"></i>
           <div class="admin-status-text">
-            <div class="admin-status-title">Error</div>
+            <div class="admin-status-title">{{apkgText 'apkg.error'}}</div>
             <div>{{analyzeError}}</div>
           </div>
         </div>
         {{/if}}
 
         <div class="wizard-actions">
-          <button class="btn btn-secondary" id="cancel-wizard">Cancel</button>
+          <button class="btn btn-secondary" id="cancel-wizard">{{apkgText 'apkg.cancel'}}</button>
           {{#if analyzeDisabled}}
           <button class="btn btn-primary" id="analyze-deck" disabled>
-            Analyze Deck →
+            {{apkgText 'apkg.analyzeDeck'}} →
           </button>
           {{else}}
           <button class="btn btn-primary" id="analyze-deck">
-            Analyze Deck →
+            {{apkgText 'apkg.analyzeDeck'}} →
           </button>
           {{/if}}
         </div>
@@ -113,7 +112,7 @@
       <!-- Step 2: Source Setup -->
       {{#if isStep 2}}
       <div class="wizard-step step-preview">
-        <h4>Step 2: Configure Lesson Sources</h4>
+        <h4>{{apkgText 'apkg.step2Title'}}</h4>
 
         {{#if deckMetadata}}
         <div class="deck-info card wizard-card">
@@ -121,28 +120,28 @@
             <h5>{{deckMetadata.deckName}}</h5>
             <div class="row">
               <div class="col-md-3">
-                <strong>Notes:</strong> {{deckMetadata.noteCount}}
+                <strong>{{apkgText 'apkg.notes'}}:</strong> {{deckMetadata.noteCount}}
               </div>
               <div class="col-md-3">
-                <strong>Cards:</strong> {{deckMetadata.cardCount}}
+                <strong>{{apkgText 'apkg.cards'}}:</strong> {{deckMetadata.cardCount}}
               </div>
               <div class="col-md-3">
-                <strong>Media:</strong> {{deckMetadata.mediaCount}}
+                <strong>{{apkgText 'apkg.media'}}:</strong> {{deckMetadata.mediaCount}}
               </div>
               <div class="col-md-3">
-                <strong>Model:</strong> {{deckMetadata.modelName}}
+                <strong>{{apkgText 'apkg.model'}}:</strong> {{deckMetadata.modelName}}
               </div>
             </div>
             {{#if (eq importableNoteCount deckMetadata.noteCount)}}
             {{else}}
             <div class="wizard-status-detail small text-muted">
-              Importable notes from the primary model: {{importableNoteCount}}
+              {{apkgText 'apkg.importableNotes' count=importableNoteCount}}
             </div>
             {{/if}}
           </div>
         </div>
 
-        <h5>Available Fields:</h5>
+        <h5>{{apkgText 'apkg.availableFields'}}</h5>
         <div class="fields-list">
           {{#each deckMetadata.fields}}
           <div class="field-card card wizard-card-sm">
@@ -155,20 +154,20 @@
                 <div class="col-md-9">
                   {{#if sampleImage}}
                   <div class="field-preview wizard-card-sm">
-                    <img src="{{sampleImage}}" alt="Preview" class="img-thumbnail" style="max-height: 80px; max-width: 120px;">
+                    <img src="{{sampleImage}}" alt="{{apkgText 'apkg.previewAlt'}}" class="img-thumbnail" style="max-height: 80px; max-width: 120px;">
                   </div>
                   {{/if}}
                   <small class="text-muted">
                     {{#if (eq type "image")}}
-                      <i class="fa fa-image"></i> Image field
+                      <i class="fa fa-image"></i> {{apkgText 'apkg.imageField'}}
                     {{else if (eq type "mixed")}}
-                      <i class="fa fa-image"></i><i class="fa fa-font"></i> Image + Text
+                      <i class="fa fa-image"></i><i class="fa fa-font"></i> {{apkgText 'apkg.imageTextField'}}
                     {{else}}
-                      <i class="fa fa-font"></i> Text field
+                      <i class="fa fa-font"></i> {{apkgText 'apkg.textField'}}
                     {{/if}}
                     {{#unless sampleImage}}
                     <br>
-                    Samples: {{joinSamples samples}}
+                    {{joinSamples samples}}
                     {{/unless}}
                   </small>
                 </div>
@@ -183,10 +182,10 @@
           {{#each tdfConfigs}}
           <div class="tdf-config-card card wizard-card">
             <div class="card-header">
-              <strong>TDF {{plusOne @index}}: {{#if name}}{{name}}{{else}}(unnamed){{/if}}</strong>
+              <strong>TDF {{plusOne @index}}: {{#if name}}{{name}}{{else}}{{apkgText 'apkg.unnamed'}}{{/if}}</strong>
               {{#if isMultipleMode}}
               <button class="btn btn-sm btn-danger float-right remove-config" data-index="{{@index}}">
-                <i class="fa fa-trash"></i> Remove
+                <i class="fa fa-trash"></i> {{apkgText 'apkg.remove'}}
               </button>
               {{/if}}
             </div>
@@ -194,16 +193,16 @@
 
               <!-- TDF Name -->
               <div class="form-group">
-                <label>TDF Name:</label>
+                <label>{{apkgText 'apkg.tdfName'}}</label>
                 <input type="text" class="form-control tdf-name" data-index="{{@index}}"
-                       value="{{name}}" placeholder="e.g., Countries_Flags">
+                       value="{{name}}" placeholder="{{apkgText 'apkg.tdfNamePlaceholder'}}">
               </div>
 
               <!-- Prompt Field -->
               <div class="form-group">
-                <label>Prompt (what students see):</label>
+                <label>{{apkgText 'apkg.promptField'}}</label>
                 <select class="form-control prompt-field" data-index="{{@index}}" data-selected="{{prompt.field}}">
-                  <option value="">-- Select field --</option>
+                  <option value="">{{apkgText 'apkg.selectField'}}</option>
                   {{#each deckFields}}
                   <option value="{{index}}">
                     {{plusOne index}}. {{name}} ({{type}})
@@ -214,9 +213,9 @@
 
               <!-- Response Field -->
               <div class="form-group">
-                <label>Response (correct answer):</label>
+                <label>{{apkgText 'apkg.responseField'}}</label>
                 <select class="form-control response-field" data-index="{{@index}}" data-selected="{{response.field}}">
-                  <option value="">-- Select field --</option>
+                  <option value="">{{apkgText 'apkg.selectField'}}</option>
                   {{#each deckFields}}
                   <option value="{{index}}">
                     {{plusOne index}}. {{name}} ({{type}})
@@ -226,20 +225,20 @@
               </div>
 
               <div class="form-group">
-                <label>Note Range (optional):</label>
+                <label>{{apkgText 'apkg.noteRange'}}</label>
                 <input
                   type="text"
                   class="form-control source-range"
                   data-index="{{@index}}"
                   value="{{sourceRange}}"
-                  placeholder='e.g., 0-999 or 0-499 1000-1499'>
+                  placeholder="{{apkgText 'apkg.noteRangePlaceholder'}}">
                 <small class="form-text text-muted">
-                  Leave blank to use all notes. Uses zero-based note ranges in deck order.
+                  {{apkgText 'apkg.noteRangeHelp'}}
                 </small>
               </div>
 
               <div class="text-muted small wizard-card-sm">
-                Uses <strong>{{selectedNoteCount this}}</strong> of {{importableNoteCount}} importable notes{{#if usingSubset this}} for this TDF{{/if}}.
+                {{selectedNoteSummary this}}
               </div>
 
               {{#if validationError}}
@@ -252,7 +251,7 @@
               {{#if isValid}}
               <div class="admin-status admin-status-success admin-status-small">
                 <i class="fa fa-check"></i>
-                <div class="admin-status-text">Configuration looks good.</div>
+                <div class="admin-status-text">{{apkgText 'apkg.configurationLooksGood'}}</div>
               </div>
               {{/if}}
 
@@ -265,10 +264,10 @@
         {{#unless hideAddButton}}
         <div class="text-center wizard-card">
           <button class="btn btn-outline-primary" id="add-tdf-config">
-            <i class="fa fa-plus"></i> Add Another TDF Configuration
+            <i class="fa fa-plus"></i> {{apkgText 'apkg.addTdfConfiguration'}}
           </button>
           <p class="text-muted small wizard-status-detail">
-            Want to create multiple learning modules from this deck?
+            {{apkgText 'apkg.addTdfHelp'}}
           </p>
         </div>
         {{/unless}}
@@ -276,26 +275,26 @@
         <!-- Summary -->
         <div class="card bg-light">
           <div class="card-body">
-            <h5>Summary:</h5>
+            <h5>{{apkgText 'apkg.summary'}}</h5>
             <ul>
-              <li><strong>{{configCount}}</strong> TDF{{#if isMultipleMode}}s{{/if}} configured</li>
-              <li><strong>{{totalCards}}</strong> total cards will be generated</li>
+              <li>{{tdfConfiguredSummary}}</li>
+              <li>{{totalCardsGeneratedSummary}}</li>
               {{#if totalMedia}}
-              <li><strong>{{totalMedia}}</strong> media files will be included</li>
+              <li>{{mediaFilesIncludedSummary}}</li>
               {{/if}}
             </ul>
           </div>
         </div>
 
         <div class="wizard-actions wizard-actions-extra">
-          <button class="btn btn-secondary" id="back-to-upload">← Back</button>
+          <button class="btn btn-secondary" id="back-to-upload">← {{apkgText 'apkg.back'}}</button>
           {{#if allConfigsValid}}
           <button class="btn btn-primary" id="open-draft-editor">
-            Open Draft Editor →
+            {{apkgText 'apkg.openDraftEditor'}} →
           </button>
           {{else}}
           <button class="btn btn-primary" id="open-draft-editor" disabled>
-            Open Draft Editor →
+            {{apkgText 'apkg.openDraftEditor'}} →
           </button>
           {{/if}}
         </div>
@@ -310,7 +309,7 @@
         <div class="admin-status admin-status-error">
           <i class="fa fa-exclamation-circle"></i>
           <div class="admin-status-text">
-            <div class="admin-status-title">Packaging error</div>
+            <div class="admin-status-title">{{apkgText 'apkg.packagingError'}}</div>
             <div>{{generateError}}</div>
           </div>
         </div>
@@ -327,13 +326,13 @@
       <!-- Step 4: Generate & Upload -->
       {{#if isStep 4}}
       <div class="wizard-step step-generate">
-        <h4>Step 4: {{#if generationComplete}}Package Ready{{else}}Generating...{{/if}}</h4>
+        <h4>{{step4Title}}</h4>
 
         {{#if generating}}
         <div class="admin-status">
           <i class="fa fa-spinner fa-spin"></i>
           <div class="admin-status-text">
-            <div class="admin-status-title">Generating TDF{{#if isMultipleMode}}s{{/if}}...</div>
+            <div class="admin-status-title">{{generatingTdfsLabel}}</div>
             <div class="admin-progress-row wizard-status-detail">
               <div class="admin-progress-track">
                 <div class="admin-progress-bar progress-bar-striped progress-bar-animated"
@@ -353,10 +352,10 @@
         <div class="admin-status admin-status-error">
           <i class="fa fa-exclamation-circle"></i>
           <div class="admin-status-text">
-            <div class="admin-status-title">Error</div>
+            <div class="admin-status-title">{{apkgText 'apkg.error'}}</div>
             <div>{{generateError}}</div>
           <button class="btn btn-sm btn-secondary wizard-status-detail" id="back-to-config-error">
-            ← Back to Configuration
+            ← {{apkgText 'apkg.backToConfiguration'}}
           </button>
           </div>
         </div>
@@ -366,35 +365,31 @@
         <div class="admin-status admin-status-success">
           <i class="fa fa-check"></i>
           <div class="admin-status-text">
-            <div class="admin-status-title">Generation Complete!</div>
+            <div class="admin-status-title">{{apkgText 'apkg.generationComplete'}}</div>
           </div>
         </div>
 
         {{#if generationResult.totalSkipped}}
         <div class="admin-status admin-status-warning">
           <i class="fa fa-exclamation-triangle"></i>
-          <div class="admin-status-text">Skipped {{generationResult.totalSkipped}} cards while preparing the imported lessons.</div>
+          <div class="admin-status-text">{{skippedCardsSummary}}</div>
         </div>
         {{/if}}
 
         <div class="card wizard-card">
           <div class="card-header">
-            <h5>Generated Files:</h5>
+            <h5>{{apkgText 'apkg.generatedFiles'}}</h5>
           </div>
           <div class="card-body">
             <ul>
               {{#each generationResult.manifest}}
               <li>
-                <strong>{{tdfName}}</strong>: {{cardCount}} cards
-                {{#if mediaCount}}, {{mediaCount}} media files{{/if}}
-                {{#if skippedCount}}, {{skippedCount}} skipped{{/if}}
+                {{generatedManifestLine this}}
               </li>
               {{/each}}
             </ul>
             <div class="wizard-status-detail">
-              <strong>Total:</strong> {{generationResult.totalCards}} cards,
-              {{generationResult.totalMedia}} media files
-              {{#if generationResult.totalSkipped}}, {{generationResult.totalSkipped}} skipped{{/if}}
+              {{generatedTotalLine}}
             </div>
           </div>
         </div>
@@ -431,17 +426,17 @@
         <div class="wizard-actions">
           {{#if uploadStatus}}
           <button class="btn btn-outline-secondary" id="download-package" disabled>
-            <i class="fa fa-download"></i> Download Package
+            <i class="fa fa-download"></i> {{apkgText 'apkg.downloadPackage'}}
           </button>
           <button class="btn btn-primary" id="upload-to-mofacts" disabled>
-            <i class="fa fa-upload"></i> Upload to MoFaCTS
+            <i class="fa fa-upload"></i> {{apkgText 'apkg.uploadToMofacts'}}
           </button>
           {{else}}
           <button class="btn btn-outline-secondary" id="download-package">
-            <i class="fa fa-download"></i> Download Package
+            <i class="fa fa-download"></i> {{apkgText 'apkg.downloadPackage'}}
           </button>
           <button class="btn btn-primary" id="upload-to-mofacts">
-            <i class="fa fa-upload"></i> Upload to MoFaCTS
+            <i class="fa fa-upload"></i> {{apkgText 'apkg.uploadToMofacts'}}
           </button>
           {{/if}}
         </div>
@@ -450,9 +445,9 @@
         <div class="admin-status admin-status-success wizard-card">
           <i class="fa fa-check"></i>
           <div class="admin-status-text">
-            <div class="admin-status-title">Successfully uploaded to MoFaCTS!</div>
+            <div class="admin-status-title">{{apkgText 'apkg.uploadedSuccess'}}</div>
             <button class="btn btn-sm btn-primary wizard-status-detail" id="close-wizard">
-              Close Wizard
+              {{apkgText 'apkg.closeWizard'}}
             </button>
           </div>
         </div>

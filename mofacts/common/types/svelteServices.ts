@@ -64,6 +64,11 @@ export interface TtsSpeakOptions {
   rate?: number;
   volume?: number;
   isQuestion?: boolean;
+  languageSource?: 'authored-content' | 'platform-prompt' | undefined;
+  uiLocale?: string | undefined;
+  voiceLocaleOverride?: string | null | undefined;
+  allowedVoiceLocaleOverrides?: readonly string[] | undefined;
+  availableVoiceLocales?: readonly string[] | undefined;
 }
 
 export interface TtsPlaybackEvent {
@@ -74,6 +79,11 @@ export interface TtsPlaybackEvent {
   delayAfterQuestionMs?: number;
   isQuestion?: boolean;
   autoRestartSr?: boolean;
+  languageSource?: 'authored-content' | 'platform-prompt' | undefined;
+  uiLocale?: string | undefined;
+  voiceLocaleOverride?: string | null | undefined;
+  allowedVoiceLocaleOverrides?: readonly string[] | undefined;
+  availableVoiceLocales?: readonly string[] | undefined;
 }
 
 export type TtsServiceStatus = 'completed' | 'skipped' | 'error';

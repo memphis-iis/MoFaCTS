@@ -19,6 +19,12 @@
   /** @type {boolean} Auto-focus on mount */
   export let autoFocus = true;
 
+  /** @type {string} Authored content language for text input, if declared */
+  export let inputLanguage = '';
+
+  /** @type {'ltr' | 'rtl' | ''} Authored content text direction */
+  export let inputTextDirection = '';
+
   let inputElement;
 
   onMount(() => {
@@ -71,6 +77,8 @@
     class="text-input"
     class:disabled={!enabled}
     {placeholder}
+    lang={inputLanguage || undefined}
+    dir={inputTextDirection || undefined}
     disabled={!enabled}
     on:keydown={handleKeydown}
     on:input={handleInput}

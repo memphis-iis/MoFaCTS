@@ -1,26 +1,26 @@
 <template name="classSelection">
   <div class="container class-selection-container">
-    <h3 class="page-header-title">Join Courses</h3>
+    <h3 class="page-header-title">{{t 'home.joinCourses'}}</h3>
 
     <div class="card class-selection-card">
       <div class="card-body">
         <div class="class-selection-heading">
           <i class="fa fa-users class-selection-heading-icon"></i>
-          <h5>Course Enrollment</h5>
+          <h5>{{t 'classSelection.courseEnrollment'}}</h5>
         </div>
 
         {{#if hasSelectedClassContext}}
-          <p class="class-selection-current">Current course: <strong>{{selectedClassDisplay}}</strong></p>
+          <p class="class-selection-current">{{currentCourseText}}</p>
         {{else}}
-          <p class="class-selection-current">No course selected. Join an available course to view assigned content.</p>
+          <p class="class-selection-current">{{t 'classSelection.noCourseSelected'}}</p>
         {{/if}}
 
         {{#if classSelectionReady}}
           <div class="row g-2 align-items-end">
             <div class="col-md-5 col-12">
-              <label class="form-label" for="classSelectionTeacherSelect">Instructor</label>
+              <label class="form-label" for="classSelectionTeacherSelect">{{t 'classSelection.instructor'}}</label>
               <select id="classSelectionTeacherSelect" class="form-select">
-                <option value="">Select instructor</option>
+                <option value="">{{t 'classSelection.selectInstructor'}}</option>
                 {{#each classSelectionTeachers}}
                   <option value="{{this._id}}">{{this.displayIdentifier}}</option>
                 {{/each}}
@@ -28,9 +28,9 @@
             </div>
 
             <div class="col-md-5 col-12">
-              <label class="form-label" for="classSelectionClassSelect">Course</label>
+              <label class="form-label" for="classSelectionClassSelect">{{t 'classSelection.course'}}</label>
               <select id="classSelectionClassSelect" class="form-select">
-                <option value="">Select course</option>
+                <option value="">{{t 'classSelection.selectCourse'}}</option>
                 {{#each classSelectionClasses}}
                   <option value="{{this.sectionId}}">
                     {{this.courseName}}{{#if this.sectionName}} - {{this.sectionName}}{{/if}}
@@ -40,14 +40,14 @@
             </div>
 
             <div class="col-md-2 col-12 d-grid">
-              <button type="button" id="saveClassSelectionButton" class="btn btn-primary">Save</button>
+              <button type="button" id="saveClassSelectionButton" class="btn btn-primary">{{t 'classSelection.save'}}</button>
             </div>
           </div>
           <div class="class-selection-actions">
-            <button type="button" id="backToHomeButton" class="btn btn-outline-secondary">Back to practice menu</button>
+            <button type="button" id="backToHomeButton" class="btn btn-outline-secondary">{{t 'classSelection.backToPracticeMenu'}}</button>
           </div>
         {{else}}
-          <p class="class-selection-loading">Course options are loading...</p>
+          <p class="class-selection-loading">{{t 'classSelection.loadingOptions'}}</p>
         {{/if}}
       </div>
     </div>

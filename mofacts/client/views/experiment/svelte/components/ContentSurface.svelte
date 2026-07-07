@@ -66,6 +66,7 @@
   import { waitForBrowserPaint } from '../utils/paintTiming';
   import { getMainTimeoutMs, getFeedbackTimeoutMs } from '../utils/timeoutUtils';
   import { recordCurrentInstructionContinue } from '../../instructions';
+  import { resolveContentLanguageAttributes } from '../../../../../common/lib/contentLanguageAttributes';
   import {
     resolveH5PTrialDisplayResult,
     selfHostedH5PTrialDisplayOwnsInteraction,
@@ -529,7 +530,14 @@
   $: trialContentMounted = activeSlotMounted;
   $: trialContentVisible = activeSlotVisible;
   $: cardVisualReady = trialContentMounted || sessionContentSurface.showSparcSession || state.matches('videoWaiting') || videoEnded;
-  $: flashcardControllerProps = activeFlashcardControllerState.props;
+  $: contentLanguageAttributes = resolveContentLanguageAttributes(
+    Session.get('currentTdfFile')?.tdfs?.tutor?.setspec?.contentLanguage
+  );
+  $: flashcardControllerProps = {
+    ...activeFlashcardControllerState.props,
+    inputLanguage: contentLanguageAttributes.lang || '',
+    inputTextDirection: contentLanguageAttributes.dir || '',
+  };
   $: videoEnded = state.matches('videoEnded');
   $: videoEndOverlayController.syncVideoEnded(videoEnded);
 
@@ -1136,7 +1144,7 @@
       bind:videoPlayer={videoPlayer}
       bind:trialContentFadeElement={trialContentFadeElement}
       checkpointGateState={videoRuntimeSnapshot.checkpointGateState}
-      continueButtonText={deliverySettings.continueButtonText || 'Continue'}
+      continueButtonText={deliverySettings.continueButtonText || ''}
       {deliverySettings}
       fadingOut={isFadingOut}
       instructionHtml={sanitizedVideoInstructionText}
@@ -1251,7 +1259,7 @@
   {#if hasDisplayTimeout}
     <DisplayTimeoutFooter
       canContinue={displayTimeoutCanContinue}
-      continueButtonText={deliverySettings.continueButtonText || 'Continue'}
+      continueButtonText={deliverySettings.continueButtonText || ''}
       continuing={continuingToNextUnit}
       message={footerMessage}
       on:continue={handleFooterContinue}

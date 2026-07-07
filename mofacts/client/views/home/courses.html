@@ -4,13 +4,13 @@
       <div class="table-toolbar">
         <div class="toolbar-search">
           <span class="fa fa-search" aria-hidden="true"></span>
-          <input id="coursesSearch" type="text" placeholder="Search courses and assignments..." disabled="{{#if isLoading}}disabled{{/if}}">
+          <input id="coursesSearch" type="text" placeholder="{{t 'courses.searchPlaceholder'}}" disabled="{{#if isLoading}}disabled{{/if}}">
         </div>
         <div class="toolbar-filters">
           <select id="coursesSort" class="form-select form-select-sm">
-            <option value="course">Course</option>
-            <option value="due">Due date</option>
-            <option value="recent">Last practice</option>
+            <option value="course">{{t 'courses.sortCourse'}}</option>
+            <option value="due">{{t 'courses.sortDueDate'}}</option>
+            <option value="recent">{{t 'courses.sortLastPractice'}}</option>
           </select>
         </div>
       </div>
@@ -55,25 +55,25 @@
               </div>
             </div>
           </div>
-          <div class="sr-only" role="status" aria-live="polite">Loading courses...</div>
+          <div class="sr-only" role="status" aria-live="polite">{{t 'courses.loadingCourses'}}</div>
         {{else}}
           <div class="learning-dashboard-sections learning-dashboard-content-ready">
             {{#if hasAssignedAssignments}}
               <div class="practice-section">
-                <div class="practice-section-heading">Assigned courses</div>
+                <div class="practice-section-heading">{{t 'courses.assignedCourses'}}</div>
                 {{> courseAssignmentTable courses=assignedCourses}}
                 {{> courseAssignmentCards courses=assignedCourses}}
               </div>
             {{/if}}
 
             <div class="practice-section">
-              <div class="practice-section-heading">Public courses</div>
+              <div class="practice-section-heading">{{t 'courses.publicCourses'}}</div>
               {{#if hasPublicAssignments}}
                 {{> courseAssignmentTable courses=publicCourses}}
                 {{> courseAssignmentCards courses=publicCourses}}
               {{else}}
                 <div class="practice-empty-state">
-                  <p class="learning-dashboard-flush">No public courses are available.</p>
+                  <p class="learning-dashboard-flush">{{t 'courses.noPublicCourses'}}</p>
                 </div>
               {{/if}}
             </div>
@@ -103,17 +103,17 @@
         </colgroup>
         <thead>
           <tr>
-            <th scope="col">Course</th>
-            <th scope="col">Assignment</th>
-            <th scope="col" class="actions-heading">Actions</th>
-            <th scope="col">Status</th>
-            <th scope="col">Due</th>
-            <th scope="col" class="num">Trials</th>
-            <th scope="col">Accuracy</th>
-            <th scope="col" class="num">Items</th>
-            <th scope="col" class="num">Days</th>
-            <th scope="col" class="num">Time</th>
-            <th scope="col">Last Practice</th>
+            <th scope="col">{{t 'courses.course'}}</th>
+            <th scope="col">{{t 'courses.assignment'}}</th>
+            <th scope="col" class="actions-heading">{{t 'courses.actions'}}</th>
+            <th scope="col">{{t 'courses.status'}}</th>
+            <th scope="col">{{t 'courses.due'}}</th>
+            <th scope="col" class="num">{{t 'courses.trials'}}</th>
+            <th scope="col">{{t 'courses.accuracy'}}</th>
+            <th scope="col" class="num">{{t 'courses.items'}}</th>
+            <th scope="col" class="num">{{t 'courses.days'}}</th>
+            <th scope="col" class="num">{{t 'courses.time'}}</th>
+            <th scope="col">{{t 'courses.lastPractice'}}</th>
           </tr>
         </thead>
         <tbody>
@@ -133,7 +133,7 @@
 
 <template name="courseTreeCourseRow">
   <tr id="{{rowId}}" class="learning-dashboard-row course-tree-course-row" role="row" aria-level="1" aria-expanded="{{#if expanded}}true{{else}}false{{/if}}">
-    <th scope="row" class="learning-dashboard-cell course-assignment-cell--course" data-label="Course">
+    <th scope="row" class="learning-dashboard-cell course-assignment-cell--course" data-label="{{t 'courses.course'}}">
       <button type="button" class="course-tree-toggle toggle-course-tree"
         data-courseid="{{courseId}}"
         aria-expanded="{{#if expanded}}true{{else}}false{{/if}}">
@@ -144,34 +144,34 @@
         </span>
       </button>
     </th>
-    <td class="learning-dashboard-cell course-assignment-cell--assignment" data-label="Assignment">
+    <td class="learning-dashboard-cell course-assignment-cell--assignment" data-label="{{t 'courses.assignment'}}">
       <span class="learning-dashboard-cell__value course-tree-assignment-count">{{assignmentCountLabel}} <span class="course-assignment-timezone">{{timezoneLabel}}</span></span>
     </td>
-    <td class="learning-dashboard-cell learning-dashboard-cell--action" data-label="Action">
+    <td class="learning-dashboard-cell learning-dashboard-cell--action" data-label="{{t 'courses.action'}}">
       <span class="learning-dashboard-cell__value course-tree-parent-action">-</span>
     </td>
-    <td class="learning-dashboard-cell course-assignment-cell--status" data-label="Status">
+    <td class="learning-dashboard-cell course-assignment-cell--status" data-label="{{t 'courses.status'}}">
       <span class="learning-dashboard-cell__value">-</span>
     </td>
-    <td class="learning-dashboard-cell course-assignment-cell--date" data-label="Due">
+    <td class="learning-dashboard-cell course-assignment-cell--date" data-label="{{t 'courses.due'}}">
       <span class="learning-dashboard-cell__value">-</span>
     </td>
-    <td class="learning-dashboard-cell learning-dashboard-cell--stat num" data-label="Trials">
+    <td class="learning-dashboard-cell learning-dashboard-cell--stat num" data-label="{{t 'courses.trials'}}">
       <span class="learning-dashboard-cell__value">-</span>
     </td>
-    <td class="learning-dashboard-cell learning-dashboard-cell--stat accuracy-cell" data-label="Accuracy">
+    <td class="learning-dashboard-cell learning-dashboard-cell--stat accuracy-cell" data-label="{{t 'courses.accuracy'}}">
       <span class="learning-dashboard-cell__value">-</span>
     </td>
-    <td class="learning-dashboard-cell learning-dashboard-cell--stat num" data-label="Items">
+    <td class="learning-dashboard-cell learning-dashboard-cell--stat num" data-label="{{t 'courses.items'}}">
       <span class="learning-dashboard-cell__value">-</span>
     </td>
-    <td class="learning-dashboard-cell learning-dashboard-cell--stat num" data-label="Days">
+    <td class="learning-dashboard-cell learning-dashboard-cell--stat num" data-label="{{t 'courses.days'}}">
       <span class="learning-dashboard-cell__value">-</span>
     </td>
-    <td class="learning-dashboard-cell learning-dashboard-cell--stat num" data-label="Time">
+    <td class="learning-dashboard-cell learning-dashboard-cell--stat num" data-label="{{t 'courses.time'}}">
       <span class="learning-dashboard-cell__value">-</span>
     </td>
-    <td class="learning-dashboard-cell course-assignment-cell--date" data-label="Last Practice">
+    <td class="learning-dashboard-cell course-assignment-cell--date" data-label="{{t 'courses.lastPractice'}}">
       <span class="learning-dashboard-cell__value">-</span>
     </td>
   </tr>
@@ -179,8 +179,8 @@
 
 <template name="courseAssignmentTableRow">
   <tr id="{{rowId}}" class="learning-dashboard-row course-assignment-row course-tree-assignment-row {{#if isLocked}}course-assignment-row--locked{{else if isUsed}}learning-dashboard-row--used{{else}}learning-dashboard-row--unused{{/if}}" role="row" aria-level="2">
-    <th scope="row" class="learning-dashboard-cell course-assignment-cell--course" data-label="Course" aria-label="Assignment"></th>
-    <td class="learning-dashboard-cell course-assignment-cell--assignment" data-label="Assignment">
+    <th scope="row" class="learning-dashboard-cell course-assignment-cell--course" data-label="{{t 'courses.course'}}" aria-label="{{t 'courses.assignment'}}"></th>
+    <td class="learning-dashboard-cell course-assignment-cell--assignment" data-label="{{t 'courses.assignment'}}">
       <div class="learning-dashboard-cell__value course-assignment-lesson">
         <span class="course-assignment-title" title="{{title}}">{{title}}</span>
         {{#if hasReleaseLabel}}
@@ -188,7 +188,7 @@
         {{/if}}
       </div>
     </td>
-    <td class="learning-dashboard-cell learning-dashboard-cell--action" data-label="Action">
+    <td class="learning-dashboard-cell learning-dashboard-cell--action" data-label="{{t 'courses.action'}}">
       <div class="learning-dashboard-cell__value learning-dashboard-action">
         <button type="button" class="btn btn-sm learning-dashboard-action-button {{#if isLocked}}btn-outline-secondary{{else}}{{actionButtonClass}}{{/if}} launch-course-assignment"
           data-assignmentid="{{assignmentId}}"
@@ -199,31 +199,31 @@
         </button>
       </div>
     </td>
-    <td class="learning-dashboard-cell course-assignment-cell--status" data-label="Status">
+    <td class="learning-dashboard-cell course-assignment-cell--status" data-label="{{t 'courses.status'}}">
       <span class="learning-dashboard-cell__value course-assignment-status {{statusClass}}">{{statusLabel}}</span>
     </td>
-    <td class="learning-dashboard-cell course-assignment-cell--date" data-label="Due">
+    <td class="learning-dashboard-cell course-assignment-cell--date" data-label="{{t 'courses.due'}}">
       <span class="learning-dashboard-cell__value">{{dueLabel}}</span>
     </td>
-    <td class="learning-dashboard-cell learning-dashboard-cell--stat num" data-label="Trials">
+    <td class="learning-dashboard-cell learning-dashboard-cell--stat num" data-label="{{t 'courses.trials'}}">
       <span class="learning-dashboard-cell__value">{{trialsValue}}</span>
     </td>
-    <td class="learning-dashboard-cell learning-dashboard-cell--stat accuracy-cell" data-label="Accuracy">
+    <td class="learning-dashboard-cell learning-dashboard-cell--stat accuracy-cell" data-label="{{t 'courses.accuracy'}}">
       <div class="accuracy-pct">{{accuracyValue}}</div>
       {{#if showAccuracyBar}}
         <div class="accuracy-bar"><div class="accuracy-fill" style="width:{{accuracyBarWidth}}"></div></div>
       {{/if}}
     </td>
-    <td class="learning-dashboard-cell learning-dashboard-cell--stat num" data-label="Items">
+    <td class="learning-dashboard-cell learning-dashboard-cell--stat num" data-label="{{t 'courses.items'}}">
       <span class="learning-dashboard-cell__value">{{itemsValue}}</span>
     </td>
-    <td class="learning-dashboard-cell learning-dashboard-cell--stat num" data-label="Days">
+    <td class="learning-dashboard-cell learning-dashboard-cell--stat num" data-label="{{t 'courses.days'}}">
       <span class="learning-dashboard-cell__value">{{sessionDaysValue}}</span>
     </td>
-    <td class="learning-dashboard-cell learning-dashboard-cell--stat num" data-label="Time">
+    <td class="learning-dashboard-cell learning-dashboard-cell--stat num" data-label="{{t 'courses.time'}}">
       <span class="learning-dashboard-cell__value">{{timeValue}}</span>
     </td>
-    <td class="learning-dashboard-cell course-assignment-cell--date" data-label="Last Practice">
+    <td class="learning-dashboard-cell course-assignment-cell--date" data-label="{{t 'courses.lastPractice'}}">
       <span class="learning-dashboard-cell__value">{{lastPracticeValue}}</span>
     </td>
   </tr>
@@ -268,31 +268,31 @@
       <span class="course-assignment-card-meta">{{statusLabel}}</span>
     </div>
     <div class="course-assignment-card-meta">
-      {{#if hasReleaseLabel}}{{releaseLabel}} · {{/if}}Due {{dueLabel}}
+      {{#if hasReleaseLabel}}{{releaseLabel}} · {{/if}}{{dueWithDateLabel}}
     </div>
     <div class="course-assignment-card-grid">
       <div>
-        <span>Trials</span>
+        <span>{{t 'courses.trials'}}</span>
         <strong>{{trialsValue}}</strong>
       </div>
       <div>
-        <span>Accuracy</span>
+        <span>{{t 'courses.accuracy'}}</span>
         <strong>{{accuracyValue}}</strong>
       </div>
       <div>
-        <span>Items</span>
+        <span>{{t 'courses.items'}}</span>
         <strong>{{itemsValue}}</strong>
       </div>
       <div>
-        <span>Days</span>
+        <span>{{t 'courses.days'}}</span>
         <strong>{{sessionDaysValue}}</strong>
       </div>
       <div>
-        <span>Time</span>
+        <span>{{t 'courses.time'}}</span>
         <strong>{{timeValue}}</strong>
       </div>
       <div>
-        <span>Last</span>
+        <span>{{t 'courses.last'}}</span>
         <strong>{{lastPracticeValue}}</strong>
       </div>
     </div>

@@ -23,6 +23,32 @@ export const SETSPEC_FIELD_REGISTRY: SectionFieldRegistry = {
       severity: 'error',
     },
   }),
+  contentLanguage: simpleField(stringField('', 4), {
+    brief: 'Content language.',
+    verbose: 'BCP 47 language tag for authored instructional content, such as "en", "es", "zh-Hans", or "hi". This describes author-provided content and does not request translation.'
+  }, {
+    validation: {
+      validators: [{ type: 'bcp47LanguageTag', message: 'Must be a BCP 47 language tag such as "en", "es", "zh-Hans", or "hi"' }],
+      severity: 'warning',
+    },
+    surfaces: { learnerConfig: false },
+  }),
+  recommendedUiLocales: simpleField(stringArrayField('Recommended UI locales', 'Locale'), {
+    brief: 'Recommended UI locales.',
+    verbose: 'Optional BCP 47 UI locale tags recommended for platform chrome when this content is used. These do not translate authored instructional content.'
+  }, {
+    validation: {
+      validators: [{ type: 'bcp47LanguageTagArray', message: 'Each recommended UI locale must be a BCP 47 language tag' }],
+      severity: 'warning',
+    },
+    surfaces: { learnerConfig: false },
+  }),
+  translationStatus: simpleField(enumStringField(['author-provided', 'not-translated', 'draft', 'reviewed'], 'author-provided', 4), {
+    brief: 'Content translation status.',
+    verbose: 'Author-declared status for the authored content language variant. This is metadata for review and packaging; MoFaCTS does not automatically translate course content.'
+  }, {
+    surfaces: { learnerConfig: false },
+  }),
   stimulusfile: simpleField(stringField('', 12), {
     brief: 'Filename of the stimulus JSON file.',
     verbose: 'Stimulus/content filename paired with this TDF.'

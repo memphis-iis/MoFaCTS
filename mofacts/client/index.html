@@ -50,7 +50,7 @@
   <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style="background-color: var(--app-loading-overlay-color, rgba(245,245,245,0.95)); z-index: 10000; transition: opacity var(--app-transition-smooth, 200ms) ease-in-out;">
     <div class="text-center">
       <div class="spinner-border" role="status" style="width: calc(3rem * var(--app-density-scale)); height: calc(3rem * var(--app-density-scale)); color: var(--app-text-color);">
-        <span class="sr-only">Loading...</span>
+        <span class="sr-only">{{t 'common.loading'}}</span>
       </div>
       <div class="app-loading-message" style="color: var(--app-text-color);">{{appLoadingMessage}}</div>
     </div>
@@ -65,7 +65,7 @@
       <div class="main {{appMainClass}}" id="homeMain">
         <header class="top-header {{appHeaderClass}}">
           {{#if showAppSidebar}}
-            <button class="icon-btn mobile-sidebar-trigger" id="mobileSidebarToggle" type="button" aria-label="Open menu" title="Open menu">
+            <button class="icon-btn mobile-sidebar-trigger" id="mobileSidebarToggle" type="button" aria-label="{{t 'common.openMenu'}}" title="{{t 'common.openMenu'}}">
               <span class="header-action-icon header-action-icon-sidebar" aria-hidden="true"></span>
             </button>
           {{/if}}
@@ -73,7 +73,7 @@
           <div class="header-right">
             {{#if isPracticeChrome}}
               <button type="button" class="btn btn-primary practice-return-button" id="saveReturnPracticeMenuButton">
-                Save and return to practice menu
+                {{t 'practice.saveReturnToPracticeMenu'}}
               </button>
             {{else}}
               {{> appAccountMenu}}
@@ -94,7 +94,7 @@
           <div class="container app-ui-message-container">
             <div class="alert alert-{{uiMessage.variant}} d-flex align-items-center justify-content-between" role="alert">
               <div>{{uiMessage.text}}</div>
-              <button type="button" class="btn-close" aria-label="Close" data-ui-message-clear="true"></button>
+              <button type="button" class="btn-close" aria-label="{{t 'common.close'}}" data-ui-message-clear="true"></button>
             </div>
           </div>
           {{/if}}
@@ -131,7 +131,7 @@
     <div class="container app-ui-message-container">
       <div class="alert alert-{{uiMessage.variant}} d-flex align-items-center justify-content-between" role="alert">
         <div>{{uiMessage.text}}</div>
-        <button type="button" class="btn-close" aria-label="Close" data-ui-message-clear="true"></button>
+        <button type="button" class="btn-close" aria-label="{{t 'common.close'}}" data-ui-message-clear="true"></button>
       </div>
     </div>
     {{/if}}

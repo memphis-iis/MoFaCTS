@@ -3,7 +3,7 @@
 <template name="userAdmin">
 {{#if isInRole 'admin'}}
     <div class="container admin-page">
-        <h3 class="page-header-title">User Admin</h3>
+        <h3 class="page-header-title">{{userAdminText 'admin.userAdmin'}}</h3>
 
         {{#if adminMessage}}
         <div class="admin-status admin-status-{{adminMessageClass}} admin-message" role="status" aria-live="polite">
@@ -17,7 +17,7 @@
                 <div class="card-body">
                     <div class="admin-section-heading">
                         <i class="fa fa-key admin-section-icon"></i>
-                        <h5>API Key Alternatives</h5>
+                        <h5>{{userAdminText 'admin.apiKeyAlternatives'}}</h5>
                     </div>
                     {{#if apiKeyMessage}}
                     <div class="admin-status admin-status-{{apiKeyAlertClass}} admin-status-small admin-form-row-sm" role="status" aria-live="polite">
@@ -29,56 +29,56 @@
                         <div class="admin-api-key-group">
                             <div class="admin-api-key-fields">
                                 <div>
-                                    <label for="adminOpenRouterKey" class="form-label">OpenRouter API Key</label>
+                                    <label for="adminOpenRouterKey" class="form-label">{{userAdminText 'profile.openRouterApiKey'}}</label>
                                     <input id="adminOpenRouterKey" type="password" class="form-control" autocomplete="new-password" placeholder="{{openRouterKeyPlaceholder}}">
                                     <small class="text-muted d-block admin-form-row-top">{{openRouterKeyStatus}}</small>
                                 </div>
                                 <div>
-                                    <label for="adminOpenRouterModel" class="form-label">OpenRouter Model</label>
+                                    <label for="adminOpenRouterModel" class="form-label">{{userAdminText 'profile.openRouterModel'}}</label>
                                     <input id="adminOpenRouterModel" type="text" class="form-control" maxlength="160" value="{{adminOpenRouterModel}}" placeholder="provider/model">
                                     <small class="text-muted d-block admin-form-row-top">{{openRouterModelStatus}}</small>
                                 </div>
                             </div>
                             <div class="admin-api-key-actions">
                                 <button type="button" id="saveAdminOpenRouterAlternative" class="btn btn-sm btn-primary" {{apiKeyActionAttrs}}>
-                                    <i class="fa fa-save"></i> Save OpenRouter
+                                    <i class="fa fa-save"></i> {{userAdminText 'admin.saveOpenRouter'}}
                                 </button>
                                 <button type="button" class="btn btn-sm btn-outline-danger btn-admin-api-key-delete" data-provider="openrouter" {{apiKeyActionAttrs}}>
-                                    <i class="fa fa-trash"></i> Delete Key
+                                    <i class="fa fa-trash"></i> {{userAdminText 'admin.deleteKey'}}
                                 </button>
                             </div>
                         </div>
                         <div class="admin-api-key-group">
                             <div class="admin-api-key-fields">
                                 <div>
-                                    <label for="adminGoogleTtsKey" class="form-label">Google TTS Key</label>
+                                    <label for="adminGoogleTtsKey" class="form-label">{{userAdminText 'admin.googleTtsKey'}}</label>
                                     <input id="adminGoogleTtsKey" type="password" class="form-control" autocomplete="new-password" placeholder="{{googleTtsKeyPlaceholder}}">
                                     <small class="text-muted d-block admin-form-row-top">{{googleTtsKeyStatus}}</small>
                                 </div>
                             </div>
                             <div class="admin-api-key-actions">
                                 <button type="button" class="btn btn-sm btn-primary btn-admin-api-key-save" data-provider="googleTts" data-input="#adminGoogleTtsKey" {{apiKeyActionAttrs}}>
-                                    <i class="fa fa-save"></i> Save TTS
+                                    <i class="fa fa-save"></i> {{userAdminText 'admin.saveTts'}}
                                 </button>
                                 <button type="button" class="btn btn-sm btn-outline-danger btn-admin-api-key-delete" data-provider="googleTts" {{apiKeyActionAttrs}}>
-                                    <i class="fa fa-trash"></i> Delete TTS
+                                    <i class="fa fa-trash"></i> {{userAdminText 'admin.deleteTts'}}
                                 </button>
                             </div>
                         </div>
                         <div class="admin-api-key-group">
                             <div class="admin-api-key-fields">
                                 <div>
-                                    <label for="adminGoogleSpeechKey" class="form-label">Google SR Key</label>
+                                    <label for="adminGoogleSpeechKey" class="form-label">{{userAdminText 'admin.googleSrKey'}}</label>
                                     <input id="adminGoogleSpeechKey" type="password" class="form-control" autocomplete="new-password" placeholder="{{googleSpeechKeyPlaceholder}}">
                                     <small class="text-muted d-block admin-form-row-top">{{googleSpeechKeyStatus}}</small>
                                 </div>
                             </div>
                             <div class="admin-api-key-actions">
                                 <button type="button" class="btn btn-sm btn-primary btn-admin-api-key-save" data-provider="googleSpeech" data-input="#adminGoogleSpeechKey" {{apiKeyActionAttrs}}>
-                                    <i class="fa fa-save"></i> Save SR
+                                    <i class="fa fa-save"></i> {{userAdminText 'admin.saveSr'}}
                                 </button>
                                 <button type="button" class="btn btn-sm btn-outline-danger btn-admin-api-key-delete" data-provider="googleSpeech" {{apiKeyActionAttrs}}>
-                                    <i class="fa fa-trash"></i> Delete SR
+                                    <i class="fa fa-trash"></i> {{userAdminText 'admin.deleteSr'}}
                                 </button>
                             </div>
                         </div>
@@ -93,39 +93,39 @@
                 <div class="card-body">
                     <div class="admin-section-heading">
                         <i class="fa fa-users admin-section-icon"></i>
-                        <h5>User List</h5>
+                        <h5>{{userAdminText 'admin.userList'}}</h5>
                     </div>
                     <div class="admin-form-row">
-                        <label for="filter" class="form-label">Filter users</label>
-                        <input type="text" name="filter" id="filter" class="form-control" value="{{currentFilter}}" placeholder="Filter by email">
+                        <label for="filter" class="form-label">{{userAdminText 'admin.filterUsers'}}</label>
+                        <input type="text" name="filter" id="filter" class="form-control" value="{{currentFilter}}" placeholder="{{userAdminText 'admin.filterByEmail'}}">
                     </div>
 
                     {{#if isLoading}}
                     <div class="text-center admin-empty-state">
                         <i class="fa fa-spinner fa-spin fa-2x"></i>
-                        <p class="admin-form-row-top text-muted">Loading users...</p>
+                        <p class="admin-form-row-top text-muted">{{userAdminText 'admin.loadingUsers'}}</p>
                     </div>
                     {{else}}
                     <div class="d-flex justify-content-between align-items-center admin-form-row">
                         <div>
-                            <small class="text-muted d-block">Showing {{showingRange}} users</small>
+                            <small class="text-muted d-block">{{showingUsersText}}</small>
                             <small class="text-muted d-block">{{usageAggregateSummary}}</small>
                         </div>
                         <div class="btn-group" role="group">
                             <button type="button" id="composeNewsEmail" class="btn btn-sm btn-outline-primary" {{newsEmailAttrs}}>
                                 <i class="fa {{#if isPreparingNewsEmail}}fa-spinner fa-spin{{else}}fa-envelope{{/if}}"></i>
-                                Compose News Email
+                                {{userAdminText 'admin.composeNewsEmail'}}
                             </button>
                             <button type="button" id="refreshUsageCaches" class="btn btn-sm btn-outline-primary" {{refreshUsageAttrs}}>
                                 <i class="fa {{#if isRefreshingUsage}}fa-spinner fa-spin{{else}}fa-refresh{{/if}}"></i>
-                                Refresh Usage
+                                {{userAdminText 'admin.refreshUsage'}}
                             </button>
                             <button type="button" id="prevPage" class="btn btn-sm btn-outline-secondary" {{prevPageAttrs}}>
-                                <i class="fa fa-chevron-left"></i> Prev
+                                <i class="fa fa-chevron-left"></i> {{userAdminText 'admin.prev'}}
                             </button>
-                            <span class="btn btn-sm btn-outline-secondary disabled">Page {{currentPage}} of {{totalPages}}</span>
+                            <span class="btn btn-sm btn-outline-secondary disabled">{{pageOfText}}</span>
                             <button type="button" id="nextPage" class="btn btn-sm btn-outline-secondary" {{nextPageAttrs}}>
-                                Next <i class="fa fa-chevron-right"></i>
+                                {{userAdminText 'admin.next'}} <i class="fa fa-chevron-right"></i>
                             </button>
                         </div>
                     </div>
@@ -146,17 +146,17 @@
                             <table class="table table-striped table-bordered user-admin-table">
                                 <thead>
                                     <tr>
-                                        <th class="table-col-medium sortable-useradmin" data-sortfield="identifier"><span class="user-admin-header-label">Email / ID {{sortIndicator 'identifier'}}</span></th>
-                                        <th class="table-col-medium sortable-useradmin" data-sortfield="totalTrials"><span class="user-admin-header-label">Total Trials {{sortIndicator 'totalTrials'}}</span></th>
-                                        <th class="table-col-medium sortable-useradmin" data-sortfield="weightedAccuracy"><span class="user-admin-header-label">Accuracy {{sortIndicator 'weightedAccuracy'}}</span></th>
-                                        <th class="table-col-medium sortable-useradmin" data-sortfield="totalTimeMinutes"><span class="user-admin-header-label">Total Time {{sortIndicator 'totalTimeMinutes'}}</span></th>
-                                        <th class="table-col-medium sortable-useradmin" data-sortfield="averageSessionDays"><span class="user-admin-header-label">Avg Session Days {{sortIndicator 'averageSessionDays'}}</span></th>
-                                        <th class="table-col-medium sortable-useradmin" data-sortfield="averageItemsPracticed"><span class="user-admin-header-label">Avg Items {{sortIndicator 'averageItemsPracticed'}}</span></th>
-                                        <th class="table-col-medium sortable-useradmin" data-sortfield="lastActivityDate"><span class="user-admin-header-label">Last Activity {{sortIndicator 'lastActivityDate'}}</span></th>
-                                        <th class="table-col-medium sortable-useradmin" data-sortfield="cacheUpdated"><span class="user-admin-header-label">Cache Updated {{sortIndicator 'cacheUpdated'}}</span></th>
-                                        <th class="table-col-large"><span class="user-admin-header-label">Roles</span></th>
+                                        <th class="table-col-medium sortable-useradmin" data-sortfield="identifier"><span class="user-admin-header-label">{{userAdminText 'admin.emailId'}} {{sortIndicator 'identifier'}}</span></th>
+                                        <th class="table-col-medium sortable-useradmin" data-sortfield="totalTrials"><span class="user-admin-header-label">{{userAdminText 'admin.totalTrials'}} {{sortIndicator 'totalTrials'}}</span></th>
+                                        <th class="table-col-medium sortable-useradmin" data-sortfield="weightedAccuracy"><span class="user-admin-header-label">{{userAdminText 'admin.accuracy'}} {{sortIndicator 'weightedAccuracy'}}</span></th>
+                                        <th class="table-col-medium sortable-useradmin" data-sortfield="totalTimeMinutes"><span class="user-admin-header-label">{{userAdminText 'admin.totalTime'}} {{sortIndicator 'totalTimeMinutes'}}</span></th>
+                                        <th class="table-col-medium sortable-useradmin" data-sortfield="averageSessionDays"><span class="user-admin-header-label">{{userAdminText 'admin.avgSessionDays'}} {{sortIndicator 'averageSessionDays'}}</span></th>
+                                        <th class="table-col-medium sortable-useradmin" data-sortfield="averageItemsPracticed"><span class="user-admin-header-label">{{userAdminText 'admin.avgItems'}} {{sortIndicator 'averageItemsPracticed'}}</span></th>
+                                        <th class="table-col-medium sortable-useradmin" data-sortfield="lastActivityDate"><span class="user-admin-header-label">{{userAdminText 'admin.lastActivity'}} {{sortIndicator 'lastActivityDate'}}</span></th>
+                                        <th class="table-col-medium sortable-useradmin" data-sortfield="cacheUpdated"><span class="user-admin-header-label">{{userAdminText 'admin.cacheUpdated'}} {{sortIndicator 'cacheUpdated'}}</span></th>
+                                        <th class="table-col-large"><span class="user-admin-header-label">{{userAdminText 'admin.roles'}}</span></th>
                                         {{#if canManageUsers}}
-                                        <th class="table-col-medium"><span class="user-admin-header-label">Actions</span></th>
+                                        <th class="table-col-medium"><span class="user-admin-header-label">{{userAdminText 'admin.actions'}}</span></th>
                                         {{/if}}
                                     </tr>
                                 </thead>
@@ -173,7 +173,7 @@
                                     <td class="{{usageCellClass}}">{{cacheUpdatedDisplay}}</td>
 
                                     <td>
-                                        <div class="btn-group" role="group" aria-label="Role toggles">
+                                        <div class="btn-group" role="group" aria-label="{{userAdminText 'admin.roleToggles'}}">
                                             <button
                                                 type="button"
                                                 class="btn btn-sm {{#if admin}}btn-success{{else}}btn-outline-secondary{{/if}} btn-user-change"
@@ -182,7 +182,7 @@
                                                 data-roleaction="{{#if admin}}remove{{else}}add{{/if}}"
                                             >
                                                 <i class="fa {{#if admin}}fa-check{{else}}fa-minus{{/if}}"></i>
-                                                Admin
+                                                {{userAdminText 'admin.adminRole'}}
                                             </button>
                                             <button
                                                 type="button"
@@ -192,7 +192,7 @@
                                                 data-roleaction="{{#if teacher}}remove{{else}}add{{/if}}"
                                             >
                                                 <i class="fa {{#if teacher}}fa-check{{else}}fa-minus{{/if}}"></i>
-                                                Teacher
+                                                {{userAdminText 'admin.teacherRole'}}
                                             </button>
                                         </div>
                                     </td>
@@ -205,17 +205,17 @@
                                             data-displayidentifier="{{displayIdentifier}}"
                                         >
                                             <i class="fa fa-trash"></i>
-                                            Delete
+                                            {{userAdminText 'admin.delete'}}
                                         </button>
                                         {{#if deleteUserConfirmationOpen _id}}
                                         <div class="admin-inline-confirmation admin-form-row-top" role="alert">
-                                            <div class="admin-inline-confirmation-title">Delete User</div>
+                                            <div class="admin-inline-confirmation-title">{{userAdminText 'admin.deleteUser'}}</div>
                                             <div class="admin-inline-confirmation-message">
-                                                Delete {{displayIdentifier}}? This only works for accounts that do not own lessons, uploaded assets, themes, or teacher-owned courses.
+                                                {{deleteUserMessageText displayIdentifier}}
                                             </div>
                                             <div class="admin-inline-confirmation-actions">
-                                                <button type="button" class="btn btn-danger btn-sm btn-user-delete-confirm" data-userid="{{_id}}">Delete User</button>
-                                                <button type="button" class="btn btn-outline-secondary btn-sm btn-user-delete-cancel">Cancel</button>
+                                                <button type="button" class="btn btn-danger btn-sm btn-user-delete-confirm" data-userid="{{_id}}">{{userAdminText 'admin.deleteUser'}}</button>
+                                                <button type="button" class="btn btn-outline-secondary btn-sm btn-user-delete-cancel">{{userAdminText 'content.cancel'}}</button>
                                             </div>
                                         </div>
                                         {{/if}}
@@ -238,17 +238,17 @@
                 <div class="card-body">
                     <div class="admin-section-heading">
                         <i class="fa fa-upload admin-section-icon"></i>
-                        <h5>Import User File</h5>
+                        <h5>{{userAdminText 'admin.importUserFile'}}</h5>
                     </div>
-                    <p class="text-muted small admin-form-row">CSV format: header row, then email in column 1 and password in column 2. Passwords must be at least 8 characters.</p>
+                    <p class="text-muted small admin-form-row">{{userAdminText 'admin.importUserFileDescription'}}</p>
                     <div class="row g-3">
                         <div class="col-12">
-                            <input type="file" class="form-control" name="upload-users" id="upload-users" value="" placeholder="Users File">
+                            <input type="file" class="form-control" name="upload-users" id="upload-users" value="" placeholder="{{userAdminText 'admin.usersFile'}}">
                             <span class='label label-info file-info admin-form-row-top d-block text-muted small' id="users-file-info"></span>
                         </div>
                         <div class="col-md-6 text-center">
                             <button type='button' id='doUploadUsers' class='btn btn-primary'>
-                                <i class="fa fa-users"></i> Batch Import Users
+                                <i class="fa fa-users"></i> {{userAdminText 'admin.batchImportUsers'}}
                             </button>
                         </div>
                     </div>
@@ -258,10 +258,10 @@
     </div>
 {{else}}
     <div class="container admin-page">
-        <h3 class="page-header-title">User Admin</h3>
+        <h3 class="page-header-title">{{userAdminText 'admin.userAdmin'}}</h3>
         <div class="admin-status admin-status-warning admin-denied-alert" role="alert">
             <i class="fa fa-exclamation-triangle" aria-hidden="true"></i>
-            <div class="admin-status-text"><strong>Access Denied:</strong> You do not have permission to access this function.</div>
+            <div class="admin-status-text"><strong>{{userAdminText 'admin.accessDenied'}}</strong> {{userAdminText 'admin.accessDeniedMessage'}}</div>
         </div>
     </div>
 {{/if}}

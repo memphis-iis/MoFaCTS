@@ -1,4 +1,7 @@
 <script>
+  import { getActiveUiLocale } from '../../../lib/interfaceLocaleState';
+  import { translatePlatformString } from '../../../lib/interfaceI18n';
+
   export let tdfId = '';
   export let initialTdf = null;
   export let selectedStimFile = '';
@@ -11,11 +14,13 @@
   export let errorText = '';
   export let onCancel = () => {};
   export let onSave = () => {};
+
+  const sparcText = (key) => translatePlatformString(getActiveUiLocale(), key);
 </script>
 
 <header class="sparc-editor-header">
   <div>
-    <h1>Sparc Visual Editor</h1>
+    <h1>{sparcText('sparc.title')}</h1>
     <div class="sparc-editor-subtitle">{initialTdf?.content?.tdfs?.tutor?.setspec?.lessonname || tdfId}</div>
     {#if selectedStimFile}
       <div class="sparc-editor-subtitle">{selectedStimFile}</div>
@@ -24,12 +29,12 @@
   <div class="sparc-editor-actions">
     <label class="sparc-advanced-toggle">
       <input type="checkbox" bind:checked={showAdvancedEditors} />
-      Advanced editors
+      {sparcText('sparc.advancedEditors')}
     </label>
     {#if saveMessage}<span class="sparc-save-message">{saveMessage}</span>{/if}
-    <button type="button" class="btn btn-secondary" on:click={onCancel}>Cancel</button>
+    <button type="button" class="btn btn-secondary" on:click={onCancel}>{sparcText('apkg.cancel')}</button>
     <button type="button" class="btn btn-primary" on:click={onSave} disabled={saving}>
-      {saving ? 'Saving...' : 'Save SPARC Content'}
+      {saving ? sparcText('sparc.saving') : sparcText('sparc.saveContent')}
     </button>
   </div>
 </header>
@@ -40,7 +45,7 @@
 
 {#if sparcTargets.length > 1}
   <div class="sparc-target-row">
-    <label for="sparc-target-select">SPARC page</label>
+    <label for="sparc-target-select">{sparcText('sparc.page')}</label>
     <select id="sparc-target-select" bind:value={activeTargetKey}>
       {#each sparcTargets as target}
         <option value={target.key}>{target.label}</option>
@@ -50,9 +55,9 @@
 {/if}
 
 {#if showAdvancedEditors}
-  <div class="sparc-editor-tabs" role="tablist" aria-label="SPARC editor sections">
-    <button type="button" class:active={activeEditorTab === 'visual'} on:click={() => activeEditorTab = 'visual'}>Visual Editor</button>
-    <button type="button" class:active={activeEditorTab === 'production'} on:click={() => activeEditorTab = 'production'}>Production Rules</button>
+  <div class="sparc-editor-tabs" role="tablist" aria-label={sparcText('sparc.editorSections')}>
+    <button type="button" class:active={activeEditorTab === 'visual'} on:click={() => activeEditorTab = 'visual'}>{sparcText('sparc.visualEditor')}</button>
+    <button type="button" class:active={activeEditorTab === 'production'} on:click={() => activeEditorTab = 'production'}>{sparcText('sparc.productionRules')}</button>
   </div>
 {/if}
 

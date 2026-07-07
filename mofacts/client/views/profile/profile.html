@@ -4,30 +4,40 @@
       <section class="profile-section">
         <div class="profile-section-heading">
           <span class="fa fa-lock profile-section-icon" aria-hidden="true"></span>
-          <h2>Private Account Information</h2>
+          <h2>{{t 'profile.privateAccountInformation'}}</h2>
         </div>
 
         <div class="profile-field">
-          <label for="profileEmail">Email</label>
+          <label for="profileEmail">{{t 'profile.email'}}</label>
           <input id="profileEmail" type="email" value="{{email}}" readonly>
-          <p>Used for login. Not shown to other users.</p>
+          <p>{{t 'profile.emailHelp'}}</p>
         </div>
 
         <div class="profile-field">
-          <label for="profileName">Name</label>
+          <label for="profileName">{{t 'profile.name'}}</label>
           <input id="profileName" type="text" maxlength="100" value="{{name}}">
-          <p>Used for personal communications. Not shown to other users.</p>
+          <p>{{t 'profile.nameHelp'}}</p>
+        </div>
+
+        <div class="profile-field">
+          <label for="profileUiLocale">{{t 'profile.interfaceLanguage'}}</label>
+          <select id="profileUiLocale" value="{{uiLocale}}">
+            {{#each uiLocaleOptions}}
+              <option value="{{locale}}" {{selectedAttrs}}>{{label}}</option>
+            {{/each}}
+          </select>
+          <p>{{t 'profile.interfaceLanguageHelp'}}</p>
         </div>
       </section>
 
       <section class="profile-section">
         <div class="profile-section-heading">
           <span class="fa fa-user-circle profile-section-icon" aria-hidden="true"></span>
-          <h2>Public Profile</h2>
+          <h2>{{t 'profile.publicProfile'}}</h2>
         </div>
 
         <div class="profile-avatar-row">
-          <div class="profile-avatar-preview" aria-label="Avatar preview">
+          <div class="profile-avatar-preview" aria-label="{{t 'profile.avatarPreview'}}">
             {{#if previewIsImage}}
               <img src="{{previewImageData}}" alt="" aria-hidden="true">
             {{else}}
@@ -41,18 +51,18 @@
 
           <div class="profile-avatar-controls">
             <div class="profile-field">
-              <label for="profileDisplayName">Display Name</label>
+              <label for="profileDisplayName">{{t 'profile.displayName'}}</label>
               <input id="profileDisplayName" type="text" maxlength="60" value="{{displayName}}">
-              <p>Shown to other users and in your Account menu.</p>
+              <p>{{t 'profile.displayNameHelp'}}</p>
             </div>
 
-            <div class="profile-segmented-control" role="group" aria-label="Avatar type">
-              <button type="button" class="{{#if avatarTypeIs 'initials'}}active{{/if}}" data-avatar-type="initials">Initials</button>
-              <button type="button" class="{{#if avatarTypeIs 'icon'}}active{{/if}}" data-avatar-type="icon">Icon</button>
-              <button type="button" class="{{#if avatarTypeIs 'image'}}active{{/if}}" data-avatar-type="image">Picture</button>
+            <div class="profile-segmented-control" role="group" aria-label="{{t 'profile.avatarType'}}">
+              <button type="button" class="{{#if avatarTypeIs 'initials'}}active{{/if}}" data-avatar-type="initials">{{t 'profile.initials'}}</button>
+              <button type="button" class="{{#if avatarTypeIs 'icon'}}active{{/if}}" data-avatar-type="icon">{{t 'profile.icon'}}</button>
+              <button type="button" class="{{#if avatarTypeIs 'image'}}active{{/if}}" data-avatar-type="image">{{t 'profile.picture'}}</button>
             </div>
 
-            <div class="profile-icon-grid" aria-label="Avatar icons">
+            <div class="profile-icon-grid" aria-label="{{t 'profile.avatarIcons'}}">
               {{#each avatarOptions}}
                 <button type="button" class="{{#if avatarIconSelected id}}active{{/if}}" data-avatar-icon="{{id}}" title="{{label}}" aria-label="{{label}}">
                   <span class="fa {{avatarIconClass id}}" aria-hidden="true"></span>
@@ -64,12 +74,12 @@
               <input id="profileAvatarUpload" type="file" accept="image/jpeg,image/png,image/webp" hidden>
               <button id="profileAvatarUploadButton" type="button">
                 <span class="fa fa-upload" aria-hidden="true"></span>
-                Upload Picture
+                {{t 'profile.uploadPicture'}}
               </button>
               {{#if previewIsImage}}
                 <button id="profileAvatarRemoveImage" type="button">
                   <span class="fa fa-trash" aria-hidden="true"></span>
-                  Remove Picture
+                  {{t 'profile.removePicture'}}
                 </button>
               {{/if}}
             </div>
@@ -80,26 +90,26 @@
       <section class="profile-section">
         <div class="profile-section-heading">
           <span class="fa fa-plug profile-section-icon" aria-hidden="true"></span>
-          <h2>AI Provider</h2>
+          <h2>{{t 'profile.aiProvider'}}</h2>
         </div>
 
         {{#if hasOpenRouterKey}}
           <div class="profile-key-status" role="status">
             <span class="fa fa-check-circle" aria-hidden="true"></span>
-            Key saved for this account
+            {{t 'profile.keySaved'}}
           </div>
         {{/if}}
 
         <div class="profile-field">
-          <label for="openRouterApiKey">OpenRouter API Key</label>
-          <input id="openRouterApiKey" type="password" autocomplete="new-password" placeholder="{{#if hasOpenRouterKey}}Enter a new key to replace saved key{{else}}OpenRouter API key{{/if}}">
-          <p>Saved encrypted for your account. Stored keys are not shown again; enter a new key to replace one.</p>
+          <label for="openRouterApiKey">{{t 'profile.openRouterApiKey'}}</label>
+          <input id="openRouterApiKey" type="password" autocomplete="new-password" placeholder="{{#if hasOpenRouterKey}}{{t 'profile.replaceSavedKeyPlaceholder'}}{{else}}{{t 'profile.apiKeyPlaceholder'}}{{/if}}">
+          <p>{{t 'profile.openRouterApiKeyHelp'}}</p>
         </div>
 
         <div class="profile-field">
-          <label for="openRouterDefaultModel">OpenRouter Model</label>
+          <label for="openRouterDefaultModel">{{t 'profile.openRouterModel'}}</label>
           <input id="openRouterDefaultModel" type="text" maxlength="160" value="{{openRouterDefaultModel}}" placeholder="openai/gpt-4o-mini">
-          <p>Used for AI-assisted content creation when the content does not provide its own model.</p>
+          <p>{{t 'profile.openRouterModelHelp'}}</p>
         </div>
 
         {{#if openRouterStatusMessage}}
@@ -110,16 +120,16 @@
       <div class="profile-actions">
         <button id="profileSave" type="button" class="profile-primary-action" {{savingAttrs}}>
           <span class="fa fa-save" aria-hidden="true"></span>
-          {{#if saving}}Saving{{else}}Save Profile{{/if}}
+          {{#if saving}}{{t 'profile.saving'}}{{else}}{{t 'profile.saveProfile'}}{{/if}}
         </button>
         <button id="openRouterTest" type="button" {{testingAttrs}}>
           <span class="fa fa-flask" aria-hidden="true"></span>
-          {{#if testing}}Checking{{else}}Check Configuration{{/if}}
+          {{#if testing}}{{t 'profile.checking'}}{{else}}{{t 'profile.checkConfiguration'}}{{/if}}
         </button>
         {{#if hasOpenRouterKey}}
           <button id="openRouterDeleteKey" type="button" class="profile-danger-action" {{savingAttrs}}>
             <span class="fa fa-trash" aria-hidden="true"></span>
-            Delete Key
+            {{t 'profile.deleteKey'}}
           </button>
         {{/if}}
       </div>
