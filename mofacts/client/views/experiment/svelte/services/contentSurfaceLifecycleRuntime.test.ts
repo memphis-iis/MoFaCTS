@@ -30,6 +30,7 @@ function launchDeps(events: string[]): CardLaunchOrchestrationDeps {
       currentStimuliSetId: null,
       currentUnitNumber: null,
       currentUnitName: null,
+      currentContentLanguage: null,
       deliveryParamKeys: [],
     }),
     buildInitializeFailureDiagnostic: (error) => ({
@@ -47,6 +48,7 @@ function launchDeps(events: string[]): CardLaunchOrchestrationDeps {
     log: () => undefined,
     routeInitializationFailure: () => undefined,
     setLaunchLoadingMessage: () => undefined,
+    loadingContentMessage: 'Loading content...',
     markLaunchLoadingTiming: () => undefined,
     prepareRender: async () => {
       events.push('old-prepare-render');

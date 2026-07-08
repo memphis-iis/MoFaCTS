@@ -29,6 +29,7 @@ function createDeps(overrides: Partial<CardLaunchOrchestrationDeps> = {}) {
       currentStimuliSetId: null,
       currentUnitNumber: 0,
       currentUnitName: 'Unit',
+      currentContentLanguage: null,
       deliveryParamKeys: [],
     }),
     buildInitializeFailureDiagnostic: (error) => ({
@@ -54,6 +55,7 @@ function createDeps(overrides: Partial<CardLaunchOrchestrationDeps> = {}) {
     setLaunchLoadingMessage: (message) => {
       events.push(`message:${message}`);
     },
+    loadingContentMessage: 'Loading content...',
     markLaunchLoadingTiming: (name, details) => {
       events.push(`timing:${name}:${JSON.stringify(details || {})}`);
     },

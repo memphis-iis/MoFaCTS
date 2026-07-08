@@ -53,6 +53,9 @@ type TdfLike = {
           stimulusfile?: string;
           experimentTarget?: string;
           aiVisibilityLockReason?: string;
+          contentLanguage?: string;
+          recommendedUiLocales?: string[];
+          translationStatus?: string;
         };
         unit?: Array<{ learningsession?: { stimulusfile?: string } }>;
       };

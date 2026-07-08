@@ -229,6 +229,24 @@ function normalizeAssignmentRow(row: any, index: number, tdfTitleById: Map<strin
   };
 }
 
+function assignmentLanguageMetadata(summary: {
+  contentLanguage?: string;
+  recommendedUiLocales?: string[];
+  translationStatus?: string;
+}): Pick<CourseAssignmentSummary, 'contentLanguage' | 'recommendedUiLocales' | 'translationStatus'> {
+  const metadata: Pick<CourseAssignmentSummary, 'contentLanguage' | 'recommendedUiLocales' | 'translationStatus'> = {};
+  if (typeof summary.contentLanguage === 'string') {
+    metadata.contentLanguage = summary.contentLanguage;
+  }
+  if (Array.isArray(summary.recommendedUiLocales)) {
+    metadata.recommendedUiLocales = summary.recommendedUiLocales;
+  }
+  if (typeof summary.translationStatus === 'string') {
+    metadata.translationStatus = summary.translationStatus;
+  }
+  return metadata;
+}
+
 function normalizeCourseDocumentForRead<T extends Record<string, any>>(course: T): T & {
   visibility: CourseVisibility;
   beginDate: Date | null;
@@ -395,15 +413,13 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     const summariesById = await getTdfSummariesByIds(rows.map((row: any) => String(row?.TDFId || '')).filter(Boolean));
     const titleById = new Map(Array.from(summariesById.entries()).map(([tdfId, summary]) => [tdfId, summary.displayName]));
     return rows
-      .map((row: any, index: number) => {
+      .map((row: any, index: number): CourseAssignmentSummary | null => {
         const normalized = normalizeAssignmentRow(row, index, titleById);
         if (!normalized) return null;
         const summary = summariesById.get(normalized.TDFId);
         return {
           ...normalized,
-          contentLanguage: summary?.contentLanguage,
-          recommendedUiLocales: summary?.recommendedUiLocales,
-          translationStatus: summary?.translationStatus,
+          ...(summary ? assignmentLanguageMetadata(summary) : {}),
         };
       })
       .filter((row: CourseAssignmentSummary | null): row is CourseAssignmentSummary => !!row)

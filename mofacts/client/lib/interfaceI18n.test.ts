@@ -7,10 +7,17 @@ import {
 import {
   PLATFORM_LOCALE_RESOURCES,
   type LocaleResource,
+  type PlatformStringKey,
 } from './interfaceI18nResources';
 import type { TargetUiLocale } from '../../common/lib/interfaceLocales';
 
 describe('interfaceI18n', function() {
+  function requireResourceString(resource: LocaleResource, key: PlatformStringKey, label: string): string {
+    const value = resource[key];
+    expect(value, label).to.be.a('string');
+    return value as string;
+  }
+
   const manualCreatorAudioKeys = [
     'manualCreator.buttonOrder',
     'manualCreator.speechRecognition',
@@ -676,8 +683,9 @@ describe('interfaceI18n', function() {
     for (const locale of ['hi', 'bn', 'ur'] as const) {
       const resource = PLATFORM_LOCALE_RESOURCES[locale];
       for (const key of apkgKeys) {
-        const valueWithoutPlaceholders = resource[key].replace(/\{[^}]+\}/g, '');
-        expect(resource[key], `${locale} ${key}`).to.not.equal(english[key]);
+        const value = requireResourceString(resource, key, `${locale} ${key}`);
+        const valueWithoutPlaceholders = value.replace(/\{[^}]+\}/g, '');
+        expect(value, `${locale} ${key}`).to.not.equal(english[key]);
         expect(valueWithoutPlaceholders, `${locale} ${key}`).to.not.match(englishFragments);
       }
     }

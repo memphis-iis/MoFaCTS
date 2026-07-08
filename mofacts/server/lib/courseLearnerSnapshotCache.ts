@@ -76,6 +76,20 @@ function updateCount(result: unknown): unknown {
   return result;
 }
 
+function assignmentLanguageMetadata(tdf: TdfSummary): Pick<LearnerCourseSnapshotAssignment, 'contentLanguage' | 'recommendedUiLocales' | 'translationStatus'> {
+  const metadata: Pick<LearnerCourseSnapshotAssignment, 'contentLanguage' | 'recommendedUiLocales' | 'translationStatus'> = {};
+  if (typeof tdf.contentLanguage === 'string') {
+    metadata.contentLanguage = tdf.contentLanguage;
+  }
+  if (Array.isArray(tdf.recommendedUiLocales)) {
+    metadata.recommendedUiLocales = tdf.recommendedUiLocales;
+  }
+  if (typeof tdf.translationStatus === 'string') {
+    metadata.translationStatus = tdf.translationStatus;
+  }
+  return metadata;
+}
+
 export function createCourseLearnerSnapshotCacheHelpers(deps: CourseLearnerSnapshotCacheDeps) {
   async function invalidateCourseSnapshotForUser(userId: string, reason: string) {
     const result = await deps.CourseLearnerSnapshotCache.updateAsync(
@@ -217,9 +231,7 @@ export function createCourseLearnerSnapshotCacheHelpers(deps: CourseLearnerSnaps
         availability,
         fileName: tdf.fileName,
         tags: tdf.tags,
-        contentLanguage: tdf.contentLanguage,
-        recommendedUiLocales: tdf.recommendedUiLocales,
-        translationStatus: tdf.translationStatus,
+        ...assignmentLanguageMetadata(tdf),
         currentStimuliSetId: tdf.currentStimuliSetId,
         ...progressProjection,
       };
