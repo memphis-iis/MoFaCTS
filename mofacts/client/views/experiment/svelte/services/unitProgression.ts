@@ -23,6 +23,8 @@ import type { UnitCompletionEngine } from '../../../../../common/types/svelteSer
 import { COMPLETED_LESSON_REDIRECT } from '../../../../lib/cardEntryIntent';
 import { getCourseAssignmentLaunchContext } from '../../../../lib/courseAssignmentLaunchContext';
 import { assertIdInvariants, logIdInvariantBreachOnce } from '../../../../lib/idContext';
+import { translatePlatformString } from '../../../../lib/interfaceI18n';
+import { getActiveUiLocale } from '../../../../lib/interfaceLocaleState';
 import { resolveRuntimeEngine } from './cardRuntimeState';
 import { resetQuestionIndex } from './trialProgressionState';
 
@@ -240,7 +242,7 @@ export async function unitIsFinished(_reason: string): Promise<void> {
       })) as RootTdfBoxed | null;
       if (!rootTDFBoxed) {
         clientConsole(1, 'Could not find root TDF:', rootTdfId);
-        alert('Unfortunately, the root TDF could not be loaded. Please contact your administrator.');
+        alert(translatePlatformString(getActiveUiLocale(), 'lesson.rootTdfLoadFailed'));
         FlowRouter.go('/home');
         return;
       }

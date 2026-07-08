@@ -14,6 +14,7 @@ export const TARGET_UI_LOCALES = [
 export type TargetUiLocale = typeof TARGET_UI_LOCALES[number];
 
 export type TextDirection = 'ltr' | 'rtl';
+export type PlatformLocaleReviewStatus = 'draft' | 'reviewed' | 'enabled' | 'deprecated';
 
 export type PrimaryTtsLanguageCode =
   | 'en-US'
@@ -27,12 +28,26 @@ export type PrimaryTtsLanguageCode =
   | 'id-ID'
   | 'ur-IN';
 
+export type PrimarySpeechRecognitionLanguageCode =
+  | 'en-US'
+  | 'cmn-Hans-CN'
+  | 'hi-IN'
+  | 'es-ES'
+  | 'ar-SA'
+  | 'fr-FR'
+  | 'bn-IN'
+  | 'pt-BR'
+  | 'id-ID'
+  | 'ur-IN';
+
 export interface TargetLocaleDefinition {
   locale: TargetUiLocale;
   englishName: string;
   nativeName: string;
   primaryTtsLanguageCode: PrimaryTtsLanguageCode;
+  primarySpeechRecognitionLanguageCode: PrimarySpeechRecognitionLanguageCode;
   direction: TextDirection;
+  reviewStatus: PlatformLocaleReviewStatus;
 }
 
 export const TARGET_LOCALE_DEFINITIONS = Object.freeze({
@@ -41,70 +56,90 @@ export const TARGET_LOCALE_DEFINITIONS = Object.freeze({
     englishName: 'English',
     nativeName: 'English',
     primaryTtsLanguageCode: 'en-US',
+    primarySpeechRecognitionLanguageCode: 'en-US',
     direction: 'ltr',
+    reviewStatus: 'enabled',
   },
   'zh-Hans': {
     locale: 'zh-Hans',
     englishName: 'Mandarin Chinese',
     nativeName: '中文',
     primaryTtsLanguageCode: 'cmn-CN',
+    primarySpeechRecognitionLanguageCode: 'cmn-Hans-CN',
     direction: 'ltr',
+    reviewStatus: 'draft',
   },
   hi: {
     locale: 'hi',
     englishName: 'Hindi',
     nativeName: 'हिन्दी',
     primaryTtsLanguageCode: 'hi-IN',
+    primarySpeechRecognitionLanguageCode: 'hi-IN',
     direction: 'ltr',
+    reviewStatus: 'draft',
   },
   es: {
     locale: 'es',
     englishName: 'Spanish',
     nativeName: 'Español',
     primaryTtsLanguageCode: 'es-ES',
+    primarySpeechRecognitionLanguageCode: 'es-ES',
     direction: 'ltr',
+    reviewStatus: 'draft',
   },
   ar: {
     locale: 'ar',
     englishName: 'Standard Arabic',
     nativeName: 'العربية',
     primaryTtsLanguageCode: 'ar-XA',
+    primarySpeechRecognitionLanguageCode: 'ar-SA',
     direction: 'rtl',
+    reviewStatus: 'draft',
   },
   fr: {
     locale: 'fr',
     englishName: 'French',
     nativeName: 'Français',
     primaryTtsLanguageCode: 'fr-FR',
+    primarySpeechRecognitionLanguageCode: 'fr-FR',
     direction: 'ltr',
+    reviewStatus: 'draft',
   },
   bn: {
     locale: 'bn',
     englishName: 'Bengali',
     nativeName: 'বাংলা',
     primaryTtsLanguageCode: 'bn-IN',
+    primarySpeechRecognitionLanguageCode: 'bn-IN',
     direction: 'ltr',
+    reviewStatus: 'draft',
   },
   pt: {
     locale: 'pt',
     englishName: 'Portuguese',
     nativeName: 'Português',
     primaryTtsLanguageCode: 'pt-BR',
+    primarySpeechRecognitionLanguageCode: 'pt-BR',
     direction: 'ltr',
+    reviewStatus: 'draft',
   },
   id: {
     locale: 'id',
     englishName: 'Indonesian',
     nativeName: 'Bahasa Indonesia',
     primaryTtsLanguageCode: 'id-ID',
+    primarySpeechRecognitionLanguageCode: 'id-ID',
     direction: 'ltr',
+    reviewStatus: 'draft',
   },
   ur: {
     locale: 'ur',
     englishName: 'Urdu',
     nativeName: 'اردو',
     primaryTtsLanguageCode: 'ur-IN',
+    primarySpeechRecognitionLanguageCode: 'ur-IN',
     direction: 'rtl',
+    reviewStatus: 'draft',
   },
 } satisfies Record<TargetUiLocale, TargetLocaleDefinition>);
 
@@ -181,6 +216,18 @@ export function getTextDirectionForLocale(rawLocale: string | null | undefined):
 
 export function getPrimaryTtsLanguageCode(rawLocale: string | null | undefined): PrimaryTtsLanguageCode {
   return getTargetLocaleDefinition(requireTargetUiLocale(rawLocale)).primaryTtsLanguageCode;
+}
+
+export function getPrimarySpeechRecognitionLanguageCode(rawLocale: string | null | undefined): PrimarySpeechRecognitionLanguageCode {
+  return getTargetLocaleDefinition(requireTargetUiLocale(rawLocale)).primarySpeechRecognitionLanguageCode;
+}
+
+export function getPlatformLocaleReviewStatus(rawLocale: string | null | undefined): PlatformLocaleReviewStatus {
+  return getTargetLocaleDefinition(requireTargetUiLocale(rawLocale)).reviewStatus;
+}
+
+export function isPlatformLocaleProductionEnabled(rawLocale: string | null | undefined): boolean {
+  return getPlatformLocaleReviewStatus(rawLocale) === 'enabled';
 }
 
 export function resolvePlatformPromptTtsLanguage(input: PlatformTtsResolutionInput): PlatformTtsResolution {

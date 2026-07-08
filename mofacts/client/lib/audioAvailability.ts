@@ -21,6 +21,7 @@ type TdfLike = {
       setspec?: {
         audioInputEnabled?: string | boolean;
         speechAPIKey?: string;
+        speechRecognitionLanguage?: string | string[] | null;
       };
     };
   };

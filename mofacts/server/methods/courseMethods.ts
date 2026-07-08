@@ -179,11 +179,19 @@ function getTdfSummary(tdf: any) {
   const setspec = tdf?.content?.tdfs?.tutor?.setspec || {};
   const fileName = normalizeOptionalString(tdf?.content?.fileName) || normalizeOptionalString(tdf?.tdfFileName) || String(tdf?._id || '');
   const displayName = normalizeOptionalString(setspec.lessonname) || fileName;
+  const contentLanguage = normalizeOptionalString(setspec.contentLanguage) || '';
+  const recommendedUiLocales = Array.isArray(setspec.recommendedUiLocales)
+    ? setspec.recommendedUiLocales.map((locale: unknown) => normalizeOptionalString(locale)).filter(Boolean)
+    : [];
+  const translationStatus = normalizeOptionalString(setspec.translationStatus) || '';
   return {
     TDFId: String(tdf?._id || ''),
     fileName,
     displayName,
     tags: Array.isArray(setspec.tags) ? setspec.tags : [],
+    contentLanguage,
+    recommendedUiLocales,
+    translationStatus,
     currentStimuliSetId: tdf?.stimuliSetId ?? null,
     ownerId: String(tdf?.ownerId || ''),
     isMultiTdf: Boolean(tdf?.content?.isMultiTdf),
@@ -330,6 +338,9 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
           'content.isMultiTdf': 1,
           'content.tdfs.tutor.setspec.lessonname': 1,
           'content.tdfs.tutor.setspec.tags': 1,
+          'content.tdfs.tutor.setspec.contentLanguage': 1,
+          'content.tdfs.tutor.setspec.recommendedUiLocales': 1,
+          'content.tdfs.tutor.setspec.translationStatus': 1,
         },
       }
     ).fetchAsync();
@@ -384,7 +395,17 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     const summariesById = await getTdfSummariesByIds(rows.map((row: any) => String(row?.TDFId || '')).filter(Boolean));
     const titleById = new Map(Array.from(summariesById.entries()).map(([tdfId, summary]) => [tdfId, summary.displayName]));
     return rows
-      .map((row: any, index: number) => normalizeAssignmentRow(row, index, titleById))
+      .map((row: any, index: number) => {
+        const normalized = normalizeAssignmentRow(row, index, titleById);
+        if (!normalized) return null;
+        const summary = summariesById.get(normalized.TDFId);
+        return {
+          ...normalized,
+          contentLanguage: summary?.contentLanguage,
+          recommendedUiLocales: summary?.recommendedUiLocales,
+          translationStatus: summary?.translationStatus,
+        };
+      })
       .filter((row: CourseAssignmentSummary | null): row is CourseAssignmentSummary => !!row)
       .sort((a: CourseAssignmentSummary, b: CourseAssignmentSummary) => a.order - b.order || a.title.localeCompare(b.title) || a.assignmentId.localeCompare(b.assignmentId));
   }
@@ -622,6 +643,9 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
           'content.fileName': 1,
           'content.tdfs.tutor.setspec.lessonname': 1,
           'content.tdfs.tutor.setspec.tags': 1,
+          'content.tdfs.tutor.setspec.contentLanguage': 1,
+          'content.tdfs.tutor.setspec.recommendedUiLocales': 1,
+          'content.tdfs.tutor.setspec.translationStatus': 1,
         },
       }
     ).fetchAsync();
@@ -641,6 +665,9 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
           fileName: tdf.fileName,
           displayName: tdf.displayName,
           tags: tdf.tags,
+          contentLanguage: tdf.contentLanguage,
+          recommendedUiLocales: tdf.recommendedUiLocales,
+          translationStatus: tdf.translationStatus,
           ownerId: tdf.ownerId,
         }))
         .sort((a: any, b: any) => a.displayName.localeCompare(b.displayName) || a.fileName.localeCompare(b.fileName)),

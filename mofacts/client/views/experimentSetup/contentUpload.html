@@ -259,6 +259,13 @@
                                             </div>
 
                                             {{#unless isPending}}
+                                                {{#if languageMetadataRows}}
+                                                <div class="asset-language-metadata text-muted small">
+                                                    {{#each languageMetadataRows}}
+                                                        <span class="asset-language-metadata-item"><b>{{label}}:</b> {{value}}</span>
+                                                    {{/each}}
+                                                </div>
+                                                {{/if}}
                                                 {{#if conditions}}
                                                 <div class="asset-conditions text-muted small">
                                                     &bull; {{t 'content.conditions'}}
@@ -542,7 +549,7 @@
                                                         <option value="{{this.tdfId}}"
                                                                 {{disabledAttr this.tdfId}}>
                                                             {{this.condition}}
-                                                            {{#unless this.tdfId}} (Not Found){{/unless}}
+                                                            {{#unless this.tdfId}} ({{t 'content.notFoundMarker'}}){{/unless}}
                                                         </option>
                                                     {{/each}}
                                                 </select>
@@ -552,7 +559,7 @@
                                             {{#if stimFiles}}
                                             <div class="condition-selector-wrapper">
                                                 <label for="stim-selector-{{_id}}" class="form-label small admin-form-row-xs">
-                                                    Select stim file to edit:
+                                                    {{t 'content.selectStimFileToEdit'}}
                                                 </label>
                                                 <select id="stim-selector-{{_id}}"
                                                         class="form-select form-select-sm stim-file-selector"
@@ -562,7 +569,7 @@
                                                                 data-filename="{{this.filename}}"
                                                                 {{disabledAttr this.exists}}>
                                                             {{this.filename}}
-                                                            {{#unless this.exists}} (Not Found){{/unless}}
+                                                            {{#unless this.exists}} ({{t 'content.notFoundMarker'}}){{/unless}}
                                                         </option>
                                                     {{/each}}
                                                 </select>

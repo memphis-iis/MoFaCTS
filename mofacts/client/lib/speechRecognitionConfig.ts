@@ -1,4 +1,5 @@
-const DEFAULT_SPEECH_RECOGNITION_LANGUAGE = 'en-US' as const;
+import { getPrimarySpeechRecognitionLanguageCode } from '../../common/lib/interfaceLocales';
+
 const DEFAULT_IGNORE_OUT_OF_GRAMMAR_RESPONSES = true;
 const DEFAULT_FILTER_CLOSE_SPEECH_RESPONSES = true;
 
@@ -12,7 +13,8 @@ type SetSpecWithSpeechGrammar = {
 };
 
 export function resolveSpeechRecognitionLanguage(
-  setSpec: SetSpecWithSpeechLanguage | null | undefined
+  setSpec: SetSpecWithSpeechLanguage | null | undefined,
+  uiLocale: string | null | undefined = 'en'
 ): string {
   const raw = setSpec?.speechRecognitionLanguage;
 
@@ -20,11 +22,17 @@ export function resolveSpeechRecognitionLanguage(
     const firstNonEmpty = raw
       .map((value) => String(value || '').trim())
       .find(Boolean);
-    return firstNonEmpty || DEFAULT_SPEECH_RECOGNITION_LANGUAGE;
+    if (firstNonEmpty) {
+      return firstNonEmpty;
+    }
+  } else {
+    const language = String(raw || '').trim();
+    if (language) {
+      return language;
+    }
   }
 
-  const language = String(raw || '').trim();
-  return language || DEFAULT_SPEECH_RECOGNITION_LANGUAGE;
+  return getPrimarySpeechRecognitionLanguageCode(uiLocale);
 }
 
 export function resolveSpeechIgnoreOutOfGrammarResponses(

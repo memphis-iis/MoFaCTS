@@ -1,11 +1,17 @@
 <script>
   import { createEventDispatcher, onDestroy } from 'svelte';
   import LearningProgressChart from './LearningProgressChart.svelte';
+  import { getActiveUiLocale } from '../../../../lib/interfaceLocaleState';
+  import { translatePlatformString } from '../../../../lib/interfaceI18n';
 
   export let snapshot = null;
   export let open = false;
 
   const dispatch = createEventDispatcher();
+
+  function platformText(key, values) {
+    return translatePlatformString(getActiveUiLocale(), key, values);
+  }
 
   function setOpen(nextOpen) {
     dispatch('toggle', { open: nextOpen });
@@ -35,7 +41,7 @@
 <aside
   class="learning-progress-shell"
   class:learning-progress-shell-open={open}
-  aria-label="Learning progress"
+  aria-label={platformText('learningProgress.label')}
 >
   <button
     type="button"
@@ -46,17 +52,17 @@
     on:click={handleToggle}
   >
     <span class="learning-progress-toggle-icon" aria-hidden="true"></span>
-    <span class="learning-progress-toggle-text">Progress</span>
+    <span class="learning-progress-toggle-text">{platformText('learningProgress.progress')}</span>
   </button>
 
   {#if open}
     <section id="learning-progress-panel" class="learning-progress-panel">
       <header class="learning-progress-header">
-        <h2>Progress</h2>
+        <h2>{platformText('learningProgress.progress')}</h2>
         <button
           type="button"
           class="learning-progress-close"
-          aria-label="Close progress panel"
+          aria-label={platformText('learningProgress.closePanel')}
           on:click={() => setOpen(false)}
         >
           <span aria-hidden="true">x</span>

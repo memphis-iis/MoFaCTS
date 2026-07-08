@@ -3,10 +3,16 @@
     buildCompactLearningProgressChartHeightExpression,
     buildLearningProgressChartStyle,
   } from '../services/learningProgressChartSizing';
+  import { getActiveUiLocale } from '../../../../lib/interfaceLocaleState';
+  import { translatePlatformString } from '../../../../lib/interfaceI18n';
 
   export let snapshot = null;
   export let showReferenceLines = true;
   export let compact = false;
+
+  function platformText(key, values) {
+    return translatePlatformString(getActiveUiLocale(), key, values);
+  }
 
   $: available = snapshot?.available === true;
   $: rows = Array.isArray(snapshot?.rows) ? snapshot.rows : [];
@@ -24,25 +30,29 @@
     ? Number(snapshot.meanPercent)
     : 0;
   $: graphicLabel = available
-    ? `${stats.totalItems} learning items. ${stats.atOrAboveThreshold} at or above target. ${stats.belowThreshold} below target.`
-    : (snapshot?.reason || 'Progress is not ready yet.');
+    ? platformText('learningProgress.graphicLabel', {
+      totalItems: stats.totalItems,
+      atOrAboveThreshold: stats.atOrAboveThreshold,
+      belowThreshold: stats.belowThreshold,
+    })
+    : (snapshot?.reason || platformText('learningProgress.notReady'));
   $: chartStyle = buildLearningProgressChartStyle(rows.length);
   $: compactChartHeight = buildCompactLearningProgressChartHeightExpression();
   $: chartInlineStyle = `${chartStyle}; --compact-chart-height: ${compactChartHeight}`;
 </script>
 
 {#if available}
-  <div class="learning-progress-stats" class:learning-progress-stats-compact={compact} aria-label="Learning progress summary">
+  <div class="learning-progress-stats" class:learning-progress-stats-compact={compact} aria-label={platformText('learningProgress.summary')}>
     <div>
-      <span class="learning-progress-stat-label">At target</span>
+      <span class="learning-progress-stat-label">{platformText('learningProgress.atTarget')}</span>
       <strong>{stats.atOrAboveThreshold}</strong>
     </div>
     <div>
-      <span class="learning-progress-stat-label">Below</span>
+      <span class="learning-progress-stat-label">{platformText('learningProgress.below')}</span>
       <strong>{stats.belowThreshold}</strong>
     </div>
     <div>
-      <span class="learning-progress-stat-label">Mean</span>
+      <span class="learning-progress-stat-label">{platformText('learningProgress.mean')}</span>
       <strong>{meanPercent.toFixed(0)}%</strong>
     </div>
   </div>
@@ -61,13 +71,13 @@
           class="learning-progress-line learning-progress-line-target"
           style="--line-left: {thresholdPercent}%"
         >
-          <span>Target {thresholdPercent.toFixed(0)}%</span>
+          <span>{platformText('learningProgress.targetPercent', { percent: thresholdPercent.toFixed(0) })}</span>
         </span>
         <span
           class="learning-progress-line learning-progress-line-mean"
           style="--line-left: {meanPercent}%"
         >
-          <span>Mean {meanPercent.toFixed(0)}%</span>
+          <span>{platformText('learningProgress.meanPercent', { percent: meanPercent.toFixed(0) })}</span>
         </span>
       </div>
     {/if}
@@ -96,7 +106,7 @@
   {/if}
 {:else}
   <div class="learning-progress-empty" role="status">
-    {snapshot?.reason || 'Progress is not ready yet.'}
+    {snapshot?.reason || platformText('learningProgress.notReady')}
   </div>
 {/if}
 

@@ -133,11 +133,22 @@
 
 .course-assignment-subline,
 .course-assignment-timezone,
+.course-assignment-language-metadata,
 .course-assignment-card-meta,
 .course-assignment-card-grid span {
   color: color-mix(in srgb, var(--app-text-color) 62%, transparent);
   font-size: calc(var(--app-font-size-base) * 0.75);
   line-height: 1.25;
+}
+
+.course-assignment-language-metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.course-assignment-language-metadata-item {
+  white-space: nowrap;
 }
 
 .course-assignment-status {

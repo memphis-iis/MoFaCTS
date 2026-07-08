@@ -24,6 +24,8 @@ import {
   startLaunchLoading,
 } from '../../lib/launchLoading';
 import { setEnterKeyLock } from './svelte/services/trialReadinessState';
+import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
+import { translatePlatformString } from '../../lib/interfaceI18n';
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra');
 
 declare const Meteor: any;
@@ -486,7 +488,7 @@ function getUnitsRemaining() {
 // pains to not modify anything reactive until this function has returned
 async function instructContinue() {
   if (!isLaunchLoadingActive()) {
-    startLaunchLoading('Loading content...', 'instructions');
+    startLaunchLoading(translatePlatformString(getActiveUiLocale(), 'common.loadingContent'), 'instructions');
   }
   markLaunchLoadingTiming('instructionContinue:instructContinue:start');
   assertIdInvariants('instructions.instructContinue', { requireCurrentTdfId: true, requireStimuliSetId: false });
@@ -548,6 +550,10 @@ async function instructContinue() {
 
 
 Template.instructions.helpers({
+  platformText: function(key: Parameters<typeof translatePlatformString>[1], options?: { hash?: Parameters<typeof translatePlatformString>[2] }) {
+    return translatePlatformString(getActiveUiLocale(), key, options?.hash);
+  },
+
   isExperiment: function() {
     return Meteor.user()?.loginParams?.loginMode === 'experiment';
   },
@@ -956,7 +962,7 @@ async function handleInstructionContinueAction(forceBypassLockout = false) {
     }
   }
 
-  startLaunchLoading('Loading content...', 'instructions');
+  startLaunchLoading(translatePlatformString(getActiveUiLocale(), 'common.loadingContent'), 'instructions');
   markLaunchLoadingTiming('instructionContinue:pressed', { forceBypassLockout });
   await recordCurrentInstructionContinue(timeRendered);
   await instructContinue();

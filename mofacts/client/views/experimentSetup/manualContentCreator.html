@@ -153,6 +153,29 @@
                                 </div>
                                 {{/if}}
                             </div>
+                            <div class="manual-section-panel">
+                                <h5>{{manualText 'manualCreator.languageMetadata'}}</h5>
+                                <div class="manual-helper">{{manualText 'manualCreator.languageMetadataHelper'}}</div>
+                                <div class="row g-3 admin-form-row-top">
+                                    <div class="col-md-4">
+                                        <div class="manual-field-label">{{manualText 'manualCreator.contentLanguage'}}</div>
+                                        <input type="text" class="form-control" data-field="contentLanguage" value="{{contentLanguage}}" placeholder="{{manualText 'manualCreator.contentLanguagePlaceholder'}}">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="manual-field-label">{{manualText 'manualCreator.recommendedUiLocales'}}</div>
+                                        <input type="text" class="form-control" data-field="recommendedUiLocales" value="{{recommendedUiLocales}}" placeholder="{{manualText 'manualCreator.recommendedUiLocalesPlaceholder'}}">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="manual-field-label">{{manualText 'manualCreator.translationStatus'}}</div>
+                                        <select class="form-select" data-field="translationStatus">
+                                            <option value="author-provided" selected="{{selectedIf translationStatus 'author-provided'}}">{{manualText 'manualCreator.translationStatusAuthorProvided'}}</option>
+                                            <option value="not-translated" selected="{{selectedIf translationStatus 'not-translated'}}">{{manualText 'manualCreator.translationStatusNotTranslated'}}</option>
+                                            <option value="draft" selected="{{selectedIf translationStatus 'draft'}}">{{manualText 'manualCreator.translationStatusDraft'}}</option>
+                                            <option value="reviewed" selected="{{selectedIf translationStatus 'reviewed'}}">{{manualText 'manualCreator.translationStatusReviewed'}}</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         {{/if}}
 
@@ -201,6 +224,23 @@
                                 </select>
                             </div>
                             {{/if}}
+                            {{#unless isMultipleChoice}}
+                            <div class="manual-section-panel">
+                                <h5>{{manualText 'manualCreator.answerMatching'}}</h5>
+                                <div class="manual-helper">{{manualText 'manualCreator.answerMatchingHelper'}}</div>
+                                <div class="manual-inline-options admin-form-row-top">
+                                    <label class="form-check editor-inline-check">
+                                        <input class="form-check-input" type="checkbox" data-field="caseSensitive" checked="{{boolChecked caseSensitive}}">
+                                        <span class="form-check-label">{{manualText 'manualCreator.caseSensitive'}}</span>
+                                    </label>
+                                    <label class="form-check editor-inline-check">
+                                        <input class="form-check-input" type="checkbox" data-field="accentSensitive" checked="{{boolChecked accentSensitive}}">
+                                        <span class="form-check-label">{{manualText 'manualCreator.accentSensitive'}}</span>
+                                    </label>
+                                </div>
+                                <div class="manual-helper">{{manualText 'manualCreator.accentSensitiveHelper'}}</div>
+                            </div>
+                            {{/unless}}
                         </div>
                         {{/if}}
 

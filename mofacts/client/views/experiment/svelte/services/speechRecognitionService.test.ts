@@ -1,8 +1,12 @@
 import { expect } from 'chai';
 import {
+  TARGET_UI_LOCALES,
+  getPrimarySpeechRecognitionLanguageCode,
+} from '../../../../../common/lib/interfaceLocales';
+import {
+  resolveSpeechRecognitionLanguage,
   resolveSpeechFilterCloseResponses,
-  resolveSpeechIgnoreOutOfGrammarResponses,
-  resolveSpeechRecognitionLanguage
+  resolveSpeechIgnoreOutOfGrammarResponses
 } from '../../../../lib/speechRecognitionConfig';
 import {
   buildSpeechRecognitionPhraseHints,
@@ -89,7 +93,20 @@ describe('speechRecognitionConfig', function() {
       .to.throw('Invalid setspec.srfilterclose value "sometimes" for SR');
   });
 
-  it('keeps the existing speech language default', function() {
-    expect(resolveSpeechRecognitionLanguage({})).to.equal('en-US');
+  it('uses explicit TDF speech language before UI-locale speech language', function() {
+    expect(resolveSpeechRecognitionLanguage({ speechRecognitionLanguage: [' ', 'es-ES'] }, 'hi'))
+      .to.equal('es-ES');
+  });
+
+  it('uses the UI locale speech language when TDF speech language is missing', function() {
+    expect(resolveSpeechRecognitionLanguage({}, 'hi')).to.equal('hi-IN');
+    expect(resolveSpeechRecognitionLanguage({}, 'zh-Hans')).to.equal('cmn-Hans-CN');
+  });
+
+  it('uses the explicit UI-locale speech language for every target UI locale', function() {
+    for (const locale of TARGET_UI_LOCALES) {
+      expect(resolveSpeechRecognitionLanguage({}, locale), locale)
+        .to.equal(getPrimarySpeechRecognitionLanguageCode(locale));
+    }
   });
 });

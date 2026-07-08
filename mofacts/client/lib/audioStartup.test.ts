@@ -66,6 +66,7 @@ describe('audioStartup', function() {
             setspec: {
               textToSpeechAPIKey: 'tts-key',
               enableAudioPromptAndFeedback: 'true',
+              textToSpeechLanguage: 'es-ES',
             },
           },
         },
@@ -92,6 +93,7 @@ describe('audioStartup', function() {
             setspec: {
               textToSpeechAPIKey: 'tts-key',
               enableAudioPromptAndFeedback: 'true',
+              textToSpeechLanguage: 'es-ES',
             },
           },
         },
@@ -116,6 +118,7 @@ describe('audioStartup', function() {
             setspec: {
               textToSpeechAPIKey: 'tts-key',
               enableAudioPromptAndFeedback: 'false',
+              textToSpeechLanguage: 'es-ES',
             },
           },
         },
@@ -141,6 +144,7 @@ describe('audioStartup', function() {
           tutor: {
             setspec: {
               enableAudioPromptAndFeedback: 'true',
+              audioPromptFeedbackVoice: 'fr-FR-Neural2-A',
             },
           },
         },
@@ -174,6 +178,7 @@ describe('audioStartup', function() {
       {
         audioSettings: {
           audioPromptMode: 'feedback',
+          audioPromptFeedbackVoice: 'en-US-Standard-A',
           audioInputMode: false,
         },
       },
@@ -181,6 +186,31 @@ describe('audioStartup', function() {
 
     expect(plan.requiresPreparation).to.equal(true);
     expect(plan.ttsWarmup).to.equal(true);
+    expect(plan.srWarmup).to.equal(false);
+    expect(plan.recorderPreInitialization).to.equal(false);
+  });
+
+  it('does not prepare TTS warmup when no TTS language or voice locale is explicit', function() {
+    Session.set('ttsAPIKeyConfigured', true);
+
+    const plan = getAudioLaunchPreparationPlan(
+      {
+        tdfs: {
+          tutor: {
+            setspec: {},
+          },
+        },
+      },
+      {
+        audioSettings: {
+          audioPromptMode: 'feedback',
+          audioInputMode: false,
+        },
+      },
+    );
+
+    expect(plan.requiresPreparation).to.equal(false);
+    expect(plan.ttsWarmup).to.equal(false);
     expect(plan.srWarmup).to.equal(false);
     expect(plan.recorderPreInitialization).to.equal(false);
   });
@@ -193,6 +223,7 @@ describe('audioStartup', function() {
             setspec: {
               audioInputEnabled: 'true',
               speechAPIKey: 'speech-key',
+              speechRecognitionLanguage: 'es-ES',
             },
           },
         },
@@ -237,6 +268,34 @@ describe('audioStartup', function() {
   });
 
   it('prepares SR warmup from the learner audio setting when the TDF enables speech input and a resolved server key is available', function() {
+    Session.set('speechAPIKeyConfigured', true);
+
+    const plan = getAudioLaunchPreparationPlan(
+      {
+        tdfs: {
+          tutor: {
+            setspec: {
+              audioInputEnabled: 'true',
+              speechRecognitionLanguage: 'es-ES',
+            },
+          },
+        },
+      },
+      {
+        audioSettings: {
+          audioPromptMode: 'silent',
+          audioInputMode: true,
+        },
+      },
+    );
+
+    expect(plan.requiresPreparation).to.equal(true);
+    expect(plan.ttsWarmup).to.equal(false);
+    expect(plan.srWarmup).to.equal(true);
+    expect(plan.recorderPreInitialization).to.equal(true);
+  });
+
+  it('prepares SR warmup from the UI locale when TDF speech language is missing', function() {
     Session.set('speechAPIKeyConfigured', true);
 
     const plan = getAudioLaunchPreparationPlan(

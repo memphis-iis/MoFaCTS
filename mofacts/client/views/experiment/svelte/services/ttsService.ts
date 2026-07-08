@@ -34,6 +34,7 @@ import {
 } from './audioRuntimeState';
 import { resolveDynamicAssetPath } from './mediaResolver';
 import { logIdInvariantBreachOnce } from '../../../../lib/idContext';
+import { resolveExplicitTtsLanguageCode } from '../../../../lib/audioLanguage';
 import { resolvePlatformPromptTtsLanguage } from '../../../../../common/lib/interfaceLocales';
 import type {
   AudioPromptSource,
@@ -228,20 +229,11 @@ export function resolveAuthoredContentTtsLanguageCode(
   setspec: { textToSpeechLanguage?: string | string[] } | null | undefined,
   requestedVoice: string
 ): string {
-  const configuredLanguage = Array.isArray(setspec?.textToSpeechLanguage)
-    ? setspec?.textToSpeechLanguage[0]
-    : setspec?.textToSpeechLanguage;
-  const normalizedLanguage = String(configuredLanguage || '').trim();
-  if (normalizedLanguage) {
-    return normalizedLanguage;
-  }
-
-  const voiceMatch = String(requestedVoice || '').trim().match(/^([A-Za-z]{2,3}-[A-Za-z]{2,3})-/);
-  if (voiceMatch?.[1]) {
-    return voiceMatch[1];
-  }
-
-  return 'en-US';
+  return resolveExplicitTtsLanguageCode({
+    configuredLanguage: setspec?.textToSpeechLanguage,
+    requestedVoice,
+    contextLabel: 'Authored content TTS',
+  });
 }
 
 export function resolveTtsLanguageForSpeak(input: TtsLanguageResolutionInput): TtsLanguageResolution {
@@ -966,8 +958,12 @@ export async function ttsPlaybackService(_context: Record<string, unknown>, even
       }
     }
 
-    // Don't crash the trial - just log error and continue
-    return { status: 'error', error: error instanceof Error ? error.message : String(error) };
+    // Don't crash the trial. The visual lesson text remains available even when audio cannot play.
+    return {
+      status: 'error',
+      error: error instanceof Error ? error.message : String(error),
+      textAvailable: true,
+    };
   } finally {
     if (activeTtsPlayback?.id === playbackId && getCancellation()) {
       activeTtsPlayback = null;

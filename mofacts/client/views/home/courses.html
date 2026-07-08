@@ -186,6 +186,13 @@
         {{#if hasReleaseLabel}}
           <span class="course-assignment-subline">{{releaseLabel}}</span>
         {{/if}}
+        {{#if languageMetadataRows}}
+          <span class="course-assignment-language-metadata">
+            {{#each languageMetadataRows}}
+              <span class="course-assignment-language-metadata-item"><b>{{label}}:</b> {{value}}</span>
+            {{/each}}
+          </span>
+        {{/if}}
       </div>
     </td>
     <td class="learning-dashboard-cell learning-dashboard-cell--action" data-label="{{t 'courses.action'}}">
@@ -270,6 +277,13 @@
     <div class="course-assignment-card-meta">
       {{#if hasReleaseLabel}}{{releaseLabel}} · {{/if}}{{dueWithDateLabel}}
     </div>
+    {{#if languageMetadataRows}}
+      <div class="course-assignment-language-metadata course-assignment-card-meta">
+        {{#each languageMetadataRows}}
+          <span class="course-assignment-language-metadata-item"><b>{{label}}:</b> {{value}}</span>
+        {{/each}}
+      </div>
+    {{/if}}
     <div class="course-assignment-card-grid">
       <div>
         <span>{{t 'courses.trials'}}</span>

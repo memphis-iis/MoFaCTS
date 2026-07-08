@@ -16,6 +16,7 @@ import {
 } from '../lib/state/audioState';
 import { getErrorMessage } from '../lib/errorUtils';
 import { evaluateSrAvailability } from '../lib/audioAvailability';
+import { resolveExplicitTtsLanguageCode } from '../lib/audioLanguage';
 import { resolveSpeechRecognitionLanguage } from '../lib/speechRecognitionConfig';
 import { clientConsole } from '../lib/userSessionHelpers';
 import { getActiveUiLocale } from '../lib/interfaceLocaleState';
@@ -487,21 +488,28 @@ async function updateAudioPromptMode(e: any, template?: any){
 }
 
 export async function warmupGoogleTTS() {
-  // Get voice from TDF if available, otherwise use default
   const tdfFile = Session.get('currentTdfFile');
-  const voice = tdfFile?.tdfs?.tutor?.setspec?.audioPromptFeedbackVoice || 'en-US-Standard-A';
-  const ttsLanguage = tdfFile?.tdfs?.tutor?.setspec?.textToSpeechLanguage || 'en-US';
+  const settings = getUserAudioSettings();
+  const voice = tdfFile?.tdfs?.tutor?.setspec?.audioPromptFeedbackVoice ||
+    settings.audioPromptFeedbackVoice ||
+    settings.audioPromptVoice ||
+    '';
 
   // Make a dummy TTS request to establish the Meteor method connection
   // Use valid text instead of "." - Google TTS rejects punctuation-only input
   // Server will handle key lookup (user personal key or TDF key fallback)
   try {
+    const ttsLanguage = resolveExplicitTtsLanguageCode({
+      configuredLanguage: tdfFile?.tdfs?.tutor?.setspec?.textToSpeechLanguage,
+      requestedVoice: voice,
+      contextLabel: 'Audio Settings TTS warmup',
+    });
     await (Meteor as any).callAsync('makeGoogleTTSApiCall',
       Session.get('currentTdfId'),
       'warmup', // Valid word for synthesis
       1.0, // Default rate
       0.0, // Volume 0 (silent warmup)
-      voice,
+      voice || '',
       ttsLanguage
     );
     setTtsWarmedUp(true);
@@ -521,7 +529,8 @@ export async function warmupGoogleSpeechRecognition() {
   const silentAudioBytes = new Uint8Array(3200).fill(0);
   const base64Audio = btoa(String.fromCharCode.apply(null, Array.from(silentAudioBytes) as any));
   const speechRecognitionLanguage = resolveSpeechRecognitionLanguage(
-    Session.get('currentTdfFile')?.tdfs?.tutor?.setspec
+    Session.get('currentTdfFile')?.tdfs?.tutor?.setspec,
+    getActiveUiLocale()
   );
 
   // Build minimal request matching production format

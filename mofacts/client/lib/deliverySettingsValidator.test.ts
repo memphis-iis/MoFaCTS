@@ -177,6 +177,7 @@ describe('DeliverySettings Validator (Phase 4)', function() {
         continueButtonText: 'Next',
         skipStudyButtonText: 'Skip it',
         caseSensitive: true,
+        accentSensitive: true,
         displayQuestionNumber: true,
       };
 
@@ -202,6 +203,7 @@ describe('DeliverySettings Validator (Phase 4)', function() {
       expect(result.continueButtonText).to.equal('Next');
       expect(result.skipStudyButtonText).to.equal('Skip it');
       expect(result.caseSensitive).to.equal(true);
+      expect(result.accentSensitive).to.equal(true);
       expect(result.displayQuestionNumber).to.equal(true);
     });
   });

@@ -7,6 +7,8 @@ import { Meteor } from 'meteor/meteor';
 import { Session } from 'meteor/session';
 import { meteorCallAsync } from '../../../../index';
 import { checkUserSession, clientConsole, startSessionCheckInterval } from '../../../../lib/userSessionHelpers';
+import { translatePlatformString } from '../../../../lib/interfaceI18n';
+import { getActiveUiLocale } from '../../../../lib/interfaceLocaleState';
 import { ensureStimDisplayTypeMapReady, startStimDisplayTypeMapVersionSync } from '../../../../lib/stimDisplayTypeMapSync';
 import {
   refreshCurrentDeliverySettingsStore,
@@ -772,7 +774,7 @@ async function initializeStandardCardEntry(
   });
 
   if (shouldShowInstructions && !canInlineVideoInstructions) {
-    setLaunchLoadingMessage('Loading instructions...');
+    setLaunchLoadingMessage(translatePlatformString(getActiveUiLocale(), 'common.loadingInstructions'));
     FlowRouter.go('/instructions');
     return { redirected: true };
   }
@@ -863,7 +865,7 @@ export async function initializeSvelteCard(): Promise<SvelteCardInitResult> {
   markRuntimeResumeInactive();
 
   resetHiddenItems();
-  setLaunchLoadingMessage('Loading content...');
+  setLaunchLoadingMessage(translatePlatformString(getActiveUiLocale(), 'common.loadingContent'));
   await restoreHiddenItemsFromHistory();
   assertIdInvariants('svelteInit.before-media-resolution', {
     requireCurrentTdfId: true,

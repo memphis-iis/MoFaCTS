@@ -49,6 +49,10 @@ describe('manualDraftBuilder', function() {
     expect(tutor.setspec.experimentTarget).to.equal('manual-test');
     expect(tutor.setspec.shuffleclusters).to.equal('0-0');
     expect(tutor.setspec.tags).to.deep.equal(['geography', 'capitals']);
+    expect(tutor.setspec.enableAudioPromptAndFeedback).to.equal('false');
+    expect(tutor.setspec.audioInputEnabled).to.equal('false');
+    expect(tutor.setspec).to.not.have.property('textToSpeechLanguage');
+    expect(tutor.setspec).to.not.have.property('speechRecognitionLanguage');
     expect(tutor.unit).to.have.length(2);
     expect(tutor.unit[0]?.unitname).to.equal('Instructions');
     expect(tutor.unit[0]?.unitinstructions).to.contain('Read this first.');
@@ -97,6 +101,7 @@ describe('manualDraftBuilder', function() {
 
     expect(tutor.setspec.enableAudioPromptAndFeedback).to.equal('true');
     expect(tutor.setspec.audioPromptMode).to.equal('feedback');
+    expect(tutor.setspec.textToSpeechLanguage).to.equal('es-ES');
     expect(tutor.setspec.audioInputEnabled).to.equal('true');
     expect(tutor.setspec.speechRecognitionLanguage).to.equal('es-ES');
     expect(tutor.setspec.speechIgnoreOutOfGrammarResponses).to.equal('false');
@@ -155,5 +160,87 @@ describe('manualDraftBuilder', function() {
       templatesrepeated: '10',
       group: '0,b,t,0 0,b,t,0 0,b,t,0 0,b,t,0 0,b,t,0 0,b,t,0 0,b,t,0 0,b,t,0 0,b,t,0 0,b,t,0',
     });
+  });
+
+  it('emits author-declared language metadata without translating lesson content', function() {
+    const draft = buildManualDraftLesson(buildState({
+      contentLanguage: 'es',
+      recommendedUiLocales: 'es, en',
+      translationStatus: 'author-provided',
+      rows: [
+        {
+          id: 'row-1',
+          promptText: 'Sistema esquelético',
+          mediaRef: '',
+          answer: 'hueso',
+          choice2: '',
+          choice3: '',
+          choice4: '',
+        },
+      ],
+    }));
+
+    const tutor = draft.workingCopy.tutor as {
+      setspec: Record<string, unknown>;
+    };
+    const firstCluster = draft.workingCopy.stimuli.setspec.clusters[0] as {
+      stims?: Array<{ display?: Record<string, unknown> }>;
+    };
+
+    expect(tutor.setspec.contentLanguage).to.equal('es');
+    expect(tutor.setspec.recommendedUiLocales).to.deep.equal(['es', 'en']);
+    expect(tutor.setspec.translationStatus).to.equal('author-provided');
+    expect(firstCluster.stims?.[0]?.display?.text).to.equal('Sistema esquelético');
+  });
+
+  it('emits author-controlled typed-answer matching settings', function() {
+    const draft = buildManualDraftLesson(buildState({
+      responseType: 'typed',
+      caseSensitive: true,
+      accentSensitive: true,
+      rows: [
+        {
+          id: 'row-1',
+          promptText: 'Spanish word for heart',
+          mediaRef: '',
+          answer: 'corazón',
+          choice2: '',
+          choice3: '',
+          choice4: '',
+        },
+      ],
+    }));
+
+    const tutor = draft.workingCopy.tutor as {
+      deliverySettings: Record<string, unknown>;
+      unit: Array<{ deliverySettings?: Record<string, unknown> }>;
+    };
+    const practiceUnit = tutor.unit.find((unit) => unit.deliverySettings);
+
+    expect(tutor.deliverySettings.caseSensitive).to.equal(true);
+    expect(tutor.deliverySettings.accentSensitive).to.equal(true);
+    expect(practiceUnit?.deliverySettings?.caseSensitive).to.equal(true);
+    expect(practiceUnit?.deliverySettings?.accentSensitive).to.equal(true);
+  });
+
+  it('requires explicit speech language before emitting text-to-speech language metadata', function() {
+    expect(() => buildManualDraftLesson(buildState({
+      textToSpeechMode: 'prompts',
+      speechLanguage: '',
+    }))).to.throw('Manual draft text-to-speech requires an explicit speech language.');
+  });
+
+  it('allows speech recognition without TDF speech language metadata', function() {
+    const draft = buildManualDraftLesson(buildState({
+      speechRecognitionEnabled: true,
+      speechLanguage: '',
+    }));
+
+    const tutor = draft.workingCopy.tutor as {
+      setspec: Record<string, unknown>;
+    };
+
+    expect(tutor.setspec.audioInputEnabled).to.equal('true');
+    expect(tutor.setspec).to.not.have.property('speechRecognitionLanguage');
   });
 });

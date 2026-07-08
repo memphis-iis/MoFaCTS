@@ -9,7 +9,7 @@ describe('audioAvailability', function() {
   it('returns available when user pref, TDF audio input, and key availability are satisfied', function() {
     const result = evaluateSrAvailability({
       user: { audioSettings: { audioInputMode: true } },
-      tdfFile: { tdfs: { tutor: { setspec: { audioInputEnabled: 'true', speechAPIKey: 'tdf-key' } } } },
+      tdfFile: { tdfs: { tutor: { setspec: { audioInputEnabled: 'true', speechAPIKey: 'tdf-key', speechRecognitionLanguage: 'es-ES' } } } },
       sessionSpeechApiKey: null,
     });
     expect(result.status).to.equal('available');
@@ -26,10 +26,20 @@ describe('audioAvailability', function() {
     expect(result.detail).to.equal('tdf_audio_disabled');
   });
 
-  it('blocks on missing key while user audio is enabled', function() {
+  it('allows speech input without a TDF speech language when key availability is satisfied', function() {
     const result = evaluateSrAvailability({
       user: { audioSettings: { audioInputMode: true } },
-      tdfFile: { tdfs: { tutor: { setspec: { audioInputEnabled: 'true' } } } },
+      tdfFile: { tdfs: { tutor: { setspec: { audioInputEnabled: 'true', speechAPIKey: 'tdf-key' } } } },
+      sessionSpeechApiKey: '',
+    });
+    expect(result.status).to.equal('available');
+    expect(result.detail).to.equal('ok');
+  });
+
+  it('blocks on missing key while user audio and speech language are enabled', function() {
+    const result = evaluateSrAvailability({
+      user: { audioSettings: { audioInputMode: true } },
+      tdfFile: { tdfs: { tutor: { setspec: { audioInputEnabled: 'true', speechRecognitionLanguage: 'es-ES' } } } },
       sessionSpeechApiKey: '',
     });
     expect(result.status).to.equal('blocked');

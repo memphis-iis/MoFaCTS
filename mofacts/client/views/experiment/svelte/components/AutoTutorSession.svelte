@@ -3,6 +3,8 @@
   import 'deep-chat';
   import { createAutoTutorRuntime } from '../services/autoTutorClient';
   import { clientConsole } from '../../../../lib/clientLogger';
+  import { getActiveUiLocale } from '../../../../lib/interfaceLocaleState';
+  import { translatePlatformString } from '../../../../lib/interfaceI18n';
 
   const dispatch = createEventDispatcher();
   const MOBILE_LAYOUT_QUERY = '(max-width: 768px)';
@@ -30,6 +32,10 @@
   let isMobileLayout = false;
   let runtimeReady = false;
   let chatReady = false;
+
+  function platformText(key, values) {
+    return translatePlatformString(getActiveUiLocale(), key, values);
+  }
 
   function toDeepChatHistory(dialogue) {
     return dialogue.map((message) => ({
@@ -61,12 +67,12 @@
     const waitingForRuntime = !chatReady && !errorMessage;
     const disabled = completed || !!errorMessage || waitingForRuntime;
     const placeholder = errorMessage
-      ? 'AutoTutor unavailable'
+      ? platformText('autoTutor.unavailable')
       : completed
-        ? 'Conversation complete'
+        ? platformText('autoTutor.conversationComplete')
         : waitingForRuntime
-          ? 'Loading AutoTutor...'
-          : 'Type your answer...';
+          ? platformText('autoTutor.loading')
+          : platformText('autoTutor.typeYourAnswer');
     chatElement.setPlaceholderText?.(placeholder);
     chatElement.disableSubmitButton?.(disabled);
     const textInput = chatElement.shadowRoot?.querySelector('#text-input');
@@ -135,6 +141,12 @@
     return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
   }
 
+  function formatTurnCount(value) {
+    return value === 1
+      ? platformText('autoTutor.oneTurn')
+      : platformText('autoTutor.turnCount', { count: value });
+  }
+
   function applyDeepChatHostLayout() {
     if (!chatElement) {
       return;
@@ -153,8 +165,8 @@
     }
     chatElement.introMessage = {
       text: isMobileLayout && questionPrompt
-        ? `${questionPrompt}\n\nTell me what you think. A short answer is fine.`
-        : 'Tell me what you think. A short answer is fine.',
+        ? `${questionPrompt}\n\n${platformText('autoTutor.introPrompt')}`
+        : platformText('autoTutor.introPrompt'),
     };
   }
 
@@ -165,7 +177,7 @@
     applyDeepChatHostLayout();
     applyDeepChatIntroMessage();
     chatElement.textInput = {
-      placeholder: { text: 'Type your answer...' },
+      placeholder: { text: platformText('autoTutor.typeYourAnswer') },
       styles: {
         container: {
           backgroundColor: 'var(--learning-card-surface-color)',
@@ -249,7 +261,7 @@
           updateChatInputState();
           clientConsole(1, '[AutoTutor] Chat turn failed', error);
           await signals.onResponse({
-            text: 'This AutoTutor session hit a configuration or service error. Please contact the lesson author.',
+            text: platformText('autoTutor.serviceError'),
           });
         }
       },
@@ -303,16 +315,16 @@
     <div class="auto-tutor-question">
       <h1>{questionPrompt}</h1>
     </div>
-    <div class="auto-tutor-progress" aria-label="AutoTutor progress">
+    <div class="auto-tutor-progress" aria-label={platformText('autoTutor.progress')}>
       <div class="auto-tutor-meter-row">
         <div class="auto-tutor-meter-copy">
-          <span>Expectations</span>
+          <span>{platformText('autoTutor.expectations')}</span>
           <strong>{formatProgressCount(progressCounts.coveredExpectations)}/{progressCounts.requiredExpectations}</strong>
         </div>
         <div
           class="auto-tutor-progress-track auto-tutor-progress-track-ideas"
           role="meter"
-          aria-label="Covered ideas"
+          aria-label={platformText('autoTutor.coveredIdeas')}
           aria-valuemin="0"
           aria-valuemax={progressCounts.requiredExpectations}
           aria-valuenow={progressCounts.coveredExpectations}
@@ -330,13 +342,13 @@
       </div>
       <div class="auto-tutor-meter-row">
         <div class="auto-tutor-meter-copy">
-          <span>Misconceptions</span>
+          <span>{platformText('autoTutor.misconceptions')}</span>
           <strong>{progressCounts.activeMisconceptions}/{progressCounts.totalMisconceptions}</strong>
         </div>
         <div
           class="auto-tutor-progress-track auto-tutor-progress-track-misconceptions"
           role="meter"
-          aria-label="Active misconceptions"
+          aria-label={platformText('autoTutor.activeMisconceptions')}
           aria-valuemin="0"
           aria-valuemax={progressCounts.totalMisconceptions}
           aria-valuenow={progressCounts.activeMisconceptions}
@@ -353,7 +365,7 @@
         </div>
       </div>
       <div class="auto-tutor-turns">
-        {turnCount === 1 ? '1 turn' : `${turnCount} turns`}
+        {formatTurnCount(turnCount)}
       </div>
     </div>
   </header>
@@ -367,13 +379,13 @@
   {#if completed}
     <div class="auto-tutor-complete" role="status">
       {#if mastered}
-        Nice work. Review the conversation, then continue.
+        {platformText('autoTutor.niceWorkComplete')}
       {:else if stoppedByCost}
-        Cost cap reached. Review the conversation, then continue.
+        {platformText('autoTutor.costCapReached')}
       {:else if endReason === 'max_turns'}
-        Turn limit reached. Review the conversation, then continue.
+        {platformText('autoTutor.turnLimitReached')}
       {:else}
-        Session ended. Review the conversation, then continue.
+        {platformText('autoTutor.sessionEnded')}
       {/if}
     </div>
   {/if}
@@ -381,7 +393,7 @@
   <div class="auto-tutor-chat" class:auto-tutor-chat-disabled={!!errorMessage || completed || !chatReady}>
     {#if !chatReady && !errorMessage}
       <div class="auto-tutor-loading" role="status">
-        Loading AutoTutor...
+        {platformText('autoTutor.loading')}
       </div>
     {/if}
     {#if runtimeReady}
@@ -393,12 +405,12 @@
     {/if}
   </div>
 
-  <div class="auto-tutor-continue-bar" aria-label="AutoTutor continue controls">
+  <div class="auto-tutor-continue-bar" aria-label={platformText('autoTutor.continueControls')}>
     <div class="auto-tutor-footer-label" aria-hidden="true">AutoTutor</div>
-    <div class="auto-tutor-mobile-progress" aria-label="AutoTutor progress">
+    <div class="auto-tutor-mobile-progress" aria-label={platformText('autoTutor.progress')}>
       <div class="auto-tutor-meter-row">
         <div class="auto-tutor-meter-copy">
-          <span>Expectations</span>
+          <span>{platformText('autoTutor.expectations')}</span>
           <strong>{formatProgressCount(progressCounts.coveredExpectations)}/{progressCounts.requiredExpectations}</strong>
         </div>
         <div class="auto-tutor-progress-track auto-tutor-progress-track-ideas">
@@ -410,7 +422,7 @@
       </div>
       <div class="auto-tutor-meter-row">
         <div class="auto-tutor-meter-copy">
-          <span>Misconceptions</span>
+          <span>{platformText('autoTutor.misconceptions')}</span>
           <strong>{progressCounts.activeMisconceptions}/{progressCounts.totalMisconceptions}</strong>
         </div>
         <div class="auto-tutor-progress-track auto-tutor-progress-track-misconceptions">
@@ -421,7 +433,7 @@
         </div>
       </div>
       <div class="auto-tutor-turns">
-        {turnCount === 1 ? '1 turn' : `${turnCount} turns`}
+        {formatTurnCount(turnCount)}
       </div>
     </div>
     <button
@@ -430,7 +442,7 @@
       disabled={!completed}
       on:click={handleContinue}
     >
-      Continue
+      {platformText('common.continue')}
     </button>
   </div>
 </section>

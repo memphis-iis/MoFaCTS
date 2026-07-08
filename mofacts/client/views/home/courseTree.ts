@@ -48,7 +48,14 @@ function courseSearchText(course: LearnerCourseSnapshotCourse) {
 }
 
 function assignmentSearchText(assignment: LearnerCourseSnapshotAssignment) {
-  return `${assignment.title} ${assignment.fileName} ${(assignment.tags || []).join(' ')}`.toLowerCase();
+  return [
+    assignment.title,
+    assignment.fileName,
+    (assignment.tags || []).join(' '),
+    assignment.contentLanguage || '',
+    (assignment.recommendedUiLocales || []).join(' '),
+    assignment.translationStatus || '',
+  ].join(' ').toLowerCase();
 }
 
 function dateTime(value: unknown, emptyValue: number) {

@@ -9,6 +9,10 @@ type FeedbackHtmlContext = {
   correctAnswerText?: string;
   displayCorrectAnswer?: boolean;
   correctAnswerImage?: string;
+  userAnswerFeedbackText?: string;
+  correctAnswerFeedbackText?: string;
+  correctAnswerImageFeedbackText?: string;
+  correctAnswerImageAltText?: string;
   feedbackLayout?: 'inline' | 'stacked';
   correctLabelText?: string;
   incorrectLabelText?: string;
@@ -39,6 +43,7 @@ type FeedbackSemanticState =
       reason: 'correctAnswerImage';
       mainText: string;
       imageSrc: string;
+      imageAltText: string;
     };
 
 type FeedbackSegmentKey =
@@ -61,6 +66,22 @@ type FeedbackContent = {
 
 function stripTags(value: unknown): string {
   return String(value || '').replace(/<[^>]*>/g, '');
+}
+
+function escapeHtmlAttribute(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function requireLocalizedText(value: string | undefined, label: string): string {
+  const text = String(value || '').trim();
+  if (!text) {
+    throw new Error(`[FeedbackDisplay] Missing localized feedback text: ${label}`);
+  }
+  return text;
 }
 
 function formatLabel(text: string): string {
@@ -93,13 +114,16 @@ function normalizeDisplayPolicy({
     showCorrectAnswerOnIncorrect: displayCorrectAnswer === true,
     mode: 'full',
     layout: feedbackLayout === 'inline' ? 'inline' : 'stacked',
-    correctLabelText: normalizeOutcomeLabelText(correctLabelText, 'Correct.'),
-    incorrectLabelText: normalizeOutcomeLabelText(incorrectLabelText, 'Incorrect.'),
+    correctLabelText: normalizeOutcomeLabelText(correctLabelText, 'correctLabelText'),
+    incorrectLabelText: normalizeOutcomeLabelText(incorrectLabelText, 'incorrectLabelText'),
   };
 }
 
-function normalizeOutcomeLabelText(value: unknown, fallback: string): string {
-  const label = stripTags(value || '').trim() || fallback;
+function normalizeOutcomeLabelText(value: unknown, labelName: string): string {
+  const label = stripTags(value || '').trim();
+  if (!label) {
+    throw new Error(`Missing feedback display label "${labelName}"`);
+  }
   return /[.!?]$/.test(label) ? label : `${label}.`;
 }
 
@@ -123,12 +147,16 @@ function determineSemanticState({
   isCorrectAnswer,
   isTimeoutAnswer,
   correctAnswerImage,
+  correctAnswerImageFeedbackText,
+  correctAnswerImageAltText,
   policy,
 }: {
   message: string | undefined;
   isCorrectAnswer: boolean | undefined;
   isTimeoutAnswer: boolean | undefined;
   correctAnswerImage: string | undefined;
+  correctAnswerImageFeedbackText: string | undefined;
+  correctAnswerImageAltText: string | undefined;
   policy: FeedbackDisplayPolicy;
 }): FeedbackSemanticState {
   const outcome = isCorrectAnswer ? 'correct' : 'incorrect';
@@ -138,8 +166,9 @@ function determineSemanticState({
     return {
       outcome: 'incorrect',
       reason: 'correctAnswerImage',
-      mainText: 'Incorrect. The correct response is displayed below.',
+      mainText: requireLocalizedText(correctAnswerImageFeedbackText, 'correctAnswerImageFeedbackText'),
       imageSrc: String(correctAnswerImage),
+      imageAltText: requireLocalizedText(correctAnswerImageAltText, 'correctAnswerImageAltText'),
     };
   }
 
@@ -153,8 +182,8 @@ function determineSemanticState({
 
   let mainText = normalizeEvaluatorMessage(message);
 
-  if (isTimeoutAnswer && !stripTags(mainText).includes('Incorrect.')) {
-    mainText = mainText ? `Incorrect. ${mainText}` : 'Incorrect.';
+  if (isTimeoutAnswer && !stripTags(mainText).includes(policy.incorrectLabelText)) {
+    mainText = mainText ? `${policy.incorrectLabelText} ${mainText}` : policy.incorrectLabelText;
   }
 
   return {
@@ -210,11 +239,15 @@ function composeFeedbackSegments({
   policy,
   userAnswerText,
   correctAnswerText,
+  userAnswerFeedbackText,
+  correctAnswerFeedbackText,
 }: {
   semanticState: FeedbackSemanticState;
   policy: FeedbackDisplayPolicy;
   userAnswerText: string | undefined;
   correctAnswerText: string | undefined;
+  userAnswerFeedbackText: string | undefined;
+  correctAnswerFeedbackText: string | undefined;
 }): FeedbackSegment[] {
   const segments: FeedbackSegment[] = [];
   const hasCorrectImage = semanticState.reason === 'correctAnswerImage';
@@ -227,7 +260,10 @@ function composeFeedbackSegments({
     !!correctAnswerText;
 
   if (displayUserAnswer && userAnswerText) {
-    segments.push(projectTextSegment('userAnswerText', `Your answer was ${userAnswerText}.`));
+    segments.push(projectTextSegment(
+      'userAnswerText',
+      requireLocalizedText(userAnswerFeedbackText, 'userAnswerFeedbackText')
+    ));
   }
 
   if (semanticState.mainText) {
@@ -243,7 +279,10 @@ function composeFeedbackSegments({
   }
 
   if (displayCorrectAnswer) {
-    segments.push(projectTextSegment('correctAnswerText', `The correct answer is ${correctAnswerText}.`));
+    segments.push(projectTextSegment(
+      'correctAnswerText',
+      requireLocalizedText(correctAnswerFeedbackText, 'correctAnswerFeedbackText')
+    ));
   }
 
   if (hasCorrectImage) {
@@ -251,7 +290,7 @@ function composeFeedbackSegments({
       key: 'correctAnswerImage',
       kind: 'image',
       text: '',
-      html: `<img src="${semanticState.imageSrc}" alt="Correct answer image" class="feedback-image">`,
+      html: `<img src="${semanticState.imageSrc}" alt="${escapeHtmlAttribute(semanticState.imageAltText)}" class="feedback-image">`,
     });
   }
 
@@ -286,6 +325,10 @@ function buildFeedbackContent({
   correctAnswerText,
   displayCorrectAnswer,
   correctAnswerImage,
+  userAnswerFeedbackText,
+  correctAnswerFeedbackText,
+  correctAnswerImageFeedbackText,
+  correctAnswerImageAltText,
   feedbackLayout,
   correctLabelText,
   incorrectLabelText,
@@ -302,6 +345,8 @@ function buildFeedbackContent({
     isCorrectAnswer,
     isTimeoutAnswer,
     correctAnswerImage,
+    correctAnswerImageFeedbackText,
+    correctAnswerImageAltText,
     policy,
   });
   const segments = composeFeedbackSegments({
@@ -309,6 +354,8 @@ function buildFeedbackContent({
     policy,
     userAnswerText,
     correctAnswerText,
+    userAnswerFeedbackText,
+    correctAnswerFeedbackText,
   });
 
   return {

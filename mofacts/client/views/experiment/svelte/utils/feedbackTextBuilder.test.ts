@@ -1,6 +1,13 @@
 import { expect } from 'chai';
 import { buildFeedbackContent } from './feedbackTextBuilder';
 
+const englishFeedbackText = {
+  userAnswerFeedbackText: 'Your answer was Lyon.',
+  correctAnswerFeedbackText: 'The correct answer is Paris.',
+  correctAnswerImageFeedbackText: 'Incorrect. The correct response is displayed below.',
+  correctAnswerImageAltText: 'Correct answer image',
+};
+
 describe('feedbackTextBuilder', function() {
   it('keeps canonical feedback text plain while preserving display HTML', function() {
     const content = buildFeedbackContent({
@@ -21,6 +28,7 @@ describe('feedbackTextBuilder', function() {
       userAnswerText: '',
       correctAnswerText: 'Paris',
       displayCorrectAnswer: false,
+      ...englishFeedbackText,
     });
 
     expect(content.feedbackText).to.equal('Incorrect.');
@@ -33,6 +41,7 @@ describe('feedbackTextBuilder', function() {
       isCorrectAnswer: false,
       correctAnswerText: 'Paris',
       displayCorrectAnswer: true,
+      ...englishFeedbackText,
     });
 
     expect(content.feedbackText).to.equal('Incorrect. The correct answer is Paris.');
@@ -45,6 +54,7 @@ describe('feedbackTextBuilder', function() {
       isCorrectAnswer: false,
       correctAnswerText: 'Choong Moo one',
       displayCorrectAnswer: true,
+      correctAnswerFeedbackText: 'The correct answer is Choong Moo one.',
     });
 
     expect(content.feedbackText).to.equal('Incorrect. The correct answer is Choong Moo one.');
@@ -69,6 +79,7 @@ describe('feedbackTextBuilder', function() {
       showUserAnswer: true,
       userAnswerText: 'Lyon',
       feedbackLayout: 'stacked',
+      ...englishFeedbackText,
     });
     const inline = buildFeedbackContent({
       message: 'Incorrect.',
@@ -76,6 +87,7 @@ describe('feedbackTextBuilder', function() {
       showUserAnswer: true,
       userAnswerText: 'Lyon',
       feedbackLayout: 'inline',
+      ...englishFeedbackText,
     });
 
     expect(stacked.feedbackText).to.equal(inline.feedbackText);
@@ -93,5 +105,31 @@ describe('feedbackTextBuilder', function() {
 
     expect(content.feedbackText).to.equal('Not quite.');
     expect(content.feedbackHtml).to.contain('<b class="feedback-label">Not quite.</b>');
+  });
+
+  it('uses caller-provided localized sentence fragments around authored answer text', function() {
+    const content = buildFeedbackContent({
+      message: 'Incorrect.',
+      isCorrectAnswer: false,
+      showUserAnswer: true,
+      userAnswerText: 'Lyon',
+      correctAnswerText: 'Paris',
+      displayCorrectAnswer: true,
+      userAnswerFeedbackText: 'Tu respuesta fue Lyon.',
+      correctAnswerFeedbackText: 'La respuesta correcta es Paris.',
+      incorrectLabelText: 'Incorrecto.',
+    });
+
+    expect(content.feedbackText).to.equal('Tu respuesta fue Lyon. Incorrecto. La respuesta correcta es Paris.');
+    expect(content.feedbackHtml).to.equal('Tu respuesta fue Lyon.<br><b class="feedback-label">Incorrecto.</b><br>La respuesta correcta es Paris.');
+  });
+
+  it('fails clearly when a required localized feedback fragment is missing', function() {
+    expect(() => buildFeedbackContent({
+      message: 'Incorrect.',
+      isCorrectAnswer: false,
+      correctAnswerText: 'Paris',
+      displayCorrectAnswer: true,
+    })).to.throw('[FeedbackDisplay] Missing localized feedback text: correctAnswerFeedbackText');
   });
 });

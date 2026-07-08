@@ -80,6 +80,23 @@ describe('machine services contracts', function() {
     });
   });
 
+  it('passes accent-sensitive delivery settings into answer evaluation', async function() {
+    const result = await evaluateAnswerService({
+      userAnswer: 'corazon',
+      currentAnswer: 'corazón',
+      originalAnswer: 'corazón',
+      setspec: { lfparameter: 0 },
+      deliverySettings: {
+        accentSensitive: true,
+      },
+    });
+
+    expect(result).to.deep.equal({
+      isCorrect: false,
+      matchText: 'Incorrect.',
+    });
+  });
+
   it('delegates SPARC intent evaluation and preserves the machine payload shape', async function() {
     const result = await evaluateAnswerService({
       currentDisplay: {

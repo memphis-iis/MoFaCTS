@@ -39,6 +39,7 @@ import {
 } from '../../lib/launchLoading';
 import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 import { translatePlatformString } from '../../lib/interfaceI18n';
+import { formatActiveInterfaceDateTime } from '../../lib/interfaceFormatting';
 
 declare const Template: any;
 declare const Meteor: any;
@@ -184,16 +185,45 @@ function formatSnapshotLesson(lesson: any) {
     totalPracticeItems: lesson.totalPracticeItems ?? lesson.progress?.totalPracticeItems,
     lastPracticeTimestamp: Number.isFinite(lastPracticeTimestamp) ? lastPracticeTimestamp : 0,
     lastPracticeDate: lesson.lastPracticeDate || (lesson.progress?.lastPracticed
-      ? new Date(lesson.progress.lastPracticed).toLocaleDateString()
+      ? formatActiveInterfaceDateTime(lesson.progress.lastPracticed, { dateStyle: 'medium' })
       : undefined),
     totalSessions: lesson.totalSessions ?? lesson.progress?.sessionDays,
     tags: Array.isArray(lesson.tags) ? lesson.tags : [],
     conditions: Array.isArray(lesson.conditions) && lesson.conditions.length > 0 ? lesson.conditions : null,
+    languageMetadataRows: buildDashboardLanguageMetadataRows(lesson),
   };
 }
 
 function dashboardText(key: Parameters<typeof translatePlatformString>[1], values?: Parameters<typeof translatePlatformString>[2]): string {
   return translatePlatformString(getActiveUiLocale(), key, values);
+}
+
+function dashboardTranslationStatusText(status: string): string {
+  if (status === 'author-provided') return dashboardText('manualCreator.translationStatusAuthorProvided');
+  if (status === 'not-translated') return dashboardText('manualCreator.translationStatusNotTranslated');
+  if (status === 'draft') return dashboardText('manualCreator.translationStatusDraft');
+  if (status === 'reviewed') return dashboardText('manualCreator.translationStatusReviewed');
+  return status;
+}
+
+function buildDashboardLanguageMetadataRows(lesson: any): Array<{ label: string; value: string }> {
+  const rows: Array<{ label: string; value: string }> = [];
+  const contentLanguage = String(lesson?.contentLanguage || lesson?.setspec?.contentLanguage || '').trim();
+  const recommendedUiLocales = Array.isArray(lesson?.recommendedUiLocales)
+    ? lesson.recommendedUiLocales.map((locale: unknown) => String(locale || '').trim()).filter(Boolean)
+    : Array.isArray(lesson?.setspec?.recommendedUiLocales)
+      ? lesson.setspec.recommendedUiLocales.map((locale: unknown) => String(locale || '').trim()).filter(Boolean)
+      : [];
+  const translationStatus = String(lesson?.translationStatus || lesson?.setspec?.translationStatus || '').trim();
+
+  if (contentLanguage) rows.push({ label: dashboardText('manualCreator.contentLanguage'), value: contentLanguage });
+  if (recommendedUiLocales.length > 0) {
+    rows.push({ label: dashboardText('manualCreator.recommendedUiLocales'), value: recommendedUiLocales.join(', ') });
+  }
+  if (translationStatus) {
+    rows.push({ label: dashboardText('manualCreator.translationStatus'), value: dashboardTranslationStatusText(translationStatus) });
+  }
+  return rows;
 }
 
 function applyPracticeDashboardSnapshot(instance: any, snapshot: PracticeDashboardSnapshot) {
@@ -638,7 +668,7 @@ function sortUsedTdfsByRecency(tdfs: any[]) {
 
 function sortUnusedTdfsByName(tdfs: any[]) {
   return tdfs.sort((a, b) =>
-    a.displayName.localeCompare(b.displayName, 'en', {
+    a.displayName.localeCompare(b.displayName, getActiveUiLocale(), {
       numeric: true,
       sensitivity: 'base'
     })
@@ -737,12 +767,11 @@ function getEffectiveTtsState(tdf: any) {
   const keyAvailable = tdf?.hasTTSAPIKey === true;
   const supported = tdfPromptsEnabled ||
     promptModeOverride ||
-    hasEnabledAudioPromptMode(tdf?.audioPromptMode) ||
-    promptModeEnabled;
+    hasEnabledAudioPromptMode(tdf?.audioPromptMode);
 
   return {
     supported,
-    active: promptModeEnabled && keyAvailable,
+    active: supported && promptModeEnabled && keyAvailable,
     tdfPromptsEnabled,
     promptModeEnabled,
     keyAvailable,
@@ -755,12 +784,11 @@ function getEffectiveSrState(tdf: any) {
   const userAudioEnabled = getUserAudioSettings().audioInputMode === true;
   const keyAvailable = tdf?.hasSpeechAPIKey === true;
   const supported = parseBooleanLike(tdf?.audioInputEnabled) ||
-    learnerConfigHasSetSpecAudioOverride(tdfId, 'audioInputEnabled') ||
-    userAudioEnabled;
+    learnerConfigHasSetSpecAudioOverride(tdfId, 'audioInputEnabled');
 
   return {
     supported,
-    active: userAudioEnabled && keyAvailable,
+    active: supported && tdfAudioEnabled && userAudioEnabled && keyAvailable,
     tdfAudioEnabled,
     userAudioEnabled,
     keyAvailable,
@@ -1519,7 +1547,7 @@ async function checkAndWarmupAudioIfNeeded() {
     return;
   }
 
-  setLaunchLoadingMessage('Preparing audio features...');
+  setLaunchLoadingMessage(dashboardText('dashboard.preparingAudioFeatures'));
   markLaunchLoadingTiming('audioWarmup:start', audioPreparationPlan);
   await prepareAudioForLaunchIfNeeded(currentTdfFile, audioStartupUser);
   markLaunchLoadingTiming('audioWarmup:complete');
@@ -1687,7 +1715,7 @@ async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId
     if (isMultiTdf) {
       await navigateForMultiTdf(launchProgress.intent);
     } else {
-      setLaunchLoadingMessage('Loading content...');
+      setLaunchLoadingMessage(dashboardText('common.loadingContent'));
       setCardEntryIntent(launchProgress.intent, {
         source: 'practiceMenu.selectTdf',
       });
@@ -1706,7 +1734,7 @@ async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId
 }
 
 async function navigateForMultiTdf(entryIntent: CardEntryIntent = CARD_ENTRY_INTENT.INITIAL_TDF_ENTRY) {
-  setLaunchLoadingMessage('Restoring progress...');
+  setLaunchLoadingMessage(dashboardText('dashboard.restoringProgress'));
   markLaunchLoadingTiming('getExperimentState:start', { source: 'navigateForMultiTdf' });
   const experimentState: any = await getExperimentState();
   markLaunchLoadingTiming('getExperimentState:complete', { source: 'navigateForMultiTdf' });
@@ -1725,7 +1753,7 @@ async function navigateForMultiTdf(entryIntent: CardEntryIntent = CARD_ENTRY_INT
   }
   // Only show selection if we're in a unit where it doesn't matter (infinite learning sessions)
   if (unitLocked) {
-    setLaunchLoadingMessage('Loading content...');
+    setLaunchLoadingMessage(dashboardText('common.loadingContent'));
     setCardEntryIntent(entryIntent, {
       source: 'practiceMenu.navigateForMultiTdf',
     });

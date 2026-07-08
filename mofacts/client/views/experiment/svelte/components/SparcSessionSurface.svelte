@@ -20,8 +20,11 @@
   import SparcNode from './SparcNode.svelte';
   import SparcAutoTutorProgress from './SparcAutoTutorProgress.svelte';
   import TrialInteractionPane from './TrialInteractionPane.svelte';
+  import { getActiveUiLocale } from '../../../../lib/interfaceLocaleState';
+  import { translatePlatformString } from '../../../../lib/interfaceI18n';
 
   const dispatch = createEventDispatcher();
+  const platformText = (key, values) => translatePlatformString(getActiveUiLocale(), key, values);
 
   export let display = {};
   export let adminDiagnosticMode = false;
@@ -40,8 +43,8 @@
   export let feedbackUserAnswer = '';
   export let correctAnswer = '';
   export let correctAnswerImageSrc = '';
-  export let correctLabelText = 'Correct.';
-  export let incorrectLabelText = 'Incorrect.';
+  export let correctLabelText = '';
+  export let incorrectLabelText = '';
   export let feedbackMessage = '';
   export let correctColor = 'var(--feedback-correct-color)';
   export let incorrectColor = 'var(--feedback-error-color)';
@@ -50,6 +53,8 @@
   export let displayUserAnswerInFeedback = 'onIncorrect';
   export let feedbackLayout = 'stacked';
   export let displayCorrectAnswerInIncorrectFeedback = true;
+  export let inputLanguage = '';
+  export let inputTextDirection = '';
   export let onAuthoringNodeValueChange = null;
   export let onAuthoringNodeFocus = null;
   export let authoringSelectedNodeId = '';
@@ -641,7 +646,7 @@
       <SparcAutoTutorProgress display={sparcDisplay} runtimeNodeValues={nodeValues} />
     </header>
 
-    <section class="sparc-auto-tutor-chat" aria-label="AutoTutor conversation">
+    <section class="sparc-auto-tutor-chat" aria-label={platformText('autoTutor.conversation')}>
       {#each autoTutorDialogueMessages as node (node.id)}
         <SparcNode
           {node}
@@ -650,6 +655,8 @@
           {learningProgressSnapshot}
           {authoringSelectedNodeId}
           {authoringSelectOnly}
+          {inputLanguage}
+          {inputTextDirection}
           onNodeValueChange={handleNodeValueChange}
           onNodeCommit={handleNodeValueCommit}
           onNodeFocus={handleNodeFocus}
@@ -669,6 +676,8 @@
             {learningProgressSnapshot}
             {authoringSelectedNodeId}
             {authoringSelectOnly}
+            {inputLanguage}
+            {inputTextDirection}
             onNodeValueChange={handleNodeValueChange}
             onNodeCommit={handleNodeValueCommit}
             onNodeEnter={handleNodeEnter}
@@ -687,6 +696,8 @@
             {learningProgressSnapshot}
             {authoringSelectedNodeId}
             {authoringSelectOnly}
+            {inputLanguage}
+            {inputTextDirection}
             onNodeValueChange={handleNodeValueChange}
             onNodeCommit={handleNodeValueCommit}
             onNodeFocus={handleNodeFocus}
@@ -722,6 +733,8 @@
               {learningProgressSnapshot}
               {authoringSelectedNodeId}
               {authoringSelectOnly}
+              {inputLanguage}
+              {inputTextDirection}
               onNodeValueChange={handleNodeValueChange}
               onNodeCommit={handleNodeValueCommit}
               onNodeFocus={handleNodeFocus}
@@ -739,6 +752,8 @@
           {learningProgressSnapshot}
           {authoringSelectedNodeId}
           {authoringSelectOnly}
+          {inputLanguage}
+          {inputTextDirection}
           onNodeValueChange={handleNodeValueChange}
           onNodeCommit={handleNodeValueCommit}
           onNodeFocus={handleNodeFocus}

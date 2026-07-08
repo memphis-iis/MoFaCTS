@@ -243,6 +243,13 @@
                       </select>
                     {{/if}}
                   </div>
+                  {{#if this.languageMetadataRows}}
+                    <div class="learning-dashboard-language-metadata text-muted small">
+                      {{#each this.languageMetadataRows}}
+                        <span class="learning-dashboard-language-metadata-item"><b>{{label}}:</b> {{value}}</span>
+                      {{/each}}
+                    </div>
+                  {{/if}}
                 </div>
               </th>
               <td class="learning-dashboard-cell learning-dashboard-cell--stat num" data-label="{{t 'dashboard.totalTrials'}}">
@@ -296,6 +303,13 @@
           </select>
         {{/if}}
       </div>
+      {{#if this.languageMetadataRows}}
+        <div class="learning-dashboard-language-metadata text-muted small">
+          {{#each this.languageMetadataRows}}
+            <span class="learning-dashboard-language-metadata-item"><b>{{label}}:</b> {{value}}</span>
+          {{/each}}
+        </div>
+      {{/if}}
 
       <div class="d-flex align-items-center learning-dashboard-card-features-row">
         <div class="learning-dashboard-card-feature-icons">

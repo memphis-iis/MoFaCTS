@@ -14,6 +14,7 @@ Do not put active implementation plans, audits, decomposition notes, or explorat
 Current public/operator entry points:
 
 - `authoring.md`: content authoring overview.
+- `interface-internationalization.md`: UI locale, authored-content language, input, and platform-prompt TTS behavior.
 - `development.md`: contributor setup notes.
 - `deployment/`: self-hosted deployment, backup, upgrade, readiness, and release evidence.
 - `dependency-security.md`: dependency-audit residuals and remediation notes.

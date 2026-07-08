@@ -34,11 +34,16 @@ export type ManualCreatorState = {
   visibility: VisibilityMode;
   experimentLinkEnabled: boolean;
   experimentTarget: string;
+  contentLanguage: string;
+  recommendedUiLocales: string;
+  translationStatus: 'author-provided' | 'not-translated' | 'draft' | 'reviewed';
   promptType: PromptType;
   responseType: ResponseType;
   cardCount: number;
   shuffle: boolean;
   buttonOrder: ButtonOrder;
+  caseSensitive: boolean;
+  accentSensitive: boolean;
   speechRecognitionEnabled: boolean;
   speechLanguage: string;
   ignoreOutOfGrammar: boolean;
@@ -73,11 +78,16 @@ export function createDefaultManualCreatorState(): ManualCreatorState {
     visibility: 'private',
     experimentLinkEnabled: false,
     experimentTarget: '',
+    contentLanguage: '',
+    recommendedUiLocales: '',
+    translationStatus: 'author-provided',
     promptType: 'text',
     responseType: 'typed',
     cardCount: 10,
     shuffle: true,
     buttonOrder: 'random',
+    caseSensitive: false,
+    accentSensitive: false,
     speechRecognitionEnabled: false,
     speechLanguage: 'en-US',
     ignoreOutOfGrammar: true,
@@ -175,8 +185,15 @@ function buildDeliverySettings(state: ManualCreatorState) {
 
   return {
     displayPerformance: showTime || showScore,
-    choiceButtonCols: state.responseType === 'multiple-choice' ? 2 : 1
+    choiceButtonCols: state.responseType === 'multiple-choice' ? 2 : 1,
+    caseSensitive: !!state.caseSensitive,
+    accentSensitive: !!state.accentSensitive
   };
+}
+
+function applyAnswerMatchingSettings(deliverySettings: Record<string, unknown>, state: ManualCreatorState) {
+  deliverySettings.caseSensitive = !!state.caseSensitive;
+  deliverySettings.accentSensitive = !!state.accentSensitive;
 }
 
 function buildPromptFromRow(row: StarterRow, promptType: PromptType): NormalizedImportItem['prompt'] {
@@ -229,6 +246,7 @@ function buildLearningUnit(state: ManualCreatorState, clusterRange: string) {
     deliverySettings.displayMinSeconds = String(state.minPracticeTime || '').trim() || '0';
     deliverySettings.displayMaxSeconds = String(state.maxPracticeTime || '').trim() || '0';
   }
+  applyAnswerMatchingSettings(deliverySettings, state);
 
   return {
     unitname: 'Practice',
@@ -255,6 +273,7 @@ function buildAssessmentUnit(
 ) {
   const parameters = cloneImportParameterDefaults();
   const { lfparameter: _lfparameter, ...deliverySettings } = parameters;
+  applyAnswerMatchingSettings(deliverySettings, state);
 
   return {
     unitname: 'Assessment',
@@ -300,6 +319,12 @@ export function buildManualDraftLesson(state: ManualCreatorState): ImportDraftLe
   const items = buildItems(state);
   const clusterRange = buildClusterRange(items.length);
   const instructionsHtml = buildInstructionsHtml(state.instructionText, state.lessonName);
+  const speechLanguage = String(state.speechLanguage || '').trim();
+  const textToSpeechEnabled = state.textToSpeechMode !== 'none';
+
+  if (textToSpeechEnabled && !speechLanguage) {
+    throw new Error('Manual draft text-to-speech requires an explicit speech language.');
+  }
 
   const draft = buildImportLessonDraft({
     id: `manual-${Date.now()}`,
@@ -313,11 +338,16 @@ export function buildManualDraftLesson(state: ManualCreatorState): ImportDraftLe
       visibility: state.visibility,
       experimentLinkEnabled: state.experimentLinkEnabled,
       experimentTarget: state.experimentTarget,
+      contentLanguage: state.contentLanguage,
+      recommendedUiLocales: state.recommendedUiLocales,
+      translationStatus: state.translationStatus,
       promptType: state.promptType,
       responseType: state.responseType,
       cardCount: state.cardCount,
       shuffle: state.shuffle,
       buttonOrder: state.buttonOrder,
+      caseSensitive: state.caseSensitive,
+      accentSensitive: state.accentSensitive,
       speechRecognitionEnabled: state.speechRecognitionEnabled,
       speechLanguage: state.speechLanguage,
       ignoreOutOfGrammar: state.ignoreOutOfGrammar,
@@ -341,12 +371,25 @@ export function buildManualDraftLesson(state: ManualCreatorState): ImportDraftLe
   tutor.setspec.userselect = state.visibility === 'public' ? 'true' : 'false';
   tutor.setspec.experimentTarget = state.experimentLinkEnabled ? String(state.experimentTarget || '').trim() : '';
   tutor.setspec.tags = normalizeTags(state.tags);
+  const contentLanguage = String(state.contentLanguage || '').trim();
+  const recommendedUiLocales = normalizeTags(state.recommendedUiLocales);
+  if (contentLanguage) {
+    tutor.setspec.contentLanguage = contentLanguage;
+    tutor.setspec.translationStatus = state.translationStatus || 'author-provided';
+  }
+  if (recommendedUiLocales.length > 0) {
+    tutor.setspec.recommendedUiLocales = recommendedUiLocales;
+  }
   tutor.setspec.shuffleclusters = state.shuffle ? clusterRange : '';
-  tutor.setspec.enableAudioPromptAndFeedback = state.textToSpeechMode === 'none' ? 'false' : 'true';
+  tutor.setspec.enableAudioPromptAndFeedback = textToSpeechEnabled ? 'true' : 'false';
   tutor.setspec.audioPromptMode = mapAudioPromptMode(state.textToSpeechMode);
-  tutor.setspec.textToSpeechLanguage = String(state.speechLanguage || '').trim() || 'en-US';
+  if (textToSpeechEnabled) {
+    tutor.setspec.textToSpeechLanguage = speechLanguage;
+  }
   tutor.setspec.audioInputEnabled = state.speechRecognitionEnabled ? 'true' : 'false';
-  tutor.setspec.speechRecognitionLanguage = String(state.speechLanguage || '').trim() || 'en-US';
+  if (state.speechRecognitionEnabled && speechLanguage) {
+    tutor.setspec.speechRecognitionLanguage = speechLanguage;
+  }
   tutor.setspec.speechIgnoreOutOfGrammarResponses = state.speechRecognitionEnabled && state.ignoreOutOfGrammar ? 'true' : 'false';
   tutor.deliverySettings = buildDeliverySettings(state);
   tutor.unit = buildUnits(state, clusterRange, items.length, instructionsHtml);

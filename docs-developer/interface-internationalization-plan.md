@@ -12,7 +12,7 @@ Implementation is ready to begin when the team treats these as hard constraints:
 - Treat `C:\dev\mofacts_config` as the authoritative companion content/config repository for compatibility checks before adding or renaming TDF fields, package metadata, config keys, schema fields, or generated schema output.
 - Treat `C:\dev\MoFaCTS.wiki` as the place for longer product/developer documentation after the implementation shape stabilizes.
 - Before touching config or wiki work, verify `MOFACTS_CONFIG_REPO` and `MOFACTS_WIKI_REPO` when present. If either points somewhere other than `C:\dev\mofacts_config` or `C:\dev\MoFaCTS.wiki`, stop and report the mismatch. If absent, use the canonical paths after verifying they exist.
-- Do not add silent fallback behavior. Missing locale resources, invalid locale tags, missing required translation keys, missing voice mappings, and missing declared speech-recognition language for SR-enabled lessons must fail clearly.
+- Do not add silent fallback behavior. Missing locale resources, invalid locale tags, missing required translation keys, and missing voice mappings must fail clearly. For SR-enabled lessons, an explicit TDF `speechRecognitionLanguage` wins; otherwise the active UI locale resolves through the explicit primary speech-recognition language map.
 - Do not add new npm, Meteor, Docker, or system dependencies unless an implementation decision explicitly proves the existing stack is insufficient and the user approves the dependency.
 - Do not run Docker build, push, deploy, release, or production-affecting commands for this work unless explicitly requested.
 - Do not translate authored instructional content as part of platform i18n.
@@ -55,7 +55,7 @@ In this plan, "platform-owned system prompts" means user-facing MoFaCTS system m
 - Preserve authorial control over prompts, hints, worked examples, feedback, distractors, answer keys, rubrics, and KC labels.
 - Support AI-assisted first-pass translation for every platform-owned UI string and system prompt in each initial target language.
 - Keep translation files versioned, auditable, and reviewable by qualified humans.
-- Avoid fallback behavior when a requested locale or content-language invariant is missing.
+- Avoid fallback behavior when a requested locale or content-language invariant is missing. The SR language default is not a hidden fallback: it is an explicit UI-locale-to-provider-language mapping used only after the lesson has opted into speech recognition.
 
 ## Non-Goals
 
@@ -243,7 +243,8 @@ Speech recognition requirements:
 - Speech recognition remains strictly opt-in through lesson/runtime audio controls.
 - Supporting UI locale, text input, and display for the ten initial target languages does not require speech recognition support for those languages.
 - `speechRecognitionLanguage` remains a speech-to-text configuration for microphone transcription, not the source of truth for UI locale or content language.
-- If a lesson enables speech recognition, it must declare an explicit speech-recognition language supported by the speech provider.
+- If a lesson enables speech recognition, an explicit `speechRecognitionLanguage` supported by the speech provider takes precedence. If the lesson does not declare one, transcription uses the active UI locale's explicit primary speech-recognition language code.
+- The primary speech-recognition code is a separate provider mapping from TTS: `en` -> `en-US`, `zh-Hans` -> `cmn-Hans-CN`, `hi` -> `hi-IN`, `es` -> `es-ES`, `ar` -> `ar-SA`, `fr` -> `fr-FR`, `bn` -> `bn-IN`, `pt` -> `pt-BR`, `id` -> `id-ID`, and `ur` -> `ur-IN`.
 - The locale plan must not trigger microphone permission prompts merely because a learner selects a non-English UI locale.
 - UI locale can localize speech-recognition controls, status labels, permission copy, and error messages even when speech recognition itself is unavailable for that locale.
 
@@ -362,7 +363,7 @@ Deliverables:
 1. Audit every caller that resolves `textToSpeechLanguage`, `speechRecognitionLanguage`, audio prompt voice IDs, and audio prompt modes.
 2. Split platform-prompt TTS language selection from authored lesson/content TTS selection.
 3. Route platform-owned system-prompt TTS through the selected UI locale and primary TTS-code mapping.
-4. Keep speech recognition gated by explicit lesson/user audio controls and configured speech-recognition language.
+4. Keep speech recognition gated by explicit lesson/user audio controls, available speech key resolution, and either a TDF speech-recognition language or the active UI locale's primary speech-recognition language.
 5. Localize speech recognition UI, status, permission, and error text without promising speech-to-text coverage for every target locale.
 6. Preserve SR/TTS coordination so TTS playback still locks recording and restarts SR only when SR was already eligible.
 7. Remove any implicit hard-coded `en-US` TTS behavior from platform-prompt paths unless `en-US` was selected explicitly through the locale/TTS mapping.

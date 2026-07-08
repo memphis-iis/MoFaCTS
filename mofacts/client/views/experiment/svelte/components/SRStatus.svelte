@@ -19,11 +19,26 @@
   /** @type {string} Last transcript */
   export let transcript = '';
 
+  /** @type {string} Recording prompt */
+  export let saySkipOrAnswerMessage = '';
+
+  /** @type {string} Processing prompt */
+  export let pleaseWaitMessage = '';
+
+  /** @type {string} Fallback error message */
+  export let fallbackErrorMessage = '';
+
+  /** @type {(attempt: number, maxAttempts: number) => string} Attempt formatter */
+  export let formatAttemptMessage = () => '';
+
+  /** @type {(transcript: string) => string} Transcript formatter */
+  export let formatTranscriptMessage = () => '';
+
   $: isRecording = status === 'ready' || status === 'active' || status === 'recording';
   $: isProcessing = status === 'processing';
   $: statusMessage = getStatusMessage(status);
-  $: attemptMessage = attempt > 0 && maxAttempts > 0 ? `Attempt ${attempt} of ${maxAttempts}` : '';
-  $: transcriptMessage = transcript ? `Last transcript: ${transcript}` : '';
+  $: attemptMessage = attempt > 0 && maxAttempts > 0 ? formatAttemptMessage(attempt, maxAttempts) : '';
+  $: transcriptMessage = transcript ? formatTranscriptMessage(transcript) : '';
   $: statusAriaLabel = [statusMessage, attemptMessage, transcriptMessage].filter(Boolean).join('. ');
 
   function getStatusMessage(currentStatus) {
@@ -33,11 +48,11 @@
       case 'ready':
       case 'active':
       case 'recording':
-        return 'Say skip or answer';
+        return saySkipOrAnswerMessage;
       case 'processing':
-        return 'Please wait...';
+        return pleaseWaitMessage;
       case 'error':
-        return errorMessage || 'Speech recognition error';
+        return errorMessage || fallbackErrorMessage;
       default:
         return '';
     }

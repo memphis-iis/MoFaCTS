@@ -15,6 +15,8 @@ import {
   resolveSessionSurfaceUnitEntryRoute,
 } from './svelte/services/sessionSurfaceMode';
 import '../../../common/Collections';
+import { translatePlatformString } from '../../lib/interfaceI18n';
+import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 
 type RootTdfBoxed = {
   content: {
@@ -173,7 +175,7 @@ export async function unitIsFinished(reason: string, options: { engine?: unknown
       })) as RootTdfBoxed | null;
       if (!rootTDFBoxed) {
         clientConsole(1, 'Could not find root TDF:', Session.get('currentRootTdfId'));
-        alert('Unfortunately, the root TDF could not be loaded. Please contact your administrator.');
+        alert(translatePlatformString(getActiveUiLocale(), 'lesson.rootTdfLoadFailed'));
         FlowRouter.go('/home');
         return;
       }

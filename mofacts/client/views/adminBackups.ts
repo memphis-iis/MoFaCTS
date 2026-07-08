@@ -5,6 +5,7 @@ import { meteorCallAsync } from '..';
 import { clientConsole } from '../lib/userSessionHelpers';
 import { getActiveUiLocale } from '../lib/interfaceLocaleState';
 import { translatePlatformString } from '../lib/interfaceI18n';
+import { formatActiveInterfaceDateTime } from '../lib/interfaceFormatting';
 
 const BACKUP_MESSAGE_KEY = 'adminBackupsMessage';
 const BACKUP_CONFIG_KEY = 'adminBackupsConfig';
@@ -126,7 +127,7 @@ Template.adminBackups.helpers({
     if (!value) {
       return '';
     }
-    return new Date(value).toLocaleString();
+    return formatActiveInterfaceDateTime(value);
   },
   formatBytes(value: number | undefined) {
     if (!Number.isFinite(value || NaN)) {

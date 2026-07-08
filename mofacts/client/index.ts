@@ -120,27 +120,27 @@ const PRACTICE_SHELL_TEMPLATES = new Set([
   'instructions',
 ]);
 
-const APP_SHELL_TITLES: Record<string, string> = {
-  contentUpload: 'Create Content',
-  aiContentCreator: 'Create Content',
-  manualContentCreator: 'Create Content',
-  contentEdit: 'Create Content',
-  tdfEdit: 'Create Content',
-  dataDownload: 'Detailed Data',
-  profile: 'Profile',
-  audioSettings: 'Audio Settings',
-  classSelection: 'Join Courses',
-  help: 'Help',
-  adminControls: 'Admin Control Panel',
-  adminBackups: 'Backups',
-  userAdmin: 'User Admin',
-  turkWorkflow: 'Mechanical Turk',
-  theme: 'Theme',
-  testRunner: 'Admin Tests',
-  classEdit: 'Courses',
-  courses: 'Courses',
-  tdfAssignmentEdit: 'Assignments',
-  instructorReporting: 'Grades',
+const APP_SHELL_TITLE_KEYS: Record<string, PlatformStringKey> = {
+  contentUpload: 'home.createContent',
+  aiContentCreator: 'home.createContent',
+  manualContentCreator: 'home.createContent',
+  contentEdit: 'home.createContent',
+  tdfEdit: 'home.createContent',
+  dataDownload: 'home.detailedData',
+  profile: 'home.profile',
+  audioSettings: 'audio.settings',
+  classSelection: 'home.joinCourses',
+  help: 'home.help',
+  adminControls: 'home.adminControlPanel',
+  adminBackups: 'home.backups',
+  userAdmin: 'home.userAdmin',
+  turkWorkflow: 'home.mechanicalTurk',
+  theme: 'home.theme',
+  testRunner: 'home.adminTests',
+  classEdit: 'home.courses',
+  courses: 'home.courses',
+  tdfAssignmentEdit: 'home.assignments',
+  instructorReporting: 'home.grades',
 };
 
 type AuthenticatedChromeMode = 'none' | 'app' | 'practice';
@@ -310,10 +310,14 @@ Session.setDefault('authRolesHydrated', false);
 Session.setDefault('authRolesSyncedUserId', null);
 const AUTH_ROLE_CACHE_KEY = 'mofacts.authRoles.v1';
 const STARTUP_DIAGNOSTIC_GRACE_MS = 2500;
+const STARTUP_DIAGNOSTIC_VISIBLE_DELAY_MS = 250;
 
 let authSyncSeq = 0;
 let lastAuthSyncedUserId: string | null = null;
 let startupDiagnosticsStartedAt = Date.now();
+let startupDiagnosticPendingKey: string | null = null;
+let startupDiagnosticPendingSince: number | null = null;
+let startupDiagnosticVisibilityTimer: ReturnType<typeof setTimeout> | null = null;
 
 function loadCachedAuthRoles() {
   try {
@@ -794,7 +798,7 @@ Template.DefaultLayout.events({
     //set the modalTemplate session variable to the reportError template
     const templateObject = {
       template: 'errorReportModal',
-      title: 'Report an Error',
+      title: translatePlatformString(getActiveUiLocale(), 'common.reportAnError'),
     }
     Session.set('modalTemplate', templateObject);
     clientConsole(2, 'modalTemplate:', Session.get('modalTemplate'));
@@ -812,7 +816,7 @@ Template.DefaultLayout.events({
     const errorDescription = $('#errorDescription').val();
     //if error description is empty, alert the user to enter a description
     if (errorDescription === '') {
-      alert('Please enter a description of the error');
+      alert(translatePlatformString(getActiveUiLocale(), 'errorReport.descriptionRequired'));
       return;
     }
     const curUser = Meteor.userId();
@@ -900,7 +904,8 @@ Template.registerHelper('appShellTitle', function() {
     return getPracticeLessonTitle();
   }
   const currentTemplate = String(Session.get('currentTemplate') || '');
-  return APP_SHELL_TITLES[currentTemplate] || 'Practice';
+  const titleKey = APP_SHELL_TITLE_KEYS[currentTemplate] || 'home.practice';
+  return translatePlatformString(getActiveUiLocale(), titleKey);
 });
 Template.registerHelper('appShellUnderlayStyle', function() {
   const theme = Session.get('curTheme') as any;
@@ -986,13 +991,7 @@ Template.registerHelper('uiMessage', function() {
   };
 });
 
-Template.registerHelper('startupDiagnostic', function() {
-  Session.get('startupDiagnosticTick');
-  const elapsed = Date.now() - startupDiagnosticsStartedAt;
-  if (elapsed < STARTUP_DIAGNOSTIC_GRACE_MS) {
-    return null;
-  }
-
+function getStartupDiagnosticCandidate(): { variant: string; text: string } | null {
   const connected = Meteor.status?.().connected ?? true;
   if (!connected) {
     return {
@@ -1031,6 +1030,49 @@ Template.registerHelper('startupDiagnostic', function() {
   }
 
   return null;
+}
+
+function resetStartupDiagnosticDelay(): void {
+  startupDiagnosticPendingKey = null;
+  startupDiagnosticPendingSince = null;
+  if (startupDiagnosticVisibilityTimer) {
+    clearTimeout(startupDiagnosticVisibilityTimer);
+    startupDiagnosticVisibilityTimer = null;
+  }
+}
+
+Template.registerHelper('startupDiagnostic', function() {
+  Session.get('startupDiagnosticTick');
+  const elapsed = Date.now() - startupDiagnosticsStartedAt;
+  if (elapsed < STARTUP_DIAGNOSTIC_GRACE_MS) {
+    resetStartupDiagnosticDelay();
+    return null;
+  }
+
+  const diagnostic = getStartupDiagnosticCandidate();
+  if (!diagnostic) {
+    resetStartupDiagnosticDelay();
+    return null;
+  }
+
+  const diagnosticKey = `${diagnostic.variant}:${diagnostic.text}`;
+  if (startupDiagnosticPendingKey !== diagnosticKey || startupDiagnosticPendingSince === null) {
+    startupDiagnosticPendingKey = diagnosticKey;
+    startupDiagnosticPendingSince = Date.now();
+  }
+
+  const visibleDelayElapsed = Date.now() - startupDiagnosticPendingSince;
+  if (visibleDelayElapsed < STARTUP_DIAGNOSTIC_VISIBLE_DELAY_MS) {
+    if (!startupDiagnosticVisibilityTimer) {
+      startupDiagnosticVisibilityTimer = setTimeout(() => {
+        startupDiagnosticVisibilityTimer = null;
+        Session.set('startupDiagnosticTick', Date.now());
+      }, STARTUP_DIAGNOSTIC_VISIBLE_DELAY_MS - visibleDelayElapsed);
+    }
+    return null;
+  }
+
+  return diagnostic;
 });
 
 

@@ -29,8 +29,8 @@
   export let feedbackUserAnswer = '';
   export let correctAnswer = '';
   export let correctAnswerImageSrc = '';
-  export let correctLabelText = 'Correct.';
-  export let incorrectLabelText = 'Incorrect.';
+  export let correctLabelText = '';
+  export let incorrectLabelText = '';
   export let feedbackMessage = '';
   export let correctColor = 'var(--feedback-correct-color)';
   export let incorrectColor = 'var(--feedback-error-color)';
@@ -73,7 +73,7 @@
       enabled={inputEnabled}
       {isForceCorrecting}
       {forceCorrectPrompt}
-      {userAnswer}
+      bind:userAnswer
       {inputPlaceholder}
       {inputLanguage}
       {inputTextDirection}

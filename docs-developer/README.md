@@ -27,6 +27,7 @@ Keep `docs/` focused on software consortium, repository, user, author, operator,
 - `h5p-stimuli-architecture-plan.md`: H5P stimuli architecture plan.
 - `interface-internationalization-plan.md`: interface localization, multilingual input/display, and locale-aware TTS implementation handoff plan.
 - `interface-internationalization-status.md`: implementation status, locale review matrix, and language ownership map for interface internationalization.
+- `interface-i18n-translation-review-checklist.md`: reviewer checklist and signoff template for moving AI-draft locale strings toward reviewed/enabled status.
 - `autotutor-dialogue-planner-plan.md`: AutoTutor dialogue planner decomposition plan.
 - `autotutor-concern-matrix.md`: AutoTutor concern matrix and implementation audit notes.
 - `autotutor-implementation-questions.md`: AutoTutor implementation decision log.

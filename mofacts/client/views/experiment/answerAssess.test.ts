@@ -2,11 +2,50 @@ import { expect } from 'chai';
 import { Answers } from './answerAssess';
 
 describe('answerAssess', function() {
+  it('accepts exact learner responses for every initial target language', async function() {
+    const cases = [
+      ['heart', 'heart'],
+      ['中文', '中文'],
+      ['हृदय', 'हृदय'],
+      ['corazón', 'corazón'],
+      ['قلب', 'قلب'],
+      ['élève', 'élève'],
+      ['বাংলা', 'বাংলা'],
+      ['ação', 'ação'],
+      ['bahasa', 'bahasa'],
+      ['دل', 'دل'],
+    ] as const;
+
+    for (const [learnerAnswer, authoredAnswer] of cases) {
+      const result = await Answers.answerIsCorrect(
+        learnerAnswer,
+        authoredAnswer,
+        authoredAnswer,
+        '',
+        { lfparameter: 0 }
+      );
+
+      expect(result.isCorrect).to.equal(true);
+    }
+  });
+
   it('matches answers without caring about accent marks', async function() {
     const result = await Answers.answerIsCorrect(
       'él',
       'el',
       'el',
+      '',
+      { lfparameter: 0 }
+    );
+
+    expect(result.isCorrect).to.equal(true);
+  });
+
+  it('matches composed and decomposed accents through answer assessment', async function() {
+    const result = await Answers.answerIsCorrect(
+      'cafe\u0301',
+      'café',
+      'café',
       '',
       { lfparameter: 0 }
     );
@@ -37,6 +76,67 @@ describe('answerAssess', function() {
     );
 
     expect(result.isCorrect).to.equal(true);
+  });
+
+  it('matches Mandarin Chinese pipe-delimited alternatives without whitespace assumptions', async function() {
+    const result = await Answers.answerIsCorrect(
+      '汉语',
+      '中文|汉语',
+      '中文|汉语',
+      '',
+      { lfparameter: 0 }
+    );
+
+    expect(result.isCorrect).to.equal(true);
+  });
+
+  it('matches Bengali and right-to-left responses as literal Unicode text', async function() {
+    const bengali = await Answers.answerIsCorrect(
+      'বাংলা',
+      'বাংলা',
+      'বাংলা',
+      '',
+      { lfparameter: 0 }
+    );
+    const arabic = await Answers.answerIsCorrect(
+      'قلب',
+      'قلب',
+      'قلب',
+      '',
+      { lfparameter: 0 }
+    );
+    const urdu = await Answers.answerIsCorrect(
+      'دل',
+      'دل',
+      'دل',
+      '',
+      { lfparameter: 0 }
+    );
+
+    expect(bengali.isCorrect).to.equal(true);
+    expect(arabic.isCorrect).to.equal(true);
+    expect(urdu.isCorrect).to.equal(true);
+  });
+
+  it('supports accent policy for Portuguese answers', async function() {
+    const accentInsensitive = await Answers.answerIsCorrect(
+      'acao',
+      'ação',
+      'ação',
+      '',
+      { lfparameter: 0 }
+    );
+    const accentSensitive = await Answers.answerIsCorrect(
+      'acao',
+      'ação',
+      'ação',
+      '',
+      { lfparameter: 0 },
+      { accentSensitive: true }
+    );
+
+    expect(accentInsensitive.isCorrect).to.equal(true);
+    expect(accentSensitive.isCorrect).to.equal(false);
   });
 
   it('does not include the correct answer in the default incorrect feedback message', async function() {

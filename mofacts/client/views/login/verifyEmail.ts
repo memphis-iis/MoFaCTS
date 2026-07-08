@@ -89,7 +89,7 @@ Template.verifyEmail.onRendered(function() {
       setVerificationError('');
     } else {
       setVerificationStatus(authText('auth.emailVerificationFailed'));
-      setVerificationError(error?.reason || authText('auth.requestNewVerificationEmail'));
+      setVerificationError(authText('auth.requestNewVerificationEmail'));
     }
     Session.set('showVerificationResend', true);
   });
@@ -110,7 +110,7 @@ Template.verifyEmail.events({
       setVerificationError('');
     } catch (error: any) {
       if (error?.error === 'verification-rate-limit') {
-        setVerificationError(error?.reason || authText('auth.verificationEmailRateLimit'));
+        setVerificationError(authText('auth.verificationEmailRateLimit'));
         return;
       }
       setVerificationError(authText('auth.verificationEmailSendFailed'));

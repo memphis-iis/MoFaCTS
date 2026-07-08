@@ -8,6 +8,8 @@
   import SparcSelectedNodeCard from './SparcSelectedNodeCard.svelte';
   import SparcStimulusAttachmentsCard from './SparcStimulusAttachmentsCard.svelte';
   import SparcVisualSurface from './SparcVisualSurface.svelte';
+  import { getActiveUiLocale } from '../../../lib/interfaceLocaleState';
+  import { translatePlatformString } from '../../../lib/interfaceI18n';
 
   export let paletteEntries = [];
   export let paletteIconClass = () => '';
@@ -82,6 +84,8 @@
   export let onUpdateRuleExpression = () => {};
   export let onAddExpressionArg = () => {};
   export let onRemoveExpressionArg = () => {};
+
+  const sparcText = (key) => translatePlatformString(getActiveUiLocale(), key);
 </script>
 
 <div class="sparc-editor-grid">
@@ -187,7 +191,7 @@
         onRemoveExpressionArg={onRemoveExpressionArg}
       />
     {:else}
-      <p class="sparc-muted">Select a node or add one from the palette.</p>
+      <p class="sparc-muted">{sparcText('sparc.selectNodeOrAddFromPalette')}</p>
     {/if}
   </section>
 </div>

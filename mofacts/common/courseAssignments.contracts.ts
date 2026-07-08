@@ -29,6 +29,9 @@ export interface CourseAssignmentSummary {
   availability: CourseAssignmentAvailability;
   createdAt: Date | null;
   updatedAt: Date | null;
+  contentLanguage?: string;
+  recommendedUiLocales?: string[];
+  translationStatus?: string;
 }
 
 export interface LearnerCourseSnapshotAssignment extends CourseAssignmentSummary {
@@ -77,6 +80,9 @@ export interface CourseAssignmentEditorSnapshot {
     fileName: string;
     displayName: string;
     tags: string[];
+    contentLanguage?: string;
+    recommendedUiLocales?: string[];
+    translationStatus?: string;
     ownerId: string;
   }>;
 }

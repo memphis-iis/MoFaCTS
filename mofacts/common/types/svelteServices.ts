@@ -91,6 +91,7 @@ export type TtsServiceStatus = 'completed' | 'skipped' | 'error';
 export interface TtsServiceResult {
   status: TtsServiceStatus;
   error?: string;
+  textAvailable?: boolean;
   isCorrect?: boolean;
 }
 

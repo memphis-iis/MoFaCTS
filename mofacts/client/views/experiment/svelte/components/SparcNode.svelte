@@ -1,7 +1,12 @@
 <script>
   import DOMPurify from 'dompurify';
   import LearningProgressChart from './LearningProgressChart.svelte';
+  import { getActiveUiLocale } from '../../../../lib/interfaceLocaleState';
+  import { translatePlatformString } from '../../../../lib/interfaceI18n';
   import { sanitizeSparcRichHtml } from '../services/sparcRichHtml';
+  import { shouldSubmitTextInputOnKeydown } from '../services/textInputComposition';
+
+  const sparcText = (key) => translatePlatformString(getActiveUiLocale(), key);
 
   export let node;
   export let adminDiagnosticMode = false;
@@ -9,6 +14,8 @@
   export let learningProgressSnapshot = null;
   export let authoringSelectedNodeId = '';
   export let authoringSelectOnly = false;
+  export let inputLanguage = '';
+  export let inputTextDirection = '';
   export let onNodeValueChange = () => {};
   export let onNodeCommit = () => {};
   export let onNodeEnter = () => {};
@@ -259,7 +266,7 @@
           </div>
         </div>
       {:else}
-        <div class="sparc-unknown">Invalid fraction: missing numerator or denominator</div>
+        <div class="sparc-unknown">{sparcText('sparc.invalidFractionMissingParts')}</div>
       {/if}
     {:else if headerFeedbackNode}
       <div class="sparc-group-header">
@@ -483,12 +490,14 @@
       value={getNodeValue(node)}
       maxlength={node.maxlength}
       placeholder={node.hint || ''}
+      lang={inputLanguage || undefined}
+      dir={inputTextDirection || undefined}
       readonly={node.readOnly === true}
       on:focus={() => onNodeFocus(node.id)}
       on:input={(event) => updateNodeValue(node, event.currentTarget.value)}
       on:blur={(event) => commitNodeValue(node, event.currentTarget.value)}
       on:keydown={(event) => {
-        if (event.key === 'Enter') {
+        if (shouldSubmitTextInputOnKeydown(event)) {
           event.preventDefault();
           if (onNodeEnter(node.id, event.currentTarget.value, event) === true) {
             return;

@@ -14,7 +14,7 @@ import '../footer.html';
 import { setExperimentParticipantContext } from '../../lib/idContext';
 import { resolveSpeechIgnoreOutOfGrammarResponses } from '../../lib/speechRecognitionConfig';
 import '../../lib/memphisSaml';
-import { translatePlatformString } from '../../lib/interfaceI18n';
+import { translatePlatformString, type TranslationValues } from '../../lib/interfaceI18n';
 import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 
 
@@ -22,6 +22,10 @@ import { legacyTrim } from '../../../common/underscoreCompat';
 
 const FlowRouterAny = FlowRouter as any;
 const MeteorAny = Meteor as any;
+
+function authText(key: Parameters<typeof translatePlatformString>[1], values?: TranslationValues): string {
+  return translatePlatformString(getActiveUiLocale(), key, values);
+}
 
 type SignInState = {
   serverErrorMessage: string;
@@ -155,7 +159,7 @@ function beginExperimentLaunchTransition(template?: any) {
   signInTemplate?.isLoggingIn?.set?.(true);
   Session.set('suppressAuthenticatedChrome', true);
   Session.set('appLoading', true);
-  Session.set('appLoadingMessage', 'Starting experiment...');
+  Session.set('appLoadingMessage', authText('auth.experimentStarting'));
 
   const container = document.getElementById('signInContainer') as HTMLElement | null;
   if (!container) {
@@ -190,9 +194,6 @@ function showFieldSignInError(nextState: Partial<SignInState>, template?: any) {
     ...nextState,
   }, template);
 }
-
-const EXPERIMENT_PORTAL_DESCRIPTION =
-  'Welcome to the MoFaCTs experiment portal. This page is used to start a new experiment session or continue a previous one.';
 
 function queueMainMenuReturnTour() {
   Session.set('showMainMenuReturnTour', true);
@@ -360,7 +361,7 @@ Template.signIn.events({
 
   'click #signUpButton': function(event: any) {
     if (!Session.get('allowPublicSignup')) {
-      showInlineSignInError('Public signup is currently disabled.');
+      showInlineSignInError(authText('auth.publicSignupDisabled'));
       return;
     }
     clearInlineSignInError();
@@ -389,7 +390,7 @@ Template.signIn.events({
     if (!msConfig) {
       clientConsole(1, '[MS-LOGIN] ERROR: OAuth service configuration not ready yet!');
       restoreVisibleSignInScreen(template);
-      showInlineSignInError('OAuth configuration is still loading. Please wait a moment and try again.', {}, template);
+      showInlineSignInError(authText('auth.oauthConfigLoading'), {}, template);
       focusFirstSignInError(template);
       return;
     }
@@ -578,7 +579,7 @@ Template.signIn.events({
     if (!googleConfig) {
       clientConsole(1, '[GOOGLE-LOGIN] ERROR: OAuth service configuration not ready yet!');
       restoreVisibleSignInScreen(template);
-      showInlineSignInError('OAuth configuration is still loading. Please wait a moment and try again.', {}, template);
+      showInlineSignInError(authText('auth.oauthConfigLoading'), {}, template);
       $('#signInButton').prop('disabled', false);
       focusFirstSignInError(template);
       return;
@@ -681,7 +682,7 @@ Template.signIn.helpers({
   },
 
   experimentLoginLabel: function() {
-    return Session.get('loginPrompt') || 'Participant ID';
+    return Session.get('loginPrompt') || authText('auth.participationId');
   },
 
   experimentPasswordRequired: function() {
@@ -694,7 +695,7 @@ Template.signIn.helpers({
 
   auth_sign_in_description: function() {
     if (Session.get('loginMode') === 'experiment') {
-      return EXPERIMENT_PORTAL_DESCRIPTION;
+      return authText('auth.experimentPortalDescription');
     }
     const activeLocale = getActiveUiLocale();
     const theme = Session.get('curTheme') as any;
@@ -717,7 +718,9 @@ Template.signIn.helpers({
   },
 
   memphisSamlButtonLabel: function() {
-    return `Sign in with ${Session.get('memphisSamlDisplayName') || 'University of Memphis'}`;
+    return authText('auth.signInWithProvider', {
+      provider: String(Session.get('memphisSamlDisplayName') || 'University of Memphis'),
+    });
   },
 
   serverErrorMessage: function() {
@@ -824,13 +827,13 @@ async function resolveExperimentTargetForLogin() {
   const foundExpTarget = (await meteorCallAsync('getTdfByExperimentTarget', experimentTarget)) as any;
 
   if (!foundExpTarget?.content?.tdfs?.tutor?.setspec) {
-    throw new Error('Experiment target could not be found.');
+    throw new Error(authText('auth.experimentTargetNotFound'));
   }
 
   const setspec = foundExpTarget.content.tdfs.tutor.setspec;
   const ignoreOutOfGrammarResponses = resolveSpeechIgnoreOutOfGrammarResponses(setspec);
   const speechOutOfGrammarFeedback = setspec.speechOutOfGrammarFeedback ?
-    setspec.speechOutOfGrammarFeedback : 'Response not in answer set';
+    setspec.speechOutOfGrammarFeedback : authText('speech.outOfGrammarFeedback');
 
   return {
     experimentTarget,
@@ -879,13 +882,13 @@ async function completeExperimentSignIn(template?: any) {
 function getExperimentLoginErrorMessage(error: unknown): string {
   const errorCode = getMeteorErrorCode(error);
   if (errorCode === 'already_complete') {
-    return 'This participation ID has already completed this experiment.';
+    return authText('auth.experimentAlreadyComplete');
   }
   if (errorCode === 'experiment-target-mismatch') {
-    return 'This participation ID is already linked to a different experiment.';
+    return authText('auth.experimentTargetMismatch');
   }
   if (errorCode === 'duplicate-user') {
-    return 'This participation ID is already in use.';
+    return authText('auth.participationIdInUse');
   }
   return toErrorMessage(error);
 }
@@ -893,30 +896,30 @@ function getExperimentLoginErrorMessage(error: unknown): string {
 function getOAuthDuplicateAccountMessage(error: unknown, providerName: string): string {
   const errorCode = getMeteorErrorCode(error);
   if (errorCode === 'popup-closed-by-user') {
-    return `${providerName} sign-in was canceled before it finished.`;
+    return authText('auth.oauthCanceled', { provider: providerName });
   }
   if (errorCode === 'oauth-account-exists-password') {
-    return 'This email is already registered with a password. Sign in with your password or use Forgot password to reset it.';
+    return authText('auth.oauthAccountExistsPassword');
   }
   if (errorCode === 'oauth-account-exists-google') {
-    return 'This email is already registered with Google sign-in. Use Google to continue.';
+    return authText('auth.oauthAccountExistsGoogle');
   }
   if (errorCode === 'oauth-account-exists-microsoft') {
-    return 'This email is already registered with Microsoft sign-in. Use Microsoft to continue.';
+    return authText('auth.oauthAccountExistsMicrosoft');
   }
   if (errorCode === 'oauth-account-exists-memphis-saml') {
-    return 'This email is already registered with University of Memphis sign-in. Use that button to continue.';
+    return authText('auth.oauthAccountExistsMemphisSaml');
   }
   if (errorCode === 'oauth-account-exists-different-method') {
-    return 'This email is already registered with a different sign-in method. Use your existing method to continue.';
+    return authText('auth.oauthAccountExistsDifferent');
   }
 
   const detailedMessage = toErrorMessage(error).trim();
   if (detailedMessage) {
-    return `${providerName} sign-in failed: ${detailedMessage}`;
+    return authText('auth.oauthSignInFailed', { provider: providerName, detail: detailedMessage });
   }
 
-  return `${providerName} sign-in failed because no error details were returned.`;
+  return authText('auth.oauthSignInFailedNoDetails', { provider: providerName });
 }
 
 function isLoginDataRaceError(error: unknown): boolean {
@@ -962,35 +965,35 @@ async function userPasswordCheck(template?: any) {
 
   if (experiment) {
     if (!newUsername) {
-      showFieldSignInError({ experimentUsernameError: 'Enter your participation ID.' }, template);
+      showFieldSignInError({ experimentUsernameError: authText('auth.enterParticipationId') }, template);
       $('#experimentSignin').prop('disabled', false);
       focusFirstSignInError(template);
       return;
     }
 
     if (experimentPasswordRequired && !newPassword) {
-      showFieldSignInError({ experimentPasswordError: 'Enter your password.' }, template);
+      showFieldSignInError({ experimentPasswordError: authText('auth.enterPassword') }, template);
       $('#experimentSignin').prop('disabled', false);
       focusFirstSignInError(template);
       return;
     }
   } else {
     if (!newUsername) {
-      showFieldSignInError({ normalEmailError: 'Enter your email address.' }, template);
+      showFieldSignInError({ normalEmailError: authText('auth.enterEmailAddress') }, template);
       $('#signInButton').prop('disabled', false);
       focusFirstSignInError(template);
       return;
     }
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newUsername)) {
-      showFieldSignInError({ normalEmailError: 'Enter a valid email address.' }, template);
+      showFieldSignInError({ normalEmailError: authText('auth.enterValidEmail') }, template);
       $('#signInButton').prop('disabled', false);
       focusFirstSignInError(template);
       return;
     }
 
     if (!newPassword) {
-      showFieldSignInError({ normalPasswordError: 'Enter your password.' }, template);
+      showFieldSignInError({ normalPasswordError: authText('auth.enterPassword') }, template);
       $('#signInButton').prop('disabled', false);
       focusFirstSignInError(template);
       return;
@@ -1013,7 +1016,7 @@ async function userPasswordCheck(template?: any) {
       } catch (error) {
         clientConsole(1, 'ERROR: The user was not logged in on experiment sign in?', newUsername, 'Error:', error);
         restoreVisibleSignInScreen(template);
-        showInlineSignInError('It appears that you could not be logged in as ' + newUsername + '.', {}, template);
+        showInlineSignInError(authText('auth.experimentLoginFailed', { username: newUsername }), {}, template);
         $('#experimentSignin').prop('disabled', false);
         focusFirstSignInError(template);
       }
@@ -1031,14 +1034,14 @@ async function userPasswordCheck(template?: any) {
         const provisionResult = (await meteorCallAsync('provisionExperimentUser', experimentTarget, newUsername)) as any;
 
         if (provisionResult?.status === 'already_complete') {
-          showInlineSignInError('This participation ID has already completed this experiment.', {}, template);
+          showInlineSignInError(authText('auth.experimentAlreadyComplete'), {}, template);
           $('#experimentSignin').prop('disabled', false);
           focusFirstSignInError(template);
           return;
         }
 
         if (!provisionResult?.loginToken) {
-          throw new Error('Provisioning did not return a login token');
+          throw new Error(authText('auth.experimentProvisionFailed'));
         }
 
         // Everything was OK if we make it here - now we init the session,
@@ -1057,7 +1060,10 @@ async function userPasswordCheck(template?: any) {
             error
           });
           showInlineSignInError(
-            'It appears that you could not be logged in as ' + newUsername + ': ' + getMeteorErrorReason(error),
+            authText('auth.experimentTokenLoginFailed', {
+              username: newUsername,
+              reason: getMeteorErrorReason(error),
+            }),
             {},
             template
           );
@@ -1079,7 +1085,10 @@ async function userPasswordCheck(template?: any) {
           });
           restoreVisibleSignInScreen(template);
           showInlineSignInError(
-            'You were logged in as ' + newUsername + ', but the experiment could not be started: ' + getMeteorErrorReason(error),
+            authText('auth.experimentStartFailed', {
+              username: newUsername,
+              reason: getMeteorErrorReason(error),
+            }),
             {},
             template
           );
@@ -1120,7 +1129,7 @@ async function userPasswordCheck(template?: any) {
       clientConsole(2, '[PASSWORD-LOGIN] setUserLoginData completed');
     } catch (error) {
       clientConsole(1, '[PASSWORD-LOGIN] setUserLoginData failed:', error);
-      showInlineSignInError('Failed to save login data: ' + toErrorMessage(error), {}, template);
+      showInlineSignInError(authText('auth.saveLoginDataFailed', { error: toErrorMessage(error) }), {}, template);
       $('#signInButton').prop('disabled', false);
       focusFirstSignInError(template);
       return;
@@ -1131,7 +1140,7 @@ async function userPasswordCheck(template?: any) {
     clientConsole(1, 'Login error: ' + error);
     if (getMeteorErrorCode(error) === 'email-not-verified') {
       showInlineSignInError(
-        'Please verify your email before signing in. You can request a new verification email from the verification page.',
+        authText('auth.emailNotVerifiedSignIn'),
         { showVerificationHelp: true },
         template
       );
@@ -1140,7 +1149,7 @@ async function userPasswordCheck(template?: any) {
       return;
     }
     showFieldSignInError({
-      normalPasswordError: "We couldn't sign you in with that email and password.",
+      normalPasswordError: authText('auth.invalidEmailAndPassword'),
     }, template);
     $('#signInButton').prop('disabled', false);
     focusFirstSignInError(template);

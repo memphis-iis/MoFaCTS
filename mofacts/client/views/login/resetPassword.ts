@@ -1,4 +1,6 @@
 import './resetPassword.html';
+import { translatePlatformString, type TranslationValues } from '../../lib/interfaceI18n';
+import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 
 declare const Template: {
   resetPassword: {
@@ -37,6 +39,10 @@ const RESET_STATUS_KEY = 'resetPasswordStatusMessage';
 const RESET_ERROR_KEY = 'resetPasswordErrorMessage';
 const RESET_TOKEN_KEY = 'resetPasswordLinkToken';
 const RESET_EMAIL_KEY = 'resetPasswordLinkEmail';
+
+function authText(key: Parameters<typeof translatePlatformString>[1], values?: TranslationValues): string {
+  return translatePlatformString(getActiveUiLocale(), key, values);
+}
 
 function normalizeEmailForReset(rawValue: unknown): string {
   return String(rawValue || '').trim().toLowerCase();
@@ -99,14 +105,14 @@ Template.resetPassword.onRendered(function() {
   if (resetToken) {
     Session.set(RESET_TOKEN_KEY, resetToken);
     if (resetEmail) {
-      setResetStatus('Choose a new password for this account.');
+      setResetStatus(authText('auth.resetChooseNewPassword'));
     } else {
-      setResetStatus('Enter your email address and choose a new password for this account.');
+      setResetStatus(authText('auth.resetEnterEmailAndChooseNewPassword'));
     }
     return;
   }
   if (stage === 'reset') {
-    setResetStatus('Check your email for the password reset link to continue.');
+    setResetStatus(authText('auth.resetCheckEmailLink'));
   }
 });
 
@@ -119,19 +125,19 @@ Template.resetPassword.events({
       clearResetMessages();
       const email = normalizeEmailForReset($('#email').val());
       if (!email) {
-        setResetError('Enter your email address to receive a reset link.');
+        setResetError(authText('auth.resetEnterEmailForLink'));
         return;
       }
       try {
         await Meteor.callAsync<{ success?: boolean }>('requestPasswordReset', email);
-        setResetStatus('If that account exists, a password reset link has been sent to your email.');
+        setResetStatus(authText('auth.resetLinkSentIfAccountExists'));
         FlowRouter.go(`/auth/reset-password?email=${encodeURIComponent(email)}`);
       } catch (err: unknown) {
         const errorCode = (err as { error?: string })?.error;
         if (errorCode === 'rate-limit') {
-          setResetError('Too many reset requests. Please wait a minute and try again.');
+          setResetError(authText('auth.resetRateLimit'));
         } else {
-          setResetError('We could not send a reset email right now. Please try again later.');
+          setResetError(authText('auth.resetEmailSendFailed'));
         }
       }
   },
@@ -145,42 +151,41 @@ Template.resetPassword.events({
 
     if (!email) {
       if (token) {
-        setResetError('Enter the email address for the account you are resetting.');
+        setResetError(authText('auth.resetEnterAccountEmail'));
       } else {
-        setResetError('Open the password reset link from your email to continue.');
+        setResetError(authText('auth.resetOpenEmailLink'));
       }
       return;
     }
     if (!token) {
-      setResetError('This reset link is incomplete or expired. Request a new password reset email.');
+      setResetError(authText('auth.resetLinkIncompleteExpired'));
       return;
     }
     if (newPassword !== confirmPassword) {
-      setResetError('Passwords do not match.');
+      setResetError(authText('auth.passwordsMustMatch'));
       return;
     }
     const minPasswordLength = Number(Session.get('minPasswordLength')) || MIN_PASSWORD_LENGTH;
     if (newPassword.length < minPasswordLength) {
-      setResetError(`Password must be at least ${minPasswordLength} characters.`);
+      setResetError(authText('auth.passwordTooShort', { min: minPasswordLength }));
       return;
     }
 
     try {
       await Meteor.callAsync('resetPasswordWithToken', email, token, newPassword);
-      setResetStatus('Your password has been reset. Redirecting to sign in...');
+      setResetStatus(authText('auth.resetPasswordResetRedirect'));
       Session.set(RESET_TOKEN_KEY, '');
       setTimeout(() => {
         FlowRouter.go('/auth/login');
       }, 1200);
     } catch (err: unknown) {
       const errorCode = (err as { error?: string })?.error;
-      const errorReason = (err as { reason?: string })?.reason;
       if (errorCode === 'invalid-token') {
-        setResetError('This reset link is invalid or expired. Request a new password reset email.');
+        setResetError(authText('auth.resetLinkInvalidExpired'));
       } else if (errorCode === 'weak-password') {
-        setResetError(errorReason || 'Password is too weak.');
+        setResetError(authText('auth.passwordTooWeak'));
       } else {
-        setResetError('An error occurred. Please try again.');
+        setResetError(authText('auth.genericTryAgain'));
       }
     }
   },

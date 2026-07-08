@@ -14,6 +14,8 @@ import {
     applyAdaptiveVideoTemplateSchedule,
     requireAdaptiveVideoSession,
 } from "./videoAdaptiveQuestions";
+import { translatePlatformString } from "../../lib/interfaceI18n";
+import { getActiveUiLocale } from "../../lib/interfaceLocaleState";
 declare const Session: any;
 declare const Meteor: any;
 declare const alert: (message?: string) => void;
@@ -120,7 +122,7 @@ export class AdaptiveQuestionLogic {
     unitBuilder(newUnit: any, adaptiveQuestionTimes: any[], adaptiveQuestions: any[], adaptiveCheckpoints: any[]){
         //if newunit is not defined, throw an error
         if(!newUnit){
-            alert(`There was an error building the unit. Please contact the administrator`);
+            alert(translatePlatformString(getActiveUiLocale(), 'lesson.unitBuildFailed'));
             throw new Error('Unit template not found');
         }
         const assessmentScheduleApplied = applyAdaptiveAssessmentTemplateSchedule({

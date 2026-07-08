@@ -13,7 +13,12 @@ export type ActionContext = {
   buttonTrial: boolean;
   buttonList: unknown[];
   testType: string;
-  deliverySettings: { caseSensitive?: boolean; correctLabelText?: string; incorrectLabelText?: string };
+  deliverySettings: {
+    caseSensitive?: boolean;
+    accentSensitive?: boolean;
+    correctLabelText?: string;
+    incorrectLabelText?: string;
+  };
   setspec?: unknown;
   engine?: unknown;
   engineIndices?: { clusterIndex?: number; whichStim?: number; stimIndex?: number } | null;

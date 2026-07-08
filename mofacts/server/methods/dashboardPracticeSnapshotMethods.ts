@@ -105,6 +105,9 @@ async function getDashboardVisibleTdfs(deps: DashboardPracticeSnapshotDeps, user
     'content.isMultiTdf': 1,
     'content.tdfs.tutor.setspec.lessonname': 1,
     'content.tdfs.tutor.setspec.tags': 1,
+    'content.tdfs.tutor.setspec.contentLanguage': 1,
+    'content.tdfs.tutor.setspec.recommendedUiLocales': 1,
+    'content.tdfs.tutor.setspec.translationStatus': 1,
     'content.tdfs.tutor.setspec.condition': 1,
     'content.tdfs.tutor.setspec.conditionTdfIds': 1,
     'content.tdfs.tutor.setspec.audioInputEnabled': 1,
@@ -255,6 +258,11 @@ function buildPracticeDashboardLesson(
 
   const fileName = resolveDashboardTdfFileName(tdf);
   const displayName = normalizeOptionalString(setspec.lessonname) || fileName || TDFId;
+  const contentLanguage = normalizeOptionalString(setspec.contentLanguage) || '';
+  const recommendedUiLocales = Array.isArray(setspec.recommendedUiLocales)
+    ? setspec.recommendedUiLocales.map((locale: unknown) => normalizeOptionalString(locale)).filter(Boolean)
+    : [];
+  const translationStatus = normalizeOptionalString(setspec.translationStatus) || '';
   const totalPracticeItems = null;
   const statsProjection = buildDashboardStatsProjection(stats, totalPracticeItems);
   const conditions = tdf.ownerId === userId && Array.isArray(setspec.condition) && setspec.condition.length > 0
@@ -274,6 +282,9 @@ function buildPracticeDashboardLesson(
     displayName,
     fileName: fileName || '',
     tags: Array.isArray(setspec.tags) ? setspec.tags : [],
+    contentLanguage,
+    recommendedUiLocales,
+    translationStatus,
     availability: 'available',
     currentStimuliSetId: tdf.stimuliSetId ?? null,
     learnerConfig,

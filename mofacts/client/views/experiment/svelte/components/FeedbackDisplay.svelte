@@ -8,8 +8,11 @@
   import { buildFeedbackContent, shouldShow } from '../utils/feedbackTextBuilder';
   import { clientConsole } from '../../../../lib/clientLogger';
   import { waitForBrowserPaint } from '../utils/paintTiming';
+  import { getActiveUiLocale } from '../../../../lib/interfaceLocaleState';
+  import { translatePlatformString } from '../../../../lib/interfaceI18n';
 
   const dispatch = createEventDispatcher();
+  const platformText = (key, values) => translatePlatformString(getActiveUiLocale(), key, values);
 
   /** @type {boolean} Whether feedback is visible */
   export let visible = false;
@@ -30,10 +33,10 @@
   export let correctAnswerImageSrc = '';
 
   /** @type {string} Correct outcome label */
-  export let correctLabelText = 'Correct.';
+  export let correctLabelText = '';
 
   /** @type {string} Incorrect outcome label */
-  export let incorrectLabelText = 'Incorrect.';
+  export let incorrectLabelText = '';
 
   /** @type {string} Feedback message from answer evaluation */
   export let feedbackMessage = '';
@@ -69,6 +72,8 @@
 
   const ALLOWED_TAGS = ['b', 'br', 'span', 'img'];
   const ALLOWED_ATTR = ['class', 'src', 'alt'];
+  const DEFAULT_CORRECT_LABELS = new Set(['Correct', 'Correct.']);
+  const DEFAULT_INCORRECT_LABELS = new Set(['Incorrect', 'Incorrect.']);
   const loadedImageCache = new Set();
   let imageReady = true;
   let imageLoadToken = 0;
@@ -85,6 +90,22 @@
   $: sanitizedUserAnswer = DOMPurify.sanitize(userAnswer, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
   $: sanitizedCorrectAnswer = DOMPurify.sanitize(correctAnswer, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
   $: sanitizedCorrectAnswerImage = DOMPurify.sanitize(correctAnswerImageSrc, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
+  $: rawCorrectLabelText = String(correctLabelText || '').trim();
+  $: rawIncorrectLabelText = String(incorrectLabelText || '').trim();
+  $: resolvedCorrectLabelText = rawCorrectLabelText && !DEFAULT_CORRECT_LABELS.has(rawCorrectLabelText)
+    ? rawCorrectLabelText
+    : platformText('feedback.correct');
+  $: resolvedIncorrectLabelText = rawIncorrectLabelText && !DEFAULT_INCORRECT_LABELS.has(rawIncorrectLabelText)
+    ? rawIncorrectLabelText
+    : platformText('feedback.incorrect');
+  $: userAnswerFeedbackText = sanitizedUserAnswer
+    ? platformText('feedback.userAnswerWas', { answer: sanitizedUserAnswer })
+    : '';
+  $: correctAnswerFeedbackText = sanitizedCorrectAnswer
+    ? platformText('feedback.correctAnswerIs', { answer: sanitizedCorrectAnswer })
+    : '';
+  $: correctAnswerImageFeedbackText = platformText('feedback.correctResponseDisplayedBelow');
+  $: correctAnswerImageAltText = platformText('feedback.correctAnswerImageAlt');
 
   $: feedbackContent = buildFeedbackContent({
     message: feedbackMessageText,
@@ -95,9 +116,13 @@
     correctAnswerText: sanitizedCorrectAnswer,
     displayCorrectAnswer: displayCorrectAnswerInIncorrectFeedback,
     correctAnswerImage: sanitizedCorrectAnswerImage,
+    userAnswerFeedbackText,
+    correctAnswerFeedbackText,
+    correctAnswerImageFeedbackText,
+    correctAnswerImageAltText,
     feedbackLayout,
-    correctLabelText,
-    incorrectLabelText,
+    correctLabelText: resolvedCorrectLabelText,
+    incorrectLabelText: resolvedIncorrectLabelText,
   });
 
   $: feedbackHtml = feedbackContent.feedbackHtml;

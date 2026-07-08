@@ -27,6 +27,7 @@ export interface DeliverySettings {
   continueButtonText?: string;
   skipStudyButtonText?: string;
   caseSensitive?: boolean;
+  accentSensitive?: boolean;
   displayQuestionNumber?: boolean;
   allowRevisitUnit?: boolean;
 }

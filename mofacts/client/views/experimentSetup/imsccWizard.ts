@@ -15,6 +15,7 @@ import { clientConsole } from '../..';
 import { getUploadIntegrity } from '../../lib/uploadIntegrity';
 import { translatePlatformString } from '../../lib/interfaceI18n';
 import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
+import { formatActiveInterfaceDateTime } from '../../lib/interfaceFormatting';
 
 declare const $: any;
 declare const DynamicAssets: any;
@@ -302,7 +303,7 @@ Template.imsccWizard.helpers({
     if (Number.isNaN(date.getTime())) {
       return rawDate;
     }
-    return date.toLocaleString();
+    return formatActiveInterfaceDateTime(date);
   },
 
   plusOne(index: any) {

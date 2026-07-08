@@ -29,6 +29,7 @@ import {
   resolveSpeechFilterCloseResponses,
   resolveSpeechRecognitionLanguage
 } from '../../../../lib/speechRecognitionConfig';
+import { getActiveUiLocale } from '../../../../lib/interfaceLocaleState';
 import { clientConsole } from '../../../../lib/userSessionHelpers';
 import {
   classifySrInitFailure,
@@ -525,7 +526,7 @@ function parseSpeechHintExclusionList(value: unknown): string[] {
 }
 
 function requireSpeechRecognitionLanguage(setSpec: CurrentSetSpecLike | undefined): string {
-  return resolveSpeechRecognitionLanguage(setSpec);
+  return resolveSpeechRecognitionLanguage(setSpec, getActiveUiLocale());
 }
 
 function requireIgnoreOutOfGrammarResponses(setSpec: CurrentSetSpecLike | undefined): boolean {

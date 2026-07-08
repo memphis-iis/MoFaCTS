@@ -650,26 +650,18 @@ Template.userAdmin.helpers({
     return hasNext ? {} : { disabled: true };
   },
 
-  showingRange: function() {
-    const instance = Template.instance() as any;
-    const page = instance.currentPage.get();
-    const countDoc = UserCounts.findOne('filtered') as any;
-    const total = countDoc ? countDoc.count : 0;
-
-    const start = page * USERS_PER_PAGE + 1;
-    const end = Math.min((page + 1) * USERS_PER_PAGE, total);
-
-    return `${start}-${end} of ${total}`;
-  },
-
   showingUsersText: function() {
     const instance = Template.instance() as any;
     const page = instance.currentPage.get();
     const countDoc = UserCounts.findOne('filtered') as any;
     const total = countDoc ? countDoc.count : 0;
-    const start = page * USERS_PER_PAGE + 1;
+    const start = total > 0 ? page * USERS_PER_PAGE + 1 : 0;
     const end = Math.min((page + 1) * USERS_PER_PAGE, total);
-    return userAdminText('admin.showingUsers', { range: `${start}-${end} of ${total}` });
+    return userAdminText('admin.showingUsers', {
+      start: formatActiveInterfaceNumber(start),
+      end: formatActiveInterfaceNumber(end),
+      total: formatActiveInterfaceNumber(total),
+    });
   },
 
   pageOfText: function() {

@@ -1,5 +1,7 @@
 import {sessionCleanUp} from '../../lib/sessionUtils';
 import {routeToSignin} from '../../lib/router';
+import { translatePlatformString, type TranslationValues } from '../../lib/interfaceI18n';
+import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 import './signUp.html';
 import '../footer.html';
 
@@ -17,6 +19,10 @@ declare const _: { each<T>(arr: T[], fn: (item: T) => void): void };
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra') as {
   FlowRouter: { go(path: string): void };
 };
+
+function authText(key: Parameters<typeof translatePlatformString>[1], values?: TranslationValues): string {
+  return translatePlatformString(getActiveUiLocale(), key, values);
+}
 
 function normalizeEmailForAuth(rawValue: unknown): string {
   return legacyTrim(String(rawValue || '')).toLowerCase();
@@ -106,38 +112,37 @@ Template.signUp.events({
       sessionCleanUp();
       const requireEmailVerification = !!Session.get('requireEmailVerification');
       if (requireEmailVerification) {
-        showServerSuccess('Your account has been created. Check your email for a verification link before signing in. If you do not see it soon, check your spam folder.');
+        showServerSuccess(authText('auth.accountCreatedVerifyEmail'));
         setTimeout(() => {
           FlowRouter.go('/auth/verify-email');
         }, 1200);
         return;
       }
 
-      showServerSuccess('Your account has been created. You can now sign in.');
+      showServerSuccess(authText('auth.accountCreatedCanSignIn'));
       setTimeout(() => {
         FlowRouter.go('/auth/login');
       }, 1200);
     } catch (error: unknown) {
       const code = (error as { error?: string })?.error;
-      const reason = (error as { reason?: string })?.reason || '';
       if (code === 'signup-disabled') {
-        showServerError('Public signup is currently disabled.');
+        showServerError(authText('auth.publicSignupDisabled'));
         return;
       }
       if (code === 'weak-password') {
         const minPasswordLength = Number(Session.get('minPasswordLength')) || 8;
-        showServerError(reason || `Password must be at least ${minPasswordLength} characters long.`);
+        showServerError(authText('auth.passwordTooShort', { min: minPasswordLength }));
         return;
       }
       if (code === 'invalid-email') {
-        showServerError('Enter a valid email address.');
+        showServerError(authText('auth.enterValidEmail'));
         return;
       }
       if (code === 'duplicate-user') {
-        showServerError('We could not create that account. If you already have one, sign in or reset your password.');
+        showServerError(authText('auth.accountCreateDuplicate'));
         return;
       }
-      showServerError('We could not create that account right now. Please try again.');
+      showServerError(authText('auth.accountCreateFailed'));
     }
   },
 
@@ -191,8 +196,8 @@ Template.signUp.helpers({
   },
   signUpInstructionCopy() {
     return Session.get('requireEmailVerification')
-      ? 'We will email you a confirmation link before you can sign in. If it does not arrive soon, check your spam folder.'
-      : 'You can sign in as soon as your account is created.';
+      ? authText('auth.signUpInstructionVerifyEmail')
+      : authText('auth.signUpInstructionImmediate');
   }
 });
 

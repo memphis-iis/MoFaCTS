@@ -13,6 +13,8 @@ import { shouldLockMultiTdfLaunchToCurrentUnit } from './lessonLaunchLockPolicy'
 import { sessionCleanUp } from './sessionUtils';
 import { setCourseAssignmentLaunchContext } from './courseAssignmentLaunchContext';
 import type { CourseAssignmentHistoryContext } from '../../common/courseAssignments.contracts';
+import { translatePlatformString } from './interfaceI18n';
+import { getActiveUiLocale } from './interfaceLocaleState';
 import {
   getAudioPromptFeedbackView,
   setAudioEnabled,
@@ -100,7 +102,7 @@ export async function selectTdf(
   } catch (error) {
     clientConsole(1, '[LessonLaunch] Failed to load launch-ready TDF:', currentTdfId, error);
     setCourseAssignmentLaunchContext(null);
-    alert('Unable to load the selected lesson. Please try again or contact support.');
+    alert(translatePlatformString(getActiveUiLocale(), 'dashboard.unableToLoadSelectedLesson'));
     return;
   }
 

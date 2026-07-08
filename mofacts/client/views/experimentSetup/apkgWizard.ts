@@ -495,9 +495,9 @@ Template.apkgWizard.events({
     event.preventDefault();
     const confirmed = await requestInlineConfirmation(template, {
       id: 'cancel-wizard',
-      title: 'Cancel import?',
-      message: 'All progress in this import wizard will be lost.',
-      confirmLabel: 'Cancel import'
+      title: apkgText('apkg.cancelImportTitle'),
+      message: apkgText('apkg.cancelImportMessage'),
+      confirmLabel: apkgText('apkg.cancelImportConfirm')
     });
 
     if (confirmed) {

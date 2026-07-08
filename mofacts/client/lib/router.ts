@@ -21,6 +21,8 @@ import { CARD_ENTRY_INTENT, setCardEntryIntent } from './cardEntryIntent';
 import { isLaunchLoadingActive } from './launchLoading';
 import { getRouteAccessPolicy, type RouteAccessPolicy } from './routeAccessPolicies';
 import { resolveSpeechIgnoreOutOfGrammarResponses } from './speechRecognitionConfig';
+import { translatePlatformString } from './interfaceI18n';
+import { getActiveUiLocale } from './interfaceLocaleState';
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra');
 const BlazeLayout: any = (globalThis as any).BlazeLayout;
 const Tdfs: any = (globalThis as any).Tdfs;
@@ -256,7 +258,7 @@ function consumePendingClassInvite(controller: any = null): boolean {
     })
     .catch((error: unknown) => {
       clientConsole(1, '[ROUTER] Failed to accept class invitation:', getErrorMessage(error));
-      alert('Could not join that class. Please ask your instructor for a fresh class link.');
+      alert(translatePlatformString(getActiveUiLocale(), 'route.classJoinFailed'));
       FlowRouter.go('/classSelection');
     });
   return true;
@@ -542,7 +544,7 @@ FlowRouter.route('/experiment/:target?/:xcond?', {
 
     } else {
       clientConsole(1, 'tdf not found');
-      alert('The experiment you are trying to access does not exist.');
+      alert(translatePlatformString(getActiveUiLocale(), 'route.experimentNotFound'));
       if (Meteor.user()) {
         Meteor.logout();
       }
@@ -845,7 +847,7 @@ FlowRouter.route('/classes/:teacherId/:sectionId', {
     const teacherId = normalizeRouteParam(params.teacherId);
     const sectionId = normalizeRouteParam(params.sectionId);
     if (!teacherId || !sectionId) {
-      alert('That class link is missing required information.');
+      alert(translatePlatformString(getActiveUiLocale(), 'route.classLinkMissingInfo'));
       FlowRouter.go('/home');
       return;
     }
@@ -1165,7 +1167,7 @@ FlowRouter.route('/card', {
         const setspec = tdf.content.tdfs.tutor.setspec ? tdf.content.tdfs.tutor.setspec : null;
         const ignoreOutOfGrammarResponses = resolveSpeechIgnoreOutOfGrammarResponses(setspec);
         const speechOutOfGrammarFeedback = setspec.speechOutOfGrammarFeedback ?
-        setspec.speechOutOfGrammarFeedback : 'Response not in answer set';
+        setspec.speechOutOfGrammarFeedback : translatePlatformString(getActiveUiLocale(), 'speech.outOfGrammarFeedback');
 
         // Render a loading template while selectTdf processes
         renderLayout(this, 'customLoading');

@@ -363,7 +363,7 @@ Template.profile.events({
           apiKeyInput.value = '';
         }
       }
-      setStatus(template, result?.success ? 'success' : 'error', result?.message || 'Unknown error');
+      setStatus(template, result?.success ? 'success' : 'error', result?.message || profileText('profile.unknownError'));
     } catch (error: unknown) {
       setStatus(template, 'error', getErrorMessage(error));
     } finally {

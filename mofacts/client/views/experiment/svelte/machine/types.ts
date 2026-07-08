@@ -108,6 +108,7 @@
  *
  * Miscellaneous
  * @property {boolean} caseSensitive - Case-sensitive answer checking
+ * @property {boolean} accentSensitive - Accent-sensitive answer checking
  * @property {boolean} displayQuestionNumber - Show the current question number
  */
 

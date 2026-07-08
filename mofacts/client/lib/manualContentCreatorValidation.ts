@@ -7,9 +7,22 @@ import {
   structureIncludesInstructions,
 } from './manualContentCreatorUtils';
 
+const CONSERVATIVE_BCP47_PATTERN = /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/;
+
 export function parsePositiveInteger(value: unknown) {
   const parsed = Number.parseInt(String(value ?? ''), 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function parseLocaleList(value: unknown): string[] {
+  return String(value || '')
+    .split(',')
+    .map((locale) => locale.trim())
+    .filter(Boolean);
+}
+
+function isBcp47Like(value: string): boolean {
+  return CONSERVATIVE_BCP47_PATTERN.test(value);
 }
 
 function parseNonNegativeNumber(value: unknown) {
@@ -74,6 +87,14 @@ export function validateManualCreatorStep(
         errors.push('Link name must use letters, numbers, underscores, or hyphens.');
       }
     }
+    if (state.contentLanguage.trim() && !isBcp47Like(state.contentLanguage.trim())) {
+      errors.push('Content language must be a BCP 47 language tag such as en, es, zh-Hans, or hi.');
+    }
+    const invalidRecommendedLocales = parseLocaleList(state.recommendedUiLocales)
+      .filter((locale) => !isBcp47Like(locale));
+    if (invalidRecommendedLocales.length > 0) {
+      errors.push(`Recommended UI locales must be comma-separated BCP 47 language tags. Invalid: ${invalidRecommendedLocales.join(', ')}.`);
+    }
   }
 
   if (step === 2) {
@@ -83,8 +104,8 @@ export function validateManualCreatorStep(
   }
 
   if (step === 3) {
-    if (state.speechRecognitionEnabled && !state.speechLanguage.trim()) {
-      errors.push('Speech language required when speech recognition is enabled.');
+    if (state.textToSpeechMode !== 'none' && !state.speechLanguage.trim()) {
+      errors.push('Speech language required when text-to-speech is enabled.');
     }
 
     if (state.practiceTimingEnabled) {

@@ -233,6 +233,16 @@ export const DELIVERY_DISPLAY_SETTINGS_FIELD_REGISTRY: SectionFieldRegistry = {
       validation: { kind: 'boolean' },
     },
   }),
+  accentSensitive: simpleField(booleanField(false, 4), {
+    brief: 'Use accent-sensitive answer matching.',
+    verbose: 'Compare typed answers with accents and diacritics preserved. Leave off when unaccented responses should match accented targets.'
+  }, {
+    runtime: {
+      default: false,
+      coerce: 'boolean',
+      validation: { kind: 'boolean' },
+    },
+  }),
   displayQuestionNumber: simpleField(booleanField(false, 4), {
     brief: 'Show the question number.',
     verbose: 'Render the current question number in the lesson UI.'

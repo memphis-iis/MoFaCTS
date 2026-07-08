@@ -13,6 +13,7 @@ const speechReadyTdf = {
     tutor: {
       setspec: {
         audioInputEnabled: true,
+        speechRecognitionLanguage: 'es-ES',
       },
     },
   },

@@ -7,6 +7,29 @@
   import TextInput from './TextInput.svelte';
   import MultipleChoice from './MultipleChoice.svelte';
   import SRStatus from './SRStatus.svelte';
+  import { getActiveUiLocale } from '../../../../lib/interfaceLocaleState';
+  import { translatePlatformString } from '../../../../lib/interfaceI18n';
+
+  function platformText(key, values) {
+    return translatePlatformString(getActiveUiLocale(), key, values);
+  }
+
+  const DEFAULT_TEXT_PLACEHOLDERS = new Set([
+    'Type your answer...',
+    'Type your answer here...',
+  ]);
+
+  const DEFAULT_FORCE_CORRECT_PROMPTS = new Set([
+    'Please type the correct answer to continue',
+  ]);
+
+  function resolvePromptText(value, defaultKey, knownDefaults) {
+    const text = typeof value === 'string' ? value.trim() : '';
+    if (!text || knownDefaults.has(text)) {
+      return platformText(defaultKey);
+    }
+    return text;
+  }
 
   /** @type {'text' | 'buttons' | 'sr'} Input mode */
   export let inputMode = 'text';
@@ -55,16 +78,27 @@
 
   /** @type {string} Prompt for force correction */
   export let forceCorrectPrompt = 'Please type the correct answer to continue';
+
+  $: resolvedInputPlaceholder = resolvePromptText(
+    inputPlaceholder,
+    'autoTutor.typeYourAnswer',
+    DEFAULT_TEXT_PLACEHOLDERS,
+  );
+  $: resolvedForceCorrectPrompt = resolvePromptText(
+    forceCorrectPrompt,
+    'response.typeCorrectAnswer',
+    DEFAULT_FORCE_CORRECT_PROMPTS,
+  );
 </script>
 
 <div class="response-area">
   {#if isForceCorrecting}
     <div class="force-correct-container">
-      <p class="force-correct-hint">{forceCorrectPrompt}</p>
+      <p class="force-correct-hint">{resolvedForceCorrectPrompt}</p>
       <TextInput
         bind:value={userAnswer}
         enabled={enabled}
-        placeholder="Type the correct answer..."
+        placeholder={platformText('response.typeCorrectAnswer')}
         {inputLanguage}
         {inputTextDirection}
         on:submit
@@ -77,7 +111,7 @@
     <TextInput
       bind:value={userAnswer}
       {enabled}
-      placeholder={inputPlaceholder}
+      placeholder={resolvedInputPlaceholder}
       {inputLanguage}
       {inputTextDirection}
       on:submit
@@ -100,6 +134,11 @@
       maxAttempts={srMaxAttempts}
       errorMessage={srError}
       transcript={srTranscript}
+      saySkipOrAnswerMessage={platformText('speech.saySkipOrAnswer')}
+      pleaseWaitMessage={platformText('speech.pleaseWait')}
+      fallbackErrorMessage={platformText('speech.error')}
+      formatAttemptMessage={(attempt, maxAttempts) => platformText('speech.attemptOfMax', { attempt, max: maxAttempts })}
+      formatTranscriptMessage={(transcript) => platformText('speech.lastTranscript', { transcript })}
     />
   {/if}
 

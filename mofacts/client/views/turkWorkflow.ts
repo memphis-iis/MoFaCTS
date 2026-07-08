@@ -7,6 +7,9 @@ import { Mongo } from 'meteor/mongo';
 import { meteorCallAsync } from '..';
 import { displayify } from '../../common/globalHelpers';
 import { getErrorMessage } from '../lib/errorUtils';
+import { getActiveUiLocale } from '../lib/interfaceLocaleState';
+import { translatePlatformString, type TranslationValues } from '../lib/interfaceI18n';
+import { formatActiveInterfaceDateTime } from '../lib/interfaceFormatting';
 import {
   cleanupBootstrapModalState,
   getBootstrapModal,
@@ -25,6 +28,12 @@ const TURK_LOG_SELECTED_EXPERIMENT_KEY = 'turkLogSelectedExperiment';
 const PROFILE_INLINE_STATUS_KEY = 'profileInlineStatus';
 const PROFILE_INLINE_STATUS_CLASS_KEY = 'profileInlineStatusClass';
 const TURK_WORKFLOW_MESSAGE_KEY = 'turkWorkflowMessage';
+
+type PlatformStringKey = Parameters<typeof translatePlatformString>[1];
+
+function turkText(key: PlatformStringKey, values?: TranslationValues): string {
+  return translatePlatformString(getActiveUiLocale(), key, values);
+}
 
 function messageIcon(level: string) {
   if (level === 'success') return 'fa-check-circle';
@@ -45,8 +54,12 @@ function buildAwsProfileSummary() {
   const haveId = !!getProfileField('have_aws_id');
   const haveSecret = !!getProfileField('have_aws_secret');
   const useSandbox = !!getProfileField('use_sandbox');
-  const endpointMode = useSandbox ? 'Sandbox' : 'Production';
-  return `Endpoint mode: ${endpointMode}. AWS ID stored: ${haveId ? 'Yes' : 'No'}. AWS Secret stored: ${haveSecret ? 'Yes' : 'No'}.`;
+  const endpointMode = useSandbox ? turkText('turk.sandbox') : turkText('turk.production');
+  return turkText('turk.endpointSummary', {
+    mode: endpointMode,
+    haveId: haveId ? turkText('turk.yes') : turkText('turk.no'),
+    haveSecret: haveSecret ? turkText('turk.yes') : turkText('turk.no'),
+  });
 }
 
 function collectAwsProfileFormData() {
@@ -64,7 +77,7 @@ function setInlineProfileStatus(message: string, statusClass: string) {
 
 async function saveAndValidateAwsProfile(showModal: boolean) {
   Session.set('saveComplete', false);
-  Session.set('profileWorkModalMessage', 'Please wait while we save your information and contact Mechanical Turk.');
+  Session.set('profileWorkModalMessage', turkText('turk.saveAndContact'));
   setInlineProfileStatus('', 'info');
   const data = collectAwsProfileFormData();
 
@@ -76,18 +89,18 @@ async function saveAndValidateAwsProfile(showModal: boolean) {
   const error = result?.error;
   const saveResult = result?.saveResult;
   const acctBal = result?.acctBal;
-  const mode = data.use_sandbox ? 'Sandbox' : 'Production';
-  const timestamp = new Date().toLocaleString();
+  const mode = data.use_sandbox ? turkText('turk.sandbox') : turkText('turk.production');
+  const timestamp = formatActiveInterfaceDateTime(new Date());
 
   if (error || !saveResult) {
-    const errMessage = error ? getErrorMessage(error) : 'No save result returned.';
+    const errMessage = error ? getErrorMessage(error) : turkText('turk.noSaveResult');
     const failureText = [
-      `Test failed at ${timestamp}.`,
-      `Selected mode: ${mode}.`,
-      `Reason: ${errMessage}`,
+      turkText('turk.testFailedAt', { timestamp }),
+      turkText('turk.selectedMode', { mode }),
+      turkText('turk.reason', { reason: errMessage }),
     ].join('\n');
     setInlineProfileStatus(failureText, 'error');
-    Session.set('profileWorkModalMessage', 'Your changes were not saved! The server said: ' + errMessage);
+    Session.set('profileWorkModalMessage', turkText('turk.profileNotSaved', { reason: errMessage }));
     Session.set('saveComplete', true);
     return;
   }
@@ -95,14 +108,14 @@ async function saveAndValidateAwsProfile(showModal: boolean) {
   $('.clearOnSave').val('');
 
   const successText = [
-    `Test succeeded at ${timestamp}.`,
-    `Selected mode: ${mode}.`,
-    `AWS account balance check succeeded.`,
-    `Reported AvailableBalance: ${typeof acctBal === 'undefined' ? 'Unavailable' : acctBal}`,
-    'Credentials are stored encrypted and are never shown back in full.',
+    turkText('turk.testSucceededAt', { timestamp }),
+    turkText('turk.selectedMode', { mode }),
+    turkText('turk.balanceCheckSucceeded'),
+    turkText('turk.reportedAvailableBalance', { balance: typeof acctBal === 'undefined' ? turkText('turk.unavailable') : acctBal }),
+    turkText('turk.credentialsStoredEncrypted'),
   ].join('\n');
   setInlineProfileStatus(successText, 'success');
-  Session.set('profileWorkModalMessage', 'Your profile changes have been saved. Save details follow: ' + JSON.stringify(saveResult, null, 2));
+  Session.set('profileWorkModalMessage', turkText('turk.profileSavedDetails', { details: JSON.stringify(saveResult, null, 2) }));
   Session.set('saveComplete', true);
 }
 
@@ -142,13 +155,13 @@ function turkLogInsert(newRec: any) {
   };
   newRec.emailDeliveryBadgeClass = deliveryBadgeClassMap[deliveryStatus] || deliveryBadgeClassMap.unknown;
   if (newRec.emailDeliveryLastAttempt) {
-    newRec.emailDeliveryLastAttemptDisplay = new Date(newRec.emailDeliveryLastAttempt).toLocaleString();
+    newRec.emailDeliveryLastAttemptDisplay = formatActiveInterfaceDateTime(newRec.emailDeliveryLastAttempt);
   } else {
-    newRec.emailDeliveryLastAttemptDisplay = 'N/A';
+    newRec.emailDeliveryLastAttemptDisplay = turkText('turk.notAvailable');
   }
 
   if (newRec.maxTimestamp) {
-    newRec.lastAction = new Date(newRec.maxTimestamp).toLocaleString();
+    newRec.lastAction = formatActiveInterfaceDateTime(newRec.maxTimestamp);
   }
   const parsedUnit = Number(newRec.lastUnitSeen);
   newRec.currentUnitDisplay = Number.isFinite(parsedUnit) && parsedUnit >= 0
@@ -176,7 +189,7 @@ function dismissTurkModalThenAlert(message: string, level = 'info') {
 }
 
 async function turkLogRefresh(exp: any) {
-  $('#turkExpTitle').text('Viewing data for ' + exp.displayLabel);
+  $('#turkExpTitle').text(turkText('turk.viewingDataFor', { label: exp.displayLabel }));
   clearTurkExpLog();
 
   try {
@@ -192,7 +205,7 @@ async function turkLogRefresh(exp: any) {
       }, val));
     });
   } catch (error: unknown) {
-    const disp = 'Failed to retrieve log entries. Error:' + getErrorMessage(error);
+    const disp = turkText('turk.failedRetrieveLogs', { error: getErrorMessage(error) });
     setTurkWorkflowMessage('error', disp);
   }
 }
@@ -213,6 +226,18 @@ function turkLogButtonToRec(element: any) {
 }
 
 Template.turkWorkflow.helpers({
+  turkText: function(key: PlatformStringKey, options?: { hash?: TranslationValues }) {
+    return turkText(key, options?.hash);
+  },
+
+  awsIdPlaceholder: function() {
+    return getProfileField('have_aws_id') ? turkText('turk.awsIdPlaceholderOverwrite') : turkText('turk.awsIdPlaceholderEnter');
+  },
+
+  awsSecretPlaceholder: function() {
+    return getProfileField('have_aws_secret') ? turkText('turk.awsSecretPlaceholderOverwrite') : turkText('turk.awsSecretPlaceholderEnter');
+  },
+
   turkExperimentLogToShow: function() {
     return !!Session.get(TURK_LOG_SELECTED_EXPERIMENT_KEY);
   },
@@ -349,17 +374,17 @@ Template.turkWorkflow.events({
   'click #turk-show-assign': async function(event: any) {
     event.preventDefault();
     const assignid = $('#turk-assignid').val();
-    $('#turk-assign-results').text('Working on ' + assignid);
-    $('#turkModalMessage').text('Looking up assignment\u2026');
+    $('#turk-assign-results').text(turkText('turk.workingOnAssignment', { assignmentId: assignid }));
+    $('#turkModalMessage').text(turkText('turk.lookingUpAssignment'));
     showBootstrapModal('turkModal', { backdrop: 'static', keyboard: false });
     try {
       const result = await (Meteor as any).callAsync('turkGetAssignment', assignid);
       hideBootstrapModal('turkModal');
-      const disp = 'Server returned:' + JSON.stringify(result, null, 2);
+      const disp = turkText('turk.serverReturned', { result: JSON.stringify(result, null, 2) });
       $('#turk-assign-results').text(disp);
     } catch (error: unknown) {
       hideBootstrapModal('turkModal');
-      const disp = 'Failed to handle turk approval. Error:' + getErrorMessage(error);
+      const disp = turkText('turk.failedHandleTurkApproval', { error: getErrorMessage(error) });
       $('#turk-assign-results').text(disp);
     }
   },
@@ -399,16 +424,16 @@ Template.turkWorkflow.events({
     const workerid = $('#turk-workerid').val();
     const msgtext = $('#turk-msg').val();
     
-    $('#turkModalMessage').text('Sending message via Mechanical Turk\u2026');
+    $('#turkModalMessage').text(turkText('turk.sendingMessage'));
     showBootstrapModal('turkModal', { backdrop: 'static', keyboard: false });
     try {
       const result = await (Meteor as any).callAsync('turkSendMessage', workerid, msgtext);
       hideBootstrapModal('turkModal');
-      const disp = 'Server returned:' + JSON.stringify(result, null, 2);
+      const disp = turkText('turk.serverReturned', { result: JSON.stringify(result, null, 2) });
       setTurkWorkflowMessage('success', disp);
     } catch (error: unknown) {
       hideBootstrapModal('turkModal');
-      const disp = 'Failed to handle turk approval. Error:' + getErrorMessage(error);
+      const disp = turkText('turk.failedHandleTurkApproval', { error: getErrorMessage(error) });
       setTurkWorkflowMessage('error', disp);
     }
   },
@@ -446,40 +471,40 @@ Template.turkWorkflow.events({
 
     const rec: any = turkLogButtonToRec(event.currentTarget);
     if (!rec) {
-      setTurkWorkflowMessage('error', 'Cannot find record for that table entry.');
+      setTurkWorkflowMessage('error', turkText('turk.cannotFindRecord'));
       return;
     }
     const experimentFileName = rec.experimentFileName || rec.experiment;
     const exp: any = await meteorCallAsync('getTdfByFileName', experimentFileName)
     if (!exp || !exp._id) {
-      setTurkWorkflowMessage('error', 'Could not determine the experiment name for this entry.');
+      setTurkWorkflowMessage('error', turkText('turk.cannotDetermineExperiment'));
       return;
     }
     const expId = exp._id
 
-    const msg = 'Thank you for participating';
+    const msg = turkText('turk.approvalWorkerMessage');
 
-    $('#turkModalMessage').text('Approving assignment via Mechanical Turk\u2026');
+    $('#turkModalMessage').text(turkText('turk.approvingAssignment'));
     showBootstrapModal('turkModal', { backdrop: 'static', keyboard: false });
     try {
       const result = await (Meteor as any).callAsync('turkPay', rec.userId, expId, msg);
 
       rec.turkpayDetails = {
-        msg: 'Refresh the view to see details on server',
+        msg: turkText('turk.refreshViewDetailsServer'),
         details: '',
       };
 
       if (result) {
-        rec.turkpay = 'FAIL';
+        rec.turkpay = turkText('turk.failed');
         rec.turkpayDetails.details = result;
       } else {
-        rec.turkpay = 'Complete';
-        rec.turkpayDetails.details = 'None available';
+        rec.turkpay = turkText('turk.complete');
+        rec.turkpayDetails.details = turkText('turk.noneAvailable');
       }
 
       const payMsg = result
-        ? 'There was a problem with the approval/payment: ' + result
-        : 'Your approval succeeded';
+        ? turkText('turk.problemApprovalPayment', { result })
+        : turkText('turk.approvalSucceeded');
 
       turkExperimentLog.remove({'idx': rec.idx});
       turkLogInsert(rec);
@@ -487,12 +512,12 @@ Template.turkWorkflow.events({
       dismissTurkModalThenAlert(payMsg, result ? 'error' : 'success');
     } catch (error: unknown) {
       rec.turkpayDetails = {
-        msg: 'Refresh the view to see details on server',
+        msg: turkText('turk.refreshViewDetailsServer'),
         details: error,
       };
-      rec.turkpay = 'FAIL';
+      rec.turkpay = turkText('turk.failed');
 
-      const errMsg = 'There was a server failure of some kind: ' + getErrorMessage(error);
+      const errMsg = turkText('turk.serverFailure', { error: getErrorMessage(error) });
 
       turkExperimentLog.remove({'idx': rec.idx});
       turkLogInsert(rec);
@@ -507,41 +532,41 @@ Template.turkWorkflow.events({
 
     const rec: any = turkLogButtonToRec(event.currentTarget);
     if (!rec) {
-      setTurkWorkflowMessage('error', 'Cannot find record for that table entry.');
+      setTurkWorkflowMessage('error', turkText('turk.cannotFindRecord'));
       return;
     }
 
     const experimentFileName = rec.experimentFileName || rec.experiment;
     const exp: any = await meteorCallAsync('getTdfByFileName', experimentFileName)
     if (!exp || !exp._id) {
-      setTurkWorkflowMessage('error', 'Could not determine the experiment name for this entry.');
+      setTurkWorkflowMessage('error', turkText('turk.cannotDetermineExperiment'));
       return;
     }
     const expId = exp._id
     const expFile =  legacyTrim(experimentFileName).replace(/\./g, '_');
 
-    $('#turkModalMessage').text('Sending bonus via Mechanical Turk\u2026');
+    $('#turkModalMessage').text(turkText('turk.sendingBonus'));
     showBootstrapModal('turkModal', { backdrop: 'static', keyboard: false });
 
     try {
       const result = await (Meteor as any).callAsync('turkBonus', rec.userId, expFile, expId);
 
       rec.turkbonusDetails = {
-        msg: 'Refresh the view to see details on server',
+        msg: turkText('turk.refreshViewDetailsServer'),
         details: '',
       };
 
       if (result) {
-        rec.turkbonus = 'FAIL';
+        rec.turkbonus = turkText('turk.failed');
         rec.turkbonusDetails.details = result;
       } else {
-        rec.turkbonus = 'Complete';
-        rec.turkbonusDetails.details = 'None available';
+        rec.turkbonus = turkText('turk.complete');
+        rec.turkbonusDetails.details = turkText('turk.noneAvailable');
       }
 
       const bonusMsg = result
-        ? 'There was a problem with the bonus: ' + result
-        : 'Your bonus payment succeeded';
+        ? turkText('turk.problemBonus', { result })
+        : turkText('turk.bonusSucceeded');
 
       turkExperimentLog.remove({'idx': rec.idx});
       turkLogInsert(rec);
@@ -549,12 +574,12 @@ Template.turkWorkflow.events({
       dismissTurkModalThenAlert(bonusMsg, result ? 'error' : 'success');
     } catch (error: unknown) {
       rec.turkbonusDetails = {
-        msg: 'Refresh the view to see details on server',
+        msg: turkText('turk.refreshViewDetailsServer'),
         details: error,
       };
-      rec.turkbonus = 'FAIL';
+      rec.turkbonus = turkText('turk.failed');
 
-      const errMsg = 'There was a server failure of some kind: ' + getErrorMessage(error);
+      const errMsg = turkText('turk.serverFailure', { error: getErrorMessage(error) });
 
       turkExperimentLog.remove({'idx': rec.idx});
       turkLogInsert(rec);
@@ -573,7 +598,7 @@ Template.turkWorkflow.events({
     try {
       disp = displayify((turkLogButtonToRec(event.currentTarget) as any).turkpayDetails);
     } catch (e: unknown) {
-      disp = 'Error finding details to display: ' + getErrorMessage(e);
+      disp = turkText('turk.errorFindingDetails', { error: getErrorMessage(e) });
     }
 
     $('#detailsModalListing').text(disp);
@@ -590,7 +615,7 @@ Template.turkWorkflow.events({
     try {
       disp = displayify((turkLogButtonToRec(event.currentTarget) as any).turkbonusDetails);
     } catch (e: unknown) {
-      disp = 'Error finding details to display: ' + getErrorMessage(e);
+      disp = turkText('turk.errorFindingDetails', { error: getErrorMessage(e) });
     }
 
     $('#detailsModalListing').text(disp);
@@ -607,7 +632,7 @@ Template.turkWorkflow.events({
     try {
       disp = displayify((turkLogButtonToRec(event.currentTarget) as any).turkEmailScheduleDetails);
     } catch (e: unknown) {
-      disp = 'Error finding details to display: ' + getErrorMessage(e);
+      disp = turkText('turk.errorFindingDetails', { error: getErrorMessage(e) });
     }
 
     $('#detailsModalListing').text(disp);
@@ -624,7 +649,7 @@ Template.turkWorkflow.events({
     try {
       disp = displayify((turkLogButtonToRec(event.currentTarget) as any).turkEmailSendDetails);
     } catch (e: unknown) {
-      disp = 'Error finding details to display: ' + getErrorMessage(e);
+      disp = turkText('turk.errorFindingDetails', { error: getErrorMessage(e) });
     }
 
     $('#detailsModalListing').text(disp);
@@ -641,7 +666,7 @@ Template.turkWorkflow.events({
     try {
       disp = displayify((turkLogButtonToRec(event.currentTarget) as any).emailDeliveryDetails);
     } catch (e: unknown) {
-      disp = 'Error finding details to display: ' + getErrorMessage(e);
+      disp = turkText('turk.errorFindingDetails', { error: getErrorMessage(e) });
     }
 
     $('#detailsModalListing').text(disp);

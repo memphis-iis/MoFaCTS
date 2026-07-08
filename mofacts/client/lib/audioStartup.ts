@@ -1,7 +1,9 @@
 import { Meteor } from 'meteor/meteor';
 import { Session } from 'meteor/session';
 import { audioManager } from './audioContextManager';
+import { canResolveExplicitTtsLanguageCode, resolveExplicitTtsLanguageCode } from './audioLanguage';
 import { evaluateSrAvailability } from './audioAvailability';
+import { getActiveUiLocale } from './interfaceLocaleState';
 import { resolveSpeechRecognitionLanguage } from './speechRecognitionConfig';
 import {
   getAudioRecorderInitialized,
@@ -18,6 +20,8 @@ type AudioStartupUser = {
   audioSettings?: {
     audioInputMode?: boolean;
     audioPromptMode?: string;
+    audioPromptVoice?: string;
+    audioPromptFeedbackVoice?: string;
   };
 };
 
@@ -73,16 +77,25 @@ function supportsSr(currentTdfFile: AudioStartupTdf | null | undefined, user: Au
 
 function supportsTts(currentTdfFile: AudioStartupTdf | null | undefined, user: AudioStartupUser | null | undefined) {
   const userAudioPromptMode = user?.audioSettings?.audioPromptMode;
+  const setspec = currentTdfFile?.tdfs?.tutor?.setspec;
+  const requestedVoice = setspec?.audioPromptFeedbackVoice ||
+    user?.audioSettings?.audioPromptFeedbackVoice ||
+    user?.audioSettings?.audioPromptVoice;
   const hasTtsKey = (
-    typeof currentTdfFile?.tdfs?.tutor?.setspec?.textToSpeechAPIKey === 'string' &&
-    currentTdfFile.tdfs.tutor.setspec.textToSpeechAPIKey.trim().length > 0
+    typeof setspec?.textToSpeechAPIKey === 'string' &&
+    setspec.textToSpeechAPIKey.trim().length > 0
   ) || (
     typeof user?.ttsAPIKey === 'string' &&
     user.ttsAPIKey.trim().length > 0
   ) || Session.get('ttsAPIKeyConfigured') === true;
 
   return hasEnabledAudioPromptMode(userAudioPromptMode) &&
-    hasTtsKey;
+    hasTtsKey &&
+    canResolveExplicitTtsLanguageCode({
+      configuredLanguage: setspec?.textToSpeechLanguage,
+      requestedVoice,
+      contextLabel: 'TTS warmup',
+    });
 }
 
 function ensureMediaDevicesPolyfill() {
@@ -129,6 +142,15 @@ async function warmupTtsIfNeeded(
   if (!supportsTts(currentTdfFile, user) || getTtsWarmedUp()) {
     return;
   }
+  const setspec = currentTdfFile?.tdfs?.tutor?.setspec;
+  const requestedVoice = setspec?.audioPromptFeedbackVoice ||
+    user?.audioSettings?.audioPromptFeedbackVoice ||
+    user?.audioSettings?.audioPromptVoice;
+  const ttsLanguage = resolveExplicitTtsLanguageCode({
+    configuredLanguage: setspec?.textToSpeechLanguage,
+    requestedVoice,
+    contextLabel: 'TTS warmup',
+  });
 
   await withStartupTimeout(
     (Meteor as any).callAsync(
@@ -137,8 +159,8 @@ async function warmupTtsIfNeeded(
       'warmup',
       1.0,
       0.0,
-      currentTdfFile?.tdfs?.tutor?.setspec?.audioPromptFeedbackVoice || 'en-US-Standard-A',
-      currentTdfFile?.tdfs?.tutor?.setspec?.textToSpeechLanguage || 'en-US'
+      requestedVoice || '',
+      ttsLanguage
     ),
     'TTS warmup'
   );
@@ -154,7 +176,10 @@ async function warmupSrIfNeeded(
     return;
   }
 
-  const speechRecognitionLanguage = resolveSpeechRecognitionLanguage(currentTdfFile?.tdfs?.tutor?.setspec);
+  const speechRecognitionLanguage = resolveSpeechRecognitionLanguage(
+    currentTdfFile?.tdfs?.tutor?.setspec,
+    getActiveUiLocale()
+  );
 
   const silentAudioBytes = new Uint8Array(3200).fill(0);
   const base64Audio = btoa(String.fromCharCode.apply(null, Array.from(silentAudioBytes) as any));

@@ -50,6 +50,16 @@ describe('manualContentCreatorValidation', function() {
     expect(errors).to.include('Link name must use letters, numbers, underscores, or hyphens.');
   });
 
+  it('validates authored language metadata as BCP 47 tags', function() {
+    const errors = validateManualCreatorStep(1, buildState({
+      contentLanguage: 'bad locale',
+      recommendedUiLocales: 'es, also bad',
+    }), () => 'row-1');
+
+    expect(errors).to.include('Content language must be a BCP 47 language tag such as en, es, zh-Hans, or hi.');
+    expect(errors).to.include('Recommended UI locales must be comma-separated BCP 47 language tags. Invalid: also bad.');
+  });
+
   it('validates practice timing as numeric and ordered', function() {
     const errors = validateManualCreatorStep(3, buildState({
       practiceTimingEnabled: true,
@@ -60,6 +70,20 @@ describe('manualContentCreatorValidation', function() {
     expect(errors).to.deep.equal([
       'Maximum practice time must be greater than or equal to minimum practice time.'
     ]);
+  });
+
+  it('requires explicit speech language for text-to-speech but not speech recognition', function() {
+    expect(validateManualCreatorStep(3, buildState({
+      textToSpeechMode: 'prompts',
+      speechLanguage: '',
+    }), () => 'row-1')).to.deep.equal([
+      'Speech language required when text-to-speech is enabled.',
+    ]);
+
+    expect(validateManualCreatorStep(3, buildState({
+      speechRecognitionEnabled: true,
+      speechLanguage: '',
+    }), () => 'row-1')).to.deep.equal([]);
   });
 
   it('validates multiple-choice media starter rows', function() {

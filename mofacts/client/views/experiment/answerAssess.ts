@@ -8,8 +8,14 @@ import {
   type LearnerResponseNormalizationOptions,
   normalizeLearnerResponseText,
 } from '../../../common/lib/learnerResponseNormalization';
+import { translatePlatformString } from '../../lib/interfaceI18n';
+import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 
 export {Answers};
+
+function answerAssessText(key: Parameters<typeof translatePlatformString>[1], values?: Parameters<typeof translatePlatformString>[2]): string {
+  return translatePlatformString(getActiveUiLocale(), key, values);
+}
 
 /*
 Copyright (c) 2011 Andrei Mackenzie
@@ -210,8 +216,8 @@ async function stringMatch(
   if (userInput === '' || userAnswer === ''){
     //user didnt enter a response.
     return 0;
-  } else if (/^[\|A-Za-z0-9 \.\%-]+$/i.test(stimStr)) {
-    // They have the regex matching our special condition - check it manually
+  } else if (legacyTrim(stimStr).includes('|')) {
+    // Pipe-delimited answer alternatives are authored literal answers, not an English-only pattern.
     const checks = legacyTrim(stimStr).split('|');
     for (const check of checks) {
       if (check.length < 1) {
@@ -363,10 +369,10 @@ async function checkAnswer(
       matchText = '';
     } else if (match === 1) {
       isCorrect = true;
-      matchText = 'Correct.';
+      matchText = `${answerAssessText('feedback.correct')}.`;
     } else if (match === 2) {
       isCorrect = true;
-      matchText = 'Close enough to the correct answer \''+ dispAnswer + '\'.';
+      matchText = answerAssessText('feedback.closeEnoughToCorrectAnswer', { answer: dispAnswer });
     } else if (match === 3) {
       isCorrect = true;
       matchText = 'That sounds like the answer but you\'re writing it the wrong way, the correct answer is \''+ dispAnswer + '\'.';
@@ -377,7 +383,7 @@ async function checkAnswer(
     }
     
     if (!matchText) {
-      matchText = isCorrect ? 'Correct' : 'Incorrect.';
+      matchText = isCorrect ? answerAssessText('feedback.correct') : `${answerAssessText('feedback.incorrect')}.`;
     }
   }
   return {isCorrect, matchText};

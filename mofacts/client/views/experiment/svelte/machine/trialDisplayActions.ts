@@ -1,7 +1,26 @@
 import { Session } from 'meteor/session';
 import { Answers } from '../../answerAssess';
+import { translatePlatformString } from '../../../../lib/interfaceI18n';
+import { getActiveUiLocale } from '../../../../lib/interfaceLocaleState';
 import { setDisplayReadyState, setInputReadyState } from '../services/cardRuntimeState';
 import { assign, type ActionArgs } from './contentRuntimeMachineActionTypes';
+
+const DEFAULT_CORRECT_LABELS = new Set(['Correct', 'Correct.']);
+const DEFAULT_INCORRECT_LABELS = new Set(['Incorrect', 'Incorrect.']);
+
+function resolveOutcomeLabelText(
+  rawLabel: unknown,
+  defaultKey: 'feedback.correct' | 'feedback.incorrect',
+  knownDefaults: Set<string>,
+): string {
+  const platformText = (key: Parameters<typeof translatePlatformString>[1]) =>
+    translatePlatformString(getActiveUiLocale(), key);
+  const label = typeof rawLabel === 'string' ? rawLabel.trim() : '';
+  if (label && !knownDefaults.has(label)) {
+    return label;
+  }
+  return platformText(defaultKey);
+}
 
 export const setPrestimulusDisplay = assign({
   currentDisplay: ({ context }: ActionArgs) => {
@@ -49,11 +68,19 @@ export function announceToScreenReader({ context }: ActionArgs) {
   let message = '';
 
   if (context.isCorrect) {
-    message = context.deliverySettings.correctLabelText || 'Correct.';
+    message = resolveOutcomeLabelText(
+      context.deliverySettings.correctLabelText,
+      'feedback.correct',
+      DEFAULT_CORRECT_LABELS,
+    );
   } else if (!context.isCorrect && context.userAnswer) {
-    message = context.deliverySettings.incorrectLabelText || 'Incorrect.';
+    message = resolveOutcomeLabelText(
+      context.deliverySettings.incorrectLabelText,
+      'feedback.incorrect',
+      DEFAULT_INCORRECT_LABELS,
+    );
   } else if (context.isTimeout) {
-    message = 'Time out';
+    message = translatePlatformString(getActiveUiLocale(), 'feedback.timeout');
   }
 
   if (message && typeof window !== 'undefined') {

@@ -37,7 +37,7 @@ function formatDate(value: unknown, timezone?: string | null) {
   if (!value) return '';
   const date = new Date(value as string | number | Date);
   if (!Number.isFinite(date.getTime())) return '';
-  return date.toLocaleString([], {
+  return date.toLocaleString(getActiveUiLocale(), {
     dateStyle: 'medium',
     timeStyle: 'short',
     ...(timezone ? { timeZone: timezone } : {}),
@@ -48,7 +48,7 @@ function formatDateOnly(value: unknown, timezone?: string | null) {
   if (!value) return '';
   const date = new Date(value as string | number | Date);
   if (!Number.isFinite(date.getTime())) return '';
-  return date.toLocaleDateString([], {
+  return date.toLocaleDateString(getActiveUiLocale(), {
     dateStyle: 'medium',
     ...(timezone ? { timeZone: timezone } : {}),
   });
@@ -56,6 +56,31 @@ function formatDateOnly(value: unknown, timezone?: string | null) {
 
 function courseText(key: Parameters<typeof translatePlatformString>[1], values?: Parameters<typeof translatePlatformString>[2]): string {
   return translatePlatformString(getActiveUiLocale(), key, values);
+}
+
+function courseTranslationStatusText(status: string): string {
+  if (status === 'author-provided') return courseText('manualCreator.translationStatusAuthorProvided');
+  if (status === 'not-translated') return courseText('manualCreator.translationStatusNotTranslated');
+  if (status === 'draft') return courseText('manualCreator.translationStatusDraft');
+  if (status === 'reviewed') return courseText('manualCreator.translationStatusReviewed');
+  return status;
+}
+
+function buildCourseLanguageMetadataRows(assignment: Pick<CourseAssignmentDisplayRow, 'contentLanguage' | 'recommendedUiLocales' | 'translationStatus'>) {
+  const rows: Array<{ label: string; value: string }> = [];
+  const contentLanguage = String(assignment?.contentLanguage || '').trim();
+  const recommendedUiLocales = Array.isArray(assignment?.recommendedUiLocales)
+    ? assignment.recommendedUiLocales.map((locale: unknown) => String(locale || '').trim()).filter(Boolean)
+    : [];
+  const translationStatus = String(assignment?.translationStatus || '').trim();
+  if (contentLanguage) rows.push({ label: courseText('manualCreator.contentLanguage'), value: contentLanguage });
+  if (recommendedUiLocales.length > 0) {
+    rows.push({ label: courseText('manualCreator.recommendedUiLocales'), value: recommendedUiLocales.join(', ') });
+  }
+  if (translationStatus) {
+    rows.push({ label: courseText('manualCreator.translationStatus'), value: courseTranslationStatusText(translationStatus) });
+  }
+  return rows;
 }
 
 function getExpandedCourseIds() {
@@ -206,6 +231,9 @@ const courseAssignmentDisplayHelpers = {
     const lastPracticed = row.progress?.lastPracticed;
     return lastPracticed ? formatDateOnly(lastPracticed, row.timezone) : '-';
   },
+  languageMetadataRows(this: CourseAssignmentDisplayRow) {
+    return buildCourseLanguageMetadataRows(this);
+  },
   actionLabel(this: CourseAssignmentDisplayRow) {
     const row = this;
     if (row.availability === 'scheduled') return courseText('courses.locked');
@@ -267,7 +295,7 @@ Template.courses.events({
         assignment.title,
         assignment.currentStimuliSetId,
         resolveSpeechIgnoreOutOfGrammarResponses(setspec),
-        setspec.speechOutOfGrammarFeedback || 'Response not in answer set',
+        setspec.speechOutOfGrammarFeedback || translatePlatformString(getActiveUiLocale(), 'speech.outOfGrammarFeedback'),
         'Course assignment launch',
         Boolean(tdf?.content?.isMultiTdf),
         setspec,

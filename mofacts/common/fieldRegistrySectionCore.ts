@@ -166,6 +166,7 @@ export const GOOGLE_STT_LANGUAGE_CODES = Object.freeze([
   'bn-IN',
   'bs-BA',
   'ca-ES',
+  'cmn-Hans-CN',
   'cs-CZ',
   'da-DK',
   'de-AT',

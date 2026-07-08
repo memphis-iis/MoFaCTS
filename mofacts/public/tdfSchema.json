@@ -299,6 +299,7 @@
                 "bn-IN",
                 "bs-BA",
                 "ca-ES",
+                "cmn-Hans-CN",
                 "cs-CZ",
                 "da-DK",
                 "de-AT",
@@ -1907,6 +1908,22 @@
                               "sparc"
                             ]
                           },
+                          "accentSensitive": {
+                            "title": "Use accent-sensitive answer matching.",
+                            "description": "Compare typed answers with accents and diacritics preserved. Leave off when unaccented responses should match accented targets.",
+                            "type": "boolean",
+                            "default": false,
+                            "options": {
+                              "grid_columns": 4
+                            },
+                            "x-appliesToUnitTypes": [
+                              "learning",
+                              "assessment",
+                              "video",
+                              "autotutor",
+                              "sparc"
+                            ]
+                          },
                           "displayQuestionNumber": {
                             "title": "Show the question number.",
                             "description": "Render the current question number in the lesson UI.",
@@ -2699,6 +2716,22 @@
                             "caseSensitive": {
                               "title": "Use case-sensitive answer matching.",
                               "description": "Compare typed answers with case preserved.",
+                              "type": "boolean",
+                              "default": false,
+                              "options": {
+                                "grid_columns": 4
+                              },
+                              "x-appliesToUnitTypes": [
+                                "learning",
+                                "assessment",
+                                "video",
+                                "autotutor",
+                                "sparc"
+                              ]
+                            },
+                            "accentSensitive": {
+                              "title": "Use accent-sensitive answer matching.",
+                              "description": "Compare typed answers with accents and diacritics preserved. Leave off when unaccented responses should match accented targets.",
                               "type": "boolean",
                               "default": false,
                               "options": {
@@ -4256,6 +4289,22 @@
                           "sparc"
                         ]
                       },
+                      "accentSensitive": {
+                        "title": "Use accent-sensitive answer matching.",
+                        "description": "Compare typed answers with accents and diacritics preserved. Leave off when unaccented responses should match accented targets.",
+                        "type": "boolean",
+                        "default": false,
+                        "options": {
+                          "grid_columns": 4
+                        },
+                        "x-appliesToUnitTypes": [
+                          "learning",
+                          "assessment",
+                          "video",
+                          "autotutor",
+                          "sparc"
+                        ]
+                      },
                       "displayQuestionNumber": {
                         "title": "Show the question number.",
                         "description": "Render the current question number in the lesson UI.",
@@ -5048,6 +5097,22 @@
                         "caseSensitive": {
                           "title": "Use case-sensitive answer matching.",
                           "description": "Compare typed answers with case preserved.",
+                          "type": "boolean",
+                          "default": false,
+                          "options": {
+                            "grid_columns": 4
+                          },
+                          "x-appliesToUnitTypes": [
+                            "learning",
+                            "assessment",
+                            "video",
+                            "autotutor",
+                            "sparc"
+                          ]
+                        },
+                        "accentSensitive": {
+                          "title": "Use accent-sensitive answer matching.",
+                          "description": "Compare typed answers with accents and diacritics preserved. Leave off when unaccented responses should match accented targets.",
                           "type": "boolean",
                           "default": false,
                           "options": {
@@ -6347,6 +6412,22 @@
             "caseSensitive": {
               "title": "Use case-sensitive answer matching.",
               "description": "Compare typed answers with case preserved.",
+              "type": "boolean",
+              "default": false,
+              "options": {
+                "grid_columns": 4
+              },
+              "x-appliesToUnitTypes": [
+                "learning",
+                "assessment",
+                "video",
+                "autotutor",
+                "sparc"
+              ]
+            },
+            "accentSensitive": {
+              "title": "Use accent-sensitive answer matching.",
+              "description": "Compare typed answers with accents and diacritics preserved. Leave off when unaccented responses should match accented targets.",
               "type": "boolean",
               "default": false,
               "options": {

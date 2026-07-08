@@ -5,6 +5,7 @@ import { Tracker } from 'meteor/tracker';
 import { ReactiveVar } from 'meteor/reactive-var';
 import { getActiveUiLocale } from '../lib/interfaceLocaleState';
 import { translatePlatformString } from '../lib/interfaceI18n';
+import { formatActiveInterfaceDateTime } from '../lib/interfaceFormatting';
 import {
     isThemeLengthProperty,
     isThemeDensityScaleProperty,
@@ -296,7 +297,7 @@ async function downloadThemeJson(template: any, themeId: any, filenameFallback =
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
     } catch (err: any) {
-        setThemeMessage(template, 'error', 'Error exporting theme: ' + (err?.message || err));
+        setThemeMessage(template, 'error', themeText('theme.errorExportingTheme', { error: err?.message || err }));
     }
 }
 
@@ -401,7 +402,7 @@ Template.theme.helpers({
     },
     'formatDate': function(date: any) {
         if (!date) return '';
-        return new Date(date).toLocaleString();
+        return formatActiveInterfaceDateTime(date);
     },
     'getContrastInfo': function(fgProp: any, bgProp: any) {
         const instance = Template.instance() as any;
@@ -632,7 +633,7 @@ function commitThemePropInput(inputEl: HTMLInputElement | HTMLTextAreaElement, t
             await saveThemeProperty(dataId, value);
         } catch (err: any) {
             clientConsole(1, `[Theme] Error auto-saving ${dataId}:`, err);
-            setThemeMessage(template, 'error', `Error saving ${dataId}: ${err}`);
+            setThemeMessage(template, 'error', themeText('theme.errorSavingField', { field: dataId, error: err }));
         }
     })();
 }
@@ -707,7 +708,7 @@ Template.theme.events({
             const activeTheme = await (Meteor as any).callAsync('setActiveTheme', themeId);
             applyThemeState(activeTheme);
         } catch (err: any) {
-            setThemeMessage(template, 'error', 'Error activating theme: ' + (err?.message || err));
+            setThemeMessage(template, 'error', themeText('theme.errorActivatingTheme', { error: err?.message || err }));
         }
     },
     'click .duplicate-theme': async function(event: any, template: any) {
@@ -725,7 +726,7 @@ Template.theme.events({
                 name: newName
             });
         } catch (err: any) {
-            setThemeMessage(template, 'error', 'Error duplicating theme: ' + (err?.message || err));
+            setThemeMessage(template, 'error', themeText('theme.errorDuplicatingTheme', { error: err?.message || err }));
         }
     },
     'click .rename-theme': async function(event: any, template: any) {
@@ -745,7 +746,7 @@ Template.theme.events({
                 newName: newName
             });
         } catch (err: any) {
-            setThemeMessage(template, 'error', 'Error renaming theme: ' + (err?.message || err));
+            setThemeMessage(template, 'error', themeText('theme.errorRenamingTheme', { error: err?.message || err }));
         }
     },
     'click .delete-theme': async function(event: any, template: any) {
@@ -765,9 +766,9 @@ Template.theme.events({
         }
         try {
             await (Meteor as any).callAsync('deleteTheme', themeId);
-            setThemeMessage(template, 'success', `${themeName} deleted.`);
+            setThemeMessage(template, 'success', themeText('theme.deleted', { name: themeName }));
         } catch (err: any) {
-            setThemeMessage(template, 'error', 'Error deleting theme: ' + (err?.message || err));
+            setThemeMessage(template, 'error', themeText('theme.errorDeletingTheme', { error: err?.message || err }));
         }
     },
     'click .export-theme': async function(event: any, template: any) {
@@ -782,7 +783,7 @@ Template.theme.events({
     'click #exportActiveTheme': async function(event: any, template: any) {
         const activeId = getActiveThemeId();
         if (!activeId) {
-            setThemeMessage(template, 'warning', 'No active theme selected.');
+            setThemeMessage(template, 'warning', themeText('theme.noActiveThemeSelected'));
             return;
         }
         const theme = getServerActiveTheme();
@@ -794,29 +795,29 @@ Template.theme.events({
         const fileInput = template.find('#themeImportInput');
         const file = fileInput?.files?.[0];
         if (!file) {
-            setThemeMessage(template, 'warning', 'Select a theme JSON file to import.');
+            setThemeMessage(template, 'warning', themeText('theme.selectThemeJsonFile'));
             return;
         }
         if (file.size > THEME_IMPORT_MAX_FILE_BYTES) {
-            setThemeMessage(template, 'warning', 'Theme files must be smaller than 10MB.');
+            setThemeMessage(template, 'warning', themeText('theme.themeFileSizeLessThanTenMb'));
             return;
         }
         try {
             const text = await file.text();
             await (Meteor as any).callAsync('importThemeFile', text, true);
             fileInput.value = '';
-            setThemeMessage(template, 'success', 'Theme imported.');
+            setThemeMessage(template, 'success', themeText('theme.imported'));
         } catch (err: any) {
-            setThemeMessage(template, 'error', 'Error importing theme: ' + (err?.message || err));
+            setThemeMessage(template, 'error', themeText('theme.errorImportingTheme', { error: err?.message || err }));
         }
     },
     'click #themeResetButton': async function(event: any, template: any) {
         try {
             const activeTheme = await (Meteor as any).callAsync('initializeCustomTheme', 'MoFaCTS');
             applyThemeState(activeTheme);
-            setThemeMessage(template, 'success', 'Theme reset to default.');
+            setThemeMessage(template, 'success', themeText('theme.resetToDefault'));
         } catch (err: any) {
-            setThemeMessage(template, 'error', 'Error resetting theme: ' + (err?.message || err));
+            setThemeMessage(template, 'error', themeText('theme.errorResettingTheme', { error: err?.message || err }));
         }
     },
     'input .currentThemeProp': function(event: any) {
@@ -887,7 +888,7 @@ Template.theme.events({
                 
             } catch (err: any) {
                 clientConsole(1, `[Theme] Error auto-saving ${data_id}:`, err);
-                setThemeMessage(instance, 'error', `Error saving ${data_id}: ${err}`);
+                setThemeMessage(instance, 'error', themeText('theme.errorSavingField', { field: data_id, error: err }));
             }
         }, 300);
     },
@@ -902,13 +903,13 @@ Template.theme.events({
         }
 
         if (!file.type.startsWith('image/')) {
-            setThemeMessage(template, 'warning', 'Please select an image file.');
+            setThemeMessage(template, 'warning', themeText('theme.selectImageFile'));
             fileInput.value = '';
             return;
         }
 
         if (file.size > HOME_UNDERLAY_MAX_FILE_BYTES) {
-            setThemeMessage(template, 'warning', 'Underlay image file size must be less than 5MB.');
+            setThemeMessage(template, 'warning', themeText('theme.underlayFileSizeLessThanFiveMb'));
             fileInput.value = '';
             return;
         }
@@ -920,13 +921,13 @@ Template.theme.events({
                 updateServerActiveThemeSessionProperty('practice_menu_underlay_image_url', base64Data);
                 await saveThemeProperty('practice_menu_underlay_image_url', base64Data);
                 fileInput.value = '';
-                setThemeMessage(template, 'success', 'Home underlay image uploaded.');
+                setThemeMessage(template, 'success', themeText('theme.homeUnderlayUploaded'));
             } catch (err: any) {
-                setThemeMessage(template, 'error', 'Error uploading home underlay image: ' + (err?.message || err));
+                setThemeMessage(template, 'error', themeText('theme.homeUnderlayUploadError', { error: err?.message || err }));
             }
         };
         reader.onerror = function() {
-            setThemeMessage(template, 'error', 'Error reading home underlay image.');
+            setThemeMessage(template, 'error', themeText('theme.homeUnderlayReadError'));
             fileInput.value = '';
         };
         reader.readAsDataURL(file);
@@ -937,9 +938,9 @@ Template.theme.events({
             await saveThemeProperty('practice_menu_underlay_image_url', '');
             $('#homeUnderlayUpload').val('');
             $('.currentThemeProp[data-id=practice_menu_underlay_image_url]').val('');
-            setThemeMessage(template, 'success', 'Home underlay image cleared.');
+            setThemeMessage(template, 'success', themeText('theme.homeUnderlayCleared'));
         } catch (err: any) {
-            setThemeMessage(template, 'error', 'Error clearing home underlay image: ' + (err?.message || err));
+            setThemeMessage(template, 'error', themeText('theme.homeUnderlayClearError', { error: err?.message || err }));
         }
     },
     'change #logoUpload': function(event: any, template: any) {
@@ -947,12 +948,12 @@ Template.theme.events({
         if (file) {
             // Validate file type
             if (!file.type.startsWith('image/')) {
-                setThemeMessage(template, 'warning', 'Please select an image file.');
+                setThemeMessage(template, 'warning', themeText('theme.selectImageFile'));
                 return;
             }
             // Validate file size (max 2MB)
             if (file.size > 2 * 1024 * 1024) {
-                setThemeMessage(template, 'warning', 'File size must be less than 2MB.');
+                setThemeMessage(template, 'warning', themeText('theme.fileSizeLessThanTwoMb'));
                 return;
             }
 
@@ -1003,9 +1004,9 @@ Template.theme.events({
 
                         
                         // PHASE 1.5: No need to call getCurrentTheme() - reactive subscription handles it
-                        setThemeMessage(template, 'success', 'Logo uploaded.');
+                        setThemeMessage(template, 'success', themeText('theme.logoUploaded'));
                     } catch (err: any) {
-                        setThemeMessage(template, 'error', "Error uploading logo: " + err);
+                        setThemeMessage(template, 'error', themeText('theme.logoUploadError', { error: err }));
                     }
                 };
                 img.src = base64Data;
@@ -1015,9 +1016,9 @@ Template.theme.events({
     },
     'click #clearLogo': async function(event: any, template: any) {
         const confirmed = await requestThemeConfirmation(template, {
-            title: 'Clear logo?',
-            message: 'The active theme logo will be removed.',
-            confirmLabel: 'Clear logo'
+            title: themeText('theme.clearLogoTitle'),
+            message: themeText('theme.clearLogoMessage'),
+            confirmLabel: themeText('theme.clearLogo')
         });
         if (confirmed) {
             try {
@@ -1025,9 +1026,9 @@ Template.theme.events({
                 
                 $('#logoUpload').val('');
                 // PHASE 1.5: No need to call getCurrentTheme() - reactive subscription handles it
-                setThemeMessage(template, 'success', 'Logo cleared.');
+                setThemeMessage(template, 'success', themeText('theme.logoCleared'));
             } catch (err: any) {
-                setThemeMessage(template, 'error', "Error clearing logo: " + err);
+                setThemeMessage(template, 'error', themeText('theme.logoClearError', { error: err }));
             }
         }
     },
@@ -1039,26 +1040,26 @@ Template.theme.events({
         const statusSpan = document.getElementById('helpFileUploadStatus') as any;
 
         if (!file) {
-            statusSpan.textContent = 'Please select a file first';
+            statusSpan.textContent = themeText('theme.selectFileFirst');
             statusSpan.className = 'text-danger';
             return;
         }
 
         // Validate file extension
         if (!file.name.endsWith('.md')) {
-            statusSpan.textContent = 'Please select a markdown (.md) file';
+            statusSpan.textContent = themeText('theme.selectMarkdownFile');
             statusSpan.className = 'text-danger';
             return;
         }
 
         // Validate file size (1MB max)
         if (file.size > 1048576) {
-            statusSpan.textContent = 'File size must be less than 1MB';
+            statusSpan.textContent = themeText('theme.fileSizeLessThanOneMb');
             statusSpan.className = 'text-danger';
             return;
         }
 
-        statusSpan.textContent = 'Uploading...';
+        statusSpan.textContent = themeText('theme.uploading');
         statusSpan.className = 'text-info';
 
         // Read file as text
@@ -1068,17 +1069,17 @@ Template.theme.events({
 
                 try {
                     await (Meteor as any).callAsync('setCustomHelpPage', markdownContent);
-                    statusSpan.textContent = 'Custom help page uploaded successfully!';
+                    statusSpan.textContent = themeText('theme.customHelpUploaded');
                     statusSpan.className = 'text-success';
                     fileInput.value = '';
                 } catch (err: any) {
-                    statusSpan.textContent = 'Error: ' + err.message;
+                    statusSpan.textContent = themeText('theme.errorWithMessage', { error: err.message });
                     statusSpan.className = 'text-danger';
                 }
         };
 
         reader.onerror = function() {
-            statusSpan.textContent = 'Error reading file';
+            statusSpan.textContent = themeText('theme.errorReadingFile');
             statusSpan.className = 'text-danger';
         };
 
@@ -1087,21 +1088,21 @@ Template.theme.events({
 
     'click #removeHelpFileButton': async function(event: any, template: any) {
         const confirmed = await requestThemeConfirmation(template, {
-            title: 'Remove custom help page?',
-            message: 'The app will revert to the wiki help page.',
-            confirmLabel: 'Remove help page'
+            title: themeText('theme.removeCustomHelpTitle'),
+            message: themeText('theme.removeCustomHelpMessage'),
+            confirmLabel: themeText('theme.removeHelpPage')
         });
         if (confirmed) {
             const statusSpan = document.getElementById('helpFileUploadStatus') as any;
-            statusSpan.textContent = 'Removing...';
+            statusSpan.textContent = themeText('theme.removing');
             statusSpan.className = 'text-info';
 
             try {
                 await (Meteor as any).callAsync('removeCustomHelpPage');
-                statusSpan.textContent = 'Custom help page removed. Now using wiki.';
+                statusSpan.textContent = themeText('theme.customHelpRemovedUsingWiki');
                 statusSpan.className = 'text-success';
             } catch (err: any) {
-                statusSpan.textContent = 'Error: ' + err.message;
+                statusSpan.textContent = themeText('theme.errorWithMessage', { error: err.message });
                 statusSpan.className = 'text-danger';
             }
         }

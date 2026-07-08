@@ -67,6 +67,8 @@
   import { getMainTimeoutMs, getFeedbackTimeoutMs } from '../utils/timeoutUtils';
   import { recordCurrentInstructionContinue } from '../../instructions';
   import { resolveContentLanguageAttributes } from '../../../../../common/lib/contentLanguageAttributes';
+  import { getActiveUiLocale } from '../../../../lib/interfaceLocaleState';
+  import { translatePlatformString } from '../../../../lib/interfaceI18n';
   import {
     resolveH5PTrialDisplayResult,
     selfHostedH5PTrialDisplayOwnsInteraction,
@@ -530,9 +532,8 @@
   $: trialContentMounted = activeSlotMounted;
   $: trialContentVisible = activeSlotVisible;
   $: cardVisualReady = trialContentMounted || sessionContentSurface.showSparcSession || state.matches('videoWaiting') || videoEnded;
-  $: contentLanguageAttributes = resolveContentLanguageAttributes(
-    Session.get('currentTdfFile')?.tdfs?.tutor?.setspec?.contentLanguage
-  );
+  $: declaredContentLanguage = String(Session.get('currentTdfFile')?.tdfs?.tutor?.setspec?.contentLanguage || '').trim();
+  $: contentLanguageAttributes = resolveContentLanguageAttributes(declaredContentLanguage || getActiveUiLocale());
   $: flashcardControllerProps = {
     ...activeFlashcardControllerState.props,
     inputLanguage: contentLanguageAttributes.lang || '',
@@ -1049,6 +1050,7 @@
       log: clientConsole,
       routeInitializationFailure: cardLaunchEnvironment.routeInitializationFailure,
       setLaunchLoadingMessage,
+      loadingContentMessage: translatePlatformString(getActiveUiLocale(), 'common.loadingContent'),
       markLaunchLoadingTiming,
       prepareRender: async () => undefined,
       resolveLaunchCompletion: () => resolveSessionSurfaceLaunchCompletion({
@@ -1214,6 +1216,8 @@
       displayUserAnswerInFeedback={flashcardControllerProps.displayUserAnswerInFeedback}
       feedbackLayout={flashcardControllerProps.feedbackLayout}
       displayCorrectAnswerInIncorrectFeedback={flashcardControllerProps.displayCorrectAnswerInIncorrectFeedback}
+      inputLanguage={flashcardControllerProps.inputLanguage}
+      inputTextDirection={flashcardControllerProps.inputTextDirection}
       on:feedbackcontent={handleFeedbackContent}
       on:blockingassetstate={handleBlockingAssetState}
       on:reviewrevealstarted={handleReviewRevealStarted}

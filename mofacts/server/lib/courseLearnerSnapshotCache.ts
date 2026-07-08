@@ -25,6 +25,9 @@ type TdfSummary = {
   fileName: string;
   displayName: string;
   tags: string[];
+  contentLanguage?: string;
+  recommendedUiLocales?: string[];
+  translationStatus?: string;
   currentStimuliSetId: string | number | null;
 };
 
@@ -214,6 +217,9 @@ export function createCourseLearnerSnapshotCacheHelpers(deps: CourseLearnerSnaps
         availability,
         fileName: tdf.fileName,
         tags: tdf.tags,
+        contentLanguage: tdf.contentLanguage,
+        recommendedUiLocales: tdf.recommendedUiLocales,
+        translationStatus: tdf.translationStatus,
         currentStimuliSetId: tdf.currentStimuliSetId,
         ...progressProjection,
       };

@@ -4,6 +4,8 @@ import { Session } from 'meteor/session';
 import { Tracker } from 'meteor/tracker';
 import { clientConsole } from '../../lib/userSessionHelpers';
 import { finishLaunchLoading, markLaunchLoadingTiming, setLaunchLoadingMessage } from '../../lib/launchLoading';
+import { translatePlatformString } from '../../lib/interfaceI18n';
+import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 import { createBlazeMount } from './svelte/meteorIntegration';
 import './card.html';
 
@@ -26,7 +28,7 @@ type CardTemplateInstance = {
 Template.card.onRendered(function (this: CardTemplateInstance) {
   const template = this;
   template.isDestroyed = false;
-  setLaunchLoadingMessage('Loading content...');
+  setLaunchLoadingMessage(translatePlatformString(getActiveUiLocale(), 'common.loadingContent'));
   markLaunchLoadingTiming('cardRoute:entered');
 
   Tracker.afterFlush(() => {

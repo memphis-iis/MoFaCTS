@@ -56,6 +56,7 @@ export type CardLaunchOrchestrationDeps = {
   log: (level: number, message: string, details?: unknown) => void;
   routeInitializationFailure: () => void;
   setLaunchLoadingMessage: (message: string) => void;
+  loadingContentMessage: string;
   markLaunchLoadingTiming: (name: string, details?: Record<string, unknown>) => void;
   prepareRender: () => Promise<void>;
   resolveLaunchCompletion: () => SessionSurfaceLaunchCompletion | null;
@@ -94,7 +95,7 @@ export async function runCardLaunchOrchestration(
 ): Promise<CardLaunchRunResult> {
   let initResult: CardInitResult;
   try {
-    deps.setLaunchLoadingMessage('Loading content...');
+    deps.setLaunchLoadingMessage(deps.loadingContentMessage);
     deps.markLaunchLoadingTiming('initializeSvelteCard:start');
     initResult = await deps.initializeCard();
     deps.markLaunchLoadingTiming('initializeSvelteCard:complete', {

@@ -77,6 +77,7 @@ interface AnswerEvaluationContext extends ServiceRecord {
   };
   deliverySettings?: {
     caseSensitive?: boolean;
+    accentSensitive?: boolean;
   };
   tdfId?: unknown;
   sessionId?: unknown;
@@ -503,6 +504,7 @@ export async function evaluateAnswerService(context: AnswerEvaluationContext) {
   const currentAnswer = context.currentAnswer || '';
   const originalAnswer = context.originalAnswer || '';
   const caseSensitive = context.deliverySettings?.caseSensitive === true;
+  const accentSensitive = context.deliverySettings?.accentSensitive === true;
   const setspec = context.setspec || (context.buttonTrial
     ? undefined
     : Session.get('currentTdfFile')?.tdfs?.tutor?.setspec);
@@ -513,7 +515,7 @@ export async function evaluateAnswerService(context: AnswerEvaluationContext) {
     originalAnswer,
     '',
     setspec,
-    { caseSensitive }
+    { caseSensitive, accentSensitive }
   );
 
   return {

@@ -70,7 +70,7 @@
       <button type="button" class:active={commandActive('link')} on:click={() => runCommand('link', richTextLinkHref)}>{sparcText('sparc.link')}</button>
       <button type="button" on:click={() => runCommand('link', '')}>{sparcText('sparc.unlink')}</button>
       <input class="sparc-link-input" placeholder={sparcText('sparc.imageUrl')} bind:value={richTextImageSrc} aria-label={sparcText('sparc.imageUrl')} />
-      <input class="sparc-short-input" placeholder="Alt" bind:value={richTextImageAlt} aria-label={sparcText('sparc.imageAltText')} />
+      <input class="sparc-short-input" placeholder={sparcText('sparc.imageAltPlaceholder')} bind:value={richTextImageAlt} aria-label={sparcText('sparc.imageAltText')} />
       <button type="button" on:click={() => runCommand('image', { src: richTextImageSrc, alt: richTextImageAlt })}>{sparcText('sparc.image')}</button>
       <input class="sparc-link-input" placeholder={sparcText('sparc.embedUrl')} bind:value={richTextEmbedSrc} aria-label={sparcText('sparc.embedUrl')} />
       <button type="button" on:click={() => runCommand('embed', richTextEmbedSrc)}>{sparcText('sparc.embed')}</button>

@@ -7,10 +7,13 @@
   import { marked } from 'marked';
   import { createEventDispatcher, onDestroy, tick } from 'svelte';
   import { isExternalH5PDisplay } from '../../../../../common/lib/h5pDisplay';
+  import { getActiveUiLocale } from '../../../../lib/interfaceLocaleState';
+  import { translatePlatformString } from '../../../../lib/interfaceI18n';
   import { waitForBrowserPaint } from '../utils/paintTiming';
   import H5PFrame from './H5PFrame.svelte';
 
   const dispatch = createEventDispatcher();
+  const platformText = (key) => translatePlatformString(getActiveUiLocale(), key);
 
   /** @type {{ text?: string, clozeText?: string, imgSrc?: string, videoSrc?: string, audioSrc?: string, h5p?: object, attribution?: { creatorName?: string, sourceName?: string, sourceUrl?: string, licenseName?: string, licenseUrl?: string } }} */
   export let display = {};
@@ -595,8 +598,8 @@
               class="replay-button"
               on:click={handleReplay}
               disabled={!replayEnabled}
-              title="Replay Audio"
-              aria-label="Replay Audio"
+              title={platformText('stimulus.replayAudio')}
+              aria-label={platformText('stimulus.replayAudio')}
             >
               <i class="fa fa-volume-up"></i>
             </button>

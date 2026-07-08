@@ -2,9 +2,15 @@
   import {
     buildSparcAutoTutorProgressSnapshot,
   } from '../services/sparcAutoTutorProgress';
+  import { getActiveUiLocale } from '../../../../lib/interfaceLocaleState';
+  import { translatePlatformString } from '../../../../lib/interfaceI18n';
 
   export let display = null;
   export let runtimeNodeValues = {};
+
+  function platformText(key, values) {
+    return translatePlatformString(getActiveUiLocale(), key, values);
+  }
 
   function barWidth(value, total) {
     if (!Number.isFinite(total) || total <= 0) {
@@ -24,21 +30,27 @@
     return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
   }
 
+  function formatTurnCount(value) {
+    return value === 1
+      ? platformText('autoTutor.oneTurn')
+      : platformText('autoTutor.turnCount', { count: value });
+  }
+
   $: snapshot = buildSparcAutoTutorProgressSnapshot({ display, runtimeNodeValues });
 </script>
 
-<section class="sparc-auto-tutor-progress" aria-label="AutoTutor progress">
-  <div class="sparc-auto-tutor-progress-title">Progress</div>
+<section class="sparc-auto-tutor-progress" aria-label={platformText('autoTutor.progress')}>
+  <div class="sparc-auto-tutor-progress-title">{platformText('learningProgress.progress')}</div>
 
   <div class="sparc-auto-tutor-meter-row">
     <div class="sparc-auto-tutor-meter-copy">
-      <span>Expectations</span>
+      <span>{platformText('autoTutor.expectations')}</span>
       <strong>{formatProgressCount(snapshot.coveredExpectations)}/{snapshot.requiredExpectations}</strong>
     </div>
     <div
       class="sparc-auto-tutor-progress-track"
       role="meter"
-      aria-label="Covered expectations"
+      aria-label={platformText('autoTutor.coveredExpectations')}
       aria-valuemin="0"
       aria-valuemax={snapshot.requiredExpectations}
       aria-valuenow={snapshot.coveredExpectations}
@@ -57,13 +69,13 @@
 
   <div class="sparc-auto-tutor-meter-row">
     <div class="sparc-auto-tutor-meter-copy">
-      <span>Misconceptions</span>
+      <span>{platformText('autoTutor.misconceptions')}</span>
       <strong>{formatProgressCount(snapshot.misconceptionScore)}/{snapshot.totalMisconceptions}</strong>
     </div>
     <div
       class="sparc-auto-tutor-progress-track sparc-auto-tutor-progress-track-misconceptions"
       role="meter"
-      aria-label="Misconception score"
+      aria-label={platformText('autoTutor.misconceptionScore')}
       aria-valuemin="0"
       aria-valuemax={snapshot.totalMisconceptions}
       aria-valuenow={snapshot.misconceptionScore}
@@ -81,7 +93,7 @@
   </div>
 
   <div class="sparc-auto-tutor-turns">
-    {snapshot.turnCount === 1 ? '1 turn' : `${snapshot.turnCount} turns`}
+    {formatTurnCount(snapshot.turnCount)}
   </div>
 </section>
 

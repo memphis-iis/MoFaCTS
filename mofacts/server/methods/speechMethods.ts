@@ -65,8 +65,8 @@ export function createSpeechMethods(deps: SpeechMethodsDeps) {
       message: string,
       audioPromptSpeakingRate: number,
       audioVolume: number,
-      selectedVoice = 'en-US-Standard-A',
-      languageCode = 'en-US'
+      selectedVoice = '',
+      languageCode = ''
     ) {
       try {
         deps.serverConsole('[TTS] makeGoogleTTSApiCall called:', {
@@ -103,7 +103,10 @@ export function createSpeechMethods(deps: SpeechMethodsDeps) {
           throw new Meteor.Error('no-api-key', 'No TTS API key available');
         }
 
-        const normalizedLanguageCode = String(languageCode || '').trim() || 'en-US';
+        const normalizedLanguageCode = String(languageCode || '').trim();
+        if (!normalizedLanguageCode) {
+          throw new Meteor.Error('missing-tts-language', 'Text-to-speech language code is required');
+        }
         const normalizedVoice = String(selectedVoice || '').trim();
         const includeVoiceName = normalizedVoice.toLowerCase().startsWith(`${normalizedLanguageCode.toLowerCase()}-`);
         const voiceConfig = includeVoiceName

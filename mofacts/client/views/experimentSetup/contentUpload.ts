@@ -63,6 +63,34 @@ function uploadErrorText(error: any): string {
   return String(error?.reason || error?.message || error || '');
 }
 
+function translationStatusText(status: string): string {
+  if (status === 'author-provided') return contentText('manualCreator.translationStatusAuthorProvided');
+  if (status === 'not-translated') return contentText('manualCreator.translationStatusNotTranslated');
+  if (status === 'draft') return contentText('manualCreator.translationStatusDraft');
+  if (status === 'reviewed') return contentText('manualCreator.translationStatusReviewed');
+  return status;
+}
+
+function buildLanguageMetadataRows(summary: any): Array<{ label: string; value: string }> {
+  const rows: Array<{ label: string; value: string }> = [];
+  const contentLanguage = String(summary?.contentLanguage || '').trim();
+  const recommendedUiLocales = Array.isArray(summary?.recommendedUiLocales)
+    ? summary.recommendedUiLocales.map((locale: unknown) => String(locale || '').trim()).filter(Boolean)
+    : [];
+  const translationStatus = String(summary?.translationStatus || '').trim();
+
+  if (contentLanguage) {
+    rows.push({ label: contentText('manualCreator.contentLanguage'), value: contentLanguage });
+  }
+  if (recommendedUiLocales.length > 0) {
+    rows.push({ label: contentText('manualCreator.recommendedUiLocales'), value: recommendedUiLocales.join(', ') });
+  }
+  if (translationStatus) {
+    rows.push({ label: contentText('manualCreator.translationStatus'), value: translationStatusText(translationStatus) });
+  }
+  return rows;
+}
+
 function uploadMessageIcon(level: UploadMessageLevel) {
   if (level === 'success') return 'fa-check-circle';
   if (level === 'warning') return 'fa-exclamation-triangle';
@@ -435,6 +463,7 @@ Template.contentUpload.helpers({
             thisTdf.stimFileInfo = [];
             thisTdf.stimFilesCount = null;
             thisTdf.fileName = summary?.fileName || 'unknown.xml';
+            thisTdf.languageMetadataRows = buildLanguageMetadataRows(summary);
 
             thisTdf.isOwnTdf = summary?.ownerId === Meteor.userId();
             thisTdf.isPublic = summary?.isPublic ?? false;

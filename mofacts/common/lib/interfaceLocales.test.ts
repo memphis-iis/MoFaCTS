@@ -1,9 +1,13 @@
 import { expect } from 'chai';
+import { GOOGLE_STT_LANGUAGE_CODES, GOOGLE_TTS_LANGUAGE_CODES } from '../fieldRegistrySectionCore';
 import {
   TARGET_UI_LOCALES,
   canonicalizeUiLocale,
+  getPlatformLocaleReviewStatus,
+  getPrimarySpeechRecognitionLanguageCode,
   getPrimaryTtsLanguageCode,
   getTextDirectionForLocale,
+  isPlatformLocaleProductionEnabled,
   resolvePlatformPromptTtsLanguage,
 } from './interfaceLocales';
 
@@ -34,6 +38,32 @@ describe('interface locale source of truth', function() {
     expect(getPrimaryTtsLanguageCode('pt')).to.equal('pt-BR');
     expect(getPrimaryTtsLanguageCode('id')).to.equal('id-ID');
     expect(getPrimaryTtsLanguageCode('ur')).to.equal('ur-IN');
+  });
+
+  it('keeps every primary TTS code in the provider language-code registry', function() {
+    const providerCodes = new Set<string>(GOOGLE_TTS_LANGUAGE_CODES);
+
+    for (const locale of TARGET_UI_LOCALES) {
+      expect(providerCodes.has(getPrimaryTtsLanguageCode(locale)), locale).to.equal(true);
+    }
+  });
+
+  it('keeps every primary speech-recognition code in the provider language-code registry', function() {
+    const providerCodes = new Set<string>(GOOGLE_STT_LANGUAGE_CODES);
+
+    for (const locale of TARGET_UI_LOCALES) {
+      expect(providerCodes.has(getPrimarySpeechRecognitionLanguageCode(locale)), locale).to.equal(true);
+    }
+  });
+
+  it('tracks locale review and production enablement status explicitly', function() {
+    expect(getPlatformLocaleReviewStatus('en')).to.equal('enabled');
+    expect(isPlatformLocaleProductionEnabled('en')).to.equal(true);
+
+    for (const locale of TARGET_UI_LOCALES.filter((value) => value !== 'en')) {
+      expect(getPlatformLocaleReviewStatus(locale)).to.equal('draft');
+      expect(isPlatformLocaleProductionEnabled(locale)).to.equal(false);
+    }
   });
 
   it('canonicalizes only explicit locale aliases', function() {
@@ -85,4 +115,3 @@ describe('interface locale source of truth', function() {
     });
   });
 });
-

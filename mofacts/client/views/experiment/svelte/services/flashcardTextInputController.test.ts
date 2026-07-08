@@ -40,6 +40,30 @@ function createHarness() {
 }
 
 describe('card text input controller', function() {
+  it('preserves learner input text across the initial target language scripts', function() {
+    const cases = [
+      'heart',
+      '中文',
+      'हृदय',
+      'corazón',
+      'قلب',
+      'élève',
+      'বাংলা',
+      'ação',
+      'bahasa',
+      'دل',
+    ];
+
+    for (const value of cases) {
+      const harness = createHarness();
+
+      harness.controller.handleInput({ value });
+
+      expect(harness.textAnswer()).to.equal(value);
+      expect(harness.context.userAnswer).to.equal(value);
+    }
+  });
+
   it('updates local and context answer from input detail', function() {
     const harness = createHarness();
 

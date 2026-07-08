@@ -7,6 +7,8 @@ import { loadLaunchReadyTdf } from './launchReadyTdf';
 import { clientConsole } from './clientLogger';
 import { resolveCardLaunchProgress, type CardLaunchProgress } from './cardEntryIntent';
 import { resolveSpeechIgnoreOutOfGrammarResponses } from './speechRecognitionConfig';
+import { translatePlatformString } from './interfaceI18n';
+import { getActiveUiLocale } from './interfaceLocaleState';
 import type { CourseAssignmentHistoryContext } from '../../common/courseAssignments.contracts';
 
 type LessonLaunchTimingLogger = (eventName: string, payload?: Record<string, unknown>) => void;
@@ -48,7 +50,7 @@ export async function prepareLessonLaunchContext(params: PrepareLessonLaunchPara
   }, `${source}.start`);
   clearConditionResolutionContext(`${source}.start`);
 
-  setLaunchLoadingMessage?.('Loading lesson...');
+  setLaunchLoadingMessage?.(translatePlatformString(getActiveUiLocale(), 'common.loadingContent'));
   markLaunchLoadingTiming?.('loadLaunchReadyTdf:start', { currentTdfId });
   const launchTdf = await loadLaunchReadyTdf(currentTdfId, {
     allowConditionRoot: true,
@@ -71,7 +73,7 @@ export async function prepareLessonLaunchContext(params: PrepareLessonLaunchPara
     ?? resolveSpeechIgnoreOutOfGrammarResponses(setspec);
   const speechOutOfGrammarFeedback = params.speechOutOfGrammarFeedback
     ?? setspec.speechOutOfGrammarFeedback
-    ?? 'Response not in answer set';
+    ?? translatePlatformString(getActiveUiLocale(), 'speech.outOfGrammarFeedback');
 
   const hasConditionPool = Array.isArray(content?.tdfs?.tutor?.setspec?.condition)
     && content.tdfs.tutor.setspec.condition.length > 0;
@@ -90,7 +92,7 @@ export async function prepareLessonLaunchContext(params: PrepareLessonLaunchPara
   Session.set('speechOutOfGrammarFeedback', speechOutOfGrammarFeedback);
 
   const unitCount = Array.isArray(content?.tdfs?.tutor?.unit) ? content.tdfs.tutor.unit.length : 0;
-  setLaunchLoadingMessage?.('Restoring progress...');
+  setLaunchLoadingMessage?.(translatePlatformString(getActiveUiLocale(), 'dashboard.restoringProgress'));
   markLaunchLoadingTiming?.('getExperimentState:start', { source });
   const persistedExperimentState = await getExperimentState();
   markLaunchLoadingTiming?.('getExperimentState:complete', { source });

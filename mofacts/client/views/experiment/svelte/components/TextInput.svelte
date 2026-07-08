@@ -4,6 +4,7 @@
    * Text entry field that submits on Enter.
    */
   import { onMount, createEventDispatcher } from 'svelte';
+  import { shouldSubmitTextInputOnKeydown } from '../services/textInputComposition';
 
   const dispatch = createEventDispatcher();
 
@@ -39,7 +40,7 @@
   }
 
   function handleKeydown(event) {
-    if (event.key === 'Enter' && enabled) {
+    if (shouldSubmitTextInputOnKeydown(event) && enabled) {
       handleSubmit();
     } else if (enabled) {
       dispatch('activity', { timestamp: Date.now() });
@@ -54,7 +55,10 @@
   function handleSubmit() {
     if (!enabled) return;
 
-    const answer = typeof value === 'string' ? value.trim() : '';
+    const rawAnswer = inputElement && typeof inputElement.value === 'string'
+      ? inputElement.value
+      : value;
+    const answer = typeof rawAnswer === 'string' ? rawAnswer.trim() : '';
     dispatch('submit', {
       answer,
       timestamp: Date.now()
@@ -62,7 +66,10 @@
   }
 
   function handleInput() {
-    dispatch('input', { value });
+    const rawValue = inputElement && typeof inputElement.value === 'string'
+      ? inputElement.value
+      : value;
+    dispatch('input', { value: rawValue });
     if (enabled) {
       dispatch('activity', { timestamp: Date.now() });
     }

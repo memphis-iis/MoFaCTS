@@ -110,10 +110,10 @@
   export let correctAnswerImageSrc = '';
 
   /** @type {string} Correct outcome label */
-  export let correctLabelText = 'Correct.';
+  export let correctLabelText = '';
 
   /** @type {string} Incorrect outcome label */
-  export let incorrectLabelText = 'Incorrect.';
+  export let incorrectLabelText = '';
 
   /** @type {string} Feedback message from answer evaluation */
   export let feedbackMessage = '';
@@ -399,6 +399,7 @@
       <div class="interaction-container">
         <TrialInteractionPane
           bind:fadeElement={interactionFadeElement}
+          bind:userAnswer
           {interactionVisible}
           {mountedFeedbackVisible}
           {mountedResponseVisible}
@@ -406,7 +407,6 @@
           {inputEnabled}
           {isForceCorrecting}
           {forceCorrectPrompt}
-          {userAnswer}
           {inputPlaceholder}
           {inputLanguage}
           {inputTextDirection}

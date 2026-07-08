@@ -113,6 +113,9 @@ export interface PracticeDashboardSnapshotLesson {
   displayName: string;
   fileName?: string;
   tags: string[];
+  contentLanguage?: string;
+  recommendedUiLocales?: string[];
+  translationStatus?: string;
   availability: 'available';
   currentStimuliSetId: string | number | null;
   learnerConfig: LearnerTdfConfig | null;
