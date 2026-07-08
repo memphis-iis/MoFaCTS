@@ -53,6 +53,10 @@ export interface LearnerCourseSnapshotCourse {
   teacherUserId: string;
   teacherDisplayName: string;
   membership: 'assigned' | 'public' | 'teacher' | 'admin';
+  joinableSections: Array<{
+    sectionId: string;
+    sectionName: string;
+  }>;
   assignments: LearnerCourseSnapshotAssignment[];
 }
 

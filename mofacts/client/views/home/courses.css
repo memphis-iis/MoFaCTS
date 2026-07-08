@@ -65,6 +65,27 @@
   font-weight: 700;
 }
 
+.course-join-control {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.course-join-control .form-select {
+  min-width: 118px;
+  font-size: calc(var(--app-font-size-base) * 0.75);
+}
+
+.course-join-control .btn {
+  width: 100%;
+  min-width: 76px;
+  padding-inline: calc(9px * var(--app-density-scale));
+}
+
+.course-join-control--card {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
 .course-tree-toggle,
 .course-tree-card-toggle {
   width: 100%;

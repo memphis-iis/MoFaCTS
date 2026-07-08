@@ -115,6 +115,7 @@ export function buildCourseTreeRows(
       teacherUserId: course.teacherUserId,
       teacherDisplayName: course.teacherDisplayName,
       membership: course.membership,
+      joinableSections: course.joinableSections || [],
       expanded: Boolean(query) || options.expandedCourseIds.has(course.courseId),
       assignmentCount: course.assignments.length,
       visibleAssignmentCount: visibleAssignments.length,

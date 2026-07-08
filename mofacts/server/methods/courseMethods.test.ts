@@ -13,8 +13,12 @@ function cursor(rows: any[] = []) {
   };
 }
 
-function matchesSelector(row: any, selector: Record<string, any> = {}) {
+function matchesSelector(row: any, selector: Record<string, any> = {}): boolean {
+  if (Array.isArray(selector.$or)) {
+    return selector.$or.some((branch: Record<string, any>) => matchesSelector(row, branch));
+  }
   return Object.entries(selector).every(([key, expected]) => {
+    if (key === '$or') return true;
     const actual = row[key];
     if (expected && typeof expected === 'object' && !Array.isArray(expected)) {
       if ('$in' in expected) {
@@ -43,13 +47,18 @@ function createMemoryCollection(initialRows: any[] = []) {
       rows.push({ _id: id, ...document });
       return id;
     },
-    async updateAsync(selector: Record<string, any>, modifier: any) {
+    async updateAsync(selector: Record<string, any>, modifier: any, options: Record<string, any> = {}) {
       let count = 0;
       for (const row of rows) {
         if (!matchesSelector(row, selector)) continue;
         if (modifier?.$set) Object.assign(row, modifier.$set);
         if (!modifier?.$set) Object.assign(row, modifier);
         count += 1;
+      }
+      if (count === 0 && options.upsert) {
+        const document = { ...selector, ...(modifier?.$set || modifier || {}) };
+        rows.push(document);
+        count = 1;
       }
       return count;
     },
@@ -326,5 +335,90 @@ describe('course assignment metadata methods', function() {
     expect(sentEmails[0].subject).to.contain('Course One');
     expect(sentEmails[0].text).to.contain('https://mofacts.example.test/courses');
     expect(sentEmails[0].text).to.contain('choose Courses from the Learn menu');
+  });
+
+  it('shows public courses as joinable but unavailable until section membership exists', async function() {
+    const sectionUserMap = createMemoryCollection();
+    const courseSnapshotCache = createMemoryCollection();
+    const methods = createCourseMethods(createDeps({
+      Courses: createMemoryCollection([
+        { _id: 'course-public', courseName: 'Public Course', teacherUserId: 'teacher-1', semester: 'current', visibility: 'public', timezone: 'America/Chicago' },
+      ]),
+      Sections: createMemoryCollection([
+        { _id: 'section-a', courseId: 'course-public', sectionName: 'A' },
+        { _id: 'section-b', courseId: 'course-public', sectionName: 'B' },
+      ]),
+      SectionUserMap: sectionUserMap,
+      Assignments: createMemoryCollection([
+        { _id: 'assignment-1', courseId: 'course-public', TDFId: 'tdf-1', order: 0, required: true },
+      ]),
+      Tdfs: createMemoryCollection([
+        { _id: 'tdf-1', ownerId: 'teacher-1', stimuliSetId: 'stim-1', content: { fileName: 'lesson.json', tdfs: { tutor: { setspec: { lessonname: 'Lesson One' } } } } },
+      ]),
+      usersCollection: createMemoryCollection([
+        { _id: 'teacher-1', username: 'Teacher One', emails: [{ address: 'teacher@example.test' }] },
+        { _id: 'student-user', username: 'Student One', emails: [{ address: 'student@example.test' }], loginParams: {} },
+      ]),
+      CourseLearnerSnapshotCache: courseSnapshotCache,
+      UserDashboardCache: createMemoryCollection([{ userId: 'student-user', tdfStats: {} }]),
+    }));
+
+    const beforeJoin = await methods.getLearnerCoursesSnapshot.call({ userId: 'student-user' });
+    expect(beforeJoin.assignedCourses).to.deep.equal([]);
+    expect(beforeJoin.publicCourses).to.have.length(1);
+    const publicCourse = beforeJoin.publicCourses[0];
+    if (!publicCourse) throw new Error('Expected public course before join');
+    expect(publicCourse.membership).to.equal('public');
+    expect(publicCourse.joinableSections).to.deep.equal([
+      { sectionId: 'section-a', sectionName: 'A' },
+      { sectionId: 'section-b', sectionName: 'B' },
+    ]);
+    expect(publicCourse.assignments[0]?.availability).to.equal('unavailable');
+
+    await methods.addUserToTeachersClass.call({ userId: 'student-user' }, 'teacher-1', 'section-a');
+    const afterJoin = await methods.getLearnerCoursesSnapshot.call({ userId: 'student-user' });
+    expect(afterJoin.publicCourses).to.deep.equal([]);
+    expect(afterJoin.assignedCourses).to.have.length(1);
+    const assignedCourse = afterJoin.assignedCourses[0];
+    if (!assignedCourse) throw new Error('Expected assigned course after join');
+    expect(assignedCourse.membership).to.equal('assigned');
+    expect(assignedCourse.joinableSections).to.deep.equal([]);
+    expect(assignedCourse.assignments[0]?.availability).to.equal('available');
+  });
+
+  it('lets a teacher see and launch their private course from the learner course snapshot', async function() {
+    const methods = createCourseMethods(createDeps({
+      Courses: createMemoryCollection([
+        { _id: 'course-private', courseName: 'Private Course', teacherUserId: 'teacher-user', semester: 'current', visibility: 'private', timezone: 'America/Chicago' },
+      ]),
+      Sections: createMemoryCollection([
+        { _id: 'section-private', courseId: 'course-private', sectionName: '001' },
+      ]),
+      SectionUserMap: createMemoryCollection(),
+      Assignments: createMemoryCollection([
+        { _id: 'assignment-1', courseId: 'course-private', TDFId: 'tdf-1', order: 0, required: true },
+      ]),
+      Tdfs: createMemoryCollection([
+        { _id: 'tdf-1', ownerId: 'teacher-user', stimuliSetId: 'stim-1', content: { fileName: 'lesson.json', tdfs: { tutor: { setspec: { lessonname: 'Lesson One' } } } } },
+      ]),
+      usersCollection: createMemoryCollection([
+        { _id: 'teacher-user', username: 'Teacher One', emails: [{ address: 'teacher@example.test' }] },
+      ]),
+      CourseLearnerSnapshotCache: createMemoryCollection(),
+      UserDashboardCache: createMemoryCollection([{ userId: 'teacher-user', tdfStats: {} }]),
+      getMethodAuthorizationDeps: () => ({
+        async userIsInRoleAsync(userId: string, roles: string[]) {
+          return userId === 'teacher-user' && roles.includes('teacher');
+        },
+      }),
+    }));
+
+    const snapshot = await methods.getLearnerCoursesSnapshot.call({ userId: 'teacher-user' });
+    expect(snapshot.publicCourses).to.deep.equal([]);
+    expect(snapshot.assignedCourses).to.have.length(1);
+    const teacherCourse = snapshot.assignedCourses[0];
+    if (!teacherCourse) throw new Error('Expected teacher course');
+    expect(teacherCourse.membership).to.equal('teacher');
+    expect(teacherCourse.assignments[0]?.availability).to.equal('available');
   });
 });

@@ -53,6 +53,7 @@ function snapshot(): LearnerCoursesSnapshot {
         teacherUserId: 'teacher-1',
         teacherDisplayName: 'Dr. Bee',
         membership: 'assigned',
+        joinableSections: [],
         assignments: [
           assignment({ assignmentId: 'b-2', courseId: 'course-b', title: 'Cells', order: 2, dueAt: '2026-07-10T00:00:00.000Z' }),
           assignment({ assignmentId: 'b-1', courseId: 'course-b', title: 'Genetics', order: 1, dueAt: '2026-07-02T00:00:00.000Z', lastPracticedTimestamp: 30 }),
@@ -68,6 +69,7 @@ function snapshot(): LearnerCoursesSnapshot {
         teacherUserId: 'teacher-2',
         teacherDisplayName: 'Dr. Al',
         membership: 'assigned',
+        joinableSections: [],
         assignments: [
           assignment({ assignmentId: 'a-1', courseId: 'course-a', title: 'Linear Equations', order: 1, dueAt: '2026-07-01T00:00:00.000Z', lastPracticedTimestamp: 10 }),
         ],

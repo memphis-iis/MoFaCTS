@@ -1,5 +1,6 @@
 import './courses.html';
 import './courses.css';
+import { Meteor } from 'meteor/meteor';
 import { ReactiveVar } from 'meteor/reactive-var';
 import { Session } from 'meteor/session';
 import { Template } from 'meteor/templating';
@@ -24,6 +25,8 @@ import {
 } from './courseTree';
 
 const EXPANDED_COURSES_SESSION_KEY = 'coursesExpandedCourseIds';
+const JOINING_COURSE_SESSION_KEY = 'coursesJoiningCourseId';
+const JOIN_SECTION_SELECTIONS_SESSION_KEY = 'coursesJoinSectionSelections';
 
 type CoursesTemplateInstance = Blaze.TemplateInstance & {
   snapshot: ReactiveVar<LearnerCoursesSnapshot | null>;
@@ -92,6 +95,20 @@ function setExpandedCourseIds(expandedIds: Set<string>) {
   Session.set(EXPANDED_COURSES_SESSION_KEY, Array.from(expandedIds));
 }
 
+function getJoinSectionSelections(): Record<string, string> {
+  const stored = Session.get(JOIN_SECTION_SELECTIONS_SESSION_KEY);
+  return stored && typeof stored === 'object' && !Array.isArray(stored)
+    ? stored as Record<string, string>
+    : {};
+}
+
+function setJoinSectionSelection(courseId: string, sectionId: string) {
+  Session.set(JOIN_SECTION_SELECTIONS_SESSION_KEY, {
+    ...getJoinSectionSelections(),
+    [courseId]: sectionId,
+  });
+}
+
 function getCourseRows(snapshot: LearnerCoursesSnapshot | null, section: CourseTreeSection, instance: CoursesTemplateInstance) {
   return buildCourseTreeRows(snapshot, section, {
     query: instance.search.get(),
@@ -106,6 +123,12 @@ function currentCourseFromAssignment(instance: CoursesTemplateInstance, assignme
     .find((course) => course.courseId === assignment.courseId) || null;
 }
 
+async function reloadCoursesSnapshot(instance: CoursesTemplateInstance) {
+  const snapshot = await meteorCallAsync('getLearnerCoursesSnapshot') as LearnerCoursesSnapshot;
+  instance.snapshot.set(snapshot);
+  return snapshot;
+}
+
 Template.courses.onCreated(function(this: CoursesTemplateInstance) {
   this.snapshot = new ReactiveVar(null);
   this.loading = new ReactiveVar(true);
@@ -115,14 +138,17 @@ Template.courses.onCreated(function(this: CoursesTemplateInstance) {
   if (!Array.isArray(Session.get(EXPANDED_COURSES_SESSION_KEY))) {
     Session.set(EXPANDED_COURSES_SESSION_KEY, []);
   }
+  if (!Session.get(JOIN_SECTION_SELECTIONS_SESSION_KEY)) {
+    Session.set(JOIN_SECTION_SELECTIONS_SESSION_KEY, {});
+  }
+  Session.set(JOINING_COURSE_SESSION_KEY, null);
 });
 
 Template.courses.onRendered(async function(this: CoursesTemplateInstance) {
   this.loading.set(true);
   this.error.set(null);
   try {
-    const snapshot = await meteorCallAsync('getLearnerCoursesSnapshot') as LearnerCoursesSnapshot;
-    this.snapshot.set(snapshot);
+    await reloadCoursesSnapshot(this);
   } catch (error: any) {
     clientConsole(1, '[Courses] Failed to load learner course snapshot:', error);
     this.error.set(error?.reason || error?.message || String(error));
@@ -245,8 +271,43 @@ const courseAssignmentDisplayHelpers = {
   },
 };
 
-Template.courseTreeCourseRow.helpers({
+const courseTreeCourseRowHelpers = {
   ...courseAssignmentDisplayHelpers,
+  isJoinableCourse(this: CourseTreeCourseRow) {
+    return this.membership === 'public';
+  },
+  joinableSectionCount(this: CourseTreeCourseRow) {
+    return Array.isArray(this.joinableSections) ? this.joinableSections.length : 0;
+  },
+  hasMultipleJoinableSections(this: CourseTreeCourseRow) {
+    return Array.isArray(this.joinableSections) && this.joinableSections.length > 1;
+  },
+  singleJoinableSectionId(this: CourseTreeCourseRow) {
+    if (!Array.isArray(this.joinableSections) || this.joinableSections.length !== 1) return '';
+    const [section] = this.joinableSections;
+    return section?.sectionId || '';
+  },
+  selectedJoinSectionId(this: CourseTreeCourseRow) {
+    return getJoinSectionSelections()[this.courseId] || '';
+  },
+  isJoiningCourse(this: CourseTreeCourseRow) {
+    return Session.get(JOINING_COURSE_SESSION_KEY) === this.courseId;
+  },
+  joinLabel(this: CourseTreeCourseRow) {
+    return Session.get(JOINING_COURSE_SESSION_KEY) === this.courseId ? courseText('courses.joining') : courseText('courses.join');
+  },
+  joinDisabled(this: CourseTreeCourseRow) {
+    const isJoining = Session.get(JOINING_COURSE_SESSION_KEY) === this.courseId;
+    if (isJoining) return true;
+    const sections = Array.isArray(this.joinableSections) ? this.joinableSections : [];
+    if (sections.length === 0) return true;
+    if (sections.length > 1 && !getJoinSectionSelections()[this.courseId]) return true;
+    return false;
+  },
+};
+
+Template.courseTreeCourseRow.helpers({
+  ...courseTreeCourseRowHelpers,
 });
 Template.courseAssignmentTableRow.helpers(courseAssignmentDisplayHelpers);
 Template.courseAssignmentCard.helpers(courseAssignmentDisplayHelpers);
@@ -258,6 +319,12 @@ Template.courses.events({
   },
   'change #coursesSort': function(event: Event, instance: CoursesTemplateInstance) {
     instance.sort.set(normalizeCourseTreeSort(String((event.currentTarget as HTMLSelectElement).value || 'course')));
+  },
+  'change .join-course-section': function(event: Event) {
+    const select = event.currentTarget as HTMLSelectElement;
+    const courseId = select.dataset.courseid;
+    if (!courseId) return;
+    setJoinSectionSelection(courseId, String(select.value || ''));
   },
   'click .toggle-course-tree': function(event: Event) {
     const target = event.currentTarget as HTMLElement;
@@ -306,6 +373,58 @@ Template.courses.events({
     } catch (error: any) {
       setCourseAssignmentLaunchContext(null);
       instance.error.set(error?.reason || error?.message || String(error));
+    }
+  },
+  'click .join-public-course': async function(event: Event, instance: CoursesTemplateInstance) {
+    const course = this as CourseTreeCourseRow;
+    if (course.membership !== 'public') return;
+    const button = event.currentTarget as HTMLElement;
+    const sectionId = String(button.dataset.sectionid || getJoinSectionSelections()[course.courseId] || '');
+    if (!sectionId) {
+      instance.error.set(courseText('courses.selectSectionToJoin'));
+      return;
+    }
+    const section = (course.joinableSections || []).find((row) => row.sectionId === sectionId);
+    if (!section) {
+      instance.error.set(courseText('courses.selectSectionToJoin'));
+      return;
+    }
+    Session.set(JOINING_COURSE_SESSION_KEY, course.courseId);
+    instance.error.set(null);
+    try {
+      await meteorCallAsync('addUserToTeachersClass', course.teacherUserId, sectionId);
+      const assignedTdfIds = await meteorCallAsync('getTdfsAssignedToStudent', Meteor.userId(), sectionId);
+      const teacher = {
+        _id: course.teacherUserId,
+        displayIdentifier: course.teacherDisplayName,
+      };
+      const curClass = {
+        sectionId,
+        sectionName: section.sectionName,
+        courseId: course.courseId,
+        courseName: course.courseName,
+        teacherUserId: course.teacherUserId,
+        visibility: course.visibility,
+        timezone: course.timezone,
+      };
+      await meteorCallAsync(
+        'setUserLoginData',
+        'learn-course-join',
+        Session.get('loginMode') || 'password',
+        teacher,
+        curClass,
+        assignedTdfIds,
+      );
+      Session.set('curTeacher', teacher);
+      Session.set('curClass', curClass);
+      const expandedIds = getExpandedCourseIds();
+      expandedIds.add(course.courseId);
+      setExpandedCourseIds(expandedIds);
+      await reloadCoursesSnapshot(instance);
+    } catch (error: any) {
+      instance.error.set(error?.reason || error?.message || String(error));
+    } finally {
+      Session.set(JOINING_COURSE_SESSION_KEY, null);
     }
   },
 });

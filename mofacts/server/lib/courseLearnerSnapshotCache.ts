@@ -206,6 +206,27 @@ export function createCourseLearnerSnapshotCacheHelpers(deps: CourseLearnerSnaps
         { fields: { _id: 1, courseId: 1, TDFId: 1, order: 1, releaseAt: 1, dueAt: 1, required: 1, createdAt: 1, updatedAt: 1 } }
       ).fetchAsync()
       : [];
+    const visibleSections = courseIds.length > 0
+      ? await deps.Sections.find(
+        { courseId: { $in: courseIds } },
+        { fields: { _id: 1, courseId: 1, sectionName: 1 } },
+      ).fetchAsync()
+      : [];
+    const sectionsByCourseId = new Map<string, Array<{ sectionId: string; sectionName: string }>>();
+    for (const section of visibleSections) {
+      const courseId = normalizeOptionalString(section?.courseId);
+      const sectionId = normalizeOptionalString(section?._id);
+      if (!courseId || !sectionId) continue;
+      const list = sectionsByCourseId.get(courseId) || [];
+      list.push({
+        sectionId,
+        sectionName: normalizeOptionalString(section?.sectionName) || sectionId,
+      });
+      sectionsByCourseId.set(courseId, list);
+    }
+    for (const [courseId, sections] of sectionsByCourseId.entries()) {
+      sectionsByCourseId.set(courseId, sections.sort((a, b) => a.sectionName.localeCompare(b.sectionName)));
+    }
     const tdfSummaries = await deps.getTdfSummariesByIds(assignmentRows.map((row: any) => String(row?.TDFId || '')).filter(Boolean));
     const titleById = new Map(Array.from(tdfSummaries.entries()).map(([tdfId, summary]) => [tdfId, summary.displayName]));
     const dashboardCache = await deps.UserDashboardCache.findOneAsync({ userId });
@@ -221,8 +242,7 @@ export function createCourseLearnerSnapshotCacheHelpers(deps: CourseLearnerSnaps
       const releaseAt = summary.releaseAt;
       const course = visibleCourseById.get(summary.courseId);
       const ordinaryLearner = !roleFlags.admin && String(course?.teacherUserId || '') !== userId;
-      const isPublicCourse = deps.normalizeCourseVisibility(course?.visibility) === 'public';
-      const canLaunchCourseAssignment = isPublicCourse || enrolledCourseIdSet.has(summary.courseId);
+      const canLaunchCourseAssignment = enrolledCourseIdSet.has(summary.courseId) || !ordinaryLearner;
       const availability: LearnerCourseSnapshotAssignment['availability'] = !canLaunchCourseAssignment
         ? 'unavailable'
         : releaseAt && releaseAt.getTime() > now.getTime() && ordinaryLearner ? 'scheduled' : 'available';
@@ -254,6 +274,9 @@ export function createCourseLearnerSnapshotCacheHelpers(deps: CourseLearnerSnaps
       teacherUserId: String(course.teacherUserId || ''),
       teacherDisplayName: teacherById.get(String(course.teacherUserId || '')) || String(course.teacherUserId || ''),
       membership,
+      joinableSections: membership === 'public'
+        ? sectionsByCourseId.get(String(course._id)) || []
+        : [],
       assignments: (assignmentsByCourseId.get(String(course._id)) || [])
         .sort((a, b) => a.order - b.order || a.title.localeCompare(b.title)),
     });

@@ -148,7 +148,29 @@
       <span class="learning-dashboard-cell__value course-tree-assignment-count">{{assignmentCountLabel}} <span class="course-assignment-timezone">{{timezoneLabel}}</span></span>
     </td>
     <td class="learning-dashboard-cell learning-dashboard-cell--action" data-label="{{t 'courses.action'}}">
-      <span class="learning-dashboard-cell__value course-tree-parent-action">-</span>
+      <div class="learning-dashboard-cell__value course-tree-parent-action">
+        {{#if isJoinableCourse}}
+          {{#if hasMultipleJoinableSections}}
+            <div class="course-join-control">
+              <select class="form-select form-select-sm join-course-section" data-courseid="{{courseId}}" aria-label="{{t 'courses.selectSection'}}">
+                <option value="">{{t 'courses.selectSection'}}</option>
+                {{#each joinableSections}}
+                  <option value="{{sectionId}}">{{sectionName}}</option>
+                {{/each}}
+              </select>
+              <button type="button" class="btn btn-sm btn-success join-public-course" data-courseid="{{courseId}}" disabled="{{#if joinDisabled}}disabled{{/if}}">
+                {{joinLabel}}
+              </button>
+            </div>
+          {{else}}
+            <button type="button" class="btn btn-sm btn-success join-public-course" data-courseid="{{courseId}}" data-sectionid="{{singleJoinableSectionId}}" disabled="{{#if joinDisabled}}disabled{{/if}}">
+              {{joinLabel}}
+            </button>
+          {{/if}}
+        {{else}}
+          <span>-</span>
+        {{/if}}
+      </div>
     </td>
     <td class="learning-dashboard-cell course-assignment-cell--status" data-label="{{t 'courses.status'}}">
       <span class="learning-dashboard-cell__value">-</span>
@@ -258,6 +280,25 @@
       <span class="course-assignment-card-meta">{{teacherDisplayName}}</span>
       <span class="course-assignment-card-meta">{{assignmentCountLabel}} · {{timezoneLabel}}</span>
     </button>
+    {{#if isJoinableCourse}}
+      <div class="course-join-control course-join-control--card">
+        {{#if hasMultipleJoinableSections}}
+          <select class="form-select form-select-sm join-course-section" data-courseid="{{courseId}}" aria-label="{{t 'courses.selectSection'}}">
+            <option value="">{{t 'courses.selectSection'}}</option>
+            {{#each joinableSections}}
+              <option value="{{sectionId}}">{{sectionName}}</option>
+            {{/each}}
+          </select>
+          <button type="button" class="btn btn-sm btn-success join-public-course" data-courseid="{{courseId}}" disabled="{{#if joinDisabled}}disabled{{/if}}">
+            {{joinLabel}}
+          </button>
+        {{else}}
+          <button type="button" class="btn btn-sm btn-success join-public-course" data-courseid="{{courseId}}" data-sectionid="{{singleJoinableSectionId}}" disabled="{{#if joinDisabled}}disabled{{/if}}">
+            {{joinLabel}}
+          </button>
+        {{/if}}
+      </div>
+    {{/if}}
     {{#if expanded}}
       <div id="{{rowId}}-assignments" class="course-assignment-card-children">
         {{#each assignments}}

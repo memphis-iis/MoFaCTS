@@ -82,7 +82,7 @@ Rules:
 - `timezone` is required for new courses. Existing courses receive an explicit timezone value during migration, and the migration report must list the value applied.
 - Teachers can edit visibility, begin date, end date, and timezone for their own courses.
 - Admins can edit those fields for any course.
-- Public courses are discoverable by every signed-in user, including teachers and admins.
+- Public courses are discoverable by every signed-in user, including teachers and admins, but ordinary learners must join a section before launching course assignments from the Courses page.
 
 ### Assignment Fields
 
@@ -538,7 +538,7 @@ Design and test the v1 implementation against these approximate upper bounds:
 - Up to 250 assignments in one course.
 - Up to 500 enrolled learners in one course.
 - Up to 5 assigned/enrolled courses per learner.
-- Public courses visible to all signed-in users.
+- Public courses visible to all signed-in users, with launch access gated by course section membership for ordinary learners.
 
 Performance rules:
 
@@ -656,15 +656,18 @@ Navigation:
 Layout:
 
 - Use the Practice dashboard visual language: dense, restrained, scan-friendly, and responsive.
-- Desktop: two stacked sections with course cards or course bands; assigned courses first, public courses below.
+- Desktop: two stacked sections with course cards or course bands; My Courses first, public courses below.
 - Mobile: the same two sections with assignment rows stacked inside each course card.
 - Avoid decorative marketing-style cards; this is an operational learner surface.
 
 Required v1 structure:
 
-- Assigned courses section at top.
-- Hide the assigned courses section entirely when the learner has no assigned/enrolled courses.
-- Public courses section below assigned courses and visible for every signed-in user.
+- My Courses section at top for enrolled courses and teacher/admin-owned courses.
+- Hide the My Courses section entirely when the learner has no enrolled or owned courses.
+- Public courses section below My Courses and visible for every signed-in user.
+- Public course rows/cards expose a Join action. If multiple sections are available, the learner chooses a section before joining.
+- Public course assignment Start/Continue actions remain unavailable until the learner joins a section.
+- Private courses only appear for enrolled learners, the course owner, or admins. Teacher-owned private courses appear in My Courses and remain launchable for the teacher.
 - Top toolbar: search and sort menu.
 - Course row/card: course name, instructor, visibility/membership badge, assignment count, last practiced summary.
 - Assignment row/card: title, due/release labels, required/optional badge, progress metrics, action button.
@@ -798,8 +801,8 @@ Client/unit tests:
 - Assignment row ordering is recomputed from UI order.
 - Assignment title display uses the live TDF lesson name.
 - Courses page progress formatting matches Practice dashboard helpers.
-- Courses page shows assigned courses as the top section only when present.
-- Courses page shows public courses below assigned courses for every signed-in user.
+- Courses page shows My Courses as the top section only when enrolled or owned courses are present.
+- Courses page shows public courses below My Courses for every signed-in user, with Join required before ordinary learners can launch course assignments.
 - Sidebar and compact menu route mappings include `/courses`.
 
 Verification commands:
@@ -839,5 +842,5 @@ UI verification:
 - Scale targets are hundreds of courses, up to 250 assignments per course, up to 500 enrolled learners per course, and up to 5 assigned courses per learner.
 - `Chapter Assignments` is renamed to `Course Assignments`.
 - All teachers can edit course visibility immediately for courses they own.
-- Public courses are discoverable by signed-in learners, teachers, and admins.
+- Public courses are discoverable by signed-in learners, teachers, and admins; learners join a section before launching course assignments.
 - Course-specific assignment title overrides are deferred out of v1.
