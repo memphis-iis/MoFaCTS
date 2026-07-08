@@ -361,6 +361,11 @@ describe('course assignment metadata methods', function() {
       ]),
       CourseLearnerSnapshotCache: courseSnapshotCache,
       UserDashboardCache: createMemoryCollection([{ userId: 'student-user', tdfStats: {} }]),
+      getMethodAuthorizationDeps: () => ({
+        async userIsInRoleAsync() {
+          return false;
+        },
+      }),
     }));
 
     const beforeJoin = await methods.getLearnerCoursesSnapshot.call({ userId: 'student-user' });
