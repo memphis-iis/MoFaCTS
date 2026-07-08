@@ -186,6 +186,21 @@ export function createProfileMethods(deps: ProfileMethodsDeps) {
       return { success: true };
     },
 
+    updateOwnUiLocale: async function(this: MethodContext, params: unknown) {
+      check(params, {
+        uiLocale: String,
+      });
+      const userId = requireAuthenticatedUser(this.userId, 'Must be logged in to update your language', 401);
+      const data = params as { uiLocale: string };
+      await deps.usersCollection.updateAsync({ _id: userId }, {
+        $set: {
+          'profile.uiLocale': requireTargetUiLocale(data.uiLocale),
+          'profile.updatedAt': new Date(),
+        },
+      });
+      return { success: true };
+    },
+
     updateOwnOpenRouterSettings: async function(this: MethodContext, params: unknown) {
       check(params, {
         apiKey: Match.Maybe(String),

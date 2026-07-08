@@ -55,4 +55,37 @@ describe('profile methods', function() {
     expect((thrown as Error).message).to.equal('Unsupported UI locale "de"');
     expect(updateCalls).to.have.length(0);
   });
+
+  it('saves top-level UI locale changes without rewriting the rest of the profile', async function() {
+    const updateCalls: UpdateCall[] = [];
+    const methods = createProfileMethods(createDeps(updateCalls));
+
+    await methods.updateOwnUiLocale.call({ userId: 'user-1' }, {
+      uiLocale: 'fr',
+    });
+
+    expect(updateCalls).to.have.length(1);
+    expect(updateCalls[0]?.selector).to.deep.equal({ _id: 'user-1' });
+    expect(updateCalls[0]?.modifier.$set['profile.uiLocale']).to.equal('fr');
+    expect(updateCalls[0]?.modifier.$set).not.to.have.property('profile.name');
+    expect(updateCalls[0]?.modifier.$set).not.to.have.property('profile.displayName');
+  });
+
+  it('rejects unsupported top-level UI locale changes without substituting another locale', async function() {
+    const updateCalls: UpdateCall[] = [];
+    const methods = createProfileMethods(createDeps(updateCalls));
+
+    let thrown: unknown;
+    try {
+      await methods.updateOwnUiLocale.call({ userId: 'user-1' }, {
+        uiLocale: 'de',
+      });
+    } catch (error: unknown) {
+      thrown = error;
+    }
+
+    expect(thrown).to.be.instanceOf(Error);
+    expect((thrown as Error).message).to.equal('Unsupported UI locale "de"');
+    expect(updateCalls).to.have.length(0);
+  });
 });

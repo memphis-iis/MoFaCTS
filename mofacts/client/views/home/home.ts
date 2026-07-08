@@ -5,9 +5,11 @@ import DOMPurify from 'dompurify';
 import { Cookie } from '../../lib/cookies';
 import { currentUserHasRole } from '../../lib/roleUtils';
 import { getUserDisplayName, getUserInitials } from '../../lib/userIdentity';
-import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
+import { getErrorMessage } from '../../lib/errorUtils';
+import { getActiveUiLocale, setActiveUiLocale } from '../../lib/interfaceLocaleState';
 import { translatePlatformString } from '../../lib/interfaceI18n';
 import type { PlatformStringKey } from '../../lib/interfaceI18nResources';
+import { TARGET_LOCALE_DEFINITIONS, TARGET_UI_LOCALES } from '../../../common/lib/interfaceLocales';
 import { applyThemeCSSProperties } from '../../lib/currentTestingHelpers';
 import {
   clearSavedUserThemeSelection,
@@ -27,6 +29,8 @@ import './home.css';
 declare const Template: any;
 declare const Session: any;
 declare const Meteor: any;
+
+const MeteorAny = Meteor as typeof Meteor & { callAsync: (name: string, ...args: any[]) => Promise<any> };
 
 const MAIN_MENU_RETURN_TOUR_DURATION_MS = 5000;
 const HOME_SIDEBAR_COLLAPSED_KEY = 'mofacts.home.sidebarCollapsed';
@@ -190,6 +194,7 @@ function toggleAccountMenu(): void {
   toggle?.setAttribute('aria-expanded', open ? 'true' : 'false');
   if (!open) {
     Session.set('themeMenuOpen', false);
+    Session.set('localeMenuOpen', false);
   }
 }
 
@@ -355,6 +360,28 @@ Template.appAccountMenu.helpers({
     return Session.get('themeMenuOpen') === true;
   },
 
+  localeMenuOpen(): boolean {
+    return Session.get('localeMenuOpen') === true;
+  },
+
+  availableUiLocales(): Array<{ locale: string; label: string }> {
+    return TARGET_UI_LOCALES.map((locale) => {
+      const definition = TARGET_LOCALE_DEFINITIONS[locale];
+      return {
+        locale,
+        label: `${definition.englishName} (${definition.nativeName})`,
+      };
+    });
+  },
+
+  isSelectedUiLocale(locale: string): boolean {
+    return getActiveUiLocale() === locale;
+  },
+
+  localeSelectionActiveClass(locale: string): string {
+    return getActiveUiLocale() === locale ? 'locale-selection-item-active' : '';
+  },
+
   availableUserThemes(): ThemeLibraryEntry[] {
     return getAvailableUserThemes().map((theme) => ({
       ...theme,
@@ -434,6 +461,9 @@ Template.appAccountMenu.events({
   'click #userToggle': function(event: any) {
     event.preventDefault();
     event.stopPropagation();
+    if ((event.target as HTMLElement | null)?.closest('#userDropdown')) {
+      return;
+    }
     toggleAccountMenu();
   },
 
@@ -451,11 +481,18 @@ Template.appAccountMenu.events({
     const action = event.currentTarget.getAttribute('data-home-action');
     if (action === 'toggleTheme') {
       Session.set('themeMenuOpen', Session.get('themeMenuOpen') !== true);
+      Session.set('localeMenuOpen', false);
+      return;
+    }
+    if (action === 'toggleLocale') {
+      Session.set('localeMenuOpen', Session.get('localeMenuOpen') !== true);
+      Session.set('themeMenuOpen', false);
       return;
     }
     document.getElementById('userDropdown')?.classList.remove('open');
     document.getElementById('userToggle')?.setAttribute('aria-expanded', 'false');
     Session.set('themeMenuOpen', false);
+    Session.set('localeMenuOpen', false);
 
     if (action === 'tour') {
       FlowRouter.go('/home');
@@ -508,6 +545,26 @@ Template.appAccountMenu.events({
       document.getElementById('userToggle')?.setAttribute('aria-expanded', 'false');
     } catch (error: unknown) {
       reportThemeToggleError(error);
+    }
+  },
+
+  async 'click .locale-selection-item'(event: any) {
+    event.preventDefault();
+    event.stopPropagation();
+    const nextLocale = event.currentTarget.getAttribute('data-ui-locale') || '';
+    try {
+      await MeteorAny.callAsync('updateOwnUiLocale', { uiLocale: nextLocale });
+      setActiveUiLocale(nextLocale);
+      Session.set('localeMenuOpen', false);
+      document.getElementById('userDropdown')?.classList.remove('open');
+      document.getElementById('userToggle')?.setAttribute('aria-expanded', 'false');
+    } catch (error: unknown) {
+      const message = getErrorMessage(error);
+      clientConsole(1, '[LocaleMenu] Failed to select language:', message);
+      Session.set('uiMessage', {
+        variant: 'danger',
+        text: message,
+      });
     }
   },
 });
@@ -610,6 +667,9 @@ Template.home.events({
   'click #userToggle': function(event: any) {
     event.preventDefault();
     event.stopPropagation();
+    if ((event.target as HTMLElement | null)?.closest('#userDropdown')) {
+      return;
+    }
     toggleAccountMenu();
   },
 
@@ -619,11 +679,18 @@ Template.home.events({
     const action = event.currentTarget.getAttribute('data-home-action');
     if (action === 'toggleTheme') {
       Session.set('themeMenuOpen', Session.get('themeMenuOpen') !== true);
+      Session.set('localeMenuOpen', false);
+      return;
+    }
+    if (action === 'toggleLocale') {
+      Session.set('localeMenuOpen', Session.get('localeMenuOpen') !== true);
+      Session.set('themeMenuOpen', false);
       return;
     }
     document.getElementById('userDropdown')?.classList.remove('open');
     document.getElementById('userToggle')?.setAttribute('aria-expanded', 'false');
     Session.set('themeMenuOpen', false);
+    Session.set('localeMenuOpen', false);
 
     if (action === 'tour') {
       startMainMenuTour(template, { manual: true });
@@ -903,6 +970,7 @@ Template.appAccountMenu.onRendered(function(this: any) {
       document.getElementById('userDropdown')?.classList.remove('open');
       document.getElementById('userToggle')?.setAttribute('aria-expanded', 'false');
       Session.set('themeMenuOpen', false);
+      Session.set('localeMenuOpen', false);
     }
   };
   document.addEventListener('click', this._appAccountDocumentClickHandler);
@@ -944,6 +1012,7 @@ Template.home.onRendered(async function(this: any) {
       document.getElementById('userDropdown')?.classList.remove('open');
       document.getElementById('userToggle')?.setAttribute('aria-expanded', 'false');
       Session.set('themeMenuOpen', false);
+      Session.set('localeMenuOpen', false);
     }
     if (
       window.matchMedia('(max-width: 1024px)').matches &&

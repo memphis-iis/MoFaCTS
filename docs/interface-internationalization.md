@@ -23,6 +23,8 @@ The initial target UI locale set is:
 
 Locale resources are checked in with AI-draft strings. The runtime locale definitions track review status explicitly: English is the enabled baseline, and the other initial target locales remain draft until qualified human review marks them ready for production enablement.
 
+Authenticated users can choose their interface language from the account menu in the top-right app header or from their Profile page. The selection is saved as the user's UI locale preference.
+
 ## Authored Content
 
 MoFaCTS does not automatically translate lessons. Content authors provide and validate prompts, answers, hints, feedback, assessments, rubrics, and KC labels.

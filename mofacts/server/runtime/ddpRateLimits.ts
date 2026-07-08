@@ -103,6 +103,7 @@ export function registerDdpRateLimits(deps: DdpRateLimitDeps) {
     name(name: string) {
       return [
         'updateOwnProfile',
+        'updateOwnUiLocale',
         'updateOwnOpenRouterSettings',
         'getOwnOpenRouterSettings',
         'getOpenRouterCapability',
