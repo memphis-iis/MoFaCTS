@@ -18,9 +18,11 @@ import {
 } from '../../../../lib/currentTestingHelpers';
 import {
   getAudioInputSensitivity,
+  getAudioPromptMode,
   getAudioPromptSpeakingRate,
   setAudioPromptSpeakingRate
 } from '../../../../lib/state/audioState';
+import { isAudioPromptModeEnabled } from '../../../../../common/lib/audioPromptMode';
 import { audioManager } from '../../../../lib/audioContextManager';
 import { setEngine } from '../../../../lib/engineManager';
 import { resolveUnitEngineTypeForUnit } from '../../engineConstructors';
@@ -889,8 +891,7 @@ export async function initializeSvelteCard(): Promise<SvelteCardInitResult> {
     }
   }
 
-  const audioOutputEnabled = Session.get('enableAudioPromptAndFeedback');
-  if (audioOutputEnabled && !getAudioPromptSpeakingRate()) {
+  if (isAudioPromptModeEnabled(getAudioPromptMode()) && !getAudioPromptSpeakingRate()) {
     const speakingRate = parseFloat(String(tutor.setspec?.audioPromptSpeakingRate ?? '')) || 1;
     setAudioPromptSpeakingRate(speakingRate);
   }

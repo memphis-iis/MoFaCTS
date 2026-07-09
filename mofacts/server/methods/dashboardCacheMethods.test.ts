@@ -66,7 +66,7 @@ describe('dashboardCacheMethods', function() {
               userselect: 'true',
               speechOutOfGrammarFeedback: 'Try one of the listed answers',
               audioInputEnabled: 'true',
-              enableAudioPromptAndFeedback: 'false'
+              audioPromptMode: 'silent'
             },
             unit: [
               { learningsession: {} }
@@ -209,7 +209,7 @@ describe('dashboardCacheMethods', function() {
               tags: [],
               userselect: 'true',
               audioInputEnabled: 'false',
-              enableAudioPromptAndFeedback: 'false'
+              audioPromptMode: 'silent'
             },
             unit: [
               { autotutorsession: {} }
@@ -284,7 +284,7 @@ describe('dashboardCacheMethods', function() {
               tags: [],
               userselect: 'true',
               audioInputEnabled: 'true',
-              enableAudioPromptAndFeedback: 'true',
+              audioPromptMode: 'feedback',
               speechAPIKey: 'encrypted-tdf-speech'
             },
             unit: [
@@ -310,7 +310,7 @@ describe('dashboardCacheMethods', function() {
               tags: [],
               userselect: 'true',
               audioInputEnabled: 'false',
-              enableAudioPromptAndFeedback: 'false'
+              audioPromptMode: 'silent'
             },
             unit: [
               { unitinstructionsquestion: { text: 'Warmup' } },
@@ -335,7 +335,7 @@ describe('dashboardCacheMethods', function() {
               tags: [],
               userselect: 'true',
               audioInputEnabled: 'false',
-              enableAudioPromptAndFeedback: 'false',
+              audioPromptMode: 'silent',
               condition: ['condition-a.json', 'condition-b.json'],
               conditionTdfIds: ['condition-a', 'condition-b']
             },
@@ -413,7 +413,7 @@ describe('dashboardCacheMethods', function() {
       TDFId: 'tdfVideo',
       firstContentUnitType: 'video',
       audioInputEnabled: true,
-      enableAudioPromptAndFeedback: true,
+      audioPromptMode: 'feedback',
       hasSpeechAPIKey: true,
       hasTTSAPIKey: true
     });

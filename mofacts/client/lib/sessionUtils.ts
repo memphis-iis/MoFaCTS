@@ -56,7 +56,6 @@ declare const GlobalExperimentStates: any;
  * currentUnitNumber
  * currentUnitStartTime      - Mostly only for lock-outs
  * debugging                 - Generic debugging flag
- * enableAudioPromptAndFeedback
  * experimentPasswordRequired - If enabled we'll prompt for a password in the experiment page
  * experimentTarget          - untouched in sessionCleanUp
  * experimentXCond           - untouched in sessionCleanUp

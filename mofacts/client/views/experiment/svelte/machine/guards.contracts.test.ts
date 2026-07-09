@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import { Session } from 'meteor/session';
+import { resetAudioState, setAudioPromptMode } from '../../../../lib/state/audioState';
 import {
   isSupportedTrialType,
   isUnsupportedTrialType,
@@ -14,7 +15,10 @@ import {
   isSoftError,
   isHardError,
   hasQuestionAudio,
+  feedbackReadyForTts,
+  feedbackReadyWithoutTts,
   isVideoSession,
+  ttsEnabled,
   trialDisplaySuppressesStandardTimeout,
   trialRevealStarted,
 } from './guards';
@@ -41,6 +45,7 @@ describe('machine guard contracts', function() {
   afterEach(function() {
     Session.set('isVideoSession', false);
     Session.set('videoCheckpoints', null);
+    resetAudioState();
   });
 
   it('accepts supported trial types and rejects unknown trial types', function() {
@@ -171,6 +176,46 @@ describe('machine guard contracts', function() {
   it('detects question-audio payload', function() {
     expect(hasQuestionAudio(makeArgs({ context: { currentDisplay: { audioSrc: '/audio/test.mp3' } } }))).to.equal(true);
     expect(hasQuestionAudio(makeArgs({ context: { currentDisplay: { text: 'no-audio' } } }))).to.equal(false);
+  });
+
+  it('routes generated question TTS only when spoken audio mode allows questions', function() {
+    setAudioPromptMode('silent');
+    expect(ttsEnabled(makeArgs())).to.equal(false);
+
+    setAudioPromptMode('feedback');
+    expect(ttsEnabled(makeArgs())).to.equal(false);
+
+    setAudioPromptMode('question');
+    expect(ttsEnabled(makeArgs())).to.equal(true);
+
+    setAudioPromptMode('all');
+    expect(ttsEnabled(makeArgs())).to.equal(true);
+  });
+
+  it('routes generated feedback TTS only when spoken audio mode allows feedback', function() {
+    const args = makeArgs({
+      context: {
+        feedbackRevealStarted: true,
+        feedbackSuppressed: false,
+        feedbackText: 'Correct.',
+      },
+    });
+
+    setAudioPromptMode('silent');
+    expect(feedbackReadyForTts(args)).to.equal(false);
+    expect(feedbackReadyWithoutTts(args)).to.equal(true);
+
+    setAudioPromptMode('question');
+    expect(feedbackReadyForTts(args)).to.equal(false);
+    expect(feedbackReadyWithoutTts(args)).to.equal(true);
+
+    setAudioPromptMode('feedback');
+    expect(feedbackReadyForTts(args)).to.equal(true);
+    expect(feedbackReadyWithoutTts(args)).to.equal(false);
+
+    setAudioPromptMode('all');
+    expect(feedbackReadyForTts(args)).to.equal(true);
+    expect(feedbackReadyWithoutTts(args)).to.equal(false);
   });
 
   it('treats a positive trialStart as the response-timeout reveal gate', function() {

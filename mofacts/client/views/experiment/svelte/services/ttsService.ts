@@ -36,6 +36,10 @@ import { resolveDynamicAssetPath } from './mediaResolver';
 import { logIdInvariantBreachOnce } from '../../../../lib/idContext';
 import { resolveExplicitTtsLanguageCode } from '../../../../lib/audioLanguage';
 import { resolvePlatformPromptTtsLanguage } from '../../../../../common/lib/interfaceLocales';
+import {
+  audioPromptModeAllows,
+  normalizeAudioPromptMode,
+} from '../../../../../common/lib/audioPromptMode';
 import type {
   AudioPromptSource,
   TtsPlaybackEvent,
@@ -45,12 +49,6 @@ import type {
 
 type MeteorCallAsyncCompat = typeof Meteor & {
   callAsync: (name: string, ...args: unknown[]) => Promise<unknown>;
-};
-
-type UserAudioProfile = {
-  audioSettings?: {
-    audioPromptMode?: string;
-  };
 };
 
 const MeteorCompat = Meteor as MeteorCallAsyncCompat;
@@ -319,11 +317,7 @@ async function restartSrAfterTtsHandoff(): Promise<void> {
  * @returns {boolean} True if question TTS enabled
  */
 function getEffectiveAudioPromptMode(): string {
-  const sessionAudioPromptMode = getAudioPromptMode();
-  const userAudioPromptMode = (Meteor.user() as UserAudioProfile | null)?.audioSettings?.audioPromptMode;
-  const audioPromptMode = sessionAudioPromptMode || userAudioPromptMode;
-
-  return audioPromptMode && audioPromptMode !== 'silent' ? audioPromptMode : 'silent';
+  return normalizeAudioPromptMode(getAudioPromptMode());
 }
 
 /**
@@ -331,11 +325,7 @@ function getEffectiveAudioPromptMode(): string {
  * @returns {boolean}
  */
 export function shouldPlayAudioPrompt(source: AudioPromptSource): boolean {
-  const audioPromptMode = getEffectiveAudioPromptMode();
-  if (!audioPromptMode || audioPromptMode === 'silent') {
-    return false;
-  }
-  return audioPromptMode === 'all' || audioPromptMode === source;
+  return audioPromptModeAllows(getEffectiveAudioPromptMode(), source);
 }
 
 function isTtsEnabledForQuestions() {
@@ -690,19 +680,15 @@ async function playAudioFile(
       }
 
       const audio = new Audio(currentAudioSrc);
+      audio.preload = 'auto';
       clientConsole(2, '[TTS] path selected', { path: 'pre-recorded-audio', src: currentAudioSrc });
       let settled = false;
-      let canPlayHandler: (() => void) | null = null;
       let unregisterCancellation = () => {};
 
       const resolveOnce = () => {
         if (settled) return;
         settled = true;
         unregisterCancellation();
-        if (canPlayHandler) {
-          audio.removeEventListener('canplay', canPlayHandler);
-          canPlayHandler = null;
-        }
         resolve();
       };
 
@@ -710,10 +696,6 @@ async function playAudioFile(
         if (settled) return;
         settled = true;
         unregisterCancellation();
-        if (canPlayHandler) {
-          audio.removeEventListener('canplay', canPlayHandler);
-          canPlayHandler = null;
-        }
         reject(error);
       };
 
@@ -770,25 +752,7 @@ async function playAudioFile(
         });
       };
 
-      // Wait until enough media is decoded to avoid clipping the first syllable.
-      if ((audio.readyState || 0) < 3) {
-        canPlayHandler = () => {
-          if (!canPlayHandler) {
-            return;
-          }
-          audio.removeEventListener('canplay', canPlayHandler);
-          canPlayHandler = null;
-          playFromStart();
-        };
-        audio.addEventListener('canplay', canPlayHandler, { once: true });
-        try {
-          audio.load();
-        } catch (_err: unknown) {
-          playFromStart();
-        }
-      } else {
-        playFromStart();
-      }
+      playFromStart();
     } catch (error: unknown) {
       clientConsole(1, '[TTS] Error playing audio file:', error);
       reject(error);
@@ -904,14 +868,16 @@ export async function ttsPlaybackService(_context: Record<string, unknown>, even
     } else if (audioSrc) {
       await playAudioFile(audioSrc, getCancellation, playbackId);
     } else if (text) {
-      await speakText(text, {
-        isQuestion,
-        languageSource: event.languageSource,
-        uiLocale: event.uiLocale,
-        voiceLocaleOverride: event.voiceLocaleOverride,
-        allowedVoiceLocaleOverrides: event.allowedVoiceLocaleOverrides,
-        availableVoiceLocales: event.availableVoiceLocales,
-      }, getCancellation, playbackId);
+      if (shouldPlayAudioPrompt(isQuestion ? 'question' : 'feedback')) {
+        await speakText(text, {
+          isQuestion,
+          languageSource: event.languageSource,
+          uiLocale: event.uiLocale,
+          voiceLocaleOverride: event.voiceLocaleOverride,
+          allowedVoiceLocaleOverrides: event.allowedVoiceLocaleOverrides,
+          availableVoiceLocales: event.availableVoiceLocales,
+        }, getCancellation, playbackId);
+      }
     } else {
       // No TTS/audio payload for this transition.
     }

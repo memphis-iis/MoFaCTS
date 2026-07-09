@@ -22,7 +22,6 @@ export const CARD_RUNTIME_SESSION_DEFAULTS: readonly SessionCleanupEntry[] = [
   { key: 'currentDisplay', value: undefined, domain: 'card-display', reason: 'Clear previous card display payload.' },
   { key: 'originalQuestion', value: undefined, domain: 'card-display', reason: 'Clear previous question text.' },
   { key: 'engineIndices', value: undefined, domain: 'unit-engine', reason: 'Engine must publish fresh indices for the next card.' },
-  { key: 'enableAudioPromptAndFeedback', value: false, domain: 'audio', reason: 'Disable prompt/feedback audio until delivery settings enable it.' },
   { key: 'errorReportStart', value: undefined, domain: 'diagnostics', reason: 'Reset per-launch error report timing.' },
   { key: 'mainCardTimeoutStart', value: undefined, domain: 'timing', reason: 'Reset per-card timeout timing.' },
   { key: 'experimentPasswordRequired', value: false, domain: 'launch-auth', reason: 'Password prompts are resolved per experiment launch.' },

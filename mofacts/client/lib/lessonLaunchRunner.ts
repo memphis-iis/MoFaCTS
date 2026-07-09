@@ -16,7 +16,6 @@ import type { CourseAssignmentHistoryContext } from '../../common/courseAssignme
 import { translatePlatformString } from './interfaceI18n';
 import { getActiveUiLocale } from './interfaceLocaleState';
 import {
-  getAudioPromptFeedbackView,
   setAudioEnabled,
   setAudioEnabledView,
   setAudioInputSensitivity,
@@ -82,8 +81,6 @@ export async function selectTdf(
 ) {
   clientConsole(2, 'Starting Lesson:', lessonName, 'tdfId:', currentTdfId,
     'stimuliSetId:', currentStimuliSetId, 'isMultiTdf:', isMultiTdf, 'source:', how);
-
-  const audioPromptFeedbackView = getAudioPromptFeedbackView();
 
   sessionCleanUp();
   setCourseAssignmentLaunchContext(options.courseAssignment ?? null);
@@ -175,18 +172,6 @@ export async function selectTdf(
   setAudioPromptVoice(audioPromptVoice);
   setAudioPromptFeedbackVoice(audioPromptFeedbackVoice);
   setAudioInputSensitivity(audioInputSensitivity);
-
-  const audioPromptFeedbackMode = String((audioPromptFeedbackView as unknown) || '');
-  const userAudioPromptFeedbackToggled =
-    audioPromptFeedbackMode === 'feedback' ||
-    audioPromptFeedbackMode === 'all' ||
-    audioPromptFeedbackMode === 'question';
-  const tdfAudioPromptFeedbackEnabled = !!curTdfContent.tdfs.tutor.setspec.enableAudioPromptAndFeedback &&
-    curTdfContent.tdfs.tutor.setspec.enableAudioPromptAndFeedback === 'true';
-  const audioPromptFeedbackEnabled = Session.get('experimentTarget')
-    ? tdfAudioPromptFeedbackEnabled
-    : userAudioPromptFeedbackToggled;
-  Session.set('enableAudioPromptAndFeedback', audioPromptFeedbackEnabled);
 
   const userAudioToggled = audioInputEnabled;
   const tdfAudioEnabled = curTdfContent.tdfs.tutor.setspec.audioInputEnabled

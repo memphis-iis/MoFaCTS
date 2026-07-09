@@ -192,26 +192,6 @@
                 "grid_columns": 12
               }
             },
-            "enableAudioPromptAndFeedback": {
-              "title": "Enable text-to-speech prompts and feedback.",
-              "description": "Advertises and enables lesson audio prompt/feedback support.",
-              "anyOf": [
-                {
-                  "type": "string",
-                  "enum": [
-                    "true",
-                    "false"
-                  ]
-                },
-                {
-                  "type": "boolean"
-                }
-              ],
-              "default": "false",
-              "options": {
-                "grid_columns": 4
-              }
-            },
             "speechAPIKey": {
               "title": "Speech recognition API key.",
               "description": "Google Speech API key used for speech recognition.",

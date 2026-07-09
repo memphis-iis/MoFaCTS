@@ -121,12 +121,12 @@ const PRACTICE_SHELL_TEMPLATES = new Set([
 ]);
 
 const APP_SHELL_TITLE_KEYS: Record<string, PlatformStringKey> = {
-  contentUpload: 'home.createContent',
-  aiContentCreator: 'home.createContent',
-  manualContentCreator: 'home.createContent',
-  contentEdit: 'home.createContent',
-  tdfEdit: 'home.createContent',
-  dataDownload: 'home.detailedData',
+  contentUpload: 'home.content',
+  aiContentCreator: 'home.content',
+  manualContentCreator: 'home.content',
+  contentEdit: 'home.content',
+  tdfEdit: 'home.content',
+  dataDownload: 'home.data',
   profile: 'home.profile',
   audioSettings: 'audio.settings',
   classSelection: 'home.joinCourses',

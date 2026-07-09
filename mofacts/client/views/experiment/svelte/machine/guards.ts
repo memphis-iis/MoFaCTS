@@ -9,6 +9,10 @@ import { TRIAL_TYPES, SUPPORTED_TRIAL_TYPES, THRESHOLDS, ERROR_SEVERITY_MAP, ERR
 import { getFeedbackTimeoutMs } from '../utils/timeoutUtils';
 import { evaluateSrAvailability } from '../../../../lib/audioAvailability';
 import { getAudioPromptMode } from '../../../../lib/state/audioState';
+import {
+  audioPromptModeAllows,
+  isAudioPromptModeEnabled,
+} from '../../../../../common/lib/audioPromptMode';
 import { selfHostedH5PTrialDisplayOwnsInteraction } from '../services/h5pTrialDisplay';
 import { resolveSessionSurfaceState } from '../services/sessionSurfaceMode';
 import {
@@ -281,11 +285,7 @@ export function attemptsExhausted(args: ContentRuntimeMachineActorArgs): boolean
  * @returns {boolean}
  */
 export function ttsEnabled(_args: ContentRuntimeMachineActorArgs): boolean {
-  const audioPromptMode = getAudioPromptMode();
-  const questionTtsEnabled = !!audioPromptMode && audioPromptMode !== 'silent';
-  const feedbackTtsEnabled = Session.get('enableAudioPromptAndFeedback') === true;
-
-  return questionTtsEnabled || feedbackTtsEnabled;
+  return audioPromptModeAllows(getAudioPromptMode(), 'question');
 }
 
 /**
@@ -293,8 +293,8 @@ export function ttsEnabled(_args: ContentRuntimeMachineActorArgs): boolean {
  * @param {ContentRuntimeMachineActorArgs} args
  * @returns {boolean}
  */
-export function ttsDisabled(args: ContentRuntimeMachineActorArgs): boolean {
-  return !ttsEnabled(args);
+export function ttsDisabled(_args: ContentRuntimeMachineActorArgs): boolean {
+  return !isAudioPromptModeEnabled(getAudioPromptMode());
 }
 
 function feedbackContentReady({ context }: ContentRuntimeMachineActorArgs): boolean {
@@ -308,13 +308,13 @@ export function feedbackReadyForTts(args: ContentRuntimeMachineActorArgs): boole
   return args.context.feedbackRevealStarted === true &&
     args.context.feedbackSuppressed !== true &&
     feedbackContentReady(args) &&
-    ttsEnabled(args);
+    audioPromptModeAllows(getAudioPromptMode(), 'feedback');
 }
 
 export function feedbackReadyWithoutTts(args: ContentRuntimeMachineActorArgs): boolean {
   return args.context.feedbackRevealStarted === true &&
     feedbackContentReady(args) &&
-    (args.context.feedbackSuppressed === true || ttsDisabled(args));
+    (args.context.feedbackSuppressed === true || !audioPromptModeAllows(getAudioPromptMode(), 'feedback'));
 }
 
 // =============================================================================

@@ -8,7 +8,6 @@ import {checkUserSession} from '../../lib/userSessionHelpers';
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra');
 import {currentUserHasRole} from '../../lib/roleUtils';
 import {
-  getAudioPromptFeedbackView,
   setAudioPromptMode, setAudioPromptFeedbackView,
   setAudioEnabledView, setAudioEnabled,
   setAudioPromptFeedbackSpeakingRate, setAudioPromptQuestionSpeakingRate,
@@ -30,6 +29,7 @@ import {
   learnerTdfFieldAppliesToUnit,
   type LearnerTdfConfig
 } from '../../../common/lib/learnerTdfConfig';
+import { isAudioPromptModeEnabled } from '../../../common/lib/audioPromptMode';
 import { detectTdfUnitType } from '../../../common/fieldApplicability';
 import {
   finishLaunchLoading,
@@ -743,10 +743,6 @@ function parseBooleanLike(value: unknown): boolean {
   return value === true || value === 'true' || value === 1 || value === '1';
 }
 
-function hasEnabledAudioPromptMode(value: unknown): boolean {
-  return typeof value === 'string' && value.trim().length > 0 && value.trim().toLowerCase() !== 'silent';
-}
-
 function getEffectiveSetSpecValue(tdf: any, key: 'audioInputEnabled' | 'audioPromptMode') {
   const override = getLearnerTdfConfig(String(tdf?.TDFId || ''))?.overrides?.setspec?.[key];
   return override !== undefined ? override : tdf?.[key];
@@ -762,17 +758,15 @@ function getEffectiveTtsState(tdf: any) {
   const effectivePromptMode = promptModeOverride
     ? getEffectiveSetSpecValue(tdf, 'audioPromptMode')
     : getUserAudioSettings().audioPromptMode;
-  const tdfPromptsEnabled = parseBooleanLike(tdf?.enableAudioPromptAndFeedback);
-  const promptModeEnabled = hasEnabledAudioPromptMode(effectivePromptMode);
+  const promptModeEnabled = isAudioPromptModeEnabled(effectivePromptMode);
   const keyAvailable = tdf?.hasTTSAPIKey === true;
-  const supported = tdfPromptsEnabled ||
+  const supported = promptModeEnabled ||
     promptModeOverride ||
-    hasEnabledAudioPromptMode(tdf?.audioPromptMode);
+    isAudioPromptModeEnabled(tdf?.audioPromptMode);
 
   return {
     supported,
     active: supported && promptModeEnabled && keyAvailable,
-    tdfPromptsEnabled,
     promptModeEnabled,
     keyAvailable,
   };
@@ -1572,7 +1566,6 @@ async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId
 
   startLaunchLoading(dashboardText('dashboard.preparingLesson'), 'practiceMenu');
   markLaunchLoadingTiming('practiceMenuClick', { currentTdfId, lessonName, how, isMultiTdf });
-  const audioPromptFeedbackView = getAudioPromptFeedbackView();
 
   // make sure session variables are cleared from previous tests
   sessionCleanUp();
@@ -1676,20 +1669,6 @@ async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId
   setAudioPromptVoice(audioPromptVoice);
   setAudioPromptFeedbackVoice(audioPromptFeedbackVoice);
   setAudioInputSensitivity(audioInputSensitivity);
-
-  // Check to see if the user has turned on audio prompts. Experiment launches
-  // keep using the TDF value as the fixed protocol setting.
-  const userAudioPromptFeedbackToggled = ((audioPromptFeedbackView as any) == 'feedback') || ((audioPromptFeedbackView as any) == 'all') || ((audioPromptFeedbackView as any) == 'question');
-  const tdfAudioPromptFeedbackEnabled = !!curTdfContent.tdfs.tutor.setspec.enableAudioPromptAndFeedback &&
-    curTdfContent.tdfs.tutor.setspec.enableAudioPromptAndFeedback == 'true';
-  let audioPromptFeedbackEnabled = undefined;
-
-  if (Session.get('experimentTarget')) {
-    audioPromptFeedbackEnabled = tdfAudioPromptFeedbackEnabled;
-  } else {
-    audioPromptFeedbackEnabled = userAudioPromptFeedbackToggled;
-  }
-  Session.set('enableAudioPromptAndFeedback', audioPromptFeedbackEnabled);
 
   // If we're in experiment mode and the tdf file defines whether audio input is enabled
   // forcibly use that, otherwise go with whatever the user set the audio input toggle to

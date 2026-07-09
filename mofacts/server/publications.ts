@@ -498,7 +498,6 @@ const TDF_LISTING_FIELDS = {
     'content.tdfs.tutor.setspec.audioPromptMode': 1,
     'content.tdfs.tutor.setspec.audioInputEnabled': 1,
     'content.tdfs.tutor.setspec.audioInputSensitivity': 1,
-    'content.tdfs.tutor.setspec.enableAudioPromptAndFeedback': 1,
     'content.tdfs.tutor.setspec.audioPromptFeedbackSpeakingRate': 1,
     'content.tdfs.tutor.setspec.audioPromptQuestionSpeakingRate': 1,
     'content.tdfs.tutor.setspec.audioPromptVoice': 1,

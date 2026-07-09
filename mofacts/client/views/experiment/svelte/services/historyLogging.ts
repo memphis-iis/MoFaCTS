@@ -13,11 +13,13 @@ type UnderscoreLike = {
 };
 const _ = underscore as unknown as UnderscoreLike;
 import { ExperimentStateStore } from '../../../../lib/state/experimentStateStore';
+import { getAudioPromptMode } from '../../../../lib/state/audioState';
 import { getStimCluster, getStimCount } from '../../../../lib/currentTestingHelpers';
 import { evaluateSrAvailability } from '../../../../lib/audioAvailability';
 import { clientConsole } from '../../../../lib/clientLogger';
 import { parseSchedItemCondition } from '../../../../lib/tdfUtils';
 import { SCHEDULE_UNIT } from '../../../../../common/Definitions';
+import { isAudioPromptModeEnabled } from '../../../../../common/lib/audioPromptMode';
 import { meteorCallAsync } from '../../../../lib/meteorAsync';
 import { insertCompressedHistory } from '../../../../lib/historyWire';
 import {
@@ -786,7 +788,7 @@ export function createHistoryRecord({
 
     // Custom fields (CF prefix)
     'CFAudioInputEnabled': checkAudioInputMode(),
-    'CFAudioOutputEnabled': Session.get('enableAudioPromptAndFeedback'),
+    'CFAudioOutputEnabled': isAudioPromptModeEnabled(getAudioPromptMode()),
     'CFDisplayOrder': displayOrder,
     'CFStimFileIndex': stimFileIndex,
     'CFSetShuffledIndex': shufIndex,

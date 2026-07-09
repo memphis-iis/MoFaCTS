@@ -26,6 +26,8 @@ import {
 import { setEnterKeyLock } from './svelte/services/trialReadinessState';
 import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 import { translatePlatformString } from '../../lib/interfaceI18n';
+import { getAudioPromptMode } from '../../lib/state/audioState';
+import { isAudioPromptModeEnabled } from '../../../common/lib/audioPromptMode';
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra');
 
 declare const Meteor: any;
@@ -889,7 +891,7 @@ function gatherInstructionLogRecord(trialEndTimeStamp: any, trialStartTimeStamp:
     'displayedStimulus': displayedStimulus,
     'eventType': 'instruct',
     'CFAudioInputEnabled': checkAudioInputMode(),
-    'CFAudioOutputEnabled': Session.get('enableAudioPromptAndFeedback'),
+    'CFAudioOutputEnabled': isAudioPromptModeEnabled(getAudioPromptMode()),
     'CFResponseTime': trialEndTimeStamp,
     'feedbackType': '',
     'entryPoint': loginParams.entryPoint

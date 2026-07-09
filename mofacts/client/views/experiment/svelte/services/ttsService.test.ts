@@ -9,6 +9,7 @@ import {
   isAppleMobileSpeechSynthesisEnvironment,
   resolveAuthoredContentTtsLanguageCode,
   resolveTtsLanguageForSpeak,
+  shouldPlayAudioPrompt,
   ttsPlaybackService,
 } from './ttsService';
 
@@ -161,5 +162,77 @@ describe('ttsService Apple mobile recovery helpers', function() {
       error: 'Unsupported UI locale "de-DE"',
       textAvailable: true,
     });
+  });
+
+  it('does not play generated feedback speech when spoken audio mode is silent', async function() {
+    setAudioPromptMode('silent');
+
+    const result = await ttsPlaybackService({}, {
+      text: 'Incorrect. The correct answer is red.',
+      isQuestion: false,
+    });
+
+    expect(result).to.deep.equal({
+      status: 'completed',
+    });
+  });
+
+  it('applies spoken audio mode by generated speech source', function() {
+    setAudioPromptMode('silent');
+    expect(shouldPlayAudioPrompt('question')).to.equal(false);
+    expect(shouldPlayAudioPrompt('feedback')).to.equal(false);
+
+    setAudioPromptMode('question');
+    expect(shouldPlayAudioPrompt('question')).to.equal(true);
+    expect(shouldPlayAudioPrompt('feedback')).to.equal(false);
+
+    setAudioPromptMode('feedback');
+    expect(shouldPlayAudioPrompt('question')).to.equal(false);
+    expect(shouldPlayAudioPrompt('feedback')).to.equal(true);
+
+    setAudioPromptMode('all');
+    expect(shouldPlayAudioPrompt('question')).to.equal(true);
+    expect(shouldPlayAudioPrompt('feedback')).to.equal(true);
+  });
+
+  it('plays recorded content audio even when spoken audio mode is silent', async function() {
+    setAudioPromptMode('silent');
+    const OriginalAudio = globalThis.Audio;
+    let playCalls = 0;
+
+    class MockAudio {
+      onended: (() => void) | null = null;
+      onerror: ((error: unknown) => void) | null = null;
+      currentTime = 0;
+      preload = '';
+      constructor(public src: string) {}
+      pause() {}
+      play() {
+        playCalls++;
+        setTimeout(() => this.onended?.(), 0);
+        return Promise.resolve();
+      }
+    }
+
+    Object.defineProperty(globalThis, 'Audio', {
+      configurable: true,
+      writable: true,
+      value: MockAudio,
+    });
+    try {
+      const result = await ttsPlaybackService({}, {
+        audioSrc: '/media/prompt.mp3',
+        isQuestion: true,
+      });
+
+      expect(result).to.deep.equal({ status: 'completed' });
+      expect(playCalls).to.equal(1);
+    } finally {
+      Object.defineProperty(globalThis, 'Audio', {
+        configurable: true,
+        writable: true,
+        value: OriginalAudio,
+      });
+    }
   });
 });

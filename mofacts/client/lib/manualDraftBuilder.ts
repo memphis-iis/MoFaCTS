@@ -381,7 +381,6 @@ export function buildManualDraftLesson(state: ManualCreatorState): ImportDraftLe
     tutor.setspec.recommendedUiLocales = recommendedUiLocales;
   }
   tutor.setspec.shuffleclusters = state.shuffle ? clusterRange : '';
-  tutor.setspec.enableAudioPromptAndFeedback = textToSpeechEnabled ? 'true' : 'false';
   tutor.setspec.audioPromptMode = mapAudioPromptMode(state.textToSpeechMode);
   if (textToSpeechEnabled) {
     tutor.setspec.textToSpeechLanguage = speechLanguage;

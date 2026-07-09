@@ -123,10 +123,6 @@ export const SETSPEC_FIELD_REGISTRY: SectionFieldRegistry = {
       breaking: true,
     },
   }),
-  enableAudioPromptAndFeedback: simpleField(legacyBooleanField('false'), {
-    brief: 'Enable text-to-speech prompts and feedback.',
-    verbose: 'Advertises and enables lesson audio prompt/feedback support.'
-  }),
   speechAPIKey: simpleField(stringField('', 12), {
     brief: 'Speech recognition API key.',
     verbose: 'Google Speech API key used for speech recognition.'
@@ -683,7 +679,6 @@ export const SETSPEC_DIRECT_RUNTIME_KEYS = Object.freeze([
   'countcompletion',
   'disableProgressReport',
   'duedate',
-  'enableAudioPromptAndFeedback',
   'experimentPasswordRequired',
   'loadbalancing',
   'prestimulusDisplay',

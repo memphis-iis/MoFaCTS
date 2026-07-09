@@ -49,7 +49,7 @@ describe('manualDraftBuilder', function() {
     expect(tutor.setspec.experimentTarget).to.equal('manual-test');
     expect(tutor.setspec.shuffleclusters).to.equal('0-0');
     expect(tutor.setspec.tags).to.deep.equal(['geography', 'capitals']);
-    expect(tutor.setspec.enableAudioPromptAndFeedback).to.equal('false');
+    expect(tutor.setspec).to.not.have.property('enableAudioPromptAndFeedback');
     expect(tutor.setspec.audioInputEnabled).to.equal('false');
     expect(tutor.setspec).to.not.have.property('textToSpeechLanguage');
     expect(tutor.setspec).to.not.have.property('speechRecognitionLanguage');
@@ -99,7 +99,7 @@ describe('manualDraftBuilder', function() {
     const firstStim = firstCluster.stims?.[0];
     const response = (firstStim?.response || {}) as Record<string, unknown>;
 
-    expect(tutor.setspec.enableAudioPromptAndFeedback).to.equal('true');
+    expect(tutor.setspec).to.not.have.property('enableAudioPromptAndFeedback');
     expect(tutor.setspec.audioPromptMode).to.equal('feedback');
     expect(tutor.setspec.textToSpeechLanguage).to.equal('es-ES');
     expect(tutor.setspec.audioInputEnabled).to.equal('true');

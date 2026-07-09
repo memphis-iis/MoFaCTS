@@ -38,7 +38,6 @@ describe('audioStartup', function() {
         tdfs: {
           tutor: {
             setspec: {
-              enableAudioPromptAndFeedback: 'false',
               audioInputEnabled: 'false',
             },
           },
@@ -65,7 +64,6 @@ describe('audioStartup', function() {
           tutor: {
             setspec: {
               textToSpeechAPIKey: 'tts-key',
-              enableAudioPromptAndFeedback: 'true',
               textToSpeechLanguage: 'es-ES',
             },
           },
@@ -85,14 +83,13 @@ describe('audioStartup', function() {
     expect(plan.recorderPreInitialization).to.equal(false);
   });
 
-  it('skips TTS warmup when the learner has prompt audio turned off even if the TDF is enabled', function() {
+  it('skips TTS warmup when the learner has prompt audio turned off', function() {
     const plan = getAudioLaunchPreparationPlan(
       {
         tdfs: {
           tutor: {
             setspec: {
               textToSpeechAPIKey: 'tts-key',
-              enableAudioPromptAndFeedback: 'true',
               textToSpeechLanguage: 'es-ES',
             },
           },
@@ -110,14 +107,13 @@ describe('audioStartup', function() {
     expect(plan.ttsWarmup).to.equal(false);
   });
 
-  it('prepares TTS warmup from the learner audio setting even when the TDF does not enable prompt audio', function() {
+  it('prepares TTS warmup from the learner audio setting and a TDF key', function() {
     const plan = getAudioLaunchPreparationPlan(
       {
         tdfs: {
           tutor: {
             setspec: {
               textToSpeechAPIKey: 'tts-key',
-              enableAudioPromptAndFeedback: 'false',
               textToSpeechLanguage: 'es-ES',
             },
           },
@@ -143,7 +139,6 @@ describe('audioStartup', function() {
         tdfs: {
           tutor: {
             setspec: {
-              enableAudioPromptAndFeedback: 'true',
               audioPromptFeedbackVoice: 'fr-FR-Neural2-A',
             },
           },
@@ -328,7 +323,6 @@ describe('audioStartup', function() {
         tdfs: {
           tutor: {
             setspec: {
-              enableAudioPromptAndFeedback: 'false',
               audioInputEnabled: 'false',
             },
           },

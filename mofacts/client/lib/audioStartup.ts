@@ -29,7 +29,6 @@ type AudioStartupTdf = {
   tdfs?: {
     tutor?: {
       setspec?: {
-        enableAudioPromptAndFeedback?: string | boolean;
         textToSpeechAPIKey?: string;
         textToSpeechLanguage?: string;
         audioPromptFeedbackVoice?: string;
