@@ -539,6 +539,8 @@
     inputLanguage: contentLanguageAttributes.lang || '',
     inputTextDirection: contentLanguageAttributes.dir || '',
   };
+  $: showSparcSessionSurface = sessionContentSurface.showSparcSession &&
+    flashcardControllerProps.subsetKind !== 'none';
   $: videoEnded = state.matches('videoEnded');
   $: videoEndOverlayController.syncVideoEnded(videoEnded);
 
@@ -581,10 +583,13 @@
     trialSubsetKind,
   });
 
-  $: activeTrialRevealController.queueRevealIfReady({
-    allBlockingAssetsReady,
-    isOutgoingFreezeState,
-  });
+  $: {
+    activeSlotMounted;
+    activeTrialRevealController.queueRevealIfReady({
+      allBlockingAssetsReady,
+      isOutgoingFreezeState,
+    });
+  }
 
   $: if (
     sessionContentSurface.showFlashcardSession &&
@@ -1187,7 +1192,7 @@
       on:instructioncontinue={(event) => videoEventRuntime.handleInstructionContinue(event)}
       on:videocontinue={() => videoEventRuntime.handleContinue()}
     />
-  {:else if sessionContentSurface.showSparcSession}
+  {:else if showSparcSessionSurface}
     <SparcSessionSurface
       display={flashcardControllerProps.display}
       adminDiagnosticMode={adminDiagnosticModeEnabled()}

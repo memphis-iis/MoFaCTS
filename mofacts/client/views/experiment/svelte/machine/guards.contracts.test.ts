@@ -112,7 +112,7 @@ describe('machine guard contracts', function() {
     expect(noFeedback(h5pDrill)).to.equal(true);
   });
 
-  it('suppresses the standard response timeout for H5P but not SPARC displays', function() {
+  it('suppresses the standard response timeout for H5P and production-rule SPARC displays', function() {
     const h5pDisplay = makeArgs({
       context: {
         currentDisplay: {
@@ -125,17 +125,27 @@ describe('machine guard contracts', function() {
         },
       },
     });
-    const sparcDisplay = makeArgs({
+    const sparcProductionRuleDisplay = makeArgs({
       context: {
         currentDisplay: {
           documentId: 'sparc-fractions-addition',
+          nodes: [],
+          productionRules: [],
+        },
+      },
+    });
+    const sparcPlainDisplay = makeArgs({
+      context: {
+        currentDisplay: {
+          documentId: 'sparc-static-display',
           nodes: [],
         },
       },
     });
 
     expect(trialDisplaySuppressesStandardTimeout(h5pDisplay)).to.equal(true);
-    expect(trialDisplaySuppressesStandardTimeout(sparcDisplay)).to.equal(false);
+    expect(trialDisplaySuppressesStandardTimeout(sparcProductionRuleDisplay)).to.equal(true);
+    expect(trialDisplaySuppressesStandardTimeout(sparcPlainDisplay)).to.equal(false);
   });
 
   it('treats CARD_SELECTED unitFinished payload as authoritative', function() {

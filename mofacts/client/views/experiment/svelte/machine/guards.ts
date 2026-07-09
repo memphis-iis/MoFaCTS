@@ -443,7 +443,17 @@ export function notWaitingForTranscription(args: ContentRuntimeMachineActorArgs)
 }
 
 export function trialDisplaySuppressesStandardTimeout({ context }: ContentRuntimeMachineActorArgs): boolean {
-  return selfHostedH5PTrialDisplayOwnsInteraction(context.currentDisplay);
+  if (selfHostedH5PTrialDisplayOwnsInteraction(context.currentDisplay)) {
+    return true;
+  }
+  const display = context.currentDisplay;
+  return Boolean(
+    display &&
+    typeof display === 'object' &&
+    !Array.isArray(display) &&
+    Array.isArray((display as Record<string, unknown>).nodes) &&
+    Array.isArray((display as Record<string, unknown>).productionRules),
+  );
 }
 
 // =============================================================================
