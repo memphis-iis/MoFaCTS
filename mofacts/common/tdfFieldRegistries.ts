@@ -483,6 +483,16 @@ export const LEARNING_SESSION_FIELD_REGISTRY: SectionFieldRegistry = {
   }),
 };
 
+export const SPARC_SESSION_FIELD_REGISTRY: SectionFieldRegistry = {
+  ...LEARNING_SESSION_FIELD_REGISTRY,
+  pageId: simpleField(stringField('', 12), {
+    brief: 'SPARC page id.',
+    verbose: 'Explicit rawStimuliFile.setspec.sparcPages pageId to launch for this SPARC session. Required when a stimulus file contains multiple SPARC pages and useful for documenting single-page generated packages.'
+  }, {
+    surfaces: { learnerConfig: false },
+  }),
+};
+
 
 export const ASSESSMENT_CONDITION_TEMPLATES_FIELD_REGISTRY: SectionFieldRegistry = {
   groupnames: simpleField(stringField('', 6), {
@@ -718,6 +728,11 @@ export const LEARNING_SESSION_DIRECT_RUNTIME_KEYS = Object.freeze([
   'clusterlist',
   'stimulusfile',
   'unitMode',
+]);
+
+export const SPARC_SESSION_DIRECT_RUNTIME_KEYS = Object.freeze([
+  ...LEARNING_SESSION_DIRECT_RUNTIME_KEYS,
+  'pageId',
 ]);
 
 

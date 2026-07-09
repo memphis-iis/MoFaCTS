@@ -2863,6 +2863,15 @@
                         "options": {
                           "grid_columns": 12
                         }
+                      },
+                      "pageId": {
+                        "title": "SPARC page id.",
+                        "description": "Explicit rawStimuliFile.setspec.sparcPages pageId to launch for this SPARC session. Required when a stimulus file contains multiple SPARC pages and useful for documenting single-page generated packages.",
+                        "type": "string",
+                        "default": "",
+                        "options": {
+                          "grid_columns": 12
+                        }
                       }
                     },
                     "additionalProperties": false
@@ -5239,6 +5248,15 @@
                   "stimulusfile": {
                     "title": "Learning-session stimulus file.",
                     "description": "Optional learning-session-level stimulus filename used by content lookup workflows.",
+                    "type": "string",
+                    "default": "",
+                    "options": {
+                      "grid_columns": 12
+                    }
+                  },
+                  "pageId": {
+                    "title": "SPARC page id.",
+                    "description": "Explicit rawStimuliFile.setspec.sparcPages pageId to launch for this SPARC session. Required when a stimulus file contains multiple SPARC pages and useful for documenting single-page generated packages.",
                     "type": "string",
                     "default": "",
                     "options": {

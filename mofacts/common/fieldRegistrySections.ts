@@ -25,6 +25,8 @@ import {
   LEARNING_SESSION_FIELD_REGISTRY,
   SETSPEC_DIRECT_RUNTIME_KEYS,
   SETSPEC_FIELD_REGISTRY,
+  SPARC_SESSION_DIRECT_RUNTIME_KEYS,
+  SPARC_SESSION_FIELD_REGISTRY,
   UNIT_DIRECT_RUNTIME_KEYS,
   UNIT_FIELD_REGISTRY,
   VIDEO_SESSION_DIRECT_RUNTIME_KEYS,
@@ -160,7 +162,7 @@ function createLearningSessionSchema(): Record<string, unknown> {
 }
 
 function createSparcSessionSchema(): Record<string, unknown> {
-  return createClosedObjectSchema('SPARC Session', LEARNING_SESSION_FIELD_REGISTRY);
+  return createClosedObjectSchema('SPARC Session', SPARC_SESSION_FIELD_REGISTRY);
 }
 
 function createVideoSessionSchema(): Record<string, unknown> {
@@ -285,6 +287,10 @@ export function createTdfTooltipMap(): Record<string, TooltipContent> {
       'unit[].learningsession',
       'setspec.unitTemplate[].learningsession',
     ]),
+    ...createTooltipMapForRegistry(SPARC_SESSION_FIELD_REGISTRY, [
+      'unit[].sparcsession',
+      'setspec.unitTemplate[].sparcsession',
+    ]),
     ...createTooltipMapForRegistry(ASSESSMENT_SESSION_FIELD_REGISTRY, [
       'unit[].assessmentsession',
       'setspec.unitTemplate[].assessmentsession',
@@ -328,6 +334,10 @@ export function createTdfValidatorMap(): Record<string, ValidatorConfig> {
     ...createValidatorMapForRegistry(LEARNING_SESSION_FIELD_REGISTRY, [
       'unit[].learningsession',
       'setspec.unitTemplate[].learningsession',
+    ]),
+    ...createValidatorMapForRegistry(SPARC_SESSION_FIELD_REGISTRY, [
+      'unit[].sparcsession',
+      'setspec.unitTemplate[].sparcsession',
     ]),
     ...createValidatorMapForRegistry(ASSESSMENT_SESSION_FIELD_REGISTRY, [
       'unit[].assessmentsession',
@@ -381,6 +391,13 @@ export const TDF_REGISTRY_SECTIONS: RegistrySectionDescriptor[] = [
     tooltipPrefixes: ['unit[].learningsession', 'setspec.unitTemplate[].learningsession'],
     registry: LEARNING_SESSION_FIELD_REGISTRY,
     directRuntimeKeys: LEARNING_SESSION_DIRECT_RUNTIME_KEYS,
+  },
+  {
+    schemaLabel: 'tutor.unit[].sparcsession',
+    schemaPath: ['tutor', 'unit', 'items', 'sparcsession'],
+    tooltipPrefixes: ['unit[].sparcsession', 'setspec.unitTemplate[].sparcsession'],
+    registry: SPARC_SESSION_FIELD_REGISTRY,
+    directRuntimeKeys: SPARC_SESSION_DIRECT_RUNTIME_KEYS,
   },
   {
     schemaLabel: 'tutor.unit[].assessmentsession',
@@ -450,6 +467,7 @@ export const TDF_VALIDATION_COVERAGE = Object.freeze({
   deliverySettings: createValidationCoverageForRegistry(DELIVERY_DISPLAY_SETTINGS_FIELD_REGISTRY),
   unit: createValidationCoverageForRegistry(UNIT_FIELD_REGISTRY),
   learningsession: createValidationCoverageForRegistry(LEARNING_SESSION_FIELD_REGISTRY),
+  sparcsession: createValidationCoverageForRegistry(SPARC_SESSION_FIELD_REGISTRY),
   assessmentsession: createValidationCoverageForRegistry(ASSESSMENT_SESSION_FIELD_REGISTRY),
   conditiontemplatesbygroup: createValidationCoverageForRegistry(ASSESSMENT_CONDITION_TEMPLATES_FIELD_REGISTRY),
   videosession: createValidationCoverageForRegistry(VIDEO_SESSION_FIELD_REGISTRY),
