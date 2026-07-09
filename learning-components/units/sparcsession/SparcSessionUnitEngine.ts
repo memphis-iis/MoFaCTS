@@ -167,16 +167,19 @@ function createCleanAutoTutorClusterTarget(params: {
 }
 
 function cleanMisconceptionsFromDisplay(display: SparcTrialDisplay): readonly SparcAutoTutorMisconception[] {
+  const autoTutorTargets = isRecord(display.autoTutorTargets) ? display.autoTutorTargets : {};
   const table = isRecord(display.misconceptionTable) ? display.misconceptionTable : {};
-  const misconceptions = Array.isArray(table.misconceptions) ? table.misconceptions : [];
+  const misconceptions = Array.isArray(autoTutorTargets.misconceptions)
+    ? autoTutorTargets.misconceptions
+    : (Array.isArray(table.misconceptions) ? table.misconceptions : []);
   return misconceptions.map((entry, index) => {
     if (!isRecord(entry)) {
-      throw new Error(`SPARC AutoTutor misconceptionTable.misconceptions[${index}] must be an object`);
+      throw new Error(`SPARC AutoTutor autoTutorTargets.misconceptions[${index}] must be an object`);
     }
     const id = typeof entry.id === 'string' && entry.id.trim() ? entry.id.trim() : '';
     const text = typeof entry.text === 'string' && entry.text.trim() ? entry.text.trim() : '';
     if (!id || !text) {
-      throw new Error(`SPARC AutoTutor misconceptionTable.misconceptions[${index}] requires id and text`);
+      throw new Error(`SPARC AutoTutor autoTutorTargets.misconceptions[${index}] requires id and text`);
     }
     return { id, text };
   });

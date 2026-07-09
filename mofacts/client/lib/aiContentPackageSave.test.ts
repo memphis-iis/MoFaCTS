@@ -196,7 +196,7 @@ describe('aiContentPackageSave', function() {
     callAsync.onSecondCall().resolves([{
       moduleId: 'autoTutor',
       title: 'Tutor_Draft',
-      artifactKindLabel: 'AutoTutor',
+      artifactKindLabel: 'SPARC AutoTutor',
       packageAssetId: 'asset-2',
       itemCount: 1,
     }]);

@@ -670,6 +670,10 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
                     clusterKC: 'autotutor.stats-confidence-interval-001.kc.e1',
                     text: 'Clean authored expectation text.',
                   }],
+                  misconceptions: [{
+                    id: 'M1',
+                    text: 'Clean authored misconception text.',
+                  }],
                 },
                 workingMemoryFacts: [{
                   factType: 'controller.targetSelectionPolicy',
@@ -699,6 +703,10 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
     assert.deepEqual(preparedState.currentDisplay.autoTutorTargets.expectations, [{
       clusterKC: 'autotutor.stats-confidence-interval-001.kc.e1',
       text: 'Clean authored expectation text.',
+    }]);
+    assert.deepEqual(preparedState.currentDisplay.autoTutorTargets.misconceptions, [{
+      id: 'M1',
+      text: 'Clean authored misconception text.',
     }]);
     assert.deepEqual(preparedState.currentDisplay.workingMemoryFacts, [{
       factType: 'controller.targetSelectionPolicy',

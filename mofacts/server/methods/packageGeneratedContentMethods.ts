@@ -88,7 +88,7 @@ function artifactKindLabel(moduleId: string): string {
     return 'Assessment session';
   }
   if (moduleId === 'autoTutor') {
-    return 'AutoTutor';
+    return 'SPARC AutoTutor';
   }
   return 'Learning session';
 }

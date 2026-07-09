@@ -9,6 +9,10 @@ import { getImportFileNames, sanitizeImportName } from './importCompositionBuild
 import type { ImportDraftLesson } from './normalizedImportTypes';
 import type { AiItem, CreationModuleId } from './aiContentTypes';
 import { normalizeAttribution, validateAiOutput, validateAutoTutorOutput } from './aiContentValidation';
+import {
+  buildCanonicalSparcAutoTutorProductionRules,
+  SPARC_AUTOTUTOR_CALCULATE_PROBABILITY,
+} from './sparcAutoTutorDraftTemplate';
 
 function promptTextFromItem(item: AiItem): string {
   return String(item.prompt?.text || '').trim();
@@ -76,41 +80,165 @@ export function buildDrafts(output: ReturnType<typeof validateAiOutput>['output'
     .map((moduleId) => applyVisibilityLock(buildManualDraftLesson(buildStateFromAi(output, moduleId)), output));
 }
 
+function normalizeSparcSlug(value: string, fallback: string): string {
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return normalized || fallback;
+}
+
+function ensureSparcAutoTutorName(value: string): string {
+  const safeBase = sanitizeImportName(value, 'AI_AutoTutor');
+  return /^SPARC_AutoTutor_/i.test(safeBase)
+    ? safeBase
+    : sanitizeImportName(`SPARC_AutoTutor_${safeBase}`, 'SPARC_AutoTutor');
+}
+
+function normalizeTargetId(value: string, fallback: string): string {
+  return normalizeSparcSlug(value, fallback).replace(/-/g, '');
+}
+
+function clusterListForCount(count: number): string {
+  return count === 1 ? '0' : `0-${count - 1}`;
+}
+
 export function buildAutoTutorDraft(output: ReturnType<typeof validateAutoTutorOutput>['output'], apiKey: string, model: string): ImportDraftLesson {
-  const safeLessonName = sanitizeImportName(output.lessonName, 'AI_AutoTutor');
+  const safeLessonName = ensureSparcAutoTutorName(output.lessonName);
   const { stimFileName } = getImportFileNames(safeLessonName);
-  const scriptId = sanitizeImportName(`${safeLessonName}_script`, 'AI_AutoTutor_script');
+  const lessonSlug = normalizeSparcSlug(safeLessonName, 'sparc-autotutor');
+  const pageId = `sparc-session-${lessonSlug}`;
+  const documentId = `sparc-autotutor-${lessonSlug}`;
+  const expectationTargets = output.expectations.map((expectation, index) => {
+    const targetId = normalizeTargetId(expectation.id, `e${index + 1}`);
+    const clusterKC = `autotutor.${lessonSlug}.kc.${targetId}`;
+    const text = expectation.assertion || expectation.proposition;
+    return {
+      index,
+      clusterKC,
+      text,
+    };
+  });
+  const misconceptionTargets = output.misconceptions.filter((misconception) => misconception !== null).map((misconception) => ({
+    id: misconception.id,
+    text: misconception.misconception,
+  }));
   const stimuli = {
     setspec: {
-      clusters: [
+      clusters: expectationTargets.map((target) => ({
+        clusterKC: target.clusterKC,
+        stims: [
+          {
+            clusterKC: target.clusterKC,
+            text: target.text,
+          },
+        ],
+      })),
+      sparcPages: [
         {
-          stims: [
-            {
-              display: {
-                text: output.prompt || output.learningGoal || `Explain ${output.topic}.`,
-                ...(output.attribution ? { attribution: output.attribution } : {}),
-              },
-              autoTutor: {
-                id: scriptId,
-                topic: output.topic,
-                learningGoal: output.learningGoal || output.prompt,
-                idealAnswer: output.idealAnswer,
-                expectations: output.expectations,
-                expectationRelationships: output.expectationRelationships,
-                ...(output.expectationRelationshipProvenance
-                  ? { expectationRelationshipProvenance: output.expectationRelationshipProvenance }
-                  : {}),
-                misconceptions: output.misconceptions,
-                dialogPolicy: {
-                  allowAnyOrder: true,
-                  requiredExpectations: output.expectations.map((entry) => entry.id),
-                  optionalExpectations: [],
-                  completionRule: 'Complete when required expectations are covered and active misconceptions are within the graduation threshold.',
-                },
-                summary: output.summary || output.idealAnswer,
-              },
+          pageId,
+          display: {
+            type: 'sparc',
+            schema: 'tutorscript-sparc/1.0',
+            documentId,
+            unitType: 'sparc-autotutor-dialogue',
+            layout: {
+              layoutMode: 'document',
+              scrollAxis: 'vertical',
+              visualPreset: 'practice-panel',
+              density: 'comfortable',
             },
-          ],
+            nodes: [
+              {
+                id: 'dialogue-thread',
+                nodeType: 'group',
+                groupType: 'dialogue-thread',
+                children: [
+                  {
+                    id: 'opening-tutor-message',
+                    nodeType: 'atomic',
+                    atomType: 'dialogue-utterance',
+                    speaker: 'tutor',
+                    value: output.prompt || output.learningGoal || `Explain ${output.topic}.`,
+                    clusterIndices: expectationTargets.map((target) => target.index),
+                  },
+                ],
+              },
+              {
+                id: 'learner-response-input',
+                nodeType: 'atomic',
+                atomType: 'text-input',
+                label: 'Response',
+              },
+              {
+                id: 'learner-response-submit',
+                nodeType: 'atomic',
+                atomType: 'button',
+                label: 'Submit',
+                value: 'submit',
+              },
+            ],
+            clusterTargets: expectationTargets.map((target) => ({
+              clusterIndex: target.index,
+              clusterKC: target.clusterKC,
+            })),
+            autoTutorTargets: {
+              expectations: expectationTargets.map((target) => ({
+                clusterKC: target.clusterKC,
+                text: target.text,
+              })),
+              misconceptions: misconceptionTargets,
+            },
+            workingMemoryFacts: [
+              {
+                factType: 'dialogue.source',
+                slots: {
+                  sourceKind: 'ai-generated-sparc-autotutor',
+                  sourceLessonName: safeLessonName,
+                  sourceUnitName: 'SPARC AutoTutor',
+                  topic: output.topic,
+                  openRouterModel: model,
+                },
+              },
+              {
+                factType: 'dialogue.thresholds',
+                slots: {
+                  lowCoverageMax: 0.33,
+                  mediumCoverageMax: 0.67,
+                  highCoverageMin: 0.67,
+                  coverageThreshold: 0.8,
+                },
+              },
+              {
+                factType: 'controller.targetSelectionPolicy',
+                slots: {
+                  policy: 'kc-graph-priority',
+                  coverageThreshold: 0.8,
+                  frontierWeight: 0.5,
+                  coherenceWeight: 0.3,
+                  centralityWeight: 0.2,
+                },
+              },
+              {
+                factType: 'dialogue.graduation',
+                slots: {
+                  requiredTargetCount: output.requiredExpectationCount,
+                  maxActiveMisconceptions: output.maxActiveMisconceptions,
+                  maxTurns: output.maxTurns,
+                },
+              },
+              ...expectationTargets.map((target) => ({
+                factType: 'kcGraph.node',
+                slots: {
+                  clusterKC: target.clusterKC,
+                  description: target.text,
+                  centrality: 0,
+                },
+              })),
+            ],
+            productionRules: buildCanonicalSparcAutoTutorProductionRules(),
+          },
         },
       ],
     },
@@ -118,22 +246,21 @@ export function buildAutoTutorDraft(output: ReturnType<typeof validateAutoTutorO
   const tutor = {
       setspec: {
         lessonname: safeLessonName,
+        name: pageId,
         stimulusfile: stimFileName,
         userselect: output.visibility === 'public' ? 'true' : 'false',
         openRouterApiKey: apiKey,
         openRouterModel: model,
+        tags: ['autotutor', 'sparc-session', 'sparc-autotutor', 'ai-generated'],
       },
     unit: [
       {
-        unitname: 'AutoTutor',
-        autotutorsession: {
-          cluster: 0,
-          openRouterModel: model,
-          maxTurns: output.maxTurns,
-          graduation: {
-            requiredExpectationCount: output.requiredExpectationCount,
-            maxActiveMisconceptions: output.maxActiveMisconceptions,
-          },
+        unitname: 'SPARC AutoTutor',
+        sparcsession: {
+          unitMode: 'distance',
+          pageId,
+          clusterlist: clusterListForCount(expectationTargets.length),
+          calculateProbability: SPARC_AUTOTUTOR_CALCULATE_PROBABILITY,
         },
       },
     ],

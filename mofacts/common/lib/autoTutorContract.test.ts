@@ -82,6 +82,83 @@ function buildValidStimuli() {
   };
 }
 
+function buildValidSparcAutoTutorTdf() {
+  return {
+    tutor: {
+      unit: [
+        {
+          unitname: 'SPARC AutoTutor',
+          sparcsession: {
+            pageId: 'sparc-session-demo',
+            clusterlist: '0',
+          },
+        },
+      ],
+    },
+  };
+}
+
+function buildValidSparcAutoTutorStimuli() {
+  return {
+    setspec: {
+      clusters: [
+        {
+          clusterKC: 'autotutor.demo.kc.e1',
+          stims: [
+            {
+              clusterKC: 'autotutor.demo.kc.e1',
+              text: 'A confidence interval procedure has long-run coverage.',
+            },
+          ],
+        },
+      ],
+      sparcPages: [
+        {
+          pageId: 'sparc-session-demo',
+          display: {
+            schema: 'tutorscript-sparc/1.0',
+            unitType: 'sparc-autotutor-dialogue',
+            nodes: [
+              {
+                id: 'learner-response-input',
+                nodeType: 'atomic',
+                atomType: 'text-input',
+              },
+            ],
+            clusterTargets: [
+              {
+                clusterIndex: 0,
+                clusterKC: 'autotutor.demo.kc.e1',
+              },
+            ],
+            autoTutorTargets: {
+              expectations: [
+                {
+                  clusterKC: 'autotutor.demo.kc.e1',
+                  text: 'A confidence interval procedure has long-run coverage.',
+                },
+              ],
+              misconceptions: [
+                {
+                  id: 'M1',
+                  text: 'A confidence interval assigns probability to the fixed parameter.',
+                },
+              ],
+            },
+            productionRules: [
+              {
+                id: 'dialogue.move.generated-completion-summary',
+                when: [{ factType: 'dialogue.completionSelected' }],
+                then: [],
+              },
+            ],
+          },
+        },
+      ],
+    },
+  };
+}
+
 describe('AutoTutor content contract', function() {
   it('accepts a valid AutoTutor TDF and stimulus pair', function() {
     const result = validateAutoTutorContent({
@@ -90,6 +167,28 @@ describe('AutoTutor content contract', function() {
     });
 
     expect(result).to.deep.equal({ valid: true, errors: [] });
+  });
+
+  it('accepts a clean SPARC AutoTutor TDF and stimulus pair', function() {
+    const result = validateAutoTutorContent({
+      tdf: buildValidSparcAutoTutorTdf(),
+      stimuli: buildValidSparcAutoTutorStimuli(),
+    });
+
+    expect(result).to.deep.equal({ valid: true, errors: [] });
+  });
+
+  it('rejects forbidden legacy target fields in SPARC AutoTutor content', function() {
+    const stimuli = buildValidSparcAutoTutorStimuli();
+    (stimuli.setspec.sparcPages[0]!.display.clusterTargets[0] as Record<string, unknown>).KCDefault = 'legacy';
+
+    const result = validateAutoTutorContent({
+      tdf: buildValidSparcAutoTutorTdf(),
+      stimuli,
+    });
+
+    expect(result.valid).to.equal(false);
+    expect(result.errors).to.include('setspec.sparcPages[0].display.clusterTargets[0].KCDefault is not allowed in SPARC AutoTutor target data');
   });
 
   it('requires an effective model for AutoTutor units without requiring stored provider keys', function() {

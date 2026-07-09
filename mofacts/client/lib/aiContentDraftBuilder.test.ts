@@ -30,7 +30,7 @@ describe('aiContentDraftBuilder', function() {
     expect(drafts[1]!.workingCopy.stimuli.setspec.clusters).to.have.length(2);
   });
 
-  it('builds an AutoTutor draft with script, graduation settings, and private/public visibility', function() {
+  it('builds a clean SPARC AutoTutor draft with canonical dialogue rules and private/public visibility', function() {
     const validation = validateAutoTutorOutput({
       lessonName: 'Krebs Tutor',
       prompt: 'Explain the Krebs cycle.',
@@ -69,18 +69,74 @@ describe('aiContentDraftBuilder', function() {
 
     const draft = buildAutoTutorDraft(validation.output, 'test-openrouter-key', 'openai/test-model');
     const tutor = draft.workingCopy.tutor as { setspec: Record<string, unknown>; unit: Array<Record<string, any>> };
-    const firstStim = (draft.workingCopy.stimuli.setspec.clusters[0] as any).stims[0];
+    const stimuli = draft.workingCopy.stimuli as any;
+    const sparcPage = stimuli.setspec.sparcPages[0];
+    const display = sparcPage.display;
 
-    expect(draft.title).to.equal('Krebs_Tutor');
+    expect(draft.title).to.equal('SPARC_AutoTutor_Krebs_Tutor');
     expect(tutor.setspec.userselect).to.equal('false');
     expect(tutor.setspec.openRouterApiKey).to.equal('test-openrouter-key');
     expect(tutor.setspec.openRouterModel).to.equal('openai/test-model');
-    expect(tutor.unit[0]!.autotutorsession.maxTurns).to.equal(12);
-    expect(tutor.unit[0]!.autotutorsession.graduation.requiredExpectationCount).to.equal(1);
-    expect(firstStim.display.text).to.equal('Explain the Krebs cycle.');
-    expect(firstStim.autoTutor.expectations[0].id).to.equal('E1');
-    expect(firstStim.autoTutor.expectationRelationships).to.deep.equal({ E1: { E2: 0.8 } });
-    expect(firstStim.autoTutor.expectationRelationshipProvenance.cacheKey).to.equal('cache-key');
-    expect(firstStim.autoTutor.dialogPolicy.requiredExpectations).to.deep.equal(['E1', 'E2']);
+    expect(tutor.setspec.tags).to.deep.equal(['autotutor', 'sparc-session', 'sparc-autotutor', 'ai-generated']);
+    expect(tutor.setspec.tags).not.to.include('autotutor-converted');
+    expect(tutor.unit[0]!.autotutorsession).to.equal(undefined);
+    expect(tutor.unit[0]!.sparcsession).to.include({
+      unitMode: 'distance',
+      pageId: 'sparc-session-sparc-autotutor-krebs-tutor',
+      clusterlist: '0-1',
+    });
+    expect(tutor.unit[0]!.sparcsession.calculateProbability).to.be.a('string').and.contain('pFunc.logitdec');
+
+    expect(stimuli.setspec.clusters).to.have.length(2);
+    expect(stimuli.setspec.clusters[0].clusterKC).to.equal('autotutor.sparc-autotutor-krebs-tutor.kc.e1');
+    expect(stimuli.setspec.clusters[0].stims[0]).to.deep.equal({
+      clusterKC: 'autotutor.sparc-autotutor-krebs-tutor.kc.e1',
+      text: 'Acetyl-CoA enters the cycle.',
+    });
+
+    expect(sparcPage.pageId).to.equal('sparc-session-sparc-autotutor-krebs-tutor');
+    expect(display.schema).to.equal('tutorscript-sparc/1.0');
+    expect(display.unitType).to.equal('sparc-autotutor-dialogue');
+    expect(display.clusterTargets).to.deep.equal([
+      {
+        clusterIndex: 0,
+        clusterKC: 'autotutor.sparc-autotutor-krebs-tutor.kc.e1',
+      },
+      {
+        clusterIndex: 1,
+        clusterKC: 'autotutor.sparc-autotutor-krebs-tutor.kc.e2',
+      },
+    ]);
+    expect(display.autoTutorTargets.expectations).to.deep.equal([
+      {
+        clusterKC: 'autotutor.sparc-autotutor-krebs-tutor.kc.e1',
+        text: 'Acetyl-CoA enters the cycle.',
+      },
+      {
+        clusterKC: 'autotutor.sparc-autotutor-krebs-tutor.kc.e2',
+        text: 'The cycle makes electron carriers.',
+      },
+    ]);
+    expect(display.autoTutorTargets.misconceptions).to.deep.equal([
+      {
+        id: 'M1',
+        text: 'The Krebs cycle directly makes most ATP.',
+      },
+    ]);
+    expect(display.productionRules.map((rule: any) => rule.id)).to.deep.equal([
+      'dialogue.move.paper-rule-08-summary',
+      'dialogue.move.paper-rule-04-splice',
+      'dialogue.move.misconception-repair-splice',
+      'dialogue.move.paper-rule-06-hint',
+      'dialogue.move.paper-rule-07-hint',
+      'dialogue.move.paper-rule-09-elaborate',
+      'dialogue.move.paper-rule-03-positive-pump',
+      'dialogue.move.paper-rule-05-prompt',
+      'dialogue.move.paper-rule-01-pump',
+      'dialogue.move.paper-rule-02-pump',
+      'dialogue.move.generated-completion-summary',
+    ]);
+    expect(JSON.stringify(draft.workingCopy)).not.to.contain('autotutorsession');
+    expect(JSON.stringify(display.clusterTargets)).not.to.match(/sourceAutoTutor|stimulusKC|KCId|KCDefault|KCCluster/);
   });
 });
