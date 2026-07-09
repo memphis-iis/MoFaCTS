@@ -12,6 +12,7 @@ import { sortPropertiesModal } from '../../lib/schemaApplicabilityEditor';
 import { ensureJsonEditor } from '../../lib/jsonEditorLoader';
 import { translatePlatformString } from '../../lib/interfaceI18n';
 import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
+import { buildStimulusEditorRawStimuliSavePayload } from '../../../common/lib/editorSaveShape';
 
 const FlowRouter = (globalThis as any).FlowRouter;
 const TdfsCollection = (globalThis as any).Tdfs || (globalThis as any).TdfsCollection;
@@ -471,9 +472,8 @@ Template.contentEdit.events({
                 throw new Error(contentEditorText('contentEditor.tdfDataUnavailable'));
             }
 
-            // Build updated rawStimuliFile - wrap clusters back into setspec
-            const updatedRawStimuli = clone(tdf.rawStimuliFile);
-            updatedRawStimuli.setspec = { clusters: editedClusters };
+            // Build updated rawStimuliFile while preserving non-cluster stimulus metadata.
+            const updatedRawStimuli = buildStimulusEditorRawStimuliSavePayload(tdf.rawStimuliFile, editedClusters);
 
             // We'll let the server regenerate the stimuli array from the raw file
             // This is cleaner than trying to rebuild it client-side

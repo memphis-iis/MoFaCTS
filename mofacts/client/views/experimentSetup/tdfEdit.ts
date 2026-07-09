@@ -304,9 +304,10 @@ Template.tdfEdit.events({
             // Wrap back in the expected structure for storage
             // Editor edits tutor, content is { tdfs: { tutor: {...} } }
             const tdfContent = { tdfs: { tutor: editedTutor } };
+            const removedTutorPaths = collectRemovedEditorPaths(instance._baselineValue, editedTutor);
 
             // Call server to save (server validates ownership, encrypts new API keys, and saves)
-            await meteorCallAsync('saveTdfContent', instance.tdfId, tdfContent, apiKeyUpdates);
+            await meteorCallAsync('saveTdfContent', instance.tdfId, tdfContent, apiKeyUpdates, removedTutorPaths);
 
             showSaveFeedbackAndRedirect(instance, tdfEditorText('tdfEditor.savedReturning'));
             instance.hasChanges.set(false);
@@ -383,6 +384,29 @@ function removeEmptyProperties(obj: any): any {
 
 function normalizeEditorValue(value: any) {
     return value && typeof value === 'object' ? value : {};
+}
+
+function cloneJsonLike(value: any): any {
+    return value === undefined ? value : JSON.parse(JSON.stringify(value));
+}
+
+function collectRemovedEditorPaths(originalValue: any, editedValue: any, prefix = ''): string[] {
+    if (!originalValue || typeof originalValue !== 'object' || Array.isArray(originalValue)) {
+        return [];
+    }
+    const editedObject = editedValue && typeof editedValue === 'object' && !Array.isArray(editedValue)
+        ? editedValue
+        : {};
+    const removedPaths: string[] = [];
+    Object.keys(originalValue).forEach((key) => {
+        const path = prefix ? `${prefix}.${key}` : key;
+        if (!Object.prototype.hasOwnProperty.call(editedObject, key)) {
+            removedPaths.push(path);
+            return;
+        }
+        removedPaths.push(...collectRemovedEditorPaths(originalValue[key], editedObject[key], path));
+    });
+    return removedPaths;
 }
 
 function updateChangeState(instance: any, value: any) {
@@ -778,6 +802,7 @@ async function initEditor(instance: any, tdf: any) {
         // This prevents false "unsaved changes" due to json-editor normalizing data
         instance.originalTdf.tutor = instance.editor.getValue();
         const baselineValue = instance.editor.getValue();
+        instance._baselineValue = cloneJsonLike(baselineValue);
         instance._baselineSerialized = JSON.stringify(normalizeEditorValue(baselineValue));
         updateChangeState(instance, baselineValue);
 

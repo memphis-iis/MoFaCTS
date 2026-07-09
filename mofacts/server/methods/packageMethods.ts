@@ -5,6 +5,7 @@ import { processPackageUploadWorkflow } from '../lib/packageUpload';
 import type { PackageUploadIntegrity } from '../lib/packageUploadShared';
 import type { createStorageBoundary } from '../lib/storageBoundary';
 import { validateAutoTutorContent } from '../../common/lib/autoTutorContract';
+import { mergeEditorContentPreservingSourceShape } from '../../common/lib/editorSaveShape';
 import { createPackageGeneratedContentMethods } from './packageGeneratedContentMethods';
 import type { ApiKeyResolutionDeps } from '../lib/apiKeyResolution';
 
@@ -124,6 +125,43 @@ type PackageMethodsDeps = {
   canonicalizeStimDisplayMediaRefs: (stimuliDoc: any, stimuliSetId: any, options: any) => Promise<any>;
   canonicalizeFlatStimuliMediaRefs: (canonicalStimuli: any, stimuliSetId: any, options: any) => Promise<any>;
 };
+
+function isPlainRecord(value: unknown): value is UnknownRecord {
+  return Object.prototype.toString.call(value) === '[object Object]';
+}
+
+function isSafeEditorRemovalPath(path: string) {
+  if (!path || path.length > 500) {
+    return false;
+  }
+  return path
+    .split('.')
+    .every((segment) => /^[A-Za-z0-9_$-]+$/.test(segment) && !['__proto__', 'constructor', 'prototype'].includes(segment));
+}
+
+function deleteEditorRelativePath(root: unknown, path: string) {
+  if (!isSafeEditorRemovalPath(path)) {
+    throw new Meteor.Error(400, `Invalid editor removal path: ${path}`);
+  }
+  const segments = path.split('.');
+  let current: unknown = root;
+  for (const segment of segments.slice(0, -1)) {
+    if (!isPlainRecord(current)) {
+      return;
+    }
+    const next = current[segment];
+    if (!isPlainRecord(next)) {
+      return;
+    }
+    current = next;
+  }
+  if (isPlainRecord(current)) {
+    const lastSegment = segments[segments.length - 1];
+    if (lastSegment) {
+      delete current[lastSegment];
+    }
+  }
+}
 
 export function createPackageMethods(deps: PackageMethodsDeps) {
   async function requireContentUploadActor(thisArg: MethodContext, requestedOwner: unknown) {
@@ -898,11 +936,13 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     this: MethodContext,
     tdfId: string,
     tdfContent: { tdfs?: { tutor?: { setspec?: { lessonname?: string; speechAPIKey?: string; textToSpeechAPIKey?: string; openRouterApiKey?: string; condition?: string[]; conditionTdfIds?: Array<string | null>; [key: string]: unknown } } } } & UnknownRecord,
-    apiKeyUpdates: { speechAPIKey?: boolean; textToSpeechAPIKey?: boolean; openRouterApiKey?: boolean } = {}
+    apiKeyUpdates: { speechAPIKey?: boolean; textToSpeechAPIKey?: boolean; openRouterApiKey?: boolean } = {},
+    removedTutorPaths: string[] = []
   ) {
     check(tdfId, String);
     check(tdfContent, Object);
     check(apiKeyUpdates, Object);
+    check(removedTutorPaths, [String]);
 
     const tdf = await deps.Tdfs.findOneAsync({_id: tdfId});
     if (!tdf) {
@@ -918,7 +958,14 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       throw new Meteor.Error('invalid-tdf', 'TDF must have a lesson name');
     }
 
-    const setspec = tdfContent.tdfs?.tutor?.setspec;
+    const tdfContentToSave = mergeEditorContentPreservingSourceShape(tdf.content, tdfContent);
+    const tutorToSave = tdfContentToSave.tdfs?.tutor;
+    if (tutorToSave) {
+      for (const path of removedTutorPaths) {
+        deleteEditorRelativePath(tutorToSave, path);
+      }
+    }
+    const setspec = tdfContentToSave.tdfs?.tutor?.setspec;
     if (setspec) {
       if (apiKeyUpdates.speechAPIKey && setspec.speechAPIKey) {
         setspec.speechAPIKey = deps.encryptData(setspec.speechAPIKey);
@@ -932,16 +979,20 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
         setspec.openRouterApiKey = deps.encryptData(setspec.openRouterApiKey);
         deps.serverConsole('saveTdfContent: Encrypted new openRouterApiKey');
       }
-      setspec.conditionTdfIds = await resolveConditionTdfIds(setspec);
+      if (Array.isArray(setspec.condition) && setspec.condition.length > 0) {
+        setspec.conditionTdfIds = await resolveConditionTdfIds(setspec);
+      } else {
+        delete setspec.conditionTdfIds;
+      }
     }
     const autoTutorValidation = validateAutoTutorContent({
-      tdf: tdfContent.tdfs,
+      tdf: tdfContentToSave.tdfs,
       stimuli: tdf.rawStimuliFile,
     });
     if (!autoTutorValidation.valid) {
       throw new Meteor.Error('invalid-autotutor-content', autoTutorValidation.errors.join('; '));
     }
-    const tutor = tdfContent.tdfs?.tutor as { unit?: Array<{ unitinstructions?: string; unitinstructionsquestion?: string }> } | undefined;
+    const tutor = tdfContentToSave.tdfs?.tutor as { unit?: Array<{ unitinstructions?: string; unitinstructionsquestion?: string }> } | undefined;
     if (tutor?.unit && Array.isArray(tutor.unit)) {
       await deps.processAudioFilesForTDF({ tutor: { unit: tutor.unit } }, tdf.stimuliSetId, {
         rejectUnresolved: true,
@@ -951,11 +1002,11 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
 
     await deps.Tdfs.updateAsync({_id: tdfId}, {
       $set: {
-        content: tdfContent
+        content: tdfContentToSave
       }
     });
 
-    deps.serverConsole('saveTdfContent: Updated TDF', tdfId, 'lesson:', tdfContent.tdfs?.tutor?.setspec?.lessonname || '');
+    deps.serverConsole('saveTdfContent: Updated TDF', tdfId, 'lesson:', tdfContentToSave.tdfs?.tutor?.setspec?.lessonname || '');
 
     return { success: true };
   }

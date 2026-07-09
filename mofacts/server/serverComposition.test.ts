@@ -1017,6 +1017,142 @@ describe('public TDF and stimulus method authorization', function() {
   });
 });
 
+describe('editor save shape preservation methods', function() {
+  beforeEach(async function() {
+    await clearServerCompositionCollections();
+  });
+
+  it('preserves condition-root fields and absence of tutor.unit when saving TDF editor changes', async function() {
+    await TdfsAny.insertAsync({
+      _id: 'condition-a',
+      ownerId: 'owner-user',
+      content: { fileName: 'condition-a.json', tdfs: { tutor: { setspec: { lessonname: 'A' }, unit: [] } } },
+    });
+    await TdfsAny.insertAsync({
+      _id: 'condition-b',
+      ownerId: 'owner-user',
+      content: { fileName: 'condition-b.json', tdfs: { tutor: { setspec: { lessonname: 'B' }, unit: [] } } },
+    });
+    await TdfsAny.insertAsync({
+      _id: 'condition-root-save',
+      ownerId: 'owner-user',
+      stimuliSetId: 501,
+      conditionCounts: [7, 9],
+      content: {
+        fileName: 'condition-root.json',
+        tdfs: {
+          tutor: {
+            setspec: {
+              lessonname: 'Condition Root',
+              condition: ['condition-a.json', 'condition-b.json'],
+              conditionTdfIds: ['condition-a', 'condition-b'],
+              loadbalancing: 'min',
+            },
+            deliverySettings: {
+              experimentLoginText: 'Prolific ID',
+            },
+          },
+        },
+      },
+    });
+
+    await (asyncMethods.saveTdfContent as any).call({ userId: 'owner-user' }, 'condition-root-save', {
+      tdfs: {
+        tutor: {
+          setspec: {
+            lessonname: 'Condition Root',
+            condition: ['condition-a.json', 'condition-b.json'],
+            loadbalancing: 'max',
+          },
+          unit: [],
+        },
+      },
+    }, {});
+
+    const updated = await TdfsAny.findOneAsync({ _id: 'condition-root-save' });
+    expect(updated.content.fileName).to.equal('condition-root.json');
+    expect(updated.content.tdfs.tutor).to.not.have.property('unit');
+    expect(updated.content.tdfs.tutor.setspec.loadbalancing).to.equal('max');
+    expect(updated.content.tdfs.tutor.setspec.condition).to.deep.equal(['condition-a.json', 'condition-b.json']);
+    expect(updated.content.tdfs.tutor.setspec.conditionTdfIds).to.deep.equal(['condition-a', 'condition-b']);
+    expect(updated.content.tdfs.tutor.deliverySettings).to.deep.equal({ experimentLoginText: 'Prolific ID' });
+    expect(updated.conditionCounts).to.deep.equal([7, 9]);
+  });
+
+  it('does not add TDF wrapper fields when saving stimuli editor changes', async function() {
+    await TdfsAny.insertAsync({
+      _id: 'stimulus-editor-save',
+      ownerId: 'owner-user',
+      stimuliSetId: 502,
+      rawStimuliFile: {
+        setspec: {
+          prompt: 'Keep prompt metadata',
+          clusters: [{ stims: [] }],
+        },
+      },
+      stimuli: [],
+      content: {
+        fileName: 'stimulus-editor-root.json',
+        tdfs: {
+          tutor: {
+            setspec: {
+              lessonname: 'Stimulus Editor Root',
+              stimulusfile: 'stimulus-editor-stims.json',
+            },
+          },
+        },
+      },
+    });
+
+    await (asyncMethods.saveTdfStimuli as any).call({ userId: 'owner-user' }, 'stimulus-editor-save', {
+      setspec: {
+        prompt: 'Keep prompt metadata',
+        clusters: [{ stims: [] }],
+      },
+    }, null);
+
+    const updated = await TdfsAny.findOneAsync({ _id: 'stimulus-editor-save' });
+    expect(updated.content.tdfs.tutor).to.not.have.property('unit');
+    expect(updated.rawStimuliFile.setspec.prompt).to.equal('Keep prompt metadata');
+    expect(updated.rawStimuliFile.setspec.clusters).to.deep.equal([{ stims: [] }]);
+  });
+
+  it('honors explicit TDF editor removal paths without stripping source-only fields', async function() {
+    await TdfsAny.insertAsync({
+      _id: 'tdf-editor-removal',
+      ownerId: 'owner-user',
+      content: {
+        fileName: 'tdf-editor-removal.json',
+        tdfs: {
+          tutor: {
+            setspec: {
+              lessonname: 'Removal Test',
+              tips: ['remove me'],
+            },
+            deliverySettings: {
+              experimentLoginText: 'Keep login prompt',
+            },
+          },
+        },
+      },
+    });
+
+    await (asyncMethods.saveTdfContent as any).call({ userId: 'owner-user' }, 'tdf-editor-removal', {
+      tdfs: {
+        tutor: {
+          setspec: {
+            lessonname: 'Removal Test',
+          },
+        },
+      },
+    }, {}, ['setspec.tips']);
+
+    const updated = await TdfsAny.findOneAsync({ _id: 'tdf-editor-removal' });
+    expect(updated.content.tdfs.tutor.setspec).to.not.have.property('tips');
+    expect(updated.content.tdfs.tutor.deliverySettings).to.deep.equal({ experimentLoginText: 'Keep login prompt' });
+  });
+});
+
 describe('learner analytics method authorization', function() {
   beforeEach(async function() {
     await clearServerCompositionCollections();
