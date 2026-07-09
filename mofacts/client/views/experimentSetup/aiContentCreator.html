@@ -17,11 +17,11 @@
       .ai-create-card {
         width: min(100%, 720px);
         display: grid;
-        gap: var(--app-space-3);
-        padding: clamp(var(--app-space-3), 4vw, var(--app-space-4));
+        gap: var(--app-space-2);
+        padding: var(--app-space-3);
         background: var(--learning-card-surface-color);
         border: 1px solid var(--border-color);
-        border-radius: calc(var(--border-radius, 4px) * 4);
+        border-radius: var(--app-border-radius-sm);
         box-shadow: var(--app-elevation-3, 0 12px 40px rgba(0, 0, 0, 0.12));
       }
 
@@ -35,14 +35,14 @@
       .ai-create-page.is-embedded .ai-create-card {
         width: 100%;
         max-width: none;
-        border-radius: var(--border-radius, 4px);
+        border-radius: var(--app-border-radius-sm);
         box-shadow: none;
       }
 
       .ai-create-header {
         display: flex;
-        gap: var(--app-space-3);
-        align-items: flex-start;
+        gap: var(--app-space-2);
+        align-items: center;
       }
 
       .ai-create-icon,
@@ -57,17 +57,17 @@
       }
 
       .ai-create-icon {
-        width: calc(44px * var(--app-density-scale));
-        height: calc(44px * var(--app-density-scale));
-        border-radius: calc(var(--border-radius, 4px) * 3);
-        font-size: calc(var(--app-font-size-base) * 1.25);
+        width: calc(34px * var(--app-density-scale));
+        height: calc(34px * var(--app-density-scale));
+        border-radius: var(--app-border-radius-sm);
+        font-size: var(--app-font-size-base);
       }
 
       .ai-create-title {
         margin: 0;
-        font-size: calc(var(--app-font-size-base) * 1.375);
-        font-weight: 700;
-        line-height: 1.2;
+        font-size: calc(var(--app-font-size-base) * 1.125);
+        font-weight: 600;
+        line-height: 1.25;
         letter-spacing: 0;
       }
 
@@ -78,7 +78,7 @@
       }
 
       .ai-create-subtitle {
-        margin: var(--app-space-1) 0 0;
+        margin: 2px 0 0;
         font-size: calc(var(--app-font-size-base) * 0.875);
       }
 
@@ -88,16 +88,16 @@
 
       .ai-source-box {
         width: 100%;
-        min-height: calc(188px * var(--app-density-scale));
-        padding: calc(1.125rem * var(--app-density-scale)) calc(1.125rem * var(--app-density-scale)) calc(3.25rem * var(--app-density-scale));
-        border-radius: calc(var(--border-radius, 4px) * 5);
+        min-height: calc(126px * var(--app-density-scale));
+        padding: calc(0.75rem * var(--app-density-scale)) calc(0.875rem * var(--app-density-scale)) calc(2.4rem * var(--app-density-scale));
+        border-radius: var(--app-border-radius-sm);
         border: 1.5px solid var(--border-color);
         background: color-mix(in srgb, var(--learning-card-surface-color) 94%, var(--app-muted-surface-color));
         color: var(--app-text-color);
         resize: vertical;
         font: inherit;
         font-size: max(16px, var(--app-font-size-base));
-        line-height: 1.55;
+        line-height: 1.4;
         transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
       }
 
@@ -114,29 +114,36 @@
 
       .ai-source-meta {
         position: absolute;
-        left: calc(1.125rem * var(--app-density-scale));
-        right: calc(1.125rem * var(--app-density-scale));
-        bottom: calc(0.875rem * var(--app-density-scale));
+        left: calc(0.875rem * var(--app-density-scale));
+        right: calc(0.875rem * var(--app-density-scale));
+        bottom: calc(0.6rem * var(--app-density-scale));
         display: flex;
-        justify-content: flex-end;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--app-space-2);
         pointer-events: none;
       }
 
+      .ai-input-tip {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: var(--app-secondary-text-color);
+        font-size: calc(var(--app-font-size-base) * 0.75);
+      }
+
       .ai-char-count {
+        flex-shrink: 0;
         padding: 2px var(--app-space-1);
-        border-radius: var(--border-radius, 4px);
+        border-radius: var(--app-border-radius-sm);
         background: color-mix(in srgb, var(--learning-card-surface-color) 84%, transparent);
         color: var(--app-secondary-text-color);
         font-size: calc(var(--app-font-size-base) * 0.75);
       }
 
-      .ai-create-tip {
-        margin: calc(-1 * var(--app-space-1)) var(--app-space-1) 0;
-        font-size: calc(var(--app-font-size-base) * 0.8125);
-      }
-
       .ai-mode-label {
-        margin: var(--app-space-1) 0 0 var(--app-space-1);
+        margin: 0 0 calc(-0.25rem * var(--app-density-scale)) var(--app-space-1);
         color: var(--app-secondary-text-color);
         font-size: calc(var(--app-font-size-base) * 0.8125);
         font-weight: 700;
@@ -147,18 +154,18 @@
       .ai-mode-selector {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: var(--app-space-2);
+        gap: var(--app-space-1);
       }
 
       .ai-mode-card {
-        min-height: calc(72px * var(--app-density-scale));
+        min-height: calc(var(--app-button-height) * 0.9);
         display: flex;
         align-items: center;
-        gap: var(--app-space-2);
-        padding: calc(0.875rem * var(--app-density-scale));
+        gap: var(--app-space-1);
+        padding: calc(0.45rem * var(--app-density-scale)) calc(0.6rem * var(--app-density-scale));
         background: var(--learning-card-surface-color);
         border: 1.5px solid var(--border-color);
-        border-radius: calc(var(--border-radius, 4px) * 4);
+        border-radius: var(--app-border-radius-sm);
         color: var(--app-text-color);
         text-align: left;
         transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
@@ -177,11 +184,12 @@
       }
 
       .ai-mode-icon {
-        width: calc(40px * var(--app-density-scale));
-        height: calc(40px * var(--app-density-scale));
-        border-radius: calc(var(--border-radius, 4px) * 3);
+        width: calc(28px * var(--app-density-scale));
+        height: calc(28px * var(--app-density-scale));
+        border-radius: var(--app-border-radius-sm);
         background: var(--app-muted-surface-color);
         color: var(--app-secondary-text-color);
+        font-size: calc(var(--app-font-size-base) * 0.875);
       }
 
       .ai-mode-card.is-selected .ai-mode-icon {
@@ -189,26 +197,17 @@
         color: var(--app-info-color);
       }
 
-      .ai-mode-text strong,
-      .ai-mode-text span {
-        display: block;
+      .ai-mode-text {
+        min-width: 0;
       }
 
       .ai-mode-text strong {
-        font-size: calc(var(--app-font-size-base) * 0.9375);
-        line-height: 1.1;
-      }
-
-      .ai-mode-text span {
-        margin-top: 3px;
-        color: var(--app-secondary-text-color);
-        font-size: calc(var(--app-font-size-base) * 0.75);
-      }
-
-      .ai-mode-helper {
-        min-height: calc(18px * var(--app-density-scale));
-        margin: calc(-1 * var(--app-space-1)) var(--app-space-1) 0;
-        font-size: calc(var(--app-font-size-base) * 0.8125);
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: calc(var(--app-font-size-base) * 0.875);
+        line-height: 1.15;
       }
 
       .ai-create-footer {
@@ -216,12 +215,10 @@
         align-items: center;
         justify-content: space-between;
         gap: var(--app-space-3);
-        padding-top: var(--app-space-3);
-        border-top: 1px solid var(--border-color);
       }
 
       .ai-manual-link {
-        min-height: calc(32px * var(--app-density-scale));
+        min-height: calc(var(--app-button-height) * 0.72);
         display: inline-flex;
         align-items: center;
         gap: var(--app-space-1);
@@ -229,7 +226,7 @@
         color: var(--app-accent-color);
         background: transparent;
         border: none;
-        border-radius: var(--border-radius, 4px);
+        border-radius: var(--app-border-radius-sm);
         font: inherit;
         font-size: calc(var(--app-font-size-base) * 0.875);
         font-weight: 650;
@@ -243,13 +240,13 @@
 
       .ai-create-submit {
         min-width: calc(132px * var(--app-density-scale));
-        min-height: calc(50px * var(--app-density-scale));
+        min-height: var(--app-button-height);
         display: inline-flex;
         align-items: center;
         justify-content: center;
         gap: var(--app-space-2);
         padding: 0 calc(1.5rem * var(--app-density-scale));
-        border-radius: calc(var(--border-radius, 4px) * 3);
+        border-radius: var(--app-border-radius-sm);
         font-weight: 700;
       }
 
@@ -268,7 +265,7 @@
         }
 
         .ai-create-card {
-          border-radius: calc(var(--border-radius, 4px) * 3);
+          border-radius: var(--app-border-radius-sm);
         }
 
         .ai-mode-selector {
@@ -276,7 +273,7 @@
         }
 
         .ai-mode-card {
-          min-height: calc(64px * var(--app-density-scale));
+          min-height: calc(var(--app-button-height) * 0.9);
         }
 
         .ai-create-footer {
@@ -318,11 +315,10 @@
       <div class="ai-input-wrap">
         <textarea id="ai-source-text" class="ai-source-box" placeholder="{{aiText 'aiCreator.sourcePlaceholder'}}" aria-label="{{aiText 'aiCreator.sourceAriaLabel'}}">{{sourceText}}</textarea>
         <div class="ai-source-meta">
+          <span class="ai-input-tip">{{aiText 'aiCreator.tip'}}</span>
           <span class="ai-char-count">{{sourceLength}}</span>
         </div>
       </div>
-
-      <p class="ai-create-tip">{{aiText 'aiCreator.tip'}}</p>
 
       <p class="ai-mode-label">{{aiText 'aiCreator.modeLabel'}}</p>
       <div class="ai-mode-selector" role="group" aria-label="{{aiText 'aiCreator.modeGroupLabel'}}">
@@ -332,13 +328,11 @@
             <i class="fa {{icon}}"></i>
           </div>
           <div class="ai-mode-text">
-            <strong>{{shortLabel}}</strong>
-            <span>{{description}}</span>
+            <strong>{{shortLabel}} ({{description}})</strong>
           </div>
         </button>
         {{/each}}
       </div>
-      <p class="ai-mode-helper" aria-live="polite">{{modeHelper}}</p>
 
       <footer class="ai-create-footer">
         <button type="button" class="ai-manual-link" id="ai-open-manual-creator">

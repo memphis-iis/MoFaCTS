@@ -174,6 +174,39 @@ function clearUploadMessage(template: any) {
   template.uploadMessage.set(null);
 }
 
+function getPackageUploadFiles(fileList: any): File[] {
+  return Array.from(fileList || [])
+    .filter((file: any): file is File => Boolean(file?.name) && /\.zip$/i.test(String(file.name)));
+}
+
+function resetPackageFileInput() {
+  $('#upload-file').val('');
+}
+
+function queuePackageUploads(fileList: any, template: any) {
+  const files = getPackageUploadFiles(fileList);
+  if (files.length === 0) {
+    setUploadMessage(template, contentText('content.noFilesSelected'), 'warning');
+    resetPackageFileInput();
+    return;
+  }
+
+  const runQueue = async () => {
+    for (const file of files) {
+      await doPackageUpload(file, template);
+    }
+    resetPackageFileInput();
+  };
+
+  template.packageUploadQueue = (template.packageUploadQueue || Promise.resolve())
+    .then(runQueue)
+    .catch((error: any) => {
+      clientConsole(1, '[UPLOAD] Package upload queue failed:', error);
+      setUploadMessage(template, contentText('content.packageProcessingFailed', { error: uploadErrorText(error) }), 'error');
+      resetPackageFileInput();
+    });
+}
+
 function clearInlineConfirmation(template: any, result = false) {
   if (!template?.inlineConfirmation) {
     return;
@@ -727,6 +760,7 @@ Template.contentUpload.helpers({
     this.quotaStatus = new ReactiveVar({ unlimited: true }); // Default to unlimited until loaded
     this.uploadMessage = new ReactiveVar(null);
     this.uploadMessageTimer = null;
+    this.packageUploadQueue = Promise.resolve();
     this.inlineConfirmation = new ReactiveVar(null);
     this.inlineConfirmationResolve = null;
     this.pendingUploads = new ReactiveDict(); // Track pending package uploads
@@ -1188,20 +1222,40 @@ Template.contentUpload.events({
     }
   },
 
-  // Admin/Teachers - upload a TDF file
-  'change #upload-file': function(_event: any) {
-    const template = (Template.instance() as any);
-    clearUploadMessage(template);
-    //get files array from reactive var
-    const _files = template.curFilesToUpload.get();
-    //add new files to array, appending the current file type from the dropdown
-    for (const file of Array.from($('#upload-file').prop('files'))) {
-      doPackageUpload(file, template);
+  'dragenter .package-drop-zone, dragover .package-drop-zone': function(event: any) {
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.classList.add('drag-over');
+  },
+
+  'dragleave .package-drop-zone': function(event: any) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!event.currentTarget.contains(event.relatedTarget)) {
+      event.currentTarget.classList.remove('drag-over');
     }
-    //update reactive var with new array
-    
-    //clear file input
-    $('#upload-file').val('');
+  },
+
+  'drop .package-drop-zone': function(event: any, template: any) {
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.classList.remove('drag-over');
+    clearUploadMessage(template);
+    queuePackageUploads(event.originalEvent?.dataTransfer?.files || event.dataTransfer?.files, template);
+  },
+
+  'keydown .package-drop-zone': function(event: any) {
+    if (event.key !== 'Enter' && event.key !== ' ') {
+      return;
+    }
+    event.preventDefault();
+    $('#upload-file').trigger('click');
+  },
+
+  // Admin/Teachers - upload MoFaCTS package files
+  'change #upload-file': function(event: any, template: any) {
+    clearUploadMessage(template);
+    queuePackageUploads(event.currentTarget.files, template);
   },
   // Admin/Teachers - upload and convert .apkg file
   'change #upload-apkg': async function(event: any) {
@@ -1953,7 +2007,7 @@ async function doFileUpload(fileArray: any) {
         setUploadMessage(template, contentText('content.deleteExistingFileError'), 'error');
       }
     } else {
-      doPackageUpload(file, (Template.instance() as any));
+      await doPackageUpload(file, (Template.instance() as any));
     }
   } else {
       const name = file.name;
@@ -2021,14 +2075,14 @@ async function doFileUpload(fileArray: any) {
 
 
 
-async function doPackageUpload(file: any, template: any){
+async function doPackageUpload(file: any, template: any): Promise<{ fileName: string; error?: string; skipped?: boolean }>{
   let existingFile = null;
   try {
     existingFile = await MeteorAny.callAsync('getUserAssetByName', file.name);
   } catch (error: any) {
     clientConsole(1, '[UPLOAD] Failed to check existing package:', error);
     setUploadMessage(template, contentText('content.existingPackageCheckError', { error: uploadErrorText(error) }), 'error');
-    return;
+    return { fileName: file.name, error: uploadErrorText(error) };
   }
 
   if (existingFile) {
@@ -2042,10 +2096,10 @@ async function doPackageUpload(file: any, template: any){
     });
     if (confirmed) {
       // Security: Use server method instead of direct client remove
-      MeteorAny.callAsync('removeAssetById', existingFile._id);
+      await MeteorAny.callAsync('removeAssetById', existingFile._id);
     } else {
       setUploadMessage(template, contentText('content.uploadCanceledPackage', { filename: file.name }), 'warning');
-      return;
+      return { fileName: file.name, skipped: true };
     }
   }
 
@@ -2079,228 +2133,250 @@ async function doPackageUpload(file: any, template: any){
     clientConsole(1, '[UPLOAD] Could not compute package checksum; continuing with size check only:', error);
   }
 
-  const upload = DynamicAssetsCollection.insert({
-    file: file,
-    chunkSize: 'dynamic',
-    meta: {
-      expectedSize: uploadIntegrity.expectedSize,
-      sha256: uploadIntegrity.sha256
-    }
-  }, false);
+  return await new Promise<{ fileName: string; error?: string; skipped?: boolean }>((resolve) => {
+    const finish = (result: { fileName: string; error?: string; skipped?: boolean }) => {
+      resolve(result);
+    };
 
-  upload.on('start', function (this: any) {
-    template.currentUpload.set(this);
+    const upload = DynamicAssetsCollection.insert({
+      file: file,
+      chunkSize: 'dynamic',
+      meta: {
+        expectedSize: uploadIntegrity.expectedSize,
+        sha256: uploadIntegrity.sha256
+      }
+    }, false);
 
-    // OPTIMISTIC UI: Replace temp ID with actual upload ID
-    const actualId = this._id;
-    const pendingData = template.pendingUploads.get(tempId);
-    if (!pendingData || typeof pendingData.fileName !== 'string') {
-      throw new Error('Pending package upload metadata is missing before upload start.');
-    }
-    template.pendingUploads.set(tempId, undefined);
-    template.pendingUploads.set(actualId, {
-      ...pendingData,
-      uploadId: actualId
-    });
+    upload.on('start', function (this: any) {
+      template.currentUpload.set(this);
 
-    // Refresh UI
-    assetsHelperLastRun = 0;
-    assetsHelperCachedResult = [];
-  });
-
-  // OPTIMISTIC UI: Track upload progress
-  upload.on('progress', function (this: any, progress: any) {
-    const uploadData = template.pendingUploads.get(this._id);
-    if (uploadData) {
-      template.pendingUploads.set(this._id, {
-        ...uploadData,
-        progress: progress
-      });
-      // UI refresh throttled by helper, no manual trigger needed
-    }
-  });
-
-  upload.on('end', function (this: any, error: any, fileObj: any) {
-    const pendingUploadId = this._id;
-    const packageAssetId = fileObj?._id || null;
-    if (error) {
-      // OPTIMISTIC UI: Update to error state (no alert)
-      const uploadData = template.pendingUploads.get(pendingUploadId);
-      if (uploadData) {
-        const message = contentText('content.uploadFailedForFile', { filename: file.name, error: uploadErrorText(error) });
-        template.pendingUploads.set(pendingUploadId, {
-          ...uploadData,
+      // OPTIMISTIC UI: Replace temp ID with actual upload ID
+      const actualId = this._id;
+      const pendingData = template.pendingUploads.get(tempId);
+      if (!pendingData || typeof pendingData.fileName !== 'string') {
+        const message = 'Pending package upload metadata is missing before upload start.';
+        template.pendingUploads.set(tempId, {
+          uploadId: tempId,
+          fileName: file.name,
           status: "error",
-          error: message,
-          progress: 0
+          lessonName: file.name.replace(/\.zip$/i, ''),
+          progress: 0,
+          error: message
         });
         setUploadMessage(template, message, 'error');
-        assetsHelperLastRun = 0;
-        assetsHelperCachedResult = [];
+        finish({ fileName: file.name, error: message });
+        return;
       }
-      clientConsole(1, '[UPLOAD] Upload failed:', error);
-    } else {
-      const link = DynamicAssetsCollection.link({...fileObj});
-      const fileExt = (fileObj.ext || (fileObj.name ? fileObj.name.split('.').pop() : null) || (file?.name ? file.name.split('.').pop() : null) || '').toLowerCase();
-      if (fileExt === "zip") {
-        // check if emailInsteadOfAlert is checked
-        const emailToggle = $('#emailInsteadOfAlert').is(':checked') ? true : false;
+      template.pendingUploads.set(tempId, undefined);
+      template.pendingUploads.set(actualId, {
+        ...pendingData,
+        uploadId: actualId
+      });
 
-        // OPTIMISTIC UI: Update status to processing
+      // Refresh UI
+      assetsHelperLastRun = 0;
+      assetsHelperCachedResult = [];
+    });
+
+    // OPTIMISTIC UI: Track upload progress
+    upload.on('progress', function (this: any, progress: any) {
+      const uploadData = template.pendingUploads.get(this._id);
+      if (uploadData) {
+        template.pendingUploads.set(this._id, {
+          ...uploadData,
+          progress: progress
+        });
+        // UI refresh throttled by helper, no manual trigger needed
+      }
+    });
+
+    upload.on('end', function (this: any, error: any, fileObj: any) {
+      const pendingUploadId = this._id;
+      const packageAssetId = fileObj?._id || null;
+      if (error) {
+        // OPTIMISTIC UI: Update to error state (no alert)
         const uploadData = template.pendingUploads.get(pendingUploadId);
+        const message = contentText('content.uploadFailedForFile', { filename: file.name, error: uploadErrorText(error) });
         if (uploadData) {
           template.pendingUploads.set(pendingUploadId, {
             ...uploadData,
-            status: "processing",
-            packageAssetId: packageAssetId,
-            // Keep below 100% until the processed lesson row is actually visible.
-            progress: 95
+            status: "error",
+            error: message,
+            progress: 0
           });
+          setUploadMessage(template, message, 'error');
           assetsHelperLastRun = 0;
           assetsHelperCachedResult = [];
         }
+        clientConsole(1, '[UPLOAD] Upload failed:', error);
+        finish({ fileName: file.name, error: message });
+      } else {
+        const link = DynamicAssetsCollection.link({...fileObj});
+        const fileExt = (fileObj.ext || (fileObj.name ? fileObj.name.split('.').pop() : null) || (file?.name ? file.name.split('.').pop() : null) || '').toLowerCase();
+        if (fileExt === "zip") {
+          // check if emailInsteadOfAlert is checked
+          const emailToggle = $('#emailInsteadOfAlert').is(':checked') ? true : false;
 
-        if (DEBUG_SKIP_PACKAGE_PROCESSING) {
-          clientConsole(1, '[UPLOAD] Debug: skipping processPackageUpload for', fileObj._id);
+          // OPTIMISTIC UI: Update status to processing
           const uploadData = template.pendingUploads.get(pendingUploadId);
           if (uploadData) {
-            const message = contentText('content.processingDisabledDebug');
             template.pendingUploads.set(pendingUploadId, {
               ...uploadData,
-              status: "error",
+              status: "processing",
               packageAssetId: packageAssetId,
-              error: message
+              // Keep below 100% until the processed lesson row is actually visible.
+              progress: 95
             });
-            setUploadMessage(template, message, 'warning');
             assetsHelperLastRun = 0;
             assetsHelperCachedResult = [];
           }
-          return;
-        }
 
-        (async () => {
-          try {
-            const result = await MeteorAny.callAsync('processPackageUpload', fileObj._id, Meteor.userId(), link, emailToggle, uploadIntegrity);
-            
-            for (const res of (result.results || [])) {
-              if (res.data && res.data.res == 'awaitClientTDF') {
-                let reason = []
-                const reasons = Array.isArray(res.data.reason) ? res.data.reason : [];
-                if(reasons.includes('prevTDFExists'))
-                  reason.push(contentText('content.previousTdfOverwriteMessage', { filename: res.data.TDF.content.fileName }))
-                if(reasons.includes(`prevStimExists`))
-                  reason.push(contentText('content.previousStimOverwriteMessage', { filename: res.data.TDF.content.tdfs.tutor.setspec.stimulusfile }))
-                
-                const confirmed = await requestInlineConfirmation(template, {
-                  placement: 'upload-package',
-                  title: contentText('content.overwriteExistingContent'),
-                  message: reason.join(' '),
-                  confirmLabel: contentText('content.overwriteContent'),
-                  cancelLabel: contentText('content.cancel'),
-                  level: 'warning'
-                });
-                if(confirmed){
-                  try {
-                    await MeteorAny.callAsync('tdfUpdateConfirmed', res.data.TDF, false, reasons);
-                  } catch (err: any) {
-                    // OPTIMISTIC UI: Update error state (no alert)
-                    const uploadData = template.pendingUploads.get(pendingUploadId);
-                    if (uploadData) {
-                      const message = contentText('content.confirmationFailed', { error: uploadErrorText(err) });
-                      template.pendingUploads.set(pendingUploadId, {
-                        ...uploadData,
-                        status: "error",
-                        packageAssetId: packageAssetId,
-                        error: message
-                      });
-                      setUploadMessage(template, message, 'error');
-                      assetsHelperLastRun = 0;
-                      assetsHelperCachedResult = [];
-                    }
-                    clientConsole(1, '[UPLOAD] Confirmation failed:', err);
-                    return;
-                  }
-                }
-              }
-              else if(!res.result) {
-                // OPTIMISTIC UI: Update error state (no alert)
-                const uploadData = template.pendingUploads.get(pendingUploadId);
-                if (uploadData) {
-                  const message = res.errmsg
-                    ? contentText('content.packageProcessingFailed', { error: res.errmsg })
-                    : contentText('content.packageProcessingFailed', { error: '' });
-                  template.pendingUploads.set(pendingUploadId, {
-                    ...uploadData,
-                    status: "error",
-                    packageAssetId: packageAssetId,
-                    error: message
-                  });
-                  setUploadMessage(template, message, 'error');
-                  assetsHelperLastRun = 0;
-                  assetsHelperCachedResult = [];
-                }
-                clientConsole(1, '[UPLOAD] Package processing failed:', res.errmsg);
-                return
-              }
-            }
-            // SUCCESS: Keep pending entry visible until the actual lesson row appears.
+          if (DEBUG_SKIP_PACKAGE_PROCESSING) {
+            clientConsole(1, '[UPLOAD] Debug: skipping processPackageUpload for', fileObj._id);
             const uploadData = template.pendingUploads.get(pendingUploadId);
+            const message = contentText('content.processingDisabledDebug');
             if (uploadData) {
-              template.pendingUploads.set(pendingUploadId, {
-                ...uploadData,
-                status: "completed",
-                progress: 100,
-                packageAssetId: packageAssetId,
-                stimuliSetId: result?.stimSetId ?? uploadData.stimuliSetId ?? null
-              });
-              setUploadMessage(template, contentText('content.uploadedPackageRefreshing', { filename: file.name }), 'success');
-            }
-
-            // Invalidate cache and trigger reactive refresh after successful upload
-            assetsHelperLastRun = 0;
-            assetsHelperCachedResult = [];
-            assetsRefreshTrigger.set(assetsRefreshTrigger.get() + 1);
-          } catch (err: any) {
-            // OPTIMISTIC UI: Update error state (no alert)
-            const uploadData = template.pendingUploads.get(pendingUploadId);
-            if (uploadData) {
-              const message = contentText('content.packageProcessingFailed', { error: uploadErrorText(err) });
               template.pendingUploads.set(pendingUploadId, {
                 ...uploadData,
                 status: "error",
                 packageAssetId: packageAssetId,
                 error: message
               });
-              setUploadMessage(template, message, 'error');
+              setUploadMessage(template, message, 'warning');
               assetsHelperLastRun = 0;
               assetsHelperCachedResult = [];
             }
-            clientConsole(1, '[UPLOAD] Processing error:', err);
+            finish({ fileName: file.name, error: message });
+            return;
           }
-        })();  
-      } else {
-        const uploadData = template.pendingUploads.get(pendingUploadId);
-        if (uploadData) {
-          template.pendingUploads.set(pendingUploadId, {
-            ...uploadData,
-            status: "completed",
-            progress: 100
-          });
-          setUploadMessage(template, contentText('content.uploadedFile', { filename: file.name }), 'success');
-        }
-        assetsHelperLastRun = 0;
-        assetsHelperCachedResult = [];
-        setTimeout(() => {
-          template.pendingUploads.set(pendingUploadId, undefined);
+
+          (async () => {
+            try {
+              const result = await MeteorAny.callAsync('processPackageUpload', fileObj._id, Meteor.userId(), link, emailToggle, uploadIntegrity);
+
+              for (const res of (result.results || [])) {
+                if (res.data && res.data.res == 'awaitClientTDF') {
+                  let reason = []
+                  const reasons = Array.isArray(res.data.reason) ? res.data.reason : [];
+                  if(reasons.includes('prevTDFExists'))
+                    reason.push(contentText('content.previousTdfOverwriteMessage', { filename: res.data.TDF.content.fileName }))
+                  if(reasons.includes(`prevStimExists`))
+                    reason.push(contentText('content.previousStimOverwriteMessage', { filename: res.data.TDF.content.tdfs.tutor.setspec.stimulusfile }))
+
+                  const confirmed = await requestInlineConfirmation(template, {
+                    placement: 'upload-package',
+                    title: contentText('content.overwriteExistingContent'),
+                    message: reason.join(' '),
+                    confirmLabel: contentText('content.overwriteContent'),
+                    cancelLabel: contentText('content.cancel'),
+                    level: 'warning'
+                  });
+                  if(confirmed){
+                    try {
+                      await MeteorAny.callAsync('tdfUpdateConfirmed', res.data.TDF, false, reasons);
+                    } catch (err: any) {
+                      // OPTIMISTIC UI: Update error state (no alert)
+                      const uploadData = template.pendingUploads.get(pendingUploadId);
+                      const message = contentText('content.confirmationFailed', { error: uploadErrorText(err) });
+                      if (uploadData) {
+                        template.pendingUploads.set(pendingUploadId, {
+                          ...uploadData,
+                          status: "error",
+                          packageAssetId: packageAssetId,
+                          error: message
+                        });
+                        setUploadMessage(template, message, 'error');
+                        assetsHelperLastRun = 0;
+                        assetsHelperCachedResult = [];
+                      }
+                      clientConsole(1, '[UPLOAD] Confirmation failed:', err);
+                      finish({ fileName: file.name, error: message });
+                      return;
+                    }
+                  }
+                }
+                else if(!res.result) {
+                  // OPTIMISTIC UI: Update error state (no alert)
+                  const uploadData = template.pendingUploads.get(pendingUploadId);
+                  const message = res.errmsg
+                    ? contentText('content.packageProcessingFailed', { error: res.errmsg })
+                    : contentText('content.packageProcessingFailed', { error: '' });
+                  if (uploadData) {
+                    template.pendingUploads.set(pendingUploadId, {
+                      ...uploadData,
+                      status: "error",
+                      packageAssetId: packageAssetId,
+                      error: message
+                    });
+                    setUploadMessage(template, message, 'error');
+                    assetsHelperLastRun = 0;
+                    assetsHelperCachedResult = [];
+                  }
+                  clientConsole(1, '[UPLOAD] Package processing failed:', res.errmsg);
+                  finish({ fileName: file.name, error: message });
+                  return
+                }
+              }
+              // SUCCESS: Keep pending entry visible until the actual lesson row appears.
+              const uploadData = template.pendingUploads.get(pendingUploadId);
+              if (uploadData) {
+                template.pendingUploads.set(pendingUploadId, {
+                  ...uploadData,
+                  status: "completed",
+                  progress: 100,
+                  packageAssetId: packageAssetId,
+                  stimuliSetId: result?.stimSetId ?? uploadData.stimuliSetId ?? null
+                });
+                setUploadMessage(template, contentText('content.uploadedPackageRefreshing', { filename: file.name }), 'success');
+              }
+
+              // Invalidate cache and trigger reactive refresh after successful upload
+              assetsHelperLastRun = 0;
+              assetsHelperCachedResult = [];
+              assetsRefreshTrigger.set(assetsRefreshTrigger.get() + 1);
+              finish({ fileName: file.name });
+            } catch (err: any) {
+              // OPTIMISTIC UI: Update error state (no alert)
+              const uploadData = template.pendingUploads.get(pendingUploadId);
+              const message = contentText('content.packageProcessingFailed', { error: uploadErrorText(err) });
+              if (uploadData) {
+                template.pendingUploads.set(pendingUploadId, {
+                  ...uploadData,
+                  status: "error",
+                  packageAssetId: packageAssetId,
+                  error: message
+                });
+                setUploadMessage(template, message, 'error');
+                assetsHelperLastRun = 0;
+                assetsHelperCachedResult = [];
+              }
+              clientConsole(1, '[UPLOAD] Processing error:', err);
+              finish({ fileName: file.name, error: message });
+            }
+          })();
+        } else {
+          const uploadData = template.pendingUploads.get(pendingUploadId);
+          if (uploadData) {
+            template.pendingUploads.set(pendingUploadId, {
+              ...uploadData,
+              status: "completed",
+              progress: 100
+            });
+            setUploadMessage(template, contentText('content.uploadedFile', { filename: file.name }), 'success');
+          }
           assetsHelperLastRun = 0;
           assetsHelperCachedResult = [];
-        }, 500);
+          setTimeout(() => {
+            template.pendingUploads.set(pendingUploadId, undefined);
+            assetsHelperLastRun = 0;
+            assetsHelperCachedResult = [];
+          }, 500);
+          finish({ fileName: file.name });
+        }
       }
-    }
+    });
+    upload.start();
   });
-  upload.start();
-  //return the filename
-  return { fileName: file.name };
 }
 
 async function readFileAsDataURL(file: any) {

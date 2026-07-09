@@ -270,6 +270,69 @@
     margin-top: var(--app-space-3);
 }
 
+.content-package-upload-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 34%);
+    gap: var(--app-space-3);
+    align-items: center;
+}
+
+.content-package-upload-copy {
+    min-width: 0;
+}
+
+.content-package-upload-heading {
+    margin-bottom: var(--app-space-2);
+}
+
+.content-package-upload-copy .form-check {
+    margin-left: calc(1.5rem * var(--app-density-scale));
+}
+
+.package-drop-zone {
+    display: flex;
+    min-height: calc(4.25rem * var(--app-density-scale));
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+    gap: var(--app-space-2);
+    border: 2px dashed var(--border-color);
+    border-radius: var(--app-border-radius-sm);
+    background: var(--learning-card-surface-color);
+    color: var(--app-secondary-text-color);
+    cursor: pointer;
+    text-align: center;
+    transition: border-color var(--app-transition-fast) ease, background-color var(--app-transition-fast) ease, color var(--app-transition-fast) ease;
+}
+
+.package-drop-zone:hover,
+.package-drop-zone:focus,
+.package-drop-zone.drag-over {
+    border-color: var(--app-info-color);
+    background: var(--app-info-surface-color);
+    color: var(--app-text-color);
+    outline: none;
+}
+
+.package-drop-zone.drag-over {
+    border-style: solid;
+}
+
+.package-drop-icon {
+    font-size: calc(var(--app-font-size-base) * 1.4);
+    line-height: 1;
+}
+
+.package-drop-text {
+    font-weight: 600;
+    line-height: 1.25;
+    max-width: 12rem;
+}
+
+.package-drop-zone input[type="file"] {
+    display: none;
+}
+
 .content-upload-drafts,
 .asset-accessors-section {
     margin-top: var(--app-space-3);
@@ -394,6 +457,10 @@
 }
 
 @media (max-width: 768px) {
+    .content-package-upload-layout {
+        grid-template-columns: 1fr;
+    }
+
     .content-upload-table-wrapper {
         overflow-x: hidden;
     }

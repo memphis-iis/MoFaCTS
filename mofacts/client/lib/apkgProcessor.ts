@@ -5,6 +5,8 @@
  */
 
 import JSZip from 'jszip';
+import { init as initZstd, decompress as decompressZstd } from '@bokuweb/zstd-wasm';
+import { Reader } from 'protobufjs/minimal';
 import { clientConsole } from './clientLogger';
 import { buildImportLessonDraft } from './importCompositionBuilder';
 import { parseImportIndexSpec } from './importRangeUtils';
@@ -13,9 +15,13 @@ import type { ImportDraftLesson } from './normalizedImportTypes';
 import { ensureSqlJs } from './sqlJsLoader';
 
 const US = '\x1f'; // Anki field separator
+const ZSTD_WASM_URL = '/vendor/zstd-wasm/0.0.27/zstd.wasm';
+const ZSTD_MAGIC = [0x28, 0xb5, 0x2f, 0xfd] as const;
+export type ApkgArchiveFormat = 'legacy' | 'modern';
 
 // sql.js needs to load the WASM file
 let SQL: any = null;
+let zstdLoadPromise: Promise<void> | null = null;
 
 /**
  * Initialize sql.js (loads WASM)
@@ -25,6 +31,185 @@ async function initSQL(): Promise<any> {
     SQL = await ensureSqlJs();
   }
   return SQL;
+}
+
+async function initZstdDecoder(): Promise<void> {
+  if (!zstdLoadPromise) {
+    const initZstdFromUrl = initZstd as (path?: string) => Promise<void>;
+    zstdLoadPromise = initZstdFromUrl(ZSTD_WASM_URL).catch((error: unknown) => {
+      zstdLoadPromise = null;
+      throw error;
+    });
+  }
+  return zstdLoadPromise;
+}
+
+function hasZstdMagic(bytes: Uint8Array) {
+  return ZSTD_MAGIC.every((byte, index) => bytes[index] === byte);
+}
+
+function describeApkgEntries(zip: JSZip) {
+  const entries = Object.keys(zip.files).sort();
+  return entries.slice(0, 20).join(', ') + (entries.length > 20 ? `, ... (${entries.length} entries)` : '');
+}
+
+function asMediaIndexByName(mediaIndex: Record<string, string>) {
+  const mediaIndexByName: Record<string, string> = {};
+  for (const [key, value] of Object.entries(mediaIndex)) {
+    if (value && !mediaIndexByName[value]) {
+      mediaIndexByName[value] = key;
+    }
+  }
+  return mediaIndexByName;
+}
+
+function normalizeMediaIndexValue(value: unknown, context: string) {
+  if (typeof value !== 'string') {
+    throw new Error(`Invalid APKG media map: ${context} must be a filename string`);
+  }
+  return value;
+}
+
+export function detectApkgArchiveFormat(entryNames: Iterable<string>, mediaBytes: Uint8Array): ApkgArchiveFormat {
+  const entries = new Set(entryNames);
+  const hasModernCollection = entries.has('collection.anki21b');
+  const hasModernMedia = hasZstdMagic(mediaBytes);
+
+  if (hasModernCollection || hasModernMedia) {
+    if (hasModernCollection && hasModernMedia) {
+      return 'modern';
+    }
+    throw new Error(
+      'Unsupported APKG format: modern packages must include collection.anki21b and Zstandard-compressed media'
+    );
+  }
+
+  if (entries.has('collection.anki21') || entries.has('collection.anki2')) {
+    return 'legacy';
+  }
+
+  throw new Error('No collection database found in .apkg file');
+}
+
+export function parseApkgLegacyMediaIndex(text: string) {
+  if (!text.trim()) {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(text);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('media JSON must be an object');
+    }
+    const mediaIndex: Record<string, string> = {};
+    Object.entries(parsed as Record<string, unknown>).forEach(([key, value]) => {
+      mediaIndex[key] = normalizeMediaIndexValue(value, `entry ${key}`);
+    });
+    return mediaIndex;
+  } catch (error) {
+    throw new Error(`Invalid legacy APKG media JSON: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+export function parseApkgModernMediaIndex(bytes: Uint8Array) {
+  const reader = Reader.create(bytes);
+  const mediaIndex: Record<string, string> = {};
+  let mediaOrdinal = 0;
+
+  try {
+    while (reader.pos < reader.len) {
+      const outerTag = reader.uint32();
+      const outerField = outerTag >>> 3;
+      const outerWireType = outerTag & 7;
+      if (outerField !== 1 || outerWireType !== 2) {
+        throw new Error(`unexpected top-level field ${outerField} with wire type ${outerWireType}`);
+      }
+
+      const entryLength = reader.uint32();
+      const entryEnd = reader.pos + entryLength;
+      if (entryEnd > reader.len) {
+        throw new Error('media entry length exceeds protobuf payload');
+      }
+
+      let filename = '';
+      while (reader.pos < entryEnd) {
+        const tag = reader.uint32();
+        const field = tag >>> 3;
+        const wireType = tag & 7;
+        if (field === 1 && wireType === 2) {
+          filename = reader.string();
+        } else {
+          reader.skipType(wireType);
+        }
+      }
+
+      if (reader.pos !== entryEnd) {
+        throw new Error('media entry parser did not stop at the entry boundary');
+      }
+      if (!filename) {
+        throw new Error(`media entry ${mediaOrdinal} is missing a filename`);
+      }
+
+      mediaIndex[String(mediaOrdinal)] = filename;
+      mediaOrdinal += 1;
+    }
+  } catch (error) {
+    throw new Error(`Invalid modern APKG media protobuf: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  return mediaIndex;
+}
+
+async function readZipEntryBytes(zip: JSZip, entryName: string) {
+  const entry = zip.file(entryName);
+  if (!entry) {
+    throw new Error(`APKG archive is missing ${entryName}`);
+  }
+  return entry.async('uint8array');
+}
+
+async function decompressModernApkgEntry(bytes: Uint8Array, entryName: string) {
+  if (!hasZstdMagic(bytes)) {
+    throw new Error(`Modern APKG ${entryName} is not Zstandard-compressed`);
+  }
+  await initZstdDecoder();
+  try {
+    return decompressZstd(bytes);
+  } catch (error) {
+    throw new Error(`Modern APKG ${entryName} could not be decompressed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+async function resolveApkgSource(zip: JSZip) {
+  const mediaEntry = zip.file('media');
+  if (!mediaEntry) {
+    throw new Error(`No media map found in .apkg file. Entries: ${describeApkgEntries(zip)}`);
+  }
+
+  const mediaBytes = await mediaEntry.async('uint8array');
+  const archiveFormat = detectApkgArchiveFormat(Object.keys(zip.files), mediaBytes);
+
+  if (archiveFormat === 'modern') {
+    const compressedCollectionBytes = await readZipEntryBytes(zip, 'collection.anki21b');
+    const sqliteBytes = await decompressModernApkgEntry(compressedCollectionBytes, 'collection.anki21b');
+    const mediaIndex = parseApkgModernMediaIndex(await decompressModernApkgEntry(mediaBytes, 'media'));
+    return {
+      format: 'modern' as const,
+      sqliteBytes,
+      mediaIndex,
+      mediaIndexByName: asMediaIndexByName(mediaIndex)
+    };
+  }
+
+  const mediaText = await mediaEntry.async('string');
+  const mediaIndex = parseApkgLegacyMediaIndex(mediaText);
+  const c21 = zip.file('collection.anki21');
+  const c2 = zip.file('collection.anki2');
+  return {
+    format: 'legacy' as const,
+    sqliteBytes: await (c21 || c2)!.async('uint8array'),
+    mediaIndex,
+    mediaIndexByName: asMediaIndexByName(mediaIndex)
+  };
 }
 
 /**
@@ -38,6 +223,105 @@ function queryAll(db: any, sql: any) {
   }
   stmt.free();
   return rows;
+}
+
+function tableExists(db: any, tableName: string) {
+  const stmt = db.prepare('SELECT 1 FROM sqlite_master WHERE type = ? AND name = ? LIMIT 1');
+  stmt.bind(['table', tableName]);
+  const exists = stmt.step();
+  stmt.free();
+  return exists;
+}
+
+function parseTemplateConfig(config: unknown) {
+  const result = {
+    qfmt: '',
+    afmt: ''
+  };
+  if (!(config instanceof Uint8Array)) {
+    return result;
+  }
+
+  const reader = Reader.create(config);
+  while (reader.pos < reader.len) {
+    const tag = reader.uint32();
+    const field = tag >>> 3;
+    const wireType = tag & 7;
+    if (field === 1 && wireType === 2) {
+      result.qfmt = reader.string();
+    } else if (field === 2 && wireType === 2) {
+      result.afmt = reader.string();
+    } else {
+      reader.skipType(wireType);
+    }
+  }
+  return result;
+}
+
+function loadAnkiMetadata(db: any) {
+  const colRows = queryAll(db, 'SELECT models, decks FROM col');
+  if (colRows.length === 0) {
+    throw new Error('Invalid collection: no metadata found');
+  }
+
+  const legacyModelsText = String(colRows[0].models || '').trim();
+  const legacyDecksText = String(colRows[0].decks || '').trim();
+  if (legacyModelsText) {
+    return {
+      models: JSON.parse(legacyModelsText || '{}'),
+      decks: legacyDecksText ? JSON.parse(legacyDecksText) : {}
+    };
+  }
+
+  if (!tableExists(db, 'notetypes') || !tableExists(db, 'fields') || !tableExists(db, 'templates')) {
+    return {
+      models: {},
+      decks: {}
+    };
+  }
+
+  const models: Record<string, any> = {};
+  queryAll(db, 'SELECT id, name FROM notetypes ORDER BY id ASC').forEach((noteType: any) => {
+    const modelId = String(noteType.id);
+    const fields = queryAll(
+      db,
+      `SELECT ord, name FROM fields WHERE ntid = ${modelId} ORDER BY ord ASC`
+    ).map((field: any) => ({
+      ord: Number(field.ord),
+      name: field.name
+    }));
+    const templates = queryAll(
+      db,
+      `SELECT ord, name, config FROM templates WHERE ntid = ${modelId} ORDER BY ord ASC`
+    ).map((template: any) => {
+      const parsedConfig = parseTemplateConfig(template.config);
+      return {
+        ord: Number(template.ord),
+        name: template.name,
+        qfmt: parsedConfig.qfmt,
+        afmt: parsedConfig.afmt
+      };
+    });
+    models[modelId] = {
+      id: noteType.id,
+      name: noteType.name,
+      type: 0,
+      flds: fields,
+      tmpls: templates
+    };
+  });
+
+  const decks: Record<string, any> = {};
+  if (tableExists(db, 'decks')) {
+    queryAll(db, 'SELECT id, name FROM decks ORDER BY id ASC').forEach((deck: any) => {
+      decks[String(deck.id)] = {
+        id: deck.id,
+        name: deck.name
+      };
+    });
+  }
+
+  return { models, decks };
 }
 
 /**
@@ -100,6 +384,14 @@ function extractMediaRefs(html: any) {
   return [...refs];
 }
 
+function isAudioMediaFilename(filename: unknown) {
+  return /\.(mp3|m4a|ogg|oga|wav|webm|aac|flac)$/i.test(String(filename || '').split('?')[0] || '');
+}
+
+function isImageMediaFilename(filename: unknown) {
+  return /\.(avif|gif|jpe?g|png|svg|webp|bmp)$/i.test(String(filename || '').split('?')[0] || '');
+}
+
 function isExternalMediaRef(ref: any) {
   return /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(ref);
 }
@@ -128,15 +420,22 @@ function resolveMediaRef(ref: any, mediaIndex: any, mediaIndexByName: any, zip: 
   return null;
 }
 
-function buildFieldContent(fieldValue: any, fieldType: any, mediaIndex: any, mediaIndexByName: any, zip: any) {
+export function buildApkgFieldContent(fieldValue: any, fieldType: any, mediaIndex: any, mediaIndexByName: any, zip: any) {
   const refs = extractMediaRefs(fieldValue);
   const resolvedRefs: any[] = [];
   const missingRefs: any[] = [];
+  const imageRefs: any[] = [];
+  const audioRefs: any[] = [];
 
   refs.forEach(ref => {
     const resolved = resolveMediaRef(ref, mediaIndex, mediaIndexByName, zip);
     if (resolved) {
       resolvedRefs.push(resolved);
+      if (isAudioMediaFilename(resolved.filename) || (fieldType === 'audio' && !isImageMediaFilename(resolved.filename))) {
+        audioRefs.push(resolved);
+      } else if (isImageMediaFilename(resolved.filename) || fieldType === 'image') {
+        imageRefs.push(resolved);
+      }
     } else {
       missingRefs.push(ref);
     }
@@ -145,9 +444,11 @@ function buildFieldContent(fieldValue: any, fieldType: any, mediaIndex: any, med
   const stripped = stripHtml(fieldValue);
   let text = '';
   let image = null;
+  let audio = null;
 
   if (resolvedRefs.length > 0) {
-    image = resolvedRefs[0].filename;
+    image = imageRefs[0]?.filename || null;
+    audio = audioRefs[0]?.filename || null;
     if ((fieldType === 'mixed' || fieldType === 'both') && stripped) {
       text = stripped;
     } else if (fieldType !== 'image' && fieldType !== 'audio' && stripped) {
@@ -157,16 +458,18 @@ function buildFieldContent(fieldValue: any, fieldType: any, mediaIndex: any, med
     text = stripped;
   }
 
-  return { text, image, resolvedRefs, missingRefs };
+  return { text, image, audio, resolvedRefs, missingRefs };
 }
 
 function isFieldComplete(fieldContent: any, fieldType: any) {
   const hasText = !!(fieldContent.text && fieldContent.text.trim());
   const hasImage = !!fieldContent.image;
+  const hasAudio = !!fieldContent.audio;
 
   if (fieldType === 'text') return hasText;
-  if (fieldType === 'image' || fieldType === 'audio') return hasImage;
-  return hasText || hasImage;
+  if (fieldType === 'image') return hasImage;
+  if (fieldType === 'audio') return hasAudio;
+  return hasText || hasImage || hasAudio;
 }
 
 function getImportableNoteCount(metadata: any) {
@@ -190,18 +493,9 @@ export async function analyzeApkg(file: any, onProgress: any = () => {}) {
   const zip = await JSZip.loadAsync(buffer);
   onProgress(20);
 
-  // 3. Find and load SQLite database
-  let sqliteBytes;
-  const c21 = zip.file('collection.anki21');
-  const c2 = zip.file('collection.anki2');
-
-  if (c21) {
-    sqliteBytes = await c21.async('uint8array');
-  } else if (c2) {
-    sqliteBytes = await c2.async('uint8array');
-  } else {
-    throw new Error('No collection database found in .apkg file');
-  }
+  // 3. Resolve archive format and load SQLite/media data
+  const apkgSource = await resolveApkgSource(zip);
+  const { sqliteBytes, mediaIndex, mediaIndexByName } = apkgSource;
   onProgress(30);
 
   // 4. Open SQLite database
@@ -210,14 +504,7 @@ export async function analyzeApkg(file: any, onProgress: any = () => {}) {
   onProgress(40);
 
   // 5. Extract models and decks
-  const colRows = queryAll(db, 'SELECT models, decks FROM col');
-  if (colRows.length === 0) {
-    db.close();
-    throw new Error('Invalid collection: no metadata found');
-  }
-
-  const models = JSON.parse(colRows[0].models || '{}');
-  const decks = JSON.parse(colRows[0].decks || '{}');
+  const { models, decks } = loadAnkiMetadata(db);
 
   // 6. Get primary deck name (skip "Default" if there's another)
   const deckValues = Object.values(decks) as any[];
@@ -253,15 +540,8 @@ export async function analyzeApkg(file: any, onProgress: any = () => {}) {
                        (modelName.toLowerCase().includes('cloze'));
   onProgress(60);
 
-  // 9. Load media index (needed for image previews)
-  let mediaIndex: Record<string, any> = {};
-  let mediaCount = 0;
-  const mediaJson = zip.file('media');
-  if (mediaJson) {
-    const txt = await mediaJson.async('string');
-    mediaIndex = JSON.parse(txt || '{}');
-    mediaCount = Object.keys(mediaIndex).length;
-  }
+  // 9. Count media index entries (needed for image previews)
+  const mediaCount = Object.keys(mediaIndex).length;
 
   // 10. Build field list with metadata
   const fields = primaryModel.flds.map((fld: any, index: any) => {
@@ -276,12 +556,13 @@ export async function analyzeApkg(file: any, onProgress: any = () => {}) {
     };
   });
 
-  // 11. Get sample notes to determine field types
-  const SAMPLE_SIZE = 5;
-  const sampleNotes = queryAll(db, `SELECT flds FROM notes WHERE mid = ${primaryModelId} LIMIT ${SAMPLE_SIZE}`);
+  // 11. Inspect importable notes to determine field types. Display samples can
+  // appear sparse in Quizlet/Anki exports, especially image fields.
+  const FIELD_DISPLAY_SAMPLE_LIMIT = 3;
+  const fieldAnalysisNotes = queryAll(db, `SELECT flds FROM notes WHERE mid = ${primaryModelId} ORDER BY id ASC`);
   onProgress(70);
 
-  // Analyze each field across samples
+  // Analyze each field across all importable notes, while keeping only a few display samples.
   for (const field of fields) {
     let textCount = 0;
     let imageCount = 0;
@@ -289,12 +570,14 @@ export async function analyzeApkg(file: any, onProgress: any = () => {}) {
     const samples: any[] = [];
     let firstImageRef: any = null;
 
-    sampleNotes.forEach(note => {
+    fieldAnalysisNotes.forEach(note => {
       const fieldValues = splitFields(note.flds);
       const value = fieldValues[field.index] || '';
 
       if (value.trim()) {
-        samples.push(value);
+        if (samples.length < FIELD_DISPLAY_SAMPLE_LIMIT) {
+          samples.push(value);
+        }
 
         if (hasImages(value)) {
           imageCount++;
@@ -322,24 +605,14 @@ export async function analyzeApkg(file: any, onProgress: any = () => {}) {
       field.type = 'text';
     }
 
-    field.samples = samples.slice(0, 3);
+    field.samples = samples;
     field.hasImages = imageCount > 0;
     field.hasAudio = audioCount > 0;
 
     // Extract sample image preview
     if (firstImageRef && (field.type === 'image' || field.type === 'mixed')) {
       const filename = mediaIndex[firstImageRef] || firstImageRef;
-
-      // Find numeric key for this filename
-      let numericKey = null;
-      for (const [key, value] of Object.entries(mediaIndex)) {
-        if (value === filename) {
-          numericKey = key;
-          break;
-        }
-      }
-
-      const zipKey = numericKey || firstImageRef;
+      const zipKey = mediaIndexByName[filename] || firstImageRef;
       const zipFile = zip.file(zipKey);
       if (zipFile) {
         try {
@@ -390,6 +663,7 @@ export async function analyzeApkg(file: any, onProgress: any = () => {}) {
     templates,
     // Store these for conversion phase
     _zip: zip,
+    _apkgSource: apkgSource,
     _primaryModelId: primaryModelId,
     _primaryModelNoteCount: modelUsage[primaryModelId],
     _mediaIndex: mediaIndex
@@ -453,34 +727,27 @@ async function buildDraftLessonFromApkg(metadata: any, config: any, onProgress: 
     throw new Error(rangeSelection.errorMessage || 'Invalid note range');
   }
 
-  const { _zip: zip, _primaryModelId: primaryModelId, _mediaIndex: mediaIndex } = metadata;
+  const {
+    _zip: zip,
+    _apkgSource: apkgSource,
+    _primaryModelId: primaryModelId,
+    _mediaIndex: mediaIndex
+  } = metadata;
 
   if (!zip) {
     throw new Error('Metadata missing zip data - run analyzeApkg first');
   }
 
-  const mediaIndexByName: Record<string, any> = {};
-  for (const [key, value] of Object.entries(mediaIndex as Record<string, any>)) {
-    if (value && !mediaIndexByName[value]) {
-      mediaIndexByName[value] = key;
-    }
+  if (!apkgSource?.sqliteBytes) {
+    throw new Error('Metadata missing APKG source data - run analyzeApkg first');
   }
+
+  const mediaIndexByName: Record<string, any> = apkgSource.mediaIndexByName || asMediaIndexByName(mediaIndex);
 
   // Initialize SQL if needed
   await initSQL();
 
-  // Re-open database from zip
-  let sqliteBytes;
-  const c21 = zip.file('collection.anki21');
-  const c2 = zip.file('collection.anki2');
-
-  if (c21) {
-    sqliteBytes = await c21.async('uint8array');
-  } else if (c2) {
-    sqliteBytes = await c2.async('uint8array');
-  }
-
-  const db = new SQL.Database(new Uint8Array(sqliteBytes));
+  const db = new SQL.Database(new Uint8Array(apkgSource.sqliteBytes));
   onProgress(20);
 
   // Load all notes from primary model
@@ -518,7 +785,7 @@ async function buildDraftLessonFromApkg(metadata: any, config: any, onProgress: 
     const promptFieldValue = note.fields[config.prompt.field] || '';
     const responseFieldValue = note.fields[config.response.field] || '';
 
-    const promptContent = buildFieldContent(
+    const promptContent = buildApkgFieldContent(
       promptFieldValue,
       config.prompt.type,
       mediaIndex,
@@ -530,7 +797,7 @@ async function buildDraftLessonFromApkg(metadata: any, config: any, onProgress: 
       continue;
     }
 
-    const responseContent = buildFieldContent(
+    const responseContent = buildApkgFieldContent(
       responseFieldValue,
       config.response.type,
       mediaIndex,
@@ -559,8 +826,10 @@ async function buildDraftLessonFromApkg(metadata: any, config: any, onProgress: 
     cards.push({
       promptText: promptContent.text,
       promptImage: promptContent.image,
+      promptAudio: promptContent.audio,
       responseText: responseContent.text,
       responseImage: responseContent.image,
+      responseAudio: responseContent.audio,
       tags: note.tags
     });
 
@@ -571,10 +840,11 @@ async function buildDraftLessonFromApkg(metadata: any, config: any, onProgress: 
   const items = cards.map((card: any) => ({
     prompt: {
       ...(card.promptText ? { text: card.promptText } : {}),
-      ...(card.promptImage ? { imgSrc: card.promptImage } : {})
+      ...(card.promptImage ? { imgSrc: card.promptImage } : {}),
+      ...(card.promptAudio ? { audioSrc: card.promptAudio } : {})
     },
     response: {
-      correctResponse: card.responseText || card.responseImage
+      correctResponse: card.responseText || card.responseImage || card.responseAudio
     },
     sourceType: 'freeResponse' as const
   }));

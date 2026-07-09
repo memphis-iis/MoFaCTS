@@ -272,25 +272,6 @@ function orderedModules(moduleIds: CreationModuleId[]): CreationModuleId[] {
   return CREATION_MODULES.map((module) => module.id).filter((moduleId) => selected.has(moduleId));
 }
 
-function modeHelperText(moduleIds: CreationModuleId[]): string {
-  const ordered = orderedModules(moduleIds);
-  if (ordered.length === 0) {
-    return aiText('aiCreator.selectMode');
-  }
-  if (ordered.length === 1) {
-    const module = CREATION_MODULES.find((entry) => entry.id === ordered[0]);
-    return module ? aiText(module.descriptionKey) : '';
-  }
-  const labels = ordered
-    .map((moduleId) => {
-      const module = CREATION_MODULES.find((entry) => entry.id === moduleId);
-      return module ? aiText(module.shortLabelKey) : '';
-    })
-    .filter(Boolean)
-    .join(' + ');
-  return aiText('aiCreator.comboMode', { labels });
-}
-
 async function generateAutoTutorFromAi(
   sourceText: string,
   apiKey: string,
@@ -661,9 +642,6 @@ Template.aiContentCreator.helpers({
       pressed: selected.has(module.id) ? 'true' : 'false',
       disabled: module.disabled ? true : null,
     }));
-  },
-  modeHelper() {
-    return modeHelperText((Template.instance() as AiCreatorInstance).selectedModules.get());
   },
   creating() {
     return (Template.instance() as AiCreatorInstance).creating.get();

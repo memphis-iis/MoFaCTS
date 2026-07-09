@@ -178,6 +178,52 @@
             {{> aiContentCreator embedded=true}}
         </div>
 
+        <!-- Upload Package (ZIP) Section -->
+        <div class="admin-section content-package-upload-section">
+            <div class="card admin-card content-package-upload-card">
+                <div class="card-body content-package-upload-layout">
+                    <div class="content-package-upload-copy">
+                        <div class="admin-section-heading content-package-upload-heading">
+                            <i class="fa fa-file-archive-o admin-section-icon"></i>
+                            <h5>{{t 'content.uploadMofactsPackage'}}</h5>
+                        </div>
+
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="emailInsteadOfAlert">
+                            <label class="form-check-label" for="emailInsteadOfAlert">
+                                {{t 'content.emailUploadSummary'}}
+                            </label>
+                        </div>
+
+                        {{#if uploadMessageText}}
+                        <div class="admin-status admin-status-{{uploadMessageLevel}} admin-status-inline" role="status" aria-live="polite">
+                            <i class="fa {{uploadMessageIcon}}" aria-hidden="true"></i>
+                            <div class="admin-status-text">{{uploadMessageText}}</div>
+                        </div>
+                        {{/if}}
+                        {{#if uploadConfirmationOpen}}
+                        <div class="admin-inline-confirmation admin-form-row-top" role="alert">
+                            <div class="admin-inline-confirmation-title">{{inlineConfirmationTitle}}</div>
+                            <div class="admin-inline-confirmation-message">{{inlineConfirmationMessage}}</div>
+                            <div class="admin-inline-confirmation-actions">
+                                <button type="button" class="btn btn-danger btn-sm inline-confirm-accept">{{inlineConfirmationConfirmLabel}}</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm inline-confirm-cancel">{{inlineConfirmationCancelLabel}}</button>
+                            </div>
+                        </div>
+                        {{/if}}
+                    </div>
+
+                    <div class="content-package-upload-target">
+                        <label class="package-drop-zone" for="upload-file" tabindex="0">
+                            <span class="package-drop-icon"><i class="fa fa-cloud-upload"></i></span>
+                            <span class="package-drop-text">{{t 'content.dropFilesBrowse'}}</span>
+                            <input type="file" name="upload-file" id="upload-file" value="" accept=".zip" multiple>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="admin-section">
             <div class="card admin-card">
                 <div class="card-body">
@@ -641,48 +687,6 @@
                 </button>
                 {{/if}}
             </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Upload Package (ZIP) Section -->
-        <div class="admin-section">
-            <div class="card admin-card">
-                <div class="card-body">
-                    <div class="admin-section-heading">
-                        <i class="fa fa-file-archive-o admin-section-icon"></i>
-                        <h5>{{t 'content.uploadMofactsPackage'}}</h5>
-                    </div>
-
-                    <div class="row g-3">
-                        <div class="col-12">
-                            <div class="form-check">
-                                <input type="checkbox" class="form-check-input" id="emailInsteadOfAlert">
-                                <label class="form-check-label" for="emailInsteadOfAlert">
-                                    {{t 'content.emailUploadSummary'}}
-                                </label>
-                            </div>
-                        </div>
-                        <div class="col-12">
-                            <input type="file" class="form-control" name="upload-file" id="upload-file" value="" accept=".zip">
-                        </div>
-                    </div>
-                    {{#if uploadMessageText}}
-                    <div class="admin-status admin-status-{{uploadMessageLevel}} admin-status-inline" role="status" aria-live="polite">
-                        <i class="fa {{uploadMessageIcon}}" aria-hidden="true"></i>
-                        <div class="admin-status-text">{{uploadMessageText}}</div>
-                    </div>
-                    {{/if}}
-                    {{#if uploadConfirmationOpen}}
-                    <div class="admin-inline-confirmation admin-form-row-top" role="alert">
-                        <div class="admin-inline-confirmation-title">{{inlineConfirmationTitle}}</div>
-                        <div class="admin-inline-confirmation-message">{{inlineConfirmationMessage}}</div>
-                        <div class="admin-inline-confirmation-actions">
-                            <button type="button" class="btn btn-danger btn-sm inline-confirm-accept">{{inlineConfirmationConfirmLabel}}</button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm inline-confirm-cancel">{{inlineConfirmationCancelLabel}}</button>
-                        </div>
-                    </div>
-                    {{/if}}
                 </div>
             </div>
         </div>
