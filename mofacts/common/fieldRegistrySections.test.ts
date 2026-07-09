@@ -13,6 +13,7 @@ describe('field registry section composition', function() {
       'tutor.setspec',
       'tutor.unit[]',
       'tutor.unit[].learningsession',
+      'tutor.unit[].sparcsession',
       'tutor.unit[].assessmentsession',
       'tutor.unit[].assessmentsession.conditiontemplatesbygroup',
       'tutor.unit[].videosession',

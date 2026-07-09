@@ -793,51 +793,214 @@ export const SPARC_GROUP_NODE_CATALOG: readonly SparcAuthoringCatalogEntry[] = [
   }),
 ] as const;
 
-export const SPARC_SEMANTIC_NODE_CATALOG: readonly SparcAuthoringCatalogEntry[] = [{
-  id: 'semantic.multiple-choice',
-  label: 'Semantic multiple choice',
-  category: 'semantic-node',
-  description: 'Clean authored multiple-choice object expanded by the runtime into concrete prompt, answer-list, button, and message nodes.',
-  schema: {
-    type: 'object',
-    required: ['id', 'nodeType', 'semanticType', 'choices'],
-    properties: {
-      id: idProperty,
-      nodeType: { const: 'semantic' },
-      semanticType: { const: 'multiple-choice' },
-      label: { type: 'string' },
-      feedbackNodeId: { type: 'string' },
-      prompt: {
+const semanticPromptSchema: SparcAuthoringSchema = {
+  type: 'object',
+  properties: {
+    id: idProperty,
+    value: { type: 'string' },
+    html: htmlValueProperty,
+  },
+  additionalProperties: true,
+};
+
+const semanticModelTargetSchema: SparcAuthoringSchema = {
+  type: 'object',
+  required: ['clusterIndex'],
+  properties: {
+    clusterIndex: { type: 'number' },
+    clusterKC: { type: 'string' },
+    stimulusKC: { type: 'string' },
+  },
+  additionalProperties: true,
+};
+
+const semanticScoringSchema: SparcAuthoringSchema = {
+  type: 'object',
+  properties: {
+    responses: {
+      type: 'array',
+      items: {
         type: 'object',
         properties: {
-          id: idProperty,
-          value: { type: 'string' },
+          id: { type: 'string' },
+          value: {},
+          expected: {},
+          acceptedValues: { type: 'array', items: {} },
+          regex: { type: 'string' },
+          outcome: { enum: ['correct', 'incorrect', 'partial', 'study', 'skipped', 'unknown'] },
+          feedback: htmlValueProperty,
         },
-      },
-      answerGroupId: { type: 'string' },
-      choices: {
-        type: 'array',
-        items: {
-          type: 'object',
-          required: ['id', 'label'],
-          properties: {
-            id: idProperty,
-            label: { type: 'string' },
-            value: {},
-            variant: { type: 'string' },
-          },
-        },
+        additionalProperties: true,
       },
     },
-    additionalProperties: true,
+    default: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        outcome: { enum: ['correct', 'incorrect', 'partial', 'study', 'skipped', 'unknown'] },
+        feedback: htmlValueProperty,
+      },
+      additionalProperties: true,
+    },
   },
-  defaultValue: {
-    nodeType: 'semantic',
+  additionalProperties: true,
+};
+
+const semanticSharedProperties: Readonly<Record<string, SparcAuthoringSchema>> = {
+  id: idProperty,
+  nodeType: { const: 'semantic' },
+  label: { type: 'string' },
+  prompt: semanticPromptSchema,
+  feedbackNodeId: { type: 'string' },
+  headerFeedbackNodeId: { type: 'string' },
+  clusterIndex: { type: 'number' },
+  modelTarget: semanticModelTargetSchema,
+  kc: { type: 'string' },
+  scoring: semanticScoringSchema,
+  layout: { type: 'object', additionalProperties: true },
+  source: { type: 'object', additionalProperties: true },
+};
+
+const semanticChoiceSchema: SparcAuthoringSchema = {
+  type: 'object',
+  required: ['id'],
+  properties: {
+    id: idProperty,
+    label: { type: 'string' },
+    html: htmlValueProperty,
+    value: {},
+    correct: { type: 'boolean' },
+    variant: { type: 'string' },
+  },
+  additionalProperties: true,
+};
+
+const semanticInputSchema: SparcAuthoringSchema = {
+  type: 'object',
+  required: ['id'],
+  properties: {
+    id: idProperty,
+    label: { type: 'string' },
+    html: htmlValueProperty,
+    expected: {},
+    acceptedValues: { type: 'array', items: {} },
+    options: { type: 'array', items: {} },
+    clusterIndex: { type: 'number' },
+    modelTarget: semanticModelTargetSchema,
+    kc: { type: 'string' },
+    scoring: semanticScoringSchema,
+  },
+  additionalProperties: true,
+};
+
+function semanticEntry(params: {
+  readonly semanticType: string;
+  readonly label: string;
+  readonly description: string;
+  readonly properties: Readonly<Record<string, SparcAuthoringSchema>>;
+  readonly defaultValue: Record<string, unknown>;
+}): SparcAuthoringCatalogEntry {
+  return {
+    id: `semantic.${params.semanticType}`,
+    label: params.label,
+    category: 'semantic-node',
+    description: params.description,
+    schema: {
+      type: 'object',
+      required: ['id', 'nodeType', 'semanticType'],
+      properties: {
+        ...semanticSharedProperties,
+        semanticType: { const: params.semanticType },
+        ...params.properties,
+      },
+      additionalProperties: true,
+    },
+    defaultValue: {
+      nodeType: 'semantic',
+      semanticType: params.semanticType,
+      ...params.defaultValue,
+    },
+    renderedBy: ['sparcSemanticNodes.ts', 'SparcNode.svelte'],
+  };
+}
+
+export const SPARC_SEMANTIC_NODE_CATALOG: readonly SparcAuthoringCatalogEntry[] = [
+  semanticEntry({
     semanticType: 'multiple-choice',
-    choices: [],
-  },
-  renderedBy: ['sparcSemanticNodes.ts', 'SparcNode.svelte'],
-}] as const;
+    label: 'Semantic multiple choice',
+    description: 'Authored single-select question expanded into prompt, answer-list buttons, response intent, feedback rules, and model-practice effects when model target metadata is present.',
+    properties: {
+      answerGroupId: { type: 'string' },
+      choices: { type: 'array', items: semanticChoiceSchema },
+    },
+    defaultValue: {
+      id: 'semantic-multiple-choice',
+      choices: [{ id: 'choice-a', label: 'Choice A', value: 'A', correct: true }],
+    },
+  }),
+  semanticEntry({
+    semanticType: 'select-many',
+    label: 'Semantic select many',
+    description: 'Authored choose-all-that-apply question expanded into checkbox rows, a check button, feedback rules, and model-practice effects.',
+    properties: {
+      answerGroupId: { type: 'string' },
+      choices: { type: 'array', items: semanticChoiceSchema },
+    },
+    defaultValue: {
+      id: 'semantic-select-many',
+      choices: [{ id: 'choice-a', label: 'Choice A', value: 'A', correct: true }],
+    },
+  }),
+  semanticEntry({
+    semanticType: 'dropdown',
+    label: 'Semantic dropdown',
+    description: 'Authored one-or-many dropdown question expanded into dropdown rows, response intent, feedback rules, and model-practice effects.',
+    properties: {
+      inputs: { type: 'array', items: semanticInputSchema },
+    },
+    defaultValue: {
+      id: 'semantic-dropdown',
+      inputs: [{ id: 'a', label: 'Answer', options: ['Option A', 'Option B'], expected: 'Option A' }],
+    },
+  }),
+  semanticEntry({
+    semanticType: 'text-input',
+    label: 'Semantic text input',
+    description: 'Authored one-or-many text input question expanded into text-input rows, response intent, feedback rules, and model-practice effects.',
+    properties: {
+      inputs: { type: 'array', items: semanticInputSchema },
+    },
+    defaultValue: {
+      id: 'semantic-text-input',
+      inputs: [{ id: 'answer', label: 'Answer', expected: '' }],
+    },
+  }),
+  semanticEntry({
+    semanticType: 'numeric-input',
+    label: 'Semantic numeric input',
+    description: 'Authored numeric answer question expanded into text-input rows with numeric input hints, response intent, feedback rules, and model-practice effects.',
+    properties: {
+      inputs: { type: 'array', items: semanticInputSchema },
+    },
+    defaultValue: {
+      id: 'semantic-numeric-input',
+      inputs: [{ id: 'answer', label: 'Answer', expected: 0 }],
+    },
+  }),
+  semanticEntry({
+    semanticType: 'short-answer',
+    label: 'Semantic short answer',
+    description: 'Authored short-answer question expanded into stem, learner response input, submit button, feedback rules, and model-practice effects.',
+    properties: {
+      expected: {},
+      inputs: { type: 'array', items: semanticInputSchema },
+    },
+    defaultValue: {
+      id: 'semantic-short-answer',
+      expected: '',
+    },
+  }),
+] as const;
 
 export const SPARC_LAYOUT_CATALOG: readonly SparcAuthoringCatalogEntry[] = [{
   id: 'layout.policy',
@@ -950,7 +1113,7 @@ export const SPARC_RULE_CATALOG: readonly SparcAuthoringCatalogEntry[] = [{
     type: 'object',
     required: ['op', 'left'],
     properties: {
-      op: { enum: ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'truthy', 'falsy'] },
+      op: { enum: ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'truthy', 'falsy', 'regex'] },
       left: ruleExpressionSchema,
       right: ruleExpressionSchema,
     },

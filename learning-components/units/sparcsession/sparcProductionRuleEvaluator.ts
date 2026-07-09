@@ -195,6 +195,8 @@ function compareRuleTest(
       return requireFiniteNumber(left, 'SPARC rule test left') < requireFiniteNumber(right, 'SPARC rule test right');
     case 'lte':
       return requireFiniteNumber(left, 'SPARC rule test left') <= requireFiniteNumber(right, 'SPARC rule test right');
+    case 'regex':
+      return new RegExp(String(right ?? '')).test(String(left ?? ''));
   }
 }
 

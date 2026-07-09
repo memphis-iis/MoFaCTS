@@ -1,6 +1,6 @@
 import type { LearningComponentManifest } from '../../runtime/ComponentManifest';
 import type { TrialDisplayAdapter } from '../../runtime/TrialDisplayAdapterRegistry';
-import { expandSparcSemanticNodes } from './sparcSemanticNodes';
+import { compileSparcSemanticDisplay } from './sparcSemanticNodes';
 import { normalizeSparcFractionGroups } from './sparcFractionGroups';
 
 export const SPARC_TRIAL_DISPLAY_TYPE = 'sparc';
@@ -148,15 +148,16 @@ export const sparcTrialDisplayAdapter: TrialDisplayAdapter<SparcTrialDisplay, Sp
     if (!Array.isArray(display.nodes)) {
       throw new Error('SPARC trial display requires a nodes array');
     }
-    const normalizedProgressReporter = normalizeSparcProgressReporter(display.progressReporter);
-    const normalizedResponse = isPlainObject(display.response)
+    const semanticCompiledDisplay = compileSparcSemanticDisplay(display);
+    const normalizedProgressReporter = normalizeSparcProgressReporter(semanticCompiledDisplay.display.progressReporter);
+    const normalizedResponse = isPlainObject(semanticCompiledDisplay.display.response)
       ? {
-          ...display.response,
-          scoredNodes: Array.isArray(display.response.scoredNodes)
-            ? display.response.scoredNodes.map((node) => String(node))
+          ...semanticCompiledDisplay.display.response,
+          scoredNodes: Array.isArray(semanticCompiledDisplay.display.response.scoredNodes)
+            ? semanticCompiledDisplay.display.response.scoredNodes.map((node) => String(node))
             : [],
-          intentByNode: Array.isArray(display.response.intentByNode)
-            ? display.response.intentByNode
+          intentByNode: Array.isArray(semanticCompiledDisplay.display.response.intentByNode)
+            ? semanticCompiledDisplay.display.response.intentByNode
                 .filter(isPlainObject)
                 .map((entry) => ({
                   node: String(entry.node || ''),
@@ -165,8 +166,8 @@ export const sparcTrialDisplayAdapter: TrialDisplayAdapter<SparcTrialDisplay, Sp
                   ...(typeof entry.type === 'string' ? { type: entry.type } : {}),
                 }))
             : [],
-          intentByPath: Array.isArray(display.response.intentByPath)
-            ? display.response.intentByPath
+          intentByPath: Array.isArray(semanticCompiledDisplay.display.response.intentByPath)
+            ? semanticCompiledDisplay.display.response.intentByPath
                 .filter(isPlainObject)
                 .map((pathEntry) => ({
                   path: String(pathEntry.path || ''),
@@ -182,8 +183,8 @@ export const sparcTrialDisplayAdapter: TrialDisplayAdapter<SparcTrialDisplay, Sp
                     : [],
                 }))
             : [],
-          traceByNode: Array.isArray(display.response.traceByNode)
-            ? display.response.traceByNode
+          traceByNode: Array.isArray(semanticCompiledDisplay.display.response.traceByNode)
+            ? semanticCompiledDisplay.display.response.traceByNode
                 .filter(isPlainObject)
                 .map((entry) => ({
                   node: String(entry.node || ''),
@@ -207,8 +208,8 @@ export const sparcTrialDisplayAdapter: TrialDisplayAdapter<SparcTrialDisplay, Sp
         }
       : null;
     return {
-      ...display,
-      nodes: normalizeSparcFractionGroups(expandSparcSemanticNodes(display.nodes)),
+      ...semanticCompiledDisplay.display,
+      nodes: normalizeSparcFractionGroups(semanticCompiledDisplay.nodes),
       ...(normalizedProgressReporter ? { progressReporter: normalizedProgressReporter } : {}),
       ...(normalizedResponse ? { response: normalizedResponse } : {}),
     };

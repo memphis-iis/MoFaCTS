@@ -254,7 +254,7 @@ export type SparcProductionRuleCondition =
     };
 
 export type SparcProductionRuleTest = {
-  readonly op: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'truthy' | 'falsy';
+  readonly op: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'truthy' | 'falsy' | 'regex';
   readonly left: SparcRuleExpression;
   readonly right?: SparcRuleExpression;
 };
