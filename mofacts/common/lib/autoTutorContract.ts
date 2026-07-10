@@ -283,10 +283,6 @@ export function validateAutoTutorContent(context: AutoTutorValidationContext): A
   }
 
   const autoTutorUnits = getAutoTutorUnits(context.tdf);
-  if (autoTutorUnits.length === 0) {
-    return { valid: true, errors };
-  }
-
   const setspec = isRecord(tutor.setspec) ? tutor.setspec : {};
 
   for (const { unit, index } of autoTutorUnits) {
