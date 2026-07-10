@@ -1,6 +1,7 @@
 import { Meteor } from 'meteor/meteor';
 import { ReactiveVar } from 'meteor/reactive-var';
 import { Template } from 'meteor/templating';
+import { Tracker } from 'meteor/tracker';
 import {
   findProfileAvatarIcon,
   normalizeProfileAvatarType,
@@ -17,6 +18,12 @@ import {
 import { TARGET_LOCALE_DEFINITIONS, TARGET_UI_LOCALES } from '../../../common/lib/interfaceLocales';
 import { getActiveUiLocale, setActiveUiLocale } from '../../lib/interfaceLocaleState';
 import { translatePlatformString } from '../../lib/interfaceI18n';
+import {
+  createInlineConfirmationController,
+  type InlineConfirmationController,
+  type InlineConfirmationView,
+} from '../../lib/adminUi/inlineConfirmationController';
+import '../shared/adminUi/adminUi';
 
 const MeteorAny = Meteor as typeof Meteor & { callAsync: (name: string, ...args: any[]) => Promise<any> };
 
@@ -29,6 +36,8 @@ type ProfileTemplateInstance = Blaze.TemplateInstance & {
   avatarIconId: ReactiveVar<string>;
   avatarImageData: ReactiveVar<string>;
   openRouterHasServerKey: ReactiveVar<boolean>;
+  confirmationState: ReactiveVar<InlineConfirmationView>;
+  confirmationController: InlineConfirmationController<'delete-openrouter-key'>;
 };
 
 const AVATAR_IMAGE_SIZE = 256;
@@ -163,12 +172,21 @@ Template.profile.onCreated(function(this: ProfileTemplateInstance) {
   this.avatarIconId = new ReactiveVar(PROFILE_AVATAR_DEFAULT_ICON_ID);
   this.avatarImageData = new ReactiveVar('');
   this.openRouterHasServerKey = new ReactiveVar(userHasServerOpenRouterKey(Meteor.user()));
+  this.confirmationController = createInlineConfirmationController<'delete-openrouter-key'>(
+    (view) => this.confirmationState.set(view),
+    () => document.getElementById('profileSave'),
+  );
+  this.confirmationState = new ReactiveVar(this.confirmationController.getView());
   this.autorun(() => {
     if (Meteor.user()) {
       syncAvatarFromCurrentUser(this);
       this.openRouterHasServerKey.set(userHasServerOpenRouterKey(Meteor.user()));
     }
   });
+});
+
+Template.profile.onDestroyed(function(this: ProfileTemplateInstance) {
+  this.confirmationController.destroy();
 });
 
 Template.profile.helpers({
@@ -208,8 +226,21 @@ Template.profile.helpers({
     return (Template.instance() as ProfileTemplateInstance).avatarType.get() === type;
   },
 
+  avatarTypePressed(type: ProfileAvatarType): string {
+    return (Template.instance() as ProfileTemplateInstance).avatarType.get() === type
+      ? 'true'
+      : 'false';
+  },
+
   avatarIconSelected(iconId: string): boolean {
     return (Template.instance() as ProfileTemplateInstance).avatarIconId.get() === iconId;
+  },
+
+  avatarIconPressed(iconId: string): string {
+    const template = Template.instance() as ProfileTemplateInstance;
+    return template.avatarIconId.get() === iconId && template.avatarType.get() === 'icon'
+      ? 'true'
+      : 'false';
   },
 
   avatarIconClass(iconId: string): string {
@@ -272,6 +303,10 @@ Template.profile.helpers({
 
   testingAttrs(): Record<string, boolean> {
     return (Template.instance() as ProfileTemplateInstance).testing.get() ? { disabled: true } : {};
+  },
+
+  profileConfirmationView(): InlineConfirmationView {
+    return (Template.instance() as ProfileTemplateInstance).confirmationState.get();
   },
 });
 
@@ -371,7 +406,37 @@ Template.profile.events({
     }
   },
 
-  'click #openRouterDeleteKey': async function(_event: Event, template: ProfileTemplateInstance) {
+  'click #openRouterDeleteKey'(event: Event, template: ProfileTemplateInstance) {
+    template.confirmationController.open({
+      confirmationId: 'profile-delete-openrouter-key',
+      title: profileText('profile.deleteKey'),
+      message: profileText('profile.deleteKeyConfirmation'),
+      confirmLabel: profileText('profile.deleteKey'),
+      cancelLabel: profileText('content.cancel'),
+      severity: 'danger',
+      context: 'delete-openrouter-key',
+    }, event.currentTarget as HTMLElement);
+    Tracker.afterFlush(() => template.confirmationController.focusInitial());
+  },
+
+  'click .admin-confirmation-cancel'(_event: Event, template: ProfileTemplateInstance) {
+    template.confirmationController.cancel();
+  },
+
+  'keydown .admin-inline-confirmation'(event: KeyboardEvent, template: ProfileTemplateInstance) {
+    template.confirmationController.handleKeydown(event);
+  },
+
+  'click .admin-confirmation-confirm': async function(_event: Event, template: ProfileTemplateInstance) {
+    const view = template.confirmationController.getView();
+    if (
+      view.status !== 'open'
+      || view.pending
+      || template.confirmationController.getContext() !== 'delete-openrouter-key'
+    ) {
+      return;
+    }
+    template.confirmationController.setPending(true);
     template.saving.set(true);
     try {
       await MeteorAny.callAsync('deleteOwnOpenRouterKey');
@@ -380,8 +445,10 @@ Template.profile.events({
       if (apiKeyInput) {
         apiKeyInput.value = '';
       }
+      template.confirmationController.complete();
       setStatus(template, 'success', profileText('profile.openRouterKeyDeleted'));
     } catch (error: unknown) {
+      template.confirmationController.setPending(false);
       setStatus(template, 'error', getErrorMessage(error));
     } finally {
       template.saving.set(false);

@@ -1,65 +1,127 @@
-import { Template } from 'meteor/templating';
 import { Meteor } from 'meteor/meteor';
+import { ReactiveVar } from 'meteor/reactive-var';
+import { Template } from 'meteor/templating';
 import './testRunner.html';
+import './shared/adminUi/adminUi';
+import {
+  createAsyncCommandController,
+  type AsyncCommandController,
+  type AsyncCommandState,
+} from '../lib/adminUi/asyncCommandState';
+import { getErrorMessage } from '../lib/errorUtils';
 import { getActiveUiLocale } from '../lib/interfaceLocaleState';
 import { translatePlatformString } from '../lib/interfaceI18n';
+import {
+  normalizeDeploymentReadinessResult,
+  type DeploymentReadinessResult,
+} from './testRunnerState';
 
-declare const $: (selector: string | EventTarget | null) => {
-  html(value: string): void;
+type TestRunnerInstance = Blaze.TemplateInstance & {
+  readinessState: ReactiveVar<AsyncCommandState<DeploymentReadinessResult>>;
+  readinessCommand: AsyncCommandController<DeploymentReadinessResult>;
 };
 
-type ReadinessCheck = {
-  name: string;
-  status: 'pass' | 'fail';
-  message: string;
-};
-
-function testText(key: Parameters<typeof translatePlatformString>[1], values?: Parameters<typeof translatePlatformString>[2]): string {
+function testText(
+  key: Parameters<typeof translatePlatformString>[1],
+  values?: Parameters<typeof translatePlatformString>[2],
+): string {
   return translatePlatformString(getActiveUiLocale(), key, values);
 }
 
-function readinessStatusLabel(status: ReadinessCheck['status']): string {
-  return status === 'pass' ? testText('adminTests.pass') : testText('adminTests.fail');
+function runDeploymentReadiness(): Promise<DeploymentReadinessResult> {
+  return new Promise((resolve, reject) => {
+    Meteor.call('deploymentReadiness', (error: Meteor.Error | undefined, result: unknown) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      try {
+        resolve(normalizeDeploymentReadinessResult(result));
+      } catch (contractError: unknown) {
+        reject(contractError);
+      }
+    });
+  });
 }
 
-function escapeHtml(value: unknown) {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
+function readinessState(): AsyncCommandState<DeploymentReadinessResult> {
+  return (Template.instance() as TestRunnerInstance).readinessState.get();
 }
+
+Template.testRunner.onCreated(function(this: TestRunnerInstance) {
+  this.readinessState = new ReactiveVar<AsyncCommandState<DeploymentReadinessResult>>({ status: 'idle' });
+  this.readinessCommand = createAsyncCommandController((state) => {
+    this.readinessState.set(state);
+  });
+});
+
+Template.testRunner.onDestroyed(function(this: TestRunnerInstance) {
+  this.readinessCommand.destroy();
+});
 
 Template.testRunner.helpers({
   testText(key: Parameters<typeof translatePlatformString>[1]) {
     return testText(key);
   },
+  readinessPending() {
+    return readinessState().status === 'pending';
+  },
+  readinessOutput() {
+    const state = readinessState();
+    if (state.status === 'pending') {
+      return {
+        template: 'adminStatus',
+        data: {
+          variant: 'info',
+          text: testText('adminTests.runningReadinessChecks'),
+          urgent: false,
+        },
+      };
+    }
+    if (state.status === 'error') {
+      return {
+        template: 'adminStatus',
+        data: {
+          variant: 'error',
+          text: state.message,
+          urgent: true,
+        },
+      };
+    }
+    if (state.status === 'success') {
+      return {
+        template: 'testRunnerReadinessResult',
+        data: {
+          summaryVariant: state.result.ok ? 'success' : 'error',
+          summaryText: testText(
+            state.result.ok ? 'adminTests.readinessPassed' : 'adminTests.readinessFailed',
+            { generatedAt: state.result.generatedAt },
+          ),
+          summaryUrgent: !state.result.ok,
+          tableLabel: testText('adminTests.deploymentReadiness'),
+          checkLabel: testText('adminTests.check'),
+          statusLabel: testText('adminTests.status'),
+          messageLabel: testText('adminTests.message'),
+          emptyText: testText('adminTests.noChecksReturned'),
+          checks: state.result.checks.map((check) => ({
+            ...check,
+            rowClass: check.status === 'pass' ? 'table-success' : 'table-danger',
+            displayStatus: check.status === 'pass'
+              ? testText('adminTests.pass')
+              : testText('adminTests.fail'),
+          })),
+        },
+      };
+    }
+    return null;
+  },
 });
 
 Template.testRunner.events({
-  'click .run-deployment-readiness'(event: Event) {
+  async 'click .run-deployment-readiness'(event: Event, instance: TestRunnerInstance) {
     event.preventDefault();
-    $('#deployment-readiness-output').html(escapeHtml(testText('adminTests.runningReadinessChecks')));
-    Meteor.call('deploymentReadiness', (error: Meteor.Error | undefined, result: any) => {
-      if (error) {
-        $('#deployment-readiness-output').html(`<div class="alert alert-danger">${escapeHtml(error.reason || error.message)}</div>`);
-        return;
-      }
-      const checks = Array.isArray(result?.checks) ? result.checks as ReadinessCheck[] : [];
-      const rows = checks.map((check) => {
-        const className = check.status === 'pass' ? 'table-success' : 'table-danger';
-        return `<tr class="${className}"><td>${escapeHtml(check.name)}</td><td>${escapeHtml(readinessStatusLabel(check.status))}</td><td>${escapeHtml(check.message)}</td></tr>`;
-      }).join('');
-      $('#deployment-readiness-output').html(`
-        <div class="alert ${result?.ok ? 'alert-success' : 'alert-danger'}">
-          ${escapeHtml(testText(result?.ok ? 'adminTests.readinessPassed' : 'adminTests.readinessFailed', { generatedAt: result?.generatedAt }))}
-        </div>
-        <table class="table table-sm table-bordered">
-          <thead><tr><th>${escapeHtml(testText('adminTests.check'))}</th><th>${escapeHtml(testText('adminTests.status'))}</th><th>${escapeHtml(testText('adminTests.message'))}</th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-      `);
+    await instance.readinessCommand.run(runDeploymentReadiness, {
+      getErrorMessage,
     });
-  }
+  },
 });

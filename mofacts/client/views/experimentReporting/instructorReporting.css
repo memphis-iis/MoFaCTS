@@ -5,8 +5,8 @@
 }
 
 #mainContent {
-  padding-left: calc(20px * var(--app-density-scale));
-  padding-right: calc(20px * var(--app-density-scale));
+  padding-left: var(--app-space-0);
+  padding-right: var(--app-space-0);
 }
 
 #mainContent .form-select {

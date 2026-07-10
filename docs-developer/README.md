@@ -28,6 +28,8 @@ Keep `docs/` focused on software consortium, repository, user, author, operator,
 - `interface-internationalization-plan.md`: interface localization, multilingual input/display, and locale-aware TTS implementation handoff plan.
 - `interface-internationalization-status.md`: implementation status, locale review matrix, and language ownership map for interface internationalization.
 - `interface-i18n-translation-review-checklist.md`: reviewer checklist and signoff template for moving AI-draft locale strings toward reviewed/enabled status.
+- `mofacts_administration_interface_polish_audit.md`: static code-quality audit of user, teacher, and administrator management interfaces.
+- `administration-interface-behavioral-primitives-plan.md`: phased implementation plan for shared route, async-state, command, confirmation, disclosure, form, and table behavior across management interfaces.
 - `autotutor-dialogue-planner-plan.md`: AutoTutor dialogue planner decomposition plan.
 - `autotutor-concern-matrix.md`: AutoTutor concern matrix and implementation audit notes.
 - `autotutor-implementation-questions.md`: AutoTutor implementation decision log.

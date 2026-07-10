@@ -44,6 +44,20 @@
 </body>
 
 
+<template name="managementRouteError">
+  <section class="management-route-frame management-route-frame-error" role="alert">
+    <div class="alert alert-danger">
+      <h2 class="h5">{{appShellTitle}}</h2>
+      <p>{{managementRouteErrorMessage}}</p>
+      {{#if managementRouteCanRetry}}
+        <button type="button" class="btn btn-outline-danger" data-management-route-retry="true">
+          {{t 'common.tryAgain'}}
+        </button>
+      {{/if}}
+    </div>
+  </section>
+</template>
+
 <template name="DefaultLayout">
   <!-- Global Loading Spinner - Persists across route transitions for elegant UX -->
   {{#if appLoading}}
@@ -98,31 +112,26 @@
             </div>
           </div>
           {{/if}}
-          {{#if startupDiagnostic}}
-          <div class="container app-ui-message-container">
-            <div class="alert alert-{{startupDiagnostic.variant}}" role="status" aria-live="polite">
-              {{startupDiagnostic.text}}
-            </div>
-          </div>
-          {{/if}}
-          {{#if currentTemplate}}
-            {{> Template.dynamic template=currentTemplate}}
-          {{else}}
-            {{#if main}}
-              {{> Template.dynamic template=main}}
-            {{/if}}
-            {{#if content}}
-              {{> Template.dynamic template=content}}
-            {{/if}}
-            {{#if yield}}
-              {{> Template.dynamic template=yield}}
+          <div class="app-page-root container">
+            {{#if currentTemplate}}
+              {{> Template.dynamic template=currentTemplate}}
             {{else}}
-              {{> yield}}
+              {{#if main}}
+                {{> Template.dynamic template=main}}
+              {{/if}}
+              {{#if content}}
+                {{> Template.dynamic template=content}}
+              {{/if}}
+              {{#if yield}}
+                {{> Template.dynamic template=yield}}
+              {{else}}
+                {{> yield}}
+              {{/if}}
             {{/if}}
-          {{/if}}
-          {{#unless isPracticeChrome}}
+          </div>
+          {{#if showAppFooter}}
             {{> footer}}
-          {{/unless}}
+          {{/if}}
         </main>
       </div>
     </div>
@@ -132,13 +141,6 @@
       <div class="alert alert-{{uiMessage.variant}} d-flex align-items-center justify-content-between" role="alert">
         <div>{{uiMessage.text}}</div>
         <button type="button" class="btn-close" aria-label="{{t 'common.close'}}" data-ui-message-clear="true"></button>
-      </div>
-    </div>
-    {{/if}}
-    {{#if startupDiagnostic}}
-    <div class="container app-ui-message-container">
-      <div class="alert alert-{{startupDiagnostic.variant}}" role="status" aria-live="polite">
-        {{startupDiagnostic.text}}
       </div>
     </div>
     {{/if}}

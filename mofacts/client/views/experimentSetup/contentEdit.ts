@@ -13,6 +13,17 @@ import { ensureJsonEditor } from '../../lib/jsonEditorLoader';
 import { translatePlatformString } from '../../lib/interfaceI18n';
 import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 import { buildStimulusEditorRawStimuliSavePayload } from '../../../common/lib/editorSaveShape';
+import { getErrorMessage } from '../../lib/errorUtils';
+import {
+    rejectLoad,
+    resolveLoad,
+    startLoad,
+    type LoadableState,
+} from '../../lib/adminUi/loadableState';
+import {
+    createTemplateLifetime,
+    type TemplateLifetime,
+} from '../../lib/adminUi/templateLifetime';
 
 const FlowRouter = (globalThis as any).FlowRouter;
 const TdfsCollection = (globalThis as any).Tdfs || (globalThis as any).TdfsCollection;
@@ -40,6 +51,7 @@ const clone = (obj: any) => JSON.parse(JSON.stringify(obj));
 // Cache the schema after first load
 let cachedStimSchema: any = null;
 const SAVE_SUCCESS_REDIRECT_DELAY_MS = 1000;
+type ContentEditorLoadValue = Readonly<{ tdf: any | null }>;
 
 function setEditorMessage(instance: any, type: string, title: string, text: string) {
     instance.editorMessage.set({
@@ -71,15 +83,12 @@ Template.contentEdit.onCreated(function(this: any) {
     // Get TDF ID from route
     instance.tdfId = FlowRouter.getParam('tdfId');
 
-    // Subscribe to TDF data
-    instance.subscribe('tdfForEdit', instance.tdfId);
-    instance.subscribe('files.assets.all');
+    instance.lifetime = createTemplateLifetime() as TemplateLifetime;
+    instance.loadState = new ReactiveVar<LoadableState<ContentEditorLoadValue>>({ status: 'idle' });
 
     // Reactive state
     instance.hasChanges = new ReactiveVar(false);
     instance.saving = new ReactiveVar(false);
-    instance.schemaLoaded = new ReactiveVar(false);
-    instance.editorReady = new ReactiveVar(false);  // Track when editor has finished initializing
     instance.saveFeedback = new ReactiveVar('');
     instance.editorMessage = new ReactiveVar(null);
     instance.removeIncorrectConfirmation = new ReactiveVar(false);
@@ -98,25 +107,11 @@ Template.contentEdit.onCreated(function(this: any) {
     instance.validator = new ValidatorEngine({ type: 'stim', debounceMs: 300 });
     instance.validationContext = null;
 
-    // Load schema
-    loadStimSchema(instance);
-});
-
-Template.contentEdit.onRendered(function(this: any) {
-    const instance = this;
-
-    // Initialize editor when both TDF and schema are ready
-    instance.autorun(() => {
-        if (instance.subscriptionsReady() && instance.schemaLoaded.get()) {
-            const tdf = findTdf(instance.tdfId);
-            if (tdf && !instance.editor) {
-                Meteor.defer(() => initStimEditor(instance, tdf));
-            }
-        }
-    });
+    void initializeContentEditor(instance);
 });
 
 Template.contentEdit.onDestroyed(function(this: any) {
+    this.lifetime.destroy();
     // Clean up editor
     if (this.editor) {
         this.editor.destroy();
@@ -165,19 +160,17 @@ Template.contentEdit.onDestroyed(function(this: any) {
 });
 
 Template.contentEdit.helpers({
-    loading() {
-        const instance = Template.instance() as any as any;
-        // Show spinner while data is loading
-        return !instance.subscriptionsReady() || !instance.schemaLoaded.get();
+    editorLoadError() {
+        const state = (Template.instance() as any).loadState.get();
+        return state.status === 'error' ? state.message : '';
     },
 
     editorReady() {
-        return (Template.instance() as any).editorReady.get();
+        return (Template.instance() as any).loadState.get().status === 'ready';
     },
 
     noData() {
-        const tdf = findTdf((Template.instance() as any).tdfId);
-        return !tdf || !tdf.rawStimuliFile?.setspec?.clusters;
+        return (Template.instance() as any).loadState.get().status === 'empty';
     },
 
     lessonName() {
@@ -318,6 +311,18 @@ Template.contentEdit.helpers({
 });
 
 Template.contentEdit.events({
+    'click .content-editor-retry'(event: Event, instance: any) {
+        event.preventDefault();
+        instance.editor?.destroy();
+        instance.editor = null;
+        instance.domObserver?.disconnect();
+        instance.domObserver = null;
+        instance.fieldObserver?.disconnect();
+        instance.fieldObserver = null;
+        document.getElementById('stim-editor-container')?.replaceChildren();
+        void initializeContentEditor(instance);
+    },
+
     // Handle tooltip mode toggle
     'change input[name="tooltipMode"]'(event: any, instance: any) {
         const newMode = event.target.value;
@@ -496,10 +501,9 @@ Template.contentEdit.events({
 /**
  * Load the stimulus schema
  */
-async function loadStimSchema(instance: any) {
+async function loadStimSchema(): Promise<any> {
     if (cachedStimSchema) {
-        instance.schemaLoaded.set(true);
-        return;
+        return cachedStimSchema;
     }
 
     try {
@@ -509,10 +513,77 @@ async function loadStimSchema(instance: any) {
             throw new Error('Failed to load schema: ' + response.statusText);
         }
         cachedStimSchema = await response.json();
-        instance.schemaLoaded.set(true);
+        return cachedStimSchema;
     } catch (error: any) {
         clientConsole(1, '[Content Edit] Error loading stim schema:', error);
-        setEditorMessage(instance, 'error', contentEditorText('contentEditor.errorLoadingSchema'), contentEditorText('tdfEditor.refreshPage'));
+        throw error;
+    }
+}
+
+function waitForContentEditorSubscriptions(instance: any): Promise<void> {
+    const subscribe = (publication: string, ...args: unknown[]): Promise<void> => (
+        new Promise((resolve, reject) => {
+            let settled = false;
+            instance.subscribe(publication, ...args, {
+                onReady: () => {
+                    if (!settled) {
+                        settled = true;
+                        resolve();
+                    }
+                },
+                onStop: (error?: unknown) => {
+                    if (settled) return;
+                    settled = true;
+                    if (error) reject(error);
+                    else resolve();
+                },
+            });
+        })
+    );
+    return Promise.all([
+        subscribe('tdfForEdit', instance.tdfId),
+        subscribe('files.assets.all'),
+    ]).then(() => undefined);
+}
+
+function contentEditorAfterFlush(): Promise<void> {
+    return new Promise((resolve) => Tracker.afterFlush(resolve));
+}
+
+async function initializeContentEditor(instance: any): Promise<void> {
+    const requestId = instance.lifetime.begin();
+    instance.loadState.set(startLoad(instance.loadState.get(), requestId));
+    try {
+        await Promise.all([loadStimSchema(), waitForContentEditorSubscriptions(instance)]);
+        if (!instance.lifetime.isCurrent(requestId)) return;
+        const tdf = findTdf(instance.tdfId) || null;
+        const hasClusters = Boolean(tdf?.rawStimuliFile?.setspec?.clusters);
+        if (!hasClusters) {
+            instance.loadState.set(resolveLoad(
+                instance.loadState.get(),
+                requestId,
+                { tdf: null },
+                (value: ContentEditorLoadValue) => value.tdf === null,
+            ));
+            return;
+        }
+        await contentEditorAfterFlush();
+        if (!instance.lifetime.isCurrent(requestId)) return;
+        await initStimEditor(instance, tdf);
+        if (!instance.lifetime.isCurrent(requestId)) return;
+        instance.loadState.set(resolveLoad(
+            instance.loadState.get(),
+            requestId,
+            { tdf },
+            () => false,
+        ));
+    } catch (error: unknown) {
+        if (!instance.lifetime.isCurrent(requestId)) return;
+        clientConsole(1, '[Content Edit] Failed to initialize editor:', error);
+        instance.loadState.set(rejectLoad(instance.loadState.get(), requestId, {
+            message: getErrorMessage(error),
+            retryable: true,
+        }));
     }
 }
 
@@ -1156,7 +1227,9 @@ async function handleMediaUpload(file: any, mediaType: any, input: any, preview:
  */
 async function initStimEditor(instance: any, tdf: any) {
     const container = document.getElementById('stim-editor-container');
-    if (!container || !cachedStimSchema) return;
+    if (!container || !cachedStimSchema) {
+        throw new Error('Content editor initialization requires its container and schema.');
+    }
 
     // Apply hide-descriptions class if mode is 'none' on initial load
     const tooltipMode = instance.tooltipMode.get();
@@ -1204,10 +1277,17 @@ async function initStimEditor(instance: any, tdf: any) {
     } catch (error: any) {
         clientConsole(1, '[Content Edit] JSONEditor failed to load:', error);
         setEditorMessage(instance, 'error', contentEditorText('tdfEditor.editorLibraryNotLoaded'), contentEditorText('tdfEditor.refreshContactSupport'));
-        return;
+        throw error;
     }
 
+    const initialEditorReady = new Promise<void>((resolve, reject) => {
+        instance._resolveInitialEditor = resolve;
+        instance._rejectInitialEditor = reject;
+    });
     renderClusterEditor(instance, instance.currentClusterIndex.get());
+    await initialEditorReady;
+    instance._resolveInitialEditor = null;
+    instance._rejectInitialEditor = null;
 }
 
 /**
@@ -1215,7 +1295,12 @@ async function initStimEditor(instance: any, tdf: any) {
  */
 function renderClusterEditor(instance: any, clusterIndex: any) {
     const container = document.getElementById('stim-editor-container');
-    if (!container || !instance.clusterSchema) return;
+    if (!container || !instance.clusterSchema) {
+        instance._rejectInitialEditor?.(
+            new Error('Content editor rendering requires its container and cluster schema.'),
+        );
+        return;
+    }
 
     const total = instance.clusters.length;
     if (total === 0) {
@@ -1290,6 +1375,7 @@ function renderClusterEditor(instance: any, clusterIndex: any) {
     if (typeof JSONEditorAny === 'undefined') {
         clientConsole(1, '[Content Edit] JSONEditor not loaded after route asset initialization.');
         setEditorMessage(instance, 'error', contentEditorText('tdfEditor.editorLibraryNotLoaded'), contentEditorText('tdfEditor.refreshPage'));
+        instance._rejectInitialEditor?.(new Error('JSONEditor is not loaded.'));
         return;
     }
 
@@ -1300,14 +1386,12 @@ function renderClusterEditor(instance: any, clusterIndex: any) {
     let pendingActionNodes: any[] = [];
 
     instance.editor.on('ready', () => {
+      try {
         const currentValue = instance.editor.getValue();
         if (!Array.isArray(currentValue) || currentValue.length === 0) {
             instance.editor.setValue(slice);
         }
         Meteor.defer(() => updateClusterHeaders(instance, container));
-
-        // Mark editor as ready so loading spinner hides
-        instance.editorReady.set(true);
 
         convertLongInputsToTextareas(container, instance.editor);
         injectLabelsForInputs(container, instance.editor);
@@ -1358,6 +1442,10 @@ function renderClusterEditor(instance: any, clusterIndex: any) {
         instance._windowBaselineSerialized = JSON.stringify(normalizeWindowValue(baselineValue));
         updateChangeState(instance, baselineValue);
         isInitializing = false;
+        instance._resolveInitialEditor?.();
+      } catch (error: unknown) {
+        instance._rejectInitialEditor?.(error);
+      }
     });
 
     // Listen for changes

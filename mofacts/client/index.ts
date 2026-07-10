@@ -43,6 +43,7 @@ import {
 } from './lib/userSessionHelpers';
 import {Cookie} from './lib/cookies';
 import {currentUserHasRole, hasRoleFromAuthFlags} from './lib/roleUtils';
+import { managementRoutePresentation } from './lib/adminUi/routePresentationState';
 import { getErrorMessage } from './lib/errorUtils';
 import { hideBootstrapModal } from './lib/bootstrapModal';
 import './index.html';
@@ -92,56 +93,10 @@ function sanitizeHTML(dirty: string | null | undefined) {
 
 export { clientConsole };
 
-const APP_SHELL_TEMPLATES = new Set([
-  'contentUpload',
-  'aiContentCreator',
-  'manualContentCreator',
-  'contentEdit',
-  'tdfEdit',
-  'dataDownload',
-  'profile',
-  'audioSettings',
-  'classSelection',
-  'help',
-  'adminControls',
-  'adminBackups',
-  'userAdmin',
-  'turkWorkflow',
-  'theme',
-  'testRunner',
-  'classEdit',
-  'courses',
-  'tdfAssignmentEdit',
-  'instructorReporting',
-]);
-
 const PRACTICE_SHELL_TEMPLATES = new Set([
   'card',
   'instructions',
 ]);
-
-const APP_SHELL_TITLE_KEYS: Record<string, PlatformStringKey> = {
-  contentUpload: 'home.content',
-  aiContentCreator: 'home.content',
-  manualContentCreator: 'home.content',
-  contentEdit: 'home.content',
-  tdfEdit: 'home.content',
-  dataDownload: 'home.data',
-  profile: 'home.profile',
-  audioSettings: 'audio.settings',
-  classSelection: 'home.joinCourses',
-  help: 'home.help',
-  adminControls: 'home.adminControlPanel',
-  adminBackups: 'home.backups',
-  userAdmin: 'home.userAdmin',
-  turkWorkflow: 'home.mechanicalTurk',
-  theme: 'home.theme',
-  testRunner: 'home.adminTests',
-  classEdit: 'home.courses',
-  courses: 'home.courses',
-  tdfAssignmentEdit: 'home.assignments',
-  instructorReporting: 'home.grades',
-};
 
 type AuthenticatedChromeMode = 'none' | 'app' | 'practice';
 
@@ -177,8 +132,9 @@ function getAuthenticatedChromeMode(): AuthenticatedChromeMode {
   if (PRACTICE_SHELL_TEMPLATES.has(currentTemplate)) {
     return 'practice';
   }
-  if (APP_SHELL_TEMPLATES.has(currentTemplate)) {
-    return 'app';
+  const routePresentation = managementRoutePresentation.get();
+  if (routePresentation.status !== 'idle') {
+    return routePresentation.chromeMode;
   }
   return 'none';
 }
@@ -727,23 +683,31 @@ Template.DefaultLayout.onRendered(function(this: any) {
     };
     document.addEventListener('click', instance._appShellDocumentClickHandler);
   }
-  document.getElementById('errorReportingModal')?.addEventListener('hidden.bs.modal', function() {
+  instance._errorReportingModalHiddenHandler = () => {
     clientConsole(2, 'error reporting modal hidden');
-  });
+  };
+  document.getElementById('errorReportingModal')?.addEventListener(
+    'hidden.bs.modal',
+    instance._errorReportingModalHiddenHandler,
+  );
 
-  Meteor.setInterval(() => {
+  instance._startupDiagnosticInterval = Meteor.setInterval(() => {
     Session.set('startupDiagnosticTick', Date.now());
   }, 1000);
   //load css into head based on user's preferences
-  document.getElementById('helpModal')?.addEventListener('hidden.bs.modal', function() {
+  instance._helpModalHiddenHandler = () => {
     const currentAudio = audioManager.getCurrentAudio();
     if (currentAudio) {
       currentAudio.play();
     }
-  });
+  };
+  document.getElementById('helpModal')?.addEventListener(
+    'hidden.bs.modal',
+    instance._helpModalHiddenHandler,
+  );
 
   // Global handler for continue buttons
-  $(window).keypress(function(e: JQuery.KeyPressEvent) {
+  instance._appShellKeypressHandler = function(e: JQuery.KeyPressEvent) {
     const key = e.keyCode || e.which;
     if (key == ENTER_KEY && (e.target as any).tagName != 'INPUT') {
       windowAny.keypressEvent = e;
@@ -764,10 +728,39 @@ Template.DefaultLayout.onRendered(function(this: any) {
         }
       }
     }
-  });
+  };
+  $(window).on('keypress.mofactsDefaultLayout', instance._appShellKeypressHandler);
+});
+
+Template.DefaultLayout.onDestroyed(function(this: any) {
+  if (this._appShellDocumentClickHandler) {
+    document.removeEventListener('click', this._appShellDocumentClickHandler);
+  }
+  if (this._errorReportingModalHiddenHandler) {
+    document.getElementById('errorReportingModal')?.removeEventListener(
+      'hidden.bs.modal',
+      this._errorReportingModalHiddenHandler,
+    );
+  }
+  if (this._helpModalHiddenHandler) {
+    document.getElementById('helpModal')?.removeEventListener(
+      'hidden.bs.modal',
+      this._helpModalHiddenHandler,
+    );
+  }
+  if (this._startupDiagnosticInterval) {
+    Meteor.clearInterval(this._startupDiagnosticInterval);
+  }
+  if (this._appShellKeypressHandler) {
+    $(window).off('keypress.mofactsDefaultLayout', this._appShellKeypressHandler);
+  }
 });
 
 Template.DefaultLayout.events({
+  'click [data-management-route-retry]': function(event: JQuery.TriggeredEvent) {
+    event.preventDefault();
+    managementRoutePresentation.retry();
+  },
   'click [data-ui-message-clear]': function(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     Session.set('uiMessage', null);
@@ -881,6 +874,18 @@ Template.registerHelper('showAppSidebar', function() {
 Template.registerHelper('isPracticeChrome', function() {
   return getAuthenticatedChromeMode() === 'practice';
 });
+Template.registerHelper('showAppFooter', function() {
+  if (getAuthenticatedChromeMode() === 'practice') {
+    return false;
+  }
+  const routePresentation = managementRoutePresentation.get();
+  const currentTemplate = String(Session.get('currentTemplate') || '');
+  if (routePresentation.status === 'ready') {
+    return currentTemplate === routePresentation.targetTemplate;
+  }
+  return routePresentation.status === 'error'
+    && currentTemplate === 'managementRouteError';
+});
 Template.registerHelper('showPracticeMenu', function() {
   return getAuthenticatedChromeMode() === 'practice';
 });
@@ -903,9 +908,19 @@ Template.registerHelper('appShellTitle', function() {
   if (getAuthenticatedChromeMode() === 'practice') {
     return getPracticeLessonTitle();
   }
-  const currentTemplate = String(Session.get('currentTemplate') || '');
-  const titleKey = APP_SHELL_TITLE_KEYS[currentTemplate] || 'home.practice';
-  return translatePlatformString(getActiveUiLocale(), titleKey);
+  const routePresentation = managementRoutePresentation.get();
+  if (routePresentation.status === 'idle') {
+    return translatePlatformString(getActiveUiLocale(), 'home.practice');
+  }
+  return translatePlatformString(getActiveUiLocale(), routePresentation.titleKey);
+});
+Template.registerHelper('managementRouteErrorMessage', function() {
+  const routePresentation = managementRoutePresentation.get();
+  return routePresentation.status === 'error' ? routePresentation.message : '';
+});
+Template.registerHelper('managementRouteCanRetry', function() {
+  const routePresentation = managementRoutePresentation.get();
+  return routePresentation.status === 'error' && routePresentation.retryable;
 });
 Template.registerHelper('appShellUnderlayStyle', function() {
   const theme = Session.get('curTheme') as any;

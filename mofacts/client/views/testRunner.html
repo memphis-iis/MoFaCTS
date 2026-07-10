@@ -1,7 +1,5 @@
 <template name="testRunner">
-  <div class="container admin-page">
-    <h3 class="page-header-title">{{testText 'home.adminTests'}}</h3>
-
+  <div>
     <div class="admin-section">
       <div class="card admin-card">
         <div class="card-body">
@@ -15,14 +13,59 @@
                 {{testText 'adminTests.description'}}
               </div>
             </div>
-            <button type="button" class="btn btn-primary run-deployment-readiness">
-              <i class="fa fa-check-circle"></i> {{testText 'adminTests.runReadinessChecks'}}
-            </button>
+            {{#if readinessPending}}
+              <button type="button" class="btn btn-primary run-deployment-readiness" disabled aria-busy="true">
+                <i class="fa fa-spinner fa-spin" aria-hidden="true"></i>
+                {{testText 'adminTests.runReadinessChecks'}}
+              </button>
+            {{else}}
+              <button type="button" class="btn btn-primary run-deployment-readiness" aria-busy="false">
+                <i class="fa fa-check-circle" aria-hidden="true"></i>
+                {{testText 'adminTests.runReadinessChecks'}}
+              </button>
+            {{/if}}
           </div>
 
-          <div id="deployment-readiness-output" class="admin-output-region"></div>
+          <div id="deployment-readiness-output" class="admin-output-region" aria-live="polite">
+            {{#with readinessOutput}}
+              {{> Template.dynamic template=template data=data}}
+            {{/with}}
+          </div>
         </div>
       </div>
     </div>
   </div>
+</template>
+
+<template name="testRunnerReadinessResult">
+  {{> adminStatus variant=summaryVariant text=summaryText urgent=summaryUrgent}}
+  {{#if checks.length}}
+    {{> adminTableShell
+      label=tableLabel
+      tableTemplate="testRunnerReadinessTable"
+      tableData=this}}
+  {{else}}
+    {{> adminEmptyState text=emptyText icon="fa-list-alt"}}
+  {{/if}}
+</template>
+
+<template name="testRunnerReadinessTable">
+  <table class="table table-sm table-bordered admin-readiness-table">
+    <thead>
+      <tr>
+        <th scope="col">{{checkLabel}}</th>
+        <th scope="col">{{statusLabel}}</th>
+        <th scope="col">{{messageLabel}}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each checks}}
+        <tr class="{{rowClass}}">
+          <td>{{name}}</td>
+          <td>{{displayStatus}}</td>
+          <td>{{message}}</td>
+        </tr>
+      {{/each}}
+    </tbody>
+  </table>
 </template>

@@ -15,6 +15,17 @@ import { installSchemaApplicabilityControls, sortPropertiesModal } from '../../l
 import { ensureJsonEditor } from '../../lib/jsonEditorLoader';
 import { translatePlatformString } from '../../lib/interfaceI18n';
 import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
+import { getErrorMessage } from '../../lib/errorUtils';
+import {
+    rejectLoad,
+    resolveLoad,
+    startLoad,
+    type LoadableState,
+} from '../../lib/adminUi/loadableState';
+import {
+    createTemplateLifetime,
+    type TemplateLifetime,
+} from '../../lib/adminUi/templateLifetime';
 
 type PlatformStringKey = Parameters<typeof translatePlatformString>[1];
 
@@ -33,6 +44,8 @@ function tdfEditorText(key: PlatformStringKey, values?: Parameters<typeof transl
 // Cache the schema after first load
 let cachedSchema: any = null;
 const SAVE_SUCCESS_REDIRECT_DELAY_MS = 1000;
+
+type TdfEditorLoadValue = Readonly<{ tdf: any | null }>;
 
 function setEditorMessage(instance: any, type: string, title: string, text: string) {
     instance.editorMessage.set({
@@ -65,12 +78,12 @@ Template.tdfEdit.onCreated(function(this: any) {
     instance.tdfId = FlowRouter.getParam('tdfId');
 
     // Subscribe to TDF data
-    instance.subscribe('tdfForEdit', instance.tdfId);
+    instance.lifetime = createTemplateLifetime() as TemplateLifetime;
+    instance.loadState = new ReactiveVar<LoadableState<TdfEditorLoadValue>>({ status: 'idle' });
 
     // Reactive state
     instance.hasChanges = new ReactiveVar(false);
     instance.saving = new ReactiveVar(false);
-    instance.schemaLoaded = new ReactiveVar(false);
     instance.saveFeedback = new ReactiveVar('');
     instance.editorMessage = new ReactiveVar(null);
     instance.tooltipMode = new ReactiveVar(getTooltipMode());
@@ -82,25 +95,11 @@ Template.tdfEdit.onCreated(function(this: any) {
     instance.validator = new ValidatorEngine({ type: 'tdf', debounceMs: 300 });
     instance.validationContext = null;
 
-    // Load schema
-    loadSchema(instance);
-});
-
-Template.tdfEdit.onRendered(function(this: any) {
-    const instance = this;
-
-    // Initialize editor when both TDF and schema are ready
-    instance.autorun(() => {
-        if (instance.subscriptionsReady() && instance.schemaLoaded.get()) {
-            const tdf = TdfsCollection.findOne(instance.tdfId);
-            if (tdf && !instance.editor) {
-                Meteor.defer(() => initEditor(instance, tdf));
-            }
-        }
-    });
+    void initializeTdfEditor(instance);
 });
 
 Template.tdfEdit.onDestroyed(function(this: any) {
+    this.lifetime.destroy();
     // Clean up editor
     if (this.editor) {
         this.editor.destroy();
@@ -147,14 +146,17 @@ Template.tdfEdit.onDestroyed(function(this: any) {
 });
 
 Template.tdfEdit.helpers({
-    loading() {
-        const instance = (Template.instance() as any);
-        return !instance.subscriptionsReady() || !instance.schemaLoaded.get();
+    editorReady() {
+        return (Template.instance() as any).loadState.get().status === 'ready';
+    },
+
+    editorLoadError() {
+        const state = (Template.instance() as any).loadState.get();
+        return state.status === 'error' ? state.message : '';
     },
 
     noData() {
-        const tdf = TdfsCollection.findOne((Template.instance() as any).tdfId);
-        return !tdf;
+        return (Template.instance() as any).loadState.get().status === 'empty';
     },
 
     lessonName() {
@@ -234,6 +236,18 @@ Template.tdfEdit.helpers({
 });
 
 Template.tdfEdit.events({
+    'click .tdf-editor-retry'(event: Event, instance: any) {
+        event.preventDefault();
+        if (instance.editor) {
+            instance.editor.destroy();
+            instance.editor = null;
+        }
+        instance.applicabilityController?.destroy();
+        instance.applicabilityController = null;
+        document.getElementById('tdf-editor-container')?.replaceChildren();
+        void initializeTdfEditor(instance);
+    },
+
     // Handle tooltip mode toggle
     'change input[name="tooltipMode"]'(event: any, instance: any) {
         const newMode = event.target.value;
@@ -325,10 +339,9 @@ Template.tdfEdit.events({
 /**
  * Load the TDF schema
  */
-async function loadSchema(instance: any) {
+async function loadSchema(): Promise<any> {
     if (cachedSchema) {
-        instance.schemaLoaded.set(true);
-        return;
+        return cachedSchema;
     }
 
     try {
@@ -338,10 +351,70 @@ async function loadSchema(instance: any) {
             throw new Error('Failed to load schema: ' + response.statusText);
         }
         cachedSchema = await response.json();
-        instance.schemaLoaded.set(true);
+        return cachedSchema;
     } catch (error: any) {
         clientConsole(1, '[TDF Edit] Error loading TDF schema:', error);
-        setEditorMessage(instance, 'error', tdfEditorText('tdfEditor.errorLoadingSchema'), tdfEditorText('tdfEditor.refreshPage'));
+        throw error;
+    }
+}
+
+function waitForTdfSubscription(instance: any): Promise<void> {
+    return new Promise((resolve, reject) => {
+        let settled = false;
+        instance.subscribe('tdfForEdit', instance.tdfId, {
+            onReady: () => {
+                if (!settled) {
+                    settled = true;
+                    resolve();
+                }
+            },
+            onStop: (error?: unknown) => {
+                if (settled) return;
+                settled = true;
+                if (error) reject(error);
+                else resolve();
+            },
+        });
+    });
+}
+
+function afterFlush(): Promise<void> {
+    return new Promise((resolve) => Tracker.afterFlush(resolve));
+}
+
+async function initializeTdfEditor(instance: any): Promise<void> {
+    const requestId = instance.lifetime.begin();
+    instance.loadState.set(startLoad(instance.loadState.get(), requestId));
+    try {
+        await Promise.all([loadSchema(), waitForTdfSubscription(instance)]);
+        if (!instance.lifetime.isCurrent(requestId)) return;
+        const tdf = TdfsCollection.findOne(instance.tdfId) || null;
+        if (!tdf) {
+            instance.loadState.set(resolveLoad(
+                instance.loadState.get(),
+                requestId,
+                { tdf: null },
+                (value: TdfEditorLoadValue) => value.tdf === null,
+            ));
+            return;
+        }
+        await afterFlush();
+        if (!instance.lifetime.isCurrent(requestId)) return;
+        await initEditor(instance, tdf);
+        if (!instance.lifetime.isCurrent(requestId)) return;
+        instance.loadState.set(resolveLoad(
+            instance.loadState.get(),
+            requestId,
+            { tdf },
+            () => false,
+        ));
+    } catch (error: unknown) {
+        if (!instance.lifetime.isCurrent(requestId)) return;
+        clientConsole(1, '[TDF Edit] Failed to initialize editor:', error);
+        instance.loadState.set(rejectLoad(instance.loadState.get(), requestId, {
+            message: getErrorMessage(error),
+            retryable: true,
+        }));
     }
 }
 
@@ -689,7 +762,9 @@ function injectLabelsForInputs(container: any, editor: any, rootArg?: any) {
  */
 async function initEditor(instance: any, tdf: any) {
     const container = document.getElementById('tdf-editor-container');
-    if (!container || !cachedSchema) return;
+    if (!container || !cachedSchema) {
+        throw new Error('TDF editor initialization requires its container and schema.');
+    }
 
     // Apply hide-descriptions class if mode is 'none' on initial load
     const tooltipMode = instance.tooltipMode.get();
@@ -760,7 +835,7 @@ async function initEditor(instance: any, tdf: any) {
     } catch (error: any) {
         clientConsole(1, '[TDF Edit] JSONEditor failed to load:', error);
         setEditorMessage(instance, 'error', tdfEditorText('tdfEditor.editorLibraryNotLoaded'), tdfEditorText('tdfEditor.refreshContactSupport'));
-        return;
+        throw error;
     }
 
     instance.editor = new JSONEditorAny(container, options);
@@ -770,7 +845,9 @@ async function initEditor(instance: any, tdf: any) {
     let isInitializing = true;
 
     // After editor is ready, ensure all data is loaded
+    const editorReady = new Promise<void>((resolve, reject) => {
     instance.editor.on('ready', () => {
+      try {
         // Ensure the editor has initial data in case startval didn't populate
         const currentValue = instance.editor.getValue();
         if (!currentValue || Object.keys(currentValue).length === 0) {
@@ -832,6 +909,11 @@ async function initEditor(instance: any, tdf: any) {
 
         // Done initializing - now track real changes
         isInitializing = false;
+        resolve();
+      } catch (error: unknown) {
+        reject(error);
+      }
+    });
     });
 
     // Listen for changes
@@ -972,6 +1054,7 @@ async function initEditor(instance: any, tdf: any) {
 
     // Inject MC toggle buttons for learning session units (after a short delay to ensure DOM is ready)
     setTimeout(() => injectMCButtons(instance), 200);
+    await editorReady;
 }
 
 /**

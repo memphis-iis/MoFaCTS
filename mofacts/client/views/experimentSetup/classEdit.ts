@@ -6,10 +6,12 @@ import { meteorCallAsync } from '../..';
 import { curSemester } from '../../../common/Definitions';
 import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 import { translatePlatformString } from '../../lib/interfaceI18n';
+import { getErrorMessage } from '../../lib/errorUtils';
 import $ from 'jquery';
 
-// Initialize to null to detect loading state ([] means loaded but empty)
-Session.set('classes', null);
+Session.set('classes', []);
+Session.set('sectionsByInstructorId', []);
+Session.set('classEditLoading', true);
 
 let isNewClass = true;
 
@@ -214,20 +216,26 @@ async function loadCourseManagementData() {
 }
 
 Template.classEdit.onCreated(function() {
-  // Reset to loading state when entering the page
-  Session.set('classes', null);
-  Session.set('sectionsByInstructorId', null);
+  Session.set('classes', []);
+  Session.set('sectionsByInstructorId', []);
+  Session.set('classEditLoading', true);
   Session.set('classEditMessage', null);
   Session.set('classEditConfirmation', null);
 });
 
 Template.classEdit.onRendered(async function () {
-  await loadCourseManagementData();
-  noClassSelectedSetup();
+  try {
+    await loadCourseManagementData();
+    noClassSelectedSetup();
+  } catch (error: unknown) {
+    setClassEditMessage('error', getErrorMessage(error));
+  } finally {
+    Session.set('classEditLoading', false);
+  }
 });
 
 Template.classEdit.helpers({
-  isLoading: () => Session.get('classes') === null,
+  isLoading: () => Session.get('classEditLoading') === true,
   classEditMessage: () => Session.get('classEditMessage'),
   classEditConfirmation: () => Session.get('classEditConfirmation'),
   isEditingCourse: () => Session.get('classEditMode') === 'edit',

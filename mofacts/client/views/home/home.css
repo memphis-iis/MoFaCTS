@@ -534,18 +534,26 @@ html.learning-progress-panel-viewport-open .practice-top-header {
 }
 
 .user-area {
+    position: relative;
+}
+
+.user-toggle {
     display: flex;
     align-items: center;
     gap: calc(10px * var(--app-density-scale));
     cursor: pointer;
     min-height: var(--app-button-height);
     padding: var(--app-space-1-px) calc(6px * var(--app-density-scale)) var(--app-space-1-px) var(--app-space-1-px);
+    border: 0;
     border-radius: var(--app-border-radius-sm);
-    position: relative;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
 }
 
-.user-area:hover,
-.user-area:focus-visible {
+.user-toggle:hover,
+.user-toggle:focus-visible {
     background: color-mix(in srgb, var(--app-text-color) 5%, var(--learning-card-surface-color));
     outline: none;
 }
@@ -587,6 +595,8 @@ html.learning-progress-panel-viewport-open .practice-top-header {
 }
 
 .user-info {
+    display: flex;
+    flex-direction: column;
     line-height: 1.25;
 }
 
@@ -608,7 +618,7 @@ html.learning-progress-panel-viewport-open .practice-top-header {
     font-size: calc(var(--app-font-size-base) * 0.75);
 }
 
-.user-area[aria-expanded="true"] .caret {
+.user-toggle[aria-expanded="true"] .caret {
     transform: rotate(180deg);
 }
 
@@ -744,7 +754,7 @@ html.learning-progress-panel-viewport-open .practice-top-header {
 }
 
 .content {
-    padding: var(--app-space-4);
+    padding: var(--app-content-padding);
     background: var(--app-background-color);
     flex: 1;
     position: relative;
@@ -906,7 +916,7 @@ html.learning-progress-panel-viewport-open .practice-top-header {
 
 .class-selection-container {
     max-width: 900px;
-    margin-top: var(--app-space-3);
+    margin: var(--app-space-0) auto;
 }
 
 .class-selection-card {
@@ -1021,7 +1031,7 @@ html.learning-progress-panel-viewport-open .practice-top-header {
     }
 
     .content {
-        padding: var(--app-space-4-px);
+        padding: var(--app-content-padding);
     }
 
     .practice-content {
@@ -1029,11 +1039,7 @@ html.learning-progress-panel-viewport-open .practice-top-header {
     }
 
     .tool-content {
-        padding-top: var(--app-space-3-px);
-    }
-
-    .tool-content > .container {
-        margin-top: 0 !important;
+        padding-top: var(--app-content-padding);
     }
 }
 

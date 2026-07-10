@@ -72,7 +72,6 @@
       }
 
       .ai-create-subtitle,
-      .ai-create-tip,
       .ai-mode-helper {
         color: var(--app-secondary-text-color);
       }
@@ -119,18 +118,9 @@
         bottom: calc(0.6rem * var(--app-density-scale));
         display: flex;
         align-items: center;
-        justify-content: space-between;
+        justify-content: flex-end;
         gap: var(--app-space-2);
         pointer-events: none;
-      }
-
-      .ai-input-tip {
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        color: var(--app-secondary-text-color);
-        font-size: calc(var(--app-font-size-base) * 0.75);
       }
 
       .ai-char-count {
@@ -315,7 +305,6 @@
       <div class="ai-input-wrap">
         <textarea id="ai-source-text" class="ai-source-box" placeholder="{{aiText 'aiCreator.sourcePlaceholder'}}" aria-label="{{aiText 'aiCreator.sourceAriaLabel'}}">{{sourceText}}</textarea>
         <div class="ai-source-meta">
-          <span class="ai-input-tip">{{aiText 'aiCreator.tip'}}</span>
           <span class="ai-char-count">{{sourceLength}}</span>
         </div>
       </div>

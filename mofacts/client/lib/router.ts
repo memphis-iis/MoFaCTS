@@ -19,12 +19,17 @@ import { legacyInt, legacyTrim } from '../../common/underscoreCompat';
 import { getErrorMessage } from './errorUtils';
 import { CARD_ENTRY_INTENT, setCardEntryIntent } from './cardEntryIntent';
 import { isLaunchLoadingActive } from './launchLoading';
-import { getRouteAccessPolicy, type RouteAccessPolicy } from './routeAccessPolicies';
+import {
+  getManagementRoutePolicyByRouteName,
+  getManagementRoutePolicyByTemplate,
+  type ManagementRoutePresentationPolicy,
+  type RouteAccessPolicy,
+} from './adminUi/managementRoutePresentationPolicies';
+import { managementRoutePresentation } from './adminUi/routePresentationState';
 import { resolveSpeechIgnoreOutOfGrammarResponses } from './speechRecognitionConfig';
 import { translatePlatformString } from './interfaceI18n';
 import { getActiveUiLocale } from './interfaceLocaleState';
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra');
-const BlazeLayout: any = (globalThis as any).BlazeLayout;
 const Tdfs: any = (globalThis as any).Tdfs;
 const COURSE_ASSIGNMENT_DIRECT_LAUNCH_DENIED_REASON = 'Launch this TDF through its active course assignment';
 
@@ -267,28 +272,8 @@ function consumePendingClassInvite(controller: any = null): boolean {
 // Load infrequently-used route modules on demand to keep the initial client bundle smaller.
 const lazyTemplateLoaders: Record<string, any> = {
   card: () => import('../views/experiment/card'),
-  classSelection: () => import('../views/home/classSelection'),
-  courses: () => import('../views/home/courses'),
-  adminControls: () => import('../views/adminControls'),
-  adminBackups: () => import('../views/adminBackups'),
-  audioSettings: () => import('../views/audioSettings'),
-  profile: () => import('../views/profile'),
-  help: () => import('../views/help'),
   experimentError: () => import('../views/experimentError'),
-  testRunner: () => import('../views/testRunner'),
-  theme: () => import('../views/theme'),
-  turkWorkflow: () => import('../views/turkWorkflow'),
-  userAdmin: () => import('../views/userAdmin'),
-  classEdit: () => import('../views/experimentSetup/classEdit'),
-  contentUpload: () => import('../views/experimentSetup/contentUpload'),
-  aiContentCreator: () => import('../views/experimentSetup/aiContentCreator'),
-  manualContentCreator: () => import('../views/experimentSetup/manualContentCreator'),
-  contentEdit: () => import('../views/experimentSetup/contentEdit'),
   sparcEdit: () => import('../views/experimentSetup/sparcEdit'),
-  tdfEdit: () => import('../views/experimentSetup/tdfEdit'),
-  tdfAssignmentEdit: () => import('../views/experimentSetup/tdfAssignmentEdit'),
-  dataDownload: () => import('../views/experimentReporting/dataDownload'),
-  instructorReporting: () => import('../views/experimentReporting/instructorReporting'),
 };
 
 const loadedLazyTemplates = new Set();
@@ -303,72 +288,86 @@ async function ensureTemplateModuleLoaded(templateName: any) {
   loadedLazyTemplates.add(templateName);
 }
 
+function currentRoutePath(): string {
+  return `${window.location.pathname}${window.location.search}`;
+}
+
+function prepareManagementRoutePresentation(
+  policy: ManagementRoutePresentationPolicy,
+): number {
+  const path = currentRoutePath();
+  const current = managementRoutePresentation.get();
+  if (
+    current.status === 'loading'
+    && current.routeName === policy.routeName
+    && current.path === path
+  ) {
+    return current.navigationGeneration;
+  }
+
+  const generation = managementRoutePresentation.begin(policy, path, () => {
+    FlowRouter.reload();
+  });
+  return generation;
+}
+
 async function renderRouteTemplate(controller: any, templateName: any) {
-  try {
-    await ensureTemplateModuleLoaded(templateName);
-  } catch (error: unknown) {
-    clientConsole(1, '[ROUTER] Failed to lazy-load route template module for', templateName, getErrorMessage(error));
+  const managementPolicy = getManagementRoutePolicyByTemplate(String(templateName));
+  if (managementPolicy) {
+    const generation = prepareManagementRoutePresentation(managementPolicy);
+    try {
+      await managementPolicy.load();
+      if (!managementRoutePresentation.isCurrent(generation)) {
+        return;
+      }
+      if (!Template[managementPolicy.template]) {
+        throw new Error(`Loaded module did not register template ${managementPolicy.template}.`);
+      }
+      if (!managementRoutePresentation.resolve(generation)) {
+        return;
+      }
+      renderLayout(controller, managementPolicy.template);
+    } catch (error: unknown) {
+      if (!managementRoutePresentation.fail(generation, getErrorMessage(error), true)) {
+        return;
+      }
+      clientConsole(
+        1,
+        '[ROUTER] Failed to present management route',
+        managementPolicy.routeName,
+        getErrorMessage(error),
+      );
+      renderLayout(controller, 'managementRouteError');
+    }
+    return;
+  }
+
+  await ensureTemplateModuleLoaded(templateName);
+  if (!Template[templateName]) {
+    throw new Error(`Loaded module did not register template ${templateName}.`);
   }
   renderLayout(controller, templateName);
 }
 
 function renderLayout(controller: any, templateName: any) {
   clientConsole(2, '[ROUTER] renderLayout called with template:', templateName);
+  const managementPolicy = getManagementRoutePolicyByTemplate(String(templateName));
+  const isManagementPresentationFrame = templateName === 'managementRouteError';
+  if (!managementPolicy && !isManagementPresentationFrame) {
+    managementRoutePresentation.clear();
+  }
   Session.set('currentTemplate', templateName);
   clientConsole(2, '[ROUTER] Session currentTemplate set to:', templateName);
 
-  // Check if template exists
-  const templateExists = !!Template[templateName];
-  clientConsole(2, '[ROUTER] Template.' + templateName + ' exists:', templateExists);
-
-  if (!templateExists) {
-    clientConsole(1, '[ROUTER] ERROR: Template', templateName, 'does not exist!');
-    clientConsole(1, '[ROUTER] Available templates:', Object.keys(Template).filter((k: any) => !k.startsWith('_')).slice(0, 20));
+  if (!Template[templateName]) {
+    throw new Error(`Template ${templateName} is not registered.`);
+  }
+  if (!controller || typeof controller.render !== 'function') {
+    throw new Error(`Route controller cannot render DefaultLayout for ${templateName}.`);
   }
 
-  if (controller && typeof controller.render === 'function') {
-    try {
-      controller.render('DefaultLayout', templateName);
-      clientConsole(2, '[ROUTER] Successfully rendered via controller.render(DefaultLayout, template)');
-      return;
-    } catch (error: unknown) {
-      clientConsole(2, '[ROUTER] render(DefaultLayout, template) failed:', getErrorMessage(error));
-    }
-
-    try {
-      controller.render('DefaultLayout', { main: templateName });
-      clientConsole(2, '[ROUTER] Successfully rendered via controller.render(DefaultLayout, {main})');
-      return;
-    } catch (error: unknown) {
-      clientConsole(2, '[ROUTER] render(DefaultLayout, {main}) failed:', getErrorMessage(error));
-    }
-
-    try {
-      controller.layout('DefaultLayout');
-      controller.render(templateName);
-      clientConsole(2, '[ROUTER] Successfully rendered via layout+render');
-      return;
-    } catch (error: unknown) {
-      clientConsole(2, '[ROUTER] layout+render failed:', getErrorMessage(error));
-    }
-  }
-
-  if (typeof BlazeLayout !== 'undefined' && typeof BlazeLayout.render === 'function') {
-    BlazeLayout.render('DefaultLayout', { main: templateName });
-    clientConsole(2, '[ROUTER] Successfully rendered via BlazeLayout.render');
-    return;
-  }
-
-  if (controller && typeof controller.render === 'function') {
-    try {
-      controller.render(templateName);
-      return;
-    } catch (error: unknown) {
-      clientConsole(2, '[ROUTER] render(template) failed:', getErrorMessage(error));
-    }
-  }
-
-  clientConsole(1, '[ROUTER] No render method available for', templateName);
+  controller.render('DefaultLayout');
+  clientConsole(2, '[ROUTER] Rendered DefaultLayout through the Flow Router controller');
 }
 
 function renderHomeForUser(controller: any, user: any) {
@@ -560,12 +559,27 @@ const restrictedRoutes = [
   'instructorReporting',
 ];
 
+function getRouteAccessPolicy(routeName: string): RouteAccessPolicy {
+  const policy = getManagementRoutePolicyByRouteName(routeName);
+  if (policy) {
+    return policy;
+  }
+  if (routeName === 'client.multiTdfSelect') {
+    return { requiresAuth: true };
+  }
+  throw new Error(`No route access policy is registered for ${routeName}.`);
+}
+
 function waitForAuthenticatedRoute(
   controller: any,
   routeName: string,
   onReady: (user: any) => void | Promise<void>,
   policy: RouteAccessPolicy = { requiresAuth: true }
 ) {
+  const managementPolicy = getManagementRoutePolicyByRouteName(routeName);
+  if (managementPolicy) {
+    prepareManagementRoutePresentation(managementPolicy);
+  }
   const currentDecision = evaluateRouteAccess(policy);
   if (currentDecision === 'allow') {
     const user = Meteor.user();
@@ -585,7 +599,9 @@ function waitForAuthenticatedRoute(
     return;
   }
 
-  renderLayout(controller, 'customLoading');
+  if (!managementPolicy) {
+    renderLayout(controller, 'customLoading');
+  }
   if (pendingAuthRouteHandles[routeName]) {
     return;
   }
@@ -995,7 +1011,7 @@ FlowRouter.route('/sparcEdit/:tdfId', {
     waitForAuthenticatedRoute(this, 'client.sparcEdit', async () => {
       Session.set('editingTdfId', params.tdfId);
       await renderRouteTemplate(this, 'sparcEdit');
-    }, getRouteAccessPolicy('client.sparcEdit'));
+    }, { requiresAuth: true });
   }
 })
 

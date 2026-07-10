@@ -492,7 +492,7 @@
         }
     </style>
 
-    <div class="container admin-page">
+    <div>
         <!-- Header -->
         <div class="editor-page-header">
             <a href="/contentUpload" class="btn btn-outline-secondary editor-back-button">
@@ -508,11 +508,12 @@
             </h3>
         </div>
 
-        {{#if loading}}
-        <div class="text-center editor-loading-state">
-            <i class="fa fa-spinner fa-spin fa-2x"></i>
-            <p class="admin-form-row-top">{{tdfEditorText 'tdfEditor.loadingTdf'}}</p>
+        {{#if editorLoadError}}
+        <div class="admin-status admin-status-error" role="alert">
+            <i class="fa fa-exclamation-circle" aria-hidden="true"></i>
+            <div class="admin-status-text">{{editorLoadError}}</div>
         </div>
+        <button type="button" class="btn btn-outline-danger tdf-editor-retry">{{tdfEditorText 'common.tryAgain'}}</button>
         {{else}}
         {{#if noData}}
         <div class="admin-status admin-status-warning">
@@ -531,6 +532,7 @@
         </div>
         {{/if}}
 
+        {{#if editorReady}}
         <!-- Tooltip toggle + unsaved state (mobile-friendly) -->
         <div class="editor-topbar admin-form-row">
             <div class="editor-status">
@@ -554,17 +556,19 @@
                 </div>
             </div>
         </div>
+        {{/if}}
 
         <!-- Validation Summary Panel -->
         <div id="tdf-validation-summary"></div>
 
         <!-- JSON Editor container -->
-        <div class="card admin-card">
+        <div class="card admin-card editor-initial-surface" aria-busy="{{#if editorReady}}false{{else}}true{{/if}}">
             <div class="card-body admin-alert-compact">
                 <div id="tdf-editor-container"></div>
             </div>
         </div>
 
+        {{#if editorReady}}
         <!-- Action buttons -->
         <div class="content-edit-actions">
             <div class="save-feedback {{#if saveFeedbackText}}is-visible{{/if}}" role="status" aria-live="polite" aria-atomic="true">
@@ -580,6 +584,7 @@
                 <i class="fa fa-save"></i> {{tdfEditorText 'tdfEditor.saveChanges'}}
             </button>
         </div>
+        {{/if}}
 
         {{/if}}
         {{/if}}

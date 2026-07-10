@@ -1,5 +1,5 @@
 <template name="dataDownload">
-    <div class="container admin-page">
+    <div>
         <h3 class="page-header-title">{{reportingText 'reporting.downloadData'}}</h3>
 
     {{#if downloadMessage}}
@@ -37,7 +37,7 @@
                         <i class="fa fa-download"></i> {{reportingText 'reporting.downloadOwnedTdfData'}}
                     </a>
                 </div>
-                <div class="admin-table-wrapper">
+                <div class="admin-table-wrapper" aria-busy="{{#if isLoading}}true{{else}}false{{/if}}">
                     <div class="table-responsive data-download-table-wrapper">
                         <table class="table table-striped table-bordered data-download-table">
                             <thead>
@@ -48,13 +48,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {{#if isLoading}}
-                                <tr>
-                                    <td colspan="3" class="text-center admin-table-status-cell">
-                                        <i class="fa fa-spinner fa-spin"></i> {{reportingText 'reporting.loading'}}
-                                    </td>
-                                </tr>
-                                {{else}}
+                                {{#unless isLoading}}
                                 {{#each dataDownloads}}
                                 <tr>
                                     <td class="text-center">
@@ -89,7 +83,7 @@
                                     <td colspan="3" class="text-center text-muted admin-table-status-cell">{{reportingText 'reporting.noDataFiles'}}</td>
                                 </tr>
                                 {{/each}}
-                                {{/if}}
+                                {{/unless}}
                             </tbody>
                         </table>
                     </div>

@@ -677,7 +677,7 @@
         }
     </style>
 
-    <div class="container admin-page">
+    <div>
         <!-- Header -->
         <div class="editor-page-header">
             <a href="/contentUpload" class="btn btn-outline-secondary editor-back-button">
@@ -698,11 +698,12 @@
             </h3>
         </div>
 
-        {{#if loading}}
-        <div class="text-center editor-loading-state">
-            <i class="fa fa-spinner fa-spin fa-2x"></i>
-            <p class="admin-form-row-top">{{contentEditorText 'contentEditor.loadingContent'}}</p>
+        {{#if editorLoadError}}
+        <div class="admin-status admin-status-error" role="alert">
+            <i class="fa fa-exclamation-circle" aria-hidden="true"></i>
+            <div class="admin-status-text">{{editorLoadError}}</div>
         </div>
+        <button type="button" class="btn btn-outline-danger content-editor-retry">{{contentEditorText 'common.tryAgain'}}</button>
         {{else}}
         {{#if noData}}
         <div class="admin-status admin-status-warning">
@@ -720,14 +721,6 @@
             </div>
         </div>
         {{/if}}
-
-        {{#unless editorReady}}
-        <!-- Show initializing message while editor loads -->
-        <div class="text-center admin-empty-state">
-            <i class="fa fa-spinner fa-spin fa-2x text-primary"></i>
-            <p class="admin-form-row-top text-muted">{{contentEditorText 'contentEditor.initializingEditor'}}</p>
-        </div>
-        {{/unless}}
 
         {{#if editorReady}}
         <!-- Tooltip toggle + unsaved state (mobile-friendly) -->
@@ -776,7 +769,6 @@
                 </button>
             </div>
         </div>
-        {{/if}}
         {{/if}}
 
         <!-- Generate Incorrect Responses Modal -->
@@ -830,12 +822,13 @@
             </div>
             <div class="small text-muted text-truncate cluster-name">{{currentClusterName}}</div>
         </div>
+        {{/if}}
 
         <!-- Validation Summary Panel -->
         <div id="stim-validation-summary"></div>
 
         <!-- JSON Editor container -->
-        <div class="card admin-card">
+        <div class="card admin-card editor-initial-surface" aria-busy="{{#if editorReady}}false{{else}}true{{/if}}">
             <div class="card-body admin-alert-compact">
                 <div id="stim-editor-container"></div>
             </div>

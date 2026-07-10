@@ -1,6 +1,6 @@
 <template name="classEdit">
 {{#if isInRole 'admin, teacher'}}
-    <div class="container admin-page">
+    <div aria-busy="{{#if isLoading}}true{{else}}false{{/if}}">
       <h3 class="page-header-title class-edit-heading">{{courseText 'courseManagement.title'}}</h3>
 
       {{#if classEditMessage}}
@@ -10,14 +10,6 @@
       </div>
       {{/if}}
 
-      {{#if isLoading}}
-      <div class="text-center admin-loading-block">
-        <div class="spinner-border text-primary" role="status">
-          <span class="visually-hidden">{{courseText 'common.loading'}}</span>
-        </div>
-        <p class="admin-loading-text text-muted">{{courseText 'courseManagement.loadingClassData'}}</p>
-      </div>
-      {{else}}
       <!-- Add or Edit a Course Section -->
       <div class="admin-section">
         <div class="card admin-card">
@@ -26,7 +18,7 @@
               <i class="fa fa-pencil admin-section-icon"></i>
               <h5>{{courseText 'courseManagement.addOrEditCourse'}}</h5>
             </div>
-            <div class="row g-3">
+            <fieldset class="row g-3" disabled="{{#if isLoading}}disabled{{/if}}">
               <div class="col-12">
                 <label for="class-select" class="form-label">{{courseText 'courseManagement.selectExistingCourse'}}</label>
                 <select id="class-select" class="form-select">
@@ -94,7 +86,7 @@
                   </button>
                 {{/if}}
               </div>
-            </div>
+            </fieldset>
           </div>
         </div>
       </div>
@@ -107,22 +99,23 @@
               <i class="fa fa-link admin-section-icon"></i>
               <h5>{{courseText 'courseManagement.sectionLinks'}}</h5>
             </div>
-            {{#if sections}}
-              <ul class="list-unstyled">
-                {{#each sections}}
-                  <li class="admin-list-row">
-                    <i class="fa fa-external-link admin-inline-icon"></i>
-                    <a href="{{baseLink}}classes/{{this.teacherUserId}}/{{this.sectionId}}">{{this.courseName}} - {{this.sectionName}}</a>
-                  </li>
-                {{/each}}
-              </ul>
-            {{else}}
-              <p class="text-muted text-center admin-empty-text">{{courseText 'courseManagement.noSections'}}</p>
-            {{/if}}
+            {{#unless isLoading}}
+              {{#if sections}}
+                <ul class="list-unstyled">
+                  {{#each sections}}
+                    <li class="admin-list-row">
+                      <i class="fa fa-external-link admin-inline-icon"></i>
+                      <a href="{{baseLink}}classes/{{this.teacherUserId}}/{{this.sectionId}}">{{this.courseName}} - {{this.sectionName}}</a>
+                    </li>
+                  {{/each}}
+                </ul>
+              {{else}}
+                <p class="text-muted text-center admin-empty-text">{{courseText 'courseManagement.noSections'}}</p>
+              {{/if}}
+            {{/unless}}
           </div>
         </div>
       </div>
-      {{/if}}
     </div>
 {{/if}}
 </template>

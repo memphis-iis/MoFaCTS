@@ -1,0 +1,68 @@
+<template name="adminStatus">
+  <div class="admin-status admin-status-{{statusVariant}}" role="{{statusRole}}" aria-live="{{statusLive}}">
+    <i class="fa {{statusIcon}}" aria-hidden="true"></i>
+    <div class="admin-status-text">
+      {{#if title}}<strong>{{title}}</strong>{{/if}}
+      <span>{{text}}</span>
+    </div>
+  </div>
+</template>
+
+<template name="adminEmptyState">
+  <div class="admin-empty-state" role="status">
+    <i class="fa {{emptyStateIcon}}" aria-hidden="true"></i>
+    <p>{{text}}</p>
+  </div>
+</template>
+
+<template name="adminAsyncRegion">
+  <section class="admin-async-region" aria-busy="{{busy}}" aria-live="polite">
+    {{> Template.dynamic template=contentTemplate data=contentData}}
+  </section>
+</template>
+
+<template name="adminTableShell">
+  <div class="admin-table-shell" role="region" aria-label="{{label}}" tabindex="0">
+    {{> Template.dynamic template=tableTemplate data=tableData}}
+  </div>
+</template>
+
+<template name="adminInlineConfirmation">
+  {{#with confirmationPresentation}}
+  <section
+    id="{{confirmationId}}"
+    class="admin-inline-confirmation admin-inline-confirmation-{{severity}} {{visibilityClass}}"
+    role="group"
+    aria-labelledby="{{titleId}}"
+    aria-describedby="{{messageId}}"
+    aria-hidden="{{ariaHidden}}">
+    <h6 id="{{titleId}}">{{title}}</h6>
+    <p id="{{messageId}}">{{message}}</p>
+    <div class="{{inputClass}}">
+      <label for="{{inputId}}">{{inputLabel}}</label>
+      <input
+        type="text"
+        id="{{inputId}}"
+        class="form-control admin-confirmation-input"
+        autocomplete="off"
+        disabled="{{pending}}">
+    </div>
+    <div class="admin-inline-confirmation-actions">
+      <button
+        type="button"
+        class="btn btn-secondary admin-confirmation-cancel"
+        data-confirmation-initial-focus="true"
+        disabled="{{pending}}">
+        {{cancelLabel}}
+      </button>
+      <button
+        type="button"
+        class="btn {{confirmButtonClass}} admin-confirmation-confirm"
+        aria-busy="{{pending}}"
+        disabled="{{pending}}">
+        {{confirmLabel}}
+      </button>
+    </div>
+  </section>
+  {{/with}}
+</template>

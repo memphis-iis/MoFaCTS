@@ -1,0 +1,75 @@
+.management-route-frame {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  justify-content: center;
+  min-block-size: 18rem;
+  padding: 2rem 1rem;
+}
+
+.management-route-frame-error .alert {
+  inline-size: min(100%, 42rem);
+  margin: 0;
+}
+
+.admin-async-region,
+.admin-output-region {
+  min-block-size: 5rem;
+}
+
+.admin-async-state-hidden {
+  display: none;
+}
+
+.admin-status-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.admin-table-shell {
+  max-inline-size: 100%;
+  overflow-x: auto;
+}
+
+.admin-table-shell:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.admin-empty-state {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  justify-content: center;
+  min-block-size: 5rem;
+  text-align: center;
+}
+
+.admin-empty-state p {
+  margin: 0;
+}
+
+.admin-inline-confirmation {
+  border: 1px solid currentColor;
+  border-radius: 0.375rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-block-start: 1rem;
+  padding: 1rem;
+}
+
+.admin-inline-confirmation-hidden,
+.admin-inline-confirmation-input-hidden {
+  display: none;
+}
+
+.admin-inline-confirmation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}

@@ -1,5 +1,5 @@
 <template name="classSelection">
-  <div class="container class-selection-container">
+  <div class="class-selection-container" aria-busy="{{#if classSelectionBusy}}true{{else}}false{{/if}}">
     <h3 class="page-header-title">{{t 'home.joinCourses'}}</h3>
 
     <div class="card class-selection-card">
@@ -15,24 +15,34 @@
           <p class="class-selection-current">{{t 'classSelection.noCourseSelected'}}</p>
         {{/if}}
 
-        {{#if classSelectionReady}}
+        {{#if classSelectionMessage}}
+          {{> adminStatus variant=classSelectionMessage.variant text=classSelectionMessage.text}}
+        {{/if}}
+
+        {{#if classSelectionError}}
+          {{> adminStatus variant="error" text=classSelectionError urgent=true}}
+          <button type="button" class="btn btn-outline-danger class-selection-retry">{{t 'common.tryAgain'}}</button>
+        {{else}}
+          {{#if classSelectionEmpty}}
+            {{> adminEmptyState text=(t 'classSelection.noAvailableCourses') icon="fa-users"}}
+          {{/if}}
           <div class="row g-2 align-items-end">
             <div class="col-md-5 col-12">
               <label class="form-label" for="classSelectionTeacherSelect">{{t 'classSelection.instructor'}}</label>
-              <select id="classSelectionTeacherSelect" class="form-select">
+              <select id="classSelectionTeacherSelect" class="form-select" disabled="{{classSelectionBusy}}">
                 <option value="">{{t 'classSelection.selectInstructor'}}</option>
                 {{#each classSelectionTeachers}}
-                  <option value="{{this._id}}">{{this.displayIdentifier}}</option>
+                  <option value="{{this._id}}" {{teacherSelectedAttrs this._id}}>{{this.displayIdentifier}}</option>
                 {{/each}}
               </select>
             </div>
 
             <div class="col-md-5 col-12">
               <label class="form-label" for="classSelectionClassSelect">{{t 'classSelection.course'}}</label>
-              <select id="classSelectionClassSelect" class="form-select">
+              <select id="classSelectionClassSelect" class="form-select" disabled="{{classSelectionBusy}}">
                 <option value="">{{t 'classSelection.selectCourse'}}</option>
                 {{#each classSelectionClasses}}
-                  <option value="{{this.sectionId}}">
+                  <option value="{{this.sectionId}}" {{sectionSelectedAttrs this.sectionId}}>
                     {{this.courseName}}{{#if this.sectionName}} - {{this.sectionName}}{{/if}}
                   </option>
                 {{/each}}
@@ -40,14 +50,12 @@
             </div>
 
             <div class="col-md-2 col-12 d-grid">
-              <button type="button" id="saveClassSelectionButton" class="btn btn-primary">{{t 'classSelection.save'}}</button>
+              <button type="button" id="saveClassSelectionButton" class="btn btn-primary" disabled="{{classSelectionBusy}}" aria-busy="{{#if classSelectionBusy}}true{{else}}false{{/if}}">{{t 'classSelection.save'}}</button>
             </div>
           </div>
           <div class="class-selection-actions">
             <button type="button" id="backToHomeButton" class="btn btn-outline-secondary">{{t 'classSelection.backToPracticeMenu'}}</button>
           </div>
-        {{else}}
-          <p class="class-selection-loading">{{t 'classSelection.loadingOptions'}}</p>
         {{/if}}
       </div>
     </div>

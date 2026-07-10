@@ -233,7 +233,7 @@ describe('interfaceI18n', function() {
     'classSelection.selectCourse',
     'classSelection.save',
     'classSelection.backToPracticeMenu',
-    'classSelection.loadingOptions',
+    'classSelection.noAvailableCourses',
     'classSelection.none',
     'classSelection.selected',
     'classSelection.selectBoth',
@@ -296,7 +296,6 @@ describe('interfaceI18n', function() {
   ] as const;
   const courseManagementKeys = [
     'courseManagement.title',
-    'courseManagement.loadingClassData',
     'courseManagement.addOrEditCourse',
     'courseManagement.selectExistingCourse',
     'courseManagement.addCourse',
@@ -338,9 +337,7 @@ describe('interfaceI18n', function() {
   const contentEditorKeys = [
     'contentEditor.editTitle',
     'contentEditor.stimFileInfo',
-    'contentEditor.loadingContent',
     'contentEditor.noStimulusData',
-    'contentEditor.initializingEditor',
     'contentEditor.generateIncorrectResponses',
     'contentEditor.removeAllIncorrectResponses',
     'contentEditor.removeIncorrectTitle',
@@ -381,7 +378,6 @@ describe('interfaceI18n', function() {
   const tdfEditorKeys = [
     'tdfEditor.editTitle',
     'tdfEditor.conditionInfo',
-    'tdfEditor.loadingTdf',
     'tdfEditor.notFound',
     'tdfEditor.unsavedChanges',
     'tdfEditor.descriptions',

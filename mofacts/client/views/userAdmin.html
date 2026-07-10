@@ -2,7 +2,7 @@
 
 <template name="userAdmin">
 {{#if isInRole 'admin'}}
-    <div class="container admin-page">
+    <div>
         <h3 class="page-header-title">{{userAdminText 'admin.userAdmin'}}</h3>
 
         {{#if adminMessage}}
@@ -100,12 +100,7 @@
                         <input type="text" name="filter" id="filter" class="form-control" value="{{currentFilter}}" placeholder="{{userAdminText 'admin.filterByEmail'}}">
                     </div>
 
-                    {{#if isLoading}}
-                    <div class="text-center admin-empty-state">
-                        <i class="fa fa-spinner fa-spin fa-2x"></i>
-                        <p class="admin-form-row-top text-muted">{{userAdminText 'admin.loadingUsers'}}</p>
-                    </div>
-                    {{else}}
+                    <div aria-busy="{{#if isLoading}}true{{else}}false{{/if}}" inert="{{#if isLoading}}inert{{/if}}">
                     <div class="d-flex justify-content-between align-items-center admin-form-row">
                         <div>
                             <small class="text-muted d-block">{{showingUsersText}}</small>
@@ -227,7 +222,7 @@
                             </table>
                         </div>
                     </div>
-                    {{/if}}
+                    </div>
                 </div>
             </div>
         </div>
@@ -257,7 +252,7 @@
         </div>
     </div>
 {{else}}
-    <div class="container admin-page">
+    <div>
         <h3 class="page-header-title">{{userAdminText 'admin.userAdmin'}}</h3>
         <div class="admin-status admin-status-warning admin-denied-alert" role="alert">
             <i class="fa fa-exclamation-triangle" aria-hidden="true"></i>

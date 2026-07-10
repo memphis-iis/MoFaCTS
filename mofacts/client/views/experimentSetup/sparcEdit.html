@@ -1,22 +1,14 @@
 <template name="sparcEdit">
-  <div class="container-fluid admin-page sparc-edit-page">
-    {{#if loading}}
-      <div class="loading-container">
-        <div class="spinner-border text-primary" role="status">
-          <span class="visually-hidden">{{sparcText 'common.loading'}}</span>
-        </div>
+  <div class="sparc-edit-page" aria-busy="{{#if loading}}true{{else}}false{{/if}}">
+    {{#if noData}}
+      <div class="alert alert-warning">
+        {{sparcText 'sparc.contentNotFound'}}
       </div>
+      <a href="/contentUpload" class="btn btn-secondary">
+        <i class="fa fa-arrow-left"></i> {{sparcText 'sparc.backToContentManager'}}
+      </a>
     {{else}}
-      {{#if noData}}
-        <div class="alert alert-warning">
-          {{sparcText 'sparc.contentNotFound'}}
-        </div>
-        <a href="/contentUpload" class="btn btn-secondary">
-          <i class="fa fa-arrow-left"></i> {{sparcText 'sparc.backToContentManager'}}
-        </a>
-      {{else}}
-        <div id="sparc-editor-root"></div>
-      {{/if}}
+      <div id="sparc-editor-root" class="editor-initial-surface"></div>
     {{/if}}
   </div>
 </template>

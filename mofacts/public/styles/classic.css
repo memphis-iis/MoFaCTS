@@ -103,6 +103,8 @@
     --app-space-3-px: calc(12px * var(--app-density-scale));
     --app-space-4-px: calc(16px * var(--app-density-scale));
     --app-space-5-px: calc(24px * var(--app-density-scale));
+    --app-content-padding: var(--app-space-4);
+    --app-page-top-margin: var(--app-space-3);
 
     /* Design Tokens - Border Radius for Semantic Consistency */
     /* Admin configurable via Theme Settings (2 values) */
@@ -1662,9 +1664,18 @@ body:has(.instructions-container) {
     text-align: center;
 }
 
-/* Admin page spacing utilities */
-.admin-page {
-    margin-top: var(--app-space-3);
+/* One root layout for every authenticated user, teacher, and admin page. */
+.app-page-root {
+    width: 100%;
+    min-width: 0;
+}
+
+.tool-content > .app-page-root {
+    margin-top: var(--app-page-top-margin);
+}
+
+.practice-content > .app-page-root {
+    display: contents;
 }
 
 .admin-message {
@@ -1688,6 +1699,11 @@ body:has(.instructions-container) {
 
 .admin-section:first-child {
     margin-top: 0; /* No top margin for first section */
+}
+
+/* A hidden page heading or status region may precede the first card section. */
+.tool-content .app-page-root > * > .admin-section:not(.admin-section ~ .admin-section) {
+    margin-top: var(--app-space-0);
 }
 
 .admin-subsection {
@@ -2106,14 +2122,14 @@ body:has(.instructions-container) {
     color: var(--app-state-error-color);
 }
 
-.admin-page .bg-light,
+.app-page-root .bg-light,
 .admin-card .bg-light,
 .theme-settings-container .bg-light {
     background-color: var(--app-muted-surface-color) !important;
     color: var(--app-text-color) !important;
 }
 
-.admin-page .text-bg-light,
+.app-page-root .text-bg-light,
 .admin-card .text-bg-light,
 .theme-settings-container .text-bg-light {
     background-color: var(--app-muted-surface-color) !important;
@@ -2121,43 +2137,43 @@ body:has(.instructions-container) {
     border-color: var(--border-color) !important;
 }
 
-.admin-page .badge,
+.app-page-root .badge,
 .theme-settings-container .badge {
     border-radius: var(--border-radius-pill);
     font-weight: var(--app-font-weight-semibold);
 }
 
-.admin-page .badge.bg-light,
+.app-page-root .badge.bg-light,
 .theme-settings-container .badge.bg-light {
     background-color: var(--app-muted-surface-color) !important;
     color: var(--app-text-color) !important;
     border: 1px solid var(--border-color);
 }
 
-.admin-page .badge.bg-success,
+.app-page-root .badge.bg-success,
 .theme-settings-container .badge.bg-success {
     background-color: var(--app-state-success-surface-color) !important;
     color: var(--app-state-success-color) !important;
     border: 1px solid var(--app-state-success-color);
 }
 
-.admin-page .badge.bg-warning,
+.app-page-root .badge.bg-warning,
 .theme-settings-container .badge.bg-warning {
     background-color: var(--app-state-warning-surface-color) !important;
     color: var(--app-state-warning-color) !important;
     border: 1px solid var(--app-state-warning-color);
 }
 
-.admin-page .badge.bg-danger,
+.app-page-root .badge.bg-danger,
 .theme-settings-container .badge.bg-danger {
     background-color: var(--app-state-error-surface-color) !important;
     color: var(--app-state-error-color) !important;
     border: 1px solid var(--app-state-error-color);
 }
 
-.admin-page .badge.bg-info,
-.admin-page .badge.bg-primary,
-.admin-page .badge.bg-secondary,
+.app-page-root .badge.bg-info,
+.app-page-root .badge.bg-primary,
+.app-page-root .badge.bg-secondary,
 .theme-settings-container .badge.bg-info,
 .theme-settings-container .badge.bg-primary,
 .theme-settings-container .badge.bg-secondary {
@@ -2434,9 +2450,8 @@ body:has(.instructions-container) {
     margin: 0;
 }
 
-.editor-loading-state {
-    padding-top: var(--app-space-5);
-    padding-bottom: var(--app-space-5);
+.editor-initial-surface {
+    min-height: clamp(20rem, 55vh, 44rem);
 }
 
 .editor-inline-check {

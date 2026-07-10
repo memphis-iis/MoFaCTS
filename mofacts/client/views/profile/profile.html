@@ -57,14 +57,14 @@
             </div>
 
             <div class="profile-segmented-control" role="group" aria-label="{{t 'profile.avatarType'}}">
-              <button type="button" class="{{#if avatarTypeIs 'initials'}}active{{/if}}" data-avatar-type="initials">{{t 'profile.initials'}}</button>
-              <button type="button" class="{{#if avatarTypeIs 'icon'}}active{{/if}}" data-avatar-type="icon">{{t 'profile.icon'}}</button>
-              <button type="button" class="{{#if avatarTypeIs 'image'}}active{{/if}}" data-avatar-type="image">{{t 'profile.picture'}}</button>
+              <button type="button" class="{{#if avatarTypeIs 'initials'}}active{{/if}}" data-avatar-type="initials" aria-pressed="{{avatarTypePressed 'initials'}}">{{t 'profile.initials'}}</button>
+              <button type="button" class="{{#if avatarTypeIs 'icon'}}active{{/if}}" data-avatar-type="icon" aria-pressed="{{avatarTypePressed 'icon'}}">{{t 'profile.icon'}}</button>
+              <button type="button" class="{{#if avatarTypeIs 'image'}}active{{/if}}" data-avatar-type="image" aria-pressed="{{avatarTypePressed 'image'}}">{{t 'profile.picture'}}</button>
             </div>
 
             <div class="profile-icon-grid" aria-label="{{t 'profile.avatarIcons'}}">
               {{#each avatarOptions}}
-                <button type="button" class="{{#if avatarIconSelected id}}active{{/if}}" data-avatar-icon="{{id}}" title="{{label}}" aria-label="{{label}}">
+                <button type="button" class="{{#if avatarIconSelected id}}active{{/if}}" data-avatar-icon="{{id}}" title="{{label}}" aria-label="{{label}}" aria-pressed="{{avatarIconPressed id}}">
                   <span class="fa {{avatarIconClass id}}" aria-hidden="true"></span>
                 </button>
               {{/each}}
@@ -133,6 +133,7 @@
           </button>
         {{/if}}
       </div>
+      {{> adminInlineConfirmation confirmation=profileConfirmationView}}
     </div>
   </div>
 </template>

@@ -1,6 +1,7 @@
 import {checkUserSession, clientConsole} from '../../lib/userSessionHelpers';
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra');
 import { Tracker } from 'meteor/tracker';
+import { ReactiveVar } from 'meteor/reactive-var';
 import DOMPurify from 'dompurify';
 import { Cookie } from '../../lib/cookies';
 import { currentUserHasRole } from '../../lib/roleUtils';
@@ -23,6 +24,10 @@ import {
 } from '../../lib/userThemeSelection';
 import { findProfileAvatarIcon, normalizeProfileAvatarType } from '../../../common/profileAvatar';
 import { hydrateHomePracticeStateFromDashboardCache } from './homePracticeState';
+import {
+  createDisclosureController,
+  type DisclosureController,
+} from '../../lib/adminUi/disclosureController';
 import './home.html';
 import './home.css';
 
@@ -37,6 +42,24 @@ const HOME_SIDEBAR_COLLAPSED_KEY = 'mofacts.home.sidebarCollapsed';
 const PRACTICE_MENU_OPEN_KEY = 'mofacts.practice.menuOpen';
 const HOME_WELCOME_ALLOWED_TAGS = ['h1', 'h2', 'h3', 'p', 'br', 'span', 'strong', 'em', 'b', 'i', 'u', 'a', 'ul', 'ol', 'li'];
 const HOME_WELCOME_ALLOWED_ATTR = ['href', 'title', 'target', 'rel', 'class', 'style'];
+
+type ThemeLibraryPresentation =
+  | { status: 'loading' }
+  | { status: 'ready' }
+  | { status: 'error'; message: string };
+
+type AppAccountMenuInstance = Blaze.TemplateInstance & {
+  accountMenuOpen: ReactiveVar<boolean>;
+  localeMenuOpen: ReactiveVar<boolean>;
+  themeMenuOpen: ReactiveVar<boolean>;
+  themeLibraryPresentation: ReactiveVar<ThemeLibraryPresentation>;
+  accountDisclosure: DisclosureController;
+  localeDisclosure: DisclosureController;
+  themeDisclosure: DisclosureController;
+  accountMenuDestroyed: boolean;
+  _themeLibraryAutorun?: Tracker.Computation | null;
+  _appAccountDocumentClickHandler?: ((event: Event) => void) | null;
+};
 
 type HomeTourStepId =
   | 'main-menu-return'
@@ -183,21 +206,6 @@ function closeMobileSidebar(): void {
   window.setTimeout(clearClosingState, 320);
 }
 
-function toggleAccountMenu(): void {
-  const dropdown = document.getElementById('userDropdown');
-  const toggle = document.getElementById('userToggle');
-  const open = !dropdown?.classList.contains('open');
-  if (open) {
-    closeMobileSidebar();
-  }
-  dropdown?.classList.toggle('open', open);
-  toggle?.setAttribute('aria-expanded', open ? 'true' : 'false');
-  if (!open) {
-    Session.set('themeMenuOpen', false);
-    Session.set('localeMenuOpen', false);
-  }
-}
-
 function scrollHomeToTop(): void {
   window.scrollTo({ top: 0, behavior: 'smooth' });
   document.querySelector('.content')?.scrollTo({ top: 0, behavior: 'smooth' });
@@ -316,6 +324,10 @@ Template.appSidebar.helpers({
 });
 
 Template.appAccountMenu.helpers({
+  accountMenuOpen(): boolean {
+    return (Template.instance() as AppAccountMenuInstance).accountMenuOpen.get();
+  },
+
   userInitials(): string {
     return getUserInitials(Meteor.user());
   },
@@ -357,11 +369,11 @@ Template.appAccountMenu.helpers({
   },
 
   themeMenuOpen(): boolean {
-    return Session.get('themeMenuOpen') === true;
+    return (Template.instance() as AppAccountMenuInstance).themeMenuOpen.get();
   },
 
   localeMenuOpen(): boolean {
-    return Session.get('localeMenuOpen') === true;
+    return (Template.instance() as AppAccountMenuInstance).localeMenuOpen.get();
   },
 
   availableUiLocales(): Array<{ locale: string; label: string }> {
@@ -394,6 +406,15 @@ Template.appAccountMenu.helpers({
 
   hasAvailableThemes(): boolean {
     return getAvailableUserThemes().length > 0;
+  },
+
+  themeLibraryLoading(): boolean {
+    return (Template.instance() as AppAccountMenuInstance).themeLibraryPresentation.get().status === 'loading';
+  },
+
+  themeLibraryError(): string {
+    const state = (Template.instance() as AppAccountMenuInstance).themeLibraryPresentation.get();
+    return state.status === 'error' ? state.message : '';
   },
 
   themeSelectionName(theme: ThemeLibraryEntry): string {
@@ -457,42 +478,111 @@ Object.keys(SIDEBAR_ACTION_ROUTES).forEach((elementId) => {
   });
 });
 
+function requireAccountMenuElement(id: string): HTMLElement {
+  const element = document.getElementById(id);
+  if (!element) {
+    throw new Error(`Account menu requires #${id}.`);
+  }
+  return element;
+}
+
+function closeNestedAccountDisclosures(instance: AppAccountMenuInstance): void {
+  instance.localeDisclosure.close(false);
+  instance.themeDisclosure.close(false);
+}
+
+function closeAccountMenu(
+  instance: AppAccountMenuInstance,
+  restoreFocus = false,
+): void {
+  closeNestedAccountDisclosures(instance);
+  instance.accountDisclosure.close(restoreFocus);
+}
+
 Template.appAccountMenu.events({
-  'click #userToggle': function(event: any) {
+  'click #userToggle': function(event: Event, instance: AppAccountMenuInstance) {
     event.preventDefault();
     event.stopPropagation();
-    if ((event.target as HTMLElement | null)?.closest('#userDropdown')) {
-      return;
+    if (!instance.accountMenuOpen.get()) {
+      closeMobileSidebar();
     }
-    toggleAccountMenu();
+    instance.accountDisclosure.toggle(
+      event.currentTarget as HTMLElement,
+      requireAccountMenuElement('userDropdown'),
+    );
   },
 
-  'keydown #userToggle': function(event: any) {
-    if (event.key !== 'Enter' && event.key !== ' ') {
-      return;
+  'keydown #userToggle': function(event: KeyboardEvent, instance: AppAccountMenuInstance) {
+    if (!instance.accountMenuOpen.get()) {
+      closeMobileSidebar();
     }
-    event.preventDefault();
-    toggleAccountMenu();
+    instance.accountDisclosure.handleTriggerKeydown(
+      event,
+      event.currentTarget as HTMLElement,
+      requireAccountMenuElement('userDropdown'),
+    );
   },
 
-  'click [data-home-action]': function(event: any) {
+  'keydown #userDropdown': function(event: KeyboardEvent, instance: AppAccountMenuInstance) {
+    if (event.key !== 'Escape') {
+      return;
+    }
+    if (instance.themeMenuOpen.get()) {
+      instance.themeDisclosure.handlePanelKeydown(event);
+      event.stopPropagation();
+      return;
+    }
+    if (instance.localeMenuOpen.get()) {
+      instance.localeDisclosure.handlePanelKeydown(event);
+      event.stopPropagation();
+      return;
+    }
+    instance.accountDisclosure.handlePanelKeydown(event);
+  },
+
+  'keydown [data-home-action="toggleTheme"]': function(event: KeyboardEvent, instance: AppAccountMenuInstance) {
+    const handled = instance.themeDisclosure.handleTriggerKeydown(
+      event,
+      event.currentTarget as HTMLElement,
+      requireAccountMenuElement('themeSelectionMenu'),
+    );
+    if (handled) {
+      event.stopPropagation();
+    }
+  },
+
+  'keydown [data-home-action="toggleLocale"]': function(event: KeyboardEvent, instance: AppAccountMenuInstance) {
+    const handled = instance.localeDisclosure.handleTriggerKeydown(
+      event,
+      event.currentTarget as HTMLElement,
+      requireAccountMenuElement('localeSelectionMenu'),
+    );
+    if (handled) {
+      event.stopPropagation();
+    }
+  },
+
+  'click [data-home-action]': function(event: any, instance: AppAccountMenuInstance) {
     event.preventDefault();
     event.stopPropagation();
     const action = event.currentTarget.getAttribute('data-home-action');
     if (action === 'toggleTheme') {
-      Session.set('themeMenuOpen', Session.get('themeMenuOpen') !== true);
-      Session.set('localeMenuOpen', false);
+      instance.localeDisclosure.close(false);
+      instance.themeDisclosure.toggle(
+        event.currentTarget,
+        requireAccountMenuElement('themeSelectionMenu'),
+      );
       return;
     }
     if (action === 'toggleLocale') {
-      Session.set('localeMenuOpen', Session.get('localeMenuOpen') !== true);
-      Session.set('themeMenuOpen', false);
+      instance.themeDisclosure.close(false);
+      instance.localeDisclosure.toggle(
+        event.currentTarget,
+        requireAccountMenuElement('localeSelectionMenu'),
+      );
       return;
     }
-    document.getElementById('userDropdown')?.classList.remove('open');
-    document.getElementById('userToggle')?.setAttribute('aria-expanded', 'false');
-    Session.set('themeMenuOpen', false);
-    Session.set('localeMenuOpen', false);
+    closeAccountMenu(instance, false);
 
     if (action === 'tour') {
       FlowRouter.go('/home');
@@ -530,7 +620,7 @@ Template.appAccountMenu.events({
     }
   },
 
-  'click .theme-selection-item': function(event: any) {
+  'click .theme-selection-item': function(event: any, instance: AppAccountMenuInstance) {
     event.preventDefault();
     event.stopPropagation();
     const themeId = event.currentTarget.getAttribute('data-theme-id');
@@ -540,24 +630,20 @@ Template.appAccountMenu.events({
         throw new Error(`Theme "${themeId || ''}" is not configured for selection.`);
       }
       applyUserSelectedTheme(selectedTheme);
-      Session.set('themeMenuOpen', false);
-      document.getElementById('userDropdown')?.classList.remove('open');
-      document.getElementById('userToggle')?.setAttribute('aria-expanded', 'false');
+      closeAccountMenu(instance, true);
     } catch (error: unknown) {
       reportThemeToggleError(error);
     }
   },
 
-  async 'click .locale-selection-item'(event: any) {
+  async 'click .locale-selection-item'(event: any, instance: AppAccountMenuInstance) {
     event.preventDefault();
     event.stopPropagation();
     const nextLocale = event.currentTarget.getAttribute('data-ui-locale') || '';
     try {
       await MeteorAny.callAsync('updateOwnUiLocale', { uiLocale: nextLocale });
       setActiveUiLocale(nextLocale);
-      Session.set('localeMenuOpen', false);
-      document.getElementById('userDropdown')?.classList.remove('open');
-      document.getElementById('userToggle')?.setAttribute('aria-expanded', 'false');
+      closeAccountMenu(instance, true);
     } catch (error: unknown) {
       const message = getErrorMessage(error);
       clientConsole(1, '[LocaleMenu] Failed to select language:', message);
@@ -664,66 +750,6 @@ Template.home.events({
     document.getElementById('sidebar')?.classList.toggle('sidebar-mobile-open', true);
   },
 
-  'click #userToggle': function(event: any) {
-    event.preventDefault();
-    event.stopPropagation();
-    if ((event.target as HTMLElement | null)?.closest('#userDropdown')) {
-      return;
-    }
-    toggleAccountMenu();
-  },
-
-  'click [data-home-action]': function(event: any, template: any) {
-    event.preventDefault();
-    event.stopPropagation();
-    const action = event.currentTarget.getAttribute('data-home-action');
-    if (action === 'toggleTheme') {
-      Session.set('themeMenuOpen', Session.get('themeMenuOpen') !== true);
-      Session.set('localeMenuOpen', false);
-      return;
-    }
-    if (action === 'toggleLocale') {
-      Session.set('localeMenuOpen', Session.get('localeMenuOpen') !== true);
-      Session.set('themeMenuOpen', false);
-      return;
-    }
-    document.getElementById('userDropdown')?.classList.remove('open');
-    document.getElementById('userToggle')?.setAttribute('aria-expanded', 'false');
-    Session.set('themeMenuOpen', false);
-    Session.set('localeMenuOpen', false);
-
-    if (action === 'tour') {
-      startMainMenuTour(template, { manual: true });
-      return;
-    }
-    if (action === 'documentation') {
-      window.open('https://github.com/memphis-iis/mofacts/wiki', '_blank');
-      return;
-    }
-    if (action === 'logout') {
-      Session.set('loginMode', 'normal');
-      Cookie.set('isExperiment', '0', 1);
-      Cookie.set('experimentTarget', '', 1);
-      Cookie.set('experimentXCond', '', 1);
-      Meteor.logout(() => {
-        Session.set('curModule', 'signinoauth');
-        Session.set('currentTemplate', 'signIn');
-        Session.set('appLoading', false);
-        FlowRouter.go('/');
-      });
-      return;
-    }
-
-    const routes: Record<string, string> = {
-      profile: '/profile',
-      audioSettings: '/audioSettings',
-      classSelection: '/classSelection',
-      help: '/help',
-    };
-    if (routes[action]) {
-      FlowRouter.go(routes[action]);
-    }
-  }
 });
 
 // We'll use this in card.js if audio input is enabled and user has provided a
@@ -952,10 +978,44 @@ Template.appSidebar.onRendered(function() {
   restoreHomeSidebarPreference();
 });
 
-Template.appAccountMenu.onRendered(function(this: any) {
-  this.subscribe('themeLibrary');
+Template.appAccountMenu.onCreated(function(this: AppAccountMenuInstance) {
+  this.accountMenuDestroyed = false;
+  this.accountMenuOpen = new ReactiveVar(false);
+  this.localeMenuOpen = new ReactiveVar(false);
+  this.themeMenuOpen = new ReactiveVar(false);
+  this.themeLibraryPresentation = new ReactiveVar<ThemeLibraryPresentation>({ status: 'loading' });
+  this.accountDisclosure = createDisclosureController(({ open }) => {
+    this.accountMenuOpen.set(open);
+    if (!open) {
+      closeNestedAccountDisclosures(this);
+    }
+  });
+  this.localeDisclosure = createDisclosureController(({ open }) => {
+    this.localeMenuOpen.set(open);
+  });
+  this.themeDisclosure = createDisclosureController(({ open }) => {
+    this.themeMenuOpen.set(open);
+  });
+  this.subscribe('themeLibrary', {
+    onReady: () => {
+      if (!this.accountMenuDestroyed) {
+        this.themeLibraryPresentation.set({ status: 'ready' });
+      }
+    },
+    onStop: (error?: unknown) => {
+      if (error && !this.accountMenuDestroyed) {
+        this.themeLibraryPresentation.set({
+          status: 'error',
+          message: getErrorMessage(error),
+        });
+      }
+    },
+  });
+});
+
+Template.appAccountMenu.onRendered(function(this: AppAccountMenuInstance) {
   this._themeLibraryAutorun = this.autorun(() => {
-    if (!this.subscriptionsReady()) {
+    if (this.themeLibraryPresentation.get().status !== 'ready') {
       return;
     }
     try {
@@ -966,17 +1026,19 @@ Template.appAccountMenu.onRendered(function(this: any) {
   });
   this._appAccountDocumentClickHandler = (event: Event) => {
     const target = event.target as HTMLElement | null;
-    if (!target?.closest('#userToggle')) {
-      document.getElementById('userDropdown')?.classList.remove('open');
-      document.getElementById('userToggle')?.setAttribute('aria-expanded', 'false');
-      Session.set('themeMenuOpen', false);
-      Session.set('localeMenuOpen', false);
+    const root = document.getElementById('userAccountArea');
+    if (root) {
+      this.accountDisclosure.closeFromOutside(target, root);
     }
   };
   document.addEventListener('click', this._appAccountDocumentClickHandler);
 });
 
-Template.appAccountMenu.onDestroyed(function(this: any) {
+Template.appAccountMenu.onDestroyed(function(this: AppAccountMenuInstance) {
+  this.accountMenuDestroyed = true;
+  this.accountDisclosure.destroy();
+  this.localeDisclosure.destroy();
+  this.themeDisclosure.destroy();
   if (this._themeLibraryAutorun) {
     this._themeLibraryAutorun.stop();
     this._themeLibraryAutorun = null;
@@ -1008,12 +1070,6 @@ Template.home.onRendered(async function(this: any) {
   restoreHomeSidebarPreference();
   templateInstance._homeDocumentClickHandler = (event: Event) => {
     const target = event.target as HTMLElement | null;
-    if (!target?.closest('#userToggle')) {
-      document.getElementById('userDropdown')?.classList.remove('open');
-      document.getElementById('userToggle')?.setAttribute('aria-expanded', 'false');
-      Session.set('themeMenuOpen', false);
-      Session.set('localeMenuOpen', false);
-    }
     if (
       window.matchMedia('(max-width: 1024px)').matches &&
       !target?.closest('#sidebar') &&
