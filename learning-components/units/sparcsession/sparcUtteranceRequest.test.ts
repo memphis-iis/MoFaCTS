@@ -38,9 +38,22 @@ describe('createSparcUtteranceRequestFromFacts', function() {
 
   it('matches clean misconception text by misconception id', function() {
     const request = createSparcUtteranceRequestFromFacts([
+      fact('autotutor.expectation', {
+        clusterKC: 'kc-a',
+        text: 'Interest is calculated from the updated balance.',
+      }),
       fact('autotutor.misconception', {
         id: 'm1',
-        text: 'Repair this misconception.',
+        text: 'The same dollar amount is added every year.',
+      }),
+      fact('diagnostic.misconceptionScore', {
+        id: 'm1',
+        confidence: 0.95,
+        evidence: 'The learner repeated the fixed-dollar claim.',
+      }),
+      fact('learnerResponse.contribution', {
+        type: 'answer',
+        confidence: 0.9,
       }),
       fact('controller.selectedAction', {
         targetType: 'misconception',
@@ -50,7 +63,30 @@ describe('createSparcUtteranceRequestFromFacts', function() {
     ]);
 
     assert.equal(request.targetId, 'm1');
-    assert.deepEqual(request.contentTexts, ['Repair this misconception.']);
+    assert.deepEqual(request.contentTexts, ['The same dollar amount is added every year.']);
+    assert.deepEqual(request.targetContent, {
+      selectedMisconception: {
+        id: 'm1',
+        text: 'The same dollar amount is added every year.',
+      },
+      correctExpectations: [{
+        clusterKC: 'kc-a',
+        text: 'Interest is calculated from the updated balance.',
+      }],
+    });
+    assert.deepEqual(request.feedbackEvidence, {
+      targetType: 'misconception',
+      targetId: 'm1',
+      selectedTargetScore: {
+        id: 'm1',
+        confidence: 0.95,
+        evidence: 'The learner repeated the fixed-dollar claim.',
+      },
+      learnerContribution: {
+        type: 'answer',
+        confidence: 0.9,
+      },
+    });
   });
 
   it('fails clearly when selected clean target text is missing', function() {

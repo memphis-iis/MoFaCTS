@@ -73,6 +73,15 @@ const utteranceRequest: SparcUtteranceRequest = {
     clusterKC: 'kc-a',
     text: 'A target text',
   },
+  feedbackEvidence: {
+    targetType: 'learningTarget',
+    targetId: 'kc-a',
+    selectedTargetScore: {
+      clusterKC: 'kc-a',
+      coverage: 0.6,
+      evidence: 'The latest answer partially addresses A.',
+    },
+  },
   plannerState: {
     expectations: [{ clusterKC: 'kc-a', coverage: 0.6 }],
   },
@@ -226,10 +235,14 @@ describe('SPARC dialogue OpenRouter provider', function() {
         }
         expect(params.messages[0]?.content).to.contain('Selected move: hint.');
         expect(params.messages[0]?.content).to.contain('Move prompt:');
+        expect(params.messages[0]?.content).to.contain('grounded in Immediate-feedback evidence');
+        expect(params.messages[0]?.content).to.contain('Do not describe repetition or endorsement of an active misconception as progress');
         expect(params.messages[0]?.content).to.contain('The JSON object must exactly follow this envelope shape:');
         expect(userMessage.content).to.contain('Latest student answer:');
         expect(userMessage.content).to.contain('App-selected plan. Echo targetType, targetId, and selectedMove exactly in the response.');
         expect(userMessage.content).to.contain('Registered move definition:');
+        expect(userMessage.content).to.contain('Immediate-feedback evidence.');
+        expect(userMessage.content).to.contain('The latest answer partially addresses A.');
         expect(userMessage.content).to.contain('"targetType": "learningTarget"');
         expect(userMessage.content).to.contain('"targetId": "kc-a"');
         expect(userMessage.content).to.contain('"selectedMove": "hint"');

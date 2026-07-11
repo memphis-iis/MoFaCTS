@@ -17,6 +17,7 @@ export type SparcUtteranceRequest = {
   readonly pedagogicalState?: Readonly<Record<string, unknown>>;
   readonly transitionMetadata?: Readonly<Record<string, unknown>>;
   readonly targetContent?: unknown;
+  readonly feedbackEvidence?: Readonly<Record<string, unknown>>;
   readonly plannerState?: unknown;
   readonly dialogueHistory?: readonly Readonly<Record<string, unknown>>[];
 };
@@ -85,7 +86,33 @@ function learningTargetContent(facts: readonly SparcWorkingMemoryFact[], cluster
 function misconceptionContent(facts: readonly SparcWorkingMemoryFact[], id: string): unknown {
   const source = factsByType(facts, 'autotutor.misconception')
     .find((fact) => stringSlot(fact, 'id') === id);
-  return source?.slots ?? { id, text: '' };
+  return {
+    selectedMisconception: source?.slots ?? { id, text: '' },
+    correctExpectations: factsByType(facts, 'autotutor.expectation')
+      .map((fact) => fact.slots ?? {})
+      .filter((slots) => stringSlot({ factType: 'autotutor.expectation', slots }, 'text')),
+  };
+}
+
+function feedbackEvidence(params: {
+  readonly facts: readonly SparcWorkingMemoryFact[];
+  readonly targetType: string;
+  readonly targetId: string;
+  readonly learnerContribution?: Readonly<Record<string, unknown>>;
+}): Readonly<Record<string, unknown>> {
+  const selectedScore = params.targetType === 'learningTarget'
+    ? factsByType(params.facts, 'learningTarget.score')
+      .find((fact) => stringSlot(fact, 'clusterKC') === params.targetId)?.slots
+    : params.targetType === 'misconception'
+      ? factsByType(params.facts, 'diagnostic.misconceptionScore')
+        .find((fact) => stringSlot(fact, 'id') === params.targetId)?.slots
+      : undefined;
+  return {
+    targetType: params.targetType,
+    targetId: params.targetId,
+    selectedTargetScore: selectedScore ?? null,
+    learnerContribution: params.learnerContribution ?? null,
+  };
 }
 
 function targetContent(params: {
@@ -205,6 +232,12 @@ export function createSparcUtteranceRequestFromFacts(
     pedagogicalState: pedagogicalState(selectedAction),
     transitionMetadata: transitionMetadata(selectedAction, facts),
     targetContent: targetContent({ facts, targetType, targetId, contentTexts }),
+    feedbackEvidence: feedbackEvidence({
+      facts,
+      targetType,
+      targetId,
+      ...(contribution ? { learnerContribution: contribution } : {}),
+    }),
     plannerState: plannerState(facts),
     dialogueHistory: dialogueHistory(facts),
     ...(sourceRuleId ? { sourceRuleId } : {}),
