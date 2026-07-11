@@ -376,6 +376,21 @@
     text-transform: var(--app-label-text-transform);
 }
 
+.learning-dashboard-content-shell.is-loading,
+.learning-dashboard-slow-loading {
+    min-height: 14rem;
+}
+
+.learning-dashboard-slow-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--app-space-2-px);
+    padding: var(--app-space-4-px);
+    color: color-mix(in srgb, var(--app-text-color) 72%, transparent);
+    text-align: center;
+}
+
 .learning-dashboard-table-shell {
     display: block;
 }

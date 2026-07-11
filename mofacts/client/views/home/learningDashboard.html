@@ -48,7 +48,7 @@
       <div class="table-toolbar">
         <div class="toolbar-search">
           <span class="fa fa-search" aria-hidden="true"></span>
-          <input id="learningDashboardSearch" type="text" placeholder="{{t 'dashboard.searchPlaceholder'}}" value="{{searchQuery}}" disabled="{{#if isLoading}}disabled{{/if}}" aria-disabled="{{#if isLoading}}true{{else}}false{{/if}}">
+          <input id="learningDashboardSearch" type="text" placeholder="{{t 'dashboard.searchPlaceholder'}}" value="{{searchQuery}}" disabled="{{#if loadingShellBusy}}disabled{{/if}}" aria-disabled="{{#if loadingShellBusy}}true{{else}}false{{/if}}">
           {{#if hasSearchQuery}}
             <button type="button" class="learning-dashboard-search-clear" aria-label="{{t 'dashboard.clearSearch'}}" title="{{t 'dashboard.clearSearch'}}" disabled="{{#if isLoading}}disabled{{/if}}">
               <span class="fa fa-times" aria-hidden="true"></span>
@@ -60,8 +60,14 @@
         </div>
       </div>
 
-      <div class="learning-dashboard-content-shell {{#if isLoading}}is-loading{{else}}is-ready{{/if}}" aria-busy="{{#if isLoading}}true{{else}}false{{/if}}">
-        {{#if isLoading}}
+      <div class="learning-dashboard-content-shell {{#if loadingShellBusy}}is-loading{{else}}is-ready{{/if}}" aria-busy="{{#if loadingShellBusy}}true{{else}}false{{/if}}">
+        {{#if showLoadingFeedback}}
+          {{#if showSlowLoading}}
+          <div class="learning-dashboard-slow-loading" role="status" aria-live="polite">
+            <span class="fa fa-wifi" aria-hidden="true"></span>
+            <span>{{t 'common.loadingTakingLonger'}}</span>
+          </div>
+          {{else}}
           <div class="learning-dashboard-loading-preview" aria-hidden="true">
             <div class="learning-dashboard-loading-section">
               <div class="learning-dashboard-loading-heading">
@@ -122,7 +128,9 @@
             </div>
           </div>
           <div class="sr-only" role="status" aria-live="polite">{{t 'dashboard.loadingLessons'}}</div>
+          {{/if}}
         {{else}}
+          {{#unless isLoading}}
           {{#if hasTdfs}}
             <div class="learning-dashboard-sections learning-dashboard-content-ready">
               {{#if hasUsedTdfs}}
@@ -145,6 +153,7 @@
               <p class="learning-dashboard-flush">{{t 'dashboard.noLessonsFound'}}</p>
             </div>
           {{/if}}
+          {{/unless}}
         {{/if}}
       </div>
     </section>

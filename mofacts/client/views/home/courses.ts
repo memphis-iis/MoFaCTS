@@ -10,6 +10,7 @@ import { setCourseAssignmentLaunchContext } from '../../lib/courseAssignmentLaun
 import { resolveSpeechIgnoreOutOfGrammarResponses } from '../../lib/speechRecognitionConfig';
 import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 import { translatePlatformString } from '../../lib/interfaceI18n';
+import { DelayedLoadingVisibility } from '../../lib/delayedLoadingVisibility';
 import type {
   LearnerCourseSnapshotAssignment,
   LearnerCourseSnapshotCourse,
@@ -31,6 +32,9 @@ const JOIN_SECTION_SELECTIONS_SESSION_KEY = 'coursesJoinSectionSelections';
 type CoursesTemplateInstance = Blaze.TemplateInstance & {
   snapshot: ReactiveVar<LearnerCoursesSnapshot | null>;
   loading: ReactiveVar<boolean>;
+  showLoadingFeedback: ReactiveVar<boolean>;
+  showSlowLoading: ReactiveVar<boolean>;
+  loadingVisibility: DelayedLoadingVisibility;
   error: ReactiveVar<string | null>;
   search: ReactiveVar<string>;
   sort: ReactiveVar<CourseTreeSort>;
@@ -137,6 +141,13 @@ async function reloadCoursesSnapshot(instance: CoursesTemplateInstance) {
 Template.courses.onCreated(function(this: CoursesTemplateInstance) {
   this.snapshot = new ReactiveVar(null);
   this.loading = new ReactiveVar(true);
+  this.showLoadingFeedback = new ReactiveVar(false);
+  this.showSlowLoading = new ReactiveVar(false);
+  this.loadingVisibility = new DelayedLoadingVisibility({
+    onVisibilityChange: (visible) => this.showLoadingFeedback.set(visible),
+    onSlowChange: (slow) => this.showSlowLoading.set(slow),
+  });
+  this.loadingVisibility.setPending(true);
   this.error = new ReactiveVar(null);
   this.search = new ReactiveVar('');
   this.sort = new ReactiveVar('course');
@@ -159,12 +170,23 @@ Template.courses.onRendered(async function(this: CoursesTemplateInstance) {
     this.error.set(error?.reason || error?.message || String(error));
   } finally {
     this.loading.set(false);
+    this.loadingVisibility.setPending(false);
   }
 });
 
 Template.courses.helpers({
   isLoading() {
     return (Template.instance() as CoursesTemplateInstance).loading.get();
+  },
+  showLoadingFeedback() {
+    return (Template.instance() as CoursesTemplateInstance).showLoadingFeedback.get();
+  },
+  showSlowLoading() {
+    return (Template.instance() as CoursesTemplateInstance).showSlowLoading.get();
+  },
+  loadingShellBusy() {
+    const instance = Template.instance() as CoursesTemplateInstance;
+    return instance.loading.get() || instance.showLoadingFeedback.get();
   },
   errorMessage() {
     return (Template.instance() as CoursesTemplateInstance).error.get();
@@ -188,6 +210,10 @@ Template.courses.helpers({
     const instance = Template.instance() as CoursesTemplateInstance;
     return getCourseRows(instance.snapshot.get(), 'publicCourses', instance).length > 0;
   },
+});
+
+Template.courses.onDestroyed(function(this: CoursesTemplateInstance) {
+  this.loadingVisibility.destroy();
 });
 
 const courseAssignmentDisplayHelpers = {

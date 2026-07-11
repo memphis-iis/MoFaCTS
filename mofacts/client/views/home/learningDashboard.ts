@@ -5,6 +5,7 @@ import {getExperimentState} from '../experiment/svelte/services/experimentState'
 import {meteorCallAsync, clientConsole} from '../..';
 import {sessionCleanUp} from '../../lib/sessionUtils';
 import {checkUserSession} from '../../lib/userSessionHelpers';
+import { DelayedLoadingVisibility } from '../../lib/delayedLoadingVisibility';
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra');
 import {currentUserHasRole} from '../../lib/roleUtils';
 import {
@@ -243,6 +244,7 @@ function applyPracticeDashboardSnapshot(instance: any, snapshot: PracticeDashboa
   instance.allTdfsList.set(combinedTdfs);
   applyLearningDashboardSearch(instance, instance.searchQuery.get());
   instance.isLoading.set(false);
+  instance.loadingVisibility.setPending(false);
 }
 
 function parseCssDurationMs(rawValue: string | null | undefined) {
@@ -929,6 +931,13 @@ Template.learningDashboard.onCreated(function(this: any) {
   this.searching = new ReactiveVar(false);
   this.searchQuery = new ReactiveVar('');
   this.isLoading = new ReactiveVar(true);
+  this.showLoadingFeedback = new ReactiveVar(false);
+  this.showSlowLoading = new ReactiveVar(false);
+  this.loadingVisibility = new DelayedLoadingVisibility({
+    onVisibilityChange: (visible) => this.showLoadingFeedback.set(visible),
+    onSlowChange: (slow) => this.showSlowLoading.set(slow),
+  });
+  this.loadingVisibility.setPending(true);
   this.subscriptions = [];
   this.autoruns = [];
   this.searchDebounceTimer = null;
@@ -941,6 +950,19 @@ Template.learningDashboard.onCreated(function(this: any) {
 Template.learningDashboard.helpers({
   isLoading: () => {
     return ((Template.instance() as any) as any).isLoading.get();
+  },
+
+  showLoadingFeedback: () => {
+    return (Template.instance() as any).showLoadingFeedback.get();
+  },
+
+  showSlowLoading: () => {
+    return (Template.instance() as any).showSlowLoading.get();
+  },
+
+  loadingShellBusy: () => {
+    const instance = Template.instance() as any;
+    return instance.isLoading.get() || instance.showLoadingFeedback.get();
   },
 
   searchQuery: () => {
@@ -1457,6 +1479,7 @@ Template.learningDashboard.rendered = async function(this: any) {
       clientConsole(1, '[Dashboard] Failed to sync authoritative practice snapshot:', error);
       if (instance.isLoading.get()) {
         instance.isLoading.set(false);
+        instance.loadingVisibility.setPending(false);
       }
     });
 
@@ -1466,6 +1489,7 @@ Template.learningDashboard.rendered = async function(this: any) {
 };
 
 Template.learningDashboard.onDestroyed(function(this: any) {
+  this.loadingVisibility.destroy();
   // Clean up autoruns
   this.autoruns.forEach((ar: any) => ar.stop());
 

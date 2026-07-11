@@ -4,7 +4,7 @@
       <div class="table-toolbar">
         <div class="toolbar-search">
           <span class="fa fa-search" aria-hidden="true"></span>
-          <input id="coursesSearch" type="text" aria-label="{{t 'courses.searchPlaceholder'}}" disabled="{{#if isLoading}}disabled{{/if}}">
+          <input id="coursesSearch" type="text" aria-label="{{t 'courses.searchPlaceholder'}}" disabled="{{#if loadingShellBusy}}disabled{{/if}}">
         </div>
         <div class="toolbar-filters">
           <select id="coursesSort" class="form-select form-select-sm">
@@ -19,8 +19,14 @@
         <div class="alert alert-danger" role="alert">{{errorMessage}}</div>
       {{/if}}
 
-      <div class="learning-dashboard-content-shell {{#if isLoading}}is-loading{{else}}is-ready{{/if}}" aria-busy="{{#if isLoading}}true{{else}}false{{/if}}">
-        {{#if isLoading}}
+      <div class="learning-dashboard-content-shell {{#if loadingShellBusy}}is-loading{{else}}is-ready{{/if}}" aria-busy="{{#if loadingShellBusy}}true{{else}}false{{/if}}">
+        {{#if showLoadingFeedback}}
+          {{#if showSlowLoading}}
+          <div class="learning-dashboard-slow-loading" role="status" aria-live="polite">
+            <span class="fa fa-wifi" aria-hidden="true"></span>
+            <span>{{t 'common.loadingTakingLonger'}}</span>
+          </div>
+          {{else}}
           <div class="learning-dashboard-loading-preview" aria-hidden="true">
             <div class="learning-dashboard-loading-section">
               <div class="learning-dashboard-loading-heading">
@@ -56,7 +62,9 @@
             </div>
           </div>
           <div class="sr-only" role="status" aria-live="polite">{{t 'courses.loadingCourses'}}</div>
+          {{/if}}
         {{else}}
+          {{#unless isLoading}}
           <div class="learning-dashboard-sections learning-dashboard-content-ready">
             {{#if hasAssignedAssignments}}
               <div class="practice-section">
@@ -78,6 +86,7 @@
               {{/if}}
             </div>
           </div>
+          {{/unless}}
         {{/if}}
       </div>
     </section>
