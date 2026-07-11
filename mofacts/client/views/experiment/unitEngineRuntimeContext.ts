@@ -19,7 +19,7 @@ import { ExperimentStateStore } from '../../lib/state/experimentStateStore';
 import { meteorCallAsync } from '../../index';
 import { clientConsole } from '../../lib/userSessionHelpers';
 import { displayify } from '../../../common/globalHelpers';
-import { Answers } from './answerAssess';
+import { getDisplayAnswerText } from './learnerResponseAssessment';
 import { KC_MULTIPLE } from '../../../common/Definitions';
 import { AdaptiveUnitCoordinator } from '../../../../learning-components/units/shared/AdaptiveUnitCoordinator';
 import { reconstructLearningStateFromHistory } from '../../lib/history/historyReconstruction';
@@ -123,7 +123,7 @@ export function createAppUnitEngineRuntimeContext(): AppUnitEngineRuntimeContext
       getStimCount,
       getStimCluster: (clusterIndex) => getStimCluster(clusterIndex) as any,
       getTestType,
-      getDisplayAnswerText: (answer) => Answers.getDisplayAnswerText(answer),
+      getDisplayAnswerText,
       extractDelimFields,
       rangeVal,
       legacyFloat,

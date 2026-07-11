@@ -340,10 +340,6 @@ Meteor.publish('userExperimentState', function(tdfId: any) {
     return this.ready();
 });
 
-Meteor.publish('allUserExperimentState', function() {
-    return GlobalExperimentStates.find({userId: this.userId});
-});
-
 async function publishRuntimeTdfsByIds(publication: any, tdfIdOrIds: any) {
     if (!publication.userId) {
         return publication.ready();
@@ -634,19 +630,6 @@ Meteor.publish('contentUploadOwners', async function(ownerIds: any[] = []) {
             }
         }
     );
-});
-
-// ===== LEGACY TDF LISTING PUBLICATION =====
-// Kept for compatibility with old clients, but intentionally listing-only.
-// Full runtime content must come from exact-ID publications such as currentTdf or tdfByIds.
-Meteor.publish('allTdfs', async function() {
-    // Security: Filter TDFs based on user role and access permissions
-    if (!this.userId) {
-        return this.ready(); // No data for unauthenticated users
-    }
-
-    const selector = await tdfPublicationAccess.resolveListingSelector(this.userId);
-    return Tdfs.find(selector, { fields: TDF_LISTING_FIELDS });
 });
 
 Meteor.publish('ownedTdfs', async function(ownerId: any) {

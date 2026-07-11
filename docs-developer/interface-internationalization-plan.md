@@ -228,7 +228,7 @@ Before implementation, audit the current code paths that already use language co
 - Speech recognition configuration and launch gating in `mofacts/client/lib/speechRecognitionConfig.ts`, `mofacts/client/lib/audioStartup.ts`, and speech-recognition services.
 - TTS language and voice selection in `mofacts/client/views/experiment/svelte/services/ttsService.ts`, including the current `textToSpeechLanguage`, voice-prefix, and `en-US` resolution behavior.
 - Spanish phonetic strategy routing in `mofacts/client/lib/phoneticMatchingByLanguage.ts`.
-- Answer comparison and normalization in `mofacts/client/views/experiment/answerAssess.ts` and adjacent runtime scoring paths.
+- Answer comparison and normalization in `learning-components/content/response-assessment/`, the app adapter at `mofacts/client/views/experiment/learnerResponseAssessment.ts`, and adjacent runtime scoring paths.
 - Manual content creation validation for speech language fields.
 - Dashboard and admin sort paths that currently use `localeCompare`, including any hard-coded English locale arguments.
 

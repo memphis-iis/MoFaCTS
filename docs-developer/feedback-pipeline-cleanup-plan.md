@@ -30,7 +30,7 @@ For live learner-visible feedback, the implemented canonical route is:
 
 ```text
 answer evaluation
-  -> Answers.answerIsCorrect(...)
+  -> assessAppLearnerResponse(...)
   -> { isCorrect, matchText }
   -> card machine context.feedbackMessage
   -> FeedbackDisplay.buildFeedbackContent(...)

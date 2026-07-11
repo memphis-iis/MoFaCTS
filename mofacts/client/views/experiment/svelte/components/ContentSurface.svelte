@@ -24,7 +24,7 @@
     markLaunchLoadingTiming,
     setLaunchLoadingMessage
   } from '../../../../lib/launchLoading';
-  import { Answers } from '../../answerAssess';
+  import { getDisplayAnswerText } from '../../learnerResponseAssessment';
   import { contentRuntimeMachine } from '../machine/contentRuntimeMachine';
   import { DEFAULT_DELIVERY_SETTINGS, EVENTS } from '../machine/constants';
   import { initializeSvelteCard } from '../services/svelteInit';
@@ -456,7 +456,7 @@
     displayCorrectFeedback: deliverySettings.displayCorrectFeedback,
     displayIncorrectFeedback: deliverySettings.displayIncorrectFeedback,
     feedbackMessage: context.feedbackMessage,
-    formatAnswerText: (answer) => Answers.getDisplayAnswerText(answer),
+    formatAnswerText: getDisplayAnswerText,
     h5pOwnsResponse,
     isCorrect: context.isCorrect,
     isForceCorrecting: baseIsForceCorrecting,
@@ -610,7 +610,7 @@
   $: incomingSlotDisplaySnapshot = buildIncomingTrialSlotDisplaySnapshot({
     defaultInputMode: inputMode,
     deliverySettings,
-    formatAnswerText: (answer) => Answers.getDisplayAnswerText(answer),
+    formatAnswerText: getDisplayAnswerText,
     layoutMode,
     performanceCurrentTrial: performanceData?.currentTrial || 0,
     preparedTrial,

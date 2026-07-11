@@ -4,7 +4,7 @@ import { getStimCluster } from '../../../../lib/runtimeStimuli';
 import { deliverySettingsStore } from '../../../../lib/state/deliverySettingsStore';
 import { getIsVideoSessionFlag } from './cardRuntimeState';
 import { sanitizeHTML, nextChar } from '../../../../lib/stringUtils';
-import { Answers } from '../../answerAssess';
+import { getDisplayAnswerText } from '../../learnerResponseAssessment';
 import { resolveDynamicAssetPath } from './mediaResolver';
 import { applyDisplayFieldSubset } from '../../../../../common/lib/displayFieldSubsets';
 import { isSelfHostedH5PConfig, normalizeH5PDisplayConfig } from '../../../../../common/lib/h5pDisplay';
@@ -288,7 +288,7 @@ export function buildButtonList({
     throw new Error('Bad TDF/Stim file - no buttonOptions and no false responses');
   }
 
-  const displayCorrectAnswer = Answers.getDisplayAnswerText(originalAnswer || correctAnswer || '');
+  const displayCorrectAnswer = getDisplayAnswerText(originalAnswer || correctAnswer || '');
   const wrongButtonLimitValue = deliverySettings?.falseAnswerLimit;
   const wrongButtonLimit = typeof wrongButtonLimitValue === 'number'
     ? wrongButtonLimitValue

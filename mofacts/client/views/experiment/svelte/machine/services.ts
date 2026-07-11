@@ -4,7 +4,7 @@
  */
 
 import { DEFAULT_TIMINGS, LOG_PREFIXES } from './constants';
-import { Answers } from '../../answerAssess';
+import { assessAppLearnerResponse } from '../../learnerResponseAssessment';
 import { getAllCurrentStimAnswers } from '../../../../lib/runtimeStimuli';
 import { Session } from 'meteor/session';
 import { clientConsole } from '../../../../lib/clientLogger';
@@ -515,7 +515,7 @@ export async function evaluateAnswerService(context: AnswerEvaluationContext) {
     ? undefined
     : Session.get('currentTdfFile')?.tdfs?.tutor?.setspec);
 
-  const result = await Answers.answerIsCorrect({
+  const result = await assessAppLearnerResponse({
     userInput: userAnswer,
     answer: currentAnswer,
     originalAnswer,

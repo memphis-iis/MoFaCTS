@@ -1,8 +1,6 @@
-import { deliverySettingsStore } from '../../lib/state/deliverySettingsStore';
 import { doubleMetaphone } from 'double-metaphone';
 import {
   assessLearnerResponse,
-  branchingCorrectText,
   buildClozeStudy,
   displayResponseAnswer,
   type ResponseAssessmentResult,
@@ -10,10 +8,9 @@ import {
 import type { LearnerResponseNormalizationOptions } from '../../../../learning-components/content/response-normalization/learnerResponseNormalization';
 import { translatePlatformString } from '../../lib/interfaceI18n';
 import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
+import { deliverySettingsStore } from '../../lib/state/deliverySettingsStore';
 
-export { Answers };
-
-function answerAssessText(
+function responseAssessmentText(
   key: Parameters<typeof translatePlatformString>[1],
   values?: Parameters<typeof translatePlatformString>[2],
 ): string {
@@ -26,14 +23,14 @@ function projectFeedback(result: ResponseAssessmentResult): string {
     return result.branchWasClose ? `${authoredFeedback} (you were close enough)` : authoredFeedback;
   }
   if (result.matchKind === 'close') {
-    return answerAssessText('feedback.closeEnoughToCorrectAnswer', { answer: result.displayAnswer });
+    return responseAssessmentText('feedback.closeEnoughToCorrectAnswer', { answer: result.displayAnswer });
   }
   if (result.matchKind === 'phonetic') {
     return `That sounds like the answer but you're writing it the wrong way, the correct answer is '${result.displayAnswer}'.`;
   }
   return result.isCorrect
-    ? `${answerAssessText('feedback.correct')}.`
-    : `${answerAssessText('feedback.incorrect')}.`;
+    ? `${responseAssessmentText('feedback.correct')}.`
+    : `${responseAssessmentText('feedback.incorrect')}.`;
 }
 
 export interface AppResponseAssessmentRequest {
@@ -68,25 +65,23 @@ function appAssessmentPolicy(request: AppResponseAssessmentRequest) {
   };
 }
 
-const Answers = {
-  branchingCorrectText,
+export function getDisplayAnswerText(answer: string): string {
+  return displayResponseAnswer(answer, Boolean(deliverySettingsStore.get().branchingEnabled));
+}
 
-  getDisplayAnswerText(answer: string) {
-    return displayResponseAnswer(answer, Boolean(deliverySettingsStore.get().branchingEnabled));
-  },
+export function buildClozeStudyText(question: string, answer: string): string {
+  return buildClozeStudy(question, answer, Boolean(deliverySettingsStore.get().branchingEnabled));
+}
 
-  clozeStudy(question: string, answer: string) {
-    return buildClozeStudy(question, answer, Boolean(deliverySettingsStore.get().branchingEnabled));
-  },
-
-  async answerIsCorrect(request: AppResponseAssessmentRequest) {
-    const result = assessLearnerResponse({
-      userInput: request.userInput,
-      answer: request.answer,
-      originalAnswer: request.originalAnswer,
-      displayedAnswer: request.displayedAnswer,
-      policy: appAssessmentPolicy(request),
-    });
-    return { isCorrect: result.isCorrect, matchText: projectFeedback(result) };
-  },
-};
+export async function assessAppLearnerResponse(
+  request: AppResponseAssessmentRequest,
+): Promise<{ isCorrect: boolean; matchText: string }> {
+  const result = assessLearnerResponse({
+    userInput: request.userInput,
+    answer: request.answer,
+    originalAnswer: request.originalAnswer,
+    displayedAnswer: request.displayedAnswer,
+    policy: appAssessmentPolicy(request),
+  });
+  return { isCorrect: result.isCorrect, matchText: projectFeedback(result) };
+}

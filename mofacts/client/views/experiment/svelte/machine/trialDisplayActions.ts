@@ -1,5 +1,5 @@
 import { Session } from 'meteor/session';
-import { Answers } from '../../answerAssess';
+import { getDisplayAnswerText } from '../../learnerResponseAssessment';
 import { translatePlatformString } from '../../../../lib/interfaceI18n';
 import { getActiveUiLocale } from '../../../../lib/interfaceLocaleState';
 import { setDisplayReadyState, setInputReadyState } from '../services/cardRuntimeState';
@@ -91,7 +91,7 @@ export function announceToScreenReader({ context }: ActionArgs) {
 }
 
 export function displayAnswer({ context }: ActionArgs) {
-  const displayAnswerText = Answers.getDisplayAnswerText(
+  const displayAnswerText = getDisplayAnswerText(
     String(context.originalAnswer || context.currentAnswer || ''),
   ) || String(context.currentAnswer || '');
 
@@ -103,7 +103,7 @@ export function displayAnswer({ context }: ActionArgs) {
 }
 
 export function displayFeedback({ context }: ActionArgs) {
-  const displayCorrectAnswerText = Answers.getDisplayAnswerText(
+  const displayCorrectAnswerText = getDisplayAnswerText(
     String(context.currentAnswer || ''),
   ) || String(context.currentAnswer || '');
 
