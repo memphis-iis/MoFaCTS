@@ -1,0 +1,16 @@
+/* Turk workflow modal overrides */
+#turkModal .modal-title,
+#profileWorkModal .modal-title {
+    margin-left: 0;
+    display: flex;
+    align-items: center;
+}
+
+#turkModal .modal-body,
+#profileWorkModal .modal-body {
+    padding: var(--app-space-3) calc(1.25rem * var(--app-density-scale));
+}
+
+#turk-assign-results:empty {
+    display: none;
+}

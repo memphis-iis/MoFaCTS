@@ -4,6 +4,7 @@ import { Random } from 'meteor/random';
 import { Session } from 'meteor/session';
 import { Template } from 'meteor/templating';
 import './aiContentCreator.html';
+import './aiContentCreator.css';
 import { clientConsole } from '../..';
 import { translatePlatformString } from '../../lib/interfaceI18n';
 import { getActiveUiLocale } from '../../lib/interfaceLocaleState';

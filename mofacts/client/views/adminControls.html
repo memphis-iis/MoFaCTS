@@ -2,13 +2,14 @@
 
 <template name="adminControls">
     <div>
-        <h3 class="page-header-title">{{t 'admin.controlPanel'}}</h3>
-
         {{#if adminMessage}}
-        <div class="admin-status admin-status-{{adminMessage.level}} admin-message" role="status" aria-live="polite">
-            <i class="fa {{adminMessage.icon}}" aria-hidden="true"></i>
-            <div class="admin-status-text">{{adminMessage.text}}</div>
-        </div>
+        {{> adminStatus variant=adminMessage.level text=adminMessage.text urgent=adminMessageUrgent}}
+        {{/if}}
+        {{#if loadErrorText}}
+        {{> adminStatus variant="error" text=loadErrorText urgent=true}}
+        <button type="button" class="btn btn-outline-secondary btn-sm admin-form-row-sm" data-admin-load-retry="true">
+            {{t 'common.tryAgain'}}
+        </button>
         {{/if}}
 
         {{#if isInRole 'admin'}}
@@ -25,10 +26,14 @@
                             <strong>{{t 'admin.serverStorageSpace'}}</strong>
                         </div>
                         <div class="col-md-6">
-                            {{#if serverStatus.error}}
-                            <span class="admin-badge admin-badge-error">{{serverStatus.error}}</span>
+                            {{#if serverStatusReady}}
+                                {{#if serverStatus.error}}
+                                <span class="admin-badge admin-badge-error">{{serverStatus.error}}</span>
+                                {{else}}
+                                {{serverStorageSummary}}
+                                {{/if}}
                             {{else}}
-                            {{serverStorageSummary}}
+                                {{t 'common.loading'}}
                             {{/if}}
                         </div>
                     </div>
@@ -51,7 +56,7 @@
                             </p>
                         </div>
                         <div class="admin-maintenance-action">
-                            <button type="button" id="updateStimDisplayTypeMap" class="btn btn-primary">
+                            <button type="button" id="updateStimDisplayTypeMap" class="btn btn-primary" disabled="{{cacheCommandBusy}}" aria-busy="{{#if cacheCommandBusy}}true{{else}}false{{/if}}">
                                 <i class="fa fa-refresh"></i> {{t 'admin.rebuildDisplayCache'}}
                             </button>
                         </div>
@@ -73,35 +78,38 @@
                             <p class="admin-verbosity-intro">{{t 'admin.serverLoggingDescription'}}</p>
                         </div>
                     </div>
-                    <div class="admin-verbosity-options">
-                        <label class="admin-verbosity-option" for="verbosityRadio0">
-                            <span class="admin-verbosity-option-control">
-                                <input class="form-check-input serverVerbosityRadio" type="radio" name="serverVerbosityRadio" id="verbosityRadio0">
-                            </span>
-                            <span class="admin-verbosity-option-copy">
-                                <span class="admin-verbosity-option-title">{{t 'admin.routineServerLogs'}}</span>
-                                <span class="admin-verbosity-option-description">{{t 'admin.routineServerLogsDescription'}}</span>
-                            </span>
-                        </label>
-                        <label class="admin-verbosity-option" for="verbosityRadio1">
-                            <span class="admin-verbosity-option-control">
-                                <input class="form-check-input serverVerbosityRadio" type="radio" name="serverVerbosityRadio" id="verbosityRadio1">
-                            </span>
-                            <span class="admin-verbosity-option-copy">
-                                <span class="admin-verbosity-option-title">{{t 'admin.timingInstrumentation'}}</span>
-                                <span class="admin-verbosity-option-description">{{t 'admin.timingInstrumentationDescription'}}</span>
-                            </span>
-                        </label>
-                        <label class="admin-verbosity-option" for="verbosityRadio2">
-                            <span class="admin-verbosity-option-control">
-                                <input class="form-check-input serverVerbosityRadio" type="radio" name="serverVerbosityRadio" id="verbosityRadio2">
-                            </span>
-                            <span class="admin-verbosity-option-copy">
-                                <span class="admin-verbosity-option-title">{{t 'admin.serverLogsAndTiming'}}</span>
-                                <span class="admin-verbosity-option-description">{{t 'admin.serverLogsAndTimingDescription'}}</span>
-                            </span>
-                        </label>
-                    </div>
+                    <fieldset class="admin-verbosity-fieldset">
+                        <legend class="sr-only">{{t 'admin.serverLogging'}}</legend>
+                        <div class="admin-verbosity-options">
+                            <label class="admin-verbosity-option" for="verbosityRadio0">
+                                <span class="admin-verbosity-option-control">
+                                    <input class="form-check-input serverVerbosityRadio" type="radio" name="serverVerbosityRadio" id="verbosityRadio0" data-verbosity="0" checked="{{serverVerbosityChecked '0'}}" disabled="{{serverVerbosityDisabled}}">
+                                </span>
+                                <span class="admin-verbosity-option-copy">
+                                    <span class="admin-verbosity-option-title">{{t 'admin.routineServerLogs'}}</span>
+                                    <span class="admin-verbosity-option-description">{{t 'admin.routineServerLogsDescription'}}</span>
+                                </span>
+                            </label>
+                            <label class="admin-verbosity-option" for="verbosityRadio1">
+                                <span class="admin-verbosity-option-control">
+                                    <input class="form-check-input serverVerbosityRadio" type="radio" name="serverVerbosityRadio" id="verbosityRadio1" data-verbosity="1" checked="{{serverVerbosityChecked '1'}}" disabled="{{serverVerbosityDisabled}}">
+                                </span>
+                                <span class="admin-verbosity-option-copy">
+                                    <span class="admin-verbosity-option-title">{{t 'admin.timingInstrumentation'}}</span>
+                                    <span class="admin-verbosity-option-description">{{t 'admin.timingInstrumentationDescription'}}</span>
+                                </span>
+                            </label>
+                            <label class="admin-verbosity-option" for="verbosityRadio2">
+                                <span class="admin-verbosity-option-control">
+                                    <input class="form-check-input serverVerbosityRadio" type="radio" name="serverVerbosityRadio" id="verbosityRadio2" data-verbosity="2" checked="{{serverVerbosityChecked '2'}}" disabled="{{serverVerbosityDisabled}}">
+                                </span>
+                                <span class="admin-verbosity-option-copy">
+                                    <span class="admin-verbosity-option-title">{{t 'admin.serverLogsAndTiming'}}</span>
+                                    <span class="admin-verbosity-option-description">{{t 'admin.serverLogsAndTimingDescription'}}</span>
+                                </span>
+                            </label>
+                        </div>
+                    </fieldset>
                 </div>
             </div>
         </div>
@@ -120,35 +128,38 @@
                             <p class="admin-verbosity-intro">{{t 'admin.browserConsoleLoggingDescription'}}</p>
                         </div>
                     </div>
-                    <div class="admin-verbosity-options">
-                        <label class="admin-verbosity-option" for="clientVerbosityRadio0">
-                            <span class="admin-verbosity-option-control">
-                                <input class="form-check-input clientVerbosityRadio" type="radio" name="clientVerbosityRadio" id="clientVerbosityRadio0">
-                            </span>
-                            <span class="admin-verbosity-option-copy">
-                                <span class="admin-verbosity-option-title">{{t 'admin.off'}}</span>
-                                <span class="admin-verbosity-option-description">{{t 'admin.clientOffDescription'}}</span>
-                            </span>
-                        </label>
-                        <label class="admin-verbosity-option" for="clientVerbosityRadio1">
-                            <span class="admin-verbosity-option-control">
-                                <input class="form-check-input clientVerbosityRadio" type="radio" name="clientVerbosityRadio" id="clientVerbosityRadio1">
-                            </span>
-                            <span class="admin-verbosity-option-copy">
-                                <span class="admin-verbosity-option-title">{{t 'admin.importantDiagnostics'}}</span>
-                                <span class="admin-verbosity-option-description">{{t 'admin.importantDiagnosticsDescription'}}</span>
-                            </span>
-                        </label>
-                        <label class="admin-verbosity-option" for="clientVerbosityRadio2">
-                            <span class="admin-verbosity-option-control">
-                                <input class="form-check-input clientVerbosityRadio" type="radio" name="clientVerbosityRadio" id="clientVerbosityRadio2">
-                            </span>
-                            <span class="admin-verbosity-option-copy">
-                                <span class="admin-verbosity-option-title">{{t 'admin.detailedTrace'}}</span>
-                                <span class="admin-verbosity-option-description">{{t 'admin.detailedTraceDescription'}}</span>
-                            </span>
-                        </label>
-                    </div>
+                    <fieldset class="admin-verbosity-fieldset">
+                        <legend class="sr-only">{{t 'admin.browserConsoleLogging'}}</legend>
+                        <div class="admin-verbosity-options">
+                            <label class="admin-verbosity-option" for="clientVerbosityRadio0">
+                                <span class="admin-verbosity-option-control">
+                                    <input class="form-check-input clientVerbosityRadio" type="radio" name="clientVerbosityRadio" id="clientVerbosityRadio0" data-verbosity="0" checked="{{clientVerbosityChecked '0'}}" disabled="{{clientVerbosityDisabled}}">
+                                </span>
+                                <span class="admin-verbosity-option-copy">
+                                    <span class="admin-verbosity-option-title">{{t 'admin.off'}}</span>
+                                    <span class="admin-verbosity-option-description">{{t 'admin.clientOffDescription'}}</span>
+                                </span>
+                            </label>
+                            <label class="admin-verbosity-option" for="clientVerbosityRadio1">
+                                <span class="admin-verbosity-option-control">
+                                    <input class="form-check-input clientVerbosityRadio" type="radio" name="clientVerbosityRadio" id="clientVerbosityRadio1" data-verbosity="1" checked="{{clientVerbosityChecked '1'}}" disabled="{{clientVerbosityDisabled}}">
+                                </span>
+                                <span class="admin-verbosity-option-copy">
+                                    <span class="admin-verbosity-option-title">{{t 'admin.importantDiagnostics'}}</span>
+                                    <span class="admin-verbosity-option-description">{{t 'admin.importantDiagnosticsDescription'}}</span>
+                                </span>
+                            </label>
+                            <label class="admin-verbosity-option" for="clientVerbosityRadio2">
+                                <span class="admin-verbosity-option-control">
+                                    <input class="form-check-input clientVerbosityRadio" type="radio" name="clientVerbosityRadio" id="clientVerbosityRadio2" data-verbosity="2" checked="{{clientVerbosityChecked '2'}}" disabled="{{clientVerbosityDisabled}}">
+                                </span>
+                                <span class="admin-verbosity-option-copy">
+                                    <span class="admin-verbosity-option-title">{{t 'admin.detailedTrace'}}</span>
+                                    <span class="admin-verbosity-option-description">{{t 'admin.detailedTraceDescription'}}</span>
+                                </span>
+                            </label>
+                        </div>
+                    </fieldset>
                 </div>
             </div>
         </div>

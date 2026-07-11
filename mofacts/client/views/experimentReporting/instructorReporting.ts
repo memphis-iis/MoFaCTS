@@ -1,223 +1,505 @@
 import { Meteor } from 'meteor/meteor';
 import { Template } from 'meteor/templating';
-import { Session } from 'meteor/session';
+import { ReactiveVar } from 'meteor/reactive-var';
+import { Tracker } from 'meteor/tracker';
 import './instructorReporting.html';
 import './instructorReporting.css';
-import { ReactiveDict } from 'meteor/reactive-dict';
+import '../shared/adminUi/adminUi';
 import { meteorCallAsync } from '../..';
 import { INVALID } from '../../../common/Definitions';
-import { Tracker } from 'meteor/tracker';
 import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 import { translatePlatformString } from '../../lib/interfaceI18n';
-declare const $: any;
-declare const Tdfs: any;
+import {
+  rejectLoad,
+  resolveLoad,
+  startLoad,
+  type LoadableState,
+} from '../../lib/adminUi/loadableState';
+import { createTemplateLifetime, type TemplateLifetime } from '../../lib/adminUi/templateLifetime';
+import {
+  createAsyncCommandController,
+  type AsyncCommandController,
+  type AsyncCommandState,
+} from '../../lib/adminUi/asyncCommandState';
+import {
+  findAssignmentForTdf,
+  findTdfSummary,
+  getCourseAssignments,
+  getReportingTotals,
+  normalizePerformanceBuckets,
+  resolveSelectedDueDate,
+  rowsHaveData,
+  toDateInputValue,
+  toDateMillis,
+  type ReportingAssignment,
+  type ReportingAssignmentsByCourseId,
+  type ReportingCourse,
+  type ReportingPerformanceBuckets,
+  type ReportingPerformanceRow,
+  type ReportingTdfSummary,
+} from './instructorReportingState';
 
-const _state = new ReactiveDict('instructorReportingState');
+declare const Tdfs: {
+  find(): { fetch(): ReportingTdfSummary[] };
+};
 
-let curTdf = INVALID;
-let curAssignmentId: string | null = null;
+type ReportingMessage = Readonly<{
+  text: string;
+  level: 'info' | 'success' | 'warning' | 'error';
+}>;
+
+type InstructorReportingInitialData = Readonly<{
+  courses: ReportingCourse[];
+  assignmentsByCourseId: ReportingAssignmentsByCourseId;
+  allTdfs: ReportingTdfSummary[];
+}>;
+
+type InstructorReportingInstance = Blaze.TemplateInstance & {
+  initialPresentation: ReactiveVar<LoadableState<InstructorReportingInitialData>>;
+  performancePresentation: ReactiveVar<LoadableState<ReportingPerformanceBuckets>>;
+  exceptionCommandState: ReactiveVar<AsyncCommandState<void>>;
+  exceptionCommand: AsyncCommandController<void>;
+  initialLifetime: TemplateLifetime;
+  performanceLifetime: TemplateLifetime;
+  nextInitialRequestId: number;
+  nextPerformanceRequestId: number;
+  selectedCourseId: ReactiveVar<string>;
+  selectedTdfId: ReactiveVar<string>;
+  selectedAssignmentId: ReactiveVar<string | null>;
+  selectedDueDate: ReactiveVar<string>;
+  deadlineDate: ReactiveVar<string>;
+  exceptionDate: ReactiveVar<string>;
+  dueDateFilter: ReactiveVar<boolean>;
+  reportingMessage: ReactiveVar<ReportingMessage | null>;
+  tdfListingSub?: { stop(): void };
+  tdfReadyComputation?: { stop(): void };
+};
 
 function reportingText(key: Parameters<typeof translatePlatformString>[1], values?: Parameters<typeof translatePlatformString>[2]): string {
   return translatePlatformString(getActiveUiLocale(), key, values);
 }
 
-function setReportingMessage(text: string, level = 'info'): void {
-  const icon = level === 'success'
-    ? 'fa-check-circle'
-    : level === 'error'
-      ? 'fa-times-circle'
-      : level === 'warning'
-        ? 'fa-exclamation-triangle'
-        : 'fa-info-circle';
-  Session.set('instructorReportingMessage', { text, level, icon });
+function errorMessage(error: unknown): string {
+  const meteorError = error as { reason?: string; message?: string } | null;
+  return meteorError?.reason || meteorError?.message || String(error);
 }
 
-async function updateTables(_tdfId: string | number, date?: number | false){
-  const dateInt = date || false;
-  const [historiesMet, historiesNotMet] = (await meteorCallAsync('getClassPerformanceByTDF', Session.get('curClass')._id, curTdf, dateInt)) as [unknown, unknown];
-  
-  Session.set('curClassStudentPerformance', historiesMet)
-  Session.set('curClassStudentPerformanceAfterFilter', historiesNotMet);
+function readyLoadValue<T>(state: LoadableState<T>): T | null {
+  return state.status === 'ready' || state.status === 'empty' || state.status === 'refreshing' || state.status === 'refresh-error'
+    ? state.value
+    : null;
 }
 
-Template.instructorReporting.helpers({
-  INVALID: INVALID,
-  curClassStudentPerformance: () => Session.get('curClassStudentPerformance'),
-  curClassStudentPerformanceAfterFilter: () => Session.get('curClassStudentPerformanceAfterFilter'),
-  curInstructorReportingTdfs: () => Session.get('curInstructorReportingTdfs'),
-  classes: () => Session.get('classes'),
-  curClassPerformance: () => Session.get('curClassPerformance'),
-  performanceLoading: () => Session.get('performanceLoading'),
-  reportingMessage: () => Session.get('instructorReportingMessage'),
-  reportingText(key: Parameters<typeof translatePlatformString>[1], options?: { hash?: Parameters<typeof translatePlatformString>[2] }) {
-    return reportingText(key, options?.hash);
-  },
-  replaceSpacesWithUnderscores: (value: string) => value.replace(' ', '_'),
-  selectedTdfDueDate: () => Session.get('selectedTdfDueDate'),
-  dueDateFilter: () => Session.get('dueDateFilter'),
-});
+function loadErrorMessage<T>(state: LoadableState<T>): string {
+  return state.status === 'error' || state.status === 'refresh-error' ? state.message : '';
+}
 
-Template.instructorReporting.events({
-  'change #class-select': function(event: Event) {
-    Session.set('curClassStudentPerformance', []);
-    Session.set('curClassPerformance', []);
-    const curClassId = $(event.currentTarget).val();
-    const curClass = Session.get('classes').find((x: any) => x._id == curClassId);
-    Session.set('curClass', curClass);
-    const curClassTdfs = Session.get('instructorReportingTdfs')[curClassId];
-    
-    Session.set('curInstructorReportingTdfs', curClassTdfs);
+function loadPending<T>(state: LoadableState<T>): boolean {
+  return state.status === 'idle' || state.status === 'loading' || state.status === 'refreshing';
+}
 
-    curTdf = INVALID;
-    curAssignmentId = null;
-    $('#tdf-select').val(INVALID);
-    $('#tdf-select').prop('disabled', false);
-    $('#practice-deadline-date').prop('disabled', true);
-    _state.set('userMetThresholdMap', undefined);
-  },
+function loadBusy<T>(state: LoadableState<T>): boolean {
+  return state.status === 'loading' || state.status === 'refreshing';
+}
 
-  'change #tdf-select': async function(event: Event) {
-    curTdf = $(event.currentTarget).val();
-    _state.set('currentTdf', curTdf);
-    const curClassId = Session.get('curClass')?._id;
-    const assignmentRows = curClassId ? (Session.get('instructorReportingTdfs')?.[curClassId] || []) : [];
-    const selectedAssignment = assignmentRows.find((row: any) => String(row?.TDFId || '') === String(curTdf));
-    curAssignmentId = selectedAssignment?.assignmentId || null;
-    
-    updateTables(curTdf);
-    if (Session.get('curClass')) {
-      const tdfData = Session.get('allTdfs').find((x: any) => x._id == curTdf);
-      const assignmentDueDate = selectedAssignment?.dueAt;
-      const tdfDate = tdfData.content.tdfs.tutor.setspec.duedate;
-      Session.set('selectedTdfDueDate', assignmentDueDate || tdfDate);
-      
-    } else {
-      Session.set('selectedTdfDueDate', undefined);
-      setReportingMessage(reportingText('reporting.pleaseSelectClass'), 'warning');
-    }
-    _state.set('userMetThresholdMap', undefined);
-    $('#practice-deadline-date').prop('disabled', false);
-  },
+function performanceLoadError(instance: InstructorReportingInstance): string {
+  return loadErrorMessage(instance.performancePresentation.get());
+}
 
-  'change #practice-deadline-date': async (event: Event) => {
-    const date = String((event.currentTarget as HTMLInputElement).value || '');
-    const dateInt = new Date(date).getTime();
-    
-    if(dateInt && !isNaN(dateInt)){
-        updateTables((_state.get('currentTdf') as string | number), dateInt);
-    }
-  },
-  'change #due-date-filter': async function(event: Event) {
-    if((event.target as HTMLInputElement).checked){
-      $('#practice-deadline-date').prop('disabled', true);
-      const curTdfDueDate = Session.get('selectedTdfDueDate');
-      
-      $('#practice-deadline-date').val(curTdfDueDate);
-      Session.set('dueDateFilter', true);
-      const date = String($('#practice-deadline-date').val() || '');
-      const dateInt = new Date(date).getTime();
-      
-      if(dateInt && !isNaN(dateInt)){
-        updateTables((_state.get('currentTdf') as string | number), dateInt);
-      }
-    } else {
-      $('#practice-deadline-date').prop('disabled', false);
-      $('#practice-deadline-date').val('');
-      Session.set('dueDateFilter', false);
-      updateTables(curTdf, false);
-    }
-  },
-  'click #add-exception': async function(event: Event) {
-    let date = String($('#exception-date').val() || '');
-    let dateInt = new Date(date).getTime();
-    const userId = $(event.currentTarget).attr('data-userid');
-    updateTables(curTdf, dateInt);
-    curTdf = (_state.get('currentTdf') as string);
-    const classId = Session.get('curClass')._id;
-    
-    await meteorCallAsync('addUserDueDateException', userId, curTdf, classId, dateInt, curAssignmentId);
-    setReportingMessage(reportingText('reporting.exceptionAdded'), 'success');
-    date = String(Session.get('selectedTdfDueDate') || '');
-    dateInt = new Date(date).getTime();
-    updateTables(curTdf, dateInt);
-  },
+function reportingActionLabel(key: Parameters<typeof translatePlatformString>[1], row: ReportingPerformanceRow): string {
+  const action = reportingText(key);
+  const target = String(row?.username || '').trim();
+  return target ? `${action}: ${target}` : action;
+}
 
-  'click #remove-exception': async function(event: Event) {
-    const userId = $(event.currentTarget).attr('data-userid');
-    curTdf = (_state.get('currentTdf') as string);
-    const classId = Session.get('curClass')._id;
-    
-    await meteorCallAsync('removeUserDueDateException', userId, curTdf, classId, curAssignmentId);
-    setReportingMessage(reportingText('reporting.exceptionRemoved'), 'success');
-    const date = String(Session.get('selectedTdfDueDate') || '');
-    const dateInt = new Date(date).getTime();
-    updateTables(curTdf, dateInt);
-  }
+function getInitialData(instance: InstructorReportingInstance): InstructorReportingInitialData {
+  return readyLoadValue(instance.initialPresentation.get()) || {
+    courses: [],
+    assignmentsByCourseId: {},
+    allTdfs: [],
+  };
+}
 
-});
+function getPerformanceBuckets(instance: InstructorReportingInstance): ReportingPerformanceBuckets {
+  return readyLoadValue(instance.performancePresentation.get()) || {
+    met: [],
+    notMet: [],
+  };
+}
 
-Template.instructorReporting.onCreated(function(this: any) {
-  this.subscriptions = [];
-  this.autoruns = [];
-});
+function setReportingMessage(
+  instance: InstructorReportingInstance,
+  text: string,
+  level: ReportingMessage['level'] = 'info',
+): void {
+  instance.reportingMessage.set({ text, level });
+}
 
-Template.instructorReporting.onRendered(async function(this: any) {
-  
-  Session.set('curClass', undefined);
-  Session.set('curStudentID', undefined);
-  Session.set('studentUsername', undefined);
-  Session.set('curStudentPerformance', undefined);
-  Session.set('instructorSelectedTdf', undefined);
-  Session.set('instructorReportingTdfs', []);
-  Session.set('classes', []);
-  Session.set('curClassStudentPerformance', []);
-  Session.set('curClassPerformance', undefined);
-  Session.set('curInstructorReportingTdfs', []);
-  Session.set('dueDateFilter', false);
-  Session.set('instructorReportingMessage', null);
-
-  Session.set('performanceLoading', true);
-
-  const tdfListingSub = Meteor.subscribe('allTdfsListing');
-  this.subscriptions.push(tdfListingSub);
-  await new Promise<void>((resolve) => {
-    const handle = Tracker.autorun(() => {
-      if (tdfListingSub.ready()) {
-        handle.stop();
+function waitForTdfListing(instance: InstructorReportingInstance, sub: { ready(): boolean }): Promise<void> {
+  instance.tdfReadyComputation?.stop();
+  return new Promise<void>((resolve) => {
+    instance.tdfReadyComputation = Tracker.autorun((computation) => {
+      if (sub.ready()) {
+        computation.stop();
+        if (instance.tdfReadyComputation === computation) {
+          instance.tdfReadyComputation = undefined;
+        }
         resolve();
       }
     });
   });
-  Session.set('allTdfs', Tdfs.find().fetch());
+}
 
-  // Parallelize all async calls for faster page load
-  const [studentPerformance, instructorReportingTdfs, courses] = await Promise.all([
-    meteorCallAsync('getStudentPerformanceForClassAndTdfId', Meteor.userId()),
-    meteorCallAsync('getTdfAssignmentsByCourseIdMap', Meteor.userId()),
-    meteorCallAsync('getAllCoursesForInstructor', Meteor.userId())
-  ]);
+async function loadInitialReportingData(instance: InstructorReportingInstance): Promise<void> {
+  const requestId = ++instance.nextInitialRequestId;
+  const generation = instance.initialLifetime.begin();
+  instance.initialPresentation.set(startLoad(instance.initialPresentation.get(), requestId));
+  instance.performancePresentation.set({ status: 'idle' });
+  instance.reportingMessage.set(null);
 
-  const [studentPerformanceForClass, studentPerformanceForClassAndTdfIdMap] = studentPerformance as [unknown, unknown];
-  Session.set('studentPerformanceForClass', studentPerformanceForClass);
-  Session.set('studentPerformanceForClassAndTdfIdMap', studentPerformanceForClassAndTdfIdMap);
+  instance.tdfListingSub?.stop();
+  const tdfListingSub = Meteor.subscribe('allTdfsListing');
+  instance.tdfListingSub = tdfListingSub;
 
-  Session.set('instructorReportingTdfs', instructorReportingTdfs);
-  Session.set('classes', courses);
+  try {
+    const [assignmentsByCourseId, courses] = await Promise.all([
+      meteorCallAsync('getTdfAssignmentsByCourseIdMap', Meteor.userId()),
+      meteorCallAsync('getAllCoursesForInstructor', Meteor.userId()),
+      waitForTdfListing(instance, tdfListingSub),
+    ]);
+    if (!instance.initialLifetime.isCurrent(generation)) return;
 
-  Session.set('performanceLoading', false);
+    const value = {
+      courses: Array.isArray(courses) ? courses as ReportingCourse[] : [],
+      assignmentsByCourseId: (assignmentsByCourseId || {}) as ReportingAssignmentsByCourseId,
+      allTdfs: Tdfs.find().fetch(),
+    };
+    instance.initialPresentation.set(resolveLoad(
+      instance.initialPresentation.get(),
+      requestId,
+      value,
+      (data) => data.courses.length === 0,
+    ));
+  } catch (error: unknown) {
+    if (!instance.initialLifetime.isCurrent(generation)) return;
+    const message = errorMessage(error);
+    instance.initialPresentation.set(rejectLoad(
+      instance.initialPresentation.get(),
+      requestId,
+      { message, retryable: true },
+    ));
+    setReportingMessage(instance, message, 'error');
+  }
+}
 
-  
+function clearTdfSelection(instance: InstructorReportingInstance): void {
+  instance.selectedTdfId.set(String(INVALID));
+  instance.selectedAssignmentId.set(null);
+  instance.selectedDueDate.set('');
+  instance.deadlineDate.set('');
+  instance.exceptionDate.set('');
+  instance.dueDateFilter.set(false);
+  instance.performancePresentation.set({ status: 'idle' });
+}
+
+function selectClass(instance: InstructorReportingInstance, courseId: string): void {
+  instance.reportingMessage.set(null);
+  instance.selectedCourseId.set(courseId);
+  clearTdfSelection(instance);
+}
+
+function selectTdf(instance: InstructorReportingInstance, tdfId: string): void {
+  instance.reportingMessage.set(null);
+  const data = getInitialData(instance);
+  const courseId = instance.selectedCourseId.get();
+  const assignment = findAssignmentForTdf(data.assignmentsByCourseId, courseId, tdfId);
+  const tdf = findTdfSummary(data.allTdfs, tdfId);
+  const dueDate = toDateInputValue(resolveSelectedDueDate(assignment, tdf));
+  instance.selectedTdfId.set(tdfId);
+  instance.selectedAssignmentId.set(assignment?.assignmentId || null);
+  instance.selectedDueDate.set(dueDate);
+  instance.deadlineDate.set('');
+  instance.exceptionDate.set('');
+  instance.dueDateFilter.set(false);
+}
+
+function currentFilterDate(instance: InstructorReportingInstance): number | false {
+  if (instance.dueDateFilter.get()) {
+    return toDateMillis(instance.selectedDueDate.get());
+  }
+  return toDateMillis(instance.deadlineDate.get());
+}
+
+function reloadPerformance(instance: InstructorReportingInstance, date: number | false = currentFilterDate(instance)): void {
+  const courseId = instance.selectedCourseId.get();
+  const tdfId = instance.selectedTdfId.get();
+  if (!courseId || !tdfId || tdfId === String(INVALID)) {
+    instance.performancePresentation.set({ status: 'idle' });
+    return;
+  }
+
+  const requestId = ++instance.nextPerformanceRequestId;
+  const generation = instance.performanceLifetime.begin();
+  instance.performancePresentation.set(startLoad(instance.performancePresentation.get(), requestId));
+
+  meteorCallAsync('getClassPerformanceByTDF', courseId, tdfId, date || false)
+    .then((result) => {
+      if (!instance.performanceLifetime.isCurrent(generation)) return;
+      const buckets = normalizePerformanceBuckets(result);
+      instance.performancePresentation.set(resolveLoad(
+        instance.performancePresentation.get(),
+        requestId,
+        buckets,
+        (value) => value.met.length === 0 && value.notMet.length === 0,
+      ));
+    })
+    .catch((error) => {
+      if (!instance.performanceLifetime.isCurrent(generation)) return;
+      const message = errorMessage(error);
+      instance.performancePresentation.set(rejectLoad(
+        instance.performancePresentation.get(),
+        requestId,
+        { message, retryable: true },
+      ));
+      setReportingMessage(instance, message, 'error');
+    });
+}
+
+function exceptionRefreshDate(instance: InstructorReportingInstance): number | false {
+  return toDateMillis(instance.selectedDueDate.get()) || currentFilterDate(instance);
+}
+
+function runExceptionCommand(
+  instance: InstructorReportingInstance,
+  work: () => Promise<void>,
+  successMessage: string,
+): void {
+  void instance.exceptionCommand.run(work, {
+    getErrorMessage: errorMessage,
+    onSuccess: () => {
+      setReportingMessage(instance, successMessage, 'success');
+      reloadPerformance(instance, exceptionRefreshDate(instance));
+    },
+    onFailure: (error) => {
+      setReportingMessage(instance, errorMessage(error), 'error');
+    },
+  });
+}
+
+Template.instructorReporting.onCreated(function(this: InstructorReportingInstance) {
+  this.initialPresentation = new ReactiveVar<LoadableState<InstructorReportingInitialData>>({ status: 'idle' });
+  this.performancePresentation = new ReactiveVar<LoadableState<ReportingPerformanceBuckets>>({ status: 'idle' });
+  this.exceptionCommandState = new ReactiveVar<AsyncCommandState<void>>({ status: 'idle' });
+  this.exceptionCommand = createAsyncCommandController((state) => this.exceptionCommandState.set(state));
+  this.initialLifetime = createTemplateLifetime();
+  this.performanceLifetime = createTemplateLifetime();
+  this.nextInitialRequestId = 0;
+  this.nextPerformanceRequestId = 0;
+  this.selectedCourseId = new ReactiveVar('');
+  this.selectedTdfId = new ReactiveVar(String(INVALID));
+  this.selectedAssignmentId = new ReactiveVar<string | null>(null);
+  this.selectedDueDate = new ReactiveVar('');
+  this.deadlineDate = new ReactiveVar('');
+  this.exceptionDate = new ReactiveVar('');
+  this.dueDateFilter = new ReactiveVar(false);
+  this.reportingMessage = new ReactiveVar<ReportingMessage | null>(null);
+  void loadInitialReportingData(this);
 });
 
-Template.instructorReporting.onDestroyed(function(this: any) {
-  // Clean up autoruns
-  this.autoruns.forEach((ar: { stop(): void }) => ar.stop());
-
-  // Clean up subscriptions
-  this.subscriptions.forEach((sub: { stop(): void }) => sub.stop());
+Template.instructorReporting.onDestroyed(function(this: InstructorReportingInstance) {
+  this.initialLifetime.destroy();
+  this.performanceLifetime.destroy();
+  this.exceptionCommand.destroy();
+  this.tdfReadyComputation?.stop();
+  this.tdfListingSub?.stop();
 });
 
+Template.instructorReporting.helpers({
+  INVALID: INVALID,
+  classes(): ReportingCourse[] {
+    return getInitialData(Template.instance() as InstructorReportingInstance).courses;
+  },
+  selectedClassAttrs(courseId: string) {
+    return (Template.instance() as InstructorReportingInstance).selectedCourseId.get() === String(courseId || '')
+      ? { selected: true }
+      : {};
+  },
+  curInstructorReportingTdfs(): ReportingAssignment[] {
+    const instance = Template.instance() as InstructorReportingInstance;
+    return getCourseAssignments(getInitialData(instance).assignmentsByCourseId, instance.selectedCourseId.get());
+  },
+  selectedTdfAttrs(tdfId: string) {
+    return (Template.instance() as InstructorReportingInstance).selectedTdfId.get() === String(tdfId || '')
+      ? { selected: true }
+      : {};
+  },
+  initialLoading(): boolean {
+    return loadPending((Template.instance() as InstructorReportingInstance).initialPresentation.get());
+  },
+  performanceLoading(): boolean {
+    return loadBusy((Template.instance() as InstructorReportingInstance).performancePresentation.get());
+  },
+  loadError(): string {
+    const instance = Template.instance() as InstructorReportingInstance;
+    return loadErrorMessage(instance.initialPresentation.get())
+      || loadErrorMessage(instance.performancePresentation.get());
+  },
+  reportingMessage(): ReportingMessage | null {
+    return (Template.instance() as InstructorReportingInstance).reportingMessage.get();
+  },
+  messageVariant(): string {
+    return (Template.instance() as InstructorReportingInstance).reportingMessage.get()?.level || 'info';
+  },
+  reportingText(key: Parameters<typeof translatePlatformString>[1], options?: { hash?: Parameters<typeof translatePlatformString>[2] }) {
+    return reportingText(key, options?.hash);
+  },
+  classReportingTableLabel(): string {
+    return reportingText('reporting.classData');
+  },
+  classReportingTableData() {
+    const instance = Template.instance() as InstructorReportingInstance;
+    const buckets = getPerformanceBuckets(instance);
+    return {
+      metRows: buckets.met,
+      notMetRows: buckets.notMet,
+      hasMetRows: rowsHaveData(buckets.met),
+      hasNotMetRows: rowsHaveData(buckets.notMet),
+      totals: getReportingTotals([...buckets.met, ...buckets.notMet]),
+      dueDateFilter: instance.dueDateFilter.get(),
+      performanceLoading: loadBusy(instance.performancePresentation.get()),
+      loadError: performanceLoadError(instance),
+      exceptionBusy: instance.exceptionCommandState.get().status === 'pending',
+    };
+  },
+  selectedTdfDueDate(): string {
+    return (Template.instance() as InstructorReportingInstance).selectedDueDate.get();
+  },
+  deadlineDateValue(): string {
+    return (Template.instance() as InstructorReportingInstance).deadlineDate.get();
+  },
+  exceptionDateValue(): string {
+    return (Template.instance() as InstructorReportingInstance).exceptionDate.get();
+  },
+  dueDateFilter(): boolean {
+    return (Template.instance() as InstructorReportingInstance).dueDateFilter.get();
+  },
+  dueDateFilterChecked(): string {
+    return (Template.instance() as InstructorReportingInstance).dueDateFilter.get() ? 'checked' : '';
+  },
+  tdfSelectDisabled(): boolean {
+    const instance = Template.instance() as InstructorReportingInstance;
+    return loadPending(instance.initialPresentation.get()) || !instance.selectedCourseId.get();
+  },
+  deadlineDisabled(): boolean {
+    const instance = Template.instance() as InstructorReportingInstance;
+    return !instance.selectedTdfId.get()
+      || instance.selectedTdfId.get() === String(INVALID)
+      || instance.dueDateFilter.get()
+      || loadBusy(instance.performancePresentation.get());
+  },
+  exceptionBusy(): boolean {
+    return (Template.instance() as InstructorReportingInstance).exceptionCommandState.get().status === 'pending';
+  },
+});
 
+Template.instructorReportingClassTable.helpers({
+  reportingText(key: Parameters<typeof translatePlatformString>[1], options?: { hash?: Parameters<typeof translatePlatformString>[2] }) {
+    return reportingText(key, options?.hash);
+  },
+});
 
+Template.instructorReportingStudentRow.helpers({
+  reportingText(key: Parameters<typeof translatePlatformString>[1], options?: { hash?: Parameters<typeof translatePlatformString>[2] }) {
+    return reportingText(key, options?.hash);
+  },
+  exceptionActionLabel(key: Parameters<typeof translatePlatformString>[1], row: ReportingPerformanceRow): string {
+    return reportingActionLabel(key, row);
+  },
+});
 
+Template.instructorReporting.events({
+  'change #class-select'(event: Event, instance: InstructorReportingInstance) {
+    const courseId = String((event.currentTarget as HTMLSelectElement).value || '');
+    selectClass(instance, courseId);
+  },
 
+  'change #tdf-select'(event: Event, instance: InstructorReportingInstance) {
+    const tdfId = String((event.currentTarget as HTMLSelectElement).value || '');
+    selectTdf(instance, tdfId);
+    reloadPerformance(instance, false);
+  },
+
+  'change #practice-deadline-date'(event: Event, instance: InstructorReportingInstance) {
+    const date = String((event.currentTarget as HTMLInputElement).value || '');
+    instance.deadlineDate.set(date);
+    const dateInt = toDateMillis(date);
+    if (dateInt) {
+      reloadPerformance(instance, dateInt);
+    }
+  },
+
+  'change #exception-date'(event: Event, instance: InstructorReportingInstance) {
+    instance.exceptionDate.set(String((event.currentTarget as HTMLInputElement).value || ''));
+  },
+
+  'change #due-date-filter'(event: Event, instance: InstructorReportingInstance) {
+    const checked = Boolean((event.currentTarget as HTMLInputElement).checked);
+    instance.dueDateFilter.set(checked);
+    if (checked) {
+      instance.deadlineDate.set(instance.selectedDueDate.get());
+      const dateInt = toDateMillis(instance.selectedDueDate.get());
+      if (dateInt) {
+        reloadPerformance(instance, dateInt);
+      }
+    } else {
+      instance.deadlineDate.set('');
+      reloadPerformance(instance, false);
+    }
+  },
+
+  'click .instructor-reporting-student-link'(event: Event, instance: InstructorReportingInstance) {
+    event.preventDefault();
+    const username = String((event.currentTarget as HTMLElement).dataset.username || '');
+    const navigateToStudentReporting = (globalThis as any).navigateToStudentReporting;
+    try {
+      navigateToStudentReporting(username);
+    } catch (error) {
+      setReportingMessage(instance, errorMessage(error), 'error');
+    }
+  },
+
+  'click .add-exception'(event: Event, instance: InstructorReportingInstance) {
+    event.preventDefault();
+    const userId = String((event.currentTarget as HTMLElement).dataset.userid || '');
+    const dateInt = toDateMillis(instance.exceptionDate.get());
+    if (!dateInt) {
+      setReportingMessage(instance, reportingText('reporting.exceptionDate'), 'warning');
+      return;
+    }
+    const courseId = instance.selectedCourseId.get();
+    const tdfId = instance.selectedTdfId.get();
+    const assignmentId = instance.selectedAssignmentId.get() || undefined;
+    runExceptionCommand(
+      instance,
+      async () => {
+        await meteorCallAsync('addUserDueDateException', userId, tdfId, courseId, dateInt, assignmentId);
+      },
+      reportingText('reporting.exceptionAdded'),
+    );
+  },
+
+  'click .remove-exception'(event: Event, instance: InstructorReportingInstance) {
+    event.preventDefault();
+    const userId = String((event.currentTarget as HTMLElement).dataset.userid || '');
+    const courseId = instance.selectedCourseId.get();
+    const tdfId = instance.selectedTdfId.get();
+    const assignmentId = instance.selectedAssignmentId.get() || undefined;
+    runExceptionCommand(
+      instance,
+      async () => {
+        await meteorCallAsync('removeUserDueDateException', userId, tdfId, courseId, assignmentId);
+      },
+      reportingText('reporting.exceptionRemoved'),
+    );
+  },
+});

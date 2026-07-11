@@ -1,36 +1,12 @@
 <template name="instructorReporting">
-  <style>
-    /* Chrome, Safari, Edge, Opera */
-  input::-webkit-outer-spin-button,
-  input::-webkit-inner-spin-button {
-    -webkit-appearance: none;
-    margin: var(--app-space-0);
-  }
-
-  /* Firefox */
-  input[type=number] {
-    -moz-appearance: textfield;
-  }
-
-  .instructor-reporting-group-row {
-    font-weight: 600;
-    background-color: var(--app-muted-surface-color);
-    color: var(--app-text-color);
-  }
-
-  .instructor-reporting-exception {
-    color: var(--feedback-error-color);
-  }
-  </style>
 {{#if isInRole 'admin, teacher'}}
   <div>
-    <h3 class="page-header-title">{{reportingText 'reporting.instructorReporting'}}</h3>
-
     {{#if reportingMessage}}
-    <div class="admin-status admin-status-{{reportingMessage.level}} admin-message" role="status" aria-live="polite">
-      <i class="fa {{reportingMessage.icon}}" aria-hidden="true"></i>
-      <div class="admin-status-text">{{reportingMessage.text}}</div>
-    </div>
+      {{> adminStatus variant=messageVariant text=reportingMessage.text urgent=false}}
+    {{/if}}
+
+    {{#if loadError}}
+      {{> adminStatus variant="error" text=loadError urgent=true}}
     {{/if}}
 
     <div id="mainContent">
@@ -42,10 +18,11 @@
               <i class="fa fa-users admin-section-icon"></i>
               <h5>{{reportingText 'reporting.classSelection'}}</h5>
             </div>
-            <select id="class-select" class="form-select">
+            <label for="class-select" class="form-label">{{reportingText 'reporting.selectClass'}}</label>
+            <select id="class-select" class="form-select" disabled="{{initialLoading}}">
               <option selected="selected" value="{{INVALID}}" disabled="true">{{reportingText 'reporting.selectClass'}}</option>
               {{#each classes}}
-                <option value="{{this._id}}">{{this.courseName}}</option>
+                <option value="{{this._id}}" {{selectedClassAttrs this._id}}>{{this.courseName}}</option>
               {{/each}}
             </select>
           </div>
@@ -60,14 +37,15 @@
               <i class="fa fa-book admin-section-icon"></i>
               <h5>{{reportingText 'reporting.selectModule'}}</h5>
             </div>
-            <select id="tdf-select" disabled="true" class="form-select">
+            <label for="tdf-select" class="form-label">{{reportingText 'reporting.selectModule'}}</label>
+            <select id="tdf-select" disabled="{{tdfSelectDisabled}}" class="form-select">
               <option selected="selected" value="{{INVALID}}" disabled="true">{{reportingText 'reporting.selectModule'}}</option>
               {{#each curInstructorReportingTdfs}}
-                <option value="{{this.TDFId}}">{{this.displayName}}</option>
+                <option value="{{this.TDFId}}" {{selectedTdfAttrs this.TDFId}}>{{this.displayName}}</option>
               {{/each}}
             </select>
-            {{#if performanceLoading}}
-              <p class="text-muted text-center admin-loading-text">{{reportingText 'reporting.loadingReports'}}</p>
+            {{#if initialLoading}}
+              {{> adminStatus variant="info" text=(reportingText 'reporting.loadingReports')}}
             {{/if}}
           </div>
         </div>
@@ -82,7 +60,8 @@
               <i class="fa fa-calendar admin-section-icon"></i>
               <h5>{{reportingText 'reporting.practiceDeadline'}}</h5>
             </div>
-            <input type="date" id="practice-deadline-date" name="practice-deadline-date-select" disabled="true" class="form-control">
+            <label for="practice-deadline-date" class="form-label">{{reportingText 'reporting.practiceDeadline'}}</label>
+            <input type="date" id="practice-deadline-date" name="practice-deadline-date-select" value="{{deadlineDateValue}}" disabled="{{deadlineDisabled}}" class="form-control">
           </div>
         </div>
       </div>
@@ -98,7 +77,7 @@
             <div class="row g-3">
               <div class="col-12">
                 <div class="form-check">
-                  <input type="checkbox" class="form-check-input" id="due-date-filter" name="due-date-filter-select">
+                  <input type="checkbox" class="form-check-input" id="due-date-filter" name="due-date-filter-select" checked="{{dueDateFilterChecked}}" disabled="{{performanceLoading}}">
                   <label class="form-check-label" for="due-date-filter">
                     {{reportingText 'reporting.enableDueDateFilter'}}
                   </label>
@@ -106,7 +85,7 @@
               </div>
               <div class="col-12">
                 <label for="exception-date" class="form-label">{{reportingText 'reporting.exceptionDate'}}</label>
-                <input type="date" id="exception-date" name="exception-date-select" class="form-control">
+                <input type="date" id="exception-date" name="exception-date-select" value="{{exceptionDateValue}}" class="form-control" disabled="{{exceptionBusy}}">
               </div>
             </div>
           </div>
@@ -122,95 +101,10 @@
               <i class="fa fa-table admin-section-icon"></i>
               <h5>{{reportingText 'reporting.classData'}}</h5>
             </div>
-            <div class="admin-table-wrapper">
-              <div class="table-responsive">
-                <table class="table table-striped table-bordered">
-            <thead>
-              <tr>
-                <th class="table-col-medium">{{reportingText 'reporting.student'}}</th>
-                <th class="table-col-narrow text-center">{{reportingText 'reporting.percentCorrect'}}</th>
-                <th class="table-col-narrow text-center">{{reportingText 'reporting.count'}}</th>
-                <th class="table-col-narrow text-center">{{reportingText 'reporting.totalTimeMin'}}</th>
-                <th class="table-col-small">{{reportingText 'reporting.exceptions'}}</th>
-                <th class="table-col-small">{{reportingText 'reporting.actions'}}</th>
-              </tr>
-            </thead>
-            <tbody>
-          {{#if dueDateFilter}}
-          <tr>
-            <td colspan="6" class="instructor-reporting-group-row">
-              {{reportingText 'reporting.completedBeforeDueDate'}}
-            </td>
-          </tr>
-          {{/if}}
-          {{#if curClassStudentPerformance}}
-            {{#each curClassStudentPerformance}}
-              <tr id="{{this.userId}}">
-                <td><a onclick="navigateToStudentReporting('{{this.username}}')">{{this.username}}</a></td>
-                <td class="text-center">{{this.percentCorrect}}</td>
-                <td class="text-center">{{this.count}}</td>
-                <td class="text-center">{{this.totalTimeMins}}</td>
-                <td>
-                  {{#if this.exception}}
-                    {{this.exception}}
-                  {{/if}}
-                </td>
-                <td>
-                {{#if this.exception}}
-                  <a data-userid="{{this.userId}}" id="remove-exception">{{reportingText 'reporting.removeException'}}</a>
-                {{else}}
-                {{/if}}
-                </td>
-              </tr>
-            {{/each}}
-          {{else}}
-            <tr><td colspan="6">{{reportingText 'reporting.noDataAvailable'}}</td></tr>
-          {{/if}}
-          {{#if dueDateFilter}}
-          <tr>
-            <td colspan="6" class="instructor-reporting-group-row">
-              {{reportingText 'reporting.completedAfterDueDate'}}
-            </td>
-          </tr>
-            {{#if curClassStudentPerformanceAfterFilter}}
-              {{#each curClassStudentPerformanceAfterFilter}}
-              <tr>
-                <td><a onclick="navigateToStudentReporting('{{this.username}}')">{{this.username}}</a></td>
-                <td class="text-center">{{this.percentCorrect}}</td>
-                <td class="text-center">{{this.count}}</td>
-                <td class="text-center">{{this.totalTimeMins}}</td>
-                <td>
-                  {{#if this.exception}}
-                    <span class="instructor-reporting-exception">{{this.exception}}</span>
-                  {{/if}}
-                </td>
-                <td>
-                  {{#if this.exception}}
-                    <a data-userid="{{this.userId}}" id="remove-exception">{{reportingText 'reporting.removeException'}}</a>
-                  {{else}}
-                    <a data-userid="{{this.userId}}" id="add-exception">{{reportingText 'reporting.addException'}}</a>
-                  {{/if}}
-                </td>
-              </tr>
-              {{/each}}
-            {{else}}
-              <tr><td colspan="6">{{reportingText 'reporting.noDataAvailable'}}</td></tr>
+            {{#if performanceLoading}}
+              {{> adminStatus variant="info" text=(reportingText 'reporting.loadingReports')}}
             {{/if}}
-          {{/if}}
-            </tbody>
-          <tfoot id="classReportingTotal">
-            <tr>
-              <td>{{reportingText 'reporting.totals'}}</td>
-              <td class="text-center">{{curClassPerformance.percentCorrect}}</td>
-              <td class="text-center">{{curClassPerformance.count}}</td>
-              <td class="text-center">{{curClassPerformance.totalTimeMins}}</td>
-              <td></td>
-              <td></td>
-            </tr>
-          </tfoot>
-                </table>
-              </div>
-            </div>
+            {{> adminTableShell label=classReportingTableLabel tableTemplate="instructorReportingClassTable" tableData=classReportingTableData}}
           </div>
         </div>
       </div>
@@ -218,4 +112,98 @@
   </div>
 {{/if}}
 
+</template>
+
+<template name="instructorReportingClassTable">
+  <table class="table table-striped table-bordered instructor-reporting-table" aria-busy="{{#if performanceLoading}}true{{else}}false{{/if}}">
+    <thead>
+      <tr>
+        <th scope="col" class="table-col-medium">{{reportingText 'reporting.student'}}</th>
+        <th scope="col" class="table-col-narrow text-center">{{reportingText 'reporting.percentCorrect'}}</th>
+        <th scope="col" class="table-col-narrow text-center">{{reportingText 'reporting.count'}}</th>
+        <th scope="col" class="table-col-narrow text-center">{{reportingText 'reporting.totalTimeMin'}}</th>
+        <th scope="col" class="table-col-small">{{reportingText 'reporting.exceptions'}}</th>
+        <th scope="col" class="table-col-small">{{reportingText 'reporting.actions'}}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#if performanceLoading}}
+        <tr>
+          <td colspan="6" class="text-center text-muted admin-table-status-cell">{{reportingText 'reporting.loadingReports'}}</td>
+        </tr>
+      {{else}}
+        {{#if loadError}}
+          <tr>
+            <td colspan="6" class="text-center text-danger admin-table-status-cell">{{loadError}}</td>
+          </tr>
+        {{else}}
+          {{#if dueDateFilter}}
+          <tr>
+            <th scope="rowgroup" colspan="6" class="instructor-reporting-group-row">
+              {{reportingText 'reporting.completedBeforeDueDate'}}
+            </th>
+          </tr>
+          {{/if}}
+          {{#if hasMetRows}}
+            {{#each metRows}}
+              {{> instructorReportingStudentRow row=this exceptionBusy=../exceptionBusy allowAddException=false}}
+            {{/each}}
+          {{else}}
+            <tr><td colspan="6" class="text-center text-muted admin-table-status-cell">{{reportingText 'reporting.noDataAvailable'}}</td></tr>
+          {{/if}}
+          {{#if dueDateFilter}}
+          <tr>
+            <th scope="rowgroup" colspan="6" class="instructor-reporting-group-row">
+              {{reportingText 'reporting.completedAfterDueDate'}}
+            </th>
+          </tr>
+          {{#if hasNotMetRows}}
+            {{#each notMetRows}}
+              {{> instructorReportingStudentRow row=this exceptionBusy=../exceptionBusy allowAddException=true}}
+            {{/each}}
+          {{else}}
+            <tr><td colspan="6" class="text-center text-muted admin-table-status-cell">{{reportingText 'reporting.noDataAvailable'}}</td></tr>
+          {{/if}}
+          {{/if}}
+        {{/if}}
+      {{/if}}
+    </tbody>
+    <tfoot id="classReportingTotal">
+      <tr>
+        <th scope="row">{{reportingText 'reporting.totals'}}</th>
+        <td class="text-center">{{totals.percentCorrect}}</td>
+        <td class="text-center">{{totals.count}}</td>
+        <td class="text-center">{{totals.totalTimeMins}}</td>
+        <td></td>
+        <td></td>
+      </tr>
+    </tfoot>
+  </table>
+</template>
+
+<template name="instructorReportingStudentRow">
+  <tr id="{{row.userId}}">
+    <th scope="row">
+      <button type="button" class="btn btn-sm btn-link instructor-reporting-student-link" data-username="{{row.username}}">
+        {{row.username}}
+      </button>
+    </th>
+    <td class="text-center">{{row.percentCorrect}}</td>
+    <td class="text-center">{{row.count}}</td>
+    <td class="text-center">{{row.totalTimeMins}}</td>
+    <td>
+      {{#if row.exception}}
+        <span class="instructor-reporting-exception">{{row.exception}}</span>
+      {{/if}}
+    </td>
+    <td>
+      {{#if row.exception}}
+        <button type="button" class="btn btn-sm btn-link remove-exception" data-userid="{{row.userId}}" aria-label="{{exceptionActionLabel 'reporting.removeException' row}}" disabled="{{exceptionBusy}}">{{reportingText 'reporting.removeException'}}</button>
+      {{else}}
+        {{#if allowAddException}}
+          <button type="button" class="btn btn-sm btn-link add-exception" data-userid="{{row.userId}}" aria-label="{{exceptionActionLabel 'reporting.addException' row}}" disabled="{{exceptionBusy}}">{{reportingText 'reporting.addException'}}</button>
+        {{/if}}
+      {{/if}}
+    </td>
+  </tr>
 </template>

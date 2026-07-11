@@ -194,104 +194,7 @@ export { extractDelimFields, rangeVal, shuffle, randomChoice, search, getUserDis
 
 // Track if CSS has been applied this page session (resets on refresh, unlike Session)
 let themeCssAppliedThisSession = false;
-const THEME_CACHE_KEY = 'mofacts.theme.v3';
-const LEGACY_THEME_CACHE_KEYS = ['mofacts.theme.v1', 'mofacts.theme.v2'];
-const LEGACY_THEME_CACHE_PROPERTY_NAMES = [
-  'background_color',
-  'button_color',
-  'primary_button_text_color',
-  'accent_color',
-  'main_button_color',
-  'main_button_text_color',
-  'home_hero_image_url',
-  'home_welcome_html',
-  'home_no_practice_welcome_html',
-  'brand_label',
-  'logo_url',
-  'signInDescription'
-];
-const REQUIRED_THEME_CACHE_PROPERTY_NAMES = [
-  'app_background_color',
-  'app_text_color',
-  'app_page_header_text_color',
-  'app_primary_action_surface_color',
-  'app_primary_action_text_color',
-  'app_accent_color',
-  'app_secondary_surface_color',
-  'app_secondary_text_color',
-  'navigation_surface_color',
-  'navigation_text_color',
-  'learning_card_surface_color',
-  'learning_card_stimulus_surface_color',
-  'learning_card_primary_action_surface_color',
-  'learning_card_primary_action_text_color',
-  'practice_menu_accuracy_bar_fill_color',
-  'practice_menu_accuracy_bar_track_color',
-  'practice_menu_underlay_image_url',
-  'brand_display_label',
-  'brand_logo_url',
-  'auth_sign_in_description',
-  'app_density_scale',
-  'app_button_height',
-  'app_text_input_height'
-];
 const THEME_FONT_STYLESHEET_LINK_ID = 'mofacts-theme-font-stylesheet';
-
-function discardLegacyThemeCache() {
-  for (const key of LEGACY_THEME_CACHE_KEYS) {
-    localStorage.removeItem(key);
-  }
-}
-
-function hasLegacyThemeCacheProperties(themeData: ThemeData) {
-  const properties = themeData.properties;
-  if (!properties || typeof properties !== 'object') {
-    return false;
-  }
-  return LEGACY_THEME_CACHE_PROPERTY_NAMES.some((property) =>
-    Object.prototype.hasOwnProperty.call(properties, property)
-  );
-}
-
-function hasRequiredThemeCacheProperties(themeData: ThemeData) {
-  const properties = themeData.properties;
-  if (!properties || typeof properties !== 'object') {
-    return false;
-  }
-  return REQUIRED_THEME_CACHE_PROPERTY_NAMES.every((property) =>
-    Object.prototype.hasOwnProperty.call(properties, property)
-  );
-}
-
-function cacheTheme(themeData: ThemeData) {
-  try {
-    localStorage.setItem(THEME_CACHE_KEY, JSON.stringify(themeData));
-  } catch (_error) {
-    // Ignore storage failures.
-  }
-}
-
-function loadCachedTheme(): ThemeData | null {
-  try {
-    discardLegacyThemeCache();
-    const raw = localStorage.getItem(THEME_CACHE_KEY);
-    if (!raw) {
-      return null;
-    }
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object') {
-      return null;
-    }
-    const themeData = parsed as ThemeData;
-    if (hasLegacyThemeCacheProperties(themeData) || !hasRequiredThemeCacheProperties(themeData)) {
-      localStorage.removeItem(THEME_CACHE_KEY);
-      return null;
-    }
-    return themeData;
-  } catch (_error) {
-    return null;
-  }
-}
 
 function applyThemeCssVariable(property: string, rawValue: unknown) {
   const propConverted = '--' + property.replace(/_/g, '-');
@@ -329,7 +232,7 @@ function applyThemeFontStylesheet(rawValue: unknown) {
 }
 
 // Helper function to apply theme CSS properties
-function applyThemeCSSProperties(themeData: ThemeData | null | undefined, options: { cache?: boolean } = {}) {
+function applyThemeCSSProperties(themeData: ThemeData | null | undefined) {
   if (!themeData) {
     clientConsole(2, 'applyThemeCSSProperties - no theme data');
     return;
@@ -397,36 +300,19 @@ function applyThemeCSSProperties(themeData: ThemeData | null | undefined, option
   if (themeChanged) {
     clientConsole(2, 'Theme changed, updating Session');
     Session.set('curTheme', themeData);
-    if (options.cache !== false) {
-      cacheTheme(themeData);
-    }
   }
 
   // Mark theme as ready (enables navbar rendering without layout shift)
   Session.set('themeReady', true);
 }
 
-function applyTemporaryStartupTheme() {
-  const temporaryTheme = {
-    ...(defaultTheme as ThemeData),
-    activeThemeId: 'mofacts-startup-temporary',
-    themeName: 'MoFaCTS',
-  };
-  Session.set('startupThemeTemporary', true);
-  applyThemeCSSProperties(temporaryTheme, { cache: false });
-}
-
 // Subscribe to theme and set up reactive autorun
 // This function should be called once on app startup
 function getCurrentTheme() {
   clientConsole(2, 'getCurrentTheme - setting up theme subscription');
-  const cachedTheme = loadCachedTheme();
-  const savedThemeIdAtStartup = getSavedUserThemeId();
-  if (cachedTheme && !savedThemeIdAtStartup) {
-    applyThemeCSSProperties(cachedTheme);
-  } else {
-    applyTemporaryStartupTheme();
-  }
+  // Never paint a cached or temporary theme: either can be stale. The layout
+  // remains non-visible until this subscription supplies the authoritative one.
+  Session.set('themeReady', false);
 
   // Subscribe to theme publication and track when ready
   const themeSubscription = Meteor.subscribe('theme');
@@ -475,8 +361,7 @@ function getCurrentTheme() {
         clientConsole(1, `[ThemeToggle] Saved theme "${savedThemeId}" is no longer configured.`);
       } else {
         Session.set('userThemeOverrideActive', true);
-        Session.set('startupThemeTemporary', false);
-        applyThemeCSSProperties(serializeThemeSelection(selectedTheme), { cache: false });
+        applyThemeCSSProperties(serializeThemeSelection(selectedTheme));
         return;
       }
     }
@@ -486,7 +371,6 @@ function getCurrentTheme() {
       return;
     }
 
-    Session.set('startupThemeTemporary', false);
     applyThemeCSSProperties(themeData);
   });
 }

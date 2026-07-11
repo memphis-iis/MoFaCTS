@@ -3,8 +3,6 @@
 <template name="userAdmin">
 {{#if isInRole 'admin'}}
     <div>
-        <h3 class="page-header-title">{{userAdminText 'admin.userAdmin'}}</h3>
-
         {{#if adminMessage}}
         <div class="admin-status admin-status-{{adminMessageClass}} admin-message" role="status" aria-live="polite">
             <i class="fa {{adminMessageIcon}}" aria-hidden="true"></i>
@@ -30,13 +28,13 @@
                             <div class="admin-api-key-fields">
                                 <div>
                                     <label for="adminOpenRouterKey" class="form-label">{{userAdminText 'profile.openRouterApiKey'}}</label>
-                                    <input id="adminOpenRouterKey" type="password" class="form-control" autocomplete="new-password" placeholder="{{openRouterKeyPlaceholder}}">
-                                    <small class="text-muted d-block admin-form-row-top">{{openRouterKeyStatus}}</small>
+                                    <input id="adminOpenRouterKey" type="password" class="form-control" autocomplete="new-password" placeholder="{{openRouterKeyPlaceholder}}" aria-describedby="adminOpenRouterKeyStatus">
+                                    <small id="adminOpenRouterKeyStatus" class="text-muted d-block admin-form-row-top">{{openRouterKeyStatus}}</small>
                                 </div>
                                 <div>
                                     <label for="adminOpenRouterModel" class="form-label">{{userAdminText 'profile.openRouterModel'}}</label>
-                                    <input id="adminOpenRouterModel" type="text" class="form-control" maxlength="160" value="{{adminOpenRouterModel}}" placeholder="provider/model">
-                                    <small class="text-muted d-block admin-form-row-top">{{openRouterModelStatus}}</small>
+                                    <input id="adminOpenRouterModel" type="text" class="form-control" maxlength="160" value="{{adminOpenRouterModel}}" placeholder="provider/model" aria-describedby="adminOpenRouterModelStatus">
+                                    <small id="adminOpenRouterModelStatus" class="text-muted d-block admin-form-row-top">{{openRouterModelStatus}}</small>
                                 </div>
                             </div>
                             <div class="admin-api-key-actions">
@@ -52,8 +50,8 @@
                             <div class="admin-api-key-fields">
                                 <div>
                                     <label for="adminGoogleTtsKey" class="form-label">{{userAdminText 'admin.googleTtsKey'}}</label>
-                                    <input id="adminGoogleTtsKey" type="password" class="form-control" autocomplete="new-password" placeholder="{{googleTtsKeyPlaceholder}}">
-                                    <small class="text-muted d-block admin-form-row-top">{{googleTtsKeyStatus}}</small>
+                                    <input id="adminGoogleTtsKey" type="password" class="form-control" autocomplete="new-password" placeholder="{{googleTtsKeyPlaceholder}}" aria-describedby="adminGoogleTtsKeyStatus">
+                                    <small id="adminGoogleTtsKeyStatus" class="text-muted d-block admin-form-row-top">{{googleTtsKeyStatus}}</small>
                                 </div>
                             </div>
                             <div class="admin-api-key-actions">
@@ -69,8 +67,8 @@
                             <div class="admin-api-key-fields">
                                 <div>
                                     <label for="adminGoogleSpeechKey" class="form-label">{{userAdminText 'admin.googleSrKey'}}</label>
-                                    <input id="adminGoogleSpeechKey" type="password" class="form-control" autocomplete="new-password" placeholder="{{googleSpeechKeyPlaceholder}}">
-                                    <small class="text-muted d-block admin-form-row-top">{{googleSpeechKeyStatus}}</small>
+                                    <input id="adminGoogleSpeechKey" type="password" class="form-control" autocomplete="new-password" placeholder="{{googleSpeechKeyPlaceholder}}" aria-describedby="adminGoogleSpeechKeyStatus">
+                                    <small id="adminGoogleSpeechKeyStatus" class="text-muted d-block admin-form-row-top">{{googleSpeechKeyStatus}}</small>
                                 </div>
                             </div>
                             <div class="admin-api-key-actions">
@@ -136,92 +134,7 @@
                         <div class="admin-status-text">{{newsEmailMessage}}</div>
                     </div>
                     {{/if}}
-                    <div class="admin-table-wrapper">
-                        <div class="table-responsive">
-                            <table class="table table-striped table-bordered user-admin-table">
-                                <thead>
-                                    <tr>
-                                        <th class="table-col-medium sortable-useradmin" data-sortfield="identifier"><span class="user-admin-header-label">{{userAdminText 'admin.emailId'}} {{sortIndicator 'identifier'}}</span></th>
-                                        <th class="table-col-medium sortable-useradmin" data-sortfield="totalTrials"><span class="user-admin-header-label">{{userAdminText 'admin.totalTrials'}} {{sortIndicator 'totalTrials'}}</span></th>
-                                        <th class="table-col-medium sortable-useradmin" data-sortfield="weightedAccuracy"><span class="user-admin-header-label">{{userAdminText 'admin.accuracy'}} {{sortIndicator 'weightedAccuracy'}}</span></th>
-                                        <th class="table-col-medium sortable-useradmin" data-sortfield="totalTimeMinutes"><span class="user-admin-header-label">{{userAdminText 'admin.totalTime'}} {{sortIndicator 'totalTimeMinutes'}}</span></th>
-                                        <th class="table-col-medium sortable-useradmin" data-sortfield="averageSessionDays"><span class="user-admin-header-label">{{userAdminText 'admin.avgSessionDays'}} {{sortIndicator 'averageSessionDays'}}</span></th>
-                                        <th class="table-col-medium sortable-useradmin" data-sortfield="averageItemsPracticed"><span class="user-admin-header-label">{{userAdminText 'admin.avgItems'}} {{sortIndicator 'averageItemsPracticed'}}</span></th>
-                                        <th class="table-col-medium sortable-useradmin" data-sortfield="lastActivityDate"><span class="user-admin-header-label">{{userAdminText 'admin.lastActivity'}} {{sortIndicator 'lastActivityDate'}}</span></th>
-                                        <th class="table-col-medium sortable-useradmin" data-sortfield="cacheUpdated"><span class="user-admin-header-label">{{userAdminText 'admin.cacheUpdated'}} {{sortIndicator 'cacheUpdated'}}</span></th>
-                                        <th class="table-col-large"><span class="user-admin-header-label">{{userAdminText 'admin.roles'}}</span></th>
-                                        {{#if canManageUsers}}
-                                        <th class="table-col-medium"><span class="user-admin-header-label">{{userAdminText 'admin.actions'}}</span></th>
-                                        {{/if}}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                {{#each userRoleEditList}}
-                                <tr>
-                                    <td>{{displayIdentifier}}</td>
-                                    <td class="{{usageCellClass}}">{{totalTrialsDisplay}}</td>
-                                    <td class="{{usageCellClass}}">{{accuracyDisplay}}</td>
-                                    <td class="{{usageCellClass}}">{{totalTimeDisplay}}</td>
-                                    <td class="{{usageCellClass}}">{{averageSessionDaysDisplay}}</td>
-                                    <td class="{{usageCellClass}}">{{averageItemsPracticedDisplay}}</td>
-                                    <td class="{{usageCellClass}}">{{lastActivityDisplay}}</td>
-                                    <td class="{{usageCellClass}}">{{cacheUpdatedDisplay}}</td>
-
-                                    <td>
-                                        <div class="btn-group" role="group" aria-label="{{userAdminText 'admin.roleToggles'}}">
-                                            <button
-                                                type="button"
-                                                class="btn btn-sm {{#if admin}}btn-success{{else}}btn-outline-secondary{{/if}} btn-user-change"
-                                                data-userid="{{_id}}"
-                                                data-rolename="admin"
-                                                data-roleaction="{{#if admin}}remove{{else}}add{{/if}}"
-                                            >
-                                                <i class="fa {{#if admin}}fa-check{{else}}fa-minus{{/if}}"></i>
-                                                {{userAdminText 'admin.adminRole'}}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                class="btn btn-sm {{#if teacher}}btn-success{{else}}btn-outline-secondary{{/if}} btn-user-change"
-                                                data-userid="{{_id}}"
-                                                data-rolename="teacher"
-                                                data-roleaction="{{#if teacher}}remove{{else}}add{{/if}}"
-                                            >
-                                                <i class="fa {{#if teacher}}fa-check{{else}}fa-minus{{/if}}"></i>
-                                                {{userAdminText 'admin.teacherRole'}}
-                                            </button>
-                                        </div>
-                                    </td>
-                                    {{#if canManageUsers}}
-                                    <td>
-                                        <button
-                                            type="button"
-                                            class="btn btn-sm btn-outline-danger btn-user-delete"
-                                            data-userid="{{_id}}"
-                                            data-displayidentifier="{{displayIdentifier}}"
-                                        >
-                                            <i class="fa fa-trash"></i>
-                                            {{userAdminText 'admin.delete'}}
-                                        </button>
-                                        {{#if deleteUserConfirmationOpen _id}}
-                                        <div class="admin-inline-confirmation admin-form-row-top" role="alert">
-                                            <div class="admin-inline-confirmation-title">{{userAdminText 'admin.deleteUser'}}</div>
-                                            <div class="admin-inline-confirmation-message">
-                                                {{deleteUserMessageText displayIdentifier}}
-                                            </div>
-                                            <div class="admin-inline-confirmation-actions">
-                                                <button type="button" class="btn btn-danger btn-sm btn-user-delete-confirm" data-userid="{{_id}}">{{userAdminText 'admin.deleteUser'}}</button>
-                                                <button type="button" class="btn btn-outline-secondary btn-sm btn-user-delete-cancel">{{userAdminText 'content.cancel'}}</button>
-                                            </div>
-                                        </div>
-                                        {{/if}}
-                                    </td>
-                                    {{/if}}
-                                </tr>
-                                {{/each}}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+                    {{> adminTableShell label=userAdminTableLabel tableTemplate="userAdminTable" tableData=userAdminTableData}}
                     </div>
                 </div>
             </div>
@@ -238,8 +151,9 @@
                     <p class="text-muted small admin-form-row">{{userAdminText 'admin.importUserFileDescription'}}</p>
                     <div class="row g-3">
                         <div class="col-12">
-                            <input type="file" class="form-control" name="upload-users" id="upload-users" value="" placeholder="{{userAdminText 'admin.usersFile'}}">
-                            <span class='label label-info file-info admin-form-row-top d-block text-muted small' id="users-file-info"></span>
+                            <label for="upload-users" class="form-label">{{userAdminText 'admin.usersFile'}}</label>
+                            <input type="file" class="form-control" name="upload-users" id="upload-users" value="" aria-describedby="users-file-info">
+                            <span class='label label-info file-info admin-form-row-top d-block text-muted small' id="users-file-info" role="status" aria-live="polite"></span>
                         </div>
                         <div class="col-md-6 text-center">
                             <button type='button' id='doUploadUsers' class='btn btn-primary'>
@@ -253,11 +167,116 @@
     </div>
 {{else}}
     <div>
-        <h3 class="page-header-title">{{userAdminText 'admin.userAdmin'}}</h3>
         <div class="admin-status admin-status-warning admin-denied-alert" role="alert">
             <i class="fa fa-exclamation-triangle" aria-hidden="true"></i>
             <div class="admin-status-text"><strong>{{userAdminText 'admin.accessDenied'}}</strong> {{userAdminText 'admin.accessDeniedMessage'}}</div>
         </div>
     </div>
 {{/if}}
+</template>
+
+<template name="userAdminTable">
+    <table class="table table-striped table-bordered user-admin-table" aria-busy="{{#if isLoading}}true{{else}}false{{/if}}">
+        <thead>
+            <tr>
+                {{> userAdminSortableHeader field="identifier" label=(userAdminText 'admin.emailId') sortField=sortField sortDirection=sortDirection}}
+                {{> userAdminSortableHeader field="totalTrials" label=(userAdminText 'admin.totalTrials') sortField=sortField sortDirection=sortDirection}}
+                {{> userAdminSortableHeader field="weightedAccuracy" label=(userAdminText 'admin.accuracy') sortField=sortField sortDirection=sortDirection}}
+                {{> userAdminSortableHeader field="totalTimeMinutes" label=(userAdminText 'admin.totalTime') sortField=sortField sortDirection=sortDirection}}
+                {{> userAdminSortableHeader field="averageSessionDays" label=(userAdminText 'admin.avgSessionDays') sortField=sortField sortDirection=sortDirection}}
+                {{> userAdminSortableHeader field="averageItemsPracticed" label=(userAdminText 'admin.avgItems') sortField=sortField sortDirection=sortDirection}}
+                {{> userAdminSortableHeader field="lastActivityDate" label=(userAdminText 'admin.lastActivity') sortField=sortField sortDirection=sortDirection}}
+                {{> userAdminSortableHeader field="cacheUpdated" label=(userAdminText 'admin.cacheUpdated') sortField=sortField sortDirection=sortDirection}}
+                <th scope="col" class="table-col-large"><span class="user-admin-header-label">{{userAdminText 'admin.roles'}}</span></th>
+                {{#if canManageUsers}}
+                <th scope="col" class="table-col-medium"><span class="user-admin-header-label">{{userAdminText 'admin.actions'}}</span></th>
+                {{/if}}
+            </tr>
+        </thead>
+        <tbody>
+        {{#if isLoading}}
+            <tr>
+                <td colspan="{{userAdminTableColumnCount canManageUsers}}" class="text-center text-muted admin-table-status-cell">{{userAdminText 'common.loading'}}</td>
+            </tr>
+        {{else}}
+            {{#each rows}}
+            <tr>
+                <th scope="row">{{displayIdentifier}}</th>
+                <td class="{{usageCellClass}}">{{totalTrialsDisplay}}</td>
+                <td class="{{usageCellClass}}">{{accuracyDisplay}}</td>
+                <td class="{{usageCellClass}}">{{totalTimeDisplay}}</td>
+                <td class="{{usageCellClass}}">{{averageSessionDaysDisplay}}</td>
+                <td class="{{usageCellClass}}">{{averageItemsPracticedDisplay}}</td>
+                <td class="{{usageCellClass}}">{{lastActivityDisplay}}</td>
+                <td class="{{usageCellClass}}">{{cacheUpdatedDisplay}}</td>
+                <td>
+                    <div class="btn-group" role="group" aria-label="{{roleTogglesLabel this}}">
+                        <button
+                            type="button"
+                            class="btn btn-sm {{#if admin}}btn-success{{else}}btn-outline-secondary{{/if}} btn-user-change"
+                            data-userid="{{_id}}"
+                            data-rolename="admin"
+                            data-roleaction="{{#if admin}}remove{{else}}add{{/if}}"
+                            aria-label="{{roleToggleLabel 'admin.adminRole' this}}"
+                        >
+                            <i class="fa {{#if admin}}fa-check{{else}}fa-minus{{/if}}" aria-hidden="true"></i>
+                            {{userAdminText 'admin.adminRole'}}
+                        </button>
+                        <button
+                            type="button"
+                            class="btn btn-sm {{#if teacher}}btn-success{{else}}btn-outline-secondary{{/if}} btn-user-change"
+                            data-userid="{{_id}}"
+                            data-rolename="teacher"
+                            data-roleaction="{{#if teacher}}remove{{else}}add{{/if}}"
+                            aria-label="{{roleToggleLabel 'admin.teacherRole' this}}"
+                        >
+                            <i class="fa {{#if teacher}}fa-check{{else}}fa-minus{{/if}}" aria-hidden="true"></i>
+                            {{userAdminText 'admin.teacherRole'}}
+                        </button>
+                    </div>
+                </td>
+                {{#if ../canManageUsers}}
+                <td>
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-outline-danger btn-user-delete"
+                        data-userid="{{_id}}"
+                        data-displayidentifier="{{displayIdentifier}}"
+                        aria-label="{{deleteUserActionLabel this}}"
+                    >
+                        <i class="fa fa-trash" aria-hidden="true"></i>
+                        {{userAdminText 'admin.delete'}}
+                    </button>
+                    {{#if deleteUserConfirmationOpen _id}}
+                    <div class="admin-inline-confirmation admin-form-row-top" role="alert">
+                        <div class="admin-inline-confirmation-title">{{userAdminText 'admin.deleteUser'}}</div>
+                        <div class="admin-inline-confirmation-message">
+                            {{deleteUserMessageText displayIdentifier}}
+                        </div>
+                        <div class="admin-inline-confirmation-actions">
+                            <button type="button" class="btn btn-danger btn-sm btn-user-delete-confirm" data-userid="{{_id}}" aria-label="{{deleteUserActionLabel this}}">{{userAdminText 'admin.deleteUser'}}</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm btn-user-delete-cancel">{{userAdminText 'content.cancel'}}</button>
+                        </div>
+                    </div>
+                    {{/if}}
+                </td>
+                {{/if}}
+            </tr>
+            {{else}}
+            <tr>
+                <td colspan="{{userAdminTableColumnCount canManageUsers}}" class="text-center text-muted admin-table-status-cell">{{userAdminText 'reporting.noDataAvailable'}}</td>
+            </tr>
+            {{/each}}
+        {{/if}}
+        </tbody>
+    </table>
+</template>
+
+<template name="userAdminSortableHeader">
+    <th scope="col" class="table-col-medium" aria-sort="{{sortAria field}}">
+        <button type="button" class="btn btn-link btn-sm user-admin-sort-button" data-sortfield="{{field}}">
+            <span class="user-admin-header-label">{{label}}</span>
+            <span aria-hidden="true">{{sortIndicator field}}</span>
+        </button>
+    </th>
 </template>

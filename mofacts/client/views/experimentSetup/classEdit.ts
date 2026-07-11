@@ -1,69 +1,71 @@
 import { Meteor } from 'meteor/meteor';
 import { Template } from 'meteor/templating';
-import { Session } from 'meteor/session';
+import { ReactiveVar } from 'meteor/reactive-var';
 import './classEdit.html';
+import './classEdit.css';
+import '../shared/adminUi/adminUi';
 import { meteorCallAsync } from '../..';
 import { curSemester } from '../../../common/Definitions';
 import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 import { translatePlatformString } from '../../lib/interfaceI18n';
 import { getErrorMessage } from '../../lib/errorUtils';
-import $ from 'jquery';
+import {
+  rejectLoad,
+  resolveLoad,
+  startLoad,
+  type LoadableState,
+} from '../../lib/adminUi/loadableState';
+import { createTemplateLifetime, type TemplateLifetime } from '../../lib/adminUi/templateLifetime';
+import {
+  createAsyncCommandController,
+  type AsyncCommandController,
+  type AsyncCommandState,
+} from '../../lib/adminUi/asyncCommandState';
+import {
+  buildCourseManagementData,
+  coursePayloadFromDraft,
+  defaultCourseDraft,
+  normalizeSectionNames,
+  sectionNamesText,
+  toDatetimeLocalValue,
+  type CourseManagementData,
+  type CourseSection,
+  type CourseVisibility,
+  type EditableCourse,
+} from './classEditState';
 
-Session.set('classes', []);
-Session.set('sectionsByInstructorId', []);
-Session.set('classEditLoading', true);
+type ClassEditMessage = Readonly<{
+  level: 'info' | 'success' | 'warning' | 'error';
+  text: string;
+}>;
 
-let isNewClass = true;
-
-function courseText(key: Parameters<typeof translatePlatformString>[1], values?: Parameters<typeof translatePlatformString>[2]): string {
-  return translatePlatformString(getActiveUiLocale(), key, values);
-}
-
-function setClassEditMessage(level: string, text: string) {
-  Session.set('classEditMessage', {
-    level,
-    text,
-    icon: level === 'success' ? 'fa-check-circle' : level === 'warning' ? 'fa-exclamation-triangle' : level === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'
-  });
-}
-
-function clearClassEditMessage() {
-  Session.set('classEditMessage', null);
-}
-
-function clearClassEditConfirmation() {
-  Session.set('classEditConfirmation', null);
-}
-
-interface EditableClass {
-  courseId: string | undefined;
-  courseName: string;
-  teacherUserId: string | null;
-  semester: string;
-  beginDate: Date | string | null;
-  endDate: Date | string | null;
-  timezone: string;
-  visibility: 'private' | 'public';
-  sections: string[];
-}
-
-type CourseSection = {
-  _id?: string;
+type ClassEditConfirmation = Readonly<{
   courseId: string;
-  courseName: string;
-  teacherUserId?: string;
-  teacheruserid?: string;
-  semester?: string;
-  beginDate?: Date | string | null;
-  endDate?: Date | string | null;
-  timezone?: string;
-  visibility?: 'private' | 'public';
-  sectionId?: string;
-  sectionName?: string;
-  sections?: string[];
+  title: string;
+  message: string;
+}>;
+
+type TimezoneOption = Readonly<{
+  value: string;
+  label?: string;
+  labelKey?: Parameters<typeof translatePlatformString>[1];
+}>;
+
+type ClassEditInstance = Blaze.TemplateInstance & {
+  coursesPresentation: ReactiveVar<LoadableState<CourseManagementData>>;
+  saveCommandState: ReactiveVar<AsyncCommandState<string>>;
+  deleteCommandState: ReactiveVar<AsyncCommandState<void>>;
+  saveCommand: AsyncCommandController<string>;
+  deleteCommand: AsyncCommandController<void>;
+  lifetime: TemplateLifetime;
+  nextRequestId: number;
+  selectedCourseId: ReactiveVar<string>;
+  draftCourse: ReactiveVar<EditableCourse>;
+  message: ReactiveVar<ClassEditMessage | null>;
+  confirmation: ReactiveVar<ClassEditConfirmation | null>;
 };
 
-const COURSE_TIMEZONE_OPTIONS = [
+const COURSE_TIMEZONE_OPTIONS: TimezoneOption[] = [
   { value: 'America/New_York', labelKey: 'courseManagement.easternTime' },
   { value: 'America/Chicago', labelKey: 'courseManagement.centralTime' },
   { value: 'America/Denver', labelKey: 'courseManagement.mountainTime' },
@@ -74,45 +76,8 @@ const COURSE_TIMEZONE_OPTIONS = [
   { value: 'UTC', label: 'UTC' },
 ];
 
-let curClass: EditableClass = {
-  courseId: undefined,
-  courseName: '',
-  teacherUserId: Meteor.userId(),
-  semester: curSemester,
-  beginDate: null,
-  endDate: null,
-  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || '',
-  visibility: 'private',
-  sections: [],
-};
-
-function toDatetimeLocalValue(value: unknown, timezone?: string): string {
-  if (!value) return '';
-  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) {
-    return value;
-  }
-  const date = new Date(value as string | number | Date);
-  if (!Number.isFinite(date.getTime())) return '';
-  const pad = (num: number) => String(num).padStart(2, '0');
-  if (timezone) {
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: timezone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hourCycle: 'h23',
-    }).formatToParts(date);
-    const partValue = (type: string) => parts.find((part) => part.type === type)?.value || '';
-    return `${partValue('year')}-${partValue('month')}-${partValue('day')}T${partValue('hour')}:${partValue('minute')}`;
-  }
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
-function readOptionalDateInput(selector: string): string | null {
-  const value = String($(selector).val() || '').trim();
-  return value || null;
+function courseText(key: Parameters<typeof translatePlatformString>[1], values?: Parameters<typeof translatePlatformString>[2]): string {
+  return translatePlatformString(getActiveUiLocale(), key, values);
 }
 
 function defaultTimezone(): string {
@@ -121,146 +86,272 @@ function defaultTimezone(): string {
 
 function timezoneLabel(timezone: string): string {
   const knownOption = COURSE_TIMEZONE_OPTIONS.find((option) => option.value === timezone);
-  if (knownOption) return knownOption.label || courseText(knownOption.labelKey as Parameters<typeof translatePlatformString>[1]);
+  if (knownOption) {
+    return knownOption.label || courseText(knownOption.labelKey!);
+  }
   return timezone.replace(/_/g, ' ');
 }
 
-function ensureTimezoneOption(timezone: string) {
-  if (!timezone || $(`#courseTimezone option[value="${timezone}"]`).length > 0) {
+function readyLoadValue<T>(state: LoadableState<T>): T | null {
+  return state.status === 'ready' || state.status === 'empty' || state.status === 'refreshing' || state.status === 'refresh-error'
+    ? state.value
+    : null;
+}
+
+function loadPending<T>(state: LoadableState<T>): boolean {
+  return state.status === 'idle' || state.status === 'loading' || state.status === 'refreshing';
+}
+
+function loadErrorMessage<T>(state: LoadableState<T>): string {
+  return state.status === 'error' || state.status === 'refresh-error' ? state.message : '';
+}
+
+function emptyCourseManagementData(): CourseManagementData {
+  return {
+    courses: [],
+    sectionLinks: [],
+  };
+}
+
+function getCourseManagementData(instance: ClassEditInstance): CourseManagementData {
+  return readyLoadValue(instance.coursesPresentation.get()) || emptyCourseManagementData();
+}
+
+function newCourseDraft(): EditableCourse {
+  return defaultCourseDraft(Meteor.userId(), defaultTimezone());
+}
+
+function setClassEditMessage(
+  instance: ClassEditInstance,
+  level: ClassEditMessage['level'],
+  text: string,
+): void {
+  instance.message.set({ level, text });
+}
+
+function clearClassEditFeedback(instance: ClassEditInstance): void {
+  instance.message.set(null);
+  instance.confirmation.set(null);
+}
+
+function selectNoCourse(instance: ClassEditInstance, options: { preserveFeedback?: boolean } = {}): void {
+  if (!options.preserveFeedback) {
+    clearClassEditFeedback(instance);
+  }
+  instance.selectedCourseId.set('');
+  instance.draftCourse.set(newCourseDraft());
+}
+
+function selectCourse(instance: ClassEditInstance, courseId: string, options: { preserveFeedback?: boolean } = {}): void {
+  if (!options.preserveFeedback) {
+    clearClassEditFeedback(instance);
+  }
+  const foundCourse = getCourseManagementData(instance).courses.find((course) => course.courseId === courseId);
+  if (!foundCourse) {
+    selectNoCourse(instance, options);
     return;
   }
-  $('#courseTimezone').append($('<option>', { value: timezone, text: timezoneLabel(timezone) }));
+  instance.selectedCourseId.set(courseId);
+  instance.draftCourse.set({ ...foundCourse, sections: [...foundCourse.sections] });
 }
 
-function setTimezoneSelection(timezone: string) {
-  ensureTimezoneOption(timezone);
-  $('#courseTimezone').val(timezone);
+function updateDraft(instance: ClassEditInstance, patch: Partial<EditableCourse>): void {
+  instance.draftCourse.set({
+    ...instance.draftCourse.get(),
+    ...patch,
+  });
 }
 
-function classSelectedSetup(courseId: string) {
-  $('#class-select').children('[value="' + courseId + '"]').prop('selected', true);
-  const classes = (Session.get('classes') || []) as EditableClass[];
-  const foundClass = classes.find((c) => c.courseId === courseId);
-  if (!foundClass) {
+function currentCoursePayload(instance: ClassEditInstance): EditableCourse {
+  const draft = coursePayloadFromDraft(instance.draftCourse.get());
+  return {
+    ...draft,
+    courseId: instance.selectedCourseId.get() || draft.courseId,
+    teacherUserId: draft.teacherUserId || Meteor.userId(),
+    semester: draft.semester || curSemester,
+  };
+}
+
+function loadCourseManagementData(
+  instance: ClassEditInstance,
+  selectedCourseId?: string,
+  options: { preserveFeedback?: boolean } = {},
+): void {
+  const requestId = ++instance.nextRequestId;
+  const generation = instance.lifetime.begin();
+  instance.coursesPresentation.set(startLoad(instance.coursesPresentation.get(), requestId));
+
+  meteorCallAsync('getAllCourseSections')
+    .then((allCourseSections) => {
+      if (!instance.lifetime.isCurrent(generation)) return;
+      const value = buildCourseManagementData(
+        Array.isArray(allCourseSections) ? allCourseSections as CourseSection[] : [],
+        Meteor.userId(),
+        defaultTimezone(),
+      );
+      instance.coursesPresentation.set(resolveLoad(
+        instance.coursesPresentation.get(),
+        requestId,
+        value,
+        (data) => data.courses.length === 0 && data.sectionLinks.length === 0,
+      ));
+      const nextCourseId = selectedCourseId || instance.selectedCourseId.get();
+      if (nextCourseId && value.courses.some((course) => course.courseId === nextCourseId)) {
+        selectCourse(instance, nextCourseId, options);
+      } else {
+        selectNoCourse(instance, options);
+      }
+    })
+    .catch((error) => {
+      if (!instance.lifetime.isCurrent(generation)) return;
+      const message = getErrorMessage(error);
+      instance.coursesPresentation.set(rejectLoad(
+        instance.coursesPresentation.get(),
+        requestId,
+        { message, retryable: true },
+      ));
+      setClassEditMessage(instance, 'error', message);
+    });
+}
+
+function runSaveCourse(instance: ClassEditInstance): void {
+  clearClassEditFeedback(instance);
+  const payload = currentCoursePayload(instance);
+  if (!payload.courseName) {
+    setClassEditMessage(instance, 'warning', courseText('courseManagement.courseCannotBeBlank'));
     return;
   }
-  $('#newClassName').val(foundClass.courseName);
-  $('#sectionNames').val(foundClass.sections.map((x: string) => x + '\n').join(''));
-  const courseTimezone = foundClass.timezone || defaultTimezone();
-  $('#courseVisibility').val(foundClass.visibility || 'private');
-  $('#courseBeginDate').val(toDatetimeLocalValue(foundClass.beginDate, courseTimezone));
-  $('#courseEndDate').val(toDatetimeLocalValue(foundClass.endDate, courseTimezone));
-  setTimezoneSelection(courseTimezone);
-  clearClassEditMessage();
-  clearClassEditConfirmation();
-  Session.set('classEditMode', 'edit');
-  isNewClass = false;
-}
-
-function noClassSelectedSetup() {
-  $('#newClassName').val('');
-  $('#sectionNames').val('');
-  $('#courseVisibility').val('private');
-  $('#courseBeginDate').val('');
-  $('#courseEndDate').val('');
-  setTimezoneSelection(defaultTimezone());
-  clearClassEditMessage();
-  clearClassEditConfirmation();
-  Session.set('classEditMode', 'new');
-  isNewClass = true;
-}
-
-function readSectionNames(): string[] {
-  return String($('#sectionNames').val() || '')
-    .split(/\r?\n/)
-    .map((sectionName) => sectionName.trim())
-    .filter(Boolean);
-}
-
-async function loadCourseManagementData() {
-  const allCourseSections = (await meteorCallAsync('getAllCourseSections')) as CourseSection[];
-
-  const classes: Record<string, CourseSection & { sections: string[] }> = {};
-  const sectionsByInstructorId: Array<{ sectionId: string; courseName: string; sectionName: string; teacherUserId: string }> = [];
-
-  for (const courseSection of allCourseSections) {
-    if (courseSection.teacherUserId != Meteor.userId()) continue;
-    if (!classes[courseSection.courseId]) {
-      classes[courseSection.courseId] = {
-        courseId: courseSection.courseId,
-        courseName: courseSection.courseName,
-        teacherUserId: courseSection.teacherUserId,
-        semester: courseSection.semester || curSemester,
-        beginDate: courseSection.beginDate || null,
-        endDate: courseSection.endDate || null,
-        timezone: courseSection.timezone || defaultTimezone(),
-        visibility: courseSection.visibility === 'public' ? 'public' : 'private',
-        sections: [],
-      };
-    }
-    const sectionId = String(courseSection.sectionId || '');
-    const sectionName = String(courseSection.sectionName || '');
-    if (sectionId && sectionName) {
-      classes[courseSection.courseId]!.sections.push(sectionName);
-      sectionsByInstructorId.push({
-        sectionId,
-        courseName: courseSection.courseName,
-        sectionName,
-        teacherUserId: String(courseSection.teacherUserId || '')
-      });
-    }
+  if (!payload.timezone) {
+    setClassEditMessage(instance, 'warning', courseText('courseManagement.chooseTimezone'));
+    return;
   }
 
-  Session.set('classes', Object.values(classes));
-  Session.set('sectionsByInstructorId', sectionsByInstructorId);
+  const isNewCourse = !instance.selectedCourseId.get();
+  void instance.saveCommand.run(async () => {
+    const result = await meteorCallAsync(isNewCourse ? 'addCourse' : 'editCourse', payload);
+    return String(result || payload.courseId || '');
+  }, {
+    getErrorMessage,
+    onSuccess: (courseId) => {
+      setClassEditMessage(instance, 'success', courseText('courseManagement.courseSaved'));
+      loadCourseManagementData(instance, courseId, { preserveFeedback: true });
+    },
+    onFailure: (error) => {
+      setClassEditMessage(instance, 'error', courseText('courseManagement.errorSavingCourse', { error: getErrorMessage(error) }));
+    },
+  });
 }
 
-Template.classEdit.onCreated(function() {
-  Session.set('classes', []);
-  Session.set('sectionsByInstructorId', []);
-  Session.set('classEditLoading', true);
-  Session.set('classEditMessage', null);
-  Session.set('classEditConfirmation', null);
+function runDeleteCourse(instance: ClassEditInstance, courseId: string): void {
+  instance.confirmation.set(null);
+  void instance.deleteCommand.run(async () => {
+    await meteorCallAsync('deleteCourse', courseId);
+  }, {
+    getErrorMessage,
+    onSuccess: () => {
+      setClassEditMessage(instance, 'success', courseText('courseManagement.courseDeleted'));
+      instance.selectedCourseId.set('');
+      instance.draftCourse.set(newCourseDraft());
+      loadCourseManagementData(instance, undefined, { preserveFeedback: true });
+    },
+    onFailure: (error) => {
+      setClassEditMessage(instance, 'error', courseText('courseManagement.errorDeletingCourse', { error: getErrorMessage(error) }));
+    },
+  });
+}
+
+Template.classEdit.onCreated(function(this: ClassEditInstance) {
+  this.coursesPresentation = new ReactiveVar<LoadableState<CourseManagementData>>({ status: 'idle' });
+  this.saveCommandState = new ReactiveVar<AsyncCommandState<string>>({ status: 'idle' });
+  this.deleteCommandState = new ReactiveVar<AsyncCommandState<void>>({ status: 'idle' });
+  this.saveCommand = createAsyncCommandController((state) => this.saveCommandState.set(state));
+  this.deleteCommand = createAsyncCommandController((state) => this.deleteCommandState.set(state));
+  this.lifetime = createTemplateLifetime();
+  this.nextRequestId = 0;
+  this.selectedCourseId = new ReactiveVar('');
+  this.draftCourse = new ReactiveVar<EditableCourse>(newCourseDraft());
+  this.message = new ReactiveVar<ClassEditMessage | null>(null);
+  this.confirmation = new ReactiveVar<ClassEditConfirmation | null>(null);
+  loadCourseManagementData(this);
 });
 
-Template.classEdit.onRendered(async function () {
-  try {
-    await loadCourseManagementData();
-    noClassSelectedSetup();
-  } catch (error: unknown) {
-    setClassEditMessage('error', getErrorMessage(error));
-  } finally {
-    Session.set('classEditLoading', false);
-  }
+Template.classEdit.onDestroyed(function(this: ClassEditInstance) {
+  this.lifetime.destroy();
+  this.saveCommand.destroy();
+  this.deleteCommand.destroy();
 });
 
 Template.classEdit.helpers({
-  isLoading: () => Session.get('classEditLoading') === true,
-  classEditMessage: () => Session.get('classEditMessage'),
-  classEditConfirmation: () => Session.get('classEditConfirmation'),
-  isEditingCourse: () => Session.get('classEditMode') === 'edit',
-
-  classes: () => Session.get('classes'),
-
-  'sections': function() {
-    const sections = Session.get('sectionsByInstructorId');
-    
-    return sections;
+  isLoading(): boolean {
+    return loadPending((Template.instance() as ClassEditInstance).coursesPresentation.get());
   },
-
-  'curTeacherClasses': () => Session.get('curTeacherClasses'),
-
-  'curTeacher': () => Meteor.user()?.username || '',
-
-  'baseLink': function(){
-    return "https://" + window.location.host + "/";
+  isBusy(): boolean {
+    const instance = Template.instance() as ClassEditInstance;
+    return loadPending(instance.coursesPresentation.get())
+      || instance.saveCommandState.get().status === 'pending'
+      || instance.deleteCommandState.get().status === 'pending';
   },
-
-  courseTimezoneOptions: () => {
+  classEditMessage(): ClassEditMessage | null {
+    return (Template.instance() as ClassEditInstance).message.get();
+  },
+  messageVariant(): string {
+    return (Template.instance() as ClassEditInstance).message.get()?.level || 'info';
+  },
+  loadError(): string {
+    return loadErrorMessage((Template.instance() as ClassEditInstance).coursesPresentation.get());
+  },
+  classEditConfirmation(): ClassEditConfirmation | null {
+    return (Template.instance() as ClassEditInstance).confirmation.get();
+  },
+  isEditingCourse(): boolean {
+    return Boolean((Template.instance() as ClassEditInstance).selectedCourseId.get());
+  },
+  classes(): EditableCourse[] {
+    return getCourseManagementData(Template.instance() as ClassEditInstance).courses;
+  },
+  selectedCourseAttrs(courseId: string) {
+    return (Template.instance() as ClassEditInstance).selectedCourseId.get() === String(courseId || '')
+      ? { selected: true }
+      : {};
+  },
+  sections() {
+    return getCourseManagementData(Template.instance() as ClassEditInstance).sectionLinks;
+  },
+  curTeacher(): string {
+    return Meteor.user()?.username || '';
+  },
+  baseLink() {
+    return `https://${window.location.host}/`;
+  },
+  draftCourseName(): string {
+    return (Template.instance() as ClassEditInstance).draftCourse.get().courseName;
+  },
+  draftSectionNames(): string {
+    return sectionNamesText((Template.instance() as ClassEditInstance).draftCourse.get().sections);
+  },
+  draftBeginDate(): string {
+    const draft = (Template.instance() as ClassEditInstance).draftCourse.get();
+    return toDatetimeLocalValue(draft.beginDate, draft.timezone);
+  },
+  draftEndDate(): string {
+    const draft = (Template.instance() as ClassEditInstance).draftCourse.get();
+    return toDatetimeLocalValue(draft.endDate, draft.timezone);
+  },
+  selectedVisibilityAttrs(visibility: CourseVisibility) {
+    return (Template.instance() as ClassEditInstance).draftCourse.get().visibility === visibility
+      ? { selected: true }
+      : {};
+  },
+  selectedTimezoneAttrs(timezone: string) {
+    return (Template.instance() as ClassEditInstance).draftCourse.get().timezone === timezone
+      ? { selected: true }
+      : {};
+  },
+  courseTimezoneOptions() {
     const detectedTimezone = defaultTimezone();
     const localizedOptions = COURSE_TIMEZONE_OPTIONS.map((option) => ({
       value: option.value,
-      label: option.label || courseText(option.labelKey as Parameters<typeof translatePlatformString>[1]),
+      label: option.label || courseText(option.labelKey!),
     }));
     if (!detectedTimezone || localizedOptions.some((option) => option.value === detectedTimezone)) {
       return localizedOptions;
@@ -270,142 +361,87 @@ Template.classEdit.helpers({
       { value: detectedTimezone, label: timezoneLabel(detectedTimezone) },
     ];
   },
+  saveBusy(): boolean {
+    return (Template.instance() as ClassEditInstance).saveCommandState.get().status === 'pending';
+  },
+  deleteBusy(): boolean {
+    return (Template.instance() as ClassEditInstance).deleteCommandState.get().status === 'pending';
+  },
   courseText(key: Parameters<typeof translatePlatformString>[1], options?: { hash?: Parameters<typeof translatePlatformString>[2] }) {
     return courseText(key, options?.hash);
   },
-
 });
+
 Template.classEdit.events({
-  'change #class-select': function(event: Event) {
-    
+  'change #class-select'(event: Event, instance: ClassEditInstance) {
     const courseId = String((event.currentTarget as HTMLSelectElement | null)?.value || '');
     if (courseId) {
-      classSelectedSetup(courseId);
+      selectCourse(instance, courseId);
     } else {
-      // Creating a new class with name from $textBox
-      noClassSelectedSetup();
+      selectNoCourse(instance);
     }
   },
 
-  'click #saveClass': function(_event: Event) {
-    clearClassEditMessage();
-    clearClassEditConfirmation();
-    const classes = (Session.get('classes') || []) as EditableClass[];
-    if (isNewClass) {
-      const curClassName = String($('#newClassName').val() || '');
-      if(curClassName == ""){
-        setClassEditMessage('warning', courseText('courseManagement.courseCannotBeBlank'));
-        return false;
-      }
-      curClass = {
-        courseId: undefined,
-        courseName: curClassName,
-        teacherUserId: Meteor.userId(),
-        semester: curSemester,
-        beginDate: null,
-        endDate: null,
-        timezone: defaultTimezone(),
-        visibility: 'private',
-        sections: [],
-      };
-      classes.push(curClass);
-    } else {
-      const courseId = String($('#class-select').val() || '');
-      const foundClass = classes.find((course) => course.courseId === courseId);
-      if (!foundClass) {
-        setClassEditMessage('error', courseText('courseManagement.selectedCourseNotFound'));
-        return false;
-      }
-      curClass = foundClass;
-      const newClassName = String($('#newClassName').val() || '');
-      curClass.courseName = newClassName;
-    }
-
-    curClass.sections = readSectionNames();
-    curClass.visibility = String($('#courseVisibility').val() || 'private') === 'public' ? 'public' : 'private';
-    curClass.beginDate = readOptionalDateInput('#courseBeginDate');
-    curClass.endDate = readOptionalDateInput('#courseEndDate');
-    curClass.timezone = String($('#courseTimezone').val() || '').trim();
-    if (!curClass.timezone) {
-      setClassEditMessage('warning', courseText('courseManagement.chooseTimezone'));
-      return false;
-    }
-
-    function handleSuccess(res: unknown) {
-      curClass.courseId = res as string;
-
-      void loadCourseManagementData().then(function() {
-        classSelectedSetup(String(curClass.courseId || ''));
-        setClassEditMessage('success', courseText('courseManagement.courseSaved'));
-      });
-    }
-
-    function handleError(err: unknown) {
-      const message = (err as any)?.reason || (err as any)?.message || String(err);
-      setClassEditMessage('error', courseText('courseManagement.errorSavingCourse', { error: message }));
-    }
-
-    if (isNewClass) {
-      meteorCallAsync('addCourse', curClass)
-        .then(handleSuccess)
-        .catch(handleError);
-    } else {
-      meteorCallAsync('editCourse', curClass)
-        .then(handleSuccess)
-        .catch(handleError);
-    }
+  'input #newClassName'(event: Event, instance: ClassEditInstance) {
+    updateDraft(instance, { courseName: String((event.currentTarget as HTMLInputElement).value || '') });
   },
 
-  'click #deleteCourse': function(_event: Event) {
-    clearClassEditMessage();
-    const courseId = String($('#class-select').val() || '');
-    const classes = (Session.get('classes') || []) as EditableClass[];
-    const foundClass = classes.find((course) => course.courseId === courseId);
+  'change #courseVisibility'(event: Event, instance: ClassEditInstance) {
+    updateDraft(instance, {
+      visibility: String((event.currentTarget as HTMLSelectElement).value || '') === 'public' ? 'public' : 'private',
+    });
+  },
+
+  'change #courseBeginDate'(event: Event, instance: ClassEditInstance) {
+    updateDraft(instance, { beginDate: String((event.currentTarget as HTMLInputElement).value || '') || null });
+  },
+
+  'change #courseEndDate'(event: Event, instance: ClassEditInstance) {
+    updateDraft(instance, { endDate: String((event.currentTarget as HTMLInputElement).value || '') || null });
+  },
+
+  'change #courseTimezone'(event: Event, instance: ClassEditInstance) {
+    updateDraft(instance, { timezone: String((event.currentTarget as HTMLSelectElement).value || '').trim() });
+  },
+
+  'input #sectionNames'(event: Event, instance: ClassEditInstance) {
+    updateDraft(instance, { sections: normalizeSectionNames(String((event.currentTarget as HTMLTextAreaElement).value || '')) });
+  },
+
+  'click #saveClass'(event: Event, instance: ClassEditInstance) {
+    event.preventDefault();
+    runSaveCourse(instance);
+  },
+
+  'click #deleteCourse'(event: Event, instance: ClassEditInstance) {
+    event.preventDefault();
+    const courseId = instance.selectedCourseId.get();
+    const foundClass = getCourseManagementData(instance).courses.find((course) => course.courseId === courseId);
     if (!courseId || !foundClass) {
-      setClassEditMessage('warning', courseText('courseManagement.selectCourseToDelete'));
-      return false;
+      setClassEditMessage(instance, 'warning', courseText('courseManagement.selectCourseToDelete'));
+      return;
     }
-
-    Session.set('classEditConfirmation', {
+    instance.message.set(null);
+    instance.confirmation.set({
       courseId,
       title: courseText('courseManagement.deleteCourseTitle', { courseName: foundClass.courseName }),
-      message: courseText('courseManagement.deleteCourseMessage')
+      message: courseText('courseManagement.deleteCourseMessage'),
     });
-    return false;
   },
 
-  'click #cancelCourseDelete': function(event: Event) {
+  'click #cancelCourseDelete'(event: Event, instance: ClassEditInstance) {
     event.preventDefault();
-    clearClassEditConfirmation();
-    return false;
+    instance.confirmation.set(null);
   },
 
-  'click #confirmCourseDelete': function(event: Event) {
+  'click #confirmCourseDelete'(event: Event, instance: ClassEditInstance) {
     event.preventDefault();
-    const confirmation = Session.get('classEditConfirmation') as { courseId?: string } | null;
-    const courseId = String(confirmation?.courseId || '');
+    const courseId = instance.confirmation.get()?.courseId || '';
     if (!courseId) {
-      setClassEditMessage('warning', courseText('courseManagement.selectCourseToDelete'));
-      clearClassEditConfirmation();
-      return false;
+      setClassEditMessage(instance, 'warning', courseText('courseManagement.selectCourseToDelete'));
+      instance.confirmation.set(null);
+      return;
     }
-
-    meteorCallAsync('deleteCourse', courseId)
-      .then(async function() {
-        await loadCourseManagementData();
-        noClassSelectedSetup();
-        setClassEditMessage('success', courseText('courseManagement.courseDeleted'));
-      })
-      .catch(function(err: unknown) {
-        const message = (err as any)?.reason || (err as any)?.message || String(err);
-        setClassEditMessage('error', courseText('courseManagement.errorDeletingCourse', { error: message }));
-      });
-    clearClassEditConfirmation();
-    return false;
+    runDeleteCourse(instance, courseId);
   },
 });
-
-
-
-
-

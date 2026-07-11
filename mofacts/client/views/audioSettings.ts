@@ -2,17 +2,27 @@ import { Meteor } from 'meteor/meteor';
 import { Template } from 'meteor/templating';
 import { Session } from 'meteor/session';
 import { ReactiveVar } from 'meteor/reactive-var';
+import { Tracker } from 'meteor/tracker';
 import './audioSettings.html';
+import './audioSettings.css';
+import './shared/adminUi/adminUi';
 import {
   setTtsWarmedUp,
-  getSrWarmedUp, setSrWarmedUp,
-  setAudioInputSensitivity, setAudioInputSensitivityView,
+  getSrWarmedUp,
+  setSrWarmedUp,
+  setAudioInputSensitivity,
+  setAudioInputSensitivityView,
   setAudioPromptFeedbackView,
-  setAudioPromptQuestionVolume, setAudioPromptFeedbackVolume,
-  setAudioPromptQuestionSpeakingRate, setAudioPromptFeedbackSpeakingRate,
-  setAudioPromptQuestionSpeakingRateView, setAudioPromptFeedbackSpeakingRateView,
-  setAudioPromptVoice, setAudioPromptFeedbackVoice,
-  setAudioPromptVoiceView, setAudioPromptFeedbackVoiceView
+  setAudioPromptQuestionVolume,
+  setAudioPromptFeedbackVolume,
+  setAudioPromptQuestionSpeakingRate,
+  setAudioPromptFeedbackSpeakingRate,
+  setAudioPromptQuestionSpeakingRateView,
+  setAudioPromptFeedbackSpeakingRateView,
+  setAudioPromptVoice,
+  setAudioPromptFeedbackVoice,
+  setAudioPromptVoiceView,
+  setAudioPromptFeedbackVoiceView,
 } from '../lib/state/audioState';
 import { getErrorMessage } from '../lib/errorUtils';
 import { evaluateSrAvailability } from '../lib/audioAvailability';
@@ -21,470 +31,575 @@ import { resolveSpeechRecognitionLanguage } from '../lib/speechRecognitionConfig
 import { clientConsole } from '../lib/userSessionHelpers';
 import { getActiveUiLocale } from '../lib/interfaceLocaleState';
 import { translatePlatformString } from '../lib/interfaceI18n';
+import {
+  createAsyncCommandController,
+  type AsyncCommandController,
+  type AsyncCommandState,
+} from '../lib/adminUi/asyncCommandState';
+import {
+  rejectLoad,
+  resolveLoad,
+  startLoad,
+  type LoadableState,
+} from '../lib/adminUi/loadableState';
+import { createTemplateLifetime, type TemplateLifetime } from '../lib/adminUi/templateLifetime';
+import {
+  createInlineConfirmationController,
+  type InlineConfirmationController,
+  type InlineConfirmationView,
+} from '../lib/adminUi/inlineConfirmationController';
+import {
+  AUDIO_INPUT_SENSITIVITY_MAX,
+  AUDIO_INPUT_SENSITIVITY_MIN,
+  normalizeAudioInputSensitivity,
+  normalizeAudioSettings,
+  parsePublishedAudioSettings,
+  promptControlsVisible,
+  promptFeedbackEnabled,
+  promptModeFromToggles,
+  promptQuestionEnabled,
+  rangeProgress,
+  type AudioSettingsForm,
+} from './audioSettingsState';
 
-declare const $: any;
+type AudioSettingsMessage = Readonly<{
+  level: 'success' | 'error';
+  text: string;
+}>;
 
-// Set up input sensitivity range to display/hide when audio input is enabled/disabled
+type AudioSettingsInstance = Blaze.TemplateInstance & {
+  settingsPresentation: ReactiveVar<LoadableState<AudioSettingsForm>>;
+  keyPresentation: ReactiveVar<LoadableState<boolean>>;
+  settingsCommandState: ReactiveVar<AsyncCommandState<void>>;
+  keyCommandState: ReactiveVar<AsyncCommandState<void>>;
+  audioSettingsMessage: ReactiveVar<AudioSettingsMessage | null>;
+  volumeDraft: ReactiveVar<number>;
+  sensitivityDraft: ReactiveVar<number>;
+  speechApiDraft: ReactiveVar<string>;
+  settingsCommand: AsyncCommandController<void>;
+  keyCommand: AsyncCommandController<void>;
+  confirmationState: ReactiveVar<InlineConfirmationView>;
+  confirmationController: InlineConfirmationController<'delete-speech-api-key'>;
+  settingsLifetime: TemplateLifetime;
+  keyLifetime: TemplateLifetime;
+  nextSettingsRequestId: number;
+  nextKeyRequestId: number;
+};
 
-// Cache success color to avoid repeated getComputedStyle calls during slider drag
-let cachedSuccessColor: string | null = null;
-let cachedTrackColor: string | null = null;
-const AUDIO_INPUT_SENSITIVITY_MIN = 20;
-const AUDIO_INPUT_SENSITIVITY_MAX = 80;
-const AUDIO_INPUT_SENSITIVITY_DEFAULT = 60;
-
-function audioText(key: Parameters<typeof translatePlatformString>[1], values?: Parameters<typeof translatePlatformString>[2]): string {
+function audioText(
+  key: Parameters<typeof translatePlatformString>[1],
+  values?: Parameters<typeof translatePlatformString>[2],
+): string {
   return translatePlatformString(getActiveUiLocale(), key, values);
 }
 
-function setAudioSettingsMessage(template: any, level: string, text: string) {
-  template?.audioSettingsMessage?.set?.({
-    level,
-    text,
-    icon: level === 'success' ? 'fa-check-circle' : level === 'warning' ? 'fa-exclamation-triangle' : level === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'
-  });
+function sharedVolume(settings: AudioSettingsForm): number {
+  return settings.audioPromptQuestionVolume || settings.audioPromptFeedbackVolume || 0;
 }
 
-function normalizeAudioInputSensitivity(value: unknown): number {
-  const parsed = parseInt(String(value), 10);
-  if (!Number.isFinite(parsed)) {
-    return AUDIO_INPUT_SENSITIVITY_DEFAULT;
-  }
-  return Math.min(AUDIO_INPUT_SENSITIVITY_MAX, Math.max(AUDIO_INPUT_SENSITIVITY_MIN, parsed));
+function sharedSpeakingRate(settings: AudioSettingsForm): number {
+  return settings.audioPromptQuestionSpeakingRate || settings.audioPromptFeedbackSpeakingRate || 1;
 }
 
-function updateAudioInputSensitivityLabel(value: unknown) {
-  const label = document.getElementById('audioInputSensitivityLabel');
-  if (!label) return;
-  label.textContent = String(normalizeAudioInputSensitivity(value));
+function sharedVoice(settings: AudioSettingsForm): string {
+  return settings.audioPromptVoice || settings.audioPromptFeedbackVoice || 'en-US-Standard-A';
 }
 
-// Update range slider fill color based on value
-function updateRangeSliderFill(slider: any) {
-  const value = slider.value;
-  const min = slider.min || 0;
-  const max = slider.max || 100;
-  const percentage = ((value - min) / (max - min)) * 100;
-
-  // Cache the success color on first call (avoid layout thrashing on every input event)
-  if (!cachedSuccessColor) {
-    cachedSuccessColor = getComputedStyle(document.documentElement).getPropertyValue('--feedback-correct-color').trim() || 'var(--feedback-correct-color)';
-  }
-  if (!cachedTrackColor) {
-    cachedTrackColor = getComputedStyle(document.documentElement).getPropertyValue('--app-muted-surface-color').trim() || 'var(--app-muted-surface-color)';
-  }
-  slider.style.background = `linear-gradient(to right, ${cachedSuccessColor} 0%, ${cachedSuccessColor} ${percentage}%, ${cachedTrackColor} ${percentage}%, ${cachedTrackColor} 100%)`;
+function readySettings(instance: AudioSettingsInstance): AudioSettingsForm | null {
+  const state = instance.settingsPresentation.get();
+  return state.status === 'ready' || state.status === 'refreshing' || state.status === 'refresh-error'
+    ? state.value
+    : null;
 }
 
-// Default audio settings
-const DEFAULT_AUDIO_SETTINGS = {
-  audioPromptMode: 'silent',
-  audioPromptQuestionVolume: 0,
-  audioPromptQuestionSpeakingRate: 1,
-  audioPromptVoice: 'en-US-Standard-A',
-  audioPromptFeedbackVolume: 0,
-  audioPromptFeedbackSpeakingRate: 1,
-  audioPromptFeedbackVoice: 'en-US-Standard-A',
-  audioInputMode: false,
-  audioInputSensitivity: AUDIO_INPUT_SENSITIVITY_DEFAULT,
-};
-
-// Get user's audio settings with fallbacks to defaults
-function getUserAudioSettings() {
-  const user = Meteor.user() as any;
-  if (!user) return DEFAULT_AUDIO_SETTINGS;
-
-  // audioSettings should always exist (initialized by server publication)
-  // Merge with defaults to handle any missing fields
-  const settings = { ...DEFAULT_AUDIO_SETTINGS, ...(user.audioSettings || {}) };
-  settings.audioInputSensitivity = normalizeAudioInputSensitivity(settings.audioInputSensitivity);
-  return settings;
+function publishReadySettings(instance: AudioSettingsInstance, settings: AudioSettingsForm): void {
+  instance.settingsPresentation.set({ status: 'ready', value: settings });
 }
 
-// Save a single audio setting to database (updates entire audioSettings object)
-async function saveAudioSettingToDatabase(settingKey: any, settingValue: any, template?: any) {
-  try {
-    // Get current settings
-    const currentSettings = getUserAudioSettings();
-
-    // Update the specific setting
-    currentSettings[settingKey] = settingValue;
-
-    // Save entire settings object
-    await (Meteor as any).callAsync('saveAudioSettings', currentSettings);
-  } catch (error: unknown) {
-    clientConsole(1, '[Audio Settings] Error saving audio setting:', error);
-    setAudioSettingsMessage(template, 'error', audioText('audio.failedSaveAudioSettings', { error: getErrorMessage(error) }));
-  }
-}
-
-const showHideAudioEnabledGroup = function(show: any) {
-  if (show) {
-    $('.audioEnabledGroup').show();
-    $('.audioEnabledGroup').addClass('flow');
-  } else {
-    $('.audioEnabledGroup').hide();
-    $('.audioEnabledGroup').removeClass('flow');
-  }
-};
-
-const showHideAudioInputGroup = function(show: any) {
-  if (show) {
-    $('.audioInputGroup').show();
-    $('.audioInputGroup').addClass('flow');
-  } else {
-    $('.audioInputGroup').hide();
-    $('.audioInputGroup').removeClass('flow');
-  }
-};
-
-function getAudioPromptModeFromPage() {
-  if ($('#audioPromptFeedbackOn')[0].checked && $('#audioPromptQuestionOn')[0].checked) {
-    return 'all';
-  } else if ($('#audioPromptFeedbackOn')[0].checked){
-    return 'feedback';
-  } else if ($('#audioPromptQuestionOn')[0].checked) {
-    return 'question';
-  } else {
-    return 'silent';
-  }
-}
-
-function setAudioPromptVolumeOnPage(audioVolume: any) {
-  //Google's TTS API uses decibels to alter audio, the range is -96 to 16. 0 is default
-  (document.getElementById('audioPromptVolume') as any).value = audioVolume;
-}
-
-function setAudioPromptModeOnPage(audioPromptMode: any) {
-  switch (audioPromptMode) {
-    case 'all':
-      $('#audioPromptFeedbackOn')[0].checked = true;
-      $('#audioPromptQuestionOn')[0].checked = true;
-      break;
-    case 'feedback':
-      $('#audioPromptFeedbackOn')[0].checked = true;
-      $('#audioPromptQuestionOn')[0].checked = false;
-      break;
-    case 'question':
-      $('#audioPromptFeedbackOn')[0].checked = false;
-      $('#audioPromptQuestionOn')[0].checked = true;
-      break;
-    default:
-      $('#audioPromptFeedbackOn')[0].checked = false;
-      $('#audioPromptQuestionOn')[0].checked = false;
-      break;
-  }
-}
-
-function getAudioInputFromPage() {
-  return $('#audioInputOn')[0].checked;
-}
-
-function setAudioInputOnPage(audioInputEnabled: any) {
-  if (audioInputEnabled) {
-    $('#audioInputOn')[0].checked = true;
-  } else {
-    $('#audioInputOn')[0].checked = false;
-  }
-}
-
-function showHideheadphonesSuggestedDiv(show: any) {
-  if (show) {
-    $('#headphonesSuggestedDiv').show();
-  } else {
-    $('#headphonesSuggestedDiv').hide();
-  }
-}
-
-function showHideAudioPromptGroupDependingOnAudioPromptMode(audioPromptMode: any) {
-  const audioPromptSharedGroup = $('.audioPromptSharedGroup');
-
-  // Show shared controls if any audio mode is enabled
-  if (audioPromptMode !== 'silent') {
-    audioPromptSharedGroup.show();
-    audioPromptSharedGroup.addClass('flow');
-  } else {
-    audioPromptSharedGroup.removeClass('flow');
-    audioPromptSharedGroup.hide();
-  }
-}
-
-Template.audioSettings.onRendered(async function(this: any) {
-  // Load settings from database on page load
-  const settings = getUserAudioSettings();
-
-  // Batch all DOM updates in a single frame to avoid layout thrashing
-  requestAnimationFrame(() => {
-    // Set toggle states
-    setAudioInputOnPage(settings.audioInputMode);
-    setAudioPromptModeOnPage(settings.audioPromptMode);
-    showHideAudioPromptGroupDependingOnAudioPromptMode(settings.audioPromptMode);
-
-    // Set all control values (use first available value for shared controls)
-    const volume = settings.audioPromptQuestionVolume || settings.audioPromptFeedbackVolume || 0;
-    const speakingRate = settings.audioPromptQuestionSpeakingRate || settings.audioPromptFeedbackSpeakingRate || 1;
-    const voice = settings.audioPromptVoice || settings.audioPromptFeedbackVoice || 'en-US-Standard-A';
-
-    setAudioPromptVolumeOnPage(volume);
-    (document.getElementById('audioPromptSpeakingRate') as any).value = speakingRate;
-    (document.getElementById('audioPromptVoice') as any).value = voice;
-    (document.getElementById('audioInputSensitivity') as any).value = settings.audioInputSensitivity;
-    updateAudioInputSensitivityLabel(settings.audioInputSensitivity);
-
-    // Initialize range slider fills (both in same frame)
-    updateRangeSliderFill(document.getElementById('audioPromptVolume'));
-    updateRangeSliderFill(document.getElementById('audioInputSensitivity'));
-
-    // Show/hide appropriate groups
-    showHideAudioInputGroup(settings.audioInputMode);
-    showHideAudioEnabledGroup(settings.audioPromptMode != 'silent' || settings.audioInputMode);
-    const showHeadphonesSuggestedDiv = settings.audioPromptMode != 'silent' && settings.audioInputMode;
-    showHideheadphonesSuggestedDiv(showHeadphonesSuggestedDiv);
-  });
-
-  const srAvailability = evaluateSrAvailability({
-    user: Meteor.user() as any,
-    tdfFile: Session.get('currentTdfFile'),
-    sessionSpeechApiKey: Session.get('speechAPIKey'),
-    serverSpeechConfigured: Session.get('speechAPIKeyConfigured'),
-  });
-  clientConsole(2, '[Audio Settings] SR availability evaluated', srAvailability);
-
-  // Update AudioState for backward compatibility (set both to same values)
-  const volume = settings.audioPromptQuestionVolume || settings.audioPromptFeedbackVolume || 0;
-  const speakingRate = settings.audioPromptQuestionSpeakingRate || settings.audioPromptFeedbackSpeakingRate || 1;
-  const voice = settings.audioPromptVoice || settings.audioPromptFeedbackVoice || 'en-US-Standard-A';
+function applyRuntimeAudioSettings(settings: AudioSettingsForm): void {
+  const volume = sharedVolume(settings);
+  const speakingRate = sharedSpeakingRate(settings);
+  const voice = sharedVoice(settings);
+  setAudioPromptFeedbackView(settings.audioPromptMode);
   setAudioPromptQuestionVolume(volume);
   setAudioPromptFeedbackVolume(volume);
   setAudioPromptQuestionSpeakingRate(speakingRate);
   setAudioPromptFeedbackSpeakingRate(speakingRate);
+  setAudioPromptQuestionSpeakingRateView(speakingRate);
+  setAudioPromptFeedbackSpeakingRateView(speakingRate);
   setAudioPromptVoice(voice);
+  setAudioPromptVoiceView(voice);
   setAudioPromptFeedbackVoice(voice);
+  setAudioPromptFeedbackVoiceView(voice);
   setAudioInputSensitivity(settings.audioInputSensitivity);
+  setAudioInputSensitivityView(settings.audioInputSensitivity);
+}
 
-  checkAndSetSpeechAPIKeyIsSetup();
+function settingSaveError(error: unknown): string {
+  return audioText('audio.failedSaveAudioSettings', { error: getErrorMessage(error) });
+}
 
-  // Stored keys are replacement-only; do not load secrets back into the browser.
-  if (Session.get('showSpeechAPISetup')) {
-    $('#speechAPIKey').val('');
-  }
+async function saveSettings(
+  instance: AudioSettingsInstance,
+  nextSettings: AudioSettingsForm,
+  onActivated?: () => void,
+): Promise<void> {
+  const previousSettings = readySettings(instance);
+  if (!previousSettings) return;
 
-  // Note: TTS warmup on hot code reload is now handled in index.js Meteor.startup
-  // This ensures it runs even if the user is already in a practice session
+  instance.audioSettingsMessage.set(null);
+  await instance.settingsCommand.run(async () => {
+    publishReadySettings(instance, nextSettings);
+    applyRuntimeAudioSettings(nextSettings);
+    onActivated?.();
+    await (Meteor as typeof Meteor & { callAsync: (name: string, ...args: unknown[]) => Promise<void> })
+      .callAsync('saveAudioSettings', nextSettings);
+  }, {
+    getErrorMessage: settingSaveError,
+    onFailure: (error: unknown) => {
+      publishReadySettings(instance, previousSettings);
+      instance.volumeDraft.set(sharedVolume(previousSettings));
+      instance.sensitivityDraft.set(previousSettings.audioInputSensitivity);
+      applyRuntimeAudioSettings(previousSettings);
+      instance.audioSettingsMessage.set({ level: 'error', text: settingSaveError(error) });
+    },
+  });
+}
 
-});
-
-Template.audioSettings.onCreated(function(this: any) {
-  this.audioSettingsMessage = new ReactiveVar(null);
-});
-
-Template.audioSettings.onDestroyed(function(this: any) {
-  // Reset cached color so it's recalculated if theme changes
-  cachedSuccessColor = null;
-  cachedTrackColor = null;
-});
-
-Template.audioSettings.events({
-  'click #audioPromptQuestionOn': function(event: any, template: any) {
-    updateAudioPromptMode(event, template);
-  },
-
-  'click #audioPromptFeedbackOn': function(event: any, template: any) {
-    updateAudioPromptMode(event, template);
-  },
-
-  'click #audioInputOn': async function(_event: any, template: any) {
-    const audioInputEnabled = getAudioInputFromPage();
-
-    const showHeadphonesSuggestedDiv = (getAudioPromptModeFromPage() != 'silent') && audioInputEnabled;
-
-    showHideheadphonesSuggestedDiv(showHeadphonesSuggestedDiv);
-    showHideAudioInputGroup(audioInputEnabled)
-    showHideAudioEnabledGroup(audioInputEnabled || (getAudioPromptModeFromPage() != 'silent'));
-
-    // FIX: Warm up Google Speech Recognition API when user enables audio input
-    // This eliminates the cold start delay on first trial
-    if (audioInputEnabled) {
-      warmupGoogleSpeechRecognition();
-    }
-
-    //save the audio input mode to the user profile using unified settings
-    await saveAudioSettingToDatabase('audioInputMode', audioInputEnabled, template);
-  },
-
-  'click #speechAPISubmit': async function(_e: any, template: any) {
-    const key = $('#speechAPIKey').val();
-    try {
-      await (Meteor as any).callAsync('saveUserSpeechAPIKey', key);
-      // Make sure to update our reactive session variable so the api key is
-      // setup indicator updates
-      checkAndSetSpeechAPIKeyIsSetup();
-
-      
-      setAudioSettingsMessage(template, 'success', audioText('audio.speechApiKeySaved'));
-    } catch (error) {
-      // Make sure to update our reactive session variable so the api key is
-      // setup indicator updates
-      checkAndSetSpeechAPIKeyIsSetup();
-
-      
-      setAudioSettingsMessage(template, 'error', audioText('audio.changesNotSaved', { error: getErrorMessage(error) }));
-    }
-  },
-
-  'click #speechAPIDelete': async function(_e: any, template: any) {
-    try {
-      await (Meteor as any).callAsync('deleteUserSpeechAPIKey');
-      // Make sure to update our reactive session variable so the api key is
-      // setup indicator updates
-      checkAndSetSpeechAPIKeyIsSetup();
-      $('#speechAPIKey').val('');
-      
-      setAudioSettingsMessage(template, 'success', audioText('audio.speechApiKeyDeleted'));
-    } catch (error) {
-      // Make sure to update our reactive session variable so the api key is
-      // setup indicator updates
-      checkAndSetSpeechAPIKeyIsSetup();
-      
-      setAudioSettingsMessage(template, 'error', audioText('audio.changesNotSaved', { error: getErrorMessage(error) }));
-    }
-  },
-
-  'input #audioPromptVolume': function(event: any) {
-    updateRangeSliderFill(event.currentTarget);
-  },
-
-  'change #audioPromptVolume': async function(event: any) {
-    const value = parseFloat(event.currentTarget.value);
-    updateRangeSliderFill(event.currentTarget);
-
-    // Set both AudioState variables to the same value for backward compatibility
-    setAudioPromptQuestionVolume(value);
-    setAudioPromptFeedbackVolume(value);
-
-    // Save both to database
-    const currentSettings = getUserAudioSettings();
-    currentSettings.audioPromptQuestionVolume = value;
-    currentSettings.audioPromptFeedbackVolume = value;
-    await (Meteor as any).callAsync('saveAudioSettings', currentSettings);
-  },
-
-  'change #audioPromptSpeakingRate': async function(event: any) {
-    const value = parseFloat(event.currentTarget.value);
-    // Set both AudioState variables to the same value for backward compatibility
-    setAudioPromptQuestionSpeakingRate(value);
-    setAudioPromptFeedbackSpeakingRate(value);
-    setAudioPromptQuestionSpeakingRateView(value);
-    setAudioPromptFeedbackSpeakingRateView(value);
-
-    // Save both to database
-    const currentSettings = getUserAudioSettings();
-    currentSettings.audioPromptQuestionSpeakingRate = value;
-    currentSettings.audioPromptFeedbackSpeakingRate = value;
-    await (Meteor as any).callAsync('saveAudioSettings', currentSettings);
-  },
-
-  'change #audioPromptVoice': async function(event: any) {
-    const value = event.currentTarget.value;
-    // Set both voice variables to the same value for simplicity
-    setAudioPromptVoice(value);
-    setAudioPromptVoiceView(value);
-    setAudioPromptFeedbackVoice(value);
-    setAudioPromptFeedbackVoiceView(value);
-
-    // Save both to database for backward compatibility
-    const currentSettings = getUserAudioSettings();
-    currentSettings.audioPromptVoice = value;
-    currentSettings.audioPromptFeedbackVoice = value;
-    await (Meteor as any).callAsync('saveAudioSettings', currentSettings);
-  },
-
-  'input #audioInputSensitivity': function(event: any) {
-    const value = normalizeAudioInputSensitivity(event.currentTarget.value);
-    event.currentTarget.value = value;
-    updateAudioInputSensitivityLabel(value);
-    updateRangeSliderFill(event.currentTarget);
-  },
-
-  'change #audioInputSensitivity': async function(event: any, template: any) {
-    const value = normalizeAudioInputSensitivity(event.currentTarget.value);
-    event.currentTarget.value = value;
-    updateAudioInputSensitivityLabel(value);
-    updateRangeSliderFill(event.currentTarget);
-
-    setAudioInputSensitivity(value);
-    setAudioInputSensitivityView(value);
-    await saveAudioSettingToDatabase('audioInputSensitivity', value, template);
-  },
-
-  'click #audioPromptVoiceTest': function(event: any) {
-    event.preventDefault();
-    const voice = (document.getElementById('audioPromptVoice') as any).value;
-    const audioObj = new Audio(`https://cloud.google.com/text-to-speech/docs/audio/${voice}.wav`);
-    audioObj.play();
-  }
-});
-
-Template.audioSettings.helpers({
-  audioText: function(key: Parameters<typeof translatePlatformString>[1], values?: Parameters<typeof translatePlatformString>[2]) {
-    return audioText(key, values);
-  },
-
-  audioVoiceLabel: function(gender: 'male' | 'female', number: number) {
-    return audioText(gender === 'female' ? 'audio.femaleVoice' : 'audio.maleVoice', { number });
-  },
-
-  audioSettingsMessage: function() {
-    return (Template.instance() as any).audioSettingsMessage.get();
-  },
-
-  showSpeechAPISetup: function() {
-    //check if Session variable useEmbeddedAPIKey is set
-    if(Session.get('useEmbeddedAPIKeys')){
-      return false;
-    } else {
-      return Session.get('showSpeechAPISetup');
-    }
-  },
-
-  speechAPIKeyIsSetup: function() {
-    return Session.get('speechAPIKeyIsSetup');
-  },
-
-  speechAPIKeyPlaceholder: function() {
-    return Session.get('speechAPIKeyIsSetup')
-      ? audioText('audio.enterNewKeyReplaceSaved')
-      : audioText('audio.enterYourApiKey');
-  },
-});
-
-async function checkAndSetSpeechAPIKeyIsSetup() {
+async function loadSpeechApiKeyStatus(instance: AudioSettingsInstance): Promise<void> {
+  const requestId = ++instance.nextKeyRequestId;
+  const generation = instance.keyLifetime.begin();
+  instance.keyPresentation.set(startLoad(instance.keyPresentation.get(), requestId));
   try {
-    const data = await (Meteor as any).callAsync('isUserSpeechAPIKeySetup');
-    Session.set('speechAPIKeyIsSetup', data);
-  } catch (_err) {
-    // API setup lookup failure should not break settings page render.
+    const configured = await (Meteor as typeof Meteor & {
+      callAsync: (name: string) => Promise<unknown>;
+    }).callAsync('isUserSpeechAPIKeySetup');
+    if (!instance.keyLifetime.isCurrent(generation)) return;
+    instance.keyPresentation.set(resolveLoad(
+      instance.keyPresentation.get(),
+      requestId,
+      configured === true,
+      () => false,
+    ));
+  } catch (error: unknown) {
+    if (!instance.keyLifetime.isCurrent(generation)) return;
+    instance.keyPresentation.set(rejectLoad(
+      instance.keyPresentation.get(),
+      requestId,
+      {
+        message: audioText('audio.speechApiKeyStatusFailed', { error: getErrorMessage(error) }),
+        retryable: true,
+      },
+    ));
   }
 }
 
-async function updateAudioPromptMode(e: any, template?: any){
-  const audioPromptMode = getAudioPromptModeFromPage();
+function loadAudioSettings(instance: AudioSettingsInstance): void {
+  const requestId = ++instance.nextSettingsRequestId;
+  const generation = instance.settingsLifetime.begin();
+  instance.settingsPresentation.set(startLoad(instance.settingsPresentation.get(), requestId));
+  instance.subscribe('userAudioSettings', {
+    onReady: () => {
+      if (!instance.settingsLifetime.isCurrent(generation)) return;
+      const user = Meteor.user() as { audioSettings?: unknown } | null;
+      let settings: AudioSettingsForm;
+      try {
+        settings = parsePublishedAudioSettings(user?.audioSettings);
+      } catch (error: unknown) {
+        instance.settingsPresentation.set(rejectLoad(
+          instance.settingsPresentation.get(),
+          requestId,
+          {
+            message: audioText('audio.settingsLoadFailed', { error: getErrorMessage(error) }),
+            retryable: true,
+          },
+        ));
+        return;
+      }
+      instance.settingsPresentation.set(resolveLoad(
+        instance.settingsPresentation.get(),
+        requestId,
+        settings,
+        () => false,
+      ));
+      instance.volumeDraft.set(sharedVolume(settings));
+      instance.sensitivityDraft.set(settings.audioInputSensitivity);
+      applyRuntimeAudioSettings(settings);
 
-  (setAudioPromptFeedbackView as any)(audioPromptMode);
-  //if toggle is on, show the warning, else hide it
-  if (e.currentTarget.checked){
-    $('.audioEnabledGroup').show();
+      const srAvailability = evaluateSrAvailability({
+        user,
+        tdfFile: Session.get('currentTdfFile'),
+        sessionSpeechApiKey: Session.get('speechAPIKey'),
+        serverSpeechConfigured: Session.get('speechAPIKeyConfigured'),
+      });
+      clientConsole(2, '[Audio Settings] SR availability evaluated', srAvailability);
+      if (instance.keyPresentation.get().status === 'idle') {
+        void loadSpeechApiKeyStatus(instance);
+      }
+    },
+    onStop: (error?: unknown) => {
+      if (!error || !instance.settingsLifetime.isCurrent(generation)) return;
+      instance.settingsPresentation.set(rejectLoad(
+        instance.settingsPresentation.get(),
+        requestId,
+        {
+          message: audioText('audio.settingsLoadFailed', { error: getErrorMessage(error) }),
+          retryable: true,
+        },
+      ));
+    },
+  });
+}
 
-    // FIX: Warm up Google TTS API when user enables audio prompts
-    // This eliminates the 8-9 second cold start delay on first trial
-    warmupGoogleTTS();
-  } else if(audioPromptMode == 'silent' && !getAudioInputFromPage()){
-    $('.audioEnabledGroup').hide();
-  }
-  showHideAudioPromptGroupDependingOnAudioPromptMode(audioPromptMode);
+function setRangeProgress(element: HTMLInputElement, value: number, minimum: number, maximum: number): void {
+  element.style.setProperty('--audio-range-progress', `${rangeProgress(value, minimum, maximum)}%`);
+}
 
-  //save the audio prompt mode to the user profile using unified settings
-  await saveAudioSettingToDatabase('audioPromptMode', audioPromptMode, template);
+Template.audioSettings.onCreated(function(this: AudioSettingsInstance) {
+  this.settingsPresentation = new ReactiveVar<LoadableState<AudioSettingsForm>>({ status: 'idle' });
+  this.keyPresentation = new ReactiveVar<LoadableState<boolean>>({ status: 'idle' });
+  this.settingsCommandState = new ReactiveVar<AsyncCommandState<void>>({ status: 'idle' });
+  this.keyCommandState = new ReactiveVar<AsyncCommandState<void>>({ status: 'idle' });
+  this.audioSettingsMessage = new ReactiveVar<AudioSettingsMessage | null>(null);
+  this.volumeDraft = new ReactiveVar(0);
+  this.sensitivityDraft = new ReactiveVar(60);
+  this.speechApiDraft = new ReactiveVar('');
+  this.settingsLifetime = createTemplateLifetime();
+  this.keyLifetime = createTemplateLifetime();
+  this.nextSettingsRequestId = 0;
+  this.nextKeyRequestId = 0;
+  this.settingsCommand = createAsyncCommandController((state) => this.settingsCommandState.set(state));
+  this.keyCommand = createAsyncCommandController((state) => this.keyCommandState.set(state));
+  this.confirmationController = createInlineConfirmationController<'delete-speech-api-key'>(
+    (view) => this.confirmationState.set(view),
+    () => document.getElementById('speechAPIKey'),
+  );
+  this.confirmationState = new ReactiveVar(this.confirmationController.getView());
+  loadAudioSettings(this);
+});
+
+Template.audioSettings.onDestroyed(function(this: AudioSettingsInstance) {
+  this.settingsLifetime.destroy();
+  this.keyLifetime.destroy();
+  this.settingsCommand.destroy();
+  this.keyCommand.destroy();
+  this.confirmationController.destroy();
+});
+
+Template.audioSettings.events({
+  'click #audioPromptQuestionOn'(event: Event, instance: AudioSettingsInstance) {
+    event.preventDefault();
+    const current = readySettings(instance);
+    if (!current) return;
+    const nextMode = promptModeFromToggles(!promptQuestionEnabled(current), promptFeedbackEnabled(current));
+    void saveSettings(instance, { ...current, audioPromptMode: nextMode }, () => {
+      if (nextMode !== 'silent') void warmupGoogleTTS();
+    });
+  },
+
+  'click #audioPromptFeedbackOn'(event: Event, instance: AudioSettingsInstance) {
+    event.preventDefault();
+    const current = readySettings(instance);
+    if (!current) return;
+    const nextMode = promptModeFromToggles(promptQuestionEnabled(current), !promptFeedbackEnabled(current));
+    void saveSettings(instance, { ...current, audioPromptMode: nextMode }, () => {
+      if (nextMode !== 'silent') void warmupGoogleTTS();
+    });
+  },
+
+  'click #audioInputOn'(event: Event, instance: AudioSettingsInstance) {
+    event.preventDefault();
+    const current = readySettings(instance);
+    if (!current) return;
+    const audioInputMode = !current.audioInputMode;
+    void saveSettings(instance, { ...current, audioInputMode }, () => {
+      if (audioInputMode) void warmupGoogleSpeechRecognition();
+    });
+  },
+
+  'input #audioPromptVolume'(event: Event, instance: AudioSettingsInstance) {
+    const input = event.currentTarget as HTMLInputElement;
+    const value = Number.parseFloat(input.value);
+    instance.volumeDraft.set(value);
+    setRangeProgress(input, value, -6, 6);
+  },
+
+  'change #audioPromptVolume'(event: Event, instance: AudioSettingsInstance) {
+    const current = readySettings(instance);
+    if (!current) return;
+    const value = Number.parseFloat((event.currentTarget as HTMLInputElement).value);
+    void saveSettings(instance, {
+      ...current,
+      audioPromptQuestionVolume: value,
+      audioPromptFeedbackVolume: value,
+    });
+  },
+
+  'change #audioPromptSpeakingRate'(event: Event, instance: AudioSettingsInstance) {
+    const current = readySettings(instance);
+    if (!current) return;
+    const value = Number.parseFloat((event.currentTarget as HTMLSelectElement).value);
+    void saveSettings(instance, {
+      ...current,
+      audioPromptQuestionSpeakingRate: value,
+      audioPromptFeedbackSpeakingRate: value,
+    });
+  },
+
+  'change #audioPromptVoice'(event: Event, instance: AudioSettingsInstance) {
+    const current = readySettings(instance);
+    if (!current) return;
+    const value = (event.currentTarget as HTMLSelectElement).value;
+    void saveSettings(instance, {
+      ...current,
+      audioPromptVoice: value,
+      audioPromptFeedbackVoice: value,
+    });
+  },
+
+  'input #audioInputSensitivity'(event: Event, instance: AudioSettingsInstance) {
+    const input = event.currentTarget as HTMLInputElement;
+    const value = normalizeAudioInputSensitivity(input.value);
+    instance.sensitivityDraft.set(value);
+    setRangeProgress(input, value, AUDIO_INPUT_SENSITIVITY_MIN, AUDIO_INPUT_SENSITIVITY_MAX);
+  },
+
+  'change #audioInputSensitivity'(event: Event, instance: AudioSettingsInstance) {
+    const current = readySettings(instance);
+    if (!current) return;
+    const value = normalizeAudioInputSensitivity((event.currentTarget as HTMLInputElement).value);
+    void saveSettings(instance, { ...current, audioInputSensitivity: value });
+  },
+
+  'input #speechAPIKey'(event: Event, instance: AudioSettingsInstance) {
+    instance.speechApiDraft.set((event.currentTarget as HTMLInputElement).value);
+  },
+
+  'click #speechAPISubmit'(event: Event, instance: AudioSettingsInstance) {
+    event.preventDefault();
+    const key = instance.speechApiDraft.get();
+    instance.audioSettingsMessage.set(null);
+    void instance.keyCommand.run(async () => {
+      await (Meteor as typeof Meteor & {
+        callAsync: (name: string, key: string) => Promise<void>;
+      }).callAsync('saveUserSpeechAPIKey', key);
+    }, {
+      getErrorMessage: (error: unknown) => audioText('audio.changesNotSaved', { error: getErrorMessage(error) }),
+      onSuccess: () => {
+        instance.keyPresentation.set({ status: 'ready', value: true });
+        instance.speechApiDraft.set('');
+        instance.audioSettingsMessage.set({ level: 'success', text: audioText('audio.speechApiKeySaved') });
+      },
+      onFailure: (error: unknown) => {
+        instance.audioSettingsMessage.set({
+          level: 'error',
+          text: audioText('audio.changesNotSaved', { error: getErrorMessage(error) }),
+        });
+      },
+    });
+  },
+
+  'click #speechAPIDelete'(event: Event, instance: AudioSettingsInstance) {
+    event.preventDefault();
+    instance.confirmationController.open({
+      confirmationId: 'audio-delete-speech-api-key',
+      title: audioText('audio.deleteKey'),
+      message: audioText('audio.deleteKeyConfirmation'),
+      confirmLabel: audioText('audio.deleteKey'),
+      cancelLabel: audioText('content.cancel'),
+      severity: 'danger',
+      context: 'delete-speech-api-key',
+    }, event.currentTarget as HTMLElement);
+    Tracker.afterFlush(() => instance.confirmationController.focusInitial());
+  },
+
+  'click .admin-confirmation-cancel'(_event: Event, instance: AudioSettingsInstance) {
+    instance.confirmationController.cancel();
+  },
+
+  'keydown .admin-inline-confirmation'(event: KeyboardEvent, instance: AudioSettingsInstance) {
+    instance.confirmationController.handleKeydown(event);
+  },
+
+  'click .admin-confirmation-confirm'(event: Event, instance: AudioSettingsInstance) {
+    event.preventDefault();
+    const view = instance.confirmationController.getView();
+    if (
+      view.status !== 'open'
+      || view.pending
+      || instance.confirmationController.getContext() !== 'delete-speech-api-key'
+    ) {
+      return;
+    }
+    instance.confirmationController.setPending(true);
+    instance.audioSettingsMessage.set(null);
+    void instance.keyCommand.run(async () => {
+      await (Meteor as typeof Meteor & { callAsync: (name: string) => Promise<void> })
+        .callAsync('deleteUserSpeechAPIKey');
+    }, {
+      getErrorMessage: (error: unknown) => audioText('audio.changesNotSaved', { error: getErrorMessage(error) }),
+      onSuccess: () => {
+        instance.keyPresentation.set({ status: 'ready', value: false });
+        instance.speechApiDraft.set('');
+        instance.confirmationController.complete();
+        instance.audioSettingsMessage.set({ level: 'success', text: audioText('audio.speechApiKeyDeleted') });
+      },
+      onFailure: (error: unknown) => {
+        instance.confirmationController.setPending(false);
+        instance.audioSettingsMessage.set({
+          level: 'error',
+          text: audioText('audio.changesNotSaved', { error: getErrorMessage(error) }),
+        });
+      },
+    });
+  },
+
+  'click [data-audio-key-status-retry]'(event: Event, instance: AudioSettingsInstance) {
+    event.preventDefault();
+    void loadSpeechApiKeyStatus(instance);
+  },
+
+  'click [data-audio-settings-retry]'(event: Event, instance: AudioSettingsInstance) {
+    event.preventDefault();
+    loadAudioSettings(instance);
+  },
+
+  'click #audioPromptVoiceTest'(event: Event, instance: AudioSettingsInstance) {
+    event.preventDefault();
+    const current = readySettings(instance);
+    if (!current) return;
+    const audio = new Audio(`https://cloud.google.com/text-to-speech/docs/audio/${sharedVoice(current)}.wav`);
+    void audio.play();
+  },
+});
+
+Template.audioSettings.helpers({
+  audioText,
+
+  audioVoiceLabel(gender: 'male' | 'female', number: number) {
+    return audioText(gender === 'female' ? 'audio.femaleVoice' : 'audio.maleVoice', { number });
+  },
+
+  audioSettingsLoadError(): string {
+    const state = (Template.instance() as AudioSettingsInstance).settingsPresentation.get();
+    return state.status === 'error' || state.status === 'refresh-error' ? state.message : '';
+  },
+
+  audioSettingsReady(): boolean {
+    return readySettings(Template.instance() as AudioSettingsInstance) !== null;
+  },
+
+  audioSettingsMessage(): AudioSettingsMessage | null {
+    return (Template.instance() as AudioSettingsInstance).audioSettingsMessage.get();
+  },
+
+  audioSettingsMessageUrgent(): boolean {
+    return (Template.instance() as AudioSettingsInstance).audioSettingsMessage.get()?.level === 'error';
+  },
+
+  settingsBusy(): boolean {
+    return (Template.instance() as AudioSettingsInstance).settingsCommandState.get().status === 'pending';
+  },
+
+  settingsDisabled(): boolean {
+    const instance = Template.instance() as AudioSettingsInstance;
+    return readySettings(instance) === null || instance.settingsCommandState.get().status === 'pending';
+  },
+
+  audioPromptQuestionOn(): boolean {
+    const settings = readySettings(Template.instance() as AudioSettingsInstance);
+    return settings ? promptQuestionEnabled(settings) : false;
+  },
+
+  audioPromptFeedbackOn(): boolean {
+    const settings = readySettings(Template.instance() as AudioSettingsInstance);
+    return settings ? promptFeedbackEnabled(settings) : false;
+  },
+
+  showAudioPromptControls(): boolean {
+    const settings = readySettings(Template.instance() as AudioSettingsInstance);
+    return settings ? promptControlsVisible(settings) : false;
+  },
+
+  audioInputOn(): boolean {
+    return readySettings(Template.instance() as AudioSettingsInstance)?.audioInputMode === true;
+  },
+
+  audioPromptVolume(): number {
+    return (Template.instance() as AudioSettingsInstance).volumeDraft.get();
+  },
+
+  audioPromptVolumeProgress(): number {
+    return rangeProgress((Template.instance() as AudioSettingsInstance).volumeDraft.get(), -6, 6);
+  },
+
+  audioPromptSpeakingRateSelected(value: string): string {
+    const settings = readySettings(Template.instance() as AudioSettingsInstance);
+    return settings && sharedSpeakingRate(settings) === Number.parseFloat(value) ? 'selected' : '';
+  },
+
+  audioPromptVoiceSelected(value: string): string {
+    const settings = readySettings(Template.instance() as AudioSettingsInstance);
+    return settings && sharedVoice(settings) === value ? 'selected' : '';
+  },
+
+  audioInputSensitivity(): number {
+    return (Template.instance() as AudioSettingsInstance).sensitivityDraft.get();
+  },
+
+  audioInputSensitivityProgress(): number {
+    return rangeProgress(
+      (Template.instance() as AudioSettingsInstance).sensitivityDraft.get(),
+      AUDIO_INPUT_SENSITIVITY_MIN,
+      AUDIO_INPUT_SENSITIVITY_MAX,
+    );
+  },
+
+  showSpeechAPISetup(): boolean {
+    return !Session.get('useEmbeddedAPIKeys') && Session.get('showSpeechAPISetup') === true;
+  },
+
+  keyStatusLoading(): boolean {
+    const status = (Template.instance() as AudioSettingsInstance).keyPresentation.get().status;
+    return status === 'idle' || status === 'loading' || status === 'refreshing';
+  },
+
+  keyStatusError(): string {
+    const state = (Template.instance() as AudioSettingsInstance).keyPresentation.get();
+    return state.status === 'error' || state.status === 'refresh-error' ? state.message : '';
+  },
+
+  speechAPIKeyIsSetup(): boolean {
+    const state = (Template.instance() as AudioSettingsInstance).keyPresentation.get();
+    return (state.status === 'ready' || state.status === 'refreshing' || state.status === 'refresh-error')
+      && state.value;
+  },
+
+  speechAPIKeyPlaceholder(): string {
+    const instance = Template.instance() as AudioSettingsInstance;
+    const state = instance.keyPresentation.get();
+    const configured = (state.status === 'ready' || state.status === 'refreshing' || state.status === 'refresh-error')
+      && state.value;
+    return configured
+      ? audioText('audio.enterNewKeyReplaceSaved')
+      : audioText('audio.enterYourApiKey');
+  },
+
+  speechApiDraft(): string {
+    return (Template.instance() as AudioSettingsInstance).speechApiDraft.get();
+  },
+
+  keyCommandBusy(): boolean {
+    return (Template.instance() as AudioSettingsInstance).keyCommandState.get().status === 'pending';
+  },
+
+  audioConfirmationView(): InlineConfirmationView {
+    return (Template.instance() as AudioSettingsInstance).confirmationState.get();
+  },
+});
+
+function getUserAudioSettings(): AudioSettingsForm {
+  return normalizeAudioSettings((Meteor.user() as { audioSettings?: unknown } | null)?.audioSettings);
 }
 
 export async function warmupGoogleTTS() {
@@ -495,9 +610,6 @@ export async function warmupGoogleTTS() {
     settings.audioPromptVoice ||
     '';
 
-  // Make a dummy TTS request to establish the Meteor method connection
-  // Use valid text instead of "." - Google TTS rejects punctuation-only input
-  // Server will handle key lookup (user personal key or TDF key fallback)
   try {
     const ttsLanguage = resolveExplicitTtsLanguageCode({
       configuredLanguage: tdfFile?.tdfs?.tutor?.setspec?.textToSpeechLanguage,
@@ -506,69 +618,55 @@ export async function warmupGoogleTTS() {
     });
     await (Meteor as any).callAsync('makeGoogleTTSApiCall',
       Session.get('currentTdfId'),
-      'warmup', // Valid word for synthesis
-      1.0, // Default rate
-      0.0, // Volume 0 (silent warmup)
+      'warmup',
+      1.0,
+      0.0,
       voice || '',
-      ttsLanguage
+      ttsLanguage,
     );
     setTtsWarmedUp(true);
   } catch (_err) {
-    setTtsWarmedUp(false); // Allow retry on failure
+    setTtsWarmedUp(false);
   }
 }
 
 export async function warmupGoogleSpeechRecognition() {
-  // Check if already warmed up
   if (getSrWarmedUp()) {
     return;
   }
 
-  // Create minimal silent audio data (LINEAR16 format, 16kHz, 100ms of silence)
-  // 16kHz * 100ms = 1600 samples, each sample is 2 bytes (16-bit) = 3200 bytes
   const silentAudioBytes = new Uint8Array(3200).fill(0);
   const base64Audio = btoa(String.fromCharCode.apply(null, Array.from(silentAudioBytes) as any));
   const speechRecognitionLanguage = resolveSpeechRecognitionLanguage(
     Session.get('currentTdfFile')?.tdfs?.tutor?.setspec,
-    getActiveUiLocale()
+    getActiveUiLocale(),
   );
 
-  // Build minimal request matching production format
   const request = {
     config: {
       encoding: 'LINEAR16',
-      sampleRateHertz: 16000,  // Using 16kHz (Google recommended)
+      sampleRateHertz: 16000,
       languageCode: speechRecognitionLanguage,
       maxAlternatives: 1,
       profanityFilter: false,
       enableAutomaticPunctuation: false,
       model: 'latest_short',
       useEnhanced: true,
-      speechContexts: [{
-        phrases: ['warmup'],  // Minimal phrase hint
-        boost: 5
-      }]
+      speechContexts: [{ phrases: ['warmup'], boost: 5 }],
     },
-    audio: {
-      content: base64Audio
-    }
+    audio: { content: base64Audio },
   };
 
-  // Make warmup call
   try {
-    await (Meteor as any).callAsync('makeGoogleSpeechAPICall',
+    await (Meteor as any).callAsync(
+      'makeGoogleSpeechAPICall',
       Session.get('currentTdfId'),
-      '', // Empty key - server will fetch TDF or user key
+      '',
       request,
-      ['warmup'] // Minimal answer grammar
+      ['warmup'],
     );
     setSrWarmedUp(true);
   } catch (_err) {
-    setSrWarmedUp(false); // Allow retry on failure
+    setSrWarmedUp(false);
   }
 }
-
-
-
-
-

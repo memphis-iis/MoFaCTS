@@ -69,6 +69,11 @@ function courseTranslationStatusText(status: string): string {
   return status;
 }
 
+function targetActionLabel(action: string, target: unknown): string {
+  const targetText = String(target || '').trim();
+  return targetText ? `${action}: ${targetText}` : action;
+}
+
 function buildCourseLanguageMetadataRows(assignment: Pick<CourseAssignmentDisplayRow, 'contentLanguage' | 'recommendedUiLocales' | 'translationStatus'>) {
   const rows: Array<{ label: string; value: string }> = [];
   const contentLanguage = String(assignment?.contentLanguage || '').trim();
@@ -266,6 +271,9 @@ const courseAssignmentDisplayHelpers = {
     if (row.availability === 'unavailable') return courseText('courses.unavailable');
     return row.isUsed ? courseText('courses.continue') : courseText('courses.start');
   },
+  assignmentActionLabel(this: CourseAssignmentDisplayRow) {
+    return targetActionLabel(courseAssignmentDisplayHelpers.actionLabel.call(this), this.title);
+  },
   actionButtonClass(this: CourseAssignmentDisplayRow) {
     return this.isUsed ? 'btn-primary' : 'btn-success';
   },
@@ -295,6 +303,9 @@ const courseTreeCourseRowHelpers = {
   },
   joinLabel(this: CourseTreeCourseRow) {
     return Session.get(JOINING_COURSE_SESSION_KEY) === this.courseId ? courseText('courses.joining') : courseText('courses.join');
+  },
+  joinActionLabel(this: CourseTreeCourseRow) {
+    return targetActionLabel(courseTreeCourseRowHelpers.joinLabel.call(this), this.courseName);
   },
   joinDisabled(this: CourseTreeCourseRow) {
     const isJoining = Session.get(JOINING_COURSE_SESSION_KEY) === this.courseId;

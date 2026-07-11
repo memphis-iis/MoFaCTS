@@ -4,6 +4,7 @@ import { ReactiveVar } from 'meteor/reactive-var';
 import { _ as underscore } from 'meteor/underscore';
 const _ = underscore as any;
 import './userAdmin.html';
+import './shared/adminUi/adminUi';
 import { Mongo } from 'meteor/mongo';
 import { userHasRole } from '../lib/roleUtils';
 import { getErrorMessage } from '../lib/errorUtils';
@@ -127,6 +128,16 @@ function formatStatusDate(value: unknown): string {
     return userAdminText('admin.noDate');
   }
   return formatDate(value);
+}
+
+function rowTargetLabel(user: any): string {
+  return String(user?.displayIdentifier || user?._id || '').trim();
+}
+
+function rowActionLabel(actionKey: Parameters<typeof translatePlatformString>[1], user: any): string {
+  const action = userAdminText(actionKey);
+  const target = rowTargetLabel(user);
+  return target ? `${action}: ${target}` : action;
 }
 
 function apiKeyMetadata(instance: any): AdminApiKeyMetadata {
@@ -348,6 +359,53 @@ Template.userAdmin.onDestroyed(function(this: any) {
   }
 });
 
+function buildUserRoleEditRows(instance: any): any[] {
+  // Establish reactive dependency on role-assignment collection so the helper
+  // reruns on both add AND remove (not just remove).
+  (Meteor as any).roleAssignment?.find({}).fetch();
+  const canManageUsers = userHasRole(Meteor.user(), 'admin');
+  const sortField = String(instance.sortField.get() || 'identifier');
+  const sortDirection = instance.sortDirection.get() as SortDirection;
+  const pagedUserIds = getPagedUserIds();
+  const roleStateOverrides = instance.roleStateOverrides.get() as RoleStateOverrides;
+
+  if (pagedUserIds.length === 0) {
+    return [];
+  }
+
+  // Only render the users explicitly included in the active paged subscription.
+  const users = Meteor.users.find({ _id: { $in: pagedUserIds } }).fetch();
+
+  return users.map((user: any) => {
+    const { displayIdentifier, hasIdentifierInvariantViolation } = getDisplayIdentifier(user);
+    const usageDisplay = buildUsageDisplay(user);
+    user.teacher = false;
+    user.admin = false;
+    user.canManageUsers = canManageUsers;
+    user.displayIdentifier = displayIdentifier;
+    user.hasIdentifierInvariantViolation = hasIdentifierInvariantViolation;
+    Object.assign(user, usageDisplay);
+
+    user.teacher = getDisplayedRoleFlag(user._id, 'teacher', roleStateOverrides);
+    user.admin = getDisplayedRoleFlag(user._id, 'admin', roleStateOverrides);
+    return user;
+  }).sort((a: any, b: any) => {
+    const aViolation = !!a.hasIdentifierInvariantViolation;
+    const bViolation = !!b.hasIdentifierInvariantViolation;
+    if (aViolation !== bViolation) {
+      return aViolation ? 1 : -1;
+    }
+    let compareValue = 0;
+    if (sortField === 'identifier') {
+      compareValue = String(a.displayIdentifier || '').localeCompare(String(b.displayIdentifier || ''));
+    } else {
+      compareValue = Number(a.usageSort?.[sortField] ?? Number.NEGATIVE_INFINITY) -
+        Number(b.usageSort?.[sortField] ?? Number.NEGATIVE_INFINITY);
+    }
+    return sortDirection === 'asc' ? compareValue : -compareValue;
+  });
+}
+
 Template.userAdmin.helpers({
   canManageUsers: function() {
     const currentUser = Meteor.user();
@@ -356,55 +414,6 @@ Template.userAdmin.helpers({
 
   userAdminText: function(key: Parameters<typeof translatePlatformString>[1]) {
     return userAdminText(key);
-  },
-
-  userRoleEditList: function() {
-    // Establish reactive dependency on role-assignment collection so the helper
-    // reruns on both add AND remove (not just remove).
-    (Meteor as any).roleAssignment?.find({}).fetch();
-    const canManageUsers = userHasRole(Meteor.user(), 'admin');
-    const instance = Template.instance() as any;
-    const sortField = String(instance.sortField.get() || 'identifier');
-    const sortDirection = instance.sortDirection.get() as SortDirection;
-    const pagedUserIds = getPagedUserIds();
-    const roleStateOverrides = instance.roleStateOverrides.get() as RoleStateOverrides;
-
-    if (pagedUserIds.length === 0) {
-      return [];
-    }
-
-    // Only render the users explicitly included in the active paged subscription.
-    const users = Meteor.users.find({ _id: { $in: pagedUserIds } }).fetch();
-
-    // Process roles for display (O(n) single pass)
-    return users.map((user: any) => {
-      const { displayIdentifier, hasIdentifierInvariantViolation } = getDisplayIdentifier(user);
-      const usageDisplay = buildUsageDisplay(user);
-      user.teacher = false;
-      user.admin = false;
-      user.canManageUsers = canManageUsers;
-      user.displayIdentifier = displayIdentifier;
-      user.hasIdentifierInvariantViolation = hasIdentifierInvariantViolation;
-      Object.assign(user, usageDisplay);
-
-      user.teacher = getDisplayedRoleFlag(user._id, 'teacher', roleStateOverrides);
-      user.admin = getDisplayedRoleFlag(user._id, 'admin', roleStateOverrides);
-      return user;
-    }).sort((a: any, b: any) => {
-      const aViolation = !!a.hasIdentifierInvariantViolation;
-      const bViolation = !!b.hasIdentifierInvariantViolation;
-      if (aViolation !== bViolation) {
-        return aViolation ? 1 : -1;
-      }
-      let compareValue = 0;
-      if (sortField === 'identifier') {
-        compareValue = String(a.displayIdentifier || '').localeCompare(String(b.displayIdentifier || ''));
-      } else {
-        compareValue = Number(a.usageSort?.[sortField] ?? Number.NEGATIVE_INFINITY) -
-          Number(b.usageSort?.[sortField] ?? Number.NEGATIVE_INFINITY);
-      }
-      return sortDirection === 'asc' ? compareValue : -compareValue;
-    });
   },
 
   hasIdentifierInvariantViolations: function() {
@@ -530,10 +539,6 @@ Template.userAdmin.helpers({
     return (Template.instance() as any).selectedDeleteUser.get();
   },
 
-  deleteUserConfirmationOpen: function(userId: string) {
-    return (Template.instance() as any).selectedDeleteUser.get()?.userId === userId;
-  },
-
   apiKeyActionAttrs: function() {
     return (Template.instance() as any).apiKeyBusy.get() ? { disabled: true } : {};
   },
@@ -594,16 +599,24 @@ Template.userAdmin.helpers({
       : userAdminText('admin.noAdminGoogleSrKey');
   },
 
-  sortIndicator: function(field: string) {
-    const instance = Template.instance() as any;
-    if (instance.sortField.get() !== field) {
-      return '';
-    }
-    return instance.sortDirection.get() === 'asc' ? '^' : 'v';
-  },
-
   isLoading: function() {
     return (Template.instance() as any).isLoading.get();
+  },
+
+  userAdminTableLabel: function() {
+    return userAdminText('admin.userList');
+  },
+
+  userAdminTableData: function() {
+    const instance = Template.instance() as any;
+    return {
+      rows: buildUserRoleEditRows(instance),
+      canManageUsers: userHasRole(Meteor.user(), 'admin'),
+      isLoading: instance.isLoading.get(),
+      selectedDeleteUser: instance.selectedDeleteUser.get(),
+      sortField: String(instance.sortField.get() || 'identifier'),
+      sortDirection: instance.sortDirection.get() as SortDirection,
+    };
   },
 
   currentFilter: function() {
@@ -676,6 +689,54 @@ Template.userAdmin.helpers({
   }
 });
 
+Template.userAdminTable.helpers({
+  userAdminText: function(key: Parameters<typeof translatePlatformString>[1]) {
+    return userAdminText(key);
+  },
+
+  userAdminTableColumnCount: function(canManageUsers: boolean) {
+    return canManageUsers ? 10 : 9;
+  },
+
+  roleTogglesLabel: function(user: any) {
+    const target = rowTargetLabel(user);
+    const label = userAdminText('admin.roleToggles');
+    return target ? `${label}: ${target}` : label;
+  },
+
+  roleToggleLabel: function(key: Parameters<typeof translatePlatformString>[1], user: any) {
+    return rowActionLabel(key, user);
+  },
+
+  deleteUserActionLabel: function(user: any) {
+    return rowActionLabel('admin.deleteUser', user);
+  },
+
+  deleteUserConfirmationOpen: function(userId: string) {
+    return Template.instance().data?.selectedDeleteUser?.userId === userId;
+  },
+
+  deleteUserMessageText: function(identifier: string) {
+    return userAdminText('admin.deleteUserMessage', { identifier });
+  },
+});
+
+Template.userAdminSortableHeader.helpers({
+  sortAria: function(field: string) {
+    if (this.sortField !== field) {
+      return 'none';
+    }
+    return this.sortDirection === 'desc' ? 'descending' : 'ascending';
+  },
+
+  sortIndicator: function(field: string) {
+    if (this.sortField !== field) {
+      return '';
+    }
+    return this.sortDirection === 'desc' ? 'v' : '^';
+  },
+});
+
 Template.userAdmin.events({
   'input #filter': function(event: any, instance: any) {
     event.preventDefault();
@@ -694,9 +755,9 @@ Template.userAdmin.events({
     }, 300);
   },
 
-  'click .sortable-useradmin': function(event: any, instance: any) {
+  'click .user-admin-sort-button': function(event: any, instance: any) {
     event.preventDefault();
-    const sortField = legacyTrim($(event.currentTarget).data('sortfield'));
+    const sortField = legacyTrim((event.currentTarget as HTMLElement).dataset.sortfield);
     if (!sortField) {
       return;
     }

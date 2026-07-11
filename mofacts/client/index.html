@@ -59,6 +59,7 @@
 </template>
 
 <template name="DefaultLayout">
+  <div class="theme-bootstrap {{themeBootstrapClass}}">
   <!-- Global Loading Spinner - Persists across route transitions for elegant UX -->
   {{#if appLoading}}
   <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style="background-color: var(--app-loading-overlay-color, rgba(245,245,245,0.95)); z-index: 10000; transition: opacity var(--app-transition-smooth, 200ms) ease-in-out;">
@@ -73,16 +74,12 @@
 
   {{#if showAuthenticatedAppChrome}}
     <div class="app home-app {{appChromeClass}} page-loaded" id="homeContainer" style="{{appShellUnderlayStyle}}">
-      {{#if showAppSidebar}}
-        {{> appSidebar}}
-      {{/if}}
+      {{> appSidebar}}
       <div class="main {{appMainClass}}" id="homeMain">
         <header class="top-header {{appHeaderClass}}">
-          {{#if showAppSidebar}}
-            <button class="icon-btn mobile-sidebar-trigger" id="mobileSidebarToggle" type="button" aria-label="{{t 'common.openMenu'}}" title="{{t 'common.openMenu'}}">
-              <span class="header-action-icon header-action-icon-sidebar" aria-hidden="true"></span>
-            </button>
-          {{/if}}
+          <button class="icon-btn mobile-sidebar-trigger" id="mobileSidebarToggle" type="button" aria-label="{{t 'common.openMenu'}}" title="{{t 'common.openMenu'}}">
+            <span class="header-action-icon header-action-icon-sidebar" aria-hidden="true"></span>
+          </button>
           <h1 class="page-title">{{appShellTitle}}</h1>
           <div class="header-right">
             {{#if isPracticeChrome}}
@@ -95,9 +92,7 @@
           </div>
         </header>
 
-        {{#if showPracticeMenu}}
-          {{> appPracticeMenu}}
-        {{/if}}
+        {{> appPracticeMenu}}
 
         {{#if showPageNumbers}}
           {{> curPageNumbers}}
@@ -220,6 +215,7 @@
   </div>
 -->
 
+  </div>
 </template>
 
 <!-- Custom Loading Template for Admin Page Transitions - Invisible for subtle transitions -->

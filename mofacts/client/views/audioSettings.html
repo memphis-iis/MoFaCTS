@@ -1,14 +1,11 @@
 <template name="audioSettings">
   <div>
-    <h3 class="page-header-title">{{audioText 'audio.settings'}}</h3>
-
     {{#if audioSettingsMessage}}
-      <div class="admin-status admin-status-{{audioSettingsMessage.level}} admin-message" role="status" aria-live="polite">
-        <i class="fa {{audioSettingsMessage.icon}}"></i>
-        <div class="admin-status-text">{{audioSettingsMessage.text}}</div>
-      </div>
+      {{> adminStatus variant=audioSettingsMessage.level text=audioSettingsMessage.text urgent=audioSettingsMessageUrgent}}
     {{/if}}
 
+    {{#if audioSettingsReady}}
+    <div aria-busy="{{#if settingsBusy}}true{{else}}false{{/if}}">
     <!-- Text-to-Speech Section -->
     <div class="admin-section">
       <div class="card admin-card">
@@ -21,7 +18,7 @@
           <div class="card border">
             <div class="card-body">
               <div class="form-check form-switch admin-form-row">
-                <input class="form-check-input" type="checkbox" role="switch" id="audioPromptQuestionOn">
+                <input class="form-check-input" type="checkbox" role="switch" id="audioPromptQuestionOn" checked="{{#if audioPromptQuestionOn}}checked{{/if}}" disabled="{{settingsDisabled}}">
                 <label class="form-check-label admin-inline-action" for="audioPromptQuestionOn">
                   <strong>{{audioText 'audio.readQuestions'}}</strong>
                   <br><small class="text-muted">{{audioText 'audio.readQuestionsHelp'}}</small>
@@ -29,7 +26,7 @@
               </div>
 
               <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" role="switch" id="audioPromptFeedbackOn">
+                <input class="form-check-input" type="checkbox" role="switch" id="audioPromptFeedbackOn" checked="{{#if audioPromptFeedbackOn}}checked{{/if}}" disabled="{{settingsDisabled}}">
                 <label class="form-check-label admin-inline-action" for="audioPromptFeedbackOn">
                   <strong>{{audioText 'audio.readFeedback'}}</strong>
                   <br><small class="text-muted">{{audioText 'audio.readFeedbackHelp'}}</small>
@@ -39,7 +36,8 @@
           </div>
 
           <!-- Voice Controls (shown when TTS is enabled) -->
-          <div class="audioPromptSharedGroup" style="display: none;">
+          {{#if showAudioPromptControls}}
+          <div class="audioPromptSharedGroup flow">
             <div class="card border bg-light admin-form-row-top">
               <div class="card-body">
                 <div class="row g-3">
@@ -47,7 +45,7 @@
                     <label for="audioPromptVolume" class="form-label fw-semibold">
                       <i class="fa fa-volume-up admin-section-icon"></i>{{audioText 'audio.volume'}}
                     </label>
-                    <input type="range" class="form-range" id="audioPromptVolume" min="-6" max="6" step=".5" value="0">
+                    <input type="range" class="form-range audio-settings-range" id="audioPromptVolume" min="-6" max="6" step=".5" value="{{audioPromptVolume}}" style="--audio-range-progress: {{audioPromptVolumeProgress}}%;" disabled="{{settingsDisabled}}">
                     <div class="d-flex justify-content-between">
                       <small class="text-muted">{{audioText 'audio.quieter'}}</small>
                       <small class="text-muted">{{audioText 'audio.louder'}}</small>
@@ -58,15 +56,15 @@
                     <label for="audioPromptSpeakingRate" class="form-label fw-semibold">
                       <i class="fa fa-gauge admin-section-icon"></i>{{audioText 'audio.speed'}}
                     </label>
-                    <select class="form-select" id="audioPromptSpeakingRate">
-                      <option value=".25">0.25x</option>
-                      <option value=".5">0.50x</option>
-                      <option value=".75">0.75x</option>
-                      <option value="1" selected>{{audioText 'audio.normal'}}</option>
-                      <option value="1.25">1.25x</option>
-                      <option value="1.5">1.50x</option>
-                      <option value="1.75">1.75x</option>
-                      <option value="2">2.00x</option>
+                    <select class="form-select" id="audioPromptSpeakingRate" disabled="{{settingsDisabled}}">
+                      <option value=".25" selected="{{audioPromptSpeakingRateSelected '.25'}}">0.25x</option>
+                      <option value=".5" selected="{{audioPromptSpeakingRateSelected '.5'}}">0.50x</option>
+                      <option value=".75" selected="{{audioPromptSpeakingRateSelected '.75'}}">0.75x</option>
+                      <option value="1" selected="{{audioPromptSpeakingRateSelected '1'}}">{{audioText 'audio.normal'}}</option>
+                      <option value="1.25" selected="{{audioPromptSpeakingRateSelected '1.25'}}">1.25x</option>
+                      <option value="1.5" selected="{{audioPromptSpeakingRateSelected '1.5'}}">1.50x</option>
+                      <option value="1.75" selected="{{audioPromptSpeakingRateSelected '1.75'}}">1.75x</option>
+                      <option value="2" selected="{{audioPromptSpeakingRateSelected '2'}}">2.00x</option>
                     </select>
                   </div>
 
@@ -75,20 +73,20 @@
                       <i class="fa fa-user admin-section-icon"></i>{{audioText 'audio.voice'}}
                     </label>
                     <div class="input-group">
-                      <select class="form-select" id="audioPromptVoice">
-                        <option value="en-US-Standard-A" selected>{{audioVoiceLabel 'male' 1}}</option>
-                        <option value="en-US-Standard-B">{{audioVoiceLabel 'male' 2}}</option>
-                        <option value="en-US-Standard-C">{{audioVoiceLabel 'female' 1}}</option>
-                        <option value="en-US-Standard-D">{{audioVoiceLabel 'male' 3}}</option>
-                        <option value="en-US-Standard-E">{{audioVoiceLabel 'female' 2}}</option>
-                        <option value="en-US-Standard-F">{{audioVoiceLabel 'female' 3}}</option>
-                        <option value="en-US-Standard-G">{{audioVoiceLabel 'female' 4}}</option>
-                        <option value="en-US-Standard-H">{{audioVoiceLabel 'female' 5}}</option>
-                        <option value="en-US-Standard-I">{{audioVoiceLabel 'male' 4}}</option>
-                        <option value="en-US-Standard-J">{{audioVoiceLabel 'male' 5}}</option>
+                      <select class="form-select" id="audioPromptVoice" disabled="{{settingsDisabled}}">
+                        <option value="en-US-Standard-A" selected="{{audioPromptVoiceSelected 'en-US-Standard-A'}}">{{audioVoiceLabel 'male' 1}}</option>
+                        <option value="en-US-Standard-B" selected="{{audioPromptVoiceSelected 'en-US-Standard-B'}}">{{audioVoiceLabel 'male' 2}}</option>
+                        <option value="en-US-Standard-C" selected="{{audioPromptVoiceSelected 'en-US-Standard-C'}}">{{audioVoiceLabel 'female' 1}}</option>
+                        <option value="en-US-Standard-D" selected="{{audioPromptVoiceSelected 'en-US-Standard-D'}}">{{audioVoiceLabel 'male' 3}}</option>
+                        <option value="en-US-Standard-E" selected="{{audioPromptVoiceSelected 'en-US-Standard-E'}}">{{audioVoiceLabel 'female' 2}}</option>
+                        <option value="en-US-Standard-F" selected="{{audioPromptVoiceSelected 'en-US-Standard-F'}}">{{audioVoiceLabel 'female' 3}}</option>
+                        <option value="en-US-Standard-G" selected="{{audioPromptVoiceSelected 'en-US-Standard-G'}}">{{audioVoiceLabel 'female' 4}}</option>
+                        <option value="en-US-Standard-H" selected="{{audioPromptVoiceSelected 'en-US-Standard-H'}}">{{audioVoiceLabel 'female' 5}}</option>
+                        <option value="en-US-Standard-I" selected="{{audioPromptVoiceSelected 'en-US-Standard-I'}}">{{audioVoiceLabel 'male' 4}}</option>
+                        <option value="en-US-Standard-J" selected="{{audioPromptVoiceSelected 'en-US-Standard-J'}}">{{audioVoiceLabel 'male' 5}}</option>
                       </select>
-                      <button class="btn btn-outline-secondary" type="button" id="audioPromptVoiceTest" title="{{audioText 'audio.testVoice'}}">
-                        <i class="fa fa-play"></i>
+                      <button class="btn btn-outline-secondary" type="button" id="audioPromptVoiceTest" title="{{audioText 'audio.testVoice'}}" aria-label="{{audioText 'audio.testVoice'}}" disabled="{{settingsDisabled}}">
+                        <i class="fa fa-play" aria-hidden="true"></i>
                       </button>
                     </div>
                   </div>
@@ -96,6 +94,7 @@
               </div>
             </div>
           </div>
+          {{/if}}
         </div>
       </div>
     </div>
@@ -114,7 +113,7 @@
               <div class="row align-items-start admin-form-row">
                 <div class="col-12 col-md-6">
                   <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" role="switch" id="audioInputOn">
+                    <input class="form-check-input" type="checkbox" role="switch" id="audioInputOn" checked="{{#if audioInputOn}}checked{{/if}}" disabled="{{settingsDisabled}}">
                     <label class="form-check-label admin-inline-action" for="audioInputOn">
                       <strong>{{audioText 'audio.enableVoiceInput'}}</strong>
                       <br><small class="text-muted">{{audioText 'audio.enableVoiceInputHelp'}}</small>
@@ -122,16 +121,17 @@
                   </div>
                 </div>
 
-                <div class="col-12 col-md-6 audioInputGroup" style="display: none;">
+                {{#if audioInputOn}}
+                <div class="col-12 col-md-6 audioInputGroup flow">
                   <div class="d-flex justify-content-between align-items-center admin-form-row-sm">
                     <label for="audioInputSensitivity" class="form-label fw-semibold admin-empty-text">
                       <i class="fa fa-sliders admin-section-icon"></i>{{audioText 'audio.speechDetectionThreshold'}}
                     </label>
                     <span class="badge text-bg-light border">
-                      <span id="audioInputSensitivityLabel">60</span> dB
+                      <span id="audioInputSensitivityLabel">{{audioInputSensitivity}}</span> dB
                     </span>
                   </div>
-                  <input type="range" class="form-range" id="audioInputSensitivity" value="60" step="1" min="20" max="80">
+                  <input type="range" class="form-range audio-settings-range" id="audioInputSensitivity" value="{{audioInputSensitivity}}" step="1" min="20" max="80" style="--audio-range-progress: {{audioInputSensitivityProgress}}%;" disabled="{{settingsDisabled}}">
                   <div class="d-flex justify-content-between">
                     <small class="text-muted">20 dB<br>{{audioText 'audio.veryEasyToTrigger'}}</small>
                     <small class="text-muted text-end">80 dB<br>{{audioText 'audio.needsLoudSpeech'}}</small>
@@ -139,7 +139,7 @@
                   <p class="small text-muted admin-form-row-sm">
                     {{audioText 'audio.thresholdHelp'}}
                   </p>
-                  <div class="table-responsive">
+                  <div class="table-responsive" role="region" aria-label="{{audioText 'audio.commonSound'}}" tabindex="0">
                     <table class="table table-sm table-bordered align-middle admin-empty-text">
                       <thead class="table-light">
                         <tr>
@@ -150,32 +150,32 @@
                       </thead>
                       <tbody>
                         <tr>
-                          <td>{{audioText 'audio.normalBreathing'}}</td>
+                          <th scope="row">{{audioText 'audio.normalBreathing'}}</th>
                           <td>10 dB</td>
                           <td>{{audioText 'audio.barelyAudible'}}</td>
                         </tr>
                         <tr>
-                          <td>{{audioText 'audio.whisper'}}</td>
+                          <th scope="row">{{audioText 'audio.whisper'}}</th>
                           <td>30 dB</td>
                           <td>{{audioText 'audio.verySoft'}}</td>
                         </tr>
                         <tr>
-                          <td>{{audioText 'audio.quietLibraryOffice'}}</td>
+                          <th scope="row">{{audioText 'audio.quietLibraryOffice'}}</th>
                           <td>40 dB</td>
                           <td>{{audioText 'audio.soft'}}</td>
                         </tr>
                         <tr>
-                          <td>{{audioText 'audio.moderateRainfall'}}</td>
+                          <th scope="row">{{audioText 'audio.moderateRainfall'}}</th>
                           <td>50 dB</td>
                           <td>{{audioText 'audio.moderate'}}</td>
                         </tr>
                         <tr>
-                          <td>{{audioText 'audio.normalConversation'}}</td>
+                          <th scope="row">{{audioText 'audio.normalConversation'}}</th>
                           <td>60 dB</td>
                           <td>{{audioText 'audio.comfortable'}}</td>
                         </tr>
                         <tr>
-                          <td>{{audioText 'audio.vacuumCleanerDishwasher'}}</td>
+                          <th scope="row">{{audioText 'audio.vacuumCleanerDishwasher'}}</th>
                           <td>70 dB</td>
                           <td>{{audioText 'audio.loud'}}</td>
                         </tr>
@@ -183,45 +183,68 @@
                     </table>
                   </div>
                 </div>
+                {{/if}}
               </div>
 
-              <div class="audioInputGroup" style="display: none;">
+              {{#if audioInputOn}}
+              <div class="audioInputGroup flow">
                 {{#if showSpeechAPISetup}}
                   <div class="border-top admin-section-top-border">
                     <h6 class="admin-section-heading">
                       <i class="fa fa-key admin-section-icon"></i>{{audioText 'audio.googleSpeechApiKey'}}
                     </h6>
-                    <p class="text-muted small admin-form-row-sm">
+                    <p id="speechAPIKeyHelp" class="text-muted small admin-form-row-sm">
                       {{audioText 'audio.speechApiKeyHelp'}}
-                      <a href="https://support.google.com/cloud/answer/6158862?hl=en" target="_blank">{{audioText 'audio.learnHowToGetOne'}} <i class="fa fa-external-link-alt fa-xs"></i></a>
+                      <a href="https://support.google.com/cloud/answer/6158862?hl=en" target="_blank" rel="noopener noreferrer">{{audioText 'audio.learnHowToGetOne'}} <i class="fa fa-external-link-alt fa-xs" aria-hidden="true"></i></a>
                     </p>
 
+                    {{#if keyStatusLoading}}
+                      {{> adminStatus variant="info" text=(audioText 'common.loading')}}
+                    {{else}}
+                    {{#if keyStatusError}}
+                      {{> adminStatus variant="error" text=keyStatusError urgent=true}}
+                      <button type="button" class="btn btn-outline-secondary btn-sm admin-form-row-sm" data-audio-key-status-retry="true">
+                        {{audioText 'common.tryAgain'}}
+                      </button>
+                    {{/if}}
                     {{#if speechAPIKeyIsSetup}}
-                      <div class="admin-status admin-status-success admin-status-small admin-form-row-sm" role="status">
-                        <i class="fa fa-check-circle"></i>
-                        <div class="admin-status-text">{{audioText 'audio.speechApiKeyConfigured'}}</div>
-                      </div>
+                      {{> adminStatus variant="success" text=(audioText 'audio.speechApiKeyConfigured')}}
                     {{/if}}
 
+                    <label for="speechAPIKey" class="form-label">{{audioText 'audio.googleSpeechApiKey'}}</label>
                     <div class="input-group admin-form-row-sm">
-                      <input type="password" class="form-control" id="speechAPIKey" autocomplete="new-password" placeholder="{{speechAPIKeyPlaceholder}}">
-                      <button id="speechAPISubmit" type="button" class="btn btn-primary">
-                        <i class="fa fa-save"></i> {{audioText 'audio.save'}}
+                      <input type="password" class="form-control" id="speechAPIKey" autocomplete="new-password" value="{{speechApiDraft}}" placeholder="{{speechAPIKeyPlaceholder}}" aria-describedby="speechAPIKeyHelp" disabled="{{keyCommandBusy}}">
+                      <button id="speechAPISubmit" type="button" class="btn btn-primary" disabled="{{keyCommandBusy}}" aria-busy="{{#if keyCommandBusy}}true{{else}}false{{/if}}">
+                        <i class="fa fa-save" aria-hidden="true"></i> {{audioText 'audio.save'}}
                       </button>
                     </div>
 
                     {{#if speechAPIKeyIsSetup}}
-                      <button id="speechAPIDelete" type="button" class="btn btn-outline-danger btn-sm">
-                        <i class="fa fa-trash"></i> {{audioText 'audio.deleteKey'}}
+                      <button id="speechAPIDelete" type="button" class="btn btn-outline-danger btn-sm" disabled="{{keyCommandBusy}}" aria-busy="{{#if keyCommandBusy}}true{{else}}false{{/if}}">
+                        <i class="fa fa-trash" aria-hidden="true"></i> {{audioText 'audio.deleteKey'}}
                       </button>
+                    {{/if}}
+                    {{> adminInlineConfirmation confirmation=audioConfirmationView}}
                     {{/if}}
                   </div>
                 {{/if}}
               </div>
+              {{/if}}
             </div>
           </div>
         </div>
       </div>
     </div>
+    </div>
+    {{else}}
+      {{#if audioSettingsLoadError}}
+        {{> adminStatus variant="error" text=audioSettingsLoadError urgent=true}}
+        <button type="button" class="btn btn-outline-secondary" data-audio-settings-retry="true">
+          {{audioText 'common.tryAgain'}}
+        </button>
+      {{else}}
+        {{> adminStatus variant="info" text=(audioText 'common.loading')}}
+      {{/if}}
+    {{/if}}
   </div>
 </template>

@@ -7,6 +7,7 @@ import { Meteor } from 'meteor/meteor';
 import { Template } from 'meteor/templating';
 import { Session } from 'meteor/session';
 import './imsccWizard.html';
+import './imsccWizard.css';
 import { ReactiveVar } from 'meteor/reactive-var';
 import './draftEditorWorkspace';
 import { buildImportPackageFromDraftLessons } from '../../lib/importPackageBuilder';

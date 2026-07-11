@@ -1,27 +1,8 @@
 <template name="home">
-  <div class="app home-app page-loading" id="homeContainer" style="{{homeUnderlayStyle}}">
-    {{> appSidebar}}
-
-    <div class="main" id="homeMain">
-      <header class="top-header">
-        <button class="icon-btn mobile-sidebar-trigger" id="mobileSidebarToggle" type="button" aria-label="{{t 'common.openMenu'}}" title="{{t 'common.openMenu'}}">
-          <span class="header-action-icon header-action-icon-sidebar" aria-hidden="true"></span>
-        </button>
-        <h1 class="page-title">{{t 'home.practice'}}</h1>
-        <div class="header-right">
-          {{> appAccountMenu}}
-        </div>
-      </header>
-
-      <main class="content">
-        <div class="welcome">
-          {{{homeWelcomeHtml}}}
-        </div>
-        {{> learningDashboard}}
-      </main>
-      {{> footer}}
-    </div>
+  <div class="welcome">
+    {{{homeWelcomeHtml}}}
   </div>
+  {{> learningDashboard}}
 
   <div id="mainMenuReturnTour" class="main-menu-return-tour" role="status" aria-live="polite" hidden>
     <span class="main-menu-return-tour-arrow" aria-hidden="true"></span>

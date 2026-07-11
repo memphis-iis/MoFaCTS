@@ -4,6 +4,7 @@ import { Template } from 'meteor/templating';
 import { ReactiveVar } from 'meteor/reactive-var';
 import { Random } from 'meteor/random';
 import './manualContentCreator.html';
+import './manualContentCreator.css';
 import './draftEditorWorkspace';
 import { buildImportPackageFromDraftLessons } from '../../lib/importPackageBuilder';
 import { getUploadIntegrity } from '../../lib/uploadIntegrity';

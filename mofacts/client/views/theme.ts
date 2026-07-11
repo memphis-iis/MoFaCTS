@@ -17,11 +17,12 @@ import {
     themeEditorDisplayValue,
 } from '../../common/themePropertyNormalization';
 import { clientConsole } from '../lib/clientLogger';
+import { createTemplateLifetime } from '../lib/adminUi/templateLifetime';
 import './themeGenerationWizard';
 import './theme.html';
+import './theme.css';
 
 declare const DynamicSettings: any;
-declare const $: any;
 
 const THEME_FONT_STYLESHEET_LINK_ID = 'mofacts-theme-font-stylesheet';
 const THEME_IMPORT_MAX_FILE_BYTES = 10 * 1024 * 1024;
@@ -116,9 +117,10 @@ function syncThemeColorPicker(inputEl: HTMLInputElement, themeProperties: Record
     inputEl.value = colorValue;
 }
 
-function syncThemeColorPickers(root: ParentNode = document) {
-    const theme = getServerActiveTheme();
-    const themeProperties = theme?.properties;
+function syncThemeColorPickers(
+    root: ParentNode = document,
+    themeProperties: Record<string, unknown> | undefined = getServerActiveTheme()?.properties,
+) {
     if (!themeProperties) {
         return;
     }
@@ -261,12 +263,39 @@ function clearThemeMessage(template: any) {
     template?.themeMessage?.set?.(null);
 }
 
+function setThemeHelpStatus(template: any, level: 'info' | 'success' | 'error', text: string) {
+    template.themeHelpStatus.set({ level, text });
+}
+
 function clearThemeConfirmation(template: any) {
     const pending = template?.themeConfirmation?.get?.();
     if (pending?.resolve) {
         pending.resolve(false);
     }
     template?.themeConfirmation?.set?.(null);
+}
+
+function loadThemePublications(template: any) {
+    const generation = template.themePublicationLifetime.begin();
+    template.themePublicationState.set({ themeReady: false, libraryReady: false, error: null });
+
+    const markReady = (key: 'themeReady' | 'libraryReady') => {
+        if (!template.themePublicationLifetime.isCurrent(generation)) return;
+        template.themePublicationState.set({
+            ...template.themePublicationState.get(),
+            [key]: true,
+        });
+    };
+    const markError = (error: unknown) => {
+        if (!error || !template.themePublicationLifetime.isCurrent(generation)) return;
+        template.themePublicationState.set({
+            ...template.themePublicationState.get(),
+            error: error instanceof Error ? error.message : String(error),
+        });
+    };
+
+    template.subscribe('theme', { onReady: () => markReady('themeReady'), onStop: markError });
+    template.subscribe('themeLibrary', { onReady: () => markReady('libraryReady'), onStop: markError });
 }
 
 function requestThemeConfirmation(template: any, options: any): Promise<boolean> {
@@ -302,9 +331,6 @@ async function downloadThemeJson(template: any, themeId: any, filenameFallback =
 }
 
 Template.theme.onCreated(function(this: any) {
-    this.subscribe('theme');
-    this.subscribe('themeLibrary');
-    this.subscriptions = [];
     this.autoruns = [];
 
     // Memoization cache for contrast calculations
@@ -312,15 +338,23 @@ Template.theme.onCreated(function(this: any) {
     this.contrastCache = new Map();
     this.themeMessage = new ReactiveVar(null);
     this.themeConfirmation = new ReactiveVar(null);
+    this.themeHelpStatus = new ReactiveVar(null);
+    this.themePublicationState = new ReactiveVar({ themeReady: false, libraryReady: false, error: null });
+    this.themePublicationLifetime = createTemplateLifetime();
+    this.themeFontLoadState = new ReactiveVar({ status: 'idle', href: '' });
+    this.themeEditorDraftProperties = new ReactiveVar({});
+    this.themePropertyRevisions = new Map();
+    this.themeColorSaveTimeout = null;
+    loadThemePublications(this);
 });
 
 Template.theme.onRendered(function(this: any) {
     this.autoruns.push(this.autorun(() => {
-        const theme = getServerActiveTheme();
+        const theme = getThemeEditorTheme(this);
         if (!theme?.properties) {
             return;
         }
-        Tracker.afterFlush(() => syncThemeColorPickers(this.firstNode?.parentNode || document));
+        Tracker.afterFlush(() => syncThemeColorPickers(this.firstNode?.parentNode || document, theme.properties));
     }));
 });
 
@@ -328,35 +362,31 @@ Template.theme.onDestroyed(function(this: any) {
     // Clean up autoruns
     this.autoruns.forEach((ar: any) => ar.stop());
 
-    // Clean up subscriptions
-    this.subscriptions.forEach((sub: any) => sub.stop());
-
-    // Clear theme save timeouts
-    if ((window as any).themeSaveTimeout) {
-        clearTimeout((window as any).themeSaveTimeout);
-    }
-    if ((window as any).themeColorSaveTimeout) {
-        clearTimeout((window as any).themeColorSaveTimeout);
+    if (this.themeColorSaveTimeout) {
+        clearTimeout(this.themeColorSaveTimeout);
+        this.themeColorSaveTimeout = null;
     }
 
     // Clear contrast cache
     this.contrastCache.clear();
+    this.themePropertyRevisions.clear();
+    this.themePublicationLifetime.destroy();
 });
 
 
 Template.theme.helpers({
     'currentTheme': function() {
-        return getServerActiveTheme();
+        return getThemeEditorTheme(Template.instance());
     },
     'themeEditorValue': function(propId: any) {
-        const theme = getServerActiveTheme();
+        const theme = getThemeEditorTheme(Template.instance());
         if (!theme || !theme.properties || !propId) {
             return '';
         }
         return themeEditorDisplayValue(String(propId), theme.properties[propId]);
     },
     'themeColorPickerValue': function(propId: any) {
-        const theme = getServerActiveTheme();
+        const theme = getThemeEditorTheme(Template.instance());
         return normalizeColorPickerValue(theme?.properties?.[propId]) || '#000000';
     },
     'availableThemes': function() {
@@ -406,7 +436,7 @@ Template.theme.helpers({
     },
     'getContrastInfo': function(fgProp: any, bgProp: any) {
         const instance = Template.instance() as any;
-        const theme = getServerActiveTheme();
+        const theme = getThemeEditorTheme(instance);
         if (!theme || !theme.properties) return null;
 
         const fg = theme.properties[fgProp];
@@ -441,6 +471,29 @@ Template.theme.helpers({
     },
     'themeConfirmation': function() {
         return (Template.instance() as any).themeConfirmation.get();
+    },
+    'themeHelpStatus': function() {
+        return (Template.instance() as any).themeHelpStatus.get();
+    },
+    'themeLoading': function() {
+        const state = (Template.instance() as any).themePublicationState.get();
+        return !state.error && (!state.themeReady || !state.libraryReady);
+    },
+    'themeLoadError': function() {
+        const state = (Template.instance() as any).themePublicationState.get();
+        if (!state.error) return null;
+        return themeText('theme.errorSavingField', {
+            field: themeText('theme.settingsTitle'),
+            error: state.error,
+        });
+    },
+    'themeFontLoadError': function() {
+        const state = (Template.instance() as any).themeFontLoadState.get();
+        if (state.status !== 'error') return null;
+        return themeText('theme.errorSavingField', {
+            field: themeText('theme.webFontStylesheetUrl'),
+            error: state.error || state.href,
+        });
     },
     'themeText': function(key: Parameters<typeof translatePlatformString>[1], options?: { hash?: Parameters<typeof translatePlatformString>[2] }) {
         return themeText(key, options?.hash);
@@ -543,12 +596,17 @@ function applyThemeCssVariable(property: string, rawValue: unknown) {
     document.documentElement.style.setProperty(propConverted, String(normalizedText));
 }
 
-function applyThemeFontStylesheet(rawValue: unknown) {
+function setThemeFontLoadState(template: any, state: { status: 'idle' | 'loading' | 'ready' | 'error'; href: string; error?: string }) {
+    template?.themeFontLoadState?.set?.(state);
+}
+
+function applyThemeFontStylesheet(rawValue: unknown, template?: any) {
     const href = typeof rawValue === 'string' ? rawValue.trim() : '';
     const existingLink = document.getElementById(THEME_FONT_STYLESHEET_LINK_ID) as HTMLLinkElement | null;
 
     if (!href) {
         existingLink?.remove();
+        setThemeFontLoadState(template, { status: 'idle', href: '' });
         return;
     }
 
@@ -560,19 +618,40 @@ function applyThemeFontStylesheet(rawValue: unknown) {
         document.head.appendChild(link);
     }
 
-    if (link.getAttribute('href') !== href) {
-        link.href = href;
+    if (link.getAttribute('href') === href) {
+        const status = link.dataset.themeFontLoadState === 'error' ? 'error' : 'ready';
+        setThemeFontLoadState(template, {
+            status,
+            href,
+            error: link.dataset.themeFontLoadError,
+        });
+        return;
     }
+
+    link.dataset.themeFontLoadState = 'loading';
+    delete link.dataset.themeFontLoadError;
+    setThemeFontLoadState(template, { status: 'loading', href });
+    link.onload = () => {
+        link.dataset.themeFontLoadState = 'ready';
+        setThemeFontLoadState(template, { status: 'ready', href });
+    };
+    link.onerror = () => {
+        const error = 'The stylesheet could not be loaded.';
+        link.dataset.themeFontLoadState = 'error';
+        link.dataset.themeFontLoadError = error;
+        setThemeFontLoadState(template, { status: 'error', href, error });
+    };
+    link.href = href;
 }
 
-function applyThemePropertyPreview(property: string, value: unknown) {
+function applyThemePropertyPreview(property: string, value: unknown, template?: any) {
     applyThemeCssVariable(property, value);
     if (property === 'app_font_stylesheet_url') {
-        applyThemeFontStylesheet(value);
+        applyThemeFontStylesheet(value, template);
     }
 }
 
-function applyThemeState(themeData: any) {
+function applyThemeState(themeData: any, template?: any) {
     if (!themeData?.properties) {
         throw new Error('[Theme] Active theme payload is missing properties');
     }
@@ -582,35 +661,100 @@ function applyThemeState(themeData: any) {
     if (Session.get('userThemeOverrideActive') !== true) {
         Session.set('curTheme', themeData);
         Object.entries(themeData.properties).forEach(([property, value]) => {
-            applyThemePropertyPreview(property, value);
+            applyThemePropertyPreview(property, value, template);
         });
         document.title = themeData.properties.themeName || 'MoFaCTS';
     }
-    syncThemeColorPickers();
+    syncThemeColorPickers(document, themeData.properties);
 }
 
-function updateServerActiveThemeSessionProperty(property: string, value: unknown) {
-    const theme = getServerActiveTheme();
-    if (theme && theme.properties) {
-        const updatedTheme = {
-            ...theme,
-            properties: {
-                ...theme.properties,
-                [property]: value
-            }
-        };
-        Session.set('serverActiveTheme', updatedTheme);
+function getThemeEditorDraftProperties(template: any): Record<string, unknown> {
+    return template?.themeEditorDraftProperties?.get?.() || {};
+}
+
+function getThemeEditorTheme(template: any) {
+    const confirmedTheme = getServerActiveTheme();
+    if (!confirmedTheme?.properties) {
+        return confirmedTheme;
+    }
+
+    return {
+        ...confirmedTheme,
+        properties: {
+            ...confirmedTheme.properties,
+            ...getThemeEditorDraftProperties(template),
+        },
+    };
+}
+
+function applyThemeEditorDraftPreview(template: any) {
+    const draftProperties = getThemeEditorDraftProperties(template);
+    for (const [property, value] of Object.entries(draftProperties)) {
         if (Session.get('userThemeOverrideActive') !== true) {
-            Session.set('curTheme', updatedTheme);
+            applyThemePropertyPreview(property, value, template);
         }
+    }
+    syncThemeColorPickers(template?.firstNode?.parentNode || document, getThemeEditorTheme(template)?.properties);
+}
+
+function clearThemeEditorDraft(template: any) {
+    template.themeEditorDraftProperties.set({});
+    template.themePropertyRevisions.clear();
+    if (template.themeColorSaveTimeout) {
+        clearTimeout(template.themeColorSaveTimeout);
+        template.themeColorSaveTimeout = null;
+    }
+}
+
+function stageThemePropertyDraft(template: any, property: string, value: unknown) {
+    const revision = (template.themePropertyRevisions.get(property) || 0) + 1;
+    template.themePropertyRevisions.set(property, revision);
+    template.themeEditorDraftProperties.set({
+        ...getThemeEditorDraftProperties(template),
+        [property]: value,
+    });
+    applyThemeEditorDraftPreview(template);
+    return revision;
+}
+
+async function persistThemePropertyDraft(template: any, property: string, value: unknown, revision: number): Promise<boolean> {
+    try {
+        const response = await saveThemeProperty(property, value);
+        if (template.themePropertyRevisions.get(property) !== revision) {
+            return false;
+        }
+
+        const { [property]: _savedDraftValue, ...remainingDraftProperties } = getThemeEditorDraftProperties(template);
+        template.themeEditorDraftProperties.set(remainingDraftProperties);
+        if (!response?.theme?.properties) {
+            throw new Error('Theme update did not return the confirmed theme state');
+        }
+        applyThemeState(response.theme, template);
+        applyThemeEditorDraftPreview(template);
+        return true;
+    } catch (err: any) {
+        if (template.themePropertyRevisions.get(property) !== revision) {
+            return false;
+        }
+
+        const { [property]: _failedDraftValue, ...remainingDraftProperties } = getThemeEditorDraftProperties(template);
+        template.themeEditorDraftProperties.set(remainingDraftProperties);
+        const confirmedTheme = getServerActiveTheme();
+        if (confirmedTheme?.properties) {
+            applyThemeState(confirmedTheme, template);
+        }
+        applyThemeEditorDraftPreview(template);
+        clientConsole(1, `[Theme] Error auto-saving ${property}:`, err);
+        setThemeMessage(template, 'error', themeText('theme.errorSavingField', { field: property, error: err }));
+        return false;
     }
 }
 
 async function saveThemeProperty(property: string, value: unknown) {
-    await (Meteor as any).callAsync('setCustomThemeProperty', property, value);
+    return await (Meteor as any).callAsync('setCustomThemeProperty', property, value);
 }
 
-function commitThemePropInput(inputEl: HTMLInputElement | HTMLTextAreaElement, template?: any) {
+function commitThemePropInput(inputEl: HTMLInputElement | HTMLTextAreaElement, template: any) {
     const dataId = inputEl.getAttribute('data-id');
     if (!dataId) {
         throw new Error('[Theme] Editable theme field is missing data-id');
@@ -621,21 +765,8 @@ function commitThemePropInput(inputEl: HTMLInputElement | HTMLTextAreaElement, t
         return;
     }
 
-    updateServerActiveThemeSessionProperty(dataId, value);
-
-    if (Session.get('userThemeOverrideActive') !== true) {
-        applyThemePropertyPreview(dataId, value);
-    }
-    syncThemeColorPickers();
-
-    (async () => {
-        try {
-            await saveThemeProperty(dataId, value);
-        } catch (err: any) {
-            clientConsole(1, `[Theme] Error auto-saving ${dataId}:`, err);
-            setThemeMessage(template, 'error', themeText('theme.errorSavingField', { field: dataId, error: err }));
-        }
-    })();
+    const revision = stageThemePropertyDraft(template, dataId, value);
+    void persistThemePropertyDraft(template, dataId, value, revision);
 }
 
 function getThemeIconBackgroundColor() {
@@ -698,6 +829,9 @@ function createPngDataUrlFromImage(
 }
 
 Template.theme.events({
+    'click [data-theme-retry]': function(_event: any, template: any) {
+        loadThemePublications(template);
+    },
     'click .set-active-theme': async function(event: any, template: any) {
         event.preventDefault();
         const themeId = event.currentTarget.getAttribute('data-id');
@@ -706,7 +840,8 @@ Template.theme.events({
         }
         try {
             const activeTheme = await (Meteor as any).callAsync('setActiveTheme', themeId);
-            applyThemeState(activeTheme);
+            clearThemeEditorDraft(template);
+            applyThemeState(activeTheme, template);
         } catch (err: any) {
             setThemeMessage(template, 'error', themeText('theme.errorActivatingTheme', { error: err?.message || err }));
         }
@@ -814,20 +949,21 @@ Template.theme.events({
     'click #themeResetButton': async function(event: any, template: any) {
         try {
             const activeTheme = await (Meteor as any).callAsync('initializeCustomTheme', 'MoFaCTS');
-            applyThemeState(activeTheme);
+            clearThemeEditorDraft(template);
+            applyThemeState(activeTheme, template);
             setThemeMessage(template, 'success', themeText('theme.resetToDefault'));
         } catch (err: any) {
             setThemeMessage(template, 'error', themeText('theme.errorResettingTheme', { error: err?.message || err }));
         }
     },
-    'input .currentThemeProp': function(event: any) {
+    'input .currentThemeProp': function(event: any, template: any) {
         const dataId = event.currentTarget.getAttribute('data-id');
         if (!dataId) {
             throw new Error('[Theme] Editable theme field is missing data-id');
         }
         const { valid, value } = validateThemePropInput(event.currentTarget, dataId, event.currentTarget.value);
         if (valid && isThemeDensityScaleProperty(dataId) && Session.get('userThemeOverrideActive') !== true) {
-            applyThemePropertyPreview(dataId, value);
+            applyThemePropertyPreview(dataId, value, template);
         }
     },
     'keydown .currentThemeProp': function(event: KeyboardEvent, template: any) {
@@ -839,57 +975,41 @@ Template.theme.events({
         commitThemePropInput(event.currentTarget as HTMLInputElement, template);
     },
     // Native mobile color pickers can open before focus has synchronized the value.
-    'pointerdown .currentThemePropColor, focus .currentThemePropColor': function(event: any) {
-        const theme = getServerActiveTheme();
+    'pointerdown .currentThemePropColor, focus .currentThemePropColor': function(event: any, instance: any) {
+        const theme = getThemeEditorTheme(instance);
         if (theme && theme.properties) {
             syncThemeColorPicker(event.currentTarget, theme.properties);
         }
     },
     'input .currentThemePropColor': function(event: any, instance: any) {
         const data_id = event.currentTarget.getAttribute('data-id');
+        if (!data_id) {
+            throw new Error('[Theme] Color editor field is missing data-id');
+        }
         const value = normalizeColorPickerValue(event.currentTarget.value);
         if (!value) {
             clientConsole(1, `[Theme] Native color picker produced an invalid value for ${data_id}`);
             return;
         }
-        //change the corresponding currentThemeProp value. we need to find a input with the same data-id and change its value
-        $(`.currentThemeProp[data-id=${data_id}]`).val(value);
+        const textInput = instance.find(`.currentThemeProp[data-id="${data_id}"]`) as HTMLInputElement | null;
+        if (textInput) {
+            textInput.value = value;
+        }
 
         // Clear contrast cache since colors changed
         if (instance.contrastCache) {
             instance.contrastCache.clear();
         }
 
-        // Update session to trigger reactive updates - create new object for reactivity
-        const theme = getServerActiveTheme();
-        if (theme && theme.properties) {
-            const updatedTheme = {
-                ...theme,
-                properties: {
-                    ...theme.properties,
-                    [data_id]: value
-                }
-            };
-            Session.set('serverActiveTheme', updatedTheme);
-            if (Session.get('userThemeOverrideActive') !== true) {
-                Session.set('curTheme', updatedTheme);
-            }
-        }
-
-        if (Session.get('userThemeOverrideActive') !== true) {
-            applyThemePropertyPreview(data_id, value);
-        }
+        const revision = stageThemePropertyDraft(instance, data_id, value);
 
         // Auto-save with debounce (prevents network thrashing during color picker drag)
-        clearTimeout((window as any).themeColorSaveTimeout);
-        (window as any).themeColorSaveTimeout = setTimeout(async () => {
-            try {
-                await (Meteor as any).callAsync('setCustomThemeProperty', data_id, value);
-                
-            } catch (err: any) {
-                clientConsole(1, `[Theme] Error auto-saving ${data_id}:`, err);
-                setThemeMessage(instance, 'error', themeText('theme.errorSavingField', { field: data_id, error: err }));
-            }
+        if (instance.themeColorSaveTimeout) {
+            clearTimeout(instance.themeColorSaveTimeout);
+        }
+        instance.themeColorSaveTimeout = setTimeout(async () => {
+            instance.themeColorSaveTimeout = null;
+            await persistThemePropertyDraft(instance, data_id, value, revision);
         }, 300);
     },
     'change .currentThemeProp': function(event: any, template: any) {
@@ -917,13 +1037,11 @@ Template.theme.events({
         const reader = new FileReader();
         reader.onload = async function(e: any) {
             const base64Data = e.target.result;
-            try {
-                updateServerActiveThemeSessionProperty('practice_menu_underlay_image_url', base64Data);
-                await saveThemeProperty('practice_menu_underlay_image_url', base64Data);
+            const revision = stageThemePropertyDraft(template, 'practice_menu_underlay_image_url', base64Data);
+            const saved = await persistThemePropertyDraft(template, 'practice_menu_underlay_image_url', base64Data, revision);
+            if (saved) {
                 fileInput.value = '';
                 setThemeMessage(template, 'success', themeText('theme.homeUnderlayUploaded'));
-            } catch (err: any) {
-                setThemeMessage(template, 'error', themeText('theme.homeUnderlayUploadError', { error: err?.message || err }));
             }
         };
         reader.onerror = function() {
@@ -933,14 +1051,14 @@ Template.theme.events({
         reader.readAsDataURL(file);
     },
     'click #clearHomeUnderlay': async function(event: any, template: any) {
-        try {
-            updateServerActiveThemeSessionProperty('practice_menu_underlay_image_url', '');
-            await saveThemeProperty('practice_menu_underlay_image_url', '');
-            $('#homeUnderlayUpload').val('');
-            $('.currentThemeProp[data-id=practice_menu_underlay_image_url]').val('');
+        const revision = stageThemePropertyDraft(template, 'practice_menu_underlay_image_url', '');
+        const saved = await persistThemePropertyDraft(template, 'practice_menu_underlay_image_url', '', revision);
+        if (saved) {
+            const fileInput = template.find('#homeUnderlayUpload') as HTMLInputElement | null;
+            const urlInput = template.find('.currentThemeProp[data-id="practice_menu_underlay_image_url"]') as HTMLInputElement | null;
+            if (fileInput) fileInput.value = '';
+            if (urlInput) urlInput.value = '';
             setThemeMessage(template, 'success', themeText('theme.homeUnderlayCleared'));
-        } catch (err: any) {
-            setThemeMessage(template, 'error', themeText('theme.homeUnderlayClearError', { error: err?.message || err }));
         }
     },
     'change #logoUpload': function(event: any, template: any) {
@@ -970,8 +1088,11 @@ Template.theme.events({
                             getThemeIconBackgroundColor()
                         );
 
-                        // Upload the logo
-                        await (Meteor as any).callAsync('setCustomThemeProperty', 'brand_logo_url', base64Data);
+                        const logoRevision = stageThemePropertyDraft(template, 'brand_logo_url', base64Data);
+                        const logoSaved = await persistThemePropertyDraft(template, 'brand_logo_url', base64Data, logoRevision);
+                        if (!logoSaved) {
+                            return;
+                        }
 
                         const generatedIcons: Record<string, string> = {
                             brand_favicon_32_url: createPngDataUrlFromImage(img, 32),
@@ -999,7 +1120,10 @@ Template.theme.events({
                         };
 
                         for (const [property, generatedData] of Object.entries(generatedIcons)) {
-                            await (Meteor as any).callAsync('setCustomThemeProperty', property, generatedData);
+                            const response = await saveThemeProperty(property, generatedData);
+                            if (response?.theme?.properties) {
+                                applyThemeState(response.theme, template);
+                            }
                         }
 
                         
@@ -1021,46 +1145,39 @@ Template.theme.events({
             confirmLabel: themeText('theme.clearLogo')
         });
         if (confirmed) {
-            try {
-                await (Meteor as any).callAsync('setCustomThemeProperty', 'brand_logo_url', '');
-                
-                $('#logoUpload').val('');
-                // PHASE 1.5: No need to call getCurrentTheme() - reactive subscription handles it
+            const revision = stageThemePropertyDraft(template, 'brand_logo_url', '');
+            const saved = await persistThemePropertyDraft(template, 'brand_logo_url', '', revision);
+            if (saved) {
+                const fileInput = template.find('#logoUpload') as HTMLInputElement | null;
+                if (fileInput) fileInput.value = '';
                 setThemeMessage(template, 'success', themeText('theme.logoCleared'));
-            } catch (err: any) {
-                setThemeMessage(template, 'error', themeText('theme.logoClearError', { error: err }));
             }
         }
     },
 
     // Custom Help Page Upload
-    'click #uploadHelpFileButton': function() {
-        const fileInput = document.getElementById('helpFileUpload') as any;
-        const file = fileInput.files[0];
-        const statusSpan = document.getElementById('helpFileUploadStatus') as any;
+    'click #uploadHelpFileButton': function(_event: any, template: any) {
+        const fileInput = template.find('#helpFileUpload') as HTMLInputElement | null;
+        const file = fileInput?.files?.[0];
 
         if (!file) {
-            statusSpan.textContent = themeText('theme.selectFileFirst');
-            statusSpan.className = 'text-danger';
+            setThemeHelpStatus(template, 'error', themeText('theme.selectFileFirst'));
             return;
         }
 
         // Validate file extension
         if (!file.name.endsWith('.md')) {
-            statusSpan.textContent = themeText('theme.selectMarkdownFile');
-            statusSpan.className = 'text-danger';
+            setThemeHelpStatus(template, 'error', themeText('theme.selectMarkdownFile'));
             return;
         }
 
         // Validate file size (1MB max)
         if (file.size > 1048576) {
-            statusSpan.textContent = themeText('theme.fileSizeLessThanOneMb');
-            statusSpan.className = 'text-danger';
+            setThemeHelpStatus(template, 'error', themeText('theme.fileSizeLessThanOneMb'));
             return;
         }
 
-        statusSpan.textContent = themeText('theme.uploading');
-        statusSpan.className = 'text-info';
+        setThemeHelpStatus(template, 'info', themeText('theme.uploading'));
 
         // Read file as text
         const reader = new FileReader();
@@ -1069,18 +1186,15 @@ Template.theme.events({
 
                 try {
                     await (Meteor as any).callAsync('setCustomHelpPage', markdownContent);
-                    statusSpan.textContent = themeText('theme.customHelpUploaded');
-                    statusSpan.className = 'text-success';
-                    fileInput.value = '';
+                    setThemeHelpStatus(template, 'success', themeText('theme.customHelpUploaded'));
+                    if (fileInput) fileInput.value = '';
                 } catch (err: any) {
-                    statusSpan.textContent = themeText('theme.errorWithMessage', { error: err.message });
-                    statusSpan.className = 'text-danger';
+                    setThemeHelpStatus(template, 'error', themeText('theme.errorWithMessage', { error: err.message }));
                 }
         };
 
         reader.onerror = function() {
-            statusSpan.textContent = themeText('theme.errorReadingFile');
-            statusSpan.className = 'text-danger';
+            setThemeHelpStatus(template, 'error', themeText('theme.errorReadingFile'));
         };
 
         reader.readAsText(file);
@@ -1093,17 +1207,13 @@ Template.theme.events({
             confirmLabel: themeText('theme.removeHelpPage')
         });
         if (confirmed) {
-            const statusSpan = document.getElementById('helpFileUploadStatus') as any;
-            statusSpan.textContent = themeText('theme.removing');
-            statusSpan.className = 'text-info';
+            setThemeHelpStatus(template, 'info', themeText('theme.removing'));
 
             try {
                 await (Meteor as any).callAsync('removeCustomHelpPage');
-                statusSpan.textContent = themeText('theme.customHelpRemovedUsingWiki');
-                statusSpan.className = 'text-success';
+                setThemeHelpStatus(template, 'success', themeText('theme.customHelpRemovedUsingWiki'));
             } catch (err: any) {
-                statusSpan.textContent = themeText('theme.errorWithMessage', { error: err.message });
-                statusSpan.className = 'text-danger';
+                setThemeHelpStatus(template, 'error', themeText('theme.errorWithMessage', { error: err.message }));
             }
         }
     },

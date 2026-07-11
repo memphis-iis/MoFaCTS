@@ -2,7 +2,10 @@ import { Meteor } from 'meteor/meteor';
 import { Template } from 'meteor/templating';
 import { Session } from 'meteor/session';
 import { ReactiveVar } from 'meteor/reactive-var';
+import { Tracker } from 'meteor/tracker';
 import './turkWorkflow.html';
+import './turkWorkflow.css';
+import './shared/adminUi/adminUi';
 import { Mongo } from 'meteor/mongo';
 import { meteorCallAsync } from '..';
 import { displayify } from '../../common/globalHelpers';
@@ -16,12 +19,32 @@ import {
   hideBootstrapModal,
   showBootstrapModal,
 } from '../lib/bootstrapModal';
+import {
+  rejectLoad,
+  resolveLoad,
+  startLoad,
+  type LoadableState,
+} from '../lib/adminUi/loadableState';
+import { createTemplateLifetime, type TemplateLifetime } from '../lib/adminUi/templateLifetime';
+import {
+  createAsyncCommandController,
+  type AsyncCommandController,
+  type AsyncCommandState,
+} from '../lib/adminUi/asyncCommandState';
+import {
+  createInlineConfirmationController,
+  type InlineConfirmationController,
+  type InlineConfirmationView,
+} from '../lib/adminUi/inlineConfirmationController';
+import {
+  normalizeTurkWorkflowExperiments,
+  type TurkWorkflowExperiment,
+} from './turkWorkflowState';
 
 import { legacyInt, legacyTrim } from '../../common/underscoreCompat';
 
 declare const $: any;
 declare const _: any;
-declare const Tdfs: any;
 
 const turkExperimentLog = new Mongo.Collection(null); // local-only - no database;
 const TURK_LOG_SELECTED_EXPERIMENT_KEY = 'turkLogSelectedExperiment';
@@ -30,6 +53,29 @@ const PROFILE_INLINE_STATUS_CLASS_KEY = 'profileInlineStatusClass';
 const TURK_WORKFLOW_MESSAGE_KEY = 'turkWorkflowMessage';
 
 type PlatformStringKey = Parameters<typeof translatePlatformString>[1];
+type TurkWorkflowMessage = Readonly<{
+  level: 'info' | 'success' | 'warning' | 'error';
+  text: string;
+}>;
+type TurkRemovalUser = Readonly<{
+  userId: string;
+  userName: string;
+}>;
+type TurkWorkflowInstance = Blaze.TemplateInstance & {
+  experimentsPresentation: ReactiveVar<LoadableState<TurkWorkflowExperiment[]>>;
+  removalUsersPresentation: ReactiveVar<LoadableState<TurkRemovalUser[]>>;
+  workflowMessage: ReactiveVar<TurkWorkflowMessage | null>;
+  selectedRemovalExperimentId: ReactiveVar<string>;
+  selectedRemovalUserId: ReactiveVar<string>;
+  removalConfirmationState: ReactiveVar<InlineConfirmationView>;
+  removalConfirmationController: InlineConfirmationController<'remove-turk-user'>;
+  removalCommandState: ReactiveVar<AsyncCommandState<void>>;
+  removalCommand: AsyncCommandController<void>;
+  experimentsLifetime: TemplateLifetime;
+  removalUsersLifetime: TemplateLifetime;
+  nextExperimentsRequestId: number;
+  nextRemovalUsersRequestId: number;
+};
 
 function turkText(key: PlatformStringKey, values?: TranslationValues): string {
   return translatePlatformString(getActiveUiLocale(), key, values);
@@ -42,12 +88,16 @@ function messageIcon(level: string) {
   return 'fa-info-circle';
 }
 
-function setTurkWorkflowMessage(level: string, text: string) {
-  Session.set(TURK_WORKFLOW_MESSAGE_KEY, {
-    level,
-    text,
-    icon: messageIcon(level)
-  });
+function activeTurkWorkflowInstance(): TurkWorkflowInstance | null {
+  return Template.instance() as TurkWorkflowInstance | null;
+}
+
+function setTurkWorkflowMessage(level: TurkWorkflowMessage['level'], text: string) {
+  Session.set(TURK_WORKFLOW_MESSAGE_KEY, { level, text, icon: messageIcon(level) });
+  const instance = activeTurkWorkflowInstance();
+  if (instance?.workflowMessage) {
+    instance.workflowMessage.set({ level, text });
+  }
 }
 
 function buildAwsProfileSummary() {
@@ -119,17 +169,78 @@ async function saveAndValidateAwsProfile(showModal: boolean) {
   Session.set('saveComplete', true);
 }
 
-function normalizeOptionalString(value: unknown): string | null {
-  if (value === null || value === undefined) {
-    return null;
-  }
-  const normalized = String(value).trim();
-  return normalized.length > 0 ? normalized : null;
+function readyLoadValue<T>(state: LoadableState<T>): T | null {
+  return state.status === 'ready' || state.status === 'empty' || state.status === 'refreshing' || state.status === 'refresh-error'
+    ? state.value
+    : null;
 }
 
-function formatExperimentLabel(fileName: string, tdfId: string): string {
-  const shortId = tdfId.slice(0, 8);
-  return `${fileName} (${shortId})`;
+function loadErrorMessage<T>(state: LoadableState<T>): string {
+  return state.status === 'error' || state.status === 'refresh-error' ? state.message : '';
+}
+
+function loadPending<T>(state: LoadableState<T>): boolean {
+  return state.status === 'idle' || state.status === 'loading' || state.status === 'refreshing';
+}
+
+function loadTurkExperiments(instance: TurkWorkflowInstance): void {
+  const requestId = ++instance.nextExperimentsRequestId;
+  const generation = instance.experimentsLifetime.begin();
+  instance.experimentsPresentation.set(startLoad(instance.experimentsPresentation.get(), requestId));
+  meteorCallAsync('getTurkWorkflowExperiments')
+    .then((allTdfs) => {
+      if (!instance.experimentsLifetime.isCurrent(generation)) return;
+      const logExperiments = normalizeTurkWorkflowExperiments(allTdfs);
+      instance.experimentsPresentation.set(resolveLoad(
+        instance.experimentsPresentation.get(),
+        requestId,
+        logExperiments,
+        (value) => value.length === 0,
+      ));
+      const selected = Session.get(TURK_LOG_SELECTED_EXPERIMENT_KEY);
+      if (!selected || !logExperiments.some((exp) => exp.selectorKey === selected)) {
+        Session.set(TURK_LOG_SELECTED_EXPERIMENT_KEY, '');
+      }
+    })
+    .catch((error: unknown) => {
+      if (!instance.experimentsLifetime.isCurrent(generation)) return;
+      instance.experimentsPresentation.set(rejectLoad(
+        instance.experimentsPresentation.get(),
+        requestId,
+        { message: turkText('turk.failedRetrieveLogs', { error: getErrorMessage(error) }), retryable: true },
+      ));
+    });
+}
+
+function loadRemovalUsers(instance: TurkWorkflowInstance, selectedExperimentId: string): void {
+  const requestId = ++instance.nextRemovalUsersRequestId;
+  const generation = instance.removalUsersLifetime.begin();
+  instance.removalUsersPresentation.set(startLoad(instance.removalUsersPresentation.get(), requestId));
+  instance.selectedRemovalUserId.set('');
+  meteorCallAsync('getUsersByExperimentId', selectedExperimentId)
+    .then((users) => {
+      if (!instance.removalUsersLifetime.isCurrent(generation)) return;
+      const normalizedUsers = Array.isArray(users)
+        ? users.map((user: any) => ({
+          userId: String(user?.userId || ''),
+          userName: String(user?.userName || user?.userId || ''),
+        })).filter((user) => user.userId)
+        : [];
+      instance.removalUsersPresentation.set(resolveLoad(
+        instance.removalUsersPresentation.get(),
+        requestId,
+        normalizedUsers,
+        (value) => value.length === 0,
+      ));
+    })
+    .catch((error: unknown) => {
+      if (!instance.removalUsersLifetime.isCurrent(generation)) return;
+      instance.removalUsersPresentation.set(rejectLoad(
+        instance.removalUsersPresentation.get(),
+        requestId,
+        { message: turkText('turk.serverFailure', { error: getErrorMessage(error) }), retryable: true },
+      ));
+    });
 }
 
 function clearTurkExpLog() {
@@ -170,7 +281,7 @@ function turkLogInsert(newRec: any) {
   turkExperimentLog.insert(newRec);
 }
 
-function dismissTurkModalThenAlert(message: string, level = 'info') {
+function dismissTurkModalThenAlert(message: string, level: TurkWorkflowMessage['level'] = 'info') {
   const el = document.getElementById('turkModal');
   if (el) {
     const instance = getBootstrapModal(el);
@@ -254,14 +365,19 @@ Template.turkWorkflow.helpers({
     ).fetch();
   },
   logExperiments: function() {
-    return ((Template.instance() as any).turkLogExperiments?.get() || []);
+    return readyLoadValue((Template.instance() as TurkWorkflowInstance).experimentsPresentation.get()) || [];
+  },
+  logExperimentsLoading: function() {
+    return loadPending((Template.instance() as TurkWorkflowInstance).experimentsPresentation.get());
+  },
+  logExperimentsError: function() {
+    return loadErrorMessage((Template.instance() as TurkWorkflowInstance).experimentsPresentation.get());
   },
   isSelectedLogExperiment: function(selectorKey: string) {
     return Session.get(TURK_LOG_SELECTED_EXPERIMENT_KEY) === selectorKey;
   },
   experiments: function() {
-    const experiments = Tdfs.find({"ownerId": Meteor.userId(), "content.tdfs.tutor.setspec.experimentTarget": {$ne: null}}).fetch()
-    return experiments
+    return readyLoadValue((Template.instance() as TurkWorkflowInstance).experimentsPresentation.get()) || [];
   },
   use_sandbox: function() {
     return getProfileField('use_sandbox') ? 'checked' : false;
@@ -292,84 +408,90 @@ Template.turkWorkflow.helpers({
     return messageIcon(String(Session.get(PROFILE_INLINE_STATUS_CLASS_KEY) || 'info'));
   },
   turkWorkflowMessage: function() {
-    return Session.get(TURK_WORKFLOW_MESSAGE_KEY);
+    const message = Session.get(TURK_WORKFLOW_MESSAGE_KEY)
+      || (Template.instance() as TurkWorkflowInstance).workflowMessage?.get();
+    return message ? { ...message, icon: messageIcon(message.level) } : null;
   },
-  turkIds: () => Session.get('turkIds')
+  turkWorkflowMessageUrgent: function() {
+    const message = Session.get(TURK_WORKFLOW_MESSAGE_KEY)
+      || (Template.instance() as TurkWorkflowInstance).workflowMessage?.get();
+    return message?.level === 'error';
+  },
+  turkIds: function() {
+    return readyLoadValue((Template.instance() as TurkWorkflowInstance).removalUsersPresentation.get()) || [];
+  },
+  removalUsersLoading: function() {
+    return loadPending((Template.instance() as TurkWorkflowInstance).removalUsersPresentation.get());
+  },
+  removalUsersError: function() {
+    return loadErrorMessage((Template.instance() as TurkWorkflowInstance).removalUsersPresentation.get());
+  },
+  removalUserSelectDisabled: function() {
+    const instance = Template.instance() as TurkWorkflowInstance;
+    return !instance.selectedRemovalExperimentId.get() || loadPending(instance.removalUsersPresentation.get());
+  },
+  removalButtonDisabled: function() {
+    const instance = Template.instance() as TurkWorkflowInstance;
+    return !instance.selectedRemovalExperimentId.get()
+      || !instance.selectedRemovalUserId.get()
+      || instance.removalCommandState.get().status === 'pending';
+  },
+  removalCommandBusy: function() {
+    return (Template.instance() as TurkWorkflowInstance).removalCommandState.get().status === 'pending';
+  },
+  turkRemovalConfirmationView: function() {
+    return (Template.instance() as TurkWorkflowInstance).removalConfirmationState.get();
+  },
 });
 
 
 // //////////////////////////////////////////////////////////////////////////
 // Template Events
 
-Template.turkWorkflow.onCreated(function(this: any) {
-  (this as any).turkLogExperiments = new ReactiveVar([]);
+Template.turkWorkflow.onCreated(function(this: TurkWorkflowInstance) {
+  this.experimentsPresentation = new ReactiveVar<LoadableState<TurkWorkflowExperiment[]>>({ status: 'idle' });
+  this.removalUsersPresentation = new ReactiveVar<LoadableState<TurkRemovalUser[]>>({ status: 'idle' });
+  this.workflowMessage = new ReactiveVar<TurkWorkflowMessage | null>(null);
+  this.selectedRemovalExperimentId = new ReactiveVar('');
+  this.selectedRemovalUserId = new ReactiveVar('');
+  this.removalCommandState = new ReactiveVar<AsyncCommandState<void>>({ status: 'idle' });
+  this.removalCommand = createAsyncCommandController((state) => this.removalCommandState.set(state));
+  this.experimentsLifetime = createTemplateLifetime();
+  this.removalUsersLifetime = createTemplateLifetime();
+  this.nextExperimentsRequestId = 0;
+  this.nextRemovalUsersRequestId = 0;
+  this.removalConfirmationController = createInlineConfirmationController<'remove-turk-user'>(
+    (view) => this.removalConfirmationState.set(view),
+    () => document.getElementById('turk-assignment-removal'),
+  );
+  this.removalConfirmationState = new ReactiveVar(this.removalConfirmationController.getView());
   Session.setDefault(TURK_LOG_SELECTED_EXPERIMENT_KEY, '');
   Session.setDefault(PROFILE_INLINE_STATUS_KEY, '');
   Session.setDefault(PROFILE_INLINE_STATUS_CLASS_KEY, 'info');
-  Session.setDefault(TURK_WORKFLOW_MESSAGE_KEY, null);
+  Session.set(TURK_WORKFLOW_MESSAGE_KEY, null);
+  loadTurkExperiments(this);
 });
 
-Template.turkWorkflow.rendered = async function(this: any) {
-  const instance = this;
+Template.turkWorkflow.onRendered(function() {
   // Init the modal dialogs
   getBootstrapModal('turkModal', { backdrop: 'static', keyboard: false });
   getBootstrapModal('profileWorkModal', { backdrop: 'static', keyboard: false });
   getBootstrapModal('detailsModal');
+});
 
-  const allTdfs = (await meteorCallAsync('getTurkWorkflowExperiments')) as any[];
-  const logExperiments: {
-    _id: string;
-    selectorKey: string;
-    fileName: string;
-    lessonName: string;
-    displayLabel: string;
-  }[] = [];
-
-  allTdfs.forEach(function(tdf: any) {
-    const tdfObject = tdf?.content;
-    if (!tdfObject) {
-      return;
-    }
-
-    // Make sure we have a valid TDF (with a setspec)
-    const setspec = tdfObject?.tdfs?.tutor?.setspec;
-
-    if (!setspec) {
-      return;
-    }
-
-    // No lesson name? that's wrong
-    const name = setspec.lessonname;
-    if (!name) {
-      return;
-    }
-    const fileName = tdfObject.fileName;
-    if (!fileName) {
-      return;
-    }
-
-    const expTarget = setspec.experimentTarget ? setspec.experimentTarget.trim() : '';
-    const selectorKey = normalizeOptionalString(tdf._id) || fileName;
-
-    if (expTarget.length > 0) {
-      logExperiments.push({
-        _id: tdf._id,
-        selectorKey,
-        fileName,
-        lessonName: name,
-        displayLabel: formatExperimentLabel(fileName, String(tdf._id || 'unknown')),
-      });
-    }
-  });
-  instance.turkLogExperiments.set(logExperiments);
-  const selected = Session.get(TURK_LOG_SELECTED_EXPERIMENT_KEY);
-  if (!selected || !logExperiments.some((exp) => exp.selectorKey === selected)) {
-    Session.set(TURK_LOG_SELECTED_EXPERIMENT_KEY, '');
-  }
-};
-
+Template.turkWorkflow.onDestroyed(function(this: TurkWorkflowInstance) {
+  this.experimentsLifetime.destroy();
+  this.removalUsersLifetime.destroy();
+  this.removalCommand.destroy();
+  this.removalConfirmationController.destroy();
+});
 
 Template.turkWorkflow.events({
+  'click [data-turk-experiments-retry]'(event: Event, instance: TurkWorkflowInstance) {
+    event.preventDefault();
+    loadTurkExperiments(instance);
+  },
+
   // Admin/Teachers - show details from single Turk assignment
   'click #turk-show-assign': async function(event: any) {
     event.preventDefault();
@@ -404,18 +526,85 @@ Template.turkWorkflow.events({
     await saveAndValidateAwsProfile(false);
   },
   'change #experiment-select': async function(event: any) {
-    event.preventDefault()
-    const selectedExperimentId: any = $("#experiment-select").val();
-    const users = await meteorCallAsync('getUsersByExperimentId', selectedExperimentId);
-    $('#user-select').prop('disabled', false);
-    Session.set('turkIds', users)
+    event.preventDefault();
+    const instance = Template.instance() as TurkWorkflowInstance;
+    const selectedExperimentId = String((event.currentTarget as HTMLSelectElement).value || '');
+    instance.selectedRemovalExperimentId.set(selectedExperimentId);
+    instance.removalConfirmationController.cancel();
+    if (!selectedExperimentId) {
+      instance.removalUsersPresentation.set({ status: 'idle' });
+      instance.selectedRemovalUserId.set('');
+      return;
+    }
+    loadRemovalUsers(instance, selectedExperimentId);
+  },
+
+  'change #user-select': function(event: any) {
+    event.preventDefault();
+    const instance = Template.instance() as TurkWorkflowInstance;
+    instance.selectedRemovalUserId.set(String((event.currentTarget as HTMLSelectElement).value || ''));
+    instance.removalConfirmationController.cancel();
   },
 
   'click #turk-assignment-removal': function(event: any) {
     event.preventDefault();
-    const turkId = $("#user-select").val();
-    const selectedExperimentId: any = $("#experiment-select").val();
-    (Meteor as any).callAsync('removeTurkById', turkId, selectedExperimentId);
+    const instance = Template.instance() as TurkWorkflowInstance;
+    const turkId = instance.selectedRemovalUserId.get();
+    const selectedExperimentId = instance.selectedRemovalExperimentId.get();
+    if (!turkId || !selectedExperimentId || instance.removalCommandState.get().status === 'pending') {
+      return;
+    }
+    instance.removalConfirmationController.open({
+      confirmationId: 'turk-remove-user-confirmation',
+      title: turkText('turk.removeTurkUser'),
+      message: `${turkText('turk.removeTurkUser')}: ${turkId}`,
+      confirmLabel: turkText('turk.removeTurkUser'),
+      cancelLabel: turkText('content.cancel'),
+      severity: 'danger',
+      context: 'remove-turk-user',
+    }, event.currentTarget as HTMLElement);
+    Tracker.afterFlush(() => instance.removalConfirmationController.focusInitial());
+  },
+
+  'click .admin-confirmation-cancel'(_event: Event, instance: TurkWorkflowInstance) {
+    instance.removalConfirmationController.cancel();
+  },
+
+  'keydown .admin-inline-confirmation'(event: KeyboardEvent, instance: TurkWorkflowInstance) {
+    instance.removalConfirmationController.handleKeydown(event);
+  },
+
+  'click .admin-confirmation-confirm'(event: Event, instance: TurkWorkflowInstance) {
+    event.preventDefault();
+    const view = instance.removalConfirmationController.getView();
+    if (
+      view.status !== 'open'
+      || view.pending
+      || instance.removalConfirmationController.getContext() !== 'remove-turk-user'
+    ) {
+      return;
+    }
+    const turkId = instance.selectedRemovalUserId.get();
+    const selectedExperimentId = instance.selectedRemovalExperimentId.get();
+    if (!turkId || !selectedExperimentId) {
+      instance.removalConfirmationController.cancel();
+      return;
+    }
+    instance.removalConfirmationController.setPending(true);
+    void instance.removalCommand.run(async () => {
+      await (Meteor as any).callAsync('removeTurkById', turkId, selectedExperimentId);
+    }, {
+      getErrorMessage: (error) => turkText('turk.serverFailure', { error: getErrorMessage(error) }),
+      onSuccess: () => {
+        instance.removalConfirmationController.complete();
+        setTurkWorkflowMessage('success', turkText('turk.complete'));
+        loadRemovalUsers(instance, selectedExperimentId);
+      },
+      onFailure: (error) => {
+        instance.removalConfirmationController.setPending(false);
+        setTurkWorkflowMessage('error', turkText('turk.serverFailure', { error: getErrorMessage(error) }));
+      },
+    });
   },
 
   // Admin/Teachers - send Turk message

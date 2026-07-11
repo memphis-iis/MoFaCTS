@@ -9,6 +9,7 @@
 import { Meteor } from 'meteor/meteor';
 import { Template } from 'meteor/templating';
 import './apkgWizard.html';
+import './apkgWizard.css';
 import { Session } from 'meteor/session';
 import { ReactiveVar } from 'meteor/reactive-var';
 import { Tracker } from 'meteor/tracker';
@@ -20,6 +21,11 @@ import { translatePlatformString } from '../../lib/interfaceI18n';
 import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 import './draftEditorWorkspace';
 import { buildImportPackageFromDraftLessons } from '../../lib/importPackageBuilder';
+import {
+  createInlineConfirmationController,
+  type InlineConfirmationController,
+} from '../../lib/adminUi/inlineConfirmationController';
+import '../shared/adminUi/adminUi';
 
 declare const $: any;
 declare const DynamicAssets: any;
@@ -52,28 +58,38 @@ function clearWizardMessage(template: any) {
   template.wizardMessage.set(null);
 }
 
-function clearInlineConfirmation(template: any) {
-  const pending = template.inlineConfirmation?.get?.();
-  if (pending?.resolve) {
-    pending.resolve(false);
+type ApkgConfirmationContext = {
+  resolve: (confirmed: boolean) => void;
+};
+
+function closeInlineConfirmation(template: any, confirmed: boolean) {
+  const context = template.inlineConfirmationController.getContext() as ApkgConfirmationContext | undefined;
+  const closed = confirmed
+    ? template.inlineConfirmationController.complete()
+    : template.inlineConfirmationController.cancel();
+  if (closed) {
+    context?.resolve(confirmed);
   }
-  template.inlineConfirmation?.set?.(null);
 }
 
-function requestInlineConfirmation(template: any, options: any): Promise<boolean> {
-  clearInlineConfirmation(template);
+function requestApkgConfirmation(template: any, options: any): Promise<boolean> {
+  closeInlineConfirmation(template, false);
   clearWizardMessage(template);
 
   return new Promise(resolve => {
-    template.inlineConfirmation.set({
-      id: options.id,
+    const trigger = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : template.find('#apkg-wizard-container');
+    template.inlineConfirmationController.open({
+      confirmationId: `apkg-confirmation-${options.id}`,
       title: options.title,
       message: options.message,
       confirmLabel: options.confirmLabel || apkgText('common.continue'),
-      confirmClass: options.confirmClass || 'btn-danger',
-      icon: options.icon || 'fa-exclamation-triangle',
-      resolve
-    });
+      cancelLabel: apkgText('apkg.cancel'),
+      severity: options.confirmClass === 'btn-primary' ? 'warning' : 'danger',
+      context: { resolve },
+    }, trigger);
+    Tracker.afterFlush(() => template.inlineConfirmationController.focusInitial(template.firstNode?.parentNode || document));
   });
 }
 
@@ -84,6 +100,10 @@ Template.apkgWizard.onCreated(function(this: any) {
   this.completedSteps = new ReactiveVar([]);
   this.wizardMessage = new ReactiveVar(null);
   this.inlineConfirmation = new ReactiveVar(null);
+  this.inlineConfirmationController = createInlineConfirmationController<ApkgConfirmationContext>(
+    (view) => this.inlineConfirmation.set(view.status === 'open' ? view : null),
+    () => this.find('#close-wizard'),
+  );
 
   // File and metadata
   this.selectedFile = new ReactiveVar(null);
@@ -131,6 +151,12 @@ Template.apkgWizard.onRendered(function(this: any) {
       }
     });
   });
+});
+
+Template.apkgWizard.onDestroyed(function(this: any) {
+  const context = this.inlineConfirmationController.getContext() as ApkgConfirmationContext | undefined;
+  this.inlineConfirmationController.destroy();
+  context?.resolve(false);
 });
 
 // Helper functions
@@ -448,7 +474,7 @@ Template.apkgWizard.events({
     const file = event.target.files[0];
     if (file) {
       clearWizardMessage(template);
-      clearInlineConfirmation(template);
+      closeInlineConfirmation(template, false);
       template.selectedFile.set(file);
       template.selectedFileName.set(file.name);
       template.analyzeError.set(null);
@@ -493,7 +519,7 @@ Template.apkgWizard.events({
 
   'click #cancel-wizard': async function(event: any, template: any) {
     event.preventDefault();
-    const confirmed = await requestInlineConfirmation(template, {
+    const confirmed = await requestApkgConfirmation(template, {
       id: 'cancel-wizard',
       title: apkgText('apkg.cancelImportTitle'),
       message: apkgText('apkg.cancelImportMessage'),
@@ -507,7 +533,7 @@ Template.apkgWizard.events({
       template.selectedFile.set(null);
       template.selectedFileName.set(null);
       template.deckMetadata.set(null);
-      clearInlineConfirmation(template);
+      closeInlineConfirmation(template, false);
     }
   },
 
@@ -578,7 +604,7 @@ Template.apkgWizard.events({
 
   'click #add-tdf-config': function(event: any, template: any) {
     clearWizardMessage(template);
-    clearInlineConfirmation(template);
+    closeInlineConfirmation(template, false);
     const configs = template.tdfConfigs.get();
     const newConfig = {
       name: '',
@@ -601,7 +627,7 @@ Template.apkgWizard.events({
       return;
     }
 
-    const confirmed = await requestInlineConfirmation(template, {
+    const confirmed = await requestApkgConfirmation(template, {
       id: `remove-config-${index}`,
       title: apkgText('apkg.removeConfigTitle'),
       message: apkgText('apkg.removeConfigMessage'),
@@ -611,7 +637,7 @@ Template.apkgWizard.events({
     if (confirmed) {
       configs.splice(index, 1);
       template.tdfConfigs.set(configs);
-      clearInlineConfirmation(template);
+      closeInlineConfirmation(template, false);
     }
   },
 
@@ -718,7 +744,7 @@ Template.apkgWizard.events({
       // Upload using DynamicAssets (same pattern as doPackageUpload)
       const existingFile = await DynamicAssets.findOne({ name: file.name, userId: Meteor.userId() });
       if (existingFile) {
-        const confirmed = await requestInlineConfirmation(template, {
+        const confirmed = await requestApkgConfirmation(template, {
           id: 'overwrite-package',
           title: apkgText('apkg.overwritePackageTitle'),
           message: apkgText('apkg.overwritePackageMessage'),
@@ -727,7 +753,7 @@ Template.apkgWizard.events({
 
         if (confirmed) {
           await (Meteor as any).callAsync('removeAssetById', existingFile._id);
-          clearInlineConfirmation(template);
+          closeInlineConfirmation(template, false);
         } else {
           return;
         }
@@ -798,7 +824,7 @@ Template.apkgWizard.events({
                   if (reasons.includes('prevStimExists'))
                     reason.push(apkgText('content.previousStimOverwriteMessage', { filename: res.data.TDF.content.tdfs.tutor.setspec.stimulusfile }));
 
-                  const confirmed = await requestInlineConfirmation(template, {
+                  const confirmed = await requestApkgConfirmation(template, {
                     id: `overwrite-tdf-${res.data.TDF._id || res.data.TDF.content.fileName}`,
                     title: apkgText('apkg.overwriteTdfTitle'),
                     message: reason.join(' '),
@@ -811,7 +837,7 @@ Template.apkgWizard.events({
                       progress: 95
                     });
                     await (Meteor as any).callAsync('tdfUpdateConfirmed', res.data.TDF, false, reasons);
-                    clearInlineConfirmation(template);
+                    closeInlineConfirmation(template, false);
                   } else {
                     template.uploadStatus.set(null);
                     template.uploadError.set(apkgText('apkg.uploadStoppedBeforeOverwrite'));
@@ -848,7 +874,7 @@ Template.apkgWizard.events({
   'click #close-wizard': async function(event: any, template: any) {
     event.preventDefault();
     // Reset wizard and close
-    const confirmed = await requestInlineConfirmation(template, {
+    const confirmed = await requestApkgConfirmation(template, {
       id: 'close-wizard',
       title: apkgText('apkg.closeWizardTitle'),
       message: apkgText('apkg.closeWizardMessage'),
@@ -862,18 +888,26 @@ Template.apkgWizard.events({
     }
   },
 
-  'click #cancel-inline-confirmation': function(event: any, template: any) {
+  'click .admin-confirmation-cancel': function(event: any, template: any) {
     event.preventDefault();
-    clearInlineConfirmation(template);
+    closeInlineConfirmation(template, false);
   },
 
-  'click #confirm-inline-confirmation': function(event: any, template: any) {
+  'click .admin-confirmation-confirm': function(event: any, template: any) {
     event.preventDefault();
-    const pending = template.inlineConfirmation.get();
-    if (pending?.resolve) {
-      pending.resolve(true);
+    const controller = template.inlineConfirmationController as InlineConfirmationController<ApkgConfirmationContext>;
+    if (controller.getView().pending) {
+      return;
     }
-    template.inlineConfirmation.set(null);
+    closeInlineConfirmation(template, true);
+  },
+
+  'keydown #apkg-wizard-container': function(event: KeyboardEvent, template: any) {
+    const controller = template.inlineConfirmationController as InlineConfirmationController<ApkgConfirmationContext>;
+    const context = controller.getContext();
+    if (controller.handleKeydown(event)) {
+      context?.resolve(false);
+    }
   }
 });
 

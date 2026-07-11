@@ -16,8 +16,30 @@ import { getUploadIntegrity } from '../../lib/uploadIntegrity';
 import { ensureSqlJs } from '../../lib/sqlJsLoader';
 import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 import { translatePlatformString } from '../../lib/interfaceI18n';
+import {
+  rejectLoad,
+  resolveLoad,
+  startLoad,
+  type LoadableState,
+} from '../../lib/adminUi/loadableState';
+import { createTemplateLifetime, type TemplateLifetime } from '../../lib/adminUi/templateLifetime';
+import {
+  createInlineConfirmationController,
+  type InlineConfirmationController,
+  type InlineConfirmationView,
+} from '../../lib/adminUi/inlineConfirmationController';
+import '../shared/adminUi/adminUi';
 import './apkgWizard';
 import './imsccWizard';
+import {
+  buildRowSummaryPresentation,
+  normalizeContentUploadListResult,
+  normalizeContentUploadSummaryMap,
+  normalizeUploadQuotaStatus,
+  type ContentUploadListResult,
+  type ContentUploadSummaryMap,
+  type UploadQuotaStatus,
+} from './contentUploadState';
 export {doFileUpload};
 
 const FlowRouter = (globalThis as any).FlowRouter;
@@ -55,12 +77,70 @@ type InlineConfirmation = {
   level: UploadMessageLevel;
 };
 
+type ContentUploadConfirmationContext = {
+  resolve: (confirmed: boolean) => void;
+};
+
+type ContentUploadConfirmationPresentation = {
+  placement: string;
+  view: InlineConfirmationView;
+};
+
+type ContentUploadInstance = Blaze.TemplateInstance & {
+  listPresentation: ReactiveVar<LoadableState<ContentUploadListResult>>;
+  summaryPresentation: ReactiveVar<LoadableState<ContentUploadSummaryMap>>;
+  quotaPresentation: ReactiveVar<LoadableState<UploadQuotaStatus>>;
+  listLifetime: TemplateLifetime;
+  summaryLifetime: TemplateLifetime;
+  quotaLifetime: TemplateLifetime;
+  nextListRequestId: number;
+  nextSummaryRequestId: number;
+  nextQuotaRequestId: number;
+};
+
 function contentText(key: Parameters<typeof translatePlatformString>[1], values?: Parameters<typeof translatePlatformString>[2]): string {
   return translatePlatformString(getActiveUiLocale(), key, values);
 }
 
 function uploadErrorText(error: any): string {
   return String(error?.reason || error?.message || error || '');
+}
+
+function readyLoadValue<T>(state: LoadableState<T>): T | null {
+  return state.status === 'ready'
+    || state.status === 'empty'
+    || state.status === 'refreshing'
+    || state.status === 'refresh-error'
+    ? state.value
+    : null;
+}
+
+function loadErrorMessage<T>(state: LoadableState<T>): string {
+  return state.status === 'error' || state.status === 'refresh-error' ? state.message : '';
+}
+
+function loadPending<T>(state: LoadableState<T>): boolean {
+  return state.status === 'idle' || state.status === 'loading' || state.status === 'refreshing';
+}
+
+function contentListFailureText(error: unknown): string {
+  return `${contentText('content.uploadedContent')} ${contentText('content.failed')}: ${uploadErrorText(error)}`;
+}
+
+function summaryFailureText(error: unknown): string {
+  return `${contentText('content.summary')} ${contentText('content.failed')}: ${uploadErrorText(error)}`;
+}
+
+function summaryRowFailureText(): string {
+  return `${contentText('content.summary')} ${contentText('content.failed')}`;
+}
+
+function quotaFailureText(error: unknown): string {
+  return `${contentText('content.uploadQuota')} ${contentText('content.failed')}: ${uploadErrorText(error)}`;
+}
+
+function missingSummaryText(): string {
+  return `${contentText('content.summary')} ${contentText('content.notFoundMarker')}`;
 }
 
 function translationStatusText(status: string): string {
@@ -207,31 +287,41 @@ function queuePackageUploads(fileList: any, template: any) {
     });
 }
 
-function clearInlineConfirmation(template: any, result = false) {
-  if (!template?.inlineConfirmation) {
-    return;
-  }
-  const resolve = template.inlineConfirmationResolve;
-  template.inlineConfirmationResolve = null;
-  template.inlineConfirmation.set(null);
-  if (resolve) {
-    resolve(result);
+function closeContentConfirmation(template: any, result = false) {
+  const controller = template?.inlineConfirmationController as InlineConfirmationController<ContentUploadConfirmationContext> | undefined;
+  if (!controller) return;
+  const context = controller.getContext();
+  const closed = result ? controller.complete() : controller.cancel();
+  if (closed) {
+    context?.resolve(result);
   }
 }
 
-function requestInlineConfirmation(template: any, confirmation: InlineConfirmation): Promise<boolean> {
-  if (!template?.inlineConfirmation) {
+function requestContentConfirmation(template: any, confirmation: InlineConfirmation): Promise<boolean> {
+  if (!template?.inlineConfirmationController) {
     return Promise.resolve(false);
   }
-  clearInlineConfirmation(template, false);
-  template.inlineConfirmation.set(confirmation);
+  closeContentConfirmation(template, false);
   return new Promise((resolve) => {
-    template.inlineConfirmationResolve = resolve;
+    template.inlineConfirmationPlacement = confirmation.placement;
+    const trigger = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : template.find('.content-upload-root');
+    template.inlineConfirmationController.open({
+      confirmationId: `content-confirmation-${Random.id()}`,
+      title: confirmation.title,
+      message: confirmation.message,
+      confirmLabel: confirmation.confirmLabel,
+      cancelLabel: confirmation.cancelLabel,
+      severity: confirmation.level === 'error' ? 'danger' : 'warning',
+      context: { resolve },
+    }, trigger);
+    Tracker.afterFlush(() => template.inlineConfirmationController.focusInitial(template.firstNode?.parentNode || document));
   });
 }
 
 function inlineConfirmationPlacement(template: any) {
-  return template?.inlineConfirmation?.get()?.placement || '';
+  return (template?.inlineConfirmation?.get() as ContentUploadConfirmationPresentation | null)?.placement || '';
 }
 
 function assetActionPlacement(tdfId: string) {
@@ -348,6 +438,111 @@ async function addAccessorsForTdf(template: any, tdfId: any) {
   }
 }
 
+function invalidateAssetsRows(): void {
+  assetsHelperLastRun = 0;
+  assetsHelperCachedResult = [];
+}
+
+function listValue(instance: ContentUploadInstance): ContentUploadListResult | null {
+  return readyLoadValue(instance.listPresentation.get());
+}
+
+function summaryMapValue(instance: ContentUploadInstance): ContentUploadSummaryMap {
+  return readyLoadValue(instance.summaryPresentation.get()) || {};
+}
+
+function loadContentUploadList(instance: ContentUploadInstance, limit: number): void {
+  const requestId = ++instance.nextListRequestId;
+  const generation = instance.listLifetime.begin();
+  instance.listPresentation.set(startLoad(instance.listPresentation.get(), requestId));
+  clientConsole(2, '[CONTENT UPLOAD] Fetching list ids via method', 'limit:', limit);
+
+  MeteorAny.callAsync('getContentUploadListIds', { limit })
+    .then((result: any) => {
+      if (!instance.listLifetime.isCurrent(generation)) return;
+      const listResult = normalizeContentUploadListResult(result);
+      instance.listPresentation.set(resolveLoad(
+        instance.listPresentation.get(),
+        requestId,
+        listResult,
+        (value) => value.ids.length === 0,
+      ));
+      invalidateAssetsRows();
+    })
+    .catch((err: any) => {
+      if (!instance.listLifetime.isCurrent(generation)) return;
+      instance.listPresentation.set(rejectLoad(
+        instance.listPresentation.get(),
+        requestId,
+        { message: contentListFailureText(err), retryable: true },
+      ));
+      if (!readyLoadValue(instance.listPresentation.get())) {
+        instance.summaryPresentation.set({ status: 'empty', value: {} });
+      }
+      invalidateAssetsRows();
+      clientConsole(1, '[CONTENT UPLOAD] List fetch failed:', err);
+    });
+}
+
+function loadContentUploadSummaries(instance: ContentUploadInstance, ids: string[]): void {
+  const requestId = ++instance.nextSummaryRequestId;
+  const generation = instance.summaryLifetime.begin();
+  if (ids.length === 0) {
+    instance.summaryPresentation.set({ status: 'empty', value: {} });
+    invalidateAssetsRows();
+    return;
+  }
+
+  instance.summaryPresentation.set(startLoad(instance.summaryPresentation.get(), requestId));
+  MeteorAny.callAsync('getContentUploadSummariesForIds', ids)
+    .then((summaries: any) => {
+      if (!instance.summaryLifetime.isCurrent(generation)) return;
+      const map = normalizeContentUploadSummaryMap(summaries);
+      instance.summaryPresentation.set(resolveLoad(
+        instance.summaryPresentation.get(),
+        requestId,
+        map,
+        () => false,
+      ));
+      invalidateAssetsRows();
+    })
+    .catch((err: any) => {
+      if (!instance.summaryLifetime.isCurrent(generation)) return;
+      instance.summaryPresentation.set(rejectLoad(
+        instance.summaryPresentation.get(),
+        requestId,
+        { message: summaryFailureText(err), retryable: true },
+      ));
+      invalidateAssetsRows();
+      clientConsole(1, '[CONTENT UPLOAD] Summary fetch failed:', err);
+    });
+}
+
+function loadUploadQuotaStatus(instance: ContentUploadInstance): void {
+  const requestId = ++instance.nextQuotaRequestId;
+  const generation = instance.quotaLifetime.begin();
+  instance.quotaPresentation.set(startLoad(instance.quotaPresentation.get(), requestId));
+  MeteorAny.callAsync('getUploadQuotaStatus')
+    .then((status: any) => {
+      if (!instance.quotaLifetime.isCurrent(generation)) return;
+      instance.quotaPresentation.set(resolveLoad(
+        instance.quotaPresentation.get(),
+        requestId,
+        normalizeUploadQuotaStatus(status),
+        () => false,
+      ));
+    })
+    .catch((err: any) => {
+      if (!instance.quotaLifetime.isCurrent(generation)) return;
+      instance.quotaPresentation.set(rejectLoad(
+        instance.quotaPresentation.get(),
+        requestId,
+        { message: quotaFailureText(err), retryable: true },
+      ));
+      clientConsole(1, '[QUOTA] Error loading quota status:', err);
+    });
+}
+
 // Global helper for equality comparison in Blaze templates
 Template.registerHelper('equals', function(a: any, b: any) {
   return a === b;
@@ -369,20 +564,8 @@ Template.contentUpload.helpers({
   uploadMessageIcon() {
     return (Template.instance() as any).uploadMessage?.get()?.icon || 'fa-info-circle';
   },
-  inlineConfirmationTitle() {
-    return (Template.instance() as any).inlineConfirmation?.get()?.title || '';
-  },
-  inlineConfirmationMessage() {
-    return (Template.instance() as any).inlineConfirmation?.get()?.message || '';
-  },
-  inlineConfirmationLevel() {
-    return (Template.instance() as any).inlineConfirmation?.get()?.level || 'warning';
-  },
-  inlineConfirmationConfirmLabel() {
-    return (Template.instance() as any).inlineConfirmation?.get()?.confirmLabel || contentText('content.continue');
-  },
-  inlineConfirmationCancelLabel() {
-    return (Template.instance() as any).inlineConfirmation?.get()?.cancelLabel || contentText('content.cancel');
+  inlineConfirmationView() {
+    return ((Template.instance() as any).inlineConfirmation?.get() as ContentUploadConfirmationPresentation | null)?.view || null;
   },
   assetActionConfirmationOpen(tdfId: any) {
     return inlineConfirmationPlacement(Template.instance()) === assetActionPlacement(String(tdfId || ''));
@@ -397,12 +580,25 @@ Template.contentUpload.helpers({
     return inlineConfirmationPlacement(Template.instance()) === 'admin-danger';
   },
   quotaStatus() {
-    return (Template.instance() as any).quotaStatus.get();
+    const state = (Template.instance() as ContentUploadInstance).quotaPresentation.get();
+    return readyLoadValue(state) || { unlimited: true };
+  },
+  quotaStatusError() {
+    return loadErrorMessage((Template.instance() as ContentUploadInstance).quotaPresentation.get());
+  },
+  listErrorText() {
+    return loadErrorMessage((Template.instance() as ContentUploadInstance).listPresentation.get());
+  },
+  summaryErrorText() {
+    return loadErrorMessage((Template.instance() as ContentUploadInstance).summaryPresentation.get());
   },
   assets: function(this: any) {
     try {
-      const template = (Template.instance() as any);
-      const summaryMap = template.summaryMap ? template.summaryMap.get() : {};
+      const template = (Template.instance() as ContentUploadInstance & any);
+      const listState = template.listPresentation.get();
+      const summaryState = template.summaryPresentation.get();
+      const currentList = listValue(template);
+      const summaryMap = summaryMapValue(template);
       const accessMessages = template.accessMessages ? template.accessMessages.get() : {};
       // Row-level refresh trigger (panel open/close/subscription attach) without
       // forcing list/summaries to refetch from the server.
@@ -417,8 +613,8 @@ Template.contentUpload.helpers({
       // Depend on refresh trigger to force re-run after deletions
       assetsRefreshTrigger.get();
 
-      const listIds = template.listIds ? template.listIds.get() : [];
-      const listLoading = template.listLoading ? template.listLoading.get() : false;
+      const listIds = currentList?.ids || [];
+      const listLoading = loadPending(listState);
       const pendingUploadsSnapshot = template.pendingUploads ? template.pendingUploads.all() : {};
       const pendingKeysSnapshot = Object.keys(pendingUploadsSnapshot || {});
       if (pendingKeysSnapshot.length > 0 && template.pendingUploadTick) {
@@ -487,12 +683,19 @@ Template.contentUpload.helpers({
 
             const thisTdf: any = {};
             const summary = summaryMap?.[tdfId];
-            thisTdf.lessonName = summary?.lessonName || 'Loading...';
+            const summaryPresentation = buildRowSummaryPresentation({
+              summary,
+              summaryStatus: summaryState.status,
+              loadingText: contentText('common.loading'),
+              missingText: missingSummaryText(),
+              failureText: summaryRowFailureText(),
+            });
+            thisTdf.lessonName = summaryPresentation.lessonName;
             thisTdf.packageFile = summary?.packageFile || null;
             thisTdf.packageAssetId = summary?.packageAssetId || null;
             thisTdf._id = tdfId;
             thisTdf.stimuliSetId = summary?.stimuliSetId || null;
-            thisTdf.errors = [];
+            thisTdf.errors = [...summaryPresentation.errors];
             thisTdf.stimFileInfo = [];
             thisTdf.stimFilesCount = null;
             thisTdf.fileName = summary?.fileName || 'unknown.xml';
@@ -507,7 +710,7 @@ Template.contentUpload.helpers({
             thisTdf.publicPrivateToggleAttrs = thisTdf.publicVisibilityLocked
               ? { disabled: true, title: thisTdf.publicVisibilityLockReason || 'This content is locked private.' }
               : {};
-            thisTdf.summaryLoading = !summary;
+            thisTdf.summaryLoading = summaryPresentation.summaryLoading;
             thisTdf.accessMessageText = accessMessages?.[tdfId]?.text || null;
             thisTdf.accessMessageClass = accessMessages?.[tdfId]?.className || 'alert-info';
 
@@ -701,11 +904,11 @@ Template.contentUpload.helpers({
     }
   },
   listReady() {
-    const template = (Template.instance() as any);
-    return template.listLoading ? !template.listLoading.get() : false;
+    const state = (Template.instance() as ContentUploadInstance).listPresentation.get();
+    return !loadPending(state);
   },
   listDisplayReady() {
-    const template = (Template.instance() as any);
+    const template = (Template.instance() as ContentUploadInstance & any);
     return template.listDisplayReady ? template.listDisplayReady.get() : false;
   },
   overlayVisible() {
@@ -717,28 +920,23 @@ Template.contentUpload.helpers({
     return template.initialPaintDone ? template.initialPaintDone.get() : false;
   },
   showEmptyState() {
-    const template = (Template.instance() as any);
-    if (!template || (template.listLoading && template.listLoading.get())) {
+    const template = (Template.instance() as ContentUploadInstance & any);
+    if (!template || loadPending(template.listPresentation.get())) {
       return false;
     }
-    const ids = template.listIds ? template.listIds.get() : [];
+    const ids = listValue(template)?.ids || [];
     const hasIds = Array.isArray(ids) && ids.length > 0;
     const pendingUploads = template.pendingUploads ? template.pendingUploads.all() : {};
     const hasPending = Object.values(pendingUploads || {}).some(Boolean);
     return !hasIds && !hasPending;
   },
   canLoadMore() {
-    const template = (Template.instance() as any);
-    if (!template.listLoading || template.listLoading.get()) {
+    const template = (Template.instance() as ContentUploadInstance & any);
+    if (loadPending(template.listPresentation.get())) {
       return false;
     }
-    const hasMore = template.listHasMore ? template.listHasMore.get() : null;
-    if (typeof hasMore === 'boolean') {
-      return hasMore;
-    }
-    const count = template.listIds ? template.listIds.get().length : 0;
-    const total = template.listTotalCount ? template.listTotalCount.get() : 0;
-    return total > count;
+    const currentList = listValue(template);
+    return currentList ? currentList.hasMore : false;
   },
   'showDeleteAllButton': function(this: any){
     // Only show delete all button if user is admin AND setting is enabled
@@ -754,28 +952,38 @@ Template.contentUpload.helpers({
   }
 });
 
-  Template.contentUpload.onCreated(function(this: any) {
+  Template.contentUpload.onCreated(function(this: ContentUploadInstance & any) {
     this.currentUpload = new ReactiveVar(false);
     this.curFilesToUpload = new ReactiveVar([]);
-    this.quotaStatus = new ReactiveVar({ unlimited: true }); // Default to unlimited until loaded
     this.uploadMessage = new ReactiveVar(null);
     this.uploadMessageTimer = null;
     this.packageUploadQueue = Promise.resolve();
-    this.inlineConfirmation = new ReactiveVar(null);
-    this.inlineConfirmationResolve = null;
+    this.inlineConfirmation = new ReactiveVar<ContentUploadConfirmationPresentation | null>(null);
+    this.inlineConfirmationPlacement = '';
+    this.inlineConfirmationController = createInlineConfirmationController<ContentUploadConfirmationContext>(
+      (view) => {
+        this.inlineConfirmation.set(view.status === 'open'
+          ? { placement: this.inlineConfirmationPlacement, view }
+          : null);
+        if (view.status === 'closed') this.inlineConfirmationPlacement = '';
+      },
+      () => this.find('.content-upload-root'),
+    );
     this.pendingUploads = new ReactiveDict(); // Track pending package uploads
     this.autoruns = [];
     this.detailSubs = new Map();
     this.assetSubs = new Map();
-  this.listIds = new ReactiveVar([]);
-  this.listTotalCount = new ReactiveVar(0);
-  this.listHasMore = new ReactiveVar(false);
-  this.listLoading = new ReactiveVar(false);
-  this.listError = new ReactiveVar(null);
+  this.listPresentation = new ReactiveVar<LoadableState<ContentUploadListResult>>({ status: 'idle' });
+  this.summaryPresentation = new ReactiveVar<LoadableState<ContentUploadSummaryMap>>({ status: 'idle' });
+  this.quotaPresentation = new ReactiveVar<LoadableState<UploadQuotaStatus>>({ status: 'idle' });
+  this.listLifetime = createTemplateLifetime();
+  this.summaryLifetime = createTemplateLifetime();
+  this.quotaLifetime = createTemplateLifetime();
+  this.nextListRequestId = 0;
+  this.nextSummaryRequestId = 0;
+  this.nextQuotaRequestId = 0;
   this.lastListFetchKey = null;
   this.lastListFetch = 0;
-  this.summaryMap = new ReactiveVar({});
-  this.summaryLoading = new ReactiveVar(false);
   this.summaryFetchKey = null;
     this.lastSummaryFetch = 0;
     this.listLimit = new ReactiveVar(CONTENT_UPLOAD_LIST_LIMIT);
@@ -844,40 +1052,14 @@ Template.contentUpload.helpers({
     this.lastListFetchKey = key;
     this.lastListFetch = now;
 
-    this.listLoading.set(true);
-    this.listError.set(null);
-    clientConsole(2, '[CONTENT UPLOAD] Fetching list ids via method', 'limit:', limit);
-
-    MeteorAny.callAsync('getContentUploadListIds', { limit })
-      .then((result: any) => {
-        const ids = Array.isArray(result?.ids) ? result.ids : [];
-        const totalCount = Number.isFinite(result?.totalCount) ? result.totalCount : ids.length;
-        const hasMore = typeof result?.hasMore === 'boolean'
-          ? result.hasMore
-          : totalCount > ids.length;
-        this.listIds.set(ids);
-        this.listTotalCount.set(totalCount);
-        this.listHasMore.set(hasMore);
-        this.listLoading.set(false);
-        assetsHelperLastRun = 0;
-        assetsHelperCachedResult = [];
-      })
-      .catch((err: any) => {
-        this.listIds.set([]);
-        this.listTotalCount.set(0);
-        this.listHasMore.set(false);
-        this.listLoading.set(false);
-        this.listError.set(err);
-        clientConsole(1, '[CONTENT UPLOAD] List fetch failed:', err);
-      });
+    loadContentUploadList(this, limit);
   }));
 
   this.autoruns.push(this.autorun(() => {
-    const ids = this.listIds.get();
+    const ids = listValue(this)?.ids || [];
     const refreshToken = contentUploadRefreshToken();
     if (!Array.isArray(ids) || ids.length === 0) {
-      this.summaryLoading.set(false);
-      this.summaryMap.set({});
+      this.summaryPresentation.set({ status: 'empty', value: {} });
       return;
     }
     const key = `${ids.slice().sort().join(',')}-${refreshToken}`;
@@ -888,22 +1070,7 @@ Template.contentUpload.helpers({
     this.summaryFetchKey = key;
     this.lastSummaryFetch = now;
 
-    this.summaryLoading.set(true);
-    MeteorAny.callAsync('getContentUploadSummariesForIds', ids)
-      .then((summaries: any) => {
-        const map: Record<string, any> = {};
-        summaries.forEach((summary: any) => {
-          map[summary._id] = summary;
-        });
-        this.summaryMap.set(map);
-        this.summaryLoading.set(false);
-        assetsHelperLastRun = 0;
-        assetsHelperCachedResult = [];
-      })
-      .catch((err: any) => {
-        this.summaryLoading.set(false);
-        clientConsole(1, '[CONTENT UPLOAD] Summary fetch failed:', err);
-      });
+    loadContentUploadSummaries(this, ids);
   }));
 
   this.autoruns.push(this.autorun(() => {
@@ -915,8 +1082,8 @@ Template.contentUpload.helpers({
   }));
 
   this.autoruns.push(this.autorun(() => {
-    const listLoading = this.listLoading.get();
-    const summaryLoading = this.summaryLoading.get();
+    const listLoading = loadPending(this.listPresentation.get());
+    const summaryLoading = loadPending(this.summaryPresentation.get());
     this.listDisplayReady.set(!listLoading && !summaryLoading);
   }));
 
@@ -961,13 +1128,7 @@ Template.contentUpload.helpers({
     }
   }));
 
-  // Load upload quota status
-  const self = this;
-  MeteorAny.callAsync('getUploadQuotaStatus').then((status: any) => {
-    self.quotaStatus.set(status);
-  }).catch((err: any) => {
-    clientConsole(1, '[QUOTA] Error loading quota status:', err);
-  });
+  loadUploadQuotaStatus(this);
 
 });
 
@@ -977,9 +1138,12 @@ Template.contentUpload.onRendered(function(this: any) {
   
 });
 
-Template.contentUpload.onDestroyed(function(this: any) {
+Template.contentUpload.onDestroyed(function(this: ContentUploadInstance & any) {
   // Clean up autoruns
   this.autoruns.forEach((ar: any) => ar.stop());
+  this.listLifetime.destroy();
+  this.summaryLifetime.destroy();
+  this.quotaLifetime.destroy();
   if (this.overlayTimer) {
     clearTimeout(this.overlayTimer);
     this.overlayTimer = null;
@@ -992,7 +1156,9 @@ Template.contentUpload.onDestroyed(function(this: any) {
     Meteor.clearTimeout(this.uploadMessageTimer);
     this.uploadMessageTimer = null;
   }
-  clearInlineConfirmation(this, false);
+  const confirmationContext = this.inlineConfirmationController.getContext() as ContentUploadConfirmationContext | undefined;
+  this.inlineConfirmationController.destroy();
+  confirmationContext?.resolve(false);
 
   if (this.detailSubs) {
     this.detailSubs.forEach((sub: any) => sub.stop());
@@ -1018,13 +1184,34 @@ Template.contentUpload.onDestroyed(function(this: any) {
 // Template events
 
 Template.contentUpload.events({
-  'click .inline-confirm-accept': function(event: any, template: any) {
+  'click [data-content-quota-retry]'(event: any, template: ContentUploadInstance & any) {
     event.preventDefault();
-    clearInlineConfirmation(template, true);
+    loadUploadQuotaStatus(template);
   },
-  'click .inline-confirm-cancel': function(event: any, template: any) {
+  'click [data-content-list-retry]'(event: any, template: ContentUploadInstance & any) {
     event.preventDefault();
-    clearInlineConfirmation(template, false);
+    assetsRefreshTrigger.set(assetsRefreshTrigger.get() + 1);
+  },
+  'click [data-content-summary-retry]'(event: any, template: ContentUploadInstance & any) {
+    event.preventDefault();
+    const ids = listValue(template)?.ids || [];
+    loadContentUploadSummaries(template, ids);
+  },
+  'click .admin-confirmation-confirm': function(event: any, template: any) {
+    event.preventDefault();
+    if (template.inlineConfirmationController.getView().pending) return;
+    closeContentConfirmation(template, true);
+  },
+  'click .admin-confirmation-cancel': function(event: any, template: any) {
+    event.preventDefault();
+    closeContentConfirmation(template, false);
+  },
+  'keydown .content-upload-root': function(event: KeyboardEvent, template: any) {
+    const controller = template.inlineConfirmationController as InlineConfirmationController<ContentUploadConfirmationContext>;
+    const context = controller.getContext();
+    if (controller.handleKeydown(event)) {
+      context?.resolve(false);
+    }
   },
 
   // Toggle TDF public/private setting
@@ -1171,7 +1358,7 @@ Template.contentUpload.events({
     event.preventDefault();
     const tdfId = event.currentTarget.value;
 
-    const confirmed = await requestInlineConfirmation(template, {
+    const confirmed = await requestContentConfirmation(template, {
       placement: assetActionPlacement(String(tdfId || '')),
       title: contentText('content.createPrivateCopy'),
       message: contentText('content.privateCopyMessage'),
@@ -1368,26 +1555,30 @@ Template.contentUpload.events({
       $('#upload-apkg').val('');
     }
   },  
-  'click #show_stimuli': function(event: any, template: any){
+  'click .show-stimuli-btn': function(event: any, template: any){
     event.preventDefault();
     const tdfId = event.currentTarget.getAttribute('data-file');
     const panel = $('#stimuli-' + tdfId);
     if (panel.attr('hidden')) {
       template.ensureTdfDetails(tdfId);
       panel.removeAttr('hidden');
+      event.currentTarget.setAttribute('aria-expanded', 'true');
     } else {
       panel.attr('hidden', 'true');
+      event.currentTarget.setAttribute('aria-expanded', 'false');
     }
   },
-  'click #show_manage_access': function(event: any, template: any){
+  'click .show-manage-access-btn': function(event: any, template: any){
     event.preventDefault();
     const tdfId = event.currentTarget.getAttribute('data-file');
     const panel = $('#manage-access-' + tdfId);
     if (panel.attr('hidden')) {
       template.ensureTdfDetails(tdfId);
       panel.removeAttr('hidden');
+      event.currentTarget.setAttribute('aria-expanded', 'true');
     } else {
       panel.attr('hidden', 'true');
+      event.currentTarget.setAttribute('aria-expanded', 'false');
     }
   },
   'click #doUpload': async function(_event: any) {
@@ -1426,7 +1617,7 @@ Template.contentUpload.events({
       const row = $(event.currentTarget).closest('tr');
       const tdfId = row.find('#content-edit-btn').attr('value') || packageAssetId || fileName;
 
-      const confirmed = await requestInlineConfirmation(template, {
+      const confirmed = await requestContentConfirmation(template, {
         placement: assetActionPlacement(String(tdfId || '')),
         title: contentText('content.deletePackage'),
         message: contentText('content.deletePackageMessage', { filename: fileName }),
@@ -1476,7 +1667,7 @@ Template.contentUpload.events({
     MeteorAny.callAsync('removeAssetById', assetId);
   },
 
-  'click #stim-download-btn': async function(event: any, template: any){
+  'click .stim-download-btn': async function(event: any, template: any){
     event.preventDefault();
     const tdfId = event.currentTarget.getAttribute('data-tdfid');
     if (!tdfId) {
@@ -1509,7 +1700,7 @@ Template.contentUpload.events({
   },
   'click #deleteAllAssetsConfirm': async function(e: any, template: any) {
     e.preventDefault();
-    const confirmed = await requestInlineConfirmation(template, {
+    const confirmed = await requestContentConfirmation(template, {
       placement: 'admin-danger',
       title: contentText('content.deleteAllUploadedFiles'),
       message: contentText('content.deleteAllWarning'),
@@ -1554,7 +1745,7 @@ Template.contentUpload.events({
     popup.document.body.appendChild(img);
     popup.print();
   },
-  'click #add-access-btn': async function(event: any, template: any){
+  'click .add-access-btn': async function(event: any, template: any){
     const tdfId = event.currentTarget.getAttribute('value');
     await addAccessorsForTdf(template, tdfId);
   },
@@ -1566,7 +1757,7 @@ Template.contentUpload.events({
     const tdfId = event.currentTarget.getAttribute('data-id');
     await addAccessorsForTdf(template, tdfId);
   },
-  'click #remove-access-btn': async function(event: any, template: any){
+  'click .remove-access-btn': async function(event: any, template: any){
     const tdfId = event.currentTarget.getAttribute('value');
     const tdf = TdfsCollection.findOne({ _id: tdfId });
     let currentAccessors = Array.isArray(tdf?.accessors) ? tdf.accessors : null;
@@ -1595,7 +1786,7 @@ Template.contentUpload.events({
       setAccessMessage(template, tdfId, contentText('content.removeAccessError', { error: uploadErrorText(error) }), 'error');
     }
   },
-  'click #transfer-btn': async function(event: any, template: any){
+  'click .transfer-btn': async function(event: any, template: any){
     const tdfId = event.currentTarget.getAttribute('value');
     const newOwnerUsername = String(($('#transfer-' + tdfId).val() || '')).trim();
     if (!newOwnerUsername) {
@@ -1627,7 +1818,7 @@ Template.contentUpload.events({
       setAccessMessage(template, tdfId, contentText('content.transferOwnershipError', { error: uploadErrorText(error) }), 'error');
     }
   },
-  'click #load-more-TdfsCollection': function(event: any, template: any){
+  'click #load-more-tdfs': function(event: any, template: any){
     event.preventDefault();
     const currentLimit = template.listLimit.get();
     template.listLimit.set(currentLimit + CONTENT_UPLOAD_LIST_LIMIT);
@@ -1648,8 +1839,10 @@ Template.contentUpload.events({
     if (panel.attr('hidden')) {
       template.ensureAssetsSubscription(tdfId, stimSetId);
       panel.removeAttr('hidden');
+      event.currentTarget.setAttribute('aria-expanded', 'true');
     } else {
       panel.attr('hidden', 'true');
+      event.currentTarget.setAttribute('aria-expanded', 'false');
       template.stopAssetsSubscription(tdfId);
     }
   },
@@ -1682,14 +1875,6 @@ Template.contentUpload.events({
     if (files.length > 0) {
       await uploadMediaFiles(files, tdfId, stimSetId, template);
     }
-  },
-
-  // Click drop zone to open file picker
-  'click .media-drop-zone': function(event: any) {
-    // Don't trigger if clicking on the file input itself
-    if (event.target.tagName === 'INPUT') return;
-    const tdfId = event.currentTarget.getAttribute('data-tdfid');
-    $(`.media-file-input[data-tdfid="${tdfId}"]`).click();
   },
 
   // File input change handler
@@ -1758,7 +1943,7 @@ Template.contentUpload.events({
       return;
     }
 
-    const confirmed = await requestInlineConfirmation(template, {
+    const confirmed = await requestContentConfirmation(template, {
       placement: mediaPlacement(String(tdfId || '')),
       title: contentText('content.deleteMediaFile'),
       message: contentText('content.deleteFileMessage', { filename: filename || '' }),
@@ -1816,7 +2001,7 @@ Template.contentUpload.events({
       ? contentText('content.deleteFileMessage', { filename: filenames[0] || '' })
       : contentText('content.deleteFilesMessage', { count: assetIds.length, files: filesPreview });
 
-    const confirmed = await requestInlineConfirmation(template, {
+    const confirmed = await requestContentConfirmation(template, {
       placement: mediaPlacement(String(tdfId || '')),
       title: contentText('content.deleteSelectedMedia'),
       message: confirmMsg,
@@ -1893,7 +2078,7 @@ async function uploadMediaFiles(files: any, tdfId: any, stimSetId: any, template
       // Check if file already exists
       const existingFile = DynamicAssetsCollection.findOne({ name: file.name, 'meta.stimuliSetId': stimSetId });
       if (existingFile) {
-        const confirmed = await requestInlineConfirmation(template, {
+        const confirmed = await requestContentConfirmation(template, {
           placement: mediaPlacement(String(tdfId || '')),
           title: contentText('content.overwriteMediaFile'),
           message: contentText('content.mediaFileExistsOverwrite', { filename: file.name }),
@@ -2026,7 +2211,7 @@ async function doFileUpload(fileArray: any) {
           if (!result.result) {
             if(result.data && result.data.res == 'awaitClientTDF'){
               const reasons = Array.isArray(result.data.reason) ? result.data.reason : [];
-              const confirmed = await requestInlineConfirmation(template, {
+              const confirmed = await requestContentConfirmation(template, {
                 placement: 'upload-package',
                 title: contentText('content.overwriteExistingContent'),
                 message: contentText('content.previousFileOverwriteMessage', { filename: result.data.TDF.content.fileName }),
@@ -2086,7 +2271,7 @@ async function doPackageUpload(file: any, template: any): Promise<{ fileName: st
   }
 
   if (existingFile) {
-    const confirmed = await requestInlineConfirmation(template, {
+    const confirmed = await requestContentConfirmation(template, {
       placement: 'upload-package',
       title: contentText('content.overwriteExistingPackage'),
       message: contentText('content.packageOverwriteMessage', { filename: file.name }),
@@ -2263,7 +2448,7 @@ async function doPackageUpload(file: any, template: any): Promise<{ fileName: st
                   if(reasons.includes(`prevStimExists`))
                     reason.push(contentText('content.previousStimOverwriteMessage', { filename: res.data.TDF.content.tdfs.tutor.setspec.stimulusfile }))
 
-                  const confirmed = await requestInlineConfirmation(template, {
+                  const confirmed = await requestContentConfirmation(template, {
                     placement: 'upload-package',
                     title: contentText('content.overwriteExistingContent'),
                     message: reason.join(' '),

@@ -47,6 +47,8 @@ db/mongodump.tar.gz
 spacing-inventory.json
 padding-inventory*.json
 autotutor-concern-matrix-working-copy.md
+docs-developer/jedm-web-of-science-phase-1-backup-plan.md
+docs-developer/jedm-web-of-science-readiness-plan.md
 
 # Shareable local Docker/dev config
 !deploy/.env.local.example

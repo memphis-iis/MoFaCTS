@@ -1,0 +1,9 @@
+.audio-settings-range {
+  background: linear-gradient(
+    to right,
+    var(--feedback-correct-color) 0%,
+    var(--feedback-correct-color) var(--audio-range-progress),
+    var(--app-muted-surface-color) var(--audio-range-progress),
+    var(--app-muted-surface-color) 100%
+  );
+}

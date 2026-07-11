@@ -1,13 +1,12 @@
 <template name="classEdit">
 {{#if isInRole 'admin, teacher'}}
     <div aria-busy="{{#if isLoading}}true{{else}}false{{/if}}">
-      <h3 class="page-header-title class-edit-heading">{{courseText 'courseManagement.title'}}</h3>
-
       {{#if classEditMessage}}
-      <div class="admin-status admin-status-{{classEditMessage.level}} admin-message" role="status" aria-live="polite">
-        <i class="fa {{classEditMessage.icon}}"></i>
-        <div class="admin-status-text">{{classEditMessage.text}}</div>
-      </div>
+        {{> adminStatus variant=messageVariant text=classEditMessage.text urgent=false}}
+      {{/if}}
+
+      {{#if loadError}}
+        {{> adminStatus variant="error" text=loadError urgent=true}}
       {{/if}}
 
       <!-- Add or Edit a Course Section -->
@@ -18,47 +17,47 @@
               <i class="fa fa-pencil admin-section-icon"></i>
               <h5>{{courseText 'courseManagement.addOrEditCourse'}}</h5>
             </div>
-            <fieldset class="row g-3" disabled="{{#if isLoading}}disabled{{/if}}">
+            <fieldset class="row g-3" disabled="{{#if isBusy}}disabled{{/if}}">
               <div class="col-12">
                 <label for="class-select" class="form-label">{{courseText 'courseManagement.selectExistingCourse'}}</label>
                 <select id="class-select" class="form-select">
                   <option selected="selected" value="">{{courseText 'courseManagement.addCourse'}}</option>
                   {{#each classes}}
-                    <option value="{{this.courseId}}">{{this.courseName}}</option>
+                    <option value="{{this.courseId}}" {{selectedCourseAttrs this.courseId}}>{{this.courseName}}</option>
                   {{/each}}
                 </select>
               </div>
               <div class="col-12">
                 <label for="newClassName" class="form-label">{{courseText 'courseManagement.courseName'}}</label>
-                <input class="form-control" type="text" placeholder="{{courseText 'courseManagement.courseNamePlaceholder'}}" id="newClassName" />
+                <input class="form-control" type="text" placeholder="{{courseText 'courseManagement.courseNamePlaceholder'}}" id="newClassName" value="{{draftCourseName}}" />
               </div>
               <div class="col-md-4 col-12">
                 <label for="courseVisibility" class="form-label">{{courseText 'courseManagement.visibility'}}</label>
                 <select id="courseVisibility" class="form-select">
-                  <option value="private" selected>{{courseText 'courseManagement.private'}}</option>
-                  <option value="public">{{courseText 'courseManagement.public'}}</option>
+                  <option value="private" {{selectedVisibilityAttrs 'private'}}>{{courseText 'courseManagement.private'}}</option>
+                  <option value="public" {{selectedVisibilityAttrs 'public'}}>{{courseText 'courseManagement.public'}}</option>
                 </select>
                 <div class="form-text">{{courseText 'courseManagement.visibilityHelp'}}</div>
               </div>
               <div class="col-md-4 col-12">
                 <label for="courseBeginDate" class="form-label">{{courseText 'courseManagement.beginDate'}}</label>
-                <input class="form-control" type="datetime-local" id="courseBeginDate" />
+                <input class="form-control" type="datetime-local" id="courseBeginDate" value="{{draftBeginDate}}" />
               </div>
               <div class="col-md-4 col-12">
                 <label for="courseEndDate" class="form-label">{{courseText 'courseManagement.endDate'}}</label>
-                <input class="form-control" type="datetime-local" id="courseEndDate" />
+                <input class="form-control" type="datetime-local" id="courseEndDate" value="{{draftEndDate}}" />
               </div>
               <div class="col-12">
                 <label for="courseTimezone" class="form-label">{{courseText 'courseManagement.courseTimezone'}}</label>
                 <select id="courseTimezone" class="form-select">
                   {{#each courseTimezoneOptions}}
-                    <option value="{{this.value}}">{{this.label}}</option>
+                    <option value="{{this.value}}" {{selectedTimezoneAttrs this.value}}>{{this.label}}</option>
                   {{/each}}
                 </select>
               </div>
               <div class="col-12">
                 <label for="sectionNames" class="form-label">{{courseText 'courseManagement.sectionNames'}}</label>
-                <textarea class="form-control" rows="5" id="sectionNames" placeholder="{{courseText 'courseManagement.sectionNamesPlaceholder'}}"></textarea>
+                <textarea class="form-control" rows="5" id="sectionNames" placeholder="{{courseText 'courseManagement.sectionNamesPlaceholder'}}">{{draftSectionNames}}</textarea>
               </div>
               {{#if classEditConfirmation}}
                 <div class="col-12">
@@ -68,8 +67,8 @@
                       <div class="admin-inline-confirmation-message">{{classEditConfirmation.message}}</div>
                     </div>
                     <div class="admin-inline-confirmation-actions">
-                      <button type="button" class="btn btn-sm btn-outline-secondary" id="cancelCourseDelete">{{courseText 'courseManagement.cancel'}}</button>
-                      <button type="button" class="btn btn-sm btn-danger" id="confirmCourseDelete">
+                      <button type="button" class="btn btn-sm btn-outline-secondary" id="cancelCourseDelete" disabled="{{#if deleteBusy}}disabled{{/if}}">{{courseText 'courseManagement.cancel'}}</button>
+                      <button type="button" class="btn btn-sm btn-danger" id="confirmCourseDelete" aria-busy="{{#if deleteBusy}}true{{else}}false{{/if}}" disabled="{{#if deleteBusy}}disabled{{/if}}">
                         <i class="fa fa-trash"></i> {{courseText 'courseManagement.delete'}}
                       </button>
                     </div>
@@ -77,11 +76,11 @@
                 </div>
               {{/if}}
               <div class="col-12 text-center">
-                <button type='button' id='saveClass' class='btn btn-primary'>
+                <button type='button' id='saveClass' class='btn btn-primary' aria-busy="{{#if saveBusy}}true{{else}}false{{/if}}">
                   <i class="fa fa-save"></i> {{courseText 'courseManagement.saveCourse'}}
                 </button>
                 {{#if isEditingCourse}}
-                  <button type='button' id='deleteCourse' class='btn btn-outline-danger'>
+                  <button type='button' id='deleteCourse' class='btn btn-outline-danger' aria-busy="{{#if deleteBusy}}true{{else}}false{{/if}}">
                     <i class="fa fa-trash"></i> {{courseText 'courseManagement.deleteCourse'}}
                   </button>
                 {{/if}}

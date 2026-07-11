@@ -1,6 +1,7 @@
 import { Template } from 'meteor/templating';
 import { ReactiveVar } from 'meteor/reactive-var';
 import './draftEditorWorkspace.html';
+import './draftEditorWorkspace.css';
 import { clientConsole } from '../../lib/clientLogger';
 import { createTdfDraftEditor } from './tdfDraftEditor';
 import { createContentDraftEditor } from './contentDraftEditor';

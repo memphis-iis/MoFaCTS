@@ -4,6 +4,31 @@
   text-align: center;
 }
 
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: var(--app-space-0);
+}
+
+input[type=number] {
+  -moz-appearance: textfield;
+}
+
+.instructor-reporting-group-row {
+  font-weight: 600;
+  background-color: var(--app-muted-surface-color);
+  color: var(--app-text-color);
+}
+
+.instructor-reporting-exception {
+  color: var(--feedback-error-color);
+}
+
+.instructor-reporting-student-link {
+  padding-inline: var(--app-space-0);
+  text-align: start;
+}
+
 #mainContent {
   padding-left: var(--app-space-0);
   padding-right: var(--app-space-0);

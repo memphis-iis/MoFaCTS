@@ -44,6 +44,7 @@ import {
 import {Cookie} from './lib/cookies';
 import {currentUserHasRole, hasRoleFromAuthFlags} from './lib/roleUtils';
 import { managementRoutePresentation } from './lib/adminUi/routePresentationState';
+import './views/shared/adminUi/adminUi';
 import { getErrorMessage } from './lib/errorUtils';
 import { hideBootstrapModal } from './lib/bootstrapModal';
 import './index.html';
@@ -98,6 +99,10 @@ const PRACTICE_SHELL_TEMPLATES = new Set([
   'instructions',
 ]);
 
+const APP_SHELL_TEMPLATES = new Set([
+  'home',
+]);
+
 type AuthenticatedChromeMode = 'none' | 'app' | 'practice';
 
 async function leavePracticeForHome(): Promise<boolean> {
@@ -129,8 +134,17 @@ function getAuthenticatedChromeMode(): AuthenticatedChromeMode {
   }
 
   const currentTemplate = String(Session.get('currentTemplate') || '');
-  if (PRACTICE_SHELL_TEMPLATES.has(currentTemplate)) {
+  const currentModule = String(Session.get('curModule') || '');
+  const currentPath = FlowRouter.current()?.path || window.location.pathname || '';
+  if (
+    PRACTICE_SHELL_TEMPLATES.has(currentTemplate) ||
+    PRACTICE_SHELL_TEMPLATES.has(currentModule) ||
+    isPracticeRoutePath(currentPath)
+  ) {
     return 'practice';
+  }
+  if (APP_SHELL_TEMPLATES.has(currentTemplate)) {
+    return 'app';
   }
   const routePresentation = managementRoutePresentation.get();
   if (routePresentation.status !== 'idle') {
@@ -868,8 +882,10 @@ Template.registerHelper('isLoggedIn', function() {
 Template.registerHelper('showAuthenticatedAppChrome', function() {
   return getAuthenticatedChromeMode() !== 'none';
 });
-Template.registerHelper('showAppSidebar', function() {
-  return getAuthenticatedChromeMode() === 'app';
+Template.registerHelper('themeBootstrapClass', function() {
+  return Session.get('themeReady') === true
+    ? 'theme-bootstrap-ready'
+    : 'theme-bootstrap-pending';
 });
 Template.registerHelper('isPracticeChrome', function() {
   return getAuthenticatedChromeMode() === 'practice';
@@ -880,14 +896,14 @@ Template.registerHelper('showAppFooter', function() {
   }
   const routePresentation = managementRoutePresentation.get();
   const currentTemplate = String(Session.get('currentTemplate') || '');
+  if (routePresentation.status === 'idle') {
+    return currentTemplate === 'home';
+  }
   if (routePresentation.status === 'ready') {
     return currentTemplate === routePresentation.targetTemplate;
   }
   return routePresentation.status === 'error'
     && currentTemplate === 'managementRouteError';
-});
-Template.registerHelper('showPracticeMenu', function() {
-  return getAuthenticatedChromeMode() === 'practice';
 });
 Template.registerHelper('appChromeClass', function() {
   const mode = getAuthenticatedChromeMode();

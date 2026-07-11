@@ -2,7 +2,6 @@
   <div class="apkg-wizard" id="apkg-wizard-container">
     <!-- Wizard Header -->
     <div class="wizard-header">
-      <h3 class="page-header-title">{{apkgText 'apkg.title'}}</h3>
       <p class="text-muted">
         {{apkgText 'apkg.subtitle'}}
       </p>
@@ -41,18 +40,8 @@
       {{/if}}
 
       {{#if inlineConfirmation}}
-      <div class="admin-inline-confirmation wizard-card">
-        <i class="fa {{inlineConfirmation.icon}}" aria-hidden="true"></i>
-        <div>
-          <div class="admin-inline-confirmation-title">{{inlineConfirmation.title}}</div>
-          <div class="admin-inline-confirmation-message">{{inlineConfirmation.message}}</div>
-        </div>
-        <div class="admin-inline-confirmation-actions">
-          <button type="button" class="btn btn-sm btn-outline-secondary" id="cancel-inline-confirmation">{{apkgText 'apkg.cancel'}}</button>
-          <button type="button" class="btn btn-sm {{inlineConfirmation.confirmClass}}" id="confirm-inline-confirmation">
-            {{inlineConfirmation.confirmLabel}}
-          </button>
-        </div>
+      <div class="wizard-card">
+        {{> adminInlineConfirmation confirmation=inlineConfirmation}}
       </div>
       {{/if}}
 
@@ -193,15 +182,15 @@
 
               <!-- TDF Name -->
               <div class="form-group">
-                <label>{{apkgText 'apkg.tdfName'}}</label>
-                <input type="text" class="form-control tdf-name" data-index="{{@index}}"
+                <label for="apkg-tdf-name-{{@index}}">{{apkgText 'apkg.tdfName'}}</label>
+                <input type="text" class="form-control tdf-name" id="apkg-tdf-name-{{@index}}" data-index="{{@index}}"
                        value="{{name}}" placeholder="{{apkgText 'apkg.tdfNamePlaceholder'}}">
               </div>
 
               <!-- Prompt Field -->
               <div class="form-group">
-                <label>{{apkgText 'apkg.promptField'}}</label>
-                <select class="form-control prompt-field" data-index="{{@index}}" data-selected="{{prompt.field}}">
+                <label for="apkg-prompt-field-{{@index}}">{{apkgText 'apkg.promptField'}}</label>
+                <select class="form-control prompt-field" id="apkg-prompt-field-{{@index}}" data-index="{{@index}}" data-selected="{{prompt.field}}">
                   <option value="">{{apkgText 'apkg.selectField'}}</option>
                   {{#each deckFields}}
                   <option value="{{index}}">
@@ -213,8 +202,8 @@
 
               <!-- Response Field -->
               <div class="form-group">
-                <label>{{apkgText 'apkg.responseField'}}</label>
-                <select class="form-control response-field" data-index="{{@index}}" data-selected="{{response.field}}">
+                <label for="apkg-response-field-{{@index}}">{{apkgText 'apkg.responseField'}}</label>
+                <select class="form-control response-field" id="apkg-response-field-{{@index}}" data-index="{{@index}}" data-selected="{{response.field}}">
                   <option value="">{{apkgText 'apkg.selectField'}}</option>
                   {{#each deckFields}}
                   <option value="{{index}}">
@@ -225,10 +214,11 @@
               </div>
 
               <div class="form-group">
-                <label>{{apkgText 'apkg.noteRange'}}</label>
+                <label for="apkg-source-range-{{@index}}">{{apkgText 'apkg.noteRange'}}</label>
                 <input
                   type="text"
                   class="form-control source-range"
+                  id="apkg-source-range-{{@index}}"
                   data-index="{{@index}}"
                   value="{{sourceRange}}"
                   placeholder="{{apkgText 'apkg.noteRangePlaceholder'}}">
@@ -459,128 +449,4 @@
 
     </div>
   </div>
-
-  <style>
-  .apkg-wizard {
-    max-width: 900px;
-    margin: var(--app-space-4) auto;
-    padding: var(--app-space-4);
-    background: var(--learning-card-surface-color);
-    color: var(--app-text-color);
-    border-radius: var(--app-border-radius-lg);
-    box-shadow: var(--app-surface-shadow);
-  }
-
-  .apkg-wizard .wizard-header {
-    text-align: center;
-    margin-bottom: var(--app-space-5);
-  }
-
-  .apkg-wizard .wizard-steps {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: var(--app-space-5);
-    position: relative;
-  }
-
-  .apkg-wizard .wizard-steps::before {
-    content: '';
-    position: absolute;
-    top: 20px;
-    left: 10%;
-    right: 10%;
-    height: 2px;
-    background: var(--border-color);
-    z-index: 0;
-  }
-
-  .apkg-wizard .wizard-steps .step {
-    flex: 1;
-    text-align: center;
-    position: relative;
-    z-index: 1;
-  }
-
-  .apkg-wizard .wizard-steps .step-number {
-    display: inline-block;
-    width: 40px;
-    height: 40px;
-    line-height: 40px;
-    border-radius: var(--border-radius-circle);
-    background: var(--learning-card-surface-color);
-    border: 2px solid var(--border-color);
-    color: var(--app-secondary-text-color);
-    font-weight: bold;
-    margin-bottom: var(--app-space-1);
-  }
-
-  .apkg-wizard .wizard-steps .step.active .step-number {
-    border-color: var(--app-info-color);
-    background: var(--app-info-color);
-    color: var(--app-primary-action-text-color);
-  }
-
-  .apkg-wizard .wizard-steps .step.completed .step-number {
-    border-color: var(--app-success-color);
-    background: var(--app-success-color);
-    color: var(--learning-card-primary-action-text-color);
-  }
-
-  .apkg-wizard .wizard-steps .step-label {
-    display: block;
-    font-size: calc(var(--app-font-size-base) * 0.75);
-    color: var(--app-secondary-text-color);
-  }
-
-  .apkg-wizard .wizard-content {
-    min-height: 400px;
-  }
-
-  .apkg-wizard .wizard-actions {
-    display: flex;
-    justify-content: space-between;
-    gap: var(--app-space-2);
-    margin-top: var(--app-space-4);
-    padding-top: var(--app-space-4);
-    border-top: 1px solid var(--border-color);
-  }
-
-  .apkg-wizard .field-card {
-    border-left: 3px solid var(--app-info-color);
-  }
-
-  .apkg-wizard .tdf-config-card {
-    border-left: 4px solid var(--app-info-color);
-  }
-
-  .apkg-wizard .tdf-config-card.editing {
-    border-left-color: var(--app-warning-color);
-  }
-
-  .apkg-wizard .badge-text { background: var(--app-secondary-surface-color); color: var(--app-secondary-text-color); }
-  .apkg-wizard .badge-image { background: var(--app-media-image-color); color: var(--learning-card-primary-action-text-color); }
-  .apkg-wizard .badge-mixed { background: var(--app-media-mixed-color); color: var(--learning-card-primary-action-text-color); }
-  .apkg-wizard .badge-audio { background: var(--app-media-audio-color); color: var(--app-primary-action-text-color); }
-
-  .apkg-wizard .fields-list {
-    max-height: 400px;
-    overflow-y: auto;
-  }
-
-  .apkg-wizard .wizard-card {
-    margin-bottom: var(--app-space-3);
-  }
-
-  .apkg-wizard .wizard-status-detail {
-    margin-top: var(--app-space-2);
-  }
-
-  .apkg-wizard .wizard-card-sm {
-    margin-bottom: var(--app-space-2);
-  }
-
-  .apkg-wizard .wizard-actions-extra {
-    margin-top: var(--app-space-3);
-  }
-  </style>
 </template>

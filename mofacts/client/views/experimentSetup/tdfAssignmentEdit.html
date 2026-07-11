@@ -1,8 +1,6 @@
 <template name="tdfAssignmentEdit">
 {{#if isInRole 'admin, teacher'}}
   <div>
-    <h3 class="page-header-title">{{assignmentText 'courseAssignments.title'}}</h3>
-
     <div class="admin-section">
       <div class="card admin-card">
         <div class="card-body">
@@ -14,7 +12,7 @@
           <div class="row g-3">
             <div class="col-12">
               <label for="class-select" class="form-label">{{assignmentText 'courseAssignments.course'}}</label>
-              <select id="class-select" class="form-select">
+              <select id="class-select" class="form-select" disabled="{{editorBusy}}">
                 <option selected="selected" value="" disabled="true">{{assignmentText 'courseAssignments.selectCourse'}}</option>
                 {{#each courses}}
                   <option value="{{this._id}}" {{selectedCourseAttrs this._id}}>{{this.courseName}}</option>
@@ -24,16 +22,16 @@
 
             {{#if editorError}}
               <div class="col-12">
-                <div class="alert alert-danger" role="alert">{{editorError}}</div>
+                {{> adminStatus variant="error" text=editorError urgent=true}}
               </div>
             {{/if}}
 
             <div class="col-lg-4 col-12">
               <label for="assignmentSearch" class="form-label fw-bold">{{assignmentText 'courseAssignments.addLesson'}}</label>
-              <input id="assignmentSearch" class="form-control" type="search" placeholder="{{assignmentText 'courseAssignments.searchPlaceholder'}}">
+              <input id="assignmentSearch" class="form-control" type="search" placeholder="{{assignmentText 'courseAssignments.searchPlaceholder'}}" disabled="{{editorBusy}}">
               <div class="assignment-picker-list">
                 {{#each filteredAssignableTdfs}}
-                  <button type="button" class="assignment-picker-row add-assignment" data-tdfid="{{this.TDFId}}">
+                  <button type="button" class="assignment-picker-row add-assignment" data-tdfid="{{this.TDFId}}" disabled="{{editorBusy}}">
                     <span class="assignment-picker-title">{{this.displayName}}</span>
                     <span class="assignment-picker-meta">{{this.fileName}}</span>
                   </button>
@@ -48,7 +46,7 @@
               </div>
 
               {{#if isLoading}}
-                <div class="text-muted assignment-editor-empty">{{assignmentText 'courseAssignments.loadingAssignments'}}</div>
+                {{> adminStatus variant="info" text=(assignmentText 'courseAssignments.loadingAssignments')}}
               {{else}}
                 {{#if hasAssignmentRows}}
                   <div class="assignment-row-list">
@@ -56,10 +54,10 @@
                       <div class="assignment-editor-row" data-assignment-index="{{@index}}">
                         <div class="assignment-row-order">
                           <span class="fa fa-bars" title="{{assignmentText 'courseAssignments.dragHandle'}}" aria-hidden="true"></span>
-                          <button type="button" class="btn btn-sm btn-outline-secondary move-assignment-up" title="{{assignmentText 'courseAssignments.moveUp'}}">
+                          <button type="button" class="btn btn-sm btn-outline-secondary move-assignment-up" title="{{assignmentText 'courseAssignments.moveUp'}}" aria-label="{{assignmentText 'courseAssignments.moveUp'}}" disabled="{{editorBusy}}">
                             <span class="fa fa-arrow-up" aria-hidden="true"></span>
                           </button>
-                          <button type="button" class="btn btn-sm btn-outline-secondary move-assignment-down" title="{{assignmentText 'courseAssignments.moveDown'}}">
+                          <button type="button" class="btn btn-sm btn-outline-secondary move-assignment-down" title="{{assignmentText 'courseAssignments.moveDown'}}" aria-label="{{assignmentText 'courseAssignments.moveDown'}}" disabled="{{editorBusy}}">
                             <span class="fa fa-arrow-down" aria-hidden="true"></span>
                           </button>
                         </div>
@@ -67,39 +65,39 @@
                           <div class="assignment-row-title">{{this.title}}</div>
                           <div class="assignment-row-meta">{{this.fileName}}</div>
                           <div class="assignment-row-controls">
-                            <label class="form-check form-switch assignment-required-wrap">
-                              <input class="form-check-input assignment-required" type="checkbox" checked="{{isRequiredChecked}}">
-                              <span class="form-check-label">{{assignmentText 'courseAssignments.required'}}</span>
-                            </label>
-                            <label class="assignment-date-control">
-                              <span>{{assignmentText 'courseAssignments.visibleOn'}}</span>
-                              <input class="form-control form-control-sm assignment-release" type="datetime-local" value="{{releaseInputValue}}">
-                              <button type="button" class="btn btn-sm btn-link clear-release">{{assignmentText 'courseAssignments.clear'}}</button>
-                            </label>
-                            <label class="assignment-date-control">
-                              <span>{{assignmentText 'courseAssignments.dueOn'}}</span>
-                              <input class="form-control form-control-sm assignment-due" type="datetime-local" value="{{dueInputValue}}">
-                              <button type="button" class="btn btn-sm btn-link clear-due">{{assignmentText 'courseAssignments.clear'}}</button>
-                            </label>
+                            <div class="form-check form-switch assignment-required-wrap">
+                              <input id="{{rowControlId 'assignment-required'}}" class="form-check-input assignment-required" type="checkbox" checked="{{isRequiredChecked}}" disabled="{{editorBusy}}">
+                              <label class="form-check-label" for="{{rowControlId 'assignment-required'}}">{{assignmentText 'courseAssignments.required'}}</label>
+                            </div>
+                            <div class="assignment-date-control">
+                              <label for="{{rowControlId 'assignment-release'}}">{{assignmentText 'courseAssignments.visibleOn'}}</label>
+                              <input id="{{rowControlId 'assignment-release'}}" class="form-control form-control-sm assignment-release" type="datetime-local" value="{{releaseInputValue}}" disabled="{{editorBusy}}">
+                              <button type="button" class="btn btn-sm btn-link clear-release" disabled="{{editorBusy}}">{{assignmentText 'courseAssignments.clear'}}</button>
+                            </div>
+                            <div class="assignment-date-control">
+                              <label for="{{rowControlId 'assignment-due'}}">{{assignmentText 'courseAssignments.dueOn'}}</label>
+                              <input id="{{rowControlId 'assignment-due'}}" class="form-control form-control-sm assignment-due" type="datetime-local" value="{{dueInputValue}}" disabled="{{editorBusy}}">
+                              <button type="button" class="btn btn-sm btn-link clear-due" disabled="{{editorBusy}}">{{assignmentText 'courseAssignments.clear'}}</button>
+                            </div>
                           </div>
                         </div>
-                        <button type="button" class="btn btn-sm btn-outline-danger remove-assignment" title="{{assignmentText 'courseAssignments.remove'}}">
+                        <button type="button" class="btn btn-sm btn-outline-danger remove-assignment" title="{{assignmentText 'courseAssignments.remove'}}" aria-label="{{assignmentText 'courseAssignments.remove'}}" disabled="{{editorBusy}}">
                           <span class="fa fa-trash" aria-hidden="true"></span>
                         </button>
                       </div>
                     {{/each}}
                   </div>
                 {{else}}
-                  <div class="text-muted assignment-editor-empty">{{assignmentText 'courseAssignments.noAssignments'}}</div>
+                  {{> adminEmptyState icon="fa-list" text=(assignmentText 'courseAssignments.noAssignments')}}
                 {{/if}}
               {{/if}}
             </div>
 
             <div class="col-12 assignment-save-bar">
-              <button id="reloadAssignments" type="button" class="btn btn-outline-secondary">
+              <button id="reloadAssignments" type="button" class="btn btn-outline-secondary" disabled="{{editorBusy}}">
                 <i class="fa fa-refresh"></i> {{assignmentText 'courseAssignments.reset'}}
               </button>
-              <button id="saveAssignment" type="button" class="btn btn-primary" disabled="{{#if isLoading}}disabled{{/if}}">
+              <button id="saveAssignment" type="button" class="btn btn-primary" disabled="{{editorBusy}}" aria-busy="{{#if saveBusy}}true{{else}}false{{/if}}">
                 <i class="fa fa-save"></i> {{assignmentText 'courseAssignments.saveAssignments'}}
               </button>
             </div>

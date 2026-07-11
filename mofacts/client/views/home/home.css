@@ -11,6 +11,7 @@
 .home-app {
     display: flex;
     min-height: 100vh;
+    min-height: 100dvh;
     overflow-x: hidden;
     background: var(--app-background-color);
     color: var(--app-text-color);
@@ -25,6 +26,7 @@
     display: flex;
     flex-direction: column;
     height: 100vh;
+    height: 100dvh;
     overflow: hidden;
     position: fixed;
     left: 0;
@@ -356,6 +358,18 @@
     height: 100vh;
     height: 100dvh;
     overflow: hidden;
+}
+
+.practice-app .sidebar {
+    display: none;
+}
+
+.practice-app .mobile-sidebar-trigger {
+    display: none;
+}
+
+.tool-app .app-practice-menu {
+    display: none;
 }
 
 .practice-app .practice-main {
@@ -818,11 +832,6 @@ html.learning-progress-panel-viewport-open .practice-top-header {
 .tool-content > * {
     position: relative;
     z-index: 1;
-}
-
-.tool-content .page-header-title,
-.tool-content .page-header-text {
-    display: none;
 }
 
 .welcome {

@@ -1,12 +1,13 @@
 <template name="dataDownload">
     <div>
-        <h3 class="page-header-title">{{reportingText 'reporting.downloadData'}}</h3>
-
     {{#if downloadMessage}}
-    <div class="admin-status admin-status-{{downloadMessage.level}} admin-message" role="status" aria-live="polite">
-        <i class="fa {{downloadMessage.icon}}" aria-hidden="true"></i>
-        <div class="admin-status-text">{{downloadMessage.text}}</div>
-    </div>
+    {{> adminStatus variant=downloadMessage.level text=downloadMessage.text urgent=downloadMessageUrgent}}
+    {{/if}}
+    {{#if loadErrorText}}
+    {{> adminStatus variant="error" text=loadErrorText urgent=true}}
+    <button type="button" class="btn btn-outline-secondary btn-sm admin-form-row-sm" data-download-load-retry="true">
+        {{reportingText 'common.tryAgain'}}
+    </button>
     {{/if}}
 
     <div class="admin-section">
@@ -17,7 +18,7 @@
                     <h5>{{reportingText 'reporting.yourLearningHistory'}}</h5>
                 </div>
                 <div class="admin-form-row text-center">
-                    <button class="btn btn-primary" id="ownHistoryDownloadButton" type="button">
+                    <button class="btn btn-primary" id="ownHistoryDownloadButton" type="button" disabled="{{downloadBusy}}" aria-busy="{{#if downloadBusy}}true{{else}}false{{/if}}">
                         <i class="fa fa-download"></i> {{reportingText 'reporting.downloadYourHistory'}}
                     </button>
                 </div>
@@ -33,63 +34,81 @@
                     <h5>{{reportingText 'reporting.dataFromOwnedTdfs'}}</h5>
                 </div>
                 <div class="admin-form-row text-center">
-                    <a class="btn btn-primary" id="userDataDownloadLink" target="_blank" href>
+                    <button class="btn btn-primary" id="userDataDownloadLink" type="button" disabled="{{downloadBusy}}" aria-busy="{{#if downloadBusy}}true{{else}}false{{/if}}">
                         <i class="fa fa-download"></i> {{reportingText 'reporting.downloadOwnedTdfData'}}
-                    </a>
+                    </button>
                 </div>
-                <div class="admin-table-wrapper" aria-busy="{{#if isLoading}}true{{else}}false{{/if}}">
-                    <div class="table-responsive data-download-table-wrapper">
-                        <table class="table table-striped table-bordered data-download-table">
-                            <thead>
-                                <tr>
-                                    <th scope="col" class="table-col-icon text-center">{{reportingText 'reporting.link'}}</th>
-                                    <th scope="col" class="table-col-large">{{reportingText 'reporting.lessonName'}}</th>
-                                    <th scope="col" class="table-col-medium">{{reportingText 'reporting.fileName'}}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {{#unless isLoading}}
-                                {{#each dataDownloads}}
-                                <tr>
-                                    <td class="text-center">
-                                        <button class="btn-icon data-download-link" type="button" data-fileName="{{this.content.fileName}}" data-fileId="{{this._id}}" title="{{reportingText 'reporting.downloadDataFile'}}">
-                                            <span class="fa fa-download" aria-hidden="true"></span>
-                                        </button>
-                                        {{#if this.hasConditionChildren}}
-                                        <button
-                                          class="btn-icon root-omnibus-download-link"
-                                          type="button"
-                                          data-fileName="{{this.content.fileName}}"
-                                          title="{{reportingText 'reporting.downloadRootOmnibus'}}"
-                                        >
-                                            <span class="fa fa-sitemap" aria-hidden="true"></span>
-                                        </button>
-                                        {{/if}}
-                                    </td>
-                                    <td>{{this.content.tdfs.tutor.setspec.lessonname}}</td>
-                                    <td>
-                                        {{#if this.content.fileName}}
-                                            {{this.content.fileName}}
-                                            {{#if this.hasConditionChildren}}
-                                            <span class="text-muted small"> {{reportingText 'reporting.rootConditions' count=this.conditionCount}}</span>
-                                            {{/if}}
-                                        {{else}}
-                                            {{reportingText 'reporting.missing'}}
-                                        {{/if}}
-                                    </td>
-                                </tr>
-                                {{else}}
-                                <tr>
-                                    <td colspan="3" class="text-center text-muted admin-table-status-cell">{{reportingText 'reporting.noDataFiles'}}</td>
-                                </tr>
-                                {{/each}}
-                                {{/unless}}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                {{> adminTableShell label=downloadFilesTableLabel tableTemplate="dataDownloadFilesTable" tableData=downloadFilesTableData}}
             </div>
         </div>
     </div>
     </div>
+</template>
+
+<template name="dataDownloadFilesTable">
+    <table class="table table-striped table-bordered data-download-table" aria-busy="{{#if isLoading}}true{{else}}false{{/if}}">
+        <thead>
+            <tr>
+                <th scope="col" class="table-col-icon text-center">{{reportingText 'reporting.link'}}</th>
+                <th scope="col" class="table-col-large">{{reportingText 'reporting.lessonName'}}</th>
+                <th scope="col" class="table-col-medium">{{reportingText 'reporting.fileName'}}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{#if isLoading}}
+            <tr>
+                <td colspan="3" class="text-center text-muted admin-table-status-cell">{{reportingText 'reporting.loading'}}</td>
+            </tr>
+            {{else}}
+                {{#if loadErrorText}}
+                <tr>
+                    <td colspan="3" class="text-center text-danger admin-table-status-cell">{{loadErrorText}}</td>
+                </tr>
+                {{else}}
+                    {{#each rows}}
+                    <tr>
+                        <td class="text-center">
+                            <button
+                              class="btn-icon data-download-link"
+                              type="button"
+                              data-fileName="{{this.content.fileName}}"
+                              data-fileId="{{this._id}}"
+                              aria-label="{{downloadFileAriaLabel this}}"
+                              title="{{reportingText 'reporting.downloadDataFile'}}"
+                              disabled="{{#if ../downloadBusy}}disabled{{/if}}">
+                                <span class="fa fa-download" aria-hidden="true"></span>
+                            </button>
+                            {{#if this.hasConditionChildren}}
+                            <button
+                              class="btn-icon root-omnibus-download-link"
+                              type="button"
+                              data-fileName="{{this.content.fileName}}"
+                              aria-label="{{rootOmnibusAriaLabel this}}"
+                              title="{{reportingText 'reporting.downloadRootOmnibus'}}"
+                              disabled="{{#if ../downloadBusy}}disabled{{/if}}">
+                                <span class="fa fa-sitemap" aria-hidden="true"></span>
+                            </button>
+                            {{/if}}
+                        </td>
+                        <td>{{this.disp}}</td>
+                        <td>
+                            {{#if this.content.fileName}}
+                                {{this.content.fileName}}
+                                {{#if this.hasConditionChildren}}
+                                <span class="text-muted small"> {{reportingText 'reporting.rootConditions' count=this.conditionCount}}</span>
+                                {{/if}}
+                            {{else}}
+                                {{reportingText 'reporting.missing'}}
+                            {{/if}}
+                        </td>
+                    </tr>
+                    {{else}}
+                    <tr>
+                        <td colspan="3" class="text-center text-muted admin-table-status-cell">{{reportingText 'reporting.noDataFiles'}}</td>
+                    </tr>
+                    {{/each}}
+                {{/if}}
+            {{/if}}
+        </tbody>
+    </table>
 </template>

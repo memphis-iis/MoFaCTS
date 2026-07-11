@@ -5,6 +5,7 @@ import { clientConsole } from '../lib/clientLogger';
 import { getActiveUiLocale } from '../lib/interfaceLocaleState';
 import { translatePlatformString } from '../lib/interfaceI18n';
 import './help.html';
+import './help.css';
 
 declare const Template: {
   help: {

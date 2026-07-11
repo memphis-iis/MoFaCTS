@@ -4,7 +4,7 @@
       <div class="table-toolbar">
         <div class="toolbar-search">
           <span class="fa fa-search" aria-hidden="true"></span>
-          <input id="coursesSearch" type="text" placeholder="{{t 'courses.searchPlaceholder'}}" disabled="{{#if isLoading}}disabled{{/if}}">
+          <input id="coursesSearch" type="text" aria-label="{{t 'courses.searchPlaceholder'}}" disabled="{{#if isLoading}}disabled{{/if}}">
         </div>
         <div class="toolbar-filters">
           <select id="coursesSort" class="form-select form-select-sm">
@@ -61,7 +61,7 @@
             {{#if hasAssignedAssignments}}
               <div class="practice-section">
                 <div class="practice-section-heading">{{t 'courses.assignedCourses'}}</div>
-                {{> courseAssignmentTable courses=assignedCourses}}
+                {{> courseAssignmentTable courses=assignedCourses label=(t 'courses.assignedCourses')}}
                 {{> courseAssignmentCards courses=assignedCourses}}
               </div>
             {{/if}}
@@ -69,7 +69,7 @@
             <div class="practice-section">
               <div class="practice-section-heading">{{t 'courses.publicCourses'}}</div>
               {{#if hasPublicAssignments}}
-                {{> courseAssignmentTable courses=publicCourses}}
+                {{> courseAssignmentTable courses=publicCourses label=(t 'courses.publicCourses')}}
                 {{> courseAssignmentCards courses=publicCourses}}
               {{else}}
                 <div class="practice-empty-state">
@@ -85,9 +85,9 @@
 </template>
 
 <template name="courseAssignmentTable">
-  <div class="learning-dashboard-table-shell course-assignment-table-shell">
+  <div class="learning-dashboard-table-shell course-assignment-table-shell" role="region" aria-label="{{label}}" tabindex="0">
     <div class="table-wrap">
-      <table class="practice-table learning-dashboard-table course-assignment-table" role="treegrid">
+      <table class="practice-table learning-dashboard-table course-assignment-table">
         <colgroup>
           <col class="course-assignment-col-course">
           <col class="course-assignment-col-assignment">
@@ -132,7 +132,7 @@
 </template>
 
 <template name="courseTreeCourseRow">
-  <tr id="{{rowId}}" class="learning-dashboard-row course-tree-course-row" role="row" aria-level="1" aria-expanded="{{#if expanded}}true{{else}}false{{/if}}">
+  <tr id="{{rowId}}" class="learning-dashboard-row course-tree-course-row">
     <th scope="row" class="learning-dashboard-cell course-assignment-cell--course" data-label="{{t 'courses.course'}}">
       <button type="button" class="course-tree-toggle toggle-course-tree"
         data-courseid="{{courseId}}"
@@ -158,12 +158,12 @@
                   <option value="{{sectionId}}">{{sectionName}}</option>
                 {{/each}}
               </select>
-              <button type="button" class="btn btn-sm btn-success join-public-course" data-courseid="{{courseId}}" disabled="{{#if joinDisabled}}disabled{{/if}}">
+              <button type="button" class="btn btn-sm btn-success join-public-course" data-courseid="{{courseId}}" aria-label="{{joinActionLabel}}" disabled="{{#if joinDisabled}}disabled{{/if}}">
                 {{joinLabel}}
               </button>
             </div>
           {{else}}
-            <button type="button" class="btn btn-sm btn-success join-public-course" data-courseid="{{courseId}}" data-sectionid="{{singleJoinableSectionId}}" disabled="{{#if joinDisabled}}disabled{{/if}}">
+            <button type="button" class="btn btn-sm btn-success join-public-course" data-courseid="{{courseId}}" data-sectionid="{{singleJoinableSectionId}}" aria-label="{{joinActionLabel}}" disabled="{{#if joinDisabled}}disabled{{/if}}">
               {{joinLabel}}
             </button>
           {{/if}}
@@ -200,8 +200,10 @@
 </template>
 
 <template name="courseAssignmentTableRow">
-  <tr id="{{rowId}}" class="learning-dashboard-row course-assignment-row course-tree-assignment-row {{#if isLocked}}course-assignment-row--locked{{else if isUsed}}learning-dashboard-row--used{{else}}learning-dashboard-row--unused{{/if}}" role="row" aria-level="2">
-    <th scope="row" class="learning-dashboard-cell course-assignment-cell--course" data-label="{{t 'courses.course'}}" aria-label="{{t 'courses.assignment'}}"></th>
+  <tr id="{{rowId}}" class="learning-dashboard-row course-assignment-row course-tree-assignment-row {{#if isLocked}}course-assignment-row--locked{{else if isUsed}}learning-dashboard-row--used{{else}}learning-dashboard-row--unused{{/if}}">
+    <th scope="row" class="learning-dashboard-cell course-assignment-cell--course course-assignment-cell--assignment-row-header" data-label="{{t 'courses.course'}}">
+      <span class="sr-only">{{title}}</span>
+    </th>
     <td class="learning-dashboard-cell course-assignment-cell--assignment" data-label="{{t 'courses.assignment'}}">
       <div class="learning-dashboard-cell__value course-assignment-lesson">
         <span class="course-assignment-title" title="{{title}}">{{title}}</span>
@@ -223,6 +225,7 @@
           data-assignmentid="{{assignmentId}}"
           data-courseid="{{courseId}}"
           data-tdfid="{{TDFId}}"
+          aria-label="{{assignmentActionLabel}}"
           disabled="{{#if isLocked}}disabled{{/if}}">
           {{actionLabel}}
         </button>
@@ -289,11 +292,11 @@
               <option value="{{sectionId}}">{{sectionName}}</option>
             {{/each}}
           </select>
-          <button type="button" class="btn btn-sm btn-success join-public-course" data-courseid="{{courseId}}" disabled="{{#if joinDisabled}}disabled{{/if}}">
+          <button type="button" class="btn btn-sm btn-success join-public-course" data-courseid="{{courseId}}" aria-label="{{joinActionLabel}}" disabled="{{#if joinDisabled}}disabled{{/if}}">
             {{joinLabel}}
           </button>
         {{else}}
-          <button type="button" class="btn btn-sm btn-success join-public-course" data-courseid="{{courseId}}" data-sectionid="{{singleJoinableSectionId}}" disabled="{{#if joinDisabled}}disabled{{/if}}">
+          <button type="button" class="btn btn-sm btn-success join-public-course" data-courseid="{{courseId}}" data-sectionid="{{singleJoinableSectionId}}" aria-label="{{joinActionLabel}}" disabled="{{#if joinDisabled}}disabled{{/if}}">
             {{joinLabel}}
           </button>
         {{/if}}
@@ -356,6 +359,7 @@
         data-assignmentid="{{assignmentId}}"
         data-courseid="{{courseId}}"
         data-tdfid="{{TDFId}}"
+        aria-label="{{assignmentActionLabel}}"
         disabled="{{#if isLocked}}disabled{{/if}}">
         {{actionLabel}}
       </button>

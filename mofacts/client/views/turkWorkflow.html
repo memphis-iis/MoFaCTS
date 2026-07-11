@@ -1,27 +1,7 @@
 <!-- Turk Workflow Template -->
 
 <template name="turkWorkflow">
-    <style>
-        /* Turk workflow modal overrides */
-        #turkModal .modal-title,
-        #profileWorkModal .modal-title {
-            margin-left: 0;
-            display: flex;
-            align-items: center;
-        }
-
-        #turkModal .modal-body,
-        #profileWorkModal .modal-body {
-            padding: var(--app-space-3) calc(1.25rem * var(--app-density-scale));
-        }
-
-        #turk-assign-results:empty {
-            display: none;
-        }
-    </style>
     <div>
-        <h3 class="page-header-title">{{turkText 'turk.pageTitle'}}</h3>
-
         {{#if turkWorkflowMessage}}
         <div class="admin-status admin-status-{{turkWorkflowMessage.level}} admin-message" role="status" aria-live="polite">
             <i class="fa {{turkWorkflowMessage.icon}}"></i>
@@ -43,6 +23,7 @@
     <div class="row" id="profileContainer">
         <div class="col-lg-6 col-md-8 offset-lg-3 offset-md-2">
                 <div class="form-group admin-form-row">
+                    <label for="profileAWSID" class="form-label">{{awsIdPlaceholder}}</label>
                     <input type="text"
                         id="profileAWSID" name="profileAWSID"
                         class="form-control clearOnSave"
@@ -51,6 +32,7 @@
                     >
                 </div>
                 <div class="form-group admin-form-row">
+                    <label for="profileAWSSecret" class="form-label">{{awsSecretPlaceholder}}</label>
                     <input type="password"
                         id="profileAWSSecret" name="profileAWSSecret"
                         class="form-control clearOnSave"
@@ -104,9 +86,18 @@
     <div id="turkLogEntireWorkflow">
         <div class="row">
             <div class="col-md-6 text-center offset-md-3" id="turkLogSelectContainer">
-                <p class="text-muted admin-form-row-sm">{{turkText 'turk.selectTdfForLog'}}</p>
+                <label for="tdf-select" class="form-label text-muted admin-form-row-sm">{{turkText 'turk.selectTdfForLog'}}</label>
+                {{#if logExperimentsError}}
+                {{> adminStatus variant="error" text=logExperimentsError urgent=true}}
+                <button type="button" class="btn btn-outline-secondary btn-sm admin-form-row-sm" data-turk-experiments-retry="true">
+                    {{turkText 'common.tryAgain'}}
+                </button>
+                {{/if}}
+                {{#if logExperimentsLoading}}
+                {{> adminStatus variant="info" text=(turkText 'common.loading')}}
+                {{/if}}
                 
-                <select id="tdf-select" class="form-select">
+                <select id="tdf-select" class="form-select" disabled="{{logExperimentsLoading}}">
                     <option value="">{{turkText 'turk.selectLesson'}}</option>
                     {{#each logExperiments}}
                     <option value="{{selectorKey}}" selected={{isSelectedLogExperiment selectorKey}}>{{displayLabel}}</option>
@@ -123,27 +114,28 @@
                     </h5>
 
                     <div class="form-group admin-form-row">
+                        <label for="turklog-filt" class="form-label">{{turkText 'turk.trialFilterPlaceholder'}}</label>
                         <input type="text" class="form-control" name="turklog-filt" id="turklog-filt" value="" placeholder="{{turkText 'turk.trialFilterPlaceholder'}}">
                     </div>
 
 
                     <div class="admin-table-wrapper">
-                        <div class="table-responsive">
+                        <div class="table-responsive" role="region" aria-label="{{turkText 'turk.experimentLogHeading'}}" tabindex="0">
                             <table class="table table-striped table-bordered table-sm">
                                 <thead class="table-light">
                                     <tr>
-                                        <th class="table-col-narrow">{{turkText 'turk.userMongoId'}}</th>
-                                        <th class="table-col-narrow">{{turkText 'turk.userNameTurk'}}</th>
-                                        <th class="table-col-small">{{turkText 'turk.emailSched'}}</th>
-                                        <th class="table-col-icon text-center">{{turkText 'turk.correct'}}</th>
-                                        <th class="table-col-small">{{turkText 'turk.approval'}}</th>
-                                        <th class="table-col-small">{{turkText 'turk.emailSent'}}</th>
-                                        <th class="table-col-small">{{turkText 'turk.delivery'}}</th>
-                                        <th class="table-col-icon text-center">{{turkText 'turk.currentUnit'}}</th>
-                                        <th class="table-col-narrow">{{turkText 'turk.lastActionTime'}}</th>
-                                        <th class="table-col-icon text-center">{{turkText 'turk.questionsSeen'}}</th>
-                                        <th class="table-col-icon text-center">{{turkText 'turk.posttestCorrect'}}</th>
-                                        <th class="table-col-small">{{turkText 'turk.bonus'}}</th>
+                                        <th scope="col" class="table-col-narrow">{{turkText 'turk.userMongoId'}}</th>
+                                        <th scope="col" class="table-col-narrow">{{turkText 'turk.userNameTurk'}}</th>
+                                        <th scope="col" class="table-col-small">{{turkText 'turk.emailSched'}}</th>
+                                        <th scope="col" class="table-col-icon text-center">{{turkText 'turk.correct'}}</th>
+                                        <th scope="col" class="table-col-small">{{turkText 'turk.approval'}}</th>
+                                        <th scope="col" class="table-col-small">{{turkText 'turk.emailSent'}}</th>
+                                        <th scope="col" class="table-col-small">{{turkText 'turk.delivery'}}</th>
+                                        <th scope="col" class="table-col-icon text-center">{{turkText 'turk.currentUnit'}}</th>
+                                        <th scope="col" class="table-col-narrow">{{turkText 'turk.lastActionTime'}}</th>
+                                        <th scope="col" class="table-col-icon text-center">{{turkText 'turk.questionsSeen'}}</th>
+                                        <th scope="col" class="table-col-icon text-center">{{turkText 'turk.posttestCorrect'}}</th>
+                                        <th scope="col" class="table-col-small">{{turkText 'turk.bonus'}}</th>
                                     </tr>
                                 </thead>
 
@@ -158,13 +150,14 @@
                         {{#each turkExperimentLog}}
                             <tr>
                                 <td class="small text-break">{{userId}}</td>
-                                <td>{{turk_username}}</td>
+                                <th scope="row">{{turk_username}}</th>
                                 <td>
                                     {{#if haveEmailSched}}
                                     <button type="button"
                                         class="btn btn-fix btn-primary btn-xs btn-sched-detail"
                                         data-idx="{{idx}}"
-                                    ><i class="fa fa-search-plus"></i>&nbsp;{{turkEmailSchedule}}
+                                        aria-label="{{turkText 'turk.emailSched'}}: {{turk_username}}"
+                                    ><i class="fa fa-search-plus" aria-hidden="true"></i>&nbsp;{{turkEmailSchedule}}
                                     </button>
                                     {{else}}
                                     <span class="text-muted small">{{turkText 'turk.notScheduled'}}</span>
@@ -176,12 +169,14 @@
                                         <button type="button"
                                             class="btn btn-fix btn-success btn-xs btn-pay-action"
                                             data-idx="{{idx}}"
+                                            aria-label="{{turkText 'turk.approvePay'}}: {{turk_username}}"
                                         ><span class="fa fa-usd" aria-hidden="true"></span>&nbsp;{{turkText 'turk.approvePay'}}
                                         </button>
                                     {{else}}
                                         <button type="button"
                                             class="btn btn-fix btn-primary btn-xs btn-pay-detail"
                                             data-idx="{{idx}}"
+                                            aria-label="{{turkText 'turk.approval'}}: {{turk_username}}"
                                         ><span class="fa fa-search-plus" aria-hidden="true"></span>&nbsp;
                                         {{turkpay}}
                                         </button>
@@ -192,6 +187,7 @@
                                     <button type="button"
                                         class="btn btn-fix btn-primary btn-xs btn-send-detail"
                                         data-idx="{{idx}}"
+                                        aria-label="{{turkText 'turk.emailSent'}}: {{turk_username}}"
                                     ><span class="fa fa-search-plus" aria-hidden="true"></span>&nbsp;{{turkEmailSend}}
                                     </button>
                                     {{else}}
@@ -203,6 +199,7 @@
                                     <button type="button"
                                         class="btn btn-fix btn-primary btn-xs btn-delivery-detail"
                                         data-idx="{{idx}}"
+                                        aria-label="{{turkText 'turk.delivery'}}: {{turk_username}}"
                                     ><span class="fa fa-search-plus" aria-hidden="true"></span>&nbsp;<span class="{{emailDeliveryBadgeClass}}">{{emailDeliveryStatus}}</span>&nbsp;({{emailDeliveryAttempts}})
                                     </button>
                                     <div class="small text-muted">{{turkText 'turk.last'}}: {{emailDeliveryLastAttemptDisplay}}</div>
@@ -216,11 +213,11 @@
                                 <td class="text-center">{{posttestCorrect}}</td>
                                 <td>
                                     {{#if needBonus}}
-                                        <button type="button" class="btn btn-fix btn-warning btn-xs btn-bonus-action" data-idx="{{idx}}">
+                                        <button type="button" class="btn btn-fix btn-warning btn-xs btn-bonus-action" data-idx="{{idx}}" aria-label="{{turkText 'turk.sendBonus'}}: {{turk_username}}">
                                             <span class="fa fa-usd" aria-hidden="true"></span>&nbsp;{{turkText 'turk.sendBonus'}}
                                         </button>
                                     {{else}}
-                                        <button type="button" class="btn btn-fix btn-primary btn-xs btn-bonus-detail" data-idx="{{idx}}">
+                                        <button type="button" class="btn btn-fix btn-primary btn-xs btn-bonus-detail" data-idx="{{idx}}" aria-label="{{turkText 'turk.bonus'}}: {{turk_username}}">
                                             <span class="fa fa-search-plus" aria-hidden="true"></span>&nbsp;{{turkbonus}}
                                         </button>
                                     {{/if}}
@@ -251,9 +248,10 @@
                 </div>
                 <div class="row">
                     <div class="col-md-6 offset-md-3 text-center" id="turk-assignment-details">
+                        <label for="turk-assignid" class="form-label">{{turkText 'turk.assignmentIdPlaceholder'}}</label>
                         <div class="input-group admin-form-row-sm">
                             <input type="text" class="form-control" name="turk-assignid" id="turk-assignid" value="" placeholder="{{turkText 'turk.assignmentIdPlaceholder'}}">
-                            <button id="turk-show-assign" class="btn btn-fix"><i class="fa fa-search admin-button-icon"></i>{{turkText 'turk.getAssignment'}}</button>
+                            <button type="button" id="turk-show-assign" class="btn btn-fix"><i class="fa fa-search admin-button-icon"></i>{{turkText 'turk.getAssignment'}}</button>
                         </div>
                         <pre id="turk-assign-results" class="text-start admin-alert-compact rounded admin-preformatted-output"></pre>
                     </div>
@@ -273,13 +271,15 @@
                 <div class="row">
                     <div class="col-md-6 offset-md-3" id="turk-send-message">
                         <div class="form-group admin-form-row">
+                            <label for="turk-workerid" class="form-label">{{turkText 'turk.workerIdPlaceholder'}}</label>
                             <input type="text" class="form-control" name="turk-workerid" id="turk-workerid" value="" placeholder="{{turkText 'turk.workerIdPlaceholder'}}">
                         </div>
                         <div class="form-group admin-form-row">
+                            <label for="turk-msg" class="form-label">{{turkText 'turk.messagePlaceholder'}}</label>
                             <textarea name="turk-msg" id="turk-msg" class="form-control" rows="8" placeholder="{{turkText 'turk.messagePlaceholder'}}"></textarea>
                         </div>
                         <div class="text-center">
-                            <button id="turk-send-msg" class="btn btn-fix btn-primary">
+                            <button type="button" id="turk-send-msg" class="btn btn-fix btn-primary">
                                 <i class="fa fa-paper-plane admin-button-icon"></i>{{turkText 'turk.sendMessage'}}
                             </button>
                         </div>
@@ -301,24 +301,39 @@
                     <div class="col-md-6 offset-md-3" id="turk-assignment-removal-container">
                         <p class="text-muted admin-form-row-sm">{{turkText 'turk.selectExperimentAndUser'}}</p>
                         <div class="form-group admin-form-row-sm">
-                            <select id="experiment-select" class="form-select">
+                            {{#if logExperimentsError}}
+                            {{> adminStatus variant="error" text=logExperimentsError urgent=true}}
+                            {{/if}}
+                            {{#if logExperimentsLoading}}
+                            {{> adminStatus variant="info" text=(turkText 'common.loading')}}
+                            {{/if}}
+                            <label for="experiment-select" class="form-label">{{turkText 'turk.selectExperiment'}}</label>
+                            <select id="experiment-select" class="form-select" disabled="{{logExperimentsLoading}}">
                                 <option selected="selected" value="{{INVALID}}" disabled="true">{{turkText 'turk.selectExperiment'}}</option>
                                 {{#each experiments}}
-                                    <option value="{{this._id}}">{{this.content.tdfs.tutor.setspec.lessonname}}</option>
+                                    <option value="{{_id}}">{{lessonName}}</option>
                                 {{/each}}
                             </select>
                         </div>
                         <div class="form-group admin-form-row-sm">
-                            <select id="user-select" disabled="true" class="form-select">
+                            {{#if removalUsersError}}
+                            {{> adminStatus variant="error" text=removalUsersError urgent=true}}
+                            {{/if}}
+                            {{#if removalUsersLoading}}
+                            {{> adminStatus variant="info" text=(turkText 'common.loading')}}
+                            {{/if}}
+                            <label for="user-select" class="form-label">{{turkText 'turk.selectUser'}}</label>
+                            <select id="user-select" disabled="{{removalUserSelectDisabled}}" class="form-select">
                                 <option selected="selected" value="{{INVALID}}" disabled="true">{{turkText 'turk.selectUser'}}</option>
                                 {{#each turkIds}}
                                     <option value="{{this.userId}}">{{this.userName}}</option>
                                 {{/each}}
                             </select>
                         </div>
-                        <button id="turk-assignment-removal" class="btn btn-fix btn-danger">
+                        <button type="button" id="turk-assignment-removal" class="btn btn-fix btn-danger" disabled="{{removalButtonDisabled}}" aria-busy="{{#if removalCommandBusy}}true{{else}}false{{/if}}">
                             <i class="fa fa-trash admin-button-icon"></i>{{turkText 'turk.removeTurkUser'}}
                         </button>
+                        {{> adminInlineConfirmation confirmation=turkRemovalConfirmationView}}
                     </div>
                 </div>
             </div>

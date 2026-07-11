@@ -246,7 +246,7 @@ function openSidebarForTour(): number {
 function applyUserSelectedTheme(theme: ThemeLibraryEntry): void {
   const selectedTheme = serializeThemeSelection(theme);
   Session.set('userThemeOverrideActive', true);
-  applyThemeCSSProperties(selectedTheme, { cache: false });
+  applyThemeCSSProperties(selectedTheme);
   saveUserThemeSelection(selectedTheme.activeThemeId as string);
 }
 
@@ -265,7 +265,7 @@ function restoreUserSelectedTheme(): void {
   }
 
   Session.set('userThemeOverrideActive', true);
-  applyThemeCSSProperties(serializeThemeSelection(selectedTheme), { cache: false });
+  applyThemeCSSProperties(serializeThemeSelection(selectedTheme));
 }
 
 function reportThemeToggleError(error: unknown): void {
@@ -281,16 +281,6 @@ function reportThemeToggleError(error: unknown): void {
 // Template storage and helpers
 
 Template.home.helpers({
-  homeUnderlayStyle(): string {
-    const theme = Session.get('curTheme');
-    const url = (theme?.properties?.practice_menu_underlay_image_url as string | undefined);
-    if (typeof url === 'string' && url.trim().length > 0) {
-      const escapedUrl = url.trim().replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-      return `--practice-menu-underlay-image: url("${escapedUrl}");`;
-    }
-    return '';
-  },
-
   homeWelcomeHtml(): string {
     const theme = Session.get('curTheme');
     const hasPracticeRecords = Session.get('homeHasPracticeRecords');
@@ -678,78 +668,6 @@ Template.home.events({
   'click #mainMenuReturnTour': function(_event: any, template: any) {
     advanceMainMenuTour(template);
   },
-
-  'click #homePracticeButton': function(event: any) {
-    event.preventDefault();
-    closeMobileSidebar();
-    scrollHomeToTop();
-  },
-
-  'click #contentUploadButton': function(event: any) {
-    event.preventDefault();
-    FlowRouter.go('/contentUpload');
-  },
-
-  'click #classEditButton': function(event: any) {
-    event.preventDefault();
-    FlowRouter.go('/classEdit');
-  },
-
-  'click #instructorReportingButton': function(event: any) {
-    event.preventDefault();
-    FlowRouter.go('/instructorReporting');
-  },
-
-  'click #tdfAssignmentEditButton': function(event: any) {
-    event.preventDefault();
-    FlowRouter.go('/tdfAssignmentEdit');
-  },
-
-  'click #dataDownloadButton': function(event: any) {
-    event.preventDefault();
-    FlowRouter.go('/dataDownload');
-  },
-
-  'click #adminControlsBtn': function(event: any) {
-    event.preventDefault();
-    FlowRouter.go('/adminControls');
-  },
-
-  'click #userAdminButton': function(event: any) {
-    event.preventDefault();
-    FlowRouter.go('/userAdmin');
-  },
-
-  'click #mechTurkButton': function(event: any) {
-    event.preventDefault();
-    FlowRouter.go('/turkWorkflow');
-  },
-
-  'click #themeButton': function(event: any) {
-    event.preventDefault();
-    FlowRouter.go('/theme');
-  },
-
-  'click #adminTestsButton': function(event: any) {
-    event.preventDefault();
-    FlowRouter.go('/admin/tests');
-  },
-
-  'click #adminBackupsButton': function(event: any) {
-    event.preventDefault();
-    FlowRouter.go('/admin/backups');
-  },
-
-  'click #sidebarToggle': function(event: any) {
-    event.preventDefault();
-    toggleDesktopSidebarCollapse();
-  },
-
-  'click #mobileSidebarToggle': function(event: any) {
-    event.preventDefault();
-    document.getElementById('sidebar')?.classList.toggle('sidebar-mobile-open', true);
-  },
-
 });
 
 // We'll use this in card.js if audio input is enabled and user has provided a
@@ -1067,63 +985,12 @@ Template.home.onRendered(async function(this: any) {
 
   const templateInstance = this;
   void hydrateHomePracticeState();
-  restoreHomeSidebarPreference();
-  templateInstance._homeDocumentClickHandler = (event: Event) => {
-    const target = event.target as HTMLElement | null;
-    if (
-      window.matchMedia('(max-width: 1024px)').matches &&
-      !target?.closest('#sidebar') &&
-      !target?.closest('#mobileSidebarToggle')
-    ) {
-      document.getElementById('sidebar')?.classList.remove('sidebar-mobile-open');
-    }
-  };
-  document.addEventListener('click', templateInstance._homeDocumentClickHandler);
   templateInstance._homeTourRequestHandler = () => startMainMenuTour(templateInstance, { manual: true });
   window.addEventListener('mofacts:startHomeTour', templateInstance._homeTourRequestHandler);
-  // Trigger fade-in after theme is ready and CSS is painted
-  // Store handle for cleanup
-  templateInstance._themeAutorunHandle = Tracker.autorun(() => {
-    if (!Session.get('themeReady')) return;
-    if (!Session.get('authReady')) return;
-    const userId = Meteor.userId();
-    if (!userId) return;
-    clientConsole(2, '[HOME] Theme ready, waiting for CSS paint before fade-in');
-
-    // Ensure DOM is ready before attempting to show
-    Tracker.afterFlush(() => {
-      // Use requestAnimationFrame to ensure CSS is painted before making visible
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          const container = document.getElementById("homeContainer");
-          if (container) {
-            clientConsole(2, '[HOME] CSS painted, fading in home page');
-            container.classList.remove("page-loading");
-            container.classList.add("page-loaded");
-            templateInstance._homeReadyForTour = true;
-            if (templateInstance._themeAutorunHandle) {
-              templateInstance._themeAutorunHandle.stop();
-              templateInstance._themeAutorunHandle = null;
-            }
-          } else {
-            clientConsole(1, '[HOME] WARNING: homeContainer not found after theme ready!');
-          }
-        });
-      });
-    });
-  });
 });
 
 // Cleanup autoruns when template is destroyed to prevent zombie computations
 Template.home.onDestroyed(function(this: any) {
-  if (this._themeAutorunHandle) {
-    this._themeAutorunHandle.stop();
-    this._themeAutorunHandle = null;
-  }
-  if (this._homeDocumentClickHandler) {
-    document.removeEventListener('click', this._homeDocumentClickHandler);
-    this._homeDocumentClickHandler = null;
-  }
   if (this._homeTourRequestHandler) {
     window.removeEventListener('mofacts:startHomeTour', this._homeTourRequestHandler);
     this._homeTourRequestHandler = null;

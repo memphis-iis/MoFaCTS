@@ -1,39 +1,10 @@
 <template name="manualContentCreator">
     <div>
-        <style>
-            .manual-content-shell { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:var(--app-space-3); align-items:start; }
-            .manual-stepper { display:flex; flex-wrap:wrap; gap:var(--app-space-2); margin-bottom:var(--app-space-3); }
-            .manual-step-chip { display:inline-flex; align-items:center; gap:calc(0.45rem * var(--app-density-scale)); padding:calc(0.4rem * var(--app-density-scale)) calc(0.7rem * var(--app-density-scale)); border-radius:var(--border-radius-pill); border:1px solid var(--border-color); background:var(--learning-card-surface-color); color:var(--app-secondary-text-color); font-size:calc(var(--app-font-size-base) * 0.875); }
-            .manual-step-chip.is-active { border-color:var(--app-accent-color); background:var(--app-selected-surface-color); color:var(--app-text-color); }
-            .manual-step-chip.is-complete { border-color:var(--app-success-color); color:var(--app-success-color); }
-            .manual-step-chip .step-number { width:1.35rem; height:1.35rem; border-radius:var(--border-radius-circle); display:inline-flex; align-items:center; justify-content:center; background:var(--app-muted-surface-color); font-size:calc(var(--app-font-size-base) * 0.75); font-weight:600; }
-            .manual-step-chip.is-active .step-number { background:var(--app-accent-color); color:var(--app-primary-action-text-color); }
-            .manual-step-chip.is-complete .step-number { background:var(--app-success-color); color:var(--learning-card-primary-action-text-color); }
-            .manual-field-label { font-size:calc(var(--app-font-size-base) * 0.8); font-weight:600; text-transform:uppercase; letter-spacing:0.03em; color:var(--app-secondary-text-color); margin-bottom:calc(0.35rem * var(--app-density-scale)); }
-            .manual-helper { font-size:calc(var(--app-font-size-base) * 0.8); color:var(--app-secondary-text-color); margin-top:calc(0.3rem * var(--app-density-scale)); }
-            .manual-field-stack { display:grid; gap:var(--app-space-3); }
-            .manual-inline-options { display:flex; flex-wrap:wrap; gap:calc(0.75rem * var(--app-density-scale)) var(--app-space-3); }
-            .manual-summary-card { position:sticky; top:var(--app-space-3); }
-            .manual-summary-grid, .manual-summary-item { display:grid; gap:calc(0.2rem * var(--app-density-scale)); }
-            .manual-summary-label { font-size:calc(var(--app-font-size-base) * 0.75); text-transform:uppercase; letter-spacing:0.04em; color:var(--app-secondary-text-color); }
-            .manual-summary-value { font-size:calc(var(--app-font-size-base) * 0.95); font-weight:600; color:var(--app-text-color); word-break:break-word; }
-            .manual-actions { display:flex; justify-content:space-between; align-items:center; gap:calc(0.75rem * var(--app-density-scale)); margin-top:var(--app-space-3); padding-top:var(--app-space-3); border-top:1px solid var(--border-color); }
-            .manual-actions-right { display:flex; gap:var(--app-space-2); flex-wrap:wrap; justify-content:flex-end; }
-            .manual-step-intro { margin-bottom:var(--app-space-3); }
-            .manual-step-intro h4 { margin-bottom:var(--app-space-1); }
-            .manual-table-actions { display:flex; justify-content:space-between; align-items:center; gap:calc(0.75rem * var(--app-density-scale)); margin-bottom:calc(0.75rem * var(--app-density-scale)); }
-            .manual-row-actions { display:inline-flex; gap:calc(0.35rem * var(--app-density-scale)); }
-            .manual-alert-list { margin:0; padding-left:var(--app-space-3); }
-            @media (max-width: 991px) { .manual-content-shell { grid-template-columns:1fr; } .manual-summary-card { position:static; } }
-            @media (max-width: 768px) { .manual-actions { flex-direction:column-reverse; align-items:stretch; } .manual-actions-right { width:100%; } .manual-actions-right .btn, .manual-actions > .btn { width:100%; } .manual-inline-options { flex-direction:column; gap:var(--app-space-2); } }
-        </style>
-
         <div class="manual-page-header">
             <div class="editor-page-header content-upload-empty-text">
                 <a href="/contentUpload" class="btn btn-outline-secondary editor-back-button">
                     <i class="fa fa-arrow-left"></i> {{manualText 'manualCreator.back'}}
                 </a>
-                <h3 class="page-header-text editor-page-title">{{manualText 'manualCreator.title'}}</h3>
             </div>
             <div class="theme-action-row">
                 <button type="button" class="btn btn-outline-primary" id="manual-save-draft" {{draftPersistenceAttrs}}>
@@ -108,12 +79,12 @@
                         </div>
                         <div class="manual-field-stack">
                             <div>
-                                <div class="manual-field-label">{{manualText 'manualCreator.lessonName'}}</div>
-                                <input type="text" class="form-control" data-field="lessonName" value="{{lessonName}}" placeholder="{{manualText 'manualCreator.lessonNamePlaceholder'}}">
+                                <label class="manual-field-label" for="manual-lesson-name">{{manualText 'manualCreator.lessonName'}}</label>
+                                <input type="text" class="form-control" id="manual-lesson-name" data-field="lessonName" value="{{lessonName}}" placeholder="{{manualText 'manualCreator.lessonNamePlaceholder'}}">
                             </div>
                             <div>
-                                <div class="manual-field-label">{{manualText 'manualCreator.structure'}}</div>
-                                <select class="form-select" data-field="structure">
+                                <label class="manual-field-label" for="manual-structure">{{manualText 'manualCreator.structure'}}</label>
+                                <select class="form-select" id="manual-structure" data-field="structure">
                                     <option value="learning-only" selected="{{selectedIf structure 'learning-only'}}">{{manualText 'manualCreator.learningOnly'}}</option>
                                     <option value="instructions-learning" selected="{{selectedIf structure 'instructions-learning'}}">{{manualText 'manualCreator.instructionsLearning'}}</option>
                                     <option value="assessment-only" selected="{{selectedIf structure 'assessment-only'}}">{{manualText 'manualCreator.assessmentOnly'}}</option>
@@ -122,13 +93,13 @@
                             </div>
                             {{#if structureIncludesInstructions}}
                             <div>
-                                <div class="manual-field-label">{{manualText 'manualCreator.instructionText'}}</div>
-                                <textarea class="form-control" rows="4" data-field="instructionText" placeholder="{{manualText 'manualCreator.instructionTextPlaceholder'}}">{{instructionText}}</textarea>
+                                <label class="manual-field-label" for="manual-instruction-text">{{manualText 'manualCreator.instructionText'}}</label>
+                                <textarea class="form-control" id="manual-instruction-text" rows="4" data-field="instructionText" placeholder="{{manualText 'manualCreator.instructionTextPlaceholder'}}">{{instructionText}}</textarea>
                                 <div class="manual-helper">{{manualText 'manualCreator.instructionTextHelper'}}</div>
                             </div>
                             {{/if}}
-                            <div>
-                                <div class="manual-field-label">{{manualText 'manualCreator.visibility'}}</div>
+                            <fieldset>
+                                <legend class="manual-field-label">{{manualText 'manualCreator.visibility'}}</legend>
                                 <div class="manual-inline-options">
                                     <label class="form-check editor-inline-check">
                                         <input class="form-check-input" type="radio" name="manual-visibility" data-field="visibility" value="private" checked="{{checkedIf visibility 'private'}}">
@@ -139,7 +110,7 @@
                                         <span class="form-check-label">{{manualText 'content.public'}}</span>
                                     </label>
                                 </div>
-                            </div>
+                            </fieldset>
                             <div>
                                 <label class="form-check editor-inline-check">
                                     <input class="form-check-input" type="checkbox" data-field="experimentLinkEnabled" checked="{{boolChecked experimentLinkEnabled}}">
@@ -147,8 +118,8 @@
                                 </label>
                                 {{#if experimentLinkEnabled}}
                                 <div class="admin-form-row-top">
-                                    <div class="manual-field-label">{{manualText 'manualCreator.linkName'}}</div>
-                                    <input type="text" class="form-control" data-field="experimentTarget" value="{{experimentTarget}}" placeholder="{{manualText 'manualCreator.linkNamePlaceholder'}}">
+                                    <label class="manual-field-label" for="manual-experiment-target">{{manualText 'manualCreator.linkName'}}</label>
+                                    <input type="text" class="form-control" id="manual-experiment-target" data-field="experimentTarget" value="{{experimentTarget}}" placeholder="{{manualText 'manualCreator.linkNamePlaceholder'}}">
                                     <div class="manual-helper">{{experimentLinkPreviewText}}</div>
                                 </div>
                                 {{/if}}
@@ -158,16 +129,16 @@
                                 <div class="manual-helper">{{manualText 'manualCreator.languageMetadataHelper'}}</div>
                                 <div class="row g-3 admin-form-row-top">
                                     <div class="col-md-4">
-                                        <div class="manual-field-label">{{manualText 'manualCreator.contentLanguage'}}</div>
-                                        <input type="text" class="form-control" data-field="contentLanguage" value="{{contentLanguage}}" placeholder="{{manualText 'manualCreator.contentLanguagePlaceholder'}}">
+                                        <label class="manual-field-label" for="manual-content-language">{{manualText 'manualCreator.contentLanguage'}}</label>
+                                        <input type="text" class="form-control" id="manual-content-language" data-field="contentLanguage" value="{{contentLanguage}}" placeholder="{{manualText 'manualCreator.contentLanguagePlaceholder'}}">
                                     </div>
                                     <div class="col-md-4">
-                                        <div class="manual-field-label">{{manualText 'manualCreator.recommendedUiLocales'}}</div>
-                                        <input type="text" class="form-control" data-field="recommendedUiLocales" value="{{recommendedUiLocales}}" placeholder="{{manualText 'manualCreator.recommendedUiLocalesPlaceholder'}}">
+                                        <label class="manual-field-label" for="manual-recommended-ui-locales">{{manualText 'manualCreator.recommendedUiLocales'}}</label>
+                                        <input type="text" class="form-control" id="manual-recommended-ui-locales" data-field="recommendedUiLocales" value="{{recommendedUiLocales}}" placeholder="{{manualText 'manualCreator.recommendedUiLocalesPlaceholder'}}">
                                     </div>
                                     <div class="col-md-4">
-                                        <div class="manual-field-label">{{manualText 'manualCreator.translationStatus'}}</div>
-                                        <select class="form-select" data-field="translationStatus">
+                                        <label class="manual-field-label" for="manual-translation-status">{{manualText 'manualCreator.translationStatus'}}</label>
+                                        <select class="form-select" id="manual-translation-status" data-field="translationStatus">
                                             <option value="author-provided" selected="{{selectedIf translationStatus 'author-provided'}}">{{manualText 'manualCreator.translationStatusAuthorProvided'}}</option>
                                             <option value="not-translated" selected="{{selectedIf translationStatus 'not-translated'}}">{{manualText 'manualCreator.translationStatusNotTranslated'}}</option>
                                             <option value="draft" selected="{{selectedIf translationStatus 'draft'}}">{{manualText 'manualCreator.translationStatusDraft'}}</option>
@@ -186,8 +157,8 @@
                         </div>
                         <div class="manual-field-stack">
                             <div>
-                                <div class="manual-field-label">{{manualText 'manualCreator.prompt'}}</div>
-                                <select class="form-select" data-field="promptType">
+                                <label class="manual-field-label" for="manual-prompt-type">{{manualText 'manualCreator.prompt'}}</label>
+                                <select class="form-select" id="manual-prompt-type" data-field="promptType">
                                     <option value="text" selected="{{selectedIf promptType 'text'}}">{{manualText 'manualCreator.text'}}</option>
                                     <option value="image" selected="{{selectedIf promptType 'image'}}">{{manualText 'manualCreator.image'}}</option>
                                     <option value="audio" selected="{{selectedIf promptType 'audio'}}">{{manualText 'manualCreator.audio'}}</option>
@@ -196,29 +167,31 @@
                                 </select>
                             </div>
                             <div>
-                                <div class="manual-field-label">{{manualText 'manualCreator.response'}}</div>
-                                <select class="form-select" data-field="responseType">
+                                <label class="manual-field-label" for="manual-response-type">{{manualText 'manualCreator.response'}}</label>
+                                <select class="form-select" id="manual-response-type" data-field="responseType">
                                     <option value="typed" selected="{{selectedIf responseType 'typed'}}">{{manualText 'manualCreator.typedResponse'}}</option>
                                     <option value="multiple-choice" selected="{{selectedIf responseType 'multiple-choice'}}">{{manualText 'manualCreator.multipleChoice'}}</option>
                                 </select>
                             </div>
                             <div class="row g-3">
                                 <div class="col-md-6">
-                                    <div class="manual-field-label">{{manualText 'manualCreator.cards'}}</div>
-                                    <input type="number" min="1" class="form-control" data-field="cardCount" value="{{cardCount}}">
+                                    <label class="manual-field-label" for="manual-card-count">{{manualText 'manualCreator.cards'}}</label>
+                                    <input type="number" min="1" class="form-control" id="manual-card-count" data-field="cardCount" value="{{cardCount}}">
                                 </div>
                                 <div class="col-md-6">
-                                    <div class="manual-field-label">{{manualText 'manualCreator.shuffle'}}</div>
+                                    <fieldset>
+                                    <legend class="manual-field-label">{{manualText 'manualCreator.shuffle'}}</legend>
                                     <label class="form-check admin-form-row-top">
                                         <input class="form-check-input" type="checkbox" data-field="shuffle" checked="{{boolChecked shuffle}}">
                                         <span class="form-check-label">{{manualText 'manualCreator.shuffleBeforeLearners'}}</span>
                                     </label>
+                                    </fieldset>
                                 </div>
                             </div>
                             {{#if isMultipleChoice}}
                             <div>
-                                <div class="manual-field-label">{{manualText 'manualCreator.buttonOrder'}}</div>
-                                <select class="form-select" data-field="buttonOrder">
+                                <label class="manual-field-label" for="manual-button-order">{{manualText 'manualCreator.buttonOrder'}}</label>
+                                <select class="form-select" id="manual-button-order" data-field="buttonOrder">
                                     <option value="random" selected="{{selectedIf buttonOrder 'random'}}">{{manualText 'manualCreator.random'}}</option>
                                     <option value="fixed" selected="{{selectedIf buttonOrder 'fixed'}}">{{manualText 'manualCreator.fixed'}}</option>
                                 </select>
@@ -258,22 +231,24 @@
                                 {{#if speechRecognitionEnabled}}
                                 <div class="row g-3 admin-form-row-top">
                                     <div class="col-md-6">
-                                        <div class="manual-field-label">{{manualText 'manualCreator.speechLanguage'}}</div>
-                                        <input type="text" class="form-control" data-field="speechLanguage" value="{{speechLanguage}}" placeholder="en-US">
+                                        <label class="manual-field-label" for="manual-speech-language">{{manualText 'manualCreator.speechLanguage'}}</label>
+                                        <input type="text" class="form-control" id="manual-speech-language" data-field="speechLanguage" value="{{speechLanguage}}" placeholder="en-US">
                                     </div>
                                     <div class="col-md-6">
-                                        <div class="manual-field-label">{{manualText 'manualCreator.outOfGrammarSpeech'}}</div>
+                                        <fieldset>
+                                        <legend class="manual-field-label">{{manualText 'manualCreator.outOfGrammarSpeech'}}</legend>
                                         <label class="form-check admin-form-row-top">
                                             <input class="form-check-input" type="checkbox" data-field="ignoreOutOfGrammar" checked="{{boolChecked ignoreOutOfGrammar}}">
                                             <span class="form-check-label">{{manualText 'manualCreator.ignoreOutOfGrammar'}}</span>
                                         </label>
+                                        </fieldset>
                                     </div>
                                 </div>
                                 {{/if}}
                             </div>
                             <div>
-                                <div class="manual-field-label">{{manualText 'manualCreator.textToSpeech'}}</div>
-                                <select class="form-select" data-field="textToSpeechMode">
+                                <label class="manual-field-label" for="manual-text-to-speech-mode">{{manualText 'manualCreator.textToSpeech'}}</label>
+                                <select class="form-select" id="manual-text-to-speech-mode" data-field="textToSpeechMode">
                                     <option value="none" selected="{{selectedIf textToSpeechMode 'none'}}">{{manualText 'manualCreator.neither'}}</option>
                                     <option value="prompts" selected="{{selectedIf textToSpeechMode 'prompts'}}">{{manualText 'manualCreator.prompts'}}</option>
                                     <option value="feedback" selected="{{selectedIf textToSpeechMode 'feedback'}}">{{manualText 'manualCreator.feedback'}}</option>
@@ -281,8 +256,8 @@
                                 </select>
                             </div>
                             <div>
-                                <div class="manual-field-label">{{manualText 'manualCreator.topBar'}}</div>
-                                <select class="form-select" data-field="topBarMode">
+                                <label class="manual-field-label" for="manual-top-bar-mode">{{manualText 'manualCreator.topBar'}}</label>
+                                <select class="form-select" id="manual-top-bar-mode" data-field="topBarMode">
                                     <option value="time-score" selected="{{selectedIf topBarMode 'time-score'}}">{{manualText 'manualCreator.timeScore'}}</option>
                                     <option value="time" selected="{{selectedIf topBarMode 'time'}}">{{manualText 'manualCreator.time'}}</option>
                                     <option value="score" selected="{{selectedIf topBarMode 'score'}}">{{manualText 'manualCreator.score'}}</option>
@@ -298,19 +273,19 @@
                                 {{#if practiceTimingEnabled}}
                                 <div class="row g-3 admin-form-row-top">
                                     <div class="col-md-6">
-                                        <div class="manual-field-label">{{manualText 'manualCreator.minPracticeTime'}}</div>
-                                        <input type="text" class="form-control" data-field="minPracticeTime" value="{{minPracticeTime}}" placeholder="0">
+                                        <label class="manual-field-label" for="manual-min-practice-time">{{manualText 'manualCreator.minPracticeTime'}}</label>
+                                        <input type="text" class="form-control" id="manual-min-practice-time" data-field="minPracticeTime" value="{{minPracticeTime}}" placeholder="0">
                                     </div>
                                     <div class="col-md-6">
-                                        <div class="manual-field-label">{{manualText 'manualCreator.maxPracticeTime'}}</div>
-                                        <input type="text" class="form-control" data-field="maxPracticeTime" value="{{maxPracticeTime}}" placeholder="1000000">
+                                        <label class="manual-field-label" for="manual-max-practice-time">{{manualText 'manualCreator.maxPracticeTime'}}</label>
+                                        <input type="text" class="form-control" id="manual-max-practice-time" data-field="maxPracticeTime" value="{{maxPracticeTime}}" placeholder="1000000">
                                     </div>
                                 </div>
                                 {{/if}}
                             </div>
                             <div>
-                                <div class="manual-field-label">{{manualText 'manualCreator.tags'}}</div>
-                                <input type="text" class="form-control" data-field="tags" value="{{tags}}" placeholder="{{manualText 'manualCreator.tagsPlaceholder'}}">
+                                <label class="manual-field-label" for="manual-tags">{{manualText 'manualCreator.tags'}}</label>
+                                <input type="text" class="form-control" id="manual-tags" data-field="tags" value="{{tags}}" placeholder="{{manualText 'manualCreator.tagsPlaceholder'}}">
                                 <div class="manual-helper">{{manualText 'manualCreator.tagsHelper'}}</div>
                             </div>
                         </div>
@@ -323,8 +298,8 @@
                         </div>
                         <div class="manual-field-stack">
                             <div>
-                                <div class="manual-field-label">{{manualText 'manualCreator.startingMode'}}</div>
-                                <select class="form-select" data-field="seedMode">
+                                <label class="manual-field-label" for="manual-seed-mode">{{manualText 'manualCreator.startingMode'}}</label>
+                                <select class="form-select" id="manual-seed-mode" data-field="seedMode">
                                     <option value="blank-rows" selected="{{selectedIf seedMode 'blank-rows'}}">{{manualText 'manualCreator.blankRows'}}</option>
                                     <option value="paste-table" selected="{{selectedIf seedMode 'paste-table'}}">{{manualText 'manualCreator.pastePromptAnswerTable'}}</option>
                                     <option value="example-duplicate" selected="{{selectedIf seedMode 'example-duplicate'}}">{{manualText 'manualCreator.oneExampleRowDuplicate'}}</option>
@@ -338,7 +313,7 @@
                             {{/if}}
                             {{#if isSeedMode 'paste-table'}}
                             <div>
-                                <div class="manual-field-label">{{manualText 'manualCreator.pasteTable'}}</div>
+                                <label class="manual-field-label" for="manual-seed-table-text">{{manualText 'manualCreator.pasteTable'}}</label>
                                 <textarea id="manual-seed-table-text" class="form-control" rows="6" placeholder="{{seedTablePlaceholder}}">{{seedTableText}}</textarea>
                                 <div class="manual-helper">{{expectedColumnsText}}</div>
                             </div>
@@ -349,38 +324,38 @@
                                     <i class="fa fa-plus"></i> {{manualText 'manualCreator.addRow'}}
                                 </button>
                             </div>
-                            <div class="table-responsive">
+                            <div class="table-responsive" role="region" aria-label="{{manualText 'manualCreator.starterContent'}}" tabindex="0">
                                 <table class="table table-bordered">
                                     <thead>
                                         <tr>
-                                            <th>#</th>
-                                            {{#if showPromptTextColumn}}<th>{{promptTextLabel}}</th>{{/if}}
-                                            {{#if showPromptMediaColumn}}<th>{{promptMediaLabel}}</th>{{/if}}
-                                            <th>{{manualText 'manualCreator.answer'}}</th>
-                                            {{#if isMultipleChoice}}<th>{{manualText 'manualCreator.choice2'}}</th><th>{{manualText 'manualCreator.choice3'}}</th><th>{{manualText 'manualCreator.choice4'}}</th>{{/if}}
-                                            <th>{{manualText 'manualCreator.actions'}}</th>
+                                            <th scope="col">#</th>
+                                            {{#if showPromptTextColumn}}<th scope="col">{{promptTextLabel}}</th>{{/if}}
+                                            {{#if showPromptMediaColumn}}<th scope="col">{{promptMediaLabel}}</th>{{/if}}
+                                            <th scope="col">{{manualText 'manualCreator.answer'}}</th>
+                                            {{#if isMultipleChoice}}<th scope="col">{{manualText 'manualCreator.choice2'}}</th><th scope="col">{{manualText 'manualCreator.choice3'}}</th><th scope="col">{{manualText 'manualCreator.choice4'}}</th>{{/if}}
+                                            <th scope="col">{{manualText 'manualCreator.actions'}}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {{#each rows}}
                                         <tr>
-                                            <td>{{rowNumber}}</td>
+                                            <th scope="row">{{rowNumber}}</th>
                                             {{#if showPromptTextColumn}}
-                                            <td><input type="text" class="form-control starter-row-input" data-row-id="{{id}}" data-field="promptText" value="{{promptText}}"></td>
+                                            <td><input type="text" class="form-control starter-row-input" data-row-id="{{id}}" data-field="promptText" value="{{promptText}}" aria-label="{{promptTextLabel}}: {{rowNumber}}"></td>
                                             {{/if}}
                                             {{#if showPromptMediaColumn}}
-                                            <td><input type="text" class="form-control starter-row-input" data-row-id="{{id}}" data-field="mediaRef" value="{{mediaRef}}"></td>
+                                            <td><input type="text" class="form-control starter-row-input" data-row-id="{{id}}" data-field="mediaRef" value="{{mediaRef}}" aria-label="{{promptMediaLabel}}: {{rowNumber}}"></td>
                                             {{/if}}
-                                            <td><input type="text" class="form-control starter-row-input" data-row-id="{{id}}" data-field="answer" value="{{answer}}"></td>
+                                            <td><input type="text" class="form-control starter-row-input" data-row-id="{{id}}" data-field="answer" value="{{answer}}" aria-label="{{manualText 'manualCreator.answer'}}: {{rowNumber}}"></td>
                                             {{#if isMultipleChoice}}
-                                            <td><input type="text" class="form-control starter-row-input" data-row-id="{{id}}" data-field="choice2" value="{{choice2}}"></td>
-                                            <td><input type="text" class="form-control starter-row-input" data-row-id="{{id}}" data-field="choice3" value="{{choice3}}"></td>
-                                            <td><input type="text" class="form-control starter-row-input" data-row-id="{{id}}" data-field="choice4" value="{{choice4}}"></td>
+                                            <td><input type="text" class="form-control starter-row-input" data-row-id="{{id}}" data-field="choice2" value="{{choice2}}" aria-label="{{manualText 'manualCreator.choice2'}}: {{rowNumber}}"></td>
+                                            <td><input type="text" class="form-control starter-row-input" data-row-id="{{id}}" data-field="choice3" value="{{choice3}}" aria-label="{{manualText 'manualCreator.choice3'}}: {{rowNumber}}"></td>
+                                            <td><input type="text" class="form-control starter-row-input" data-row-id="{{id}}" data-field="choice4" value="{{choice4}}" aria-label="{{manualText 'manualCreator.choice4'}}: {{rowNumber}}"></td>
                                             {{/if}}
                                             <td>
                                                 <div class="manual-row-actions">
-                                                    <button type="button" class="btn btn-outline-secondary btn-sm duplicate-starter-row" data-row-id="{{id}}"><i class="fa fa-copy"></i></button>
-                                                    <button type="button" class="btn btn-outline-danger btn-sm delete-starter-row" data-row-id="{{id}}"><i class="fa fa-trash"></i></button>
+                                                    <button type="button" class="btn btn-outline-secondary btn-sm duplicate-starter-row" data-row-id="{{id}}" aria-label="Duplicate row {{rowNumber}}"><i class="fa fa-copy" aria-hidden="true"></i></button>
+                                                    <button type="button" class="btn btn-outline-danger btn-sm delete-starter-row" data-row-id="{{id}}" aria-label="Delete row {{rowNumber}}"><i class="fa fa-trash" aria-hidden="true"></i></button>
                                                 </div>
                                             </td>
                                         </tr>

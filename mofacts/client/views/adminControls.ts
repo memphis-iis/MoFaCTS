@@ -1,18 +1,56 @@
-// PHASE 1.5: Removed unused getCurrentTheme import - now uses reactive subscription
 import { Template } from 'meteor/templating';
-import { Session } from 'meteor/session';
+import { ReactiveVar } from 'meteor/reactive-var';
 import './adminControls.html';
+import './adminControls.css';
+import './shared/adminUi/adminUi';
 import { clientConsole } from '../lib/userSessionHelpers';
 import { meteorCallAsync } from '..';
 import { getActiveUiLocale } from '../lib/interfaceLocaleState';
 import { translatePlatformString } from '../lib/interfaceI18n';
+import {
+    createAsyncCommandController,
+    type AsyncCommandController,
+    type AsyncCommandState,
+} from '../lib/adminUi/asyncCommandState';
+import {
+    rejectLoad,
+    resolveLoad,
+    startLoad,
+    type LoadableState,
+} from '../lib/adminUi/loadableState';
+import { createTemplateLifetime, type TemplateLifetime } from '../lib/adminUi/templateLifetime';
+import {
+    normalizeServerStatus,
+    normalizeVerbosityLevel,
+    radioChecked,
+    type AdminMessage,
+    type AdminServerStatus,
+    type AdminVerbosityLevel,
+} from './adminControlsState';
 
-declare const $: (selector: string) => { prop(name: string, value: unknown): void };
 declare const DynamicSettings: {
     findOne(query: { key: string }): { value: unknown } | undefined;
 };
 
-const ADMIN_MESSAGE_KEY = 'adminControlsMessage';
+type AdminControlsInstance = Blaze.TemplateInstance & {
+    autoruns: Array<{ stop(): void }>;
+    serverStatusPresentation: ReactiveVar<LoadableState<AdminServerStatus>>;
+    serverVerbosityPresentation: ReactiveVar<LoadableState<AdminVerbosityLevel>>;
+    clientVerbosityPresentation: ReactiveVar<LoadableState<AdminVerbosityLevel>>;
+    adminMessage: ReactiveVar<AdminMessage | null>;
+    serverVerbosityCommandState: ReactiveVar<AsyncCommandState<void>>;
+    clientVerbosityCommandState: ReactiveVar<AsyncCommandState<void>>;
+    cacheCommandState: ReactiveVar<AsyncCommandState<void>>;
+    serverVerbosityCommand: AsyncCommandController<void>;
+    clientVerbosityCommand: AsyncCommandController<void>;
+    cacheCommand: AsyncCommandController<void>;
+    serverStatusLifetime: TemplateLifetime;
+    serverVerbosityLifetime: TemplateLifetime;
+    clientVerbosityLifetime: TemplateLifetime;
+    nextServerStatusRequestId: number;
+    nextServerVerbosityRequestId: number;
+    nextClientVerbosityRequestId: number;
+};
 
 function adminText(key: Parameters<typeof translatePlatformString>[1], values?: Parameters<typeof translatePlatformString>[2]): string {
     return translatePlatformString(getActiveUiLocale(), key, values);
@@ -28,154 +66,309 @@ function formatError(err: unknown, fallback = adminText('admin.unknownError')): 
     return fallback;
 }
 
-function setAdminMessage(text: string | null, level = 'info'): void {
-    if (!text) {
-        Session.set(ADMIN_MESSAGE_KEY, null);
-        return;
-    }
-
-    const icon = level === 'error'
-        ? 'fa-times-circle'
-        : level === 'success'
-            ? 'fa-check-circle'
-            : 'fa-info-circle';
-
-    Session.set(ADMIN_MESSAGE_KEY, { text, level, icon });
+function readyLoadValue<T>(state: LoadableState<T>): T | null {
+    return state.status === 'ready'
+        || state.status === 'empty'
+        || state.status === 'refreshing'
+        || state.status === 'refresh-error'
+        ? state.value
+        : null;
 }
 
-Template.adminControls.onCreated(async function (this: { autoruns: Array<{ stop(): void }>; subscribe(name: string): void }) {
-    // Track autoruns for cleanup
-    this.autoruns = [];
-    setAdminMessage(null);
+function loadErrorMessage<T>(state: LoadableState<T>): string {
+    return state.status === 'error' || state.status === 'refresh-error' ? state.message : '';
+}
 
-    // Subscribe to DynamicSettings collection to get client verbosity level
-    this.subscribe('settings');
+function loadPending<T>(state: LoadableState<T>): boolean {
+    return state.status === 'idle' || state.status === 'loading' || state.status === 'refreshing';
+}
 
-    // Parallelize all async calls for faster page load
+function setAdminMessage(instance: AdminControlsInstance, text: string | null, level: AdminMessage['level'] = 'info'): void {
+    instance.adminMessage.set(text ? { text, level } : null);
+}
+
+function currentServerVerbosity(instance: AdminControlsInstance): AdminVerbosityLevel | null {
+    return readyLoadValue(instance.serverVerbosityPresentation.get());
+}
+
+function currentClientVerbosity(instance: AdminControlsInstance): AdminVerbosityLevel | null {
+    return readyLoadValue(instance.clientVerbosityPresentation.get());
+}
+
+function loadServerStatus(instance: AdminControlsInstance): void {
+    const requestId = ++instance.nextServerStatusRequestId;
+    const generation = instance.serverStatusLifetime.begin();
+    instance.serverStatusPresentation.set(startLoad(instance.serverStatusPresentation.get(), requestId));
+
+    meteorCallAsync('getServerStatus')
+        .then((result) => {
+            if (!instance.serverStatusLifetime.isCurrent(generation)) return;
+            const status = normalizeServerStatus(result);
+            instance.serverStatusPresentation.set(resolveLoad(
+                instance.serverStatusPresentation.get(),
+                requestId,
+                status,
+                () => false,
+            ));
+            if (status.error) {
+                setAdminMessage(instance, adminText('admin.storageStatusUnavailable', { error: status.error }), 'error');
+            }
+        })
+        .catch((err) => {
+            if (!instance.serverStatusLifetime.isCurrent(generation)) return;
+            instance.serverStatusPresentation.set(rejectLoad(
+                instance.serverStatusPresentation.get(),
+                requestId,
+                { message: adminText('admin.loadControlsFailed', { error: formatError(err) }), retryable: true },
+            ));
+        });
+}
+
+function loadServerVerbosity(instance: AdminControlsInstance): void {
+    const requestId = ++instance.nextServerVerbosityRequestId;
+    const generation = instance.serverVerbosityLifetime.begin();
+    instance.serverVerbosityPresentation.set(startLoad(instance.serverVerbosityPresentation.get(), requestId));
+
+    meteorCallAsync('getVerbosity')
+        .then((result) => {
+            if (!instance.serverVerbosityLifetime.isCurrent(generation)) return;
+            instance.serverVerbosityPresentation.set(resolveLoad(
+                instance.serverVerbosityPresentation.get(),
+                requestId,
+                normalizeVerbosityLevel(result),
+                () => false,
+            ));
+        })
+        .catch((err) => {
+            if (!instance.serverVerbosityLifetime.isCurrent(generation)) return;
+            instance.serverVerbosityPresentation.set(rejectLoad(
+                instance.serverVerbosityPresentation.get(),
+                requestId,
+                { message: adminText('admin.loadControlsFailed', { error: formatError(err) }), retryable: true },
+            ));
+        });
+}
+
+function loadClientVerbosityFromSettings(instance: AdminControlsInstance): void {
+    const requestId = ++instance.nextClientVerbosityRequestId;
+    const generation = instance.clientVerbosityLifetime.begin();
+    instance.clientVerbosityPresentation.set(startLoad(instance.clientVerbosityPresentation.get(), requestId));
+
+    instance.subscribe('settings', {
+        onReady: () => {
+            if (!instance.clientVerbosityLifetime.isCurrent(generation)) return;
+            try {
+                const settingDoc = DynamicSettings.findOne({ key: 'clientVerbosityLevel' });
+                const value = settingDoc?.value ?? 0;
+                instance.clientVerbosityPresentation.set(resolveLoad(
+                    instance.clientVerbosityPresentation.get(),
+                    requestId,
+                    normalizeVerbosityLevel(value),
+                    () => false,
+                ));
+            } catch (err) {
+                instance.clientVerbosityPresentation.set(rejectLoad(
+                    instance.clientVerbosityPresentation.get(),
+                    requestId,
+                    { message: adminText('admin.loadControlsFailed', { error: formatError(err) }), retryable: true },
+                ));
+            }
+        },
+        onStop: (err?: unknown) => {
+            if (!err || !instance.clientVerbosityLifetime.isCurrent(generation)) return;
+            instance.clientVerbosityPresentation.set(rejectLoad(
+                instance.clientVerbosityPresentation.get(),
+                requestId,
+                { message: adminText('admin.loadControlsFailed', { error: formatError(err) }), retryable: true },
+            ));
+        },
+    });
+
+    void meteorCallAsync('ensureClientVerbositySetting')
+        .catch((err) => {
+            if (!instance.clientVerbosityLifetime.isCurrent(generation)) return;
+            instance.clientVerbosityPresentation.set(rejectLoad(
+                instance.clientVerbosityPresentation.get(),
+                requestId,
+                { message: adminText('admin.loadControlsFailed', { error: formatError(err) }), retryable: true },
+            ));
+        });
+}
+
+function syncClientVerbosityFromSettings(instance: AdminControlsInstance): void {
+    const state = instance.clientVerbosityPresentation.get();
+    if (state.status !== 'ready' && state.status !== 'empty' && state.status !== 'refresh-error') {
+        return;
+    }
+    const settingDoc = DynamicSettings.findOne({ key: 'clientVerbosityLevel' });
+    if (!settingDoc || settingDoc.value === undefined || settingDoc.value === null) {
+        return;
+    }
     try {
-        const [verbosity, serverStatus] = await Promise.all([
-            meteorCallAsync('getVerbosity'),
-            meteorCallAsync('getServerStatus'),
-            meteorCallAsync('ensureClientVerbositySetting') // Fire and forget, result not needed
-        ]) as [
-            string | number,
-            {
-                diskSpacePercent?: string;
-                remainingSpace?: string;
-                diskSpace?: string;
-                diskSpaceUsed?: string;
-                error?: string | null;
-            },
-            unknown
-        ];
-
-        
-        $(`#verbosityRadio${verbosity}`).prop('checked', true);
-
-        Session.set('serverStatus', serverStatus);
-        if (serverStatus?.error) {
-            setAdminMessage(adminText('admin.storageStatusUnavailable', { error: serverStatus.error }), 'error');
+        const level = normalizeVerbosityLevel(settingDoc.value);
+        if (readyLoadValue(state) !== level) {
+            instance.clientVerbosityPresentation.set({ status: 'ready', value: level });
         }
     } catch (err) {
-        setAdminMessage(adminText('admin.loadControlsFailed', { error: formatError(err) }), 'error');
+        setAdminMessage(instance, adminText('admin.loadControlsFailed', { error: formatError(err) }), 'error');
     }
+}
+
+Template.adminControls.onCreated(function (this: AdminControlsInstance) {
+    this.autoruns = [];
+    this.serverStatusPresentation = new ReactiveVar<LoadableState<AdminServerStatus>>({ status: 'idle' });
+    this.serverVerbosityPresentation = new ReactiveVar<LoadableState<AdminVerbosityLevel>>({ status: 'idle' });
+    this.clientVerbosityPresentation = new ReactiveVar<LoadableState<AdminVerbosityLevel>>({ status: 'idle' });
+    this.adminMessage = new ReactiveVar<AdminMessage | null>(null);
+    this.serverVerbosityCommandState = new ReactiveVar<AsyncCommandState<void>>({ status: 'idle' });
+    this.clientVerbosityCommandState = new ReactiveVar<AsyncCommandState<void>>({ status: 'idle' });
+    this.cacheCommandState = new ReactiveVar<AsyncCommandState<void>>({ status: 'idle' });
+    this.serverVerbosityCommand = createAsyncCommandController((state) => this.serverVerbosityCommandState.set(state));
+    this.clientVerbosityCommand = createAsyncCommandController((state) => this.clientVerbosityCommandState.set(state));
+    this.cacheCommand = createAsyncCommandController((state) => this.cacheCommandState.set(state));
+    this.serverStatusLifetime = createTemplateLifetime();
+    this.serverVerbosityLifetime = createTemplateLifetime();
+    this.clientVerbosityLifetime = createTemplateLifetime();
+    this.nextServerStatusRequestId = 0;
+    this.nextServerVerbosityRequestId = 0;
+    this.nextClientVerbosityRequestId = 0;
+
+    loadServerStatus(this);
+    loadServerVerbosity(this);
+    loadClientVerbosityFromSettings(this);
+
+    this.autoruns.push(this.autorun(() => {
+        syncClientVerbosityFromSettings(this);
+    }));
 });
 
-Template.adminControls.onRendered(function (this: { autoruns: Array<{ stop(): void }>; autorun(cb: () => void): { stop(): void } }) {
-    // Reactively check the client verbosity radio button when data is ready
-    const autorun = this.autorun(() => {
-        const settingDoc = DynamicSettings.findOne({key: 'clientVerbosityLevel'});
-        if (settingDoc && settingDoc.value !== undefined) {
-            const clientVerbosityLevel = String(settingDoc.value);
-            const radioId = `clientVerbosityRadio${clientVerbosityLevel}`;
-            
-            const radioElement = document.getElementById(radioId) as HTMLInputElement | null;
-            if (radioElement) {
-                radioElement.checked = true;
-            }
-        }
-    });
-    this.autoruns.push(autorun);
-});
-
-Template.adminControls.onDestroyed(function (this: { autoruns: Array<{ stop(): void }> }) {
-    // Clean up autoruns
+Template.adminControls.onDestroyed(function (this: AdminControlsInstance) {
     this.autoruns.forEach((ar: { stop(): void }) => ar.stop());
-    setAdminMessage(null);
+    this.serverStatusLifetime.destroy();
+    this.serverVerbosityLifetime.destroy();
+    this.clientVerbosityLifetime.destroy();
+    this.serverVerbosityCommand.destroy();
+    this.clientVerbosityCommand.destroy();
+    this.cacheCommand.destroy();
 });
 
 Template.adminControls.helpers({
-    'serverStatus': function() {
-        const loading = adminText('common.loading');
-        return Session.get('serverStatus') || {
-            diskSpacePercent: loading,
-            remainingSpace: loading,
-            diskSpace: loading,
-            diskSpaceUsed: loading,
-            error: null
-        };
+    adminMessage(): AdminMessage | null {
+        return (Template.instance() as AdminControlsInstance).adminMessage.get();
     },
-    'adminMessage': function() {
-        return Session.get(ADMIN_MESSAGE_KEY);
+    adminMessageUrgent(): boolean {
+        return (Template.instance() as AdminControlsInstance).adminMessage.get()?.level === 'error';
     },
-    'serverStorageSummary': function() {
-        const status = Session.get('serverStatus') || {};
+    loadErrorText(): string {
+        const instance = Template.instance() as AdminControlsInstance;
+        return loadErrorMessage(instance.serverStatusPresentation.get())
+            || loadErrorMessage(instance.serverVerbosityPresentation.get())
+            || loadErrorMessage(instance.clientVerbosityPresentation.get());
+    },
+    serverStatusReady(): boolean {
+        return readyLoadValue((Template.instance() as AdminControlsInstance).serverStatusPresentation.get()) !== null;
+    },
+    serverStatus(): AdminServerStatus | null {
+        return readyLoadValue((Template.instance() as AdminControlsInstance).serverStatusPresentation.get());
+    },
+    serverStorageSummary(): string {
+        const status = readyLoadValue((Template.instance() as AdminControlsInstance).serverStatusPresentation.get());
+        if (!status) {
+            return adminText('common.loading');
+        }
         return adminText('admin.serverStorageSummary', {
             usedPercent: status.diskSpacePercent || adminText('common.loading'),
             remaining: status.remainingSpace || adminText('common.loading'),
             total: status.diskSpace || adminText('common.loading'),
         });
-    }
+    },
+    serverVerbosityChecked(value: string): string {
+        return radioChecked(currentServerVerbosity(Template.instance() as AdminControlsInstance), value);
+    },
+    clientVerbosityChecked(value: string): string {
+        return radioChecked(currentClientVerbosity(Template.instance() as AdminControlsInstance), value);
+    },
+    serverVerbosityDisabled(): boolean {
+        const instance = Template.instance() as AdminControlsInstance;
+        return loadPending(instance.serverVerbosityPresentation.get())
+            || instance.serverVerbosityCommandState.get().status === 'pending';
+    },
+    clientVerbosityDisabled(): boolean {
+        const instance = Template.instance() as AdminControlsInstance;
+        return loadPending(instance.clientVerbosityPresentation.get())
+            || instance.clientVerbosityCommandState.get().status === 'pending';
+    },
+    cacheCommandBusy(): boolean {
+        return (Template.instance() as AdminControlsInstance).cacheCommandState.get().status === 'pending';
+    },
 });
 
 Template.adminControls.events({
-    'click .serverVerbosityRadio': function(event: Event) {
-        
-        const target = event.currentTarget as Element | null;
-        const name = target?.getAttribute('id') || '';
-        const start = name.length - 1;
-        const verbosity = name.slice(start, name.length)
-        meteorCallAsync('setVerbosity', verbosity);
+    'click [data-admin-load-retry]'(event: Event, instance: AdminControlsInstance) {
+        event.preventDefault();
+        setAdminMessage(instance, null);
+        loadServerStatus(instance);
+        loadServerVerbosity(instance);
+        loadClientVerbosityFromSettings(instance);
     },
-    'click .clientVerbosityRadio': async function(event: Event) {
-        
+    'click .serverVerbosityRadio'(event: Event, instance: AdminControlsInstance) {
+        event.preventDefault();
+        if (instance.serverVerbosityCommandState.get().status === 'pending') return;
+        const previous = currentServerVerbosity(instance);
         const target = event.currentTarget as Element | null;
-        const name = target?.getAttribute('id') || '';
-        const start = name.length - 1;
-        const verbosity = name.slice(start, name.length);
+        const next = normalizeVerbosityLevel(target?.getAttribute('data-verbosity'));
+        if (previous === next) return;
 
-        try {
-            await meteorCallAsync('setClientVerbosity', verbosity);
-            
-        } catch (err) {
-            clientConsole(1, 'Error setting client verbosity:', err);
-            setAdminMessage(adminText('admin.updateClientVerbosityFailed', { error: formatError(err) }), 'error');
-            // Revert radio button on error
-            const currentDoc = DynamicSettings.findOne({key: 'clientVerbosityLevel'});
-            if (currentDoc && currentDoc.value !== undefined && currentDoc.value !== null) {
-                const currentValue = String(currentDoc.value);
-                const radioId = `clientVerbosityRadio${currentValue}`;
-                const radioElement = document.getElementById(radioId) as HTMLInputElement | null;
-                if (radioElement) {
-                    radioElement.checked = true;
+        instance.serverVerbosityPresentation.set({ status: 'ready', value: next });
+        setAdminMessage(instance, null);
+        void instance.serverVerbosityCommand.run(async () => {
+            await meteorCallAsync('setVerbosity', next);
+        }, {
+            getErrorMessage: (err) => adminText('admin.loadControlsFailed', { error: formatError(err) }),
+            onFailure: (err) => {
+                if (previous) {
+                    instance.serverVerbosityPresentation.set({ status: 'ready', value: previous });
                 }
-            }
-        }
+                setAdminMessage(instance, adminText('admin.loadControlsFailed', { error: formatError(err) }), 'error');
+            },
+        });
     },
-    'click #updateStimDisplayTypeMap': async function() {
-        try {
+    'click .clientVerbosityRadio'(event: Event, instance: AdminControlsInstance) {
+        event.preventDefault();
+        if (instance.clientVerbosityCommandState.get().status === 'pending') return;
+        const previous = currentClientVerbosity(instance);
+        const target = event.currentTarget as Element | null;
+        const next = normalizeVerbosityLevel(target?.getAttribute('data-verbosity'));
+        if (previous === next) return;
+
+        instance.clientVerbosityPresentation.set({ status: 'ready', value: next });
+        setAdminMessage(instance, null);
+        void instance.clientVerbosityCommand.run(async () => {
+            await meteorCallAsync('setClientVerbosity', next);
+        }, {
+            getErrorMessage: (err) => adminText('admin.updateClientVerbosityFailed', { error: formatError(err) }),
+            onFailure: (err) => {
+                clientConsole(1, 'Error setting client verbosity:', err);
+                if (previous) {
+                    instance.clientVerbosityPresentation.set({ status: 'ready', value: previous });
+                }
+                setAdminMessage(instance, adminText('admin.updateClientVerbosityFailed', { error: formatError(err) }), 'error');
+            },
+        });
+    },
+    'click #updateStimDisplayTypeMap'(event: Event, instance: AdminControlsInstance) {
+        event.preventDefault();
+        setAdminMessage(instance, null);
+        void instance.cacheCommand.run(async () => {
             await meteorCallAsync('updateStimDisplayTypeMap');
-            setAdminMessage(adminText('admin.displayCacheRebuilt'), 'success');
-        } catch (err) {
-            setAdminMessage(adminText('admin.displayCacheRebuildFailed', { error: formatError(err) }), 'error');
-        }
-    }
+        }, {
+            getErrorMessage: (err) => adminText('admin.displayCacheRebuildFailed', { error: formatError(err) }),
+            onSuccess: () => {
+                setAdminMessage(instance, adminText('admin.displayCacheRebuilt'), 'success');
+            },
+            onFailure: (err) => {
+                setAdminMessage(instance, adminText('admin.displayCacheRebuildFailed', { error: formatError(err) }), 'error');
+            },
+        });
+    },
 });
-  
-
-
-
-
-
-
-
