@@ -1,4 +1,4 @@
-export * from './legacyCardEventActions';
+export * from './cardLoadEventActions';
 export * from './sessionRuntimeActions';
 export * from './learnerResponseActions';
 export * from './speechRuntimeActions';

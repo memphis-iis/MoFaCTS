@@ -11,7 +11,11 @@ import {
   type SparcProcessedResponseOutcome,
 } from './sparcResponseOutcomeProcessor';
 import { commitSparcProcessedResponseOutcome } from './sparcResponseOutcomeCommit';
-import { runSparcProductionRules } from './sparcProductionRuleEvaluator';
+import {
+  getCompiledSparcProductionRulePlan,
+  runSparcProductionRules,
+  type SparcProductionRulePlan,
+} from './sparcProductionRuleEvaluator';
 import { createSparcStateTransitionHistoryRecord } from './sparcStateTransitionHistory';
 import { createSparcProductionRuleTraceHistoryRecords } from './sparcProductionRuleTraceHistory';
 import { buildSparcWorkingMemoryFactsWithDerivations } from './sparcWorkingMemoryFacts';
@@ -31,11 +35,29 @@ import type {
   SparcFactSlotPattern,
   SparcProductionRuleCondition,
   SparcProductionRuleExecution,
+  SparcProductionRule,
   SparcInterfaceEvent,
   SparcStateWrite,
   SparcStateTransition,
   SparcWorkingMemoryFact,
 } from './sparcSessionContracts';
+
+const EMPTY_PRODUCTION_RULES: readonly SparcProductionRule[] = Object.freeze([]);
+const documentProductionRulePlans = new WeakMap<
+  SparcAuthoredDocument,
+  { readonly rules: readonly SparcProductionRule[]; readonly plan: SparcProductionRulePlan }
+>();
+
+function getDocumentProductionRulePlan(
+  document: SparcAuthoredDocument,
+  rules: readonly SparcProductionRule[],
+): SparcProductionRulePlan {
+  const cached = documentProductionRulePlans.get(document);
+  if (cached?.rules === rules) return cached.plan;
+  const plan = getCompiledSparcProductionRulePlan(rules);
+  documentProductionRulePlans.set(document, { rules, plan });
+  return plan;
+}
 
 export type SparcProductionRuleCommitRuntime = {
   readonly adaptiveModel?: ModelPracticeRuntime;
@@ -403,9 +425,12 @@ export function evaluateSparcAuthoredProductionRules(params: {
     ...baseFacts,
     ...(params.extraFacts ?? []),
   ];
+  const rules = params.document.productionRules ?? EMPTY_PRODUCTION_RULES;
+  const compiledPlan = getDocumentProductionRulePlan(params.document, rules);
   const execution = runSparcProductionRules({
     facts,
-    rules: params.document.productionRules ?? [],
+    rules,
+    compiledPlan,
     ...(params.maxCycles !== undefined ? { maxCycles: params.maxCycles } : {}),
   });
   const transition = createProductionRuleTransition({

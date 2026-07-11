@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import {
   compileSparcProductionRulePlan,
   evaluateSparcProductionRules,
+  getCompiledSparcProductionRulePlan,
+  getSparcProductionRulePlanCacheMetrics,
+  resetSparcProductionRulePlanCacheForTests,
   runSparcProductionRules,
 } from './sparcProductionRuleEvaluator';
 import type {
@@ -19,6 +22,25 @@ const fn = (
 ): SparcRuleExpression => ({ type: 'function', name, args });
 
 describe('sparcProductionRuleEvaluator', function() {
+  it('reuses immutable compiled plans and invalidates when the rule-set identity changes', function() {
+    resetSparcProductionRulePlanCacheForTests();
+    const rules: readonly SparcProductionRule[] = [{
+      id: 'cache.plan',
+      when: [{ factType: 'cache.fact' }],
+      then: [],
+    }];
+    const first = getCompiledSparcProductionRulePlan(rules);
+    const second = getCompiledSparcProductionRulePlan(rules);
+    const replacementRules = [...rules];
+    const replacement = getCompiledSparcProductionRulePlan(replacementRules);
+
+    assert.equal(first, second);
+    assert.notEqual(first, replacement);
+    assert.deepEqual(getSparcProductionRulePlanCacheMetrics(), { hits: 1, misses: 2 });
+    assert.equal(Object.isFrozen(first), true);
+    assert.equal(Object.isFrozen(first.sortedRules), true);
+  });
+
   it('generalizes the Fractions LCD denominator edge into a fact-pattern rule', function() {
     const facts: SparcWorkingMemoryFact[] = [{
       factType: 'problem',

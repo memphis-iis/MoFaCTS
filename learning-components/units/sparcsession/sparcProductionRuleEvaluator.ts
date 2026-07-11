@@ -22,6 +22,23 @@ export type SparcProductionRulePlan = {
   readonly sortedRules: readonly SparcProductionRule[];
 };
 
+let compiledPlanCache = new WeakMap<readonly SparcProductionRule[], SparcProductionRulePlan>();
+let compiledPlanCacheHits = 0;
+let compiledPlanCacheMisses = 0;
+
+export function getSparcProductionRulePlanCacheMetrics(): Readonly<{
+  hits: number;
+  misses: number;
+}> {
+  return { hits: compiledPlanCacheHits, misses: compiledPlanCacheMisses };
+}
+
+export function resetSparcProductionRulePlanCacheForTests(): void {
+  compiledPlanCache = new WeakMap();
+  compiledPlanCacheHits = 0;
+  compiledPlanCacheMisses = 0;
+}
+
 function requireNonBlank(value: unknown, label: string): string {
   const normalized = typeof value === 'string' ? value.trim() : '';
   if (!normalized) {
@@ -923,7 +940,7 @@ export function evaluateSparcProductionRules(params: {
 }): readonly SparcProductionRuleFiring[] {
   const firings: SparcProductionRuleFiring[] = [];
   const factIndex = createFactIndex(params.facts);
-  const sortedRules = params.compiledPlan?.sortedRules ?? compileSparcProductionRulePlan(params.rules).sortedRules;
+  const sortedRules = params.compiledPlan?.sortedRules ?? getCompiledSparcProductionRulePlan(params.rules).sortedRules;
   for (const rule of sortedRules) {
     const matches = findPatternMatches(factIndex, rule.when);
     for (const bindings of matches) {
@@ -959,13 +976,28 @@ export function compileSparcProductionRulePlan(
       throw new Error(`SPARC production rule "${rule.id}" then must be an array`);
     }
   }
-  return { sortedRules };
+  return Object.freeze({ sortedRules: Object.freeze(sortedRules) });
+}
+
+export function getCompiledSparcProductionRulePlan(
+  rules: readonly SparcProductionRule[],
+): SparcProductionRulePlan {
+  const cached = compiledPlanCache.get(rules);
+  if (cached) {
+    compiledPlanCacheHits += 1;
+    return cached;
+  }
+  const compiled = compileSparcProductionRulePlan(rules);
+  compiledPlanCache.set(rules, compiled);
+  compiledPlanCacheMisses += 1;
+  return compiled;
 }
 
 export function runSparcProductionRules(params: {
   readonly facts: readonly SparcWorkingMemoryFact[];
   readonly rules: readonly SparcProductionRule[];
   readonly maxCycles?: number;
+  readonly compiledPlan?: SparcProductionRulePlan;
 }): SparcProductionRuleExecution {
   const maxCycles = params.maxCycles ?? 25;
   if (!Number.isInteger(maxCycles) || maxCycles < 1) {
@@ -976,7 +1008,7 @@ export function runSparcProductionRules(params: {
   const factKeys = new Set(facts.map((fact) => createFactKey(fact)));
   const firedActivationKeys = new Set<string>();
   const firings: SparcProductionRuleFiring[] = [];
-  const compiledPlan = compileSparcProductionRulePlan(params.rules);
+  const compiledPlan = params.compiledPlan ?? getCompiledSparcProductionRulePlan(params.rules);
 
   for (let cycle = 1; cycle <= maxCycles; cycle += 1) {
     const nextFiring = evaluateSparcProductionRules({

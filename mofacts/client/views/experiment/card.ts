@@ -57,7 +57,7 @@ Template.card.onRendered(function (this: CardTemplateInstance) {
       tdfId: Session.get('currentRootTdfId') || Session.get('currentTdfId'),
     });
 
-    // The legacy card route mounts the app-owned content runtime surface.
+    // The card route mounts the app-owned content runtime surface.
     markLaunchLoadingTiming('cardRoute:loadContentSurface:start');
     loadContentSurface().then((ContentSurface) => {
       markLaunchLoadingTiming('cardRoute:loadContentSurface:complete');
