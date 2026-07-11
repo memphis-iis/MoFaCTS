@@ -105,6 +105,28 @@ describe('SPARC runtime history and resume snapshot', function() {
     expect(snapshot.nodeValues['answer-node']).to.equal('12');
   });
 
+  it('reuses the authored document for an unchanged page and replaces it when production rules change', function() {
+    const scope = {
+      userId: 'user-1',
+      TDFId: 'tdf-1',
+      levelUnit: 2,
+      pageKey: 'fractions-addition',
+    };
+    const first = readSparcResumeSnapshot({ ...scope, display });
+    const second = readSparcResumeSnapshot({ ...scope, display });
+    const changedDisplay = {
+      ...display,
+      productionRules: [{ id: 'fractions.changed-rule', when: [], then: [] }],
+    };
+    const changed = readSparcResumeSnapshot({ ...scope, display: changedDisplay });
+
+    expect(second).to.equal(first);
+    expect(second.document).to.equal(first.document);
+    expect(changed).not.to.equal(first);
+    expect(changed.document).not.to.equal(first.document);
+    expect(changed.document.productionRules?.[0]?.id).to.equal('fractions.changed-rule');
+  });
+
   it('loads a unit history once and uses the same hydration for every page snapshot', async function() {
     const records = [historyRecord({ sessionID: 'attempt-1', value: '12' })];
     let loadCount = 0;
